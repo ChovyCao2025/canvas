@@ -39,22 +39,22 @@ title: 营销画布技术设计文档
 
 ```mermaid
 graph TB
-    FE["前端 (React + xflow)<br/>画布编辑 / 保存 / 发布 / 执行测试"]
+    FE["前端 (React + ReactFlow + antd)\n画布编辑 / 保存 / 发布 / 执行测试"]
 
-    subgraph BE["canvas-engine (Spring Boot WebFlux)"]
-        CS["配置服务<br/>─────────────<br/>• 画布 CRUD<br/>• 版本管理<br/>• 发布校验<br/>• 路由注册"]
-        EE["执行引擎<br/>─────────────<br/>• 加载画布(本地缓存)<br/>• DAG 解析与调度<br/>• 上下文管理<br/>• 节点 Handler 调用"]
-        MySQL[("MySQL<br/>画布元数据 / 版本")]
-        Redis[("Redis<br/>上下文持久化<br/>触发路由表")]
+    subgraph BE["canvas-engine (Java 21 + Spring Boot WebFlux)"]
+        CS["配置服务\n─────────────\n• 画布 CRUD\n• 版本管理\n• 发布校验\n• 路由注册"]
+        EE["执行引擎\n─────────────\n• 加载画布(本地缓存)\n• DAG 解析与调度\n• 上下文管理\n• 节点 Handler 调用"]
+        MySQL[("MySQL 8.0\n画布元数据 / 版本")]
+        Redis[("Redis\n上下文持久化\n触发路由表")]
         CS -->|配置同步| EE
         CS --- MySQL
         EE --- Redis
     end
 
-    TRIGGER["触发源<br/>业务 MQ / 实时行为策略 / 业务直调"]
-    DS["下游系统<br/>券系统 / 触达平台 / 其他业务接口"]
+    TRIGGER["触发源\nRocketMQ / 实时行为策略 / 业务直调"]
+    DS["下游系统\n券系统 / 触达平台 / 其他业务接口"]
 
-    FE -->|HTTP| CS
+    FE -->|HTTP + JWT| CS
     TRIGGER -->|触发| EE
     EE -->|执行| DS
 ```
@@ -992,16 +992,8 @@ return [
 等待所有上游节点**执行完毕**（不论成功或失败），再继续执行下游节点。
 
 ```json
-{
-  "name": "集线器",
-  "timeout": 600,
-  "nextNodeId": "node_next"
-}
+{ "name": "集线器", "nextNodeId": "node_next" }
 ```
-
-| 字段 | 说明 |
-|------|------|
-| timeout | 等待超时时间（秒），默认 600s。超时后节点标记 FAILED，走防资损判定。用于防止某条并行分支因网络或系统故障永远不完成导致 Hub 永久阻塞。 |
 
 **HUB vs LOGIC_RELATION 的精确区别：**
 
@@ -1009,11 +1001,18 @@ return [
 |---------|------------|------------------------|
 | 等待条件 | 所有上游**完成**（SUCCESS + FAILED 都算） | AND：所有上游 **SUCCESS**；OR：任意一个 **SUCCESS** |
 | 上游失败时 | 继续执行下游（失败不传播） | AND 模式：整体 FAILED；OR 模式：继续等待 |
-| 超时处理 | timeout 秒后标记 FAILED，触发防资损判定 | 依赖全局执行超时，无独立超时配置 |
 | 适用场景 | 并行分支汇合，只需等待完成 | 多路触发的条件判断（如多阶段执行） |
 | 典型用法 | 并行接口调用完成后写日志 | 机票MQ + 酒店MQ 都触发后才发券 |
 
-**实现差异**：HUB 的 `checkUpstreamCondition` 只判断"是否都已 done（完成，不论状态）"；LOGIC_RELATION 还需判断各上游节点的 SUCCESS/FAILED 状态。HUB 需启动一个延迟任务（`timeout` 秒后触发），若到期时上游仍未全部完成则强制失败。
+**实现差异**：HUB 的 `checkUpstreamCondition` 只判断"是否都已 done（完成，不论状态）"；LOGIC_RELATION 还需判断各上游节点的 SUCCESS/FAILED 状态。
+
+
+```json
+{
+  "name": "集线器",
+  "nextNodeId": "node_next"
+}
+```
 
 ---
 
@@ -2434,83 +2433,46 @@ WHERE e.status = 2           -- SUCCESS
 
 ---
 
-## 十一、前端设计（xflow 集成）
+## 十一、前端设计（ReactFlow）
 
-> 本章 xflow API 来自官方 GitHub 源码核实。源码地址：https://github.com/antvis/XFlow
+> xflow（@antv/xflow）已于 2021 年停止维护，本章改用 **ReactFlow（@xyflow/react）**。
+> ReactFlow API 来自官方文档核实：https://reactflow.dev
 
-### 11.1 先说清楚：xflow 是什么，不是什么
+### 11.1 技术选型
 
-**xflow 是一个前端画布框架**，提供空白的图形基础设施。它本身：
-- 不知道什么是"MQ节点"、"IF判断"、"代金券"
-- 不知道节点的配置表单长什么样
-- 不知道数据怎么保存到后端
-- 不知道哪些节点可以连接
+| 技术 | 说明 | 来源 |
+|------|------|------|
+| `@xyflow/react` | 画布框架，36.5k stars，活跃维护 | 替代已停维护的 xflow |
+| `@dagrejs/dagre` | 自动布局算法（Dagre） | ReactFlow 官方推荐搭配 |
+| React | UI 框架 | — |
+| antd | 组件库（配置面板表单） | — |
 
-xflow 只提供**扩展点**（Extension Points），我们通过实现这些扩展点来构建营销画布。
-
----
-
-### 11.2 xflow 提供的扩展点 vs 我们需要实现的内容
-
-```mermaid
-graph TB
-    subgraph XFLOW["xflow 框架提供（骨架）"]
-        EP1["画布渲染<br/>XFlow + XFlowCanvas"]
-        EP2["左侧节点面板容器<br/>NsNodeCollapsePanel"]
-        EP3["右侧配置表单容器<br/>NsJsonSchemaForm"]
-        EP4["拖拽基础设施<br/>onNodeDrop 回调机制"]
-        EP5["事件系统<br/>hooks.x6Events"]
-        EP6["节点渲染机制<br/>hooks.reactNodeRender"]
-        EP7["数据加载/保存回调<br/>loadGraphData / saveGraphData"]
-    end
-
-    subgraph US["我们实现（填入的内容）"]
-        US1["节点卡片 React 组件<br/>每种节点的外观"]
-        US2["左侧面板数据<br/>nodeDataService<br/>从 /meta/node-types 拿数据"]
-        US3["右侧表单 Schema<br/>formSchemaService<br/>从 /meta/node-types/:key/schema 拿"]
-        US4["自定义表单控件<br/>controlMapService<br/>条件规则/参数列表/代码编辑器等"]
-        US5["事件处理逻辑<br/>节点移动保存坐标<br/>连线规则约束"]
-        US6["画布数据转换<br/>xflow格式 ↔ 后端格式"]
-        US7["后端接口调用<br/>保存/加载/发布"]
-    end
-
-    EP2 -->|调用| US2
-    EP3 -->|调用| US3
-    EP3 -->|调用| US4
-    EP4 -->|调用| US1
-    EP5 -->|调用| US5
-    EP6 -->|调用| US1
-    EP7 -->|调用| US6
-    EP7 -->|调用| US7
+```bash
+npm install @xyflow/react @dagrejs/dagre
 ```
 
-**简单说：xflow 是空的容器，我们往里填内容。**
+---
+
+### 11.2 先说清楚：ReactFlow 是什么，不是什么
+
+**ReactFlow 提供**：画布容器、节点/边渲染、拖拽、连线、缩放、选中事件。
+
+**ReactFlow 不提供**：左侧节点面板、右侧配置表单、保存/加载逻辑——这些全部由我们自己开发。
 
 ---
 
-### 11.3 技术选型
-
-| 技术 | 角色 | 来源 |
-|------|------|------|
-| `@antv/xflow` | 画布框架（骨架） | 原文选型，源码确认 |
-| `@antv/x6` | xflow 底层图引擎 | 源码 `graph-utils.ts` 确认，非 G6 |
-| React | 节点卡片/表单控件的实现语言 | — |
-| antd | xflow 内置依赖 | 源码确认 |
-
----
-
-### 11.4 整体页面结构
+### 11.3 整体页面结构
 
 ```mermaid
 graph TB
     subgraph Page["页面整体布局"]
-        TOP["顶部工具栏<br/>画布名称 ｜ 保存 ｜ 发布 ｜ 版本历史"]
+        TOP["顶部工具栏：画布名称 / 保存 / 发布 / 版本历史 / 整理布局"]
 
         subgraph MAIN["主体区域（三栏）"]
             direction LR
-            LEFT["左侧节点面板<br/>───────────<br/>xflow: NsNodeCollapsePanel<br/>我们填入: nodeDataService<br/>（从 /meta/node-types 加载）"]
-            CENTER["画布区域<br/>─────────────────<br/>xflow: XFlowCanvas<br/>我们填入: 节点卡片 React 组件<br/>（hooks.reactNodeRender）"]
-            RIGHT["右侧配置面板<br/>─────────────<br/>xflow: NsJsonSchemaForm<br/>我们填入: formSchemaService<br/>（从 /meta/node-types/:key/schema 加载）"]
+            LEFT["左侧节点面板（我们开发）<br/>按类别分组展示节点类型<br/>HTML5 draggable 拖拽"]
+            CENTER["画布区域（ReactFlow 提供）<br/>节点渲染 / 连线 / 缩放"]
+            RIGHT["右侧配置面板（我们开发）<br/>点击节点后展开<br/>antd Form 渲染表单"]
         end
 
         TOP --> MAIN
@@ -2519,309 +2481,281 @@ graph TB
 
 ---
 
-### 11.5 扩展点一：节点卡片外观
+### 11.4 ReactFlow 数据结构（官方 API）
 
-**xflow 提供**：节点渲染机制，通过 `renderKey` 将节点映射到 React 组件。
+```typescript
+// 来源：@xyflow/react 官方类型定义
 
-**我们实现**：每种节点类型对应的 React 卡片组件。
+// 节点
+interface Node<T = Record<string, unknown>> {
+  id: string
+  type?: string          // 对应 nodeTypes 中注册的 key
+  position: { x: number; y: number }
+  data: T                // 自定义业务数据
+  selected?: boolean
+}
+
+// 边
+interface Edge {
+  id: string
+  source: string         // 源节点 ID
+  target: string         // 目标节点 ID
+  sourceHandle?: string
+  targetHandle?: string
+  label?: string         // 边标签（success / fail / else 等分支标识）
+}
+```
+
+我们在 `Node.data` 中存储业务字段：
+
+```typescript
+interface CanvasNodeData {
+  nodeType: string                 // MQ_TRIGGER / IF_CONDITION 等
+  name: string                     // 节点名称（运营填写）
+  category: string                 // 类别（用于颜色）
+  bizConfig: Record<string, any>   // 各节点专属业务配置（含 nextNodeId 等）
+}
+```
+
+---
+
+### 11.5 扩展点一：自定义节点外观（我们开发）
+
+ReactFlow 通过 `nodeTypes` 对象将 `type` 字符串映射到 React 组件：
 
 ```tsx
-// ── 我们写的部分：节点卡片 React 组件 ──
-const CanvasNode: React.FC<NsGraph.INodeConfig> = (props) => {
-  const { nodeType, name, category } = props
-  return (
-    <div className={`canvas-node canvas-node--${category}`}>
-      {/* 顶部色块：图标 + 类别-组件名 */}
-      <div className="canvas-node__header">
-        {NODE_TYPE_LABELS[nodeType]}
-      </div>
-      {/* 白色区域：运营人员填写的节点名称 */}
-      <div className="canvas-node__body">{name}</div>
+// 1. 实现节点卡片 React 组件
+import { Handle, Position } from '@xyflow/react'
+
+const CanvasNode = ({ data }: { data: CanvasNodeData }) => (
+  <div className={`canvas-node canvas-node--${data.category}`}>
+    <div className="canvas-node__header">
+      {NODE_TYPE_LABELS[data.nodeType]}
     </div>
+    <div className="canvas-node__body">{data.name}</div>
+    {/* ReactFlow 的连接桩组件 */}
+    <Handle type="target" position={Position.Top} />
+    <Handle type="source" position={Position.Bottom} />
+  </div>
+)
+
+// 2. 注册（必须定义在组件外部，避免每次渲染重新创建）
+const nodeTypes = { canvasNode: CanvasNode }
+
+// 3. 传给 ReactFlow
+<ReactFlow nodeTypes={nodeTypes} ... />
+
+// 4. 节点数据中指定 type
+const node: Node<CanvasNodeData> = {
+  id: 'n1',
+  type: 'canvasNode',      // 与 nodeTypes 的 key 对应
+  position: { x: 100, y: 200 },
+  data: { nodeType: 'MQ_TRIGGER', name: '机票订单支付', category: 'behavior', bizConfig: {} }
+}
+```
+
+**节点颜色规范（基于截图观察）：**
+
+| 类别 | CSS 类 | 顶部背景色 |
+|------|--------|-----------|
+| 行为策略 | `canvas-node--behavior` | 蓝绿渐变 |
+| 逻辑分支 | `canvas-node--logic` | 蓝色 |
+| 人群圈选 | `canvas-node--audience` | 橙色 |
+| 权益发放 | `canvas-node--benefit` | 红粉渐变 |
+| 用户触达 | `canvas-node--reach` | 橙黄色 |
+| 其他 | `canvas-node--other` | 蓝色 |
+
+---
+
+### 11.6 扩展点二：左侧节点面板（我们开发）
+
+ReactFlow 没有内置节点面板，使用 HTML5 原生拖拽实现：
+
+```tsx
+// 左侧面板：每个节点类型是可拖拽的 div
+const NodePanelItem = ({ nodeType, label }) => (
+  <div
+    draggable
+    onDragStart={(e) => {
+      e.dataTransfer.setData('application/canvas-node', nodeType)
+      e.dataTransfer.effectAllowed = 'move'
+    }}
+    className="node-panel-item"
+  >
+    {label}
+  </div>
+)
+
+// 画布区域处理 drop
+const onDragOver = (e) => {
+  e.preventDefault()
+  e.dataTransfer.dropEffect = 'move'
+}
+
+const onDrop = (e) => {
+  e.preventDefault()
+  const nodeType = e.dataTransfer.getData('application/canvas-node')
+  if (!nodeType) return
+
+  // screenToFlowPosition：屏幕坐标 → 画布坐标（ReactFlow 官方 API）
+  const position = screenToFlowPosition({ x: e.clientX, y: e.clientY })
+
+  const newNode = {
+    id: crypto.randomUUID(),
+    type: 'canvasNode',
+    position,
+    data: {
+      nodeType,
+      name: NODE_DEFAULT_NAMES[nodeType],
+      category: NODE_CATEGORIES[nodeType],
+      bizConfig: {},
+    },
+  }
+  setNodes((prev) => [...prev, newNode])
+  setSelectedNodeId(newNode.id)   // 拖入后自动打开配置面板
+}
+
+// 面板数据从注册表动态加载
+const nodeGroups = await fetch('/meta/node-types').then(r => r.json())
+```
+
+---
+
+### 11.7 扩展点三：右侧配置面板（我们开发）
+
+ReactFlow 没有内置配置面板，用 antd Form 动态渲染：
+
+```tsx
+// 点击节点时记录选中 ID
+const onNodeClick = useCallback((_evt, node) => {
+  setSelectedNodeId(node.id)
+}, [])
+
+// 右侧面板组件
+const ConfigPanel = ({ nodeId }) => {
+  const node = nodes.find(n => n.id === nodeId)
+  const [schema, setSchema] = useState(null)
+
+  useEffect(() => {
+    if (!node) return
+    fetch(`/meta/node-types/${node.data.nodeType}/schema`)
+      .then(r => r.json())
+      .then(setSchema)
+  }, [node?.data.nodeType])
+
+  if (!schema) return null
+
+  return (
+    <Form
+      initialValues={node.data.bizConfig}
+      onValuesChange={(changed) => {
+        // 实时更新节点的 bizConfig
+        setNodes(prev => prev.map(n =>
+          n.id === nodeId
+            ? { ...n, data: { ...n.data, bizConfig: { ...n.data.bizConfig, ...changed } } }
+            : n
+        ))
+      }}
+    >
+      <Form.Item name="name" label="节点名称" rules={[{ required: true }]}>
+        <Input />
+      </Form.Item>
+      {schema.fields.map(field => (
+        <Form.Item key={field.key} name={field.key} label={field.label} rules={field.required ? [{ required: true }] : []}>
+          {renderControl(field)}
+        </Form.Item>
+      ))}
+    </Form>
   )
 }
-
-// ── 通过 xflow 扩展点注册（源码：config-graph.tsx） ──
-config.setRegisterHook(hooks => {
-  hooks.reactNodeRender.registerHook({
-    name: 'register-canvas-nodes',
-    handler: async renderMap => {
-      renderMap.set('CANVAS_NODE', CanvasNode)  // 一个组件处理所有节点类型
-    },
-  })
-})
 ```
 
-节点卡片外观（基于截图）：
+#### 11.7.1 后端 schema type → antd 表单控件映射
 
-```mermaid
-graph TB
-    subgraph Card["节点卡片（宽 200px）"]
-        H["[图标]  类别-组件名  [节点ID]<br/>顶部色块（颜色按节点类别）"]
-        B["节点名称（运营人员填写）<br/>白色内容区"]
-        H --> B
-    end
-```
+| 后端 type | antd / 自定义控件 | 说明 |
+|---------|----------------|------|
+| `input` | `<Input />` | 普通文本 |
+| `number` | `<InputNumber />` | 数字 |
+| `select` | `<Select />` | 单选下拉 |
+| `toggle` | `<Switch />` | 开关 |
+| `value-input` | `<ValueInput />` 自定义 | CUSTOM/CONTEXT 双模式 |
+| `condition-rule-list` | `<ConditionRuleList />` 自定义 | 条件规则列表 |
+| `param-list` | `<ParamList />` 自定义 | 参数列表 |
+| `code-editor` | `<CodeMirror />` | Groovy 代码编辑器 |
+| `node-selector` | `<NodeSelector />` 自定义 | 下步节点选择器 |
 
-各类别颜色（基于截图观察）：
-
-| 类别 | 顶部背景色 |
-|------|-----------|
-| 行为策略 | 蓝绿渐变 |
-| 逻辑分支 | 蓝色 |
-| 人群圈选 | 橙色 |
-| 权益发放 | 红粉渐变 |
-| 用户触达 | 橙黄色 |
-| 其他 | 蓝色 |
-
-**节点数据结构**（xflow `NsGraph.INodeConfig` + 我们扩展的业务字段）：
-
-```typescript
-// xflow 原生字段（来源：interface.ts）
-interface INodeConfig {
-  id: string
-  renderKey: string      // 映射到哪个 React 组件
-  width: number
-  height: number
-  x?: number             // 画布坐标（纯展示，不发后端）
-  y?: number
-  ports?: INodeAnchor[]  // 连接桩
-  [key: string]: any     // 允许扩展
-}
-
-// 我们扩展的业务字段
-interface CanvasNodeConfig extends NsGraph.INodeConfig {
-  renderKey: 'CANVAS_NODE'
-  nodeType: string                    // MQ_TRIGGER / IF_CONDITION 等
-  name: string                        // 节点名称（运营填写）
-  category: string                    // 类别（用于颜色）
-  bizConfig: Record<string, any>      // 各节点专属业务配置
-}
-```
-
-连接桩配置（来源：service.ts）：
-
-```typescript
-// 每个节点：顶部一个输入桩，底部一个输出桩
-const ports: NsGraph.INodeAnchor[] = [
-  { id: `${nodeId}-input`,  type: NsGraph.AnchorType.INPUT,
-    group: NsGraph.AnchorGroup.TOP },
-  { id: `${nodeId}-output`, type: NsGraph.AnchorType.OUTPUT,
-    group: NsGraph.AnchorGroup.BOTTOM },
-]
-```
+未知 type 降级为 `<Input />`。
 
 ---
 
-### 11.6 扩展点二：左侧节点面板
+### 11.8 扩展点四：画布数据的保存与加载（我们开发）
 
-**xflow 提供**：`NsNodeCollapsePanel` 组件，渲染一个可折叠的节点列表，支持拖拽。
+> **坐标存储策略**：节点 x/y 坐标**内嵌在 graph_json** 每个节点对象中，随画布草稿一起存入 DB，不使用 localStorage。理由：多端/多浏览器打开同一画布时坐标保持一致，且无需额外的持久化机制。
 
-**我们实现**：`nodeDataService`（告诉 xflow 面板里有哪些节点）和 `onNodeDrop`（节点拖入画布时做什么）。
+**graph_json 节点格式（含坐标）：**
 
-```typescript
-// ── 我们写的：面板数据来源（从注册表动态加载） ──
-// 来源模式：config-dnd-panel.tsx nodeDataService
-export const nodeDataService: NsNodeCollapsePanel.INodeDataService = async () => {
-  // 从后端注册表拉取所有节点类型
-  const nodeTypes = await fetch('/meta/node-types').then(r => r.json())
-
-  // 按 category 分组，传给 xflow 面板组件渲染
-  return groupByCategory(nodeTypes).map(group => ({
-    id: group.category,
-    header: group.categoryName,           // "行为策略" / "逻辑分支" 等
-    children: group.types.map(t => ({
-      id: t.typeKey,
-      label: t.typeName,
-      renderKey: 'CANVAS_NODE',
-      nodeType: t.typeKey,
-      category: t.category,
-    })),
-  }))
-}
-
-// ── 我们写的：节点拖入画布时初始化（来源：config-dnd-panel.tsx） ──
-export const onNodeDrop: NsNodeCollapsePanel.IOnNodeDrop = async (node, commands) => {
-  commands.executeCommand(XFlowNodeCommands.ADD_NODE.id, {
-    nodeConfig: {
-      ...node,
-      id: uuidv4(),
-      width: 200,
-      height: 76,
-      ports: buildDefaultPorts(),
-      bizConfig: {},          // 初始空配置，等用户在右侧面板填写
-    },
-  })
+```json
+{
+  "id": "node_001",
+  "type": "MQ_TRIGGER",
+  "name": "机票订单支付",
+  "x": 120,
+  "y": 80,
+  "config": { "topicKey": "flight_order_status_change", "nextNodeId": "node_002" }
 }
 ```
 
----
+```tsx
+const { getNodes, getEdges, setNodes, setEdges, screenToFlowPosition } = useReactFlow()
 
-### 11.7 扩展点三：右侧配置表单
-
-**xflow 提供**：`NsJsonSchemaForm` 组件，根据 schema 渲染表单，内置 Input / Select 等基础控件。
-
-**我们实现**：`formSchemaService`（告诉 xflow 当前节点的表单有哪些字段）和 `controlMapService`（注册自定义控件）。
-
-```typescript
-// ── 我们写的：根据选中节点动态返回表单 schema ──
-// 来源模式：config-form.tsx formSchemaService
-export const formSchemaService: NsJsonSchemaForm.IFormSchemaService = async (args) => {
-  const { targetData } = args
-  if (!targetData) return { tabs: [] }
-
-  // 从后端注册表拉取该节点类型的 schema，不在前端硬编码
-  const schema = await fetch(`/meta/node-types/${targetData.nodeType}/schema`)
-                       .then(r => r.json())
-
-  // schema 结构（来源：config-form.tsx controls 格式）
-  return {
-    tabs: [{
-      name: 'config',
-      groups: [{
-        name: 'main',
-        controls: [
-          // 所有节点都有的字段
-          { name: 'name', label: '节点名称', shape: 'Input', required: true },
-          // 该节点类型特有的字段（来自注册表）
-          ...schema.fields.map(f => ({
-            name: f.key,
-            label: f.label,
-            shape: mapBackendTypeToShape(f.type),  // 类型映射（见下方）
-            options: f.options,
-            required: f.required,
-          })),
-          // 通用的"下步节点"字段
-          { name: 'nextNodeId', label: '下步节点', shape: 'NodeSelector' },
-        ],
-      }],
-    }],
-  }
-}
-
-// ── 我们写的：注册自定义表单控件（xflow 内置的不够用时） ──
-// 来源模式：form-controls/index.tsx controlMapService
-export const controlMapService: NsJsonSchemaForm.IControlMapService = (controlMap) => {
-  controlMap.set('ConditionRuleList', ConditionRuleListControl) // 条件规则列表
-  controlMap.set('ParamList',         ParamListControl)         // 参数列表
-  controlMap.set('NodeSelector',      NodeSelectorControl)      // 下步节点选择
-  controlMap.set('CodeEditor',        CodeEditorControl)        // Groovy 代码编辑器
-  controlMap.set('ValueInput',        ValueInputControl)        // 自定义/上下文获取
-  return controlMap
-}
-```
-
----
-
-### 11.7.1 后端 schema type → xflow 控件类型映射
-
-后端 `node_type_registry.config_schema` 中的 `type` 字段与 xflow `NsJsonSchemaForm` 控件名称的映射关系：
-
-| 后端 type | xflow shape（NsJsonSchemaForm） | 说明 |
-|---------|-------------------------------|------|
-| `input` | `'Input'` | 普通文本输入 |
-| `number` | `'Input'`（加 `inputType: 'number'`） | 数字输入 |
-| `select` | `'Select'` | 单选下拉，需配合 `options` |
-| `toggle` | `'Switch'` 或自定义 `'Toggle'` | 开关 |
-| `value-input` | `'ValueInput'`（自定义） | CUSTOM/CONTEXT 双模式输入 |
-| `condition-rule-list` | `'ConditionRuleList'`（自定义） | 条件规则列表 |
-| `param-list` | `'ParamList'`（自定义） | 参数列表 |
-| `code-editor` | `'CodeEditor'`（自定义） | Groovy 代码编辑器 |
-| `node-selector` | `'NodeSelector'`（自定义） | 下步节点选择器 |
-
-```typescript
-// 类型映射函数
-function mapBackendTypeToShape(backendType: string): string {
-  const mapping: Record<string, string> = {
-    'input':              'Input',
-    'number':             'Input',
-    'select':             'Select',
-    'toggle':             'Switch',
-    'value-input':        'ValueInput',
-    'condition-rule-list':'ConditionRuleList',
-    'param-list':         'ParamList',
-    'code-editor':        'CodeEditor',
-    'node-selector':      'NodeSelector',
-  }
-  return mapping[backendType] ?? 'Input'  // 未知类型降级为普通输入框
-}
-```
-
-自定义 shape（`ValueInput`、`ConditionRuleList` 等）在 `controlMapService` 中注册（见 11.7 扩展点三）。
-
-### 11.8 扩展点四：画布数据的保存与加载
-
-**xflow 提供**：保存和加载的回调机制（在正确时机触发），以及图数据的基础类型。
-
-**我们实现**：实际的数据转换逻辑和后端接口调用。
-
-```typescript
-// ── 我们写的：加载画布（来源模式：service.ts loadGraphData） ──
-export const loadGraphData = async (meta): Promise<NsGraph.IGraphData> => {
-  // 1. 从后端拉 graph_json
-  const { nodes: backendNodes } = await fetch(`/canvas/${meta.canvasId}`).then(r => r.json())
-
-  // 2. 后端格式 → xflow 格式
-  const nodes: NsGraph.INodeConfig[] = backendNodes.map(n => ({
+// 保存：坐标内嵌 graph_json，一起存后端
+const saveCanvas = async () => {
+  const nodes = getNodes()
+  const backendNodes = nodes.map(n => ({
     id: n.id,
-    renderKey: 'CANVAS_NODE',     // xflow 用此找到对应的 React 组件
-    width: 200, height: 76,
-    x: savedPositions[n.id]?.x,  // 坐标存在 localStorage
-    y: savedPositions[n.id]?.y,
-    nodeType: n.type,
-    name: n.name,
-    bizConfig: n.config,
-    ports: buildDefaultPorts(n.id),
+    type: n.data.nodeType,
+    name: n.data.name,
+    x: Math.round(n.position.x),   // 坐标内嵌，换端打开保持一致
+    y: Math.round(n.position.y),
+    config: n.data.bizConfig,
   }))
-
-  // 3. 从节点 config 中推导 xflow edges（连线）
-  //    后端不存 edges，连线关系在 bizConfig.nextNodeId 等字段里
-  const edges: NsGraph.IEdgeConfig[] = deriveEdgesFromNodes(backendNodes)
-
-  return { nodes, edges }
-}
-
-// ── 我们写的：保存画布（来源模式：service.ts saveGraphData） ──
-export const saveGraphData = async (meta, graphData: NsGraph.IGraphData) => {
-  // 1. xflow 格式 → 后端格式（去掉 x/y/ports 等纯展示字段）
-  const backendNodes = graphData.nodes.map(n => ({
-    id: n.id,
-    type: n.nodeType,
-    name: n.name,
-    config: n.bizConfig,
-  }))
-
-  // 2. 坐标单独存 localStorage（不发后端）
-  const positions = Object.fromEntries(
-    graphData.nodes.map(n => [n.id, { x: n.x, y: n.y }])
-  )
-  localStorage.setItem(`canvas_pos_${meta.canvasId}`, JSON.stringify(positions))
-
-  // 3. 发后端
-  await fetch(`/canvas/${meta.canvasId}`, {
+  await fetch(`/canvas/${canvasId}`, {
     method: 'PUT',
-    body: JSON.stringify({ nodes: backendNodes })
+    body: JSON.stringify({ nodes: backendNodes }),
   })
 }
 
-// ── 推导连线（后端 config 中的 nextNodeId → xflow edges） ──
-function deriveEdgesFromNodes(nodes): NsGraph.IEdgeConfig[] {
-  const edges: NsGraph.IEdgeConfig[] = []
-  nodes.forEach(node => {
-    const c = node.config
-    const add = (target: string, label?: string) => {
+// 加载：直接从 graph_json 读坐标，无需 localStorage
+const loadCanvas = async () => {
+  const { nodes: backendNodes } = await fetch(`/canvas/${canvasId}`).then(r => r.json())
+
+  const rfNodes = backendNodes.map(n => ({
+    id: n.id,
+    type: 'canvasNode',
+    position: { x: n.x ?? 0, y: n.y ?? 0 },  // 优先用存储坐标，新节点降级为 (0,0) 后自动布局
+    data: { nodeType: n.type, name: n.name, category: NODE_CATEGORIES[n.type], bizConfig: n.config },
+  }))
+  const rfEdges = deriveEdgesFromNodes(backendNodes)
+  setNodes(rfNodes)
+  setEdges(rfEdges)
+}
+
+// 从后端节点 config 推导 ReactFlow edges
+function deriveEdgesFromNodes(nodes) {
+  const edges = []
+  nodes.forEach(n => {
+    const c = n.config
+    const add = (target, label) => {
       if (!target) return
-      edges.push({ id: uuidv4(), source: node.id, target,
-                   sourcePortId: `${node.id}-output`,
-                   targetPortId: `${target}-input`, label })
+      edges.push({ id: crypto.randomUUID(), source: n.id, target, label })
     }
     add(c.nextNodeId)
     add(c.successNodeId, 'success')
     add(c.failNodeId,    'fail')
     add(c.elseNodeId,    'else')
-    c.branches?.forEach(b  => add(b.nextNodeId, b.label))
+    c.branches?.forEach(b => add(b.nextNodeId, b.label))
     c.priorities?.forEach(p => add(p.nextNodeId))
-    c.groups?.forEach(g    => add(g.nextNodeId, g.group))
+    c.groups?.forEach(g => add(g.nextNodeId, g.group))
   })
   return edges
 }
@@ -2829,67 +2763,138 @@ function deriveEdgesFromNodes(nodes): NsGraph.IEdgeConfig[] {
 
 ---
 
-### 11.9 扩展点五：事件处理
+### 11.9 事件处理
 
-**xflow 提供**：事件注册机制 `hooks.x6Events`，底层是 X6 的原生事件。
+ReactFlow 通过 props 回调处理所有画布事件：
 
-**我们实现**：具体的事件处理逻辑。
+```tsx
+<ReactFlow
+  nodes={nodes}
+  edges={edges}
+  nodeTypes={nodeTypes}
+  onNodesChange={onNodesChange}   // 节点移动/删除（useNodesState 提供）
+  onEdgesChange={onEdgesChange}   // 边变更（useEdgesState 提供）
+  onConnect={onConnect}           // 用户拖拽连线时触发
+  onNodeClick={onNodeClick}       // 点击节点 → 打开右侧配置面板
+  onDrop={onDrop}                 // 从左侧面板拖入节点
+  onDragOver={onDragOver}
+  isValidConnection={isValidConnection}  // 连线合法性校验
+  fitView
+/>
+```
 
-```typescript
-// ── 我们写的：注册需要处理的事件（来源模式：config-graph.tsx） ──
-hooks.x6Events.registerHook({
-  name: 'canvas-events',
-  handler: async events => {
-    // 节点移动 → 保存坐标到 localStorage
-    events.push({
-      eventName: 'node:moved',
-      callback: (e, cmds) => {
-        cmds.executeCommand(XFlowNodeCommands.MOVE_NODE.id, {
-          id: e.node.id,
-          position: e.node.getPosition(),
-        })
-      },
-    } as NsGraph.IEvent<'node:moved'>)
+**连线时同步 bizConfig：**
 
-    // 节点点击 → 右侧面板展示该节点配置
-    events.push({
-      eventName: 'node:click',
-      callback: (e, cmds, modelService) => {
-        MODELS.SELECTED_NODE.useValue(modelService)
-          .then(model => model.setValue(e.node.getData()))
-      },
-    } as NsGraph.IEvent<'node:click'>)
-
-    // 连线前校验：触发器节点不允许有入边
-    events.push({
-      eventName: 'edge:connected',
-      callback: (e) => {
-        const targetNode = e.currentTarget
-        if (TRIGGER_TYPES.includes(targetNode.getData().nodeType)) {
-          e.cancel()  // 阻止连线
-        }
-      },
-    } as NsGraph.IEvent<'edge:connected'>)
-  },
-})
+```tsx
+const onConnect = useCallback((connection) => {
+  // 更新源节点的 bizConfig.nextNodeId
+  setNodes(prev => prev.map(n => {
+    if (n.id !== connection.source) return n
+    return { ...n, data: { ...n.data, bizConfig: { ...n.data.bizConfig, nextNodeId: connection.target } } }
+  }))
+  setEdges(prev => addEdge(connection, prev))  // addEdge 是 @xyflow/react 提供的工具函数
+}, [])
 ```
 
 ---
 
-### 11.10 发布前校验（我们写的业务逻辑，与 xflow 无关）
+### 11.10 连线规则约束
 
-```typescript
-function validateBeforePublish(nodes: CanvasNodeConfig[]): string[] {
-  const errors: string[] = []
-  const hasTrigger = nodes.some(n => TRIGGER_TYPES.includes(n.nodeType))
-  if (!hasTrigger) errors.push('画布必须包含至少一个触发器节点')
-  nodes.forEach(node => {
-    const missing = getMissingRequired(node)
-    if (missing.length) errors.push(`节点「${node.name}」缺少必填项：${missing.join(', ')}`)
+```tsx
+const isValidConnection = (connection) => {
+  const sourceNode = nodes.find(n => n.id === connection.source)
+  const targetNode = nodes.find(n => n.id === connection.target)
+
+  if (TRIGGER_TYPES.includes(targetNode?.data.nodeType)) return false  // 触发器无入边
+  if (sourceNode?.data.nodeType === 'DIRECT_RETURN') return false     // 直调返回无出边
+  if (connection.source === connection.target) return false             // 不允许自环
+  return true
+}
+```
+
+---
+
+### 11.11 自动布局（Dagre）
+
+```tsx
+import dagre from '@dagrejs/dagre'
+
+const getLayoutedElements = (nodes, edges) => {
+  const g = new dagre.graphlib.Graph().setDefaultEdgeLabel(() => ({}))
+  g.setGraph({ rankdir: 'TB', nodesep: 40, ranksep: 60 })
+
+  nodes.forEach(n => g.setNode(n.id, { width: 200, height: 76 }))
+  edges.forEach(e => g.setEdge(e.source, e.target))
+  dagre.layout(g)
+
+  return {
+    nodes: nodes.map(n => {
+      const { x, y } = g.node(n.id)
+      return { ...n, position: { x: x - 100, y: y - 38 } }
+    }),
+    edges,
+  }
+}
+
+// 顶部工具栏"整理画布"
+const onLayout = () => {
+  const { nodes: ln, edges: le } = getLayoutedElements(getNodes(), getEdges())
+  setNodes([...ln])
+  setEdges([...le])
+  const positions = Object.fromEntries(ln.map(n => [n.id, n.position]))
+  localStorage.setItem(`canvas_pos_${canvasId}`, JSON.stringify(positions))
+}
+```
+
+---
+
+### 11.12 撤销 / 重做
+
+ReactFlow 没有内置历史记录，通过状态快照实现（最多 50 步）：
+
+```tsx
+const [history, setHistory] = useState([])
+const [future,  setFuture]  = useState([])
+
+const snapshot = useCallback(() => {
+  setHistory(prev => [...prev.slice(-49), { nodes: getNodes(), edges: getEdges() }])
+  setFuture([])
+}, [getNodes, getEdges])
+
+const undo = () => {
+  if (!history.length) return
+  const prev = history[history.length - 1]
+  setFuture(f => [{ nodes: getNodes(), edges: getEdges() }, ...f])
+  setHistory(h => h.slice(0, -1))
+  setNodes(prev.nodes); setEdges(prev.edges)
+}
+
+const redo = () => {
+  if (!future.length) return
+  const next = future[0]
+  setHistory(h => [...h, { nodes: getNodes(), edges: getEdges() }])
+  setFuture(f => f.slice(1))
+  setNodes(next.nodes); setEdges(next.edges)
+}
+// Ctrl+Z / Ctrl+Shift+Z 绑定到上述函数
+```
+
+---
+
+### 11.13 发布前校验
+
+```tsx
+const validateBeforePublish = (nodes) => {
+  const errors = []
+  if (!nodes.some(n => TRIGGER_TYPES.includes(n.data.nodeType)))
+    errors.push('画布必须包含至少一个触发器节点')
+  nodes.forEach(n => {
+    const missing = getMissingRequired(n.data)
+    if (missing.length) errors.push(`节点「${n.data.name}」缺少必填项：${missing.join(', ')}`)
   })
-  nodes.filter(n => n.nodeType === 'IF_CONDITION').forEach(n => {
-    if (!n.bizConfig.successNodeId) errors.push(`节点「${n.name}」未配置判断成功节点`)
-    if (!n.bizConfig.failNodeId)    errors.push(`节点「${n.name}」未配置判断失败节点`)
+  nodes.filter(n => n.data.nodeType === 'IF_CONDITION').forEach(n => {
+    if (!n.data.bizConfig.successNodeId) errors.push(`节点「${n.data.name}」未配置判断成功节点`)
+    if (!n.data.bizConfig.failNodeId)    errors.push(`节点「${n.data.name}」未配置判断失败节点`)
   })
   return errors
 }
@@ -2897,94 +2902,44 @@ function validateBeforePublish(nodes: CanvasNodeConfig[]): string[] {
 
 ---
 
-### 11.11 完整交互流程
+### 11.14 完整交互流程
 
 ```mermaid
 sequenceDiagram
     actor 运营人员
     participant FE as 前端应用
-    participant XF as xflow 框架
+    participant RF as ReactFlow 画布
     participant API as 后端接口
 
-    note over FE,XF: 初始化：我们向 xflow 注入所有实现
-
     运营人员->>FE: 打开画布编辑页
-    FE->>API: loadGraphData → GET /canvas/{id}
+    FE->>API: GET /canvas/{id}
     API-->>FE: graph_json
-    FE->>FE: 后端格式 → xflow 格式（deriveEdges）
-    FE->>XF: 渲染画布（nodes + edges）
+    FE->>FE: 后端格式 → ReactFlow Node[] + Edge[]<br/>（deriveEdgesFromNodes + positions from localStorage）
+    FE->>RF: setNodes() + setEdges()
 
-    运营人员->>XF: 从左侧面板拖入 MQ节点
-    XF->>FE: 调用 nodeDataService（我们实现）
-    FE->>API: GET /meta/node-types
-    API-->>FE: 节点类型列表
-    XF->>FE: 调用 onNodeDrop（我们实现）
-    FE->>XF: ADD_NODE 命令，节点出现在画布
+    运营人员->>RF: 从左侧面板拖入节点
+    RF->>FE: onDrop 回调
+    FE->>FE: screenToFlowPosition 转换坐标
+    FE->>RF: setNodes([...nodes, newNode])
 
-    运营人员->>XF: 点击节点
-    XF->>FE: node:click 事件（我们注册）
-    FE->>API: GET /meta/node-types/MQ_TRIGGER/schema
+    运营人员->>RF: 点击节点
+    RF->>FE: onNodeClick 回调（node.id）
+    FE->>API: GET /meta/node-types/{nodeType}/schema
     API-->>FE: 表单 schema
-    XF->>FE: 调用 formSchemaService（我们实现）
-    FE->>XF: 返回 schema，右侧面板渲染表单
+    FE->>FE: 右侧 antd Form 动态渲染
 
-    运营人员->>XF: 填写配置，保存
-    XF->>FE: 调用 saveGraphData（我们实现）
-    FE->>FE: xflow 格式 → 后端格式
+    运营人员->>RF: 拖拽连线
+    RF->>FE: onConnect 回调
+    FE->>FE: 更新源节点 bizConfig.nextNodeId<br/>addEdge 更新 edges 状态
+
+    运营人员->>FE: 保存
+    FE->>FE: getNodes()/getEdges() → 后端格式
     FE->>API: PUT /canvas/{id}
+
+    运营人员->>FE: 发布
+    FE->>FE: validateBeforePublish()
+    FE->>API: POST /canvas/{id}/publish
 ```
-
-### 11.12 画布自动布局
-
-运营拖拽多个节点后画布可能杂乱，支持一键自动整理节点位置：
-
-**xflow 内置 Dagre 布局**（源码 config-graph.tsx 中已有 graphLayout hook，直接使用）：
-
-```typescript
-// 顶部工具栏"整理画布"按钮点击时
-commands.executeCommand(XFlowGraphCommands.GRAPH_LAYOUT.id, {
-  layoutType: 'dagre',
-  layoutOptions: {
-    type: 'dagre',
-    rankdir: 'TB',   // Top-to-Bottom（适合 DAG 从上到下的流程）
-    nodesep: 40,     // 同层节点间距
-    ranksep: 60,     // 层间距
-  },
-})
-```
-
-布局完成后自动保存新坐标到 localStorage，下次加载时使用整理后的位置。
-
----
-
-### 11.13 撤销 / 重做（Undo / Redo）
-
-xflow 内置操作历史功能，通过 `HistoryPlugin` 记录节点/边的增删改操作：
-
-```typescript
-// config-graph.tsx 中启用 history
-config.setRegisterHook(hooks => {
-  hooks.graphOptions.registerHook({
-    name: 'enable-history',
-    handler: async options => {
-      options.history = {
-        enabled: true,
-        maxHistoryCount: 50,   // 最多保留 50 步操作历史
-      }
-    },
-  })
-})
-
-// 顶部工具栏绑定快捷键
-commands.executeCommand(XFlowGraphCommands.GRAPH_HISTORY_UNDO.id)  // Ctrl+Z
-commands.executeCommand(XFlowGraphCommands.GRAPH_HISTORY_REDO.id)  // Ctrl+Shift+Z
-```
-
-**撤销范围**：节点增删、节点移动、连线增删、节点配置修改（需在每次配置保存时手动 push history）。
-
-**注意**：Undo/Redo 仅影响前端 xflow 状态，不会自动同步到后端。用户撤销后需要重新点击"保存"才会更新服务端草稿。
-
----
 
 ## 十二、高并发设计
 
@@ -4511,6 +4466,219 @@ CREATE TABLE canvas_audit_log (
 | CANARY_PROMOTED | 灰度全量发布 |
 | CANARY_ROLLED_BACK | 灰度回退 |
 | QUOTA_ADJUSTED | 运营手动调整某用户的配额限制 |
+
+---
+
+### 17.4 执行统计表
+
+汇总每个画布每日的执行结果，供运营看板展示：
+
+```sql
+CREATE TABLE canvas_execution_stats (
+  id            BIGINT   NOT NULL AUTO_INCREMENT,
+  canvas_id     BIGINT   NOT NULL,
+  stat_date     DATE     NOT NULL COMMENT '统计日期',
+  total_count   INT      NOT NULL DEFAULT 0 COMMENT '当日触发总次数',
+  success_count INT      NOT NULL DEFAULT 0 COMMENT '成功次数（含防资损成功）',
+  fail_count    INT      NOT NULL DEFAULT 0 COMMENT '失败次数',
+  paused_count  INT      NOT NULL DEFAULT 0 COMMENT '当前仍处于挂起状态的次数',
+  timeout_count INT      NOT NULL DEFAULT 0 COMMENT '超时次数',
+  avg_duration_ms BIGINT COMMENT '当日平均端到端执行耗时（毫秒）',
+  PRIMARY KEY (id),
+  UNIQUE KEY uk_canvas_date (canvas_id, stat_date),
+  INDEX idx_stat_date (stat_date)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='画布执行统计（按画布/日汇总）';
+```
+
+**写入时机**：执行状态变更时（RUNNING→SUCCESS/FAILED/PAUSED），由异步 Job 每 5 分钟批量汇总写入，不在主执行链路中写入。
+
+---
+
+## 十九、认证与权限设计
+
+> 系统面向内部运营人员，采用自建 JWT 登录 + RBAC 双角色模型。
+
+### 19.1 用户表
+
+```sql
+CREATE TABLE sys_user (
+  id           BIGINT       NOT NULL AUTO_INCREMENT,
+  username     VARCHAR(64)  NOT NULL COMMENT '登录用户名（唯一）',
+  password     VARCHAR(128) NOT NULL COMMENT 'BCrypt 加密后的密码',
+  display_name VARCHAR(64)  NOT NULL COMMENT '展示名称',
+  role         VARCHAR(16)  NOT NULL COMMENT 'ADMIN / OPERATOR',
+  enabled      TINYINT      NOT NULL DEFAULT 1 COMMENT '0=禁用',
+  created_at   DATETIME     NOT NULL,
+  updated_at   DATETIME     NOT NULL,
+  PRIMARY KEY (id),
+  UNIQUE KEY uk_username (username)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='系统用户表';
+```
+
+---
+
+### 19.2 RBAC 权限模型
+
+系统仅有两个角色，权限清单如下：
+
+| 操作 | OPERATOR | ADMIN |
+|------|----------|-------|
+| 查看画布列表 | ✅ | ✅ |
+| 创建画布 | ✅ | ✅ |
+| 编辑自己的画布草稿 | ✅ | ✅ |
+| 编辑他人的画布草稿 | ❌ | ✅ |
+| 发布画布 | ❌ | ✅ |
+| 下线画布 | ❌ | ✅ |
+| 灰度发布 / 回滚 | ❌ | ✅ |
+| 紧急停止（Kill） | ❌ | ✅ |
+| 干运行 | ✅ | ✅ |
+| 查看执行轨迹 | ✅ | ✅ |
+| 管理用户 | ❌ | ✅ |
+
+**设计原则**：OPERATOR 只能影响"草稿"阶段，任何影响线上执行的操作（发布、下线、Kill）均需 ADMIN。
+
+---
+
+### 19.3 JWT 登录流程
+
+```mermaid
+sequenceDiagram
+    actor 用户
+    participant FE as 前端
+    participant API as 后端 /auth
+
+    用户->>FE: 输入用户名/密码
+    FE->>API: POST /auth/login { username, password }
+
+    API->>API: 查 sys_user，BCrypt 验证密码
+    alt 验证通过
+        API->>API: 生成 JWT<br/>payload: { userId, username, role, exp }
+        API-->>FE: { token, expiresIn }
+        FE->>FE: 存 localStorage（key: canvas_token）<br/>axios 拦截器自动带 Authorization: Bearer {token}
+    else 验证失败
+        API-->>FE: 401 用户名或密码错误
+    end
+```
+
+**JWT Payload：**
+
+```json
+{
+  "sub": "42",
+  "username": "operator_zhang",
+  "role": "OPERATOR",
+  "iat": 1715000000,
+  "exp": 1715086400
+}
+```
+
+| 字段 | 说明 |
+|------|------|
+| `sub` | 用户 ID（sys_user.id） |
+| `role` | 角色（ADMIN / OPERATOR）|
+| `exp` | 过期时间，默认 24h，可通过 Nacos 配置 |
+
+---
+
+### 19.4 后端 Spring Security WebFlux 配置
+
+```java
+@Configuration
+@EnableWebFluxSecurity
+public class SecurityConfig {
+
+    @Bean
+    public SecurityWebFilterChain securityWebFilterChain(ServerHttpSecurity http,
+                                                          JwtAuthFilter jwtAuthFilter) {
+        return http
+            .csrf(ServerHttpSecurity.CsrfSpec::disable)
+            .authorizeExchange(ex -> ex
+                .pathMatchers("/auth/login").permitAll()           // 登录接口无需认证
+                .pathMatchers(HttpMethod.POST, "/canvas/*/publish",
+                              "/canvas/*/offline",
+                              "/canvas/*/kill",
+                              "/canvas/*/canary",
+                              "/canvas/*/rollback").hasRole("ADMIN") // 发布/下线/回滚仅 ADMIN
+                .anyExchange().authenticated()
+            )
+            .addFilterAt(jwtAuthFilter, SecurityWebFiltersOrder.AUTHENTICATION)
+            .httpBasic(ServerHttpSecurity.HttpBasicSpec::disable)
+            .formLogin(ServerHttpSecurity.FormLoginSpec::disable)
+            .build();
+    }
+}
+
+// JWT 过滤器：从 Authorization header 解析 token，写入 SecurityContext
+@Component
+public class JwtAuthFilter implements WebFilter {
+
+    @Override
+    public Mono<Void> filter(ServerWebExchange exchange, WebFilterChain chain) {
+        String header = exchange.getRequest().getHeaders().getFirst(HttpHeaders.AUTHORIZATION);
+        if (header == null || !header.startsWith("Bearer ")) {
+            return chain.filter(exchange);
+        }
+        String token = header.substring(7);
+        try {
+            Claims claims = jwtUtil.parse(token);
+            String role = claims.get("role", String.class);
+            UsernamePasswordAuthenticationToken auth = new UsernamePasswordAuthenticationToken(
+                claims.getSubject(), null,
+                List.of(new SimpleGrantedAuthority("ROLE_" + role))
+            );
+            return chain.filter(exchange)
+                .contextWrite(ReactiveSecurityContextHolder.withAuthentication(auth));
+        } catch (JwtException e) {
+            exchange.getResponse().setStatusCode(HttpStatus.UNAUTHORIZED);
+            return exchange.getResponse().setComplete();
+        }
+    }
+}
+```
+
+---
+
+### 19.5 前端登录页与 Token 管理
+
+**登录页路由**：`/login`，未登录时所有路由重定向到 `/login`。
+
+```tsx
+// axios 拦截器：自动带 token，401 时跳转登录
+http.interceptors.request.use(config => {
+  const token = localStorage.getItem('canvas_token')
+  if (token) config.headers.Authorization = `Bearer ${token}`
+  return config
+})
+
+http.interceptors.response.use(
+  res => res,
+  err => {
+    if (err.response?.status === 401) {
+      localStorage.removeItem('canvas_token')
+      window.location.href = '/login'
+    }
+    return Promise.reject(err)
+  }
+)
+```
+
+**前端权限控制**：JWT 的 `role` 字段存入 React Context，用于：
+- 隐藏/禁用发布、下线、Kill 按钮（OPERATOR 不可见）
+- 编辑他人画布时提示"无权限"
+
+---
+
+### 19.6 API 接口
+
+| 方法 | 路径 | 说明 | 权限 |
+|------|------|------|------|
+| POST | `/auth/login` | 登录，返回 JWT | 公开 |
+| POST | `/auth/logout` | 登出（前端清 token，后端可加黑名单） | 已登录 |
+| GET | `/auth/me` | 获取当前用户信息 | 已登录 |
+| GET | `/admin/users` | 用户列表 | ADMIN |
+| POST | `/admin/users` | 创建用户 | ADMIN |
+| PUT | `/admin/users/{id}` | 修改用户（含重置密码） | ADMIN |
+| PUT | `/admin/users/{id}/disable` | 禁用用户 | ADMIN |
 
 ---
 
