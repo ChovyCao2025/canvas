@@ -6,7 +6,6 @@ import com.photon.canvas.domain.canvas.CanvasMapper;
 import com.photon.canvas.domain.execution.CanvasExecution;
 import com.photon.canvas.domain.execution.CanvasExecutionMapper;
 import com.photon.canvas.engine.context.ExecutionContext;
-import com.photon.canvas.engine.context.NodeStatus;
 import com.photon.canvas.engine.dag.DagGraph;
 import com.photon.canvas.engine.dag.DagParser;
 import com.photon.canvas.engine.scheduler.DagEngine;
@@ -37,6 +36,7 @@ public class CanvasExecutionService {
     private final CanvasConfigCache          configCache;
     private final ContextPersistenceService  ctxStore;
     private final DagEngine                  dagEngine;
+    private final TriggerPreCheckService     preCheckService;
     private final ObjectMapper               objectMapper;
 
     @Value("${canvas.execution.context-ttl-sec:86400}")
@@ -69,7 +69,12 @@ public class CanvasExecutionService {
                 throw new IllegalStateException("画布未发布或不存在: " + canvasId);
             }
 
-            // 2. dedup 检查（dry-run 跳过）
+            // 2. 前置检查（有效期 / 配额 / 冷却期）—— dry-run 跳过
+            if (!dryRun) {
+                preCheckService.check(canvas, userId);
+            }
+
+            // 3. dedup 检查
             if (!dryRun && msgId != null) {
                 boolean isResume = ctxStore.exists(canvasId, userId);
                 Duration dedupTtl = isResume
@@ -100,8 +105,9 @@ public class CanvasExecutionService {
             // 合并本次 payload
             if (payload != null) ctx.getTriggerPayload().putAll(payload);
 
-            // 4. 加载 DAG 配置
-            DagGraph graph = configCache.get(canvasId, canvas.getPublishedVersionId());
+            // 4. 加载 DAG 配置（版本锁定：用 ctx 中的 versionId，不用当前发布版本）
+            // 设计文档 13.6节：触发时快照 versionId，全程锁定，发布新版本不影响正在执行的实例
+            DagGraph graph = configCache.get(canvasId, ctx.getVersionId());
 
             // 5. 找触发器节点（按类型和 matchKey）
             String triggerNodeId = findTriggerNode(graph, triggerNodeType, matchKey);
@@ -196,9 +202,10 @@ public class CanvasExecutionService {
     }
 
     private boolean isPaused(ExecutionContext ctx, DagGraph graph) {
-        // 简单判断：有节点还在 PENDING 状态且不是因为 DAG 执行完
+        // 多阶段挂起：有节点处于 WAITING 状态
+        // （LOGIC_RELATION / HUB 条件未满足时 DagEngine 设置此状态）
         return ctx.getNodeStatuses().values().stream()
-                .anyMatch(s -> s == NodeStatus.RUNNING);
+                .anyMatch(s -> s == com.photon.canvas.engine.context.NodeStatus.WAITING);
     }
 
     private CanvasExecution createExecution(ExecutionContext ctx) {

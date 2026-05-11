@@ -1,6 +1,8 @@
 package com.photon.canvas.engine.scheduler;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.photon.canvas.domain.execution.CanvasExecutionDlq;
+import com.photon.canvas.domain.execution.CanvasExecutionDlqMapper;
 import com.photon.canvas.domain.execution.CanvasExecutionTrace;
 import com.photon.canvas.domain.execution.CanvasExecutionTraceMapper;
 import com.photon.canvas.engine.context.ExecutionContext;
@@ -14,10 +16,12 @@ import com.photon.canvas.engine.handlers.HubHandler;
 import com.photon.canvas.engine.handlers.LogicRelationHandler;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
+import reactor.util.retry.Retry;
 
 import java.time.Duration;
 import java.time.LocalDateTime;
@@ -44,7 +48,18 @@ public class DagEngine {
 
     private final HandlerRegistry            handlerRegistry;
     private final CanvasExecutionTraceMapper traceMapper;
+    private final CanvasExecutionDlqMapper   dlqMapper;
+    private final CircuitBreakerRegistry     cbRegistry;
     private final ObjectMapper               objectMapper;
+
+    @Value("${canvas.execution.max-retry:3}")
+    private int maxRetry;
+
+    @Value("${canvas.execution.retry-base-delay-ms:1000}")
+    private long retryBaseDelayMs;
+
+    @Value("${canvas.execution.retry-max-delay-ms:30000}")
+    private long retryMaxDelayMs;
 
     /** 虚拟线程调度器，供阻塞型 Handler 使用 */
     private static final reactor.core.scheduler.Scheduler VIRTUAL =
@@ -122,7 +137,8 @@ public class DagEngine {
             writeTraceStart(ctx, node);
             NodeHandler handler = handlerRegistry.get(node.getType());
 
-            return executeHandlerWithRepeat(handler, config, ctx, waitProcess)
+            return executeHandlerWithRepeat(handler, config, ctx, waitProcess,
+                    nodeId, node.getType())
                     .flatMap(result -> {
 
                         if (!result.success()) {
@@ -165,47 +181,89 @@ public class DagEngine {
     }
 
     // ══════════════════════════════════════════════════════════════
-    // repeat 并发保护（设计文档 7.5 节）
-    //
-    // 机制说明：
-    //   1. CAS(true→false) 抢锁（阶段 4 已完成，进入此方法时已持锁）
-    //   2. 执行 Handler
-    //   3. getAndSet(true)：释放锁并返回旧值
-    //      - 旧值=true  ↔ 有协程在等待时设置了 waitProcess=true → needRepeat
-    //      - 旧值=false ↔ 无协程等待 → 无需 repeat
-    //   4. 若 needRepeat：重新 CAS 抢锁并再执行一次（最多一次）
-    //
-    // 关键：repeat 检查在写 SUCCESS 状态之前完成，确保 repeat 不被幂等拦截
+    // ══════════════════════════════════════════════════════════════
+    // repeat 并发保护 + 熔断 + 重试 + DLQ（7.5节 + 12.5节 + 13.2节 + 13.3节）
     // ══════════════════════════════════════════════════════════════
 
     private Mono<NodeResult> executeHandlerWithRepeat(NodeHandler handler,
                                                         Map<String, Object> config,
                                                         ExecutionContext ctx,
-                                                        AtomicBoolean waitProcess) {
-        return Mono.fromCallable(() -> handler.execute(config, ctx))
+                                                        AtomicBoolean waitProcess,
+                                                        String nodeId,
+                                                        String nodeType) {
+        CircuitBreakerRegistry.CircuitBreaker cb = cbRegistry.get(nodeType);
+
+        // 单次调用（含熔断检查）
+        Mono<NodeResult> singleCall = Mono.fromCallable(() -> {
+                    cb.checkState(); // OPEN 时抛 CircuitBreakerOpenException（不可重试）
+                    return handler.execute(config, ctx);
+                })
                 .subscribeOn(VIRTUAL)
-                .flatMap(result -> {
-                    if (!result.success()) {
-                        return Mono.just(result); // 失败直接返回，由调用方释放锁
-                    }
+                .doOnNext(r  -> { if (r.success()) cb.recordSuccess(); else cb.recordFailure(); })
+                .doOnError(e -> cb.recordFailure());
 
-                    // getAndSet(true)：释放锁，同时检查是否有协程在等待
-                    boolean hadWaiter = waitProcess.getAndSet(true);
-
-                    if (hadWaiter) {
-                        // 有协程等待，重新 CAS 抢锁执行一次
-                        if (waitProcess.compareAndSet(true, false)) {
-                            log.debug("[ENGINE] repeat 触发（有并发协程等待）");
-                            return Mono.fromCallable(() -> handler.execute(config, ctx))
-                                    .subscribeOn(VIRTUAL)
-                                    .doFinally(__ -> waitProcess.set(true)); // repeat 结束后释放锁
-                        }
-                        // CAS 失败：另一协程已抢先处理，返回当前结果
-                    }
-
-                    // 无等待或未能 re-acquire：直接返回（锁已释放）
-                    return Mono.just(result);
+        // 指数退避重试（13.2节）：只重试可重试异常
+        Mono<NodeResult> withRetry = singleCall
+                .retryWhen(Retry.backoff(maxRetry, Duration.ofMillis(retryBaseDelayMs))
+                        .maxBackoff(Duration.ofMillis(retryMaxDelayMs))
+                        .filter(this::isRetryable)
+                        .doBeforeRetry(sig ->
+                                log.warn("[ENGINE] 节点重试 nodeId={} attempt={} reason={}",
+                                        nodeId, sig.totalRetries() + 1, sig.failure().getMessage())))
+                // 重试耗尽或不可重试异常 → 写 DLQ（13.3节），返回 FAILED
+                .onErrorResume(e -> {
+                    writeDlq(ctx, nodeId, nodeType, e);
+                    return Mono.just(NodeResult.fail("已写入DLQ: " + e.getMessage()));
                 });
+
+        // repeat 并发保护（7.5节）：在写 SUCCESS 之前检查
+        return withRetry.flatMap(result -> {
+            if (!result.success()) {
+                return Mono.just(result); // 失败直接返回，调用方释放锁
+            }
+
+            // getAndSet(true)：释放锁，返回旧值。旧值=true → 有协程在等待 → repeat
+            boolean hadWaiter = waitProcess.getAndSet(true);
+            if (hadWaiter && waitProcess.compareAndSet(true, false)) {
+                log.debug("[ENGINE] repeat nodeId={}", nodeId);
+                return withRetry.doFinally(__ -> waitProcess.set(true));
+            }
+
+            return Mono.just(result);
+        });
+    }
+
+    /** 可重试异常（13.2节白名单） */
+    private boolean isRetryable(Throwable ex) {
+        if (ex instanceof CircuitBreakerRegistry.CircuitBreakerOpenException) return false;
+        if (ex instanceof java.net.SocketTimeoutException) return true;
+        if (ex instanceof java.net.ConnectException) return true;
+        String msg = ex.getMessage();
+        return msg != null && (msg.contains("5xx") || msg.contains("timeout") || msg.contains("Timeout"));
+    }
+
+    /** 写入死信队列（13.3节） */
+    private void writeDlq(ExecutionContext ctx, String nodeId, String nodeType, Throwable cause) {
+        try {
+            String msg = cause.getMessage() != null ? cause.getMessage() : "unknown";
+            CanvasExecutionDlq dlq = CanvasExecutionDlq.builder()
+                    .executionId(ctx.getExecutionId())
+                    .canvasId(ctx.getCanvasId())
+                    .userId(ctx.getUserId())
+                    .failedNodeId(nodeId)
+                    .failedNodeType(nodeType)
+                    .errorMsg(msg.substring(0, Math.min(500, msg.length())))
+                    .retryCount(maxRetry)
+                    .triggerPayload(objectMapper.writeValueAsString(ctx.getTriggerPayload()))
+                    .failedAt(LocalDateTime.now())
+                    .build();
+            Mono.fromRunnable(() -> dlqMapper.insert(dlq))
+                    .subscribeOn(Schedulers.boundedElastic())
+                    .subscribe(null, e -> log.error("[DLQ] 写入失败: {}", e.getMessage()));
+            log.warn("[DLQ] executionId={} nodeId={} reason={}", ctx.getExecutionId(), nodeId, msg);
+        } catch (Exception e) {
+            log.error("[DLQ] 序列化失败: {}", e.getMessage());
+        }
     }
 
     // ══════════════════════════════════════════════════════════════
@@ -227,9 +285,10 @@ public class DagEngine {
             return Mono.error(new RuntimeException("LOGIC_RELATION AND 条件因上游失败不可满足"));
         }
 
-        // 条件未满足：等待其他上游
+        // 条件未满足：进入等待态，设置 WAITING 状态（供 isPaused 检测）
         if (!LogicRelationHandler.checkCondition(relation, upstreamIds, ctx)) {
-            log.debug("[ENGINE] LOGIC_RELATION 条件未满足，等待上游 nodeId={}", nodeId);
+            ctx.setNodeStatus(nodeId, NodeStatus.WAITING);
+            log.debug("[ENGINE] LOGIC_RELATION 条件未满足，进入 WAITING nodeId={}", nodeId);
             return Mono.just(Map.of());
         }
 
@@ -249,7 +308,7 @@ public class DagEngine {
 
         // 所有上游未完成：进入等待态
         if (!HubHandler.allUpstreamDone(upstreamIds, ctx)) {
-            // 首次进入等待时启动超时定时器
+            ctx.setNodeStatus(nodeId, NodeStatus.WAITING);  // 设 WAITING 供 isPaused 检测
             if (!ctx.getScheduledHubTimeouts().contains(nodeId)) {
                 ctx.getScheduledHubTimeouts().add(nodeId);
                 ctx.getHubStartTimes().putIfAbsent(nodeId, System.currentTimeMillis());
@@ -302,7 +361,8 @@ public class DagEngine {
         writeTraceStart(ctx, node);
         NodeHandler handler = handlerRegistry.get(node.getType());
 
-        return executeHandlerWithRepeat(handler, config, ctx, waitProcess)
+        return executeHandlerWithRepeat(handler, config, ctx, waitProcess,
+                nodeId, node.getType())
                 .flatMap(result -> {
                     if (!result.success()) {
                         waitProcess.set(true);
