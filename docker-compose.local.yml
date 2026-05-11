@@ -1,0 +1,40 @@
+version: '3.8'
+
+# 本地开发依赖（设计文档附录 D）
+# 启动：docker compose -f docker-compose.local.yml up -d
+
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: canvas-mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: canvas_db
+      TZ: Asia/Shanghai
+    ports:
+      - "3306:3306"
+    volumes:
+      - canvas-mysql-data:/var/lib/mysql
+    command: --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
+
+  redis:
+    image: redis:7-alpine
+    container_name: canvas-redis
+    ports:
+      - "6379:6379"
+    command: redis-server --appendonly yes
+    volumes:
+      - canvas-redis-data:/data
+
+  # WireMock：模拟外部集成接口（券系统 / Tagger / 触达平台）
+  wiremock:
+    image: wiremock/wiremock:3.3.1
+    container_name: canvas-wiremock
+    ports:
+      - "8099:8080"
+    volumes:
+      - ./wiremock:/home/wiremock
+
+volumes:
+  canvas-mysql-data:
+  canvas-redis-data:
