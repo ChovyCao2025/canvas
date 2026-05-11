@@ -108,13 +108,17 @@ graph TB
       "id": "node_001",
       "type": "MQ_TRIGGER",
       "name": "机票订单支付",
-      "config": { ... }
+      "x": 120,
+      "y": 80,
+      "config": { "topicKey": "flight_order_status_change", "nextNodeId": "node_002" }
     },
     {
       "id": "node_002",
       "type": "IF_CONDITION",
       "name": "新用户判断",
-      "config": { ... }
+      "x": 120,
+      "y": 240,
+      "config": { "rules": [...], "successNodeId": "node_003", "failNodeId": "node_004" }
     }
   ]
 }
@@ -127,6 +131,8 @@ graph TB
 | id | String | 节点唯一标识，前端生成的短 hex 串（如 ed858f0bef1c） |
 | type | String | 节点类型枚举，见第四章 |
 | name | String | 节点显示名称，运营人员填写 |
+| x | Number | 画布坐标 X（前端保存时写入，后端原样存储，不参与执行逻辑） |
+| y | Number | 画布坐标 Y（同上） |
 | config | Object | 各节点类型的专属配置，结构见第四章 |
 
 ---
@@ -1313,9 +1319,11 @@ sequenceDiagram
 
 | 触发器类型 | Redis Key | 操作 |
 |-----------|-----------|------|
-| MQ_TRIGGER | `canvas:trigger:mq:{topic}` | SADD / SREM |
+| MQ_TRIGGER | `canvas:trigger:mq:{topicKey}` | SADD / SREM |
 | BEHAVIOR_IN_APP | `canvas:trigger:behavior:{eventCode}` | SADD / SREM |
+| TAGGER_REALTIME | `canvas:trigger:tagger:{tagCodeKey}` | SADD / SREM |
 | DIRECT_CALL | — | 无需注册，HTTP 直接路由 |
+| SCHEDULED_TRIGGER | — | 发布时向调度系统（XXL-Job）注册任务，下线时注销 |
 
 ### 6.4 服务重启后路由表恢复
 
@@ -1349,8 +1357,6 @@ void initTriggerRoutes() {
 **Redis 持久化建议**：开启 Redis AOF 持久化，可大幅降低路由表丢失概率（仅在 Redis 完全故障时才需要走全量重建）。
 
 ---
-
-## 七、执行引擎设计
 
 ## 七、执行引擎设计
 
@@ -1948,6 +1954,32 @@ sequenceDiagram
 ### 8.2 端内用户行为触发
 
 行为事件由实时行为策略系统上报，引擎侧评估多策略组合条件：
+
+#### 行为事件消息格式规范（接入方契约）
+
+行为策略系统调用触发接口时，消息体必须遵守以下格式：
+
+```json
+{
+  "eventCode":  "browse_flight",
+  "userId":     "12345678",
+  "timestamp":  1715000000000,
+  "behaviorData": {
+    "page":       "flight_main_flow",
+    "duration":   20,
+    "count":      1
+  }
+}
+```
+
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| `eventCode` | String | 是 | 行为事件标识，用于路由表查找（`canvas:trigger:behavior:{eventCode}`） |
+| `userId` | String | 是 | 触发用户 ID |
+| `timestamp` | Long | 是 | 事件产生时间（毫秒）|
+| `behaviorData` | Object | 否 | 行为参数，写入 ExecutionContext 供 Handler 评估策略条件 |
+
+**触发方式**：行为策略系统调用 `POST /canvas/trigger/behavior`，引擎侧做路由查找 + 策略评估。
 
 ```mermaid
 sequenceDiagram
@@ -2783,17 +2815,100 @@ ReactFlow 通过 props 回调处理所有画布事件：
 />
 ```
 
-**连线时同步 bizConfig：**
+**连线时同步 bizConfig（按 sourceHandle 分发）：**
+
+不同节点类型有不同的出边语义，需要根据 `connection.sourceHandle` 判断更新哪个 bizConfig 字段：
+
+| 节点类型 | sourceHandle 值 | 更新的 bizConfig 字段 |
+|---------|----------------|----------------------|
+| 普通节点（DELAY/GROOVY/COUPON 等） | `default` | `nextNodeId` |
+| IF_CONDITION | `success` | `successNodeId` |
+| IF_CONDITION | `fail` | `failNodeId` |
+| SELECTOR | `branch-{index}` | `branches[index].nextNodeId` |
+| SELECTOR | `else` | `elseNodeId` |
+| PRIORITY | `priority-{index}` | `priorities[index].nextNodeId` |
+| AB_SPLIT | `group-{groupKey}` | `groups[index].nextNodeId`（按 groupKey 查找） |
+| LOGIC_RELATION / HUB | `default` | `nextNodeId` |
+
+**Handle 命名约定**（节点卡片 React 组件中声明）：
 
 ```tsx
-const onConnect = useCallback((connection) => {
-  // 更新源节点的 bizConfig.nextNodeId
+// IF_CONDITION 节点的两个出口 Handle
+<Handle type="source" position={Position.Bottom} id="success" style={{ left: '30%' }} />
+<Handle type="source" position={Position.Bottom} id="fail"    style={{ left: '70%' }} />
+
+// SELECTOR 节点（分支数量动态，基于 bizConfig.branches 渲染）
+{branches.map((b, i) => (
+  <Handle key={i} type="source" position={Position.Bottom}
+    id={`branch-${i}`} style={{ left: `${(i+1)/(branches.length+1)*100}%` }} />
+))}
+<Handle type="source" position={Position.Bottom} id="else" style={{ right: 0 }} />
+```
+
+**`onConnect` 完整实现：**
+
+```tsx
+const onConnect = useCallback((connection: Connection) => {
+  const { source, sourceHandle, target } = connection
   setNodes(prev => prev.map(n => {
-    if (n.id !== connection.source) return n
-    return { ...n, data: { ...n.data, bizConfig: { ...n.data.bizConfig, nextNodeId: connection.target } } }
+    if (n.id !== source) return n
+    const cfg = { ...n.data.bizConfig }
+    if (sourceHandle === 'success')       cfg.successNodeId = target
+    else if (sourceHandle === 'fail')     cfg.failNodeId    = target
+    else if (sourceHandle === 'else')     cfg.elseNodeId    = target
+    else if (sourceHandle?.startsWith('branch-')) {
+      const idx = parseInt(sourceHandle.split('-')[1])
+      cfg.branches = cfg.branches?.map((b: Branch, i: number) =>
+        i === idx ? { ...b, nextNodeId: target } : b
+      )
+    } else if (sourceHandle?.startsWith('priority-')) {
+      const idx = parseInt(sourceHandle.split('-')[1])
+      cfg.priorities = cfg.priorities?.map((p: Priority, i: number) =>
+        i === idx ? { ...p, nextNodeId: target } : p
+      )
+    } else if (sourceHandle?.startsWith('group-')) {
+      const key = sourceHandle.replace('group-', '')
+      cfg.groups = cfg.groups?.map((g: Group) =>
+        g.groupKey === key ? { ...g, nextNodeId: target } : g
+      )
+    } else {
+      cfg.nextNodeId = target  // 普通节点
+    }
+    return { ...n, data: { ...n.data, bizConfig: cfg } }
   }))
-  setEdges(prev => addEdge(connection, prev))  // addEdge 是 @xyflow/react 提供的工具函数
-}, [])
+  setEdges(prev => addEdge(connection, prev))
+}, [setNodes, setEdges])
+```
+
+**节点删除时清理 bizConfig 引用：**
+
+当节点被删除时，其他节点 bizConfig 中引用它的 ID 需要清空（否则保存到后端后 DAG 校验会报错）：
+
+```tsx
+const onNodesDelete = useCallback((deletedNodes: Node[]) => {
+  const deletedIds = new Set(deletedNodes.map(n => n.id))
+  setNodes(prev => prev.map(n => ({
+    ...n,
+    data: {
+      ...n.data,
+      bizConfig: cleanBizConfigRefs(n.data.bizConfig, deletedIds)
+    }
+  })))
+}, [setNodes])
+
+function cleanBizConfigRefs(cfg: Record<string, any>, deletedIds: Set<string>) {
+  const clean = (val: any) => deletedIds.has(val) ? undefined : val
+  return {
+    ...cfg,
+    nextNodeId:    clean(cfg.nextNodeId),
+    successNodeId: clean(cfg.successNodeId),
+    failNodeId:    clean(cfg.failNodeId),
+    elseNodeId:    clean(cfg.elseNodeId),
+    branches:   cfg.branches?.map((b: Branch)   => ({ ...b, nextNodeId: clean(b.nextNodeId) })),
+    priorities: cfg.priorities?.map((p: Priority)=> ({ ...p, nextNodeId: clean(p.nextNodeId) })),
+    groups:     cfg.groups?.map((g: Group)       => ({ ...g, nextNodeId: clean(g.nextNodeId) })),
+  }
+}
 ```
 
 ---
@@ -4890,6 +5005,15 @@ CREATE TABLE sub_flow (
   "nextNodeId": "node_004"
 }
 ```
+
+**`subFlowVersion` 版本策略：**
+
+| 值 | 语义 |
+|----|------|
+| 正整数（如 `2`） | 锁定到子流程的指定版本，父流程重新发布后版本不变 |
+| `-1`（或不填） | 执行时动态取子流程当前已发布版本，子流程更新后父流程自动跟进 |
+
+推荐使用锁定版本（正整数），行为可预期。使用 `-1` 需注意子流程变更可能静默影响父流程。前端配置面板在选择子流程时默认锁定当前发布版本，提供"始终用最新"选项。
 
 **父子上下文传递规则：**
 - 子流程收到父上下文字段的**副本**（inputMapping 中指定的字段）
