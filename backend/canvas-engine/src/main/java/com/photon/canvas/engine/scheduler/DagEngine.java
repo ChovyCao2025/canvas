@@ -97,8 +97,10 @@ public class DagEngine {
 
             // ──────────────────────────────────────────────────────
             // 阶段 1：解析节点配置（CONTEXT 类型替换为实际值）
-            // ──────────────────────────────────────────────────────
-            Map<String, Object> config = resolveConfig(node.getConfig(), ctx);
+            // MANUAL_APPROVAL 额外注入 __nodeId 供 Handler 识别自身
+            Map<String, Object> config = "MANUAL_APPROVAL".equals(node.getType())
+                    ? resolveConfigWithNodeId(node.getConfig(), ctx, nodeId)
+                    : resolveConfig(node.getConfig(), ctx);
 
             // ──────────────────────────────────────────────────────
             // 阶段 2：LOGIC_RELATION / HUB 特殊处理
@@ -560,13 +562,23 @@ public class DagEngine {
         Map<String, Object> resolved = new HashMap<>(config);
         for (Map.Entry<String, Object> entry : config.entrySet()) {
             if (entry.getValue() instanceof Map<?, ?> m) {
+                @SuppressWarnings("unchecked")
                 String valueType = (String) ((Map<String, Object>) m).get("valueType");
+                @SuppressWarnings("unchecked")
                 String value     = (String) ((Map<String, Object>) m).get("value");
                 if ("CONTEXT".equals(valueType) && value != null) {
                     resolved.put(entry.getKey(), ctx.getContextValue(value));
                 }
             }
         }
+        return resolved;
+    }
+
+    /** nodeId 注入版（ManualApprovalHandler 需要知道自身 nodeId） */
+    private Map<String, Object> resolveConfigWithNodeId(Map<String, Object> config,
+                                                          ExecutionContext ctx, String nodeId) {
+        Map<String, Object> resolved = new HashMap<>(resolveConfig(config, ctx));
+        resolved.put("__nodeId", nodeId);
         return resolved;
     }
 }

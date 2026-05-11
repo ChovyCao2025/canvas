@@ -53,6 +53,10 @@ dependencies {
     // Groovy（沙箱脚本执行）
     implementation("org.apache.groovy:groovy:4.0.21")
 
+    // Actuator + Micrometer + Prometheus
+    implementation("org.springframework.boot:spring-boot-starter-actuator")
+    implementation("io.micrometer:micrometer-registry-prometheus")
+
     // Swagger / OpenAPI（生产禁用）
     implementation("org.springdoc:springdoc-openapi-starter-webflux-ui:2.5.0")
 

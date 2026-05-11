@@ -60,6 +60,30 @@ springdoc:
     enabled: true
     path: /swagger-ui.html
 
-logging:
-  level:
-    com.photon.canvas: debug
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus,metrics
+  endpoint:
+    health:
+      show-details: always
+  metrics:
+    tags:
+      application: canvas-engine
+
+# Nacos 动态配置（生产通过 spring.cloud.nacos.config 接入）
+# canvas.node.timeout-ms: 3000
+# canvas.execution.global-timeout-sec: 600
+# canvas.execution.max-retry: 3
+# canvas.groovy.timeout-ms: 5000
+canvas:
+  execution:
+    max-retry: 3
+    retry-base-delay-ms: 1000
+    retry-max-delay-ms: 30000
+  circuit-breaker:
+    default:
+      failure-threshold: 5
+      open-duration-sec: 30
+      half-open-attempts: 3
