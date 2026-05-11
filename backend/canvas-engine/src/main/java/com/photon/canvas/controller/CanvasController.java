@@ -2,23 +2,26 @@ package com.photon.canvas.controller;
 
 import com.photon.canvas.common.PageResult;
 import com.photon.canvas.common.R;
-import com.photon.canvas.domain.canvas.Canvas;
-import com.photon.canvas.domain.canvas.CanvasService;
-import com.photon.canvas.domain.canvas.CanvasVersion;
+import com.photon.canvas.domain.canvas.*;
 import com.photon.canvas.dto.*;
+import io.jsonwebtoken.Claims;
+import lombok.Data;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.core.context.ReactiveSecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
 
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/canvas")
 @RequiredArgsConstructor
 public class CanvasController {
 
-    private final CanvasService canvasService;
+    private final CanvasService    canvasService;
+    private final CanvasOpsService opsService;
 
     @PostMapping
     public Mono<R<Canvas>> create(@RequestBody CanvasCreateReq req) {
@@ -80,5 +83,97 @@ public class CanvasController {
         return Mono.fromCallable(() -> canvasService.getVersion(id, versionId))
                 .subscribeOn(Schedulers.boundedElastic())
                 .map(v -> v != null ? R.ok(v) : R.<CanvasVersion>fail("版本不存在"));
+    }
+
+    // ── 运营管控 ─────────────────────────────────────────────────
+
+    @PostMapping("/{id}/kill")
+    public Mono<R<Void>> kill(@PathVariable Long id,
+                              @RequestParam(defaultValue = "GRACEFUL") String mode) {
+        return Mono.<Void>fromRunnable(() -> opsService.kill(id, mode))
+                .subscribeOn(Schedulers.boundedElastic())
+                .thenReturn(R.<Void>ok());
+    }
+
+    @PostMapping("/{id}/canary")
+    public Mono<R<Void>> startCanary(@PathVariable Long id,
+                                     @RequestParam int percent) {
+        return currentUser().flatMap(operator ->
+                Mono.<Void>fromRunnable(() -> opsService.startCanary(id, percent, operator))
+                        .subscribeOn(Schedulers.boundedElastic())
+                        .thenReturn(R.<Void>ok()));
+    }
+
+    @PostMapping("/{id}/promote-canary")
+    public Mono<R<Void>> promoteCanary(@PathVariable Long id) {
+        return Mono.<Void>fromRunnable(() -> opsService.promoteCanary(id))
+                .subscribeOn(Schedulers.boundedElastic())
+                .thenReturn(R.<Void>ok());
+    }
+
+    @PostMapping("/{id}/rollback-canary")
+    public Mono<R<Void>> rollbackCanary(@PathVariable Long id) {
+        return Mono.<Void>fromRunnable(() -> opsService.rollbackCanary(id))
+                .subscribeOn(Schedulers.boundedElastic())
+                .thenReturn(R.<Void>ok());
+    }
+
+    @PostMapping("/{id}/rollback")
+    public Mono<R<Void>> rollback(@PathVariable Long id) {
+        return Mono.<Void>fromRunnable(() -> opsService.rollback(id))
+                .subscribeOn(Schedulers.boundedElastic())
+                .thenReturn(R.<Void>ok());
+    }
+
+    @PostMapping("/{id}/clone")
+    public Mono<R<Canvas>> clone(@PathVariable Long id) {
+        return currentUser().flatMap(operator ->
+                Mono.fromCallable(() -> opsService.clone(id, operator))
+                        .subscribeOn(Schedulers.boundedElastic())
+                        .map(R::ok));
+    }
+
+    @GetMapping("/{id}/versions/{v1}/diff/{v2}")
+    public Mono<R<Map<String, Object>>> diff(@PathVariable Long id,
+                                             @PathVariable Long v1,
+                                             @PathVariable Long v2) {
+        return Mono.fromCallable(() -> opsService.diff(id, v1, v2))
+                .subscribeOn(Schedulers.boundedElastic())
+                .map(R::ok);
+    }
+
+    /** PUT /canvas/{id} 升级：支持 editVersion 乐观锁 */
+    @PutMapping("/{id}/safe")
+    public Mono<R<Void>> safeUpdate(@PathVariable Long id,
+                                    @RequestBody SafeUpdateReq req) {
+        return currentUser().flatMap(operator ->
+                Mono.<Void>fromRunnable(() -> opsService.saveWithOptimisticLock(
+                        id, req.getName(), req.getDescription(),
+                        req.getGraphJson(), req.getEditVersion(), operator))
+                        .subscribeOn(Schedulers.boundedElastic())
+                        .thenReturn(R.<Void>ok())
+                        .onErrorResume(e -> {
+                            if ("CANVAS_010".equals(e.getMessage()))
+                                return Mono.just(R.fail("画布已被他人修改，请刷新后重试"));
+                            return Mono.error(e);
+                        }));
+    }
+
+    // ── helpers ───────────────────────────────────────────────────
+
+    private Mono<String> currentUser() {
+        return ReactiveSecurityContextHolder.getContext()
+                .map(ctx -> ctx.getAuthentication().getPrincipal())
+                .cast(io.jsonwebtoken.Claims.class)
+                .map(c -> c.get("username", String.class))
+                .defaultIfEmpty("system");
+    }
+
+    @Data
+    static class SafeUpdateReq {
+        private String name;
+        private String description;
+        private String graphJson;
+        private int editVersion;
     }
 }

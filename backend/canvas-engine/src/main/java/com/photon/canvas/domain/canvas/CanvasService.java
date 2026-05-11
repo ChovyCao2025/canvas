@@ -5,11 +5,15 @@ import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.photon.canvas.common.PageResult;
 import com.photon.canvas.dto.*;
+import com.photon.canvas.engine.dag.DagGraph;
+import com.photon.canvas.engine.dag.DagParser;
+import com.photon.canvas.infra.redis.TriggerRouteService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Map;
 
 @Service
 @RequiredArgsConstructor
@@ -17,6 +21,8 @@ public class CanvasService {
 
     private final CanvasMapper canvasMapper;
     private final CanvasVersionMapper canvasVersionMapper;
+    private final DagParser dagParser;
+    private final TriggerRouteService triggerRouteService;
 
     @Transactional
     public Canvas create(CanvasCreateReq req) {
@@ -98,8 +104,11 @@ public class CanvasService {
         CanvasVersion draft = latestDraft(id);
         if (draft == null) throw new IllegalStateException("没有可发布的草稿");
 
-        // Phase 2 补充：Kahn 算法 DAG 校验
-        // dagValidator.validate(draft.getGraphJson());
+        // DAG 校验（Kahn 算法环检测 + 触发器节点检查）
+        DagGraph graph = dagParser.parse(draft.getGraphJson());
+        if (graph.entryNodes().isEmpty()) {
+            throw new IllegalStateException("画布缺少有效触发器节点");
+        }
 
         // 生成发布版本快照
         CanvasVersion published = new CanvasVersion();
@@ -117,8 +126,8 @@ public class CanvasService {
         canvas.setPublishedVersionId(published.getId());
         canvasMapper.updateById(canvas);
 
-        // Phase 4 补充：向 Redis 注册触发路由
-        // triggerRouteService.registerAll(id, published.getGraphJson());
+        // 注册触发路由到 Redis
+        registerTriggerRoutes(canvas.getId(), graph);
 
         return published;
     }
@@ -132,8 +141,8 @@ public class CanvasService {
         canvas.setPublishedVersionId(null);
         canvasMapper.updateById(canvas);
 
-        // Phase 4 补充：清理 Redis 路由表
-        // triggerRouteService.removeAll(id);
+        // 清理 Redis 触发路由
+        clearTriggerRoutes(id);
     }
 
     public List<CanvasVersion> getVersions(Long canvasId) {
@@ -172,5 +181,40 @@ public class CanvasService {
                         .last("LIMIT 1")
         );
         return max != null ? max.getVersion() + 1 : 1;
+    }
+
+    @SuppressWarnings("unchecked")
+    private void registerTriggerRoutes(Long canvasId, DagGraph graph) {
+        for (String nodeId : graph.entryNodes()) {
+            DagParser.CanvasNode node = graph.getNode(nodeId);
+            if (node == null || node.getConfig() == null) continue;
+            Map<String, Object> cfg = node.getConfig();
+            switch (node.getType()) {
+                case "MQ_TRIGGER"      -> { String k = (String) cfg.get("topicKey");   if (k != null) triggerRouteService.registerMq(canvasId, k); }
+                case "BEHAVIOR_IN_APP" -> { String k = (String) cfg.get("eventCode");  if (k != null) triggerRouteService.registerBehavior(canvasId, k); }
+                case "TAGGER_REALTIME" -> { String k = (String) cfg.get("tagCodeKey"); if (k != null) triggerRouteService.registerTagger(canvasId, k); }
+                default -> {} // DIRECT_CALL / SCHEDULED_TRIGGER 无需注册
+            }
+        }
+    }
+
+    private void clearTriggerRoutes(Long canvasId) {
+        // 找到当前发布版本的触发器节点并清理
+        Canvas canvas = canvasMapper.selectById(canvasId);
+        if (canvas == null || canvas.getPublishedVersionId() == null) return;
+        CanvasVersion v = canvasVersionMapper.selectById(canvas.getPublishedVersionId());
+        if (v == null) return;
+        DagGraph graph = dagParser.parse(v.getGraphJson());
+        for (String nodeId : graph.entryNodes()) {
+            DagParser.CanvasNode node = graph.getNode(nodeId);
+            if (node == null || node.getConfig() == null) continue;
+            Map<String, Object> cfg = node.getConfig();
+            switch (node.getType()) {
+                case "MQ_TRIGGER"      -> { String k = (String) cfg.get("topicKey");   if (k != null) triggerRouteService.removeMq(canvasId, k); }
+                case "BEHAVIOR_IN_APP" -> { String k = (String) cfg.get("eventCode");  if (k != null) triggerRouteService.removeBehavior(canvasId, k); }
+                case "TAGGER_REALTIME" -> { String k = (String) cfg.get("tagCodeKey"); if (k != null) triggerRouteService.removeTagger(canvasId, k); }
+                default -> {}
+            }
+        }
     }
 }

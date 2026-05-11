@@ -12,6 +12,15 @@ spring:
     enabled: true
     locations: classpath:db/migration
     baseline-on-migrate: true
+  data:
+    redis:
+      host: localhost
+      port: 6379
+      # password: （无密码时注释掉）
+      lettuce:
+        pool:
+          max-active: 16
+          max-idle: 8
 
 mybatis-plus:
   configuration:
@@ -23,13 +32,27 @@ mybatis-plus:
 server:
   port: 8080
 
-# JWT 配置（生产环境通过环境变量覆盖 secret）
 canvas:
   jwt:
     secret: canvas-engine-jwt-secret-key-must-be-at-least-256-bits-long
     expiry-hours: 24
+  # 执行引擎配置（可通过 Nacos 动态覆盖）
+  execution:
+    global-timeout-sec: 600
+    context-ttl-sec: 86400        # 多阶段挂起 ctx 的 Redis TTL (24h)
+    max-concurrency: 1000         # 单画布最大并发执行数
+  node:
+    timeout-ms: 3000              # 单节点超时
+  groovy:
+    timeout-ms: 5000
+    max-output-kb: 64
+  # 集成层外部系统 URL（dev 环境指向 WireMock）
+  integration:
+    coupon-service-url: http://localhost:8099/mock/coupon
+    tagger-service-url: http://localhost:8099/mock/tagger
+    reach-platform-url: http://localhost:8099/mock/reach
+    api-call-base-url: http://localhost:8099/mock/api
 
-# Swagger：生产环境设为 false
 springdoc:
   api-docs:
     enabled: true

@@ -32,6 +32,12 @@ dependencies {
     implementation("com.baomidou:mybatis-plus-spring-boot3-starter:3.5.7")
     implementation("com.mysql:mysql-connector-j")
 
+    // Redis（reactive Lettuce）
+    implementation("org.springframework.boot:spring-boot-starter-data-redis-reactive")
+
+    // Caffeine L1 本地缓存
+    implementation("com.github.ben-manes.caffeine:caffeine:3.1.8")
+
     // Flyway DB migration
     implementation("org.flywaydb:flyway-core")
     implementation("org.flywaydb:flyway-mysql")
@@ -41,10 +47,13 @@ dependencies {
     runtimeOnly("io.jsonwebtoken:jjwt-impl:0.12.6")
     runtimeOnly("io.jsonwebtoken:jjwt-jackson:0.12.6")
 
-    // BCrypt password encoding
+    // BCrypt
     implementation("org.springframework.security:spring-security-crypto")
 
-    // Swagger / OpenAPI（生产环境禁用）
+    // Groovy（沙箱脚本执行）
+    implementation("org.apache.groovy:groovy:4.0.21")
+
+    // Swagger / OpenAPI（生产禁用）
     implementation("org.springdoc:springdoc-openapi-starter-webflux-ui:2.5.0")
 
     // Jackson
