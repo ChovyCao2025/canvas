@@ -1,0 +1,12 @@
+package com.photon.canvas.dto;
+
+import lombok.Data;
+
+@Data
+public class CanvasUpdateReq {
+    private String name;
+    private String description;
+    /** 最新草稿 graph JSON */
+    private String graphJson;
+    private String updatedBy;
+}

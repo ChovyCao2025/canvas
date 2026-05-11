@@ -1,0 +1,28 @@
+spring:
+  application:
+    name: canvas-engine
+  main:
+    web-application-type: reactive   # 强制 WebFlux 模式，即使 classpath 有 JDBC
+  datasource:
+    url: jdbc:mysql://localhost:3306/canvas_db?useUnicode=true&characterEncoding=utf8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true
+    username: root
+    password: root
+    driver-class-name: com.mysql.cj.jdbc.Driver
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    baseline-on-migrate: true
+
+mybatis-plus:
+  configuration:
+    map-underscore-to-camel-case: true
+  global-config:
+    db-config:
+      id-type: auto
+
+server:
+  port: 8080
+
+logging:
+  level:
+    com.photon.canvas: debug
