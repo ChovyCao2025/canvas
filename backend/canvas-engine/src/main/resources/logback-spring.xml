@@ -34,7 +34,7 @@
     </springProfile>
 
     <springProfile name="!prod">
-        <logger name="com.photon.canvas" level="DEBUG"/>
+        <logger name="org.chovy.canvas" level="DEBUG"/>
         <root level="INFO">
             <appender-ref ref="TEXT_CONSOLE"/>
         </root>

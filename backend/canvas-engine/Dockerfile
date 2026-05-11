@@ -1,11 +1,22 @@
-FROM eclipse-temurin:21-jre-alpine AS runtime
+# ── 构建阶段 ─────────────────────────────────────────────────
+FROM eclipse-temurin:21-jdk-alpine AS builder
+WORKDIR /build
+COPY pom.xml .
+COPY src ./src
 
+# 下载依赖（利用 Docker 层缓存；依赖不变时跳过此步）
+RUN apk add --no-cache maven && mvn dependency:go-offline -q
+
+# 打包，跳过测试（CI 中测试已在前置步骤完成）
+RUN mvn package -DskipTests -q
+
+# ── 运行阶段 ─────────────────────────────────────────────────
+FROM eclipse-temurin:21-jre-alpine AS runtime
 WORKDIR /app
 
-# 从 Gradle build 复制 jar（多阶段构建，实际 CI 中由前一阶段产出）
-COPY build/libs/canvas-engine-*.jar app.jar
+COPY --from=builder /build/target/canvas-engine-*.jar app.jar
 
-# JVM 调优：Java 21 虚拟线程友好参数
+# JVM 调优：Java 21 ZGC + 虚拟线程友好参数
 ENV JAVA_OPTS="\
   -XX:+UseZGC \
   -XX:+ZGenerational \

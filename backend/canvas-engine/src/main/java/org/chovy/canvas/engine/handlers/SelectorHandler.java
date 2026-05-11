@@ -1,0 +1,52 @@
+package org.chovy.canvas.engine.handlers;
+
+import org.chovy.canvas.engine.context.ExecutionContext;
+import org.chovy.canvas.engine.handler.NodeHandler;
+import org.chovy.canvas.engine.handler.NodeHandlerType;
+import org.chovy.canvas.engine.handler.NodeResult;
+
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+/**
+ * 条件选择器：按 branches 顺序匹配，命中则走对应 nextNodeId，全部不命中走 elseNodeId。
+ */
+@NodeHandlerType("SELECTOR")
+public class SelectorHandler implements NodeHandler {
+
+    @Override
+    @SuppressWarnings("unchecked")
+    public NodeResult execute(Map<String, Object> config, ExecutionContext ctx) {
+        List<Map<String, Object>> branches = (List<Map<String, Object>>) config.get("branches");
+        String elseNodeId = (String) config.get("elseNodeId");
+
+        if (branches != null) {
+            for (int i = 0; i < branches.size(); i++) {
+                Map<String, Object> branch = branches.get(i);
+                if (branchMatches(branch, ctx)) {
+                    String next = (String) branch.get("nextNodeId");
+                    return NodeResult.ok(next, Map.of());
+                }
+            }
+        }
+
+        // 全部不命中
+        if (elseNodeId != null) return NodeResult.ok(elseNodeId, Map.of());
+
+        // 无 else：SUCCESS，流程自然结束
+        return NodeResult.terminal(Map.of());
+    }
+
+    @SuppressWarnings("unchecked")
+    private boolean branchMatches(Map<String, Object> branch, ExecutionContext ctx) {
+        String relation = (String) branch.getOrDefault("strategyRelation", "AND");
+        List<Map<String, Object>> conditions = (List<Map<String, Object>>) branch.get("conditions");
+        if (conditions == null || conditions.isEmpty()) return true;
+
+        if ("OR".equals(relation)) {
+            return conditions.stream().anyMatch(c -> IfConditionHandler.evaluate(c, ctx));
+        }
+        return conditions.stream().allMatch(c -> IfConditionHandler.evaluate(c, ctx));
+    }
+}
