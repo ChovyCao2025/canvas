@@ -50,9 +50,9 @@ INSERT INTO node_type_registry (type_key, type_name, category, handler_class, co
 
 ('HUB', '集线器', '逻辑分支',
  'com.photon.canvas.engine.handlers.HubHandler',
+ '[{"key":"timeout","label":"等待超时(秒)","type":"number","defaultValue":600,"required":false}]',
  '[]',
- '[]',
- 0, 0, '等待所有上游节点完成（不论成功失败）后继续'),
+ 0, 0, '等待所有上游节点完成（不论成功失败）后继续，超时后标记FAILED'),
 
 ('PRIORITY', '优先级', '逻辑分支',
  'com.photon.canvas.engine.handlers.PriorityHandler',

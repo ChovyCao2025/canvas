@@ -992,8 +992,16 @@ return [
 等待所有上游节点**执行完毕**（不论成功或失败），再继续执行下游节点。
 
 ```json
-{ "name": "集线器", "nextNodeId": "node_next" }
+{
+  "name": "集线器",
+  "timeout": 600,
+  "nextNodeId": "node_next"
+}
 ```
+
+| 字段 | 说明 |
+|------|------|
+| timeout | 等待超时时间（秒），默认 600s。超时后节点标记 FAILED，走防资损判定。用于防止某条并行分支因网络或系统故障永远不完成导致 Hub 永久阻塞。 |
 
 **HUB vs LOGIC_RELATION 的精确区别：**
 
@@ -1001,18 +1009,11 @@ return [
 |---------|------------|------------------------|
 | 等待条件 | 所有上游**完成**（SUCCESS + FAILED 都算） | AND：所有上游 **SUCCESS**；OR：任意一个 **SUCCESS** |
 | 上游失败时 | 继续执行下游（失败不传播） | AND 模式：整体 FAILED；OR 模式：继续等待 |
+| 超时处理 | timeout 秒后标记 FAILED，触发防资损判定 | 依赖全局执行超时，无独立超时配置 |
 | 适用场景 | 并行分支汇合，只需等待完成 | 多路触发的条件判断（如多阶段执行） |
 | 典型用法 | 并行接口调用完成后写日志 | 机票MQ + 酒店MQ 都触发后才发券 |
 
-**实现差异**：HUB 的 `checkUpstreamCondition` 只判断"是否都已 done（完成，不论状态）"；LOGIC_RELATION 还需判断各上游节点的 SUCCESS/FAILED 状态。
-
-
-```json
-{
-  "name": "集线器",
-  "nextNodeId": "node_next"
-}
-```
+**实现差异**：HUB 的 `checkUpstreamCondition` 只判断"是否都已 done（完成，不论状态）"；LOGIC_RELATION 还需判断各上游节点的 SUCCESS/FAILED 状态。HUB 需启动一个延迟任务（`timeout` 秒后触发），若到期时上游仍未全部完成则强制失败。
 
 ---
 
