@@ -128,6 +128,34 @@ INSERT INTO node_type_registry (type_key, type_name, category, handler_class, co
  '[]',
  0, 0, '执行Groovy脚本处理复杂业务逻辑');
 
+-- ---- 第十八章扩展节点 ----
+INSERT INTO node_type_registry (type_key, type_name, category, handler_class, config_schema, output_schema, is_trigger, is_terminal, description) VALUES
+('SCHEDULED_TRIGGER', '定时触发', '行为策略',
+ 'com.photon.canvas.engine.handlers.ScheduledTriggerHandler',
+ '[{"key":"scheduleType","label":"触发类型","type":"radio","options":[{"label":"指定时间(ONCE)","value":"ONCE"},{"label":"周期(CRON)","value":"CRON"}],"required":true},{"key":"cronExpression","label":"Cron表达式","type":"input","visible":"scheduleType==CRON","required":true},{"key":"triggerTime","label":"触发时间","type":"datetime","visible":"scheduleType==ONCE","required":true},{"key":"timezone","label":"时区","type":"input","defaultValue":"Asia/Shanghai"},{"key":"userSource","label":"用户来源","type":"user-source-config","required":true}]',
+ '[]',
+ 1, 0, '按Cron或指定时间批量触发，从Tagger/列表/API获取用户'),
+
+('MANUAL_APPROVAL', '人工审批', '其他',
+ 'com.photon.canvas.engine.handlers.ManualApprovalHandler',
+ '[{"key":"approvers","label":"审批人","type":"multi-user","required":true},{"key":"timeoutHours","label":"超时时间(小时)","type":"number","defaultValue":24},{"key":"onTimeout","label":"超时处理","type":"radio","options":[{"label":"拒绝","value":"REJECT"},{"label":"通过","value":"APPROVE"},{"label":"持续等待","value":"KEEP_WAITING"}],"required":true},{"key":"approveNodeId","label":"审批通过后节点","type":"node-select"},{"key":"rejectNodeId","label":"审批拒绝后节点","type":"node-select"}]',
+ '[]',
+ 0, 0, '挂起流程等待指定人员审批，超时按策略处理'),
+
+('CANVAS_TRIGGER', '触发子画布', '其他',
+ 'com.photon.canvas.engine.handlers.CanvasTriggerHandler',
+ '[{"key":"targetCanvasId","label":"目标画布ID","type":"canvas-select","required":true},{"key":"invokeMode","label":"调用模式","type":"radio","options":[{"label":"同步等待","value":"SYNC"},{"label":"异步触发","value":"ASYNC"}],"required":true},{"key":"paramMapping","label":"参数映射","type":"key-value"},{"key":"nextNodeId","label":"下游节点","type":"node-select"}]',
+ '[]',
+ 0, 0, '在当前画布中触发另一个画布，支持同步/异步');
+
+-- ---- 第二十章子流程节点 ----
+INSERT INTO node_type_registry (type_key, type_name, category, handler_class, config_schema, output_schema, is_trigger, is_terminal, description) VALUES
+('SUB_FLOW_REF', '子流程引用', '其他',
+ 'com.photon.canvas.engine.handlers.SubFlowRefHandler',
+ '[{"key":"subFlowId","label":"子流程ID","type":"canvas-select","required":true},{"key":"subFlowVersion","label":"版本(-1=最新)","type":"number","defaultValue":-1},{"key":"inputMapping","label":"输入映射","type":"key-value"},{"key":"outputPrefix","label":"输出前缀","type":"input","required":true},{"key":"nextNodeId","label":"下游节点","type":"node-select"}]',
+ '[]',
+ 0, 0, '引用并执行子流程（策略表格/数据表格/工作流），输出带前缀写回父上下文');
+
 -- ---- 预置上下文字段 ----
 INSERT INTO context_field (field_key, field_name, data_type, source_node_type, description) VALUES
 ('orderId',        '订单号',   'STRING',  'MQ_TRIGGER,API_CALL', '业务订单唯一标识'),
