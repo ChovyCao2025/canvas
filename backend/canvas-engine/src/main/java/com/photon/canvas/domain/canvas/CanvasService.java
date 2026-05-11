@@ -7,15 +7,19 @@ import com.photon.canvas.common.PageResult;
 import com.photon.canvas.dto.*;
 import com.photon.canvas.engine.dag.DagGraph;
 import com.photon.canvas.engine.dag.DagParser;
+import com.photon.canvas.engine.handlers.GroovyHandler;
 import com.photon.canvas.engine.trigger.CanvasSchedulerService;
+import com.photon.canvas.infra.cache.CanvasConfigCache;
 import com.photon.canvas.infra.redis.TriggerRouteService;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.Map;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class CanvasService {
@@ -25,6 +29,8 @@ public class CanvasService {
     private final DagParser              dagParser;
     private final TriggerRouteService    triggerRouteService;
     private final CanvasSchedulerService schedulerService;
+    private final CanvasConfigCache      configCache;
+    private final GroovyHandler          groovyHandler;  // 用于 Groovy 预编译（12.9节）
 
     @Transactional
     public Canvas create(CanvasCreateReq req) {
@@ -132,6 +138,12 @@ public class CanvasService {
         registerTriggerRoutes(canvas.getId(), graph);
         // 注册定时调度任务
         schedulerService.registerScheduledTriggers(canvas.getId(), graph);
+        // 使旧版本缓存失效（含 L1 Caffeine 广播）
+        if (canvas.getPublishedVersionId() != null) {
+            configCache.invalidate(canvas.getId(), canvas.getPublishedVersionId());
+        }
+        // Groovy 脚本预编译（off-path，避免首次执行时的编译开销，12.9节）
+        precompileGroovyNodes(canvas.getId(), graph);
 
         return published;
     }
@@ -225,5 +237,25 @@ public class CanvasService {
                 default -> {}
             }
         }
+    }
+
+    /**
+     * 发布时预编译所有 GROOVY 节点脚本（设计文档 12.9节）。
+     * 异步执行，不阻塞发布流程。
+     */
+    @SuppressWarnings("unchecked")
+    private void precompileGroovyNodes(Long canvasId, DagGraph graph) {
+        Thread.ofVirtual().start(() -> {
+            graph.getNodeMap().forEach((nodeId, node) -> {
+                if (!"GROOVY".equals(node.getType())) return;
+                Map<String, Object> config = node.getConfig();
+                if (config == null) return;
+                String code = (String) config.get("code");
+                if (code != null && !code.isBlank()) {
+                    groovyHandler.precompileScript(canvasId, nodeId, code);
+                }
+            });
+            log.info("[PUBLISH] Groovy 预编译完成 canvasId={}", canvasId);
+        });
     }
 }

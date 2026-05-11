@@ -53,6 +53,9 @@ dependencies {
     // Groovy（沙箱脚本执行）
     implementation("org.apache.groovy:groovy:4.0.21")
 
+    // LMAX Disruptor（无锁 Ring Buffer，MQ 分发层，12.8节）
+    implementation("com.lmax:disruptor:3.4.4")
+
     // Actuator + Micrometer + Prometheus
     implementation("org.springframework.boot:spring-boot-starter-actuator")
     implementation("io.micrometer:micrometer-registry-prometheus")

@@ -47,7 +47,8 @@ import java.util.stream.Collectors;
 public class DagEngine {
 
     private final HandlerRegistry            handlerRegistry;
-    private final CanvasExecutionTraceMapper traceMapper;
+    private final CanvasExecutionTraceMapper traceMapper;      // 保留供 SKIPPED 批量写入
+    private final TraceWriteBuffer           traceBuffer;      // 异步批量写入（12.10节）
     private final CanvasExecutionDlqMapper   dlqMapper;
     private final CircuitBreakerRegistry     cbRegistry;
     private final CanvasMetrics              metrics;
@@ -496,7 +497,8 @@ public class DagEngine {
     }
 
     // ══════════════════════════════════════════════════════════════
-    // 执行轨迹写入（异步，不阻塞主链路）
+    // ══════════════════════════════════════════════════════════════
+    // 执行轨迹写入（通过 TraceWriteBuffer 异步批量写，12.10节）
     // ══════════════════════════════════════════════════════════════
 
     private void writeTraceStart(ExecutionContext ctx, DagParser.CanvasNode node) {
@@ -508,38 +510,29 @@ public class DagEngine {
                 .status(0) // 执行中
                 .startedAt(LocalDateTime.now())
                 .build();
-        Mono.fromRunnable(() -> traceMapper.insert(trace))
-                .subscribeOn(Schedulers.boundedElastic())
-                .subscribe(null, e -> log.warn("[TRACE] 写入开始轨迹失败: {}", e.getMessage()));
+        traceBuffer.offer(trace); // 非阻塞入队
     }
 
     private void writeTraceEnd(ExecutionContext ctx, DagParser.CanvasNode node, NodeResult result) {
-        // 更新已有记录（简化：直接 insert 一条 finished 记录）
         int status = result.success() ? 1 : 2;
         String outputJson = null;
-        String errorMsg   = result.errorMessage();
         try {
             if (result.output() != null && !result.output().isEmpty()) {
                 outputJson = objectMapper.writeValueAsString(result.output());
             }
         } catch (Exception ignored) {}
 
-        final String finalOutput = outputJson;
-        final String finalError  = errorMsg;
-        Mono.fromRunnable(() -> {
-            CanvasExecutionTrace trace = CanvasExecutionTrace.builder()
-                    .executionId(ctx.getExecutionId())
-                    .nodeId(node.getId())
-                    .nodeType(node.getType())
-                    .nodeName(node.getName())
-                    .status(status)
-                    .outputData(finalOutput)
-                    .errorMsg(finalError)
-                    .finishedAt(LocalDateTime.now())
-                    .build();
-            traceMapper.insert(trace);
-        }).subscribeOn(Schedulers.boundedElastic())
-          .subscribe(null, e -> log.warn("[TRACE] 写入结束轨迹失败: {}", e.getMessage()));
+        CanvasExecutionTrace trace = CanvasExecutionTrace.builder()
+                .executionId(ctx.getExecutionId())
+                .nodeId(node.getId())
+                .nodeType(node.getType())
+                .nodeName(node.getName())
+                .status(status)
+                .outputData(outputJson)
+                .errorMsg(result.errorMessage())
+                .finishedAt(LocalDateTime.now())
+                .build();
+        traceBuffer.offer(trace); // 非阻塞入队（12.10节批量写入）
     }
 
     // ══════════════════════════════════════════════════════════════

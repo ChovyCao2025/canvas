@@ -36,17 +36,31 @@ canvas:
   jwt:
     secret: canvas-engine-jwt-secret-key-must-be-at-least-256-bits-long
     expiry-hours: 24
-  # 执行引擎配置（可通过 Nacos 动态覆盖）
+  # Disruptor 无锁分发层（12.8节）
+  disruptor:
+    ring-buffer-size: 65536   # 必须是 2 的幂，2^16 ≈ 16MB
+    consumers: 0              # 0 = 自动使用 CPU 核数
+  # 执行引擎
   execution:
     global-timeout-sec: 600
-    context-ttl-sec: 86400        # 多阶段挂起 ctx 的 Redis TTL (24h)
-    max-concurrency: 1000         # 单画布最大并发执行数
+    context-ttl-sec: 86400
+    max-concurrency: 1000
+    max-retry: 3
+    retry-base-delay-ms: 1000
+    retry-max-delay-ms: 30000
   node:
-    timeout-ms: 3000              # 单节点超时
+    timeout-ms: 3000
+  # Groovy 沙箱（12.9节，预编译缓存）
   groovy:
     timeout-ms: 5000
     max-output-kb: 64
-  # 集成层外部系统 URL（dev 环境指向 WireMock）
+  # 熔断器（12.5节）
+  circuit-breaker:
+    default:
+      failure-threshold: 5
+      open-duration-sec: 30
+      half-open-attempts: 3
+  # 集成层外部系统 URL（dev 指向 WireMock）
   integration:
     coupon-service-url: http://localhost:8099/mock/coupon
     tagger-service-url: http://localhost:8099/mock/tagger
