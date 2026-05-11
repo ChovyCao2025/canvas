@@ -8,8 +8,8 @@ group = "com.photon"
 version = "1.0.0-SNAPSHOT"
 
 java {
-    sourceCompatibility = JavaVersion.VERSION_17
-    targetCompatibility = JavaVersion.VERSION_17
+    sourceCompatibility = JavaVersion.VERSION_21
+    targetCompatibility = JavaVersion.VERSION_21
 }
 
 configurations {
@@ -23,8 +23,10 @@ repositories {
 }
 
 dependencies {
-    // WebFlux（Netty 作为服务器）
+    // WebFlux（Netty）
     implementation("org.springframework.boot:spring-boot-starter-webflux")
+    // Spring Security WebFlux
+    implementation("org.springframework.boot:spring-boot-starter-security")
 
     // MyBatis-Plus（blocking DB，配合 boundedElastic 使用）
     implementation("com.baomidou:mybatis-plus-spring-boot3-starter:3.5.7")
@@ -34,8 +36,20 @@ dependencies {
     implementation("org.flywaydb:flyway-core")
     implementation("org.flywaydb:flyway-mysql")
 
+    // JWT
+    implementation("io.jsonwebtoken:jjwt-api:0.12.6")
+    runtimeOnly("io.jsonwebtoken:jjwt-impl:0.12.6")
+    runtimeOnly("io.jsonwebtoken:jjwt-jackson:0.12.6")
+
+    // BCrypt password encoding
+    implementation("org.springframework.security:spring-security-crypto")
+
+    // Swagger / OpenAPI（生产环境禁用）
+    implementation("org.springdoc:springdoc-openapi-starter-webflux-ui:2.5.0")
+
     // Jackson
     implementation("com.fasterxml.jackson.core:jackson-databind")
+    implementation("com.fasterxml.jackson.datatype:jackson-datatype-jsr310")
 
     // Lombok
     compileOnly("org.projectlombok:lombok")

@@ -2,7 +2,7 @@ spring:
   application:
     name: canvas-engine
   main:
-    web-application-type: reactive   # 强制 WebFlux 模式，即使 classpath 有 JDBC
+    web-application-type: reactive
   datasource:
     url: jdbc:mysql://localhost:3306/canvas_db?useUnicode=true&characterEncoding=utf8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true
     username: root
@@ -22,6 +22,20 @@ mybatis-plus:
 
 server:
   port: 8080
+
+# JWT 配置（生产环境通过环境变量覆盖 secret）
+canvas:
+  jwt:
+    secret: canvas-engine-jwt-secret-key-must-be-at-least-256-bits-long
+    expiry-hours: 24
+
+# Swagger：生产环境设为 false
+springdoc:
+  api-docs:
+    enabled: true
+  swagger-ui:
+    enabled: true
+    path: /swagger-ui.html
 
 logging:
   level:

@@ -9,6 +9,7 @@ import org.springframework.web.cors.reactive.UrlBasedCorsConfigurationSource;
 @Configuration
 public class WebConfig {
 
+    // CORS 必须在 Security 过滤器之前注册，用 CorsWebFilter 而非 ServerHttpSecurity.cors()
     @Bean
     public CorsWebFilter corsWebFilter() {
         CorsConfiguration config = new CorsConfiguration();
