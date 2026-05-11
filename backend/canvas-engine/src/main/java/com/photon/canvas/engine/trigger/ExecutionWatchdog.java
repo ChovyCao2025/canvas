@@ -1,8 +1,11 @@
 package com.photon.canvas.engine.trigger;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.photon.canvas.domain.approval.CanvasManualApproval;
+import com.photon.canvas.domain.approval.CanvasManualApprovalMapper;
 import com.photon.canvas.domain.execution.CanvasExecution;
 import com.photon.canvas.domain.execution.CanvasExecutionMapper;
+import com.photon.canvas.engine.handlers.ManualApprovalHandler;
 import com.photon.canvas.infra.redis.ContextPersistenceService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -13,10 +16,12 @@ import org.springframework.stereotype.Component;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 
 /**
- * Watchdog：每 30s 扫描超时执行、僵尸 ctx 清理。
- * 设计文档第 9.8 节。
+ * Watchdog：每 30s 扫描两类异常状态
+ * 1. 僵尸 ctx（Section 9.8）：PAUSED + last_dedup_key 超时 → 清理 dedup 允许 MQ 重投
+ * 2. ManualApproval 超时（Section 18.2）：PENDING 审批超过 timeoutAt → 按 onTimeout 策略处理
  */
 @Slf4j
 @Component
@@ -24,8 +29,10 @@ import java.util.List;
 @RequiredArgsConstructor
 public class ExecutionWatchdog {
 
-    private final CanvasExecutionMapper executionMapper;
-    private final ContextPersistenceService ctxStore;
+    private final CanvasExecutionMapper      executionMapper;
+    private final CanvasManualApprovalMapper approvalMapper;
+    private final ContextPersistenceService  ctxStore;
+    private final CanvasExecutionService     executionService;
 
     @Value("${canvas.execution.global-timeout-sec:600}")
     private long globalTimeoutSec;
@@ -36,30 +43,84 @@ public class ExecutionWatchdog {
     @Scheduled(fixedDelay = 30_000)
     public void scan() {
         scanZombieCtx();
+        scanApprovalTimeout();
     }
 
-    /**
-     * 扫描 PAUSED 且有 last_dedup_key 且长时间无进展的执行 → 清理 dedup，允许 MQ 重投
-     */
+    // ── 僵尸 ctx 清理（Section 9.8）────────────────────────────────
+
     private void scanZombieCtx() {
         LocalDateTime threshold = LocalDateTime.now().minusMinutes(zombieThresholdMin);
 
         List<CanvasExecution> zombies = executionMapper.selectList(
                 new LambdaQueryWrapper<CanvasExecution>()
-                        .eq(CanvasExecution::getStatus, 1)       // PAUSED
+                        .eq(CanvasExecution::getStatus, 1)
                         .isNotNull(CanvasExecution::getLastDedupKey)
                         .lt(CanvasExecution::getUpdatedAt, threshold)
         );
 
         for (CanvasExecution exec : zombies) {
-            log.warn("[WATCHDOG] 发现僵尸 ctx executionId={} lastDedupKey={}",
+            log.warn("[WATCHDOG] 僵尸 ctx executionId={} dedupKey={}",
                     exec.getId(), exec.getLastDedupKey());
-            // 清除 dedup key，让 MQ 重投时可以正常恢复
             ctxStore.releaseDedup(exec.getLastDedupKey());
-            // 重置 last_dedup_key 避免重复清理
             exec.setLastDedupKey(null);
             executionMapper.updateById(exec);
-            log.info("[WATCHDOG] 已清理僵尸 ctx，等待 MQ 重投 executionId={}", exec.getId());
+            log.info("[WATCHDOG] 僵尸 ctx 已清理 executionId={}", exec.getId());
         }
+    }
+
+    // ── ManualApproval 超时处理（Section 18.2）─────────────────────
+
+    private void scanApprovalTimeout() {
+        List<CanvasManualApproval> timedOut = approvalMapper.selectList(
+                new LambdaQueryWrapper<CanvasManualApproval>()
+                        .eq(CanvasManualApproval::getStatus, "PENDING")
+                        .lt(CanvasManualApproval::getTimeoutAt, LocalDateTime.now())
+        );
+
+        for (CanvasManualApproval approval : timedOut) {
+            log.warn("[WATCHDOG] ManualApproval 超时 approvalId={} onTimeout={}",
+                    approval.getId(), approval.getOnTimeout());
+
+            switch (approval.getOnTimeout()) {
+                case "APPROVE" -> processApprovalTimeout(approval, "APPROVED");
+                case "REJECT"  -> processApprovalTimeout(approval, "REJECTED");
+                case "KEEP_WAITING" -> {
+                    // 续期 ctx TTL（防止 Redis key 过期），不做任何处理
+                    var ctx = ctxStore.load(approval.getCanvasId(), approval.getUserId());
+                    if (ctx != null) ctxStore.save(ctx);
+                    log.info("[WATCHDOG] KEEP_WAITING，续期 ctx executionId={}", approval.getExecutionId());
+                }
+                default -> processApprovalTimeout(approval, "REJECTED");
+            }
+        }
+    }
+
+    private void processApprovalTimeout(CanvasManualApproval approval, String result) {
+        approval.setStatus("TIMEOUT");
+        approval.setResultBy("watchdog");
+        approval.setResultAt(LocalDateTime.now());
+        approvalMapper.updateById(approval);
+
+        // 向 ctx 写入超时结果，触发恢复执行
+        var ctx = ctxStore.load(approval.getCanvasId(), approval.getUserId());
+        if (ctx == null) {
+            log.warn("[WATCHDOG] ctx 不存在，跳过恢复 executionId={}", approval.getExecutionId());
+            return;
+        }
+
+        String resultKey = ManualApprovalHandler.APPROVAL_RESULT_KEY + approval.getNodeId();
+        ctx.getFlatContext().put(resultKey, result);
+        ctxStore.save(ctx);
+
+        executionService.trigger(
+                        approval.getCanvasId(), approval.getUserId(),
+                        "MANUAL_APPROVAL_TIMEOUT", "MANUAL_APPROVAL",
+                        null, Map.of(), approval.getExecutionId() + ":timeout", false)
+                .subscribe(
+                        null,
+                        e -> log.error("[WATCHDOG] 超时恢复失败: {}", e.getMessage())
+                );
+
+        log.info("[WATCHDOG] 超时处理完成 approvalId={} result={}", approval.getId(), result);
     }
 }

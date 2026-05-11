@@ -50,6 +50,7 @@ public class DagEngine {
     private final CanvasExecutionTraceMapper traceMapper;
     private final CanvasExecutionDlqMapper   dlqMapper;
     private final CircuitBreakerRegistry     cbRegistry;
+    private final CanvasMetrics              metrics;
     private final ObjectMapper               objectMapper;
 
     @Value("${canvas.execution.max-retry:3}")
@@ -166,6 +167,7 @@ public class DagEngine {
 
                         ctx.setNodeStatus(nodeId, NodeStatus.SUCCESS);
                         writeTraceEnd(ctx, node, result);
+                        metrics.recordNodeExecution(node.getType(), "SUCCESS", 0);
                         log.debug("[ENGINE] 节点完成 nodeId={} type={}", nodeId, node.getType());
 
                         return triggerDownstream(graph, result, nodeId, node.getType(), ctx);
@@ -209,9 +211,11 @@ public class DagEngine {
                 .retryWhen(Retry.backoff(maxRetry, Duration.ofMillis(retryBaseDelayMs))
                         .maxBackoff(Duration.ofMillis(retryMaxDelayMs))
                         .filter(this::isRetryable)
-                        .doBeforeRetry(sig ->
+                        .doBeforeRetry(sig -> {
+                                metrics.recordNodeRetry(nodeType);
                                 log.warn("[ENGINE] 节点重试 nodeId={} attempt={} reason={}",
-                                        nodeId, sig.totalRetries() + 1, sig.failure().getMessage())))
+                                        nodeId, sig.totalRetries() + 1, sig.failure().getMessage());
+                        }))
                 // 重试耗尽或不可重试异常 → 写 DLQ（13.3节），返回 FAILED
                 .onErrorResume(e -> {
                     writeDlq(ctx, nodeId, nodeType, e);
@@ -246,6 +250,7 @@ public class DagEngine {
 
     /** 写入死信队列（13.3节） */
     private void writeDlq(ExecutionContext ctx, String nodeId, String nodeType, Throwable cause) {
+        metrics.recordDlq(nodeType); // 记录 DLQ 指标
         try {
             String msg = cause.getMessage() != null ? cause.getMessage() : "unknown";
             CanvasExecutionDlq dlq = CanvasExecutionDlq.builder()

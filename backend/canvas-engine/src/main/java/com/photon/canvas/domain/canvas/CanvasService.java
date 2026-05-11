@@ -7,6 +7,7 @@ import com.photon.canvas.common.PageResult;
 import com.photon.canvas.dto.*;
 import com.photon.canvas.engine.dag.DagGraph;
 import com.photon.canvas.engine.dag.DagParser;
+import com.photon.canvas.engine.trigger.CanvasSchedulerService;
 import com.photon.canvas.infra.redis.TriggerRouteService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -19,10 +20,11 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class CanvasService {
 
-    private final CanvasMapper canvasMapper;
-    private final CanvasVersionMapper canvasVersionMapper;
-    private final DagParser dagParser;
-    private final TriggerRouteService triggerRouteService;
+    private final CanvasMapper           canvasMapper;
+    private final CanvasVersionMapper    canvasVersionMapper;
+    private final DagParser              dagParser;
+    private final TriggerRouteService    triggerRouteService;
+    private final CanvasSchedulerService schedulerService;
 
     @Transactional
     public Canvas create(CanvasCreateReq req) {
@@ -128,6 +130,8 @@ public class CanvasService {
 
         // 注册触发路由到 Redis
         registerTriggerRoutes(canvas.getId(), graph);
+        // 注册定时调度任务
+        schedulerService.registerScheduledTriggers(canvas.getId(), graph);
 
         return published;
     }
@@ -143,6 +147,11 @@ public class CanvasService {
 
         // 清理 Redis 触发路由
         clearTriggerRoutes(id);
+        // 取消定时调度任务
+        CanvasVersion published = canvasVersionMapper.selectById(canvas.getPublishedVersionId());
+        if (published != null) {
+            schedulerService.cancelScheduledTriggers(id, dagParser.parse(published.getGraphJson()));
+        }
     }
 
     public List<CanvasVersion> getVersions(Long canvasId) {

@@ -88,6 +88,18 @@ export const canvasApi = {
 
   clone: (id: number) =>
     http.post<R<Canvas>, R<Canvas>>(`/canvas/${id}/clone`),
+
+  kill: (id: number, mode = 'GRACEFUL') =>
+    http.post<R<void>, R<void>>(`/canvas/${id}/kill?mode=${mode}`),
+
+  canary: (id: number, percent: number) =>
+    http.post<R<void>, R<void>>(`/canvas/${id}/canary?percent=${percent}`),
+
+  promoteCanary: (id: number) =>
+    http.post<R<void>, R<void>>(`/canvas/${id}/promote-canary`),
+
+  rollback: (id: number) =>
+    http.post<R<void>, R<void>>(`/canvas/${id}/rollback`),
 }
 
 // ── 元数据 ───────────────────────────────────────────────────

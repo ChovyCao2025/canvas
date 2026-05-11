@@ -60,6 +60,9 @@ dependencies {
     // Swagger / OpenAPI（生产禁用）
     implementation("org.springdoc:springdoc-openapi-starter-webflux-ui:2.5.0")
 
+    // 结构化 JSON 日志（logback-spring.xml 使用 LogstashEncoder）
+    implementation("net.logstash.logback:logstash-logback-encoder:7.4")
+
     // Jackson
     implementation("com.fasterxml.jackson.core:jackson-databind")
     implementation("com.fasterxml.jackson.datatype:jackson-datatype-jsr310")

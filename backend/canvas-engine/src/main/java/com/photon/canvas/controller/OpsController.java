@@ -13,16 +13,15 @@ import reactor.core.scheduler.Schedulers;
 import java.util.List;
 
 /**
- * 运营工具 API（设计文档第二十三章）：
- * - 画布模板管理
- * - 发布审批流
+ * 运营工具 API（设计文档第二十三章）
  */
 @RestController
 @RequiredArgsConstructor
 public class OpsController {
 
-    private final CanvasTemplateMapper  templateMapper;
-    private final CanvasMapper          canvasMapper;
+    private final CanvasTemplateMapper       templateMapper;
+    private final CanvasMapper               canvasMapper;
+    private final CanvasVersionMapper        canvasVersionMapper;
     private final CanvasManualApprovalMapper approvalMapper;
 
     // ── 画布模板（23.1节） ─────────────────────────────────────────
@@ -49,7 +48,13 @@ public class OpsController {
             tpl.setName(req.getName() != null ? req.getName() : canvas.getName() + " 模板");
             tpl.setDescription(req.getDescription());
             tpl.setCategory(req.getCategory());
-            tpl.setGraphJson(canvas.getDescription()); // 实际应取 graphJson，简化
+            // 获取最新草稿的 graphJson
+            var draft = canvasVersionMapper.selectOne(
+                    new LambdaQueryWrapper<CanvasVersion>()
+                            .eq(CanvasVersion::getCanvasId, id)
+                            .eq(CanvasVersion::getStatus, 0)
+                            .orderByDesc(CanvasVersion::getVersion).last("LIMIT 1"));
+            tpl.setGraphJson(draft != null ? draft.getGraphJson() : "{\"nodes\":[]}");
             tpl.setIsOfficial(0);
             tpl.setUseCount(0);
             tpl.setCreatedBy("current_user");
