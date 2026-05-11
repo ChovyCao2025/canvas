@@ -5,7 +5,7 @@ import {
 } from 'antd'
 import {
   PlusOutlined, EditOutlined, CloudUploadOutlined,
-  StopOutlined, CopyOutlined, ThunderboltOutlined,
+  StopOutlined, CopyOutlined, ThunderboltOutlined, BarChartOutlined,
 } from '@ant-design/icons'
 import { useNavigate } from 'react-router-dom'
 import type { ColumnsType } from 'antd/es/table'
@@ -159,6 +159,11 @@ export default function CanvasListPage() {
           <Tooltip title="克隆">
             <Button size="small" icon={<CopyOutlined />}
               onClick={() => handleClone(record.id)} />
+          </Tooltip>
+
+          <Tooltip title="效果看板">
+            <Button size="small" icon={<BarChartOutlined />}
+              onClick={() => navigate(`/canvas/${record.id}/stats`)} />
           </Tooltip>
         </Space>
       ),

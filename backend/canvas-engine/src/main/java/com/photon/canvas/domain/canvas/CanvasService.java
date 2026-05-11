@@ -153,16 +153,21 @@ public class CanvasService {
         Canvas canvas = canvasMapper.selectById(id);
         if (canvas == null) throw new IllegalArgumentException("画布不存在: " + id);
 
+        // ★ 先保存 publishedVersionId，置 null 后再读会是 null
+        Long publishedVersionId = canvas.getPublishedVersionId();
+
         canvas.setStatus(2);
         canvas.setPublishedVersionId(null);
         canvasMapper.updateById(canvas);
 
-        // 清理 Redis 触发路由
-        clearTriggerRoutes(id);
-        // 取消定时调度任务
-        CanvasVersion published = canvasVersionMapper.selectById(canvas.getPublishedVersionId());
-        if (published != null) {
-            schedulerService.cancelScheduledTriggers(id, dagParser.parse(published.getGraphJson()));
+        if (publishedVersionId != null) {
+            CanvasVersion v = canvasVersionMapper.selectById(publishedVersionId);
+            if (v != null) {
+                DagGraph graph = dagParser.parse(v.getGraphJson());
+                clearTriggerRoutesFromGraph(id, graph);       // 清理 Redis 路由
+                schedulerService.cancelScheduledTriggers(id, graph); // 取消定时任务
+                configCache.invalidate(id, publishedVersionId);      // 失效缓存
+            }
         }
     }
 
@@ -219,13 +224,8 @@ public class CanvasService {
         }
     }
 
-    private void clearTriggerRoutes(Long canvasId) {
-        // 找到当前发布版本的触发器节点并清理
-        Canvas canvas = canvasMapper.selectById(canvasId);
-        if (canvas == null || canvas.getPublishedVersionId() == null) return;
-        CanvasVersion v = canvasVersionMapper.selectById(canvas.getPublishedVersionId());
-        if (v == null) return;
-        DagGraph graph = dagParser.parse(v.getGraphJson());
+    /** 直接从已有 DagGraph 清理路由（offline 使用，避免再次查 DB） */
+    private void clearTriggerRoutesFromGraph(Long canvasId, DagGraph graph) {
         for (String nodeId : graph.entryNodes()) {
             DagParser.CanvasNode node = graph.getNode(nodeId);
             if (node == null || node.getConfig() == null) continue;
@@ -237,6 +237,14 @@ public class CanvasService {
                 default -> {}
             }
         }
+    }
+
+    private void clearTriggerRoutes(Long canvasId) {
+        Canvas canvas = canvasMapper.selectById(canvasId);
+        if (canvas == null || canvas.getPublishedVersionId() == null) return;
+        CanvasVersion v = canvasVersionMapper.selectById(canvas.getPublishedVersionId());
+        if (v == null) return;
+        clearTriggerRoutesFromGraph(canvasId, dagParser.parse(v.getGraphJson()));
     }
 
     /**

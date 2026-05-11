@@ -135,7 +135,12 @@ public class TriggerPreCheckService {
                     existing.setDailyCount(existing.getDailyCount() + 1);
                     existing.setTotalCount(existing.getTotalCount() + 1);
                     existing.setLastTriggerAt(LocalDateTime.now());
-                    quotaMapper.updateById(existing);
+                    // 复合主键：不能用 updateById()，用 update(entity, wrapper)
+                    quotaMapper.update(existing,
+                            new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<CanvasUserQuota>()
+                                    .eq(CanvasUserQuota::getCanvasId, canvasId)
+                                    .eq(CanvasUserQuota::getUserId, userId)
+                                    .eq(CanvasUserQuota::getTriggerDate, today));
                 }
             } catch (Exception e) {
                 log.warn("[QUOTA] 用量更新失败: {}", e.getMessage());

@@ -1,0 +1,40 @@
+{
+  "mappings": [
+    {
+      "name": "coupon-issue-success",
+      "request": { "method": "POST", "url": "/mock/coupon/issue" },
+      "response": {
+        "status": 200,
+        "headers": { "Content-Type": "application/json" },
+        "jsonBody": { "status": "SUCCESS", "couponId": "MOCK_COUPON_001", "couponAmount": 50 }
+      }
+    },
+    {
+      "name": "tagger-offline-found",
+      "request": { "method": "GET", "urlPathPattern": "/mock/tagger/offline.*" },
+      "response": {
+        "status": 200,
+        "headers": { "Content-Type": "application/json" },
+        "jsonBody": { "tagValue": "1", "tagCode": "mock_tag" }
+      }
+    },
+    {
+      "name": "reach-platform-send",
+      "request": { "method": "POST", "url": "/mock/reach/send" },
+      "response": {
+        "status": 200,
+        "headers": { "Content-Type": "application/json" },
+        "jsonBody": { "status": "SUCCESS", "msgId": "MOCK_MSG_001" }
+      }
+    },
+    {
+      "name": "api-call-generic",
+      "request": { "method": "POST", "url": "/mock/api/call" },
+      "response": {
+        "status": 200,
+        "headers": { "Content-Type": "application/json" },
+        "jsonBody": { "status": "SUCCESS", "result": true, "data": { "orderId": "MOCK_ORDER_001" } }
+      }
+    }
+  ]
+}

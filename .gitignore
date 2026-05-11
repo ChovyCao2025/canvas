@@ -1,0 +1,30 @@
+# 通用忽略
+.DS_Store
+*.log
+*.tmp
+
+# Gradle
+backend/canvas-engine/.gradle/
+backend/canvas-engine/build/
+backend/canvas-engine/out/
+*.class
+*.jar
+
+# IDE
+.idea/
+*.iml
+.vscode/
+*.suo
+*.user
+
+# Node.js / 前端
+frontend/node_modules/
+frontend/dist/
+frontend/.env.local
+
+# 日志
+logs/
+*.log
+
+# 本地配置（含密钥，不提交）
+backend/canvas-engine/src/main/resources/application-local.yml

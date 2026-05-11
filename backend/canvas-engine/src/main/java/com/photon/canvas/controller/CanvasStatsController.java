@@ -4,8 +4,8 @@ import com.photon.canvas.common.R;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.photon.canvas.domain.execution.CanvasExecutionMapper;
 import com.photon.canvas.domain.execution.CanvasExecution;
+import com.photon.canvas.domain.execution.CanvasExecutionTraceMapper;
 import lombok.RequiredArgsConstructor;
-import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.web.bind.annotation.*;
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
@@ -25,7 +25,8 @@ import java.util.*;
 @RequiredArgsConstructor
 public class CanvasStatsController {
 
-    private final CanvasExecutionMapper executionMapper;
+    private final CanvasExecutionMapper      executionMapper;
+    private final CanvasExecutionTraceMapper traceMapper;
 
     /** 整体执行统计 */
     @GetMapping("/stats")
@@ -65,24 +66,14 @@ public class CanvasStatsController {
     }
 
     /**
-     * 节点漏斗：从 canvas_execution_trace 聚合每个节点的进入/成功/失败数。
+     * 节点漏斗（设计文档 21.3节）：聚合每个节点的进入/成功/失败/跳过次数。
      * 前端按此数据在画布上叠加漏斗可视化。
      */
     @GetMapping("/funnel")
     public Mono<R<List<Map<String, Object>>>> funnel(@PathVariable Long id) {
-        return Mono.fromCallable(() -> {
-            // 从 trace 表聚合（MyBatis-Plus 原生聚合较繁琐，用原生 SQL 简化）
-            // 此处返回占位结构，完整聚合需 @Select 自定义 SQL
-            List<Map<String, Object>> rows = new ArrayList<>();
-            // TODO: SELECT node_id, node_type, node_name,
-            //         COUNT(*) total_entered,
-            //         SUM(status=1) success, SUM(status=2) failed, SUM(status=3) skipped
-            //       FROM canvas_execution_trace
-            //       JOIN canvas_execution ON execution_id = id
-            //       WHERE canvas_id = #{id}
-            //       GROUP BY node_id
-            return rows;
-        }).subscribeOn(Schedulers.boundedElastic()).map(R::ok);
+        return Mono.fromCallable(() ->
+                traceMapper.selectFunnelByCanvasId(id)
+        ).subscribeOn(Schedulers.boundedElastic()).map(R::ok);
     }
 
     /** 每日执行量趋势（按天聚合） */
