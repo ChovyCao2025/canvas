@@ -77,7 +77,7 @@ public class DagEngine {
      */
     public Mono<Map<String, Object>> execute(DagGraph graph, String triggerNodeId,
                                               ExecutionContext ctx) {
-        return executeNode(graph, triggerNodeId, ctx)
+        return executeNode(graph, triggerNodeId, ctx, 0)
                 .doFinally(__ -> writeSkippedNodes(graph, ctx))
                 .onErrorResume(e -> {
                     log.error("[ENGINE] 执行出错 executionId={}: {}",
@@ -86,14 +86,31 @@ public class DagEngine {
                 });
     }
 
+    /** 最大 DAG 递归深度（防止超深链路或隐式循环导致 StackOverflowError） */
+    private static final int MAX_NODE_DEPTH = 200;
+
     // ══════════════════════════════════════════════════════════════
     // 单节点执行（6 阶段，严格遵循 7.4 节）
     // ══════════════════════════════════════════════════════════════
 
     private Mono<Map<String, Object>> executeNode(DagGraph graph, String nodeId,
                                                     ExecutionContext ctx) {
+        return executeNode(graph, nodeId, ctx, 0);
+    }
+
+    private Mono<Map<String, Object>> executeNode(DagGraph graph, String nodeId,
+                                                    ExecutionContext ctx, int depth) {
+        if (depth > MAX_NODE_DEPTH) {
+            return Mono.error(new IllegalStateException(
+                "[ENGINE] DAG 执行深度超限（" + MAX_NODE_DEPTH + "），" +
+                "可能存在隐式循环或超大画布 nodeId=" + nodeId));
+        }
+
         DagParser.CanvasNode node = graph.getNode(nodeId);
-        if (node == null) return Mono.just(Map.of());
+        if (node == null) {
+            log.warn("[ENGINE] 节点不存在，跳过 nodeId={}", nodeId);
+            return Mono.just(Map.of());
+        }
 
         return Mono.defer(() -> {
 
@@ -198,12 +215,16 @@ public class DagEngine {
                                                         String nodeType) {
         CircuitBreakerRegistry.CircuitBreaker cb = cbRegistry.get(nodeType);
 
-        // 单次调用（含熔断检查）
-        Mono<NodeResult> singleCall = Mono.fromCallable(() -> {
-                    cb.checkState(); // OPEN 时抛 CircuitBreakerOpenException（不可重试）
-                    return handler.execute(config, ctx);
+        // 单次调用：直接调用 Handler 的响应式方法，无需 subscribeOn（Handler 自行决定调度）
+        // 熔断检查用 Mono.defer() 包裹，确保每次订阅时才检查熔断状态
+        Mono<NodeResult> singleCall = Mono.defer(() -> {
+                    try {
+                        cb.checkState(); // OPEN 时抛 CircuitBreakerOpenException（不可重试）
+                    } catch (CircuitBreakerRegistry.CircuitBreakerOpenException e) {
+                        return Mono.just(NodeResult.fail(e.getMessage()));
+                    }
+                    return handler.executeAsync(config, ctx);
                 })
-                .subscribeOn(VIRTUAL)
                 .doOnNext(r  -> { if (r.success()) cb.recordSuccess(); else cb.recordFailure(); })
                 .doOnError(e -> cb.recordFailure());
 

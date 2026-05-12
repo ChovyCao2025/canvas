@@ -89,8 +89,12 @@ public class ManualApprovalHandler implements NodeHandler {
     }
 
     private String extractNodeId(Map<String, Object> config) {
-        // nodeId 由 DagEngine 在 resolveConfig 阶段注入
         Object id = config.get("__nodeId");
-        return id != null ? id.toString() : "unknown";
+        if (id == null) {
+            throw new IllegalStateException(
+                "MANUAL_APPROVAL 节点未注入 __nodeId，" +
+                "请检查 DagEngine.resolveConfigWithNodeId() 是否被正确调用");
+        }
+        return id.toString();
     }
 }

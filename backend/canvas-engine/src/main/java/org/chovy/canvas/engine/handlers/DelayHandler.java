@@ -4,21 +4,25 @@ import org.chovy.canvas.engine.context.ExecutionContext;
 import org.chovy.canvas.engine.handler.NodeHandler;
 import org.chovy.canvas.engine.handler.NodeHandlerType;
 import org.chovy.canvas.engine.handler.NodeResult;
-
+import org.springframework.stereotype.Component;
+import reactor.core.publisher.Mono;
+import reactor.core.scheduler.Schedulers;
+import java.time.Duration;
 import java.util.Map;
+import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
 /**
- * 延迟器：等待 duration 指定的时长后继续。
- * 使用 Java 21 虚拟线程 sleep，不占 OS 线程。
+ * 延迟器：使用 Mono.delay() 在响应式调度器上等待，不占用线程。
+ * 比 Thread.sleep() 更符合 Reactor 异步模型。
  */
-@NodeHandlerType("DELAY")
+@Component @NodeHandlerType("DELAY")
 public class DelayHandler implements NodeHandler {
 
     @Override
-    public NodeResult execute(Map<String, Object> config, ExecutionContext ctx) {
-        int duration = config.get("duration") instanceof Number n ? n.intValue() : 0;
-        String unit  = (String) config.getOrDefault("unit", "SECOND");
+    public Mono<NodeResult> executeAsync(Map<String, Object> config, ExecutionContext ctx) {
+        int duration    = config.get("duration") instanceof Number n ? n.intValue() : 0;
+        String unit     = (String) config.getOrDefault("unit", "SECOND");
         String nextNodeId = (String) config.get("nextNodeId");
 
         long millis = switch (unit) {
@@ -27,13 +31,8 @@ public class DelayHandler implements NodeHandler {
             default       -> TimeUnit.SECONDS.toMillis(duration);
         };
 
-        try {
-            Thread.sleep(millis);  // 虚拟线程 sleep，不占 OS 线程
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            return NodeResult.fail("延迟器被中断");
-        }
-
-        return NodeResult.ok(nextNodeId, Map.of());
+        // Mono.delay() 不占用线程，优于 Thread.sleep()
+        return Mono.delay(Duration.ofMillis(millis))
+                .thenReturn(NodeResult.ok(nextNodeId, Map.of()));
     }
 }

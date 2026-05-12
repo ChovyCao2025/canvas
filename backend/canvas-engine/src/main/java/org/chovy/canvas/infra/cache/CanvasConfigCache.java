@@ -46,7 +46,12 @@ public class CanvasConfigCache {
 
     @PostConstruct
     void init() {
-        l1 = Caffeine.newBuilder().maximumSize(500).build();
+        l1 = Caffeine.newBuilder()
+                .maximumSize(500)
+                // 兜底 TTL：即使 invalidate() 因异常未触发，2h 后自动过期
+                // 正常流程（发布/下线）仍依赖主动 invalidate() + Pub/Sub 广播
+                .expireAfterWrite(2, java.util.concurrent.TimeUnit.HOURS)
+                .build();
         // 订阅 Redis Pub/Sub 失效广播（12.7节）
         subscribeInvalidation();
     }

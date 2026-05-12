@@ -13,6 +13,7 @@ import {
   SaveOutlined, ApartmentOutlined,
 } from '@ant-design/icons'
 import { useNavigate, useParams } from 'react-router-dom'
+import type { BackendNode, BizConfig, Branch, Priority, AbGroup, CanvasNodeData } from '../../types/canvas'
 import { canvasApi } from '../../services/api'
 import type { CanvasDetail } from '../../types'
 import CanvasNodeCmp from '../../components/canvas/CanvasNode'
@@ -29,10 +30,10 @@ const nodeTypes = { canvasNode: CanvasNodeCmp }
 
 // ── 从后端节点 config 推导 ReactFlow edges ──────────────────
 
-function deriveEdges(backendNodes: any[]): Edge[] {
+function deriveEdges(backendNodes: BackendNode[]): Edge[] {
   const edges: Edge[] = []
   backendNodes.forEach(n => {
-    const c = n.config ?? {}
+    const c = (n.config ?? {}) as BizConfig
     const push = (target: string | undefined, sourceHandle: string, label?: string) => {
       if (!target) return
       edges.push({ id: `${n.id}->${target}`, source: n.id, target, sourceHandle, label })
@@ -41,9 +42,11 @@ function deriveEdges(backendNodes: any[]): Edge[] {
     push(c.successNodeId, 'success', '成功')
     push(c.failNodeId,    'fail',    '失败')
     push(c.elseNodeId,    'else',    '否则')
-    c.branches?.forEach((b: any, i: number) => push(b.nextNodeId, `branch-${i}`, b.label))
-    c.priorities?.forEach((p: any, i: number) => push(p.nextNodeId, `priority-${i}`))
-    c.groups?.forEach((g: any) => push(g.nextNodeId, `group-${g.groupKey}`, g.groupKey))
+    push(c.approveNodeId, 'approve', '通过')
+    push(c.rejectNodeId,  'reject',  '拒绝')
+    c.branches?.forEach((b, i) => push(b.nextNodeId, `branch-${i}`, b.label))
+    c.priorities?.forEach((p, i) => push(p.nextNodeId, `priority-${i}`))
+    c.groups?.forEach(g => push(g.nextNodeId, `group-${g.groupKey}`, g.groupKey))
   })
   return edges
 }
@@ -75,18 +78,18 @@ function patchBizConfig(
   else if (sourceHandle === 'else')     next.elseNodeId    = target
   else if (sourceHandle.startsWith('branch-')) {
     const idx = parseInt(sourceHandle.split('-')[1], 10)
-    next.branches = (next.branches as any[] ?? []).map((b: any, i: number) =>
-      i === idx ? { ...b, nextNodeId: target } : b
+    next.branches   = (next.branches   ?? []).map((b, i) =>
+      i === idx ? { ...(b as Branch), nextNodeId: target } : b
     )
   } else if (sourceHandle.startsWith('priority-')) {
     const idx = parseInt(sourceHandle.split('-')[1], 10)
-    next.priorities = (next.priorities as any[] ?? []).map((p: any, i: number) =>
-      i === idx ? { ...p, nextNodeId: target } : p
+    next.priorities = (next.priorities ?? []).map((p, i) =>
+      i === idx ? { ...(p as Priority), nextNodeId: target } : p
     )
   } else if (sourceHandle.startsWith('group-')) {
     const key = sourceHandle.replace('group-', '')
-    next.groups = (next.groups as any[] ?? []).map((g: any) =>
-      g.groupKey === key ? { ...g, nextNodeId: target } : g
+    next.groups = (next.groups ?? []).map((g) =>
+      (g as AbGroup).groupKey === key ? { ...(g as AbGroup), nextNodeId: target } : g
     )
   } else {
     next.nextNodeId = target
@@ -104,17 +107,17 @@ function cleanRefs(cfg: Record<string, unknown>, deletedIds: Set<string>) {
     successNodeId: clean(cfg.successNodeId),
     failNodeId:    clean(cfg.failNodeId),
     elseNodeId:    clean(cfg.elseNodeId),
-    branches:   (cfg.branches  as any[] | undefined)?.map((b: any) => ({ ...b, nextNodeId: clean(b.nextNodeId) })),
-    priorities: (cfg.priorities as any[] | undefined)?.map((p: any) => ({ ...p, nextNodeId: clean(p.nextNodeId) })),
-    groups:     (cfg.groups    as any[] | undefined)?.map((g: any) => ({ ...g, nextNodeId: clean(g.nextNodeId) })),
+    branches:   cfg.branches?.map(b   => ({ ...b,   nextNodeId: clean(b.nextNodeId) })),
+    priorities: cfg.priorities?.map(p => ({ ...p,   nextNodeId: clean(p.nextNodeId) })),
+    groups:     cfg.groups?.map(g     => ({ ...g,   nextNodeId: clean(g.nextNodeId) })),
   }
 }
 
 // ── 撤销/重做历史 ─────────────────────────────────────────────
 
-interface Snapshot { nodes: Node[]; edges: Edge[] }
+interface Snapshot { nodes: Node<CanvasNodeData>[]; edges: Edge[] }
 
-function useHistory(nodes: Node[], edges: Edge[]) {
+function useHistory(nodes: Node<CanvasNodeData>[], edges: Edge[]) {
   const [history, setHistory] = useState<Snapshot[]>([])
   const [future,  setFuture]  = useState<Snapshot[]>([])
   const { setNodes, setEdges } = useReactFlow()
@@ -164,7 +167,7 @@ function EditorInner({ detail }: { detail: CanvasDetail }) {
 
   // 初始化加载
   useEffect(() => {
-    const backendNodes: any[] = JSON.parse(detail.graphJson || '{"nodes":[]}').nodes ?? []
+    const backendNodes: BackendNode[] = JSON.parse(detail.graphJson || '{"nodes":[]}').nodes ?? []
     const rfNodes: Node[] = backendNodes.map(n => ({
       id: n.id, type: 'canvasNode',
       position: { x: n.x ?? 0, y: n.y ?? 0 },

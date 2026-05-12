@@ -1,26 +1,23 @@
 package org.chovy.canvas.engine.handler;
 
 import org.chovy.canvas.engine.context.ExecutionContext;
+import reactor.core.publisher.Mono;
 import java.util.Map;
 
 /**
- * 节点 Handler 接口。
- * 实现类用 @NodeHandler("TYPE_KEY") 注解注册，Spring 自动注入 HandlerRegistry。
+ * 节点 Handler 接口（响应式）。
+ *
+ * 返回 Mono<NodeResult> 彻底消除 .block()：
+ *   - 集成层（CouponHandler / ApiCallHandler 等）：直接返回 WebClient 响应式链
+ *   - 简单 Handler（IF / Selector 等）：Mono.just(...) 包裹，无额外开销
+ *   - 阻塞型（Groovy / Delay）：subscribeOn(virtualThreadScheduler) 调度到虚拟线程
+ *
+ * 实现类须同时标注 @Component 和 @NodeHandlerType("TYPE_KEY")。
  */
 public interface NodeHandler {
 
-    /**
-     * 执行节点业务逻辑。
-     *
-     * @param config 已完成 CONTEXT 字段解析的节点配置（valueType=CONTEXT 已替换为实际值）
-     * @param ctx    执行上下文
-     * @return       执行结果，含后继节点 ID 和输出字段
-     */
-    NodeResult execute(Map<String, Object> config, ExecutionContext ctx);
+    Mono<NodeResult> executeAsync(Map<String, Object> config, ExecutionContext ctx);
 
-    /** 是否为权益发放节点（执行成功后设 benefitGranted=true） */
     default boolean isBenefitNode() { return false; }
-
-    /** 是否为触达节点（执行成功后设 userReached=true） */
-    default boolean isReachNode() { return false; }
+    default boolean isReachNode()   { return false; }
 }

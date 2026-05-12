@@ -3,7 +3,9 @@ package org.chovy.canvas.engine.handlers;
 import org.chovy.canvas.engine.context.ExecutionContext;
 import org.chovy.canvas.engine.handler.NodeHandler;
 import org.chovy.canvas.engine.handler.NodeHandlerType;
+import org.springframework.stereotype.Component;
 import org.chovy.canvas.engine.handler.NodeResult;
+import reactor.core.publisher.Mono;
 import lombok.extern.slf4j.Slf4j;
 
 import java.util.List;
@@ -11,18 +13,19 @@ import java.util.Map;
 
 /** 发送 MQ 消息节点 — mock 直接返回成功 */
 @Slf4j
+@Component
 @NodeHandlerType("SEND_MQ")
 public class SendMqHandler implements NodeHandler {
 
     @Override
     @SuppressWarnings("unchecked")
-    public NodeResult execute(Map<String, Object> config, ExecutionContext ctx) {
+    public Mono<NodeResult> executeAsync(Map<String, Object> config, ExecutionContext ctx) {
         String messageCodeKey = (String) config.get("messageCodeKey");
         List<Map<String, Object>> params = (List<Map<String, Object>>) config.getOrDefault("params", List.of());
         String nextNodeId = (String) config.get("nextNodeId");
 
         log.info("[SEND_MQ] 发送 MQ messageCode={} userId={}", messageCodeKey, ctx.getUserId());
         // TODO: 接入 RocketMQ 生产者
-        return NodeResult.ok(nextNodeId, Map.of());
+        return Mono.just(NodeResult.ok(nextNodeId, Map.of()));
     }
 }

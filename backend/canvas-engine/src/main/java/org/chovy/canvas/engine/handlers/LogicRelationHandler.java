@@ -4,7 +4,9 @@ import org.chovy.canvas.engine.context.ExecutionContext;
 import org.chovy.canvas.engine.context.NodeStatus;
 import org.chovy.canvas.engine.handler.NodeHandler;
 import org.chovy.canvas.engine.handler.NodeHandlerType;
+import org.springframework.stereotype.Component;
 import org.chovy.canvas.engine.handler.NodeResult;
+import reactor.core.publisher.Mono;
 
 import java.util.List;
 import java.util.Map;
@@ -15,13 +17,14 @@ import java.util.Map;
  * OR  — 任意上游节点 SUCCESS 时继续。
  * 在调度器层检查（checkUpstreamCondition），此 Handler 仅负责确定 nextNodeId。
  */
+@Component
 @NodeHandlerType("LOGIC_RELATION")
 public class LogicRelationHandler implements NodeHandler {
 
     @Override
-    public NodeResult execute(Map<String, Object> config, ExecutionContext ctx) {
+    public Mono<NodeResult> executeAsync(Map<String, Object> config, ExecutionContext ctx) {
         String nextNodeId = (String) config.get("nextNodeId");
-        return NodeResult.ok(nextNodeId, Map.of());
+        return Mono.just(NodeResult.ok(nextNodeId, Map.of()));
     }
 
     /**

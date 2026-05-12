@@ -1,7 +1,9 @@
 package org.chovy.canvas.engine.context;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
-import lombok.Data;
+import lombok.Getter;
+import lombok.Setter;
+import lombok.ToString;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -9,16 +11,12 @@ import java.util.concurrent.atomic.AtomicBoolean;
 /**
  * 单次画布执行的上下文。
  *
- * 设计文档第五章：
- * - flatContext 提供 O(1) 字段查找（Last Writer Wins）
- * - nodeOutputs 保留完整历史用于轨迹查询
- * - nodeLocks 为每个节点提供 CAS 并发保护（repeat 机制）
- *
- * 序列化说明：
- * - @JsonIgnore 字段不持久化到 Redis，反序列化后按需重建
- * - hubStartTimes 持久化，用于多阶段恢复后继续检查 Hub 超时
+ * 注意：使用 @Getter/@Setter 而非 @Data，避免对含可变 Map/AtomicBoolean 的对象
+ * 生成基于所有字段的 equals()/hashCode()，那会导致并发场景下行为不可预测。
  */
-@Data
+@Getter
+@Setter
+@ToString(exclude = {"nodeLocks", "scheduledHubTimeouts"})
 public class ExecutionContext {
 
     private String executionId;

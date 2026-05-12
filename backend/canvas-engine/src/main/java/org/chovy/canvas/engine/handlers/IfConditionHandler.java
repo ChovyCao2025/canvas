@@ -3,7 +3,9 @@ package org.chovy.canvas.engine.handlers;
 import org.chovy.canvas.engine.context.ExecutionContext;
 import org.chovy.canvas.engine.handler.NodeHandler;
 import org.chovy.canvas.engine.handler.NodeHandlerType;
+import org.springframework.stereotype.Component;
 import org.chovy.canvas.engine.handler.NodeResult;
+import reactor.core.publisher.Mono;
 
 import java.math.BigDecimal;
 import java.util.List;
@@ -12,18 +14,19 @@ import java.util.Map;
 /**
  * IF 判断节点：所有 rules 均满足 → successNodeId，否则 → failNodeId
  */
+@Component
 @NodeHandlerType("IF_CONDITION")
 public class IfConditionHandler implements NodeHandler {
 
     @Override
     @SuppressWarnings("unchecked")
-    public NodeResult execute(Map<String, Object> config, ExecutionContext ctx) {
+    public Mono<NodeResult> executeAsync(Map<String, Object> config, ExecutionContext ctx) {
         List<Map<String, Object>> rules = (List<Map<String, Object>>) config.get("rules");
         String successNodeId = (String) config.get("successNodeId");
         String failNodeId    = (String) config.get("failNodeId");
 
         boolean allMatch = rules == null || rules.stream().allMatch(r -> evaluate(r, ctx));
-        return NodeResult.ifResult(allMatch, successNodeId, failNodeId);
+        return Mono.just(NodeResult.ifResult(allMatch, successNodeId, failNodeId));
     }
 
     static boolean evaluate(Map<String, Object> rule, ExecutionContext ctx) {

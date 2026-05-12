@@ -113,9 +113,7 @@ public class TriggerPreCheckService {
     }
 
     private void updateQuotaAsync(Long canvasId, String userId) {
-        org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor executor =
-                new org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor();
-        // 用虚拟线程异步写 MySQL（不阻塞触发链路）
+        // 虚拟线程异步写 MySQL，不阻塞触发链路
         Thread.ofVirtual().start(() -> {
             try {
                 LocalDate today = LocalDate.now();

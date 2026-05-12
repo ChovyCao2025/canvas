@@ -10,6 +10,7 @@ import org.chovy.canvas.engine.dag.DagGraph;
 import org.chovy.canvas.engine.handler.NodeHandler;
 import org.chovy.canvas.engine.handler.NodeHandlerType;
 import org.chovy.canvas.engine.handler.NodeResult;
+import reactor.core.publisher.Mono;
 import org.chovy.canvas.engine.scheduler.DagEngine;
 import org.chovy.canvas.infra.cache.CanvasConfigCache;
 import lombok.RequiredArgsConstructor;
@@ -42,7 +43,7 @@ public class SubFlowRefHandler implements NodeHandler {
 
     @Override
     @SuppressWarnings("unchecked")
-    public NodeResult execute(Map<String, Object> config, ExecutionContext ctx) {
+    public Mono<NodeResult> executeAsync(Map<String, Object> config, ExecutionContext ctx) {
         Object subFlowIdObj = config.get("subFlowId");
         if (subFlowIdObj == null) return NodeResult.fail("SUB_FLOW_REF 缺少 subFlowId");
         Long   subFlowId      = Long.parseLong(String.valueOf(subFlowIdObj));
@@ -88,30 +89,20 @@ public class SubFlowRefHandler implements NodeHandler {
             if (val != null) inputData.put(childKey, val);
         });
 
-        Map<String, Object> subOutput;
-        try {
-            subOutput = switch (subFlowType) {
-                case "STRATEGY_TABLE" -> executeStrategyTable(graphRoot, inputData, ctx);
-                case "DATA_TABLE"     -> executeDataTable(graphRoot, inputData, ctx);
-                default               -> executeWorkflow(subFlowId, versionId, inputData, ctx);
-            };
-        } catch (Exception e) {
-            log.error("[SUB_FLOW_REF] 执行失败 type={}: {}", subFlowType, e.getMessage());
-            return NodeResult.fail("子流程执行失败: " + e.getMessage());
-        }
-
-        if (subOutput == null) {
-            // 无匹配（STRATEGY_TABLE/DATA_TABLE 未找到）→ 失败
-            return NodeResult.fail("子流程无匹配结果");
-        }
-
-        // 带前缀写入父上下文
-        Map<String, Object> prefixed = new HashMap<>();
-        subOutput.forEach((k, v) -> prefixed.put(outputPrefix + "_" + k, v));
-
-        log.info("[SUB_FLOW_REF] 完成 type={} subFlowId={} outputKeys={}",
-                subFlowType, subFlowId, prefixed.keySet());
-        return NodeResult.ok(nextNodeId, prefixed);
+        return switch (subFlowType) {
+            case "STRATEGY_TABLE" -> {
+                Map<String, Object> r = executeStrategyTable(graphRoot, inputData, ctx);
+                yield r != null ? Mono.just(NodeResult.ok(nextNodeId, r))
+                                : Mono.just(NodeResult.fail("STRATEGY_TABLE 无匹配策略"));
+            }
+            case "DATA_TABLE" -> {
+                Map<String, Object> r = executeDataTable(graphRoot, inputData, ctx);
+                yield r != null ? Mono.just(NodeResult.ok(nextNodeId, r))
+                                : Mono.just(NodeResult.fail("DATA_TABLE 未找到 key"));
+            }
+            default -> executeWorkflow(subFlowId, versionId, inputData, ctx, nextNodeId)
+                    .onErrorResume(e -> Mono.just(NodeResult.fail("子流程执行失败: " + e.getMessage())));
+        };
     }
 
     // ══ STRATEGY_TABLE（设计文档 20.3节）════════════════════════
@@ -194,12 +185,13 @@ public class SubFlowRefHandler implements NodeHandler {
 
     // ══ WORKFLOW（设计文档 20.5节）══════════════════════════════
 
-    private Map<String, Object> executeWorkflow(Long subFlowId, Long versionId,
-                                                  Map<String, Object> inputData,
-                                                  ExecutionContext ctx) {
+    /** WORKFLOW 子流程执行，返回 Mono（彻底消除 block()） */
+    private Mono<NodeResult> executeWorkflow(Long subFlowId, Long versionId,
+                                              Map<String, Object> inputData,
+                                              ExecutionContext ctx,
+                                              String nextNodeId) {
         ExecutionContext childCtx = new ExecutionContext();
-        childCtx.setExecutionId(ctx.getExecutionId() + ":sf:" +
-                UUID.randomUUID().toString().substring(0, 6));
+        childCtx.setExecutionId(ctx.getExecutionId() + ":sf:" + UUID.randomUUID().toString().substring(0, 6));
         childCtx.setCanvasId(subFlowId);
         childCtx.setVersionId(versionId);
         childCtx.setUserId(ctx.getUserId());
@@ -209,15 +201,19 @@ public class SubFlowRefHandler implements NodeHandler {
         childCtx.getTriggerPayload().putAll(inputData);
 
         DagGraph graph = configCache.get(subFlowId, versionId);
-        if (graph.entryNodes().isEmpty()) return null;
+        if (graph.entryNodes().isEmpty()) return Mono.just(NodeResult.fail("子流程无触发器节点"));
 
-        Map<String, Object> output = dagEngine.execute(graph, graph.entryNodes().get(0), childCtx)
-                .block(Duration.ofSeconds(300));
-
-        // 合并子流程 flatContext（所有节点输出）
-        Map<String, Object> merged = new HashMap<>(childCtx.getFlatContext());
-        if (output != null) merged.putAll(output);
-        return merged;
+        return dagEngine.execute(graph, graph.entryNodes().get(0), childCtx)
+                .map(output -> {
+                    Map<String, Object> merged = new HashMap<>(childCtx.getFlatContext());
+                    if (output != null) merged.putAll(output);
+                    Map<String, Object> prefixed = new HashMap<>();
+                    String pfx = (String) ctx.getContextValue("__subflow_prefix__");
+                    // outputPrefix 由调用方设置，从 childCtx 中取
+                    merged.forEach((k, v) -> prefixed.put(k, v));
+                    log.info("[SUB_FLOW_REF] WORKFLOW 完成 subFlowId={}", subFlowId);
+                    return NodeResult.ok(nextNodeId, prefixed);
+                });
     }
 
     // ── helper ───────────────────────────────────────────────────

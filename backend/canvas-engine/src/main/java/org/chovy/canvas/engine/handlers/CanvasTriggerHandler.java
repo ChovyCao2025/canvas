@@ -7,6 +7,7 @@ import org.chovy.canvas.engine.dag.DagGraph;
 import org.chovy.canvas.engine.handler.NodeHandler;
 import org.chovy.canvas.engine.handler.NodeHandlerType;
 import org.chovy.canvas.engine.handler.NodeResult;
+import reactor.core.publisher.Mono;
 import org.chovy.canvas.engine.scheduler.DagEngine;
 import org.chovy.canvas.infra.cache.CanvasConfigCache;
 import lombok.RequiredArgsConstructor;
@@ -35,9 +36,9 @@ public class CanvasTriggerHandler implements NodeHandler {
 
     @Override
     @SuppressWarnings("unchecked")
-    public NodeResult execute(Map<String, Object> config, ExecutionContext ctx) {
+    public Mono<NodeResult> executeAsync(Map<String, Object> config, ExecutionContext ctx) {
         Object targetId = config.get("targetCanvasId");
-        if (targetId == null) return NodeResult.fail("CANVAS_TRIGGER 缺少 targetCanvasId");
+        if (targetId == null) return Mono.just(NodeResult.fail("CANVAS_TRIGGER 缺少 targetCanvasId"));
         Long targetCanvasId = Long.parseLong(String.valueOf(targetId));
 
         String invokeMode = (String) config.getOrDefault("invokeMode", "SYNC");
@@ -45,17 +46,15 @@ public class CanvasTriggerHandler implements NodeHandler {
         Map<String, Object> paramMapping =
                 (Map<String, Object>) config.getOrDefault("paramMapping", Map.of());
 
-        // 防循环检查（设计文档 20.5 节）
         if (ctx.getCallStack().contains(targetCanvasId)) {
-            return NodeResult.fail("CANVAS_TRIGGER 检测到循环调用: " + targetCanvasId);
+            return Mono.just(NodeResult.fail("CANVAS_TRIGGER 检测到循环调用: " + targetCanvasId));
         }
 
         Canvas target = canvasMapper.selectById(targetCanvasId);
         if (target == null || target.getStatus() != 1) {
-            return NodeResult.fail("目标画布未发布: " + targetCanvasId);
+            return Mono.just(NodeResult.fail("目标画布未发布: " + targetCanvasId));
         }
 
-        // 构建子执行上下文
         ExecutionContext childCtx = new ExecutionContext();
         childCtx.setExecutionId(ctx.getExecutionId() + ":sub:" + UUID.randomUUID().toString().substring(0, 8));
         childCtx.setCanvasId(targetCanvasId);
@@ -63,43 +62,34 @@ public class CanvasTriggerHandler implements NodeHandler {
         childCtx.setUserId(ctx.getUserId());
         childCtx.setTriggerType("CANVAS_TRIGGER");
 
-        // paramMapping：父上下文字段映射到子上下文
         paramMapping.forEach((childKey, parentKeyObj) -> {
-            String parentKey = String.valueOf(parentKeyObj)
-                    .replace("ctx.", "");
+            String parentKey = String.valueOf(parentKeyObj).replace("ctx.", "");
             Object val = ctx.getContextValue(parentKey);
             if (val != null) childCtx.getTriggerPayload().put(childKey, val);
         });
 
-        // 防循环：子 ctx 继承父 callStack 并加入自身
         childCtx.getCallStack().addAll(ctx.getCallStack());
         childCtx.getCallStack().add(ctx.getCanvasId());
 
-        try {
-            DagGraph childGraph = configCache.get(targetCanvasId, target.getPublishedVersionId());
-            String triggerNodeId = childGraph.entryNodes().isEmpty()
-                    ? null : childGraph.entryNodes().get(0);
-            if (triggerNodeId == null) {
-                return NodeResult.fail("目标画布无触发器节点");
-            }
+        DagGraph childGraph = configCache.get(targetCanvasId, target.getPublishedVersionId());
+        String triggerNodeId = childGraph.entryNodes().isEmpty() ? null : childGraph.entryNodes().get(0);
+        if (triggerNodeId == null) return Mono.just(NodeResult.fail("目标画布无触发器节点"));
 
-            if ("ASYNC".equals(invokeMode)) {
-                // 异步：fire-and-forget
-                dagEngine.execute(childGraph, triggerNodeId, childCtx).subscribe();
-                log.info("[CANVAS_TRIGGER] ASYNC 触发子画布 canvasId={}", targetCanvasId);
-                return NodeResult.ok(nextNodeId, Map.of());
-            }
-
-            // SYNC：等待子画布完成，合并输出
-            Map<String, Object> childResult = dagEngine.execute(childGraph, triggerNodeId, childCtx)
-                    .block(Duration.ofSeconds(300));
-
-            log.info("[CANVAS_TRIGGER] SYNC 子画布完成 canvasId={}", targetCanvasId);
-            return NodeResult.ok(nextNodeId,
-                    childResult != null ? childResult : Map.of());
-        } catch (Exception e) {
-            log.error("[CANVAS_TRIGGER] 执行失败: {}", e.getMessage());
-            return NodeResult.fail("子画布执行失败: " + e.getMessage());
+        if ("ASYNC".equals(invokeMode)) {
+            dagEngine.execute(childGraph, triggerNodeId, childCtx).subscribe();
+            log.info("[CANVAS_TRIGGER] ASYNC 触发子画布 canvasId={}", targetCanvasId);
+            return Mono.just(NodeResult.ok(nextNodeId, Map.of()));
         }
+
+        // SYNC：直接 flatMap 子执行链，无需 block()
+        return dagEngine.execute(childGraph, triggerNodeId, childCtx)
+                .map(result -> {
+                    log.info("[CANVAS_TRIGGER] SYNC 子画布完成 canvasId={}", targetCanvasId);
+                    return NodeResult.ok(nextNodeId, result != null ? result : Map.of());
+                })
+                .onErrorResume(e -> {
+                    log.error("[CANVAS_TRIGGER] 执行失败: {}", e.getMessage());
+                    return Mono.just(NodeResult.fail("子画布执行失败: " + e.getMessage()));
+                });
     }
 }

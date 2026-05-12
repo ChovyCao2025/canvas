@@ -3,7 +3,9 @@ package org.chovy.canvas.engine.handlers;
 import org.chovy.canvas.engine.context.ExecutionContext;
 import org.chovy.canvas.engine.handler.NodeHandler;
 import org.chovy.canvas.engine.handler.NodeHandlerType;
+import org.springframework.stereotype.Component;
 import org.chovy.canvas.engine.handler.NodeResult;
+import reactor.core.publisher.Mono;
 
 import java.util.HashMap;
 import java.util.List;
@@ -12,12 +14,13 @@ import java.util.Map;
 /**
  * 条件选择器：按 branches 顺序匹配，命中则走对应 nextNodeId，全部不命中走 elseNodeId。
  */
+@Component
 @NodeHandlerType("SELECTOR")
 public class SelectorHandler implements NodeHandler {
 
     @Override
     @SuppressWarnings("unchecked")
-    public NodeResult execute(Map<String, Object> config, ExecutionContext ctx) {
+    public Mono<NodeResult> executeAsync(Map<String, Object> config, ExecutionContext ctx) {
         List<Map<String, Object>> branches = (List<Map<String, Object>>) config.get("branches");
         String elseNodeId = (String) config.get("elseNodeId");
 
@@ -26,7 +29,7 @@ public class SelectorHandler implements NodeHandler {
                 Map<String, Object> branch = branches.get(i);
                 if (branchMatches(branch, ctx)) {
                     String next = (String) branch.get("nextNodeId");
-                    return NodeResult.ok(next, Map.of());
+                    return Mono.just(NodeResult.ok(next, Map.of()));
                 }
             }
         }
@@ -35,7 +38,7 @@ public class SelectorHandler implements NodeHandler {
         if (elseNodeId != null) return NodeResult.ok(elseNodeId, Map.of());
 
         // 无 else：SUCCESS，流程自然结束
-        return NodeResult.terminal(Map.of());
+        return Mono.just(NodeResult.terminal(Map.of()));
     }
 
     @SuppressWarnings("unchecked")

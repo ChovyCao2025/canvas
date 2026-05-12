@@ -83,13 +83,13 @@ public class CircuitBreakerRegistry {
             }
         }
 
-        /** 记录成功 */
+        /** 记录成功：任何状态均重置失败计数，确保"连续失败"语义 */
         public void recordSuccess() {
             if (state == State.HALF_OPEN) {
                 state = State.CLOSED;
-                failures.set(0);
                 log.info("[CIRCUIT] {} HALF_OPEN → CLOSED（探测成功）", name);
             }
+            failures.set(0); // CLOSED 状态也重置，防止"偶发失败"积累到阈值
         }
 
         /** 记录失败 */

@@ -3,7 +3,9 @@ package org.chovy.canvas.engine.handlers;
 import org.chovy.canvas.engine.context.ExecutionContext;
 import org.chovy.canvas.engine.handler.NodeHandler;
 import org.chovy.canvas.engine.handler.NodeHandlerType;
+import org.springframework.stereotype.Component;
 import org.chovy.canvas.engine.handler.NodeResult;
+import reactor.core.publisher.Mono;
 
 import java.util.HashMap;
 import java.util.List;
@@ -14,12 +16,13 @@ import java.util.Map;
  * 全部失败时，有 nextNodeId 则走 nextNodeId（标记 PARTIAL_FAIL），否则 FAILED。
  * 调度器在执行完每个子节点后回调此 Handler 判断是否继续。
  */
+@Component
 @NodeHandlerType("PRIORITY")
 public class PriorityHandler implements NodeHandler {
 
     @Override
     @SuppressWarnings("unchecked")
-    public NodeResult execute(Map<String, Object> config, ExecutionContext ctx) {
+    public Mono<NodeResult> executeAsync(Map<String, Object> config, ExecutionContext ctx) {
         List<Map<String, Object>> priorities = (List<Map<String, Object>>) config.get("priorities");
         String nextNodeId = (String) config.get("nextNodeId");
 
@@ -41,6 +44,6 @@ public class PriorityHandler implements NodeHandler {
             if (tid != null) branchMap.put("priority-" + i, tid);
         }
 
-        return NodeResult.multiNext(branchMap, nextNodeId);
+        return Mono.just(NodeResult.multiNext(branchMap, nextNodeId));
     }
 }

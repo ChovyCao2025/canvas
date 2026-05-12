@@ -4,7 +4,9 @@ import org.chovy.canvas.engine.context.ExecutionContext;
 import org.chovy.canvas.engine.context.NodeStatus;
 import org.chovy.canvas.engine.handler.NodeHandler;
 import org.chovy.canvas.engine.handler.NodeHandlerType;
+import org.springframework.stereotype.Component;
 import org.chovy.canvas.engine.handler.NodeResult;
+import reactor.core.publisher.Mono;
 
 import java.util.List;
 import java.util.Map;
@@ -13,13 +15,14 @@ import java.util.Map;
  * 集线器：等待所有上游完成（SUCCESS + FAILED 均计入），再继续执行下游。
  * timeout 配置防止并行分支永久阻塞。
  */
+@Component
 @NodeHandlerType("HUB")
 public class HubHandler implements NodeHandler {
 
     @Override
-    public NodeResult execute(Map<String, Object> config, ExecutionContext ctx) {
+    public Mono<NodeResult> executeAsync(Map<String, Object> config, ExecutionContext ctx) {
         String nextNodeId = (String) config.get("nextNodeId");
-        return NodeResult.ok(nextNodeId, Map.of());
+        return Mono.just(NodeResult.ok(nextNodeId, Map.of()));
     }
 
     /**

@@ -3,6 +3,7 @@ package org.chovy.canvas.engine.handlers;
 import org.chovy.canvas.engine.context.ExecutionContext;
 import org.chovy.canvas.engine.handler.NodeHandler;
 import org.chovy.canvas.engine.handler.NodeHandlerType;
+import reactor.core.publisher.Mono;
 import org.chovy.canvas.engine.handler.NodeResult;
 import groovy.lang.Binding;
 import groovy.lang.Script;
@@ -102,12 +103,12 @@ public class GroovyHandler implements NodeHandler {
 
     @Override
     @SuppressWarnings("unchecked")
-    public NodeResult execute(Map<String, Object> config, ExecutionContext ctx) {
+    public Mono<NodeResult> executeAsync(Map<String, Object> config, ExecutionContext ctx) {
         String code       = (String) config.get("code");
         String nextNodeId = (String) config.get("nextNodeId");
         List<Map<String, Object>> inputParams = (List<Map<String, Object>>) config.get("inputParams");
 
-        if (code == null || code.isBlank()) return NodeResult.ok(nextNodeId, Map.of());
+        if (code == null || code.isBlank()) return Mono.just(NodeResult.ok(nextNodeId, Map.of()));
 
         // 解析输入参数
         Map<String, Object> input = new HashMap<>();
@@ -134,6 +135,46 @@ public class GroovyHandler implements NodeHandler {
 
             // 缓存 key（发布时可预编译，运行时命中则无编译开销）
             String cacheKey = ctx.getCanvasId() + ":__groovy__:" + GroovyScriptCache.hash(code);
+
+            Future<Object> future = vte.submit(() -> {
+                Script script = scriptCache.getOrCompile(cacheKey, code, finalShell);
+                script.setBinding(binding);
+                return script.run();
+            });
+
+            Object result;
+            try {
+                result = future.get(timeoutMs, TimeUnit.MILLISECONDS);
+            } catch (TimeoutException e) {
+                future.cancel(true);
+                return Mono.just(NodeResult.fail("Groovy 脚本执行超时（" + timeoutMs + "ms）"));
+            }
+
+            Map<String, Object> output = result instanceof Map<?, ?> m
+                    ? new HashMap<>((Map<String, Object>) m) : Map.of();
+
+            if (output.toString().length() > maxOutputKb * 1024) {
+                return Mono.just(NodeResult.fail("Groovy 输出超过大小限制（" + maxOutputKb + "KB）"));
+            }
+
+            Boolean validateResult = (Boolean) config.get("validateResult");
+            if (Boolean.TRUE.equals(validateResult)) {
+                Object res = output.get("result");
+                if (!Boolean.TRUE.equals(res) && !"true".equals(String.valueOf(res))) {
+                    return Mono.just(NodeResult.fail("Groovy 脚本输出校验不通过"));
+                }
+            }
+
+            return Mono.just(NodeResult.ok(nextNodeId, output));
+
+        } catch (Exception e) {
+            log.warn("[GROOVY] 节点执行异常: {}", e.getMessage());
+            return Mono.just(NodeResult.fail("Groovy 执行异常: " + e.getMessage()));
+        } finally {
+            if (shell != null) shellPool.offer(shell);
+        }
+    }
+}
 
             Future<Object> future = vte.submit(() -> {
                 // 优先从预编译缓存获取 Script，否则即时编译
@@ -230,79 +271,5 @@ public class GroovyHandler implements NodeHandler {
         CompilerConfiguration config = new CompilerConfiguration();
         config.addCompilationCustomizers(security);
         return config;
-    }
-
-    @Override
-    @SuppressWarnings("unchecked")
-    public NodeResult execute(Map<String, Object> config, ExecutionContext ctx) {
-        String code         = (String) config.get("code");
-        String nextNodeId   = (String) config.get("nextNodeId");
-        List<Map<String, Object>> inputParams = (List<Map<String, Object>>) config.get("inputParams");
-
-        if (code == null || code.isBlank()) return NodeResult.ok(nextNodeId, Map.of());
-
-        // 解析输入参数
-        Map<String, Object> input = new HashMap<>();
-        if (inputParams != null) {
-            for (Map<String, Object> p : inputParams) {
-                String name = (String) p.get("name");
-                input.put(name, ctx.getContextValue(name));
-            }
-        }
-
-        groovy.lang.GroovyShell shell = null;
-        try {
-            shell = shellPool.poll(100, TimeUnit.MILLISECONDS);
-            if (shell == null) shell = new groovy.lang.GroovyShell(buildConfig());
-
-            Binding binding = new Binding();
-            binding.setVariable("input",       input);
-            binding.setVariable("userId",      ctx.getUserId());
-            binding.setVariable("canvasId",    String.valueOf(ctx.getCanvasId()));
-            binding.setVariable("executionId", ctx.getExecutionId());
-            binding.setVariable("ctx",         ctx);
-
-            final groovy.lang.GroovyShell finalShell = shell;
-            final String finalCode = code;
-
-            Future<Object> future = vte.submit(() -> {
-                Script script = finalShell.parse(finalCode);
-                script.setBinding(binding);
-                return script.run();
-            });
-
-            Object result;
-            try {
-                result = future.get(timeoutMs, TimeUnit.MILLISECONDS);
-            } catch (TimeoutException e) {
-                future.cancel(true);
-                return NodeResult.fail("Groovy 脚本执行超时（" + timeoutMs + "ms）");
-            }
-
-            Map<String, Object> output = result instanceof Map<?, ?> m
-                    ? new HashMap<>((Map<String, Object>) m) : Map.of();
-
-            // 检查输出大小
-            if (output.toString().length() > maxOutputKb * 1024) {
-                return NodeResult.fail("Groovy 输出超过大小限制（" + maxOutputKb + "KB）");
-            }
-
-            // validateResult 校验
-            Boolean validateResult = (Boolean) config.get("validateResult");
-            if (Boolean.TRUE.equals(validateResult)) {
-                Object res = output.get("result");
-                if (!Boolean.TRUE.equals(res) && !"true".equals(String.valueOf(res))) {
-                    return NodeResult.fail("Groovy 脚本输出校验不通过");
-                }
-            }
-
-            return NodeResult.ok(nextNodeId, output);
-
-        } catch (Exception e) {
-            log.warn("[GROOVY] 节点执行异常: {}", e.getMessage());
-            return NodeResult.fail("Groovy 执行异常: " + e.getMessage());
-        } finally {
-            if (shell != null) shellPool.offer(shell);
-        }
     }
 }

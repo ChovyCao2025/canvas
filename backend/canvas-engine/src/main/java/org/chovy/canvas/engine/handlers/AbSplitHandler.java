@@ -3,7 +3,9 @@ package org.chovy.canvas.engine.handlers;
 import org.chovy.canvas.engine.context.ExecutionContext;
 import org.chovy.canvas.engine.handler.NodeHandler;
 import org.chovy.canvas.engine.handler.NodeHandlerType;
+import org.springframework.stereotype.Component;
 import org.chovy.canvas.engine.handler.NodeResult;
+import reactor.core.publisher.Mono;
 
 import java.util.List;
 import java.util.Map;
@@ -19,18 +21,19 @@ import java.util.Map;
  *
  * 若需自定义比例，在 ABTest 系统维护后由其返回分组，canvas 侧不硬编码比例。
  */
+@Component
 @NodeHandlerType("AB_SPLIT")
 public class AbSplitHandler implements NodeHandler {
 
     @Override
     @SuppressWarnings("unchecked")
-    public NodeResult execute(Map<String, Object> config, ExecutionContext ctx) {
+    public Mono<NodeResult> executeAsync(Map<String, Object> config, ExecutionContext ctx) {
         String experimentKey = (String) config.get("experimentKey");
         List<Map<String, Object>> groups =
                 (List<Map<String, Object>>) config.get("groups");
 
         if (groups == null || groups.isEmpty()) {
-            return NodeResult.terminal(Map.of());
+            return Mono.just(NodeResult.terminal(Map.of()));
         }
 
         // 确定性 Hash 分桶（相同 userId + experimentKey 永远同组）
@@ -44,6 +47,6 @@ public class AbSplitHandler implements NodeHandler {
         String nextNodeId = (String) matched.get("nextNodeId");
         String groupKey   = (String) matched.getOrDefault("groupKey", String.valueOf(groupIndex));
 
-        return NodeResult.ok(nextNodeId, Map.of("abGroup", groupKey));
+        return Mono.just(NodeResult.ok(nextNodeId, Map.of("abGroup", groupKey)));
     }
 }

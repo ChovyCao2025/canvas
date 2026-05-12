@@ -148,27 +148,37 @@ public class CanvasService {
         return published;
     }
 
-    @Transactional
+    /**
+     * 画布下线。
+     * 分两步执行：
+     *   1. @Transactional DB 操作（状态置 2，清空 publishedVersionId）
+     *   2. 事务提交后再做外部调用（Redis 路由清理、Scheduler 取消、缓存失效）
+     *
+     * 不在事务内调用外部系统的原因：Redis/Scheduler 失败无法回滚 DB，
+     * 两者耦合会导致状态不一致。事务外失败最多是"路由残留"，比"状态回滚"危害小。
+     */
     public void offline(Long id, String operator) {
-        Canvas canvas = canvasMapper.selectById(id);
-        if (canvas == null) throw new IllegalArgumentException("画布不存在: " + id);
-
-        // ★ 先保存 publishedVersionId，置 null 后再读会是 null
-        Long publishedVersionId = canvas.getPublishedVersionId();
-
-        canvas.setStatus(2);
-        canvas.setPublishedVersionId(null);
-        canvasMapper.updateById(canvas);
-
+        Long publishedVersionId = offlineDb(id);   // Step 1: 事务内 DB 操作
         if (publishedVersionId != null) {
             CanvasVersion v = canvasVersionMapper.selectById(publishedVersionId);
             if (v != null) {
                 DagGraph graph = dagParser.parse(v.getGraphJson());
-                clearTriggerRoutesFromGraph(id, graph);       // 清理 Redis 路由
-                schedulerService.cancelScheduledTriggers(id, graph); // 取消定时任务
-                configCache.invalidate(id, publishedVersionId);      // 失效缓存
+                clearTriggerRoutesFromGraph(id, graph);          // Step 2: 事务外 Redis
+                schedulerService.cancelScheduledTriggers(id, graph); // 事务外 Scheduler
+                configCache.invalidate(id, publishedVersionId);      // 事务外缓存
             }
         }
+    }
+
+    @Transactional
+    Long offlineDb(Long id) {
+        Canvas canvas = canvasMapper.selectById(id);
+        if (canvas == null) throw new IllegalArgumentException("画布不存在: " + id);
+        Long publishedVersionId = canvas.getPublishedVersionId();
+        canvas.setStatus(2);
+        canvas.setPublishedVersionId(null);
+        canvasMapper.updateById(canvas);
+        return publishedVersionId;
     }
 
     public List<CanvasVersion> getVersions(Long canvasId) {
