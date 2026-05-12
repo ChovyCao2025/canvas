@@ -53,16 +53,17 @@ public class TriggerRouteService {
 
     /**
      * 检查路由表是否为空（用 SCAN，不用 KEYS，设计文档 6.4节）。
+     * blockFirst() 在 @PostConstruct 非 reactive 上下文中调用，阻塞安全。
      */
     public boolean isRouteTableEmpty() {
-        try (var cursor = reactiveFactory.getReactiveConnection()
-                .keyCommands()
-                .scan(ScanOptions.scanOptions().match(keys.triggerPattern()).count(1).build())
-                .blockFirst()) {
-            // 如果 blockFirst() 返回 null 说明没有任何 key
-            return cursor == null;
+        try {
+            byte[] firstKey = reactiveFactory.getReactiveConnection()
+                    .keyCommands()
+                    .scan(ScanOptions.scanOptions().match(keys.triggerPattern()).count(1).build())
+                    .blockFirst();
+            return firstKey == null;
         } catch (Exception e) {
-            return true;
+            return true; // Redis 不可用时保守返回 true
         }
     }
 }

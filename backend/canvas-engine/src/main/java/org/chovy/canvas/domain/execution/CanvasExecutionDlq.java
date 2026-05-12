@@ -21,5 +21,11 @@ public class CanvasExecutionDlq {
     private String errorMsg;
     private Integer retryCount;
     private String triggerPayload;
+    /** 原始触发类型（MQ / DIRECT_CALL / BEHAVIOR）—— 重放时需要 */
+    private String triggerType;
+    /** 原始触发节点类型（MQ_TRIGGER / BEHAVIOR_IN_APP 等）—— 重放时定位触发器节点 */
+    private String triggerNodeType;
+    /** 原始 matchKey（MQ topicKey / 行为 eventCode）*/
+    private String matchKey;
     private LocalDateTime failedAt;
 }

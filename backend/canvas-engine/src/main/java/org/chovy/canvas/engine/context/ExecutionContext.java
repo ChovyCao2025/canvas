@@ -24,6 +24,10 @@ public class ExecutionContext {
     private Long   versionId;
     private String userId;
     private String triggerType;
+    /** 触发器节点类型（MQ_TRIGGER / BEHAVIOR_IN_APP 等），DLQ 重放时需要 */
+    private String triggerNodeType;
+    /** 路由匹配 key（MQ=topicKey，BEHAVIOR=eventCode），DLQ 重放时需要 */
+    private String matchKey;
 
     /** 触发器携带的原始数据（写入 ctx 时的 payload） */
     private Map<String, Object> triggerPayload = new HashMap<>();

@@ -274,7 +274,7 @@ public class DagEngine {
 
     /** 写入死信队列（13.3节） */
     private void writeDlq(ExecutionContext ctx, String nodeId, String nodeType, Throwable cause) {
-        metrics.recordDlq(nodeType); // 记录 DLQ 指标
+        metrics.recordDlq(nodeType);
         try {
             String msg = cause.getMessage() != null ? cause.getMessage() : "unknown";
             CanvasExecutionDlq dlq = CanvasExecutionDlq.builder()
@@ -286,6 +286,10 @@ public class DagEngine {
                     .errorMsg(msg.substring(0, Math.min(500, msg.length())))
                     .retryCount(maxRetry)
                     .triggerPayload(objectMapper.writeValueAsString(ctx.getTriggerPayload()))
+                    // 保存原始触发信息，供 DLQ 重放使用（修复：replay 不再写死 DIRECT_CALL）
+                    .triggerType(ctx.getTriggerType())
+                    .triggerNodeType(ctx.getTriggerNodeType())
+                    .matchKey(ctx.getMatchKey())
                     .failedAt(LocalDateTime.now())
                     .build();
             Mono.fromRunnable(() -> dlqMapper.insert(dlq))

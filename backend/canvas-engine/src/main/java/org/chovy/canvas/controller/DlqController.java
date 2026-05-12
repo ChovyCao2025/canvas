@@ -70,16 +70,20 @@ public class DlqController {
                 log.warn("[DLQ] 解析 payload 失败: {}", e.getMessage());
             }
 
-            log.info("[DLQ] 手动重放 dlqId={} canvasId={} userId={} skipSuccessNodes={}",
-                    id, dlq.getCanvasId(), dlq.getUserId(), skipSuccessNodes);
+            log.info("[DLQ] 手动重放 dlqId={} canvasId={} userId={} triggerType={} skipSuccessNodes={}",
+                    id, dlq.getCanvasId(), dlq.getUserId(), dlq.getTriggerType(), skipSuccessNodes);
             return payload;
         })
         .subscribeOn(Schedulers.boundedElastic())
         .flatMap(payload -> {
             CanvasExecutionDlq dlq = dlqMapper.selectById(id);
+            // 使用原始触发类型重放，不写死 DIRECT_CALL
+            String triggerType     = dlq.getTriggerType() != null ? dlq.getTriggerType() : "DLQ_REPLAY";
+            String triggerNodeType = dlq.getTriggerNodeType() != null ? dlq.getTriggerNodeType() : "DIRECT_CALL";
+            String matchKey        = dlq.getMatchKey();
             return executionService.trigger(
-                    dlq.getCanvasId(), dlq.getUserId(), "DLQ_REPLAY",
-                    "DIRECT_CALL", null,
+                    dlq.getCanvasId(), dlq.getUserId(), triggerType,
+                    triggerNodeType, matchKey,
                     payload,
                     "dlq-replay-" + UUID.randomUUID().toString().substring(0, 8),
                     false);

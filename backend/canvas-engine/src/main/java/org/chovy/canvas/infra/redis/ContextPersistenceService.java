@@ -42,8 +42,11 @@ public class ContextPersistenceService {
     public void save(ExecutionContext ctx) {
         try {
             String json = objectMapper.writeValueAsString(ctx);
+            // 敏感字段脱敏后再存 Redis（设计文档 13.8节）
+            String masked = org.chovy.canvas.common.DataMaskingUtil.maskJson(
+                    json, org.chovy.canvas.common.DataMaskingUtil.DEFAULT_SENSITIVE_KEYS);
             redis.opsForValue().set(key(ctx.getCanvasId(), ctx.getUserId()),
-                    json, Duration.ofSeconds(ttlSec));
+                    masked, Duration.ofSeconds(ttlSec));
         } catch (Exception e) {
             log.error("保存 ExecutionContext 失败: {}", e.getMessage());
         }

@@ -39,6 +39,21 @@ public class CanvasSchedulerService {
     private final CanvasConfigCache      configCache;
     private final CanvasExecutionService executionService;
 
+    @org.springframework.beans.factory.annotation.Value("${canvas.integration.tagger-service-url}")
+    private String taggerUrl;
+    @org.springframework.beans.factory.annotation.Value("${canvas.integration.api-call-base-url}")
+    private String apiCallUrl;
+
+    // WebClient 懒建，避免循环依赖
+    private org.springframework.web.reactive.function.client.WebClient taggerClient;
+    private org.springframework.web.reactive.function.client.WebClient apiCallClient;
+
+    @jakarta.annotation.PostConstruct
+    void initClients() {
+        taggerClient  = org.springframework.web.reactive.function.client.WebClient.builder().baseUrl(taggerUrl).build();
+        apiCallClient = org.springframework.web.reactive.function.client.WebClient.builder().baseUrl(apiCallUrl).build();
+    }
+
     /** 已注册的调度任务（canvasId:nodeId → ScheduledFuture） */
     private final Map<String, ScheduledFuture<?>> activeTasks = new ConcurrentHashMap<>();
 
@@ -127,9 +142,61 @@ public class CanvasSchedulerService {
     private List<String> resolveUserIds(String sourceType, Map<String, Object> src) {
         return switch (sourceType) {
             case "USER_LIST" -> (List<String>) src.getOrDefault("userIds", List.of());
-            // TAGGER_GROUP / USER_API：Phase 9 完善，此处返回空列表
+
+            case "TAGGER_GROUP" -> {
+                // 调用 Tagger 离线用户列表接口获取指定标签的用户 ID 列表
+                String tagCode = (String) src.get("tagCode");
+                int limit = src.get("limit") instanceof Number n ? n.intValue() : 10000;
+                int pageSize = src.get("pageSize") instanceof Number n ? n.intValue() : 1000;
+                if (tagCode == null) { log.warn("[SCHEDULER] TAGGER_GROUP 缺少 tagCode"); yield List.of(); }
+                try {
+                    List<String> result = new java.util.ArrayList<>();
+                    int page = 1;
+                    while (result.size() < limit) {
+                        @SuppressWarnings("unchecked")
+                        java.util.Map<String, Object> resp = taggerClient.get()
+                                .uri(u -> u.path("/offline/users")
+                                        .queryParam("tagCode", tagCode)
+                                        .queryParam("page", page)
+                                        .queryParam("size", pageSize).build())
+                                .retrieve()
+                                .bodyToMono(java.util.Map.class)
+                                .block();
+                        List<String> batch = resp != null ? (List<String>) resp.getOrDefault("userIds", List.of()) : List.of();
+                        result.addAll(batch);
+                        if (batch.size() < pageSize) break; // 最后一页
+                    }
+                    log.info("[SCHEDULER] TAGGER_GROUP tagCode={} 拉取 {} 个用户", tagCode, result.size());
+                    yield result.subList(0, Math.min(result.size(), limit));
+                } catch (Exception e) {
+                    log.error("[SCHEDULER] TAGGER_GROUP 用户列表拉取失败: {}", e.getMessage());
+                    yield List.of();
+                }
+            }
+
+            case "USER_API" -> {
+                // 调用自定义接口获取用户列表
+                String apiKey = (String) src.get("apiKey");
+                if (apiKey == null) { log.warn("[SCHEDULER] USER_API 缺少 apiKey"); yield List.of(); }
+                try {
+                    @SuppressWarnings("unchecked")
+                    java.util.Map<String, Object> resp = apiCallClient.post()
+                            .uri("/call")
+                            .bodyValue(java.util.Map.of("apiKey", apiKey, "params", src.getOrDefault("params", java.util.Map.of())))
+                            .retrieve()
+                            .bodyToMono(java.util.Map.class)
+                            .block();
+                    List<String> userIds = resp != null ? (List<String>) resp.getOrDefault("userIds", List.of()) : List.of();
+                    log.info("[SCHEDULER] USER_API apiKey={} 返回 {} 个用户", apiKey, userIds.size());
+                    yield userIds;
+                } catch (Exception e) {
+                    log.error("[SCHEDULER] USER_API 用户列表获取失败: {}", e.getMessage());
+                    yield List.of();
+                }
+            }
+
             default -> {
-                log.warn("[SCHEDULER] userSource type={} 暂不支持，需对接外部系统", sourceType);
+                log.warn("[SCHEDULER] 未知 userSource type={}", sourceType);
                 yield List.of();
             }
         };

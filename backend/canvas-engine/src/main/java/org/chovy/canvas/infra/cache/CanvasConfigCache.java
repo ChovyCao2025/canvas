@@ -94,6 +94,13 @@ public class CanvasConfigCache {
         var version = canvasVersionMapper.selectById(versionId);
         if (version == null) throw new IllegalArgumentException("版本不存在: " + versionId);
 
+        // graphJson 可能被 CanvasVersionCleanupJob 清空（旧版本归档策略）
+        if (version.getGraphJson() == null || version.getGraphJson().isBlank()) {
+            throw new IllegalStateException(
+                "版本 " + versionId + " 的 graph_json 已被归档清空，" +
+                "无法加载。请使用更新的已发布版本，或重新发布画布。");
+        }
+
         DagGraph graph = dagParser.parse(version.getGraphJson());
         redis.opsForValue().set(redisKey, version.getGraphJson(), L2_TTL);
         l1.put(l1Key, graph);
