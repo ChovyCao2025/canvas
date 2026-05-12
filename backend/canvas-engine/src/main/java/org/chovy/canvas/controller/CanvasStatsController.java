@@ -28,6 +28,58 @@ public class CanvasStatsController {
     private final CanvasExecutionMapper      executionMapper;
     private final CanvasExecutionTraceMapper traceMapper;
 
+    /** 某次执行的所有节点轨迹（前端执行轨迹可视化，14.2节） */
+    @GetMapping("/execution/{executionId}/trace")
+    public Mono<R<List<Map<String, Object>>>> getTrace(@PathVariable String executionId) {
+        return Mono.fromCallable(() -> {
+            List<org.chovy.canvas.domain.execution.CanvasExecutionTrace> traces =
+                    traceMapper.selectList(
+                            new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<
+                                    org.chovy.canvas.domain.execution.CanvasExecutionTrace>()
+                                    .eq(org.chovy.canvas.domain.execution.CanvasExecutionTrace::getExecutionId,
+                                            executionId)
+                                    .orderByAsc(org.chovy.canvas.domain.execution.CanvasExecutionTrace::getStartedAt));
+            return traces.stream().map(t -> {
+                Map<String, Object> m = new java.util.LinkedHashMap<>();
+                m.put("nodeId",    t.getNodeId());
+                m.put("nodeType",  t.getNodeType());
+                m.put("nodeName",  t.getNodeName());
+                m.put("status",    t.getStatus());
+                m.put("errorMsg",  t.getErrorMsg());
+                if (t.getStartedAt() != null && t.getFinishedAt() != null) {
+                    m.put("durationMs",
+                            java.time.Duration.between(t.getStartedAt(), t.getFinishedAt()).toMillis());
+                }
+                return m;
+            }).collect(java.util.stream.Collectors.toList());
+        }).subscribeOn(reactor.core.scheduler.Schedulers.boundedElastic()).map(R::ok);
+    }
+
+    /** 画布最近 N 次执行记录（用于前端执行轨迹选择器） */
+    @GetMapping("/{id}/executions")
+    public Mono<R<List<Map<String, Object>>>> recentExecutions(
+            @PathVariable Long id,
+            @RequestParam(defaultValue = "20") int size) {
+        return Mono.fromCallable(() -> {
+            List<org.chovy.canvas.domain.execution.CanvasExecution> execs =
+                    executionMapper.selectList(
+                            new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<
+                                    org.chovy.canvas.domain.execution.CanvasExecution>()
+                                    .eq(org.chovy.canvas.domain.execution.CanvasExecution::getCanvasId, id)
+                                    .orderByDesc(org.chovy.canvas.domain.execution.CanvasExecution::getCreatedAt)
+                                    .last("LIMIT " + Math.min(size, 100)));
+            return execs.stream().map(e -> {
+                Map<String, Object> m = new java.util.LinkedHashMap<>();
+                m.put("id",          e.getId());
+                m.put("triggerType", e.getTriggerType());
+                m.put("status",      e.getStatus());
+                m.put("userId",      e.getUserId());
+                m.put("createdAt",   e.getCreatedAt() != null ? e.getCreatedAt().toString() : null);
+                return m;
+            }).collect(java.util.stream.Collectors.toList());
+        }).subscribeOn(reactor.core.scheduler.Schedulers.boundedElastic()).map(R::ok);
+    }
+
     /** 整体执行统计 */
     @GetMapping("/stats")
     public Mono<R<Map<String, Object>>> stats(

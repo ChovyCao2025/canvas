@@ -19,7 +19,7 @@ import type { CanvasDetail } from '../../types'
 import CanvasNodeCmp from '../../components/canvas/CanvasNode'
 import NodePanel from '../../components/node-panel'
 import ConfigPanel from '../../components/config-panel'
-import type { CanvasNodeData } from '../../components/canvas/constants'
+import ExecutionTracePanel, { type TraceStatus } from '../../components/canvas/ExecutionTracePanel'
 import {
   DEFAULT_NAMES, TRIGGER_TYPES, TERMINAL_TYPES,
 } from '../../components/canvas/constants'
@@ -161,6 +161,8 @@ function EditorInner({ detail }: { detail: CanvasDetail }) {
   const [canvasName, setCanvasName] = useState(detail.canvas.name)
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
+  /** 执行轨迹叠色 map：nodeId → hex color */
+  const [traceColorMap, setTraceColorMap] = useState<Record<string, string>>({})
   const editVersion = useRef(0)
 
   const { snapshot, undo, redo, canUndo, canRedo } = useHistory(nodes, edges)
@@ -205,13 +207,23 @@ function EditorInner({ detail }: { detail: CanvasDetail }) {
     if (!nodeType) return
     snapshot()
     const position = screenToFlowPosition({ x: e.clientX, y: e.clientY })
+
+    // SELECTOR 节点需要默认分支，否则没有 Handle 无法连线（鸡蛋问题）
+    const defaultBizConfig: BizConfig = nodeType === 'SELECTOR'
+      ? { branches: [{ label: '如果', nextNodeId: undefined }] }
+      : nodeType === 'IF_CONDITION'
+      ? { rules: [] }
+      : nodeType === 'PRIORITY'
+      ? { priorities: [{ order: 1, nextNodeId: undefined }] }
+      : {}
+
     const newNode: Node = {
       id: crypto.randomUUID().replace(/-/g, '').slice(0, 12),
       type: 'canvasNode',
       position,
       data: {
         nodeType, name: DEFAULT_NAMES[nodeType] ?? nodeType,
-        category, bizConfig: {},
+        category, bizConfig: defaultBizConfig,
       } as CanvasNodeData,
     }
     setNodes(prev => [...prev, newNode])
@@ -350,7 +362,18 @@ function EditorInner({ detail }: { detail: CanvasDetail }) {
           </Tooltip>
           <Button disabled={!canUndo} onClick={undo}>撤销</Button>
           <Button disabled={!canRedo} onClick={redo}>重做</Button>
-          <Button icon={<HistoryOutlined />} onClick={() => message.info('版本历史（Phase 3 完善）')}>
+          <ExecutionTracePanel
+            canvasId={canvasId}
+            onTraceLoaded={colorMap => {
+              setTraceColorMap(colorMap)
+              // 将颜色叠加到节点 data 中（CanvasNode 通过 traceColor 渲染）
+              setNodes(prev => prev.map(n => ({
+                ...n,
+                data: { ...n.data as CanvasNodeData, traceColor: colorMap[n.id] }
+              })))
+            }}
+          />
+          <Button icon={<HistoryOutlined />} onClick={() => message.info('版本历史')}>
             历史
           </Button>
           <Button icon={<SaveOutlined />} loading={saving} onClick={handleSave}>保存</Button>

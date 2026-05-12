@@ -1,8 +1,8 @@
-import { useState, useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { Collapse, Typography, Spin } from 'antd'
 import { metaApi } from '../../services/api'
 import type { NodeTypeRegistry } from '../../types'
-import { CATEGORY_SOLID } from './constants'
+import { CATEGORY_SOLID, DEFAULT_NAMES } from '../canvas/constants'
 
 const { Text } = Typography
 
@@ -10,17 +10,22 @@ interface Props {
   onDragStart: (nodeType: string, category: string) => void
 }
 
+// 模块级缓存（会话内只请求一次）
+let cachedGroups: Record<string, NodeTypeRegistry[]> | null = null
+
 export default function NodePanel({ onDragStart }: Props) {
-  const [groups, setGroups] = useState<Record<string, NodeTypeRegistry[]>>({})
-  const [loading, setLoading] = useState(true)
+  const [groups, setGroups] = useState<Record<string, NodeTypeRegistry[]>>(cachedGroups ?? {})
+  const [loading, setLoading] = useState(!cachedGroups)
 
   useEffect(() => {
+    if (cachedGroups) return // 已有缓存，不重复请求
     metaApi.getNodeTypes().then((res) => {
       const map: Record<string, NodeTypeRegistry[]> = {}
       for (const nt of res.data) {
         if (!map[nt.category]) map[nt.category] = []
         map[nt.category].push(nt)
       }
+      cachedGroups = map
       setGroups(map)
     }).finally(() => setLoading(false))
   }, [])

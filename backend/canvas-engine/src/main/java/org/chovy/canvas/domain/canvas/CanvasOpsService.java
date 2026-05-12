@@ -139,17 +139,75 @@ public class CanvasOpsService {
         return copy;
     }
 
-    // ── 版本对比 ────────────────────────────────────────────────
+    // ── 版本对比（设计文档 23.3节）─────────────────────────────────
 
+    @SuppressWarnings("unchecked")
     public java.util.Map<String, Object> diff(Long canvasId, Long v1Id, Long v2Id) {
         CanvasVersion v1 = canvasVersionMapper.selectById(v1Id);
         CanvasVersion v2 = canvasVersionMapper.selectById(v2Id);
         if (v1 == null || v2 == null) throw new IllegalArgumentException("版本不存在");
-        // 简化 diff：返回两个版本的 graphJson（前端计算节点级 diff）
+
+        // 解析两个版本的节点列表
+        java.util.List<java.util.Map<String, Object>> nodes1 = parseNodes(v1.getGraphJson());
+        java.util.List<java.util.Map<String, Object>> nodes2 = parseNodes(v2.getGraphJson());
+
+        java.util.Map<String, java.util.Map<String, Object>> map1 =
+                nodes1.stream().collect(java.util.stream.Collectors.toMap(
+                        n -> (String) n.get("id"), n -> n));
+        java.util.Map<String, java.util.Map<String, Object>> map2 =
+                nodes2.stream().collect(java.util.stream.Collectors.toMap(
+                        n -> (String) n.get("id"), n -> n));
+
+        // added: 在 v2 有但 v1 没有的节点
+        java.util.List<Object> added = nodes2.stream()
+                .filter(n -> !map1.containsKey(n.get("id")))
+                .map(n -> java.util.Map.of("nodeId", n.get("id"), "type", n.get("type"), "name", n.get("name")))
+                .collect(java.util.stream.Collectors.toList());
+
+        // removed: 在 v1 有但 v2 没有的节点
+        java.util.List<Object> removed = nodes1.stream()
+                .filter(n -> !map2.containsKey(n.get("id")))
+                .map(n -> java.util.Map.of("nodeId", n.get("id"), "type", n.get("type"), "name", n.get("name")))
+                .collect(java.util.stream.Collectors.toList());
+
+        // modified: 两个版本都有但配置不同的节点
+        java.util.List<Object> modified = nodes2.stream()
+                .filter(n -> map1.containsKey(n.get("id")))
+                .filter(n -> {
+                    java.util.Map<String, Object> old = map1.get(n.get("id"));
+                    return !java.util.Objects.equals(n.get("config"), old.get("config")) ||
+                           !java.util.Objects.equals(n.get("name"), old.get("name"));
+                })
+                .map(n -> java.util.Map.of("nodeId", n.get("id"), "type", n.get("type"), "name", n.get("name")))
+                .collect(java.util.stream.Collectors.toList());
+
         return java.util.Map.of(
-                "v1", java.util.Map.of("versionId", v1Id, "graphJson", v1.getGraphJson()),
-                "v2", java.util.Map.of("versionId", v2Id, "graphJson", v2.getGraphJson())
+                "v1", java.util.Map.of("versionId", v1Id, "version", v1.getVersion()),
+                "v2", java.util.Map.of("versionId", v2Id, "version", v2.getVersion()),
+                "added",    added,
+                "removed",  removed,
+                "modified", modified,
+                "summary", java.util.Map.of(
+                        "addedCount",   added.size(),
+                        "removedCount", removed.size(),
+                        "modifiedCount",modified.size(),
+                        "unchanged",    nodes2.size() - added.size() - modified.size()
+                )
         );
+    }
+
+    @SuppressWarnings("unchecked")
+    private java.util.List<java.util.Map<String, Object>> parseNodes(String graphJson) {
+        if (graphJson == null || graphJson.isBlank()) return List.of();
+        try {
+            java.util.Map<String, Object> root = new com.fasterxml.jackson.databind.ObjectMapper()
+                    .readValue(graphJson, java.util.Map.class);
+            Object nodes = root.get("nodes");
+            if (nodes instanceof java.util.List<?> l) {
+                return (java.util.List<java.util.Map<String, Object>>) l;
+            }
+        } catch (Exception ignored) {}
+        return List.of();
     }
 
     // ── helpers ──────────────────────────────────────────────────

@@ -46,6 +46,9 @@ public class CanvasExecutionService {
     @Value("${canvas.execution.global-timeout-sec:600}")
     private long globalTimeoutSec;
 
+    @org.springframework.beans.factory.annotation.Value("${canvas.execution.max-concurrency:1000}")
+    private int globalMaxConcurrency;
+
     // ── 触发入口 ──────────────────────────────────────────────────
 
     /**
@@ -73,6 +76,20 @@ public class CanvasExecutionService {
             // 2. 前置检查（有效期 / 配额 / 冷却期）—— dry-run 跳过
             if (!dryRun) {
                 preCheckService.check(canvas, userId);
+            }
+
+            // 2.5 单画布并发执行上限（设计文档 12.4节）
+            // 防止同一画布被大量并发触发（如大促瞬间流量）打爆执行引擎
+            if (!dryRun) {
+                int active = executionRegistry.activeCount(canvasId);
+                int maxConc = canvas.getMaxTotalExecutions() != null
+                        ? Math.min(canvas.getMaxTotalExecutions(), globalMaxConcurrency)
+                        : globalMaxConcurrency;
+                if (active >= maxConc) {
+                    log.warn("[ENGINE] 画布并发上限已达 canvasId={} active={}/{}", canvasId, active, maxConc);
+                    return Map.of("overflow", "concurrency_limit_reached",
+                                  "active", active, "limit", maxConc);
+                }
             }
 
             // 3. dedup 检查

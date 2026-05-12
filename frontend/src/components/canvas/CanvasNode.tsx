@@ -4,8 +4,9 @@ import type { CanvasNodeData } from './constants'
 import { CATEGORY_COLORS, TRIGGER_TYPES, TERMINAL_TYPES } from './constants'
 
 const CanvasNode = memo(({ data, selected }: NodeProps) => {
-  const d = data as CanvasNodeData
-  const bg = CATEGORY_COLORS[d.category] ?? '#722ed1'
+  const d = data as CanvasNodeData & { traceColor?: string }
+  // 执行轨迹叠色（14.2节）：traceColor 覆盖默认类别颜色
+  const bg = d.traceColor ?? CATEGORY_COLORS[d.category] ?? '#722ed1'
   const isTrigger  = TRIGGER_TYPES.has(d.nodeType)
   const isTerminal = TERMINAL_TYPES.has(d.nodeType)
 
