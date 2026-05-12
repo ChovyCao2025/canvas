@@ -37,6 +37,7 @@ public class CanvasExecutionService {
     private final ContextPersistenceService  ctxStore;
     private final DagEngine                  dagEngine;
     private final TriggerPreCheckService     preCheckService;
+    private final InFlightExecutionRegistry  executionRegistry;
     private final ObjectMapper               objectMapper;
 
     @Value("${canvas.execution.context-ttl-sec:86400}")
@@ -97,9 +98,9 @@ public class CanvasExecutionService {
                     return Map.<String, Object>of("skipped", "resume-lock");
                 }
                 ctx = ctxStore.load(canvasId, userId);
-                if (ctx == null) ctx = newContext(canvasId, canvas.getPublishedVersionId(), userId, triggerType);
+                if (ctx == null) ctx = newContext(canvasId, resolveVersionId(canvas, userId), userId, triggerType);
             } else {
-                ctx = newContext(canvasId, canvas.getPublishedVersionId(), userId, triggerType);
+                ctx = newContext(canvasId, resolveVersionId(canvas, userId), userId, triggerType);
             }
 
             // 合并本次 payload
@@ -138,9 +139,19 @@ public class CanvasExecutionService {
             }
             final CanvasExecution finalExec = exec;
 
-            // 7. 执行 DAG
-            return dagEngine.execute(graph, triggerNodeId, ctx)
-                    .timeout(Duration.ofSeconds(globalTimeoutSec))
+            // 7. 执行 DAG，并向注册表注册 Disposable（供 Kill Switch FORCE 模式使用）
+            Mono<Map<String, Object>> executionMono = dagEngine.execute(graph, triggerNodeId, ctx)
+                    .timeout(Duration.ofSeconds(globalTimeoutSec));
+
+            return executionMono
+                    .doOnSubscribe(sub -> {
+                        if (!dryRun) {
+                            // 转换 Subscription 为 Disposable 并注册
+                            executionRegistry.register(canvasId, ctx.getExecutionId(),
+                                    reactor.core.Disposables.single());
+                        }
+                    })
+                    .doFinally(signal -> executionRegistry.deregister(canvasId, ctx.getExecutionId()))
                     .flatMap(result -> {
                         // 8. 执行完成，清理 ctx，更新执行记录
                         if (!dryRun) {
@@ -179,6 +190,23 @@ public class CanvasExecutionService {
         ctx.setUserId(userId);
         ctx.setTriggerType(triggerType);
         return ctx;
+    }
+
+    /**
+     * 灰度路由：根据 userId+canvasId Hash 决定使用正式版本还是灰度版本（设计文档 16.1节）。
+     * 相同用户始终落入相同版本（确定性 Hash），保证一致的用户体验。
+     */
+    private Long resolveVersionId(Canvas canvas, String userId) {
+        if (canvas.getCanaryVersionId() != null && canvas.getCanaryPercent() != null
+                && canvas.getCanaryPercent() > 0) {
+            int bucket = Math.abs((userId + ":" + canvas.getId()).hashCode()) % 100;
+            if (bucket < canvas.getCanaryPercent()) {
+                log.debug("[CANARY] 命中灰度 canvasId={} userId={} bucket={}/{}",
+                        canvas.getId(), userId, bucket, canvas.getCanaryPercent());
+                return canvas.getCanaryVersionId();
+            }
+        }
+        return canvas.getPublishedVersionId();
     }
 
     /** 在 DAG 中找匹配类型和 matchKey 的触发器节点 */

@@ -1,5 +1,8 @@
 package org.chovy.canvas.controller;
 
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import io.jsonwebtoken.Claims;
 import org.chovy.canvas.common.R;
 import org.chovy.canvas.domain.approval.CanvasManualApproval;
 import org.chovy.canvas.domain.approval.CanvasManualApprovalMapper;
@@ -8,11 +11,15 @@ import org.chovy.canvas.engine.trigger.CanvasExecutionService;
 import org.chovy.canvas.infra.redis.ContextPersistenceService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpStatus;
+import org.springframework.security.core.context.ReactiveSecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.server.ResponseStatusException;
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
 
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -29,33 +36,38 @@ public class CanvasExecutionManagementController {
     private final CanvasManualApprovalMapper  approvalMapper;
     private final ContextPersistenceService   ctxStore;
     private final CanvasExecutionService      executionService;
+    private final ObjectMapper                objectMapper;
 
     /**
      * 人工审批通过（设计文档 18.2节）。
-     * 流程：更新 approval 记录 → 向 ctx 写入结果 → 触发继续执行。
+     * 安全校验：当前用户必须在 approvers 列表中（设计文档 18.2节补充说明）。
      */
     @PostMapping("/{executionId}/approve")
-    public Mono<R<Void>> approve(@PathVariable String executionId,
-                                  @RequestParam(defaultValue = "system") String approver) {
-        return Mono.<Void>fromRunnable(() -> resumeWithResult(executionId, "APPROVED", approver))
-                .subscribeOn(Schedulers.boundedElastic())
-                .thenReturn(R.<Void>ok());
+    public Mono<R<Void>> approve(@PathVariable String executionId) {
+        return currentUsername()
+                .flatMap(username ->
+                        Mono.<Void>fromRunnable(() -> resumeWithResult(executionId, "APPROVED", username,
+                                /* watchdog */ false))
+                                .subscribeOn(Schedulers.boundedElastic())
+                                .thenReturn(R.<Void>ok()));
     }
 
     /** 人工审批拒绝（设计文档 18.2节） */
     @PostMapping("/{executionId}/reject")
     public Mono<R<Void>> reject(@PathVariable String executionId,
-                                 @RequestParam(required = false) String reason,
-                                 @RequestParam(defaultValue = "system") String approver) {
-        return Mono.<Void>fromRunnable(() -> resumeWithResult(executionId, "REJECTED", approver))
-                .subscribeOn(Schedulers.boundedElastic())
+                                 @RequestParam(required = false) String reason) {
+        return currentUsername()
+                .flatMap(username ->
+                        Mono.<Void>fromRunnable(() -> resumeWithResult(executionId, "REJECTED", username,
+                                /* watchdog */ false))
+                                .subscribeOn(Schedulers.boundedElastic())
                 .thenReturn(R.<Void>ok());
     }
 
     // ── private ──────────────────────────────────────────────────
 
-    private void resumeWithResult(String executionId, String result, String approver) {
-        // 1. 找到对应的审批记录（executionId 对应唯一一个 PENDING 审批）
+    private void resumeWithResult(String executionId, String result, String approver,
+                                   boolean isWatchdog) {
         CanvasManualApproval approval = approvalMapper.selectList(
                 new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<CanvasManualApproval>()
                         .eq(CanvasManualApproval::getExecutionId, executionId)
@@ -66,6 +78,20 @@ public class CanvasExecutionManagementController {
         if (approval == null) {
             log.warn("[APPROVAL] 找不到 PENDING 审批记录 executionId={}", executionId);
             return;
+        }
+
+        // 审批人身份校验（设计文档 18.2节安全要求；Watchdog 超时处理时跳过）
+        if (!isWatchdog) {
+            try {
+                List<String> approvers = objectMapper.readValue(
+                        approval.getApprovers(), new TypeReference<>() {});
+                if (!approvers.contains(approver)) {
+                    throw new ResponseStatusException(HttpStatus.FORBIDDEN,
+                            "AUTH_003: 当前用户不在审批人列表中，无权操作此审批");
+                }
+            } catch (ResponseStatusException e) {
+                throw e;
+            } catch (Exception ignored) {}
         }
 
         // 2. 更新审批记录
@@ -102,5 +128,14 @@ public class CanvasExecutionManagementController {
                         r  -> log.info("[APPROVAL] 恢复执行完成 executionId={} result={}", executionId, result),
                         e  -> log.error("[APPROVAL] 恢复执行失败 executionId={}: {}", executionId, e.getMessage())
                 );
+    }
+
+    /** 从 JWT SecurityContext 获取当前登录用户名 */
+    private Mono<String> currentUsername() {
+        return ReactiveSecurityContextHolder.getContext()
+                .map(ctx -> ctx.getAuthentication().getPrincipal())
+                .cast(Claims.class)
+                .map(c -> c.get("username", String.class))
+                .defaultIfEmpty("system");
     }
 }

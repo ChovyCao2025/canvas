@@ -424,6 +424,10 @@ public class DagEngine {
     private Mono<Map<String, Object>> triggerDownstream(DagGraph graph, NodeResult result,
                                                           String sourceNodeId, String sourceType,
                                                           ExecutionContext ctx) {
+        // 立即标记未走的分支入口为 SKIPPED（设计文档 7.7节两阶段写入 - 阶段一）
+        // 目的：让 LOGIC_RELATION(AND) 在执行中即时检测到上游 SKIPPED，而不是等到执行结束
+        markNonTakenBranchesSkipped(graph, sourceNodeId, sourceType, result, ctx);
+
         // PRIORITY 节点：串行依序尝试，第一个成功则停止（4.6节）
         if ("PRIORITY".equals(sourceType) && result.branchMap() != null) {
             List<String> orderedBranches = result.branchMap().values().stream()
@@ -599,5 +603,59 @@ public class DagEngine {
         Map<String, Object> resolved = new HashMap<>(resolveConfig(config, ctx));
         resolved.put("__nodeId", nodeId);
         return resolved;
+    }
+
+    /**
+     * 立即标记未走分支的入口节点为 SKIPPED（设计文档 7.7节 阶段一写入）。
+     *
+     * 必要性：LOGIC_RELATION(AND) 在执行中检查上游 SKIPPED，
+     * 若 SKIPPED 只在执行结束后才写，则 LOGIC_RELATION 永远看到 PENDING，永久等待。
+     *
+     * 覆盖场景：
+     *   IF_CONDITION  → 标记未走的 success/fail 分支入口
+     *   SELECTOR      → 标记未命中的所有 branch 入口（含 else）
+     */
+    @SuppressWarnings("unchecked")
+    private void markNonTakenBranchesSkipped(DagGraph graph, String sourceNodeId,
+                                              String sourceType, NodeResult result,
+                                              ExecutionContext ctx) {
+        DagParser.CanvasNode node = graph.getNode(sourceNodeId);
+        if (node == null || node.getConfig() == null) return;
+        Map<String, Object> cfg = node.getConfig();
+
+        if ("IF_CONDITION".equals(sourceType)) {
+            // result 中只有被走的那条（另一条是 null）
+            // 通过 config 找到"另一条"并标记 SKIPPED
+            String successId = (String) cfg.get("successNodeId");
+            String failId    = (String) cfg.get("failNodeId");
+            String takenId   = result.successNodeId() != null ? result.successNodeId()
+                                                               : result.failNodeId();
+            String skippedId = takenId != null && takenId.equals(successId) ? failId : successId;
+            markSkipped(skippedId, ctx);
+
+        } else if ("SELECTOR".equals(sourceType)) {
+            // 标记所有未走的 branch 入口
+            java.util.List<Map<String, Object>> branches =
+                    (java.util.List<Map<String, Object>>) cfg.getOrDefault("branches", List.of());
+            String elseId  = (String) cfg.get("elseNodeId");
+            String takenId = result.nextNodeId(); // SELECTOR 走的那条
+
+            branches.forEach(b -> {
+                String branchNext = (String) b.get("nextNodeId");
+                if (branchNext != null && !branchNext.equals(takenId)) {
+                    markSkipped(branchNext, ctx);
+                }
+            });
+            if (elseId != null && !elseId.equals(takenId)) {
+                markSkipped(elseId, ctx);
+            }
+        }
+    }
+
+    private void markSkipped(String nodeId, ExecutionContext ctx) {
+        if (nodeId != null && !ctx.isNodeDone(nodeId)) {
+            ctx.setNodeStatus(nodeId, NodeStatus.SKIPPED);
+            log.debug("[ENGINE] 立即标记 SKIPPED nodeId={}", nodeId);
+        }
     }
 }

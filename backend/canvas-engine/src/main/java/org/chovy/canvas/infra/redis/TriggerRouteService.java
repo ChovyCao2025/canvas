@@ -71,9 +71,20 @@ public class TriggerRouteService {
         return ids != null ? ids : Set.of();
     }
 
+    /**
+     * 检查路由表是否为空（设计文档 6.4节注意事项）。
+     * 使用 SCAN 游标而非 KEYS 命令，避免 O(N) 阻塞 Redis 单线程。
+     * SCAN count(1) + 找到第一条即停止，O(1) 开销。
+     */
     public boolean isRouteTableEmpty() {
-        // 抽查：任意一个已知 key 是否存在
-        Set<String> keys = redis.keys("canvas:trigger:*");
-        return keys == null || keys.isEmpty();
+        try (var cursor = redis.getConnectionFactory()
+                .getConnection()
+                .scan(org.springframework.data.redis.core.ScanOptions.scanOptions()
+                        .match("canvas:trigger:*").count(1).build())) {
+            return !cursor.hasNext();
+        } catch (Exception e) {
+            // Redis 不可用时保守返回 true（触发重建）
+            return true;
+        }
     }
 }

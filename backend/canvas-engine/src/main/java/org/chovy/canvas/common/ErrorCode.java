@@ -43,4 +43,6 @@ public final class ErrorCode {
     public static final String AUTH_001 = "AUTH_001"; // 用户名或密码错误
     public static final String AUTH_002 = "AUTH_002"; // Token 已过期
     public static final String AUTH_003 = "AUTH_003"; // 无权限执行此操作
+    public static final String AUTH_004 = "AUTH_004"; // 账号已锁定（暴力破解保护，15分钟后解锁）
+    public static final String AUTH_005 = "AUTH_005"; // 账号已禁用
 }
