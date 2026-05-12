@@ -205,13 +205,13 @@ public class SubFlowRefHandler implements NodeHandler {
 
         return dagEngine.execute(graph, graph.entryNodes().get(0), childCtx)
                 .map(output -> {
+                    // 合并子流程所有输出，加 outputPrefix 前缀写回父上下文防 key 冲突
                     Map<String, Object> merged = new HashMap<>(childCtx.getFlatContext());
                     if (output != null) merged.putAll(output);
                     Map<String, Object> prefixed = new HashMap<>();
-                    String pfx = (String) ctx.getContextValue("__subflow_prefix__");
-                    // outputPrefix 由调用方设置，从 childCtx 中取
-                    merged.forEach((k, v) -> prefixed.put(k, v));
-                    log.info("[SUB_FLOW_REF] WORKFLOW 完成 subFlowId={}", subFlowId);
+                    merged.forEach((k, v) -> prefixed.put(outputPrefix + "_" + k, v));
+                    log.info("[SUB_FLOW_REF] WORKFLOW 完成 subFlowId={} prefix={} outputKeys={}",
+                            subFlowId, outputPrefix, prefixed.keySet());
                     return NodeResult.ok(nextNodeId, prefixed);
                 });
     }

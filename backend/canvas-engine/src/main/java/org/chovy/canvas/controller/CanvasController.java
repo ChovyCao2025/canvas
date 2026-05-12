@@ -70,8 +70,11 @@ public class CanvasController {
     }
 
     @GetMapping("/{id}/versions")
-    public Mono<R<List<CanvasVersion>>> getVersions(@PathVariable Long id) {
-        return Mono.fromCallable(() -> canvasService.getVersions(id))
+    public Mono<R<PageResult<CanvasVersion>>> getVersions(
+            @PathVariable Long id,
+            @RequestParam(defaultValue = "1")  int page,
+            @RequestParam(defaultValue = "20") int size) {
+        return Mono.fromCallable(() -> canvasService.getVersions(id, page, size))
                 .subscribeOn(Schedulers.boundedElastic())
                 .map(R::ok);
     }

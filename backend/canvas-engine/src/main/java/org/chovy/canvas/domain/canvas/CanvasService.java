@@ -223,11 +223,24 @@ public class CanvasService {
         return publishedVersionId;
     }
 
+    public PageResult<CanvasVersion> getVersions(Long canvasId, int page, int size) {
+        com.baomidou.mybatisplus.extension.plugins.pagination.Page<CanvasVersion> p =
+                new com.baomidou.mybatisplus.extension.plugins.pagination.Page<>(page, size);
+        LambdaQueryWrapper<CanvasVersion> q = new LambdaQueryWrapper<CanvasVersion>()
+                .eq(CanvasVersion::getCanvasId, canvasId)
+                .orderByDesc(CanvasVersion::getVersion);
+        var result = canvasVersionMapper.selectPage(p, q);
+        return PageResult.of(result.getTotal(), result.getRecords());
+    }
+
+    /** @deprecated 使用 getVersions(canvasId, page, size) */
+    @Deprecated
     public List<CanvasVersion> getVersions(Long canvasId) {
         return canvasVersionMapper.selectList(
                 new LambdaQueryWrapper<CanvasVersion>()
                         .eq(CanvasVersion::getCanvasId, canvasId)
                         .orderByDesc(CanvasVersion::getVersion)
+                        .last("LIMIT 20") // 防止全量返回
         );
     }
 

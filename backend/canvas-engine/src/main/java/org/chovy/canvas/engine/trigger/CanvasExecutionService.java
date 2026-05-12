@@ -38,6 +38,7 @@ public class CanvasExecutionService {
     private final DagEngine                  dagEngine;
     private final TriggerPreCheckService     preCheckService;
     private final InFlightExecutionRegistry  executionRegistry;
+    private final org.chovy.canvas.domain.execution.CanvasExecutionStatsMapper statsMapper;
     private final ObjectMapper               objectMapper;
 
     @Value("${canvas.execution.context-ttl-sec:86400}")
@@ -175,6 +176,7 @@ public class CanvasExecutionService {
                             ctxStore.delete(ctx.getCanvasId(), ctx.getUserId());
                             if (isResume) ctxStore.releaseResumeLock(ctx.getCanvasId(), ctx.getUserId());
                             updateExecution(finalExec, 2, result); // SUCCESS
+                            incrementStats(ctx.getCanvasId(), 2, ctx.getUserId()); // 统计
                         }
                         return Mono.just(result);
                     })
@@ -272,5 +274,42 @@ public class CanvasExecutionService {
         } catch (Exception ignored) {}
         Mono.fromRunnable(() -> executionMapper.updateById(exec))
                 .subscribeOn(Schedulers.boundedElastic()).subscribe();
+    }
+
+    /**
+     * 更新 canvas_execution_stats 当日统计（设计文档 21.1节）。
+     * 使用 INSERT ... ON DUPLICATE KEY UPDATE 保证原子性。
+     */
+    private void incrementStats(Long canvasId, int finalStatus, String userId) {
+        Thread.ofVirtual().start(() -> {
+            try {
+                java.time.LocalDate today = java.time.LocalDate.now();
+                // 查已有记录
+                org.chovy.canvas.domain.execution.CanvasExecutionStats stats =
+                        statsMapper.selectOne(new com.baomidou.mybatisplus.core.conditions.query
+                                .LambdaQueryWrapper<org.chovy.canvas.domain.execution.CanvasExecutionStats>()
+                                .eq(org.chovy.canvas.domain.execution.CanvasExecutionStats::getCanvasId, canvasId)
+                                .eq(org.chovy.canvas.domain.execution.CanvasExecutionStats::getStatDate, today));
+                if (stats == null) {
+                    stats = new org.chovy.canvas.domain.execution.CanvasExecutionStats();
+                    stats.setCanvasId(canvasId); stats.setStatDate(today);
+                    stats.setTotalCount(0); stats.setSuccessCount(0);
+                    stats.setFailCount(0); stats.setPausedCount(0); stats.setUniqueUsers(0);
+                    statsMapper.insert(stats);
+                    stats = statsMapper.selectOne(new com.baomidou.mybatisplus.core.conditions.query
+                            .LambdaQueryWrapper<org.chovy.canvas.domain.execution.CanvasExecutionStats>()
+                            .eq(org.chovy.canvas.domain.execution.CanvasExecutionStats::getCanvasId, canvasId)
+                            .eq(org.chovy.canvas.domain.execution.CanvasExecutionStats::getStatDate, today));
+                }
+                if (stats == null) return;
+                stats.setTotalCount(stats.getTotalCount() + 1);
+                if (finalStatus == 2) stats.setSuccessCount(stats.getSuccessCount() + 1);
+                else if (finalStatus == 3) stats.setFailCount(stats.getFailCount() + 1);
+                else if (finalStatus == 1) stats.setPausedCount(stats.getPausedCount() + 1);
+                statsMapper.updateById(stats);
+            } catch (Exception e) {
+                log.warn("[STATS] 更新统计失败 canvasId={}: {}", canvasId, e.getMessage());
+            }
+        });
     }
 }

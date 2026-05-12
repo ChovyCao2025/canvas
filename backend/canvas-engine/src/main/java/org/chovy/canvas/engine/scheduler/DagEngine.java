@@ -157,6 +157,7 @@ public class DagEngine {
             // ──────────────────────────────────────────────────────
             writeTraceStart(ctx, node);
             NodeHandler handler = handlerRegistry.get(node.getType());
+            long nodeStartMs = System.currentTimeMillis(); // 记录节点开始时间
 
             return executeHandlerWithRepeat(handler, config, ctx, waitProcess,
                     nodeId, node.getType())
@@ -184,8 +185,9 @@ public class DagEngine {
                         }
 
                         ctx.setNodeStatus(nodeId, NodeStatus.SUCCESS);
-                        writeTraceEnd(ctx, node, result);
-                        metrics.recordNodeExecution(node.getType(), "SUCCESS", 0);
+                        long durationMs = System.currentTimeMillis() - nodeStartMs;
+                        writeTraceEnd(ctx, node, result, durationMs);
+                        metrics.recordNodeExecution(node.getType(), "SUCCESS", durationMs);
                         log.debug("[ENGINE] 节点完成 nodeId={} type={}", nodeId, node.getType());
 
                         return triggerDownstream(graph, result, nodeId, node.getType(), ctx);
@@ -532,13 +534,8 @@ public class DagEngine {
         });
 
         if (!skippedTraces.isEmpty()) {
-            // 异步批量写入，不阻塞主执行链路
-            Mono.fromRunnable(() -> skippedTraces.forEach(traceMapper::insert))
-                    .subscribeOn(Schedulers.boundedElastic())
-                    .subscribe(
-                            null,
-                            e -> log.error("[ENGINE] 写入 SKIPPED 轨迹失败: {}", e.getMessage())
-                    );
+            // 批量异步写入（TraceWriteBuffer 批量刷盘，不阻塞主执行链路）
+            skippedTraces.forEach(traceBuffer::offer);
         }
     }
 
@@ -559,7 +556,9 @@ public class DagEngine {
         traceBuffer.offer(trace); // 非阻塞入队
     }
 
-    private void writeTraceEnd(ExecutionContext ctx, DagParser.CanvasNode node, NodeResult result) {
+    /** 重载：带 durationMs（节点实际耗时）*/
+    private void writeTraceEnd(ExecutionContext ctx, DagParser.CanvasNode node,
+                                NodeResult result, long durationMs) {
         int status = result.success() ? 1 : 2;
         String outputJson = null;
         try {
@@ -578,6 +577,13 @@ public class DagEngine {
                 .errorMsg(result.errorMessage())
                 .finishedAt(LocalDateTime.now())
                 .build();
+        // TODO: store durationMs in trace record (需 V8 migration 给 trace 表加 duration_ms 列)
+        traceBuffer.offer(trace);
+    }
+
+    private void writeTraceEnd(ExecutionContext ctx, DagParser.CanvasNode node, NodeResult result) {
+        writeTraceEnd(ctx, node, result, 0);
+    }
         traceBuffer.offer(trace); // 非阻塞入队（12.10节批量写入）
     }
 
