@@ -1,11 +1,11 @@
 import { useEffect, useState, useCallback } from 'react'
 import {
   Form, Input, InputNumber, Select, Switch, Button,
-  Typography, Spin, Divider, Space, Tag, Tooltip,
+  Typography, Spin, Divider, Space, Collapse, Tag,
 } from 'antd'
-import { PlusOutlined, DeleteOutlined } from '@ant-design/icons'
-import { metaApi } from '../../services/api'
-import type { NodeTypeRegistry, ContextField, StubOption } from '../../types'
+import { PlusOutlined, DeleteOutlined, DownOutlined } from '@ant-design/icons'
+import { metaApi, canvasApi } from '../../services/api'
+import type { NodeTypeRegistry, ContextField, StubOption, Canvas } from '../../types'
 import type { CanvasNodeData } from '../canvas/constants'
 
 const { Text } = Typography
@@ -189,9 +189,18 @@ function renderControl(
       return <ContextValueList ctxFields={ctxFields} />
     case 'param-define-list':
       return <ParamDefineList />
-    case 'node-select':
+    case 'branch-list':
+      return <BranchList ctxFields={ctxFields} />
+    case 'ab-group-list':
+      return <AbGroupList />
+    case 'priority-list':
+      return <PriorityList />
+    case 'key-value':
+      return <KeyValueMapping ctxFields={ctxFields} />
     case 'canvas-select':
-      return <Input placeholder={`填入 ${field.type === 'canvas-select' ? '画布' : '节点'} ID`} />
+      return <CanvasSelector />
+    case 'node-select':
+      return <Input placeholder="节点 ID（连线后自动填入）" />
     default:
       return <Input placeholder={field.label} />
   }
@@ -316,9 +325,206 @@ function ParamDefineList() {
   )
 }
 
-// ── helpers ────────────────────────────────────────────────────────
-interface SchemaField {
-  key: string; label: string; type: string
+// ── SELECTOR 分支列表控件（branch-list）────────────────────────────
+interface BranchItem { label: string; strategyRelation: string; conditions: ConditionRule[]; nextNodeId?: string }
+function BranchList({ ctxFields }: { ctxFields: ContextField[] }) {
+  const form = Form.useFormInstance()
+  const branches: BranchItem[] = Form.useWatch('branches', form) ?? []
+  const ops = ['EQ', 'NEQ', 'CONTAINS', 'GT', 'LT', 'GTE', 'LTE']
+
+  const addBranch = () => form.setFieldValue('branches', [
+    ...branches,
+    { label: branches.length === 0 ? '如果' : '否则如果', strategyRelation: 'AND', conditions: [], nextNodeId: undefined }
+  ])
+  const removeBranch = (i: number) => {
+    const next = [...branches]; next.splice(i, 1); form.setFieldValue('branches', next)
+  }
+  const updateBranch = (i: number, k: keyof BranchItem, v: unknown) => {
+    const next = [...branches]; (next[i] as any)[k] = v; form.setFieldValue('branches', next)
+  }
+  const addCondition = (branchIdx: number) => {
+    const next = [...branches]
+    next[branchIdx] = { ...next[branchIdx], conditions: [...(next[branchIdx].conditions ?? []), { field: '', operator: 'EQ', value: '', isCustom: true }] }
+    form.setFieldValue('branches', next)
+  }
+  const removeCondition = (bi: number, ci: number) => {
+    const next = [...branches]; next[bi].conditions.splice(ci, 1); form.setFieldValue('branches', next)
+  }
+  const updateCondition = (bi: number, ci: number, k: string, v: string) => {
+    const next = [...branches]; (next[bi].conditions[ci] as any)[k] = v; form.setFieldValue('branches', next)
+  }
+
+  const items = branches.map((b, i) => ({
+    key: String(i),
+    label: (
+      <Space>
+        <Input size="small" style={{ width: 80 }} value={b.label}
+          onChange={e => updateBranch(i, 'label', e.target.value)}
+          onClick={e => e.stopPropagation()} />
+        <Select size="small" style={{ width: 60 }} value={b.strategyRelation}
+          options={[{ label: 'AND', value: 'AND' }, { label: 'OR', value: 'OR' }]}
+          onChange={v => updateBranch(i, 'strategyRelation', v)}
+          onClick={e => e.stopPropagation()} />
+        <Button size="small" danger type="text" icon={<DeleteOutlined />}
+          onClick={e => { e.stopPropagation(); removeBranch(i) }} />
+      </Space>
+    ),
+    children: (
+      <div>
+        {b.conditions?.map((c, ci) => (
+          <Space key={ci} style={{ display: 'flex', marginBottom: 4 }}>
+            <Select size="small" style={{ width: 90 }} placeholder="字段"
+              value={c.field || undefined}
+              options={ctxFields.map(f => ({ label: f.fieldName, value: f.fieldKey }))}
+              onChange={v => updateCondition(i, ci, 'field', v)} showSearch />
+            <Select size="small" style={{ width: 72 }} value={c.operator}
+              options={ops.map(o => ({ label: o, value: o }))}
+              onChange={v => updateCondition(i, ci, 'operator', v)} />
+            <Input size="small" style={{ width: 90 }} placeholder="值"
+              value={c.value} onChange={e => updateCondition(i, ci, 'value', e.target.value)} />
+            <Button size="small" danger icon={<DeleteOutlined />} onClick={() => removeCondition(i, ci)} />
+          </Space>
+        ))}
+        <Button size="small" type="dashed" icon={<PlusOutlined />} onClick={() => addCondition(i)}>添加条件</Button>
+      </div>
+    ),
+  }))
+
+  return (
+    <div>
+      {branches.length > 0 && (
+        <Collapse size="small" items={items} style={{ marginBottom: 8 }} />
+      )}
+      <Button size="small" type="dashed" icon={<PlusOutlined />} onClick={addBranch}>
+        {branches.length === 0 ? '添加第一个分支' : '添加分支'}
+      </Button>
+    </div>
+  )
+}
+
+// ── AB 分流分组路由控件（ab-group-list）────────────────────────────
+interface AbGroup { groupKey: string; nextNodeId?: string }
+function AbGroupList() {
+  const form = Form.useFormInstance()
+  const groups: AbGroup[] = Form.useWatch('groups', form) ?? []
+  const add = () => form.setFieldValue('groups', [...groups, { groupKey: `G${groups.length + 1}`, nextNodeId: undefined }])
+  const remove = (i: number) => { const n = [...groups]; n.splice(i, 1); form.setFieldValue('groups', n) }
+  const update = (i: number, k: keyof AbGroup, v: string) => {
+    const n = [...groups]; (n[i] as any)[k] = v; form.setFieldValue('groups', n)
+  }
+
+  return (
+    <div>
+      {groups.map((g, i) => (
+        <Space key={i} style={{ display: 'flex', marginBottom: 4 }}>
+          <Input size="small" style={{ width: 80 }} placeholder="分组Key"
+            value={g.groupKey} onChange={e => update(i, 'groupKey', e.target.value)} />
+          <Input size="small" style={{ width: 100 }} placeholder="后继节点ID"
+            value={g.nextNodeId ?? ''} onChange={e => update(i, 'nextNodeId', e.target.value)} />
+          <Button size="small" danger icon={<DeleteOutlined />} onClick={() => remove(i)} />
+        </Space>
+      ))}
+      <Button size="small" type="dashed" icon={<PlusOutlined />} onClick={add}>添加分组</Button>
+      <div style={{ fontSize: 11, color: '#999', marginTop: 4 }}>
+        Hash(userId:experimentKey) % 100 等比分配，分组顺序决定 bucket 范围
+      </div>
+    </div>
+  )
+}
+
+// ── 优先级列表控件（priority-list）────────────────────────────────
+interface PriorityItem { order: number; nextNodeId?: string }
+function PriorityList() {
+  const form = Form.useFormInstance()
+  const priorities: PriorityItem[] = Form.useWatch('priorities', form) ?? []
+  const add = () => form.setFieldValue('priorities', [...priorities, { order: priorities.length + 1, nextNodeId: undefined }])
+  const remove = (i: number) => { const n = [...priorities]; n.splice(i, 1); form.setFieldValue('priorities', n) }
+  const update = (i: number, k: keyof PriorityItem, v: string | number) => {
+    const n = [...priorities]; (n[i] as any)[k] = v; form.setFieldValue('priorities', n)
+  }
+
+  return (
+    <div>
+      {priorities.map((p, i) => (
+        <Space key={i} style={{ display: 'flex', marginBottom: 4 }}>
+          <InputNumber size="small" style={{ width: 60 }} placeholder="优先级"
+            value={p.order} onChange={v => update(i, 'order', v ?? i + 1)} min={1} />
+          <Input size="small" style={{ width: 110 }} placeholder="后继节点ID"
+            value={p.nextNodeId ?? ''} onChange={e => update(i, 'nextNodeId', e.target.value)} />
+          <Button size="small" danger icon={<DeleteOutlined />} onClick={() => remove(i)} />
+        </Space>
+      ))}
+      <Button size="small" type="dashed" icon={<PlusOutlined />} onClick={add}>添加优先级</Button>
+      <div style={{ fontSize: 11, color: '#999', marginTop: 4 }}>
+        按 order 从小到大依次尝试，第一个成功则停止
+      </div>
+    </div>
+  )
+}
+
+// ── 键值映射控件（CANVAS_TRIGGER paramMapping / SUB_FLOW_REF inputMapping）
+function KeyValueMapping({ ctxFields }: { ctxFields: ContextField[] }) {
+  const form = Form.useFormInstance()
+  const fieldKey = 'paramMapping'
+  const mapping: Record<string, string> = Form.useWatch(fieldKey, form) ?? {}
+  const entries = Object.entries(mapping)
+
+  const add = () => form.setFieldValue(fieldKey, { ...mapping, '': '' })
+  const remove = (k: string) => {
+    const n = { ...mapping }; delete n[k]; form.setFieldValue(fieldKey, n)
+  }
+  const updateKey = (oldKey: string, newKey: string) => {
+    const n: Record<string, string> = {}
+    Object.entries(mapping).forEach(([k, v]) => n[k === oldKey ? newKey : k] = v)
+    form.setFieldValue(fieldKey, n)
+  }
+  const updateVal = (k: string, v: string) => form.setFieldValue(fieldKey, { ...mapping, [k]: v })
+
+  return (
+    <div>
+      {entries.map(([k, v], i) => (
+        <Space key={i} style={{ display: 'flex', marginBottom: 4 }}>
+          <Input size="small" style={{ width: 90 }} placeholder="子流程字段名"
+            value={k} onChange={e => updateKey(k, e.target.value)} />
+          <span style={{ fontSize: 12 }}>←</span>
+          <Select size="small" style={{ width: 110 }} placeholder="父上下文字段"
+            value={v || undefined}
+            options={ctxFields.map(f => ({ label: f.fieldName, value: `ctx.${f.fieldKey}` }))}
+            onChange={nv => updateVal(k, nv)} showSearch />
+          <Button size="small" danger icon={<DeleteOutlined />} onClick={() => remove(k)} />
+        </Space>
+      ))}
+      <Button size="small" type="dashed" icon={<PlusOutlined />} onClick={add}>添加映射</Button>
+    </div>
+  )
+}
+
+// ── 画布选择控件（CANVAS_TRIGGER / SUB_FLOW_REF）─────────────────
+let canvasListCache: Canvas[] | null = null
+
+function CanvasSelector() {
+  const [canvases, setCanvases] = useState<Canvas[]>(canvasListCache ?? [])
+  const [loading, setLoading] = useState(!canvasListCache)
+
+  useEffect(() => {
+    if (canvasListCache) return
+    setLoading(true)
+    canvasApi.list({ status: 1, size: 100 })
+      .then(r => { canvasListCache = r.data.list; setCanvases(r.data.list) })
+      .finally(() => setLoading(false))
+  }, [])
+
+  return (
+    <Select
+      loading={loading}
+      showSearch
+      placeholder="搜索并选择已发布画布"
+      filterOption={(input, opt) =>
+        String(opt?.label ?? '').toLowerCase().includes(input.toLowerCase())}
+      options={canvases.map(c => ({ label: `${c.name} (ID:${c.id})`, value: c.id }))}
+    />
+  )
+}
   required?: boolean; options?: any[]; dataSource?: string
   visible?: string; defaultValue?: unknown
 }

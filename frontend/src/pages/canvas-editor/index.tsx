@@ -160,12 +160,24 @@ function EditorInner({ detail }: { detail: CanvasDetail }) {
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([])
   const [canvasName, setCanvasName] = useState(detail.canvas.name)
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null)
-  const [saving, setSaving] = useState(false)
-  /** 执行轨迹叠色 map：nodeId → hex color */
+  const [saving, setSaving]         = useState(false)
+  const [isDirty, setIsDirty]       = useState(false)
+  const [clipboard, setClipboard]   = useState<Node<CanvasNodeData>[]>([])
   const [traceColorMap, setTraceColorMap] = useState<Record<string, string>>({})
-  const editVersion = useRef(0)
+  const editVersion   = useRef(0)
+  const autoSaveTimer = useRef<ReturnType<typeof setTimeout>>()
 
   const { snapshot, undo, redo, canUndo, canRedo } = useHistory(nodes, edges)
+
+  // ── Auto-save：最后一次改动 3s 后静默保存 ─────────────────────
+  useEffect(() => {
+    if (!isDirty) return
+    clearTimeout(autoSaveTimer.current)
+    autoSaveTimer.current = setTimeout(() => {
+      handleSave(/* silent */ true)
+    }, 3000)
+    return () => clearTimeout(autoSaveTimer.current)
+  })
 
   // 初始化加载
   useEffect(() => {
@@ -186,13 +198,42 @@ function EditorInner({ detail }: { detail: CanvasDetail }) {
     setEdges(rfEdges)
   }, [detail, setNodes, setEdges])
 
-  // 键盘快捷键
+  // 键盘快捷键（含复制/粘贴）
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.metaKey || e.ctrlKey) {
         if (e.key === 'z' && !e.shiftKey) { e.preventDefault(); undo() }
         if ((e.key === 'z' && e.shiftKey) || e.key === 'y') { e.preventDefault(); redo() }
         if (e.key === 's') { e.preventDefault(); handleSave() }
+        // 复制选中节点（不复制 traceColor）
+        if (e.key === 'c') {
+          const selected = getNodes().filter(n => n.selected)
+          if (selected.length > 0) {
+            setClipboard(selected as Node<CanvasNodeData>[])
+            message.success(`已复制 ${selected.length} 个节点`, 1)
+          }
+        }
+        // 粘贴节点（偏移 +20px，重置 ID 和 traceColor）
+        if (e.key === 'v' && clipboard.length > 0) {
+          snapshot()
+          const pasted = clipboard.map(n => ({
+            ...n,
+            id: crypto.randomUUID().replace(/-/g, '').slice(0, 12),
+            position: { x: n.position.x + 20, y: n.position.y + 20 },
+            selected: false,
+            data: {
+              ...(n.data as CanvasNodeData),
+              name: (n.data as CanvasNodeData).name + ' (副本)',
+              traceColor: undefined,           // 不继承轨迹颜色
+              bizConfig: { ...(n.data as CanvasNodeData).bizConfig,
+                nextNodeId: undefined, successNodeId: undefined,
+                failNodeId: undefined,          // 连线关系不复制
+              },
+            },
+          }))
+          setNodes(prev => [...prev, ...pasted])
+          setIsDirty(true)
+        }
       }
     }
     window.addEventListener('keydown', onKey)
@@ -267,6 +308,9 @@ function EditorInner({ detail }: { detail: CanvasDetail }) {
     } else {
       onNodesChange(changes)
     }
+    // 节点变化标记脏
+    const significant = changes.some(c => c.type !== 'select' && c.type !== 'dimensions')
+    if (significant) setIsDirty(true)
   }, [snapshot, setNodes, setEdges, onNodesChange])
 
   // 连线规则
@@ -282,7 +326,40 @@ function EditorInner({ detail }: { detail: CanvasDetail }) {
   }, [getNodes])
 
   // 保存
-  const handleSave = useCallback(async () => {
+  /** 发布前本地校验（减少不必要的服务端请求）*/
+  const validateBeforePublish = useCallback((rfNodes: Node<CanvasNodeData>[]): string[] => {
+    const errors: string[] = []
+    const hasTrigger = rfNodes.some(n => TRIGGER_TYPES.has(n.data.nodeType))
+    if (!hasTrigger) errors.push('画布必须包含至少一个触发器节点')
+
+    rfNodes.forEach(n => {
+      const d = n.data as CanvasNodeData
+      const cfg = d.bizConfig
+      switch (d.nodeType) {
+        case 'IF_CONDITION':
+          if (!cfg.successNodeId) errors.push(`节点「${d.name}」未配置成功分支（连线到 success handle）`)
+          if (!cfg.failNodeId)    errors.push(`节点「${d.name}」未配置失败分支（连线到 fail handle）`)
+          break
+        case 'SELECTOR': {
+          const branches = cfg.branches as any[] | undefined
+          if (!branches?.length) errors.push(`节点「${d.name}」至少需要配置一个分支`)
+          break
+        }
+        case 'GROOVY':
+          if (!cfg.code) errors.push(`节点「${d.name}」Groovy 脚本不能为空`)
+          break
+        case 'MQ_TRIGGER':
+          if (!cfg.topicKey) errors.push(`节点「${d.name}」必须选择消息主题`)
+          break
+        case 'COUPON':
+          if (!cfg.couponTypeKey) errors.push(`节点「${d.name}」必须选择券类型`)
+          break
+      }
+    })
+    return errors
+  }, [])
+
+  const handleSave = useCallback(async (silent = false) => {
     setSaving(true)
     try {
       const rfNodes = getNodes()
@@ -300,11 +377,12 @@ function EditorInner({ detail }: { detail: CanvasDetail }) {
         editVersion: editVersion.current,
       })
       editVersion.current += 1
-      message.success('保存成功')
+      setIsDirty(false)
+      if (!silent) message.success('保存成功')
     } catch (err: any) {
       if (err?.response?.status === 409)
         message.error('画布已被他人修改，请刷新后重试')
-      else message.error('保存失败')
+      else if (!silent) message.error('保存失败')
     } finally {
       setSaving(false)
     }
@@ -376,10 +454,21 @@ function EditorInner({ detail }: { detail: CanvasDetail }) {
           <Button icon={<HistoryOutlined />} onClick={() => message.info('版本历史')}>
             历史
           </Button>
-          <Button icon={<SaveOutlined />} loading={saving} onClick={handleSave}>保存</Button>
+          <Tooltip title={isDirty ? '有未保存的修改（Ctrl+S）' : '已保存'}>
+            <Button icon={<SaveOutlined />} loading={saving} onClick={() => handleSave()}
+              style={isDirty ? { borderColor: '#faad14', color: '#faad14' } : {}}>
+              {isDirty ? '保存 *' : '保存'}
+            </Button>
+          </Tooltip>
           {status !== 1 && (
             <Button type="primary" icon={<CloudUploadOutlined />}
               onClick={async () => {
+                // 本地校验（快速反馈，减少服务端往返）
+                const errors = validateBeforePublish(getNodes() as Node<CanvasNodeData>[])
+                if (errors.length > 0) {
+                  message.error({ content: errors.join('\n'), duration: 5 })
+                  return
+                }
                 try { await canvasApi.publish(canvasId); message.success('发布成功') }
                 catch (e: any) { message.error(e?.response?.data?.message ?? '发布失败') }
               }}>

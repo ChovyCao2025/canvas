@@ -317,6 +317,24 @@ public class DagEngine {
         // 条件未满足：进入等待态，设置 WAITING 状态（供 isPaused 检测）
         if (!LogicRelationHandler.checkCondition(relation, upstreamIds, ctx)) {
             ctx.setNodeStatus(nodeId, NodeStatus.WAITING);
+
+            // LOGIC_RELATION 等待超时（与 Hub 类似，防止第二触发永不到来）
+            // config 中可选配置 timeout 字段（秒），默认等于全局执行超时
+            if (!ctx.getScheduledHubTimeouts().contains("lr:" + nodeId)) {
+                ctx.getScheduledHubTimeouts().add("lr:" + nodeId);
+                ctx.getHubStartTimes().putIfAbsent("lr:" + nodeId, System.currentTimeMillis());
+                int timeoutSec = config.get("timeout") instanceof Number n
+                        ? n.intValue() : (int) globalTimeout;
+
+                Mono.delay(Duration.ofSeconds(timeoutSec), VIRTUAL)
+                        .subscribe(__ -> {
+                            if (ctx.getNodeStatus(nodeId) == NodeStatus.WAITING) {
+                                log.warn("[ENGINE] LOGIC_RELATION 等待超时 timeout={}s nodeId={}", timeoutSec, nodeId);
+                                ctx.setNodeStatus(nodeId, NodeStatus.FAILED);
+                            }
+                        });
+                log.debug("[LOGIC_RELATION] 启动等待超时定时器 {}s nodeId={}", timeoutSec, nodeId);
+            }
             log.debug("[ENGINE] LOGIC_RELATION 条件未满足，进入 WAITING nodeId={}", nodeId);
             return Mono.just(Map.of());
         }
@@ -324,6 +342,9 @@ public class DagEngine {
         // 条件满足 → 走正常节点执行流程（阶段 3-6）
         return executeNodeAfterStage2(graph, nodeId, node, config, ctx);
     }
+
+    @org.springframework.beans.factory.annotation.Value("${canvas.execution.global-timeout-sec:600}")
+    private long globalTimeout;
 
     // ══════════════════════════════════════════════════════════════
     // HUB 处理（含超时延迟任务，设计文档 HUB 节点说明）
@@ -582,12 +603,16 @@ public class DagEngine {
     @SuppressWarnings("unchecked")
     private Map<String, Object> resolveConfig(Map<String, Object> config, ExecutionContext ctx) {
         if (config == null) return Map.of();
+
+        // 性能优化：先检查是否有任何 CONTEXT 字段，无则直接返回原 Map 避免 HashMap 创建
+        boolean hasContextField = config.values().stream().anyMatch(
+                v -> v instanceof Map<?, ?> m && "CONTEXT".equals(((Map<?, ?>) m).get("valueType")));
+        if (!hasContextField) return config;   // O(n) 扫描，但避免了 HashMap allocation
+
         Map<String, Object> resolved = new HashMap<>(config);
         for (Map.Entry<String, Object> entry : config.entrySet()) {
             if (entry.getValue() instanceof Map<?, ?> m) {
-                @SuppressWarnings("unchecked")
                 String valueType = (String) ((Map<String, Object>) m).get("valueType");
-                @SuppressWarnings("unchecked")
                 String value     = (String) ((Map<String, Object>) m).get("value");
                 if ("CONTEXT".equals(valueType) && value != null) {
                     resolved.put(entry.getKey(), ctx.getContextValue(value));
