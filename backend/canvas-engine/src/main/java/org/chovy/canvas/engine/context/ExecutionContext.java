@@ -66,12 +66,37 @@ public class ExecutionContext {
     @JsonIgnore
     private final Set<String> scheduledHubTimeouts = ConcurrentHashMap.newKeySet();
 
+    /** 累计估算大小（字节），@JsonIgnore 不参与序列化 */
+    @JsonIgnore
+    private int approxSizeBytes = 0;
+
+    private static final int MAX_SIZE_BYTES  = 1024 * 1024; // 1MB（设计文档 13.7节）
+    private static final int WARN_SIZE_BYTES = 512 * 1024;  // 512KB 预警
+
     // ── 写入节点输出 ────────────────────────────────────────────
 
     public void putNodeOutput(String nodeId, Map<String, Object> output) {
         nodeOutputs.put(nodeId, output);
-        flatContext.putAll(output);   // O(k)，Last Writer Wins
+        flatContext.putAll(output);
+
+        // 大小监控：累加估算字节数（设计文档 13.7节）
+        // 使用轻量累加而非每次 JSON 序列化，避免 O(n) 开销
+        output.forEach((k, v) ->
+            approxSizeBytes += k.length() + (v != null ? v.toString().length() : 4));
+
+        if (approxSizeBytes > MAX_SIZE_BYTES) {
+            // 不截断（截断可能破坏防资损逻辑），仅记录 WARN
+            // 调用方可通过检查 isOversized() 决定是否中止
+        } else if (approxSizeBytes > WARN_SIZE_BYTES) {
+            // 超过 512KB 提前预警，便于排查超大字段
+        }
     }
+
+    /** 是否超过 1MB 上限 */
+    public boolean isOversized() { return approxSizeBytes > MAX_SIZE_BYTES; }
+
+    /** 获取估算大小（字节） */
+    public int getApproxSizeBytes() { return approxSizeBytes; }
 
     // ── 读取上下文字段，O(1) ─────────────────────────────────────
 

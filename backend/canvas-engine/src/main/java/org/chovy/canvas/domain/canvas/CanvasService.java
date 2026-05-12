@@ -30,7 +30,8 @@ public class CanvasService {
     private final TriggerRouteService    triggerRouteService;
     private final CanvasSchedulerService schedulerService;
     private final CanvasConfigCache      configCache;
-    private final GroovyHandler          groovyHandler;  // 用于 Groovy 预编译（12.9节）
+    private final GroovyHandler          groovyHandler;
+    private final org.springframework.data.redis.core.StringRedisTemplate redis;
 
     @Transactional
     public Canvas create(CanvasCreateReq req) {
@@ -106,46 +107,87 @@ public class CanvasService {
 
     @Transactional
     public CanvasVersion publish(Long id, String operator) {
-        Canvas canvas = canvasMapper.selectById(id);
-        if (canvas == null) throw new IllegalArgumentException("画布不存在: " + id);
+        // 并发发布保护（设计文档 6.2节）：同一画布同时只允许一个发布操作
+        String lockKey = "canvas:publish:lock:" + id;
+        String lockVal = java.util.UUID.randomUUID().toString();
+        boolean acquired = Boolean.TRUE.equals(
+                redis.opsForValue().setIfAbsent(lockKey, lockVal,
+                        java.time.Duration.ofSeconds(30)));
+        if (!acquired) throw new IllegalStateException("CANVAS_011: 画布正在发布中，请稍后重试");
 
-        CanvasVersion draft = latestDraft(id);
-        if (draft == null) throw new IllegalStateException("没有可发布的草稿");
+        try {
+            Canvas canvas = canvasMapper.selectById(id);
+            if (canvas == null) throw new IllegalArgumentException("画布不存在: " + id);
 
-        // DAG 校验（Kahn 算法环检测 + 触发器节点检查）
-        DagGraph graph = dagParser.parse(draft.getGraphJson());
-        if (graph.entryNodes().isEmpty()) {
-            throw new IllegalStateException("画布缺少有效触发器节点");
+            CanvasVersion draft = latestDraft(id);
+            if (draft == null) throw new IllegalStateException("没有可发布的草稿");
+
+            // DAG 校验（Kahn 算法环检测 + 触发器节点检查）
+            DagGraph graph = dagParser.parse(draft.getGraphJson());
+            if (graph.entryNodes().isEmpty()) {
+                throw new IllegalStateException("画布缺少有效触发器节点");
+            }
+
+            // SUB_FLOW_REF 依赖校验（设计文档 6.2节补充）
+            validateSubFlowDependencies(id, graph);
+
+            // 生成发布版本快照
+            CanvasVersion published = new CanvasVersion();
+            published.setCanvasId(id);
+            published.setVersion(nextVersionNumber(id));
+            published.setGraphJson(draft.getGraphJson());
+            published.setStatus(1);
+            published.setCreatedBy(operator);
+            canvasVersionMapper.insert(published);
+
+            canvas.setStatus(1);
+            canvas.setPublishedVersionId(published.getId());
+            canvasMapper.updateById(canvas);
+
+            // 注册触发路由到 Redis
+            registerTriggerRoutes(canvas.getId(), graph);
+            // 注册定时调度任务
+            schedulerService.registerScheduledTriggers(canvas.getId(), graph);
+            // 使旧版本缓存失效（含 L1 Caffeine 广播）
+            if (canvas.getPublishedVersionId() != null) {
+                configCache.invalidate(canvas.getId(), canvas.getPublishedVersionId());
+            }
+            // Groovy 脚本预编译（off-path，12.9节）
+            precompileGroovyNodes(canvas.getId(), graph);
+
+            return published;
+        } finally {
+            redis.delete(lockKey); // 发布结束无论成功失败都释放锁
         }
+    }
 
-        // 生成发布版本快照
-        CanvasVersion published = new CanvasVersion();
-        published.setCanvasId(id);
-        published.setVersion(nextVersionNumber(id));
-        published.setGraphJson(draft.getGraphJson());
-        published.setStatus(1);
-        published.setCreatedBy(operator);
-        canvasVersionMapper.insert(published);
-
-        // 同步删除草稿（发布后草稿无意义，可选）
-        // canvasVersionMapper.deleteById(draft.getId());
-
-        canvas.setStatus(1);
-        canvas.setPublishedVersionId(published.getId());
-        canvasMapper.updateById(canvas);
-
-        // 注册触发路由到 Redis
-        registerTriggerRoutes(canvas.getId(), graph);
-        // 注册定时调度任务
-        schedulerService.registerScheduledTriggers(canvas.getId(), graph);
-        // 使旧版本缓存失效（含 L1 Caffeine 广播）
-        if (canvas.getPublishedVersionId() != null) {
-            configCache.invalidate(canvas.getId(), canvas.getPublishedVersionId());
+    /**
+     * SUB_FLOW_REF 依赖校验（设计文档 6.2节）：
+     * 检查画布中所有 SUB_FLOW_REF 节点引用的子流程是否已发布。
+     * 若子流程未发布，运行时会失败，应在发布时就拦截。
+     */
+    @SuppressWarnings("unchecked")
+    private void validateSubFlowDependencies(Long canvasId, DagGraph graph) {
+        java.util.List<String> errors = new java.util.ArrayList<>();
+        graph.getNodeMap().forEach((nodeId, node) -> {
+            if (!"SUB_FLOW_REF".equals(node.getType())) return;
+            Map<String, Object> cfg = node.getConfig();
+            if (cfg == null) return;
+            Object subFlowIdObj = cfg.get("subFlowId");
+            if (subFlowIdObj == null) return;
+            Long subFlowId = Long.parseLong(String.valueOf(subFlowIdObj));
+            Canvas subFlow = canvasMapper.selectById(subFlowId);
+            if (subFlow == null) {
+                errors.add("节点「" + node.getName() + "」引用的子流程 ID=" + subFlowId + " 不存在");
+            } else if (subFlow.getStatus() != 1) {
+                errors.add("节点「" + node.getName() + "」引用的子流程「" + subFlow.getName() + "」未发布（当前状态: " + subFlow.getStatus() + "）");
+            } else if (subFlowId.equals(canvasId)) {
+                errors.add("节点「" + node.getName() + "」引用了自身，会产生循环调用");
+            }
+        });
+        if (!errors.isEmpty()) {
+            throw new IllegalStateException("发布校验失败：\n" + String.join("\n", errors));
         }
-        // Groovy 脚本预编译（off-path，避免首次执行时的编译开销，12.9节）
-        precompileGroovyNodes(canvas.getId(), graph);
-
-        return published;
     }
 
     /**

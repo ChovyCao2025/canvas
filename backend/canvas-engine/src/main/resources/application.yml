@@ -36,6 +36,10 @@ canvas:
   jwt:
     secret: canvas-engine-jwt-secret-key-must-be-at-least-256-bits-long
     expiry-hours: 24
+  redis:
+    key-prefix: canvas  # key 命名空间前缀（设计文档 25.3.1节），多环境共用 Redis 时修改
+  version:
+    max-keep-count: 10  # 每个画布保留最近 N 个已发布版本（设计文档 17.2节）
   # Disruptor 无锁分发层（12.8节）
   disruptor:
     ring-buffer-size: 65536   # 必须是 2 的幂，2^16 ≈ 16MB

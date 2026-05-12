@@ -1,9 +1,11 @@
 package org.chovy.canvas.config;
 
+import org.chovy.canvas.auth.controller.AuthController;
 import org.chovy.canvas.auth.domain.JwtUtil;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.JwtException;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -21,7 +23,8 @@ import java.util.List;
 @RequiredArgsConstructor
 public class JwtAuthFilter implements WebFilter {
 
-    private final JwtUtil jwtUtil;
+    private final JwtUtil             jwtUtil;
+    private final StringRedisTemplate redis;
 
     @Override
     public Mono<Void> filter(ServerWebExchange exchange, WebFilterChain chain) {
@@ -33,6 +36,14 @@ public class JwtAuthFilter implements WebFilter {
         String token = header.substring(7);
         try {
             Claims claims = jwtUtil.parse(token);
+
+            // 检查 JWT 黑名单（服务端登出，设计文档 19.6.1节）
+            String hash = AuthController.tokenHash(token);
+            if (Boolean.TRUE.equals(redis.hasKey("canvas:jwt:revoked:" + hash))) {
+                exchange.getResponse().setStatusCode(HttpStatus.UNAUTHORIZED);
+                return exchange.getResponse().setComplete();
+            }
+
             String role = claims.get("role", String.class);
             UsernamePasswordAuthenticationToken auth = new UsernamePasswordAuthenticationToken(
                     claims, null,

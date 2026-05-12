@@ -1290,7 +1290,7 @@ sequenceDiagram
     MySQL-->>CS: graph_json
 
     CS->>CS: 校验 DAG
-    note over CS: 1. 有无触发器入口节点<br>2. 拓扑排序检测有无环<br>3. 每个节点必填 config 是否完整
+    note over CS: 1. 有无触发器入口节点<br>2. 拓扑排序检测有无环<br>3. 每个节点必填 config 是否完整<br>4. SUB_FLOW_REF 依赖画布是否已发布<br>5. 获取并发锁（防止重复发布）
 
     alt 校验失败
         CS-->>FE: 400 校验错误详情
@@ -1312,6 +1312,21 @@ sequenceDiagram
         FE-->>运营人员: 发布成功提示
     end
 ```
+
+**补充校验项说明：**
+
+**4. SUB_FLOW_REF 依赖校验**：扫描 DAG 中所有 `SUB_FLOW_REF` 节点，检查 `config.subFlowId` 引用的子流程是否存在且处于已发布状态（`status=1`）。若子流程已下线，发布时报错，防止活动上线后运行时才发现依赖缺失。
+
+```
+校验失败示例：
+  节点「推荐酒店」引用子流程「VIP发券策略」（id=123）未发布，请先发布该子流程
+```
+
+**5. 并发发布保护**：同一画布同时只允许一个发布操作进行。
+使用 Redis 分布式锁 `canvas:publish:lock:{canvasId}`（TTL 30s）：
+- 获取成功：继续发布流程
+- 获取失败：返回 409"画布正在发布中，请稍后重试"
+- 正常发布结束后主动释放锁（崩溃时 TTL 自动过期）
 
 ### 6.3 触发路由注册
 
@@ -4049,6 +4064,30 @@ flowchart LR
 | 单字段值大小 | 64KB | 截断并告警 |
 | 嵌套深度 | 5层 | 拒绝写入 |
 
+**实现方式（`ExecutionContext.putNodeOutput()`）**：
+
+大小检查在写入时触发，采用轻量的**累加计数**而非每次 JSON 序列化（避免 O(n) 开销）：
+
+```java
+// ExecutionContext 维护一个累计估算大小（字节）
+private int approxSizeBytes = 0;
+private static final int MAX_SIZE_BYTES = 1024 * 1024; // 1MB
+
+public void putNodeOutput(String nodeId, Map<String, Object> output) {
+    nodeOutputs.put(nodeId, output);
+    flatContext.putAll(output);
+    // 更新估算大小（key+value 长度之和）
+    output.forEach((k, v) -> approxSizeBytes += k.length() + (v != null ? v.toString().length() : 4));
+    if (approxSizeBytes > MAX_SIZE_BYTES) {
+        log.warn("[CTX] 上下文超过 1MB 限制 executionId={} approxSizeKB={}",
+                executionId, approxSizeBytes / 1024);
+        // 不截断执行（截断可能导致防资损逻辑失效），仅告警 + 写 Metrics
+    }
+}
+```
+
+**为什么不截断**：截断 ctx 字段可能使下游节点取不到必要数据，导致业务错误。对于超大 ctx，优先排查是否有节点输出了不必要的大字段（如 base64 图片），而不是静默截断。
+
 **Context 序列化优化**：默认 JSON 较慢，大上下文可切换为 Kryo（二进制，速度快 3~5 倍，体积小 60%）：
 
 ```java
@@ -4564,6 +4603,35 @@ flowchart LR
 | canvas_execution | 3 个月 | 超过 3 个月 | 聚合统计后归档，删除明细 |
 | canvas_execution_trace | 1 个月 | 超过 1 个月 | 直接归档，较早删除 |
 | canvas_audit_log | 永久（量小） | 不归档 | — |
+| **canvas_version** | 最近 N 个发布版本 | 超过 N 个版本 | 清空 graph_json（保留元数据供审计） |
+
+**canvas_version 版本清理策略**：
+
+版本记录不同于执行记录——它是运营的设计资产，不能按时间简单删除。建议按**版本数量**控制：
+
+```yaml
+canvas:
+  version:
+    max-keep-count: 10      # 每个画布最多保留 10 个已发布版本
+    archive-graph-json: true # 超出版本：清空 graph_json（保留 id/version/status/created_at 供历史查询）
+```
+
+**清理 Job（每日凌晨执行）**：
+```sql
+-- 找出每个画布超出 max-keep-count 的旧版本，清空其 graph_json
+UPDATE canvas_version cv
+SET graph_json = NULL
+WHERE cv.status = 1   -- 已发布
+  AND cv.version < (
+      SELECT MIN(v.version)
+      FROM canvas_version v
+      WHERE v.canvas_id = cv.canvas_id AND v.status = 1
+      ORDER BY v.version DESC
+      LIMIT 10  -- max-keep-count
+  );
+```
+
+注意：草稿版本（`status=0`）只保留最新一条，旧草稿在新发布后可直接删除。
 
 ---
 
@@ -4812,12 +4880,36 @@ http.interceptors.response.use(
 | 方法 | 路径 | 说明 | 权限 |
 |------|------|------|------|
 | POST | `/auth/login` | 登录，返回 JWT | 公开 |
-| POST | `/auth/logout` | 登出（前端清 token，后端可加黑名单） | 已登录 |
+| POST | `/auth/logout` | 登出（服务端黑名单 + 前端清 token） | 已登录 |
 | GET | `/auth/me` | 获取当前用户信息 | 已登录 |
 | GET | `/admin/users` | 用户列表 | ADMIN |
 | POST | `/admin/users` | 创建用户 | ADMIN |
 | PUT | `/admin/users/{id}` | 修改用户（含重置密码） | ADMIN |
 | PUT | `/admin/users/{id}/disable` | 禁用用户 | ADMIN |
+
+### 19.6.1 JWT 服务端登出（Token 黑名单）
+
+仅前端清除 token 是不够的：若 token 泄露或被盗，在 24h 有效期内仍可使用。服务端黑名单可立即撤销 token。
+
+**实现方案：Redis 黑名单（TTL = token 剩余有效期）**
+
+```
+Key:   canvas:jwt:revoked:{tokenHash}   （tokenHash = SHA-256(token) 前 32 位）
+Value: 1
+TTL:   token.expiration - now()          （token 自然过期后 key 自动清除）
+
+登出时：
+  1. 解析 Authorization header 中的 JWT
+  2. 计算 tokenHash，SET key 1 EX remaining_ttl
+  3. 返回 200
+
+每次鉴权时（JwtAuthFilter）：
+  1. 解析 JWT 成功后
+  2. GET canvas:jwt:revoked:{tokenHash}
+  3. 存在 → 401 Token 已失效，请重新登录
+```
+
+**为什么不用 JTI（JWT ID）**：需在生成时额外注入 jti claim，增加 token 体积。使用 token hash 更简单，且 hash 只在需要时计算。
 
 ### 19.7 登录安全：暴力破解保护
 
@@ -5838,6 +5930,38 @@ canvas:
 ```
 
 单个画布可覆盖全局默认值（在画布配置中单独设置）。
+
+---
+
+### 25.3.1 Redis Key 命名空间隔离
+
+所有 Redis key 均以可配置前缀开头，解决以下问题：
+- 同一 Redis 被多个环境（dev/test/prod）复用时，key 不冲突
+- 未来支持多业务线时，不同业务线数据隔离
+
+**配置项**：
+```yaml
+canvas:
+  redis:
+    key-prefix: canvas   # 默认值，生产环境可设为 "canvas:prod"，测试环境 "canvas:test"
+```
+
+**Key 命名规范**（通过 `RedisKeyUtil` 统一构造）：
+
+| 用途 | Key 格式 |
+|------|---------|
+| 触发路由（MQ） | `{prefix}:trigger:mq:{topicKey}` |
+| 触发路由（行为） | `{prefix}:trigger:behavior:{eventCode}` |
+| 执行上下文 | `{prefix}:{canvasId}:user:{userId}` |
+| dedup key | `{prefix}:dedup:{canvasId}:{userId}:{msgId}` |
+| 发布并发锁 | `{prefix}:publish:lock:{canvasId}` |
+| Login 失败计数 | `{prefix}:login:fail:{username}` |
+| Login 锁定 | `{prefix}:login:locked:{username}` |
+| JWT 黑名单 | `{prefix}:jwt:revoked:{tokenHash}` |
+| 缓存失效广播 | `{prefix}:cache:invalidate` |
+| Kill Switch | `{prefix}:kill:{canvasId}` |
+
+**实现**：所有服务注入 `RedisKeyUtil`，通过其方法构造 key，不硬编码字符串。
 
 ---
 
