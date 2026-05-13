@@ -27,9 +27,9 @@ class AbSplitHandlerTest {
         );
         Map<String, Object> config = Map.of("experimentKey", "exp_001", "groups", groups);
 
-        NodeResult r1 = handler.execute(config, ctx);
-        NodeResult r2 = handler.execute(config, ctx);
-        NodeResult r3 = handler.execute(config, ctx);
+        NodeResult r1 = handler.executeAsync(config, ctx).block();
+        NodeResult r2 = handler.executeAsync(config, ctx).block();
+        NodeResult r3 = handler.executeAsync(config, ctx).block();
 
         assertThat(r1.output().get("abGroup"))
                 .isEqualTo(r2.output().get("abGroup"))
@@ -48,7 +48,7 @@ class AbSplitHandlerTest {
         // 用多个不同 userId 测试，期望两组都有命中
         long countA = 0, countB = 0;
         for (int i = 0; i < 100; i++) {
-            NodeResult r = handler.execute(config, ctx("user_" + i));
+            NodeResult r = handler.executeAsync(config, ctx("user_" + i)).block();
             String g = (String) r.output().get("abGroup");
             if ("A".equals(g)) countA++;
             else countB++;
@@ -62,7 +62,7 @@ class AbSplitHandlerTest {
     @DisplayName("空 groups 时返回 terminal")
     void empty_groups_returns_terminal() {
         Map<String, Object> config = Map.of("experimentKey", "exp_003", "groups", List.of());
-        NodeResult r = handler.execute(config, ctx("user_x"));
+        NodeResult r = handler.executeAsync(config, ctx("user_x")).block();
         assertThat(r.success()).isTrue();
         assertThat(r.nextNodeId()).isNull();
     }

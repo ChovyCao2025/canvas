@@ -10,8 +10,9 @@ import org.chovy.canvas.engine.handler.NodeResult;
 import reactor.core.publisher.Mono;
 import org.chovy.canvas.engine.scheduler.DagEngine;
 import org.chovy.canvas.infra.cache.CanvasConfigCache;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.annotation.Lazy;
+import org.springframework.stereotype.Component;
 
 import java.time.Duration;
 import java.util.HashMap;
@@ -25,14 +26,22 @@ import java.util.UUID;
  * ASYNC 模式：fire-and-forget，父画布立即继续。
  * 防循环：子画布 ID 不能出现在 ctx.callStack 中。
  */
+@Component
 @Slf4j
 @NodeHandlerType("CANVAS_TRIGGER")
-@RequiredArgsConstructor
 public class CanvasTriggerHandler implements NodeHandler {
 
     private final CanvasMapper      canvasMapper;
     private final CanvasConfigCache configCache;
     private final DagEngine         dagEngine;
+
+    public CanvasTriggerHandler(CanvasMapper canvasMapper,
+                                CanvasConfigCache configCache,
+                                @Lazy DagEngine dagEngine) {
+        this.canvasMapper = canvasMapper;
+        this.configCache  = configCache;
+        this.dagEngine    = dagEngine;
+    }
 
     @Override
     @SuppressWarnings("unchecked")

@@ -20,6 +20,14 @@ public class SysUserService {
                 new LambdaQueryWrapper<SysUser>().eq(SysUser::getUsername, username));
     }
 
+    /** 仅用于登录验证，显式 SELECT password 字段（@TableField(select=false) 默认不查） */
+    public SysUser findByUsernameForAuth(String username) {
+        return sysUserMapper.selectOne(
+                new com.baomidou.mybatisplus.core.conditions.query.QueryWrapper<SysUser>()
+                        .select("id", "username", "password", "display_name", "role", "enabled")
+                        .eq("username", username));
+    }
+
     public SysUser findById(Long id) {
         return sysUserMapper.selectById(id);
     }

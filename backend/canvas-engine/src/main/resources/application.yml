@@ -25,6 +25,7 @@ spring:
 mybatis-plus:
   configuration:
     map-underscore-to-camel-case: true
+  mapper-locations: classpath:mapper/*.xml
   global-config:
     db-config:
       id-type: auto
@@ -99,13 +100,3 @@ management:
 # canvas.execution.global-timeout-sec: 600
 # canvas.execution.max-retry: 3
 # canvas.groovy.timeout-ms: 5000
-canvas:
-  execution:
-    max-retry: 3
-    retry-base-delay-ms: 1000
-    retry-max-delay-ms: 30000
-  circuit-breaker:
-    default:
-      failure-threshold: 5
-      open-duration-sec: 30
-      half-open-attempts: 3

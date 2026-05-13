@@ -18,7 +18,7 @@ CREATE TABLE `sys_user` (
 
 -- 初始化管理员账号（密码: Admin@123，BCrypt 已加密）
 INSERT INTO `sys_user` (`username`, `password`, `display_name`, `role`, `enabled`, `created_at`, `updated_at`)
-VALUES ('admin', '$2a$10$N.zmdr9k7uOCQb376NoUnuTJ8iAt6Z5EHsM8lE9lBOsl7iKTVKIom',
+VALUES ('admin', '$2a$10$49Y8JwhyOUHL0Yv./Y/mK.ldJWZD0owkuSxZ6.QpP/trR0MZRNyNq',
         '系统管理员', 'ADMIN', 1, NOW(), NOW());
 
 -- canvas 表追加字段（活动生命周期 + 灰度 + 乐观锁）

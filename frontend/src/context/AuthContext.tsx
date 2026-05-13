@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, type ReactNode } from 'react'
+import { createContext, useContext, useState, type ReactNode } from 'react'
 import type { LoginResp } from '../services/api'
 
 interface AuthState {
@@ -12,22 +12,22 @@ interface AuthState {
 const AuthContext = createContext<AuthState>({
   user: null,
   isAdmin: false,
-  loading: true,
+  loading: false,
   login: () => {},
   logout: () => {},
 })
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<LoginResp | null>(null)
-  const [loading, setLoading] = useState(true)
-
-  useEffect(() => {
-    const saved = localStorage.getItem('canvas_user')
-    if (saved) {
-      try { setUser(JSON.parse(saved)) } catch { /* ignore */ }
+  const [user, setUser] = useState<LoginResp | null>(() => {
+    try {
+      const saved = localStorage.getItem('canvas_user')
+      const token = localStorage.getItem('canvas_token')
+      console.log('[AUTH] init token:', token?.slice(0,20), 'saved:', !!saved)
+      return saved ? JSON.parse(saved) : null
+    } catch {
+      return null
     }
-    setLoading(false)
-  }, [])
+  })
 
   const login = (resp: LoginResp) => {
     localStorage.setItem('canvas_token', resp.token)
@@ -42,7 +42,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   return (
-    <AuthContext.Provider value={{ user, isAdmin: user?.role === 'ADMIN', loading, login, logout }}>
+    <AuthContext.Provider value={{ user, isAdmin: user?.role === 'ADMIN', loading: false, login, logout }}>
       {children}
     </AuthContext.Provider>
   )

@@ -56,7 +56,7 @@ public class CanvasStatsController {
     }
 
     /** 画布最近 N 次执行记录（用于前端执行轨迹选择器） */
-    @GetMapping("/{id}/executions")
+    @GetMapping("/executions")
     public Mono<R<List<Map<String, Object>>>> recentExecutions(
             @PathVariable Long id,
             @RequestParam(defaultValue = "20") int size) {

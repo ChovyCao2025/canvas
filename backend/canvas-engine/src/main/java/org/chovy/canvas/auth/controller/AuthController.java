@@ -45,7 +45,7 @@ public class AuthController {
                         ErrorCode.AUTH_004 + ": 账号已锁定，请 15 分钟后重试");
             }
 
-            SysUser user = userService.findByUsername(username);
+            SysUser user = userService.findByUsernameForAuth(username);
             if (user == null || user.getEnabled() == 0) {
                 recordFailedAttempt(username);
                 throw new IllegalArgumentException("用户名或密码错误");
@@ -111,7 +111,7 @@ public class AuthController {
     }
 
     /** 计算 token SHA-256 的前32个十六进制字符 */
-    static String tokenHash(String token) {
+    public static String tokenHash(String token) {
         try {
             java.security.MessageDigest md = java.security.MessageDigest.getInstance("SHA-256");
             byte[] digest = md.digest(token.getBytes(java.nio.charset.StandardCharsets.UTF_8));
@@ -119,7 +119,6 @@ public class AuthController {
         } catch (Exception e) {
             return String.valueOf(token.hashCode());
         }
-    }
     }
 
     @GetMapping("/me")

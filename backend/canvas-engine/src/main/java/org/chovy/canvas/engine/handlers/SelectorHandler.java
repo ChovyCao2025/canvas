@@ -35,7 +35,7 @@ public class SelectorHandler implements NodeHandler {
         }
 
         // 全部不命中
-        if (elseNodeId != null) return NodeResult.ok(elseNodeId, Map.of());
+        if (elseNodeId != null) return Mono.just(NodeResult.ok(elseNodeId, Map.of()));
 
         // 无 else：SUCCESS，流程自然结束
         return Mono.just(NodeResult.terminal(Map.of()));

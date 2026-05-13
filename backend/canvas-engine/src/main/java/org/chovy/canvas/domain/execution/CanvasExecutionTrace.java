@@ -27,4 +27,7 @@ public class CanvasExecutionTrace {
 
     private LocalDateTime startedAt;
     private LocalDateTime finishedAt;
+
+    /** 节点执行耗时（毫秒），对应 V8 migration 新增列 */
+    private Long durationMs;
 }

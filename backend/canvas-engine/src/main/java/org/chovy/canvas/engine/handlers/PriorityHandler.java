@@ -27,7 +27,7 @@ public class PriorityHandler implements NodeHandler {
         String nextNodeId = (String) config.get("nextNodeId");
 
         if (priorities == null || priorities.isEmpty()) {
-            return nextNodeId != null ? NodeResult.ok(nextNodeId, Map.of()) : NodeResult.terminal(Map.of());
+            return nextNodeId != null ? Mono.just(NodeResult.ok(nextNodeId, Map.of())) : Mono.just(NodeResult.terminal(Map.of()));
         }
 
         // 按 order 排序，返回第一个子节点 ID（调度器执行，成功后不执行后续）

@@ -6,6 +6,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.server.ResponseStatusException;
 
 /**
  * 全局异常处理（设计文档第二十二章 22.1 节统一错误响应格式）。
@@ -32,6 +33,15 @@ public class GlobalExceptionHandler {
     @ResponseStatus(HttpStatus.TOO_MANY_REQUESTS)
     public R<Void> handleTriggerRejected(TriggerRejectedException e) {
         return R.fail(e.getCode() + ": " + e.getMessage());
+    }
+
+    /** ResponseStatusException 直接透传其 HTTP 状态码和 reason */
+    @ExceptionHandler(ResponseStatusException.class)
+    public org.springframework.http.ResponseEntity<R<Void>> handleResponseStatus(
+            ResponseStatusException e) {
+        return org.springframework.http.ResponseEntity
+                .status(e.getStatusCode())
+                .body(R.fail(e.getReason() != null ? e.getReason() : e.getMessage()));
     }
 
     @ExceptionHandler(SecurityException.class)

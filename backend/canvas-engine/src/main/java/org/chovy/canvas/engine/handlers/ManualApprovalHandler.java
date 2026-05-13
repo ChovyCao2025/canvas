@@ -10,6 +10,8 @@ import org.chovy.canvas.engine.handler.NodeHandlerType;
 import org.chovy.canvas.engine.handler.NodeResult;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.stereotype.Component;
+import reactor.core.publisher.Mono;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -23,6 +25,7 @@ import java.util.Map;
  *   - 从 ctx 中读取审批结果，决定走 approveNodeId 还是 rejectNodeId
  * 超时处理：由 Watchdog 检测 timeoutAt 并按 onTimeout 策略处理。
  */
+@Component
 @Slf4j
 @NodeHandlerType("MANUAL_APPROVAL")
 @RequiredArgsConstructor
@@ -36,7 +39,7 @@ public class ManualApprovalHandler implements NodeHandler {
 
     @Override
     @SuppressWarnings("unchecked")
-    public NodeResult execute(Map<String, Object> config, ExecutionContext ctx) {
+    public Mono<NodeResult> executeAsync(Map<String, Object> config, ExecutionContext ctx) {
         String nodeId       = extractNodeId(config);  // 从 config 获取自身 nodeId（由调用方注入）
         String approveNodeId = (String) config.get("approveNodeId");
         String rejectNodeId  = (String) config.get("rejectNodeId");
@@ -50,13 +53,13 @@ public class ManualApprovalHandler implements NodeHandler {
         Object result = ctx.getContextValue(resultKey);
         if ("APPROVED".equals(result)) {
             log.info("[MANUAL_APPROVAL] 审批通过 approvalId={}", approvalId);
-            return NodeResult.ok(approveNodeId, Map.of());
+            return Mono.just(NodeResult.ok(approveNodeId, Map.of()));
         }
         if ("REJECTED".equals(result)) {
             log.info("[MANUAL_APPROVAL] 审批拒绝 approvalId={}", approvalId);
             return approveNodeId != null
-                    ? NodeResult.ok(rejectNodeId, Map.of())
-                    : NodeResult.fail("人工审批被拒绝");
+                    ? Mono.just(NodeResult.ok(rejectNodeId, Map.of()))
+                    : Mono.just(NodeResult.fail("人工审批被拒绝"));
         }
 
         // 首次进入：创建审批记录，挂起流程
@@ -85,7 +88,7 @@ public class ManualApprovalHandler implements NodeHandler {
         // 返回 WAITING（设计文档 18.2 节：流程挂起，等待审批）
         // DagEngine 的调用方（CanvasExecutionService）检测 WAITING 状态后持久化 ctx
         ctx.setNodeStatus(nodeId, NodeStatus.WAITING);
-        return NodeResult.ok(null, Map.of()); // nextNodeId=null 表示挂起
+        return Mono.just(NodeResult.ok(null, Map.of())); // nextNodeId=null 表示挂起
     }
 
     private String extractNodeId(Map<String, Object> config) {

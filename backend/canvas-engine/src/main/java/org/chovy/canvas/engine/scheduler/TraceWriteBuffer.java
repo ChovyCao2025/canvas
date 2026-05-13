@@ -2,6 +2,7 @@ package org.chovy.canvas.engine.scheduler;
 
 import org.chovy.canvas.domain.execution.CanvasExecutionTrace;
 import org.chovy.canvas.domain.execution.CanvasExecutionTraceMapper;
+import jakarta.annotation.PreDestroy;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -56,12 +57,40 @@ public class TraceWriteBuffer {
 
         if (!batch.isEmpty()) {
             try {
-                batch.forEach(traceMapper::insert);
+                traceMapper.insertBatch(batch);
                 log.debug("[TRACE_BUFFER] 批量写入 {} 条", batch.size());
             } catch (Exception e) {
                 log.error("[TRACE_BUFFER] 批量写入失败: {}", e.getMessage());
                 // 写入失败的轨迹不重试（轨迹是调试辅助数据，丢失可接受）
             }
+        }
+    }
+
+    /** 应用关闭前将缓冲区剩余轨迹全部刷盘，防止丢失 */
+    @PreDestroy
+    public void shutdownFlush() {
+        int remaining = buffer.size();
+        if (remaining == 0) return;
+        log.info("[TRACE_BUFFER] 关闭前刷盘，剩余 {} 条", remaining);
+        // 循环直到清空，不受 BATCH_SIZE 限制
+        List<CanvasExecutionTrace> batch = new ArrayList<>(BATCH_SIZE);
+        CanvasExecutionTrace item;
+        while ((item = buffer.poll()) != null) {
+            batch.add(item);
+            if (batch.size() >= BATCH_SIZE) {
+                writeBatch(batch);
+                batch = new ArrayList<>(BATCH_SIZE);
+            }
+        }
+        if (!batch.isEmpty()) writeBatch(batch);
+        log.info("[TRACE_BUFFER] 关闭刷盘完成");
+    }
+
+    private void writeBatch(List<CanvasExecutionTrace> batch) {
+        try {
+            traceMapper.insertBatch(batch);
+        } catch (Exception e) {
+            log.error("[TRACE_BUFFER] 关闭刷盘写入失败: {}", e.getMessage());
         }
     }
 

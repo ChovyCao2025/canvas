@@ -16,6 +16,7 @@ import org.springframework.stereotype.Component;
 import java.time.Duration;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
 
 /**
@@ -63,11 +64,23 @@ public class CanvasRouteInitializer {
             List<Canvas> published = canvasMapper.selectList(
                     new LambdaQueryWrapper<Canvas>().eq(Canvas::getStatus, 1));
 
+            // 批量查询版本（避免 N+1）
+            List<Long> versionIds = published.stream()
+                    .map(Canvas::getPublishedVersionId)
+                    .filter(Objects::nonNull)
+                    .distinct()
+                    .toList();
+
+            Map<Long, CanvasVersion> versionMap = versionIds.isEmpty()
+                    ? Map.of()
+                    : canvasVersionMapper.selectBatchIds(versionIds).stream()
+                            .collect(java.util.stream.Collectors.toMap(CanvasVersion::getId, v -> v));
+
             int count = 0;
             for (Canvas canvas : published) {
                 if (canvas.getPublishedVersionId() == null) continue;
                 try {
-                    CanvasVersion version = canvasVersionMapper.selectById(canvas.getPublishedVersionId());
+                    CanvasVersion version = versionMap.get(canvas.getPublishedVersionId());
                     if (version == null || version.getGraphJson() == null) continue;
                     DagGraph graph = dagParser.parse(version.getGraphJson());
                     registerRoutes(canvas.getId(), graph);

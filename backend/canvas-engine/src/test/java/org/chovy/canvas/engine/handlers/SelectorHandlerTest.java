@@ -31,7 +31,7 @@ class SelectorHandlerTest {
                 "elseNodeId", "node_ticket"
         );
 
-        NodeResult r = handler.execute(config, ctx);
+        NodeResult r = handler.executeAsync(config, ctx).block();
         assertThat(r.nextNodeId()).isEqualTo("node_hotel");
     }
 
@@ -49,7 +49,7 @@ class SelectorHandlerTest {
                 "elseNodeId", "node_ticket"
         );
 
-        NodeResult r = handler.execute(config, ctx);
+        NodeResult r = handler.executeAsync(config, ctx).block();
         assertThat(r.nextNodeId()).isEqualTo("node_shuttle");
     }
 
@@ -64,7 +64,7 @@ class SelectorHandlerTest {
                 "elseNodeId", "node_ticket"
         );
 
-        NodeResult r = handler.execute(config, ctx);
+        NodeResult r = handler.executeAsync(config, ctx).block();
         assertThat(r.nextNodeId()).isEqualTo("node_ticket");
     }
 
@@ -79,7 +79,7 @@ class SelectorHandlerTest {
                 // 无 elseNodeId
         );
 
-        NodeResult r = handler.execute(config, ctx);
+        NodeResult r = handler.executeAsync(config, ctx).block();
         assertThat(r.success()).isTrue();
         assertThat(r.nextNodeId()).isNull();
     }

@@ -109,10 +109,10 @@ public class DagEngine {
         DagParser.CanvasNode node = graph.getNode(nodeId);
         if (node == null) {
             log.warn("[ENGINE] 节点不存在，跳过 nodeId={}", nodeId);
-            return Mono.just(Map.of());
+            return Mono.just(Map.<String, Object>of());
         }
 
-        return Mono.defer(() -> {
+        return Mono.<Map<String, Object>>defer(() -> {
 
             // ──────────────────────────────────────────────────────
             // 阶段 1：解析节点配置（CONTEXT 类型替换为实际值）
@@ -136,7 +136,7 @@ public class DagEngine {
             // ──────────────────────────────────────────────────────
             if (ctx.isNodeDone(nodeId)) {
                 log.debug("[ENGINE] 幂等跳过 nodeId={}", nodeId);
-                return Mono.just(Map.of());
+                return Mono.just(Map.<String, Object>of());
             }
 
             // ──────────────────────────────────────────────────────
@@ -147,7 +147,7 @@ public class DagEngine {
                 // 抢锁失败：设置 waitProcess=true 通知持锁协程需要 repeat
                 waitProcess.set(true);
                 log.debug("[ENGINE] CAS 失败，设 waitProcess=true nodeId={}", nodeId);
-                return Mono.just(Map.of());
+                return Mono.just(Map.<String, Object>of());
             }
 
             // ──────────────────────────────────────────────────────
@@ -171,7 +171,7 @@ public class DagEngine {
                             // 防资损：已发券/已触达则整体 SUCCESS
                             if (ctx.isBenefitGranted() || ctx.isUserReached()) {
                                 log.warn("[ENGINE] 防资损：节点失败但整体判定成功 nodeId={}", nodeId);
-                                return Mono.just(Map.of());
+                                return Mono.just(new HashMap<String, Object>());
                             }
                             return Mono.error(
                                     new RuntimeException("节点 " + nodeId + " 失败: " + result.errorMessage()));
@@ -197,9 +197,9 @@ public class DagEngine {
                         ctx.setNodeStatus(nodeId, NodeStatus.FAILED);
                         log.error("[ENGINE] 节点异常 nodeId={}: {}", nodeId, e.getMessage());
                         if (ctx.isBenefitGranted() || ctx.isUserReached()) {
-                            return Mono.just(Map.of());
+                            return Mono.just(new HashMap<String, Object>());
                         }
-                        return Mono.error(e);
+                        return Mono.<Map<String, Object>>error(e);
                     });
         });
     }
@@ -316,7 +316,7 @@ public class DagEngine {
         if (LogicRelationHandler.shouldFailImmediately(relation, upstreamIds, ctx)) {
             ctx.setNodeStatus(nodeId, NodeStatus.FAILED);
             log.warn("[ENGINE] LOGIC_RELATION AND 上游失败，立即 FAILED nodeId={}", nodeId);
-            if (ctx.isBenefitGranted() || ctx.isUserReached()) return Mono.just(Map.of());
+            if (ctx.isBenefitGranted() || ctx.isUserReached()) return Mono.just(Map.<String, Object>of());
             return Mono.error(new RuntimeException("LOGIC_RELATION AND 条件因上游失败不可满足"));
         }
 
@@ -342,7 +342,7 @@ public class DagEngine {
                 log.debug("[LOGIC_RELATION] 启动等待超时定时器 {}s nodeId={}", timeoutSec, nodeId);
             }
             log.debug("[ENGINE] LOGIC_RELATION 条件未满足，进入 WAITING nodeId={}", nodeId);
-            return Mono.just(Map.of());
+            return Mono.just(Map.<String, Object>of());
         }
 
         // 条件满足 → 走正常节点执行流程（阶段 3-6）
@@ -389,7 +389,7 @@ public class DagEngine {
                     return Mono.error(new RuntimeException("HUB 等待超时 nodeId=" + nodeId));
                 }
             }
-            return Mono.just(Map.of()); // 继续等待
+            return Mono.just(Map.<String, Object>of()); // 继续等待
         }
 
         // 所有上游完成 → 走正常节点执行流程（阶段 3-6）
@@ -405,13 +405,13 @@ public class DagEngine {
                                                                Map<String, Object> config,
                                                                ExecutionContext ctx) {
         // 阶段 3：幂等
-        if (ctx.isNodeDone(nodeId)) return Mono.just(Map.of());
+        if (ctx.isNodeDone(nodeId)) return Mono.just(Map.<String, Object>of());
 
         // 阶段 4：CAS
         AtomicBoolean waitProcess = ctx.getLock(nodeId);
         if (!waitProcess.compareAndSet(true, false)) {
             waitProcess.set(true);
-            return Mono.just(Map.of());
+            return Mono.just(Map.<String, Object>of());
         }
 
         writeTraceStart(ctx, node);
@@ -424,7 +424,7 @@ public class DagEngine {
                         waitProcess.set(true);
                         ctx.setNodeStatus(nodeId, NodeStatus.FAILED);
                         writeTraceEnd(ctx, node, result);
-                        if (ctx.isBenefitGranted() || ctx.isUserReached()) return Mono.just(Map.of());
+                        if (ctx.isBenefitGranted() || ctx.isUserReached()) return Mono.just(Map.<String, Object>of());
                         return Mono.error(new RuntimeException("节点 " + nodeId + " 失败: " + result.errorMessage()));
                     }
                     if (handler.isBenefitNode()) ctx.setBenefitGranted(true);
@@ -439,8 +439,10 @@ public class DagEngine {
                 .onErrorResume(e -> {
                     waitProcess.set(true);
                     ctx.setNodeStatus(nodeId, NodeStatus.FAILED);
-                    if (ctx.isBenefitGranted() || ctx.isUserReached()) return Mono.just(Map.of());
-                    return Mono.error(e);
+                    if (ctx.isBenefitGranted() || ctx.isUserReached()) {
+                        return Mono.just(new HashMap<String, Object>());
+                    }
+                    return Mono.<Map<String, Object>>error(e);
                 });
     }
 
@@ -580,15 +582,13 @@ public class DagEngine {
                 .outputData(outputJson)
                 .errorMsg(result.errorMessage())
                 .finishedAt(LocalDateTime.now())
+                .durationMs(durationMs > 0 ? durationMs : null)
                 .build();
-        // TODO: store durationMs in trace record (需 V8 migration 给 trace 表加 duration_ms 列)
         traceBuffer.offer(trace);
     }
 
     private void writeTraceEnd(ExecutionContext ctx, DagParser.CanvasNode node, NodeResult result) {
         writeTraceEnd(ctx, node, result, 0);
-    }
-        traceBuffer.offer(trace); // 非阻塞入队（12.10节批量写入）
     }
 
     // ══════════════════════════════════════════════════════════════

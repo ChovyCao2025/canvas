@@ -34,7 +34,9 @@ docker exec canvas-mysql mysql -uroot -proot -e "CREATE DATABASE IF NOT EXISTS c
 
 ```bash
 cd /Users/photonpay/project/canvas/backend/canvas-engine
-mvn spring-boot:run
+JAVA_HOME=/Users/photonpay/Library/Java/JavaVirtualMachines/ms-21.0.11/Contents/Home \
+    /opt/homebrew/bin/mvn spring-boot:run \
+    -f /Users/photonpay/project/canvas/backend/canvas-engine/pom.xml
 # 启动完成标志：Started CanvasEngineApplication
 # Swagger UI: http://localhost:8080/swagger-ui.html
 # 健康检查:   http://localhost:8080/actuator/health

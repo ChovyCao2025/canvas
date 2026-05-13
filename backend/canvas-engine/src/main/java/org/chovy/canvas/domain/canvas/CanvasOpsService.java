@@ -198,7 +198,7 @@ public class CanvasOpsService {
 
     @SuppressWarnings("unchecked")
     private java.util.List<java.util.Map<String, Object>> parseNodes(String graphJson) {
-        if (graphJson == null || graphJson.isBlank()) return List.of();
+        if (graphJson == null || graphJson.isBlank()) return java.util.List.of();
         try {
             java.util.Map<String, Object> root = new com.fasterxml.jackson.databind.ObjectMapper()
                     .readValue(graphJson, java.util.Map.class);
@@ -207,7 +207,7 @@ public class CanvasOpsService {
                 return (java.util.List<java.util.Map<String, Object>>) l;
             }
         } catch (Exception ignored) {}
-        return List.of();
+        return java.util.List.of();
     }
 
     // ── helpers ──────────────────────────────────────────────────

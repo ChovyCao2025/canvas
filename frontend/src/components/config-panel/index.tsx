@@ -525,6 +525,9 @@ function CanvasSelector() {
     />
   )
 }
+
+interface SchemaField {
+  key: string; label: string; type: string
   required?: boolean; options?: any[]; dataSource?: string
   visible?: string; defaultValue?: unknown
 }

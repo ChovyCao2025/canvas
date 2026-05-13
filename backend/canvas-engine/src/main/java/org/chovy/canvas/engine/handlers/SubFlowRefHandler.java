@@ -13,8 +13,9 @@ import org.chovy.canvas.engine.handler.NodeResult;
 import reactor.core.publisher.Mono;
 import org.chovy.canvas.engine.scheduler.DagEngine;
 import org.chovy.canvas.infra.cache.CanvasConfigCache;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.annotation.Lazy;
+import org.springframework.stereotype.Component;
 
 import java.time.Duration;
 import java.util.*;
@@ -30,9 +31,9 @@ import java.util.*;
  * subFlowVersion = -1 → 动态取最新已发布版本
  * outputPrefix：子流程输出字段加此前缀写入父上下文，防冲突
  */
+@Component
 @Slf4j
 @NodeHandlerType("SUB_FLOW_REF")
-@RequiredArgsConstructor
 public class SubFlowRefHandler implements NodeHandler {
 
     private final CanvasMapper        canvasMapper;
@@ -41,11 +42,23 @@ public class SubFlowRefHandler implements NodeHandler {
     private final DagEngine           dagEngine;
     private final ObjectMapper        objectMapper;
 
+    public SubFlowRefHandler(CanvasMapper canvasMapper,
+                             CanvasVersionMapper canvasVersionMapper,
+                             CanvasConfigCache configCache,
+                             @Lazy DagEngine dagEngine,
+                             ObjectMapper objectMapper) {
+        this.canvasMapper        = canvasMapper;
+        this.canvasVersionMapper = canvasVersionMapper;
+        this.configCache         = configCache;
+        this.dagEngine           = dagEngine;
+        this.objectMapper        = objectMapper;
+    }
+
     @Override
     @SuppressWarnings("unchecked")
     public Mono<NodeResult> executeAsync(Map<String, Object> config, ExecutionContext ctx) {
         Object subFlowIdObj = config.get("subFlowId");
-        if (subFlowIdObj == null) return NodeResult.fail("SUB_FLOW_REF 缺少 subFlowId");
+        if (subFlowIdObj == null) return Mono.just(NodeResult.fail("SUB_FLOW_REF 缺少 subFlowId"));
         Long   subFlowId      = Long.parseLong(String.valueOf(subFlowIdObj));
         int    subFlowVersion = config.get("subFlowVersion") instanceof Number n ? n.intValue() : -1;
         String outputPrefix   = (String) config.getOrDefault("outputPrefix", "sf");
@@ -55,28 +68,28 @@ public class SubFlowRefHandler implements NodeHandler {
 
         // 防循环
         if (ctx.getCallStack().contains(subFlowId)) {
-            return NodeResult.fail("SUB_FLOW_REF 循环调用: " + subFlowId);
+            return Mono.just(NodeResult.fail("SUB_FLOW_REF 循环调用: " + subFlowId));
         }
 
         Canvas canvas = canvasMapper.selectById(subFlowId);
         if (canvas == null || canvas.getStatus() != 1) {
-            return NodeResult.fail("子流程画布未发布: " + subFlowId);
+            return Mono.just(NodeResult.fail("子流程画布未发布: " + subFlowId));
         }
         Long versionId = subFlowVersion == -1
                 ? canvas.getPublishedVersionId()
                 : resolveVersion(subFlowId, subFlowVersion);
-        if (versionId == null) return NodeResult.fail("子流程版本不存在: " + subFlowVersion);
+        if (versionId == null) return Mono.just(NodeResult.fail("子流程版本不存在: " + subFlowVersion));
 
         // 加载子流程 graph_json
         CanvasVersion version = canvasVersionMapper.selectById(versionId);
-        if (version == null) return NodeResult.fail("子流程版本记录不存在");
+        if (version == null) return Mono.just(NodeResult.fail("子流程版本记录不存在"));
 
         // 解析 graph_json 顶层结构，判断子流程类型
         Map<String, Object> graphRoot;
         try {
             graphRoot = objectMapper.readValue(version.getGraphJson(), Map.class);
         } catch (Exception e) {
-            return NodeResult.fail("子流程 JSON 解析失败: " + e.getMessage());
+            return Mono.just(NodeResult.fail("子流程 JSON 解析失败: " + e.getMessage()));
         }
 
         String subFlowType = (String) graphRoot.getOrDefault("type", "WORKFLOW");
@@ -100,7 +113,7 @@ public class SubFlowRefHandler implements NodeHandler {
                 yield r != null ? Mono.just(NodeResult.ok(nextNodeId, r))
                                 : Mono.just(NodeResult.fail("DATA_TABLE 未找到 key"));
             }
-            default -> executeWorkflow(subFlowId, versionId, inputData, ctx, nextNodeId)
+            default -> executeWorkflow(subFlowId, versionId, inputData, ctx, nextNodeId, outputPrefix)
                     .onErrorResume(e -> Mono.just(NodeResult.fail("子流程执行失败: " + e.getMessage())));
         };
     }
@@ -189,7 +202,8 @@ public class SubFlowRefHandler implements NodeHandler {
     private Mono<NodeResult> executeWorkflow(Long subFlowId, Long versionId,
                                               Map<String, Object> inputData,
                                               ExecutionContext ctx,
-                                              String nextNodeId) {
+                                              String nextNodeId,
+                                              String outputPrefix) {
         ExecutionContext childCtx = new ExecutionContext();
         childCtx.setExecutionId(ctx.getExecutionId() + ":sf:" + UUID.randomUUID().toString().substring(0, 6));
         childCtx.setCanvasId(subFlowId);

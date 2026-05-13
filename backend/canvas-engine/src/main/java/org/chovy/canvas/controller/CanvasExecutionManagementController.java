@@ -61,7 +61,7 @@ public class CanvasExecutionManagementController {
                         Mono.<Void>fromRunnable(() -> resumeWithResult(executionId, "REJECTED", username,
                                 /* watchdog */ false))
                                 .subscribeOn(Schedulers.boundedElastic())
-                .thenReturn(R.<Void>ok());
+                                .thenReturn(R.<Void>ok()));
     }
 
     // ── private ──────────────────────────────────────────────────

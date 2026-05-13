@@ -9,6 +9,7 @@ import groovy.lang.Binding;
 import groovy.lang.Script;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.stereotype.Component;
 import org.codehaus.groovy.control.CompilerConfiguration;
 import org.codehaus.groovy.control.customizers.SecureASTCustomizer;
 import org.springframework.beans.factory.annotation.Value;
@@ -29,6 +30,7 @@ import java.util.concurrent.*;
  *   - 超时强制中断
  *   - 输出大小限制 64KB
  */
+@Component
 @Slf4j
 @NodeHandlerType("GROOVY")
 @RequiredArgsConstructor
@@ -87,13 +89,11 @@ public class GroovyHandler implements NodeHandler {
                 "java.math.BigDecimal", "java.math.BigInteger", "java.math.RoundingMode",
                 "java.util.regex.Pattern", "java.util.regex.Matcher"
         ));
-        security.setDisallowedImports(List.of(
-                "java.io.*", "java.net.*", "java.lang.Runtime", "java.lang.Process",
-                "java.lang.Thread", "java.lang.ClassLoader", "java.lang.reflect.*",
-                "sun.*", "com.sun.*"
-        ));
-        security.setDisallowedMethodNames(List.of("execute", "exec", "exit", "halt",
-                "forName", "newInstance", "getDeclaredMethod"));
+        // setAllowedImports 已是白名单，无需再设黑名单
+        security.setDisallowedReceivers(List.of(
+                "java.lang.Runtime", "java.lang.Process", "java.lang.ProcessBuilder",
+                "java.lang.Thread", "java.lang.ClassLoader", "java.lang.Class",
+                "java.lang.reflect.Method", "java.lang.reflect.Field"));
         security.setIndirectImportCheckEnabled(true);
 
         CompilerConfiguration config = new CompilerConfiguration();

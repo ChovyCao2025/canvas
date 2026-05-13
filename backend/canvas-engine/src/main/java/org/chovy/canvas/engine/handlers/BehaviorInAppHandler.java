@@ -33,7 +33,7 @@ public class BehaviorInAppHandler implements NodeHandler {
                 ? strategies.stream().anyMatch(s -> evaluateStrategy(s, ctx))
                 : strategies.stream().allMatch(s -> evaluateStrategy(s, ctx));
 
-        if (!matched) return NodeResult.fail("行为策略条件不满足");
+        if (!matched) return Mono.just(NodeResult.fail("行为策略条件不满足"));
 
         return Mono.just(NodeResult.ok(nextNodeId, new HashMap<>(ctx.getTriggerPayload())));
     }

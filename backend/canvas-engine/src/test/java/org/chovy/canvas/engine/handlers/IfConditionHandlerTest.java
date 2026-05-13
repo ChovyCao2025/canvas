@@ -120,7 +120,7 @@ class IfConditionHandlerTest {
                     "successNodeId", "node_coupon",
                     "failNodeId", "node_reach"
             );
-            NodeResult result = handler.execute(config, ctx);
+            NodeResult result = handler.executeAsync(config, ctx).block();
             assertThat(result.success()).isTrue();
             assertThat(result.successNodeId()).isEqualTo("node_coupon");
             assertThat(result.failNodeId()).isNull();
@@ -133,7 +133,7 @@ class IfConditionHandlerTest {
                     "successNodeId", "node_coupon",
                     "failNodeId", "node_reach"
             );
-            NodeResult result = handler.execute(config, ctx);
+            NodeResult result = handler.executeAsync(config, ctx).block();
             assertThat(result.success()).isTrue();
             assertThat(result.successNodeId()).isNull();
             assertThat(result.failNodeId()).isEqualTo("node_reach");

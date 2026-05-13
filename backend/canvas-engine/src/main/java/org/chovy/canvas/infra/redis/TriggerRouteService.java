@@ -57,7 +57,7 @@ public class TriggerRouteService {
      */
     public boolean isRouteTableEmpty() {
         try {
-            byte[] firstKey = reactiveFactory.getReactiveConnection()
+            java.nio.ByteBuffer firstKey = reactiveFactory.getReactiveConnection()
                     .keyCommands()
                     .scan(ScanOptions.scanOptions().match(keys.triggerPattern()).count(1).build())
                     .blockFirst();

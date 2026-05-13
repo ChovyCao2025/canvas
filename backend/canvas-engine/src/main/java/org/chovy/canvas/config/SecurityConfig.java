@@ -3,11 +3,14 @@ package org.chovy.canvas.config;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.security.config.annotation.web.reactive.EnableWebFluxSecurity;
 import org.springframework.security.config.web.server.SecurityWebFiltersOrder;
 import org.springframework.security.config.web.server.ServerHttpSecurity;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.web.server.SecurityWebFilterChain;
+import reactor.core.publisher.Mono;
 
 @Configuration
 @EnableWebFluxSecurity
@@ -26,6 +29,15 @@ public class SecurityConfig {
                 .csrf(ServerHttpSecurity.CsrfSpec::disable)
                 .httpBasic(ServerHttpSecurity.HttpBasicSpec::disable)
                 .formLogin(ServerHttpSecurity.FormLoginSpec::disable)
+                // 未登录时返回 JSON 401，不触发浏览器原生 Basic Auth 弹窗
+                .exceptionHandling(ex -> ex.authenticationEntryPoint((exchange, e) -> {
+                    var response = exchange.getResponse();
+                    response.setStatusCode(HttpStatus.UNAUTHORIZED);
+                    response.getHeaders().setContentType(MediaType.APPLICATION_JSON);
+                    var body = "{\"code\":-1,\"message\":\"未登录或 Token 已过期\",\"data\":null}";
+                    var buffer = response.bufferFactory().wrap(body.getBytes());
+                    return response.writeWith(Mono.just(buffer));
+                }))
                 .authorizeExchange(ex -> ex
                         // 公开接口
                         .pathMatchers("/auth/login").permitAll()

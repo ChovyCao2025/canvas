@@ -28,3 +28,9 @@ logs/
 
 # 本地配置（含密钥，不提交）
 backend/canvas-engine/src/main/resources/application-local.yml
+
+# Maven 构建产物
+backend/canvas-engine/target/
+
+# npm lock（本地环境差异大，不提交）
+frontend/package-lock.json

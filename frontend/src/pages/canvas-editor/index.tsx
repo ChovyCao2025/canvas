@@ -7,9 +7,9 @@ import {
 } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
 import dagre from '@dagrejs/dagre'
-import { Button, Divider, Input, message, Space, Tag, Tooltip, Typography } from 'antd'
+import { Button, Divider, Input, message, Modal, Space, Tag, Tooltip, Typography } from 'antd'
 import {
-  ArrowLeftOutlined, CloudUploadOutlined, HistoryOutlined,
+  ArrowLeftOutlined, CaretRightOutlined, CloudUploadOutlined, HistoryOutlined,
   SaveOutlined, ApartmentOutlined,
 } from '@ant-design/icons'
 import { useNavigate, useParams } from 'react-router-dom'
@@ -164,6 +164,10 @@ function EditorInner({ detail }: { detail: CanvasDetail }) {
   const [isDirty, setIsDirty]       = useState(false)
   const [clipboard, setClipboard]   = useState<Node<CanvasNodeData>[]>([])
   const [traceColorMap, setTraceColorMap] = useState<Record<string, string>>({})
+  const [testModalOpen, setTestModalOpen] = useState(false)
+  const [testUserId,    setTestUserId]    = useState('user_test_001')
+  const [testPayload,   setTestPayload]   = useState('{}')
+  const [testRunning,   setTestRunning]   = useState(false)
   const editVersion   = useRef(0)
   const autoSaveTimer = useRef<ReturnType<typeof setTimeout>>()
 
@@ -463,18 +467,60 @@ function EditorInner({ detail }: { detail: CanvasDetail }) {
           {status !== 1 && (
             <Button type="primary" icon={<CloudUploadOutlined />}
               onClick={async () => {
-                // 本地校验（快速反馈，减少服务端往返）
                 const errors = validateBeforePublish(getNodes() as Node<CanvasNodeData>[])
-                if (errors.length > 0) {
-                  message.error({ content: errors.join('\n'), duration: 5 })
-                  return
-                }
+                if (errors.length > 0) { message.error({ content: errors.join('\n'), duration: 5 }); return }
                 try { await canvasApi.publish(canvasId); message.success('发布成功') }
                 catch (e: any) { message.error(e?.response?.data?.message ?? '发布失败') }
               }}>
               发布
             </Button>
           )}
+          <Button icon={<CaretRightOutlined />} onClick={() => setTestModalOpen(true)}>
+            测试运行
+          </Button>
+
+          {/* 测试运行弹窗 */}
+          <Modal
+            title="测试运行"
+            open={testModalOpen}
+            confirmLoading={testRunning}
+            okText="运行"
+            cancelText="取消"
+            onCancel={() => setTestModalOpen(false)}
+            onOk={async () => {
+              let payload: Record<string, unknown> = {}
+              try { payload = JSON.parse(testPayload) } catch {
+                message.error('Payload 不是合法 JSON'); return
+              }
+              setTestRunning(true)
+              try {
+                const res = await canvasApi.triggerDirect(canvasId, testUserId, payload)
+                const executionId = (res.data?.data as any)?.executionId
+                message.success('触发成功，executionId: ' + (executionId ?? '—'))
+                setTestModalOpen(false)
+              } catch (e: any) {
+                message.error(e?.response?.data?.message ?? '触发失败')
+              } finally {
+                setTestRunning(false)
+              }
+            }}
+          >
+            <Space direction="vertical" style={{ width: '100%' }}>
+              <div>
+                <div style={{ marginBottom: 4, fontSize: 12, color: '#666' }}>用户 ID</div>
+                <Input value={testUserId} onChange={e => setTestUserId(e.target.value)} />
+              </div>
+              <div>
+                <div style={{ marginBottom: 4, fontSize: 12, color: '#666' }}>Payload（JSON）</div>
+                <Input.TextArea
+                  rows={4}
+                  value={testPayload}
+                  onChange={e => setTestPayload(e.target.value)}
+                  style={{ fontFamily: 'monospace' }}
+                />
+              </div>
+            </Space>
+          </Modal>
         </Space>
       </div>
 

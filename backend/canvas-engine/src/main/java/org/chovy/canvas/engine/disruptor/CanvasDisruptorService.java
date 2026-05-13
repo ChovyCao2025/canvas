@@ -2,6 +2,7 @@ package org.chovy.canvas.engine.disruptor;
 
 import com.lmax.disruptor.*;
 import com.lmax.disruptor.dsl.*;
+import com.lmax.disruptor.util.DaemonThreadFactory;
 import org.chovy.canvas.engine.trigger.CanvasExecutionService;
 import jakarta.annotation.PreDestroy;
 import lombok.extern.slf4j.Slf4j;
