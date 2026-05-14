@@ -1,6 +1,7 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { AuthProvider } from './context/AuthContext'
 import { RequireAuth, RequireAdmin } from './auth/guards'
+import AppLayout from './components/layout/AppLayout'
 import LoginPage from './pages/login'
 import CanvasListPage from './pages/canvas-list'
 import CanvasEditorPage from './pages/canvas-editor'
@@ -16,19 +17,25 @@ export default function App() {
         <Routes>
           <Route path="/login" element={<LoginPage />} />
 
-          {/* 需要登录 */}
+          {/* 需要登录——带侧边栏布局 */}
           <Route element={<RequireAuth />}>
-            <Route path="/" element={<Navigate to="/canvas" replace />} />
-            <Route path="/canvas" element={<CanvasListPage />} />
-            <Route path="/canvas/:id/edit" element={<CanvasEditorPage />} />
+            <Route element={<AppLayout />}>
+              <Route path="/" element={<Navigate to="/canvas" replace />} />
+              <Route path="/canvas" element={<CanvasListPage />} />
+            </Route>
+
+            {/* 编辑器 / 统计保持全屏，无侧边栏 */}
+            <Route path="/canvas/:id/edit"  element={<CanvasEditorPage />} />
             <Route path="/canvas/:id/stats" element={<CanvasStatsPage />} />
           </Route>
 
-          {/* 需要 ADMIN */}
+          {/* 需要 ADMIN——带侧边栏布局 */}
           <Route element={<RequireAdmin />}>
-            <Route path="/admin/users" element={<AdminUsersPage />} />
-            <Route path="/api-config" element={<ApiConfigPage />} />
-            <Route path="/ab-experiments" element={<AbExperimentPage />} />
+            <Route element={<AppLayout />}>
+              <Route path="/admin/users"    element={<AdminUsersPage />} />
+              <Route path="/api-config"     element={<ApiConfigPage />} />
+              <Route path="/ab-experiments" element={<AbExperimentPage />} />
+            </Route>
           </Route>
         </Routes>
       </BrowserRouter>

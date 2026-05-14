@@ -1,12 +1,11 @@
 import { useEffect, useState } from 'react'
 import {
   Button, Table, Tag, Space, Modal, Form, Input,
-  message, Typography, Tooltip, Popconfirm,
+  message, Typography, Tooltip,
 } from 'antd'
 import {
   PlusOutlined, EditOutlined, CloudUploadOutlined,
   StopOutlined, CopyOutlined, ThunderboltOutlined, BarChartOutlined,
-  ApiOutlined, ExperimentOutlined,
 } from '@ant-design/icons'
 import { useNavigate } from 'react-router-dom'
 import type { ColumnsType } from 'antd/es/table'
@@ -172,24 +171,12 @@ export default function CanvasListPage() {
   ]
 
   return (
-    <div style={{ padding: 24 }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 16 }}>
-        <Title level={4} style={{ margin: 0 }}>营销画布</Title>
-        <Space>
-          {isAdmin && (
-            <>
-              <Button icon={<ApiOutlined />} onClick={() => navigate('/api-config')}>
-                API 管理
-              </Button>
-              <Button icon={<ExperimentOutlined />} onClick={() => navigate('/ab-experiments')}>
-                AB 实验
-              </Button>
-            </>
-          )}
-          <Button type="primary" icon={<PlusOutlined />} onClick={() => setCreateVisible(true)}>
-            新建画布
-          </Button>
-        </Space>
+    <div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+        <Title level={4} style={{ margin: 0 }}>旅程管理</Title>
+        <Button type="primary" icon={<PlusOutlined />} onClick={() => setCreateVisible(true)}>
+          新建画布
+        </Button>
       </div>
 
       <Table
