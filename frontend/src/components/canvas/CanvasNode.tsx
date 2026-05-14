@@ -32,6 +32,7 @@ function ActionBar({ onCopy, onDelete }: { onCopy: () => void; onDelete: () => v
         boxShadow: '0 3px 10px rgba(0,0,0,.3)',
         whiteSpace: 'nowrap',
       }}
+      onMouseDown={e => e.stopPropagation()}
     >
       <Tooltip title="复制" mouseEnterDelay={0.6}>
         <button
