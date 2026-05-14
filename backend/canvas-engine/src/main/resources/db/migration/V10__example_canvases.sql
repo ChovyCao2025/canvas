@@ -9,8 +9,8 @@ VALUES
 SET @canvas1_id = LAST_INSERT_ID();
 
 INSERT INTO `canvas_version`
-    (`canvas_id`, `version`, `graph_json`, `created_by`, `created_at`)
-VALUES (@canvas1_id, 1, '{
+    (`canvas_id`, `version`, `status`, `graph_json`, `created_by`, `created_at`)
+VALUES (@canvas1_id, 1, 0, '{
   "nodes": [
     {
       "id": "node_start",
@@ -66,8 +66,8 @@ VALUES
 SET @canvas2_id = LAST_INSERT_ID();
 
 INSERT INTO `canvas_version`
-    (`canvas_id`, `version`, `graph_json`, `created_by`, `created_at`)
-VALUES (@canvas2_id, 1, '{
+    (`canvas_id`, `version`, `status`, `graph_json`, `created_by`, `created_at`)
+VALUES (@canvas2_id, 1, 0, '{
   "nodes": [
     {
       "id": "node_timer",
