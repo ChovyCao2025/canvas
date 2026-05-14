@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { BaseEdge, EdgeLabelRenderer, getBezierPath, type EdgeProps } from '@xyflow/react'
 import { DeleteOutlined } from '@ant-design/icons'
 import { useCanvasActions } from '../../context/CanvasActionsContext'
@@ -20,17 +20,19 @@ export default function HoverEdge({
   const enter = () => { clearTimeout(leaveTimer.current); setHovered(true) }
   const leave = () => { leaveTimer.current = setTimeout(() => setHovered(false), 400) }
 
+  // 组件卸载时清理 timer，防止 stale state update
+  useEffect(() => () => clearTimeout(leaveTimer.current), [])
+
   const show = hovered || !!selected
 
   return (
     <>
-      {/* 透明宽路径：主要 hover 触发区 */}
+      {/* 透明宽路径：hover 触发区 */}
       <path
         d={edgePath} fill="none" strokeWidth={20} stroke="transparent"
         style={{ cursor: 'pointer' }}
         onMouseEnter={enter} onMouseLeave={leave}
       />
-      {/* 实际渲染的边 */}
       <BaseEdge path={edgePath} markerEnd={markerEnd}
         style={{
           ...style,
@@ -41,7 +43,6 @@ export default function HoverEdge({
       />
 
       <EdgeLabelRenderer>
-        {/* 边标签 */}
         {label && (
           <div style={{
             position: 'absolute',
@@ -56,24 +57,24 @@ export default function HoverEdge({
         )}
 
         {/*
-          删除按钮——始终在 DOM 中，不做条件渲染。
-          pointer-events: all 确保即使不可见也能接住 onMouseEnter，
-          从而取消 leave 计时器。
-          onClick 里加 !show 守卫，防止误触不可见按钮。
+          按钮始终在 DOM，opacity 切换（opacity:0 仍接收鼠标事件，visibility:hidden 不行）。
+          nopan 阻止 ReactFlow pane 层拦截 click。
+          !show 守卫防止不可见时误触。
         */}
         <div
+          className="nopan"
           style={{
             position: 'absolute',
             transform: `translate(-50%,-50%) translate(${labelX}px,${labelY + 14}px)`,
             pointerEvents: 'all',
             opacity: show ? 1 : 0,
-            transition: 'opacity .12s',
+            transition: 'opacity .15s',
             background: 'rgba(28,28,28,0.88)',
             borderRadius: 7,
             padding: '4px 10px',
             boxShadow: '0 2px 8px rgba(0,0,0,.28)',
             display: 'flex', alignItems: 'center', gap: 5,
-            cursor: show ? 'pointer' : 'default',
+            cursor: 'pointer',
             whiteSpace: 'nowrap',
           }}
           onMouseEnter={enter}
