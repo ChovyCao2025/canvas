@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { BaseEdge, EdgeLabelRenderer, getBezierPath, type EdgeProps } from '@xyflow/react'
 import { Button } from 'antd'
 import { DeleteOutlined } from '@ant-design/icons'
@@ -10,7 +10,17 @@ export default function HoverEdge({
   label, style, markerEnd,
 }: EdgeProps) {
   const [hovered, setHovered] = useState(false)
+  const leaveTimer = useRef<ReturnType<typeof setTimeout>>()
   const { deleteEdge } = useCanvasActions()
+
+  const enter = () => {
+    clearTimeout(leaveTimer.current)
+    setHovered(true)
+  }
+  const leave = () => {
+    // 延迟 120ms 再隐藏，给鼠标移到按钮留出时间
+    leaveTimer.current = setTimeout(() => setHovered(false), 120)
+  }
 
   const [edgePath, labelX, labelY] = getBezierPath({
     sourceX, sourceY, sourcePosition,
@@ -19,15 +29,15 @@ export default function HoverEdge({
 
   return (
     <>
-      {/* 加宽的透明区域捕获 hover（SVG path 细线难 hover） */}
+      {/* 宽透明区域捕获 hover */}
       <path
         d={edgePath}
         fill="none"
-        strokeWidth={16}
+        strokeWidth={18}
         stroke="transparent"
         style={{ cursor: 'pointer' }}
-        onMouseEnter={() => setHovered(true)}
-        onMouseLeave={() => setHovered(false)}
+        onMouseEnter={enter}
+        onMouseLeave={leave}
       />
       <BaseEdge
         path={edgePath}
@@ -35,32 +45,30 @@ export default function HoverEdge({
         style={{ ...style, strokeWidth: hovered ? 2.5 : 1.5, stroke: hovered ? '#1677ff' : '#b1b1b7' }}
       />
       <EdgeLabelRenderer>
-        {/* 边 label（分组/分支名） */}
+        {/* 边 label */}
         {label && (
           <div
             style={{
               position: 'absolute',
               transform: `translate(-50%,-50%) translate(${labelX}px,${labelY}px)`,
-              fontSize: 11, background: '#fff', padding: '1px 5px',
-              border: '1px solid #e8e8e8', borderRadius: 3, pointerEvents: 'none',
-              color: '#595959',
+              fontSize: 11, background: '#fff', padding: '1px 6px',
+              border: '1px solid #e8e8e8', borderRadius: 3,
+              pointerEvents: 'none', color: '#595959',
             }}
-            className="nodrag nopan"
           >
             {String(label)}
           </div>
         )}
-        {/* hover 时显示删除按钮 */}
+        {/* hover 删除按钮 */}
         {hovered && (
           <div
             style={{
               position: 'absolute',
-              transform: `translate(-50%,-50%) translate(${labelX}px,${labelY + (label ? 16 : 0)}px)`,
+              transform: `translate(-50%,-50%) translate(${labelX}px,${labelY + (label ? 18 : 0)}px)`,
               pointerEvents: 'all',
             }}
-            className="nodrag nopan"
-            onMouseEnter={() => setHovered(true)}
-            onMouseLeave={() => setHovered(false)}
+            onMouseEnter={enter}
+            onMouseLeave={leave}
           >
             <Button
               size="small" danger shape="circle"
