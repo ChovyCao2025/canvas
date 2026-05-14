@@ -1,8 +1,11 @@
 package org.chovy.canvas.engine.trigger;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import org.chovy.canvas.domain.canvas.Canvas;
 import org.chovy.canvas.domain.canvas.CanvasMapper;
+import org.chovy.canvas.domain.canvas.CanvasVersion;
+import org.chovy.canvas.domain.canvas.CanvasVersionMapper;
 import org.chovy.canvas.domain.execution.CanvasExecution;
 import org.chovy.canvas.domain.execution.CanvasExecutionMapper;
 import org.chovy.canvas.engine.context.ExecutionContext;
@@ -32,6 +35,7 @@ import java.util.*;
 public class CanvasExecutionService {
 
     private final CanvasMapper               canvasMapper;
+    private final CanvasVersionMapper        canvasVersionMapper;
     private final CanvasExecutionMapper      executionMapper;
     private final CanvasConfigCache          configCache;
     private final ContextPersistenceService  ctxStore;
@@ -73,10 +77,13 @@ public class CanvasExecutionService {
         return Mono.fromCallable(() -> {
             // ... (existing code)
 
-            // 1. 加载画布
+            // 1. 加载画布（草稿在 dry-run 时可用，正式触发只允许已发布）
             Canvas canvas = canvasMapper.selectById(canvasId);
-            if (canvas == null || canvas.getStatus() != 1) {
-                throw new IllegalStateException("画布未发布或不存在: " + canvasId);
+            if (canvas == null) {
+                throw new IllegalStateException("画布不存在: " + canvasId);
+            }
+            if (!dryRun && canvas.getStatus() != 1) {
+                throw new IllegalStateException("画布未发布，请先发布后再触发: " + canvasId);
             }
 
             // 2. 前置检查（有效期 / 配额 / 冷却期）—— dry-run 跳过
@@ -121,9 +128,9 @@ public class CanvasExecutionService {
                     return Map.<String, Object>of("skipped", "resume-lock");
                 }
                 ctx = ctxStore.load(canvasId, userId);
-                if (ctx == null) ctx = newContext(canvasId, resolveVersionId(canvas, userId), userId, triggerType);
+                if (ctx == null) ctx = newContext(canvasId, resolveVersionId(canvas, userId, dryRun), userId, triggerType);
             } else {
-                ctx = newContext(canvasId, resolveVersionId(canvas, userId), userId, triggerType);
+                ctx = newContext(canvasId, resolveVersionId(canvas, userId, dryRun), userId, triggerType);
             }
 
             // 合并本次 payload
@@ -231,7 +238,18 @@ public class CanvasExecutionService {
      * @param userId 用户 ID
      * @return 路由后的版本 ID
      */
-    private Long resolveVersionId(Canvas canvas, String userId) {
+    private Long resolveVersionId(Canvas canvas, String userId, boolean dryRun) {
+        // dry-run：优先用最新草稿版本（未发布时也可测试）
+        if (dryRun) {
+            CanvasVersion latest = canvasVersionMapper.selectOne(
+                new LambdaQueryWrapper<CanvasVersion>()
+                    .eq(CanvasVersion::getCanvasId, canvas.getId())
+                    .orderByDesc(CanvasVersion::getId)
+                    .last("LIMIT 1")
+            );
+            if (latest != null) return latest.getId();
+        }
+        // 正常执行：灰度 or 发布版本
         if (canvas.getCanaryVersionId() != null && canvas.getCanaryPercent() != null
                 && canvas.getCanaryPercent() > 0) {
             int bucket = Math.abs((userId + ":" + canvas.getId()).hashCode()) % 100;
@@ -254,11 +272,15 @@ public class CanvasExecutionService {
     private String findTriggerNode(DagGraph graph, String triggerNodeType, String matchKey) {
         for (String nodeId : graph.entryNodes()) {
             DagParser.CanvasNode node = graph.getNode(nodeId);
-            if (node == null || !triggerNodeType.equals(node.getType())) continue;
-            if (matchKey == null) return nodeId; // DIRECT_CALL 无需匹配 key
+            if (node == null) continue;
+            String type = node.getType();
+            // DIRECT_CALL / DRY_RUN：接受 DIRECT_CALL 类型节点或通用 START 节点
+            boolean typeMatch = triggerNodeType.equals(type)
+                    || ("DIRECT_CALL".equals(triggerNodeType) && "START".equals(type));
+            if (!typeMatch) continue;
+            if (matchKey == null) return nodeId;
             Map<String, Object> config = node.getConfig();
             if (config == null) continue;
-            // MQ_TRIGGER 匹配 topicKey；BEHAVIOR 匹配 eventCode；TAGGER 匹配 tagCodeKey
             String cfgKey = (String) config.getOrDefault("topicKey",
                     config.getOrDefault("eventCode",
                     config.getOrDefault("tagCodeKey", "")));
@@ -266,7 +288,12 @@ public class CanvasExecutionService {
         }
         // 找不到具体 key 时退回第一个匹配类型的节点（降级）
         return graph.entryNodes().stream()
-                .filter(id -> triggerNodeType.equals(graph.getNode(id).getType()))
+                .filter(id -> {
+                    DagParser.CanvasNode n = graph.getNode(id);
+                    if (n == null) return false;
+                    return triggerNodeType.equals(n.getType())
+                        || ("DIRECT_CALL".equals(triggerNodeType) && "START".equals(n.getType()));
+                })
                 .findFirst().orElse(null);
     }
 

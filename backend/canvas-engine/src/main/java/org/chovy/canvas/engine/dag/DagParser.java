@@ -60,8 +60,10 @@ public class DagParser {
     @SuppressWarnings("unchecked")
     private List<String> extractTargets(CanvasNode node) {
         List<String> targets = new ArrayList<>();
-        Map<String, Object> c = node.getConfig();
-        if (c == null) return targets;
+        // config 优先，bizConfig 兜底（触发器节点 nextNodeId 只存在 bizConfig）
+        Map<String, Object> c = new HashMap<>();
+        if (node.getBizConfig() != null) c.putAll(node.getBizConfig());
+        if (node.getConfig()    != null) c.putAll(node.getConfig());    // config 覆盖 bizConfig
 
         addIfPresent(targets, c.get("nextNodeId"));
         addIfPresent(targets, c.get("successNodeId"));
@@ -126,6 +128,7 @@ public class DagParser {
         private String type;
         private String name;
         private Map<String, Object> config;
+        private Map<String, Object> bizConfig;
         private Double x;
         private Double y;
     }

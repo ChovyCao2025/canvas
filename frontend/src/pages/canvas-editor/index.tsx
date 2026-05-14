@@ -560,7 +560,7 @@ function EditorInner({ detail }: { detail: CanvasDetail }) {
               }
               setTestRunning(true)
               try {
-                const res = await canvasApi.triggerDirect(canvasId, testUserId, payload)
+                const res = await canvasApi.dryRun(canvasId, testUserId, payload)
                 const executionId = (res.data?.data as any)?.executionId
                 message.success('触发成功，executionId: ' + (executionId ?? '—'))
                 setTestModalOpen(false)

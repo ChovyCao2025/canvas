@@ -106,6 +106,12 @@ export const canvasApi = {
       `/canvas/execute/direct/${id}`,
       { userId, inputParams: payload },
     ),
+
+  dryRun: (id: number, userId: string, payload: Record<string, unknown>) =>
+    http.post<R<Record<string, unknown>>, R<Record<string, unknown>>>(
+      `/canvas/execute/dry-run/${id}`,
+      { userId, inputParams: payload },
+    ),
 }
 
 // ── 元数据 ───────────────────────────────────────────────────
