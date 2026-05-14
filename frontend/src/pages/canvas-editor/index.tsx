@@ -24,9 +24,13 @@ import {
   DEFAULT_NAMES, TRIGGER_TYPES, TERMINAL_TYPES,
 } from '../../components/canvas/constants'
 
+import HoverEdge from '../../components/canvas/HoverEdge'
+import { CanvasActionsContext } from '../../context/CanvasActionsContext'
+
 const { Title } = Typography
 
 const nodeTypes = { canvasNode: CanvasNodeCmp }
+const edgeTypes = { default: HoverEdge }
 
 // ── 从后端节点 config 推导 ReactFlow edges ──────────────────
 
@@ -432,7 +436,49 @@ function EditorInner({ detail }: { detail: CanvasDetail }) {
     2: { label: '已下线', color: 'red' },
   }
 
+  const deleteNodeById = (nodeId: string) => {
+    snapshot('删除节点')
+    const ids = new Set([nodeId])
+    setNodes(prev => prev
+      .filter(n => !ids.has(n.id))
+      .map(n => ({ ...n, data: { ...(n.data as CanvasNodeData), bizConfig: cleanRefs((n.data as CanvasNodeData).bizConfig ?? {}, ids) } }))
+    )
+    setEdges(prev => prev.filter(e => !ids.has(e.source) && !ids.has(e.target)))
+    if (selectedNodeId === nodeId) setSelectedNodeId(null)
+  }
+
+  const copyNodeById = (nodeId: string) => {
+    const node = nodes.find(n => n.id === nodeId)
+    if (!node) return
+    snapshot('复制节点')
+    const newId = crypto.randomUUID().replace(/-/g, '').slice(0, 12)
+    setNodes(prev => [...prev, {
+      ...node,
+      id: newId,
+      position: { x: node.position.x + 30, y: node.position.y + 30 },
+      selected: false,
+      data: { ...(node.data as CanvasNodeData), traceColor: undefined },
+    }])
+  }
+
+  const deleteEdgeById = (edgeId: string) => {
+    snapshot('删除连线')
+    setEdges(prev => {
+      const edge = prev.find(e => e.id === edgeId)
+      if (edge) {
+        setNodes(nodes => nodes.map(n => {
+          if (n.id !== edge.source) return n
+          const d = n.data as CanvasNodeData
+          const ids = new Set([edge.target])
+          return { ...n, data: { ...d, bizConfig: cleanRefs(d.bizConfig ?? {}, ids) } }
+        }))
+      }
+      return prev.filter(e => e.id !== edgeId)
+    })
+  }
+
   return (
+    <CanvasActionsContext.Provider value={{ deleteNode: deleteNodeById, copyNode: copyNodeById, deleteEdge: deleteEdgeById }}>
     <div style={{ display: 'flex', flexDirection: 'column', height: '100vh' }}>
 
       {/* 顶部工具栏 */}
@@ -560,6 +606,7 @@ function EditorInner({ detail }: { detail: CanvasDetail }) {
             nodes={nodes}
             edges={edges}
             nodeTypes={nodeTypes}
+            edgeTypes={edgeTypes}
             onNodesChange={onNodesChangeWrapped}
             onEdgesChange={onEdgesChange}
             onConnect={onConnect}
@@ -578,39 +625,18 @@ function EditorInner({ detail }: { detail: CanvasDetail }) {
         {/* 右侧配置面板 */}
         <div style={{
           width: 280, borderLeft: '1px solid #f0f0f0',
-          background: '#fff', flexShrink: 0, overflow: 'hidden',
-          display: 'flex', flexDirection: 'column',
+          background: '#fff', flexShrink: 0, overflow: 'auto',
         }}>
-          <div style={{ flex: 1, overflow: 'auto' }}>
-            <ConfigPanel
-              nodeId={selectedNodeId}
-              nodeData={selectedData}
-              onChange={onNodeDataChange}
-            />
-          </div>
-          {selectedNodeId && (
-            <div style={{ padding: '8px 12px', borderTop: '1px solid #f0f0f0' }}>
-              <Button
-                danger block size="small"
-                icon={<DeleteOutlined />}
-                onClick={() => {
-                  snapshot('删除节点')
-                  const ids = new Set([selectedNodeId])
-                  setNodes(prev => prev
-                    .filter(n => !ids.has(n.id))
-                    .map(n => ({ ...n, data: { ...(n.data as CanvasNodeData), bizConfig: cleanRefs((n.data as CanvasNodeData).bizConfig ?? {}, ids) } }))
-                  )
-                  setEdges(prev => prev.filter(e => !ids.has(e.source) && !ids.has(e.target)))
-                  setSelectedNodeId(null)
-                }}
-              >
-                删除节点
-              </Button>
-            </div>
-          )}
+          <ConfigPanel
+            nodeId={selectedNodeId}
+            nodeData={selectedData}
+            onChange={onNodeDataChange}
+          />
         </div>
       </div>
     </div>
+  )
+    </CanvasActionsContext.Provider>
   )
 }
 
