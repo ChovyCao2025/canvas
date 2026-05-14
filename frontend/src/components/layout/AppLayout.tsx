@@ -4,6 +4,7 @@ import {
   ApartmentOutlined, SettingOutlined, ApiOutlined,
   ExperimentOutlined, TeamOutlined, LogoutOutlined,
   UserOutlined, MenuFoldOutlined, MenuUnfoldOutlined,
+  RocketOutlined,
 } from '@ant-design/icons'
 import { Outlet, useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
@@ -16,12 +17,11 @@ const SIDER_HOVER = '#1f2d45'
 const ACCENT      = '#4f8ef7'
 
 export default function AppLayout() {
-  const navigate   = useNavigate()
-  const location   = useLocation()
+  const navigate = useNavigate()
+  const location = useLocation()
   const { user, isAdmin, logout } = useAuth()
   const [collapsed, setCollapsed] = useState(false)
 
-  // 当前选中 key
   const selectedKey = (() => {
     if (location.pathname.startsWith('/api-config'))     return 'api-config'
     if (location.pathname.startsWith('/ab-experiments')) return 'ab-experiments'
@@ -29,16 +29,24 @@ export default function AppLayout() {
     return 'canvas'
   })()
 
-  // 展开哪个 submenu
-  const openKey = ['api-config', 'ab-experiments', 'admin-users'].includes(selectedKey)
-    ? 'settings' : undefined
+  const defaultOpenKeys = (() => {
+    if (['api-config', 'ab-experiments', 'admin-users'].includes(selectedKey)) return ['marketing', 'settings']
+    return ['marketing']
+  })()
 
   const menuItems: MenuProps['items'] = [
     {
-      key: 'canvas',
-      icon: <ApartmentOutlined />,
-      label: '旅程管理',
-      onClick: () => navigate('/canvas'),
+      key: 'marketing',
+      icon: <RocketOutlined />,
+      label: '自动化营销',
+      children: [
+        {
+          key: 'canvas',
+          icon: <ApartmentOutlined />,
+          label: '旅程管理',
+          onClick: () => navigate('/canvas'),
+        },
+      ],
     },
     {
       key: 'settings',
@@ -96,110 +104,101 @@ export default function AppLayout() {
           overflow: 'hidden',
         }}
       >
-        {/* Logo */}
+        {/* Logo 行 + 收起按钮 */}
         <div style={{
           height: 56,
           display: 'flex', alignItems: 'center',
-          padding: collapsed ? '0 20px' : '0 20px',
+          padding: '0 16px',
           gap: 10,
           borderBottom: '1px solid rgba(255,255,255,.06)',
           flexShrink: 0,
-          cursor: 'pointer',
           overflow: 'hidden',
-        }} onClick={() => navigate('/canvas')}>
-          <div style={{
-            width: 28, height: 28, borderRadius: 8,
-            background: `linear-gradient(135deg, ${ACCENT} 0%, #7c3aed 100%)`,
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            flexShrink: 0,
-          }}>
+        }}>
+          {/* Logo icon — 点击回首页 */}
+          <div
+            style={{
+              width: 28, height: 28, borderRadius: 8, flexShrink: 0,
+              background: `linear-gradient(135deg, ${ACCENT} 0%, #7c3aed 100%)`,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              cursor: 'pointer',
+            }}
+            onClick={() => navigate('/canvas')}
+          >
             <ApartmentOutlined style={{ color: '#fff', fontSize: 14 }} />
           </div>
+
           {!collapsed && (
-            <span style={{
-              color: '#fff', fontSize: 15, fontWeight: 700,
-              letterSpacing: '.5px', whiteSpace: 'nowrap',
-            }}>
+            <span
+              style={{ color: '#fff', fontSize: 15, fontWeight: 700, letterSpacing: '.5px', whiteSpace: 'nowrap', flex: 1, cursor: 'pointer' }}
+              onClick={() => navigate('/canvas')}
+            >
               营销画布
             </span>
           )}
-        </div>
 
-        {/* Menu */}
-        <div style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden', paddingTop: 8 }}>
-          <Menu
-            mode="inline"
-            selectedKeys={[selectedKey]}
-            defaultOpenKeys={openKey ? [openKey] : []}
-            items={menuItems}
-            style={{
-              background: 'transparent',
-              border: 'none',
-              color: 'rgba(255,255,255,.65)',
-            }}
-            theme="dark"
-          />
-        </div>
-
-        {/* Bottom: collapse toggle + user */}
-        <div style={{
-          borderTop: '1px solid rgba(255,255,255,.06)',
-          padding: '10px 0',
-          flexShrink: 0,
-        }}>
-          {/* User avatar */}
-          <Dropdown menu={{ items: userMenu }} placement="topLeft" trigger={['click']}>
-            <div style={{
-              display: 'flex', alignItems: 'center', gap: 10,
-              padding: collapsed ? '8px 18px' : '8px 16px',
-              cursor: 'pointer', borderRadius: 6, margin: '0 8px 4px',
-              transition: 'background .15s',
-            }}
-              onMouseEnter={e => (e.currentTarget.style.background = SIDER_HOVER)}
-              onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
-            >
-              <Avatar
-                size={28}
-                style={{ background: ACCENT, flexShrink: 0, fontSize: 12, fontWeight: 600 }}
-                icon={<UserOutlined />}
-              >
-                {user?.displayName?.[0]}
-              </Avatar>
-              {!collapsed && (
-                <div style={{ overflow: 'hidden' }}>
-                  <div style={{ color: 'rgba(255,255,255,.9)', fontSize: 13, fontWeight: 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                    {user?.displayName}
-                  </div>
-                  <div style={{ color: 'rgba(255,255,255,.4)', fontSize: 11, marginTop: 1 }}>
-                    {user?.role === 'ADMIN' ? '管理员' : '操作员'}
-                  </div>
-                </div>
-              )}
-            </div>
-          </Dropdown>
-
-          {/* Collapse toggle */}
-          <Tooltip title={collapsed ? '展开菜单' : '收起菜单'} placement="right">
+          {/* 收起/展开按钮放在 logo 行右侧 */}
+          <Tooltip title={collapsed ? '展开' : '收起'} placement="right">
             <div
-              style={{
-                display: 'flex', alignItems: 'center', justifyContent: collapsed ? 'center' : 'flex-end',
-                padding: '6px 16px',
-                color: 'rgba(255,255,255,.3)',
-                cursor: 'pointer',
-                fontSize: 16,
-                transition: 'color .15s',
-              }}
               onClick={() => setCollapsed(c => !c)}
-              onMouseEnter={e => (e.currentTarget.style.color = 'rgba(255,255,255,.7)')}
-              onMouseLeave={e => (e.currentTarget.style.color = 'rgba(255,255,255,.3)')}
+              style={{
+                color: 'rgba(255,255,255,.35)', fontSize: 15, cursor: 'pointer',
+                flexShrink: 0, transition: 'color .15s',
+                marginLeft: collapsed ? 0 : 'auto',
+              }}
+              onMouseEnter={e => (e.currentTarget.style.color = 'rgba(255,255,255,.8)')}
+              onMouseLeave={e => (e.currentTarget.style.color = 'rgba(255,255,255,.35)')}
             >
               {collapsed ? <MenuUnfoldOutlined /> : <MenuFoldOutlined />}
             </div>
           </Tooltip>
         </div>
+
+        {/* 菜单 */}
+        <div style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden', paddingTop: 8 }}>
+          <Menu
+            mode="inline"
+            selectedKeys={[selectedKey]}
+            defaultOpenKeys={collapsed ? [] : defaultOpenKeys}
+            items={menuItems}
+            style={{ background: 'transparent', border: 'none' }}
+            theme="dark"
+          />
+        </div>
+
+        {/* 用户信息——固定在最底部 */}
+        <div style={{ borderTop: '1px solid rgba(255,255,255,.06)', padding: '12px 8px', flexShrink: 0 }}>
+          <Dropdown menu={{ items: userMenu }} placement="topLeft" trigger={['click']}>
+            <div
+              style={{
+                display: 'flex', alignItems: 'center', gap: 10,
+                padding: collapsed ? '8px 10px' : '8px 12px',
+                borderRadius: 8, cursor: 'pointer', transition: 'background .15s',
+              }}
+              onMouseEnter={e => (e.currentTarget.style.background = SIDER_HOVER)}
+              onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+            >
+              <Avatar
+                size={32}
+                style={{ background: `linear-gradient(135deg, ${ACCENT}, #7c3aed)`, flexShrink: 0, fontSize: 13, fontWeight: 700 }}
+              >
+                {user?.displayName?.[0] ?? <UserOutlined />}
+              </Avatar>
+              {!collapsed && (
+                <div style={{ overflow: 'hidden', flex: 1 }}>
+                  <div style={{ color: 'rgba(255,255,255,.9)', fontSize: 13, fontWeight: 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                    {user?.displayName}
+                  </div>
+                  <div style={{ color: 'rgba(255,255,255,.38)', fontSize: 11, marginTop: 1 }}>
+                    {user?.role === 'ADMIN' ? '管理员' : '操作员'} · 点击退出
+                  </div>
+                </div>
+              )}
+            </div>
+          </Dropdown>
+        </div>
       </Sider>
 
-      {/* Main */}
+      {/* 内容区 */}
       <Layout style={{
         marginLeft: collapsed ? 64 : 220,
         transition: 'margin-left .2s',
