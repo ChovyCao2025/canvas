@@ -116,10 +116,14 @@ public class DagEngine {
 
             // ──────────────────────────────────────────────────────
             // 阶段 1：解析节点配置（CONTEXT 类型替换为实际值）
-            // MANUAL_APPROVAL 额外注入 __nodeId 供 Handler 识别自身
+            // bizConfig 兜底（触发器等节点 nextNodeId 只存在 bizConfig），config 覆盖
+            Map<String, Object> rawConfig = new HashMap<>();
+            if (node.getBizConfig() != null) rawConfig.putAll(node.getBizConfig());
+            if (node.getConfig()    != null) rawConfig.putAll(node.getConfig());
+
             Map<String, Object> config = "MANUAL_APPROVAL".equals(node.getType())
-                    ? resolveConfigWithNodeId(node.getConfig(), ctx, nodeId)
-                    : resolveConfig(node.getConfig(), ctx);
+                    ? resolveConfigWithNodeId(rawConfig, ctx, nodeId)
+                    : resolveConfig(rawConfig, ctx);
 
             // ──────────────────────────────────────────────────────
             // 阶段 2：LOGIC_RELATION / HUB 特殊处理
