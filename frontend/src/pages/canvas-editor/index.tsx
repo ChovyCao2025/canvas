@@ -161,7 +161,7 @@ function EditorInner({ detail }: { detail: CanvasDetail }) {
   const { id } = useParams<{ id: string }>()
   const canvasId = Number(id)
   const navigate = useNavigate()
-  const { screenToFlowPosition, getNodes, getEdges } = useReactFlow()
+  const { screenToFlowPosition, getNodes, getEdges, fitView } = useReactFlow()
 
   const [nodes, setNodes, onNodesChange] = useNodesState<Node>([])
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([])
@@ -207,6 +207,7 @@ function EditorInner({ detail }: { detail: CanvasDetail }) {
       ? applyDagreLayout(rfNodes, rfEdges) : rfNodes
     setNodes(layouted)
     setEdges(rfEdges)
+    requestAnimationFrame(() => fitView({ padding: 0.15, duration: 300 }))
   }, [detail, setNodes, setEdges])
 
   // 键盘快捷键（含复制/粘贴）
