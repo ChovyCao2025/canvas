@@ -23,6 +23,11 @@ public class CanvasController {
     private final CanvasService    canvasService;
     private final CanvasOpsService opsService;
 
+    /**
+     * 创建画布
+     * @param req 创建请求对象
+     * @return 创建成功的画布信息
+     */
     @PostMapping
     public Mono<R<Canvas>> create(@RequestBody CanvasCreateReq req) {
         return Mono.fromCallable(() -> canvasService.create(req))
@@ -30,6 +35,11 @@ public class CanvasController {
                 .map(R::ok);
     }
 
+    /**
+     * 根据 ID 获取画布详情
+     * @param id 画布 ID
+     * @return 画布详情
+     */
     @GetMapping("/{id}")
     public Mono<R<CanvasDetailDTO>> getById(@PathVariable Long id) {
         return Mono.fromCallable(() -> canvasService.getById(id))
@@ -37,6 +47,12 @@ public class CanvasController {
                 .map(detail -> detail != null ? R.ok(detail) : R.<CanvasDetailDTO>fail("画布不存在"));
     }
 
+    /**
+     * 更新画布草稿
+     * @param id 画布 ID
+     * @param req 更新信息
+     * @return 成功响应
+     */
     @PutMapping("/{id}")
     public Mono<R<Void>> update(@PathVariable Long id, @RequestBody CanvasUpdateReq req) {
         return Mono.<Void>fromRunnable(() -> canvasService.updateDraft(id, req))
@@ -44,6 +60,11 @@ public class CanvasController {
                 .thenReturn(R.<Void>ok());
     }
 
+    /**
+     * 查询画布列表
+     * @param query 查询条件
+     * @return 分页后的画布列表
+     */
     @GetMapping("/list")
     public Mono<R<PageResult<Canvas>>> list(CanvasListQuery query) {
         return Mono.fromCallable(() -> canvasService.list(query))
@@ -51,6 +72,12 @@ public class CanvasController {
                 .map(R::ok);
     }
 
+    /**
+     * 发布画布
+     * @param id 画布 ID
+     * @param operator 操作人标识
+     * @return 发布后的版本信息
+     */
     @PostMapping("/{id}/publish")
     public Mono<R<CanvasVersion>> publish(
             @PathVariable Long id,
@@ -60,6 +87,12 @@ public class CanvasController {
                 .map(R::ok);
     }
 
+    /**
+     * 下线画布
+     * @param id 画布 ID
+     * @param operator 操作人标识
+     * @return 成功响应
+     */
     @PostMapping("/{id}/offline")
     public Mono<R<Void>> offline(
             @PathVariable Long id,
@@ -69,6 +102,13 @@ public class CanvasController {
                 .thenReturn(R.<Void>ok());
     }
 
+    /**
+     * 获取画布历史版本
+     * @param id 画布 ID
+     * @param page 页码
+     * @param size 每页大小
+     * @return 版本列表
+     */
     @GetMapping("/{id}/versions")
     public Mono<R<PageResult<CanvasVersion>>> getVersions(
             @PathVariable Long id,
@@ -79,6 +119,12 @@ public class CanvasController {
                 .map(R::ok);
     }
 
+    /**
+     * 获取指定版本详情
+     * @param id 画布 ID
+     * @param versionId 版本 ID
+     * @return 版本详情
+     */
     @GetMapping("/{id}/versions/{versionId}")
     public Mono<R<CanvasVersion>> getVersion(
             @PathVariable Long id,
@@ -88,8 +134,15 @@ public class CanvasController {
                 .map(v -> v != null ? R.ok(v) : R.<CanvasVersion>fail("版本不存在"));
     }
 
+
     // ── 运营管控 ─────────────────────────────────────────────────
 
+    /**
+     * 终止画布执行
+     * @param id 画布 ID
+     * @param mode 终止模式 (GRACEFUL/FORCE)
+     * @return 成功响应
+     */
     @PostMapping("/{id}/kill")
     public Mono<R<Void>> kill(@PathVariable Long id,
                               @RequestParam(defaultValue = "GRACEFUL") String mode) {
@@ -98,6 +151,12 @@ public class CanvasController {
                 .thenReturn(R.<Void>ok());
     }
 
+    /**
+     * 启动画布灰度发布
+     * @param id 画布 ID
+     * @param percent 灰度流量比例 (0-100)
+     * @return 成功响应
+     */
     @PostMapping("/{id}/canary")
     public Mono<R<Void>> startCanary(@PathVariable Long id,
                                      @RequestParam int percent) {
@@ -107,6 +166,11 @@ public class CanvasController {
                         .thenReturn(R.<Void>ok()));
     }
 
+    /**
+     * 将灰度版本晋升为正式版本
+     * @param id 画布 ID
+     * @return 成功响应
+     */
     @PostMapping("/{id}/promote-canary")
     public Mono<R<Void>> promoteCanary(@PathVariable Long id) {
         return Mono.<Void>fromRunnable(() -> opsService.promoteCanary(id))
@@ -114,6 +178,11 @@ public class CanvasController {
                 .thenReturn(R.<Void>ok());
     }
 
+    /**
+     * 回滚灰度发布
+     * @param id 画布 ID
+     * @return 成功响应
+     */
     @PostMapping("/{id}/rollback-canary")
     public Mono<R<Void>> rollbackCanary(@PathVariable Long id) {
         return Mono.<Void>fromRunnable(() -> opsService.rollbackCanary(id))
@@ -121,6 +190,11 @@ public class CanvasController {
                 .thenReturn(R.<Void>ok());
     }
 
+    /**
+     * 回滚画布到上一个稳定版本
+     * @param id 画布 ID
+     * @return 成功响应
+     */
     @PostMapping("/{id}/rollback")
     public Mono<R<Void>> rollback(@PathVariable Long id) {
         return Mono.<Void>fromRunnable(() -> opsService.rollback(id))
@@ -128,6 +202,11 @@ public class CanvasController {
                 .thenReturn(R.<Void>ok());
     }
 
+    /**
+     * 克隆画布
+     * @param id 原画布 ID
+     * @return 克隆后的画布信息
+     */
     @PostMapping("/{id}/clone")
     public Mono<R<Canvas>> clone(@PathVariable Long id) {
         return currentUser().flatMap(operator ->
@@ -136,6 +215,13 @@ public class CanvasController {
                         .map(R::ok));
     }
 
+    /**
+     * 比较两个版本之间的差异
+     * @param id 画布 ID
+     * @param v1 版本 ID 1
+     * @param v2 版本 ID 2
+     * @return 差异对比结果
+     */
     @GetMapping("/{id}/versions/{v1}/diff/{v2}")
     public Mono<R<Map<String, Object>>> diff(@PathVariable Long id,
                                              @PathVariable Long v1,
@@ -149,6 +235,7 @@ public class CanvasController {
     @PutMapping("/{id}/safe")
     public Mono<R<Void>> safeUpdate(@PathVariable Long id,
                                     @RequestBody SafeUpdateReq req) {
+
         return currentUser().flatMap(operator ->
                 Mono.<Void>fromRunnable(() -> opsService.saveWithOptimisticLock(
                         id, req.getName(), req.getDescription(),

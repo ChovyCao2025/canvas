@@ -28,7 +28,11 @@ public class CanvasStatsController {
     private final CanvasExecutionMapper      executionMapper;
     private final CanvasExecutionTraceMapper traceMapper;
 
-    /** 某次执行的所有节点轨迹（前端执行轨迹可视化，14.2节） */
+    /** 
+     * 某次执行的所有节点轨迹（前端执行轨迹可视化，14.2节）
+     * @param executionId 执行实例 ID
+     * @return 节点轨迹列表
+     */
     @GetMapping("/execution/{executionId}/trace")
     public Mono<R<List<Map<String, Object>>>> getTrace(@PathVariable String executionId) {
         return Mono.fromCallable(() -> {
@@ -55,7 +59,12 @@ public class CanvasStatsController {
         }).subscribeOn(reactor.core.scheduler.Schedulers.boundedElastic()).map(R::ok);
     }
 
-    /** 画布最近 N 次执行记录（用于前端执行轨迹选择器） */
+    /** 
+     * 画布最近 N 次执行记录（用于前端执行轨迹选择器）
+     * @param id 画布 ID
+     * @param size 记录数量
+     * @return 执行记录列表
+     */
     @GetMapping("/executions")
     public Mono<R<List<Map<String, Object>>>> recentExecutions(
             @PathVariable Long id,
@@ -80,11 +89,18 @@ public class CanvasStatsController {
         }).subscribeOn(reactor.core.scheduler.Schedulers.boundedElastic()).map(R::ok);
     }
 
-    /** 整体执行统计 */
+    /** 
+     * 整体执行统计
+     * @param id 画布 ID
+     * @param days 查询天数范围
+     * @return 统计信息 Map
+     */
     @GetMapping("/stats")
     public Mono<R<Map<String, Object>>> stats(
             @PathVariable Long id,
             @RequestParam(defaultValue = "7") int days) {
+        // ... (implementation)
+
 
         return Mono.fromCallable(() -> {
             LocalDate since = LocalDate.now().minusDays(days);
@@ -120,6 +136,8 @@ public class CanvasStatsController {
     /**
      * 节点漏斗（设计文档 21.3节）：聚合每个节点的进入/成功/失败/跳过次数。
      * 前端按此数据在画布上叠加漏斗可视化。
+     * @param id 画布 ID
+     * @return 节点统计列表
      */
     @GetMapping("/funnel")
     public Mono<R<List<Map<String, Object>>>> funnel(@PathVariable Long id) {
@@ -128,11 +146,17 @@ public class CanvasStatsController {
         ).subscribeOn(Schedulers.boundedElastic()).map(R::ok);
     }
 
-    /** 每日执行量趋势（按天聚合） */
+    /**
+     * 每日执行量趋势（按天聚合）
+     * @param id 画布 ID
+     * @param days 查询天数范围
+     * @return 执行趋势列表
+     */
     @GetMapping("/trend")
     public Mono<R<List<Map<String, Object>>>> trend(
             @PathVariable Long id,
             @RequestParam(defaultValue = "30") int days) {
+
 
         return Mono.fromCallable(() -> {
             List<CanvasExecution> executions = executionMapper.selectList(

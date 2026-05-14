@@ -53,21 +53,26 @@ public class CanvasExecutionService {
     // ── 触发入口 ──────────────────────────────────────────────────
 
     /**
-     * @param canvasId    画布 ID
-     * @param userId      触发用户
-     * @param triggerType MQ / DIRECT_CALL / BEHAVIOR / DRY_RUN
-     * @param triggerNodeType 触发节点类型（用于在 DAG 中定位入口）
-     * @param matchKey    路由匹配 key（MQ=topicKey，BEHAVIOR=eventCode）
-     * @param payload     触发载荷（bizData）
-     * @param msgId       消息唯一 ID（用于 dedup，直调可传 UUID）
-     * @param dryRun      是否干运行（不写执行记录，不调真实接口）
+     * 触发画布执行：执行工作流包含 dedup 检查、上下文准备、DAG 执行以及结果持久化。
+     * 
+     * @param canvasId        画布 ID
+     * @param userId          触发用户 ID
+     * @param triggerType     触发场景类型（如 MQ, DIRECT_CALL, BEHAVIOR, DRY_RUN）
+     * @param triggerNodeType 触发器节点类型，用于定位 DAG 入口
+     * @param matchKey        触发条件匹配 Key（MQ 为 topicKey，BEHAVIOR 为 eventCode）
+     * @param payload         触发时携带的业务数据
+     * @param msgId           消息唯一 ID，用于执行幂等控制
+     * @param dryRun          是否干运行（不产生副作用，不写入数据库）
+     * @return 包含执行结果的响应式流
      */
     public Mono<Map<String, Object>> trigger(
             Long canvasId, String userId, String triggerType,
             String triggerNodeType, String matchKey,
             Map<String, Object> payload, String msgId, boolean dryRun) {
-
+        // ...
         return Mono.fromCallable(() -> {
+            // ... (existing code)
+
             // 1. 加载画布
             Canvas canvas = canvasMapper.selectById(canvasId);
             if (canvas == null || canvas.getStatus() != 1) {
@@ -201,6 +206,14 @@ public class CanvasExecutionService {
 
     // ── 私有帮助方法 ──────────────────────────────────────────────
 
+    /**
+     * 初始化执行上下文
+     * @param canvasId 画布 ID
+     * @param versionId 版本 ID
+     * @param userId 用户 ID
+     * @param triggerType 触发类型
+     * @return 新的执行上下文
+     */
     private ExecutionContext newContext(Long canvasId, Long versionId, String userId, String triggerType) {
         ExecutionContext ctx = new ExecutionContext();
         ctx.setExecutionId(UUID.randomUUID().toString());
@@ -214,6 +227,9 @@ public class CanvasExecutionService {
     /**
      * 灰度路由：根据 userId+canvasId Hash 决定使用正式版本还是灰度版本（设计文档 16.1节）。
      * 相同用户始终落入相同版本（确定性 Hash），保证一致的用户体验。
+     * @param canvas 画布对象
+     * @param userId 用户 ID
+     * @return 路由后的版本 ID
      */
     private Long resolveVersionId(Canvas canvas, String userId) {
         if (canvas.getCanaryVersionId() != null && canvas.getCanaryPercent() != null
@@ -228,7 +244,13 @@ public class CanvasExecutionService {
         return canvas.getPublishedVersionId();
     }
 
-    /** 在 DAG 中找匹配类型和 matchKey 的触发器节点 */
+    /** 
+     * 在 DAG 中找匹配类型和 matchKey 的触发器节点
+     * @param graph 画布 DAG 图
+     * @param triggerNodeType 触发器节点类型
+     * @param matchKey 触发条件匹配 Key
+     * @return 触发器节点 ID
+     */
     private String findTriggerNode(DagGraph graph, String triggerNodeType, String matchKey) {
         for (String nodeId : graph.entryNodes()) {
             DagParser.CanvasNode node = graph.getNode(nodeId);
@@ -248,6 +270,12 @@ public class CanvasExecutionService {
                 .findFirst().orElse(null);
     }
 
+    /** 
+     * 判断画布执行是否处于挂起状态（等待中）
+     * @param ctx 当前执行上下文
+     * @param graph 画布 DAG 图
+     * @return true 表示挂起
+     */
     private boolean isPaused(ExecutionContext ctx, DagGraph graph) {
         // 多阶段挂起：有节点处于 WAITING 状态
         // （LOGIC_RELATION / HUB 条件未满足时 DagEngine 设置此状态）
@@ -255,6 +283,11 @@ public class CanvasExecutionService {
                 .anyMatch(s -> s == org.chovy.canvas.engine.context.NodeStatus.WAITING);
     }
 
+    /**
+     * 创建执行记录对象
+     * @param ctx 执行上下文
+     * @return 执行记录
+     */
     private CanvasExecution createExecution(ExecutionContext ctx) {
         CanvasExecution exec = new CanvasExecution();
         exec.setId(ctx.getExecutionId());
@@ -266,6 +299,12 @@ public class CanvasExecutionService {
         return exec;
     }
 
+    /**
+     * 更新执行记录状态
+     * @param exec 执行记录对象
+     * @param status 状态码
+     * @param result 执行结果 Map
+     */
     private void updateExecution(CanvasExecution exec, int status, Map<String, Object> result) {
         if (exec == null) return;
         exec.setStatus(status);
@@ -275,6 +314,7 @@ public class CanvasExecutionService {
         Mono.fromRunnable(() -> executionMapper.updateById(exec))
                 .subscribeOn(Schedulers.boundedElastic()).subscribe();
     }
+
 
     /**
      * 更新 canvas_execution_stats 当日统计（设计文档 21.1节）。

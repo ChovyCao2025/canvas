@@ -26,6 +26,11 @@ public class OpsController {
 
     // ── 画布模板（23.1节） ─────────────────────────────────────────
 
+    /**
+     * 获取画布模板列表
+     * @param category 模板分类（可选）
+     * @return 模板列表
+     */
     @GetMapping("/canvas/templates")
     public Mono<R<List<CanvasTemplate>>> listTemplates(
             @RequestParam(required = false) String category) {
@@ -37,6 +42,12 @@ public class OpsController {
         }).subscribeOn(Schedulers.boundedElastic()).map(R::ok);
     }
 
+    /**
+     * 将当前画布另存为模板
+     * @param id 画布 ID
+     * @param req 模板信息（名称、分类等）
+     * @return 模板对象
+     */
     @PostMapping("/canvas/{id}/save-as-template")
     public Mono<R<CanvasTemplate>> saveAsTemplate(
             @PathVariable Long id,
@@ -63,6 +74,12 @@ public class OpsController {
         }).subscribeOn(Schedulers.boundedElastic()).map(R::ok);
     }
 
+    /**
+     * 基于模板创建新画布
+     * @param templateId 模板 ID
+     * @param req 画布名称
+     * @return 新画布信息
+     */
     @PostMapping("/canvas/from-template/{templateId}")
     public Mono<R<Canvas>> createFromTemplate(@PathVariable Long templateId,
                                                @RequestBody FromTemplateReq req) {
@@ -87,6 +104,10 @@ public class OpsController {
 
     // ── 发布审批（23.2节） ─────────────────────────────────────────
 
+    /**
+     * 获取待审批的发布请求列表
+     * @return 审批记录列表
+     */
     @GetMapping("/canvas/pending-reviews")
     public Mono<R<List<CanvasManualApproval>>> pendingReviews() {
         return Mono.fromCallable(() ->
@@ -96,6 +117,7 @@ public class OpsController {
                                 .orderByAsc(CanvasManualApproval::getTimeoutAt))
         ).subscribeOn(Schedulers.boundedElastic()).map(R::ok);
     }
+
 
     // ── DTOs ──────────────────────────────────────────────────────
 

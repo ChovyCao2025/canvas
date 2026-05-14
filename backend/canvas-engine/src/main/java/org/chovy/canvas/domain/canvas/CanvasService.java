@@ -33,6 +33,11 @@ public class CanvasService {
     private final GroovyHandler          groovyHandler;
     private final org.springframework.data.redis.core.StringRedisTemplate redis;
 
+    /**
+     * 创建画布
+     * @param req 创建请求信息
+     * @return 新建的画布对象
+     */
     @Transactional
     public Canvas create(CanvasCreateReq req) {
         Canvas canvas = new Canvas();
@@ -55,6 +60,11 @@ public class CanvasService {
         return canvas;
     }
 
+    /**
+     * 根据 ID 获取画布详情
+     * @param id 画布 ID
+     * @return 画布详情 DTO
+     */
     public CanvasDetailDTO getById(Long id) {
         Canvas canvas = canvasMapper.selectById(id);
         if (canvas == null) return null;
@@ -68,6 +78,11 @@ public class CanvasService {
         return dto;
     }
 
+    /**
+     * 更新画布草稿
+     * @param id 画布 ID
+     * @param req 画布更新请求
+     */
     @Transactional
     public void updateDraft(Long id, CanvasUpdateReq req) {
         Canvas canvas = canvasMapper.selectById(id);
@@ -95,6 +110,11 @@ public class CanvasService {
         }
     }
 
+    /**
+     * 分页查询画布列表
+     * @param q 查询条件
+     * @return 分页结果
+     */
     public PageResult<Canvas> list(CanvasListQuery q) {
         LambdaQueryWrapper<Canvas> wrapper = new LambdaQueryWrapper<Canvas>()
                 .eq(q.getStatus() != null, Canvas::getStatus, q.getStatus())
@@ -105,8 +125,15 @@ public class CanvasService {
         return PageResult.of(page.getTotal(), page.getRecords());
     }
 
+    /**
+     * 发布画布
+     * @param id 画布 ID
+     * @param operator 操作人
+     * @return 发布版本信息
+     */
     @Transactional
     public CanvasVersion publish(Long id, String operator) {
+
         // 并发发布保护（设计文档 6.2节）：同一画布同时只允许一个发布操作
         String lockKey = "canvas:publish:lock:" + id;
         String lockVal = java.util.UUID.randomUUID().toString();

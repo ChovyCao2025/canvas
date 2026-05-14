@@ -41,6 +41,8 @@ public class CanvasExecutionManagementController {
     /**
      * 人工审批通过（设计文档 18.2节）。
      * 安全校验：当前用户必须在 approvers 列表中（设计文档 18.2节补充说明）。
+     * @param executionId 执行实例 ID
+     * @return 成功响应
      */
     @PostMapping("/{executionId}/approve")
     public Mono<R<Void>> approve(@PathVariable String executionId) {
@@ -52,7 +54,12 @@ public class CanvasExecutionManagementController {
                                 .thenReturn(R.<Void>ok()));
     }
 
-    /** 人工审批拒绝（设计文档 18.2节） */
+    /** 
+     * 人工审批拒绝（设计文档 18.2节） 
+     * @param executionId 执行实例 ID
+     * @param reason 拒绝原因
+     * @return 成功响应
+     */
     @PostMapping("/{executionId}/reject")
     public Mono<R<Void>> reject(@PathVariable String executionId,
                                  @RequestParam(required = false) String reason) {
@@ -63,6 +70,7 @@ public class CanvasExecutionManagementController {
                                 .subscribeOn(Schedulers.boundedElastic())
                                 .thenReturn(R.<Void>ok()));
     }
+
 
     // ── private ──────────────────────────────────────────────────
 

@@ -19,8 +19,15 @@ public class CanvasOpsService {
     private final TriggerRouteService triggerRouteService;
     private final StringRedisTemplate redis;
 
-    // ── 乐观锁保存草稿 ────────────────────────────────────────────
-
+    /**
+     * 带乐观锁更新画布草稿信息
+     * @param id 画布 ID
+     * @param name 画布名称
+     * @param description 描述
+     * @param graphJson 图表 JSON
+     * @param editVersion 当前编辑版本号
+     * @param operator 操作人
+     */
     @Transactional
     public void saveWithOptimisticLock(Long id, String name, String description,
                                         String graphJson, int editVersion, String operator) {
@@ -44,6 +51,11 @@ public class CanvasOpsService {
 
     // ── Kill Switch ────────────────────────────────────────────────
 
+    /**
+     * 终止正在运行的画布实例
+     * @param id 画布 ID
+     * @param mode 终止模式
+     */
     @Transactional
     public void kill(Long id, String mode) {
         Canvas canvas = require(id);
@@ -59,6 +71,12 @@ public class CanvasOpsService {
 
     // ── 灰度发布 ────────────────────────────────────────────────
 
+    /**
+     * 启动画布灰度发布
+     * @param id 画布 ID
+     * @param percent 流量比例
+     * @param operator 操作人
+     */
     @Transactional
     public void startCanary(Long id, int percent, String operator) {
         Canvas canvas = require(id);
@@ -81,6 +99,10 @@ public class CanvasOpsService {
         canvasMapper.updateById(canvas);
     }
 
+    /**
+     * 将灰度版本晋升为正式版本
+     * @param id 画布 ID
+     */
     @Transactional
     public void promoteCanary(Long id) {
         Canvas canvas = require(id);
@@ -93,6 +115,10 @@ public class CanvasOpsService {
         canvasMapper.updateById(canvas);
     }
 
+    /**
+     * 回滚灰度发布
+     * @param id 画布 ID
+     */
     @Transactional
     public void rollbackCanary(Long id) {
         Canvas canvas = require(id);
@@ -103,6 +129,10 @@ public class CanvasOpsService {
 
     // ── 版本回滚 ────────────────────────────────────────────────
 
+    /**
+     * 回滚画布到上一个版本
+     * @param id 画布 ID
+     */
     @Transactional
     public void rollback(Long id) {
         Canvas canvas = require(id);
@@ -116,6 +146,12 @@ public class CanvasOpsService {
 
     // ── 克隆 ────────────────────────────────────────────────────
 
+    /**
+     * 克隆画布
+     * @param id 原画布 ID
+     * @param operator 操作人
+     * @return 新的画布对象
+     */
     @Transactional
     public Canvas clone(Long id, String operator) {
         Canvas src = require(id);
@@ -141,8 +177,16 @@ public class CanvasOpsService {
 
     // ── 版本对比（设计文档 23.3节）─────────────────────────────────
 
+    /**
+     * 比较两个画布版本之间的配置差异
+     * @param canvasId 画布 ID
+     * @param v1Id 版本 ID 1
+     * @param v2Id 版本 ID 2
+     * @return 差异信息
+     */
     @SuppressWarnings("unchecked")
     public java.util.Map<String, Object> diff(Long canvasId, Long v1Id, Long v2Id) {
+
         CanvasVersion v1 = canvasVersionMapper.selectById(v1Id);
         CanvasVersion v2 = canvasVersionMapper.selectById(v2Id);
         if (v1 == null || v2 == null) throw new IllegalArgumentException("版本不存在");

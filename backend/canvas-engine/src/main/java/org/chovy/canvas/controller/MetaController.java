@@ -28,6 +28,10 @@ public class MetaController {
     @Value("${canvas.integration.tagger-service-url}")
     private String taggerUrl;
 
+    /**
+     * 获取所有注册的画布节点类型定义
+     * @return 节点类型定义列表
+     */
     @GetMapping("/node-types")
     public Mono<R<List<NodeTypeRegistry>>> getNodeTypes() {
         return Mono.fromCallable(metaService::getAllNodeTypes)
@@ -35,6 +39,11 @@ public class MetaController {
                 .map(R::ok);
     }
 
+    /**
+     * 获取指定节点类型的 Schema 配置
+     * @param typeKey 节点类型 Key
+     * @return 节点类型定义
+     */
     @GetMapping("/node-types/{typeKey}/schema")
     public Mono<R<NodeTypeRegistry>> getNodeTypeSchema(@PathVariable String typeKey) {
         return Mono.fromCallable(() -> metaService.getNodeTypeSchema(typeKey))
@@ -42,6 +51,10 @@ public class MetaController {
                 .map(nt -> nt != null ? R.ok(nt) : R.<NodeTypeRegistry>fail("节点类型不存在: " + typeKey));
     }
 
+    /**
+     * 获取全局上下文中的所有可引用字段
+     * @return 字段列表
+     */
     @GetMapping("/context-fields")
     public Mono<R<List<ContextField>>> getContextFields() {
         return Mono.fromCallable(metaService::getAllContextFields)
@@ -49,21 +62,37 @@ public class MetaController {
                 .map(R::ok);
     }
 
+    /**
+     * 获取 MQ 触发器可选主题列表
+     * @return 选项列表
+     */
     @GetMapping("/mq-topics")
     public Mono<R<List<StubOption>>> getMqTopics() {
         return Mono.just(R.ok(metaService.getMqTopics()));
     }
 
+    /**
+     * 获取优惠券发放类型列表
+     * @return 选项列表
+     */
     @GetMapping("/coupon-types")
     public Mono<R<List<StubOption>>> getCouponTypes() {
         return Mono.just(R.ok(metaService.getCouponTypes()));
     }
 
+    /**
+     * 获取用户触达场景列表
+     * @return 选项列表
+     */
     @GetMapping("/reach-scenes")
     public Mono<R<List<StubOption>>> getReachScenes() {
         return Mono.just(R.ok(metaService.getReachScenes()));
     }
 
+    /**
+     * 获取所有已启用的 AB 实验列表
+     * @return 选项列表
+     */
     @GetMapping("/ab-experiments")
     public Mono<R<List<StubOption>>> getAbExperiments() {
         return Mono.fromCallable(() -> {
@@ -78,11 +107,20 @@ public class MetaController {
         }).subscribeOn(Schedulers.boundedElastic()).map(R::ok);
     }
 
+    /**
+     * 获取指定 AB 实验的分组列表
+     * @param key 实验 Key
+     * @return 分组选项列表
+     */
     @GetMapping("/ab-experiments/{key}/groups")
     public Mono<R<List<StubOption>>> getAbExperimentGroups(@PathVariable String key) {
         return Mono.just(R.ok(metaService.getAbExperimentGroups(key)));
     }
 
+    /**
+     * 获取所有已启用的 API 定义列表
+     * @return 选项列表
+     */
     @GetMapping("/api-definitions")
     public Mono<R<List<StubOption>>> getApiDefinitions() {
         return Mono.fromCallable(() -> {
@@ -96,6 +134,7 @@ public class MetaController {
                     .collect(Collectors.toList());
         }).subscribeOn(Schedulers.boundedElastic()).map(R::ok);
     }
+
 
     /**
      * 动态获取 Tagger 标签列表（代理调 Tagger 服务）。

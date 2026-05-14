@@ -32,7 +32,13 @@ public class DlqController {
     private final CanvasExecutionService    executionService;
     private final ObjectMapper              objectMapper;
 
-    /** 查询 DLQ 列表（按画布 or 全部，分页） */
+    /**
+     * 查询 DLQ 列表（分页）
+     * @param canvasId 画布 ID（可选）
+     * @param page 页码
+     * @param size 每页大小
+     * @return DLQ 条目分页列表
+     */
     @GetMapping
     public Mono<R<PageResult<CanvasExecutionDlq>>> list(
             @RequestParam(required = false) Long canvasId,
@@ -50,9 +56,10 @@ public class DlqController {
     }
 
     /**
-     * 重放 DLQ 条目（设计文档 13.3节）。
-     * skipSuccessNodes=true：跳过已成功节点，从失败节点重新执行。
-     * skipSuccessNodes=false：重新执行整个画布（全量重试）。
+     * 重放 DLQ 条目
+     * @param id DLQ 记录 ID
+     * @param skipSuccessNodes 是否跳过已成功的节点
+     * @return 重放执行结果
      */
     @PostMapping("/{id}/replay")
     public Mono<R<Map<String, Object>>> replay(
@@ -91,11 +98,16 @@ public class DlqController {
         .map(result -> R.ok(result));
     }
 
-    /** 删除 DLQ 条目（确认不需要重放时）*/
+    /**
+     * 删除 DLQ 条目
+     * @param id DLQ 记录 ID
+     * @return 成功响应
+     */
     @DeleteMapping("/{id}")
     public Mono<R<Void>> delete(@PathVariable Long id) {
         return Mono.<Void>fromRunnable(() -> dlqMapper.deleteById(id))
                 .subscribeOn(Schedulers.boundedElastic())
                 .thenReturn(R.<Void>ok());
     }
+
 }

@@ -18,6 +18,13 @@ public class AbExperimentController {
 
     private final AbExperimentMapper abExperimentMapper;
 
+    /**
+     * 分页查询 AB 实验列表
+     * @param page 页码
+     * @param size 每页大小
+     * @param enabled 启用状态（可选）
+     * @return 分页结果
+     */
     @GetMapping
     public Mono<R<PageResult<AbExperiment>>> list(
             @RequestParam(defaultValue = "1") int page,
@@ -34,6 +41,11 @@ public class AbExperimentController {
         }).subscribeOn(Schedulers.boundedElastic()).map(R::ok);
     }
 
+    /**
+     * 创建 AB 实验
+     * @param body 实验定义对象
+     * @return 创建结果
+     */
     @PostMapping
     public Mono<R<AbExperiment>> create(@RequestBody AbExperiment body) {
         return Mono.fromCallable(() -> {
@@ -43,6 +55,12 @@ public class AbExperimentController {
         }).subscribeOn(Schedulers.boundedElastic()).map(R::ok);
     }
 
+    /**
+     * 更新 AB 实验
+     * @param id 实验 ID
+     * @param body 实验信息
+     * @return 成功响应
+     */
     @PutMapping("/{id}")
     public Mono<R<Void>> update(@PathVariable Long id, @RequestBody AbExperiment body) {
         return Mono.<Void>fromRunnable(() -> {
@@ -51,10 +69,16 @@ public class AbExperimentController {
         }).subscribeOn(Schedulers.boundedElastic()).thenReturn(R.<Void>ok());
     }
 
+    /**
+     * 删除 AB 实验
+     * @param id 实验 ID
+     * @return 成功响应
+     */
     @DeleteMapping("/{id}")
     public Mono<R<Void>> delete(@PathVariable Long id) {
         return Mono.<Void>fromRunnable(() -> abExperimentMapper.deleteById(id))
                 .subscribeOn(Schedulers.boundedElastic())
                 .thenReturn(R.<Void>ok());
     }
+
 }

@@ -20,6 +20,13 @@ public class ApiDefinitionController {
 
     private final ApiDefinitionMapper apiDefinitionMapper;
 
+    /**
+     * 分页查询 API 定义列表
+     * @param page 页码
+     * @param size 每页大小
+     * @param enabled 启用状态（可选）
+     * @return 分页结果
+     */
     @GetMapping
     public Mono<R<PageResult<ApiDefinition>>> list(
             @RequestParam(defaultValue = "1") int page,
@@ -36,6 +43,11 @@ public class ApiDefinitionController {
         }).subscribeOn(Schedulers.boundedElastic()).map(R::ok);
     }
 
+    /**
+     * 创建 API 定义
+     * @param body API 定义对象
+     * @return 创建结果
+     */
     @PostMapping
     public Mono<R<ApiDefinition>> create(@RequestBody ApiDefinition body) {
         return Mono.fromCallable(() -> {
@@ -45,6 +57,12 @@ public class ApiDefinitionController {
         }).subscribeOn(Schedulers.boundedElastic()).map(R::ok);
     }
 
+    /**
+     * 更新 API 定义
+     * @param id API 定义 ID
+     * @param body API 定义信息
+     * @return 成功响应
+     */
     @PutMapping("/{id}")
     public Mono<R<Void>> update(@PathVariable Long id, @RequestBody ApiDefinition body) {
         return Mono.<Void>fromRunnable(() -> {
@@ -53,10 +71,16 @@ public class ApiDefinitionController {
         }).subscribeOn(Schedulers.boundedElastic()).thenReturn(R.<Void>ok());
     }
 
+    /**
+     * 删除 API 定义
+     * @param id API 定义 ID
+     * @return 成功响应
+     */
     @DeleteMapping("/{id}")
     public Mono<R<Void>> delete(@PathVariable Long id) {
         return Mono.<Void>fromRunnable(() -> apiDefinitionMapper.deleteById(id))
-                .subscribeOn(Schedulers.boundedElastic())
-                .thenReturn(R.<Void>ok());
+            .subscribeOn(Schedulers.boundedElastic())
+            .thenReturn(R.<Void>ok());
     }
+
 }

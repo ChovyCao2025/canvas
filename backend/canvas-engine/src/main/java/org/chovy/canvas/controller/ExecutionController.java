@@ -19,7 +19,12 @@ public class ExecutionController {
     private final CanvasExecutionService  executionService;
     private final CanvasDisruptorService  disruptorService;  // 12.8节 Disruptor 分发
 
-    /** 业务直调：同步等待结果（绕过 Disruptor，直接执行） */
+    /**
+     * 业务直调接口：同步执行并等待结果
+     * @param canvasId 画布 ID
+     * @param req 直调请求参数（包含用户 ID、输入参数、幂等 Key）
+     * @return 执行结果
+     */
     @PostMapping("/execute/direct/{canvasId}")
     public Mono<R<Map<String, Object>>> directCall(
             @PathVariable Long canvasId,
@@ -39,6 +44,8 @@ public class ExecutionController {
     /**
      * 端内行为触发：异步，经过 Disruptor Ring Buffer 削峰（12.8节）。
      * 立即返回 200，Disruptor 消费者异步执行。
+     * @param req 行为触发请求参数
+     * @return 成功响应
      */
     @PostMapping("/trigger/behavior")
     public Mono<R<Void>> behaviorTrigger(@RequestBody BehaviorTriggerReq req) {
@@ -49,7 +56,12 @@ public class ExecutionController {
         return Mono.just(R.ok());
     }
 
-    /** 干运行：不走 Disruptor，直接同步执行（不产生真实副作用） */
+    /** 
+     * 干运行：不走 Disruptor，直接同步执行（不产生真实副作用）
+     * @param canvasId 画布 ID
+     * @param req 请求参数
+     * @return 干运行执行结果
+     */
     @PostMapping("/execute/dry-run/{canvasId}")
     public Mono<R<Map<String, Object>>> dryRun(
             @PathVariable Long canvasId,
@@ -60,6 +72,7 @@ public class ExecutionController {
                 req.getInputParams(), UUID.randomUUID().toString(), true)
                 .map(R::ok);
     }
+
 
     @Data
     static class DirectCallReq {
