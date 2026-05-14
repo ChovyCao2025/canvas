@@ -546,6 +546,7 @@ function parseSchema(raw: string | undefined): SchemaField[] {
 }
 
 function dataSourceFetcher(src: string): (() => Promise<{data: StubOption[]}>) | null {
+  if (src.includes('api-definitions'))  return metaApi.getApiDefinitions
   if (src.includes('mq-topics'))        return metaApi.getMqTopics
   if (src.includes('coupon-types'))     return metaApi.getCouponTypes
   if (src.includes('reach-scenes'))     return metaApi.getReachScenes

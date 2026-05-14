@@ -9,8 +9,8 @@ import '@xyflow/react/dist/style.css'
 import dagre from '@dagrejs/dagre'
 import { Button, Divider, Input, message, Modal, Space, Tag, Tooltip, Typography } from 'antd'
 import {
-  ArrowLeftOutlined, CaretRightOutlined, CloudUploadOutlined, HistoryOutlined,
-  SaveOutlined, ApartmentOutlined,
+  ArrowLeftOutlined, CaretRightOutlined, CloudUploadOutlined, DeleteOutlined,
+  HistoryOutlined, SaveOutlined, ApartmentOutlined,
 } from '@ant-design/icons'
 import { useNavigate, useParams } from 'react-router-dom'
 import type { BackendNode, BizConfig, Branch, Priority, AbGroup, CanvasNodeData } from '../../types/canvas'
@@ -567,7 +567,7 @@ function EditorInner({ detail }: { detail: CanvasDetail }) {
             onNodeClick={(_, node) => setSelectedNodeId(node.id)}
             onPaneClick={() => setSelectedNodeId(null)}
             fitView
-            deleteKeyCode="Delete"
+            deleteKeyCode={['Delete', 'Backspace']}
           >
             <Background />
             <Controls />
@@ -579,12 +579,35 @@ function EditorInner({ detail }: { detail: CanvasDetail }) {
         <div style={{
           width: 280, borderLeft: '1px solid #f0f0f0',
           background: '#fff', flexShrink: 0, overflow: 'hidden',
+          display: 'flex', flexDirection: 'column',
         }}>
-          <ConfigPanel
-            nodeId={selectedNodeId}
-            nodeData={selectedData}
-            onChange={onNodeDataChange}
-          />
+          <div style={{ flex: 1, overflow: 'auto' }}>
+            <ConfigPanel
+              nodeId={selectedNodeId}
+              nodeData={selectedData}
+              onChange={onNodeDataChange}
+            />
+          </div>
+          {selectedNodeId && (
+            <div style={{ padding: '8px 12px', borderTop: '1px solid #f0f0f0' }}>
+              <Button
+                danger block size="small"
+                icon={<DeleteOutlined />}
+                onClick={() => {
+                  snapshot('删除节点')
+                  const ids = new Set([selectedNodeId])
+                  setNodes(prev => prev
+                    .filter(n => !ids.has(n.id))
+                    .map(n => ({ ...n, data: { ...(n.data as CanvasNodeData), bizConfig: cleanRefs((n.data as CanvasNodeData).bizConfig ?? {}, ids) } }))
+                  )
+                  setEdges(prev => prev.filter(e => !ids.has(e.source) && !ids.has(e.target)))
+                  setSelectedNodeId(null)
+                }}
+              >
+                删除节点
+              </Button>
+            </div>
+          )}
         </div>
       </div>
     </div>
