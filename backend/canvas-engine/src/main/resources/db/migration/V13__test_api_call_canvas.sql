@@ -37,7 +37,7 @@ VALUES (@canvas_api_id, 1, 0, '{
       "config": {
         "apiKey": "test-echo",
         "inputParams": {
-          "userId": "${userId}",
+          "userId": "$${userId}",
           "source": "canvas-test"
         },
         "outputPrefix": "echo",
