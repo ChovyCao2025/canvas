@@ -3,6 +3,7 @@ import { AuthProvider } from './context/AuthContext'
 import { RequireAuth, RequireAdmin } from './auth/guards'
 import AppLayout from './components/layout/AppLayout'
 import LoginPage from './pages/login'
+import HomePage from './pages/home'
 import CanvasListPage from './pages/canvas-list'
 import CanvasEditorPage from './pages/canvas-editor'
 import CanvasStatsPage from './pages/canvas-stats'
@@ -20,7 +21,8 @@ export default function App() {
           {/* 需要登录——带侧边栏布局 */}
           <Route element={<RequireAuth />}>
             <Route element={<AppLayout />}>
-              <Route path="/" element={<Navigate to="/canvas" replace />} />
+              <Route path="/" element={<Navigate to="/home" replace />} />
+              <Route path="/home"   element={<HomePage />} />
               <Route path="/canvas" element={<CanvasListPage />} />
             </Route>
 

@@ -4,7 +4,7 @@ import {
   ApartmentOutlined, SettingOutlined, ApiOutlined,
   ExperimentOutlined, TeamOutlined, LogoutOutlined,
   UserOutlined, MenuFoldOutlined, MenuUnfoldOutlined,
-  RocketOutlined,
+  RocketOutlined, HomeOutlined,
 } from '@ant-design/icons'
 import { Outlet, useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
@@ -23,6 +23,7 @@ export default function AppLayout() {
   const [collapsed, setCollapsed] = useState(false)
 
   const selectedKey = (() => {
+    if (location.pathname === '/' || location.pathname === '/home') return 'home'
     if (location.pathname.startsWith('/api-config'))     return 'api-config'
     if (location.pathname.startsWith('/ab-experiments')) return 'ab-experiments'
     if (location.pathname.startsWith('/admin/users'))    return 'admin-users'
@@ -35,6 +36,12 @@ export default function AppLayout() {
   })()
 
   const menuItems: MenuProps['items'] = [
+    {
+      key: 'home',
+      icon: <HomeOutlined />,
+      label: '首页',
+      onClick: () => navigate('/home'),
+    },
     {
       key: 'marketing',
       icon: <RocketOutlined />,
@@ -189,7 +196,7 @@ export default function AppLayout() {
                     {user?.displayName}
                   </div>
                   <div style={{ color: 'rgba(255,255,255,.38)', fontSize: 11, marginTop: 1 }}>
-                    {user?.role === 'ADMIN' ? '管理员' : '操作员'} · 点击退出
+                    {user?.role === 'ADMIN' ? '管理员' : '操作员'}
                   </div>
                 </div>
               )}
