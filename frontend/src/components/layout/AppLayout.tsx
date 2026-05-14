@@ -12,6 +12,16 @@ import { authApi } from '../../services/api'
 
 const { Sider, Content } = Layout
 
+// Ant Design Sider 内部包了一层 .ant-layout-sider-children，需要让它也是 flex column
+const siderChildrenStyle = `
+  .app-sider > .ant-layout-sider-children {
+    display: flex !important;
+    flex-direction: column !important;
+    height: 100% !important;
+    overflow: hidden !important;
+  }
+`
+
 const SIDER_DARK  = '#0d1117'
 const SIDER_HOVER = '#1f2d45'
 const ACCENT      = '#4f8ef7'
@@ -94,7 +104,9 @@ export default function AppLayout() {
 
   return (
     <Layout style={{ minHeight: '100vh' }}>
+      <style>{siderChildrenStyle}</style>
       <Sider
+        className="app-sider"
         collapsible
         collapsed={collapsed}
         trigger={null}
