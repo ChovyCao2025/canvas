@@ -129,4 +129,30 @@ export const metaApi = {
   getBizLines: () => http.get<R<StubOption[]>, R<StubOption[]>>('/meta/biz-lines'),
 }
 
+// ── API 定义管理 ─────────────────────────────────────────────
+
+export const apiDefinitionApi = {
+  list: (params?: { page?: number; size?: number; enabled?: number }) =>
+    http.get<R<PageResult<any>>, R<PageResult<any>>>('/canvas/api-definitions', { params }),
+  create: (body: any) =>
+    http.post<R<any>, R<any>>('/canvas/api-definitions', body),
+  update: (id: number, body: any) =>
+    http.put<R<void>, R<void>>(`/canvas/api-definitions/${id}`, body),
+  delete: (id: number) =>
+    http.delete<R<void>, R<void>>(`/canvas/api-definitions/${id}`),
+}
+
+// ── AB 实验管理 ──────────────────────────────────────────────
+
+export const abExperimentApi = {
+  list: (params?: { page?: number; size?: number; enabled?: number }) =>
+    http.get<R<PageResult<any>>, R<PageResult<any>>>('/canvas/ab-experiments', { params }),
+  create: (body: any) =>
+    http.post<R<any>, R<any>>('/canvas/ab-experiments', body),
+  update: (id: number, body: any) =>
+    http.put<R<void>, R<void>>(`/canvas/ab-experiments/${id}`, body),
+  delete: (id: number) =>
+    http.delete<R<void>, R<void>>(`/canvas/ab-experiments/${id}`),
+}
+
 export default http

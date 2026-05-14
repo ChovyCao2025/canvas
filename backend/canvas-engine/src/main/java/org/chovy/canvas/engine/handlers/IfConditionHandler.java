@@ -32,7 +32,9 @@ public class IfConditionHandler implements NodeHandler {
     static boolean evaluate(Map<String, Object> rule, ExecutionContext ctx) {
         String field    = (String) rule.get("field");
         String operator = (String) rule.get("operator");
-        String expected = String.valueOf(rule.get("value"));
+        // 支持上下文字段引用：value 以 "${" 开头时，从 ctx 读取实际值
+        String rawValue = String.valueOf(rule.get("value"));
+        String expected = resolveValue(rawValue, ctx);
         Object raw      = ctx.getContextValue(field);
         String actual   = raw == null ? "null" : String.valueOf(raw);
 
@@ -46,6 +48,19 @@ public class IfConditionHandler implements NodeHandler {
             case "LTE"      -> numericCompare(actual, expected) <= 0;
             default         -> false;
         };
+    }
+
+    /**
+     * 解析 value：若以 ${...} 包裹，从 ctx 读取上下文字段值。
+     * 例：${orderId} → ctx.getContextValue("orderId")
+     */
+    private static String resolveValue(String raw, ExecutionContext ctx) {
+        if (raw != null && raw.startsWith("${") && raw.endsWith("}")) {
+            String fieldKey = raw.substring(2, raw.length() - 1);
+            Object v = ctx.getContextValue(fieldKey);
+            return v == null ? "null" : String.valueOf(v);
+        }
+        return raw;
     }
 
     /** CONTAINS：expected 含逗号则为 IN 语义，否则为子串匹配 */

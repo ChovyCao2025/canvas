@@ -358,9 +358,7 @@ function BranchList({ ctxFields }: { ctxFields: ContextField[] }) {
     key: String(i),
     label: (
       <Space>
-        <Input size="small" style={{ width: 80 }} value={b.label}
-          onChange={e => updateBranch(i, 'label', e.target.value)}
-          onClick={e => e.stopPropagation()} />
+        <span style={{ fontSize: 12, fontWeight: 500, minWidth: 52 }}>{b.label}</span>
         <Select size="small" style={{ width: 60 }} value={b.strategyRelation}
           options={[{ label: 'AND', value: 'AND' }, { label: 'OR', value: 'OR' }]}
           onChange={v => updateBranch(i, 'strategyRelation', v)}
@@ -380,8 +378,20 @@ function BranchList({ ctxFields }: { ctxFields: ContextField[] }) {
             <Select size="small" style={{ width: 72 }} value={c.operator}
               options={ops.map(o => ({ label: o, value: o }))}
               onChange={v => updateCondition(i, ci, 'operator', v)} />
-            <Input size="small" style={{ width: 90 }} placeholder="值"
-              value={c.value} onChange={e => updateCondition(i, ci, 'value', e.target.value)} />
+            {c.isContext ? (
+              <Select size="small" style={{ width: 90 }} placeholder="上下文字段"
+                value={c.value || undefined}
+                options={ctxFields.map(f => ({ label: f.fieldName, value: '${' + f.fieldKey + '}' }))}
+                onChange={v => updateCondition(i, ci, 'value', v)} showSearch />
+            ) : (
+              <Input size="small" style={{ width: 90 }} placeholder="静态值"
+                value={c.value} onChange={e => updateCondition(i, ci, 'value', e.target.value)} />
+            )}
+            <Button size="small" type={c.isContext ? 'primary' : 'default'} style={{ fontSize: 10, padding: '0 4px' }}
+              title={c.isContext ? '切换为静态值' : '切换为上下文字段'}
+              onClick={() => updateCondition(i, ci, 'isContext', String(!c.isContext))}>
+              {c.isContext ? '变量' : '值'}
+            </Button>
             <Button size="small" danger icon={<DeleteOutlined />} onClick={() => removeCondition(i, ci)} />
           </Space>
         ))}
@@ -419,8 +429,7 @@ function AbGroupList() {
         <Space key={i} style={{ display: 'flex', marginBottom: 4 }}>
           <Input size="small" style={{ width: 80 }} placeholder="分组Key"
             value={g.groupKey} onChange={e => update(i, 'groupKey', e.target.value)} />
-          <Input size="small" style={{ width: 100 }} placeholder="后继节点ID"
-            value={g.nextNodeId ?? ''} onChange={e => update(i, 'nextNodeId', e.target.value)} />
+          <span style={{ fontSize: 11, color: '#999' }}>→ 通过连线设置后继节点</span>
           <Button size="small" danger icon={<DeleteOutlined />} onClick={() => remove(i)} />
         </Space>
       ))}

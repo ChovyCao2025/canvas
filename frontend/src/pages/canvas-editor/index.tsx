@@ -115,22 +115,22 @@ function cleanRefs(cfg: Record<string, unknown>, deletedIds: Set<string>) {
 
 // ── 撤销/重做历史 ─────────────────────────────────────────────
 
-interface Snapshot { nodes: Node<CanvasNodeData>[]; edges: Edge[] }
+interface Snapshot { nodes: Node<CanvasNodeData>[]; edges: Edge[]; actionName: string }
 
 function useHistory(nodes: Node<CanvasNodeData>[], edges: Edge[]) {
   const [history, setHistory] = useState<Snapshot[]>([])
   const [future,  setFuture]  = useState<Snapshot[]>([])
   const { setNodes, setEdges } = useReactFlow()
 
-  const snapshot = useCallback(() => {
-    setHistory(h => [...h.slice(-49), { nodes: [...nodes], edges: [...edges] }])
+  const snapshot = useCallback((actionName = '操作') => {
+    setHistory(h => [...h.slice(-49), { nodes: [...nodes], edges: [...edges], actionName }])
     setFuture([])
   }, [nodes, edges])
 
   const undo = useCallback(() => {
     if (!history.length) return
     const prev = history[history.length - 1]
-    setFuture(f => [{ nodes, edges }, ...f])
+    setFuture(f => [{ nodes, edges, actionName: prev.actionName }, ...f])
     setHistory(h => h.slice(0, -1))
     setNodes(prev.nodes)
     setEdges(prev.edges)
@@ -139,13 +139,16 @@ function useHistory(nodes: Node<CanvasNodeData>[], edges: Edge[]) {
   const redo = useCallback(() => {
     if (!future.length) return
     const next = future[0]
-    setHistory(h => [...h, { nodes, edges }])
+    setHistory(h => [...h, { nodes, edges, actionName: next.actionName }])
     setFuture(f => f.slice(1))
     setNodes(next.nodes)
     setEdges(next.edges)
   }, [future, nodes, edges, setNodes, setEdges])
 
-  return { snapshot, undo, redo, canUndo: history.length > 0, canRedo: future.length > 0 }
+  const undoLabel = history.length ? `撤销：${history[history.length - 1].actionName}` : '没有可撤销的操作'
+  const redoLabel = future.length  ? `重做：${future[0].actionName}` : '没有可重做的操作'
+
+  return { snapshot, undo, redo, canUndo: history.length > 0, canRedo: future.length > 0, undoLabel, redoLabel }
 }
 
 // ── 主编辑器（内部，需要 ReactFlowProvider 包裹）─────────────
@@ -171,7 +174,7 @@ function EditorInner({ detail }: { detail: CanvasDetail }) {
   const editVersion   = useRef(0)
   const autoSaveTimer = useRef<ReturnType<typeof setTimeout>>()
 
-  const { snapshot, undo, redo, canUndo, canRedo } = useHistory(nodes, edges)
+  const { snapshot, undo, redo, canUndo, canRedo, undoLabel, redoLabel } = useHistory(nodes, edges)
 
   // ── Auto-save：最后一次改动 3s 后静默保存 ─────────────────────
   useEffect(() => {
@@ -219,7 +222,7 @@ function EditorInner({ detail }: { detail: CanvasDetail }) {
         }
         // 粘贴节点（偏移 +20px，重置 ID 和 traceColor）
         if (e.key === 'v' && clipboard.length > 0) {
-          snapshot()
+          snapshot('粘贴节点')
           const pasted = clipboard.map(n => ({
             ...n,
             id: crypto.randomUUID().replace(/-/g, '').slice(0, 12),
@@ -250,7 +253,7 @@ function EditorInner({ detail }: { detail: CanvasDetail }) {
     const nodeType = e.dataTransfer.getData('application/canvas-node-type')
     const category = e.dataTransfer.getData('application/canvas-node-category')
     if (!nodeType) return
-    snapshot()
+    snapshot('添加节点')
     const position = screenToFlowPosition({ x: e.clientX, y: e.clientY })
 
     // SELECTOR 节点需要默认分支，否则没有 Handle 无法连线（鸡蛋问题）
@@ -284,13 +287,25 @@ function EditorInner({ detail }: { detail: CanvasDetail }) {
   const onConnect = useCallback((conn: Connection) => {
     const { source, sourceHandle, target } = conn
     if (!source || !target || !sourceHandle) return
-    snapshot()
+    snapshot('连线')
+    // 根据 sourceHandle 自动生成边 label（分组/分支/优先级等）
+    const edgeLabel = (() => {
+      if (sourceHandle.startsWith('group-'))    return sourceHandle.replace('group-', '分组 ')
+      if (sourceHandle.startsWith('branch-'))   return `分支 ${Number(sourceHandle.replace('branch-', '')) + 1}`
+      if (sourceHandle.startsWith('priority-')) return `优先级 ${Number(sourceHandle.replace('priority-', '')) + 1}`
+      if (sourceHandle === 'success') return '成功'
+      if (sourceHandle === 'fail')    return '失败'
+      if (sourceHandle === 'else')    return '否则'
+      if (sourceHandle === 'approve') return '通过'
+      if (sourceHandle === 'reject')  return '拒绝'
+      return undefined
+    })()
     setNodes(prev => prev.map(n => {
       if (n.id !== source) return n
       const d = n.data as CanvasNodeData
       return { ...n, data: { ...d, bizConfig: patchBizConfig(d.bizConfig, sourceHandle, target) } }
     }))
-    setEdges(prev => addEdge(conn, prev))
+    setEdges(prev => addEdge({ ...conn, label: edgeLabel }, prev))
   }, [snapshot, setNodes, setEdges])
 
   // 节点删除时清理引用
@@ -299,7 +314,7 @@ function EditorInner({ detail }: { detail: CanvasDetail }) {
       .filter((c): c is NodeChange & { type: 'remove' } => c.type === 'remove')
       .map(c => c.id)
     if (deleted.length) {
-      snapshot()
+      snapshot('删除节点')
       const ids = new Set(deleted)
       setNodes(prev => prev
         .filter(n => !ids.has(n.id))
@@ -394,7 +409,7 @@ function EditorInner({ detail }: { detail: CanvasDetail }) {
 
   // 整理布局
   const onLayout = useCallback(() => {
-    snapshot()
+    snapshot('整理布局')
     const layouted = applyDagreLayout(getNodes(), getEdges())
     setNodes([...layouted])
   }, [snapshot, getNodes, getEdges, setNodes])
@@ -442,8 +457,12 @@ function EditorInner({ detail }: { detail: CanvasDetail }) {
           <Tooltip title="整理布局">
             <Button icon={<ApartmentOutlined />} onClick={onLayout} />
           </Tooltip>
-          <Button disabled={!canUndo} onClick={undo}>撤销</Button>
-          <Button disabled={!canRedo} onClick={redo}>重做</Button>
+          <Tooltip title={undoLabel}>
+            <Button disabled={!canUndo} onClick={undo}>撤销</Button>
+          </Tooltip>
+          <Tooltip title={redoLabel}>
+            <Button disabled={!canRedo} onClick={redo}>重做</Button>
+          </Tooltip>
           <ExecutionTracePanel
             canvasId={canvasId}
             onTraceLoaded={colorMap => {

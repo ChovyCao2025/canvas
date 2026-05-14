@@ -20,11 +20,11 @@ export const CATEGORY_SOLID: Record<string, string> = {
 /** 是否为触发器节点 */
 export const TRIGGER_TYPES = new Set([
   'MQ_TRIGGER', 'BEHAVIOR_IN_APP', 'DIRECT_CALL',
-  'TAGGER_REALTIME', 'SCHEDULED_TRIGGER',
+  'TAGGER_REALTIME', 'SCHEDULED_TRIGGER', 'START',
 ])
 
 /** 是否为终止节点 */
-export const TERMINAL_TYPES = new Set(['DIRECT_RETURN'])
+export const TERMINAL_TYPES = new Set(['DIRECT_RETURN', 'END'])
 
 /** 各节点类型默认名称 */
 export const DEFAULT_NAMES: Record<string, string> = {

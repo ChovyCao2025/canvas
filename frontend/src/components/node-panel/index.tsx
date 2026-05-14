@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react'
-import { Collapse, Typography, Spin } from 'antd'
+import { Collapse, Tooltip, Typography, Spin } from 'antd'
 import { metaApi } from '../../services/api'
 import type { NodeTypeRegistry } from '../../types'
-import { CATEGORY_SOLID, DEFAULT_NAMES } from '../canvas/constants'
+import { CATEGORY_SOLID } from '../canvas/constants'
 
 const { Text } = Typography
 
@@ -42,25 +42,31 @@ export default function NodePanel({ onDragStart }: Props) {
     children: (
       <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
         {nodes.map((nt) => (
-          <div
+          <Tooltip
             key={nt.typeKey}
-            draggable
-            onDragStart={(e) => {
-              e.dataTransfer.setData('application/canvas-node-type', nt.typeKey)
-              e.dataTransfer.setData('application/canvas-node-category', nt.category)
-              e.dataTransfer.effectAllowed = 'move'
-              onDragStart(nt.typeKey, nt.category)
-            }}
-            style={{
-              padding: '5px 8px', borderRadius: 4, cursor: 'grab',
-              background: '#fafafa', border: '1px solid #f0f0f0',
-              fontSize: 12, userSelect: 'none',
-            }}
-            onMouseEnter={e => (e.currentTarget.style.borderColor = CATEGORY_SOLID[category] ?? '#722ed1')}
-            onMouseLeave={e => (e.currentTarget.style.borderColor = '#f0f0f0')}
+            title={nt.description || nt.typeName}
+            placement="right"
+            mouseEnterDelay={0.5}
           >
-            {nt.typeName}
-          </div>
+            <div
+              draggable
+              onDragStart={(e) => {
+                e.dataTransfer.setData('application/canvas-node-type', nt.typeKey)
+                e.dataTransfer.setData('application/canvas-node-category', nt.category)
+                e.dataTransfer.effectAllowed = 'move'
+                onDragStart(nt.typeKey, nt.category)
+              }}
+              style={{
+                padding: '5px 8px', borderRadius: 4, cursor: 'grab',
+                background: '#fafafa', border: '1px solid #f0f0f0',
+                fontSize: 12, userSelect: 'none',
+              }}
+              onMouseEnter={e => (e.currentTarget.style.borderColor = CATEGORY_SOLID[category] ?? '#722ed1')}
+              onMouseLeave={e => (e.currentTarget.style.borderColor = '#f0f0f0')}
+            >
+              {nt.typeName}
+            </div>
+          </Tooltip>
         ))}
       </div>
     ),
