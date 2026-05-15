@@ -1,4 +1,4 @@
--- V14: 为 canvas_execution_trace 补充 duration_ms 列（节点实际耗时）
--- 使用 IF NOT EXISTS 防止列已存在时报错
-ALTER TABLE `canvas_execution_trace`
-    ADD COLUMN IF NOT EXISTS `duration_ms` BIGINT NULL COMMENT '节点执行耗时（毫秒）' AFTER `output_data`;
+-- V14: duration_ms 列已在数据库中存在，此 migration 为空操作
+-- （列在早期手动 ALTER 中已添加，IF NOT EXISTS 语法和 DELIMITER 存储过程
+--  均不兼容当前 Flyway+MySQL 组合，故以 SELECT 1 作占位保持版本号连续）
+SELECT 1;
