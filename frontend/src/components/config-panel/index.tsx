@@ -10,9 +10,6 @@ import type { CanvasNodeData } from '../canvas/constants'
 import { PARAM_TYPES } from '../../pages/api-config'
 
 interface ApiParamDef { name: string; displayName: string; type: string; required: boolean }
-// 带 requestSchema 的完整 API 定义（/meta/api-definitions 返回）
-interface ApiDefFull { value: string; label: string; requestSchema: string }
-const apiDefsCache: ApiDefFull[] = []   // 模块级缓存
 
 const { Text } = Typography
 
@@ -22,10 +19,31 @@ interface Props {
   onChange: (nodeId: string, patch: Partial<CanvasNodeData>) => void
 }
 
-// ── 模块级缓存（会话内不重复请求）────────────────────────────────
+// ── 模块级缓存 ────────────────────────────────────────────────────
+// rawCache: URL → 原始响应数组（包含 value/label/requestSchema 等全量字段）
+// 统一缓存，彻底替代 apiDefsCache + optionsCache + dataSourceFetcher 分散逻辑
 const schemaCache   = new Map<string, NodeTypeRegistry>()
-const optionsCache  = new Map<string, StubOption[]>()
+const rawCache      = new Map<string, any[]>()         // key = dataSource URL
 let contextFieldsCache: ContextField[] | null = null
+
+/** 通用数据源加载：任意 dataSource URL，自动缓存，无需逐个注册 */
+async function loadDataSource(src: string): Promise<any[]> {
+  if (rawCache.has(src)) return rawCache.get(src)!
+  const res: any = await http.get(src)
+  const data: any[] = res.data ?? []
+  rawCache.set(src, data)
+  return data
+}
+
+/** 将原始数组归一化为 Select options（兼容多种后端字段命名）
+ *  StubOption = { key, label }，select 渲染时 value 取 o.key ?? o.value
+ */
+function toSelectOptions(data: any[]): StubOption[] {
+  return data.map(item => ({
+    key:   String(item.value ?? item.key ?? item.code ?? item.id ?? ''),
+    label: String(item.label ?? item.name ?? item.displayName ?? item.value ?? ''),
+  }))
+}
 
 export default function ConfigPanel({ nodeId, nodeData, onChange }: Props) {
   const [schema,   setSchema]   = useState<NodeTypeRegistry | null>(null)
@@ -60,26 +78,20 @@ export default function ConfigPanel({ nodeId, nodeData, onChange }: Props) {
       .finally(() => setLoading(false))
   }, [nodeData?.nodeType])
 
-  // 加载 select 下拉选项（按 dataSource 缓存）
+  // 加载 select 下拉选项：任何带 dataSource 的 select 字段，统一走 loadDataSource
   useEffect(() => {
     if (!schema) return
     const fields = parseSchema(schema.configSchema)
-    const loaders: Array<[string, () => Promise<{data: StubOption[]}>]> = []
     fields.filter(f => f.type === 'select' && f.dataSource).forEach(f => {
       const src = f.dataSource!
-      if (optionsCache.has(src)) {
-        setOptions(prev => ({ ...prev, [f.key]: optionsCache.get(src)! }))
+      if (rawCache.has(src)) {
+        setOptions(prev => ({ ...prev, [f.key]: toSelectOptions(rawCache.get(src)!) }))
         return
       }
-      const fetcher = dataSourceFetcher(src)
-      if (fetcher) loaders.push([f.key, fetcher])
+      loadDataSource(src).then(data =>
+        setOptions(prev => ({ ...prev, [f.key]: toSelectOptions(data) }))
+      )
     })
-    loaders.forEach(([key, fetch]) =>
-      fetch().then(res => {
-        optionsCache.set(key, res.data)
-        setOptions(prev => ({ ...prev, [key]: res.data }))
-      })
-    )
   }, [schema])
 
   // 同步表单初始值
@@ -631,31 +643,27 @@ function parseSchema(raw: string | undefined): SchemaField[] {
 }
 
 // ── 事件属性只读预览控件 ──────────────────────────────────────────
-// 根据选中的 eventCode，显示该事件定义的属性列表
-// 属性仅供参考，运行时由上报内容决定，不允许用户填值
+// 根据选中的 eventCode，显示该事件定义的属性列表（只读，运行时由上报内容决定）
 function EventAttrPreview() {
-  const form    = Form.useFormInstance()
-  const evCode  = Form.useWatch('eventCode', form)
+  const form   = Form.useFormInstance()
+  const evCode = Form.useWatch('eventCode', form)
   const [attrs, setAttrs] = useState<ApiParamDef[]>([])
 
   useEffect(() => {
     if (!evCode) { setAttrs([]); return }
-    // 从 apiDefsCache 或事件定义接口读取
-    const cached = apiDefsCache.find(d => d.value === evCode && (d as any)._src === '/meta/event-definitions')
-    if (cached) {
-      try { setAttrs(JSON.parse(cached.requestSchema || '[]')) } catch { setAttrs([]) }
-      return
-    }
-    http.get<any, any>('/meta/event-definitions').then((res: any) => {
-      const list = (res.data ?? []).map((d: any) => ({ ...d, _src: '/meta/event-definitions' }))
-      list.forEach((d: any) => { if (!apiDefsCache.find(x => x.value === d.value && (x as any)._src === d._src)) apiDefsCache.push(d) })
-      const def = list.find((d: any) => d.value === evCode)
+    const src = '/meta/event-definitions'
+    const pick = (list: any[]) => {
+      const def = list.find(d => d.value === evCode)
       try { setAttrs(def ? JSON.parse(def.requestSchema || '[]') : []) } catch { setAttrs([]) }
-    }).catch(() => {})
+    }
+    if (rawCache.has(src)) { pick(rawCache.get(src)!); return }
+    loadDataSource(src).then(pick)
   }, [evCode])
 
   if (!evCode) return <Text type="secondary" style={{ fontSize: 12 }}>请先选择触发事件</Text>
   if (!attrs.length) return <Text type="secondary" style={{ fontSize: 12 }}>该事件未定义属性</Text>
+
+  const TYPE_LABEL: Record<string, string> = { STRING: '字符型', NUMBER: '数值型', DATE: '日期型' }
 
   return (
     <div style={{ background: '#f0f7ff', border: '1px solid #bae0ff', borderRadius: 6, padding: '8px 12px' }}>
@@ -668,12 +676,12 @@ function EventAttrPreview() {
             ${'{' + a.name + '}'}
           </code>
           <Text style={{ fontSize: 12 }}>{a.displayName || a.name}</Text>
-          <Tag style={{ fontSize: 10, margin: 0 }}>{a.type === 'NUMBER' ? '数值型' : a.type === 'DATE' ? '日期型' : '字符型'}</Tag>
+          <Tag style={{ fontSize: 10, margin: 0 }}>{TYPE_LABEL[a.type] ?? a.type}</Tag>
           {a.required && <Text type="danger" style={{ fontSize: 10 }}>必填</Text>}
         </div>
       ))}
       <div style={{ fontSize: 11, color: '#8c8c8c', marginTop: 6 }}>
-        示例：在 API_CALL 入参中填 <code>${'{orderId}'}</code> 即可传入上报的订单号
+        在 API_CALL 入参中填 <code>${'{orderId}'}</code> 即可引用上报的对应属性值
       </div>
     </div>
   )
@@ -730,18 +738,6 @@ function DelayInput() {
   )
 }
 
-function dataSourceFetcher(src: string): (() => Promise<{data: StubOption[]}>) | null {
-  if (src.includes('api-definitions'))  return metaApi.getApiDefinitions
-  if (src.includes('mq-topics'))        return metaApi.getMqTopics
-  if (src.includes('coupon-types'))     return metaApi.getCouponTypes
-  if (src.includes('reach-scenes'))     return metaApi.getReachScenes
-  if (src.includes('ab-experiments'))   return metaApi.getAbExperiments
-  if (src.includes('tagger-tags') && src.includes('realtime')) return () => metaApi.getTaggerTags('realtime')
-  if (src.includes('tagger-tags') && src.includes('offline'))  return () => metaApi.getTaggerTags('offline')
-  if (src.includes('biz-lines'))        return metaApi.getBizLines
-  return null
-}
-
 // ── API_CALL 动态入参编辑器 ─────────────────────────────────────────
 // 每个参数渲染独立的 Form.Item name={['inputParams', paramName]}
 // 这样 onChange 会正常触发，值会回写到 canvas 节点 config
@@ -754,26 +750,22 @@ function ApiCallInputParams({ label, apiKeyField = 'apiKey', defsSource = '/meta
 
   useEffect(() => {
     if (!apiKey) { setParams([]); return }
-    const srcKey = defsSource
-    const cached = apiDefsCache.filter(d => (d as any)._src === srcKey)
-    const pick = (list: ApiDefFull[]) => {
+    const pick = (list: any[]) => {
       const def = list.find(d => d.value === apiKey)
       let schema: ApiParamDef[] = []
       try { schema = def ? JSON.parse(def.requestSchema || '[]') : [] } catch {}
       setParams(schema)
+      // 切换接口时清理不属于新 schema 的旧 inputParams 键
       const schemaKeys = new Set(schema.map(p => p.name))
       const cur: Record<string, unknown> = form.getFieldValue('inputParams') ?? {}
-      const next: Record<string, unknown> = {}
-      schema.forEach(p => { if (cur[p.name] !== undefined) next[p.name] = cur[p.name] })
       if (Object.keys(cur).some(k => !schemaKeys.has(k))) {
+        const next: Record<string, unknown> = {}
+        schema.forEach(p => { if (cur[p.name] !== undefined) next[p.name] = cur[p.name] })
         form.setFieldValue('inputParams', next)
       }
     }
-    if (cached.length) { pick(cached); return }
-    http.get<any, any>(defsSource).then((res: any) => {
-      const list = (res.data ?? []).map((d: any) => ({ ...d, _src: srcKey }))
-      apiDefsCache.push(...list); pick(list)
-    }).catch(() => {})
+    if (rawCache.has(defsSource)) { pick(rawCache.get(defsSource)!); return }
+    loadDataSource(defsSource).then(pick)
   }, [apiKey, defsSource]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const typeLabel = (t: string) => PARAM_TYPES.find(p => p.value === t)?.label ?? t
