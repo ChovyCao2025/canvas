@@ -1,10 +1,10 @@
 import { useEffect, useState, useCallback } from 'react'
 import {
   Form, Input, InputNumber, Select, Switch, Button,
-  Typography, Spin, Divider, Space, Collapse, Tag, Tooltip, AutoComplete, DatePicker,
+  Typography, Spin, Divider, Space, Tag, Tooltip, AutoComplete, DatePicker,
 } from 'antd'
-import { PlusOutlined, DeleteOutlined, DownOutlined, QuestionCircleOutlined } from '@ant-design/icons'
-import { metaApi, canvasApi } from '../../services/api'
+import { PlusOutlined, DeleteOutlined, QuestionCircleOutlined } from '@ant-design/icons'
+import http, { metaApi, canvasApi } from '../../services/api'
 import type { NodeTypeRegistry, ContextField, StubOption, Canvas } from '../../types'
 import type { CanvasNodeData } from '../canvas/constants'
 import { PARAM_TYPES } from '../../pages/api-config'
@@ -169,7 +169,7 @@ function renderControl(
   field: SchemaField,
   options: Record<string, StubOption[]>,
   ctxFields: ContextField[],
-  form: ReturnType<typeof Form.useForm>[0],
+  _form: ReturnType<typeof Form.useForm>[0],
 ): React.ReactNode {
   switch (field.type) {
     case 'select':
