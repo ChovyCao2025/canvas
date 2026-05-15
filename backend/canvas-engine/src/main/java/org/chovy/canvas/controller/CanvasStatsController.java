@@ -36,21 +36,34 @@ public class CanvasStatsController {
     @GetMapping("/execution/{executionId}/trace")
     public Mono<R<List<Map<String, Object>>>> getTrace(@PathVariable String executionId) {
         return Mono.fromCallable(() -> {
-            List<org.chovy.canvas.domain.execution.CanvasExecutionTrace> traces =
+            List<org.chovy.canvas.domain.execution.CanvasExecutionTrace> all =
                     traceMapper.selectList(
                             new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<
                                     org.chovy.canvas.domain.execution.CanvasExecutionTrace>()
                                     .eq(org.chovy.canvas.domain.execution.CanvasExecutionTrace::getExecutionId,
                                             executionId)
                                     .orderByAsc(org.chovy.canvas.domain.execution.CanvasExecutionTrace::getStartedAt));
-            return traces.stream().map(t -> {
+
+            // 去重：每个节点保留 status 最高的记录（完成 > 执行中），维持首次出现顺序
+            java.util.Map<String, org.chovy.canvas.domain.execution.CanvasExecutionTrace> best =
+                    new java.util.LinkedHashMap<>();
+            for (var t : all) {
+                best.merge(t.getNodeId(), t,
+                        (a, b) -> b.getStatus() > a.getStatus() ? b : a);
+            }
+
+            return best.values().stream().map(t -> {
                 Map<String, Object> m = new java.util.LinkedHashMap<>();
-                m.put("nodeId",    t.getNodeId());
-                m.put("nodeType",  t.getNodeType());
-                m.put("nodeName",  t.getNodeName());
-                m.put("status",    t.getStatus());
-                m.put("errorMsg",  t.getErrorMsg());
-                if (t.getStartedAt() != null && t.getFinishedAt() != null) {
+                m.put("nodeId",     t.getNodeId());
+                m.put("nodeType",   t.getNodeType());
+                m.put("nodeName",   t.getNodeName());
+                m.put("status",     t.getStatus());
+                m.put("errorMsg",   t.getErrorMsg());
+                m.put("outputData", t.getOutputData());   // API 调用结果等
+                // 优先用存储的 durationMs，无则从 startedAt/finishedAt 计算
+                if (t.getDurationMs() != null) {
+                    m.put("durationMs", t.getDurationMs());
+                } else if (t.getStartedAt() != null && t.getFinishedAt() != null) {
                     m.put("durationMs",
                             java.time.Duration.between(t.getStartedAt(), t.getFinishedAt()).toMillis());
                 }
