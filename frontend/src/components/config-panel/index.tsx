@@ -125,11 +125,19 @@ export default function ConfigPanel({ nodeId, nodeData, onChange }: Props) {
         {fields
           .filter(f => evaluateVisible(f.visible, formValues))
           .map(field => {
-            // api-input-params 自己管理嵌套 Form.Item，不能被外层 Form.Item 包住
+            // api-input-params / event-attr-preview 自己管理渲染，不能被外层 Form.Item 包住
             if (field.type === 'api-input-params') {
               return <ApiCallInputParams key={field.key} label={field.label}
                 apiKeyField={field.apiKeyField ?? 'apiKey'}
                 defsSource={field.defsSource ?? '/meta/api-definitions'} />
+            }
+            if (field.type === 'event-attr-preview') {
+              return (
+                <div key={field.key} style={{ marginBottom: 16 }}>
+                  <div style={{ fontSize: 12, color: '#595959', marginBottom: 6 }}>{field.label}</div>
+                  <EventAttrPreview />
+                </div>
+              )
             }
             return (
               <Form.Item key={field.key} name={field.key} label={field.label}
@@ -223,6 +231,8 @@ function renderControl(
       )
     case 'delay-input':
       return <DelayInput />
+    case 'event-attr-preview':
+      return <EventAttrPreview />
     case 'edge-hint':
       return (
         <div style={{ fontSize: 12, color: '#8c8c8c', background: '#f5f5f5',
@@ -618,6 +628,55 @@ interface SchemaField {
 
 function parseSchema(raw: string | undefined): SchemaField[] {
   try { return raw ? JSON.parse(raw) : [] } catch { return [] }
+}
+
+// ── 事件属性只读预览控件 ──────────────────────────────────────────
+// 根据选中的 eventCode，显示该事件定义的属性列表
+// 属性仅供参考，运行时由上报内容决定，不允许用户填值
+function EventAttrPreview() {
+  const form    = Form.useFormInstance()
+  const evCode  = Form.useWatch('eventCode', form)
+  const [attrs, setAttrs] = useState<ApiParamDef[]>([])
+
+  useEffect(() => {
+    if (!evCode) { setAttrs([]); return }
+    // 从 apiDefsCache 或事件定义接口读取
+    const cached = apiDefsCache.find(d => d.value === evCode && (d as any)._src === '/meta/event-definitions')
+    if (cached) {
+      try { setAttrs(JSON.parse(cached.requestSchema || '[]')) } catch { setAttrs([]) }
+      return
+    }
+    http.get<any, any>('/meta/event-definitions').then((res: any) => {
+      const list = (res.data ?? []).map((d: any) => ({ ...d, _src: '/meta/event-definitions' }))
+      list.forEach((d: any) => { if (!apiDefsCache.find(x => x.value === d.value && (x as any)._src === d._src)) apiDefsCache.push(d) })
+      const def = list.find((d: any) => d.value === evCode)
+      try { setAttrs(def ? JSON.parse(def.requestSchema || '[]') : []) } catch { setAttrs([]) }
+    }).catch(() => {})
+  }, [evCode])
+
+  if (!evCode) return <Text type="secondary" style={{ fontSize: 12 }}>请先选择触发事件</Text>
+  if (!attrs.length) return <Text type="secondary" style={{ fontSize: 12 }}>该事件未定义属性</Text>
+
+  return (
+    <div style={{ background: '#f0f7ff', border: '1px solid #bae0ff', borderRadius: 6, padding: '8px 12px' }}>
+      <div style={{ fontSize: 11, color: '#0958d9', marginBottom: 6, fontWeight: 500 }}>
+        事件上报后，以下属性自动注入执行上下文，可在后续节点中直接引用：
+      </div>
+      {attrs.map(a => (
+        <div key={a.name} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+          <code style={{ fontSize: 12, background: '#e6f4ff', padding: '1px 6px', borderRadius: 4, color: '#0958d9' }}>
+            ${'{' + a.name + '}'}
+          </code>
+          <Text style={{ fontSize: 12 }}>{a.displayName || a.name}</Text>
+          <Tag style={{ fontSize: 10, margin: 0 }}>{a.type === 'NUMBER' ? '数值型' : a.type === 'DATE' ? '日期型' : '字符型'}</Tag>
+          {a.required && <Text type="danger" style={{ fontSize: 10 }}>必填</Text>}
+        </div>
+      ))}
+      <div style={{ fontSize: 11, color: '#8c8c8c', marginTop: 6 }}>
+        示例：在 API_CALL 入参中填 <code>${'{orderId}'}</code> 即可传入上报的订单号
+      </div>
+    </div>
+  )
 }
 
 // ── 延迟时长复合控件 ─────────────────────────────────────────────
