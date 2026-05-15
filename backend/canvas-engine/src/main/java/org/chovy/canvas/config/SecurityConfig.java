@@ -43,6 +43,8 @@ public class SecurityConfig {
                         .pathMatchers("/auth/login").permitAll()
                         .pathMatchers("/swagger-ui.html", "/swagger-ui/**",
                                 "/v3/api-docs/**", "/webjars/**").permitAll()
+                        // OpenAPI：事件上报无需登录（业务系统直接调用）
+                        .pathMatchers(HttpMethod.POST, "/canvas/events/report").permitAll()
                         // 仅 ADMIN 可发布/下线/Kill/灰度/回滚
                         .pathMatchers(HttpMethod.POST,
                                 "/canvas/*/publish", "/canvas/*/offline",
