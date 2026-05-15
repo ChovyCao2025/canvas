@@ -2,7 +2,8 @@ import { useEffect, useState, useCallback } from 'react'
 import {
   Form, Input, InputNumber, Select, Switch, Button,
   Typography, Spin, Divider, Space, Collapse, Tag, Tooltip, AutoComplete, DatePicker,
-} from 'antd'import { PlusOutlined, DeleteOutlined, DownOutlined, QuestionCircleOutlined } from '@ant-design/icons'
+} from 'antd'
+import { PlusOutlined, DeleteOutlined, DownOutlined, QuestionCircleOutlined } from '@ant-design/icons'
 import { metaApi, canvasApi } from '../../services/api'
 import type { NodeTypeRegistry, ContextField, StubOption, Canvas } from '../../types'
 import type { CanvasNodeData } from '../canvas/constants'
