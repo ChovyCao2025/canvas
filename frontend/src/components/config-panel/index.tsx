@@ -196,7 +196,7 @@ function renderControl(
     case 'priority-list':
       return <PriorityList />
     case 'key-value':
-      return <KeyValueMapping ctxFields={ctxFields} />
+      return <KeyValueMapping fieldKey={field.key} ctxFields={ctxFields} />
     case 'canvas-select':
       return <CanvasSelector />
     case 'node-select':
@@ -472,9 +472,8 @@ function PriorityList() {
 }
 
 // ── 键值映射控件（CANVAS_TRIGGER paramMapping / SUB_FLOW_REF inputMapping）
-function KeyValueMapping({ ctxFields }: { ctxFields: ContextField[] }) {
+function KeyValueMapping({ fieldKey, ctxFields }: { fieldKey: string; ctxFields: ContextField[] }) {
   const form = Form.useFormInstance()
-  const fieldKey = 'paramMapping'
   const mapping: Record<string, string> = Form.useWatch(fieldKey, form) ?? {}
   const entries = Object.entries(mapping)
 
