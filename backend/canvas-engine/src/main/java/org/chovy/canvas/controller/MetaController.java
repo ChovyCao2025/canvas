@@ -26,6 +26,7 @@ public class MetaController {
     private final AbExperimentMapper abExperimentMapper;
     private final org.chovy.canvas.domain.meta.TagDefinitionMapper tagDefinitionMapper;
     private final org.chovy.canvas.domain.meta.MqMessageDefinitionMapper mqMapper;
+    private final org.chovy.canvas.domain.meta.EventDefinitionMapper eventDefinitionMapper;
 
     @Value("${canvas.integration.tagger-service-url}")
     private String taggerUrl;
@@ -208,6 +209,26 @@ public class MetaController {
     @GetMapping("/biz-lines")
     public Mono<R<List<StubOption>>> getBizLines() {
         return Mono.just(R.ok(metaService.getBizLines()));
+    }
+
+    /** 事件定义列表（带 attributes schema，供 BEHAVIOR_IN_APP 节点下拉选择） */
+    @GetMapping("/event-definitions")
+    public Mono<R<List<Map<String, Object>>>> getEventDefinitions() {
+        return Mono.fromCallable(() -> {
+            List<org.chovy.canvas.domain.meta.EventDefinition> defs =
+                eventDefinitionMapper.selectList(
+                    new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<
+                            org.chovy.canvas.domain.meta.EventDefinition>()
+                        .eq(org.chovy.canvas.domain.meta.EventDefinition::getEnabled, 1)
+                        .orderByAsc(org.chovy.canvas.domain.meta.EventDefinition::getId));
+            return defs.stream().map(d -> {
+                Map<String, Object> m = new java.util.LinkedHashMap<>();
+                m.put("value",      d.getEventCode());
+                m.put("label",      d.getName());
+                m.put("requestSchema", d.getAttributes() != null ? d.getAttributes() : "[]");
+                return m;
+            }).collect(Collectors.toList());
+        }).subscribeOn(reactor.core.scheduler.Schedulers.boundedElastic()).map(R::ok);
     }
 
     @GetMapping("/biz-lines/{key}/apis")

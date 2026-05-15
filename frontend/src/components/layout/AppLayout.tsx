@@ -4,7 +4,7 @@ import {
   ApartmentOutlined, SettingOutlined, ApiOutlined,
   ExperimentOutlined, TeamOutlined, LogoutOutlined,
   UserOutlined, MenuFoldOutlined, MenuUnfoldOutlined,
-  RocketOutlined, HomeOutlined, TagsOutlined, NotificationOutlined,
+  RocketOutlined, HomeOutlined, TagsOutlined, NotificationOutlined, ThunderboltOutlined,
 } from '@ant-design/icons'
 import { Outlet, useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
@@ -38,6 +38,7 @@ export default function AppLayout() {
     if (location.pathname.startsWith('/ab-experiments')) return 'ab-experiments'
     if (location.pathname.startsWith('/tag-config'))     return 'tag-config'
     if (location.pathname.startsWith('/mq-config'))      return 'mq-config'
+    if (location.pathname.startsWith('/event-config'))   return 'event-config'
     if (location.pathname.startsWith('/admin/users'))    return 'admin-users'
     return 'canvas'
   })()
@@ -95,6 +96,12 @@ export default function AppLayout() {
           icon: <NotificationOutlined />,
           label: 'MQ 消息配置',
           onClick: () => navigate('/mq-config'),
+        },
+        {
+          key: 'event-config',
+          icon: <ThunderboltOutlined />,
+          label: '事件配置',
+          onClick: () => navigate('/event-config'),
         },
         ...(isAdmin ? [{
           key: 'admin-users',

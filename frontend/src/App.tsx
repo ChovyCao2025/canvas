@@ -12,6 +12,7 @@ import ApiConfigPage from './pages/api-config'
 import AbExperimentPage from './pages/ab-experiment'
 import TagConfigPage from './pages/tag-config'
 import MqConfigPage from './pages/mq-config'
+import EventConfigPage from './pages/event-config'
 
 export default function App() {
   return (
@@ -41,6 +42,7 @@ export default function App() {
               <Route path="/ab-experiments" element={<AbExperimentPage />} />
               <Route path="/tag-config"     element={<TagConfigPage />} />
               <Route path="/mq-config"      element={<MqConfigPage />} />
+              <Route path="/event-config"   element={<EventConfigPage />} />
             </Route>
           </Route>
         </Routes>
