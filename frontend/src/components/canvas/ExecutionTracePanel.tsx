@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import {
   Modal, Select, Table, Tag, Tooltip, Typography,
   Space, Button, message,
@@ -37,11 +37,12 @@ const STATUS_LABEL: Record<TraceStatus, [string, string]> = {
 
 interface Props {
   canvasId: number
-  /** 当用户选择了某次执行后，回调节点颜色 map 给父组件叠加显示 */
   onTraceLoaded: (colorMap: Record<string, string>) => void
+  /** 测试运行完成后传入 executionId，自动打开面板并加载该次轨迹 */
+  triggerExecutionId?: string | null
 }
 
-export default function ExecutionTracePanel({ canvasId, onTraceLoaded }: Props) {
+export default function ExecutionTracePanel({ canvasId, onTraceLoaded, triggerExecutionId }: Props) {
   const [executions, setExecutions] = useState<any[]>([])
   const [traces,     setTraces]     = useState<NodeTrace[]>([])
   const [visible,    setVisible]    = useState(false)
@@ -52,11 +53,25 @@ export default function ExecutionTracePanel({ canvasId, onTraceLoaded }: Props) 
     setVisible(true)
     setLoading(true)
     try {
-      // 获取最近20次执行记录
       const res = await http.get<R<any[]>, R<any[]>>(`/canvas/${canvasId}/executions?size=20`)
       setExecutions(res.data ?? [])
     } catch { /* ignore */ } finally { setLoading(false) }
   }, [canvasId])
+
+  // 测试运行完成后自动打开并加载
+  useEffect(() => {
+    if (!triggerExecutionId) return
+    const run = async () => {
+      setVisible(true)
+      setLoading(true)
+      try {
+        const res = await http.get<R<any[]>, R<any[]>>(`/canvas/${canvasId}/executions?size=20`)
+        setExecutions(res.data ?? [])
+      } catch { /* ignore */ } finally { setLoading(false) }
+      await loadTrace(triggerExecutionId)
+    }
+    run()
+  }, [triggerExecutionId]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const loadTrace = useCallback(async (executionId: string) => {
     setSelectedExecId(executionId)

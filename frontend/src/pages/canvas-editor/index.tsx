@@ -175,6 +175,7 @@ function EditorInner({ detail }: { detail: CanvasDetail }) {
   const [testUserId,    setTestUserId]    = useState('user_test_001')
   const [testPayload,   setTestPayload]   = useState('{}')
   const [testRunning,   setTestRunning]   = useState(false)
+  const [lastExecId,    setLastExecId]    = useState<string | null>(null)
   const editVersion   = useRef(0)
   const autoSaveTimer = useRef<ReturnType<typeof setTimeout>>()
 
@@ -512,6 +513,7 @@ function EditorInner({ detail }: { detail: CanvasDetail }) {
           </Tooltip>
           <ExecutionTracePanel
             canvasId={canvasId}
+            triggerExecutionId={lastExecId}
             onTraceLoaded={colorMap => {
               setTraceColorMap(colorMap)
               // 将颜色叠加到节点 data 中（CanvasNode 通过 traceColor 渲染）
@@ -561,9 +563,10 @@ function EditorInner({ detail }: { detail: CanvasDetail }) {
               setTestRunning(true)
               try {
                 const res = await canvasApi.dryRun(canvasId, testUserId, payload)
-                const executionId = (res.data?.data as any)?.executionId
-                message.success('触发成功，executionId: ' + (executionId ?? '—'))
+                const execId = (res.data as any)?.executionId ?? null
+                message.success('运行成功' + (execId ? `，正在加载轨迹…` : ''))
                 setTestModalOpen(false)
+                setLastExecId(execId)
               } catch (e: any) {
                 message.error(e?.response?.data?.message ?? '触发失败')
               } finally {

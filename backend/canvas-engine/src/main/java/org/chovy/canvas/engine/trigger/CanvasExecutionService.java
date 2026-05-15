@@ -160,14 +160,12 @@ public class CanvasExecutionService {
             Canvas           canvas      = (Canvas)           prep.get("canvas");
 
             // 6. 写执行记录（开始）
-            CanvasExecution exec = null;
-            if (!dryRun) {
-                exec = createExecution(ctx);
-                final CanvasExecution e = exec;
-                Mono.fromRunnable(() -> executionMapper.insert(e))
-                        .subscribeOn(Schedulers.boundedElastic()).subscribe();
-            }
+            // dry-run 也写记录，这样执行轨迹面板能看到测试运行的 trace；
+            // 只是不统计、不写 ctxStore、不注册到 kill 注册表
+            CanvasExecution exec = createExecution(ctx);
             final CanvasExecution finalExec = exec;
+            Mono.fromRunnable(() -> executionMapper.insert(finalExec))
+                    .subscribeOn(Schedulers.boundedElastic()).subscribe();
 
             // 7. 执行 DAG，并向注册表注册 Disposable（供 Kill Switch FORCE 模式使用）
             Mono<Map<String, Object>> executionMono = dagEngine.execute(graph, triggerNodeId, ctx)
@@ -176,37 +174,41 @@ public class CanvasExecutionService {
             return executionMono
                     .doOnSubscribe(sub -> {
                         if (!dryRun) {
-                            // 转换 Subscription 为 Disposable 并注册
                             executionRegistry.register(canvasId, ctx.getExecutionId(),
                                     reactor.core.Disposables.single());
                         }
                     })
                     .doFinally(signal -> executionRegistry.deregister(canvasId, ctx.getExecutionId()))
                     .flatMap(result -> {
-                        // 8. 执行完成，清理 ctx，更新执行记录
+                        // 8. 执行完成，更新执行记录
+                        updateExecution(finalExec, 2, result); // SUCCESS
                         if (!dryRun) {
                             ctxStore.delete(ctx.getCanvasId(), ctx.getUserId());
                             if (isResume) ctxStore.releaseResumeLock(ctx.getCanvasId(), ctx.getUserId());
-                            updateExecution(finalExec, 2, result); // SUCCESS
-                            incrementStats(ctx.getCanvasId(), 2, ctx.getUserId()); // 统计
+                            incrementStats(ctx.getCanvasId(), 2, ctx.getUserId());
                         }
-                        return Mono.just(result);
+                        // 将 executionId 合入返回结果，便于前端定位执行轨迹
+                        Map<String, Object> resp = new HashMap<>(result);
+                        resp.put("executionId", ctx.getExecutionId());
+                        return Mono.just(resp);
                     })
                     .onErrorResume(e -> {
                         log.error("[ENGINE] 执行失败 executionId={}: {}", ctx.getExecutionId(), e.getMessage());
-                        // 检查是否需要挂起（LOGIC_RELATION 等待中）—— Phase 7 完善
                         boolean paused = isPaused(ctx, graph);
-                        if (!dryRun) {
-                            if (paused) {
-                                ctxStore.save(ctx);
-                                updateExecution(finalExec, 1, Map.of()); // PAUSED
-                            } else {
+                        if (paused) {
+                            if (!dryRun) ctxStore.save(ctx);
+                            updateExecution(finalExec, 1, Map.of()); // PAUSED
+                        } else {
+                            if (!dryRun) {
                                 ctxStore.delete(ctx.getCanvasId(), ctx.getUserId());
                                 if (isResume) ctxStore.releaseResumeLock(ctx.getCanvasId(), ctx.getUserId());
-                                updateExecution(finalExec, 3, Map.of("error", e.getMessage())); // FAILED
                             }
+                            updateExecution(finalExec, 3, Map.of("error", e.getMessage())); // FAILED
                         }
-                        return Mono.just(Map.<String, Object>of("error", e.getMessage()));
+                        return Mono.just(Map.<String, Object>of(
+                            "error", e.getMessage(),
+                            "executionId", ctx.getExecutionId()
+                        ));
                     });
         });
     }
