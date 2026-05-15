@@ -137,7 +137,6 @@ public class CanvasExecutionService {
             if (payload != null) ctx.getTriggerPayload().putAll(payload);
 
             // 4. 加载 DAG 配置（版本锁定：用 ctx 中的 versionId，不用当前发布版本）
-            // 设计文档 13.6节：触发时快照 versionId，全程锁定，发布新版本不影响正在执行的实例
             DagGraph graph = configCache.get(canvasId, ctx.getVersionId());
 
             // 5. 找触发器节点（按类型和 matchKey）
@@ -241,8 +240,17 @@ public class CanvasExecutionService {
      * @return 路由后的版本 ID
      */
     private Long resolveVersionId(Canvas canvas, String userId, boolean dryRun) {
-        // dry-run：优先用最新草稿版本（未发布时也可测试）
+        // dry-run：优先用最新草稿（status=0），即编辑器当前状态
         if (dryRun) {
+            CanvasVersion draft = canvasVersionMapper.selectOne(
+                new LambdaQueryWrapper<CanvasVersion>()
+                    .eq(CanvasVersion::getCanvasId, canvas.getId())
+                    .eq(CanvasVersion::getStatus, 0)
+                    .orderByDesc(CanvasVersion::getId)
+                    .last("LIMIT 1")
+            );
+            if (draft != null) return draft.getId();
+            // 没有草稿则取最新版本
             CanvasVersion latest = canvasVersionMapper.selectOne(
                 new LambdaQueryWrapper<CanvasVersion>()
                     .eq(CanvasVersion::getCanvasId, canvas.getId())
@@ -251,7 +259,7 @@ public class CanvasExecutionService {
             );
             if (latest != null) return latest.getId();
         }
-        // 正常执行：灰度 or 发布版本
+        // 正式执行：灰度 or 发布版本
         if (canvas.getCanaryVersionId() != null && canvas.getCanaryPercent() != null
                 && canvas.getCanaryPercent() > 0) {
             int bucket = Math.abs((userId + ":" + canvas.getId()).hashCode()) % 100;
