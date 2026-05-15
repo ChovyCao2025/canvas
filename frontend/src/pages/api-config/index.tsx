@@ -2,12 +2,28 @@ import { useEffect, useState } from 'react'
 import {
   Button, Table, Tag, Space, Modal, Form, Input,
   Select, Switch, message, Typography, Popconfirm,
+  Divider,
 } from 'antd'
 import { PlusOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
 import { apiDefinitionApi } from '../../services/api'
 
 const { Title } = Typography
+
+export const PARAM_TYPES = [
+  { value: 'STRING',       label: '字符型' },
+  { value: 'NUMBER',       label: '数值型' },
+  { value: 'TEXT',         label: '文本型' },
+  { value: 'DATE',         label: '日期型' },
+  { value: 'STRING_PARAM', label: '字符型（参数调用）' },
+]
+
+export interface ApiParam {
+  name:        string
+  displayName: string
+  type:        string
+  required:    boolean
+}
 
 interface ApiDefinition {
   id: number
@@ -17,15 +33,84 @@ interface ApiDefinition {
   method: string
   bizLine?: string
   description?: string
+  requestSchema?: string
   enabled: number
 }
 
+// ── 参数定义子表格 ───────────────────────────────────────────────
+function ParamSchemaEditor({ value, onChange }: {
+  value?: ApiParam[]; onChange?: (v: ApiParam[]) => void
+}) {
+  const params: ApiParam[] = value ?? []
+
+  const set = (next: ApiParam[]) => onChange?.(next)
+  const add = () => set([...params, { name: '', displayName: '', type: 'STRING', required: false }])
+  const remove = (i: number) => set(params.filter((_, idx) => idx !== i))
+  const update = (i: number, patch: Partial<ApiParam>) =>
+    set(params.map((p, idx) => idx === i ? { ...p, ...patch } : p))
+
+  const cols: ColumnsType<ApiParam> = [
+    {
+      title: '参数名称', dataIndex: 'name', width: 130,
+      render: (v, _, i) => (
+        <Input size="small" value={v} placeholder="paramName"
+          onChange={e => update(i, { name: e.target.value })} />
+      ),
+    },
+    {
+      title: '显示名称', dataIndex: 'displayName', width: 120,
+      render: (v, _, i) => (
+        <Input size="small" value={v} placeholder="展示给配置者"
+          onChange={e => update(i, { displayName: e.target.value })} />
+      ),
+    },
+    {
+      title: '类型', dataIndex: 'type', width: 160,
+      render: (v, _, i) => (
+        <Select size="small" style={{ width: '100%' }} value={v}
+          options={PARAM_TYPES}
+          onChange={t => update(i, { type: t })} />
+      ),
+    },
+    {
+      title: '必填', dataIndex: 'required', width: 60,
+      render: (v, _, i) => (
+        <Switch size="small" checked={v} onChange={c => update(i, { required: c })} />
+      ),
+    },
+    {
+      title: '', width: 40,
+      render: (_, __, i) => (
+        <Button size="small" type="text" danger icon={<DeleteOutlined />} onClick={() => remove(i)} />
+      ),
+    },
+  ]
+
+  return (
+    <div>
+      <Table
+        size="small"
+        rowKey={(_, i) => String(i)}
+        dataSource={params}
+        columns={cols}
+        pagination={false}
+        style={{ marginBottom: 8 }}
+        locale={{ emptyText: '暂无参数' }}
+      />
+      <Button size="small" type="dashed" icon={<PlusOutlined />} onClick={add}>
+        添加参数
+      </Button>
+    </div>
+  )
+}
+
+// ── 主页面 ────────────────────────────────────────────────────────
 export default function ApiConfigPage() {
-  const [data, setData] = useState<ApiDefinition[]>([])
-  const [total, setTotal] = useState(0)
-  const [loading, setLoading] = useState(false)
-  const [page, setPage] = useState(1)
-  const [modalVisible, setModalVisible] = useState(false)
+  const [data,          setData]          = useState<ApiDefinition[]>([])
+  const [total,         setTotal]         = useState(0)
+  const [loading,       setLoading]       = useState(false)
+  const [page,          setPage]          = useState(1)
+  const [modalVisible,  setModalVisible]  = useState(false)
   const [editingRecord, setEditingRecord] = useState<ApiDefinition | null>(null)
   const [form] = Form.useForm()
   const [submitting, setSubmitting] = useState(false)
@@ -46,16 +131,15 @@ export default function ApiConfigPage() {
   const openCreate = () => {
     setEditingRecord(null)
     form.resetFields()
-    form.setFieldsValue({ method: 'POST', enabled: true })
+    form.setFieldsValue({ method: 'POST', enabled: true, requestSchema: [] })
     setModalVisible(true)
   }
 
   const openEdit = (record: ApiDefinition) => {
     setEditingRecord(record)
-    form.setFieldsValue({
-      ...record,
-      enabled: record.enabled === 1,
-    })
+    let schema: ApiParam[] = []
+    try { schema = JSON.parse(record.requestSchema || '[]') } catch {}
+    form.setFieldsValue({ ...record, enabled: record.enabled === 1, requestSchema: schema })
     setModalVisible(true)
   }
 
@@ -63,7 +147,11 @@ export default function ApiConfigPage() {
     const values = await form.validateFields()
     setSubmitting(true)
     try {
-      const body = { ...values, enabled: values.enabled ? 1 : 0 }
+      const body = {
+        ...values,
+        enabled: values.enabled ? 1 : 0,
+        requestSchema: JSON.stringify(values.requestSchema ?? []),
+      }
       if (editingRecord) {
         await apiDefinitionApi.update(editingRecord.id, body)
         message.success('更新成功')
@@ -85,44 +173,31 @@ export default function ApiConfigPage() {
   }
 
   const columns: ColumnsType<ApiDefinition> = [
-    { title: 'ID', dataIndex: 'id', width: 70 },
+    { title: 'ID',   dataIndex: 'id',     width: 60 },
     { title: '名称', dataIndex: 'name' },
     { title: 'apiKey', dataIndex: 'apiKey', ellipsis: true },
-    { title: 'URL', dataIndex: 'url', ellipsis: true },
+    { title: 'URL',  dataIndex: 'url',    ellipsis: true },
     {
-      title: '方法',
-      dataIndex: 'method',
-      width: 80,
-      render: (m: string) => (
-        <Tag color={m === 'GET' ? 'blue' : 'green'}>{m}</Tag>
-      ),
-    },
-    { title: '业务线', dataIndex: 'bizLine', width: 100 },
-    {
-      title: '状态',
-      dataIndex: 'enabled',
-      width: 80,
-      render: (v: number) => (
-        <Tag color={v === 1 ? 'green' : 'default'}>{v === 1 ? '启用' : '禁用'}</Tag>
-      ),
+      title: '方法', dataIndex: 'method', width: 72,
+      render: (m: string) => <Tag color={m === 'GET' ? 'blue' : 'green'}>{m}</Tag>,
     },
     {
-      title: '操作',
-      width: 120,
+      title: '参数', dataIndex: 'requestSchema', width: 60,
+      render: (v: string) => {
+        try { return JSON.parse(v || '[]').length } catch { return 0 }
+      },
+    },
+    {
+      title: '状态', dataIndex: 'enabled', width: 72,
+      render: (v: number) => <Tag color={v === 1 ? 'green' : 'default'}>{v === 1 ? '启用' : '禁用'}</Tag>,
+    },
+    {
+      title: '操作', width: 100,
       render: (_, record) => (
         <Space size={4}>
-          <Button
-            size="small"
-            icon={<EditOutlined />}
-            onClick={() => openEdit(record)}
-          />
-          <Popconfirm
-            title="确认删除？"
-            onConfirm={() => handleDelete(record.id)}
-            okText="删除"
-            okType="danger"
-            cancelText="取消"
-          >
+          <Button size="small" icon={<EditOutlined />} onClick={() => openEdit(record)} />
+          <Popconfirm title="确认删除？" onConfirm={() => handleDelete(record.id)}
+            okText="删除" okType="danger" cancelText="取消">
             <Button size="small" danger icon={<DeleteOutlined />} />
           </Popconfirm>
         </Space>
@@ -131,59 +206,47 @@ export default function ApiConfigPage() {
   ]
 
   return (
-    <div style={{ padding: 24 }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 16 }}>
-        <Title level={4} style={{ margin: 0 }}>API 管理</Title>
-        <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>
-          新建 API
-        </Button>
+    <div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+        <Title level={4} style={{ margin: 0 }}>API 接口配置</Title>
+        <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>新建 API</Button>
       </div>
 
-      <Table
-        rowKey="id"
-        dataSource={data}
-        columns={columns}
-        loading={loading}
-        pagination={{
-          total,
-          pageSize: 20,
-          current: page,
-          onChange: (p) => { setPage(p); fetchList(p) },
-        }}
-      />
+      <Table rowKey="id" dataSource={data} columns={columns} loading={loading}
+        pagination={{ total, pageSize: 20, current: page, onChange: (p) => { setPage(p); fetchList(p) } }} />
 
-      <Modal
-        title={editingRecord ? '编辑 API' : '新建 API'}
-        open={modalVisible}
-        onOk={handleOk}
-        onCancel={() => setModalVisible(false)}
-        confirmLoading={submitting}
-        okText={editingRecord ? '保存' : '创建'}
-        cancelText="取消"
-        width={560}
-      >
+      <Modal title={editingRecord ? '编辑 API' : '新建 API'}
+        open={modalVisible} onOk={handleOk} onCancel={() => setModalVisible(false)}
+        confirmLoading={submitting} okText={editingRecord ? '保存' : '创建'}
+        cancelText="取消" width={700}>
         <Form form={form} layout="vertical" style={{ marginTop: 16 }}>
-          <Form.Item name="name" label="名称" rules={[{ required: true, message: '请输入名称' }]}>
-            <Input placeholder="如：查询用户信息" />
-          </Form.Item>
-          <Form.Item name="apiKey" label="apiKey" rules={[{ required: true, message: '请输入 apiKey' }]}>
-            <Input placeholder="如：query_user_info" />
-          </Form.Item>
-          <Form.Item name="url" label="URL" rules={[{ required: true, message: '请输入 URL' }]}>
-            <Input placeholder="如：/api/v1/user/info" />
-          </Form.Item>
-          <Form.Item name="method" label="HTTP 方法" rules={[{ required: true }]}>
-            <Select options={[{ value: 'GET', label: 'GET' }, { value: 'POST', label: 'POST' }]} />
-          </Form.Item>
-          <Form.Item name="bizLine" label="业务线">
-            <Input placeholder="如：FLIGHT" />
-          </Form.Item>
-          <Form.Item name="description" label="说明">
-            <Input.TextArea rows={2} />
-          </Form.Item>
-          <Form.Item name="enabled" label="状态" valuePropName="checked">
-            <Switch checkedChildren="启用" unCheckedChildren="禁用" />
-          </Form.Item>
+          <Space style={{ width: '100%' }} direction="vertical" size={0}>
+            <Form.Item name="name" label="名称" rules={[{ required: true }]}>
+              <Input placeholder="如：查询用户信息" />
+            </Form.Item>
+            <Form.Item name="apiKey" label="apiKey（唯一标识）" rules={[{ required: true }]}>
+              <Input placeholder="如：query_user_info" />
+            </Form.Item>
+            <Space style={{ width: '100%' }}>
+              <Form.Item name="url" label="URL" style={{ flex: 1 }} rules={[{ required: true }]}>
+                <Input placeholder="https://api.example.com/v1/user" />
+              </Form.Item>
+              <Form.Item name="method" label="方法" style={{ width: 100 }} rules={[{ required: true }]}>
+                <Select options={[{ value: 'GET', label: 'GET' }, { value: 'POST', label: 'POST' }]} />
+              </Form.Item>
+            </Space>
+            <Form.Item name="description" label="说明">
+              <Input.TextArea rows={2} />
+            </Form.Item>
+            <Form.Item name="enabled" label="状态" valuePropName="checked">
+              <Switch checkedChildren="启用" unCheckedChildren="禁用" />
+            </Form.Item>
+
+            <Divider style={{ margin: '8px 0 12px' }}>请求参数定义</Divider>
+            <Form.Item name="requestSchema" style={{ marginBottom: 0 }}>
+              <ParamSchemaEditor />
+            </Form.Item>
+          </Space>
         </Form>
       </Modal>
     </div>

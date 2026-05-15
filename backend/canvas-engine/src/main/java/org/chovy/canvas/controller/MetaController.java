@@ -122,16 +122,20 @@ public class MetaController {
      * @return 选项列表
      */
     @GetMapping("/api-definitions")
-    public Mono<R<List<StubOption>>> getApiDefinitions() {
+    public Mono<R<List<Map<String, Object>>>> getApiDefinitions() {
         return Mono.fromCallable(() -> {
             List<ApiDefinition> defs = apiDefinitionMapper.selectList(
                     new LambdaQueryWrapper<ApiDefinition>()
                             .eq(ApiDefinition::getEnabled, 1)
                             .orderByAsc(ApiDefinition::getId)
             );
-            return defs.stream()
-                    .map(def -> new StubOption(String.valueOf(def.getApiKey()), def.getName()))
-                    .collect(Collectors.toList());
+            return defs.stream().map(def -> {
+                Map<String, Object> m = new java.util.LinkedHashMap<>();
+                m.put("value",         def.getApiKey());
+                m.put("label",         def.getName());
+                m.put("requestSchema", def.getRequestSchema() != null ? def.getRequestSchema() : "[]");
+                return m;
+            }).collect(Collectors.toList());
         }).subscribeOn(Schedulers.boundedElastic()).map(R::ok);
     }
 
