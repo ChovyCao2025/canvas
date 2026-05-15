@@ -124,12 +124,18 @@ export default function ConfigPanel({ nodeId, nodeData, onChange }: Props) {
 
         {fields
           .filter(f => evaluateVisible(f.visible, formValues))
-          .map(field => (
-            <Form.Item key={field.key} name={field.key} label={field.label}
-              rules={field.required ? [{ required: true, message: `请填写${field.label}` }] : []}>
-              {renderControl(field, options, ctxFields, form)}
-            </Form.Item>
-          ))
+          .map(field => {
+            // api-input-params 自己管理嵌套 Form.Item，不能被外层 Form.Item 包住
+            if (field.type === 'api-input-params') {
+              return <ApiCallInputParams key={field.key} label={field.label} />
+            }
+            return (
+              <Form.Item key={field.key} name={field.key} label={field.label}
+                rules={field.required ? [{ required: true, message: `请填写${field.label}` }] : []}>
+                {renderControl(field, options, ctxFields, form)}
+              </Form.Item>
+            )
+          })
         }
       </Form>
     </div>
@@ -203,8 +209,6 @@ function renderControl(
       return <PriorityList />
     case 'key-value':
       return <KeyValueMapping fieldKey={field.key} ctxFields={ctxFields} />
-    case 'api-input-params':
-      return <ApiCallInputParams />
     case 'canvas-select':
       return <CanvasSelector />
     case 'node-select':
@@ -565,67 +569,59 @@ function dataSourceFetcher(src: string): (() => Promise<{data: StubOption[]}>) |
 }
 
 // ── API_CALL 动态入参编辑器 ─────────────────────────────────────────
-// 根据选中接口的 requestSchema 动态渲染表单项
-// 值存入 form 的 inputParams 字段（Map<paramName, value>）
-function ApiCallInputParams() {
-  const form      = Form.useFormInstance()
-  const apiKey    = Form.useWatch('apiKey', form)
-  const inputParams: Record<string, string> = Form.useWatch('inputParams', form) ?? {}
+// 每个参数渲染独立的 Form.Item name={['inputParams', paramName]}
+// 这样 onChange 会正常触发，值会回写到 canvas 节点 config
+function ApiCallInputParams({ label }: { label: string }) {
+  const form   = Form.useFormInstance()
+  const apiKey = Form.useWatch('apiKey', form)
   const [params, setParams] = useState<ApiParamDef[]>([])
 
-  // 加载 API 定义列表（带 requestSchema），缓存在模块级变量
   useEffect(() => {
-    if (apiDefsCache.length) { pickSchema(apiKey); return }
+    if (!apiKey) { setParams([]); return }
+    const pick = () => {
+      const def = apiDefsCache.find(d => d.value === apiKey)
+      try { setParams(def ? JSON.parse(def.requestSchema || '[]') : []) }
+      catch { setParams([]) }
+    }
+    if (apiDefsCache.length) { pick(); return }
     metaApi.getApiDefinitions().then((res: any) => {
-      apiDefsCache.push(...(res.data ?? []))
-      pickSchema(apiKey)
+      apiDefsCache.push(...(res.data ?? [])); pick()
     }).catch(() => {})
-  }, [apiKey]) // eslint-disable-line react-hooks/exhaustive-deps
-
-  const pickSchema = (key: string | undefined) => {
-    if (!key) { setParams([]); return }
-    const def = apiDefsCache.find(d => d.value === key)
-    try { setParams(def ? JSON.parse(def.requestSchema || '[]') : []) }
-    catch { setParams([]) }
-  }
-
-  const setVal = (name: string, val: string) =>
-    form.setFieldValue('inputParams', { ...inputParams, [name]: val })
-
-  if (!apiKey) return <Text type="secondary" style={{ fontSize: 12 }}>请先选择接口</Text>
-  if (!params.length) return <Text type="secondary" style={{ fontSize: 12 }}>该接口未定义请求参数</Text>
+  }, [apiKey])
 
   const typeLabel = (t: string) => PARAM_TYPES.find(p => p.value === t)?.label ?? t
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+    <div>
+      <div style={{ fontSize: 12, color: '#595959', marginBottom: 6 }}>{label}</div>
+      {!apiKey && <Text type="secondary" style={{ fontSize: 12 }}>请先选择接口</Text>}
+      {apiKey && !params.length && <Text type="secondary" style={{ fontSize: 12 }}>该接口未定义请求参数</Text>}
       {params.map(p => (
-        <div key={p.name}>
-          <div style={{ fontSize: 12, color: '#595959', marginBottom: 4 }}>
-            {p.displayName || p.name}
-            {p.required && <span style={{ color: '#f5222d', marginLeft: 2 }}>*</span>}
-            <Tag style={{ marginLeft: 6, fontSize: 10 }}>{typeLabel(p.type)}</Tag>
-            {p.type === 'STRING_PARAM' && (
-              <Tooltip title="支持 ${contextKey} 占位符，运行时自动替换为上下文值">
-                <QuestionCircleOutlined style={{ marginLeft: 4, color: '#8c8c8c' }} />
-              </Tooltip>
-            )}
-          </div>
+        <Form.Item
+          key={p.name}
+          name={['inputParams', p.name]}
+          label={
+            <span>
+              {p.displayName || p.name}
+              {p.required && <span style={{ color: '#f5222d', marginLeft: 2 }}>*</span>}
+              <Tag style={{ marginLeft: 6, fontSize: 10 }}>{typeLabel(p.type)}</Tag>
+              {p.type === 'STRING_PARAM' && (
+                <Tooltip title="支持 ${contextKey} 占位符，运行时自动替换为上下文值">
+                  <QuestionCircleOutlined style={{ marginLeft: 4, color: '#8c8c8c' }} />
+                </Tooltip>
+              )}
+            </span>
+          }
+          style={{ marginBottom: 8 }}
+        >
           {p.type === 'NUMBER' ? (
-            <InputNumber size="small" style={{ width: '100%' }}
-              value={inputParams[p.name] as any}
-              onChange={v => setVal(p.name, String(v ?? ''))} />
+            <InputNumber style={{ width: '100%' }} />
           ) : p.type === 'TEXT' ? (
-            <Input.TextArea size="small" rows={2}
-              value={inputParams[p.name] ?? ''}
-              onChange={e => setVal(p.name, e.target.value)} />
+            <Input.TextArea rows={2} />
           ) : (
-            <Input size="small"
-              placeholder={p.type === 'STRING_PARAM' ? '如：${userId} 或固定值' : ''}
-              value={inputParams[p.name] ?? ''}
-              onChange={e => setVal(p.name, e.target.value)} />
+            <Input placeholder={p.type === 'STRING_PARAM' ? '如：${userId} 或固定值' : ''} />
           )}
-        </div>
+        </Form.Item>
       ))}
     </div>
   )
