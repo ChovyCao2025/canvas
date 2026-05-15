@@ -126,7 +126,9 @@ export default function ConfigPanel({ nodeId, nodeData, onChange }: Props) {
           .map(field => {
             // api-input-params 自己管理嵌套 Form.Item，不能被外层 Form.Item 包住
             if (field.type === 'api-input-params') {
-              return <ApiCallInputParams key={field.key} label={field.label} />
+              return <ApiCallInputParams key={field.key} label={field.label}
+                apiKeyField={field.apiKeyField ?? 'apiKey'}
+                defsSource={field.defsSource ?? '/meta/api-definitions'} />
             }
             return (
               <Form.Item key={field.key} name={field.key} label={field.label}
@@ -608,6 +610,9 @@ interface SchemaField {
   key: string; label: string; type: string
   required?: boolean; options?: any[]; dataSource?: string
   visible?: string; defaultValue?: unknown
+  hint?: string; icon?: string          // edge-hint 使用
+  apiKeyField?: string                   // api-input-params 使用，默认 apiKey
+  defsSource?: string                    // api-input-params 使用，默认 /meta/api-definitions
 }
 
 function parseSchema(raw: string | undefined): SchemaField[] {
@@ -680,33 +685,36 @@ function dataSourceFetcher(src: string): (() => Promise<{data: StubOption[]}>) |
 // ── API_CALL 动态入参编辑器 ─────────────────────────────────────────
 // 每个参数渲染独立的 Form.Item name={['inputParams', paramName]}
 // 这样 onChange 会正常触发，值会回写到 canvas 节点 config
-function ApiCallInputParams({ label }: { label: string }) {
+function ApiCallInputParams({ label, apiKeyField = 'apiKey', defsSource = '/meta/api-definitions' }: {
+  label: string; apiKeyField?: string; defsSource?: string
+}) {
   const form   = Form.useFormInstance()
-  const apiKey = Form.useWatch('apiKey', form)
+  const apiKey = Form.useWatch(apiKeyField, form)
   const [params, setParams] = useState<ApiParamDef[]>([])
 
   useEffect(() => {
     if (!apiKey) { setParams([]); return }
-    const pick = () => {
-      const def = apiDefsCache.find(d => d.value === apiKey)
+    const srcKey = defsSource
+    const cached = apiDefsCache.filter(d => (d as any)._src === srcKey)
+    const pick = (list: ApiDefFull[]) => {
+      const def = list.find(d => d.value === apiKey)
       let schema: ApiParamDef[] = []
       try { schema = def ? JSON.parse(def.requestSchema || '[]') : [] } catch {}
       setParams(schema)
-      // 切换 API 时清空 inputParams，避免旧参数 key 混入新配置
       const schemaKeys = new Set(schema.map(p => p.name))
       const cur: Record<string, unknown> = form.getFieldValue('inputParams') ?? {}
       const next: Record<string, unknown> = {}
       schema.forEach(p => { if (cur[p.name] !== undefined) next[p.name] = cur[p.name] })
-      // 只保留属于新 schema 的 key
       if (Object.keys(cur).some(k => !schemaKeys.has(k))) {
         form.setFieldValue('inputParams', next)
       }
     }
-    if (apiDefsCache.length) { pick(); return }
-    metaApi.getApiDefinitions().then((res: any) => {
-      apiDefsCache.push(...(res.data ?? [])); pick()
+    if (cached.length) { pick(cached); return }
+    http.get<any, any>(defsSource).then((res: any) => {
+      const list = (res.data ?? []).map((d: any) => ({ ...d, _src: srcKey }))
+      apiDefsCache.push(...list); pick(list)
     }).catch(() => {})
-  }, [apiKey])
+  }, [apiKey, defsSource]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const typeLabel = (t: string) => PARAM_TYPES.find(p => p.value === t)?.label ?? t
 

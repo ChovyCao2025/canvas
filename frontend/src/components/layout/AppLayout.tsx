@@ -4,7 +4,7 @@ import {
   ApartmentOutlined, SettingOutlined, ApiOutlined,
   ExperimentOutlined, TeamOutlined, LogoutOutlined,
   UserOutlined, MenuFoldOutlined, MenuUnfoldOutlined,
-  RocketOutlined, HomeOutlined, TagsOutlined,
+  RocketOutlined, HomeOutlined, TagsOutlined, NotificationOutlined,
 } from '@ant-design/icons'
 import { Outlet, useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
@@ -37,6 +37,7 @@ export default function AppLayout() {
     if (location.pathname.startsWith('/api-config'))     return 'api-config'
     if (location.pathname.startsWith('/ab-experiments')) return 'ab-experiments'
     if (location.pathname.startsWith('/tag-config'))     return 'tag-config'
+    if (location.pathname.startsWith('/mq-config'))      return 'mq-config'
     if (location.pathname.startsWith('/admin/users'))    return 'admin-users'
     return 'canvas'
   })()
@@ -88,6 +89,12 @@ export default function AppLayout() {
           icon: <TagsOutlined />,
           label: '标签配置',
           onClick: () => navigate('/tag-config'),
+        },
+        {
+          key: 'mq-config',
+          icon: <NotificationOutlined />,
+          label: 'MQ 消息配置',
+          onClick: () => navigate('/mq-config'),
         },
         ...(isAdmin ? [{
           key: 'admin-users',

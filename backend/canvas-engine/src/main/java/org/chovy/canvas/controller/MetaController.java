@@ -25,6 +25,7 @@ public class MetaController {
     private final ApiDefinitionMapper apiDefinitionMapper;
     private final AbExperimentMapper abExperimentMapper;
     private final org.chovy.canvas.domain.meta.TagDefinitionMapper tagDefinitionMapper;
+    private final org.chovy.canvas.domain.meta.MqMessageDefinitionMapper mqMapper;
 
     @Value("${canvas.integration.tagger-service-url}")
     private String taggerUrl;
@@ -70,6 +71,26 @@ public class MetaController {
     @GetMapping("/mq-topics")
     public Mono<R<List<StubOption>>> getMqTopics() {
         return Mono.just(R.ok(metaService.getMqTopics()));
+    }
+
+    /** MQ 消息定义列表（带 requestSchema，供 SEND_MQ 节点动态渲染参数） */
+    @GetMapping("/mq-definitions")
+    public Mono<R<List<Map<String, Object>>>> getMqDefinitions() {
+        return Mono.fromCallable(() -> {
+            List<org.chovy.canvas.domain.meta.MqMessageDefinition> defs =
+                mqMapper.selectList(
+                    new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<
+                            org.chovy.canvas.domain.meta.MqMessageDefinition>()
+                        .eq(org.chovy.canvas.domain.meta.MqMessageDefinition::getEnabled, 1)
+                        .orderByAsc(org.chovy.canvas.domain.meta.MqMessageDefinition::getId));
+            return defs.stream().map(d -> {
+                Map<String, Object> m = new java.util.LinkedHashMap<>();
+                m.put("value",         d.getMessageCode());
+                m.put("label",         d.getName());
+                m.put("requestSchema", d.getRequestSchema() != null ? d.getRequestSchema() : "[]");
+                return m;
+            }).collect(Collectors.toList());
+        }).subscribeOn(reactor.core.scheduler.Schedulers.boundedElastic()).map(R::ok);
     }
 
     /**
