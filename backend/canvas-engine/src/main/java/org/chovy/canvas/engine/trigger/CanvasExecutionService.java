@@ -341,24 +341,37 @@ public class CanvasExecutionService {
      * @param matchKey 触发条件匹配 Key
      * @return 触发器节点 ID
      */
+    /**
+     * 在 DAG 入口节点中按类型和 matchKey 找触发器节点。
+     * 读取顺序：config 优先，bizConfig 兜底（与 DagEngine 保持一致）。
+     *
+     * 特殊规则：
+     *   - DIRECT_CALL 触发时，同时接受 START 节点（两者语义等价）
+     *   - BEHAVIOR_IN_APP 触发时，匹配 eventCode；matchKey=null 则返回第一个入口
+     */
     private String findTriggerNode(DagGraph graph, String triggerNodeType, String matchKey) {
         for (String nodeId : graph.entryNodes()) {
             DagParser.CanvasNode node = graph.getNode(nodeId);
             if (node == null) continue;
             String type = node.getType();
-            // DIRECT_CALL / DRY_RUN：接受 DIRECT_CALL 类型节点或通用 START 节点
+
             boolean typeMatch = triggerNodeType.equals(type)
                     || ("DIRECT_CALL".equals(triggerNodeType) && "START".equals(type));
             if (!typeMatch) continue;
+
             if (matchKey == null) return nodeId;
-            Map<String, Object> config = node.getConfig();
-            if (config == null) continue;
-            String cfgKey = (String) config.getOrDefault("topicKey",
-                    config.getOrDefault("eventCode",
-                    config.getOrDefault("tagCodeKey", "")));
+
+            // config 优先，bizConfig 兜底
+            Map<String, Object> cfg = new java.util.HashMap<>();
+            if (node.getBizConfig() != null) cfg.putAll(node.getBizConfig());
+            if (node.getConfig()    != null) cfg.putAll(node.getConfig());
+
+            String cfgKey = (String) cfg.getOrDefault("topicKey",
+                    cfg.getOrDefault("eventCode",
+                    cfg.getOrDefault("tagCodeKey", "")));
             if (matchKey.equals(cfgKey)) return nodeId;
         }
-        // 找不到具体 key 时退回第一个匹配类型的节点（降级）
+        // 降级：返回第一个类型匹配的入口节点
         return graph.entryNodes().stream()
                 .filter(id -> {
                     DagParser.CanvasNode n = graph.getNode(id);
