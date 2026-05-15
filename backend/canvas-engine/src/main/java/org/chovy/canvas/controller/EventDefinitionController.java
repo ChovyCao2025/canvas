@@ -12,6 +12,7 @@ import org.chovy.canvas.domain.meta.EventLog;
 import org.chovy.canvas.domain.meta.EventLogMapper;
 import org.chovy.canvas.engine.disruptor.CanvasDisruptorService;
 import lombok.Data;
+import org.chovy.canvas.infra.redis.TriggerRouteService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.bind.annotation.*;
@@ -20,6 +21,7 @@ import reactor.core.scheduler.Schedulers;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 
 /**
@@ -40,6 +42,7 @@ public class EventDefinitionController {
     private final EventDefinitionMapper  eventMapper;
     private final EventLogMapper         logMapper;
     private final CanvasDisruptorService disruptorService;
+    private final TriggerRouteService    triggerRouteService;
     private final ObjectMapper           objectMapper;
 
     // ── 事件定义 CRUD ────────────────────────────────────────────
@@ -101,33 +104,44 @@ public class EventDefinitionController {
                 throw new IllegalArgumentException("事件未定义或已禁用: " + req.getEventCode());
 
             // 2. 记录事件日志
-            EventLog log = new EventLog();
-            log.setEventCode(req.getEventCode());
-            log.setUserId(req.getUserId());
+            EventLog eventLog = new EventLog();
+            eventLog.setEventCode(req.getEventCode());
+            eventLog.setUserId(req.getUserId());
             try {
-                log.setAttributes(req.getAttributes() != null
+                eventLog.setAttributes(req.getAttributes() != null
                         ? objectMapper.writeValueAsString(req.getAttributes()) : null);
             } catch (Exception ignored) {}
-            log.setCanvasTriggered(0);
-            log.setCanvasCount(0);
-            logMapper.insert(log);
+            eventLog.setCanvasTriggered(0);
+            eventLog.setCanvasCount(0);
+            logMapper.insert(eventLog);
 
-            // 3. 通过 Disruptor 异步触发所有匹配 eventCode 的画布
+            // 3. 从路由表查所有监听此事件的已发布画布，逐一触发
+            Set<String> canvasIds = triggerRouteService.getCanvasByBehavior(req.getEventCode());
             String eventId = "evt-" + UUID.randomUUID().toString().replace("-", "").substring(0, 12);
-            disruptorService.publish(
-                    null,                          // canvasId=null：由路由表根据 eventCode 广播
-                    req.getUserId(),
-                    "EVENT",
-                    "BEHAVIOR_IN_APP",
-                    req.getEventCode(),
-                    req.getAttributes() != null ? req.getAttributes() : Map.of(),
-                    eventId);
+            Map<String, Object> payload = req.getAttributes() != null ? req.getAttributes() : Map.of();
+
+            canvasIds.forEach(cidStr -> {
+                try {
+                    Long cid = Long.parseLong(cidStr);
+                    disruptorService.publish(cid, req.getUserId(), "EVENT",
+                            "BEHAVIOR_IN_APP", req.getEventCode(), payload, eventId + "-" + cidStr);
+                    log.info("[EVENT] 触发画布 canvasId={} eventCode={} userId={}",
+                            cid, req.getEventCode(), req.getUserId());
+                } catch (Exception e) {
+                    log.warn("[EVENT] 触发画布失败 canvasId={}: {}", cidStr, e.getMessage());
+                }
+            });
+
+            if (canvasIds.isEmpty()) {
+                log.info("[EVENT] 无已发布画布订阅事件 eventCode={}", req.getEventCode());
+            }
 
             Map<String, Object> resp = new java.util.LinkedHashMap<>();
-            resp.put("eventLogId", log.getId());
-            resp.put("eventCode",  req.getEventCode());
-            resp.put("userId",     req.getUserId());
-            resp.put("status",     "ACCEPTED");
+            resp.put("eventLogId",     eventLog.getId());
+            resp.put("eventCode",      req.getEventCode());
+            resp.put("userId",         req.getUserId());
+            resp.put("canvasTriggered",canvasIds.size());
+            resp.put("status",         "ACCEPTED");
             return resp;
         }).subscribeOn(Schedulers.boundedElastic())
           .map(result -> R.<Map<String, Object>>ok(result));
