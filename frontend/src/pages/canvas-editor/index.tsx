@@ -560,9 +560,15 @@ function EditorInner({ detail }: { detail: CanvasDetail }) {
               }
               setTestRunning(true)
               try {
-                // 先保存画布，确保 dry-run 使用最新配置
-                await handleSave(/* silent */ true)
-                const res = await canvasApi.dryRun(canvasId, testUserId, payload)
+                // 直接传当前画布内存状态，不依赖 DB draft
+                const currentGraphJson = JSON.stringify({
+                  nodes: getNodes().map(n => {
+                    const d = n.data as CanvasNodeData
+                    return { id: n.id, type: d.nodeType, name: d.name, category: d.category,
+                             x: Math.round(n.position.x), y: Math.round(n.position.y), config: d.bizConfig, bizConfig: d.bizConfig }
+                  })
+                })
+                const res = await canvasApi.dryRun(canvasId, testUserId, payload, currentGraphJson)
                 const execId = (res.data as any)?.executionId
                 message.success(`运行完成${execId ? `，执行ID: ${execId.slice(0,8)}…` : ''}，可在「轨迹」面板查看结果`)
                 setTestModalOpen(false)

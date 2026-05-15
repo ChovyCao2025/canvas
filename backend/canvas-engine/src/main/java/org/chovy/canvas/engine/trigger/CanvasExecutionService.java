@@ -38,6 +38,7 @@ public class CanvasExecutionService {
     private final CanvasVersionMapper        canvasVersionMapper;
     private final CanvasExecutionMapper      executionMapper;
     private final CanvasConfigCache          configCache;
+    private final DagParser                  dagParser;
     private final ContextPersistenceService  ctxStore;
     private final DagEngine                  dagEngine;
     private final TriggerPreCheckService     preCheckService;
@@ -55,6 +56,65 @@ public class CanvasExecutionService {
     private int globalMaxConcurrency;
 
     // ── 触发入口 ──────────────────────────────────────────────────
+
+    /**
+     * dry-run 专用入口：直接传入 graphJson，跳过 DB draft 读取。
+     * 解决"配置未保存到 DB 时，dry-run 用旧数据"的问题。
+     */
+    public Mono<Map<String, Object>> triggerDryRun(
+            Long canvasId, String userId,
+            Map<String, Object> payload, String graphJson) {
+        return Mono.fromCallable(() -> {
+            Canvas canvas = canvasMapper.selectById(canvasId);
+            if (canvas == null) throw new IllegalStateException("画布不存在: " + canvasId);
+
+            ExecutionContext ctx = newContext(canvasId, -1L, userId, "DRY_RUN");
+            if (payload != null) ctx.getTriggerPayload().putAll(payload);
+
+            // 直接用传入的 graphJson，没有则退到 DB draft
+            DagGraph graph;
+            if (graphJson != null && !graphJson.isBlank()) {
+                graph = dagParser.parse(graphJson);
+            } else {
+                Long versionId = resolveVersionId(canvas, userId, true);
+                graph = configCache.get(canvasId, versionId);
+                ctx.setVersionId(versionId);
+            }
+
+            String triggerNodeId = findTriggerNode(graph, "DIRECT_CALL", null);
+            if (triggerNodeId == null)
+                throw new IllegalStateException("找不到触发器节点（START 或 DIRECT_CALL）");
+
+            return Map.of("ctx", ctx, "graph", graph, "triggerNodeId", triggerNodeId);
+        })
+        .subscribeOn(Schedulers.boundedElastic())
+        .flatMap(prep -> {
+            ExecutionContext ctx           = (ExecutionContext) prep.get("ctx");
+            DagGraph         graph         = (DagGraph)         prep.get("graph");
+            String           triggerNodeId = (String)           prep.get("triggerNodeId");
+
+            CanvasExecution exec = createExecution(ctx);
+            Mono.fromRunnable(() -> executionMapper.insert(exec))
+                    .subscribeOn(Schedulers.boundedElastic()).subscribe();
+
+            return dagEngine.execute(graph, triggerNodeId, ctx)
+                    .timeout(Duration.ofSeconds(globalTimeoutSec))
+                    .flatMap(result -> {
+                        updateExecution(exec, 2, result);
+                        Map<String, Object> resp = new HashMap<>(result);
+                        resp.put("executionId", ctx.getExecutionId());
+                        return Mono.just(resp);
+                    })
+                    .onErrorResume(e -> {
+                        log.error("[DRY_RUN] 执行失败: {}", e.getMessage());
+                        updateExecution(exec, 3, Map.of("error", e.getMessage()));
+                        return Mono.just(Map.of(
+                            "error", e.getMessage(),
+                            "executionId", ctx.getExecutionId()
+                        ));
+                    });
+        });
+    }
 
     /**
      * 触发画布执行：执行工作流包含 dedup 检查、上下文准备、DAG 执行以及结果持久化。

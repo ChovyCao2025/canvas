@@ -107,10 +107,10 @@ export const canvasApi = {
       { userId, inputParams: payload },
     ),
 
-  dryRun: (id: number, userId: string, payload: Record<string, unknown>) =>
+  dryRun: (id: number, userId: string, payload: Record<string, unknown>, graphJson?: string) =>
     http.post<R<Record<string, unknown>>, R<Record<string, unknown>>>(
       `/canvas/execute/dry-run/${id}`,
-      { userId, inputParams: payload },
+      { userId, inputParams: payload, graphJson },
     ),
 }
 

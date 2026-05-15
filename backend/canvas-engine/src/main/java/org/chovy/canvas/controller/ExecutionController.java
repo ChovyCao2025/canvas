@@ -66,10 +66,9 @@ public class ExecutionController {
     public Mono<R<Map<String, Object>>> dryRun(
             @PathVariable Long canvasId,
             @RequestBody DirectCallReq req) {
-        return executionService.trigger(
-                canvasId, req.getUserId(), "DRY_RUN",
-                "DIRECT_CALL", null,
-                req.getInputParams(), UUID.randomUUID().toString(), true)
+        return executionService.triggerDryRun(
+                canvasId, req.getUserId(),
+                req.getInputParams(), req.getGraphJson())
                 .map(R::ok);
     }
 
@@ -78,12 +77,9 @@ public class ExecutionController {
     static class DirectCallReq {
         private String userId;
         private Map<String, Object> inputParams;
-        /**
-         * 调用方提供的幂等 key（设计文档 13.1节）。
-         * 相同 key 在 1h 内只触发一次执行，网络超时重试时保持不变可防重复发券。
-         * 若不传，服务端生成随机 UUID（每次请求视为新执行，不保证幂等）。
-         */
         private String idempotencyKey;
+        /** dry-run 时传入当前画布 graphJson，直接使用而不读 DB draft */
+        private String graphJson;
     }
 
     @Data
