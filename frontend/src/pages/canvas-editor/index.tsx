@@ -80,6 +80,8 @@ function patchBizConfig(
   if (sourceHandle === 'success')       next.successNodeId = target
   else if (sourceHandle === 'fail')     next.failNodeId    = target
   else if (sourceHandle === 'else')     next.elseNodeId    = target
+  else if (sourceHandle === 'approve')  next.approveNodeId = target
+  else if (sourceHandle === 'reject')   next.rejectNodeId  = target
   else if (sourceHandle.startsWith('branch-')) {
     const idx = parseInt(sourceHandle.split('-')[1], 10)
     next.branches   = (next.branches   ?? []).map((b, i) =>

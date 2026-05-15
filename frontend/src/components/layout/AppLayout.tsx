@@ -4,7 +4,7 @@ import {
   ApartmentOutlined, SettingOutlined, ApiOutlined,
   ExperimentOutlined, TeamOutlined, LogoutOutlined,
   UserOutlined, MenuFoldOutlined, MenuUnfoldOutlined,
-  RocketOutlined, HomeOutlined,
+  RocketOutlined, HomeOutlined, TagsOutlined,
 } from '@ant-design/icons'
 import { Outlet, useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
@@ -36,6 +36,7 @@ export default function AppLayout() {
     if (location.pathname === '/' || location.pathname === '/home') return 'home'
     if (location.pathname.startsWith('/api-config'))     return 'api-config'
     if (location.pathname.startsWith('/ab-experiments')) return 'ab-experiments'
+    if (location.pathname.startsWith('/tag-config'))     return 'tag-config'
     if (location.pathname.startsWith('/admin/users'))    return 'admin-users'
     return 'canvas'
   })()
@@ -81,6 +82,12 @@ export default function AppLayout() {
           icon: <ExperimentOutlined />,
           label: 'AB 实验管理',
           onClick: () => navigate('/ab-experiments'),
+        },
+        {
+          key: 'tag-config',
+          icon: <TagsOutlined />,
+          label: '标签配置',
+          onClick: () => navigate('/tag-config'),
         },
         ...(isAdmin ? [{
           key: 'admin-users',

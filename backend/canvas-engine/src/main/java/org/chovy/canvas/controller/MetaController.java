@@ -24,6 +24,7 @@ public class MetaController {
     private final MetaService metaService;
     private final ApiDefinitionMapper apiDefinitionMapper;
     private final AbExperimentMapper abExperimentMapper;
+    private final org.chovy.canvas.domain.meta.TagDefinitionMapper tagDefinitionMapper;
 
     @Value("${canvas.integration.tagger-service-url}")
     private String taggerUrl;
@@ -145,23 +146,42 @@ public class MetaController {
      * Tagger 服务不可用时降级返回 stub 数据，不影响页面加载。
      */
     @GetMapping("/tagger-tags")
-    @SuppressWarnings("unchecked")
     public Mono<R<List<StubOption>>> getTaggerTags(
-            @RequestParam(defaultValue = "realtime") String type) {
-        return WebClient.builder().baseUrl(taggerUrl).build()
-                .get()
-                .uri(u -> u.path("/tags").queryParam("type", type).build())
-                .retrieve()
-                .bodyToFlux(Map.class)
-                .map(m -> new StubOption(
-                        String.valueOf(m.getOrDefault("code", "")),
-                        String.valueOf(m.getOrDefault("name", ""))))
-                .collectList()
-                .map(R::ok)
-                .onErrorResume(e -> {
-                    log.warn("[META] Tagger 标签拉取失败，降级返回 stub: {}", e.getMessage());
-                    return Mono.just(R.ok(metaService.getTaggerTags(type)));
-                });
+            @RequestParam(defaultValue = "offline") String type) {
+        // 优先从 tag_definition 表读取（管理员自定义标签）
+        return Mono.fromCallable(() -> {
+            List<org.chovy.canvas.domain.meta.TagDefinition> defs =
+                tagDefinitionMapper.selectList(
+                    new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<
+                            org.chovy.canvas.domain.meta.TagDefinition>()
+                        .eq(org.chovy.canvas.domain.meta.TagDefinition::getTagType, type)
+                        .eq(org.chovy.canvas.domain.meta.TagDefinition::getEnabled, 1)
+                        .orderByAsc(org.chovy.canvas.domain.meta.TagDefinition::getId));
+            if (!defs.isEmpty()) {
+                return defs.stream()
+                    .map(d -> new StubOption(d.getTagCode(), d.getName()))
+                    .collect(java.util.stream.Collectors.toList());
+            }
+            return null; // 空则 fallback Tagger 服务
+        }).subscribeOn(reactor.core.scheduler.Schedulers.boundedElastic())
+        .flatMap(dbList -> {
+            if (dbList != null) return Mono.just(R.ok(dbList));
+            // fallback: 调 Tagger 服务
+            return WebClient.builder().baseUrl(taggerUrl).build()
+                    .get()
+                    .uri(u -> u.path("/tags").queryParam("type", type).build())
+                    .retrieve()
+                    .bodyToFlux(Map.class)
+                    .map(m -> new StubOption(
+                            String.valueOf(m.getOrDefault("code", "")),
+                            String.valueOf(m.getOrDefault("name", ""))))
+                    .collectList()
+                    .map(R::ok)
+                    .onErrorResume(e -> {
+                        log.warn("[META] Tagger 标签拉取失败，降级返回 stub: {}", e.getMessage());
+                        return Mono.just(R.ok(metaService.getTaggerTags(type)));
+                    });
+        });
     }
 
     @GetMapping("/biz-lines")

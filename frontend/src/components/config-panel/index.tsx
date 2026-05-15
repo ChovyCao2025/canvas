@@ -2,8 +2,7 @@ import { useEffect, useState, useCallback } from 'react'
 import {
   Form, Input, InputNumber, Select, Switch, Button,
   Typography, Spin, Divider, Space, Collapse, Tag, Tooltip, AutoComplete, DatePicker,
-} from 'antd'
-import { PlusOutlined, DeleteOutlined, DownOutlined, QuestionCircleOutlined } from '@ant-design/icons'
+} from 'antd'import { PlusOutlined, DeleteOutlined, DownOutlined, QuestionCircleOutlined } from '@ant-design/icons'
 import { metaApi, canvasApi } from '../../services/api'
 import type { NodeTypeRegistry, ContextField, StubOption, Canvas } from '../../types'
 import type { CanvasNodeData } from '../canvas/constants'
@@ -219,6 +218,16 @@ function renderControl(
           </div>
         </div>
       )
+    case 'delay-input':
+      return <DelayInput />
+    case 'edge-hint':
+      return (
+        <div style={{ fontSize: 12, color: '#8c8c8c', background: '#f5f5f5',
+          borderRadius: 6, padding: '6px 10px', display: 'flex', alignItems: 'center', gap: 6 }}>
+          <span style={{ fontSize: 14 }}>{field.icon === 'check' ? '✓' : '✕'}</span>
+          {(field as any).hint ?? '通过连线自动填充'}
+        </div>
+      )
     case 'condition-rule-list':
       return <ConditionRuleList ctxFields={ctxFields} />
     case 'context-value-list':
@@ -375,9 +384,10 @@ function BranchList({ ctxFields }: { ctxFields: ContextField[] }) {
   const branches: BranchItem[] = Form.useWatch('branches', form) ?? []
   const ops = ['EQ', 'NEQ', 'CONTAINS', 'GT', 'LT', 'GTE', 'LTE']
 
+  const LABELS = ['如果', '否则如果', '否则如果', '否则如果', '否则如果']
   const addBranch = () => form.setFieldValue('branches', [
     ...branches,
-    { label: branches.length === 0 ? '如果' : '否则如果', strategyRelation: 'AND', conditions: [], nextNodeId: undefined }
+    { label: LABELS[Math.min(branches.length, LABELS.length - 1)], strategyRelation: 'AND', conditions: [], nextNodeId: undefined }
   ])
   const removeBranch = (i: number) => {
     const next = [...branches]; next.splice(i, 1); form.setFieldValue('branches', next)
@@ -397,52 +407,60 @@ function BranchList({ ctxFields }: { ctxFields: ContextField[] }) {
     const next = [...branches]; (next[bi].conditions[ci] as any)[k] = v; form.setFieldValue('branches', next)
   }
 
-  const items = branches.map((b, i) => ({
-    key: String(i),
-    label: (
-      <Space>
-        <span style={{ fontSize: 12, fontWeight: 500, minWidth: 52 }}>{b.label}</span>
-        <Select size="small" style={{ width: 60 }} value={b.strategyRelation}
-          options={[{ label: 'AND', value: 'AND' }, { label: 'OR', value: 'OR' }]}
-          onChange={v => updateBranch(i, 'strategyRelation', v)}
-          onClick={e => e.stopPropagation()} />
-        <Button size="small" danger type="text" icon={<DeleteOutlined />}
-          onClick={e => { e.stopPropagation(); removeBranch(i) }} />
-      </Space>
-    ),
-    children: (
-      <div>
-        {b.conditions?.map((c, ci) => (
-          <Space key={ci} style={{ display: 'flex', marginBottom: 4 }}>
-            <Select size="small" style={{ width: 90 }} placeholder="字段"
-              value={c.field || undefined}
-              options={ctxFields.map(f => ({ label: f.fieldName, value: f.fieldKey }))}
-              onChange={v => updateCondition(i, ci, 'field', v)} showSearch />
-            <Select size="small" style={{ width: 72 }} value={c.operator}
-              options={ops.map(o => ({ label: o, value: o }))}
-              onChange={v => updateCondition(i, ci, 'operator', v)} />
-            <AutoComplete size="small" style={{ width: 100 }}
-              placeholder="值或 ${key}"
-              value={c.value}
-              options={ctxFields.map(f => ({ value: '${' + f.fieldKey + '}', label: f.fieldName }))}
-              onChange={v => updateCondition(i, ci, 'value', v)}
-              filterOption={(input, opt) => String(opt?.label ?? '').toLowerCase().includes(input.toLowerCase())} />
-            <Button size="small" danger icon={<DeleteOutlined />} onClick={() => removeCondition(i, ci)} />
-          </Space>
-        ))}
-        <Button size="small" type="dashed" icon={<PlusOutlined />} onClick={() => addCondition(i)}>添加条件</Button>
-      </div>
-    ),
-  }))
+  const LABEL_COLORS: Record<string, string> = { '如果': '#1677ff', '否则如果': '#fa8c16', '否则': '#8c8c8c' }
 
   return (
     <div>
-      {branches.length > 0 && (
-        <Collapse size="small" items={items} style={{ marginBottom: 8 }} />
-      )}
-      <Button size="small" type="dashed" icon={<PlusOutlined />} onClick={addBranch}>
-        {branches.length === 0 ? '添加第一个分支' : '添加分支'}
+      {branches.map((b, i) => (
+        <div key={i} style={{ marginBottom: 8, border: '1px solid #e8e8e8', borderRadius: 6, overflow: 'hidden' }}>
+          {/* 分支标题行 */}
+          <div style={{ background: '#fafafa', padding: '6px 10px', display: 'flex', alignItems: 'center', gap: 8, borderBottom: b.conditions?.length ? '1px solid #f0f0f0' : 'none' }}>
+            <Tag color={LABEL_COLORS[b.label] ?? 'default'} style={{ margin: 0 }}>{b.label}</Tag>
+            <Select size="small" style={{ width: 64 }} value={b.strategyRelation}
+              options={[{ label: 'AND 全满足', value: 'AND' }, { label: 'OR 任一', value: 'OR' }]}
+              onChange={v => updateBranch(i, 'strategyRelation', v)} />
+            <span style={{ flex: 1, fontSize: 11, color: '#999' }}>
+              {b.conditions?.length
+                ? `${b.conditions.length} 个条件`
+                : <span style={{ color: '#f5222d' }}>无条件 = 必走此分支</span>}
+            </span>
+            <Button size="small" type="text" danger icon={<DeleteOutlined />} onClick={() => removeBranch(i)} />
+          </div>
+          {/* 条件列表 */}
+          <div style={{ padding: '6px 10px' }}>
+            {b.conditions?.map((c, ci) => (
+              <Space key={ci} style={{ display: 'flex', marginBottom: 4 }}>
+                <Select size="small" style={{ width: 90 }} placeholder="字段"
+                  value={c.field || undefined}
+                  options={ctxFields.map(f => ({ label: f.fieldName, value: f.fieldKey }))}
+                  onChange={v => updateCondition(i, ci, 'field', v)} showSearch />
+                <Select size="small" style={{ width: 72 }} value={c.operator}
+                  options={ops.map(o => ({ label: o, value: o }))}
+                  onChange={v => updateCondition(i, ci, 'operator', v)} />
+                <AutoComplete size="small" style={{ width: 100 }}
+                  placeholder="值或 ${key}"
+                  value={c.value}
+                  options={ctxFields.map(f => ({ value: '${' + f.fieldKey + '}', label: f.fieldName }))}
+                  onChange={v => updateCondition(i, ci, 'value', v)}
+                  filterOption={(input, opt) => String(opt?.label ?? '').toLowerCase().includes(input.toLowerCase())} />
+                <Button size="small" danger icon={<DeleteOutlined />} onClick={() => removeCondition(i, ci)} />
+              </Space>
+            ))}
+            <Button size="small" type="dashed" icon={<PlusOutlined />} onClick={() => addCondition(i)}>
+              添加条件
+            </Button>
+          </div>
+        </div>
+      ))}
+      <Button size="small" type="dashed" icon={<PlusOutlined />} onClick={addBranch}
+        style={{ width: '100%' }}>
+        {branches.length === 0 ? '添加第一个分支（如果）' : '添加分支（否则如果）'}
       </Button>
+      {branches.length > 0 && (
+        <div style={{ fontSize: 11, color: '#8c8c8c', marginTop: 4 }}>
+          最后一个分支若无条件，则作为「否则」兜底；每个分支的后继节点通过画布连线自动设置
+        </div>
+      )}
     </div>
   )
 }
@@ -458,19 +476,34 @@ function AbGroupList() {
     const n = [...groups]; (n[i] as any)[k] = v; form.setFieldValue('groups', n)
   }
 
+  // 每个分组平均 bucket 宽度
+  const bucketSize = groups.length > 0 ? Math.floor(100 / groups.length) : 0
+
   return (
     <div>
-      {groups.map((g, i) => (
-        <Space key={i} style={{ display: 'flex', marginBottom: 4 }}>
-          <Input size="small" style={{ width: 80 }} placeholder="分组Key"
-            value={g.groupKey} onChange={e => update(i, 'groupKey', e.target.value)} />
-          <span style={{ fontSize: 11, color: '#999' }}>→ 通过连线设置后继节点</span>
-          <Button size="small" danger icon={<DeleteOutlined />} onClick={() => remove(i)} />
-        </Space>
-      ))}
+      {groups.map((g, i) => {
+        const start = i * bucketSize
+        const end   = i === groups.length - 1 ? 100 : start + bucketSize
+        return (
+          <div key={i} style={{ marginBottom: 8, padding: '6px 8px', background: '#fafafa', borderRadius: 6, border: '1px solid #f0f0f0' }}>
+            <Space style={{ width: '100%', justifyContent: 'space-between' }}>
+              <Space size={4}>
+                <Tag color="blue" style={{ fontSize: 11 }}>{g.groupKey || `G${i+1}`}</Tag>
+                <Text style={{ fontSize: 11, color: '#8c8c8c' }}>bucket {start}–{end}%</Text>
+              </Space>
+              <Button size="small" type="text" danger icon={<DeleteOutlined />} onClick={() => remove(i)} />
+            </Space>
+            <Space style={{ marginTop: 4 }} size={4}>
+              <Input size="small" style={{ width: 80 }} placeholder="分组Key（如 A）"
+                value={g.groupKey} onChange={e => update(i, 'groupKey', e.target.value)} />
+              <Text style={{ fontSize: 11, color: '#999' }}>→ 从节点下方对应连接点拖线</Text>
+            </Space>
+          </div>
+        )
+      })}
       <Button size="small" type="dashed" icon={<PlusOutlined />} onClick={add}>添加分组</Button>
-      <div style={{ fontSize: 11, color: '#999', marginTop: 4 }}>
-        Hash(userId:experimentKey) % 100 等比分配，分组顺序决定 bucket 范围
+      <div style={{ fontSize: 11, color: '#8c8c8c', marginTop: 6 }}>
+        按 Hash(userId:experimentKey) % 100 分桶，等比分配；连线时边上会显示分组 Key
       </div>
     </div>
   )
@@ -579,6 +612,57 @@ interface SchemaField {
 
 function parseSchema(raw: string | undefined): SchemaField[] {
   try { return raw ? JSON.parse(raw) : [] } catch { return [] }
+}
+
+// ── 延迟时长复合控件 ─────────────────────────────────────────────
+// 存储格式：{ duration: number, unit: 'SECOND'|'MINUTE'|'HOUR' }
+function DelayInput() {
+  const form = Form.useFormInstance()
+  const delay = Form.useWatch('duration', form) ?? {}
+  const dur  = typeof delay === 'object' ? (delay.duration ?? '') : ''
+  const unit = typeof delay === 'object' ? (delay.unit ?? 'MINUTE') : 'MINUTE'
+
+  const set = (patch: object) =>
+    form.setFieldValue('duration', { duration: dur, unit, ...patch })
+
+  const PRESETS = [
+    { label: '30秒', d: 30, u: 'SECOND' },
+    { label: '5分', d: 5, u: 'MINUTE' },
+    { label: '30分', d: 30, u: 'MINUTE' },
+    { label: '1小时', d: 1, u: 'HOUR' },
+  ]
+
+  return (
+    <div>
+      <Space.Compact style={{ width: '100%' }}>
+        <InputNumber
+          style={{ flex: 1 }}
+          min={1}
+          placeholder="时长"
+          value={dur as number}
+          onChange={v => set({ duration: v })}
+        />
+        <Select
+          style={{ width: 90 }}
+          value={unit}
+          options={[
+            { value: 'SECOND', label: '秒' },
+            { value: 'MINUTE', label: '分钟' },
+            { value: 'HOUR',   label: '小时' },
+          ]}
+          onChange={u => set({ unit: u })}
+        />
+      </Space.Compact>
+      <Space style={{ marginTop: 6 }} size={4} wrap>
+        {PRESETS.map(p => (
+          <Button key={p.label} size="small"
+            onClick={() => form.setFieldValue('duration', { duration: p.d, unit: p.u })}>
+            {p.label}
+          </Button>
+        ))}
+      </Space>
+    </div>
+  )
 }
 
 function dataSourceFetcher(src: string): (() => Promise<{data: StubOption[]}>) | null {

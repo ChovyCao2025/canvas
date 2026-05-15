@@ -162,4 +162,15 @@ export const abExperimentApi = {
     http.delete<R<void>, R<void>>(`/canvas/ab-experiments/${id}`),
 }
 
+export const tagDefinitionApi = {
+  list: (params?: { page?: number; size?: number; tagType?: string; enabled?: number }) =>
+    http.get<R<PageResult<any>>, R<PageResult<any>>>('/canvas/tag-definitions', { params }),
+  create: (body: any) =>
+    http.post<R<any>, R<any>>('/canvas/tag-definitions', body),
+  update: (id: number, body: any) =>
+    http.put<R<void>, R<void>>(`/canvas/tag-definitions/${id}`, body),
+  delete: (id: number) =>
+    http.delete<R<void>, R<void>>(`/canvas/tag-definitions/${id}`),
+}
+
 export default http

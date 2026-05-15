@@ -10,6 +10,7 @@ import CanvasStatsPage from './pages/canvas-stats'
 import AdminUsersPage from './pages/admin'
 import ApiConfigPage from './pages/api-config'
 import AbExperimentPage from './pages/ab-experiment'
+import TagConfigPage from './pages/tag-config'
 
 export default function App() {
   return (
@@ -37,6 +38,7 @@ export default function App() {
               <Route path="/admin/users"    element={<AdminUsersPage />} />
               <Route path="/api-config"     element={<ApiConfigPage />} />
               <Route path="/ab-experiments" element={<AbExperimentPage />} />
+              <Route path="/tag-config"     element={<TagConfigPage />} />
             </Route>
           </Route>
         </Routes>

@@ -55,12 +55,13 @@ const CanvasNode = memo(({ data, id, selected }: NodeProps) => {
 
   const bg = d.traceColor ?? CATEGORY_COLORS[d.category] ?? '#722ed1'
   const isTrigger  = TRIGGER_TYPES.has(d.nodeType)
-  const isTerminal = TERMINAL_TYPES.has(d.nodeType)
-  const isStart    = d.nodeType === 'START'
-  const isEnd      = d.nodeType === 'END'
-  const isIf       = d.nodeType === 'IF_CONDITION'
-  const branches   = (d.bizConfig?.branches as { label?: string }[] | undefined) ?? []
-  const isSelector = d.nodeType === 'SELECTOR'
+  const isTerminal  = TERMINAL_TYPES.has(d.nodeType)
+  const isStart     = d.nodeType === 'START'
+  const isEnd       = d.nodeType === 'END'
+  const isIf        = d.nodeType === 'IF_CONDITION'
+  const isApproval  = d.nodeType === 'MANUAL_APPROVAL'
+  const branches    = (d.bizConfig?.branches as { label?: string }[] | undefined) ?? []
+  const isSelector  = d.nodeType === 'SELECTOR'
 
   if (isStart || isEnd) {
     const color = isStart ? '#52c41a' : '#f5222d'
@@ -122,6 +123,16 @@ const CanvasNode = memo(({ data, id, selected }: NodeProps) => {
             style={{ left: '30%', background: '#52c41a', border: '2px solid #fff', width: 10, height: 10 }} />
           <Handle type="source" position={Position.Bottom} id="fail"
             style={{ left: '70%', background: '#f5222d', border: '2px solid #fff', width: 10, height: 10 }} />
+        </>)}
+        {isApproval && (<>
+          <Handle type="source" position={Position.Bottom} id="approve"
+            style={{ left: '30%', background: '#52c41a', border: '2px solid #fff', width: 10, height: 10 }}>
+            <span style={{ position: 'absolute', top: 10, left: '50%', transform: 'translateX(-50%)', fontSize: 9, color: '#52c41a', whiteSpace: 'nowrap' }}>通过</span>
+          </Handle>
+          <Handle type="source" position={Position.Bottom} id="reject"
+            style={{ left: '70%', background: '#f5222d', border: '2px solid #fff', width: 10, height: 10 }}>
+            <span style={{ position: 'absolute', top: 10, left: '50%', transform: 'translateX(-50%)', fontSize: 9, color: '#f5222d', whiteSpace: 'nowrap' }}>拒绝</span>
+          </Handle>
         </>)}
         {isSelector && (<>
           {branches.map((_, i) => (
