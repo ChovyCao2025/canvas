@@ -580,8 +580,18 @@ function ApiCallInputParams({ label }: { label: string }) {
     if (!apiKey) { setParams([]); return }
     const pick = () => {
       const def = apiDefsCache.find(d => d.value === apiKey)
-      try { setParams(def ? JSON.parse(def.requestSchema || '[]') : []) }
-      catch { setParams([]) }
+      let schema: ApiParamDef[] = []
+      try { schema = def ? JSON.parse(def.requestSchema || '[]') : [] } catch {}
+      setParams(schema)
+      // 切换 API 时清空 inputParams，避免旧参数 key 混入新配置
+      const schemaKeys = new Set(schema.map(p => p.name))
+      const cur: Record<string, unknown> = form.getFieldValue('inputParams') ?? {}
+      const next: Record<string, unknown> = {}
+      schema.forEach(p => { if (cur[p.name] !== undefined) next[p.name] = cur[p.name] })
+      // 只保留属于新 schema 的 key
+      if (Object.keys(cur).some(k => !schemaKeys.has(k))) {
+        form.setFieldValue('inputParams', next)
+      }
     }
     if (apiDefsCache.length) { pick(); return }
     metaApi.getApiDefinitions().then((res: any) => {

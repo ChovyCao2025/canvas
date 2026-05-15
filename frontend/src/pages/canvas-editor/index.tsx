@@ -560,6 +560,8 @@ function EditorInner({ detail }: { detail: CanvasDetail }) {
               }
               setTestRunning(true)
               try {
+                // 先保存画布，确保 dry-run 使用最新配置
+                await handleSave(/* silent */ true)
                 const res = await canvasApi.dryRun(canvasId, testUserId, payload)
                 const execId = (res.data as any)?.executionId
                 message.success(`运行完成${execId ? `，执行ID: ${execId.slice(0,8)}…` : ''}，可在「轨迹」面板查看结果`)
