@@ -78,7 +78,7 @@ export default function ExecutionTracePanel({ canvasId, onTraceLoaded, triggerEx
     setLoading(true)
     try {
       const res = await http.get<R<NodeTrace[]>, R<NodeTrace[]>>(
-        `/canvas/execution/${executionId}/trace`)
+        `/canvas/${canvasId}/execution/${executionId}/trace`)
       const data = res.data ?? []
       setTraces(data)
 
