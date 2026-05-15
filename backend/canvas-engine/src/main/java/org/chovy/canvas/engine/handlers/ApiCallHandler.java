@@ -58,8 +58,12 @@ public class ApiCallHandler implements NodeHandler {
         Map<String, Object> reqBody = new HashMap<>();
         for (Map.Entry<String, Object> entry : inputParams.entrySet()) {
             Object val = entry.getValue();
-            if (val instanceof String s && s.startsWith("${") && s.endsWith("}")) {
-                val = ctx.getContextValue(s.substring(2, s.length() - 1));
+            if (val instanceof String s) {
+                // 兼容 Flyway 转义后的 $${key} 和标准 ${key} 两种写法
+                String norm = s.startsWith("$${") ? s.substring(1) : s;
+                if (norm.startsWith("${") && norm.endsWith("}")) {
+                    val = ctx.getContextValue(norm.substring(2, norm.length() - 1));
+                }
             }
             reqBody.put(entry.getKey(), val);
         }

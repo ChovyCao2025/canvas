@@ -229,6 +229,8 @@ public class CanvasExecutionService {
         ctx.setVersionId(versionId);
         ctx.setUserId(userId);
         ctx.setTriggerType(triggerType);
+        // userId 写入 triggerPayload，供节点 config 中 ${userId} 引用
+        if (userId != null) ctx.getTriggerPayload().put("userId", userId);
         return ctx;
     }
 
