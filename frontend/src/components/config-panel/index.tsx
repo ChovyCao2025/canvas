@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import {
   Form, Input, InputNumber, Select, Switch, Button,
-  Typography, Spin, Divider, Space, Collapse, Tag, Tooltip,
+  Typography, Spin, Divider, Space, Collapse, Tag, Tooltip, AutoComplete, DatePicker,
 } from 'antd'
 import { PlusOutlined, DeleteOutlined, DownOutlined, QuestionCircleOutlined } from '@ant-design/icons'
 import { metaApi, canvasApi } from '../../services/api'
@@ -195,6 +195,30 @@ function renderControl(
           style={{ fontFamily: 'SFMono-Regular, Consolas, monospace', fontSize: 12 }}
           placeholder={`// Groovy 脚本`} />
       )
+    case 'datetime':
+      return (
+        <DatePicker
+          showTime
+          format="YYYY-MM-DD HH:mm:ss"
+          style={{ width: '100%' }}
+          placeholder={`选择${field.label}`}
+        />
+      )
+    case 'cron':
+      return (
+        <div>
+          <Input
+            placeholder="如：0 9 * * *（每天 9 点）"
+            style={{ fontFamily: 'monospace' }}
+          />
+          <div style={{ fontSize: 11, color: '#8c8c8c', marginTop: 4, lineHeight: 1.6 }}>
+            格式：<code>分 时 日 月 周</code>，常见示例：
+            <br />· <code>0 9 * * *</code> — 每天 09:00
+            <br />· <code>0 9 * * 1</code> — 每周一 09:00
+            <br />· <code>0 9 1 * *</code> — 每月 1 日 09:00
+          </div>
+        </div>
+      )
     case 'condition-rule-list':
       return <ConditionRuleList ctxFields={ctxFields} />
     case 'context-value-list':
@@ -248,8 +272,13 @@ function ConditionRuleList({ ctxFields }: { ctxFields: ContextField[] }) {
           <Select size="small" style={{ width: 80 }} value={rule.operator}
             options={ops.map(o => ({ label: o, value: o }))}
             onChange={v => update(i, 'operator', v)} />
-          <Input size="small" style={{ width: 100 }} placeholder="值"
-            value={rule.value} onChange={e => update(i, 'value', e.target.value)} />
+          <AutoComplete size="small" style={{ width: 110 }}
+            placeholder="值或 ${key}"
+            value={rule.value}
+            options={ctxFields.map(f => ({ value: '${' + f.fieldKey + '}', label: f.fieldName }))}
+            onChange={v => update(i, 'value', v)}
+            filterOption={(input, opt) => String(opt?.label ?? '').toLowerCase().includes(input.toLowerCase())}
+          />
           <Button size="small" danger icon={<DeleteOutlined />} onClick={() => remove(i)} />
         </Space>
       ))}
@@ -286,10 +315,12 @@ function ContextValueList({ ctxFields }: { ctxFields: ContextField[] }) {
             options={[{ label: '自定义', value: 'CUSTOM' }, { label: '上下文', value: 'CONTEXT' }]}
             onChange={v => update(i, 'valueType', v)} />
           {item.valueType === 'CONTEXT'
-            ? <Select size="small" style={{ width: 110 }} placeholder="选择字段"
+            ? <AutoComplete size="small" style={{ width: 110 }}
+                placeholder="${key} 或字段名"
                 value={item.value || undefined}
-                options={ctxFields.map(f => ({ label: f.fieldName, value: f.fieldKey }))}
-                onChange={v => update(i, 'value', v)} showSearch />
+                options={ctxFields.map(f => ({ value: '${' + f.fieldKey + '}', label: f.fieldName }))}
+                onChange={v => update(i, 'value', v)}
+                filterOption={(input, opt) => String(opt?.label ?? '').toLowerCase().includes(input.toLowerCase())} />
             : <Input size="small" style={{ width: 110 }} placeholder="值"
                 value={item.value} onChange={e => update(i, 'value', e.target.value)} />
           }
@@ -390,20 +421,12 @@ function BranchList({ ctxFields }: { ctxFields: ContextField[] }) {
             <Select size="small" style={{ width: 72 }} value={c.operator}
               options={ops.map(o => ({ label: o, value: o }))}
               onChange={v => updateCondition(i, ci, 'operator', v)} />
-            {c.isContext ? (
-              <Select size="small" style={{ width: 90 }} placeholder="上下文字段"
-                value={c.value || undefined}
-                options={ctxFields.map(f => ({ label: f.fieldName, value: '${' + f.fieldKey + '}' }))}
-                onChange={v => updateCondition(i, ci, 'value', v)} showSearch />
-            ) : (
-              <Input size="small" style={{ width: 90 }} placeholder="静态值"
-                value={c.value} onChange={e => updateCondition(i, ci, 'value', e.target.value)} />
-            )}
-            <Button size="small" type={c.isContext ? 'primary' : 'default'} style={{ fontSize: 10, padding: '0 4px' }}
-              title={c.isContext ? '切换为静态值' : '切换为上下文字段'}
-              onClick={() => updateCondition(i, ci, 'isContext', String(!c.isContext))}>
-              {c.isContext ? '变量' : '值'}
-            </Button>
+            <AutoComplete size="small" style={{ width: 100 }}
+              placeholder="值或 ${key}"
+              value={c.value}
+              options={ctxFields.map(f => ({ value: '${' + f.fieldKey + '}', label: f.fieldName }))}
+              onChange={v => updateCondition(i, ci, 'value', v)}
+              filterOption={(input, opt) => String(opt?.label ?? '').toLowerCase().includes(input.toLowerCase())} />
             <Button size="small" danger icon={<DeleteOutlined />} onClick={() => removeCondition(i, ci)} />
           </Space>
         ))}
@@ -507,10 +530,12 @@ function KeyValueMapping({ fieldKey, ctxFields }: { fieldKey: string; ctxFields:
           <Input size="small" style={{ width: 90 }} placeholder="子流程字段名"
             value={k} onChange={e => updateKey(k, e.target.value)} />
           <span style={{ fontSize: 12 }}>←</span>
-          <Select size="small" style={{ width: 110 }} placeholder="父上下文字段"
+          <AutoComplete size="small" style={{ width: 130 }}
+            placeholder="${key} 或固定值"
             value={v || undefined}
-            options={ctxFields.map(f => ({ label: f.fieldName, value: `ctx.${f.fieldKey}` }))}
-            onChange={nv => updateVal(k, nv)} showSearch />
+            options={ctxFields.map(f => ({ value: '${' + f.fieldKey + '}', label: f.fieldName }))}
+            onChange={nv => updateVal(k, nv)}
+            filterOption={(input, opt) => String(opt?.label ?? '').toLowerCase().includes(input.toLowerCase())} />
           <Button size="small" danger icon={<DeleteOutlined />} onClick={() => remove(k)} />
         </Space>
       ))}
