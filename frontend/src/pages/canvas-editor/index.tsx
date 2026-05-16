@@ -9,9 +9,9 @@ import '@xyflow/react/dist/style.css'
 import dagre from '@dagrejs/dagre'
 import { Button, Divider, Input, message, Modal, Space, Spin, Tag, Tooltip } from 'antd'
 import {
-  ArrowLeftOutlined, CaretRightOutlined, CloudUploadOutlined, SaveOutlined, ApartmentOutlined, UndoOutlined, RedoOutlined, SyncOutlined,
+  ArrowLeftOutlined, CaretRightOutlined, CloudUploadOutlined, SaveOutlined, ApartmentOutlined, UndoOutlined, RedoOutlined, SyncOutlined, DeleteOutlined, QuestionCircleOutlined,
 } from '@ant-design/icons'
-import { useNavigate, useParams } from 'react-router-dom'
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import type { BackendNode, BizConfig, CanvasNodeData } from '../../types/canvas'
 import { canvasApi } from '../../services/api'
 import type { CanvasDetail } from '../../types'
@@ -174,6 +174,8 @@ function EditorInner({ detail, onStatusChange }: {
   const { id } = useParams<{ id: string }>()
   const canvasId = Number(id)
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
+  const readonly = searchParams.get('readonly') === 'true'
   const { screenToFlowPosition, getNodes, getEdges, fitView } = useReactFlow()
 
   const [nodes, setNodes, onNodesChange] = useNodesState<Node>([])
@@ -249,6 +251,12 @@ function EditorInner({ detail, onStatusChange }: {
         if (e.key === 'z' && !e.shiftKey) { e.preventDefault(); undo() }
         if ((e.key === 'z' && e.shiftKey) || e.key === 'y') { e.preventDefault(); redo() }
         if (e.key === 's') { e.preventDefault(); handleSave() }
+        if (e.key === 'a') {
+          e.preventDefault()
+          setNodes(prev => prev.map(n =>
+            (n.data as CanvasNodeData).nodeType === 'START' ? n : { ...n, selected: true }
+          ))
+        }
         // 复制选中节点：有浏览器文字选中时不拦截（让浏览器正常复制文本）
         if (e.key === 'c') {
           if (window.getSelection()?.toString()) return
@@ -348,7 +356,15 @@ function EditorInner({ detail, onStatusChange }: {
 
   // 节点删除时清理引用
   const onNodesChangeWrapped = useCallback((changes: NodeChange[]) => {
-    const deleted = changes
+    // Protect START node from deletion
+    const safeChanges = changes.filter(c => {
+      if (c.type !== 'remove') return true
+      const node = nodes.find(n => n.id === (c as { id: string }).id)
+      return (node?.data as CanvasNodeData)?.nodeType !== 'START'
+    })
+    if (safeChanges.length === 0) return
+
+    const deleted = safeChanges
       .filter((c): c is NodeChange & { type: 'remove' } => c.type === 'remove')
       .map(c => c.id)
     if (deleted.length) {
@@ -363,12 +379,12 @@ function EditorInner({ detail, onStatusChange }: {
       )
       setEdges(prev => prev.filter(e => !ids.has(e.source) && !ids.has(e.target)))
     } else {
-      onNodesChange(changes)
+      onNodesChange(safeChanges)
     }
     // 节点变化标记脏
-    const significant = changes.some(c => c.type !== 'select' && c.type !== 'dimensions')
+    const significant = safeChanges.some(c => c.type !== 'select' && c.type !== 'dimensions')
     if (significant) setIsDirty(true)
-  }, [snapshot, setNodes, setEdges, onNodesChange])
+  }, [nodes, snapshot, setNodes, setEdges, onNodesChange])
 
   // 连线规则
   const isValidConnection = useCallback((conn: Connection) => {
@@ -559,10 +575,12 @@ function EditorInner({ detail, onStatusChange }: {
           onChange={e => setCanvasName(e.target.value)}
           variant="borderless"
           style={{ width: 240, fontWeight: 600, fontSize: 14, padding: 0 }}
+          disabled={readonly}
         />
         <Tag color={statusMap[status]?.color} style={{ borderRadius: 6, fontSize: 11 }}>
           {statusMap[status]?.label}
         </Tag>
+        {readonly && <Tag color="default" style={{ borderRadius: 6, fontSize: 11 }}>只读</Tag>}
 
         <div style={{ flex: 1 }} />
 
@@ -573,9 +591,30 @@ function EditorInner({ detail, onStatusChange }: {
           boxShadow: '0 1px 3px rgba(0,0,0,.06)',
         }}>
           {/* 左：编辑 + 布局 */}
-          <Tooltip title="整理布局"><Button type="text" size="small" icon={<ApartmentOutlined />} onClick={onLayout} style={iconBtnStyle} /></Tooltip>
-          <Tooltip title={undoLabel}><Button type="text" size="small" icon={<UndoOutlined />} disabled={!canUndo} onClick={undo} style={iconBtnStyle} /></Tooltip>
-          <Tooltip title={redoLabel}><Button type="text" size="small" icon={<RedoOutlined />} disabled={!canRedo} onClick={redo} style={iconBtnStyle} /></Tooltip>
+          {!readonly && <Tooltip title="整理布局"><Button type="text" size="small" icon={<ApartmentOutlined />} onClick={onLayout} style={iconBtnStyle} /></Tooltip>}
+          {!readonly && <Tooltip title={undoLabel}><Button type="text" size="small" icon={<UndoOutlined />} disabled={!canUndo} onClick={undo} style={iconBtnStyle} /></Tooltip>}
+          {!readonly && <Tooltip title={redoLabel}><Button type="text" size="small" icon={<RedoOutlined />} disabled={!canRedo} onClick={redo} style={iconBtnStyle} /></Tooltip>}
+          {!readonly && (
+          <Tooltip title="清空画布（保留开始节点）">
+            <Button
+              type="text" size="small"
+              icon={<DeleteOutlined />}
+              style={{ ...iconBtnStyle, color: '#ff4d4f' }}
+              onClick={() => {
+                Modal.confirm({
+                  title: '清空画布',
+                  content: '将删除所有节点（保留开始节点），可通过撤销恢复。确认继续？',
+                  okText: '清空', okType: 'danger', cancelText: '取消',
+                  onOk: () => {
+                    snapshot('清空画布')
+                    setNodes(prev => prev.filter(n => (n.data as CanvasNodeData).nodeType === 'START'))
+                    setEdges([])
+                  },
+                })
+              }}
+            />
+          </Tooltip>
+          )}
 
           <div style={divStyle} />
 
@@ -590,6 +629,7 @@ function EditorInner({ detail, onStatusChange }: {
               })))
             }}
           />
+          {!readonly && (
           <Tooltip title={isDirty ? '保存草稿（Ctrl+S）— 不影响线上' : '草稿已是最新'}>
             <Button size="small" icon={<SaveOutlined />} loading={saving}
               onClick={() => handleSave()}
@@ -600,10 +640,12 @@ function EditorInner({ detail, onStatusChange }: {
               {isDirty ? '草稿*' : '已保存'}
             </Button>
           </Tooltip>
+          )}
 
           <div style={divStyle} />
 
           {/* 右：核心操作（胶囊设计）*/}
+          {!readonly && (
           <Button
             size="small" icon={<CaretRightOutlined />}
             onClick={() => setTestModalOpen(true)}
@@ -614,28 +656,39 @@ function EditorInner({ detail, onStatusChange }: {
             }}>
             测试运行
           </Button>
-
-          {status !== 1 ? (
-            <Button size="small" icon={<CloudUploadOutlined />} onClick={handlePublish}
-              style={{
-                background: '#1677ff', color: '#fff', border: 'none',
-                borderRadius: 20, padding: '0 14px', fontWeight: 500, fontSize: 12,
-                boxShadow: '0 2px 6px rgba(22,119,255,.35)',
-              }}>
-              发布
-            </Button>
-          ) : (
-            <Tooltip title="保存当前草稿并重新发布，更新线上版本">
-              <Button size="small" icon={<SyncOutlined />} onClick={handlePublish}
-                style={{
-                  background: '#52c41a', color: '#fff', border: 'none',
-                  borderRadius: 20, padding: '0 14px', fontWeight: 500, fontSize: 12,
-                  boxShadow: '0 2px 6px rgba(82,196,26,.35)',
-                }}>
-                更新发布
-              </Button>
-            </Tooltip>
           )}
+
+          {!readonly && (status !== 1 ? (
+            <Space size={4}>
+              <Button size="small" icon={<CloudUploadOutlined />} onClick={handlePublish}
+                style={{
+                  background: '#1677ff', color: '#fff', border: 'none',
+                  borderRadius: 20, padding: '0 14px', fontWeight: 500, fontSize: 12,
+                  boxShadow: '0 2px 6px rgba(22,119,255,.35)',
+                }}>
+                发布
+              </Button>
+              <Tooltip title="发布后线上版本立即生效；下线过程中已进入旅程的用户实例将执行完毕后自然结束，不会被强制中断">
+                <QuestionCircleOutlined style={{ color: '#8c8c8c', fontSize: 13 }} />
+              </Tooltip>
+            </Space>
+          ) : (
+            <Space size={4}>
+              <Tooltip title="保存当前草稿并重新发布，更新线上版本">
+                <Button size="small" icon={<SyncOutlined />} onClick={handlePublish}
+                  style={{
+                    background: '#52c41a', color: '#fff', border: 'none',
+                    borderRadius: 20, padding: '0 14px', fontWeight: 500, fontSize: 12,
+                    boxShadow: '0 2px 6px rgba(82,196,26,.35)',
+                  }}>
+                  更新发布
+                </Button>
+              </Tooltip>
+              <Tooltip title="发布后线上版本立即生效；下线过程中已进入旅程的用户实例将执行完毕后自然结束，不会被强制中断">
+                <QuestionCircleOutlined style={{ color: '#8c8c8c', fontSize: 13 }} />
+              </Tooltip>
+            </Space>
+          ))}
         </div>
       </div>
 
@@ -709,6 +762,9 @@ function EditorInner({ detail, onStatusChange }: {
             nodeTypes={nodeTypes}
             edgeTypes={edgeTypes}
             proOptions={{ hideAttribution: true }}
+            nodesDraggable={!readonly}
+            nodesConnectable={!readonly}
+            elementsSelectable={!readonly}
             onNodesChange={onNodesChangeWrapped}
             onEdgesChange={onEdgesChange}
             onConnect={onConnect}
@@ -739,6 +795,7 @@ function EditorInner({ detail, onStatusChange }: {
             nodeId={selectedNodeId}
             nodeData={selectedData}
             onChange={onNodeDataChange}
+            readonly={readonly}
           />
         </div>
       </div>
