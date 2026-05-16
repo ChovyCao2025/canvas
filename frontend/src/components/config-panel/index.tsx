@@ -14,9 +14,10 @@ interface ApiParamDef { name: string; displayName: string; type: string; require
 const { Text } = Typography
 
 interface Props {
-  nodeId:   string | null
-  nodeData: CanvasNodeData | null
-  onChange: (nodeId: string, patch: Partial<CanvasNodeData>) => void
+  nodeId:    string | null
+  nodeData:  CanvasNodeData | null
+  onChange:  (nodeId: string, patch: Partial<CanvasNodeData>) => void
+  readonly?: boolean
 }
 
 // ── 模块级缓存 ────────────────────────────────────────────────────
@@ -45,7 +46,7 @@ function toSelectOptions(data: any[]): StubOption[] {
   }))
 }
 
-export default function ConfigPanel({ nodeId, nodeData, onChange }: Props) {
+export default function ConfigPanel({ nodeId, nodeData, onChange, readonly }: Props) {
   const [schema,   setSchema]   = useState<NodeTypeRegistry | null>(null)
   const [options,  setOptions]  = useState<Record<string, StubOption[]>>({})
   const [ctxFields, setCtxFields] = useState<ContextField[]>([])
@@ -131,7 +132,7 @@ export default function ConfigPanel({ nodeId, nodeData, onChange }: Props) {
       <Text type="secondary" style={{ fontSize: 11 }}>{nodeData.nodeType}</Text>
       <Divider style={{ margin: '8px 0' }} />
 
-      <Form form={form} layout="vertical" size="small" onValuesChange={handleValuesChange}>
+      <Form form={form} layout="vertical" size="small" onValuesChange={handleValuesChange} disabled={readonly}>
         <Form.Item name="name" label="节点名称" rules={[{ required: true }]}>
           <Input />
         </Form.Item>

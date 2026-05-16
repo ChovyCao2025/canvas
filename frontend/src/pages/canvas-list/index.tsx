@@ -5,7 +5,7 @@ import {
 } from 'antd'
 import {
   PlusOutlined, EditOutlined, CloudUploadOutlined,
-  StopOutlined, CopyOutlined, ThunderboltOutlined, BarChartOutlined,
+  StopOutlined, CopyOutlined, ThunderboltOutlined, BarChartOutlined, EyeOutlined,
 } from '@ant-design/icons'
 import { useNavigate } from 'react-router-dom'
 import type { ColumnsType } from 'antd/es/table'
@@ -130,6 +130,10 @@ export default function CanvasListPage() {
       width: 240,
       render: (_, record) => (
         <Space size={4}>
+          <Tooltip title="查看">
+            <Button size="small" icon={<EyeOutlined />}
+              onClick={() => navigate(`/canvas/${record.id}/edit?readonly=true`)} />
+          </Tooltip>
           <Tooltip title="编辑">
             <Button size="small" icon={<EditOutlined />}
               onClick={() => navigate(`/canvas/${record.id}/edit`)} />
