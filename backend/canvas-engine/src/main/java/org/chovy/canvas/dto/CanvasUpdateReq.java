@@ -9,4 +9,8 @@ public class CanvasUpdateReq {
     /** 最新草稿 graph JSON */
     private String graphJson;
     private String updatedBy;
+    /** REALTIME | SCHEDULED */
+    private String triggerType;
+    private String cronExpression;
 }
+

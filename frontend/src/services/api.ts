@@ -71,7 +71,7 @@ export const canvasApi = {
   get: (id: number) =>
     http.get<R<CanvasDetail>, R<CanvasDetail>>(`/canvas/${id}`),
 
-  update: (id: number, body: { name?: string; description?: string; graphJson?: string; editVersion?: number }) =>
+  update: (id: number, body: { name?: string; description?: string; graphJson?: string; editVersion?: number; triggerType?: string; cronExpression?: string }) =>
     http.put<R<void>, R<void>>(`/canvas/${id}`, body),
 
   list: (params: { page?: number; size?: number; status?: number; name?: string }) =>
@@ -100,6 +100,9 @@ export const canvasApi = {
 
   rollback: (id: number) =>
     http.post<R<void>, R<void>>(`/canvas/${id}/rollback`),
+
+  revert: (id: number, versionId: number) =>
+    http.post<R<void>, R<void>>(`/canvas/${id}/revert/${versionId}`),
 
   triggerDirect: (id: number, userId: string, payload: Record<string, unknown>) =>
     http.post<R<Record<string, unknown>>, R<Record<string, unknown>>>(

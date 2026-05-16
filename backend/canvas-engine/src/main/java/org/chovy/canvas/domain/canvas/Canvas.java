@@ -32,6 +32,11 @@ public class Canvas {
     private Long    previousVersionId;
     private Integer editVersion;
 
+    // ── V24 触发方式 ────────────────────────────────────────────────
+    /** REALTIME | SCHEDULED */
+    private String  triggerType;
+    private String  cronExpression;
+
     @TableField(fill = FieldFill.INSERT)
     private LocalDateTime createdAt;
 

@@ -9,4 +9,8 @@ public class CanvasCreateReq {
     /** 初始 graph JSON（可为空） */
     private String graphJson;
     private String createdBy;
+    /** REALTIME | SCHEDULED */
+    private String triggerType;
+    private String cronExpression;
 }
+

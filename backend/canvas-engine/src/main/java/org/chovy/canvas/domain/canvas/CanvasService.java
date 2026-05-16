@@ -92,6 +92,8 @@ public class CanvasService {
 
         canvas.setName(req.getName());
         canvas.setDescription(req.getDescription());
+        if (req.getTriggerType()    != null) canvas.setTriggerType(req.getTriggerType());
+        if (req.getCronExpression() != null) canvas.setCronExpression(req.getCronExpression());
         canvasMapper.updateById(canvas);
 
         if (req.getGraphJson() == null) return;
@@ -301,6 +303,30 @@ public class CanvasService {
                         .last("LIMIT 1")
         );
         return max != null ? max.getVersion() + 1 : 1;
+    }
+
+    /**
+     * Reverts the current draft to the content of a historical version.
+     * Does NOT affect the published version.
+     */
+    @Transactional
+    public void revertToVersion(Long canvasId, Long versionId) {
+        CanvasVersion target = canvasVersionMapper.selectById(versionId);
+        if (target == null) throw new IllegalArgumentException("版本不存在: " + versionId);
+        if (!target.getCanvasId().equals(canvasId)) throw new IllegalArgumentException("版本不属于该画布");
+
+        CanvasVersion draft = latestDraft(canvasId);
+        if (draft != null) {
+            draft.setGraphJson(target.getGraphJson());
+            canvasVersionMapper.updateById(draft);
+        } else {
+            CanvasVersion newDraft = new CanvasVersion();
+            newDraft.setCanvasId(canvasId);
+            newDraft.setVersion(nextVersionNumber(canvasId));
+            newDraft.setGraphJson(target.getGraphJson());
+            newDraft.setStatus(0);
+            canvasVersionMapper.insert(newDraft);
+        }
     }
 
     @SuppressWarnings("unchecked")

@@ -7,9 +7,9 @@ import {
 } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
 import dagre from '@dagrejs/dagre'
-import { Button, Divider, Input, message, Modal, Space, Spin, Tag, Tooltip } from 'antd'
+import { Button, Divider, Drawer, Form, Input, message, Modal, Radio, Space, Spin, Tag, Tooltip } from 'antd'
 import {
-  ArrowLeftOutlined, CaretRightOutlined, CloudUploadOutlined, SaveOutlined, ApartmentOutlined, UndoOutlined, RedoOutlined, SyncOutlined, DeleteOutlined, QuestionCircleOutlined,
+  ArrowLeftOutlined, CaretRightOutlined, CloudUploadOutlined, SaveOutlined, ApartmentOutlined, UndoOutlined, RedoOutlined, SyncOutlined, DeleteOutlined, QuestionCircleOutlined, HistoryOutlined, SettingOutlined,
 } from '@ant-design/icons'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import type { BackendNode, BizConfig, CanvasNodeData } from '../../types/canvas'
@@ -190,6 +190,13 @@ function EditorInner({ detail, onStatusChange }: {
   const [testUserId,    setTestUserId]    = useState('user_test_001')
   const [testPayload,   setTestPayload]   = useState('{}')
   const [testRunning,   setTestRunning]   = useState(false)
+  // Version history (EF-7)
+  const [historyOpen,    setHistoryOpen]    = useState(false)
+  const [versionList,    setVersionList]    = useState<import('../../types').CanvasVersion[]>([])
+  const [historyLoading, setHistoryLoading] = useState(false)
+  // Canvas settings / trigger type (EF-8)
+  const [settingsOpen, setSettingsOpen] = useState(false)
+  const [settingsForm] = Form.useForm()
   const editVersion   = useRef(0)
   const autoSaveTimer = useRef<ReturnType<typeof setTimeout>>()
 
@@ -489,6 +496,50 @@ function EditorInner({ detail, onStatusChange }: {
     setNodes([...layouted])
   }, [snapshot, getNodes, getEdges, setNodes])
 
+  // 版本历史（EF-7）
+  const openHistory = async () => {
+    setHistoryOpen(true)
+    setHistoryLoading(true)
+    try {
+      const res = await canvasApi.getVersions(canvasId)
+      setVersionList((res.data as any)?.list ?? res.data ?? [])
+    } finally {
+      setHistoryLoading(false)
+    }
+  }
+  const handleRevert = (versionId: number) => {
+    Modal.confirm({
+      title: '回退到此版本',
+      content: '将以该版本内容覆盖当前草稿，不影响线上版本。确认继续？',
+      okText: '确认回退', okType: 'danger', cancelText: '取消',
+      onOk: async () => {
+        await canvasApi.revert(canvasId, versionId)
+        message.success('已回退到选定版本，即将刷新画布')
+        setTimeout(() => window.location.reload(), 800)
+      },
+    })
+  }
+
+  // 画布设置（EF-8）
+  const openSettings = () => {
+    settingsForm.setFieldsValue({
+      triggerType:    detail.canvas.triggerType    ?? 'REALTIME',
+      cronExpression: detail.canvas.cronExpression ?? '',
+    })
+    setSettingsOpen(true)
+  }
+  const saveSettings = async () => {
+    const vals = settingsForm.getFieldsValue()
+    await canvasApi.update(canvasId, {
+      triggerType:    vals.triggerType,
+      cronExpression: vals.triggerType === 'SCHEDULED' ? vals.cronExpression : undefined,
+    })
+    message.success('设置已保存')
+    setSettingsOpen(false)
+  }
+
+
+
   // 节点数据更新（来自配置面板）
   const onNodeDataChange = useCallback((nid: string, patch: Partial<CanvasNodeData>) => {
     setNodes(prev => prev.map(n =>
@@ -595,8 +646,7 @@ function EditorInner({ detail, onStatusChange }: {
           {!readonly && <Tooltip title={undoLabel}><Button type="text" size="small" icon={<UndoOutlined />} disabled={!canUndo} onClick={undo} style={iconBtnStyle} /></Tooltip>}
           {!readonly && <Tooltip title={redoLabel}><Button type="text" size="small" icon={<RedoOutlined />} disabled={!canRedo} onClick={redo} style={iconBtnStyle} /></Tooltip>}
           {!readonly && (
-          <Tooltip title="清空画布（保留开始节点）">
-            <Button
+          <Tooltip title="清空画布（保留开始节点）">            <Button
               type="text" size="small"
               icon={<DeleteOutlined />}
               style={{ ...iconBtnStyle, color: '#ff4d4f' }}
@@ -613,6 +663,18 @@ function EditorInner({ detail, onStatusChange }: {
                 })
               }}
             />
+          </Tooltip>
+          )}
+
+          <div style={divStyle} />
+
+          {/* 历史 + 设置 */}
+          <Tooltip title="版本历史">
+            <Button type="text" size="small" icon={<HistoryOutlined />} style={iconBtnStyle} onClick={openHistory} />
+          </Tooltip>
+          {!readonly && (
+          <Tooltip title="触发方式设置">
+            <Button type="text" size="small" icon={<SettingOutlined />} style={iconBtnStyle} onClick={openSettings} />
           </Tooltip>
           )}
 
@@ -799,6 +861,90 @@ function EditorInner({ detail, onStatusChange }: {
           />
         </div>
       </div>
+
+      {/* 版本历史 Drawer（EF-7） */}
+      <Drawer title="版本历史" placement="right" width={320}
+        open={historyOpen} onClose={() => setHistoryOpen(false)}>
+        <Spin spinning={historyLoading}>
+          {versionList.map((v, idx) => {
+            const isCurrent = idx === 0
+            return (
+              <div key={v.id} style={{
+                padding: '12px 0', borderBottom: '1px solid #f0f0f0',
+                borderLeft: isCurrent ? '3px solid #1677ff' : '3px solid #d9d9d9',
+                paddingLeft: 12, marginBottom: 4,
+                background: isCurrent ? '#f0f5ff' : 'transparent',
+              }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ fontWeight: 600, color: isCurrent ? '#1677ff' : '#262626' }}>
+                    V{v.version}{isCurrent ? '（当前草稿）' : ''}
+                  </span>
+                  <Tag color={(v.status as number) === 1 ? 'green' : (v.status as number) === 2 ? 'default' : 'blue'}>
+                    {(v.status as number) === 1 ? '已发布' : (v.status as number) === 2 ? '已下线' : '草稿'}
+                  </Tag>
+                </div>
+                <div style={{ fontSize: 12, color: '#8c8c8c', marginTop: 4 }}>
+                  {v.createdAt ? new Date(v.createdAt as string).toLocaleString('zh-CN') : ''} · {v.createdBy}
+                </div>
+                {!isCurrent && (
+                  <Button size="small" type="link" style={{ paddingLeft: 0, marginTop: 6 }}
+                    onClick={() => handleRevert(v.id)}>
+                    回退到此版本
+                  </Button>
+                )}
+              </div>
+            )
+          })}
+          {versionList.length === 0 && !historyLoading && (
+            <div style={{ textAlign: 'center', color: '#8c8c8c', marginTop: 40 }}>暂无版本记录</div>
+          )}
+        </Spin>
+        <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, padding: '12px 16px',
+                     borderTop: '1px solid #f0f0f0', background: '#fafafa', fontSize: 12, color: '#aaa' }}>
+          ⓘ 回退将覆盖当前草稿，不影响已发布的线上版本
+        </div>
+      </Drawer>
+
+      {/* 触发方式设置 Modal（EF-8） */}
+      <Modal title="触发方式设置" open={settingsOpen}
+        onOk={saveSettings} onCancel={() => setSettingsOpen(false)}
+        okText="保存" cancelText="取消">
+        <Form form={settingsForm} layout="vertical" style={{ marginTop: 16 }}>
+          <Form.Item label="触发方式" name="triggerType">
+            <Radio.Group>
+              <Radio value="REALTIME">实时触发</Radio>
+              <Radio value="SCHEDULED">定时触发</Radio>
+            </Radio.Group>
+          </Form.Item>
+          <Form.Item noStyle shouldUpdate={(prev, cur) => prev.triggerType !== cur.triggerType}>
+            {({ getFieldValue }) =>
+              getFieldValue('triggerType') === 'SCHEDULED' ? (
+                <Form.Item label="Cron 表达式" name="cronExpression"
+                  rules={[{ required: true, message: '请填写 Cron 表达式' }]}
+                  extra={
+                    <Space wrap style={{ marginTop: 4 }}>
+                      {[
+                        { label: '每天 9:00',    value: '0 9 * * *' },
+                        { label: '每周一 9:00',  value: '0 9 * * 1' },
+                        { label: '每月1日 9:00', value: '0 9 1 * *' },
+                        { label: '每小时',        value: '0 * * * *' },
+                      ].map(p => (
+                        <Button key={p.label} size="small"
+                          onClick={() => settingsForm.setFieldValue('cronExpression', p.value)}>
+                          {p.label}
+                        </Button>
+                      ))}
+                    </Space>
+                  }
+                >
+                  <Input placeholder="如：0 9 * * 1-5（工作日上午9点）" />
+                </Form.Item>
+              ) : null
+            }
+          </Form.Item>
+        </Form>
+      </Modal>
+
     </div>
     </CanvasActionsContext.Provider>
   )

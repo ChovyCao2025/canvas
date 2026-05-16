@@ -152,6 +152,17 @@ public class CanvasController {
     }
 
     /**
+     * 回退画布草稿到指定历史版本（不影响已发布线上版本）
+     */
+    @PostMapping("/{id}/revert/{versionId}")
+    public Mono<R<Void>> revertToVersion(@PathVariable Long id,
+                                          @PathVariable Long versionId) {
+        return Mono.<Void>fromRunnable(() -> canvasService.revertToVersion(id, versionId))
+                .subscribeOn(Schedulers.boundedElastic())
+                .thenReturn(R.<Void>ok());
+    }
+
+    /**
      * 启动画布灰度发布
      * @param id 画布 ID
      * @param percent 灰度流量比例 (0-100)

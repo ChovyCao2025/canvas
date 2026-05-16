@@ -29,6 +29,8 @@ export interface Canvas {
   createdBy?: string
   createdAt: string
   updatedAt: string
+  triggerType?:    string
+  cronExpression?: string
 }
 
 export interface CanvasDetail {
