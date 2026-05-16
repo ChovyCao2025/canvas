@@ -4,9 +4,10 @@ import { metaApi } from '../../services/api'
 import type { NodeTypeRegistry } from '../../types'
 import { CATEGORY_SOLID, TRIGGER_TYPES } from '../canvas/constants'
 
-const { Text } = Typography
+// 旧触发器节点（已被 START 统一入口取代，保留用于兼容已有画布）
+const LEGACY_TRIGGERS = new Set(['BEHAVIOR_IN_APP', 'SCHEDULED_TRIGGER', 'MQ_TRIGGER', 'DIRECT_CALL', 'TAGGER_REALTIME'])
 
-interface Props {
+const { Text } = Typography
   onDragStart: (nodeType: string, category: string) => void
 }
 
@@ -41,13 +42,17 @@ export default function NodePanel({ onDragStart }: Props) {
     ),
     children: (
       <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-        {nodes.map((nt) => (
+        {nodes.map((nt) => {
+          const isLegacy = LEGACY_TRIGGERS.has(nt.typeKey)
+          return (
           <Tooltip
             key={nt.typeKey}
             title={
-              TRIGGER_TYPES.has(nt.typeKey)
-                ? `【触发器】${nt.description || nt.typeName} — 只能作为流程第一个节点，可与其他触发器同时存在于画布中（各自独立入口）`
-                : (nt.description || nt.typeName)
+              nt.typeKey === 'START'
+                ? '统一入口节点 — 拖入后在配置面板选择触发方式（直调/事件/定时/MQ）'
+                : isLegacy
+                  ? `【兼容模式】${nt.description || nt.typeName} — 推荐改用「开始」节点统一配置触发方式`
+                  : (nt.description || nt.typeName)
             }
             placement="right"
             mouseEnterDelay={0.5}
@@ -62,20 +67,26 @@ export default function NodePanel({ onDragStart }: Props) {
               }}
               style={{
                 padding: '5px 8px', borderRadius: 4, cursor: 'grab',
-                background: '#fafafa', border: '1px solid #f0f0f0',
+                background: isLegacy ? '#fffbe6' : '#fafafa',
+                border: `1px solid ${isLegacy ? '#ffe58f' : '#f0f0f0'}`,
                 fontSize: 12, userSelect: 'none',
                 display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                opacity: isLegacy ? 0.75 : 1,
               }}
               onMouseEnter={e => (e.currentTarget.style.borderColor = CATEGORY_SOLID[category] ?? '#722ed1')}
-              onMouseLeave={e => (e.currentTarget.style.borderColor = '#f0f0f0')}
+              onMouseLeave={e => (e.currentTarget.style.borderColor = isLegacy ? '#ffe58f' : '#f0f0f0')}
             >
               {nt.typeName}
-              {TRIGGER_TYPES.has(nt.typeKey) && (
-                <Tag color="cyan" style={{ fontSize: 9, padding: '0 3px', lineHeight: '14px', marginLeft: 4, flexShrink: 0 }}>触发器</Tag>
-              )}
+              {nt.typeKey === 'START'
+                ? <Tag color="green" style={{ fontSize: 9, padding: '0 3px', lineHeight: '14px', marginLeft: 4, flexShrink: 0 }}>入口</Tag>
+                : TRIGGER_TYPES.has(nt.typeKey)
+                  ? <Tag color="orange" style={{ fontSize: 9, padding: '0 3px', lineHeight: '14px', marginLeft: 4, flexShrink: 0 }}>兼容</Tag>
+                  : null
+              }
             </div>
           </Tooltip>
-        ))}
+          )
+        })}
       </div>
     ),
   }))

@@ -346,12 +346,15 @@ public class CanvasExecutionService {
      * @return 触发器节点 ID
      */
     /**
-     * 在 DAG 入口节点中按类型和 matchKey 找触发器节点。
-     * 读取顺序：config 优先，bizConfig 兜底（与 DagEngine 保持一致）。
+     * 在 DAG 入口节点中按触发类型和 matchKey 找触发器节点。
      *
-     * 特殊规则：
-     *   - DIRECT_CALL 触发时，同时接受 START 节点（两者语义等价）
-     *   - BEHAVIOR_IN_APP 触发时，匹配 eventCode；matchKey=null 则返回第一个入口
+     * START 节点（统一入口）根据 triggerType 字段路由：
+     *   DIRECT    → DIRECT_CALL / dry-run
+     *   EVENT     → BEHAVIOR_IN_APP（eventCode 匹配）
+     *   MQ        → MQ_TRIGGER（topicKey 匹配）
+     *   SCHEDULED → SCHEDULED_TRIGGER
+     *
+     * 旧触发器节点（BEHAVIOR_IN_APP 等）保持兼容。
      */
     private String findTriggerNode(DagGraph graph, String triggerNodeType, String matchKey) {
         for (String nodeId : graph.entryNodes()) {
@@ -359,29 +362,54 @@ public class CanvasExecutionService {
             if (node == null) continue;
             String type = node.getType();
 
-            boolean typeMatch = triggerNodeType.equals(type)
-                    || ("DIRECT_CALL".equals(triggerNodeType) && "START".equals(type));
-            if (!typeMatch) continue;
-
-            if (matchKey == null) return nodeId;
-
-            // config 优先，bizConfig 兜底
             Map<String, Object> cfg = new java.util.HashMap<>();
             if (node.getBizConfig() != null) cfg.putAll(node.getBizConfig());
             if (node.getConfig()    != null) cfg.putAll(node.getConfig());
 
-            String cfgKey = (String) cfg.getOrDefault("topicKey",
-                    cfg.getOrDefault("eventCode",
-                    cfg.getOrDefault("tagCodeKey", "")));
-            if (matchKey.equals(cfgKey)) return nodeId;
+            if ("START".equals(type)) {
+                String configuredType = (String) cfg.getOrDefault("triggerType", "DIRECT");
+                boolean matches = switch (triggerNodeType) {
+                    case "DIRECT_CALL"       -> "DIRECT".equals(configuredType);
+                    case "BEHAVIOR_IN_APP"   -> "EVENT".equals(configuredType);
+                    case "MQ_TRIGGER"        -> "MQ".equals(configuredType);
+                    case "SCHEDULED_TRIGGER" -> "SCHEDULED".equals(configuredType);
+                    default -> false;
+                };
+                if (!matches) continue;
+                if (matchKey == null) return nodeId;
+                String cfgKey = (String) cfg.getOrDefault("eventCode", cfg.getOrDefault("topicKey", ""));
+                if (matchKey.equals(cfgKey)) return nodeId;
+            } else {
+                // 旧触发器节点兼容逻辑
+                boolean typeMatch = triggerNodeType.equals(type)
+                        || ("DIRECT_CALL".equals(triggerNodeType) && "DIRECT_CALL".equals(type));
+                if (!typeMatch) continue;
+                if (matchKey == null) return nodeId;
+                String cfgKey = (String) cfg.getOrDefault("topicKey",
+                        cfg.getOrDefault("eventCode", cfg.getOrDefault("tagCodeKey", "")));
+                if (matchKey.equals(cfgKey)) return nodeId;
+            }
         }
-        // 降级：返回第一个类型匹配的入口节点
+        // 降级：找任意匹配的入口节点
         return graph.entryNodes().stream()
                 .filter(id -> {
                     DagParser.CanvasNode n = graph.getNode(id);
                     if (n == null) return false;
-                    return triggerNodeType.equals(n.getType())
-                        || ("DIRECT_CALL".equals(triggerNodeType) && "START".equals(n.getType()));
+                    String t = n.getType();
+                    if ("START".equals(t)) {
+                        Map<String, Object> c = new java.util.HashMap<>();
+                        if (n.getBizConfig() != null) c.putAll(n.getBizConfig());
+                        if (n.getConfig()    != null) c.putAll(n.getConfig());
+                        String ct = (String) c.getOrDefault("triggerType", "DIRECT");
+                        return switch (triggerNodeType) {
+                            case "DIRECT_CALL"       -> "DIRECT".equals(ct);
+                            case "BEHAVIOR_IN_APP"   -> "EVENT".equals(ct);
+                            case "MQ_TRIGGER"        -> "MQ".equals(ct);
+                            case "SCHEDULED_TRIGGER" -> "SCHEDULED".equals(ct);
+                            default -> false;
+                        };
+                    }
+                    return triggerNodeType.equals(t);
                 })
                 .findFirst().orElse(null);
     }

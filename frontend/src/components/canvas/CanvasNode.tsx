@@ -74,7 +74,7 @@ const CanvasNode = memo(({ data, id, selected }: NodeProps) => {
           width: 80, height: 80, borderRadius: '50%', background: color,
           border: `3px solid ${selected ? '#1677ff' : '#fff'}`,
           boxShadow: '0 2px 8px rgba(0,0,0,.2)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
           color: '#fff', fontWeight: 700, fontSize: 14, position: 'relative',
         }}>
           {isStart
@@ -84,6 +84,11 @@ const CanvasNode = memo(({ data, id, selected }: NodeProps) => {
                 style={{ background: '#fff', border: '2px solid #f5222d', width: 10, height: 10 }} />
           }
           {isStart ? '开始' : '结束'}
+          {isStart && (() => {
+            const tt = d.bizConfig?.triggerType as string | undefined
+            const label = tt === 'EVENT' ? '事件' : tt === 'SCHEDULED' ? '定时' : tt === 'MQ' ? 'MQ' : tt === 'DIRECT' ? '直调' : null
+            return label ? <span style={{ fontSize: 9, fontWeight: 400, opacity: 0.85 }}>{label}</span> : null
+          })()}
         </div>
       </div>
     )
