@@ -7,7 +7,7 @@ import {
 } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
 import dagre from '@dagrejs/dagre'
-import { Button, Divider, Input, message, Modal, Space, Tag, Tooltip } from 'antd'
+import { Button, Divider, Input, message, Modal, Space, Spin, Tag, Tooltip } from 'antd'
 import {
   ArrowLeftOutlined, CaretRightOutlined, CloudUploadOutlined, DeleteOutlined,
   SaveOutlined, ApartmentOutlined, UndoOutlined, RedoOutlined, SyncOutlined,
@@ -27,7 +27,6 @@ import {
 import HoverEdge from '../../components/canvas/HoverEdge'
 import { CanvasActionsContext } from '../../context/CanvasActionsContext'
 
-const { Title } = Typography
 
 const nodeTypes = { canvasNode: CanvasNodeCmp }
 const edgeTypes = { default: HoverEdge }
@@ -159,7 +158,10 @@ function useHistory(nodes: Node<CanvasNodeData>[], edges: Edge[]) {
 
 // ── 主编辑器（内部，需要 ReactFlowProvider 包裹）─────────────
 
-function EditorInner({ detail }: { detail: CanvasDetail }) {
+function EditorInner({ detail, onStatusChange }: {
+  detail: CanvasDetail
+  onStatusChange: (status: number) => void
+}) {
   const { id } = useParams<{ id: string }>()
   const canvasId = Number(id)
   const navigate = useNavigate()
@@ -434,7 +436,7 @@ function EditorInner({ detail }: { detail: CanvasDetail }) {
       await handleSave(true)
       await canvasApi.publish(canvasId)
       message.success('发布成功，已上线')
-      setDetail(prev => prev ? { ...prev, canvas: { ...prev.canvas, status: 1 } } : prev)
+      onStatusChange(1)
     } catch (e: any) {
       message.error(e?.response?.data?.message ?? '发布失败')
     }
@@ -703,14 +705,11 @@ function EditorInner({ detail }: { detail: CanvasDetail }) {
         </div>
       </div>
     </div>
-  )
     </CanvasActionsContext.Provider>
   )
 }
 
 // ── 导出页面（包裹 ReactFlowProvider） ────────────────────────
-
-import { Spin } from 'antd'
 
 export default function CanvasEditorPage() {
   const { id } = useParams<{ id: string }>()
@@ -732,7 +731,9 @@ export default function CanvasEditorPage() {
 
   return (
     <ReactFlowProvider>
-      <EditorInner detail={detail} />
+      <EditorInner detail={detail} onStatusChange={status =>
+        setDetail(prev => prev ? { ...prev, canvas: { ...prev.canvas, status } } : prev)
+      } />
     </ReactFlowProvider>
   )
 }
