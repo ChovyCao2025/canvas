@@ -1,0 +1,1 @@
+UPDATE node_type_registry SET config_schema = '[{"key":"messageCodeKey","label":"消息类型","type":"select","dataSource":"/meta/mq-definitions","required":true},{"key":"params","label":"消息参数","type":"api-input-params","apiKeyField":"messageCodeKey","defsSource":"/meta/mq-definitions","required":false}]' WHERE type_key = 'SEND_MQ';
