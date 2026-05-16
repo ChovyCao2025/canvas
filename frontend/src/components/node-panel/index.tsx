@@ -8,6 +8,8 @@ import { CATEGORY_SOLID, TRIGGER_TYPES } from '../canvas/constants'
 const LEGACY_TRIGGERS = new Set(['BEHAVIOR_IN_APP', 'SCHEDULED_TRIGGER', 'MQ_TRIGGER', 'DIRECT_CALL', 'TAGGER_REALTIME'])
 
 const { Text } = Typography
+
+interface Props {
   onDragStart: (nodeType: string, category: string) => void
 }
 
