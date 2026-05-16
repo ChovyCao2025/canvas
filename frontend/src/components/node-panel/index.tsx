@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react'
-import { Collapse, Tooltip, Typography, Spin } from 'antd'
+import { Collapse, Tooltip, Typography, Spin, Tag } from 'antd'
 import { metaApi } from '../../services/api'
 import type { NodeTypeRegistry } from '../../types'
-import { CATEGORY_SOLID } from '../canvas/constants'
+import { CATEGORY_SOLID, TRIGGER_TYPES } from '../canvas/constants'
 
 const { Text } = Typography
 
@@ -60,11 +60,15 @@ export default function NodePanel({ onDragStart }: Props) {
                 padding: '5px 8px', borderRadius: 4, cursor: 'grab',
                 background: '#fafafa', border: '1px solid #f0f0f0',
                 fontSize: 12, userSelect: 'none',
+                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
               }}
               onMouseEnter={e => (e.currentTarget.style.borderColor = CATEGORY_SOLID[category] ?? '#722ed1')}
               onMouseLeave={e => (e.currentTarget.style.borderColor = '#f0f0f0')}
             >
               {nt.typeName}
+              {TRIGGER_TYPES.has(nt.typeKey) && (
+                <Tag color="cyan" style={{ fontSize: 9, padding: '0 3px', lineHeight: '14px', marginLeft: 4, flexShrink: 0 }}>触发器</Tag>
+              )}
             </div>
           </Tooltip>
         ))}

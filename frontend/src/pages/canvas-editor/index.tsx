@@ -223,8 +223,9 @@ function EditorInner({ detail }: { detail: CanvasDetail }) {
         if (e.key === 'z' && !e.shiftKey) { e.preventDefault(); undo() }
         if ((e.key === 'z' && e.shiftKey) || e.key === 'y') { e.preventDefault(); redo() }
         if (e.key === 's') { e.preventDefault(); handleSave() }
-        // 复制选中节点（不复制 traceColor）
+        // 复制选中节点：有浏览器文字选中时不拦截（让浏览器正常复制文本）
         if (e.key === 'c') {
+          if (window.getSelection()?.toString()) return
           const selected = getNodes().filter(n => n.selected)
           if (selected.length > 0) {
             setClipboard(selected as Node<CanvasNodeData>[])
@@ -349,7 +350,10 @@ function EditorInner({ detail }: { detail: CanvasDetail }) {
     const src = allNodes.find(n => n.id === conn.source)?.data as CanvasNodeData | undefined
     const tgt = allNodes.find(n => n.id === conn.target)?.data as CanvasNodeData | undefined
     if (!src || !tgt) return false
-    if (TRIGGER_TYPES.has(tgt.nodeType)) return false   // 触发器无入边
+    if (TRIGGER_TYPES.has(tgt.nodeType)) {
+      message.warning('触发器节点（如 BEHAVIOR_IN_APP）只能作为第一个节点，不能有入边', 2)
+      return false
+    }
     if (TERMINAL_TYPES.has(src.nodeType)) return false  // 终止节点无出边
     if (conn.source === conn.target) return false        // 禁止自环
     return true
@@ -541,7 +545,16 @@ function EditorInner({ detail }: { detail: CanvasDetail }) {
               onClick={async () => {
                 const errors = validateBeforePublish(getNodes() as Node<CanvasNodeData>[])
                 if (errors.length > 0) { message.error({ content: errors.join('\n'), duration: 5 }); return }
-                try { await canvasApi.publish(canvasId); message.success('发布成功') }
+                try {
+                  // 先保存，确保发布的是最新配置
+                  await handleSave(true)
+                  await canvasApi.publish(canvasId)
+                  message.success('发布成功')
+                  // 刷新状态，隐藏发布按钮
+                  setDetail(prev => prev
+                    ? { ...prev, canvas: { ...prev.canvas, status: 1 } }
+                    : prev)
+                }
                 catch (e: any) { message.error(e?.response?.data?.message ?? '发布失败') }
               }}>
               发布
