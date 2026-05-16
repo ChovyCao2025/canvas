@@ -4,6 +4,7 @@ import { Tooltip } from 'antd'
 import { CopyOutlined, DeleteOutlined } from '@ant-design/icons'
 import type { CanvasNodeData } from './constants'
 import { CATEGORY_COLORS, TRIGGER_TYPES, TERMINAL_TYPES } from './constants'
+import { getBranchHandles } from './branchHandles'
 import { useCanvasActions } from '../../context/CanvasActionsContext'
 
 function useHover() {
@@ -55,13 +56,13 @@ const CanvasNode = memo(({ data, id, selected }: NodeProps) => {
 
   const bg = d.traceColor ?? CATEGORY_COLORS[d.category] ?? '#722ed1'
   const isTrigger  = TRIGGER_TYPES.has(d.nodeType)
+    || (d.nodeType === 'TAGGER' && d.bizConfig?.mode === 'realtime')
   const isTerminal  = TERMINAL_TYPES.has(d.nodeType)
   const isStart     = d.nodeType === 'START'
   const isEnd       = d.nodeType === 'END'
-  const isIf        = d.nodeType === 'IF_CONDITION'
-  const isApproval  = d.nodeType === 'MANUAL_APPROVAL'
-  const branches    = (d.bizConfig?.branches as { label?: string }[] | undefined) ?? []
-  const isSelector  = d.nodeType === 'SELECTOR'
+
+  const branchHandles = getBranchHandles(d.nodeType, d.bizConfig ?? {})
+  const isBranching   = branchHandles.length > 0
 
   if (isStart || isEnd) {
     const color = isStart ? '#52c41a' : '#f5222d'
@@ -119,34 +120,50 @@ const CanvasNode = memo(({ data, id, selected }: NodeProps) => {
         <div style={{ background: '#fff', padding: '8px 10px', fontSize: 13, color: '#262626', lineHeight: 1.4, minHeight: 36 }}>
           {d.name || '未命名'}
         </div>
-        {!isTerminal && !isIf && !isSelector && (
-          <Handle type="source" position={Position.Bottom} id="default"
-            style={{ background: '#fff', border: '2px solid #bbb', width: 10, height: 10 }} />
+        {!isTerminal && (
+          isBranching ? (
+            <div style={{ paddingBottom: 18 }}>
+              {branchHandles.map((h, i) => {
+                const pct = ((i + 1) / (branchHandles.length + 1)) * 100
+                return (
+                  <Handle
+                    key={h.id}
+                    type="source"
+                    position={Position.Bottom}
+                    id={h.id}
+                    style={{
+                      left:       `${pct}%`,
+                      background: h.color,
+                      border:     '2px solid #fff',
+                      width:      10,
+                      height:     10,
+                    }}
+                  >
+                    <span style={{
+                      position:  'absolute',
+                      top:       12,
+                      left:      '50%',
+                      transform: 'translateX(-50%)',
+                      fontSize:  9,
+                      color:     h.color,
+                      whiteSpace: 'nowrap',
+                      pointerEvents: 'none',
+                    }}>
+                      {h.label}
+                    </span>
+                  </Handle>
+                )
+              })}
+            </div>
+          ) : (
+            <Handle
+              type="source"
+              position={Position.Bottom}
+              id="default"
+              style={{ background: '#fff', border: '2px solid #bbb', width: 10, height: 10 }}
+            />
+          )
         )}
-        {isIf && (<>
-          <Handle type="source" position={Position.Bottom} id="success"
-            style={{ left: '30%', background: '#52c41a', border: '2px solid #fff', width: 10, height: 10 }} />
-          <Handle type="source" position={Position.Bottom} id="fail"
-            style={{ left: '70%', background: '#f5222d', border: '2px solid #fff', width: 10, height: 10 }} />
-        </>)}
-        {isApproval && (<>
-          <Handle type="source" position={Position.Bottom} id="approve"
-            style={{ left: '30%', background: '#52c41a', border: '2px solid #fff', width: 10, height: 10 }}>
-            <span style={{ position: 'absolute', top: 10, left: '50%', transform: 'translateX(-50%)', fontSize: 9, color: '#52c41a', whiteSpace: 'nowrap' }}>通过</span>
-          </Handle>
-          <Handle type="source" position={Position.Bottom} id="reject"
-            style={{ left: '70%', background: '#f5222d', border: '2px solid #fff', width: 10, height: 10 }}>
-            <span style={{ position: 'absolute', top: 10, left: '50%', transform: 'translateX(-50%)', fontSize: 9, color: '#f5222d', whiteSpace: 'nowrap' }}>拒绝</span>
-          </Handle>
-        </>)}
-        {isSelector && (<>
-          {branches.map((_, i) => (
-            <Handle key={i} type="source" position={Position.Bottom} id={`branch-${i}`}
-              style={{ left: `${(i + 1) / (branches.length + 2) * 100}%`, background: '#1677ff', border: '2px solid #fff', width: 10, height: 10 }} />
-          ))}
-          <Handle type="source" position={Position.Bottom} id="else"
-            style={{ left: `${(branches.length + 1) / (branches.length + 2) * 100}%`, background: '#8c8c8c', border: '2px solid #fff', width: 10, height: 10 }} />
-        </>)}
       </div>
     </div>
   )
