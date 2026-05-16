@@ -103,15 +103,17 @@ export default function ConfigPanel({ nodeId, nodeData, onChange }: Props) {
     }
   }, [nodeId, nodeData, form])
 
-  const handleValuesChange = useCallback((changed: Record<string, unknown>, all: Record<string, unknown>) => {
+  const handleValuesChange = useCallback((_changed: Record<string, unknown>, all: Record<string, unknown>) => {
     if (!nodeId || !nodeData) return
     setFormValues(all)
-    const { name, ...rest } = changed
+    // 用 all（全量）而非 changed（增量）：nested Form.Item（如 inputParams.xxx）每次只在 changed
+    // 里携带单个子字段，用 changed 会导致其他子字段被丢弃；all 是表单当前完整状态
+    const { name, ...rest } = all
     onChange(nodeId, {
       ...(name !== undefined ? { name: name as string } : {}),
-      bizConfig: { ...nodeData.bizConfig, ...rest },
+      bizConfig: rest,
     })
-  }, [nodeId, nodeData, onChange])
+  }, [nodeId, onChange])
 
   if (!nodeId || !nodeData) {
     return (
