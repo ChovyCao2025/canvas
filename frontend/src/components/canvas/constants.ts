@@ -2,7 +2,6 @@
 export const CATEGORY_COLORS: Record<string, string> = {
   '行为策略': 'linear-gradient(135deg, #13c2c2, #1677ff)',
   '逻辑分支': '#1677ff',
-  '人群圈选': '#fa8c16',
   '权益发放': 'linear-gradient(135deg, #f5222d, #eb2f96)',
   '用户触达': '#faad14',
   '其他':     '#722ed1',
@@ -11,7 +10,6 @@ export const CATEGORY_COLORS: Record<string, string> = {
 export const CATEGORY_SOLID: Record<string, string> = {
   '行为策略': '#13c2c2',
   '逻辑分支': '#1677ff',
-  '人群圈选': '#fa8c16',
   '权益发放': '#f5222d',
   '用户触达': '#faad14',
   '其他':     '#722ed1',
