@@ -17,11 +17,11 @@ export const CATEGORY_SOLID: Record<string, string> = {
   '其他':     '#722ed1',
 }
 
-/** 是否为触发器节点 */
-export const TRIGGER_TYPES = new Set([
-  'MQ_TRIGGER', 'BEHAVIOR_IN_APP', 'DIRECT_CALL',
-  'TAGGER_REALTIME', 'SCHEDULED_TRIGGER', 'START',
-])
+/** 触发器节点（无 target handle，只能作为第一个节点）
+ *  只保留 START —— 统一入口节点
+ *  其余旧触发器类型移出此集合，允许接收来自 START 的连接
+ */
+export const TRIGGER_TYPES = new Set(['START'])
 
 /** 是否为终止节点 */
 export const TERMINAL_TYPES = new Set(['DIRECT_RETURN', 'END'])
