@@ -7,10 +7,10 @@ import {
 } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
 import dagre from '@dagrejs/dagre'
-import { Button, Divider, Input, message, Modal, Space, Tag, Tooltip, Typography } from 'antd'
+import { Button, Divider, Input, message, Modal, Space, Tag, Tooltip } from 'antd'
 import {
   ArrowLeftOutlined, CaretRightOutlined, CloudUploadOutlined, DeleteOutlined,
-  HistoryOutlined, SaveOutlined, ApartmentOutlined,
+  SaveOutlined, ApartmentOutlined, UndoOutlined, RedoOutlined, SyncOutlined,
 } from '@ant-design/icons'
 import { useNavigate, useParams } from 'react-router-dom'
 import type { BackendNode, BizConfig, Branch, Priority, AbGroup, CanvasNodeData } from '../../types/canvas'
@@ -426,6 +426,20 @@ function EditorInner({ detail }: { detail: CanvasDetail }) {
     }
   }, [canvasId, canvasName, getNodes])
 
+  /** 发布（或重新发布）：先保存草稿，再创建新版本上线 */
+  const handlePublish = useCallback(async () => {
+    const errors = validateBeforePublish(getNodes() as Node<CanvasNodeData>[])
+    if (errors.length > 0) { message.error({ content: errors.join('\n'), duration: 5 }); return }
+    try {
+      await handleSave(true)
+      await canvasApi.publish(canvasId)
+      message.success('发布成功，已上线')
+      setDetail(prev => prev ? { ...prev, canvas: { ...prev.canvas, status: 1 } } : prev)
+    } catch (e: any) {
+      message.error(e?.response?.data?.message ?? '发布失败')
+    }
+  }, [canvasId, getNodes, handleSave, validateBeforePublish])
+
   // 整理布局
   const onLayout = useCallback(() => {
     snapshot('整理布局')
@@ -514,65 +528,85 @@ function EditorInner({ detail }: { detail: CanvasDetail }) {
         />
         <Tag color={statusMap[status]?.color}>{statusMap[status]?.label}</Tag>
         <div style={{ flex: 1 }} />
-        <Space>
-          <Tooltip title="整理布局">
-            <Button icon={<ApartmentOutlined />} onClick={onLayout} />
-          </Tooltip>
-          <Tooltip title={undoLabel}>
-            <Button disabled={!canUndo} onClick={undo}>撤销</Button>
-          </Tooltip>
-          <Tooltip title={redoLabel}>
-            <Button disabled={!canRedo} onClick={redo}>重做</Button>
-          </Tooltip>
-          <ExecutionTracePanel
-            canvasId={canvasId}
-            onTraceLoaded={colorMap => {
-              setTraceColorMap(colorMap)
-              // 将颜色叠加到节点 data 中（CanvasNode 通过 traceColor 渲染）
-              setNodes(prev => prev.map(n => ({
-                ...n,
-                data: { ...n.data as CanvasNodeData, traceColor: colorMap[n.id] }
-              })))
-            }}
-          />
-          <Button icon={<HistoryOutlined />} onClick={() => message.info('版本历史')}>
-            历史
-          </Button>
+
+        {/* ── 工具栏 ── */}
+        <Space size={4} style={{ alignItems: 'center' }}>
+
+          {/* 编辑操作组 */}
+          <Space.Compact size="small">
+            <Tooltip title="整理布局">
+              <Button icon={<ApartmentOutlined />} onClick={onLayout} />
+            </Tooltip>
+            <Tooltip title={undoLabel}>
+              <Button icon={<UndoOutlined />} disabled={!canUndo} onClick={undo} />
+            </Tooltip>
+            <Tooltip title={redoLabel}>
+              <Button icon={<RedoOutlined />} disabled={!canRedo} onClick={redo} />
+            </Tooltip>
+          </Space.Compact>
+
+          <Divider type="vertical" style={{ margin: '0 2px' }} />
+
+          {/* 查看组 */}
+          <Space.Compact size="small">
+            <ExecutionTracePanel
+              canvasId={canvasId}
+              onTraceLoaded={colorMap => {
+                setTraceColorMap(colorMap)
+                setNodes(prev => prev.map(n => ({
+                  ...n,
+                  data: { ...n.data as CanvasNodeData, traceColor: colorMap[n.id] }
+                })))
+              }}
+            />
+          </Space.Compact>
+
+          <Divider type="vertical" style={{ margin: '0 2px' }} />
+
+          {/* 保存 */}
           <Tooltip title={
             isDirty
-              ? '保存草稿（Ctrl+S）— 不会上线，点「发布」才会生效'
-              : '草稿已保存 — 需要点「发布」才会上线生效'
+              ? '保存草稿（Ctrl+S）— 不影响线上，发布后生效'
+              : '已保存为草稿'
           }>
-            <Button icon={<SaveOutlined />} loading={saving} onClick={() => handleSave()}
-              style={isDirty ? { borderColor: '#faad14', color: '#faad14' } : {}}>
-              {isDirty ? '保存草稿 *' : '保存草稿'}
+            <Button size="small" icon={<SaveOutlined />} loading={saving}
+              onClick={() => handleSave()}
+              style={isDirty
+                ? { borderColor: '#faad14', color: '#d46b08', background: '#fffbe6' }
+                : { color: '#8c8c8c' }
+              }>
+              {isDirty ? '草稿*' : '已保存'}
             </Button>
           </Tooltip>
-          {status !== 1 && (
-            <Button type="primary" icon={<CloudUploadOutlined />}
-              onClick={async () => {
-                const errors = validateBeforePublish(getNodes() as Node<CanvasNodeData>[])
-                if (errors.length > 0) { message.error({ content: errors.join('\n'), duration: 5 }); return }
-                try {
-                  // 先保存，确保发布的是最新配置
-                  await handleSave(true)
-                  await canvasApi.publish(canvasId)
-                  message.success('发布成功')
-                  // 刷新状态，隐藏发布按钮
-                  setDetail(prev => prev
-                    ? { ...prev, canvas: { ...prev.canvas, status: 1 } }
-                    : prev)
-                }
-                catch (e: any) { message.error(e?.response?.data?.message ?? '发布失败') }
-              }}>
-              发布
-            </Button>
-          )}
-          <Button icon={<CaretRightOutlined />} onClick={() => setTestModalOpen(true)}>
+
+          {/* 测试运行 */}
+          <Button size="small" icon={<CaretRightOutlined />}
+            onClick={() => setTestModalOpen(true)}
+            style={{ color: '#1677ff', borderColor: '#1677ff' }}>
             测试运行
           </Button>
 
-          {/* 测试运行弹窗 */}
+          {/* 发布 / 更新发布 */}
+          {status !== 1
+            ? (
+              <Button size="small" type="primary" icon={<CloudUploadOutlined />}
+                onClick={handlePublish}>
+                发布
+              </Button>
+            ) : (
+              <Tooltip title="保存当前草稿并重新发布，更新线上版本">
+                <Button size="small" type="primary" icon={<SyncOutlined />}
+                  onClick={handlePublish}
+                  style={{ background: '#52c41a', borderColor: '#52c41a' }}>
+                  更新发布
+                </Button>
+              </Tooltip>
+            )
+          }
+        </Space>
+      </div>
+
+      {/* 测试运行弹窗（放在 header div 外，避免 JSX 结构错误）*/}
           <Modal
             title="测试运行"
             open={testModalOpen}
@@ -622,8 +656,6 @@ function EditorInner({ detail }: { detail: CanvasDetail }) {
               </div>
             </Space>
           </Modal>
-        </Space>
-      </div>
 
       {/* 三栏主体 */}
       <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
