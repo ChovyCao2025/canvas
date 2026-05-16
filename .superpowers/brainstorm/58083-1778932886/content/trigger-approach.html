@@ -1,0 +1,40 @@
+<h2>优化点 8：定时触发的定位</h2>
+<p class="subtitle">SCHEDULED_TRIGGER 应该保留为节点，还是升级为旅程级属性？</p>
+
+<div class="options">
+  <div class="option" data-choice="a" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>方案 A — 旅程属性（推荐）</h3>
+      <p>在旅程设置里选择触发方式：<strong>实时触发</strong> 或 <strong>定时触发</strong>。定时触发时展示 Cron 配置。SCHEDULED_TRIGGER 节点从画布节点列表中移除。</p>
+      <div class="pros-cons" style="margin-top:12px">
+        <div class="pros"><h4>优点</h4><ul><li>语义更准确（旅程的触发方式）</li><li>减少画布节点数量</li><li>配置位置更自然</li></ul></div>
+        <div class="cons"><h4>缺点</h4><ul><li>需要改造旅程创建/编辑入口</li><li>已有含此节点的旧画布需要迁移</li></ul></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="option" data-choice="b" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content">
+      <h3>方案 B — 保留节点 + 重设计 UI</h3>
+      <p>SCHEDULED_TRIGGER 保持为画布节点，但重新设计其配置面板：参照优化点附图，用可视化 Cron 选择器替换当前简陋的文本输入。</p>
+      <div class="pros-cons" style="margin-top:12px">
+        <div class="pros"><h4>优点</h4><ul><li>改动小，不影响已有画布</li><li>和其他触发节点保持一致</li></ul></div>
+        <div class="cons"><h4>缺点</h4><ul><li>定时逻辑本质上仍混入节点配置</li><li>用户仍需"找节点"才能配置触发</li></ul></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="option" data-choice="c" onclick="toggleSelect(this)">
+    <div class="letter">C</div>
+    <div class="content">
+      <h3>方案 C — 两者兼有（渐进迁移）</h3>
+      <p>旅程属性里新增触发方式选择，同时暂时保留 SCHEDULED_TRIGGER 节点，待稳定后再下线旧节点。</p>
+      <div class="pros-cons" style="margin-top:12px">
+        <div class="pros"><h4>优点</h4><ul><li>平滑过渡，不破坏存量数据</li></ul></div>
+        <div class="cons"><h4>缺点</h4><ul><li>短期维护两套逻辑</li><li>用户可能感到困惑</li></ul></div>
+      </div>
+    </div>
+  </div>
+</div>

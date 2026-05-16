@@ -7,6 +7,7 @@ import org.chovy.canvas.domain.canvas.CanvasVersion;
 import org.chovy.canvas.domain.canvas.CanvasVersionMapper;
 import org.chovy.canvas.engine.dag.DagGraph;
 import org.chovy.canvas.engine.dag.DagParser;
+import org.chovy.canvas.engine.handlers.MqTriggerHandler;
 import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -36,6 +37,7 @@ public class CanvasRouteInitializer {
     private final CanvasVersionMapper   canvasVersionMapper;
     private final DagParser             dagParser;
     private final TriggerRouteService   triggerRouteService;
+    private final MqTriggerHandler      mqTriggerHandler;
     private final StringRedisTemplate   redis;
 
     private static final String REBUILD_LOCK = "canvas:route-init:lock";
@@ -103,7 +105,7 @@ public class CanvasRouteInitializer {
             if (node == null || node.getConfig() == null) continue;
             Map<String, Object> cfg = node.getConfig();
             switch (node.getType()) {
-                case "MQ_TRIGGER"      -> { String k = (String) cfg.get("topicKey");   if (k != null) triggerRouteService.registerMq(canvasId, k); }
+                case "MQ_TRIGGER"      -> { String k = mqTriggerHandler.resolveTopic(cfg); if (!k.isEmpty()) triggerRouteService.registerMq(canvasId, k); }
                 case "BEHAVIOR_IN_APP" -> { String k = (String) cfg.get("eventCode");  if (k != null) triggerRouteService.registerBehavior(canvasId, k); }
                 case "TAGGER_REALTIME" -> { String k = (String) cfg.get("tagCodeKey"); if (k != null) triggerRouteService.registerTagger(canvasId, k); }
                 default -> {}

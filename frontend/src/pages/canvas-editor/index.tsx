@@ -183,7 +183,7 @@ function EditorInner({ detail, onStatusChange }: {
   const [saving, setSaving]         = useState(false)
   const [isDirty, setIsDirty]       = useState(false)
   const [clipboard, setClipboard]   = useState<Node<CanvasNodeData>[]>([])
-  const [traceColorMap, setTraceColorMap] = useState<Record<string, string>>({})
+  const [, setTraceColorMap] = useState<Record<string, string>>({})
   const [testModalOpen, setTestModalOpen] = useState(false)
   const [testUserId,    setTestUserId]    = useState('user_test_001')
   const [testPayload,   setTestPayload]   = useState('{}')

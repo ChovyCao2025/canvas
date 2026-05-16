@@ -162,7 +162,8 @@ export default function ExecutionTracePanel({ canvasId, onTraceLoaded }: Props) 
         )}
 
         {!selectedExecId && !loading && (
-          <Text type="secondary" style={{ fontSize: 12 }}>
+          <Text type="secondary" style={{ fontSize: 12, paddingLeft: 20 }}>
+            <br />
             选择一次执行记录后，画布节点将按执行状态着色（绿=成功 / 红=失败 / 灰=跳过 / 黄=执行中）
           </Text>
         )}

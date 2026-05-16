@@ -1,0 +1,77 @@
+<h2>AB_SPLIT — 配置后节点连接点方案</h2>
+<p class="subtitle">配置分组后，节点底部应自动出现对应的连接点，边上显示分组信息</p>
+
+<div class="options">
+
+  <div class="option" data-choice="a" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>方案 A — 带标签的 Handle（推荐）</h3>
+      <p>每配置一个分组，节点底部立即出现对应的带标签连接点。用户从标签连接点拖出连线，边上自动显示"A组 33%"等信息。</p>
+
+      <!-- AB_SPLIT 节点模拟 -->
+      <div style="margin:12px auto; width:200px">
+        <div style="border-radius:8px; border:2px solid transparent; box-shadow:0 2px 8px rgba(0,0,0,.12); overflow:visible; position:relative">
+          <!-- 节点头 -->
+          <div style="background:linear-gradient(135deg,#1677ff,#13c2c2); padding:6px 10px; border-radius:6px 6px 0 0">
+            <span style="color:#fff; font-size:11px; font-weight:600">逻辑分支 · AB_SPLIT</span>
+          </div>
+          <!-- 节点体 -->
+          <div style="background:#fff; padding:8px 10px; font-size:13px; color:#262626; border-radius:0 0 6px 6px; padding-bottom:24px">
+            AB 分流实验
+          </div>
+          <!-- A组 handle -->
+          <div style="position:absolute; bottom:-10px; left:22%">
+            <div style="width:10px; height:10px; border-radius:50%; background:#1677ff; border:2px solid #fff; box-shadow:0 0 0 2px #1677ff; margin:0 auto"></div>
+            <div style="font-size:9px; color:#1677ff; white-space:nowrap; transform:translateX(-30%); margin-top:2px; background:#e6f4ff; padding:1px 4px; border-radius:3px">A 33%</div>
+          </div>
+          <!-- B组 handle -->
+          <div style="position:absolute; bottom:-10px; left:46%">
+            <div style="width:10px; height:10px; border-radius:50%; background:#52c41a; border:2px solid #fff; box-shadow:0 0 0 2px #52c41a; margin:0 auto"></div>
+            <div style="font-size:9px; color:#52c41a; white-space:nowrap; transform:translateX(-30%); margin-top:2px; background:#f6ffed; padding:1px 4px; border-radius:3px">B 33%</div>
+          </div>
+          <!-- C组 handle -->
+          <div style="position:absolute; bottom:-10px; left:70%">
+            <div style="width:10px; height:10px; border-radius:50%; background:#fa8c16; border:2px solid #fff; box-shadow:0 0 0 2px #fa8c16; margin:0 auto"></div>
+            <div style="font-size:9px; color:#fa8c16; white-space:nowrap; transform:translateX(-30%); margin-top:2px; background:#fff7e6; padding:1px 4px; border-radius:3px">C 34%</div>
+          </div>
+        </div>
+        <!-- 模拟连线 + 标签 -->
+        <svg width="200" height="70" style="margin-top:24px; overflow:visible">
+          <!-- A → 已连接 -->
+          <line x1="54" y1="0" x2="20" y2="60" stroke="#1677ff" stroke-width="1.5" stroke-dasharray="4,2" />
+          <rect x="-10" y="25" width="52" height="16" rx="4" fill="#e6f4ff" stroke="#91caff" stroke-width="1" />
+          <text x="16" y="37" text-anchor="middle" font-size="9" fill="#1677ff">A 组 33%</text>
+          <!-- B → 已连接 -->
+          <line x1="101" y1="0" x2="100" y2="60" stroke="#52c41a" stroke-width="1.5" stroke-dasharray="4,2" />
+          <rect x="74" y="25" width="52" height="16" rx="4" fill="#f6ffed" stroke="#b7eb8f" stroke-width="1" />
+          <text x="100" y="37" text-anchor="middle" font-size="9" fill="#389e0d">B 组 33%</text>
+          <!-- C → 未连接（虚线+?） -->
+          <line x1="150" y1="0" x2="170" y2="50" stroke="#fa8c16" stroke-width="1.5" stroke-dasharray="4,2" opacity="0.5" />
+          <circle cx="170" cy="57" r="8" fill="#fff7e6" stroke="#ffa940" stroke-width="1.5" />
+          <text x="170" y="61" text-anchor="middle" font-size="9" fill="#fa8c16">?</text>
+        </svg>
+      </div>
+
+      <div class="pros-cons" style="margin-top:8px">
+        <div class="pros"><h4>优点</h4><ul><li>实现简单，只改 CanvasNode</li><li>语义清晰</li><li>ReactFlow 原生支持</li></ul></div>
+        <div class="cons"><h4>缺点</h4><ul><li>未连接时 Handle 悬空，需手动拖线</li></ul></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="option" data-choice="b" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content">
+      <h3>方案 B — 自动生成悬空虚线边</h3>
+      <p>每配置一个分组，除了生成 Handle，还自动创建一条「悬空虚线边」，末端放置一个带分组标签的「占位节点」，直到用户把它替换成真实节点。</p>
+      <div class="pros-cons" style="margin-top:12px">
+        <div class="pros"><h4>优点</h4><ul><li>用户一眼看到"有几条线等待连接"</li><li>视觉提示强</li></ul></div>
+        <div class="cons"><h4>缺点</h4><ul><li>需要管理占位节点生命周期（配置删除分组时同步删除）</li><li>与保存逻辑耦合（占位节点不能保存到后端）</li><li>实现复杂度高 2×</li></ul></div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<p class="subtitle" style="margin-top:16px">方案 A 已能解决"哪根线是哪个分组"的核心问题，方案 B 视觉更强但复杂度高。</p>

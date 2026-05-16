@@ -1,0 +1,142 @@
+<h2>Group B — 分支节点配置 UI 改造</h2>
+<p class="subtitle">核心问题：配置面板和画布连线信息脱节，用户无法在面板内就看清楚"每个分支连向哪个节点"</p>
+
+<div class="split">
+
+  <!-- 现状 -->
+  <div class="mockup">
+    <div class="mockup-header" style="background:#fff1f0; color:#cf1322">❌ 现状 — AB_SPLIT 配置面板</div>
+    <div class="mockup-body" style="font-size:13px">
+      <div style="padding:8px 0; color:#999; font-size:12px">AB 分流 — 分组路由</div>
+
+      <div style="background:#fafafa; border:1px solid #f0f0f0; border-radius:6px; padding:8px; margin-bottom:8px">
+        <div style="display:flex; justify-content:space-between">
+          <span><strong>G1</strong> <span style="color:#999; font-size:11px">bucket 0–33%</span></span>
+          <span style="color:#ff4d4f; font-size:11px; cursor:pointer">删除</span>
+        </div>
+        <div style="margin-top:6px; font-size:12px">
+          <span style="background:#e6f4ff; color:#1677ff; padding:2px 6px; border-radius:3px; margin-right:4px">G1</span>
+          <span style="color:#999">→ 从节点下方对应连接点拖线</span>
+        </div>
+      </div>
+
+      <div style="background:#fafafa; border:1px solid #f0f0f0; border-radius:6px; padding:8px; margin-bottom:8px">
+        <div style="display:flex; justify-content:space-between">
+          <span><strong>G2</strong> <span style="color:#999; font-size:11px">bucket 33–66%</span></span>
+          <span style="color:#ff4d4f; font-size:11px; cursor:pointer">删除</span>
+        </div>
+        <div style="margin-top:6px; font-size:12px">
+          <span style="background:#e6f4ff; color:#1677ff; padding:2px 6px; border-radius:3px; margin-right:4px">G2</span>
+          <span style="color:#999">→ 从节点下方对应连接点拖线</span>
+        </div>
+      </div>
+
+      <div style="color:#8c8c8c; font-size:11px; margin-top:4px">
+        按 Hash(userId:experimentKey) % 100 分桶，等比分配；连线时边上会显示分组 Key
+      </div>
+    </div>
+  </div>
+
+  <!-- 改造后 -->
+  <div class="mockup">
+    <div class="mockup-header" style="background:#f6ffed; color:#389e0d">✅ 改造后 — AB_SPLIT 配置面板</div>
+    <div class="mockup-body" style="font-size:13px">
+      <div style="padding:8px 0; color:#999; font-size:12px">AB 分流 — 分组路由（百分比可拖动分配）</div>
+
+      <!-- 百分比可视化条 -->
+      <div style="display:flex; height:8px; border-radius:4px; overflow:hidden; margin-bottom:12px">
+        <div style="flex:1; background:#1677ff; border-right:2px solid #fff"></div>
+        <div style="flex:1; background:#52c41a; border-right:2px solid #fff"></div>
+        <div style="flex:1; background:#fa8c16"></div>
+      </div>
+
+      <div style="background:#fafafa; border:1px solid #f0f0f0; border-radius:6px; padding:8px; margin-bottom:8px">
+        <div style="display:flex; justify-content:space-between; align-items:center">
+          <div style="display:flex; align-items:center; gap:6px">
+            <div style="width:10px; height:10px; border-radius:2px; background:#1677ff"></div>
+            <strong>A 组</strong>
+            <span style="color:#1677ff; font-size:12px">33%</span>
+          </div>
+          <span style="color:#ff4d4f; font-size:11px; cursor:pointer">删除</span>
+        </div>
+        <!-- 后继节点已连接 -->
+        <div style="margin-top:6px; display:flex; align-items:center; gap:4px; font-size:12px">
+          <span style="color:#999">后继节点：</span>
+          <span style="background:#e6f4ff; border:1px solid #91caff; color:#1677ff; padding:2px 8px; border-radius:4px">📦 发送优惠券</span>
+        </div>
+      </div>
+
+      <div style="background:#fafafa; border:1px solid #f0f0f0; border-radius:6px; padding:8px; margin-bottom:8px">
+        <div style="display:flex; justify-content:space-between; align-items:center">
+          <div style="display:flex; align-items:center; gap:6px">
+            <div style="width:10px; height:10px; border-radius:2px; background:#52c41a"></div>
+            <strong>B 组</strong>
+            <span style="color:#52c41a; font-size:12px">33%</span>
+          </div>
+          <span style="color:#ff4d4f; font-size:11px; cursor:pointer">删除</span>
+        </div>
+        <div style="margin-top:6px; display:flex; align-items:center; gap:4px; font-size:12px">
+          <span style="color:#999">后继节点：</span>
+          <span style="background:#e6f4ff; border:1px solid #91caff; color:#1677ff; padding:2px 8px; border-radius:4px">📩 发送短信</span>
+        </div>
+      </div>
+
+      <div style="background:#fafafa; border:1px solid #f0f0f0; border-radius:6px; padding:8px; margin-bottom:8px">
+        <div style="display:flex; justify-content:space-between; align-items:center">
+          <div style="display:flex; align-items:center; gap:6px">
+            <div style="width:10px; height:10px; border-radius:2px; background:#fa8c16"></div>
+            <strong>C 组</strong>
+            <span style="color:#fa8c16; font-size:12px">34%</span>
+          </div>
+          <span style="color:#ff4d4f; font-size:11px; cursor:pointer">删除</span>
+        </div>
+        <!-- 未连接状态 -->
+        <div style="margin-top:6px; display:flex; align-items:center; gap:4px; font-size:12px">
+          <span style="color:#999">后继节点：</span>
+          <span style="color:#faad14; background:#fffbe6; border:1px solid #ffe58f; padding:2px 8px; border-radius:4px">⚠ 未连线</span>
+        </div>
+      </div>
+
+      <div style="color:#8c8c8c; font-size:11px; margin-top:4px">
+        在画布上从对应分组的连接点拖出连线即可绑定后继节点
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<div class="section" style="margin-top:24px">
+  <h3>MANUAL_APPROVAL 配置面板改造</h3>
+  <div class="split">
+
+    <div class="mockup">
+      <div class="mockup-header" style="background:#fff1f0; color:#cf1322">❌ 现状</div>
+      <div class="mockup-body" style="font-size:13px">
+        <div style="margin-bottom:8px">审批链接：<input class="mock-input" style="width:150px" placeholder="请输入审批链接" /></div>
+        <div style="color:#999; font-size:12px">通过/拒绝后继节点：通过连线设置后续节点</div>
+        <div style="color:#faad14; font-size:11px; margin-top:4px">（用户不知道哪根线是"通过"哪根是"拒绝"）</div>
+      </div>
+    </div>
+
+    <div class="mockup">
+      <div class="mockup-header" style="background:#f6ffed; color:#389e0d">✅ 改造后</div>
+      <div class="mockup-body" style="font-size:13px">
+        <div style="margin-bottom:12px">审批链接：<input class="mock-input" style="width:150px" placeholder="请输入审批链接" /></div>
+        <div style="display:flex; flex-direction:column; gap:8px">
+          <div style="display:flex; align-items:center; gap:8px">
+            <span style="background:#f6ffed; border:1px solid #b7eb8f; color:#389e0d; padding:2px 8px; border-radius:4px; font-size:12px; width:40px; text-align:center">✅ 通过</span>
+            <span style="color:#999; font-size:12px">→</span>
+            <span style="background:#e6f4ff; border:1px solid #91caff; color:#1677ff; padding:2px 8px; border-radius:4px; font-size:12px">📦 发放权益</span>
+          </div>
+          <div style="display:flex; align-items:center; gap:8px">
+            <span style="background:#fff1f0; border:1px solid #ffa39e; color:#cf1322; padding:2px 8px; border-radius:4px; font-size:12px; width:40px; text-align:center">❌ 拒绝</span>
+            <span style="color:#999; font-size:12px">→</span>
+            <span style="color:#faad14; background:#fffbe6; border:1px solid #ffe58f; padding:2px 8px; border-radius:4px; font-size:12px">⚠ 未连线</span>
+          </div>
+        </div>
+        <div style="color:#8c8c8c; font-size:11px; margin-top:10px">从画布节点底部的"通过"/"拒绝"连接点拖出连线绑定</div>
+      </div>
+    </div>
+
+  </div>
+</div>

@@ -1,0 +1,103 @@
+<h2>AB_SPLIT — 虚线占位框 + 拖拽自动连接</h2>
+<p class="subtitle">配置分组后自动生成带标签的虚线占位框，用户拖节点到占位框即完成连线</p>
+
+<div class="mockup">
+  <div class="mockup-header">画布交互演示（静态模拟）</div>
+  <div class="mockup-body" style="min-height:360px; position:relative; background:#f8f9fb">
+
+    <!-- AB_SPLIT 节点 -->
+    <div style="position:absolute; top:20px; left:50%; transform:translateX(-50%); width:200px">
+      <div style="border-radius:8px; box-shadow:0 2px 8px rgba(0,0,0,.12); overflow:visible; position:relative">
+        <div style="background:linear-gradient(135deg,#1677ff,#13c2c2); padding:6px 10px; border-radius:6px 6px 0 0">
+          <span style="color:#fff; font-size:11px; font-weight:600">逻辑分支 · AB_SPLIT</span>
+        </div>
+        <div style="background:#fff; padding:8px 10px; font-size:13px; color:#262626; border-radius:0 0 6px 6px; padding-bottom:20px">
+          AB 分流实验
+        </div>
+        <!-- Handle A -->
+        <div style="position:absolute; bottom:-6px; left:20%">
+          <div style="width:10px;height:10px;border-radius:50%;background:#1677ff;border:2px solid #fff;box-shadow:0 0 0 2px #1677ff;margin:0 auto"></div>
+          <div style="font-size:9px;color:#1677ff;white-space:nowrap;transform:translateX(-40%);margin-top:2px;background:#e6f4ff;padding:1px 4px;border-radius:3px">A 33%</div>
+        </div>
+        <!-- Handle B -->
+        <div style="position:absolute; bottom:-6px; left:46%">
+          <div style="width:10px;height:10px;border-radius:50%;background:#52c41a;border:2px solid #fff;box-shadow:0 0 0 2px #52c41a;margin:0 auto"></div>
+          <div style="font-size:9px;color:#52c41a;white-space:nowrap;transform:translateX(-40%);margin-top:2px;background:#f6ffed;padding:1px 4px;border-radius:3px">B 33%</div>
+        </div>
+        <!-- Handle C -->
+        <div style="position:absolute; bottom:-6px; left:72%">
+          <div style="width:10px;height:10px;border-radius:50%;background:#fa8c16;border:2px solid #fff;box-shadow:0 0 0 2px #fa8c16;margin:0 auto"></div>
+          <div style="font-size:9px;color:#fa8c16;white-space:nowrap;transform:translateX(-40%);margin-top:2px;background:#fff7e6;padding:1px 4px;border-radius:3px">C 34%</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- SVG 连线 + 占位框 -->
+    <svg style="position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none" overflow="visible">
+      <!-- A → 占位框 A（已连接，实线） -->
+      <path d="M 310 108 C 310 140, 195 140, 195 175" stroke="#1677ff" stroke-width="1.5" fill="none" />
+      <!-- B → 占位框 B（虚线，待连接） -->
+      <path d="M 366 108 C 366 140, 366 140, 366 175" stroke="#52c41a" stroke-width="1.5" fill="none" stroke-dasharray="5,3" opacity="0.7" />
+      <!-- C → 占位框 C（虚线，待连接） -->
+      <path d="M 420 108 C 420 140, 530 140, 530 175" stroke="#fa8c16" stroke-width="1.5" fill="none" stroke-dasharray="5,3" opacity="0.7" />
+    </svg>
+
+    <!-- 占位框 A — 已被真实节点替换 -->
+    <div style="position:absolute; top:175px; left:130px; width:130px">
+      <div style="border-radius:8px; box-shadow:0 2px 8px rgba(0,0,0,.12); overflow:hidden">
+        <div style="background:linear-gradient(135deg,#722ed1,#722ed1); padding:5px 8px">
+          <span style="color:#fff; font-size:10px; font-weight:600">其他 · API_CALL</span>
+        </div>
+        <div style="background:#fff; padding:6px 8px; font-size:12px; color:#262626">发放权益</div>
+      </div>
+      <div style="text-align:center; font-size:10px; color:#1677ff; margin-top:4px; background:#e6f4ff; border-radius:4px; padding:1px">✓ A 组已连接</div>
+    </div>
+
+    <!-- 占位框 B — 虚线待连接 -->
+    <div style="position:absolute; top:175px; left:300px; width:130px">
+      <div style="border:2px dashed #52c41a; border-radius:8px; background:#f6ffed; padding:12px 8px; text-align:center; opacity:0.85">
+        <div style="font-size:11px; color:#389e0d; font-weight:600">B 组 33%</div>
+        <div style="font-size:10px; color:#8c8c8c; margin-top:4px">拖节点到这里</div>
+        <div style="font-size:16px; color:#52c41a; margin-top:4px">＋</div>
+      </div>
+    </div>
+
+    <!-- 占位框 C — 虚线待连接（hover 高亮状态模拟） -->
+    <div style="position:absolute; top:175px; left:465px; width:130px">
+      <div style="border:2px dashed #fa8c16; border-radius:8px; background:#fff7e6; padding:12px 8px; text-align:center; box-shadow:0 0 0 3px rgba(250,140,22,0.2)">
+        <div style="font-size:11px; color:#d46b08; font-weight:600">C 组 34%</div>
+        <div style="font-size:10px; color:#8c8c8c; margin-top:4px">拖节点到这里</div>
+        <div style="font-size:16px; color:#fa8c16; margin-top:4px">＋</div>
+      </div>
+      <!-- 拖拽中的节点 -->
+      <div style="position:absolute; top:-50px; left:5px; width:120px; opacity:0.7; pointer-events:none; transform:rotate(-2deg)">
+        <div style="border-radius:6px; box-shadow:0 4px 12px rgba(0,0,0,.2); overflow:hidden; border:2px solid #1677ff">
+          <div style="background:#fa8c16; padding:4px 8px"><span style="color:#fff; font-size:10px">其他 · SEND_MQ</span></div>
+          <div style="background:#fff; padding:5px 8px; font-size:11px">发送消息</div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<div class="section" style="margin-top:20px">
+  <h3>交互流程说明</h3>
+  <ol style="font-size:14px; line-height:2.2; color:#555">
+    <li>用户在配置面板新增分组 → 节点底部出现对应 Handle + 画布下方自动生成虚线占位框</li>
+    <li>用户从节点面板拖出一个节点，<strong>拖到占位框上方时占位框高亮</strong>（橙色发光）</li>
+    <li>松手 → 系统自动：创建节点、删除占位框、建立 AB_SPLIT → 新节点的连线（带分组标签）</li>
+    <li>用户也可以忽略占位框，直接从 Handle 拖线连接已有节点（占位框同步消失）</li>
+    <li>删除分组 → 对应占位框自动移除（若已连真实节点则断开连线并弹确认）</li>
+  </ol>
+</div>
+
+<div class="section">
+  <h3>技术可行性</h3>
+  <ul style="font-size:14px; line-height:2; color:#555">
+    <li>占位框 = 特殊 ReactFlow 节点（type: <code>ab-placeholder</code>），保存时过滤掉</li>
+    <li>拖节点到占位框：监听 <code>onDrop</code>，命中占位框 → 在其位置创建新节点并自动连线</li>
+    <li>从 Handle 连线到占位框：<code>onConnect</code> 时检测 target 是占位框 → 重定向为真实连线</li>
+    <li>分组增减同步占位框：在 <code>onChange(bizConfig)</code> 里对比新旧 groups，增删对应占位节点</li>
+  </ul>
+</div>

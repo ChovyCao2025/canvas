@@ -1,8 +1,12 @@
 package org.chovy.canvas.engine.handlers;
 
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import org.chovy.canvas.domain.meta.MqMessageDefinition;
+import org.chovy.canvas.domain.meta.MqMessageDefinitionMapper;
 import org.chovy.canvas.engine.context.ExecutionContext;
 import org.chovy.canvas.engine.handler.NodeHandler;
 import org.chovy.canvas.engine.handler.NodeHandlerType;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import org.chovy.canvas.engine.handler.NodeResult;
 import reactor.core.publisher.Mono;
@@ -17,6 +21,9 @@ import java.util.Map;
 @Component
 @NodeHandlerType("MQ_TRIGGER")
 public class MqTriggerHandler implements NodeHandler {
+
+    @Autowired(required = false)
+    private MqMessageDefinitionMapper mqMessageDefinitionMapper;
 
     @Override
     @SuppressWarnings("unchecked")
@@ -38,4 +45,22 @@ public class MqTriggerHandler implements NodeHandler {
         Map<String, Object> output = new HashMap<>(ctx.getTriggerPayload());
         return Mono.just(NodeResult.ok(nextNodeId, output));
     }
+
+    /**
+     * Resolves the actual MQ topic string from node config.
+     * Tries messageCodeKey first (new format after V29), falls back to topicKey (legacy).
+     */
+    public String resolveTopic(Map<String, Object> config) {
+        String messageCode = (String) config.get("messageCodeKey");
+        if (messageCode != null && mqMessageDefinitionMapper != null) {
+            MqMessageDefinition def = mqMessageDefinitionMapper.selectOne(
+                new LambdaQueryWrapper<MqMessageDefinition>()
+                    .eq(MqMessageDefinition::getMessageCode, messageCode)
+                    .eq(MqMessageDefinition::getEnabled, 1));
+            if (def != null) return def.getTopic();
+        }
+        // Backward-compat: old canvases store topicKey directly
+        return (String) config.getOrDefault("topicKey", "");
+    }
 }
+
