@@ -9,17 +9,16 @@ import '@xyflow/react/dist/style.css'
 import dagre from '@dagrejs/dagre'
 import { Button, Divider, Input, message, Modal, Space, Spin, Tag, Tooltip } from 'antd'
 import {
-  ArrowLeftOutlined, CaretRightOutlined, CloudUploadOutlined, DeleteOutlined,
-  SaveOutlined, ApartmentOutlined, UndoOutlined, RedoOutlined, SyncOutlined,
+  ArrowLeftOutlined, CaretRightOutlined, CloudUploadOutlined, SaveOutlined, ApartmentOutlined, UndoOutlined, RedoOutlined, SyncOutlined,
 } from '@ant-design/icons'
 import { useNavigate, useParams } from 'react-router-dom'
-import type { BackendNode, BizConfig, Branch, Priority, AbGroup, CanvasNodeData } from '../../types/canvas'
+import type { BackendNode, BizConfig, CanvasNodeData } from '../../types/canvas'
 import { canvasApi } from '../../services/api'
 import type { CanvasDetail } from '../../types'
 import CanvasNodeCmp from '../../components/canvas/CanvasNode'
 import NodePanel from '../../components/node-panel'
 import ConfigPanel from '../../components/config-panel'
-import ExecutionTracePanel, { type TraceStatus } from '../../components/canvas/ExecutionTracePanel'
+import ExecutionTracePanel from '../../components/canvas/ExecutionTracePanel'
 import {
   DEFAULT_NAMES, TRIGGER_TYPES, TERMINAL_TYPES,
 } from '../../components/canvas/constants'
@@ -74,8 +73,8 @@ function patchBizConfig(
   cfg: Record<string, unknown>,
   sourceHandle: string,
   target: string,
-): Record<string, unknown> {
-  const next = { ...cfg }
+): BizConfig {
+  const next = { ...cfg } as BizConfig
   if (sourceHandle === 'success')       next.successNodeId = target
   else if (sourceHandle === 'fail')     next.failNodeId    = target
   else if (sourceHandle === 'else')     next.elseNodeId    = target
@@ -83,18 +82,18 @@ function patchBizConfig(
   else if (sourceHandle === 'reject')   next.rejectNodeId  = target
   else if (sourceHandle.startsWith('branch-')) {
     const idx = parseInt(sourceHandle.split('-')[1], 10)
-    next.branches   = (next.branches   ?? []).map((b, i) =>
-      i === idx ? { ...(b as Branch), nextNodeId: target } : b
+    next.branches = (next.branches ?? []).map((b, i) =>
+      i === idx ? { ...b, nextNodeId: target } : b
     )
   } else if (sourceHandle.startsWith('priority-')) {
     const idx = parseInt(sourceHandle.split('-')[1], 10)
     next.priorities = (next.priorities ?? []).map((p, i) =>
-      i === idx ? { ...(p as Priority), nextNodeId: target } : p
+      i === idx ? { ...p, nextNodeId: target } : p
     )
   } else if (sourceHandle.startsWith('group-')) {
     const key = sourceHandle.replace('group-', '')
-    next.groups = (next.groups ?? []).map((g) =>
-      (g as AbGroup).groupKey === key ? { ...(g as AbGroup), nextNodeId: target } : g
+    next.groups = (next.groups ?? []).map(g =>
+      g.groupKey === key ? { ...g, nextNodeId: target } : g
     )
   } else {
     next.nextNodeId = target
@@ -104,17 +103,18 @@ function patchBizConfig(
 
 // ── 清理被删节点的引用 ────────────────────────────────────────
 
-function cleanRefs(cfg: Record<string, unknown>, deletedIds: Set<string>) {
+function cleanRefs(cfg: Record<string, unknown>, deletedIds: Set<string>): BizConfig {
   const clean = (v: unknown) => (typeof v === 'string' && deletedIds.has(v) ? undefined : v)
+  const biz = cfg as BizConfig
   return {
     ...cfg,
-    nextNodeId:    clean(cfg.nextNodeId),
-    successNodeId: clean(cfg.successNodeId),
-    failNodeId:    clean(cfg.failNodeId),
-    elseNodeId:    clean(cfg.elseNodeId),
-    branches:   cfg.branches?.map(b   => ({ ...b,   nextNodeId: clean(b.nextNodeId) })),
-    priorities: cfg.priorities?.map(p => ({ ...p,   nextNodeId: clean(p.nextNodeId) })),
-    groups:     cfg.groups?.map(g     => ({ ...g,   nextNodeId: clean(g.nextNodeId) })),
+    nextNodeId:    clean(biz.nextNodeId)    as string | undefined,
+    successNodeId: clean(biz.successNodeId) as string | undefined,
+    failNodeId:    clean(biz.failNodeId)    as string | undefined,
+    elseNodeId:    clean(biz.elseNodeId)    as string | undefined,
+    branches:   biz.branches?.map(b   => ({ ...b, nextNodeId: clean(b.nextNodeId) as string | undefined })),
+    priorities: biz.priorities?.map(p => ({ ...p, nextNodeId: clean(p.nextNodeId) as string | undefined })),
+    groups:     biz.groups?.map(g     => ({ ...g, nextNodeId: clean(g.nextNodeId) as string | undefined })),
   }
 }
 
@@ -156,6 +156,15 @@ function useHistory(nodes: Node<CanvasNodeData>[], edges: Edge[]) {
   return { snapshot, undo, redo, canUndo: history.length > 0, canRedo: future.length > 0, undoLabel, redoLabel }
 }
 
+// ── 工具栏样式常量 ───────────────────────────────────────────────
+const iconBtnStyle: React.CSSProperties = {
+  borderRadius: 8, color: '#595959', width: 28, height: 28,
+  display: 'flex', alignItems: 'center', justifyContent: 'center',
+}
+const divStyle: React.CSSProperties = {
+  width: 1, height: 16, background: '#e8e8e8', margin: '0 2px',
+}
+
 // ── 主编辑器（内部，需要 ReactFlowProvider 包裹）─────────────
 
 function EditorInner({ detail, onStatusChange }: {
@@ -182,7 +191,7 @@ function EditorInner({ detail, onStatusChange }: {
   const editVersion   = useRef(0)
   const autoSaveTimer = useRef<ReturnType<typeof setTimeout>>()
 
-  const { snapshot, undo, redo, canUndo, canRedo, undoLabel, redoLabel } = useHistory(nodes, edges)
+  const { snapshot, undo, redo, canUndo, canRedo, undoLabel, redoLabel } = useHistory(nodes as Node<CanvasNodeData>[], edges)
 
   // ── Auto-save：最后一次改动 3s 后静默保存 ─────────────────────
   useEffect(() => {
@@ -208,7 +217,7 @@ function EditorInner({ detail, onStatusChange }: {
     }))
     const rfEdges = deriveEdges(backendNodes)
     const layouted = rfNodes.every(n => n.position.x === 0 && n.position.y === 0)
-      ? applyDagreLayout(rfNodes, rfEdges) : rfNodes
+      ? applyDagreLayout(rfNodes, rfEdges) as Node<CanvasNodeData>[] : rfNodes
     setNodes(layouted)
     setEdges(rfEdges)
     requestAnimationFrame(() => fitView({ padding: 0.15, duration: 300 }))
@@ -515,100 +524,107 @@ function EditorInner({ detail, onStatusChange }: {
       {/* 顶部工具栏 */}
       <div style={{
         display: 'flex', alignItems: 'center', gap: 8,
-        padding: '0 12px', height: 52,
-        borderBottom: '1px solid #f0f0f0', background: '#fff', flexShrink: 0,
+        padding: '0 16px', height: 56,
+        background: '#fff',
+        borderBottom: '1px solid #f0f0f0',
+        boxShadow: '0 1px 4px rgba(0,0,0,.06)',
+        flexShrink: 0,
       }}>
+        {/* 返回 */}
         <Tooltip title="返回列表">
-          <Button type="text" icon={<ArrowLeftOutlined />} onClick={() => navigate('/canvas')} />
+          <Button type="text" size="small" icon={<ArrowLeftOutlined />}
+            onClick={() => navigate('/canvas')}
+            style={{ color: '#8c8c8c', borderRadius: 8 }} />
         </Tooltip>
-        <Divider type="vertical" />
+        <Divider type="vertical" style={{ margin: '0 4px' }} />
+
+        {/* 画布名 + 状态 */}
         <Input
           value={canvasName}
           onChange={e => setCanvasName(e.target.value)}
           variant="borderless"
-          style={{ width: 260, fontWeight: 500, fontSize: 15 }}
+          style={{ width: 240, fontWeight: 600, fontSize: 14, padding: 0 }}
         />
-        <Tag color={statusMap[status]?.color}>{statusMap[status]?.label}</Tag>
+        <Tag color={statusMap[status]?.color} style={{ borderRadius: 6, fontSize: 11 }}>
+          {statusMap[status]?.label}
+        </Tag>
+
         <div style={{ flex: 1 }} />
 
-        {/* ── 工具栏 ── */}
-        <Space size={4} style={{ alignItems: 'center' }}>
+        {/* ── 工具栏（极简企业风）── */}
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: 6,
+          background: '#f7f8fa', borderRadius: 10, padding: '5px 10px',
+          boxShadow: '0 1px 3px rgba(0,0,0,.06)',
+        }}>
+          {/* 左：编辑 + 布局 */}
+          <Tooltip title="整理布局"><Button type="text" size="small" icon={<ApartmentOutlined />} onClick={onLayout} style={iconBtnStyle} /></Tooltip>
+          <Tooltip title={undoLabel}><Button type="text" size="small" icon={<UndoOutlined />} disabled={!canUndo} onClick={undo} style={iconBtnStyle} /></Tooltip>
+          <Tooltip title={redoLabel}><Button type="text" size="small" icon={<RedoOutlined />} disabled={!canRedo} onClick={redo} style={iconBtnStyle} /></Tooltip>
 
-          {/* 编辑操作组 */}
-          <Space.Compact size="small">
-            <Tooltip title="整理布局">
-              <Button icon={<ApartmentOutlined />} onClick={onLayout} />
-            </Tooltip>
-            <Tooltip title={undoLabel}>
-              <Button icon={<UndoOutlined />} disabled={!canUndo} onClick={undo} />
-            </Tooltip>
-            <Tooltip title={redoLabel}>
-              <Button icon={<RedoOutlined />} disabled={!canRedo} onClick={redo} />
-            </Tooltip>
-          </Space.Compact>
+          <div style={divStyle} />
 
-          <Divider type="vertical" style={{ margin: '0 2px' }} />
-
-          {/* 查看组 */}
-          <Space.Compact size="small">
-            <ExecutionTracePanel
-              canvasId={canvasId}
-              onTraceLoaded={colorMap => {
-                setTraceColorMap(colorMap)
-                setNodes(prev => prev.map(n => ({
-                  ...n,
-                  data: { ...n.data as CanvasNodeData, traceColor: colorMap[n.id] }
-                })))
-              }}
-            />
-          </Space.Compact>
-
-          <Divider type="vertical" style={{ margin: '0 2px' }} />
-
-          {/* 保存 */}
-          <Tooltip title={
-            isDirty
-              ? '保存草稿（Ctrl+S）— 不影响线上，发布后生效'
-              : '已保存为草稿'
-          }>
+          {/* 中：状态工具 */}
+          <ExecutionTracePanel
+            canvasId={canvasId}
+            onTraceLoaded={colorMap => {
+              setTraceColorMap(colorMap)
+              setNodes(prev => prev.map(n => ({
+                ...n,
+                data: { ...n.data as CanvasNodeData, traceColor: colorMap[n.id] }
+              })))
+            }}
+          />
+          <Tooltip title={isDirty ? '保存草稿（Ctrl+S）— 不影响线上' : '草稿已是最新'}>
             <Button size="small" icon={<SaveOutlined />} loading={saving}
               onClick={() => handleSave()}
               style={isDirty
-                ? { borderColor: '#faad14', color: '#d46b08', background: '#fffbe6' }
-                : { color: '#8c8c8c' }
+                ? { borderRadius: 8, borderColor: '#faad14', color: '#d46b08', background: '#fffbe6', fontSize: 12 }
+                : { borderRadius: 8, color: '#8c8c8c', fontSize: 12 }
               }>
               {isDirty ? '草稿*' : '已保存'}
             </Button>
           </Tooltip>
 
-          {/* 测试运行 */}
-          <Button size="small" icon={<CaretRightOutlined />}
+          <div style={divStyle} />
+
+          {/* 右：核心操作（胶囊设计）*/}
+          <Button
+            size="small" icon={<CaretRightOutlined />}
             onClick={() => setTestModalOpen(true)}
-            style={{ color: '#1677ff', borderColor: '#1677ff' }}>
+            style={{
+              background: '#1677ff', color: '#fff', border: 'none',
+              borderRadius: 20, padding: '0 14px', fontWeight: 500, fontSize: 12,
+              boxShadow: '0 2px 6px rgba(22,119,255,.35)',
+            }}>
             测试运行
           </Button>
 
-          {/* 发布 / 更新发布 */}
-          {status !== 1
-            ? (
-              <Button size="small" type="primary" icon={<CloudUploadOutlined />}
-                onClick={handlePublish}>
-                发布
+          {status !== 1 ? (
+            <Button size="small" icon={<CloudUploadOutlined />} onClick={handlePublish}
+              style={{
+                background: '#1677ff', color: '#fff', border: 'none',
+                borderRadius: 20, padding: '0 14px', fontWeight: 500, fontSize: 12,
+                boxShadow: '0 2px 6px rgba(22,119,255,.35)',
+              }}>
+              发布
+            </Button>
+          ) : (
+            <Tooltip title="保存当前草稿并重新发布，更新线上版本">
+              <Button size="small" icon={<SyncOutlined />} onClick={handlePublish}
+                style={{
+                  background: '#52c41a', color: '#fff', border: 'none',
+                  borderRadius: 20, padding: '0 14px', fontWeight: 500, fontSize: 12,
+                  boxShadow: '0 2px 6px rgba(82,196,26,.35)',
+                }}>
+                更新发布
               </Button>
-            ) : (
-              <Tooltip title="保存当前草稿并重新发布，更新线上版本">
-                <Button size="small" type="primary" icon={<SyncOutlined />}
-                  onClick={handlePublish}
-                  style={{ background: '#52c41a', borderColor: '#52c41a' }}>
-                  更新发布
-                </Button>
-              </Tooltip>
-            )
-          }
-        </Space>
+            </Tooltip>
+          )}
+        </div>
       </div>
 
-      {/* 测试运行弹窗（放在 header div 外，避免 JSX 结构错误）*/}
+      {/* 测试运行弹窗 */}
           <Modal
             title="测试运行"
             open={testModalOpen}
@@ -680,7 +696,7 @@ function EditorInner({ detail, onStatusChange }: {
             onNodesChange={onNodesChangeWrapped}
             onEdgesChange={onEdgesChange}
             onConnect={onConnect}
-            isValidConnection={isValidConnection}
+            isValidConnection={isValidConnection as any}
             onNodeClick={(_, node) => setSelectedNodeId(node.id)}
             onPaneClick={() => setSelectedNodeId(null)}
             fitView
@@ -732,7 +748,7 @@ export default function CanvasEditorPage() {
   return (
     <ReactFlowProvider>
       <EditorInner detail={detail} onStatusChange={status =>
-        setDetail(prev => prev ? { ...prev, canvas: { ...prev.canvas, status } } : prev)
+        setDetail(prev => prev ? ({ ...prev, canvas: { ...prev.canvas, status } } as typeof prev) : prev)
       } />
     </ReactFlowProvider>
   )
