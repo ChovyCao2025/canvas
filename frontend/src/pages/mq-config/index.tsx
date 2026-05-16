@@ -113,6 +113,9 @@ export default function MqConfigPage() {
         <Title level={4} style={{ margin: 0 }}>MQ 消息配置</Title>
         <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>新建消息</Button>
       </div>
+      <Typography.Text type="secondary" style={{ fontSize: 13, display: 'block', marginBottom: 16 }}>
+        在此配置好 MQ 消息类型后，可在画布中的「MQ 消息触发」节点和「发送 MQ」节点直接选用。
+      </Typography.Text>
       <Table rowKey="id" dataSource={data} columns={columns} loading={loading}
         pagination={{ total, pageSize: 20, current: page, onChange: p => { setPage(p); fetchList(p) } }} />
 
