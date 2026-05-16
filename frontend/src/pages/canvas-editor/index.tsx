@@ -351,7 +351,11 @@ function EditorInner({ detail }: { detail: CanvasDetail }) {
     const tgt = allNodes.find(n => n.id === conn.target)?.data as CanvasNodeData | undefined
     if (!src || !tgt) return false
     if (TRIGGER_TYPES.has(tgt.nodeType)) {
-      message.warning('触发器节点（如 BEHAVIOR_IN_APP）只能作为第一个节点，不能有入边', 2)
+      message.warning(
+        `${tgt.nodeType === 'START' ? 'START' : tgt.nodeType} 是触发器节点，只能作为流程入口，不能有上游节点。\n` +
+        '多种触发方式（如事件触发 + 手动触发）可以各自独立作为入口，共同连接到后续节点。',
+        3
+      )
       return false
     }
     if (TERMINAL_TYPES.has(src.nodeType)) return false  // 终止节点无出边
@@ -534,10 +538,14 @@ function EditorInner({ detail }: { detail: CanvasDetail }) {
           <Button icon={<HistoryOutlined />} onClick={() => message.info('版本历史')}>
             历史
           </Button>
-          <Tooltip title={isDirty ? '有未保存的修改（Ctrl+S）' : '已保存'}>
+          <Tooltip title={
+            isDirty
+              ? '保存草稿（Ctrl+S）— 不会上线，点「发布」才会生效'
+              : '草稿已保存 — 需要点「发布」才会上线生效'
+          }>
             <Button icon={<SaveOutlined />} loading={saving} onClick={() => handleSave()}
               style={isDirty ? { borderColor: '#faad14', color: '#faad14' } : {}}>
-              {isDirty ? '保存 *' : '保存'}
+              {isDirty ? '保存草稿 *' : '保存草稿'}
             </Button>
           </Tooltip>
           {status !== 1 && (

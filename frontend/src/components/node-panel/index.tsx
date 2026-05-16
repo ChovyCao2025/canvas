@@ -44,7 +44,11 @@ export default function NodePanel({ onDragStart }: Props) {
         {nodes.map((nt) => (
           <Tooltip
             key={nt.typeKey}
-            title={nt.description || nt.typeName}
+            title={
+              TRIGGER_TYPES.has(nt.typeKey)
+                ? `【触发器】${nt.description || nt.typeName} — 只能作为流程第一个节点，可与其他触发器同时存在于画布中（各自独立入口）`
+                : (nt.description || nt.typeName)
+            }
             placement="right"
             mouseEnterDelay={0.5}
           >
