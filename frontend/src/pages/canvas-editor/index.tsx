@@ -206,6 +206,21 @@ function EditorInner({ detail, onStatusChange }: {
   // 初始化加载
   useEffect(() => {
     const backendNodes: BackendNode[] = JSON.parse(detail.graphJson || '{"nodes":[]}').nodes ?? []
+
+    // Auto-inject START node for brand-new empty canvases
+    if (backendNodes.length === 0) {
+      const startNode: Node<CanvasNodeData> = {
+        id: 'start_init',
+        type: 'canvasNode',
+        position: { x: 200, y: 100 },
+        data: { nodeType: 'START', name: '开始', category: '其他', bizConfig: {} },
+      }
+      setNodes([startNode])
+      setEdges([])
+      requestAnimationFrame(() => fitView({ padding: 0.3, duration: 300 }))
+      return
+    }
+
     const rfNodes: Node[] = backendNodes.map(n => ({
       id: n.id, type: 'canvasNode',
       position: { x: n.x ?? 0, y: n.y ?? 0 },
@@ -693,6 +708,7 @@ function EditorInner({ detail, onStatusChange }: {
             edges={edges}
             nodeTypes={nodeTypes}
             edgeTypes={edgeTypes}
+            proOptions={{ hideAttribution: true }}
             onNodesChange={onNodesChangeWrapped}
             onEdgesChange={onEdgesChange}
             onConnect={onConnect}
@@ -704,7 +720,13 @@ function EditorInner({ detail, onStatusChange }: {
           >
             <Background />
             <Controls />
-            <MiniMap zoomable pannable />
+            <MiniMap
+              zoomable
+              pannable
+              onNodeClick={(_evt, node) => {
+                fitView({ nodes: [{ id: node.id }], duration: 300, padding: 0.5 })
+              }}
+            />
           </ReactFlow>
         </div>
 
