@@ -81,9 +81,13 @@ public class CanvasExecutionService {
                 ctx.setVersionId(versionId);
             }
 
+            // dry-run：优先找 DIRECT_CALL/START，找不到则取任意入口节点（兼容 BEHAVIOR_IN_APP 等触发器）
             String triggerNodeId = findTriggerNode(graph, "DIRECT_CALL", null);
+            if (triggerNodeId == null) {
+                triggerNodeId = graph.entryNodes().stream().findFirst().orElse(null);
+            }
             if (triggerNodeId == null)
-                throw new IllegalStateException("找不到触发器节点（START 或 DIRECT_CALL）");
+                throw new IllegalStateException("画布没有入口节点，请确保存在触发器节点");
 
             return Map.of("ctx", ctx, "graph", graph, "triggerNodeId", triggerNodeId);
         })

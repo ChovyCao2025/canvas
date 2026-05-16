@@ -215,6 +215,10 @@ function EditorInner({ detail }: { detail: CanvasDetail }) {
   // 键盘快捷键（含复制/粘贴）
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      // 焦点在输入框时不拦截，让浏览器正常处理文字粘贴
+      const tag = (e.target as HTMLElement)?.tagName
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || (e.target as HTMLElement)?.isContentEditable) return
+
       if (e.metaKey || e.ctrlKey) {
         if (e.key === 'z' && !e.shiftKey) { e.preventDefault(); undo() }
         if ((e.key === 'z' && e.shiftKey) || e.key === 'y') { e.preventDefault(); redo() }
