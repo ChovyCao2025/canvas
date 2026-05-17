@@ -8,6 +8,7 @@ import { TERMINAL_TYPES }      from '../components/canvas/constants'
 const PLACEHOLDER_W = 150
 const PLACEHOLDER_H = 52
 const V_GAP         = 80
+const MIN_SPACING   = PLACEHOLDER_W + 12  // 相邻占位框左边缘最小间距
 
 /** 判断候选占位框是否与任何真实节点的包围盒重叠（宽松 padding 20px）*/
 function overlapsAnyNode(
@@ -49,15 +50,18 @@ export function useBranchPlaceholders(
 
       const nodeW = node.width  ?? 200
       const nodeH = node.height ?? 76
+      const y = node.position.y + nodeH + V_GAP
+
+      // 计算所有占位框的水平位置：整体在节点下方居中，相邻间距不小于 MIN_SPACING
+      const totalWidth = (handles.length - 1) * MIN_SPACING + PLACEHOLDER_W
+      const startX = node.position.x + nodeW / 2 - totalWidth / 2
 
       handles.forEach((h, i) => {
         if (connected.has(`${node.id}:${h.id}`)) return
 
-        const handlePct = (i + 1) / (handles.length + 1)
-        const x = node.position.x + handlePct * nodeW - PLACEHOLDER_W / 2
-        const y = node.position.y + nodeH + V_GAP
+        const x = startX + i * MIN_SPACING
 
-        // 若候选位置与已有节点重叠，跳过（已有节点可能是用户手动放置的后继）
+        // 若候选位置与已有节点重叠，跳过
         if (overlapsAnyNode(x, y, nodes)) return
 
         placeholders.push({
