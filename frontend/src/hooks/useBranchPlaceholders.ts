@@ -35,17 +35,19 @@ export function useBranchPlaceholders(
       const handles = getBranchHandles(node.data.nodeType, node.data.bizConfig ?? {})
       if (handles.length === 0) continue
 
+      // 只对未连线的 handle 生成占位框，布局基于未连线数量重新居中
+      const unconnected = handles.filter(h => !connected.has(`${node.id}:${h.id}`))
+      if (unconnected.length === 0) continue
+
       const nodeW = node.width  ?? 200
       const nodeH = node.height ?? 76
       const y     = node.position.y + nodeH + V_GAP
 
-      // 整体居中排列，相邻间距保证 >= MIN_SPACING
-      const totalWidth = (handles.length - 1) * MIN_SPACING + PLACEHOLDER_W
+      // 仅按未连线 handle 数量排列，整体居中，间距保证 >= MIN_SPACING
+      const totalWidth = (unconnected.length - 1) * MIN_SPACING + PLACEHOLDER_W
       const startX     = node.position.x + nodeW / 2 - totalWidth / 2
 
-      handles.forEach((h, i) => {
-        if (connected.has(`${node.id}:${h.id}`)) return
-
+      unconnected.forEach((h, i) => {
         const phId = `__ph_${node.id}_${h.id}`
         const x    = startX + i * MIN_SPACING
 
