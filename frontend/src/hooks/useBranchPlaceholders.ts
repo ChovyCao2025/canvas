@@ -7,19 +7,43 @@ import { getBranchHandles }    from '../components/canvas/branchHandles'
 import { TERMINAL_TYPES }      from '../components/canvas/constants'
 
 const V_GAP       = 80
-const MIN_SPACING = PLACEHOLDER_W + 12  // 相邻占位框左边缘最小间距
+const MIN_SPACING = PLACEHOLDER_W + 12
 
 export type PlaceholderResult = {
   nodes: Node<PlaceholderData>[]
   edges: Edge[]
 }
 
+/**
+ * 精确包围盒相交检测。
+ * 排除：源节点自身 + 当前正在被用户拖拽的节点（拖向占位框时不能把它挡住）。
+ */
+function overlapsAnyNode(
+  px: number, py: number,
+  nodes: Node<CanvasNodeData>[],
+  sourceId: string,
+  draggingNodeId: string | null,
+): boolean {
+  return nodes.some(n => {
+    if (n.id === sourceId)       return false
+    if (n.id === draggingNodeId) return false  // 正在拖拽，不参与碰撞
+    const nw = n.width  ?? PLACEHOLDER_W
+    const nh = n.height ?? PLACEHOLDER_H
+    return (
+      px                 < n.position.x + nw &&
+      px + PLACEHOLDER_W > n.position.x      &&
+      py                 < n.position.y + nh &&
+      py + PLACEHOLDER_H > n.position.y
+    )
+  })
+}
+
 export function useBranchPlaceholders(
   nodes: Node<CanvasNodeData>[],
   edges: Edge[],
+  draggingNodeId: string | null,
 ): PlaceholderResult {
   return useMemo(() => {
-    // 已连线的 handle 集合：不显示占位框
     const connected = new Set(
       edges
         .filter(e => e.source && e.sourceHandle)
@@ -36,20 +60,25 @@ export function useBranchPlaceholders(
       const handles = getBranchHandles(node.data.nodeType, node.data.bizConfig ?? {})
       if (handles.length === 0) continue
 
-      // 只对未连线 handle 生成占位框，按未连线数量居中排列
-      const unconnected = handles.filter(h => !connected.has(`${node.id}:${h.id}`))
-      if (unconnected.length === 0) continue
-
       const nodeW = node.width  ?? PLACEHOLDER_W
       const nodeH = node.height ?? PLACEHOLDER_H
       const y     = node.position.y + nodeH + V_GAP
 
-      const totalWidth = (unconnected.length - 1) * MIN_SPACING + PLACEHOLDER_W
+      // ★ 位置基于【全部 handle】计算，连线后不重新居中
+      //   这样 "通过" 连上后，"拒绝" 仍在其原来的右侧位置，
+      //   不会偏移到已连线节点所在的中心区域
+      const totalWidth = (handles.length - 1) * MIN_SPACING + PLACEHOLDER_W
       const startX     = node.position.x + nodeW / 2 - totalWidth / 2
 
-      unconnected.forEach((h, i) => {
+      handles.forEach((h, i) => {
+        // 已连线 → 不显示占位框
+        if (connected.has(`${node.id}:${h.id}`)) return
+
         const phId = `__ph_${node.id}_${h.id}`
-        const x    = startX + i * MIN_SPACING
+        const x    = startX + i * MIN_SPACING   // i 来自全部 handle 的索引
+
+        // 如果该位置被已有真实节点（非拖拽中）精确覆盖 → 隐藏，避免视觉重叠
+        if (overlapsAnyNode(x, y, nodes, node.id, draggingNodeId)) return
 
         phNodes.push({
           id:        phId,
@@ -82,5 +111,5 @@ export function useBranchPlaceholders(
     }
 
     return { nodes: phNodes, edges: phEdges }
-  }, [nodes, edges])
+  }, [nodes, edges, draggingNodeId])
 }

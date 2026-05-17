@@ -187,9 +187,10 @@ function EditorInner({ detail, onStatusChange }: {
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([])
 
   // Separate real nodes from placeholder residue; compute placeholders as derived state
+  const [draggingNodeId, setDraggingNodeId] = useState<string | null>(null)
   const realNodes = nodes.filter(n => !(n.data as any)?._placeholder) as Node<CanvasNodeData>[]
-  const { nodes: phNodes, edges: phEdges } = useBranchPlaceholders(realNodes, edges)
-  const placeholders  = phNodes  // alias for onDrop lookup
+  const { nodes: phNodes, edges: phEdges } = useBranchPlaceholders(realNodes, edges, draggingNodeId)
+  const placeholders  = phNodes
   const displayNodes  = useMemo(() => [...realNodes, ...phNodes],  [realNodes, phNodes])
   const displayEdges  = useMemo(() => [...edges,     ...phEdges],  [edges,     phEdges])
 
@@ -379,6 +380,7 @@ function EditorInner({ detail, onStatusChange }: {
 
   // 拖已有节点到占位框上：松手时检测命中并自动连线
   const onNodeDragStop = useCallback((_: React.MouseEvent, draggedNode: Node) => {
+    setDraggingNodeId(null)
     const d = draggedNode.data as CanvasNodeData
     if ((d as any)?._placeholder) return
 
@@ -902,6 +904,7 @@ function EditorInner({ detail, onStatusChange }: {
             isValidConnection={isValidConnection as any}
             onNodeClick={(_, node) => setSelectedNodeId(node.id)}
             onPaneClick={() => setSelectedNodeId(null)}
+            onNodeDrag={(_, node) => setDraggingNodeId(node.id)}
             onNodeDragStop={onNodeDragStop}
             fitView
             deleteKeyCode={['Delete', 'Backspace']}
