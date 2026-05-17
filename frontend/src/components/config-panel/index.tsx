@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback } from 'react'
+import type { Node } from '@xyflow/react'
 import {
   Form, Input, InputNumber, Select, Switch, Button,
   Typography, Spin, Divider, Space, Tag, Tooltip, AutoComplete, DatePicker,
@@ -17,6 +18,7 @@ interface Props {
   nodeId:    string | null
   nodeData:  CanvasNodeData | null
   onChange:  (nodeId: string, patch: Partial<CanvasNodeData>) => void
+  nodes?:    Node<CanvasNodeData>[]
   readonly?: boolean
 }
 
@@ -46,13 +48,18 @@ function toSelectOptions(data: any[]): StubOption[] {
   }))
 }
 
-export default function ConfigPanel({ nodeId, nodeData, onChange, readonly }: Props) {
+export default function ConfigPanel({ nodeId, nodeData, onChange, nodes, readonly }: Props) {
   const [schema,   setSchema]   = useState<NodeTypeRegistry | null>(null)
   const [options,  setOptions]  = useState<Record<string, StubOption[]>>({})
   const [ctxFields, setCtxFields] = useState<ContextField[]>([])
   const [loading,  setLoading]  = useState(false)
   const [formValues, setFormValues] = useState<Record<string, unknown>>({})
   const [form] = Form.useForm()
+
+  const getNodeName = (id: string | undefined): string | null => {
+    if (!id || !nodes) return null
+    return nodes.find(n => n.id === id)?.data.name ?? null
+  }
 
   useEffect(() => {
     if (!nodeData?.nodeType) { setSchema(null); return }
@@ -157,7 +164,7 @@ export default function ConfigPanel({ nodeId, nodeData, onChange, readonly }: Pr
             return (
               <Form.Item key={field.key} name={field.key} label={field.label}
                 rules={field.required ? [{ required: true, message: `请填写${field.label}` }] : []}>
-                {renderControl(field, options, ctxFields, form)}
+                {renderControl(field, options, ctxFields, form, getNodeName, nodeData)}
               </Form.Item>
             )
           })
@@ -193,6 +200,8 @@ function renderControl(
   options: Record<string, StubOption[]>,
   ctxFields: ContextField[],
   _form: ReturnType<typeof Form.useForm>[0],
+  getNodeName?: (id: string | undefined) => string | null,
+  nodeData?: CanvasNodeData | null,
 ): React.ReactNode {
   switch (field.type) {
     case 'select':
@@ -248,14 +257,19 @@ function renderControl(
       return <DelayInput />
     case 'event-attr-preview':
       return <EventAttrPreview />
-    case 'edge-hint':
+    case 'edge-hint': {
+      const connectedId = nodeData?.bizConfig?.[field.key] as string | undefined
+      const name = getNodeName?.(connectedId) ?? null
       return (
-        <div style={{ fontSize: 12, color: '#8c8c8c', background: '#f5f5f5',
-          borderRadius: 6, padding: '6px 10px', display: 'flex', alignItems: 'center', gap: 6 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <span style={{ fontSize: 14 }}>{field.icon === 'check' ? '✓' : '✕'}</span>
-          {(field as any).hint ?? '通过连线自动填充'}
+          {name
+            ? <Tag color="blue">→ {name}</Tag>
+            : <Tag color="warning">⚠ 未连线</Tag>
+          }
         </div>
       )
+    }
     case 'condition-rule-list':
       return <ConditionRuleList ctxFields={ctxFields} />
     case 'context-value-list':
@@ -265,7 +279,7 @@ function renderControl(
     case 'branch-list':
       return <BranchList ctxFields={ctxFields} />
     case 'ab-group-list':
-      return <AbGroupList />
+      return <AbGroupList getNodeName={getNodeName ?? (() => null)} />
     case 'priority-list':
       return <PriorityList />
     case 'key-value':
@@ -495,7 +509,7 @@ function BranchList({ ctxFields }: { ctxFields: ContextField[] }) {
 
 // ── AB 分流分组路由控件（ab-group-list）────────────────────────────
 interface AbGroup { groupKey: string; nextNodeId?: string }
-function AbGroupList() {
+function AbGroupList({ getNodeName }: { getNodeName: (id: string | undefined) => string | null }) {
   const form = Form.useFormInstance()
   const groups: AbGroup[] = Form.useWatch('groups', form) ?? []
   const add = () => form.setFieldValue('groups', [...groups, { groupKey: `G${groups.length + 1}`, nextNodeId: undefined }])
@@ -504,7 +518,6 @@ function AbGroupList() {
     const n = [...groups]; (n[i] as any)[k] = v; form.setFieldValue('groups', n)
   }
 
-  // 每个分组平均 bucket 宽度
   const bucketSize = groups.length > 0 ? Math.floor(100 / groups.length) : 0
 
   return (
@@ -512,6 +525,7 @@ function AbGroupList() {
       {groups.map((g, i) => {
         const start = i * bucketSize
         const end   = i === groups.length - 1 ? 100 : start + bucketSize
+        const successorName = getNodeName(g.nextNodeId)
         return (
           <div key={i} style={{ marginBottom: 8, padding: '6px 8px', background: '#fafafa', borderRadius: 6, border: '1px solid #f0f0f0' }}>
             <Space style={{ width: '100%', justifyContent: 'space-between' }}>
@@ -524,7 +538,10 @@ function AbGroupList() {
             <Space style={{ marginTop: 4 }} size={4}>
               <Input size="small" style={{ width: 80 }} placeholder="分组Key（如 A）"
                 value={g.groupKey} onChange={e => update(i, 'groupKey', e.target.value)} />
-              <Text style={{ fontSize: 11, color: '#999' }}>→ 从节点下方对应连接点拖线</Text>
+              {successorName
+                ? <Tag color="blue" style={{ fontSize: 11 }}>→ {successorName}</Tag>
+                : <Tag color="warning" style={{ fontSize: 11 }}>⚠ 未连线</Tag>
+              }
             </Space>
           </div>
         )

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   ReactFlow, ReactFlowProvider,
   addEdge, useNodesState, useEdgesState,
@@ -16,6 +16,8 @@ import type { BackendNode, BizConfig, CanvasNodeData } from '../../types/canvas'
 import { canvasApi } from '../../services/api'
 import type { CanvasDetail } from '../../types'
 import CanvasNodeCmp from '../../components/canvas/CanvasNode'
+import BranchPlaceholderNode, { type PlaceholderData } from '../../components/canvas/BranchPlaceholderNode'
+import { useBranchPlaceholders } from '../../hooks/useBranchPlaceholders'
 import NodePanel from '../../components/node-panel'
 import ConfigPanel from '../../components/config-panel'
 import ExecutionTracePanel from '../../components/canvas/ExecutionTracePanel'
@@ -27,7 +29,10 @@ import HoverEdge from '../../components/canvas/HoverEdge'
 import { CanvasActionsContext } from '../../context/CanvasActionsContext'
 
 
-const nodeTypes = { canvasNode: CanvasNodeCmp }
+const nodeTypes = {
+  canvasNode:        CanvasNodeCmp,
+  branchPlaceholder: BranchPlaceholderNode,
+}
 const edgeTypes = { default: HoverEdge }
 
 // ── 从后端节点 config 推导 ReactFlow edges ──────────────────
@@ -180,6 +185,12 @@ function EditorInner({ detail, onStatusChange }: {
 
   const [nodes, setNodes, onNodesChange] = useNodesState<Node>([])
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([])
+
+  // Separate real nodes from placeholder residue; compute placeholders as derived state
+  const realNodes   = nodes.filter(n => !(n.data as any)?._placeholder) as Node<CanvasNodeData>[]
+  const placeholders = useBranchPlaceholders(realNodes, edges)
+  const displayNodes = useMemo(() => [...realNodes, ...placeholders], [realNodes, placeholders])
+
   const [canvasName, setCanvasName] = useState(detail.canvas.name)
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null)
   const [saving, setSaving]         = useState(false)
@@ -306,30 +317,59 @@ function EditorInner({ detail, onStatusChange }: {
     const nodeType = e.dataTransfer.getData('application/canvas-node-type')
     const category = e.dataTransfer.getData('application/canvas-node-category')
     if (!nodeType) return
-    snapshot('添加节点')
-    const position = screenToFlowPosition({ x: e.clientX, y: e.clientY })
 
-    // SELECTOR 节点需要默认分支，否则没有 Handle 无法连线（鸡蛋问题）
+    const dropPos = screenToFlowPosition({ x: e.clientX, y: e.clientY })
+
+    // Check if dropped onto a placeholder
+    const hitPlaceholder = placeholders.find(ph => {
+      const { x, y } = ph.position
+      return dropPos.x >= x && dropPos.x <= x + 150
+          && dropPos.y >= y && dropPos.y <= y + 52
+    })
+
+    snapshot('添加节点')
+    const newPos: { x: number; y: number } = hitPlaceholder?.position ?? dropPos
+
     const defaultBizConfig: BizConfig = nodeType === 'SELECTOR'
       ? { branches: [{ label: '如果', nextNodeId: undefined }] }
       : nodeType === 'IF_CONDITION'
       ? { rules: [] }
       : nodeType === 'PRIORITY'
       ? { priorities: [{ order: 1, nextNodeId: undefined }] }
+      : nodeType === 'AB_SPLIT'
+      ? { groups: [{ groupKey: 'A', nextNodeId: undefined }] }
       : {}
 
+    const newId = crypto.randomUUID().replace(/-/g, '').slice(0, 12)
     const newNode: Node = {
-      id: crypto.randomUUID().replace(/-/g, '').slice(0, 12),
+      id: newId,
       type: 'canvasNode',
-      position,
+      position: newPos,
       data: {
         nodeType, name: DEFAULT_NAMES[nodeType] ?? nodeType,
         category, bizConfig: defaultBizConfig,
       } as CanvasNodeData,
     }
-    setNodes(prev => [...prev, newNode])
-    setSelectedNodeId(newNode.id)
-  }, [snapshot, screenToFlowPosition, setNodes])
+    setNodes(prev => [...prev.filter(n => !(n.data as any)?._placeholder), newNode])
+
+    if (hitPlaceholder) {
+      const ph = hitPlaceholder.data as PlaceholderData
+      setNodes(prev => prev.map(n => {
+        if (n.id !== ph.sourceId) return n
+        const d = n.data as CanvasNodeData
+        return { ...n, data: { ...d, bizConfig: patchBizConfig(d.bizConfig, ph.handleId, newId) } }
+      }))
+      setEdges(prev => addEdge({
+        id:           `${ph.sourceId}->${newId}`,
+        source:       ph.sourceId,
+        sourceHandle: ph.handleId,
+        target:       newId,
+        targetHandle: 'input',
+        label:        ph.label,
+      }, prev))
+    }
+    setSelectedNodeId(newId)
+  }, [placeholders, snapshot, screenToFlowPosition, setNodes, setEdges])
 
   const onDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault()
@@ -449,7 +489,7 @@ function EditorInner({ detail, onStatusChange }: {
   const handleSave = useCallback(async (silent = false) => {
     setSaving(true)
     try {
-      const rfNodes = getNodes()
+      const rfNodes = getNodes().filter(n => !(n.data as any)?._placeholder)
       const backendNodes = rfNodes.map(n => {
         const d = n.data as CanvasNodeData
         return {
@@ -477,7 +517,7 @@ function EditorInner({ detail, onStatusChange }: {
 
   /** 发布（或重新发布）：先保存草稿，再创建新版本上线 */
   const handlePublish = useCallback(async () => {
-    const errors = validateBeforePublish(getNodes() as Node<CanvasNodeData>[])
+    const errors = validateBeforePublish(getNodes().filter(n => !(n.data as any)?._placeholder) as Node<CanvasNodeData>[])
     if (errors.length > 0) { message.error({ content: errors.join('\n'), duration: 5 }); return }
     try {
       await handleSave(true)
@@ -819,7 +859,7 @@ function EditorInner({ detail, onStatusChange }: {
         {/* 画布 */}
         <div style={{ flex: 1 }} onDrop={onDrop} onDragOver={onDragOver}>
           <ReactFlow
-            nodes={nodes}
+            nodes={displayNodes}
             edges={edges}
             nodeTypes={nodeTypes}
             edgeTypes={edgeTypes}
@@ -857,6 +897,7 @@ function EditorInner({ detail, onStatusChange }: {
             nodeId={selectedNodeId}
             nodeData={selectedData}
             onChange={onNodeDataChange}
+            nodes={realNodes}
             readonly={readonly}
           />
         </div>
