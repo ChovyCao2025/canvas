@@ -41,19 +41,19 @@ function deriveEdges(backendNodes: BackendNode[]): Edge[] {
   const edges: Edge[] = []
   backendNodes.forEach(n => {
     const c = (n.config ?? {}) as BizConfig
-    const push = (target: string | undefined, sourceHandle: string, label?: string) => {
+    const push = (target: string | undefined, sourceHandle: string) => {
       if (!target) return
-      edges.push({ id: `${n.id}->${target}`, source: n.id, target, sourceHandle, label })
+      edges.push({ id: `${n.id}->${target}`, source: n.id, target, sourceHandle })
     }
     push(c.nextNodeId,    'default')
-    push(c.successNodeId, 'success', '成功')
-    push(c.failNodeId,    'fail',    '失败')
-    push(c.elseNodeId,    'else',    '否则')
-    push(c.approveNodeId, 'approve', '通过')
-    push(c.rejectNodeId,  'reject',  '拒绝')
-    c.branches?.forEach((b, i) => push(b.nextNodeId, `branch-${i}`, b.label))
+    push(c.successNodeId, 'success')
+    push(c.failNodeId,    'fail')
+    push(c.elseNodeId,    'else')
+    push(c.approveNodeId, 'approve')
+    push(c.rejectNodeId,  'reject')
+    c.branches?.forEach((b, i) => push(b.nextNodeId, `branch-${i}`))
     c.priorities?.forEach((p, i) => push(p.nextNodeId, `priority-${i}`))
-    c.groups?.forEach(g => push(g.nextNodeId, `group-${g.groupKey}`, g.groupKey))
+    c.groups?.forEach(g => push(g.nextNodeId, `group-${g.groupKey}`))
   })
   return edges
 }
@@ -367,7 +367,6 @@ function EditorInner({ detail, onStatusChange }: {
         sourceHandle: ph.handleId,
         target:       newId,
         targetHandle: 'input',
-        label:        ph.label,
       }, prev))
     }
     setSelectedNodeId(newId)
@@ -378,29 +377,51 @@ function EditorInner({ detail, onStatusChange }: {
     e.dataTransfer.dropEffect = 'move'
   }, [])
 
+  // 拖已有节点到占位框上：松手时检测命中并自动连线
+  const onNodeDragStop = useCallback((_: React.MouseEvent, draggedNode: Node) => {
+    const d = draggedNode.data as CanvasNodeData
+    if ((d as any)?._placeholder) return  // 占位框本身不可拖
+
+    const nodeW = draggedNode.width  ?? 200
+    const nodeH = draggedNode.height ?? 76
+    const nodeCx = draggedNode.position.x + nodeW / 2
+    const nodeCy = draggedNode.position.y + nodeH / 2
+
+    const hit = placeholders.find(ph => {
+      const { x, y } = ph.position
+      const phW = 150, phH = 52
+      return nodeCx > x && nodeCx < x + phW && nodeCy > y && nodeCy < y + phH
+    })
+    if (!hit) return
+
+    const ph = hit.data as import('../../components/canvas/BranchPlaceholderNode').PlaceholderData
+    snapshot('连线')
+    // 更新源节点 bizConfig
+    setNodes(prev => prev.map(n => {
+      if (n.id !== ph.sourceId) return n
+      const nd = n.data as CanvasNodeData
+      return { ...n, data: { ...nd, bizConfig: patchBizConfig(nd.bizConfig, ph.handleId, draggedNode.id) } }
+    }))
+    setEdges(prev => addEdge({
+      id:           `${ph.sourceId}->${draggedNode.id}`,
+      source:       ph.sourceId,
+      sourceHandle: ph.handleId,
+      target:       draggedNode.id,
+      targetHandle: 'input',
+    }, prev))
+  }, [placeholders, snapshot, setNodes, setEdges])
+
   // 连线
   const onConnect = useCallback((conn: Connection) => {
     const { source, sourceHandle, target } = conn
     if (!source || !target || !sourceHandle) return
     snapshot('连线')
-    // 根据 sourceHandle 自动生成边 label（分组/分支/优先级等）
-    const edgeLabel = (() => {
-      if (sourceHandle.startsWith('group-'))    return sourceHandle.replace('group-', '分组 ')
-      if (sourceHandle.startsWith('branch-'))   return `分支 ${Number(sourceHandle.replace('branch-', '')) + 1}`
-      if (sourceHandle.startsWith('priority-')) return `优先级 ${Number(sourceHandle.replace('priority-', '')) + 1}`
-      if (sourceHandle === 'success') return '成功'
-      if (sourceHandle === 'fail')    return '失败'
-      if (sourceHandle === 'else')    return '否则'
-      if (sourceHandle === 'approve') return '通过'
-      if (sourceHandle === 'reject')  return '拒绝'
-      return undefined
-    })()
     setNodes(prev => prev.map(n => {
       if (n.id !== source) return n
       const d = n.data as CanvasNodeData
       return { ...n, data: { ...d, bizConfig: patchBizConfig(d.bizConfig, sourceHandle, target) } }
     }))
-    setEdges(prev => addEdge({ ...conn, label: edgeLabel }, prev))
+    setEdges(prev => addEdge({ ...conn }, prev))
   }, [snapshot, setNodes, setEdges])
 
   // 节点删除时清理引用
@@ -875,6 +896,7 @@ function EditorInner({ detail, onStatusChange }: {
             isValidConnection={isValidConnection as any}
             onNodeClick={(_, node) => setSelectedNodeId(node.id)}
             onPaneClick={() => setSelectedNodeId(null)}
+            onNodeDragStop={onNodeDragStop}
             fitView
             deleteKeyCode={['Delete', 'Backspace']}
           >
