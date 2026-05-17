@@ -26,6 +26,7 @@ import {
 } from '../../components/canvas/constants'
 
 import HoverEdge from '../../components/canvas/HoverEdge'
+import CronBuilder from '../../components/config-panel/CronBuilder'
 import { CanvasActionsContext } from '../../context/CanvasActionsContext'
 
 
@@ -982,9 +983,9 @@ function EditorInner({ detail, onStatusChange }: {
       {/* 触发方式设置 Modal（EF-8） */}
       <Modal title="触发方式设置" open={settingsOpen}
         onOk={saveSettings} onCancel={() => setSettingsOpen(false)}
-        okText="保存" cancelText="取消">
+        okText="保存" cancelText="取消" width={480}>
         <Form form={settingsForm} layout="vertical" style={{ marginTop: 16 }}>
-          <Form.Item label="触发方式" name="triggerType">
+          <Form.Item label="触发方式" name="triggerType" initialValue="REALTIME">
             <Radio.Group>
               <Radio value="REALTIME">实时触发</Radio>
               <Radio value="SCHEDULED">定时触发</Radio>
@@ -993,25 +994,14 @@ function EditorInner({ detail, onStatusChange }: {
           <Form.Item noStyle shouldUpdate={(prev, cur) => prev.triggerType !== cur.triggerType}>
             {({ getFieldValue }) =>
               getFieldValue('triggerType') === 'SCHEDULED' ? (
-                <Form.Item label="Cron 表达式" name="cronExpression"
-                  rules={[{ required: true, message: '请填写 Cron 表达式' }]}
-                  extra={
-                    <Space wrap style={{ marginTop: 4 }}>
-                      {[
-                        { label: '每天 9:00',    value: '0 9 * * *' },
-                        { label: '每周一 9:00',  value: '0 9 * * 1' },
-                        { label: '每月1日 9:00', value: '0 9 1 * *' },
-                        { label: '每小时',        value: '0 * * * *' },
-                      ].map(p => (
-                        <Button key={p.label} size="small"
-                          onClick={() => settingsForm.setFieldValue('cronExpression', p.value)}>
-                          {p.label}
-                        </Button>
-                      ))}
-                    </Space>
-                  }
+                <Form.Item
+                  name="cronExpression"
+                  rules={[{ required: true, message: '请配置触发时间' }]}
+                  style={{ marginBottom: 0 }}
                 >
-                  <Input placeholder="如：0 9 * * 1-5（工作日上午9点）" />
+                  <CronBuilder
+                    onChange={cron => settingsForm.setFieldValue('cronExpression', cron)}
+                  />
                 </Form.Item>
               ) : null
             }
