@@ -380,7 +380,7 @@ function EditorInner({ detail, onStatusChange }: {
   // 拖已有节点到占位框上：松手时检测命中并自动连线
   const onNodeDragStop = useCallback((_: React.MouseEvent, draggedNode: Node) => {
     const d = draggedNode.data as CanvasNodeData
-    if ((d as any)?._placeholder) return  // 占位框本身不可拖
+    if ((d as any)?._placeholder) return
 
     const nodeW = draggedNode.width  ?? 200
     const nodeH = draggedNode.height ?? 76
@@ -395,9 +395,15 @@ function EditorInner({ detail, onStatusChange }: {
     if (!hit) return
 
     const ph = hit.data as import('../../components/canvas/BranchPlaceholderNode').PlaceholderData
+    // 吸附到占位框位置：节点水平居中对齐占位框中心，顶部对齐占位框顶部
+    const snapX = hit.position.x + 75 - nodeW / 2
+    const snapY = hit.position.y
+
     snapshot('连线')
-    // 更新源节点 bizConfig
     setNodes(prev => prev.map(n => {
+      if (n.id === draggedNode.id) {
+        return { ...n, position: { x: snapX, y: snapY } }
+      }
       if (n.id !== ph.sourceId) return n
       const nd = n.data as CanvasNodeData
       return { ...n, data: { ...nd, bizConfig: patchBizConfig(nd.bizConfig, ph.handleId, draggedNode.id) } }
