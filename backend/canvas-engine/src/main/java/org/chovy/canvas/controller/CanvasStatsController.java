@@ -102,26 +102,21 @@ public class CanvasStatsController {
         }).subscribeOn(reactor.core.scheduler.Schedulers.boundedElastic()).map(R::ok);
     }
 
-    /** 
-     * 整体执行统计
-     * @param id 画布 ID
-     * @param days 查询天数范围
-     * @return 统计信息 Map
-     */
     @GetMapping("/stats")
     public Mono<R<Map<String, Object>>> stats(
             @PathVariable Long id,
-            @RequestParam(defaultValue = "7") int days) {
-        // ... (implementation)
-
-
+            @RequestParam(defaultValue = "7") int days,
+            @RequestParam(required = false) String since,
+            @RequestParam(required = false) String until) {
         return Mono.fromCallable(() -> {
-            LocalDate since = LocalDate.now().minusDays(days);
+            LocalDate sinceDate = since != null ? LocalDate.parse(since) : LocalDate.now().minusDays(days);
+            LocalDate untilDate = until != null ? LocalDate.parse(until) : LocalDate.now();
 
             List<CanvasExecution> executions = executionMapper.selectList(
                     new LambdaQueryWrapper<CanvasExecution>()
                             .eq(CanvasExecution::getCanvasId, id)
-                            .ge(CanvasExecution::getCreatedAt, since.atStartOfDay()));
+                            .ge(CanvasExecution::getCreatedAt, sinceDate.atStartOfDay())
+                            .le(CanvasExecution::getCreatedAt, untilDate.plusDays(1).atStartOfDay()));
 
             long total   = executions.size();
             long success = executions.stream().filter(e -> e.getStatus() == 2).count();
@@ -134,8 +129,6 @@ public class CanvasStatsController {
                     .forEach(e -> uniqueUsers.add(e.getUserId()));
 
             Map<String, Object> result = new LinkedHashMap<>();
-            result.put("canvasId",   id);
-            result.put("days",       days);
             result.put("total",      total);
             result.put("success",    success);
             result.put("failed",     failed);
@@ -168,15 +161,18 @@ public class CanvasStatsController {
     @GetMapping("/trend")
     public Mono<R<List<Map<String, Object>>>> trend(
             @PathVariable Long id,
-            @RequestParam(defaultValue = "30") int days) {
-
-
+            @RequestParam(defaultValue = "30") int days,
+            @RequestParam(required = false) String since,
+            @RequestParam(required = false) String until) {
         return Mono.fromCallable(() -> {
+            LocalDate sinceDate = since != null ? LocalDate.parse(since) : LocalDate.now().minusDays(days);
+            LocalDate untilDate = until != null ? LocalDate.parse(until) : LocalDate.now();
+
             List<CanvasExecution> executions = executionMapper.selectList(
                     new LambdaQueryWrapper<CanvasExecution>()
                             .eq(CanvasExecution::getCanvasId, id)
-                            .ge(CanvasExecution::getCreatedAt,
-                                    LocalDate.now().minusDays(days).atStartOfDay())
+                            .ge(CanvasExecution::getCreatedAt, sinceDate.atStartOfDay())
+                            .le(CanvasExecution::getCreatedAt, untilDate.plusDays(1).atStartOfDay())
                             .orderByAsc(CanvasExecution::getCreatedAt));
 
             // 按日聚合
