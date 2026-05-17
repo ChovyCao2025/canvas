@@ -6,7 +6,26 @@ import { getBranchHandles }    from '../components/canvas/branchHandles'
 import { TERMINAL_TYPES }      from '../components/canvas/constants'
 
 const PLACEHOLDER_W = 150
+const PLACEHOLDER_H = 52
 const V_GAP         = 80
+
+/** 判断候选占位框是否与任何真实节点的包围盒重叠（宽松 padding 20px）*/
+function overlapsAnyNode(
+  px: number, py: number,
+  nodes: Node<CanvasNodeData>[],
+): boolean {
+  const PAD = 20
+  return nodes.some(n => {
+    const nw = n.width  ?? 200
+    const nh = n.height ?? 76
+    return (
+      px < n.position.x + nw + PAD &&
+      px + PLACEHOLDER_W > n.position.x - PAD &&
+      py < n.position.y + nh + PAD &&
+      py + PLACEHOLDER_H > n.position.y - PAD
+    )
+  })
+}
 
 export function useBranchPlaceholders(
   nodes: Node<CanvasNodeData>[],
@@ -37,6 +56,9 @@ export function useBranchPlaceholders(
         const handlePct = (i + 1) / (handles.length + 1)
         const x = node.position.x + handlePct * nodeW - PLACEHOLDER_W / 2
         const y = node.position.y + nodeH + V_GAP
+
+        // 若候选位置与已有节点重叠，跳过（已有节点可能是用户手动放置的后继）
+        if (overlapsAnyNode(x, y, nodes)) return
 
         placeholders.push({
           id:        `__ph_${node.id}_${h.id}`,

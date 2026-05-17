@@ -6,11 +6,8 @@ describe('getBranchHandles', () => {
     expect(getBranchHandles('DELAY', {})).toEqual([])
   })
 
-  it('API_CALL returns success+fail', () => {
-    expect(getBranchHandles('API_CALL', {})).toEqual([
-      { id: 'success', label: '成功', color: '#52c41a' },
-      { id: 'fail',    label: '失败', color: '#f5222d' },
-    ])
+  it('API_CALL returns empty array (no branch handles for now)', () => {
+    expect(getBranchHandles('API_CALL', {})).toEqual([])
   })
 
   it('IF_CONDITION returns fixed success+else handles', () => {

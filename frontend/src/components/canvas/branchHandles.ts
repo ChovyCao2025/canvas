@@ -23,12 +23,7 @@ export function getBranchHandles(
         { id: 'reject',  label: '拒绝', color: '#f5222d' },
       ]
 
-    case 'API_CALL':
-      return [
-        { id: 'success', label: '成功', color: '#52c41a' },
-        { id: 'fail',    label: '失败', color: '#f5222d' },
-      ]
-
+    // API_CALL 暂不实现分支 Handle，保留单路 default 输出
     case 'SELECTOR': {
       const branches = (bizConfig.branches as { label?: string }[]) ?? []
       const handles: BranchHandle[] = branches.map((b, i) => ({
