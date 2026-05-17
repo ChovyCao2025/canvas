@@ -6,32 +6,18 @@ import { getBranchHandles }    from '../components/canvas/branchHandles'
 import { TERMINAL_TYPES }      from '../components/canvas/constants'
 
 const PLACEHOLDER_W = 150
-const PLACEHOLDER_H = 52
 const V_GAP         = 80
 const MIN_SPACING   = PLACEHOLDER_W + 12  // 相邻占位框左边缘最小间距
 
-/** 判断候选占位框是否与任何真实节点的包围盒重叠（宽松 padding 20px）*/
-function overlapsAnyNode(
-  px: number, py: number,
-  nodes: Node<CanvasNodeData>[],
-): boolean {
-  const PAD = 20
-  return nodes.some(n => {
-    const nw = n.width  ?? 200
-    const nh = n.height ?? 76
-    return (
-      px < n.position.x + nw + PAD &&
-      px + PLACEHOLDER_W > n.position.x - PAD &&
-      py < n.position.y + nh + PAD &&
-      py + PLACEHOLDER_H > n.position.y - PAD
-    )
-  })
+export type PlaceholderResult = {
+  nodes: Node<PlaceholderData>[]
+  edges: Edge[]
 }
 
 export function useBranchPlaceholders(
   nodes: Node<CanvasNodeData>[],
   edges: Edge[],
-): Node<PlaceholderData>[] {
+): PlaceholderResult {
   return useMemo(() => {
     const connected = new Set(
       edges
@@ -39,7 +25,8 @@ export function useBranchPlaceholders(
         .map(e => `${e.source}:${e.sourceHandle}`),
     )
 
-    const placeholders: Node<PlaceholderData>[] = []
+    const phNodes: Node<PlaceholderData>[] = []
+    const phEdges: Edge[] = []
 
     for (const node of nodes) {
       if ((node.data as unknown as PlaceholderData)?._placeholder) continue
@@ -50,22 +37,20 @@ export function useBranchPlaceholders(
 
       const nodeW = node.width  ?? 200
       const nodeH = node.height ?? 76
-      const y = node.position.y + nodeH + V_GAP
+      const y     = node.position.y + nodeH + V_GAP
 
-      // 计算所有占位框的水平位置：整体在节点下方居中，相邻间距不小于 MIN_SPACING
+      // 整体居中排列，相邻间距保证 >= MIN_SPACING
       const totalWidth = (handles.length - 1) * MIN_SPACING + PLACEHOLDER_W
-      const startX = node.position.x + nodeW / 2 - totalWidth / 2
+      const startX     = node.position.x + nodeW / 2 - totalWidth / 2
 
       handles.forEach((h, i) => {
         if (connected.has(`${node.id}:${h.id}`)) return
 
-        const x = startX + i * MIN_SPACING
+        const phId = `__ph_${node.id}_${h.id}`
+        const x    = startX + i * MIN_SPACING
 
-        // 若候选位置与已有节点重叠，跳过
-        if (overlapsAnyNode(x, y, nodes)) return
-
-        placeholders.push({
-          id:        `__ph_${node.id}_${h.id}`,
+        phNodes.push({
+          id:        phId,
           type:      'branchPlaceholder',
           position:  { x, y },
           draggable:  false,
@@ -78,9 +63,21 @@ export function useBranchPlaceholders(
             color:    h.color,
           } as PlaceholderData,
         })
+
+        // 虚线连接边：源节点 handle → 占位框
+        phEdges.push({
+          id:           `__phe_${node.id}_${h.id}`,
+          source:       node.id,
+          sourceHandle: h.id,
+          target:       phId,
+          targetHandle: 'input',
+          style:        { stroke: h.color, strokeWidth: 1.5, strokeDasharray: '5 3', opacity: 0.6 },
+          animated:     false,
+          selectable:   false,
+        })
       })
     }
 
-    return placeholders
+    return { nodes: phNodes, edges: phEdges }
   }, [nodes, edges])
 }

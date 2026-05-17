@@ -187,9 +187,11 @@ function EditorInner({ detail, onStatusChange }: {
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([])
 
   // Separate real nodes from placeholder residue; compute placeholders as derived state
-  const realNodes   = nodes.filter(n => !(n.data as any)?._placeholder) as Node<CanvasNodeData>[]
-  const placeholders = useBranchPlaceholders(realNodes, edges)
-  const displayNodes = useMemo(() => [...realNodes, ...placeholders], [realNodes, placeholders])
+  const realNodes = nodes.filter(n => !(n.data as any)?._placeholder) as Node<CanvasNodeData>[]
+  const { nodes: phNodes, edges: phEdges } = useBranchPlaceholders(realNodes, edges)
+  const placeholders  = phNodes  // alias for onDrop lookup
+  const displayNodes  = useMemo(() => [...realNodes, ...phNodes],  [realNodes, phNodes])
+  const displayEdges  = useMemo(() => [...edges,     ...phEdges],  [edges,     phEdges])
 
   const [canvasName, setCanvasName] = useState(detail.canvas.name)
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null)
@@ -860,7 +862,7 @@ function EditorInner({ detail, onStatusChange }: {
         <div style={{ flex: 1 }} onDrop={onDrop} onDragOver={onDragOver}>
           <ReactFlow
             nodes={displayNodes}
-            edges={edges}
+            edges={displayEdges}
             nodeTypes={nodeTypes}
             edgeTypes={edgeTypes}
             proOptions={{ hideAttribution: true }}
