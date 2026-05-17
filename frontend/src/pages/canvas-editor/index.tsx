@@ -382,26 +382,27 @@ function EditorInner({ detail, onStatusChange }: {
     const d = draggedNode.data as CanvasNodeData
     if ((d as any)?._placeholder) return
 
-    const nodeW = draggedNode.width  ?? 200
-    const nodeH = draggedNode.height ?? 76
-    const nodeCx = draggedNode.position.x + nodeW / 2
-    const nodeCy = draggedNode.position.y + nodeH / 2
+    const nodeX = draggedNode.position.x
+    const nodeY = draggedNode.position.y
+    const nodeW = draggedNode.width  ?? PH_W
+    const nodeH = draggedNode.height ?? PH_H
 
+    // 用包围盒相交判断（比中心点判断更宽松，拖拽时更容易命中）
     const hit = placeholders.find(ph => {
       const { x, y } = ph.position
-      return nodeCx > x && nodeCx < x + PH_W && nodeCy > y && nodeCy < y + PH_H
+      return nodeX               < x + PH_W &&
+             nodeX + nodeW       > x         &&
+             nodeY               < y + PH_H  &&
+             nodeY + nodeH       > y
     })
     if (!hit) return
 
     const ph = hit.data as import('../../components/canvas/BranchPlaceholderNode').PlaceholderData
-    // 占位框与节点尺寸相同(200×76)，直接对齐
-    const snapX = hit.position.x
-    const snapY = hit.position.y
-
     snapshot('连线')
     setNodes(prev => prev.map(n => {
       if (n.id === draggedNode.id) {
-        return { ...n, position: { x: snapX, y: snapY } }
+        // 吸附到占位框位置（尺寸相同，直接左对齐）
+        return { ...n, position: { x: hit.position.x, y: hit.position.y } }
       }
       if (n.id !== ph.sourceId) return n
       const nd = n.data as CanvasNodeData

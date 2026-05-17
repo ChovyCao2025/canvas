@@ -14,30 +14,12 @@ export type PlaceholderResult = {
   edges: Edge[]
 }
 
-/** 占位框候选位置是否与任何真实节点精确相交（排除源节点自身）*/
-function overlapsAnyNode(
-  px: number, py: number,
-  nodes: Node<CanvasNodeData>[],
-  sourceId: string,
-): boolean {
-  return nodes.some(n => {
-    if (n.id === sourceId) return false
-    const nw = n.width  ?? PLACEHOLDER_W
-    const nh = n.height ?? PLACEHOLDER_H
-    return (
-      px                < n.position.x + nw &&
-      px + PLACEHOLDER_W > n.position.x    &&
-      py                < n.position.y + nh &&
-      py + PLACEHOLDER_H > n.position.y
-    )
-  })
-}
-
 export function useBranchPlaceholders(
   nodes: Node<CanvasNodeData>[],
   edges: Edge[],
 ): PlaceholderResult {
   return useMemo(() => {
+    // 已连线的 handle 集合：不显示占位框
     const connected = new Set(
       edges
         .filter(e => e.source && e.sourceHandle)
@@ -54,7 +36,7 @@ export function useBranchPlaceholders(
       const handles = getBranchHandles(node.data.nodeType, node.data.bizConfig ?? {})
       if (handles.length === 0) continue
 
-      // 只对未连线 handle 生成占位框，布局按未连线数量居中
+      // 只对未连线 handle 生成占位框，按未连线数量居中排列
       const unconnected = handles.filter(h => !connected.has(`${node.id}:${h.id}`))
       if (unconnected.length === 0) continue
 
@@ -68,9 +50,6 @@ export function useBranchPlaceholders(
       unconnected.forEach((h, i) => {
         const phId = `__ph_${node.id}_${h.id}`
         const x    = startX + i * MIN_SPACING
-
-        // 与已有真实节点精确相交则跳过
-        if (overlapsAnyNode(x, y, nodes, node.id)) return
 
         phNodes.push({
           id:        phId,
