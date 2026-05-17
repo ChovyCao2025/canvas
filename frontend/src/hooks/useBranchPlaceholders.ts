@@ -6,8 +6,28 @@ import { getBranchHandles }    from '../components/canvas/branchHandles'
 import { TERMINAL_TYPES }      from '../components/canvas/constants'
 
 const PLACEHOLDER_W = 150
+const PLACEHOLDER_H = 52
 const V_GAP         = 80
-const MIN_SPACING   = PLACEHOLDER_W + 12  // 相邻占位框左边缘最小间距
+const MIN_SPACING   = PLACEHOLDER_W + 12
+
+/** 占位框候选位置是否与任何真实节点的包围盒精确相交（不含源节点自身）*/
+function overlapsAnyNode(
+  px: number, py: number,
+  nodes: Node<CanvasNodeData>[],
+  sourceId: string,
+): boolean {
+  return nodes.some(n => {
+    if (n.id === sourceId) return false
+    const nw = n.width  ?? 200
+    const nh = n.height ?? 76
+    return (
+      px               < n.position.x + nw &&
+      px + PLACEHOLDER_W > n.position.x    &&
+      py               < n.position.y + nh &&
+      py + PLACEHOLDER_H > n.position.y
+    )
+  })
+}
 
 export type PlaceholderResult = {
   nodes: Node<PlaceholderData>[]
@@ -50,6 +70,9 @@ export function useBranchPlaceholders(
       unconnected.forEach((h, i) => {
         const phId = `__ph_${node.id}_${h.id}`
         const x    = startX + i * MIN_SPACING
+
+        // 若该位置与已有真实节点精确相交，跳过（保留 handle 点供手动连线）
+        if (overlapsAnyNode(x, y, nodes, node.id)) return
 
         phNodes.push({
           id:        phId,
