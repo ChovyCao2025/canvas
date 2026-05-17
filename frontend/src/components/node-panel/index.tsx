@@ -5,7 +5,11 @@ import type { NodeTypeRegistry } from '../../types'
 import { CATEGORY_SOLID, TRIGGER_TYPES } from '../canvas/constants'
 
 // 旧触发器节点（已被 START 统一入口取代，保留用于兼容已有画布）
-const LEGACY_TRIGGERS = new Set(['BEHAVIOR_IN_APP', 'SCHEDULED_TRIGGER', 'MQ_TRIGGER', 'DIRECT_CALL', 'TAGGER_REALTIME'])
+// V26/V27 新增：TAGGER_OFFLINE 也隐藏（合并到 TAGGER），BEHAVIOR_IN_APP/DIRECT_CALL 合并到 BEHAVIOR_TRIGGER
+const LEGACY_TRIGGERS = new Set([
+  'BEHAVIOR_IN_APP', 'SCHEDULED_TRIGGER', 'MQ_TRIGGER', 'DIRECT_CALL',
+  'TAGGER_REALTIME', 'TAGGER_OFFLINE',
+])
 
 const { Text } = Typography
 

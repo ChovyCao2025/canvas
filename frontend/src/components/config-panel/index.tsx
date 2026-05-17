@@ -145,7 +145,10 @@ export default function ConfigPanel({ nodeId, nodeData, onChange, nodes, readonl
         </Form.Item>
 
         {fields
-          .filter(f => evaluateVisible(f.visible, formValues))
+          .filter(f =>
+            evaluateVisible(f.visible,  formValues) &&
+            evaluateVisible(f.showWhen, formValues)
+          )
           .map(field => {
             // api-input-params / event-attr-preview 自己管理渲染，不能被外层 Form.Item 包住
             if (field.type === 'api-input-params') {
@@ -652,7 +655,7 @@ function CanvasSelector() {
 interface SchemaField {
   key: string; label: string; type: string
   required?: boolean; options?: any[]; dataSource?: string
-  visible?: string; defaultValue?: unknown
+  visible?: string; showWhen?: string; defaultValue?: unknown
   hint?: string; icon?: string          // edge-hint 使用
   apiKeyField?: string                   // api-input-params 使用，默认 apiKey
   defsSource?: string                    // api-input-params 使用，默认 /meta/api-definitions

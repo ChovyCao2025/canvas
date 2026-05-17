@@ -16,16 +16,20 @@ export const CATEGORY_SOLID: Record<string, string> = {
 }
 
 /** 触发器节点（无 target handle，只能作为第一个节点）
- *  只保留 START —— 统一入口节点
- *  其余旧触发器类型移出此集合，允许接收来自 START 的连接
+ *  BEHAVIOR_TRIGGER 是新的统一行为触发节点。
+ *  TAGGER 的 isTrigger 是动态的（mode=realtime 时为触发器），在 CanvasNode 里单独处理。
  */
-export const TRIGGER_TYPES = new Set(['START'])
+export const TRIGGER_TYPES = new Set(['START', 'BEHAVIOR_TRIGGER'])
 
 /** 是否为终止节点 */
 export const TERMINAL_TYPES = new Set(['DIRECT_RETURN', 'END'])
 
 /** 各节点类型默认名称 */
 export const DEFAULT_NAMES: Record<string, string> = {
+  // 新合并类型
+  TAGGER:            'Tagger 标签',
+  BEHAVIOR_TRIGGER:  '行为触发',
+  // 旧类型（保留兼容已有画布）
   MQ_TRIGGER:        'MQ消息触发',
   BEHAVIOR_IN_APP:   '端内行为触发',
   DIRECT_CALL:       '业务直调',
