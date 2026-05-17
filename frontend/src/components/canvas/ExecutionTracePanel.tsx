@@ -1,7 +1,7 @@
 import { useState, useCallback } from 'react'
 import {
   Modal, Select, Table, Tag, Tooltip, Typography,
-  Space, Button, message, Collapse,
+  Button, message, Collapse,
 } from 'antd'
 import { EyeOutlined } from '@ant-design/icons'
 import http from '../../services/api'
@@ -133,22 +133,53 @@ export default function ExecutionTracePanel({ canvasId, onTraceLoaded }: Props) 
         footer={null}
         width={820}
       >
-        <Space style={{ marginBottom: 12 }} wrap>
-          <Select
-            style={{ width: 340 }}
+        <Select
+            showSearch
+            optionFilterProp="label"
+            style={{ width: 480 }}
             placeholder="选择执行记录"
             loading={loading}
             value={selectedExecId}
             onChange={loadTrace}
-            options={executions.map(e => ({
-              label: `${e.id?.slice(0, 8)} | ${e.triggerType} | ${e.createdAt?.slice(0, 16)}`,
-              value: e.id,
-            }))}
-          />
-          {selectedExecId && (
-            <Button size="small" onClick={clearTrace}>清除叠色</Button>
-          )}
-        </Space>
+            labelRender={(props) => {
+              const exec = executions.find(e => e.id === props.value);
+              if (!exec) return props.value;
+              const typeText = exec.triggerType === 'EVENT' ? '事件触发' : '试运行';
+              return `[${typeText}] ${exec.id?.slice(0, 8)}`;
+            }}
+            options={executions.map(e => {
+              const typeText = e.triggerType === 'EVENT' ? '事件触发' : '测试运行';
+              // 格式化时间
+              let formattedTime = e.createdAt;
+              try {
+                const date = new Date(e.createdAt);
+                if (!isNaN(date.getTime())) {
+                  formattedTime = date.toLocaleString('zh-CN', {
+                    year: 'numeric',
+                    month: '2-digit',
+                    day: '2-digit',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    second: '2-digit',
+                    hour12: false,
+                  }).replace(/\//g, '-');
+                }
+              } catch { /* 保持原样 */ }
+
+              return {
+                label: (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 12, whiteSpace: 'nowrap' }}>
+                      <Tag color={e.triggerType === 'EVENT' ? 'blue' : 'orange'} style={{ margin: 0, minWidth: 64, textAlign: 'center' }}>
+                        {typeText}
+                      </Tag>
+                      <span style={{ fontFamily: 'monospace', fontSize: 12 }}>{e.id?.slice(0, 8)}</span>
+                      <span style={{ fontSize: 11, color: '#999' }}>📅 {formattedTime}</span>
+                    </div>
+                ),
+                value: e.id,
+              };
+            })}
+        />
 
         {selectedExecId && (
           <Table
