@@ -17,7 +17,7 @@ const WEEKDAY_OPTIONS = [
   { value: 0, label: '周日' },
 ]
 const HOUR_OPTIONS   = Array.from({ length: 24 }, (_, h) => ({ value: h, label: String(h).padStart(2, '0') }))
-const MINUTE_OPTIONS = [0, 15, 30, 45].map(m => ({ value: m, label: String(m).padStart(2, '0') }))
+const MINUTE_OPTIONS = Array.from({ length: 60 }, (_, m) => ({ value: m, label: String(m).padStart(2, '0') }))
 const DAY_OPTIONS    = Array.from({ length: 28 }, (_, i) => ({ value: i + 1, label: `${i + 1} 日` }))
 
 /** 尝试将 cron 字符串解析为简单模式；返回 null 表示超出简单模式范围 */
@@ -76,13 +76,13 @@ function TimeSelect({ hour, minute, onHourChange, onMinuteChange }: {
       <Select
         variant="borderless" size="small" value={hour}
         onChange={onHourChange} options={HOUR_OPTIONS}
-        style={{ width: 52 }} dropdownStyle={{ minWidth: 60 }}
+        style={{ width: 68 }} dropdownStyle={{ minWidth: 68 }}
       />
       <span style={{ color: '#8c8c8c', fontWeight: 600, margin: '0 1px' }}>:</span>
       <Select
         variant="borderless" size="small" value={minute}
         onChange={onMinuteChange} options={MINUTE_OPTIONS}
-        style={{ width: 52 }} dropdownStyle={{ minWidth: 60 }}
+        style={{ width: 68 }} dropdownStyle={{ minWidth: 68 }}
       />
     </div>
   )
