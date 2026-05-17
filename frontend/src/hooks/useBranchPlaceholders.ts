@@ -2,15 +2,19 @@ import { useMemo } from 'react'
 import type { Node, Edge } from '@xyflow/react'
 import type { CanvasNodeData }  from '../components/canvas/constants'
 import type { PlaceholderData } from '../components/canvas/BranchPlaceholderNode'
+import { PLACEHOLDER_W, PLACEHOLDER_H } from '../components/canvas/BranchPlaceholderNode'
 import { getBranchHandles }    from '../components/canvas/branchHandles'
 import { TERMINAL_TYPES }      from '../components/canvas/constants'
 
-const PLACEHOLDER_W = 150
-const PLACEHOLDER_H = 52
-const V_GAP         = 80
-const MIN_SPACING   = PLACEHOLDER_W + 12
+const V_GAP       = 80
+const MIN_SPACING = PLACEHOLDER_W + 12  // 相邻占位框左边缘最小间距
 
-/** 占位框候选位置是否与任何真实节点的包围盒精确相交（不含源节点自身）*/
+export type PlaceholderResult = {
+  nodes: Node<PlaceholderData>[]
+  edges: Edge[]
+}
+
+/** 占位框候选位置是否与任何真实节点精确相交（排除源节点自身）*/
 function overlapsAnyNode(
   px: number, py: number,
   nodes: Node<CanvasNodeData>[],
@@ -18,20 +22,15 @@ function overlapsAnyNode(
 ): boolean {
   return nodes.some(n => {
     if (n.id === sourceId) return false
-    const nw = n.width  ?? 200
-    const nh = n.height ?? 76
+    const nw = n.width  ?? PLACEHOLDER_W
+    const nh = n.height ?? PLACEHOLDER_H
     return (
-      px               < n.position.x + nw &&
+      px                < n.position.x + nw &&
       px + PLACEHOLDER_W > n.position.x    &&
-      py               < n.position.y + nh &&
+      py                < n.position.y + nh &&
       py + PLACEHOLDER_H > n.position.y
     )
   })
-}
-
-export type PlaceholderResult = {
-  nodes: Node<PlaceholderData>[]
-  edges: Edge[]
 }
 
 export function useBranchPlaceholders(
@@ -55,15 +54,14 @@ export function useBranchPlaceholders(
       const handles = getBranchHandles(node.data.nodeType, node.data.bizConfig ?? {})
       if (handles.length === 0) continue
 
-      // 只对未连线的 handle 生成占位框，布局基于未连线数量重新居中
+      // 只对未连线 handle 生成占位框，布局按未连线数量居中
       const unconnected = handles.filter(h => !connected.has(`${node.id}:${h.id}`))
       if (unconnected.length === 0) continue
 
-      const nodeW = node.width  ?? 200
-      const nodeH = node.height ?? 76
+      const nodeW = node.width  ?? PLACEHOLDER_W
+      const nodeH = node.height ?? PLACEHOLDER_H
       const y     = node.position.y + nodeH + V_GAP
 
-      // 仅按未连线 handle 数量排列，整体居中，间距保证 >= MIN_SPACING
       const totalWidth = (unconnected.length - 1) * MIN_SPACING + PLACEHOLDER_W
       const startX     = node.position.x + nodeW / 2 - totalWidth / 2
 
@@ -71,13 +69,15 @@ export function useBranchPlaceholders(
         const phId = `__ph_${node.id}_${h.id}`
         const x    = startX + i * MIN_SPACING
 
-        // 若该位置与已有真实节点精确相交，跳过（保留 handle 点供手动连线）
+        // 与已有真实节点精确相交则跳过
         if (overlapsAnyNode(x, y, nodes, node.id)) return
 
         phNodes.push({
           id:        phId,
           type:      'branchPlaceholder',
           position:  { x, y },
+          width:     PLACEHOLDER_W,
+          height:    PLACEHOLDER_H,
           draggable:  false,
           selectable: false,
           data: {
@@ -89,7 +89,6 @@ export function useBranchPlaceholders(
           } as PlaceholderData,
         })
 
-        // 虚线连接边：源节点 handle → 占位框
         phEdges.push({
           id:           `__phe_${node.id}_${h.id}`,
           source:       node.id,

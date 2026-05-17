@@ -16,7 +16,7 @@ import type { BackendNode, BizConfig, CanvasNodeData } from '../../types/canvas'
 import { canvasApi } from '../../services/api'
 import type { CanvasDetail } from '../../types'
 import CanvasNodeCmp from '../../components/canvas/CanvasNode'
-import BranchPlaceholderNode, { type PlaceholderData } from '../../components/canvas/BranchPlaceholderNode'
+import BranchPlaceholderNode, { type PlaceholderData, PLACEHOLDER_W as PH_W, PLACEHOLDER_H as PH_H } from '../../components/canvas/BranchPlaceholderNode'
 import { useBranchPlaceholders } from '../../hooks/useBranchPlaceholders'
 import NodePanel from '../../components/node-panel'
 import ConfigPanel from '../../components/config-panel'
@@ -325,8 +325,8 @@ function EditorInner({ detail, onStatusChange }: {
     // Check if dropped onto a placeholder
     const hitPlaceholder = placeholders.find(ph => {
       const { x, y } = ph.position
-      return dropPos.x >= x && dropPos.x <= x + 150
-          && dropPos.y >= y && dropPos.y <= y + 52
+      return dropPos.x >= x && dropPos.x <= x + PH_W
+          && dropPos.y >= y && dropPos.y <= y + PH_H
     })
 
     snapshot('添加节点')
@@ -389,14 +389,13 @@ function EditorInner({ detail, onStatusChange }: {
 
     const hit = placeholders.find(ph => {
       const { x, y } = ph.position
-      const phW = 150, phH = 52
-      return nodeCx > x && nodeCx < x + phW && nodeCy > y && nodeCy < y + phH
+      return nodeCx > x && nodeCx < x + PH_W && nodeCy > y && nodeCy < y + PH_H
     })
     if (!hit) return
 
     const ph = hit.data as import('../../components/canvas/BranchPlaceholderNode').PlaceholderData
-    // 吸附到占位框位置：节点水平居中对齐占位框中心，顶部对齐占位框顶部
-    const snapX = hit.position.x + 75 - nodeW / 2
+    // 占位框与节点尺寸相同(200×76)，直接对齐
+    const snapX = hit.position.x
     const snapY = hit.position.y
 
     snapshot('连线')
