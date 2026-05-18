@@ -188,7 +188,7 @@ public class CanvasExecutionService {
                 }
             }
 
-            // 3. 加载/恢复 ExecutionContext
+            // 4. 加载/恢复 ExecutionContext
             ExecutionContext ctx;
             boolean isResume = ctxStore.exists(canvasId, userId);
             if (isResume && !dryRun) {
@@ -199,7 +199,7 @@ public class CanvasExecutionService {
                     return Map.<String, Object>of("skipped", "resume-lock");
                 }
                 ctx = ctxStore.load(canvasId, userId);
-                if (ctx == null) ctx = newContext(canvasId, resolveVersionId(canvas, userId, dryRun), userId, triggerType);
+                if (ctx == null) ctx = newContext(canvasId, resolveVersionId(canvas, userId, false), userId, triggerType);
             } else {
                 ctx = newContext(canvasId, resolveVersionId(canvas, userId, dryRun), userId, triggerType);
             }
@@ -207,10 +207,10 @@ public class CanvasExecutionService {
             // 合并本次 payload
             if (payload != null) ctx.getTriggerPayload().putAll(payload);
 
-            // 4. 加载 DAG 配置（版本锁定：用 ctx 中的 versionId，不用当前发布版本）
+            // 5. 加载 DAG 配置（版本锁定：用 ctx 中的 versionId，不用当前发布版本）
             DagGraph graph = configCache.get(canvasId, ctx.getVersionId());
 
-            // 5. 找触发器节点（按类型和 matchKey）
+            // 6. 找触发器节点（按类型和 matchKey）
             String triggerNodeId = findTriggerNode(graph, triggerNodeType, matchKey);
             if (triggerNodeId == null) {
                 throw new IllegalStateException(
@@ -273,7 +273,7 @@ public class CanvasExecutionService {
                             }
                             updateExecution(finalExec, 3, Map.of("error", e.getMessage())); // FAILED
                         }
-                        return Mono.just(Map.<String, Object>of(
+                        return Mono.just(Map.of(
                             "error", e.getMessage(),
                             "executionId", ctx.getExecutionId()
                         ));
@@ -343,16 +343,13 @@ public class CanvasExecutionService {
         return canvas.getPublishedVersionId();
     }
 
+
     /**
-     * 在 DAG 中找匹配类型和 matchKey 的触发器节点
+     * 在 DAG 中按触发类型和 matchKey 找触发器节点。
      * @param graph 画布 DAG 图
      * @param triggerNodeType 触发器节点类型
      * @param matchKey 触发条件匹配 Key
      * @return 触发器节点 ID
-     */
-    /**
-     * 在 DAG 中按触发类型和 matchKey 找触发器节点。
-     *
      * <p>两种查找路径：
      * <ul>
      *   <li>MANUAL_APPROVAL（审批恢复）：在全图中查找类型匹配的节点，
