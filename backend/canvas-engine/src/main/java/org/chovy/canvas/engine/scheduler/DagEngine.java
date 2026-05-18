@@ -173,13 +173,13 @@ public class DagEngine {
             }
 
             // ──────────────────────────────────────────────────────
-            // 阶段 4：CAS 抢占本地锁（waitProcess 机制）
+            // 阶段 4：CAS 抢占 nodeGate 门控锁
             // ──────────────────────────────────────────────────────
-            AtomicBoolean waitProcess = ctx.getLock(nodeId);
-            if (!waitProcess.compareAndSet(true, false)) {
-                // 抢锁失败：设置 waitProcess=true 通知持锁协程需要 repeat
-                waitProcess.set(true);
-                log.debug("[ENGINE] CAS 失败，设 waitProcess=true nodeId={}", nodeId);
+            AtomicBoolean nodeGate = ctx.getLock(nodeId);
+            if (!nodeGate.compareAndSet(true, false)) {
+                // 抢锁失败：set(true) 向持锁协程发送 repeat 信号
+                nodeGate.set(true);
+                log.debug("[ENGINE] CAS 失败，发出 repeat 信号 nodeId={}", nodeId);
                 return Mono.just(Map.of());
             }
 
@@ -192,13 +192,13 @@ public class DagEngine {
             NodeHandler handler = handlerRegistry.get(node.getType());
             long nodeStartMs = System.currentTimeMillis(); // 记录节点开始时间
 
-            return executeHandlerWithRepeat(handler, config, ctx, waitProcess,
+            return executeHandlerWithRepeat(handler, config, ctx, nodeGate,
                     nodeId, node.getType())
                     .flatMap(result -> {
 
                         if (!result.success()) {
                             // Handler 返回失败
-                            waitProcess.set(true); // 释放锁
+                            nodeGate.set(true); // 释放锁
                             ctx.setNodeStatus(nodeId, NodeStatus.FAILED);
                             writeTraceEnd(ctx, node, result);
                             // 防资损：已发券/已触达则整体 SUCCESS
@@ -226,7 +226,7 @@ public class DagEngine {
                         return triggerDownstream(graph, result, nodeId, node.getType(), ctx);
                     })
                     .onErrorResume(e -> {
-                        waitProcess.set(true);
+                        nodeGate.set(true);
                         ctx.setNodeStatus(nodeId, NodeStatus.FAILED);
                         log.error("[ENGINE] 节点异常 nodeId={}: {}", nodeId, e.getMessage());
                         if (ctx.isBenefitGranted() || ctx.isUserReached()) {
@@ -242,19 +242,60 @@ public class DagEngine {
     // repeat 并发保护 + 熔断 + 重试 + DLQ（7.5节 + 12.5节 + 13.2节 + 13.3节）
     // ══════════════════════════════════════════════════════════════
 
+    /**
+     * 带 repeat 保护的 Handler 执行（含熔断、重试、DLQ）。
+     *
+     * <h3>nodeGate（原名 waitProcess）的双重语义</h3>
+     * <pre>
+     * 这是一个 AtomicBoolean，同时承担"互斥锁"和"待处理信号"两种职责：
+     *   true  = 可执行 / 有并发请求待处理（两种含义共用 true）
+     *   false = 正在执行中（持锁）
+     *
+     * 初始状态：true（可执行）
+     * 加锁：CAS(true → false)，成功才可以执行
+     * 释放锁：set(true)
+     * 并发抢锁失败：CAS 失败的协程 set(true)，表示"我来过，请你执行完后 repeat 一次"
+     * </pre>
+     *
+     * <h3>为什么需要 repeat？</h3>
+     * <pre>
+     * HUB/LogicRelation 场景：上游 A、B 并发完成，都要执行同一个节点 N。
+     *
+     * 无并发情况（Case 1）：
+     *   A 抢到锁 → 执行 N → 完成
+     *   此时 nodeGate 从未被人改回 true（B 没来）→ getAndSet(true) 返回 false
+     *   → 无 repeat，直接返回结果
+     *
+     * 有并发情况（Case 2）：
+     *   A 抢到锁（nodeGate = false），开始执行 N
+     *   B 来了，CAS(true→false) 失败 → B set(true)，表示"你执行完还需要再 repeat 一次"
+     *   A 执行完，getAndSet(true) 返回旧值 true → 检测到 B 的信号
+     *   A 再次 CAS(true→false) 重新持锁 → repeat 执行一次 N
+     *   此时 B 的更新已体现在 ctx 里（B 的 nodeStatus 已写入），repeat 能看到最终状态
+     *
+     * Case 3（竞态边界）：
+     *   A 执行完，getAndSet(true) 返回 false（B 还没到）
+     *   就在这一刹那 B 到了，B CAS(true→false) 成功 → B 自己执行
+     *   → 不需要 repeat，B 自己处理
+     *   这里的 CAS(true→false) 是关键：它既是"检测 B 信号"也是"重新持锁"，
+     *   能原子性地和 B 的抢锁操作互斥，不会双重执行。
+     * </pre>
+     *
+     * @param nodeGate 节点执行门控（对应外层 ctx.getLock(nodeId)）
+     */
     private Mono<NodeResult> executeHandlerWithRepeat(NodeHandler handler,
                                                       Map<String, Object> config,
                                                       ExecutionContext ctx,
-                                                      AtomicBoolean waitProcess,
+                                                      AtomicBoolean nodeGate,
                                                       String nodeId,
                                                       String nodeType) {
         CircuitBreakerRegistry.CircuitBreaker cb = cbRegistry.get(nodeType);
 
-        // 单次调用：直接调用 Handler 的响应式方法，无需 subscribeOn（Handler 自行决定调度）
-        // 熔断检查用 Mono.defer() 包裹，确保每次订阅时才检查熔断状态
+        // ── 单次执行：熔断检查 + Handler 调用 ──────────────────────
+        // Mono.defer 确保每次订阅（含 repeat）都重新检查熔断状态
         Mono<NodeResult> singleCall = Mono.defer(() -> {
                     try {
-                        cb.checkState(); // OPEN 时抛 CircuitBreakerOpenException（不可重试）
+                        cb.checkState(); // 熔断 OPEN 时抛异常，不可重试
                     } catch (CircuitBreakerRegistry.CircuitBreakerOpenException e) {
                         return Mono.just(NodeResult.fail(e.getMessage()));
                     }
@@ -262,11 +303,11 @@ public class DagEngine {
                 })
                 .doOnNext(r -> {
                     if (r.success()) cb.recordSuccess();
-                    else cb.recordFailure();
+                    else             cb.recordFailure();
                 })
                 .doOnError(e -> cb.recordFailure());
 
-        // 指数退避重试（13.2节）：只重试可重试异常
+        // ── 加指数退避重试，耗尽后写 DLQ ──────────────────────────
         Mono<NodeResult> withRetry = singleCall
                 .retryWhen(Retry.backoff(maxRetry, Duration.ofMillis(retryBaseDelayMs))
                         .maxBackoff(Duration.ofMillis(retryMaxDelayMs))
@@ -276,25 +317,32 @@ public class DagEngine {
                             log.warn("[ENGINE] 节点重试 nodeId={} attempt={} reason={}",
                                     nodeId, sig.totalRetries() + 1, sig.failure().getMessage());
                         }))
-                // 重试耗尽或不可重试异常 → 写 DLQ（13.3节），返回 FAILED
                 .onErrorResume(e -> {
                     writeDlq(ctx, nodeId, nodeType, e);
                     return Mono.just(NodeResult.fail("已写入DLQ: " + e.getMessage()));
                 });
 
-        // repeat 并发保护（7.5节）：在写 SUCCESS 之前检查
+        // ── repeat 保护：执行成功后检查是否有并发请求需要重跑 ─────
         return withRetry.flatMap(result -> {
             if (!result.success()) {
-                return Mono.just(result); // 失败直接返回，调用方释放锁
+                // 失败时调用方（executeNodeAfterStage2）会释放 nodeGate
+                return Mono.just(result);
             }
 
-            // getAndSet(true)：释放锁，返回旧值。旧值=true → 有协程在等待 → repeat
-            boolean hadWaiter = waitProcess.getAndSet(true);
-            if (hadWaiter && waitProcess.compareAndSet(true, false)) {
+            // getAndSet(true)：释放锁，同时读取"是否有并发协程设过信号"
+            //   返回 false → 没人来过（Case 1 / Case 3 边界由下面的 CAS 解决）→ 不 repeat
+            //   返回 true  → 有并发协程在我执行期间 set(true) 发出了信号（Case 2）→ 需要 repeat
+            boolean hasConcurrentSignal = nodeGate.getAndSet(true);
+
+            if (hasConcurrentSignal && nodeGate.compareAndSet(true, false)) {
+                // CAS 成功：重新持锁，执行 repeat
+                // doFinally 确保 repeat 执行完（无论成功/失败）都释放锁
                 log.debug("[ENGINE] repeat nodeId={}", nodeId);
-                return withRetry.doFinally(__ -> waitProcess.set(true));
+                return withRetry.doFinally(__ -> nodeGate.set(true));
             }
 
+            // hasConcurrentSignal=false，或 CAS 失败（有其他协程更早抢走了锁）
+            // 均不需要 repeat，直接返回本次执行结果
             return Mono.just(result);
         });
     }
@@ -423,16 +471,16 @@ public class DagEngine {
      *     └> executeNode(HUB)
      *          ├─ 抢到 CAS 锁
      *          ├─ allUpstreamDone=false → WAITING → 返回 Map.of()
-     *          └─ 检查 waitProcess → false → 结束
+     *          └─ 检查 nodeGate → false → 结束
      *                               上游B完成
      *                                 └> executeNode(HUB)
-     *                                      ├─ 抢锁失败（A还没释放）→ set waitProcess=true → 返回
+     *                                      ├─ 抢锁失败（A还没释放）→ set(true) 发送信号 → 返回
      *                                      或者
      *                                      ├─ 抢锁成功（A已释放）
      *                                      ├─ allUpstreamDone=true → 继续执行下游
      *                                      └─ 正常结束
      * <br/>
-     *   若抢锁失败路径：A 在释放锁前发现 waitProcess=true
+     *   若抢锁失败路径：A 在释放锁前发现 nodeGate=true（有信号）
      *     └> repeat：A 重新执行 handleHub → allUpstreamDone=true → 继续
      * <br/>
      *   Mono.delay() 是超时兜底，不是主驱动，它只做一件事：N 秒后如果 Hub 还没完成就标记 FAILED。
@@ -500,20 +548,20 @@ public class DagEngine {
         if (ctx.isNodeDone(nodeId)) return Mono.just(Map.of());
 
         // 阶段 4：CAS
-        AtomicBoolean waitProcess = ctx.getLock(nodeId);
-        if (!waitProcess.compareAndSet(true, false)) {
-            waitProcess.set(true);
+        AtomicBoolean nodeGate = ctx.getLock(nodeId);
+        if (!nodeGate.compareAndSet(true, false)) {
+            nodeGate.set(true);
             return Mono.just(Map.of());
         }
 
         writeTraceStart(ctx, node);
         NodeHandler handler = handlerRegistry.get(node.getType());
 
-        return executeHandlerWithRepeat(handler, config, ctx, waitProcess,
+        return executeHandlerWithRepeat(handler, config, ctx, nodeGate,
                 nodeId, node.getType())
                 .flatMap(result -> {
                     if (!result.success()) {
-                        waitProcess.set(true);
+                        nodeGate.set(true);
                         ctx.setNodeStatus(nodeId, NodeStatus.FAILED);
                         writeTraceEnd(ctx, node, result);
                         if (ctx.isBenefitGranted() || ctx.isUserReached()) return Mono.just(Map.<String, Object>of());
@@ -529,7 +577,7 @@ public class DagEngine {
                     return triggerDownstream(graph, result, nodeId, node.getType(), ctx);
                 })
                 .onErrorResume(e -> {
-                    waitProcess.set(true);
+                    nodeGate.set(true);
                     ctx.setNodeStatus(nodeId, NodeStatus.FAILED);
                     if (ctx.isBenefitGranted() || ctx.isUserReached()) {
                         return Mono.just(new HashMap<>());
