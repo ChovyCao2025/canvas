@@ -8,6 +8,7 @@ import org.chovy.canvas.domain.execution.CanvasExecutionDlqMapper;
 import org.chovy.canvas.domain.execution.CanvasExecutionTrace;
 import org.chovy.canvas.domain.execution.CanvasExecutionTraceMapper;
 import org.chovy.canvas.engine.context.ExecutionContext;
+import org.chovy.canvas.engine.context.NodeGate;
 import org.chovy.canvas.engine.context.NodeStatus;
 import org.chovy.canvas.engine.dag.DagGraph;
 import org.chovy.canvas.engine.dag.DagParser;
@@ -31,7 +32,6 @@ import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.*;
 import java.util.concurrent.Executors;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
 
 /**
@@ -175,10 +175,10 @@ public class DagEngine {
             // ──────────────────────────────────────────────────────
             // 阶段 4：CAS 抢占 nodeGate 门控锁
             // ──────────────────────────────────────────────────────
-            AtomicBoolean nodeGate = ctx.getLock(nodeId);
-            if (!nodeGate.compareAndSet(true, false)) {
+            NodeGate nodeGate = ctx.getGate(nodeId);
+            if (!nodeGate.executing.compareAndSet(false, true)) {
                 // 抢锁失败：set(true) 向持锁协程发送 repeat 信号
-                nodeGate.set(true);
+                nodeGate.repeatPending.set(true);
                 log.debug("[ENGINE] CAS 失败，发出 repeat 信号 nodeId={}", nodeId);
                 return Mono.just(Map.of());
             }
@@ -198,7 +198,7 @@ public class DagEngine {
 
                         if (!result.success()) {
                             // Handler 返回失败
-                            nodeGate.set(true); // 释放锁
+                            nodeGate.executing.set(false); // 释放锁
                             ctx.setNodeStatus(nodeId, NodeStatus.FAILED);
                             writeTraceEnd(ctx, node, result);
                             // 防资损：已发券/已触达则整体 SUCCESS
@@ -226,7 +226,7 @@ public class DagEngine {
                         return triggerDownstream(graph, result, nodeId, node.getType(), ctx);
                     })
                     .onErrorResume(e -> {
-                        nodeGate.set(true);
+                        nodeGate.executing.set(false); // 释放异常锁
                         ctx.setNodeStatus(nodeId, NodeStatus.FAILED);
                         log.error("[ENGINE] 节点异常 nodeId={}: {}", nodeId, e.getMessage());
                         if (ctx.isBenefitGranted() || ctx.isUserReached()) {
@@ -245,48 +245,33 @@ public class DagEngine {
     /**
      * 带 repeat 保护的 Handler 执行（含熔断、重试、DLQ）。
      *
-     * <h3>nodeGate（原名 waitProcess）的双重语义</h3>
-     * <pre>
-     * 这是一个 AtomicBoolean，同时承担"互斥锁"和"待处理信号"两种职责：
-     *   true  = 可执行 / 有并发请求待处理（两种含义共用 true）
-     *   false = 正在执行中（持锁）
-     *
-     * 初始状态：true（可执行）
-     * 加锁：CAS(true → false)，成功才可以执行
-     * 释放锁：set(true)
-     * 并发抢锁失败：CAS 失败的协程 set(true)，表示"我来过，请你执行完后 repeat 一次"
-     * </pre>
-     *
      * <h3>为什么需要 repeat？</h3>
      * <pre>
-     * HUB/LogicRelation 场景：上游 A、B 并发完成，都要执行同一个节点 N。
+     * HUB/LogicRelation 场景：上游 A、B 并发完成，都要执行同一个下游节点 N。
      *
-     * 无并发情况（Case 1）：
-     *   A 抢到锁 → 执行 N → 完成
-     *   此时 nodeGate 从未被人改回 true（B 没来）→ getAndSet(true) 返回 false
-     *   → 无 repeat，直接返回结果
+     * Case 1 — 无并发：
+     *   A 抢到锁（executing: false→true）→ 执行 N → 读 repeatPending=false → 释放锁
+     *   → 无 repeat，直接返回
      *
-     * 有并发情况（Case 2）：
-     *   A 抢到锁（nodeGate = false），开始执行 N
-     *   B 来了，CAS(true→false) 失败 → B set(true)，表示"你执行完还需要再 repeat 一次"
-     *   A 执行完，getAndSet(true) 返回旧值 true → 检测到 B 的信号
-     *   A 再次 CAS(true→false) 重新持锁 → repeat 执行一次 N
-     *   此时 B 的更新已体现在 ctx 里（B 的 nodeStatus 已写入），repeat 能看到最终状态
+     * Case 2 — 有并发（B 在 A 执行期间到达）：
+     *   A 正在执行（executing=true）
+     *   B 到了，CAS 失败 → B 设 repeatPending=true（"我来过，你执行完再跑一次"）
+     *   A 执行完 → 读 repeatPending=true，清零 → 释放锁 → 重新抢锁 → repeat
+     *   repeat 时 B 的 ctx 变更已可见，能看到最终状态
      *
-     * Case 3（竞态边界）：
-     *   A 执行完，getAndSet(true) 返回 false（B 还没到）
-     *   就在这一刹那 B 到了，B CAS(true→false) 成功 → B 自己执行
-     *   → 不需要 repeat，B 自己处理
-     *   这里的 CAS(true→false) 是关键：它既是"检测 B 信号"也是"重新持锁"，
-     *   能原子性地和 B 的抢锁操作互斥，不会双重执行。
+     * Case 3 — 竞态边界（B 在 A 释放锁后才到）：
+     *   A 读 repeatPending=false → 释放锁（executing: true→false）
+     *   就在此刻 B 到了，B CAS 成功 → B 自己执行
+     *   A 的 CAS 尝试失败（B 已持锁）→ A 不 repeat，B 接管
+     *   → 不会双重执行（读信号和重新持锁之间的 CAS 保证了原子性）
      * </pre>
      *
-     * @param nodeGate 节点执行门控（对应外层 ctx.getLock(nodeId)）
+     * @param nodeGate 节点执行门控，含独立的互斥锁（executing）和 repeat 信号（repeatPending）
      */
     private Mono<NodeResult> executeHandlerWithRepeat(NodeHandler handler,
                                                       Map<String, Object> config,
                                                       ExecutionContext ctx,
-                                                      AtomicBoolean nodeGate,
+                                                      NodeGate nodeGate,
                                                       String nodeId,
                                                       String nodeType) {
         CircuitBreakerRegistry.CircuitBreaker cb = cbRegistry.get(nodeType);
@@ -329,20 +314,20 @@ public class DagEngine {
                 return Mono.just(result);
             }
 
-            // getAndSet(true)：释放锁，同时读取"是否有并发协程设过信号"
-            //   返回 false → 没人来过（Case 1 / Case 3 边界由下面的 CAS 解决）→ 不 repeat
-            //   返回 true  → 有并发协程在我执行期间 set(true) 发出了信号（Case 2）→ 需要 repeat
-            boolean hasConcurrentSignal = nodeGate.getAndSet(true);
+            // ── 检查是否需要 repeat ──────────────────────────────
+            // 先读并清除 repeatPending，再释放 executing 锁。
+            // 顺序很关键：必须在释放锁之前读信号，否则新协程抢到锁后
+            // 才来的并发请求信号会被遗漏（具体推导见 executeHandlerWithRepeat JavaDoc）。
+            boolean needsRepeat = nodeGate.repeatPending.getAndSet(false);
+            nodeGate.executing.set(false); // 释放锁
 
-            if (hasConcurrentSignal && nodeGate.compareAndSet(true, false)) {
-                // CAS 成功：重新持锁，执行 repeat
-                // doFinally 确保 repeat 执行完（无论成功/失败）都释放锁
+            if (needsRepeat && nodeGate.executing.compareAndSet(false, true)) {
+                // 重新持锁，执行 repeat；doFinally 保证 repeat 结束后释放锁
                 log.debug("[ENGINE] repeat nodeId={}", nodeId);
-                return withRetry.doFinally(__ -> nodeGate.set(true));
+                return withRetry.doFinally(__ -> nodeGate.executing.set(false));
             }
 
-            // hasConcurrentSignal=false，或 CAS 失败（有其他协程更早抢走了锁）
-            // 均不需要 repeat，直接返回本次执行结果
+            // needsRepeat=false，或 CAS 失败（新协程已接管，不需要我 repeat）
             return Mono.just(result);
         });
     }
@@ -548,9 +533,9 @@ public class DagEngine {
         if (ctx.isNodeDone(nodeId)) return Mono.just(Map.of());
 
         // 阶段 4：CAS
-        AtomicBoolean nodeGate = ctx.getLock(nodeId);
-        if (!nodeGate.compareAndSet(true, false)) {
-            nodeGate.set(true);
+        NodeGate nodeGate = ctx.getGate(nodeId);
+        if (!nodeGate.executing.compareAndSet(false, true)) {
+            nodeGate.repeatPending.set(true);
             return Mono.just(Map.of());
         }
 
@@ -561,7 +546,7 @@ public class DagEngine {
                 nodeId, node.getType())
                 .flatMap(result -> {
                     if (!result.success()) {
-                        nodeGate.set(true);
+                        nodeGate.executing.set(false); // 释放锁
                         ctx.setNodeStatus(nodeId, NodeStatus.FAILED);
                         writeTraceEnd(ctx, node, result);
                         if (ctx.isBenefitGranted() || ctx.isUserReached()) return Mono.just(Map.<String, Object>of());
@@ -577,7 +562,7 @@ public class DagEngine {
                     return triggerDownstream(graph, result, nodeId, node.getType(), ctx);
                 })
                 .onErrorResume(e -> {
-                    nodeGate.set(true);
+                    nodeGate.executing.set(false); // 释放异常锁
                     ctx.setNodeStatus(nodeId, NodeStatus.FAILED);
                     if (ctx.isBenefitGranted() || ctx.isUserReached()) {
                         return Mono.just(new HashMap<>());

@@ -57,11 +57,11 @@ public class ExecutionContext {
     private Map<String, Long> hubStartTimes = new ConcurrentHashMap<>();
 
     /**
-     * 每节点的 waitProcess 并发保护锁。
-     * 不序列化：AtomicBoolean 无法 JSON 化；恢复时通过 getLock() 懒建。
+     * 每节点的执行门控，分离互斥锁与 repeat 信号。
+     * 不序列化：恢复时通过 {@link #getGate(String)} 懒建。
      */
     @JsonIgnore
-    private final Map<String, AtomicBoolean> nodeLocks = new ConcurrentHashMap<>();
+    private final Map<String, NodeGate> nodeGates = new ConcurrentHashMap<>();
 
     /**
      * 已为 Hub 节点调度过超时任务的节点 ID 集合（防重复调度）。
@@ -127,11 +127,8 @@ public class ExecutionContext {
 
     // ── 每节点并发锁（懒建，不序列化） ─────────────────────────────
 
-    /**
-     * 获取节点的 waitProcess 锁。初始值 true（可被 CAS 抢占）。
-     * 反序列化后 nodeLocks 为空 Map，首次访问时自动创建。
-     */
-    public AtomicBoolean getLock(String nodeId) {
-        return nodeLocks.computeIfAbsent(nodeId, k -> new AtomicBoolean(true));
+    /** 获取节点执行门控，不存在时懒建（恢复执行后首次访问时自动创建）。 */
+    public NodeGate getGate(String nodeId) {
+        return nodeGates.computeIfAbsent(nodeId, k -> new NodeGate());
     }
 }
