@@ -9,6 +9,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
+import java.util.Arrays;
 import java.util.Map;
 
 /**
@@ -30,6 +31,7 @@ public class CanvasDisruptorService {
     private final Disruptor<CanvasExecutionEvent> disruptor;
     private final RingBuffer<CanvasExecutionEvent> ringBuffer;
 
+    // 初始化配置
     public CanvasDisruptorService(
             CanvasExecutionService executionService,
             @Value("${canvas.disruptor.ring-buffer-size:65536}") int ringBufferSize,
@@ -51,23 +53,22 @@ public class CanvasDisruptorService {
         // WorkerPool：每个 event 只由一个 worker 处理
         @SuppressWarnings("unchecked")
         WorkHandler<CanvasExecutionEvent>[] workers = new WorkHandler[consumers];
-        for (int i = 0; i < consumers; i++) {
-            workers[i] = event -> {
-                try {
-                    executionService.trigger(
-                                    event.canvasId, event.userId, event.triggerType,
-                                    event.triggerNodeType, event.matchKey,
-                                    event.payload, event.msgId, false)
-                            .subscribe(
-                                    null,
-                                    e -> log.error("[DISRUPTOR] 执行失败 canvasId={} userId={}: {}",
-                                            event.canvasId, event.userId, e.getMessage())
-                            );
-                } finally {
-                    event.reset(); // 归还事件对象（Ring Buffer 复用）
-                }
-            };
-        }
+        Arrays.fill(workers, (WorkHandler<CanvasExecutionEvent>) event -> {
+            try {
+                // 实际执行逻辑
+                executionService.trigger(
+                                event.canvasId, event.userId, event.triggerType,
+                                event.triggerNodeType, event.matchKey,
+                                event.payload, event.msgId, false)
+                        .subscribe(
+                                null,
+                                e -> log.error("[DISRUPTOR] 执行失败 canvasId={} userId={}: {}",
+                                        event.canvasId, event.userId, e.getMessage())
+                        );
+            } finally {
+                event.reset(); // 归还事件对象（Ring Buffer 复用）
+            }
+        });
         disruptor.handleEventsWithWorkerPool(workers);
 
         // 异常处理：记录错误但不中断 Ring Buffer
@@ -94,7 +95,6 @@ public class CanvasDisruptorService {
     /**
      * 发布触发事件到 Ring Buffer（设计文档 12.8节）。
      * 非阻塞，当 Ring Buffer 满时 next() 自旋等待（YieldingWaitStrategy）。
-     *
      * 仅用于异步触发（MQ / 行为 / 定时），直调触发绕过 Disruptor 直接执行。
      */
     public void publish(Long canvasId, String userId, String triggerType,

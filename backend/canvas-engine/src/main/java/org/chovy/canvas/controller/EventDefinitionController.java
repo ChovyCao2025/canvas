@@ -1,17 +1,19 @@
 package org.chovy.canvas.controller;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import org.chovy.canvas.domain.constant.NodeType;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
-import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.chovy.canvas.common.PageResult;
 import org.chovy.canvas.common.R;
+import org.chovy.canvas.domain.constant.CanvasStatusEnum;
+import org.chovy.canvas.domain.constant.TriggerType;
 import org.chovy.canvas.domain.meta.EventDefinition;
 import org.chovy.canvas.domain.meta.EventDefinitionMapper;
 import org.chovy.canvas.domain.meta.EventLog;
 import org.chovy.canvas.domain.meta.EventLogMapper;
+import org.chovy.canvas.dto.EventReportReq;
 import org.chovy.canvas.engine.disruptor.CanvasDisruptorService;
-import lombok.Data;
 import org.chovy.canvas.infra.redis.TriggerRouteService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -19,14 +21,12 @@ import org.springframework.web.bind.annotation.*;
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
 
-import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
 /**
  * 事件定义管理 + 事件上报接口。
- *
  * 上报流程：
  *   POST /canvas/events/report
  *   → 验证事件定义存在
@@ -70,7 +70,7 @@ public class EventDefinitionController {
     @PutMapping("/event-definitions/{id}")
     public Mono<R<Void>> update(@PathVariable Long id, @RequestBody EventDefinition body) {
         body.setId(id);
-        return Mono.fromCallable(() -> { eventMapper.updateById(body); return R.<Void>ok(); })
+        return Mono.fromCallable(() -> { eventMapper.updateById(body); return R.ok(); })
                 .subscribeOn(Schedulers.boundedElastic());
     }
 
@@ -96,10 +96,11 @@ public class EventDefinitionController {
                 throw new IllegalArgumentException("userId 不能为空");
 
             // 1. 验证事件定义存在
+            // FIXME: 事件定义会频繁上报导致查询, 事件查询应该有缓存机制
             EventDefinition def = eventMapper.selectOne(
                     new LambdaQueryWrapper<EventDefinition>()
                             .eq(EventDefinition::getEventCode, req.getEventCode())
-                            .eq(EventDefinition::getEnabled, 1));
+                            .eq(EventDefinition::getEnabled, CanvasStatusEnum.PUBLISHED.getCode()));
             if (def == null)
                 throw new IllegalArgumentException("事件未定义或已禁用: " + req.getEventCode());
 
@@ -116,15 +117,17 @@ public class EventDefinitionController {
             logMapper.insert(eventLog);
 
             // 3. 从路由表查所有监听此事件的已发布画布，逐一触发
+            // FIXME: Redis 异常意味着整个链路都无法推进, 考虑降级方案以及是否有做好缓存刷新问题
             Set<String> canvasIds = triggerRouteService.getCanvasByBehavior(req.getEventCode());
+            // FIXME: 使用雪花算法代替
             String eventId = "evt-" + UUID.randomUUID().toString().replace("-", "").substring(0, 12);
             Map<String, Object> payload = req.getAttributes() != null ? req.getAttributes() : Map.of();
 
             canvasIds.forEach(cidStr -> {
                 try {
                     Long cid = Long.parseLong(cidStr);
-                    disruptorService.publish(cid, req.getUserId(), "EVENT",
-                            "BEHAVIOR_IN_APP", req.getEventCode(), payload, eventId + "-" + cidStr);
+                    disruptorService.publish(cid, req.getUserId(), TriggerType.EVENT,
+                            NodeType.EVENT_TRIGGER, req.getEventCode(), payload, eventId + "-" + cidStr);
                     log.info("[EVENT] 触发画布 canvasId={} eventCode={} userId={}",
                             cid, req.getEventCode(), req.getUserId());
                 } catch (Exception e) {
@@ -144,18 +147,8 @@ public class EventDefinitionController {
             resp.put("status",         "ACCEPTED");
             return resp;
         }).subscribeOn(Schedulers.boundedElastic())
-          .map(result -> R.<Map<String, Object>>ok(result));
+          .map(R::ok);
     }
 
-    @Data
-    static class EventReportReq {
-        /** 事件编码，必须在 event_definition 中已定义 */
-        private String eventCode;
-        /** 触发用户 ID */
-        private String userId;
-        /** 事件属性，key-value 结构，与事件定义中的 attributes 对应 */
-        private Map<String, Object> attributes;
-        /** 幂等 key，可选 */
-        private String idempotencyKey;
-    }
+
 }

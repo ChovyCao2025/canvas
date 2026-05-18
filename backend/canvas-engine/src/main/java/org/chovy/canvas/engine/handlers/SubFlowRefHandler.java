@@ -1,6 +1,8 @@
 package org.chovy.canvas.engine.handlers;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.chovy.canvas.domain.constant.NodeType;
+import org.chovy.canvas.domain.constant.TriggerType;
 import org.chovy.canvas.domain.canvas.Canvas;
 import org.chovy.canvas.domain.canvas.CanvasMapper;
 import org.chovy.canvas.domain.canvas.CanvasVersion;
@@ -209,7 +211,7 @@ public class SubFlowRefHandler implements NodeHandler {
         childCtx.setCanvasId(subFlowId);
         childCtx.setVersionId(versionId);
         childCtx.setUserId(ctx.getUserId());
-        childCtx.setTriggerType("SUB_FLOW_REF");
+        childCtx.setTriggerType(TriggerType.SUB_FLOW_REF);
         childCtx.getCallStack().addAll(ctx.getCallStack());
         childCtx.getCallStack().add(ctx.getCanvasId());
         childCtx.getTriggerPayload().putAll(inputData);

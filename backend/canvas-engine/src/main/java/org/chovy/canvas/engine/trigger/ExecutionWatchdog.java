@@ -1,8 +1,13 @@
 package org.chovy.canvas.engine.trigger;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import org.chovy.canvas.domain.constant.NodeType;
 import org.chovy.canvas.domain.approval.CanvasManualApproval;
 import org.chovy.canvas.domain.approval.CanvasManualApprovalMapper;
+import org.chovy.canvas.domain.constant.ApprovalOnTimeoutAction;
+import org.chovy.canvas.domain.constant.ApprovalStatus;
+import org.chovy.canvas.domain.constant.ExecutionStatus;
+import org.chovy.canvas.domain.constant.TriggerType;
 import org.chovy.canvas.domain.execution.CanvasExecution;
 import org.chovy.canvas.domain.execution.CanvasExecutionMapper;
 import org.chovy.canvas.engine.handlers.ManualApprovalHandler;
@@ -53,7 +58,7 @@ public class ExecutionWatchdog {
 
         List<CanvasExecution> zombies = executionMapper.selectList(
                 new LambdaQueryWrapper<CanvasExecution>()
-                        .eq(CanvasExecution::getStatus, 1)
+                        .eq(CanvasExecution::getStatus, ExecutionStatus.PAUSED.getCode())
                         .isNotNull(CanvasExecution::getLastDedupKey)
                         .lt(CanvasExecution::getUpdatedAt, threshold)
         );
@@ -73,7 +78,7 @@ public class ExecutionWatchdog {
     private void scanApprovalTimeout() {
         List<CanvasManualApproval> timedOut = approvalMapper.selectList(
                 new LambdaQueryWrapper<CanvasManualApproval>()
-                        .eq(CanvasManualApproval::getStatus, "PENDING")
+                        .eq(CanvasManualApproval::getStatus, ApprovalStatus.PENDING)
                         .lt(CanvasManualApproval::getTimeoutAt, LocalDateTime.now())
         );
 
@@ -82,21 +87,21 @@ public class ExecutionWatchdog {
                     approval.getId(), approval.getOnTimeout());
 
             switch (approval.getOnTimeout()) {
-                case "APPROVE" -> processApprovalTimeout(approval, "APPROVED");
-                case "REJECT"  -> processApprovalTimeout(approval, "REJECTED");
-                case "KEEP_WAITING" -> {
+                case ApprovalOnTimeoutAction.APPROVE -> processApprovalTimeout(approval, ApprovalStatus.APPROVED);
+                case ApprovalOnTimeoutAction.REJECT  -> processApprovalTimeout(approval, ApprovalStatus.REJECTED);
+                case ApprovalOnTimeoutAction.KEEP_WAITING -> {
                     // 续期 ctx TTL（防止 Redis key 过期），不做任何处理
                     var ctx = ctxStore.load(approval.getCanvasId(), approval.getUserId());
                     if (ctx != null) ctxStore.save(ctx);
                     log.info("[WATCHDOG] KEEP_WAITING，续期 ctx executionId={}", approval.getExecutionId());
                 }
-                default -> processApprovalTimeout(approval, "REJECTED");
+                default -> processApprovalTimeout(approval, ApprovalStatus.REJECTED);
             }
         }
     }
 
     private void processApprovalTimeout(CanvasManualApproval approval, String result) {
-        approval.setStatus("TIMEOUT");
+        approval.setStatus(ApprovalStatus.TIMEOUT);
         approval.setResultBy("watchdog");
         approval.setResultAt(LocalDateTime.now());
         approvalMapper.updateById(approval);
@@ -114,7 +119,7 @@ public class ExecutionWatchdog {
 
         executionService.trigger(
                         approval.getCanvasId(), approval.getUserId(),
-                        "MANUAL_APPROVAL_TIMEOUT", "MANUAL_APPROVAL",
+                        TriggerType.MANUAL_APPROVAL_TIMEOUT, NodeType.MANUAL_APPROVAL,
                         null, Map.of(), approval.getExecutionId() + ":timeout", false)
                 .subscribe(
                         null,

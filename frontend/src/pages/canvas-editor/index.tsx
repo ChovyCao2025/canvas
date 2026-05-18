@@ -472,11 +472,7 @@ function EditorInner({ detail, onStatusChange }: {
     const tgt = allNodes.find(n => n.id === conn.target)?.data as CanvasNodeData | undefined
     if (!src || !tgt) return false
     if (TRIGGER_TYPES.has(tgt.nodeType)) {
-      message.warning(
-        `${tgt.nodeType === 'START' ? 'START' : tgt.nodeType} 是触发器节点，只能作为流程入口，不能有上游节点。\n` +
-        '多种触发方式（如事件触发 + 手动触发）可以各自独立作为入口，共同连接到后续节点。',
-        3
-      )
+      message.warning('START 是流程唯一入口，不能有上游节点。', 3)
       return false
     }
     if (TERMINAL_TYPES.has(src.nodeType)) return false  // 终止节点无出边
@@ -488,13 +484,24 @@ function EditorInner({ detail, onStatusChange }: {
   /** 发布前本地校验（减少不必要的服务端请求）*/
   const validateBeforePublish = useCallback((rfNodes: Node<CanvasNodeData>[]): string[] => {
     const errors: string[] = []
-    const hasTrigger = rfNodes.some(n => TRIGGER_TYPES.has(n.data.nodeType))
-    if (!hasTrigger) errors.push('画布必须包含至少一个触发器节点')
+    // START 之后必须连接一个触发器节点（事件/MQ/定时/直调）
+    const TRIGGER_NODE_TYPES = new Set(['EVENT_TRIGGER', 'MQ_TRIGGER', 'SCHEDULED_TRIGGER', 'DIRECT_CALL'])
+    const hasTrigger = rfNodes.some(n => TRIGGER_NODE_TYPES.has(n.data.nodeType))
+    if (!hasTrigger) errors.push('画布必须包含至少一个触发器节点（事件触发 / MQ 触发 / 定时触发 / 直调）')
 
     rfNodes.forEach(n => {
       const d = n.data as CanvasNodeData
       const cfg = d.bizConfig
       switch (d.nodeType) {
+        case 'EVENT_TRIGGER':
+          if (!cfg.eventCode) errors.push(`节点「${d.name}」必须选择触发事件`)
+          break
+        case 'MQ_TRIGGER':
+          if (!cfg.topicKey) errors.push(`节点「${d.name}」必须选择消息主题`)
+          break
+        case 'SCHEDULED_TRIGGER':
+          if (!cfg.cronExpression) errors.push(`节点「${d.name}」必须配置 Cron 表达式`)
+          break
         case 'IF_CONDITION':
           if (!cfg.successNodeId) errors.push(`节点「${d.name}」未配置成功分支（连线到 success handle）`)
           if (!cfg.failNodeId)    errors.push(`节点「${d.name}」未配置失败分支（连线到 fail handle）`)
@@ -506,9 +513,6 @@ function EditorInner({ detail, onStatusChange }: {
         }
         case 'GROOVY':
           if (!cfg.code) errors.push(`节点「${d.name}」Groovy 脚本不能为空`)
-          break
-        case 'MQ_TRIGGER':
-          if (!cfg.topicKey) errors.push(`节点「${d.name}」必须选择消息主题`)
           break
         case 'COUPON':
           if (!cfg.couponTypeKey) errors.push(`节点「${d.name}」必须选择券类型`)

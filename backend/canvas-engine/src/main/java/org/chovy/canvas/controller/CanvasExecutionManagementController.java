@@ -1,11 +1,13 @@
 package org.chovy.canvas.controller;
 
 import com.fasterxml.jackson.core.type.TypeReference;
+import org.chovy.canvas.domain.constant.NodeType;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.jsonwebtoken.Claims;
 import org.chovy.canvas.common.R;
 import org.chovy.canvas.domain.approval.CanvasManualApproval;
 import org.chovy.canvas.domain.approval.CanvasManualApprovalMapper;
+import org.chovy.canvas.domain.constant.ApprovalStatus;
 import org.chovy.canvas.engine.handlers.ManualApprovalHandler;
 import org.chovy.canvas.engine.trigger.CanvasExecutionService;
 import org.chovy.canvas.infra.redis.ContextPersistenceService;
@@ -48,7 +50,7 @@ public class CanvasExecutionManagementController {
     public Mono<R<Void>> approve(@PathVariable String executionId) {
         return currentUsername()
                 .flatMap(username ->
-                        Mono.<Void>fromRunnable(() -> resumeWithResult(executionId, "APPROVED", username,
+                        Mono.<Void>fromRunnable(() -> resumeWithResult(executionId, ApprovalStatus.APPROVED, username,
                                 /* watchdog */ false))
                                 .subscribeOn(Schedulers.boundedElastic())
                                 .thenReturn(R.<Void>ok()));
@@ -65,7 +67,7 @@ public class CanvasExecutionManagementController {
                                  @RequestParam(required = false) String reason) {
         return currentUsername()
                 .flatMap(username ->
-                        Mono.<Void>fromRunnable(() -> resumeWithResult(executionId, "REJECTED", username,
+                        Mono.<Void>fromRunnable(() -> resumeWithResult(executionId, ApprovalStatus.REJECTED, username,
                                 /* watchdog */ false))
                                 .subscribeOn(Schedulers.boundedElastic())
                                 .thenReturn(R.<Void>ok()));
@@ -79,7 +81,7 @@ public class CanvasExecutionManagementController {
         CanvasManualApproval approval = approvalMapper.selectList(
                 new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<CanvasManualApproval>()
                         .eq(CanvasManualApproval::getExecutionId, executionId)
-                        .eq(CanvasManualApproval::getStatus, "PENDING")
+                        .eq(CanvasManualApproval::getStatus, ApprovalStatus.PENDING)
                         .last("LIMIT 1"))
                 .stream().findFirst().orElse(null);
 
@@ -127,7 +129,7 @@ public class CanvasExecutionManagementController {
                         approval.getCanvasId(),
                         approval.getUserId(),
                         "MANUAL_APPROVAL_RESUME",
-                        "MANUAL_APPROVAL",
+                        NodeType.MANUAL_APPROVAL,
                         null,
                         Map.of("__approvalResult", result),
                         executionId + ":resume:" + result,

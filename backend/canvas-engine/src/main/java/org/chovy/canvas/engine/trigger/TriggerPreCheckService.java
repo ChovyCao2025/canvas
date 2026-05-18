@@ -76,6 +76,7 @@ public class TriggerPreCheckService {
         }
 
         // 5. 用户总触发上限（从 MySQL 查询，允许轻微超配）
+        // FIXME: 此处修改成不允许超配
         if (canvas.getPerUserTotalLimit() != null) {
             CanvasUserQuota quota = quotaMapper.selectOne(
                     new LambdaQueryWrapper<CanvasUserQuota>()

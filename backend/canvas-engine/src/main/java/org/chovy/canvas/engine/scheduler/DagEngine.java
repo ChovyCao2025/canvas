@@ -1,6 +1,7 @@
 package org.chovy.canvas.engine.scheduler;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.chovy.canvas.domain.constant.NodeType;
 import org.chovy.canvas.domain.execution.CanvasExecutionDlq;
 import org.chovy.canvas.domain.execution.CanvasExecutionDlqMapper;
 import org.chovy.canvas.domain.execution.CanvasExecutionTrace;
@@ -121,17 +122,17 @@ public class DagEngine {
             if (node.getBizConfig() != null) rawConfig.putAll(node.getBizConfig());
             if (node.getConfig()    != null) rawConfig.putAll(node.getConfig());
 
-            Map<String, Object> config = "MANUAL_APPROVAL".equals(node.getType())
+            Map<String, Object> config = NodeType.MANUAL_APPROVAL.equals(node.getType())
                     ? resolveConfigWithNodeId(rawConfig, ctx, nodeId)
                     : resolveConfig(rawConfig, ctx);
 
             // ──────────────────────────────────────────────────────
             // 阶段 2：LOGIC_RELATION / HUB 特殊处理
             // ──────────────────────────────────────────────────────
-            if ("LOGIC_RELATION".equals(node.getType())) {
+            if (NodeType.LOGIC_RELATION.equals(node.getType())) {
                 return handleLogicRelation(graph, nodeId, node, config, ctx);
             }
-            if ("HUB".equals(node.getType())) {
+            if (NodeType.HUB.equals(node.getType())) {
                 return handleHub(graph, nodeId, node, config, ctx);
             }
 
@@ -191,7 +192,7 @@ public class DagEngine {
                         ctx.setNodeStatus(nodeId, NodeStatus.SUCCESS);
                         long durationMs = System.currentTimeMillis() - nodeStartMs;
                         writeTraceEnd(ctx, node, result, durationMs);
-                        metrics.recordNodeExecution(node.getType(), "SUCCESS", durationMs);
+                        metrics.recordNodeExecution(node.getType(), NodeStatus.SUCCESS.name(), durationMs);
                         log.debug("[ENGINE] 节点完成 nodeId={} type={}", nodeId, node.getType());
 
                         return triggerDownstream(graph, result, nodeId, node.getType(), ctx);
@@ -462,7 +463,7 @@ public class DagEngine {
         markNonTakenBranchesSkipped(graph, sourceNodeId, sourceType, result, ctx);
 
         // PRIORITY 节点：串行依序尝试，第一个成功则停止（4.6节）
-        if ("PRIORITY".equals(sourceType) && result.branchMap() != null) {
+        if (NodeType.PRIORITY.equals(sourceType) && result.branchMap() != null) {
             List<String> orderedBranches = result.branchMap().values().stream()
                     .filter(Objects::nonNull).toList();
             String fallbackNextId = result.elseNodeId();
@@ -662,7 +663,7 @@ public class DagEngine {
         if (node == null || node.getConfig() == null) return;
         Map<String, Object> cfg = node.getConfig();
 
-        if ("IF_CONDITION".equals(sourceType)) {
+        if (NodeType.IF_CONDITION.equals(sourceType)) {
             // result 中只有被走的那条（另一条是 null）
             // 通过 config 找到"另一条"并标记 SKIPPED
             String successId = (String) cfg.get("successNodeId");

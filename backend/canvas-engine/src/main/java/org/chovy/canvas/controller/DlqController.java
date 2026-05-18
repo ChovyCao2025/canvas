@@ -1,10 +1,12 @@
 package org.chovy.canvas.controller;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import org.chovy.canvas.domain.constant.NodeType;
 import org.chovy.canvas.common.PageResult;
 import org.chovy.canvas.common.R;
 import org.chovy.canvas.domain.execution.CanvasExecutionDlq;
 import org.chovy.canvas.domain.execution.CanvasExecutionDlqMapper;
+import org.chovy.canvas.domain.constant.TriggerType;
 import org.chovy.canvas.engine.trigger.CanvasExecutionService;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -85,8 +87,8 @@ public class DlqController {
         .flatMap(payload -> {
             CanvasExecutionDlq dlq = dlqMapper.selectById(id);
             // 使用原始触发类型重放，不写死 DIRECT_CALL
-            String triggerType     = dlq.getTriggerType() != null ? dlq.getTriggerType() : "DLQ_REPLAY";
-            String triggerNodeType = dlq.getTriggerNodeType() != null ? dlq.getTriggerNodeType() : "DIRECT_CALL";
+            String triggerType     = dlq.getTriggerType() != null ? dlq.getTriggerType() : TriggerType.DLQ_REPLAY;
+            String triggerNodeType = dlq.getTriggerNodeType() != null ? dlq.getTriggerNodeType() : NodeType.DIRECT_CALL;
             String matchKey        = dlq.getMatchKey();
             return executionService.trigger(
                     dlq.getCanvasId(), dlq.getUserId(), triggerType,

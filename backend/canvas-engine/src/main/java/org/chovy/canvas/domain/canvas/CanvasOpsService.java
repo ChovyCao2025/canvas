@@ -1,6 +1,8 @@
 package org.chovy.canvas.domain.canvas;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import org.chovy.canvas.domain.constant.CanvasStatusEnum;
+import org.chovy.canvas.domain.constant.VersionStatus;
 import org.chovy.canvas.infra.redis.TriggerRouteService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.redis.core.StringRedisTemplate;
@@ -43,7 +45,7 @@ public class CanvasOpsService {
             } else {
                 CanvasVersion v = new CanvasVersion();
                 v.setCanvasId(id); v.setVersion(1); v.setGraphJson(graphJson);
-                v.setStatus(0); v.setCreatedBy(operator);
+                v.setStatus(VersionStatus.DRAFT.getCode()); v.setCreatedBy(operator);
                 canvasVersionMapper.insert(v);
             }
         }
@@ -59,7 +61,7 @@ public class CanvasOpsService {
     @Transactional
     public void kill(Long id, String mode) {
         Canvas canvas = require(id);
-        canvas.setStatus(4); // KILLED（需在前端/DB 映射中补充）
+        canvas.setStatus(CanvasStatusEnum.KILLED.getCode());
         canvas.setPublishedVersionId(null);
         canvasMapper.updateById(canvas);
 
@@ -80,7 +82,7 @@ public class CanvasOpsService {
     @Transactional
     public void startCanary(Long id, int percent, String operator) {
         Canvas canvas = require(id);
-        if (canvas.getStatus() != 1) throw new IllegalStateException("画布未在发布状态");
+        if (canvas.getStatus() != CanvasStatusEnum.PUBLISHED.getCode()) throw new IllegalStateException("画布未在发布状态");
 
         // 生成灰度版本快照（复用当前草稿）
         CanvasVersion draft = latestDraft(id);
@@ -90,7 +92,7 @@ public class CanvasOpsService {
         canary.setCanvasId(id);
         canary.setVersion(nextVer(id));
         canary.setGraphJson(draft.getGraphJson());
-        canary.setStatus(1);
+        canary.setStatus(VersionStatus.PUBLISHED.getCode());
         canary.setCreatedBy(operator);
         canvasVersionMapper.insert(canary);
 
@@ -160,7 +162,7 @@ public class CanvasOpsService {
         Canvas copy = new Canvas();
         copy.setName(src.getName() + " (副本)");
         copy.setDescription(src.getDescription());
-        copy.setStatus(0);
+        copy.setStatus(CanvasStatusEnum.DRAFT.getCode());
         copy.setCreatedBy(operator);
         canvasMapper.insert(copy);
 
@@ -168,7 +170,7 @@ public class CanvasOpsService {
             CanvasVersion v = new CanvasVersion();
             v.setCanvasId(copy.getId()); v.setVersion(1);
             v.setGraphJson(srcDraft.getGraphJson());
-            v.setStatus(0); v.setCreatedBy(operator);
+            v.setStatus(VersionStatus.DRAFT.getCode()); v.setCreatedBy(operator);
             canvasVersionMapper.insert(v);
         }
 

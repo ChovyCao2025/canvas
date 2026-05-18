@@ -211,7 +211,7 @@ public class MetaController {
         return Mono.just(R.ok(metaService.getBizLines()));
     }
 
-    /** 事件定义列表（带 attributes schema，供 BEHAVIOR_IN_APP 节点下拉选择） */
+    /** 事件定义列表（带 attributes schema，供 EVENT_TRIGGER 节点下拉选择） */
     @GetMapping("/event-definitions")
     public Mono<R<List<Map<String, Object>>>> getEventDefinitions() {
         return Mono.fromCallable(() -> {

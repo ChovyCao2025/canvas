@@ -3,6 +3,8 @@ package org.chovy.canvas.engine.handlers;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.chovy.canvas.domain.approval.CanvasManualApproval;
 import org.chovy.canvas.domain.approval.CanvasManualApprovalMapper;
+import org.chovy.canvas.domain.constant.ApprovalOnTimeoutAction;
+import org.chovy.canvas.domain.constant.ApprovalStatus;
 import org.chovy.canvas.engine.context.ExecutionContext;
 import org.chovy.canvas.engine.context.NodeStatus;
 import org.chovy.canvas.engine.handler.NodeHandler;
@@ -43,7 +45,7 @@ public class ManualApprovalHandler implements NodeHandler {
         String nodeId       = extractNodeId(config);  // 从 config 获取自身 nodeId（由调用方注入）
         String approveNodeId = (String) config.get("approveNodeId");
         String rejectNodeId  = (String) config.get("rejectNodeId");
-        String onTimeout     = (String) config.getOrDefault("onTimeout", "REJECT");
+        String onTimeout     = (String) config.getOrDefault("onTimeout", ApprovalOnTimeoutAction.REJECT);
         int    timeoutHours  = config.get("timeoutHours") instanceof Number n ? n.intValue() : 24;
 
         String approvalId = ctx.getExecutionId() + ":" + nodeId;
@@ -51,11 +53,11 @@ public class ManualApprovalHandler implements NodeHandler {
 
         // 检查是否已经有审批结果（审批/拒绝 API 写入 ctx 后再次触发）
         Object result = ctx.getContextValue(resultKey);
-        if ("APPROVED".equals(result)) {
+        if (ApprovalStatus.APPROVED.equals(result)) {
             log.info("[MANUAL_APPROVAL] 审批通过 approvalId={}", approvalId);
             return Mono.just(NodeResult.ok(approveNodeId, Map.of()));
         }
-        if ("REJECTED".equals(result)) {
+        if (ApprovalStatus.REJECTED.equals(result)) {
             log.info("[MANUAL_APPROVAL] 审批拒绝 approvalId={}", approvalId);
             return approveNodeId != null
                     ? Mono.just(NodeResult.ok(rejectNodeId, Map.of()))
@@ -74,7 +76,7 @@ public class ManualApprovalHandler implements NodeHandler {
                     .approvers(objectMapper.writeValueAsString(approvers))
                     .onTimeout(onTimeout)
                     .timeoutAt(LocalDateTime.now().plusHours(timeoutHours))
-                    .status("PENDING")
+                    .status(ApprovalStatus.PENDING)
                     .createdAt(LocalDateTime.now())
                     .build();
             approvalMapper.insert(approval);

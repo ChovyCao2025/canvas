@@ -68,7 +68,7 @@ public class ContextPersistenceService {
     }
 
     public boolean exists(Long canvasId, String userId) {
-        return Boolean.TRUE.equals(redis.hasKey(key(canvasId, userId)));
+        return redis.hasKey(key(canvasId, userId));
     }
 
     // ── 恢复锁 ─────────────────────────────────────────────────────

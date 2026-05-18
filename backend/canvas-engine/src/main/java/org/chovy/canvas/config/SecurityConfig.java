@@ -45,6 +45,8 @@ public class SecurityConfig {
                                 "/v3/api-docs/**", "/webjars/**").permitAll()
                         // OpenAPI：事件上报无需登录（业务系统直接调用）
                         .pathMatchers(HttpMethod.POST, "/canvas/events/report").permitAll()
+                        // 运维接口：无需登录（内网调用，不对外暴露）
+                        .pathMatchers("/ops/**").permitAll()
                         // 仅 ADMIN 可发布/下线/Kill/灰度/回滚
                         .pathMatchers(HttpMethod.POST,
                                 "/canvas/*/publish", "/canvas/*/offline",

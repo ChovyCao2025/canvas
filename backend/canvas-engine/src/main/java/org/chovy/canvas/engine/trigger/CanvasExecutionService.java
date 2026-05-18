@@ -1,11 +1,15 @@
 package org.chovy.canvas.engine.trigger;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.chovy.canvas.domain.constant.NodeType;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import org.chovy.canvas.domain.canvas.Canvas;
 import org.chovy.canvas.domain.canvas.CanvasMapper;
 import org.chovy.canvas.domain.canvas.CanvasVersion;
 import org.chovy.canvas.domain.canvas.CanvasVersionMapper;
+import org.chovy.canvas.domain.constant.CanvasStatusEnum;
+import org.chovy.canvas.domain.constant.ExecutionStatus;
+import org.chovy.canvas.domain.constant.TriggerType;
 import org.chovy.canvas.domain.execution.CanvasExecution;
 import org.chovy.canvas.domain.execution.CanvasExecutionMapper;
 import org.chovy.canvas.engine.context.ExecutionContext;
@@ -22,7 +26,6 @@ import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
 
 import java.time.Duration;
-import java.time.LocalDateTime;
 import java.util.*;
 
 /**
@@ -68,7 +71,7 @@ public class CanvasExecutionService {
             Canvas canvas = canvasMapper.selectById(canvasId);
             if (canvas == null) throw new IllegalStateException("画布不存在: " + canvasId);
 
-            ExecutionContext ctx = newContext(canvasId, -1L, userId, "DRY_RUN");
+            ExecutionContext ctx = newContext(canvasId, -1L, userId, TriggerType.DRY_RUN);
             if (payload != null) ctx.getTriggerPayload().putAll(payload);
 
             // 直接用传入的 graphJson，没有则退到 DB draft
@@ -81,8 +84,8 @@ public class CanvasExecutionService {
                 ctx.setVersionId(versionId);
             }
 
-            // dry-run：优先找 DIRECT_CALL/START，找不到则取任意入口节点（兼容 BEHAVIOR_IN_APP 等触发器）
-            String triggerNodeId = findTriggerNode(graph, "DIRECT_CALL", null);
+            // dry-run：找 DIRECT 类型的 START 节点，找不到则取第一个入口节点
+            String triggerNodeId = findTriggerNode(graph, NodeType.DIRECT_CALL, null);
             if (triggerNodeId == null) {
                 triggerNodeId = graph.entryNodes().stream().findFirst().orElse(null);
             }
@@ -104,14 +107,14 @@ public class CanvasExecutionService {
             return dagEngine.execute(graph, triggerNodeId, ctx)
                     .timeout(Duration.ofSeconds(globalTimeoutSec))
                     .flatMap(result -> {
-                        updateExecution(exec, 2, result);
+                        updateExecution(exec, ExecutionStatus.SUCCESS.getCode(), result);
                         Map<String, Object> resp = new HashMap<>(result);
                         resp.put("executionId", ctx.getExecutionId());
                         return Mono.just(resp);
                     })
                     .onErrorResume(e -> {
                         log.error("[DRY_RUN] 执行失败: {}", e.getMessage());
-                        updateExecution(exec, 3, Map.of("error", e.getMessage()));
+                        updateExecution(exec, ExecutionStatus.FAILED.getCode(), Map.of("error", e.getMessage()));
                         return Mono.just(Map.of(
                             "error", e.getMessage(),
                             "executionId", ctx.getExecutionId()
@@ -139,19 +142,20 @@ public class CanvasExecutionService {
             Map<String, Object> payload, String msgId, boolean dryRun) {
         // ...
         return Mono.fromCallable(() -> {
-            // ... (existing code)
 
             // 1. 加载画布（草稿在 dry-run 时可用，正式触发只允许已发布）
+            // FIXME: 此处调用量可能很大, 可以借助缓存提高性能优化
             Canvas canvas = canvasMapper.selectById(canvasId);
             if (canvas == null) {
                 throw new IllegalStateException("画布不存在: " + canvasId);
             }
-            if (!dryRun && canvas.getStatus() != 1) {
+            if (!dryRun && !Objects.equals(canvas.getStatus(), CanvasStatusEnum.PUBLISHED.getCode())) {
                 throw new IllegalStateException("画布未发布，请先发布后再触发: " + canvasId);
             }
 
             // 2. 前置检查（有效期 / 配额 / 冷却期）—— dry-run 跳过
             if (!dryRun) {
+                // FIXME: 前端没有对应的位置配置此系列属性
                 preCheckService.check(canvas, userId);
             }
 
@@ -215,7 +219,6 @@ public class CanvasExecutionService {
         })
         .subscribeOn(Schedulers.boundedElastic())
         .flatMap(prep -> {
-            @SuppressWarnings("unchecked")
             ExecutionContext ctx         = (ExecutionContext) prep.get("ctx");
             DagGraph         graph       = (DagGraph)         prep.get("graph");
             String           triggerNodeId = (String)         prep.get("triggerNodeId");
@@ -225,8 +228,7 @@ public class CanvasExecutionService {
             // 6. 写执行记录（开始）
             // dry-run 也写记录，这样执行轨迹面板能看到测试运行的 trace；
             // 只是不统计、不写 ctxStore、不注册到 kill 注册表
-            CanvasExecution exec = createExecution(ctx);
-            final CanvasExecution finalExec = exec;
+            final CanvasExecution finalExec = createExecution(ctx);
             Mono.fromRunnable(() -> executionMapper.insert(finalExec))
                     .subscribeOn(Schedulers.boundedElastic()).subscribe();
 
@@ -260,7 +262,7 @@ public class CanvasExecutionService {
                         boolean paused = isPaused(ctx, graph);
                         if (paused) {
                             if (!dryRun) ctxStore.save(ctx);
-                            updateExecution(finalExec, 1, Map.of()); // PAUSED
+                            updateExecution(finalExec, ExecutionStatus.PAUSED.getCode(), Map.of()); // PAUSED
                         } else {
                             if (!dryRun) {
                                 ctxStore.delete(ctx.getCanvasId(), ctx.getUserId());
@@ -338,7 +340,7 @@ public class CanvasExecutionService {
         return canvas.getPublishedVersionId();
     }
 
-    /** 
+    /**
      * 在 DAG 中找匹配类型和 matchKey 的触发器节点
      * @param graph 画布 DAG 图
      * @param triggerNodeType 触发器节点类型
@@ -346,86 +348,35 @@ public class CanvasExecutionService {
      * @return 触发器节点 ID
      */
     /**
-     * 在 DAG 入口节点中按触发类型和 matchKey 找触发器节点。
+     * 在 DAG 中按触发类型和 matchKey 找触发器节点。
      *
-     * START 节点（统一入口）根据 triggerType 字段路由：
-     *   DIRECT    → DIRECT_CALL / dry-run
-     *   EVENT     → BEHAVIOR_IN_APP（eventCode 匹配）
-     *   MQ        → MQ_TRIGGER（topicKey 匹配）
-     *   SCHEDULED → SCHEDULED_TRIGGER
-     *
-     * 旧触发器节点（BEHAVIOR_IN_APP 等）保持兼容。
+     * <p>两种查找路径：
+     * <ul>
+     *   <li>MANUAL_APPROVAL（审批恢复）：在全图中查找类型匹配的节点，
+     *       因为该节点不是入口节点。</li>
+     *   <li>其他触发类型：仅在 entryNodes 中查找 START 节点，
+     *       通过 config.triggerType 匹配：
+     *       DIRECT_CALL → DIRECT, EVENT_TRIGGER → EVENT,
+     *       MQ_TRIGGER → MQ, SCHEDULED_TRIGGER → SCHEDULED</li>
+     * </ul>
      */
     private String findTriggerNode(DagGraph graph, String triggerNodeType, String matchKey) {
-        for (String nodeId : graph.entryNodes()) {
-            DagParser.CanvasNode node = graph.getNode(nodeId);
-            if (node == null) continue;
-            String type = node.getType();
+        log.debug("[FIND_TRIGGER] triggerNodeType={} matchKey={}", triggerNodeType, matchKey);
 
+        // 全图搜索：triggerNodeType 就是目标节点的 type 字段
+        // 触发器节点（EVENT_TRIGGER / MQ_TRIGGER / SCHEDULED_TRIGGER 等）通常不是 DAG 入口，
+        // 因为前面有一个通用 START 节点。MANUAL_APPROVAL 是流程中间节点，恢复时同样需全图搜。
+        for (String nodeId : graph.allNodeIds()) {
+            DagParser.CanvasNode node = graph.getNode(nodeId);
+            if (node == null || !triggerNodeType.equals(node.getType())) continue;
+            if (matchKey == null) return nodeId;
             Map<String, Object> cfg = new java.util.HashMap<>();
             if (node.getBizConfig() != null) cfg.putAll(node.getBizConfig());
             if (node.getConfig()    != null) cfg.putAll(node.getConfig());
-
-            if ("START".equals(type)) {
-                String configuredType = (String) cfg.getOrDefault("triggerType", "DIRECT");
-                boolean matches = switch (triggerNodeType) {
-                    case "DIRECT_CALL"       -> "DIRECT".equals(configuredType);
-                    case "BEHAVIOR_IN_APP"   -> "EVENT".equals(configuredType);
-                    case "MQ_TRIGGER"        -> "MQ".equals(configuredType);
-                    case "SCHEDULED_TRIGGER" -> "SCHEDULED".equals(configuredType);
-                    default -> false;
-                };
-                if (!matches) continue;
-                if (matchKey == null) return nodeId;
-                String cfgKey = (String) cfg.getOrDefault("eventCode", cfg.getOrDefault("topicKey", ""));
-                if (matchKey.equals(cfgKey)) return nodeId;
-
-            } else if ("BEHAVIOR_TRIGGER".equals(type)) {
-                // V27 合并节点：triggerType=inapp 对应端内行为触发
-                if (!"BEHAVIOR_IN_APP".equals(triggerNodeType)) continue;
-                String tt = (String) cfg.getOrDefault("triggerType", "inapp");
-                if (!"inapp".equals(tt)) continue;
-                if (matchKey == null) return nodeId;
-                String cfgKey = (String) cfg.getOrDefault("eventCode", "");
-                if (matchKey.equals(cfgKey)) return nodeId;
-
-            } else {
-                // 旧触发器节点兼容逻辑
-                boolean typeMatch = triggerNodeType.equals(type)
-                        || ("DIRECT_CALL".equals(triggerNodeType) && "DIRECT_CALL".equals(type));
-                if (!typeMatch) continue;
-                if (matchKey == null) return nodeId;
-                String cfgKey = (String) cfg.getOrDefault("topicKey",
-                        cfg.getOrDefault("eventCode", cfg.getOrDefault("tagCodeKey", "")));
-                if (matchKey.equals(cfgKey)) return nodeId;
-            }
+            String cfgKey = (String) cfg.getOrDefault("eventCode", cfg.getOrDefault("topicKey", ""));
+            if (matchKey.equals(cfgKey)) return nodeId;
         }
-        // 降级：找任意匹配的入口节点
-        return graph.entryNodes().stream()
-                .filter(id -> {
-                    DagParser.CanvasNode n = graph.getNode(id);
-                    if (n == null) return false;
-                    String t = n.getType();
-                    Map<String, Object> c = new java.util.HashMap<>();
-                    if (n.getBizConfig() != null) c.putAll(n.getBizConfig());
-                    if (n.getConfig()    != null) c.putAll(n.getConfig());
-                    if ("START".equals(t)) {
-                        String ct = (String) c.getOrDefault("triggerType", "DIRECT");
-                        return switch (triggerNodeType) {
-                            case "DIRECT_CALL"       -> "DIRECT".equals(ct);
-                            case "BEHAVIOR_IN_APP"   -> "EVENT".equals(ct);
-                            case "MQ_TRIGGER"        -> "MQ".equals(ct);
-                            case "SCHEDULED_TRIGGER" -> "SCHEDULED".equals(ct);
-                            default -> false;
-                        };
-                    }
-                    if ("BEHAVIOR_TRIGGER".equals(t)) {
-                        return "BEHAVIOR_IN_APP".equals(triggerNodeType)
-                                && "inapp".equals(c.getOrDefault("triggerType", "inapp"));
-                    }
-                    return triggerNodeType.equals(t);
-                })
-                .findFirst().orElse(null);
+        return null;
     }
 
     /** 
@@ -453,7 +404,7 @@ public class CanvasExecutionService {
         exec.setVersionId(ctx.getVersionId());
         exec.setUserId(ctx.getUserId());
         exec.setTriggerType(ctx.getTriggerType());
-        exec.setStatus(0); // 执行中
+        exec.setStatus(ExecutionStatus.RUNNING.getCode()); // 执行中
         return exec;
     }
 
@@ -501,9 +452,9 @@ public class CanvasExecutionService {
                 }
                 if (stats == null) return;
                 stats.setTotalCount(stats.getTotalCount() + 1);
-                if (finalStatus == 2) stats.setSuccessCount(stats.getSuccessCount() + 1);
-                else if (finalStatus == 3) stats.setFailCount(stats.getFailCount() + 1);
-                else if (finalStatus == 1) stats.setPausedCount(stats.getPausedCount() + 1);
+                if (finalStatus == ExecutionStatus.SUCCESS.getCode()) stats.setSuccessCount(stats.getSuccessCount() + 1);
+                else if (finalStatus == ExecutionStatus.FAILED.getCode()) stats.setFailCount(stats.getFailCount() + 1);
+                else if (finalStatus == ExecutionStatus.PAUSED.getCode()) stats.setPausedCount(stats.getPausedCount() + 1);
                 statsMapper.updateById(stats);
             } catch (Exception e) {
                 log.warn("[STATS] 更新统计失败 canvasId={}: {}", canvasId, e.getMessage());

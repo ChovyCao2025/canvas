@@ -1,14 +1,17 @@
 package org.chovy.canvas.domain.canvas;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import org.chovy.canvas.domain.constant.NodeType;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import org.chovy.canvas.common.PageResult;
+import org.chovy.canvas.domain.constant.CanvasStatusEnum;
+import org.chovy.canvas.domain.constant.TriggerType;
+import org.chovy.canvas.domain.constant.VersionStatus;
 import org.chovy.canvas.dto.*;
 import org.chovy.canvas.engine.dag.DagGraph;
 import org.chovy.canvas.engine.dag.DagParser;
 import org.chovy.canvas.engine.handlers.GroovyHandler;
-import org.chovy.canvas.engine.handlers.MqTriggerHandler;
 import org.chovy.canvas.engine.trigger.CanvasSchedulerService;
 import org.chovy.canvas.infra.cache.CanvasConfigCache;
 import org.chovy.canvas.infra.redis.TriggerRouteService;
@@ -32,7 +35,7 @@ public class CanvasService {
     private final CanvasSchedulerService schedulerService;
     private final CanvasConfigCache      configCache;
     private final GroovyHandler          groovyHandler;
-    private final MqTriggerHandler        mqTriggerHandler;
+    private final org.chovy.canvas.engine.handlers.MqTriggerHandler mqTriggerHandler;
     private final org.springframework.data.redis.core.StringRedisTemplate redis;
 
     /**
@@ -45,8 +48,7 @@ public class CanvasService {
         Canvas canvas = new Canvas();
         canvas.setName(req.getName());
         canvas.setDescription(req.getDescription());
-        canvas.setStatus(0);
-        canvas.setCreatedBy(req.getCreatedBy());
+        canvas.setStatus(CanvasStatusEnum.DRAFT.getCode());
         canvasMapper.insert(canvas);
 
         // 若带初始 JSON，创建第一个草稿版本
@@ -55,7 +57,7 @@ public class CanvasService {
             v.setCanvasId(canvas.getId());
             v.setVersion(1);
             v.setGraphJson(req.getGraphJson());
-            v.setStatus(0);
+            v.setStatus(VersionStatus.DRAFT.getCode());
             v.setCreatedBy(req.getCreatedBy());
             canvasVersionMapper.insert(v);
         }
@@ -108,7 +110,7 @@ public class CanvasService {
             v.setCanvasId(id);
             v.setVersion(nextVer);
             v.setGraphJson(req.getGraphJson());
-            v.setStatus(0);
+            v.setStatus(VersionStatus.DRAFT.getCode());
             v.setCreatedBy(req.getUpdatedBy());
             canvasVersionMapper.insert(v);
         }
@@ -167,11 +169,11 @@ public class CanvasService {
             published.setCanvasId(id);
             published.setVersion(nextVersionNumber(id));
             published.setGraphJson(draft.getGraphJson());
-            published.setStatus(1);
+            published.setStatus(VersionStatus.PUBLISHED.getCode());
             published.setCreatedBy(operator);
             canvasVersionMapper.insert(published);
 
-            canvas.setStatus(1);
+            canvas.setStatus(CanvasStatusEnum.PUBLISHED.getCode());
             canvas.setPublishedVersionId(published.getId());
             canvasMapper.updateById(canvas);
 
@@ -201,7 +203,7 @@ public class CanvasService {
     private void validateSubFlowDependencies(Long canvasId, DagGraph graph) {
         java.util.List<String> errors = new java.util.ArrayList<>();
         graph.getNodeMap().forEach((nodeId, node) -> {
-            if (!"SUB_FLOW_REF".equals(node.getType())) return;
+            if (!NodeType.SUB_FLOW_REF.equals(node.getType())) return;
             Map<String, Object> cfg = node.getConfig();
             if (cfg == null) return;
             Object subFlowIdObj = cfg.get("subFlowId");
@@ -210,7 +212,7 @@ public class CanvasService {
             Canvas subFlow = canvasMapper.selectById(subFlowId);
             if (subFlow == null) {
                 errors.add("节点「" + node.getName() + "」引用的子流程 ID=" + subFlowId + " 不存在");
-            } else if (subFlow.getStatus() != 1) {
+            } else if (subFlow.getStatus() != CanvasStatusEnum.PUBLISHED.getCode()) {
                 errors.add("节点「" + node.getName() + "」引用的子流程「" + subFlow.getName() + "」未发布（当前状态: " + subFlow.getStatus() + "）");
             } else if (subFlowId.equals(canvasId)) {
                 errors.add("节点「" + node.getName() + "」引用了自身，会产生循环调用");
@@ -248,7 +250,7 @@ public class CanvasService {
         Canvas canvas = canvasMapper.selectById(id);
         if (canvas == null) throw new IllegalArgumentException("画布不存在: " + id);
         Long publishedVersionId = canvas.getPublishedVersionId();
-        canvas.setStatus(2);
+        canvas.setStatus(CanvasStatusEnum.OFFLINE.getCode());
         canvas.setPublishedVersionId(null);
         canvasMapper.updateById(canvas);
         return publishedVersionId;
@@ -324,39 +326,23 @@ public class CanvasService {
             newDraft.setCanvasId(canvasId);
             newDraft.setVersion(nextVersionNumber(canvasId));
             newDraft.setGraphJson(target.getGraphJson());
-            newDraft.setStatus(0);
+            newDraft.setStatus(VersionStatus.DRAFT.getCode());
             canvasVersionMapper.insert(newDraft);
         }
     }
 
     @SuppressWarnings("unchecked")
     private void registerTriggerRoutes(Long canvasId, DagGraph graph) {
-        for (String nodeId : graph.entryNodes()) {
+        for (String nodeId : graph.allNodeIds()) {
             DagParser.CanvasNode node = graph.getNode(nodeId);
             if (node == null) continue;
-            // 合并 config + bizConfig（与 DagEngine 保持一致）
-            java.util.Map<String, Object> cfg = new java.util.HashMap<>();
+            Map<String, Object> cfg = new java.util.HashMap<>();
             if (node.getBizConfig() != null) cfg.putAll(node.getBizConfig());
             if (node.getConfig()    != null) cfg.putAll(node.getConfig());
-
             switch (node.getType()) {
-                // ── 新统一 START 节点：按 triggerType 注册 ──
-                case "START" -> {
-                    String tt = (String) cfg.getOrDefault("triggerType", "DIRECT");
-                    if ("EVENT".equals(tt)) { String k = (String) cfg.get("eventCode"); if (k != null) triggerRouteService.registerBehavior(canvasId, k); }
-                    if ("MQ".equals(tt))    { String k = (String) cfg.get("topicKey");  if (k != null) triggerRouteService.registerMq(canvasId, k); }
-                    // DIRECT / SCHEDULED 无需路由表（DIRECT 按 canvasId 直调，SCHEDULED 由调度器管理）
-                }
-                // ── 旧触发器节点（兼容已有画布）──
-                case "MQ_TRIGGER"       -> { String k = mqTriggerHandler.resolveTopic(cfg); if (!k.isEmpty()) triggerRouteService.registerMq(canvasId, k); }
-                case "BEHAVIOR_IN_APP"  -> { String k = (String) cfg.get("eventCode");  if (k != null) triggerRouteService.registerBehavior(canvasId, k); }
-                case "BEHAVIOR_TRIGGER" -> {
-                    if ("inapp".equals(cfg.getOrDefault("triggerType", "inapp"))) {
-                        String k = (String) cfg.get("eventCode");
-                        if (k != null) triggerRouteService.registerBehavior(canvasId, k);
-                    }
-                }
-                case "TAGGER_REALTIME"  -> { String k = (String) cfg.get("tagCodeKey"); if (k != null) triggerRouteService.registerTagger(canvasId, k); }
+                case NodeType.EVENT_TRIGGER -> { String k = (String) cfg.get("eventCode"); if (k != null) triggerRouteService.registerBehavior(canvasId, k); }
+                case NodeType.MQ_TRIGGER       -> { String k = mqTriggerHandler.resolveTopic(cfg); if (!k.isEmpty()) triggerRouteService.registerMq(canvasId, k); }
+                case NodeType.TAGGER_REALTIME  -> { String k = (String) cfg.get("tagCodeKey"); if (k != null) triggerRouteService.registerTagger(canvasId, k); }
                 default -> {}
             }
         }
@@ -364,23 +350,16 @@ public class CanvasService {
 
     /** 直接从已有 DagGraph 清理路由（offline 使用，避免再次查 DB） */
     private void clearTriggerRoutesFromGraph(Long canvasId, DagGraph graph) {
-        for (String nodeId : graph.entryNodes()) {
+        for (String nodeId : graph.allNodeIds()) {
             DagParser.CanvasNode node = graph.getNode(nodeId);
             if (node == null) continue;
             Map<String, Object> cfg = new java.util.HashMap<>();
             if (node.getBizConfig() != null) cfg.putAll(node.getBizConfig());
             if (node.getConfig()    != null) cfg.putAll(node.getConfig());
-            if (cfg.isEmpty()) continue;
             switch (node.getType()) {
-                case "MQ_TRIGGER"       -> { String k = mqTriggerHandler.resolveTopic(cfg); if (!k.isEmpty()) triggerRouteService.removeMq(canvasId, k); }
-                case "BEHAVIOR_IN_APP"  -> { String k = (String) cfg.get("eventCode");  if (k != null) triggerRouteService.removeBehavior(canvasId, k); }
-                case "BEHAVIOR_TRIGGER" -> {
-                    if ("inapp".equals(cfg.getOrDefault("triggerType", "inapp"))) {
-                        String k = (String) cfg.get("eventCode");
-                        if (k != null) triggerRouteService.removeBehavior(canvasId, k);
-                    }
-                }
-                case "TAGGER_REALTIME"  -> { String k = (String) cfg.get("tagCodeKey"); if (k != null) triggerRouteService.removeTagger(canvasId, k); }
+                case NodeType.EVENT_TRIGGER -> { String k = (String) cfg.get("eventCode"); if (k != null) triggerRouteService.removeBehavior(canvasId, k); }
+                case NodeType.MQ_TRIGGER       -> { String k = mqTriggerHandler.resolveTopic(cfg); if (!k.isEmpty()) triggerRouteService.removeMq(canvasId, k); }
+                case NodeType.TAGGER_REALTIME  -> { String k = (String) cfg.get("tagCodeKey"); if (k != null) triggerRouteService.removeTagger(canvasId, k); }
                 default -> {}
             }
         }

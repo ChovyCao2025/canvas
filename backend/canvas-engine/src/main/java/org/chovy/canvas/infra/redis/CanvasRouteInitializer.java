@@ -1,6 +1,8 @@
 package org.chovy.canvas.infra.redis;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import org.chovy.canvas.domain.constant.CanvasStatusEnum;
+import org.chovy.canvas.domain.constant.NodeType;
 import org.chovy.canvas.domain.canvas.Canvas;
 import org.chovy.canvas.domain.canvas.CanvasMapper;
 import org.chovy.canvas.domain.canvas.CanvasVersion;
@@ -64,7 +66,7 @@ public class CanvasRouteInitializer {
         try {
             log.warn("[ROUTE_INIT] 触发路由表为空，从 MySQL 全量重建...");
             List<Canvas> published = canvasMapper.selectList(
-                    new LambdaQueryWrapper<Canvas>().eq(Canvas::getStatus, 1));
+                    new LambdaQueryWrapper<Canvas>().eq(Canvas::getStatus, CanvasStatusEnum.PUBLISHED.getCode()));
 
             // 批量查询版本（避免 N+1）
             List<Long> versionIds = published.stream()
@@ -100,24 +102,16 @@ public class CanvasRouteInitializer {
 
     @SuppressWarnings("unchecked")
     private void registerRoutes(Long canvasId, DagGraph graph) {
-        for (String nodeId : graph.entryNodes()) {
+        for (String nodeId : graph.allNodeIds()) {
             DagParser.CanvasNode node = graph.getNode(nodeId);
             if (node == null) continue;
-            // 合并 bizConfig + config（前端配置全部存 bizConfig）
             Map<String, Object> cfg = new java.util.HashMap<>();
             if (node.getBizConfig() != null) cfg.putAll(node.getBizConfig());
             if (node.getConfig()    != null) cfg.putAll(node.getConfig());
-            if (cfg.isEmpty()) continue;
             switch (node.getType()) {
-                case "MQ_TRIGGER"       -> { String k = mqTriggerHandler.resolveTopic(cfg); if (!k.isEmpty()) triggerRouteService.registerMq(canvasId, k); }
-                case "BEHAVIOR_IN_APP"  -> { String k = (String) cfg.get("eventCode");  if (k != null) triggerRouteService.registerBehavior(canvasId, k); }
-                case "BEHAVIOR_TRIGGER" -> {
-                    if ("inapp".equals(cfg.getOrDefault("triggerType", "inapp"))) {
-                        String k = (String) cfg.get("eventCode");
-                        if (k != null) triggerRouteService.registerBehavior(canvasId, k);
-                    }
-                }
-                case "TAGGER_REALTIME"  -> { String k = (String) cfg.get("tagCodeKey"); if (k != null) triggerRouteService.registerTagger(canvasId, k); }
+                case NodeType.EVENT_TRIGGER -> { String k = (String) cfg.get("eventCode"); if (k != null) triggerRouteService.registerBehavior(canvasId, k); }
+                case NodeType.MQ_TRIGGER       -> { String k = mqTriggerHandler.resolveTopic(cfg); if (!k.isEmpty()) triggerRouteService.registerMq(canvasId, k); }
+                case NodeType.TAGGER_REALTIME  -> { String k = (String) cfg.get("tagCodeKey"); if (k != null) triggerRouteService.registerTagger(canvasId, k); }
                 default -> {}
             }
         }

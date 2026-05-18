@@ -1,8 +1,11 @@
 package org.chovy.canvas.engine.trigger;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import org.chovy.canvas.domain.constant.NodeType;
 import org.chovy.canvas.domain.canvas.Canvas;
 import org.chovy.canvas.domain.canvas.CanvasMapper;
+import org.chovy.canvas.domain.constant.NodeType;
+import org.chovy.canvas.domain.constant.TriggerType;
 import org.chovy.canvas.engine.dag.DagGraph;
 import org.chovy.canvas.engine.dag.DagParser;
 import org.chovy.canvas.infra.cache.CanvasConfigCache;
@@ -60,30 +63,29 @@ public class CanvasSchedulerService {
     // ── 注册 ─────────────────────────────────────────────────────
 
     public void registerScheduledTriggers(Long canvasId, DagGraph graph) {
-        for (String nodeId : graph.entryNodes()) {
+        for (String nodeId : graph.allNodeIds()) {
             DagParser.CanvasNode node = graph.getNode(nodeId);
-            if (node == null || !"SCHEDULED_TRIGGER".equals(node.getType())) continue;
+            if (node == null || !NodeType.SCHEDULED_TRIGGER.equals(node.getType())) continue;
 
-            Map<String, Object> cfg    = node.getConfig();
-            String scheduleType        = (String) cfg.getOrDefault("scheduleType", "CRON");
-            String taskKey             = canvasId + ":" + nodeId;
+            Map<String, Object> cfg = new java.util.HashMap<>();
+            if (node.getBizConfig() != null) cfg.putAll(node.getBizConfig());
+            if (node.getConfig()    != null) cfg.putAll(node.getConfig());
 
-            // 取消旧任务（如重复发布）
+            String taskKey = canvasId + ":" + nodeId;
             cancelTask(taskKey);
 
-            Runnable job = () -> triggerForAllUsers(canvasId, nodeId, node);
+            Runnable job = () -> triggerForAllUsers(canvasId, nodeId, cfg);
 
-            if ("CRON".equals(scheduleType)) {
-                String cron     = (String) cfg.get("cronExpression");
-                String timezone = (String) cfg.getOrDefault("timezone", "Asia/Shanghai");
-                if (cron == null || cron.isBlank()) continue;
+            String cronExpr       = (String) cfg.get("cronExpression");
+            String triggerTimeStr = (String) cfg.get("triggerTime");
+            String timezone       = (String) cfg.getOrDefault("timezone", "Asia/Shanghai");
+
+            if (cronExpr != null && !cronExpr.isBlank()) {
                 ScheduledFuture<?> future = taskScheduler.schedule(
-                        job, new CronTrigger(cron, TimeZone.getTimeZone(timezone)));
+                        job, new CronTrigger(cronExpr, TimeZone.getTimeZone(timezone)));
                 activeTasks.put(taskKey, future);
-                log.info("[SCHEDULER] 注册 CRON 任务 canvasId={} nodeId={} cron={}", canvasId, nodeId, cron);
-            } else if ("ONCE".equals(scheduleType)) {
-                String triggerTimeStr = (String) cfg.get("triggerTime");
-                if (triggerTimeStr == null) continue;
+                log.info("[SCHEDULER] 注册 CRON 任务 canvasId={} nodeId={} cron={}", canvasId, nodeId, cronExpr);
+            } else if (triggerTimeStr != null) {
                 LocalDateTime ldt = LocalDateTime.parse(triggerTimeStr);
                 Instant instant   = ldt.atZone(ZoneId.of("Asia/Shanghai")).toInstant();
                 ScheduledFuture<?> future = taskScheduler.schedule(job, instant);
@@ -96,9 +98,9 @@ public class CanvasSchedulerService {
     // ── 注销 ─────────────────────────────────────────────────────
 
     public void cancelScheduledTriggers(Long canvasId, DagGraph graph) {
-        for (String nodeId : graph.entryNodes()) {
+        for (String nodeId : graph.allNodeIds()) {
             DagParser.CanvasNode node = graph.getNode(nodeId);
-            if (node == null || !"SCHEDULED_TRIGGER".equals(node.getType())) continue;
+            if (node == null || !NodeType.SCHEDULED_TRIGGER.equals(node.getType())) continue;
             cancelTask(canvasId + ":" + nodeId);
         }
     }
@@ -117,19 +119,17 @@ public class CanvasSchedulerService {
     }
 
     @SuppressWarnings("unchecked")
-    private void triggerForAllUsers(Long canvasId, String nodeId, DagParser.CanvasNode node) {
-        Map<String, Object> cfg  = node.getConfig();
-        Map<String, Object> src  = (Map<String, Object>) cfg.getOrDefault("userSource", Map.of());
-        String sourceType        = (String) src.getOrDefault("type", "USER_LIST");
-        List<String> userIds     = resolveUserIds(sourceType, src);
+    private void triggerForAllUsers(Long canvasId, String nodeId, Map<String, Object> cfg) {
+        Map<String, Object> src = (Map<String, Object>) cfg.getOrDefault("userSource", Map.of());
+        String sourceType       = (String) src.getOrDefault("type", "USER_LIST");
+        List<String> userIds    = resolveUserIds(sourceType, src);
 
         log.info("[SCHEDULER] 定时触发 canvasId={} 用户数={}", canvasId, userIds.size());
 
-        // 分页并发触发（每个用户独立执行）
         for (String userId : userIds) {
             executionService.trigger(
-                    canvasId, userId, "SCHEDULED",
-                    "SCHEDULED_TRIGGER", null,
+                    canvasId, userId, TriggerType.SCHEDULED,
+                    NodeType.SCHEDULED_TRIGGER, null,
                     Map.of(), java.util.UUID.randomUUID().toString(), false)
                     .subscribe(
                             null,

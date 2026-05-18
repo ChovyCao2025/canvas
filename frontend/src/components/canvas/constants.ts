@@ -15,26 +15,24 @@ export const CATEGORY_SOLID: Record<string, string> = {
   '其他':     '#722ed1',
 }
 
-/** 触发器节点（无 target handle，只能作为第一个节点）
- *  BEHAVIOR_TRIGGER 是新的统一行为触发节点。
- *  TAGGER 的 isTrigger 是动态的（mode=realtime 时为触发器），在 CanvasNode 里单独处理。
+/** 不能有上游节点的节点类型（START 是流程唯一入口）
+ *  BEHAVIOR_TRIGGER / MQ_TRIGGER / SCHEDULED_TRIGGER 虽然是触发器，
+ *  但它们放在 START 之后，需要有 target handle 接受 START 的连线。
+ *  TAGGER 的 isTrigger 是动态的（mode=realtime 时），在 CanvasNode 里单独处理。
  */
-export const TRIGGER_TYPES = new Set(['START', 'BEHAVIOR_TRIGGER'])
+export const TRIGGER_TYPES = new Set(['START'])
 
 /** 是否为终止节点 */
 export const TERMINAL_TYPES = new Set(['DIRECT_RETURN', 'END'])
 
-/** 各节点类型默认名称 */
+/** 各节点类型显示名称 */
 export const DEFAULT_NAMES: Record<string, string> = {
-  // 新合并类型
   TAGGER:            'Tagger 标签',
-  BEHAVIOR_TRIGGER:  '行为触发',
-  // 旧类型（保留兼容已有画布）
+  EVENT_TRIGGER:     '事件触发',
   MQ_TRIGGER:        'MQ消息触发',
-  BEHAVIOR_IN_APP:   '端内行为触发',
   DIRECT_CALL:       '业务直调',
-  TAGGER_REALTIME:   'Tagger实时标签',
   SCHEDULED_TRIGGER: '定时触发',
+  TAGGER_REALTIME:   'Tagger实时标签',
   IF_CONDITION:      'IF判断',
   SELECTOR:          '条件选择器',
   LOGIC_RELATION:    '逻辑关系',

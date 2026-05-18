@@ -1,6 +1,7 @@
 package org.chovy.canvas.controller;
 
 import org.chovy.canvas.common.R;
+import org.chovy.canvas.domain.constant.NodeType;
 import org.chovy.canvas.engine.disruptor.CanvasDisruptorService;
 import org.chovy.canvas.engine.trigger.CanvasExecutionService;
 import lombok.Data;
@@ -35,8 +36,8 @@ public class ExecutionController {
                 ? req.getIdempotencyKey()
                 : UUID.randomUUID().toString();
         return executionService.trigger(
-                canvasId, req.getUserId(), "DIRECT_CALL",
-                "DIRECT_CALL", null,
+                canvasId, req.getUserId(), NodeType.DIRECT_CALL,
+                NodeType.DIRECT_CALL, null,
                 req.getInputParams(), dedupKey, false)
                 .map(R::ok);
     }
@@ -51,7 +52,7 @@ public class ExecutionController {
     public Mono<R<Void>> behaviorTrigger(@RequestBody BehaviorTriggerReq req) {
         disruptorService.publish(
                 req.getCanvasId(), req.getUserId(), "BEHAVIOR",
-                "BEHAVIOR_IN_APP", req.getEventCode(),
+                NodeType.EVENT_TRIGGER, req.getEventCode(),
                 req.getBehaviorData(), req.getEventId());
         return Mono.just(R.ok());
     }

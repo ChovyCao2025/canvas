@@ -5,6 +5,7 @@ import lombok.RequiredArgsConstructor;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 @Getter
 @RequiredArgsConstructor
@@ -32,5 +33,10 @@ public class DagGraph {
                 .filter(e -> e.getValue() == 0)
                 .map(Map.Entry::getKey)
                 .toList();
+    }
+
+    /** 返回图中全部节点 ID */
+    public Set<String> allNodeIds() {
+        return nodeMap.keySet();
     }
 }

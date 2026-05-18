@@ -3,6 +3,9 @@ package org.chovy.canvas.controller;
 import org.chovy.canvas.common.R;
 import org.chovy.canvas.domain.canvas.*;
 import org.chovy.canvas.domain.approval.*;
+import org.chovy.canvas.domain.constant.ApprovalStatus;
+import org.chovy.canvas.domain.constant.CanvasStatusEnum;
+import org.chovy.canvas.infra.cache.CanvasConfigCache;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import lombok.Data;
 import lombok.RequiredArgsConstructor;
@@ -23,6 +26,30 @@ public class OpsController {
     private final CanvasMapper               canvasMapper;
     private final CanvasVersionMapper        canvasVersionMapper;
     private final CanvasManualApprovalMapper approvalMapper;
+    private final CanvasConfigCache          configCache;
+
+    // ── 缓存管理 ─────────────────────────────────────────────────────
+
+    /**
+     * 强制失效指定画布的配置缓存（L1 Caffeine + L2 Redis）。
+     * 用于 Flyway 数据迁移后、或缓存脏数据时手动刷新。
+     *
+     * @param id 画布 ID
+     */
+    @PostMapping("/ops/cache/invalidate/{id}")
+    public Mono<R<String>> invalidateCache(@PathVariable Long id) {
+        return Mono.fromCallable(() -> {
+            Canvas canvas = canvasMapper.selectById(id);
+            if (canvas == null) return R.<String>fail("画布不存在: " + id);
+            if (canvas.getPublishedVersionId() != null) {
+                configCache.invalidate(id, canvas.getPublishedVersionId());
+            }
+            if (canvas.getCanaryVersionId() != null) {
+                configCache.invalidate(id, canvas.getCanaryVersionId());
+            }
+            return R.ok("已失效画布 " + id + " 的缓存");
+        }).subscribeOn(Schedulers.boundedElastic());
+    }
 
     // ── 画布模板（23.1节） ─────────────────────────────────────────
 
@@ -90,7 +117,7 @@ public class OpsController {
             Canvas canvas = new Canvas();
             canvas.setName(req.getName() != null ? req.getName() : tpl.getName() + " (副本)");
             canvas.setDescription(tpl.getDescription());
-            canvas.setStatus(0);
+            canvas.setStatus(CanvasStatusEnum.DRAFT.getCode());
             canvas.setCreatedBy("current_user");
             canvasMapper.insert(canvas);
 
@@ -113,7 +140,7 @@ public class OpsController {
         return Mono.fromCallable(() ->
                 approvalMapper.selectList(
                         new LambdaQueryWrapper<CanvasManualApproval>()
-                                .eq(CanvasManualApproval::getStatus, "PENDING")
+                                .eq(CanvasManualApproval::getStatus, ApprovalStatus.PENDING)
                                 .orderByAsc(CanvasManualApproval::getTimeoutAt))
         ).subscribeOn(Schedulers.boundedElastic()).map(R::ok);
     }

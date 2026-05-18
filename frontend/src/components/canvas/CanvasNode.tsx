@@ -85,11 +85,6 @@ const CanvasNode = memo(({ data, id, selected }: NodeProps) => {
                 style={{ background: '#fff', border: '2px solid #f5222d', width: 10, height: 10 }} />
           }
           {isStart ? '开始' : '结束'}
-          {isStart && (() => {
-            const tt = d.bizConfig?.triggerType as string | undefined
-            const label = tt === 'EVENT' ? '事件' : tt === 'SCHEDULED' ? '定时' : tt === 'MQ' ? 'MQ' : tt === 'DIRECT' ? '直调' : null
-            return label ? <span style={{ fontSize: 9, fontWeight: 400, opacity: 0.85 }}>{label}</span> : null
-          })()}
         </div>
       </div>
     )
