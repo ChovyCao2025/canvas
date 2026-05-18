@@ -10,6 +10,8 @@ public final class TriggerType {
     public static final String DRY_RUN                 = "DRY_RUN";
     public static final String DLQ_REPLAY              = "DLQ_REPLAY";
     public static final String MANUAL_APPROVAL_TIMEOUT = "MANUAL_APPROVAL_TIMEOUT";
+    public static final String HUB_TIMEOUT             = "HUB_TIMEOUT";
+    public static final String LOGIC_RELATION_TIMEOUT  = "LOGIC_RELATION_TIMEOUT";
     public static final String SUB_FLOW_REF            = "SUB_FLOW_REF";
 
     private TriggerType() {}

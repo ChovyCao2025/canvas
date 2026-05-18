@@ -2,6 +2,7 @@ package org.chovy.canvas.engine.scheduler;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.chovy.canvas.domain.constant.NodeType;
+import org.chovy.canvas.domain.constant.TriggerType;
 import org.chovy.canvas.domain.execution.CanvasExecutionDlq;
 import org.chovy.canvas.domain.execution.CanvasExecutionDlqMapper;
 import org.chovy.canvas.domain.execution.CanvasExecutionTrace;
@@ -15,9 +16,11 @@ import org.chovy.canvas.engine.handler.NodeHandler;
 import org.chovy.canvas.engine.handler.NodeResult;
 import org.chovy.canvas.engine.handlers.HubHandler;
 import org.chovy.canvas.engine.handlers.LogicRelationHandler;
+import org.chovy.canvas.infra.redis.ContextPersistenceService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Component;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
@@ -43,16 +46,38 @@ import java.util.stream.Collectors;
  */
 @Slf4j
 @Component
-@RequiredArgsConstructor
 public class DagEngine {
 
     private final HandlerRegistry handlerRegistry;
-    private final CanvasExecutionTraceMapper traceMapper;      // 保留供 SKIPPED 批量写入
-    private final TraceWriteBuffer traceBuffer;      // 异步批量写入（12.10节）
+    private final CanvasExecutionTraceMapper traceMapper;
+    private final TraceWriteBuffer traceBuffer;
     private final CanvasExecutionDlqMapper dlqMapper;
     private final CircuitBreakerRegistry cbRegistry;
     private final CanvasMetrics metrics;
     private final ObjectMapper objectMapper;
+    private final ContextPersistenceService ctxStore;
+    /** @Lazy 避免与 CanvasExecutionService → DagEngine 的循环依赖 */
+    private final org.chovy.canvas.engine.trigger.CanvasExecutionService executionService;
+
+    public DagEngine(HandlerRegistry handlerRegistry,
+                     CanvasExecutionTraceMapper traceMapper,
+                     TraceWriteBuffer traceBuffer,
+                     CanvasExecutionDlqMapper dlqMapper,
+                     CircuitBreakerRegistry cbRegistry,
+                     CanvasMetrics metrics,
+                     ObjectMapper objectMapper,
+                     ContextPersistenceService ctxStore,
+                     @Lazy org.chovy.canvas.engine.trigger.CanvasExecutionService executionService) {
+        this.handlerRegistry  = handlerRegistry;
+        this.traceMapper      = traceMapper;
+        this.traceBuffer      = traceBuffer;
+        this.dlqMapper        = dlqMapper;
+        this.cbRegistry       = cbRegistry;
+        this.metrics          = metrics;
+        this.objectMapper     = objectMapper;
+        this.ctxStore         = ctxStore;
+        this.executionService = executionService;
+    }
 
     @Value("${canvas.execution.max-retry:3}")
     private int maxRetry;
@@ -352,6 +377,14 @@ public class DagEngine {
                             if (ctx.getNodeStatus(nodeId) == NodeStatus.WAITING) {
                                 log.warn("[ENGINE] LOGIC_RELATION 等待超时 timeout={}s nodeId={}", timeoutSec, nodeId);
                                 ctx.setNodeStatus(nodeId, NodeStatus.FAILED);
+                                ctxStore.save(ctx);
+                                executionService.trigger(
+                                        ctx.getCanvasId(), ctx.getUserId(),
+                                        TriggerType.LOGIC_RELATION_TIMEOUT, NodeType.LOGIC_RELATION,
+                                        null, Map.of(),
+                                        ctx.getExecutionId() + ":lr-timeout:" + nodeId, false)
+                                        .subscribe(null,
+                                                e -> log.error("[LOGIC_RELATION] 超时恢复失败 nodeId={}: {}", nodeId, e.getMessage()));
                             }
                         });
                 log.debug("[LOGIC_RELATION] 启动等待超时定时器 {}s nodeId={}", timeoutSec, nodeId);
@@ -371,6 +404,41 @@ public class DagEngine {
     // HUB 处理（含超时延迟任务，设计文档 HUB 节点说明）
     // ══════════════════════════════════════════════════════════════
 
+    /**
+     *核心机制：每个上游节点完成时，主动调用 executeNode(HUB)
+     * <br/>
+     *   上游A完成 → executeNode(HUB) → allUpstreamDone=false → WAITING → 返回空Map
+     *   上游B完成 → executeNode(HUB) → allUpstreamDone=true  → 继续执行
+     * <br/>
+     *   触发重入的是 DagEngine 的 CAS repeat 机制：
+     *   核心机制：每个上游节点完成时，主动调用 executeNode(HUB)
+     * <br/>
+     *   上游A完成 → executeNode(HUB) → allUpstreamDone=false → WAITING → 返回空Map
+     *   上游B完成 → executeNode(HUB) → allUpstreamDone=true  → 继续执行
+     * <br/>
+     *   触发重入的是 DagEngine 的 CAS repeat 机制:
+     *   完整流程是这样的：
+     * <br/>
+     *   上游A完成
+     *     └> executeNode(HUB)
+     *          ├─ 抢到 CAS 锁
+     *          ├─ allUpstreamDone=false → WAITING → 返回 Map.of()
+     *          └─ 检查 waitProcess → false → 结束
+     *                               上游B完成
+     *                                 └> executeNode(HUB)
+     *                                      ├─ 抢锁失败（A还没释放）→ set waitProcess=true → 返回
+     *                                      或者
+     *                                      ├─ 抢锁成功（A已释放）
+     *                                      ├─ allUpstreamDone=true → 继续执行下游
+     *                                      └─ 正常结束
+     * <br/>
+     *   若抢锁失败路径：A 在释放锁前发现 waitProcess=true
+     *     └> repeat：A 重新执行 handleHub → allUpstreamDone=true → 继续
+     * <br/>
+     *   Mono.delay() 是超时兜底，不是主驱动，它只做一件事：N 秒后如果 Hub 还没完成就标记 FAILED。
+     * <br/>
+     *
+     */
     private Mono<Map<String, Object>> handleHub(DagGraph graph, String nodeId,
                                                 DagParser.CanvasNode node,
                                                 Map<String, Object> config,
@@ -385,12 +453,21 @@ public class DagEngine {
                 ctx.getHubStartTimes().putIfAbsent(nodeId, System.currentTimeMillis());
                 int timeoutSec = HubHandler.getTimeoutSeconds(config);
 
-                // 延迟任务：超时后若 Hub 仍未完成则标记 FAILED
+                // 延迟任务：超时后若 Hub 仍未完成则标记 FAILED，持久化 ctx，触发执行恢复
                 Mono.delay(Duration.ofSeconds(timeoutSec), VIRTUAL)
                         .subscribe(__ -> {
                             if (!ctx.isNodeDone(nodeId)) {
                                 log.warn("[HUB] 等待超时 timeout={}s nodeId={}", timeoutSec, nodeId);
                                 ctx.setNodeStatus(nodeId, NodeStatus.FAILED);
+                                ctxStore.save(ctx);   // 同步回写 Redis，避免内存与持久化状态不一致
+                                // 触发执行恢复：让执行引擎感知 FAILED 状态并继续后续处理
+                                executionService.trigger(
+                                        ctx.getCanvasId(), ctx.getUserId(),
+                                        TriggerType.HUB_TIMEOUT, NodeType.HUB,
+                                        null, Map.of(),
+                                        ctx.getExecutionId() + ":hub-timeout:" + nodeId, false)
+                                        .subscribe(null,
+                                                e -> log.error("[HUB] 超时恢复失败 nodeId={}: {}", nodeId, e.getMessage()));
                             }
                         });
 
