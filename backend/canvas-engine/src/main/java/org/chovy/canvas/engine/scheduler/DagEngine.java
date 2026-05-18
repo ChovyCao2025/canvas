@@ -33,7 +33,6 @@ import java.util.stream.Collectors;
 
 /**
  * DAG 执行调度器（精确实现设计文档第七章）。
- *
  * 核心机制：
  * 1. 单节点 6 阶段执行（7.4节）
  * 2. repeat 并发保护（7.5节）—— 在写 SUCCESS 之前检查 repeat，防止幂等拦截
@@ -47,13 +46,13 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class DagEngine {
 
-    private final HandlerRegistry            handlerRegistry;
+    private final HandlerRegistry handlerRegistry;
     private final CanvasExecutionTraceMapper traceMapper;      // 保留供 SKIPPED 批量写入
-    private final TraceWriteBuffer           traceBuffer;      // 异步批量写入（12.10节）
-    private final CanvasExecutionDlqMapper   dlqMapper;
-    private final CircuitBreakerRegistry     cbRegistry;
-    private final CanvasMetrics              metrics;
-    private final ObjectMapper               objectMapper;
+    private final TraceWriteBuffer traceBuffer;      // 异步批量写入（12.10节）
+    private final CanvasExecutionDlqMapper dlqMapper;
+    private final CircuitBreakerRegistry cbRegistry;
+    private final CanvasMetrics metrics;
+    private final ObjectMapper objectMapper;
 
     @Value("${canvas.execution.max-retry:3}")
     private int maxRetry;
@@ -64,7 +63,9 @@ public class DagEngine {
     @Value("${canvas.execution.retry-max-delay-ms:30000}")
     private long retryMaxDelayMs;
 
-    /** 虚拟线程调度器，供阻塞型 Handler 使用 */
+    /**
+     * 虚拟线程调度器，供阻塞型 Handler 使用
+     */
     private static final reactor.core.scheduler.Scheduler VIRTUAL =
             Schedulers.fromExecutorService(Executors.newVirtualThreadPerTaskExecutor());
 
@@ -77,7 +78,7 @@ public class DagEngine {
      * 执行完成后（无论成功/失败）批量写入所有未执行节点的 SKIPPED 轨迹。
      */
     public Mono<Map<String, Object>> execute(DagGraph graph, String triggerNodeId,
-                                              ExecutionContext ctx) {
+                                             ExecutionContext ctx) {
         return executeNode(graph, triggerNodeId, ctx, 0)
                 .doFinally(__ -> writeSkippedNodes(graph, ctx))
                 .onErrorResume(e -> {
@@ -87,7 +88,9 @@ public class DagEngine {
                 });
     }
 
-    /** 最大 DAG 递归深度（防止超深链路或隐式循环导致 StackOverflowError） */
+    /**
+     * 最大 DAG 递归深度（防止超深链路或隐式循环导致 StackOverflowError）
+     */
     private static final int MAX_NODE_DEPTH = 200;
 
     // ══════════════════════════════════════════════════════════════
@@ -95,32 +98,32 @@ public class DagEngine {
     // ══════════════════════════════════════════════════════════════
 
     private Mono<Map<String, Object>> executeNode(DagGraph graph, String nodeId,
-                                                    ExecutionContext ctx) {
+                                                  ExecutionContext ctx) {
         return executeNode(graph, nodeId, ctx, 0);
     }
 
     private Mono<Map<String, Object>> executeNode(DagGraph graph, String nodeId,
-                                                    ExecutionContext ctx, int depth) {
+                                                  ExecutionContext ctx, int depth) {
         if (depth > MAX_NODE_DEPTH) {
             return Mono.error(new IllegalStateException(
-                "[ENGINE] DAG 执行深度超限（" + MAX_NODE_DEPTH + "），" +
-                "可能存在隐式循环或超大画布 nodeId=" + nodeId));
+                    "[ENGINE] DAG 执行深度超限（" + MAX_NODE_DEPTH + "），" +
+                            "可能存在隐式循环或超大画布 nodeId=" + nodeId));
         }
 
         DagParser.CanvasNode node = graph.getNode(nodeId);
         if (node == null) {
             log.warn("[ENGINE] 节点不存在，跳过 nodeId={}", nodeId);
-            return Mono.just(Map.<String, Object>of());
+            return Mono.just(Map.of());
         }
 
-        return Mono.<Map<String, Object>>defer(() -> {
+        return Mono.defer(() -> {
 
             // ──────────────────────────────────────────────────────
             // 阶段 1：解析节点配置（CONTEXT 类型替换为实际值）
             // bizConfig 兜底（触发器等节点 nextNodeId 只存在 bizConfig），config 覆盖
             Map<String, Object> rawConfig = new HashMap<>();
             if (node.getBizConfig() != null) rawConfig.putAll(node.getBizConfig());
-            if (node.getConfig()    != null) rawConfig.putAll(node.getConfig());
+            if (node.getConfig() != null) rawConfig.putAll(node.getConfig());
 
             Map<String, Object> config = NodeType.MANUAL_APPROVAL.equals(node.getType())
                     ? resolveConfigWithNodeId(rawConfig, ctx, nodeId)
@@ -141,7 +144,7 @@ public class DagEngine {
             // ──────────────────────────────────────────────────────
             if (ctx.isNodeDone(nodeId)) {
                 log.debug("[ENGINE] 幂等跳过 nodeId={}", nodeId);
-                return Mono.just(Map.<String, Object>of());
+                return Mono.just(Map.of());
             }
 
             // ──────────────────────────────────────────────────────
@@ -152,7 +155,7 @@ public class DagEngine {
                 // 抢锁失败：设置 waitProcess=true 通知持锁协程需要 repeat
                 waitProcess.set(true);
                 log.debug("[ENGINE] CAS 失败，设 waitProcess=true nodeId={}", nodeId);
-                return Mono.just(Map.<String, Object>of());
+                return Mono.just(Map.of());
             }
 
             // ──────────────────────────────────────────────────────
@@ -184,7 +187,7 @@ public class DagEngine {
 
                         // ── 阶段 6：写输出，设状态，触发下游 ──────────
                         if (handler.isBenefitNode()) ctx.setBenefitGranted(true);
-                        if (handler.isReachNode())   ctx.setUserReached(true);
+                        if (handler.isReachNode()) ctx.setUserReached(true);
                         if (result.output() != null && !result.output().isEmpty()) {
                             ctx.putNodeOutput(nodeId, result.output());
                         }
@@ -202,9 +205,9 @@ public class DagEngine {
                         ctx.setNodeStatus(nodeId, NodeStatus.FAILED);
                         log.error("[ENGINE] 节点异常 nodeId={}: {}", nodeId, e.getMessage());
                         if (ctx.isBenefitGranted() || ctx.isUserReached()) {
-                            return Mono.just(new HashMap<String, Object>());
+                            return Mono.just(new HashMap<>());
                         }
-                        return Mono.<Map<String, Object>>error(e);
+                        return Mono.error(e);
                     });
         });
     }
@@ -215,11 +218,11 @@ public class DagEngine {
     // ══════════════════════════════════════════════════════════════
 
     private Mono<NodeResult> executeHandlerWithRepeat(NodeHandler handler,
-                                                        Map<String, Object> config,
-                                                        ExecutionContext ctx,
-                                                        AtomicBoolean waitProcess,
-                                                        String nodeId,
-                                                        String nodeType) {
+                                                      Map<String, Object> config,
+                                                      ExecutionContext ctx,
+                                                      AtomicBoolean waitProcess,
+                                                      String nodeId,
+                                                      String nodeType) {
         CircuitBreakerRegistry.CircuitBreaker cb = cbRegistry.get(nodeType);
 
         // 单次调用：直接调用 Handler 的响应式方法，无需 subscribeOn（Handler 自行决定调度）
@@ -232,7 +235,10 @@ public class DagEngine {
                     }
                     return handler.executeAsync(config, ctx);
                 })
-                .doOnNext(r  -> { if (r.success()) cb.recordSuccess(); else cb.recordFailure(); })
+                .doOnNext(r -> {
+                    if (r.success()) cb.recordSuccess();
+                    else cb.recordFailure();
+                })
                 .doOnError(e -> cb.recordFailure());
 
         // 指数退避重试（13.2节）：只重试可重试异常
@@ -241,9 +247,9 @@ public class DagEngine {
                         .maxBackoff(Duration.ofMillis(retryMaxDelayMs))
                         .filter(this::isRetryable)
                         .doBeforeRetry(sig -> {
-                                metrics.recordNodeRetry(nodeType);
-                                log.warn("[ENGINE] 节点重试 nodeId={} attempt={} reason={}",
-                                        nodeId, sig.totalRetries() + 1, sig.failure().getMessage());
+                            metrics.recordNodeRetry(nodeType);
+                            log.warn("[ENGINE] 节点重试 nodeId={} attempt={} reason={}",
+                                    nodeId, sig.totalRetries() + 1, sig.failure().getMessage());
                         }))
                 // 重试耗尽或不可重试异常 → 写 DLQ（13.3节），返回 FAILED
                 .onErrorResume(e -> {
@@ -268,7 +274,9 @@ public class DagEngine {
         });
     }
 
-    /** 可重试异常（13.2节白名单） */
+    /**
+     * 可重试异常（13.2节白名单）
+     */
     private boolean isRetryable(Throwable ex) {
         if (ex instanceof CircuitBreakerRegistry.CircuitBreakerOpenException) return false;
         if (ex instanceof java.net.SocketTimeoutException) return true;
@@ -277,7 +285,9 @@ public class DagEngine {
         return msg != null && (msg.contains("5xx") || msg.contains("timeout") || msg.contains("Timeout"));
     }
 
-    /** 写入死信队列（13.3节） */
+    /**
+     * 写入死信队列（13.3节）
+     */
     private void writeDlq(ExecutionContext ctx, String nodeId, String nodeType, Throwable cause) {
         metrics.recordDlq(nodeType);
         try {
@@ -311,9 +321,9 @@ public class DagEngine {
     // ══════════════════════════════════════════════════════════════
 
     private Mono<Map<String, Object>> handleLogicRelation(DagGraph graph, String nodeId,
-                                                            DagParser.CanvasNode node,
-                                                            Map<String, Object> config,
-                                                            ExecutionContext ctx) {
+                                                          DagParser.CanvasNode node,
+                                                          Map<String, Object> config,
+                                                          ExecutionContext ctx) {
         List<String> upstreamIds = graph.upstream(nodeId);
         String relation = (String) config.getOrDefault("relation", "AND");
 
@@ -321,7 +331,7 @@ public class DagEngine {
         if (LogicRelationHandler.shouldFailImmediately(relation, upstreamIds, ctx)) {
             ctx.setNodeStatus(nodeId, NodeStatus.FAILED);
             log.warn("[ENGINE] LOGIC_RELATION AND 上游失败，立即 FAILED nodeId={}", nodeId);
-            if (ctx.isBenefitGranted() || ctx.isUserReached()) return Mono.just(Map.<String, Object>of());
+            if (ctx.isBenefitGranted() || ctx.isUserReached()) return Mono.just(Map.of());
             return Mono.error(new RuntimeException("LOGIC_RELATION AND 条件因上游失败不可满足"));
         }
 
@@ -347,7 +357,7 @@ public class DagEngine {
                 log.debug("[LOGIC_RELATION] 启动等待超时定时器 {}s nodeId={}", timeoutSec, nodeId);
             }
             log.debug("[ENGINE] LOGIC_RELATION 条件未满足，进入 WAITING nodeId={}", nodeId);
-            return Mono.just(Map.<String, Object>of());
+            return Mono.just(Map.of());
         }
 
         // 条件满足 → 走正常节点执行流程（阶段 3-6）
@@ -362,9 +372,9 @@ public class DagEngine {
     // ══════════════════════════════════════════════════════════════
 
     private Mono<Map<String, Object>> handleHub(DagGraph graph, String nodeId,
-                                                  DagParser.CanvasNode node,
-                                                  Map<String, Object> config,
-                                                  ExecutionContext ctx) {
+                                                DagParser.CanvasNode node,
+                                                Map<String, Object> config,
+                                                ExecutionContext ctx) {
         List<String> upstreamIds = graph.upstream(nodeId);
 
         // 所有上游未完成：进入等待态
@@ -387,14 +397,14 @@ public class DagEngine {
                 log.debug("[HUB] 启动超时定时器 {}s nodeId={}", timeoutSec, nodeId);
             } else {
                 // 已调度过定时器，检查是否已超时
-                long start   = ctx.getHubStartTimes().getOrDefault(nodeId, System.currentTimeMillis());
-                int  timeout = HubHandler.getTimeoutSeconds(config);
+                long start = ctx.getHubStartTimes().getOrDefault(nodeId, System.currentTimeMillis());
+                int timeout = HubHandler.getTimeoutSeconds(config);
                 if (System.currentTimeMillis() - start > (long) timeout * 1000) {
                     ctx.setNodeStatus(nodeId, NodeStatus.FAILED);
                     return Mono.error(new RuntimeException("HUB 等待超时 nodeId=" + nodeId));
                 }
             }
-            return Mono.just(Map.<String, Object>of()); // 继续等待
+            return Mono.just(Map.of()); // 继续等待
         }
 
         // 所有上游完成 → 走正常节点执行流程（阶段 3-6）
@@ -406,17 +416,17 @@ public class DagEngine {
     // ══════════════════════════════════════════════════════════════
 
     private Mono<Map<String, Object>> executeNodeAfterStage2(DagGraph graph, String nodeId,
-                                                               DagParser.CanvasNode node,
-                                                               Map<String, Object> config,
-                                                               ExecutionContext ctx) {
+                                                             DagParser.CanvasNode node,
+                                                             Map<String, Object> config,
+                                                             ExecutionContext ctx) {
         // 阶段 3：幂等
-        if (ctx.isNodeDone(nodeId)) return Mono.just(Map.<String, Object>of());
+        if (ctx.isNodeDone(nodeId)) return Mono.just(Map.of());
 
         // 阶段 4：CAS
         AtomicBoolean waitProcess = ctx.getLock(nodeId);
         if (!waitProcess.compareAndSet(true, false)) {
             waitProcess.set(true);
-            return Mono.just(Map.<String, Object>of());
+            return Mono.just(Map.of());
         }
 
         writeTraceStart(ctx, node);
@@ -433,7 +443,7 @@ public class DagEngine {
                         return Mono.error(new RuntimeException("节点 " + nodeId + " 失败: " + result.errorMessage()));
                     }
                     if (handler.isBenefitNode()) ctx.setBenefitGranted(true);
-                    if (handler.isReachNode())   ctx.setUserReached(true);
+                    if (handler.isReachNode()) ctx.setUserReached(true);
                     if (result.output() != null && !result.output().isEmpty()) {
                         ctx.putNodeOutput(nodeId, result.output());
                     }
@@ -445,9 +455,9 @@ public class DagEngine {
                     waitProcess.set(true);
                     ctx.setNodeStatus(nodeId, NodeStatus.FAILED);
                     if (ctx.isBenefitGranted() || ctx.isUserReached()) {
-                        return Mono.just(new HashMap<String, Object>());
+                        return Mono.just(new HashMap<>());
                     }
-                    return Mono.<Map<String, Object>>error(e);
+                    return Mono.error(e);
                 });
     }
 
@@ -456,8 +466,8 @@ public class DagEngine {
     // ══════════════════════════════════════════════════════════════
 
     private Mono<Map<String, Object>> triggerDownstream(DagGraph graph, NodeResult result,
-                                                          String sourceNodeId, String sourceType,
-                                                          ExecutionContext ctx) {
+                                                        String sourceNodeId, String sourceType,
+                                                        ExecutionContext ctx) {
         // 立即标记未走的分支入口为 SKIPPED（设计文档 7.7节两阶段写入 - 阶段一）
         // 目的：让 LOGIC_RELATION(AND) 在执行中即时检测到上游 SKIPPED，而不是等到执行结束
         markNonTakenBranchesSkipped(graph, sourceNodeId, sourceType, result, ctx);
@@ -488,10 +498,10 @@ public class DagEngine {
      * 全部失败时若有 fallback(nextNodeId) 则走 fallback（设 PARTIAL_FAIL），否则整体 FAILED。
      */
     private Mono<Map<String, Object>> tryPrioritySequentially(List<String> branches,
-                                                                String fallbackNextId,
-                                                                String priorityNodeId,
-                                                                DagGraph graph,
-                                                                ExecutionContext ctx) {
+                                                              String fallbackNextId,
+                                                              String priorityNodeId,
+                                                              DagGraph graph,
+                                                              ExecutionContext ctx) {
         if (branches.isEmpty()) {
             // 所有分支均失败
             if (fallbackNextId != null) {
@@ -508,7 +518,7 @@ public class DagEngine {
                 .flatMap(__ -> {
                     if (ctx.getNodeStatus(currentBranchId) == NodeStatus.SUCCESS) {
                         log.debug("[PRIORITY] 分支成功，停止 branchId={}", currentBranchId);
-                        return Mono.just(Map.<String, Object>of());
+                        return Mono.just(Map.of());
                     }
                     // 当前分支失败，尝试下一个
                     log.debug("[PRIORITY] 分支失败，尝试下一个 branchId={}", currentBranchId);
@@ -567,16 +577,19 @@ public class DagEngine {
         traceBuffer.offer(trace); // 非阻塞入队
     }
 
-    /** 重载：带 durationMs（节点实际耗时）*/
+    /**
+     * 重载：带 durationMs（节点实际耗时）
+     */
     private void writeTraceEnd(ExecutionContext ctx, DagParser.CanvasNode node,
-                                NodeResult result, long durationMs) {
+                               NodeResult result, long durationMs) {
         int status = result.success() ? 1 : 2;
         String outputJson = null;
         try {
             if (result.output() != null && !result.output().isEmpty()) {
                 outputJson = objectMapper.writeValueAsString(result.output());
             }
-        } catch (Exception ignored) {}
+        } catch (Exception ignored) {
+        }
 
         CanvasExecutionTrace trace = CanvasExecutionTrace.builder()
                 .executionId(ctx.getExecutionId())
@@ -600,20 +613,44 @@ public class DagEngine {
     // 工具方法
     // ══════════════════════════════════════════════════════════════
 
-    /** 从 NodeResult 收集所有下游节点 ID（排除 null） */
+    /**
+     * 从 NodeResult 收集所有下游节点 ID（排除 null）
+     */
     private List<String> collectNextIds(NodeResult result) {
         List<String> ids = new ArrayList<>();
-        if (result.nextNodeId()    != null) ids.add(result.nextNodeId());
+        if (result.nextNodeId() != null) ids.add(result.nextNodeId());
         if (result.successNodeId() != null) ids.add(result.successNodeId());
-        if (result.failNodeId()    != null) ids.add(result.failNodeId());
-        if (result.elseNodeId()    != null) ids.add(result.elseNodeId());
-        if (result.branchMap()     != null) ids.addAll(result.branchMap().values());
+        if (result.failNodeId() != null) ids.add(result.failNodeId());
+        if (result.elseNodeId() != null) ids.add(result.elseNodeId());
+        if (result.branchMap() != null) ids.addAll(result.branchMap().values());
         return ids.stream().filter(Objects::nonNull).distinct().collect(Collectors.toList());
     }
 
     /**
      * 解析节点配置：将 valueType=CONTEXT 的字段替换为上下文实际值。
      * 设计文档 7.4 阶段 1。
+     * 例如:
+     * {
+     *   "apiKey": "send_sms",
+     *   "params": {
+     *     "phone": {
+     *       "valueType": "CONTEXT",
+     *       "value": "user.phone"  // ← 从上下文读取用户手机号
+     *     },
+     *     "content": {
+     *       "valueType": "CONTEXT",
+     *       "value": "trigger.message"  // ← 从触发事件读取消息内容
+     *     }
+     *   }
+     * }
+     * 会被处理为:
+     * {
+     *   "apiKey": "send_sms",
+     *   "params": {
+     *     "phone": "13800138000",       // ← 实际手机号
+     *     "content": "您的订单已发货"    // ← 实际消息
+     *   }
+     * }
      */
     @SuppressWarnings("unchecked")
     private Map<String, Object> resolveConfig(Map<String, Object> config, ExecutionContext ctx) {
@@ -621,14 +658,14 @@ public class DagEngine {
 
         // 性能优化：先检查是否有任何 CONTEXT 字段，无则直接返回原 Map 避免 HashMap 创建
         boolean hasContextField = config.values().stream().anyMatch(
-                v -> v instanceof Map<?, ?> m && "CONTEXT".equals(((Map<?, ?>) m).get("valueType")));
+                v -> v instanceof Map<?, ?> m && "CONTEXT".equals(m.get("valueType")));
         if (!hasContextField) return config;   // O(n) 扫描，但避免了 HashMap allocation
 
         Map<String, Object> resolved = new HashMap<>(config);
         for (Map.Entry<String, Object> entry : config.entrySet()) {
             if (entry.getValue() instanceof Map<?, ?> m) {
                 String valueType = (String) ((Map<String, Object>) m).get("valueType");
-                String value     = (String) ((Map<String, Object>) m).get("value");
+                String value = (String) ((Map<String, Object>) m).get("value");
                 if ("CONTEXT".equals(valueType) && value != null) {
                     resolved.put(entry.getKey(), ctx.getContextValue(value));
                 }
@@ -637,9 +674,11 @@ public class DagEngine {
         return resolved;
     }
 
-    /** nodeId 注入版（ManualApprovalHandler 需要知道自身 nodeId） */
+    /**
+     * nodeId 注入版（ManualApprovalHandler 需要知道自身 nodeId）
+     */
     private Map<String, Object> resolveConfigWithNodeId(Map<String, Object> config,
-                                                          ExecutionContext ctx, String nodeId) {
+                                                        ExecutionContext ctx, String nodeId) {
         Map<String, Object> resolved = new HashMap<>(resolveConfig(config, ctx));
         resolved.put("__nodeId", nodeId);
         return resolved;
@@ -647,18 +686,16 @@ public class DagEngine {
 
     /**
      * 立即标记未走分支的入口节点为 SKIPPED（设计文档 7.7节 阶段一写入）。
-     *
      * 必要性：LOGIC_RELATION(AND) 在执行中检查上游 SKIPPED，
      * 若 SKIPPED 只在执行结束后才写，则 LOGIC_RELATION 永远看到 PENDING，永久等待。
-     *
      * 覆盖场景：
-     *   IF_CONDITION  → 标记未走的 success/fail 分支入口
-     *   SELECTOR      → 标记未命中的所有 branch 入口（含 else）
+     * IF_CONDITION  → 标记未走的 success/fail 分支入口
+     * SELECTOR      → 标记未命中的所有 branch 入口（含 else）
      */
     @SuppressWarnings("unchecked")
     private void markNonTakenBranchesSkipped(DagGraph graph, String sourceNodeId,
-                                              String sourceType, NodeResult result,
-                                              ExecutionContext ctx) {
+                                             String sourceType, NodeResult result,
+                                             ExecutionContext ctx) {
         DagParser.CanvasNode node = graph.getNode(sourceNodeId);
         if (node == null || node.getConfig() == null) return;
         Map<String, Object> cfg = node.getConfig();
@@ -667,9 +704,9 @@ public class DagEngine {
             // result 中只有被走的那条（另一条是 null）
             // 通过 config 找到"另一条"并标记 SKIPPED
             String successId = (String) cfg.get("successNodeId");
-            String failId    = (String) cfg.get("failNodeId");
-            String takenId   = result.successNodeId() != null ? result.successNodeId()
-                                                               : result.failNodeId();
+            String failId = (String) cfg.get("failNodeId");
+            String takenId = result.successNodeId() != null ? result.successNodeId()
+                    : result.failNodeId();
             String skippedId = takenId != null && takenId.equals(successId) ? failId : successId;
             markSkipped(skippedId, ctx);
 
@@ -677,7 +714,7 @@ public class DagEngine {
             // 标记所有未走的 branch 入口
             java.util.List<Map<String, Object>> branches =
                     (java.util.List<Map<String, Object>>) cfg.getOrDefault("branches", List.of());
-            String elseId  = (String) cfg.get("elseNodeId");
+            String elseId = (String) cfg.get("elseNodeId");
             String takenId = result.nextNodeId(); // SELECTOR 走的那条
 
             branches.forEach(b -> {
