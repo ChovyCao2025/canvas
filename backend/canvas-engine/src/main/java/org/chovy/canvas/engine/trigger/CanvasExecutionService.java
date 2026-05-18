@@ -47,7 +47,7 @@ public class CanvasExecutionService {
     private final TriggerPreCheckService     preCheckService;
     private final InFlightExecutionRegistry  executionRegistry;
     private final org.chovy.canvas.domain.execution.CanvasExecutionStatsMapper statsMapper;
-    private final ObjectMapper               objectMapper;
+
 
     @Value("${canvas.execution.context-ttl-sec:86400}")
     private long ctxTtlSec;
@@ -175,10 +175,13 @@ public class CanvasExecutionService {
 
             // 3. dedup 检查
             if (!dryRun && msgId != null) {
+                // FIXME: 此处控制不足够精细, 可能会影响后续订单去重时间
+                // FIXME: 目前幂等时间默认是24小时, 但是如果在挂起期间有第二个订单进入流程的话, 幂等时间会被设置为20分钟
                 boolean isResume = ctxStore.exists(canvasId, userId);
                 Duration dedupTtl = isResume
                         ? Duration.ofSeconds(globalTimeoutSec + 600)
                         : Duration.ofHours(24);
+                // 幂等校验处理
                 if (!ctxStore.acquireDedup(canvasId, userId, msgId, dedupTtl)) {
                     log.debug("[ENGINE] dedup 拦截 canvasId={} userId={} msgId={}", canvasId, userId, msgId);
                     return Map.<String, Object>of("deduplicated", true);
