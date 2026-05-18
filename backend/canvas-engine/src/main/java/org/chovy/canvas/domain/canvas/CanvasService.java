@@ -348,9 +348,15 @@ public class CanvasService {
                     // DIRECT / SCHEDULED 无需路由表（DIRECT 按 canvasId 直调，SCHEDULED 由调度器管理）
                 }
                 // ── 旧触发器节点（兼容已有画布）──
-                case "MQ_TRIGGER"      -> { String k = mqTriggerHandler.resolveTopic(cfg); if (!k.isEmpty()) triggerRouteService.registerMq(canvasId, k); }
-                case "BEHAVIOR_IN_APP" -> { String k = (String) cfg.get("eventCode");  if (k != null) triggerRouteService.registerBehavior(canvasId, k); }
-                case "TAGGER_REALTIME" -> { String k = (String) cfg.get("tagCodeKey"); if (k != null) triggerRouteService.registerTagger(canvasId, k); }
+                case "MQ_TRIGGER"       -> { String k = mqTriggerHandler.resolveTopic(cfg); if (!k.isEmpty()) triggerRouteService.registerMq(canvasId, k); }
+                case "BEHAVIOR_IN_APP"  -> { String k = (String) cfg.get("eventCode");  if (k != null) triggerRouteService.registerBehavior(canvasId, k); }
+                case "BEHAVIOR_TRIGGER" -> {
+                    if ("inapp".equals(cfg.getOrDefault("triggerType", "inapp"))) {
+                        String k = (String) cfg.get("eventCode");
+                        if (k != null) triggerRouteService.registerBehavior(canvasId, k);
+                    }
+                }
+                case "TAGGER_REALTIME"  -> { String k = (String) cfg.get("tagCodeKey"); if (k != null) triggerRouteService.registerTagger(canvasId, k); }
                 default -> {}
             }
         }
@@ -360,12 +366,21 @@ public class CanvasService {
     private void clearTriggerRoutesFromGraph(Long canvasId, DagGraph graph) {
         for (String nodeId : graph.entryNodes()) {
             DagParser.CanvasNode node = graph.getNode(nodeId);
-            if (node == null || node.getConfig() == null) continue;
-            Map<String, Object> cfg = node.getConfig();
+            if (node == null) continue;
+            Map<String, Object> cfg = new java.util.HashMap<>();
+            if (node.getBizConfig() != null) cfg.putAll(node.getBizConfig());
+            if (node.getConfig()    != null) cfg.putAll(node.getConfig());
+            if (cfg.isEmpty()) continue;
             switch (node.getType()) {
-                case "MQ_TRIGGER"      -> { String k = mqTriggerHandler.resolveTopic(cfg); if (!k.isEmpty()) triggerRouteService.removeMq(canvasId, k); }
-                case "BEHAVIOR_IN_APP" -> { String k = (String) cfg.get("eventCode");  if (k != null) triggerRouteService.removeBehavior(canvasId, k); }
-                case "TAGGER_REALTIME" -> { String k = (String) cfg.get("tagCodeKey"); if (k != null) triggerRouteService.removeTagger(canvasId, k); }
+                case "MQ_TRIGGER"       -> { String k = mqTriggerHandler.resolveTopic(cfg); if (!k.isEmpty()) triggerRouteService.removeMq(canvasId, k); }
+                case "BEHAVIOR_IN_APP"  -> { String k = (String) cfg.get("eventCode");  if (k != null) triggerRouteService.removeBehavior(canvasId, k); }
+                case "BEHAVIOR_TRIGGER" -> {
+                    if ("inapp".equals(cfg.getOrDefault("triggerType", "inapp"))) {
+                        String k = (String) cfg.get("eventCode");
+                        if (k != null) triggerRouteService.removeBehavior(canvasId, k);
+                    }
+                }
+                case "TAGGER_REALTIME"  -> { String k = (String) cfg.get("tagCodeKey"); if (k != null) triggerRouteService.removeTagger(canvasId, k); }
                 default -> {}
             }
         }

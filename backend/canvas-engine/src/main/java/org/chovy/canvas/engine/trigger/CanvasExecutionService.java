@@ -379,6 +379,16 @@ public class CanvasExecutionService {
                 if (matchKey == null) return nodeId;
                 String cfgKey = (String) cfg.getOrDefault("eventCode", cfg.getOrDefault("topicKey", ""));
                 if (matchKey.equals(cfgKey)) return nodeId;
+
+            } else if ("BEHAVIOR_TRIGGER".equals(type)) {
+                // V27 合并节点：triggerType=inapp 对应端内行为触发
+                if (!"BEHAVIOR_IN_APP".equals(triggerNodeType)) continue;
+                String tt = (String) cfg.getOrDefault("triggerType", "inapp");
+                if (!"inapp".equals(tt)) continue;
+                if (matchKey == null) return nodeId;
+                String cfgKey = (String) cfg.getOrDefault("eventCode", "");
+                if (matchKey.equals(cfgKey)) return nodeId;
+
             } else {
                 // 旧触发器节点兼容逻辑
                 boolean typeMatch = triggerNodeType.equals(type)
@@ -396,10 +406,10 @@ public class CanvasExecutionService {
                     DagParser.CanvasNode n = graph.getNode(id);
                     if (n == null) return false;
                     String t = n.getType();
+                    Map<String, Object> c = new java.util.HashMap<>();
+                    if (n.getBizConfig() != null) c.putAll(n.getBizConfig());
+                    if (n.getConfig()    != null) c.putAll(n.getConfig());
                     if ("START".equals(t)) {
-                        Map<String, Object> c = new java.util.HashMap<>();
-                        if (n.getBizConfig() != null) c.putAll(n.getBizConfig());
-                        if (n.getConfig()    != null) c.putAll(n.getConfig());
                         String ct = (String) c.getOrDefault("triggerType", "DIRECT");
                         return switch (triggerNodeType) {
                             case "DIRECT_CALL"       -> "DIRECT".equals(ct);
@@ -408,6 +418,10 @@ public class CanvasExecutionService {
                             case "SCHEDULED_TRIGGER" -> "SCHEDULED".equals(ct);
                             default -> false;
                         };
+                    }
+                    if ("BEHAVIOR_TRIGGER".equals(t)) {
+                        return "BEHAVIOR_IN_APP".equals(triggerNodeType)
+                                && "inapp".equals(c.getOrDefault("triggerType", "inapp"));
                     }
                     return triggerNodeType.equals(t);
                 })

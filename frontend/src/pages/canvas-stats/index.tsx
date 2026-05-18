@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from 'react'
 import { Card, Col, Row, Table, Typography, Spin, Button, DatePicker, Space, Tag } from 'antd'
-import { ArrowLeftOutlined, DownOutlined, UpOutlined, CalendarOutlined } from '@ant-design/icons'
+import { ArrowLeftOutlined, DownOutlined, UpOutlined, CalendarOutlined, TeamOutlined, CheckCircleOutlined, CloseCircleOutlined, ThunderboltOutlined, PauseCircleOutlined } from '@ant-design/icons'
 import { useNavigate, useParams } from 'react-router-dom'
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -27,10 +27,10 @@ interface TrendPoint { date: string; count: number }
 function formatDate(d: Dayjs) { return d.format('YYYY-MM-DD') }
 
 function CompBadge({ curr, prev }: { curr: number; prev: number | null }) {
-  if (prev === null || prev === 0) return null
+  if (prev === null) return <span style={{ display: 'inline-block', height: 21 }} />
   const delta = curr - prev
-  const pct = Math.round(Math.abs(delta) / prev * 100)
-  if (delta === 0) return <span style={BS.neutral}>— 持平</span>
+  const pct = Math.round(Math.abs(delta) / Math.max(prev, 1) * 100)
+  if (delta === 0) return <span style={BS.neutral}>↑ 0% vs 上期</span>
   const up = delta > 0
   return <span style={up ? BS.up : BS.down}>{up ? '↑' : '↓'} {pct}% vs 上期</span>
 }
@@ -38,15 +38,15 @@ function CompBadge({ curr, prev }: { curr: number; prev: number | null }) {
 const BS = {
   up:      { display:'inline-flex', gap:3, background:'#dcfce7', borderRadius:20, padding:'2px 10px', fontSize:11, color:'#16a34a', fontWeight:600 },
   down:    { display:'inline-flex', gap:3, background:'#fee2e2', borderRadius:20, padding:'2px 10px', fontSize:11, color:'#dc2626', fontWeight:600 },
-  neutral: { display:'inline-flex', gap:3, background:'#f1f5f9', borderRadius:20, padding:'2px 10px', fontSize:11, color:'#64748b', fontWeight:600 },
+  neutral: { display:'inline-flex', gap:3, padding:'2px 0', fontSize:11, color:'#94a3b8', fontWeight:500 },
 }
 
 const KPI_DEFS = [
-  { key:'uniqueUsers', label:'触达用户数', accent:'#3b82f6', bg:'#eff6ff', iconBg:'#dbeafe', icon:'👤', format:(v:number|string) => Number(v).toLocaleString() },
-  { key:'successRate', label:'执行成功率', accent:'#22c55e', bg:'#f0fdf4', iconBg:'#dcfce7', icon:'✅', format:(v:number|string) => String(v) },
-  { key:'failed',      label:'执行失败',   accent:'#ef4444', bg:'#fff1f2', iconBg:'#fee2e2', icon:'⚠️', format:(v:number|string) => Number(v).toLocaleString() },
-  { key:'total',       label:'总触发次数', accent:'#8b5cf6', bg:'#faf5ff', iconBg:'#ede9fe', icon:'⚡', format:(v:number|string) => Number(v).toLocaleString() },
-  { key:'paused',      label:'挂起中',     accent:'#f59e0b', bg:'#fffbeb', iconBg:'#fef3c7', icon:'⏸', format:(v:number|string) => Number(v).toLocaleString() },
+  { key:'uniqueUsers', label:'触达用户数', bg:'#eff6ff', iconBg:'#dbeafe', icon:<TeamOutlined style={{ fontSize:16, color:'#3b82f6' }} />, format:(v:number|string) => Number(v).toLocaleString() },
+  { key:'successRate', label:'执行成功率', bg:'#f0fdf4', iconBg:'#dcfce7', icon:<CheckCircleOutlined style={{ fontSize:16, color:'#22c55e' }} />, format:(v:number|string) => String(v) },
+  { key:'failed',      label:'执行失败',   bg:'#fff1f2', iconBg:'#fee2e2', icon:<CloseCircleOutlined style={{ fontSize:16, color:'#ef4444' }} />, format:(v:number|string) => Number(v).toLocaleString() },
+  { key:'total',       label:'总触发次数', bg:'#faf5ff', iconBg:'#ede9fe', icon:<ThunderboltOutlined style={{ fontSize:16, color:'#8b5cf6' }} />, format:(v:number|string) => Number(v).toLocaleString() },
+  { key:'paused',      label:'挂起中',     bg:'#fffbeb', iconBg:'#fef3c7', icon:<PauseCircleOutlined style={{ fontSize:16, color:'#f59e0b' }} />, format:(v:number|string) => Number(v).toLocaleString() },
 ]
 
 // 默认展示的关键节点类型（去掉 END）
@@ -144,7 +144,7 @@ export default function CanvasStatsPage() {
             const currNum = typeof curr === 'string' ? parseFloat(curr) : (curr as number)
             const prevNum = typeof prev === 'string' ? parseFloat(prev as string) : (prev as number|null)
             return (
-              <Col key={def.key} xs={12} sm={8} md={8} lg={4} xl={4} style={{ display:'flex' }}>
+              <Col key={def.key} flex={1} style={{ minWidth:0, display:'flex' }}>
                 <div style={{
                   flex:1, background:def.bg, borderRadius:12, padding:'18px 20px',
                   display:'flex', flexDirection:'column', justifyContent:'space-between',
