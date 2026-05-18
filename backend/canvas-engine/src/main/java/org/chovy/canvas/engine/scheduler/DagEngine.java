@@ -36,12 +36,39 @@ import java.util.stream.Collectors;
 
 /**
  * DAG 执行调度器（精确实现设计文档第七章）。
- * 核心机制：
- * 1. 单节点 6 阶段执行（7.4节）
- * 2. repeat 并发保护（7.5节）—— 在写 SUCCESS 之前检查 repeat，防止幂等拦截
- * 3. LOGIC_RELATION AND 模式立即失败（7.7节）
- * 4. Hub 超时延迟任务（设计文档 Hub 定义）
- * 5. Priority 串行依序尝试（4.6节）
+ *
+ * <h3>执行隔离模型</h3>
+ * <pre>
+ * 每次 trigger() 调用都会创建或加载独立的 ExecutionContext，以 (canvasId, userId) 为 key。
+ * 不同用户、不同触发 之间完全隔离，互不干扰：
+ *
+ *                      ┌─ ctx_A ──→ nodeA1 → nodeA2 → ...
+ *   DagGraph（只读）───┤
+ *                      └─ ctx_B ──→ nodeB1 → nodeB2 → ...
+ *
+ * DagGraph 是只读的节点配置，全局共享（从缓存取）。
+ * 各节点的执行状态、输出数据、并发锁（NodeGate）均存储在各自的 ExecutionContext 里，
+ * 不同执行之间从不共享状态。
+ * </pre>
+ *
+ * <h3>repeat / NodeGate 的作用范围</h3>
+ * <pre>
+ * repeat 机制只处理 intra-execution（单次执行内部）的并行分支汇聚问题，
+ * 即同一个 ctx 里的多条并行分支同时到达同一个 HUB / LogicRelation 节点的情况：
+ *
+ *   分支1 ──→ HUB_node ← 只能执行一次（repeat 保障）
+ *   分支2 ──┘
+ *
+ * 对于线性或树状结构（每个节点只有一条入边），不存在并发到达，
+ * NodeGate.repeatPending 永远是 false，repeat 逻辑完全不触发。
+ * </pre>
+ *
+ * <h3>核心机制</h3>
+ * 1. 单节点 6 阶段执行（7.4节）<br>
+ * 2. repeat 并发保护（7.5节）—— 在写 SUCCESS 之前检查 repeat，防止幂等拦截<br>
+ * 3. LOGIC_RELATION AND 模式立即失败（7.7节）<br>
+ * 4. Hub 超时延迟任务（设计文档 Hub 定义）<br>
+ * 5. Priority 串行依序尝试（4.6节）<br>
  * 6. 执行结束批量写入 SKIPPED（7.7节）
  */
 @Slf4j
@@ -245,10 +272,28 @@ public class DagEngine {
     /**
      * 带 repeat 保护的 Handler 执行（含熔断、重试、DLQ）。
      *
-     * <h3>为什么需要 repeat？</h3>
+     * <h3>为什么不给每个并发触发各复制一份节点独立执行？</h3>
      * <pre>
-     * HUB/LogicRelation 场景：上游 A、B 并发完成，都要执行同一个下游节点 N。
+     * 直觉上，让 A、B 各自拿一份 HUB 节点独立跑，似乎并发更高、更简单。
+     * 但这是错误的——HUB 的语义是「等所有上游完成后，向下游触发【恰好一次】」。
      *
+     * 若各自复制：
+     *   上游 A 完成 → 复制一份 HUB → allUpstreamDone=true → 触发下游
+     *   上游 B 完成 → 复制一份 HUB → allUpstreamDone=true → 触发下游
+     *                                                          ↑ 下游被执行了两次！
+     *
+     * 如果下游是「发券」「发短信」「调第三方 API」，就出资损了。
+     * 这是正确性问题，不是性能问题。
+     *
+     * 此外，ExecutionContext 是单次执行内共享的，A、B 的输出都写在同一个 ctx 里。
+     * 复制出的两份 HUB 会同时读写同一个 ctx，产生数据竞争。
+     *
+     * 因此必须保证 HUB 只有一个执行实例，repeat 机制解决的是：
+     * 「最后一个并发到达者不被漏掉」的边角场景。
+     * </pre>
+     *
+     * <h3>三种到达场景（Case 1/2/3 详见下方）</h3>
+     * <pre>
      * Case 1 — 无并发：
      *   A 抢到锁（executing: false→true）→ 执行 N → 读 repeatPending=false → 释放锁
      *   → 无 repeat，直接返回
