@@ -38,6 +38,7 @@ export const DEFAULT_NAMES: Record<string, string> = {
   LOGIC_RELATION:    '逻辑关系',
   HUB:               '集线器',
   AGGREGATE:         '聚合评估',
+  THRESHOLD:         '阈值触发',
   PRIORITY:          '优先级',
   AB_SPLIT:          'AB分流',
   TAGGER_OFFLINE:    'Tagger离线标签',

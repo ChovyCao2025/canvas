@@ -23,6 +23,12 @@ export function getBranchHandles(
         { id: 'fail',    label: '条件不满足', color: '#f5222d' },
       ]
 
+    case 'THRESHOLD':
+      return [
+        { id: 'success', label: '达到阈值', color: '#52c41a' },
+        { id: 'fail',    label: '未达阈值', color: '#f5222d' },
+      ]
+
     case 'MANUAL_APPROVAL':
       return [
         { id: 'approve', label: '通过', color: '#52c41a' },

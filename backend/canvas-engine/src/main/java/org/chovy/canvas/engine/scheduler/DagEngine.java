@@ -24,6 +24,7 @@ import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Component;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
+import reactor.core.scheduler.Scheduler;
 import reactor.core.scheduler.Schedulers;
 import reactor.util.retry.Retry;
 
@@ -124,7 +125,7 @@ public class DagEngine {
     /**
      * 虚拟线程调度器，供阻塞型 Handler 使用
      */
-    private static final reactor.core.scheduler.Scheduler VIRTUAL =
+    private static final Scheduler VIRTUAL =
             Schedulers.fromExecutorService(Executors.newVirtualThreadPerTaskExecutor());
 
     // ══════════════════════════════════════════════════════════════
@@ -189,7 +190,7 @@ public class DagEngine {
                     : resolveConfig(rawConfig, ctx);
 
             // ──────────────────────────────────────────────────────
-            // 阶段 2：LOGIC_RELATION / HUB / AGGREGATE 特殊处理
+            // 阶段 2：LOGIC_RELATION / HUB / AGGREGATE / THRESHOLD 特殊处理
             // ──────────────────────────────────────────────────────
             if (NodeType.LOGIC_RELATION.equals(node.getType())) {
                 return handleLogicRelation(graph, nodeId, node, config, ctx);
@@ -199,6 +200,17 @@ public class DagEngine {
             }
             if (NodeType.AGGREGATE.equals(node.getType())) {
                 return handleAggregate(graph, nodeId, node, config, ctx);
+            }
+            if (NodeType.THRESHOLD.equals(node.getType())) {
+                // THRESHOLD 不等所有上游完成——每个上游完成都触发一次 handler。
+                // 与 HUB/AGGREGATE 的关键区别：此处只注入 upstreamIds，不加 allUpstreamDone 门控，
+                // handler 在执行时才读 ctx 计数，这是 repeat 机制真正有用的场景：
+                // 持锁期间到来的上游信号通过 repeatPending 被捕获，repeat 重新评估后正确路由。
+                Map<String, Object> enrichedConfig = new HashMap<>(config);
+                enrichedConfig.put("__upstreamIds", graph.upstream(nodeId));
+                enrichedConfig.put("__nodeId", nodeId);
+                scheduleThresholdTimeoutIfNeeded(nodeId, config, ctx);
+                return executeNodeAfterStage2(graph, nodeId, node, enrichedConfig, ctx);
             }
 
             // ──────────────────────────────────────────────────────
@@ -625,6 +637,30 @@ public class DagEngine {
     // 阶段 3-6 公共入口（LOGIC_RELATION / HUB / AGGREGATE 满足条件后调用）
     // ══════════════════════════════════════════════════════════════
 
+    /** THRESHOLD 超时调度（首次触发时启动，防止所有上游都不完成导致永久 WAITING） */
+    private void scheduleThresholdTimeoutIfNeeded(String nodeId, Map<String, Object> config,
+                                                   ExecutionContext ctx) {
+        String timerKey = "th:" + nodeId;
+        if (ctx.getScheduledHubTimeouts().contains(timerKey)) return;
+        ctx.getScheduledHubTimeouts().add(timerKey);
+        int timeoutSec = config.get("timeout") instanceof Number n ? n.intValue() : (int) globalTimeout;
+        Mono.delay(Duration.ofSeconds(timeoutSec), VIRTUAL)
+                .subscribe(__ -> {
+                    if (!ctx.isNodeDone(nodeId)) {
+                        log.warn("[THRESHOLD] 等待超时 timeout={}s nodeId={}", timeoutSec, nodeId);
+                        ctx.setNodeStatus(nodeId, NodeStatus.FAILED);
+                        ctxStore.save(ctx);
+                        executionService.trigger(
+                                ctx.getCanvasId(), ctx.getUserId(),
+                                TriggerType.THRESHOLD_TIMEOUT, NodeType.THRESHOLD,
+                                null, Map.of(),
+                                ctx.getExecutionId() + ":th-timeout:" + nodeId, false)
+                                .subscribe(null,
+                                        e -> log.error("[THRESHOLD] 超时恢复失败 nodeId={}: {}", nodeId, e.getMessage()));
+                    }
+                });
+    }
+
     private Mono<Map<String, Object>> executeNodeAfterStage2(DagGraph graph, String nodeId,
                                                              DagParser.CanvasNode node,
                                                              Map<String, Object> config,
@@ -651,6 +687,12 @@ public class DagEngine {
                         writeTraceEnd(ctx, node, result);
                         if (ctx.isBenefitGranted() || ctx.isUserReached()) return Mono.just(Map.<String, Object>of());
                         return Mono.error(new RuntimeException("节点 " + nodeId + " 失败: " + result.errorMessage()));
+                    }
+                    // THRESHOLD 节点的「阈值未满足」结果：不设 SUCCESS，不触发下游，继续等待
+                    // 注意：nodeGate 已在 executeHandlerWithRepeat 中释放，此处不需再操作
+                    if (result.pending()) {
+                        ctx.setNodeStatus(nodeId, NodeStatus.WAITING);
+                        return Mono.<Map<String,Object>>just(Map.of());
                     }
                     if (handler.isBenefitNode()) ctx.setBenefitGranted(true);
                     if (handler.isReachNode()) ctx.setUserReached(true);

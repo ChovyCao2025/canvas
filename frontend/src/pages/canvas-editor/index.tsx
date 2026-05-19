@@ -502,6 +502,14 @@ function EditorInner({ detail, onStatusChange }: {
         case 'SCHEDULED_TRIGGER':
           if (!cfg.cronExpression) errors.push(`节点「${d.name}」必须配置 Cron 表达式`)
           break
+        case 'THRESHOLD': {
+          if (!cfg.thresholdMode) { errors.push(`节点「${d.name}」必须配置触发条件`); break }
+          const needsN = cfg.thresholdMode === 'min_success' || cfg.thresholdMode === 'min_done'
+          if (needsN && !cfg.threshold) errors.push(`节点「${d.name}」必须填写阈值 N`)
+          if (!cfg.successNodeId) errors.push(`节点「${d.name}」未配置"达到阈值"分支（连线到 success handle）`)
+          if (!cfg.failNodeId)    errors.push(`节点「${d.name}」未配置"未达阈值"分支（连线到 fail handle）`)
+          break
+        }
         case 'AGGREGATE': {
           if (!cfg.evaluateMode) { errors.push(`节点「${d.name}」必须配置评估方式`); break }
           if (cfg.evaluateMode === 'count'  && !cfg.minCount)        errors.push(`节点「${d.name}」必须填写最少成功数`)

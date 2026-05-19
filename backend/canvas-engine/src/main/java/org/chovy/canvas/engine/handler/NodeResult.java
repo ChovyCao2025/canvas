@@ -3,42 +3,41 @@ package org.chovy.canvas.engine.handler;
 import org.chovy.canvas.engine.context.ExecutionContext;
 import java.util.Map;
 
-/**
- * 节点执行结果
- */
 public record NodeResult(
-        String nextNodeId,            // 普通节点的下一个节点
-        String successNodeId,         // IF_CONDITION 成功分支
-        String failNodeId,            // IF_CONDITION 失败分支
-        String elseNodeId,            // SELECTOR 否则分支
-        Map<String, String> branchMap, // SELECTOR/AB_SPLIT/PRIORITY 多出边 {handleId → nodeId}
-        Map<String, Object> output,   // 写入上下文的输出字段
+        String nextNodeId,
+        String successNodeId,
+        String failNodeId,
+        String elseNodeId,
+        Map<String, String> branchMap,
+        Map<String, Object> output,
         boolean success,
-        String errorMessage
+        String errorMessage,
+        boolean pending               // true=阈值未满足，挂起等待更多上游完成（THRESHOLD 节点专用）
 ) {
-    /** 普通成功结果 */
     public static NodeResult ok(String nextNodeId, Map<String, Object> output) {
-        return new NodeResult(nextNodeId, null, null, null, null, output, true, null);
+        return new NodeResult(nextNodeId, null, null, null, null, output, true, null, false);
     }
-
-    /** 成功但无后续节点（终止节点） */
     public static NodeResult terminal(Map<String, Object> output) {
-        return new NodeResult(null, null, null, null, null, output, true, null);
+        return new NodeResult(null, null, null, null, null, output, true, null, false);
     }
-
-    /** IF_CONDITION 结果 */
     public static NodeResult ifResult(boolean condition, String successId, String failId) {
         return new NodeResult(null, condition ? successId : null, !condition ? failId : null,
-                null, null, Map.of(), true, null);
+                null, null, Map.of(), true, null, false);
     }
-
-    /** 失败结果 */
     public static NodeResult fail(String errorMessage) {
-        return new NodeResult(null, null, null, null, null, Map.of(), false, errorMessage);
+        return new NodeResult(null, null, null, null, null, Map.of(), false, errorMessage, false);
+    }
+    public static NodeResult multiNext(Map<String, String> branchMap, String elseNodeId) {
+        return new NodeResult(null, null, null, elseNodeId, branchMap, Map.of(), true, null, false);
     }
 
-    /** 多分支结果（SELECTOR/AB_SPLIT/PRIORITY） */
-    public static NodeResult multiNext(Map<String, String> branchMap, String elseNodeId) {
-        return new NodeResult(null, null, null, elseNodeId, branchMap, Map.of(), true, null);
+    /**
+     * 阈值未满足，挂起等待更多上游完成（THRESHOLD 节点专用）。
+     * 以 {@code success=true, pending=true} 实现，使其通过 {@code executeHandlerWithRepeat}
+     * 的 repeat 检查路径——持锁期间到来的上游信号通过 repeatPending 被捕获，
+     * repeat 重新评估时若阈值满足则正确路由。
+     */
+    public static NodeResult waiting() {
+        return new NodeResult(null, null, null, null, null, Map.of(), true, null, true);
     }
 }
