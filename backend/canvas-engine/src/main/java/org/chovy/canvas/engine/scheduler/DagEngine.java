@@ -340,10 +340,7 @@ public class DagEngine {
      *
      * @param nodeGate 节点执行门控，含独立的互斥锁（executing）和 repeat 信号（repeatPending）
      */
-    // @SuppressWarnings("unchecked")：retryWhen 的链式调用在 Java 类型推断中会丢失泛型参数，
-    // 导致 onErrorResume 的接收方被推断为 raw Mono，产生 unchecked 警告。
-    // 实际操作是类型安全的（singleCall 明确声明为 Mono<NodeResult>）。
-    @SuppressWarnings("unchecked")
+    // retryWhen 的链式调用在 Java 类型推断中会丢失泛型参数（见方法体内的 retried 转型）。
     private Mono<NodeResult> executeHandlerWithRepeat(NodeHandler handler,
                                                       Map<String, Object> config,
                                                       ExecutionContext ctx,
@@ -375,7 +372,11 @@ public class DagEngine {
         // withRetry 本身也是惰性的（基于 singleCall 的 Mono.defer）：
         // 每次被订阅都会重新走一遍 singleCall → handler.executeAsync。
         // repeat 时正是通过重新订阅 withRetry 来再次执行 handler。
-        Mono<NodeResult> withRetry = singleCall
+        //
+        // retryWhen 的泛型在 Java 类型推断中会丢失，导致后续算子拿到 raw Mono。
+        // 用显式转型将类型信息补回来，onErrorResume 中的 e 就能被推断为 Throwable。
+        @SuppressWarnings("unchecked")
+        Mono<NodeResult> retried = (Mono<NodeResult>) singleCall
                 .retryWhen(Retry.backoff(maxRetry, Duration.ofMillis(retryBaseDelayMs))
                         .maxBackoff(Duration.ofMillis(retryMaxDelayMs))
                         .filter(this::isRetryable)
@@ -383,11 +384,12 @@ public class DagEngine {
                             metrics.recordNodeRetry(nodeType);
                             log.warn("[ENGINE] 节点重试 nodeId={} attempt={} reason={}",
                                     nodeId, sig.totalRetries() + 1, sig.failure().getMessage());
-                        }))
-                .onErrorResume(e -> {
-                    writeDlq(ctx, nodeId, nodeType, e);
-                    return Mono.just(NodeResult.fail("已写入DLQ: " + e.getMessage()));
-                });
+                        }));
+
+        Mono<NodeResult> withRetry = retried.onErrorResume(e -> {
+            writeDlq(ctx, nodeId, nodeType, e);
+            return Mono.just(NodeResult.fail("已写入DLQ: " + e.getMessage()));
+        });
 
         // ── ③ repeat 保护：handler 执行完后检查并发信号 ────────────
         // 执行链说明：
