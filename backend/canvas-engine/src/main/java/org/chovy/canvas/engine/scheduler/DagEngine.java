@@ -142,7 +142,7 @@ public class DagEngine {
                                              ExecutionContext ctx) {
         return executeNode(graph, triggerNodeId, ctx, 0)
                 .doFinally(__ -> writeSkippedNodes(graph, ctx))
-                .onErrorResume((Throwable e) -> {
+                .onErrorResume(e -> {
                     log.error("[ENGINE] 执行出错 executionId={}: {}",
                             ctx.getExecutionId(), e.getMessage(), e);
                     return Mono.<Map<String,Object>>just(Map.of("error", e.getMessage()));
@@ -178,7 +178,7 @@ public class DagEngine {
             return Mono.just(Map.of());
         }
 
-        return Mono.defer(() -> {
+        return Mono.<Map<String,Object>>defer(() -> {
 
             // ──────────────────────────────────────────────────────
             // 阶段 1：解析节点配置（CONTEXT 类型替换为实际值）
@@ -276,7 +276,7 @@ public class DagEngine {
 
                         return triggerDownstream(graph, result, nodeId, node.getType(), ctx);
                     })
-                    .onErrorResume((Throwable e) -> {
+                    .onErrorResume(e -> {
                         nodeGate.executing.set(false); // 释放异常锁
                         ctx.setNodeStatus(nodeId, NodeStatus.FAILED);
                         log.error("[ENGINE] 节点异常 nodeId={}: {}", nodeId, e.getMessage());
@@ -384,7 +384,7 @@ public class DagEngine {
                             log.warn("[ENGINE] 节点重试 nodeId={} attempt={} reason={}",
                                     nodeId, sig.totalRetries() + 1, sig.failure().getMessage());
                         }))
-                .onErrorResume((Throwable e) -> {
+                .onErrorResume(e -> {
                     writeDlq(ctx, nodeId, nodeType, e);
                     return Mono.just(NodeResult.fail("已写入DLQ: " + e.getMessage()));
                 });
@@ -740,7 +740,7 @@ public class DagEngine {
                     writeTraceEnd(ctx, node, result);
                     return triggerDownstream(graph, result, nodeId, node.getType(), ctx);
                 })
-                .onErrorResume((Throwable e) -> {
+                .onErrorResume(e -> {
                     // 异常时锁可能仍被持有（handler 内部抛出），在此统一释放
                     nodeGate.executing.set(false);
                     ctx.setNodeStatus(nodeId, NodeStatus.FAILED);
