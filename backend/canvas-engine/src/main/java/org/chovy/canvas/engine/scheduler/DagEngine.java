@@ -329,6 +329,10 @@ public class DagEngine {
      *
      * @param nodeGate 节点执行门控，含独立的互斥锁（executing）和 repeat 信号（repeatPending）
      */
+    // @SuppressWarnings("unchecked")：retryWhen 的链式调用在 Java 类型推断中会丢失泛型参数，
+    // 导致 onErrorResume 的接收方被推断为 raw Mono，产生 unchecked 警告。
+    // 实际操作是类型安全的（singleCall 明确声明为 Mono<NodeResult>）。
+    @SuppressWarnings("unchecked")
     private Mono<NodeResult> executeHandlerWithRepeat(NodeHandler handler,
                                                       Map<String, Object> config,
                                                       ExecutionContext ctx,
