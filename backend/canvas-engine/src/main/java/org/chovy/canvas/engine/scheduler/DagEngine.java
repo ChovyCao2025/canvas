@@ -59,12 +59,13 @@ import java.util.stream.Collectors;
  *   分支1 ──→ 汇聚节点 ← 只能执行一次（repeat 保障）
  *   分支2 ──┘
  *
- * repeat 在 AGGREGATE 节点时有真正的语义价值：
- * AggregateHandler 读取 ctx 中各上游的执行结果来做条件评估，
- * repeat 保证最后一次执行时已能看到所有并发上游的最终状态。
+ * repeat 在 THRESHOLD 节点有真正的语义价值：
+ * ThresholdHandler 不等所有上游完成，每次触发都读 ctx 计数。
+ * 持锁期间到来的上游通过 repeatPending 被捕获，repeat 重新计数后可能触发路由。
+ * 没有 repeat 则该信号永久丢失，节点卡在 WAITING 直到超时。
  *
- * 对于 HUB / LogicRelation：handler 是纯路由（只返回 nextNodeId，不读 ctx），
- * repeat 是防御性兜底，没有改变路由结果的实际效果。
+ * 对于 HUB / LogicRelation / AGGREGATE：均用 allUpstreamDone 门控，
+ * handler 执行时 ctx 已完整，repeat 是防御性兜底，不改变路由结果。
  *
  * 对于线性或树状结构（每个节点只有一条入边），不存在并发到达，
  * NodeGate.repeatPending 永远是 false，repeat 逻辑完全不触发。
@@ -287,7 +288,6 @@ public class DagEngine {
     }
 
     // ══════════════════════════════════════════════════════════════
-    // ══════════════════════════════════════════════════════════════
     // repeat 并发保护 + 熔断 + 重试 + DLQ（7.5节 + 12.5节 + 13.2节 + 13.3节）
     // ══════════════════════════════════════════════════════════════
 
@@ -301,30 +301,40 @@ public class DagEngine {
      * 因此汇聚节点必须串行执行，repeat 解决"最后到达者不被漏掉"的边角场景。
      * </pre>
      *
-     * <h3>repeat 的真正语义价值：AGGREGATE 节点</h3>
+     * <h3>repeat 有实际语义价值的节点：THRESHOLD</h3>
      * <pre>
-     * AggregateHandler 读取 ctx 中各上游的状态和输出来评估条件。
-     * 若多条上游并发完成且都到达 executeNodeAfterStage2：
-     *   A 先拿到锁 → 执行 AggregateHandler（此时 B 的输出可能还未写入 ctx）
-     *   B 抢锁失败 → 设 repeatPending=true
-     *   A 执行完 → 读 repeatPending=true → repeat
-     *   repeat 时 B 的输出已写入 ctx → AggregateHandler 看到完整结果 → 评估正确 ✓
+     * THRESHOLD 不等所有上游完成，每个上游到来都直接运行 handler。
+     * handler 读 ctx 计数，未达阈值返回 waiting()，达到阈值才路由。
      *
-     * 对比 HUB / LogicRelation：handler 只返回 nextNodeId，不读 ctx，
-     * repeat 对它们没有改变评估结果的实际效果，只是确保路由请求不丢失（幂等保护）。
+     * repeat 必要的场景（threshold=3，当前 2 个完成）：
+     *   上游2完成 → handler 持锁 → 计数=2 < 3 → 返回 waiting()
+     *   上游3在持锁期间到达 → CAS 失败 → repeatPending=true
+     *   handler 返回 → repeat 触发 → 重新计数=3 ≥ 3 → 路由 ✓
+     *
+     * 没有 repeat：上游3的信号永久丢失，节点卡在 WAITING，只能等超时恢复。
      * </pre>
      *
-     * <h3>三种到达场景（Case 1/2/3）</h3>
+     * <h3>HUB / LogicRelation / AGGREGATE：repeat 无实际语义价值</h3>
      * <pre>
-     * Case 1 — 无并发：
-     *   A 抢到锁 → 执行 → 读 repeatPending=false → 释放锁 → 无 repeat
+     * 这三者都用 allUpstreamDone 门控，只有在所有上游都完成后才进入 handler。
+     * 而上游写输出到 ctx 发生在触发下游之前，因此 handler 执行时 ctx 已完整。
+     * repeat 对它们只是防御性兜底（确保并发路由请求不丢失），不改变最终结果。
+     * </pre>
      *
-     * Case 2 — 有并发（B 在 A 执行期间到达）：
-     *   B CAS 失败 → 设 repeatPending=true
-     *   A 执行完 → 读 repeatPending=true → repeat（此时 B 的 ctx 变更已可见）
+     * <h3>三种并发到达场景（针对 THRESHOLD）</h3>
+     * <pre>
+     * Case 1 — 无并发（顺序到达）：
+     *   上游2 handler 返回 waiting() → 上游3 CAS 成功 → 直接执行 → 路由
+     *   needsRepeat=false，无 repeat。
      *
-     * Case 3 — 竞态边界（B 在 A 释放锁后才到）：
-     *   A 释放锁 → B CAS 成功 → B 自己执行 → A 的 repeat CAS 失败 → 不重复
+     * Case 2 — 有并发（上游3在持锁期间到达）：
+     *   上游3 CAS 失败 → repeatPending=true
+     *   上游2 handler 返回 → 读 repeatPending=true → repeat → 计数=3 → 路由 ✓
+     *   上游3的输出在触发前已写入 ctx，repeat 时可见。
+     *
+     * Case 3 — 竞态边界（上游3在锁释放后才到）：
+     *   上游2释放锁 → 上游3 CAS 成功 → 自己执行 → 路由
+     *   上游2的 CAS 重新持锁失败 → 不 repeat（上游3已接管，不重复）
      * </pre>
      *
      * @param nodeGate 节点执行门控，含独立的互斥锁（executing）和 repeat 信号（repeatPending）
@@ -697,19 +707,25 @@ public class DagEngine {
         return executeHandlerWithRepeat(handler, config, ctx, nodeGate,
                 nodeId, node.getType())
                 .flatMap(result -> {
+                    // ── 路径A：FAILED ─────────────────────────────────────────
+                    // executeHandlerWithRepeat 对 FAILED 结果直接返回（跳过 repeat 检查），
+                    // 锁由此处调用方释放。
                     if (!result.success()) {
-                        nodeGate.executing.set(false); // 释放锁
+                        nodeGate.executing.set(false); // 释放锁（FAILED 路径）
                         ctx.setNodeStatus(nodeId, NodeStatus.FAILED);
                         writeTraceEnd(ctx, node, result);
                         if (ctx.isBenefitGranted() || ctx.isUserReached()) return Mono.just(Map.<String, Object>of());
                         return Mono.error(new RuntimeException("节点 " + nodeId + " 失败: " + result.errorMessage()));
                     }
-                    // THRESHOLD 节点的「阈值未满足」结果：不设 SUCCESS，不触发下游，继续等待
-                    // 注意：nodeGate 已在 executeHandlerWithRepeat 中释放，此处不需再操作
+                    // ── 路径B：WAITING（THRESHOLD 阈值未满足）─────────────────
+                    // executeHandlerWithRepeat 对 success=true 的结果会走 repeat 检查，
+                    // 检查完后已执行 nodeGate.executing.set(false) 释放锁，此处不需再操作。
                     if (result.pending()) {
                         ctx.setNodeStatus(nodeId, NodeStatus.WAITING);
-                        return Mono.<Map<String,Object>>just(Map.of());
+                        return Mono.<Map<String,Object>>just(Map.of()); // 不触发下游，等待更多上游
                     }
+                    // ── 路径C：SUCCESS ────────────────────────────────────────
+                    // 同路径B，锁已在 executeHandlerWithRepeat 中释放。
                     if (handler.isBenefitNode()) ctx.setBenefitGranted(true);
                     if (handler.isReachNode()) ctx.setUserReached(true);
                     if (result.output() != null && !result.output().isEmpty()) {
@@ -720,7 +736,8 @@ public class DagEngine {
                     return triggerDownstream(graph, result, nodeId, node.getType(), ctx);
                 })
                 .onErrorResume(e -> {
-                    nodeGate.executing.set(false); // 释放异常锁
+                    // 异常时锁可能仍被持有（handler 内部抛出），在此统一释放
+                    nodeGate.executing.set(false);
                     ctx.setNodeStatus(nodeId, NodeStatus.FAILED);
                     if (ctx.isBenefitGranted() || ctx.isUserReached()) {
                         return Mono.just(new HashMap<>());
