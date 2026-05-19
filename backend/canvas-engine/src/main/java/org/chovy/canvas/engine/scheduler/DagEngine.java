@@ -59,11 +59,12 @@ import java.util.stream.Collectors;
  *   分支1 ──→ 汇聚节点 ← 只能执行一次（repeat 保障）
  *   分支2 ──┘
  *
- * repeat 在 AGGREGATE 节点时有真正的语义价值：
- * AggregateHandler 读取 ctx 中各上游的执行结果来做条件评估，
- * repeat 保证最后一次执行时已能看到所有并发上游的最终状态。
+ * repeat 在 THRESHOLD 节点有真正的语义价值：
+ * ThresholdHandler 不等所有上游完成，每次触发都读 ctx 计数。
+ * 持锁期间到来的上游通过 repeatPending 被捕获，repeat 重新计数后可能触发路由。
+ * 没有 repeat 则该信号永久丢失，节点卡在 WAITING 直到超时。
  *
- * 对于 HUB / LogicRelation：handler 是纯路由（只返回 nextNodeId，不读 ctx），
+ * 对于 HUB / LogicRelation / AGGREGATE：均用 allUpstreamDone 门控，
  * repeat 是防御性兜底，没有改变路由结果的实际效果。
  *
  * 对于线性或树状结构（每个节点只有一条入边），不存在并发到达，
@@ -83,6 +84,7 @@ import java.util.stream.Collectors;
 public class DagEngine {
 
     private final HandlerRegistry handlerRegistry;
+    // traceMapper 保留供 writeSkippedNodes 直接写入；批量写走 traceBuffer
     private final CanvasExecutionTraceMapper traceMapper;
     private final TraceWriteBuffer traceBuffer;
     private final CanvasExecutionDlqMapper dlqMapper;
@@ -90,7 +92,7 @@ public class DagEngine {
     private final CanvasMetrics metrics;
     private final ObjectMapper objectMapper;
     private final ContextPersistenceService ctxStore;
-    /** @Lazy 避免与 CanvasExecutionService → DagEngine 的循环依赖 */
+    // @Lazy 避免与 CanvasExecutionService → DagEngine 的循环依赖
     private final org.chovy.canvas.engine.trigger.CanvasExecutionService executionService;
 
     public DagEngine(HandlerRegistry handlerRegistry,
@@ -165,7 +167,7 @@ public class DagEngine {
     private Mono<Map<String, Object>> executeNode(DagGraph graph, String nodeId,
                                                   ExecutionContext ctx, int depth) {
         if (depth > MAX_NODE_DEPTH) {
-            return Mono.error(new IllegalStateException(
+            return Mono.<Map<String,Object>>error(new IllegalStateException(
                     "[ENGINE] DAG 执行深度超限（" + MAX_NODE_DEPTH + "），" +
                             "可能存在隐式循环或超大画布 nodeId=" + nodeId));
         }
@@ -253,9 +255,9 @@ public class DagEngine {
                             // 防资损：已发券/已触达则整体 SUCCESS
                             if (ctx.isBenefitGranted() || ctx.isUserReached()) {
                                 log.warn("[ENGINE] 防资损：节点失败但整体判定成功 nodeId={}", nodeId);
-                                return Mono.<Map<String,Object>>just(Map.of());
+                            return Mono.<Map<String,Object>>just(Map.of());
                             }
-                            return Mono.error(
+                            return Mono.<Map<String,Object>>error(
                                     new RuntimeException("节点 " + nodeId + " 失败: " + result.errorMessage()));
                         }
 
@@ -281,7 +283,7 @@ public class DagEngine {
                         if (ctx.isBenefitGranted() || ctx.isUserReached()) {
                             return Mono.<Map<String,Object>>just(Map.of());
                         }
-                        return Mono.error(e);
+                        return Mono.<Map<String,Object>>error(e);
                     });
         });
     }
@@ -301,17 +303,26 @@ public class DagEngine {
      * 因此汇聚节点必须串行执行，repeat 解决"最后到达者不被漏掉"的边角场景。
      * </pre>
      *
-     * <h3>repeat 的真正语义价值：AGGREGATE 节点</h3>
+     * <h3>repeat 有实际语义价值的节点：THRESHOLD</h3>
      * <pre>
-     * AggregateHandler 读取 ctx 中各上游的状态和输出来评估条件。
-     * 若多条上游并发完成且都到达 executeNodeAfterStage2：
-     *   A 先拿到锁 → 执行 AggregateHandler（此时 B 的输出可能还未写入 ctx）
-     *   B 抢锁失败 → 设 repeatPending=true
-     *   A 执行完 → 读 repeatPending=true → repeat
-     *   repeat 时 B 的输出已写入 ctx → AggregateHandler 看到完整结果 → 评估正确 ✓
+     * THRESHOLD 不等所有上游完成，每个上游到来都直接运行 handler。
+     * handler 读 ctx 计数，未达阈值返回 waiting()，达到阈值才路由。
+     * 
+ * repeat 必要的场景（threshold=3，当前 2 个完成）：
+     *   上游2完成 → handler 持锁 → 计数=2 < 3 → 返回 waiting()
+     *   上游3在持锁期间到达 → CAS 失败 → repeatPending=true
+     *   handler 返回 → repeat 触发 → 重新计数=3 ≥ 3 → 路由 ✓
+ *
+ * 没有 repeat：上游3的信号永久丢失，节点卡在 WAITING，只能等超时恢复。
      *
-     * 对比 HUB / LogicRelation：handler 只返回 nextNodeId，不读 ctx，
-     * repeat 对它们没有改变评估结果的实际效果，只是确保路由请求不丢失（幂等保护）。
+     * </pre>
+ *
+ * <h3>HUB / LogicRelation / AGGREGATE：repeat 无实际语义价值</h3>
+ * <pre>
+ * 这三者都用 allUpstreamDone 门控，只有在所有上游都完成后才进入 handler。
+ * 而上游写输出到 ctx 发生在触发下游之前，因此 handler 执行时 ctx 已完整。
+ * repeat 对它们只是防御性兜底（确保并发路由请求不丢失），不改变最终结果。
+     * handler 执行时 ctx 已完整，repeat 是防御性兜底，不改变路由结果。
      * </pre>
      *
      * <h3>三种到达场景（Case 1/2/3）</h3>
@@ -321,7 +332,7 @@ public class DagEngine {
      *
      * Case 2 — 有并发（B 在 A 执行期间到达）：
      *   B CAS 失败 → 设 repeatPending=true
-     *   A 执行完 → 读 repeatPending=true → repeat（此时 B 的 ctx 变更已可见）
+     *   上游3在持锁期间到达 → CAS 失败 → repeatPending=true（此时 B 的 ctx 变更已可见）
      *
      * Case 3 — 竞态边界（B 在 A 释放锁后才到）：
      *   A 释放锁 → B CAS 成功 → B 自己执行 → A 的 repeat CAS 失败 → 不重复
@@ -448,7 +459,7 @@ public class DagEngine {
                     .build();
             Mono.fromRunnable(() -> dlqMapper.insert(dlq))
                     .subscribeOn(Schedulers.boundedElastic())
-                    .subscribe(null, e -> log.error("[DLQ] 写入失败: {}", e.getMessage()));
+                    .subscribe(null, (Throwable e) -> log.error("[DLQ] 写入失败: {}", e.getMessage()));
             log.warn("[DLQ] executionId={} nodeId={} reason={}", ctx.getExecutionId(), nodeId, msg);
         } catch (Exception e) {
             log.error("[DLQ] 序列化失败: {}", e.getMessage());
@@ -471,7 +482,7 @@ public class DagEngine {
             ctx.setNodeStatus(nodeId, NodeStatus.FAILED);
             log.warn("[ENGINE] LOGIC_RELATION AND 上游失败，立即 FAILED nodeId={}", nodeId);
             if (ctx.isBenefitGranted() || ctx.isUserReached()) return Mono.just(Map.of());
-            return Mono.error(new RuntimeException("LOGIC_RELATION AND 条件因上游失败不可满足"));
+            return Mono.<Map<String,Object>>error(new RuntimeException("LOGIC_RELATION AND 条件因上游失败不可满足"));
         }
 
         // 条件未满足：进入等待态，设置 WAITING 状态（供 isPaused 检测）
@@ -498,7 +509,7 @@ public class DagEngine {
                                         null, Map.of(),
                                         ctx.getExecutionId() + ":lr-timeout:" + nodeId, false)
                                         .subscribe(null,
-                                                e -> log.error("[LOGIC_RELATION] 超时恢复失败 nodeId={}: {}", nodeId, e.getMessage()));
+                                                (Throwable e) -> log.error("[LOGIC_RELATION] 超时恢复失败 nodeId={}: {}", nodeId, e.getMessage()));
                             }
                         });
                 log.debug("[LOGIC_RELATION] 启动等待超时定时器 {}s nodeId={}", timeoutSec, nodeId);
@@ -581,7 +592,7 @@ public class DagEngine {
                                         null, Map.of(),
                                         ctx.getExecutionId() + ":hub-timeout:" + nodeId, false)
                                         .subscribe(null,
-                                                e -> log.error("[HUB] 超时恢复失败 nodeId={}: {}", nodeId, e.getMessage()));
+                                                (Throwable e) -> log.error("[HUB] 超时恢复失败 nodeId={}: {}", nodeId, e.getMessage()));
                             }
                         });
 
@@ -592,7 +603,7 @@ public class DagEngine {
                 int timeout = HubHandler.getTimeoutSeconds(config);
                 if (System.currentTimeMillis() - start > (long) timeout * 1000) {
                     ctx.setNodeStatus(nodeId, NodeStatus.FAILED);
-                    return Mono.error(new RuntimeException("HUB 等待超时 nodeId=" + nodeId));
+                    return Mono.<Map<String,Object>>error(new RuntimeException("HUB 等待超时 nodeId=" + nodeId));
                 }
             }
             return Mono.just(Map.of()); // 继续等待
@@ -639,7 +650,7 @@ public class DagEngine {
                                         null, Map.of(),
                                         ctx.getExecutionId() + ":ag-timeout:" + nodeId, false)
                                         .subscribe(null,
-                                                e -> log.error("[AGGREGATE] 超时恢复失败 nodeId={}: {}", nodeId, e.getMessage()));
+                                                (Throwable e) -> log.error("[AGGREGATE] 超时恢复失败 nodeId={}: {}", nodeId, e.getMessage()));
                             }
                         });
                 log.debug("[AGGREGATE] 启动超时定时器 {}s nodeId={}", timeoutSec, nodeId);
@@ -676,7 +687,7 @@ public class DagEngine {
                                 null, Map.of(),
                                 ctx.getExecutionId() + ":th-timeout:" + nodeId, false)
                                 .subscribe(null,
-                                        e -> log.error("[THRESHOLD] 超时恢复失败 nodeId={}: {}", nodeId, e.getMessage()));
+                                        (Throwable e) -> log.error("[THRESHOLD] 超时恢复失败 nodeId={}: {}", nodeId, e.getMessage()));
                     }
                 });
     }
@@ -709,7 +720,7 @@ public class DagEngine {
                         ctx.setNodeStatus(nodeId, NodeStatus.FAILED);
                         writeTraceEnd(ctx, node, result);
                         if (ctx.isBenefitGranted() || ctx.isUserReached()) return Mono.just(Map.<String, Object>of());
-                        return Mono.error(new RuntimeException("节点 " + nodeId + " 失败: " + result.errorMessage()));
+                        return Mono.<Map<String,Object>>error(new RuntimeException("节点 " + nodeId + " 失败: " + result.errorMessage()));
                     }
                     // ── 路径B：WAITING（THRESHOLD 阈值未满足）─────────────────
                     // executeHandlerWithRepeat 对 success=true 的结果会走 repeat 检查，
@@ -736,7 +747,7 @@ public class DagEngine {
                     if (ctx.isBenefitGranted() || ctx.isUserReached()) {
                         return Mono.<Map<String,Object>>just(Map.of());
                     }
-                    return Mono.error(e);
+                    return Mono.<Map<String,Object>>error(e);
                 });
     }
 
@@ -789,7 +800,7 @@ public class DagEngine {
                 return executeNode(graph, fallbackNextId, ctx);
             }
             log.debug("[PRIORITY] 所有分支失败，无 fallback，整体 FAILED");
-            return Mono.error(new RuntimeException("PRIORITY 所有分支均失败"));
+            return Mono.<Map<String,Object>>error(new RuntimeException("PRIORITY 所有分支均失败"));
         }
 
         String currentBranchId = branches.getFirst();
