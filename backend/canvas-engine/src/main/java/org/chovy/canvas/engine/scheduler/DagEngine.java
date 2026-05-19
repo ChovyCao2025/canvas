@@ -175,7 +175,7 @@ public class DagEngine {
         DagParser.CanvasNode node = graph.getNode(nodeId);
         if (node == null) {
             log.warn("[ENGINE] 节点不存在，跳过 nodeId={}", nodeId);
-            return Mono.just(Map.of());
+            return Mono.<Map<String,Object>>just(Map.of());
         }
 
         return Mono.<Map<String,Object>>defer(() -> {
@@ -220,7 +220,7 @@ public class DagEngine {
             // ──────────────────────────────────────────────────────
             if (ctx.isNodeDone(nodeId)) {
                 log.debug("[ENGINE] 幂等跳过 nodeId={}", nodeId);
-                return Mono.just(Map.of());
+                return Mono.<Map<String,Object>>just(Map.of());
             }
 
             // ──────────────────────────────────────────────────────
@@ -231,7 +231,7 @@ public class DagEngine {
                 // 抢锁失败：set(true) 向持锁协程发送 repeat 信号
                 nodeGate.repeatPending.set(true);
                 log.debug("[ENGINE] CAS 失败，发出 repeat 信号 nodeId={}", nodeId);
-                return Mono.just(Map.of());
+                return Mono.<Map<String,Object>>just(Map.of());
             }
 
             // ──────────────────────────────────────────────────────
@@ -483,7 +483,7 @@ public class DagEngine {
         if (LogicRelationHandler.shouldFailImmediately(relation, upstreamIds, ctx)) {
             ctx.setNodeStatus(nodeId, NodeStatus.FAILED);
             log.warn("[ENGINE] LOGIC_RELATION AND 上游失败，立即 FAILED nodeId={}", nodeId);
-            if (ctx.isBenefitGranted() || ctx.isUserReached()) return Mono.just(Map.of());
+            if (ctx.isBenefitGranted() || ctx.isUserReached()) return Mono.<Map<String,Object>>just(Map.of());
             return Mono.<Map<String,Object>>error(new RuntimeException("LOGIC_RELATION AND 条件因上游失败不可满足"));
         }
 
@@ -517,7 +517,7 @@ public class DagEngine {
                 log.debug("[LOGIC_RELATION] 启动等待超时定时器 {}s nodeId={}", timeoutSec, nodeId);
             }
             log.debug("[ENGINE] LOGIC_RELATION 条件未满足，进入 WAITING nodeId={}", nodeId);
-            return Mono.just(Map.of());
+            return Mono.<Map<String,Object>>just(Map.of());
         }
 
         // 条件满足 → 走正常节点执行流程（阶段 3-6）
@@ -608,7 +608,7 @@ public class DagEngine {
                     return Mono.<Map<String,Object>>error(new RuntimeException("HUB 等待超时 nodeId=" + nodeId));
                 }
             }
-            return Mono.just(Map.of()); // 继续等待
+            return Mono.<Map<String,Object>>just(Map.of()); // 继续等待
         }
 
         // 所有上游完成 → 走正常节点执行流程（阶段 3-6）
@@ -657,7 +657,7 @@ public class DagEngine {
                         });
                 log.debug("[AGGREGATE] 启动超时定时器 {}s nodeId={}", timeoutSec, nodeId);
             }
-            return Mono.just(Map.of());
+            return Mono.<Map<String,Object>>just(Map.of());
         }
 
         // 所有上游完成：将 upstreamIds 注入 config，供 AggregateHandler 读取上游结果
@@ -699,13 +699,13 @@ public class DagEngine {
                                         Map<String, Object> config,
                                         ExecutionContext ctx) {
         // 阶段 3：幂等
-        if (ctx.isNodeDone(nodeId)) return Mono.just(Map.of());
+        if (ctx.isNodeDone(nodeId)) return Mono.<Map<String,Object>>just(Map.of());
 
         // 阶段 4：CAS
         NodeGate nodeGate = ctx.getGate(nodeId);
         if (!nodeGate.executing.compareAndSet(false, true)) {
             nodeGate.repeatPending.set(true);
-            return Mono.just(Map.of());
+            return Mono.<Map<String,Object>>just(Map.of());
         }
 
         writeTraceStart(ctx, node);
@@ -810,7 +810,7 @@ public class DagEngine {
                 .flatMap(__ -> {
                     if (ctx.getNodeStatus(currentBranchId) == NodeStatus.SUCCESS) {
                         log.debug("[PRIORITY] 分支成功，停止 branchId={}", currentBranchId);
-                        return Mono.just(Map.of());
+                        return Mono.<Map<String,Object>>just(Map.of());
                     }
                     // 当前分支失败，尝试下一个
                     log.debug("[PRIORITY] 分支失败，尝试下一个 branchId={}", currentBranchId);
