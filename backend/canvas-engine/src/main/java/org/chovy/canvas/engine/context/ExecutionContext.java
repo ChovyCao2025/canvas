@@ -79,6 +79,11 @@ public class ExecutionContext {
 
     // ── 写入节点输出 ────────────────────────────────────────────
 
+    /** 获取所有节点的输出（只读），用于聚合评估等需要跨节点读输出的场景 */
+    public Map<String, Map<String, Object>> getNodeOutputs() {
+        return java.util.Collections.unmodifiableMap(nodeOutputs);
+    }
+
     public void putNodeOutput(String nodeId, Map<String, Object> output) {
         nodeOutputs.put(nodeId, output);
         flatContext.putAll(output);

@@ -18,7 +18,6 @@ import org.chovy.canvas.engine.handler.NodeResult;
 import org.chovy.canvas.engine.handlers.HubHandler;
 import org.chovy.canvas.engine.handlers.LogicRelationHandler;
 import org.chovy.canvas.infra.redis.ContextPersistenceService;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Lazy;
@@ -54,10 +53,17 @@ import java.util.stream.Collectors;
  * <h3>repeat / NodeGate 的作用范围</h3>
  * <pre>
  * repeat 机制只处理 intra-execution（单次执行内部）的并行分支汇聚问题，
- * 即同一个 ctx 里的多条并行分支同时到达同一个 HUB / LogicRelation 节点的情况：
+ * 即同一个 ctx 里的多条并行分支同时到达同一个汇聚节点的情况：
  *
- *   分支1 ──→ HUB_node ← 只能执行一次（repeat 保障）
+ *   分支1 ──→ 汇聚节点 ← 只能执行一次（repeat 保障）
  *   分支2 ──┘
+ *
+ * repeat 在 AGGREGATE 节点时有真正的语义价值：
+ * AggregateHandler 读取 ctx 中各上游的执行结果来做条件评估，
+ * repeat 保证最后一次执行时已能看到所有并发上游的最终状态。
+ *
+ * 对于 HUB / LogicRelation：handler 是纯路由（只返回 nextNodeId，不读 ctx），
+ * repeat 是防御性兜底，没有改变路由结果的实际效果。
  *
  * 对于线性或树状结构（每个节点只有一条入边），不存在并发到达，
  * NodeGate.repeatPending 永远是 false，repeat 逻辑完全不触发。
@@ -154,6 +160,7 @@ public class DagEngine {
         return executeNode(graph, nodeId, ctx, 0);
     }
 
+    // FIXME: depth 参数没有更新, 恒定为0
     private Mono<Map<String, Object>> executeNode(DagGraph graph, String nodeId,
                                                   ExecutionContext ctx, int depth) {
         if (depth > MAX_NODE_DEPTH) {
@@ -182,13 +189,16 @@ public class DagEngine {
                     : resolveConfig(rawConfig, ctx);
 
             // ──────────────────────────────────────────────────────
-            // 阶段 2：LOGIC_RELATION / HUB 特殊处理
+            // 阶段 2：LOGIC_RELATION / HUB / AGGREGATE 特殊处理
             // ──────────────────────────────────────────────────────
             if (NodeType.LOGIC_RELATION.equals(node.getType())) {
                 return handleLogicRelation(graph, nodeId, node, config, ctx);
             }
             if (NodeType.HUB.equals(node.getType())) {
                 return handleHub(graph, nodeId, node, config, ctx);
+            }
+            if (NodeType.AGGREGATE.equals(node.getType())) {
+                return handleAggregate(graph, nodeId, node, config, ctx);
             }
 
             // ──────────────────────────────────────────────────────
@@ -274,41 +284,35 @@ public class DagEngine {
      *
      * <h3>为什么不给每个并发触发各复制一份节点独立执行？</h3>
      * <pre>
-     * 直觉上，让 A、B 各自拿一份 HUB 节点独立跑，似乎并发更高、更简单。
-     * 但这是错误的——HUB 的语义是「等所有上游完成后，向下游触发【恰好一次】」。
-     *
-     * 若各自复制：
-     *   上游 A 完成 → 复制一份 HUB → allUpstreamDone=true → 触发下游
-     *   上游 B 完成 → 复制一份 HUB → allUpstreamDone=true → 触发下游
-     *                                                          ↑ 下游被执行了两次！
-     *
-     * 如果下游是「发券」「发短信」「调第三方 API」，就出资损了。
-     * 这是正确性问题，不是性能问题。
-     *
-     * 此外，ExecutionContext 是单次执行内共享的，A、B 的输出都写在同一个 ctx 里。
-     * 复制出的两份 HUB 会同时读写同一个 ctx，产生数据竞争。
-     *
-     * 因此必须保证 HUB 只有一个执行实例，repeat 机制解决的是：
-     * 「最后一个并发到达者不被漏掉」的边角场景。
+     * 直觉上让 A、B 各自拿一份节点独立跑似乎更简单，但这会导致下游被触发两次（双执行/资损）。
+     * ExecutionContext 是单次执行内共享的，复制出的两份还会并发读写同一 ctx。
+     * 因此汇聚节点必须串行执行，repeat 解决"最后到达者不被漏掉"的边角场景。
      * </pre>
      *
-     * <h3>三种到达场景（Case 1/2/3 详见下方）</h3>
+     * <h3>repeat 的真正语义价值：AGGREGATE 节点</h3>
+     * <pre>
+     * AggregateHandler 读取 ctx 中各上游的状态和输出来评估条件。
+     * 若多条上游并发完成且都到达 executeNodeAfterStage2：
+     *   A 先拿到锁 → 执行 AggregateHandler（此时 B 的输出可能还未写入 ctx）
+     *   B 抢锁失败 → 设 repeatPending=true
+     *   A 执行完 → 读 repeatPending=true → repeat
+     *   repeat 时 B 的输出已写入 ctx → AggregateHandler 看到完整结果 → 评估正确 ✓
+     *
+     * 对比 HUB / LogicRelation：handler 只返回 nextNodeId，不读 ctx，
+     * repeat 对它们没有改变评估结果的实际效果，只是确保路由请求不丢失（幂等保护）。
+     * </pre>
+     *
+     * <h3>三种到达场景（Case 1/2/3）</h3>
      * <pre>
      * Case 1 — 无并发：
-     *   A 抢到锁（executing: false→true）→ 执行 N → 读 repeatPending=false → 释放锁
-     *   → 无 repeat，直接返回
+     *   A 抢到锁 → 执行 → 读 repeatPending=false → 释放锁 → 无 repeat
      *
      * Case 2 — 有并发（B 在 A 执行期间到达）：
-     *   A 正在执行（executing=true）
-     *   B 到了，CAS 失败 → B 设 repeatPending=true（"我来过，你执行完再跑一次"）
-     *   A 执行完 → 读 repeatPending=true，清零 → 释放锁 → 重新抢锁 → repeat
-     *   repeat 时 B 的 ctx 变更已可见，能看到最终状态
+     *   B CAS 失败 → 设 repeatPending=true
+     *   A 执行完 → 读 repeatPending=true → repeat（此时 B 的 ctx 变更已可见）
      *
      * Case 3 — 竞态边界（B 在 A 释放锁后才到）：
-     *   A 读 repeatPending=false → 释放锁（executing: true→false）
-     *   就在此刻 B 到了，B CAS 成功 → B 自己执行
-     *   A 的 CAS 尝试失败（B 已持锁）→ A 不 repeat，B 接管
-     *   → 不会双重执行（读信号和重新持锁之间的 CAS 保证了原子性）
+     *   A 释放锁 → B CAS 成功 → B 自己执行 → A 的 repeat CAS 失败 → 不重复
      * </pre>
      *
      * @param nodeGate 节点执行门控，含独立的互斥锁（executing）和 repeat 信号（repeatPending）
@@ -566,8 +570,59 @@ public class DagEngine {
         return executeNodeAfterStage2(graph, nodeId, node, config, ctx);
     }
 
+    /**
+     * 聚合评估节点处理（AGGREGATE）。
+     *
+     * <p>等待机制与 HUB 相同：所有上游完成前挂起，完成后进入正常执行阶段。
+     * 差异在于进入 executeNodeAfterStage2 时会注入 {@code __upstreamIds}，
+     * 供 {@link org.chovy.canvas.engine.handlers.AggregateHandler} 读取上游结果进行评估。
+     *
+     * <p>这也是 repeat 机制真正有意义的场景：
+     * AggregateHandler 读取 ctx 中各上游的状态和输出来做判断。
+     * 若多条上游并发完成，repeat 保证最后一次执行时 ctx 已包含所有上游的结果。
+     */
+    private Mono<Map<String, Object>> handleAggregate(DagGraph graph, String nodeId,
+                                                       DagParser.CanvasNode node,
+                                                       Map<String, Object> config,
+                                                       ExecutionContext ctx) {
+        List<String> upstreamIds = graph.upstream(nodeId);
+
+        if (!HubHandler.allUpstreamDone(upstreamIds, ctx)) {
+            ctx.setNodeStatus(nodeId, NodeStatus.WAITING);
+            String timerKey = "ag:" + nodeId;
+            if (!ctx.getScheduledHubTimeouts().contains(timerKey)) {
+                ctx.getScheduledHubTimeouts().add(timerKey);
+                ctx.getHubStartTimes().putIfAbsent(timerKey, System.currentTimeMillis());
+                int timeoutSec = config.get("timeout") instanceof Number n ? n.intValue() : (int) globalTimeout;
+
+                Mono.delay(Duration.ofSeconds(timeoutSec), VIRTUAL)
+                        .subscribe(__ -> {
+                            if (!ctx.isNodeDone(nodeId)) {
+                                log.warn("[AGGREGATE] 等待超时 timeout={}s nodeId={}", timeoutSec, nodeId);
+                                ctx.setNodeStatus(nodeId, NodeStatus.FAILED);
+                                ctxStore.save(ctx);
+                                executionService.trigger(
+                                        ctx.getCanvasId(), ctx.getUserId(),
+                                        TriggerType.AGGREGATE_TIMEOUT, NodeType.AGGREGATE,
+                                        null, Map.of(),
+                                        ctx.getExecutionId() + ":ag-timeout:" + nodeId, false)
+                                        .subscribe(null,
+                                                e -> log.error("[AGGREGATE] 超时恢复失败 nodeId={}: {}", nodeId, e.getMessage()));
+                            }
+                        });
+                log.debug("[AGGREGATE] 启动超时定时器 {}s nodeId={}", timeoutSec, nodeId);
+            }
+            return Mono.just(Map.of());
+        }
+
+        // 所有上游完成：将 upstreamIds 注入 config，供 AggregateHandler 读取上游结果
+        Map<String, Object> enrichedConfig = new HashMap<>(config);
+        enrichedConfig.put("__upstreamIds", upstreamIds);
+        return executeNodeAfterStage2(graph, nodeId, node, enrichedConfig, ctx);
+    }
+
     // ══════════════════════════════════════════════════════════════
-    // 阶段 3-6 公共入口（LOGIC_RELATION/HUB 满足条件后调用）
+    // 阶段 3-6 公共入口（LOGIC_RELATION / HUB / AGGREGATE 满足条件后调用）
     // ══════════════════════════════════════════════════════════════
 
     private Mono<Map<String, Object>> executeNodeAfterStage2(DagGraph graph, String nodeId,
@@ -668,7 +723,7 @@ public class DagEngine {
             return Mono.error(new RuntimeException("PRIORITY 所有分支均失败"));
         }
 
-        String currentBranchId = branches.get(0);
+        String currentBranchId = branches.getFirst();
         return executeNode(graph, currentBranchId, ctx)
                 .flatMap(__ -> {
                     if (ctx.getNodeStatus(currentBranchId) == NodeStatus.SUCCESS) {

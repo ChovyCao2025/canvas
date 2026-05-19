@@ -37,6 +37,7 @@ export const DEFAULT_NAMES: Record<string, string> = {
   SELECTOR:          '条件选择器',
   LOGIC_RELATION:    '逻辑关系',
   HUB:               '集线器',
+  AGGREGATE:         '聚合评估',
   PRIORITY:          '优先级',
   AB_SPLIT:          'AB分流',
   TAGGER_OFFLINE:    'Tagger离线标签',

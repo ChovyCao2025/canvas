@@ -17,6 +17,12 @@ export function getBranchHandles(
         { id: 'else',    label: '否则',     color: '#8c8c8c' },
       ]
 
+    case 'AGGREGATE':
+      return [
+        { id: 'success', label: '条件满足', color: '#52c41a' },
+        { id: 'fail',    label: '条件不满足', color: '#f5222d' },
+      ]
+
     case 'MANUAL_APPROVAL':
       return [
         { id: 'approve', label: '通过', color: '#52c41a' },

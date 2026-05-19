@@ -174,4 +174,13 @@ public class GroovyHandler implements NodeHandler {
             if (shell != null) shellPool.offer(shell);
         }
     }
+
+    /**
+     * 轻量表达式求值，供其他 Handler（如 AggregateHandler）复用安全沙箱。
+     * 调用方自行构建 Binding，表达式应返回 Boolean。
+     */
+    public Object evaluateExpression(String expression, Binding binding) throws Exception {
+        groovy.lang.GroovyShell shell = new groovy.lang.GroovyShell(binding, buildConfig());
+        return shell.evaluate(expression);
+    }
 }

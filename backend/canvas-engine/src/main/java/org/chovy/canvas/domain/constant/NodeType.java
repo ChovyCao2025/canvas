@@ -30,6 +30,8 @@ public final class NodeType {
     public static final String AB_SPLIT           = "AB_SPLIT";
     /** 汇聚节点（等待多条上游汇入一条） */
     public static final String HUB                = "HUB";
+    /** 聚合评估节点：等待所有上游完成，基于上游结果评估条件，路由到成功或失败分支 */
+    public static final String AGGREGATE          = "AGGREGATE";
     /** 逻辑关系聚合（AND / OR，等待多条上游满足条件） */
     public static final String LOGIC_RELATION     = "LOGIC_RELATION";
     /** 选择器（从多个候选项中选一执行） */

@@ -502,6 +502,15 @@ function EditorInner({ detail, onStatusChange }: {
         case 'SCHEDULED_TRIGGER':
           if (!cfg.cronExpression) errors.push(`节点「${d.name}」必须配置 Cron 表达式`)
           break
+        case 'AGGREGATE': {
+          if (!cfg.evaluateMode) { errors.push(`节点「${d.name}」必须配置评估方式`); break }
+          if (cfg.evaluateMode === 'count'  && !cfg.minCount)        errors.push(`节点「${d.name}」必须填写最少成功数`)
+          if (cfg.evaluateMode === 'rate'   && cfg.minRate == null)  errors.push(`节点「${d.name}」必须填写最低成功率`)
+          if (cfg.evaluateMode === 'script' && !cfg.evaluateScript)  errors.push(`节点「${d.name}」必须填写评估脚本`)
+          if (!cfg.successNodeId) errors.push(`节点「${d.name}」未配置"条件满足"分支（连线到 success handle）`)
+          if (!cfg.failNodeId)    errors.push(`节点「${d.name}」未配置"条件不满足"分支（连线到 fail handle）`)
+          break
+        }
         case 'IF_CONDITION':
           if (!cfg.successNodeId) errors.push(`节点「${d.name}」未配置成功分支（连线到 success handle）`)
           if (!cfg.failNodeId)    errors.push(`节点「${d.name}」未配置失败分支（连线到 fail handle）`)
