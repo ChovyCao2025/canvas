@@ -337,15 +337,18 @@ public class DagEngine {
                                                       String nodeType) {
         CircuitBreakerRegistry.CircuitBreaker cb = cbRegistry.get(nodeType);
 
-        // ── 单次执行：熔断检查 + Handler 调用 ──────────────────────
-        // Mono.defer 确保每次订阅（含 repeat）都重新检查熔断状态
+        // ── ① singleCall：单次 handler 调用 ────────────────────────
+        // 必须用 Mono.defer 而不是 Mono.just(handler.executeAsync(...))。
+        // Mono.just 在定义时就立即求值，后续每次订阅返回的是同一个缓存结果；
+        // Mono.defer 在每次被订阅时重新执行 lambda，repeat 时才能真正再调一次 handler。
+        // → repeat 能生效的前提就在这里。
         Mono<NodeResult> singleCall = Mono.defer(() -> {
                     try {
                         cb.checkState(); // 熔断 OPEN 时抛异常，不可重试
                     } catch (CircuitBreakerRegistry.CircuitBreakerOpenException e) {
                         return Mono.just(NodeResult.fail(e.getMessage()));
                     }
-                    return handler.executeAsync(config, ctx);
+                    return handler.executeAsync(config, ctx); // ← handler 真正在这里被调用
                 })
                 .doOnNext(r -> {
                     if (r.success()) cb.recordSuccess();
@@ -353,7 +356,10 @@ public class DagEngine {
                 })
                 .doOnError(e -> cb.recordFailure());
 
-        // ── 加指数退避重试，耗尽后写 DLQ ──────────────────────────
+        // ── ② withRetry：singleCall + 指数退避重试 + DLQ 兜底 ────
+        // withRetry 本身也是惰性的（基于 singleCall 的 Mono.defer）：
+        // 每次被订阅都会重新走一遍 singleCall → handler.executeAsync。
+        // repeat 时正是通过重新订阅 withRetry 来再次执行 handler。
         Mono<NodeResult> withRetry = singleCall
                 .retryWhen(Retry.backoff(maxRetry, Duration.ofMillis(retryBaseDelayMs))
                         .maxBackoff(Duration.ofMillis(retryMaxDelayMs))
@@ -368,27 +374,37 @@ public class DagEngine {
                     return Mono.just(NodeResult.fail("已写入DLQ: " + e.getMessage()));
                 });
 
-        // ── repeat 保护：执行成功后检查是否有并发请求需要重跑 ─────
+        // ── ③ repeat 保护：handler 执行完后检查并发信号 ────────────
+        // 执行链说明：
+        //   withRetry 被订阅（第一次）→ singleCall → handler.executeAsync（第一次调用）
+        //   → 结果进入 flatMap 的 lambda
+        //   → 若 needsRepeat=true：lambda 返回 withRetry.doFinally(__)
+        //   → flatMap 自动订阅这个新返回的 Mono（这就是 repeat 的触发点）
+        //   → withRetry 被订阅（第二次）→ singleCall → handler.executeAsync（第二次调用）
+        //   → doFinally 在第二次完成后执行，释放 executing 锁
+        //
+        // 注意：doFinally 本身不触发订阅，触发订阅的是 flatMap 对返回值的处理。
         return withRetry.flatMap(result -> {
             if (!result.success()) {
                 // 失败时调用方（executeNodeAfterStage2）会释放 nodeGate
                 return Mono.just(result);
             }
 
-            // ── 检查是否需要 repeat ──────────────────────────────
             // 先读并清除 repeatPending，再释放 executing 锁。
-            // 顺序很关键：必须在释放锁之前读信号，否则新协程抢到锁后
-            // 才来的并发请求信号会被遗漏（具体推导见 executeHandlerWithRepeat JavaDoc）。
-            boolean needsRepeat = nodeGate.repeatPending.getAndSet(false);
+            // 顺序关键：必须在释放锁之前读信号，否则新协程抢锁后才来的请求会被遗漏。
+            // （详见 executeHandlerWithRepeat JavaDoc 中的 Case 3 分析）
+            boolean needsRepeat = nodeGate.repeatPending.getAndSet(false); // ← 读信号
             nodeGate.executing.set(false); // 释放锁
 
             if (needsRepeat && nodeGate.executing.compareAndSet(false, true)) {
-                // 重新持锁，执行 repeat；doFinally 保证 repeat 结束后释放锁
+                // 重新持锁后返回 withRetry.doFinally(__)：
+                //   flatMap 订阅它 → handler 第二次执行（repeat）
+                //   doFinally → repeat 结束后释放锁（不管成功/失败/取消）
                 log.debug("[ENGINE] repeat nodeId={}", nodeId);
                 return withRetry.doFinally(__ -> nodeGate.executing.set(false));
             }
 
-            // needsRepeat=false，或 CAS 失败（新协程已接管，不需要我 repeat）
+            // needsRepeat=false，或 CAS 失败（另一协程已接管）：不 repeat
             return Mono.just(result);
         });
     }
