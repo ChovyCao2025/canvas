@@ -189,6 +189,7 @@ public class CanvasExecutionService {
                     }
 
                     // 4. 加载/恢复 ExecutionContext
+                    // FIXME: 如果同一个用户针对同一个画布在挂起期间重新被触发, 恢复的上下文可能会有错误
                     ExecutionContext ctx;
                     boolean isResume = ctxStore.exists(canvasId, userId);
                     if (isResume && !dryRun) {
@@ -236,7 +237,7 @@ public class CanvasExecutionService {
                     Mono.fromRunnable(() -> executionMapper.insert(finalExec))
                             .subscribeOn(Schedulers.boundedElastic()).subscribe();
 
-                    // 8. 执行 DAG，并向注册表注册 Disposable（供 Kill Switch FORCE 模式使用）
+                    // 8. 实际执行 DAG，并向注册表注册 Disposable（供 Kill Switch FORCE 模式使用）
                     Mono<Map<String, Object>> executionMono = dagEngine.execute(graph, triggerNodeId, ctx)
                             .timeout(Duration.ofSeconds(globalTimeoutSec));
 
@@ -250,7 +251,7 @@ public class CanvasExecutionService {
                             .doFinally(signal -> executionRegistry.deregister(canvasId, ctx.getExecutionId()))
                             .flatMap(result -> {
                                 // 9. 执行完成，更新执行记录
-                                updateExecution(finalExec, 2, result); // SUCCESS
+                                updateExecution(finalExec, ExecutionStatus.SUCCESS.getCode(), result); // SUCCESS
                                 if (!dryRun) {
                                     ctxStore.delete(ctx.getCanvasId(), ctx.getUserId());
                                     if (isResume) ctxStore.releaseResumeLock(ctx.getCanvasId(), ctx.getUserId());
@@ -360,7 +361,7 @@ public class CanvasExecutionService {
      *       因为该节点不是入口节点。</li>
      *   <li>其他触发类型：仅在 entryNodes 中查找 START 节点，
      *       通过 config.triggerType 匹配：
-     *       DIRECT_CALL → DIRECT, EVENT_TRIGGER → EVENT,
+     *       EVENT_TRIGGER → EVENT,
      *       MQ_TRIGGER → MQ, SCHEDULED_TRIGGER → SCHEDULED</li>
      * </ul>
      */

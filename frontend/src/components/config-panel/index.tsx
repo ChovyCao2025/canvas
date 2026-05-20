@@ -61,12 +61,38 @@ export default function ConfigPanel({ nodeId, nodeData, onChange, nodes, readonl
     return nodes.find(n => n.id === id)?.data.name ?? null
   }
 
+  // 用画布中影响上下文字段的节点数据生成稳定 key，避免每次渲染都触发 effect
+  const ctxSignature = nodes
+    ?.filter(n => n.data?.nodeType === 'EVENT_TRIGGER' || n.data?.nodeType === 'API_CALL')
+    .map(n => `${n.data?.nodeType}:${(n.data?.bizConfig as any)?.eventCode ?? ''}:${(n.data?.bizConfig as any)?.apiKey ?? ''}:${(n.data?.bizConfig as any)?.outputPrefix ?? ''}`)
+    .sort()
+    .join('|') ?? ''
+
   useEffect(() => {
     if (!nodeData?.nodeType) { setSchema(null); return }
     setLoading(true)
 
-    // 上下文字段（全局，只请求一次）
-    if (!contextFieldsCache) {
+    // 动态上下文字段：从 nodes 列表提取 EVENT_TRIGGER / API_CALL 节点信息，按画布实际内容推导
+    if (nodes && nodes.length > 0) {
+      const eventCodes: string[] = []
+      const apiKeys: string[] = []
+      const outputPrefixes: string[] = []
+
+      for (const n of nodes) {
+        const cfg = n.data?.bizConfig ?? {}
+        if (n.data?.nodeType === 'EVENT_TRIGGER' && cfg.eventCode) {
+          eventCodes.push(cfg.eventCode as string)
+        }
+        if (n.data?.nodeType === 'API_CALL' && cfg.apiKey) {
+          apiKeys.push(cfg.apiKey as string)
+          outputPrefixes.push((cfg.outputPrefix as string) ?? '')
+        }
+      }
+
+      metaApi.getCanvasContextFields({ eventCodes, apiKeys, outputPrefixes })
+        .then(res => setCtxFields(res.data))
+    } else if (!contextFieldsCache) {
+      // 无 nodes 信息时退回静态表（兜底）
       metaApi.getContextFields().then(res => {
         contextFieldsCache = res.data
         setCtxFields(res.data)
@@ -84,7 +110,7 @@ export default function ConfigPanel({ nodeId, nodeData, onChange, nodes, readonl
     metaApi.getNodeTypeSchema(nodeData.nodeType)
       .then(res => { schemaCache.set(nodeData.nodeType, res.data); setSchema(res.data) })
       .finally(() => setLoading(false))
-  }, [nodeData?.nodeType])
+  }, [nodeData?.nodeType, ctxSignature])
 
   // 加载 select 下拉选项：任何带 dataSource 的 select 字段，统一走 loadDataSource
   useEffect(() => {

@@ -105,6 +105,7 @@ public class EventDefinitionController {
                 throw new IllegalArgumentException("事件未定义或已禁用: " + req.getEventCode());
 
             // 2. 记录事件日志
+            // FIXME: 此处数量统计实际上是没有生效的, 相关的统计值都被设置为0
             EventLog eventLog = new EventLog();
             eventLog.setEventCode(req.getEventCode());
             eventLog.setUserId(req.getUserId());
@@ -126,6 +127,8 @@ public class EventDefinitionController {
             canvasIds.forEach(cidStr -> {
                 try {
                     Long cid = Long.parseLong(cidStr);
+                    // 事件实际发布
+                    // 具体的消费逻辑: org.chovy.canvas.engine.disruptor.CanvasDisruptorService.CanvasDisruptorService
                     disruptorService.publish(cid, req.getUserId(), TriggerType.EVENT,
                             NodeType.EVENT_TRIGGER, req.getEventCode(), payload, eventId + "-" + cidStr);
                     log.info("[EVENT] 触发画布 canvasId={} eventCode={} userId={}",

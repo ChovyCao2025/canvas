@@ -11,9 +11,12 @@ import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 @Slf4j
 @RestController
@@ -27,6 +30,7 @@ public class MetaController {
     private final org.chovy.canvas.domain.meta.TagDefinitionMapper tagDefinitionMapper;
     private final org.chovy.canvas.domain.meta.MqMessageDefinitionMapper mqMapper;
     private final org.chovy.canvas.domain.meta.EventDefinitionMapper eventDefinitionMapper;
+    private final ObjectMapper objectMapper;
 
     @Value("${canvas.integration.tagger-service-url}")
     private String taggerUrl;
@@ -245,5 +249,90 @@ public class MetaController {
     public Mono<R<List<StubOption>>> getMessageCodes(
             @RequestParam(defaultValue = "IN_APP") String type) {
         return Mono.just(R.ok(metaService.getMessageCodes(type)));
+    }
+
+    /**
+     * 根据画布中使用的事件/API 节点动态推导可用上下文字段。
+     * 供 IF_CONDITION、SELECTOR 等节点的条件规则面板使用。
+     *
+     * @param eventCodes     EVENT_TRIGGER 节点的 eventCode 列表
+     * @param apiKeys        API_CALL 节点的 apiKey 列表（与 outputPrefixes 按索引对应）
+     * @param outputPrefixes API_CALL 节点的 outputPrefix 列表（与 apiKeys 按索引对应）
+     */
+    @GetMapping("/canvas-context-fields")
+    @SuppressWarnings("unchecked")
+    public Mono<R<List<ContextField>>> getCanvasContextFields(
+            @RequestParam(required = false) List<String> eventCodes,
+            @RequestParam(required = false) List<String> apiKeys,
+            @RequestParam(required = false) List<String> outputPrefixes) {
+        return Mono.fromCallable(() -> {
+            List<ContextField> fields = new ArrayList<>();
+
+            // 1. 基础触发字段（所有画布共有）
+            fields.add(field("userId", "用户ID", "STRING", "trigger"));
+
+            // 2. 从事件定义解析属性字段
+            if (eventCodes != null && !eventCodes.isEmpty()) {
+                List<EventDefinition> events = eventDefinitionMapper.selectList(
+                        new LambdaQueryWrapper<EventDefinition>()
+                                .in(EventDefinition::getEventCode, eventCodes));
+                for (EventDefinition evt : events) {
+                    if (evt.getAttributes() == null) continue;
+                    try {
+                        List<Map<String, Object>> attrs =
+                                objectMapper.readValue(evt.getAttributes(), List.class);
+                        for (Map<String, Object> a : attrs) {
+                            String key  = str(a.get("name"));
+                            String name = str(a.getOrDefault("displayName", a.get("name")));
+                            String type = str(a.getOrDefault("type", "STRING"));
+                            fields.add(field(key, name + "（" + evt.getName() + "）", type, "EVENT_TRIGGER"));
+                        }
+                    } catch (Exception ignored) {}
+                }
+            }
+
+            // 3. 从 API response_schema 解析输出字段
+            if (apiKeys != null && !apiKeys.isEmpty()) {
+                List<ApiDefinition> apis = apiDefinitionMapper.selectList(
+                        new LambdaQueryWrapper<ApiDefinition>()
+                                .in(ApiDefinition::getApiKey, apiKeys)
+                                .eq(ApiDefinition::getEnabled, 1));
+                Map<String, ApiDefinition> apiMap = apis.stream()
+                        .collect(Collectors.toMap(ApiDefinition::getApiKey, a -> a));
+
+                for (int i = 0; i < apiKeys.size(); i++) {
+                    ApiDefinition def = apiMap.get(apiKeys.get(i));
+                    if (def == null || def.getResponseSchema() == null) continue;
+                    String prefix = (outputPrefixes != null && i < outputPrefixes.size()
+                            && !outputPrefixes.get(i).isBlank())
+                            ? outputPrefixes.get(i) + "." : "";
+                    try {
+                        List<Map<String, Object>> schema =
+                                objectMapper.readValue(def.getResponseSchema(), List.class);
+                        for (Map<String, Object> f : schema) {
+                            String key  = prefix + str(f.get("name"));
+                            String desc = str(f.getOrDefault("desc", f.get("name")));
+                            String type = str(f.getOrDefault("type", "STRING"));
+                            fields.add(field(key, desc + "（" + def.getName() + "）", type, "API_CALL"));
+                        }
+                    } catch (Exception ignored) {}
+                }
+            }
+
+            return fields;
+        }).subscribeOn(Schedulers.boundedElastic()).map(R::ok);
+    }
+
+    private static ContextField field(String key, String name, String type, String source) {
+        ContextField f = new ContextField();
+        f.setFieldKey(key);
+        f.setFieldName(name);
+        f.setDataType(type);
+        f.setSourceNodeType(source);
+        return f;
+    }
+
+    private static String str(Object o) {
+        return o == null ? "" : String.valueOf(o);
     }
 }

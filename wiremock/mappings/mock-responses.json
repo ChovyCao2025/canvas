@@ -35,6 +35,42 @@
         "headers": { "Content-Type": "application/json" },
         "jsonBody": { "status": "SUCCESS", "result": true, "data": { "orderId": "MOCK_ORDER_001" } }
       }
+    },
+    {
+      "name": "user-info",
+      "request": { "method": "POST", "url": "/mock/user/info" },
+      "response": {
+        "status": 200,
+        "headers": { "Content-Type": "application/json" },
+        "jsonBody": { "status": "SUCCESS", "nickname": "MockUser", "level": 3, "isNewUser": false }
+      }
+    },
+    {
+      "name": "order-detail",
+      "request": { "method": "POST", "url": "/mock/order/detail" },
+      "response": {
+        "status": 200,
+        "headers": { "Content-Type": "application/json" },
+        "jsonBody": { "status": "SUCCESS", "riskLevel": "LOW", "currency": "CNY", "channel": "APP" }
+      }
+    },
+    {
+      "name": "order-large-handler",
+      "request": { "method": "POST", "url": "/mock/order/large" },
+      "response": {
+        "status": 200,
+        "headers": { "Content-Type": "application/json" },
+        "jsonBody": { "status": "SUCCESS", "message": "大额订单已提交人工审核", "reviewId": "REVIEW_MOCK_001" }
+      }
+    },
+    {
+      "name": "order-small-handler",
+      "request": { "method": "POST", "url": "/mock/order/small" },
+      "response": {
+        "status": 200,
+        "headers": { "Content-Type": "application/json" },
+        "jsonBody": { "status": "SUCCESS", "message": "小额订单已自动处理完成", "processId": "PROC_MOCK_001" }
+      }
     }
   ]
 }

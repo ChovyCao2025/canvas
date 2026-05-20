@@ -136,6 +136,7 @@ public class DagEngine {
      */
     public Mono<Map<String, Object>> execute(DagGraph graph, String triggerNodeId,
                                              ExecutionContext ctx) {
+        // 从起始节点开始执行画布相关节点
         return executeNode(graph, triggerNodeId, ctx, 0)
                 .doFinally(__ -> writeSkippedNodes(graph, ctx))
                 .onErrorResume(e -> {
@@ -219,6 +220,7 @@ public class DagEngine {
                 return Mono.just(Map.of());
             }
 
+            // FIXME: 此处CAS锁其实没有覆盖之前特殊类型的节点, 但是是否真正有竞争的是上面的特殊节点？相反如果是普通节点的话, 发生并发的概率其实不大
             // ──────────────────────────────────────────────────────
             // 阶段 4：CAS 抢占 nodeGate 门控锁
             // ──────────────────────────────────────────────────────
@@ -239,6 +241,7 @@ public class DagEngine {
             NodeHandler handler = handlerRegistry.get(node.getType());
             long nodeStartMs = System.currentTimeMillis(); // 记录节点开始时间
 
+            // 具体普通节点执行逻辑
             return executeHandlerWithRepeat(handler, config, ctx, nodeGate,
                     nodeId, node.getType())
                     .<Map<String, Object>>flatMap(result -> {
@@ -270,6 +273,7 @@ public class DagEngine {
                         metrics.recordNodeExecution(node.getType(), NodeStatus.SUCCESS.name(), durationMs);
                         log.debug("[ENGINE] 节点完成 nodeId={} type={}", nodeId, node.getType());
 
+                        // 触发下游逻辑执行
                         return triggerDownstream(graph, result, nodeId, node.getType(), ctx);
                     })
                     .onErrorResume(e -> {

@@ -14,9 +14,7 @@ import java.util.Map;
 
 /**
  * Disruptor 分发层（设计文档 12.8节）。
- *
  * 架构：外部触发（MQ / 行为 / 定时）→ Ring Buffer → WorkerPool 消费者 → DagEngine
- *
  * 关键设计选择：
  * - ProducerType.MULTI：多触发源（MQ 消费线程、行为触发、定时调度）并发发布
  * - YieldingWaitStrategy：低延迟，适合画布执行场景
@@ -72,16 +70,18 @@ public class CanvasDisruptorService {
         disruptor.handleEventsWithWorkerPool(workers);
 
         // 异常处理：记录错误但不中断 Ring Buffer
-        disruptor.setDefaultExceptionHandler(new ExceptionHandler<CanvasExecutionEvent>() {
+        disruptor.setDefaultExceptionHandler(new ExceptionHandler<>() {
             @Override
             public void handleEventException(Throwable ex, long seq, CanvasExecutionEvent e) {
                 log.error("[DISRUPTOR] event 处理异常 seq={} canvasId={}: {}",
                         seq, e.canvasId, ex.getMessage());
             }
+
             @Override
             public void handleOnStartException(Throwable ex) {
                 log.error("[DISRUPTOR] 启动异常: {}", ex.getMessage());
             }
+
             @Override
             public void handleOnShutdownException(Throwable ex) {
                 log.error("[DISRUPTOR] 关闭异常: {}", ex.getMessage());
@@ -116,6 +116,7 @@ public class CanvasDisruptorService {
     }
 
     /** 剩余可用容量（用于监控背压） */
+    // FIXME: 没有实际使用到
     public long remainingCapacity() { return ringBuffer.remainingCapacity(); }
 
     @PreDestroy

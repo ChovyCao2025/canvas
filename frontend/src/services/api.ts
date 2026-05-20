@@ -129,6 +129,25 @@ export const metaApi = {
   getContextFields: () =>
     http.get<R<ContextField[]>, R<ContextField[]>>('/meta/context-fields'),
 
+  /** 根据画布中的 EVENT_TRIGGER / API_CALL 节点动态推导可用上下文字段 */
+  getCanvasContextFields: (params: {
+    eventCodes?: string[]
+    apiKeys?: string[]
+    outputPrefixes?: string[]
+  }) =>
+    http.get<R<ContextField[]>, R<ContextField[]>>('/meta/canvas-context-fields', {
+      params,
+      // axios 默认把数组序列化为 key[]=v，Spring 需要 key=v1&key=v2
+      paramsSerializer: (p) => {
+        const parts: string[] = []
+        for (const [k, v] of Object.entries(p)) {
+          if (Array.isArray(v)) v.forEach(s => parts.push(`${k}=${encodeURIComponent(s)}`))
+          else if (v != null) parts.push(`${k}=${encodeURIComponent(v as string)}`)
+        }
+        return parts.join('&')
+      },
+    }),
+
   getMqTopics: () => http.get<R<StubOption[]>, R<StubOption[]>>('/meta/mq-topics'),
   getCouponTypes: () => http.get<R<StubOption[]>, R<StubOption[]>>('/meta/coupon-types'),
   getReachScenes: () => http.get<R<StubOption[]>, R<StubOption[]>>('/meta/reach-scenes'),
