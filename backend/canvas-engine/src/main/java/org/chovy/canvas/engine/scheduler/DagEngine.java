@@ -100,14 +100,14 @@ public class DagEngine {
                      ObjectMapper objectMapper,
                      ContextPersistenceService ctxStore,
                      @Lazy org.chovy.canvas.engine.trigger.CanvasExecutionService executionService) {
-        this.handlerRegistry  = handlerRegistry;
+        this.handlerRegistry = handlerRegistry;
         // traceMapper 保留供 writeSkippedNodes 直接写入；批量写走 traceBuffer
-        this.traceBuffer      = traceBuffer;
-        this.dlqMapper        = dlqMapper;
-        this.cbRegistry       = cbRegistry;
-        this.metrics          = metrics;
-        this.objectMapper     = objectMapper;
-        this.ctxStore         = ctxStore;
+        this.traceBuffer = traceBuffer;
+        this.dlqMapper = dlqMapper;
+        this.cbRegistry = cbRegistry;
+        this.metrics = metrics;
+        this.objectMapper = objectMapper;
+        this.ctxStore = ctxStore;
         this.executionService = executionService;
     }
 
@@ -254,7 +254,7 @@ public class DagEngine {
                             // 防资损：已发券/已触达则整体 SUCCESS
                             if (ctx.isBenefitGranted() || ctx.isUserReached()) {
                                 log.warn("[ENGINE] 防资损：节点失败但整体判定成功 nodeId={}", nodeId);
-                            return Mono.just(Map.of());
+                                return Mono.just(Map.of());
                             }
                             return Mono.error(
                                     new RuntimeException("节点 " + nodeId + " 失败: " + result.errorMessage()));
@@ -307,21 +307,21 @@ public class DagEngine {
      * <pre>
      * THRESHOLD 不等所有上游完成，每个上游到来都直接运行 handler。
      * handler 读 ctx 计数，未达阈值返回 waiting()，达到阈值才路由。
-     * 
- * repeat 必要的场景（threshold=3，当前 2 个完成）：
+     *
+     * repeat 必要的场景（threshold=3，当前 2 个完成）：
      *   上游2完成 → handler 持锁 → 计数=2 < 3 → 返回 waiting()
      *   上游3在持锁期间到达 → CAS 失败 → repeatPending=true
      *   handler 返回 → repeat 触发 → 重新计数=3 ≥ 3 → 路由 ✓
- *
- * 没有 repeat：上游3的信号永久丢失，节点卡在 WAITING，只能等超时恢复。
+     *
+     * 没有 repeat：上游3的信号永久丢失，节点卡在 WAITING，只能等超时恢复。
      *
      * </pre>
- *
- * <h3>HUB / LogicRelation / AGGREGATE：repeat 无实际语义价值</h3>
- * <pre>
- * 这三者都用 allUpstreamDone 门控，只有在所有上游都完成后才进入 handler。
- * 而上游写输出到 ctx 发生在触发下游之前，因此 handler 执行时 ctx 已完整。
- * repeat 对它们只是防御性兜底（确保并发路由请求不丢失），不改变最终结果。
+     *
+     * <h3>HUB / LogicRelation / AGGREGATE：repeat 无实际语义价值</h3>
+     * <pre>
+     * 这三者都用 allUpstreamDone 门控，只有在所有上游都完成后才进入 handler。
+     * 而上游写输出到 ctx 发生在触发下游之前，因此 handler 执行时 ctx 已完整。
+     * repeat 对它们只是防御性兜底（确保并发路由请求不丢失），不改变最终结果。
      * handler 执行时 ctx 已完整，repeat 是防御性兜底，不改变路由结果。
      * </pre>
      *
@@ -364,7 +364,7 @@ public class DagEngine {
                 })
                 .doOnNext(r -> {
                     if (r.success()) cb.recordSuccess();
-                    else             cb.recordFailure();
+                    else cb.recordFailure();
                 })
                 .doOnError(e -> cb.recordFailure());
 
@@ -505,10 +505,10 @@ public class DagEngine {
                                 ctx.setNodeStatus(nodeId, NodeStatus.FAILED);
                                 ctxStore.save(ctx);
                                 executionService.trigger(
-                                        ctx.getCanvasId(), ctx.getUserId(),
-                                        TriggerType.LOGIC_RELATION_TIMEOUT, NodeType.LOGIC_RELATION,
-                                        null, Map.of(),
-                                        ctx.getExecutionId() + ":lr-timeout:" + nodeId, false)
+                                                ctx.getCanvasId(), ctx.getUserId(),
+                                                TriggerType.LOGIC_RELATION_TIMEOUT, NodeType.LOGIC_RELATION,
+                                                null, Map.of(),
+                                                ctx.getExecutionId() + ":lr-timeout:" + nodeId, false)
                                         .subscribe(null,
                                                 (Throwable e) -> log.error("[LOGIC_RELATION] 超时恢复失败 nodeId={}: {}", nodeId, e.getMessage()));
                             }
@@ -531,37 +531,37 @@ public class DagEngine {
     // ══════════════════════════════════════════════════════════════
 
     /**
-     *核心机制：每个上游节点完成时，主动调用 executeNode(HUB)
+     * 核心机制：每个上游节点完成时，主动调用 executeNode(HUB)
      * <br/>
-     *   上游A完成 → executeNode(HUB) → allUpstreamDone=false → WAITING → 返回空Map
-     *   上游B完成 → executeNode(HUB) → allUpstreamDone=true  → 继续执行
+     * 上游A完成 → executeNode(HUB) → allUpstreamDone=false → WAITING → 返回空Map
+     * 上游B完成 → executeNode(HUB) → allUpstreamDone=true  → 继续执行
      * <br/>
-     *   触发重入的是 DagEngine 的 CAS repeat 机制：
-     *   核心机制：每个上游节点完成时，主动调用 executeNode(HUB)
+     * 触发重入的是 DagEngine 的 CAS repeat 机制：
+     * 核心机制：每个上游节点完成时，主动调用 executeNode(HUB)
      * <br/>
-     *   上游A完成 → executeNode(HUB) → allUpstreamDone=false → WAITING → 返回空Map
-     *   上游B完成 → executeNode(HUB) → allUpstreamDone=true  → 继续执行
+     * 上游A完成 → executeNode(HUB) → allUpstreamDone=false → WAITING → 返回空Map
+     * 上游B完成 → executeNode(HUB) → allUpstreamDone=true  → 继续执行
      * <br/>
-     *   触发重入的是 DagEngine 的 CAS repeat 机制:
-     *   完整流程是这样的：
+     * 触发重入的是 DagEngine 的 CAS repeat 机制:
+     * 完整流程是这样的：
      * <br/>
-     *   上游A完成
-     *     └> executeNode(HUB)
-     *          ├─ 抢到 CAS 锁
-     *          ├─ allUpstreamDone=false → WAITING → 返回 Map.of()
-     *          └─ 检查 nodeGate → false → 结束
-     *                               上游B完成
-     *                                 └> executeNode(HUB)
-     *                                      ├─ 抢锁失败（A还没释放）→ set(true) 发送信号 → 返回
-     *                                      或者
-     *                                      ├─ 抢锁成功（A已释放）
-     *                                      ├─ allUpstreamDone=true → 继续执行下游
-     *                                      └─ 正常结束
+     * 上游A完成
+     * └> executeNode(HUB)
+     * ├─ 抢到 CAS 锁
+     * ├─ allUpstreamDone=false → WAITING → 返回 Map.of()
+     * └─ 检查 nodeGate → false → 结束
+     * 上游B完成
+     * └> executeNode(HUB)
+     * ├─ 抢锁失败（A还没释放）→ set(true) 发送信号 → 返回
+     * 或者
+     * ├─ 抢锁成功（A已释放）
+     * ├─ allUpstreamDone=true → 继续执行下游
+     * └─ 正常结束
      * <br/>
-     *   若抢锁失败路径：A 在释放锁前发现 nodeGate=true（有信号）
-     *     └> repeat：A 重新执行 handleHub → allUpstreamDone=true → 继续
+     * 若抢锁失败路径：A 在释放锁前发现 nodeGate=true（有信号）
+     * └> repeat：A 重新执行 handleHub → allUpstreamDone=true → 继续
      * <br/>
-     *   Mono.delay() 是超时兜底，不是主驱动，它只做一件事：N 秒后如果 Hub 还没完成就标记 FAILED。
+     * Mono.delay() 是超时兜底，不是主驱动，它只做一件事：N 秒后如果 Hub 还没完成就标记 FAILED。
      * <br/>
      *
      */
@@ -588,10 +588,10 @@ public class DagEngine {
                                 ctxStore.save(ctx);   // 同步回写 Redis，避免内存与持久化状态不一致
                                 // 触发执行恢复：让执行引擎感知 FAILED 状态并继续后续处理
                                 executionService.trigger(
-                                        ctx.getCanvasId(), ctx.getUserId(),
-                                        TriggerType.HUB_TIMEOUT, NodeType.HUB,
-                                        null, Map.of(),
-                                        ctx.getExecutionId() + ":hub-timeout:" + nodeId, false)
+                                                ctx.getCanvasId(), ctx.getUserId(),
+                                                TriggerType.HUB_TIMEOUT, NodeType.HUB,
+                                                null, Map.of(),
+                                                ctx.getExecutionId() + ":hub-timeout:" + nodeId, false)
                                         .subscribe(null,
                                                 (Throwable e) -> log.error("[HUB] 超时恢复失败 nodeId={}: {}", nodeId, e.getMessage()));
                             }
@@ -626,9 +626,9 @@ public class DagEngine {
      * 若多条上游并发完成，repeat 保证最后一次执行时 ctx 已包含所有上游的结果。
      */
     private Mono<Map<String, Object>> handleAggregate(DagGraph graph, String nodeId,
-                                                       DagParser.CanvasNode node,
-                                                       Map<String, Object> config,
-                                                       ExecutionContext ctx) {
+                                                      DagParser.CanvasNode node,
+                                                      Map<String, Object> config,
+                                                      ExecutionContext ctx) {
         List<String> upstreamIds = graph.upstream(nodeId);
 
         if (!HubHandler.allUpstreamDone(upstreamIds, ctx)) {
@@ -646,10 +646,10 @@ public class DagEngine {
                                 ctx.setNodeStatus(nodeId, NodeStatus.FAILED);
                                 ctxStore.save(ctx);
                                 executionService.trigger(
-                                        ctx.getCanvasId(), ctx.getUserId(),
-                                        TriggerType.AGGREGATE_TIMEOUT, NodeType.AGGREGATE,
-                                        null, Map.of(),
-                                        ctx.getExecutionId() + ":ag-timeout:" + nodeId, false)
+                                                ctx.getCanvasId(), ctx.getUserId(),
+                                                TriggerType.AGGREGATE_TIMEOUT, NodeType.AGGREGATE,
+                                                null, Map.of(),
+                                                ctx.getExecutionId() + ":ag-timeout:" + nodeId, false)
                                         .subscribe(null,
                                                 (Throwable e) -> log.error("[AGGREGATE] 超时恢复失败 nodeId={}: {}", nodeId, e.getMessage()));
                             }
@@ -669,9 +669,11 @@ public class DagEngine {
     // 阶段 3-6 公共入口（LOGIC_RELATION / HUB / AGGREGATE 满足条件后调用）
     // ══════════════════════════════════════════════════════════════
 
-    /** THRESHOLD 超时调度（首次触发时启动，防止所有上游都不完成导致永久 WAITING） */
+    /**
+     * THRESHOLD 超时调度（首次触发时启动，防止所有上游都不完成导致永久 WAITING）
+     */
     private void scheduleThresholdTimeoutIfNeeded(String nodeId, Map<String, Object> config,
-                                                   ExecutionContext ctx) {
+                                                  ExecutionContext ctx) {
         String timerKey = "th:" + nodeId;
         if (ctx.getScheduledHubTimeouts().contains(timerKey)) return;
         ctx.getScheduledHubTimeouts().add(timerKey);
@@ -683,10 +685,10 @@ public class DagEngine {
                         ctx.setNodeStatus(nodeId, NodeStatus.FAILED);
                         ctxStore.save(ctx);
                         executionService.trigger(
-                                ctx.getCanvasId(), ctx.getUserId(),
-                                TriggerType.THRESHOLD_TIMEOUT, NodeType.THRESHOLD,
-                                null, Map.of(),
-                                ctx.getExecutionId() + ":th-timeout:" + nodeId, false)
+                                        ctx.getCanvasId(), ctx.getUserId(),
+                                        TriggerType.THRESHOLD_TIMEOUT, NodeType.THRESHOLD,
+                                        null, Map.of(),
+                                        ctx.getExecutionId() + ":th-timeout:" + nodeId, false)
                                 .subscribe(null,
                                         (Throwable e) -> log.error("[THRESHOLD] 超时恢复失败 nodeId={}: {}", nodeId, e.getMessage()));
                     }
@@ -696,7 +698,7 @@ public class DagEngine {
     private Mono<Map<String, Object>> executeNodeAfterStage2(DagGraph graph, String nodeId,
                                                              DagParser.CanvasNode node,
                                                              Map<String, Object> config,
-                                        ExecutionContext ctx) {
+                                                             ExecutionContext ctx) {
         // 阶段 3：幂等
         if (ctx.isNodeDone(nodeId)) return Mono.just(Map.of());
 
@@ -922,25 +924,25 @@ public class DagEngine {
      * 设计文档 7.4 阶段 1。
      * 例如:
      * {
-     *   "apiKey": "send_sms",
-     *   "params": {
-     *     "phone": {
-     *       "valueType": "CONTEXT",
-     *       "value": "user.phone"  // ← 从上下文读取用户手机号
-     *     },
-     *     "content": {
-     *       "valueType": "CONTEXT",
-     *       "value": "trigger.message"  // ← 从触发事件读取消息内容
-     *     }
-     *   }
+     * "apiKey": "send_sms",
+     * "params": {
+     * "phone": {
+     * "valueType": "CONTEXT",
+     * "value": "user.phone"  // ← 从上下文读取用户手机号
+     * },
+     * "content": {
+     * "valueType": "CONTEXT",
+     * "value": "trigger.message"  // ← 从触发事件读取消息内容
+     * }
+     * }
      * }
      * 会被处理为:
      * {
-     *   "apiKey": "send_sms",
-     *   "params": {
-     *     "phone": "13800138000",       // ← 实际手机号
-     *     "content": "您的订单已发货"    // ← 实际消息
-     *   }
+     * "apiKey": "send_sms",
+     * "params": {
+     * "phone": "13800138000",       // ← 实际手机号
+     * "content": "您的订单已发货"    // ← 实际消息
+     * }
      * }
      */
     @SuppressWarnings("unchecked")

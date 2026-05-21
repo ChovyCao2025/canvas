@@ -19,7 +19,7 @@ import java.util.Map;
  * - ProducerType.MULTI：多触发源（MQ 消费线程、行为触发、定时调度）并发发布
  * - YieldingWaitStrategy：低延迟，适合画布执行场景
  * - WorkerPool（handleEventsWithWorkerPool）：每个 event 只由一个消费者处理（work-stealing）
- *   而非 handleEventsWith（广播给所有消费者）
+ * 而非 handleEventsWith（广播给所有消费者）
  * - Ring Buffer 大小 65536（2^16）≈ 16MB，填满表示积压 65K 条，触发背压
  */
 @Slf4j
@@ -98,26 +98,30 @@ public class CanvasDisruptorService {
      * 仅用于异步触发（MQ / 行为 / 定时），直调触发绕过 Disruptor 直接执行。
      */
     public void publish(Long canvasId, String userId, String triggerType,
-                         String triggerNodeType, String matchKey,
-                         Map<String, Object> payload, String msgId) {
+                        String triggerNodeType, String matchKey,
+                        Map<String, Object> payload, String msgId) {
         long sequence = ringBuffer.next();
         try {
             CanvasExecutionEvent event = ringBuffer.get(sequence);
-            event.canvasId        = canvasId;
-            event.userId          = userId;
-            event.triggerType     = triggerType;
+            event.canvasId = canvasId;
+            event.userId = userId;
+            event.triggerType = triggerType;
             event.triggerNodeType = triggerNodeType;
-            event.matchKey        = matchKey;
-            event.payload         = payload != null ? new java.util.HashMap<>(payload) : java.util.Map.of();
-            event.msgId           = msgId;
+            event.matchKey = matchKey;
+            event.payload = payload != null ? new java.util.HashMap<>(payload) : java.util.Map.of();
+            event.msgId = msgId;
         } finally {
             ringBuffer.publish(sequence);
         }
     }
 
-    /** 剩余可用容量（用于监控背压） */
+    /**
+     * 剩余可用容量（用于监控背压）
+     */
     // FIXME: 没有实际使用到
-    public long remainingCapacity() { return ringBuffer.remainingCapacity(); }
+    public long remainingCapacity() {
+        return ringBuffer.remainingCapacity();
+    }
 
     @PreDestroy
     public void shutdown() {
