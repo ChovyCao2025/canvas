@@ -11,7 +11,6 @@ import org.springframework.web.bind.annotation.*;
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
 
-import java.util.List;
 
 @RestController
 @RequestMapping("/canvas/api-definitions")
@@ -68,7 +67,7 @@ public class ApiDefinitionController {
         return Mono.<Void>fromRunnable(() -> {
             body.setId(id);
             apiDefinitionMapper.updateById(body);
-        }).subscribeOn(Schedulers.boundedElastic()).thenReturn(R.<Void>ok());
+        }).subscribeOn(Schedulers.boundedElastic()).thenReturn(R.ok());
     }
 
     /**
@@ -80,7 +79,7 @@ public class ApiDefinitionController {
     public Mono<R<Void>> delete(@PathVariable Long id) {
         return Mono.<Void>fromRunnable(() -> apiDefinitionMapper.deleteById(id))
             .subscribeOn(Schedulers.boundedElastic())
-            .thenReturn(R.<Void>ok());
+            .thenReturn(R.ok());
     }
 
 }

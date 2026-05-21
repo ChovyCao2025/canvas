@@ -17,13 +17,14 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class ExecutionController {
 
-    private final CanvasExecutionService  executionService;
-    private final CanvasDisruptorService  disruptorService;  // 12.8节 Disruptor 分发
+    private final CanvasExecutionService executionService;
+    private final CanvasDisruptorService disruptorService;  // 12.8节 Disruptor 分发
 
     /**
      * 业务直调接口：同步执行并等待结果
+     *
      * @param canvasId 画布 ID
-     * @param req 直调请求参数（包含用户 ID、输入参数、幂等 Key）
+     * @param req      直调请求参数（包含用户 ID、输入参数、幂等 Key）
      * @return 执行结果
      */
     @PostMapping("/execute/direct/{canvasId}")
@@ -36,15 +37,16 @@ public class ExecutionController {
                 ? req.getIdempotencyKey()
                 : UUID.randomUUID().toString();
         return executionService.trigger(
-                canvasId, req.getUserId(), NodeType.DIRECT_CALL,
-                NodeType.DIRECT_CALL, null,
-                req.getInputParams(), dedupKey, false)
+                        canvasId, req.getUserId(), NodeType.DIRECT_CALL,
+                        NodeType.DIRECT_CALL, null,
+                        req.getInputParams(), dedupKey, false)
                 .map(R::ok);
     }
 
     /**
      * 端内行为触发：异步，经过 Disruptor Ring Buffer 削峰（12.8节）。
      * 立即返回 200，Disruptor 消费者异步执行。
+     *
      * @param req 行为触发请求参数
      * @return 成功响应
      */
@@ -57,10 +59,11 @@ public class ExecutionController {
         return Mono.just(R.ok());
     }
 
-    /** 
+    /**
      * 干运行：不走 Disruptor，直接同步执行（不产生真实副作用）
+     *
      * @param canvasId 画布 ID
-     * @param req 请求参数
+     * @param req      请求参数
      * @return 干运行执行结果
      */
     @PostMapping("/execute/dry-run/{canvasId}")
@@ -68,8 +71,8 @@ public class ExecutionController {
             @PathVariable Long canvasId,
             @RequestBody DirectCallReq req) {
         return executionService.triggerDryRun(
-                canvasId, req.getUserId(),
-                req.getInputParams(), req.getGraphJson())
+                        canvasId, req.getUserId(),
+                        req.getInputParams(), req.getGraphJson())
                 .map(R::ok);
     }
 
@@ -79,13 +82,15 @@ public class ExecutionController {
         private String userId;
         private Map<String, Object> inputParams;
         private String idempotencyKey;
-        /** dry-run 时传入当前画布 graphJson，直接使用而不读 DB draft */
+        /**
+         * dry-run 时传入当前画布 graphJson，直接使用而不读 DB draft
+         */
         private String graphJson;
     }
 
     @Data
     static class BehaviorTriggerReq {
-        private Long   canvasId;
+        private Long canvasId;
         private String userId;
         private String eventCode;
         private String eventId;

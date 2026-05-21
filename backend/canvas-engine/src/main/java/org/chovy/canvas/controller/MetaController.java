@@ -27,9 +27,9 @@ public class MetaController {
     private final MetaService metaService;
     private final ApiDefinitionMapper apiDefinitionMapper;
     private final AbExperimentMapper abExperimentMapper;
-    private final org.chovy.canvas.domain.meta.TagDefinitionMapper tagDefinitionMapper;
-    private final org.chovy.canvas.domain.meta.MqMessageDefinitionMapper mqMapper;
-    private final org.chovy.canvas.domain.meta.EventDefinitionMapper eventDefinitionMapper;
+    private final TagDefinitionMapper tagDefinitionMapper;
+    private final MqMessageDefinitionMapper mqMapper;
+    private final EventDefinitionMapper eventDefinitionMapper;
     private final ObjectMapper objectMapper;
 
     @Value("${canvas.integration.tagger-service-url}")
@@ -37,6 +37,7 @@ public class MetaController {
 
     /**
      * 获取所有注册的画布节点类型定义
+     *
      * @return 节点类型定义列表
      */
     @GetMapping("/node-types")
@@ -48,6 +49,7 @@ public class MetaController {
 
     /**
      * 获取指定节点类型的 Schema 配置
+     *
      * @param typeKey 节点类型 Key
      * @return 节点类型定义
      */
@@ -60,6 +62,7 @@ public class MetaController {
 
     /**
      * 获取全局上下文中的所有可引用字段
+     *
      * @return 字段列表
      */
     @GetMapping("/context-fields")
@@ -71,6 +74,7 @@ public class MetaController {
 
     /**
      * 获取 MQ 触发器可选主题列表
+     *
      * @return 选项列表
      */
     @GetMapping("/mq-topics")
@@ -78,20 +82,22 @@ public class MetaController {
         return Mono.just(R.ok(metaService.getMqTopics()));
     }
 
-    /** MQ 消息定义列表（带 requestSchema，供 SEND_MQ 节点动态渲染参数） */
+    /**
+     * MQ 消息定义列表（带 requestSchema，供 SEND_MQ 节点动态渲染参数）
+     */
     @GetMapping("/mq-definitions")
     public Mono<R<List<Map<String, Object>>>> getMqDefinitions() {
         return Mono.fromCallable(() -> {
             List<org.chovy.canvas.domain.meta.MqMessageDefinition> defs =
-                mqMapper.selectList(
-                    new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<
-                            org.chovy.canvas.domain.meta.MqMessageDefinition>()
-                        .eq(org.chovy.canvas.domain.meta.MqMessageDefinition::getEnabled, 1)
-                        .orderByAsc(org.chovy.canvas.domain.meta.MqMessageDefinition::getId));
+                    mqMapper.selectList(
+                            new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<
+                                    org.chovy.canvas.domain.meta.MqMessageDefinition>()
+                                    .eq(org.chovy.canvas.domain.meta.MqMessageDefinition::getEnabled, 1)
+                                    .orderByAsc(org.chovy.canvas.domain.meta.MqMessageDefinition::getId));
             return defs.stream().map(d -> {
                 Map<String, Object> m = new java.util.LinkedHashMap<>();
-                m.put("value",         d.getMessageCode());
-                m.put("label",         d.getName());
+                m.put("value", d.getMessageCode());
+                m.put("label", d.getName());
                 m.put("requestSchema", d.getRequestSchema() != null ? d.getRequestSchema() : "[]");
                 return m;
             }).collect(Collectors.toList());
@@ -100,6 +106,7 @@ public class MetaController {
 
     /**
      * 获取优惠券发放类型列表
+     *
      * @return 选项列表
      */
     @GetMapping("/coupon-types")
@@ -109,6 +116,7 @@ public class MetaController {
 
     /**
      * 获取用户触达场景列表
+     *
      * @return 选项列表
      */
     @GetMapping("/reach-scenes")
@@ -118,6 +126,7 @@ public class MetaController {
 
     /**
      * 获取所有已启用的 AB 实验列表
+     *
      * @return 选项列表
      */
     @GetMapping("/ab-experiments")
@@ -136,6 +145,7 @@ public class MetaController {
 
     /**
      * 获取指定 AB 实验的分组列表
+     *
      * @param key 实验 Key
      * @return 分组选项列表
      */
@@ -146,6 +156,7 @@ public class MetaController {
 
     /**
      * 获取所有已启用的 API 定义列表
+     *
      * @return 选项列表
      */
     @GetMapping("/api-definitions")
@@ -158,8 +169,8 @@ public class MetaController {
             );
             return defs.stream().map(def -> {
                 Map<String, Object> m = new java.util.LinkedHashMap<>();
-                m.put("value",         def.getApiKey());
-                m.put("label",         def.getName());
+                m.put("value", def.getApiKey());
+                m.put("label", def.getName());
                 m.put("requestSchema", def.getRequestSchema() != null ? def.getRequestSchema() : "[]");
                 return m;
             }).collect(Collectors.toList());
@@ -176,38 +187,38 @@ public class MetaController {
             @RequestParam(defaultValue = "offline") String type) {
         // 优先从 tag_definition 表读取（管理员自定义标签）
         return Mono.fromCallable(() -> {
-            List<org.chovy.canvas.domain.meta.TagDefinition> defs =
-                tagDefinitionMapper.selectList(
-                    new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<
-                            org.chovy.canvas.domain.meta.TagDefinition>()
-                        .eq(org.chovy.canvas.domain.meta.TagDefinition::getTagType, type)
-                        .eq(org.chovy.canvas.domain.meta.TagDefinition::getEnabled, 1)
-                        .orderByAsc(org.chovy.canvas.domain.meta.TagDefinition::getId));
-            if (!defs.isEmpty()) {
-                return defs.stream()
-                    .map(d -> new StubOption(d.getTagCode(), d.getName()))
-                    .collect(java.util.stream.Collectors.toList());
-            }
-            return null; // 空则 fallback Tagger 服务
-        }).subscribeOn(reactor.core.scheduler.Schedulers.boundedElastic())
-        .flatMap(dbList -> {
-            if (dbList != null) return Mono.just(R.ok(dbList));
-            // fallback: 调 Tagger 服务
-            return WebClient.builder().baseUrl(taggerUrl).build()
-                    .get()
-                    .uri(u -> u.path("/tags").queryParam("type", type).build())
-                    .retrieve()
-                    .bodyToFlux(Map.class)
-                    .map(m -> new StubOption(
-                            String.valueOf(m.getOrDefault("code", "")),
-                            String.valueOf(m.getOrDefault("name", ""))))
-                    .collectList()
-                    .map(R::ok)
-                    .onErrorResume(e -> {
-                        log.warn("[META] Tagger 标签拉取失败，降级返回 stub: {}", e.getMessage());
-                        return Mono.just(R.ok(metaService.getTaggerTags(type)));
-                    });
-        });
+                    List<org.chovy.canvas.domain.meta.TagDefinition> defs =
+                            tagDefinitionMapper.selectList(
+                                    new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<
+                                            org.chovy.canvas.domain.meta.TagDefinition>()
+                                            .eq(org.chovy.canvas.domain.meta.TagDefinition::getTagType, type)
+                                            .eq(org.chovy.canvas.domain.meta.TagDefinition::getEnabled, 1)
+                                            .orderByAsc(org.chovy.canvas.domain.meta.TagDefinition::getId));
+                    if (!defs.isEmpty()) {
+                        return defs.stream()
+                                .map(d -> new StubOption(d.getTagCode(), d.getName()))
+                                .collect(java.util.stream.Collectors.toList());
+                    }
+                    return null; // 空则 fallback Tagger 服务
+                }).subscribeOn(Schedulers.boundedElastic())
+                .flatMap(dbList -> {
+                    if (dbList != null) return Mono.just(R.ok(dbList));
+                    // fallback: 调 Tagger 服务
+                    return WebClient.builder().baseUrl(taggerUrl).build()
+                            .get()
+                            .uri(u -> u.path("/tags").queryParam("type", type).build())
+                            .retrieve()
+                            .bodyToFlux(Map.class)
+                            .map(m -> new StubOption(
+                                    String.valueOf(m.getOrDefault("code", "")),
+                                    String.valueOf(m.getOrDefault("name", ""))))
+                            .collectList()
+                            .map(R::ok)
+                            .onErrorResume(e -> {
+                                log.warn("[META] Tagger 标签拉取失败，降级返回 stub: {}", e.getMessage());
+                                return Mono.just(R.ok(metaService.getTaggerTags(type)));
+                            });
+                });
     }
 
     @GetMapping("/biz-lines")
@@ -215,20 +226,22 @@ public class MetaController {
         return Mono.just(R.ok(metaService.getBizLines()));
     }
 
-    /** 事件定义列表（带 attributes schema，供 EVENT_TRIGGER 节点下拉选择） */
+    /**
+     * 事件定义列表（带 attributes schema，供 EVENT_TRIGGER 节点下拉选择）
+     */
     @GetMapping("/event-definitions")
     public Mono<R<List<Map<String, Object>>>> getEventDefinitions() {
         return Mono.fromCallable(() -> {
             List<org.chovy.canvas.domain.meta.EventDefinition> defs =
-                eventDefinitionMapper.selectList(
-                    new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<
-                            org.chovy.canvas.domain.meta.EventDefinition>()
-                        .eq(org.chovy.canvas.domain.meta.EventDefinition::getEnabled, 1)
-                        .orderByAsc(org.chovy.canvas.domain.meta.EventDefinition::getId));
+                    eventDefinitionMapper.selectList(
+                            new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<
+                                    org.chovy.canvas.domain.meta.EventDefinition>()
+                                    .eq(org.chovy.canvas.domain.meta.EventDefinition::getEnabled, 1)
+                                    .orderByAsc(org.chovy.canvas.domain.meta.EventDefinition::getId));
             return defs.stream().map(d -> {
                 Map<String, Object> m = new java.util.LinkedHashMap<>();
-                m.put("value",      d.getEventCode());
-                m.put("label",      d.getName());
+                m.put("value", d.getEventCode());
+                m.put("label", d.getName());
                 m.put("requestSchema", d.getAttributes() != null ? d.getAttributes() : "[]");
                 return m;
             }).collect(Collectors.toList());
@@ -282,12 +295,13 @@ public class MetaController {
                         List<Map<String, Object>> attrs =
                                 objectMapper.readValue(evt.getAttributes(), List.class);
                         for (Map<String, Object> a : attrs) {
-                            String key  = str(a.get("name"));
+                            String key = str(a.get("name"));
                             String name = str(a.getOrDefault("displayName", a.get("name")));
                             String type = str(a.getOrDefault("type", "STRING"));
                             fields.add(field(key, name + "（" + evt.getName() + "）", type, "EVENT_TRIGGER"));
                         }
-                    } catch (Exception ignored) {}
+                    } catch (Exception ignored) {
+                    }
                 }
             }
 
@@ -310,12 +324,13 @@ public class MetaController {
                         List<Map<String, Object>> schema =
                                 objectMapper.readValue(def.getResponseSchema(), List.class);
                         for (Map<String, Object> f : schema) {
-                            String key  = prefix + str(f.get("name"));
+                            String key = prefix + str(f.get("name"));
                             String desc = str(f.getOrDefault("desc", f.get("name")));
                             String type = str(f.getOrDefault("type", "STRING"));
                             fields.add(field(key, desc + "（" + def.getName() + "）", type, "API_CALL"));
                         }
-                    } catch (Exception ignored) {}
+                    } catch (Exception ignored) {
+                    }
                 }
             }
 

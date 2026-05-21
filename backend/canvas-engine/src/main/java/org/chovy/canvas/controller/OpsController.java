@@ -22,11 +22,11 @@ import java.util.List;
 @RequiredArgsConstructor
 public class OpsController {
 
-    private final CanvasTemplateMapper       templateMapper;
-    private final CanvasMapper               canvasMapper;
-    private final CanvasVersionMapper        canvasVersionMapper;
+    private final CanvasTemplateMapper templateMapper;
+    private final CanvasMapper canvasMapper;
+    private final CanvasVersionMapper canvasVersionMapper;
     private final CanvasManualApprovalMapper approvalMapper;
-    private final CanvasConfigCache          configCache;
+    private final CanvasConfigCache configCache;
 
     // ── 缓存管理 ─────────────────────────────────────────────────────
 
@@ -55,6 +55,7 @@ public class OpsController {
 
     /**
      * 获取画布模板列表
+     *
      * @param category 模板分类（可选）
      * @return 模板列表
      */
@@ -71,7 +72,8 @@ public class OpsController {
 
     /**
      * 将当前画布另存为模板
-     * @param id 画布 ID
+     *
+     * @param id  画布 ID
      * @param req 模板信息（名称、分类等）
      * @return 模板对象
      */
@@ -103,13 +105,14 @@ public class OpsController {
 
     /**
      * 基于模板创建新画布
+     *
      * @param templateId 模板 ID
-     * @param req 画布名称
+     * @param req        画布名称
      * @return 新画布信息
      */
     @PostMapping("/canvas/from-template/{templateId}")
     public Mono<R<Canvas>> createFromTemplate(@PathVariable Long templateId,
-                                               @RequestBody FromTemplateReq req) {
+                                              @RequestBody FromTemplateReq req) {
         return Mono.fromCallable(() -> {
             CanvasTemplate tpl = templateMapper.selectById(templateId);
             if (tpl == null) throw new IllegalArgumentException("模板不存在");
@@ -133,6 +136,7 @@ public class OpsController {
 
     /**
      * 获取待审批的发布请求列表
+     *
      * @return 审批记录列表
      */
     @GetMapping("/canvas/pending-reviews")
@@ -148,10 +152,13 @@ public class OpsController {
 
     // ── DTOs ──────────────────────────────────────────────────────
 
-    @Data static class SaveTemplateReq {
+    @Data
+    static class SaveTemplateReq {
         private String name, description, category;
     }
-    @Data static class FromTemplateReq {
+
+    @Data
+    static class FromTemplateReq {
         private String name;
     }
 }

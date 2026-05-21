@@ -28,10 +28,10 @@ import java.util.UUID;
 /**
  * 事件定义管理 + 事件上报接口。
  * 上报流程：
- *   POST /canvas/events/report
- *   → 验证事件定义存在
- *   → 记录 event_log
- *   → 通过 Disruptor 异步触发匹配当前 eventCode 的所有画布
+ * POST /canvas/events/report
+ * → 验证事件定义存在
+ * → 记录 event_log
+ * → 通过 Disruptor 异步触发匹配当前 eventCode 的所有画布
  */
 @Slf4j
 @RestController
@@ -39,11 +39,11 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class EventDefinitionController {
 
-    private final EventDefinitionMapper  eventMapper;
-    private final EventLogMapper         logMapper;
+    private final EventDefinitionMapper eventMapper;
+    private final EventLogMapper logMapper;
     private final CanvasDisruptorService disruptorService;
-    private final TriggerRouteService    triggerRouteService;
-    private final ObjectMapper           objectMapper;
+    private final TriggerRouteService triggerRouteService;
+    private final ObjectMapper objectMapper;
 
     // ── 事件定义 CRUD ────────────────────────────────────────────
 
@@ -63,14 +63,20 @@ public class EventDefinitionController {
 
     @PostMapping("/event-definitions")
     public Mono<R<EventDefinition>> create(@RequestBody EventDefinition body) {
-        return Mono.fromCallable(() -> { eventMapper.insert(body); return R.ok(body); })
+        return Mono.fromCallable(() -> {
+                    eventMapper.insert(body);
+                    return R.ok(body);
+                })
                 .subscribeOn(Schedulers.boundedElastic());
     }
 
     @PutMapping("/event-definitions/{id}")
     public Mono<R<Void>> update(@PathVariable Long id, @RequestBody EventDefinition body) {
         body.setId(id);
-        return Mono.fromCallable(() -> { eventMapper.updateById(body); return R.ok(); })
+        return Mono.fromCallable(() -> {
+                    eventMapper.updateById(body);
+                    return R.ok();
+                })
                 .subscribeOn(Schedulers.boundedElastic());
     }
 
@@ -90,67 +96,68 @@ public class EventDefinitionController {
     @PostMapping("/events/report")
     public Mono<R<Map<String, Object>>> reportEvent(@RequestBody EventReportReq req) {
         return Mono.fromCallable(() -> {
-            if (req.getEventCode() == null || req.getEventCode().isBlank())
-                throw new IllegalArgumentException("eventCode 不能为空");
-            if (req.getUserId() == null || req.getUserId().isBlank())
-                throw new IllegalArgumentException("userId 不能为空");
+                    if (req.getEventCode() == null || req.getEventCode().isBlank())
+                        throw new IllegalArgumentException("eventCode 不能为空");
+                    if (req.getUserId() == null || req.getUserId().isBlank())
+                        throw new IllegalArgumentException("userId 不能为空");
 
-            // 1. 验证事件定义存在
-            // FIXME: 事件定义会频繁上报导致查询, 事件查询应该有缓存机制
-            EventDefinition def = eventMapper.selectOne(
-                    new LambdaQueryWrapper<EventDefinition>()
-                            .eq(EventDefinition::getEventCode, req.getEventCode())
-                            .eq(EventDefinition::getEnabled, CanvasStatusEnum.PUBLISHED.getCode()));
-            if (def == null)
-                throw new IllegalArgumentException("事件未定义或已禁用: " + req.getEventCode());
+                    // 1. 验证事件定义存在
+                    // FIXME: 事件定义会频繁上报导致查询, 事件查询应该有缓存机制
+                    EventDefinition def = eventMapper.selectOne(
+                            new LambdaQueryWrapper<EventDefinition>()
+                                    .eq(EventDefinition::getEventCode, req.getEventCode())
+                                    .eq(EventDefinition::getEnabled, CanvasStatusEnum.PUBLISHED.getCode()));
+                    if (def == null)
+                        throw new IllegalArgumentException("事件未定义或已禁用: " + req.getEventCode());
 
-            // 2. 记录事件日志
-            // FIXME: 此处数量统计实际上是没有生效的, 相关的统计值都被设置为0
-            EventLog eventLog = new EventLog();
-            eventLog.setEventCode(req.getEventCode());
-            eventLog.setUserId(req.getUserId());
-            try {
-                eventLog.setAttributes(req.getAttributes() != null
-                        ? objectMapper.writeValueAsString(req.getAttributes()) : null);
-            } catch (Exception ignored) {}
-            eventLog.setCanvasTriggered(0);
-            eventLog.setCanvasCount(0);
-            logMapper.insert(eventLog);
+                    // 2. 记录事件日志
+                    // FIXME: 此处数量统计实际上是没有生效的, 相关的统计值都被设置为0
+                    EventLog eventLog = new EventLog();
+                    eventLog.setEventCode(req.getEventCode());
+                    eventLog.setUserId(req.getUserId());
+                    try {
+                        eventLog.setAttributes(req.getAttributes() != null
+                                ? objectMapper.writeValueAsString(req.getAttributes()) : null);
+                    } catch (Exception ignored) {
+                    }
+                    eventLog.setCanvasTriggered(0);
+                    eventLog.setCanvasCount(0);
+                    logMapper.insert(eventLog);
 
-            // 3. 从路由表查所有监听此事件的已发布画布，逐一触发
-            // FIXME: Redis 异常意味着整个链路都无法推进, 考虑降级方案以及是否有做好缓存刷新问题
-            Set<String> canvasIds = triggerRouteService.getCanvasByBehavior(req.getEventCode());
-            // FIXME: 使用雪花算法代替
-            String eventId = "evt-" + UUID.randomUUID().toString().replace("-", "").substring(0, 12);
-            Map<String, Object> payload = req.getAttributes() != null ? req.getAttributes() : Map.of();
+                    // 3. 从路由表查所有监听此事件的已发布画布，逐一触发
+                    // FIXME: Redis 异常意味着整个链路都无法推进, 考虑降级方案以及是否有做好缓存刷新问题
+                    Set<String> canvasIds = triggerRouteService.getCanvasByBehavior(req.getEventCode());
+                    // FIXME: 使用雪花算法代替
+                    String eventId = "evt-" + UUID.randomUUID().toString().replace("-", "").substring(0, 12);
+                    Map<String, Object> payload = req.getAttributes() != null ? req.getAttributes() : Map.of();
 
-            canvasIds.forEach(cidStr -> {
-                try {
-                    Long cid = Long.parseLong(cidStr);
-                    // 事件实际发布
-                    // 具体的消费逻辑: org.chovy.canvas.engine.disruptor.CanvasDisruptorService.CanvasDisruptorService
-                    disruptorService.publish(cid, req.getUserId(), TriggerType.EVENT,
-                            NodeType.EVENT_TRIGGER, req.getEventCode(), payload, eventId + "-" + cidStr);
-                    log.info("[EVENT] 触发画布 canvasId={} eventCode={} userId={}",
-                            cid, req.getEventCode(), req.getUserId());
-                } catch (Exception e) {
-                    log.warn("[EVENT] 触发画布失败 canvasId={}: {}", cidStr, e.getMessage());
-                }
-            });
+                    canvasIds.forEach(cidStr -> {
+                        try {
+                            Long cid = Long.parseLong(cidStr);
+                            // 事件实际发布
+                            // 具体的消费逻辑: org.chovy.canvas.engine.disruptor.CanvasDisruptorService.CanvasDisruptorService
+                            disruptorService.publish(cid, req.getUserId(), TriggerType.EVENT,
+                                    NodeType.EVENT_TRIGGER, req.getEventCode(), payload, eventId + "-" + cidStr);
+                            log.info("[EVENT] 触发画布 canvasId={} eventCode={} userId={}",
+                                    cid, req.getEventCode(), req.getUserId());
+                        } catch (Exception e) {
+                            log.warn("[EVENT] 触发画布失败 canvasId={}: {}", cidStr, e.getMessage());
+                        }
+                    });
 
-            if (canvasIds.isEmpty()) {
-                log.info("[EVENT] 无已发布画布订阅事件 eventCode={}", req.getEventCode());
-            }
+                    if (canvasIds.isEmpty()) {
+                        log.info("[EVENT] 无已发布画布订阅事件 eventCode={}", req.getEventCode());
+                    }
 
-            Map<String, Object> resp = new java.util.LinkedHashMap<>();
-            resp.put("eventLogId",     eventLog.getId());
-            resp.put("eventCode",      req.getEventCode());
-            resp.put("userId",         req.getUserId());
-            resp.put("canvasTriggered",canvasIds.size());
-            resp.put("status",         "ACCEPTED");
-            return resp;
-        }).subscribeOn(Schedulers.boundedElastic())
-          .map(R::ok);
+                    Map<String, Object> resp = new java.util.LinkedHashMap<>();
+                    resp.put("eventLogId", eventLog.getId());
+                    resp.put("eventCode", req.getEventCode());
+                    resp.put("userId", req.getUserId());
+                    resp.put("canvasTriggered", canvasIds.size());
+                    resp.put("status", "ACCEPTED");
+                    return resp;
+                }).subscribeOn(Schedulers.boundedElastic())
+                .map(R::ok);
     }
 
 

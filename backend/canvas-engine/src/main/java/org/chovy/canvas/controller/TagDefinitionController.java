@@ -26,8 +26,8 @@ public class TagDefinitionController {
             @RequestParam(required = false) Integer enabled) {
         return Mono.fromCallable(() -> {
             var wrapper = new LambdaQueryWrapper<TagDefinition>()
-                    .eq(tagType  != null, TagDefinition::getTagType,  tagType)
-                    .eq(enabled  != null, TagDefinition::getEnabled,  enabled)
+                    .eq(tagType != null, TagDefinition::getTagType, tagType)
+                    .eq(enabled != null, TagDefinition::getEnabled, enabled)
                     .orderByAsc(TagDefinition::getId);
             Page<TagDefinition> p = mapper.selectPage(new Page<>(page, size), wrapper);
             return R.ok(PageResult.of(p.getTotal(), p.getRecords()));
@@ -36,14 +36,20 @@ public class TagDefinitionController {
 
     @PostMapping
     public Mono<R<TagDefinition>> create(@RequestBody TagDefinition body) {
-        return Mono.fromCallable(() -> { mapper.insert(body); return R.ok(body); })
+        return Mono.fromCallable(() -> {
+                    mapper.insert(body);
+                    return R.ok(body);
+                })
                 .subscribeOn(Schedulers.boundedElastic());
     }
 
     @PutMapping("/{id}")
     public Mono<R<Void>> update(@PathVariable Long id, @RequestBody TagDefinition body) {
         body.setId(id);
-        return Mono.fromCallable(() -> { mapper.updateById(body); return R.<Void>ok(); })
+        return Mono.fromCallable(() -> {
+                    mapper.updateById(body);
+                    return R.<Void>ok();
+                })
                 .subscribeOn(Schedulers.boundedElastic());
     }
 

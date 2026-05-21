@@ -16,7 +16,6 @@ import org.springframework.web.bind.annotation.*;
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
 
-import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
@@ -30,21 +29,22 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class DlqController {
 
-    private final CanvasExecutionDlqMapper  dlqMapper;
-    private final CanvasExecutionService    executionService;
-    private final ObjectMapper              objectMapper;
+    private final CanvasExecutionDlqMapper dlqMapper;
+    private final CanvasExecutionService executionService;
+    private final ObjectMapper objectMapper;
 
     /**
      * 查询 DLQ 列表（分页）
+     *
      * @param canvasId 画布 ID（可选）
-     * @param page 页码
-     * @param size 每页大小
+     * @param page     页码
+     * @param size     每页大小
      * @return DLQ 条目分页列表
      */
     @GetMapping
     public Mono<R<PageResult<CanvasExecutionDlq>>> list(
             @RequestParam(required = false) Long canvasId,
-            @RequestParam(defaultValue = "1")  int page,
+            @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "20") int size) {
         return Mono.fromCallable(() -> {
             LambdaQueryWrapper<CanvasExecutionDlq> q = new LambdaQueryWrapper<CanvasExecutionDlq>()
@@ -59,7 +59,8 @@ public class DlqController {
 
     /**
      * 重放 DLQ 条目
-     * @param id DLQ 记录 ID
+     *
+     * @param id               DLQ 记录 ID
      * @param skipSuccessNodes 是否跳过已成功的节点
      * @return 重放执行结果
      */
@@ -68,40 +69,42 @@ public class DlqController {
             @PathVariable Long id,
             @RequestParam(defaultValue = "true") boolean skipSuccessNodes) {
         return Mono.fromCallable(() -> {
-            CanvasExecutionDlq dlq = dlqMapper.selectById(id);
-            if (dlq == null) throw new IllegalArgumentException("DLQ 记录不存在: " + id);
+                    CanvasExecutionDlq dlq = dlqMapper.selectById(id);
+                    if (dlq == null) throw new IllegalArgumentException("DLQ 记录不存在: " + id);
 
-            // 解析原始 payload
-            Map<String, Object> payload = Map.of();
-            try {
-                payload = objectMapper.readValue(dlq.getTriggerPayload(), new TypeReference<>() {});
-            } catch (Exception e) {
-                log.warn("[DLQ] 解析 payload 失败: {}", e.getMessage());
-            }
+                    // 解析原始 payload
+                    Map<String, Object> payload = Map.of();
+                    try {
+                        payload = objectMapper.readValue(dlq.getTriggerPayload(), new TypeReference<>() {
+                        });
+                    } catch (Exception e) {
+                        log.warn("[DLQ] 解析 payload 失败: {}", e.getMessage());
+                    }
 
-            log.info("[DLQ] 手动重放 dlqId={} canvasId={} userId={} triggerType={} skipSuccessNodes={}",
-                    id, dlq.getCanvasId(), dlq.getUserId(), dlq.getTriggerType(), skipSuccessNodes);
-            return payload;
-        })
-        .subscribeOn(Schedulers.boundedElastic())
-        .flatMap(payload -> {
-            CanvasExecutionDlq dlq = dlqMapper.selectById(id);
-            // 使用原始触发类型重放，不写死 DIRECT_CALL
-            String triggerType     = dlq.getTriggerType() != null ? dlq.getTriggerType() : TriggerType.DLQ_REPLAY;
-            String triggerNodeType = dlq.getTriggerNodeType() != null ? dlq.getTriggerNodeType() : NodeType.DIRECT_CALL;
-            String matchKey        = dlq.getMatchKey();
-            return executionService.trigger(
-                    dlq.getCanvasId(), dlq.getUserId(), triggerType,
-                    triggerNodeType, matchKey,
-                    payload,
-                    "dlq-replay-" + UUID.randomUUID().toString().substring(0, 8),
-                    false);
-        })
-        .map(result -> R.ok(result));
+                    log.info("[DLQ] 手动重放 dlqId={} canvasId={} userId={} triggerType={} skipSuccessNodes={}",
+                            id, dlq.getCanvasId(), dlq.getUserId(), dlq.getTriggerType(), skipSuccessNodes);
+                    return payload;
+                })
+                .subscribeOn(Schedulers.boundedElastic())
+                .flatMap(payload -> {
+                    CanvasExecutionDlq dlq = dlqMapper.selectById(id);
+                    // 使用原始触发类型重放，不写死 DIRECT_CALL
+                    String triggerType = dlq.getTriggerType() != null ? dlq.getTriggerType() : TriggerType.DLQ_REPLAY;
+                    String triggerNodeType = dlq.getTriggerNodeType() != null ? dlq.getTriggerNodeType() : NodeType.DIRECT_CALL;
+                    String matchKey = dlq.getMatchKey();
+                    return executionService.trigger(
+                            dlq.getCanvasId(), dlq.getUserId(), triggerType,
+                            triggerNodeType, matchKey,
+                            payload,
+                            "dlq-replay-" + UUID.randomUUID().toString().substring(0, 8),
+                            false);
+                })
+                .map(R::ok);
     }
 
     /**
      * 删除 DLQ 条目
+     *
      * @param id DLQ 记录 ID
      * @return 成功响应
      */
@@ -109,7 +112,7 @@ public class DlqController {
     public Mono<R<Void>> delete(@PathVariable Long id) {
         return Mono.<Void>fromRunnable(() -> dlqMapper.deleteById(id))
                 .subscribeOn(Schedulers.boundedElastic())
-                .thenReturn(R.<Void>ok());
+                .thenReturn(R.ok());
     }
 
 }

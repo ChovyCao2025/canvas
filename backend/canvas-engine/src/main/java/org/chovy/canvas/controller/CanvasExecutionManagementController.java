@@ -35,14 +35,15 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class CanvasExecutionManagementController {
 
-    private final CanvasManualApprovalMapper  approvalMapper;
-    private final ContextPersistenceService   ctxStore;
-    private final CanvasExecutionService      executionService;
-    private final ObjectMapper                objectMapper;
+    private final CanvasManualApprovalMapper approvalMapper;
+    private final ContextPersistenceService ctxStore;
+    private final CanvasExecutionService executionService;
+    private final ObjectMapper objectMapper;
 
     /**
      * 人工审批通过（设计文档 18.2节）。
      * 安全校验：当前用户必须在 approvers 列表中（设计文档 18.2节补充说明）。
+     *
      * @param executionId 执行实例 ID
      * @return 成功响应
      */
@@ -51,24 +52,25 @@ public class CanvasExecutionManagementController {
         return currentUsername()
                 .flatMap(username ->
                         Mono.<Void>fromRunnable(() -> resumeWithResult(executionId, ApprovalStatus.APPROVED, username,
-                                /* watchdog */ false))
+                                        /* watchdog */ false))
                                 .subscribeOn(Schedulers.boundedElastic())
                                 .thenReturn(R.<Void>ok()));
     }
 
-    /** 
-     * 人工审批拒绝（设计文档 18.2节） 
+    /**
+     * 人工审批拒绝（设计文档 18.2节）
+     *
      * @param executionId 执行实例 ID
-     * @param reason 拒绝原因
+     * @param reason      拒绝原因
      * @return 成功响应
      */
     @PostMapping("/{executionId}/reject")
     public Mono<R<Void>> reject(@PathVariable String executionId,
-                                 @RequestParam(required = false) String reason) {
+                                @RequestParam(required = false) String reason) {
         return currentUsername()
                 .flatMap(username ->
                         Mono.<Void>fromRunnable(() -> resumeWithResult(executionId, ApprovalStatus.REJECTED, username,
-                                /* watchdog */ false))
+                                        /* watchdog */ false))
                                 .subscribeOn(Schedulers.boundedElastic())
                                 .thenReturn(R.<Void>ok()));
     }
@@ -77,12 +79,12 @@ public class CanvasExecutionManagementController {
     // ── private ──────────────────────────────────────────────────
 
     private void resumeWithResult(String executionId, String result, String approver,
-                                   boolean isWatchdog) {
+                                  boolean isWatchdog) {
         CanvasManualApproval approval = approvalMapper.selectList(
-                new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<CanvasManualApproval>()
-                        .eq(CanvasManualApproval::getExecutionId, executionId)
-                        .eq(CanvasManualApproval::getStatus, ApprovalStatus.PENDING)
-                        .last("LIMIT 1"))
+                        new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<CanvasManualApproval>()
+                                .eq(CanvasManualApproval::getExecutionId, executionId)
+                                .eq(CanvasManualApproval::getStatus, ApprovalStatus.PENDING)
+                                .last("LIMIT 1"))
                 .stream().findFirst().orElse(null);
 
         if (approval == null) {
@@ -94,14 +96,16 @@ public class CanvasExecutionManagementController {
         if (!isWatchdog) {
             try {
                 List<String> approvers = objectMapper.readValue(
-                        approval.getApprovers(), new TypeReference<>() {});
+                        approval.getApprovers(), new TypeReference<>() {
+                        });
                 if (!approvers.contains(approver)) {
                     throw new ResponseStatusException(HttpStatus.FORBIDDEN,
                             "AUTH_003: 当前用户不在审批人列表中，无权操作此审批");
                 }
             } catch (ResponseStatusException e) {
                 throw e;
-            } catch (Exception ignored) {}
+            } catch (Exception ignored) {
+            }
         }
 
         // 2. 更新审批记录
@@ -135,12 +139,14 @@ public class CanvasExecutionManagementController {
                         executionId + ":resume:" + result,
                         false)
                 .subscribe(
-                        r  -> log.info("[APPROVAL] 恢复执行完成 executionId={} result={}", executionId, result),
-                        e  -> log.error("[APPROVAL] 恢复执行失败 executionId={}: {}", executionId, e.getMessage())
+                        r -> log.info("[APPROVAL] 恢复执行完成 executionId={} result={}", executionId, result),
+                        e -> log.error("[APPROVAL] 恢复执行失败 executionId={}: {}", executionId, e.getMessage())
                 );
     }
 
-    /** 从 JWT SecurityContext 获取当前登录用户名 */
+    /**
+     * 从 JWT SecurityContext 获取当前登录用户名
+     */
     private Mono<String> currentUsername() {
         return ReactiveSecurityContextHolder.getContext()
                 .map(ctx -> ctx.getAuthentication().getPrincipal())

@@ -4,18 +4,20 @@ import org.chovy.canvas.common.R;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import org.chovy.canvas.domain.execution.CanvasExecutionMapper;
 import org.chovy.canvas.domain.execution.CanvasExecution;
+import org.chovy.canvas.domain.execution.CanvasExecutionTrace;
 import org.chovy.canvas.domain.execution.CanvasExecutionTraceMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
 
+import java.time.Duration;
 import java.time.LocalDate;
 import java.util.*;
+import java.util.stream.Collectors;
 
 /**
  * 活动效果分析 API（设计文档第二十一章 21.3节）。
- *
  * GET /canvas/{id}/stats  整体执行统计（时间范围）
  * GET /canvas/{id}/funnel 节点漏斗转化
  * GET /canvas/{id}/trend  每日执行量趋势
@@ -25,28 +27,29 @@ import java.util.*;
 @RequiredArgsConstructor
 public class CanvasStatsController {
 
-    private final CanvasExecutionMapper      executionMapper;
+    private final CanvasExecutionMapper executionMapper;
     private final CanvasExecutionTraceMapper traceMapper;
 
-    /** 
+    /**
      * 某次执行的所有节点轨迹（前端执行轨迹可视化，14.2节）
+     *
      * @param executionId 执行实例 ID
      * @return 节点轨迹列表
      */
     @GetMapping("/execution/{executionId}/trace")
     public Mono<R<List<Map<String, Object>>>> getTrace(@PathVariable String executionId) {
         return Mono.fromCallable(() -> {
-            List<org.chovy.canvas.domain.execution.CanvasExecutionTrace> all =
+            List<CanvasExecutionTrace> all =
                     traceMapper.selectList(
-                            new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<
-                                    org.chovy.canvas.domain.execution.CanvasExecutionTrace>()
-                                    .eq(org.chovy.canvas.domain.execution.CanvasExecutionTrace::getExecutionId,
+                            new LambdaQueryWrapper<
+                                    CanvasExecutionTrace>()
+                                    .eq(CanvasExecutionTrace::getExecutionId,
                                             executionId)
-                                    .orderByAsc(org.chovy.canvas.domain.execution.CanvasExecutionTrace::getStartedAt));
+                                    .orderByAsc(CanvasExecutionTrace::getStartedAt));
 
             // 去重：每个节点保留 status 最高的记录（完成 > 执行中），维持首次出现顺序
-            java.util.Map<String, org.chovy.canvas.domain.execution.CanvasExecutionTrace> best =
-                    new java.util.LinkedHashMap<>();
+            Map<String, CanvasExecutionTrace> best =
+                    new LinkedHashMap<>();
             for (var t : all) {
                 best.merge(t.getNodeId(), t,
                         (a, b) -> b.getStatus() > a.getStatus() ? b : a);
@@ -54,27 +57,28 @@ public class CanvasStatsController {
 
             return best.values().stream().map(t -> {
                 Map<String, Object> m = new java.util.LinkedHashMap<>();
-                m.put("nodeId",     t.getNodeId());
-                m.put("nodeType",   t.getNodeType());
-                m.put("nodeName",   t.getNodeName());
-                m.put("status",     t.getStatus());
-                m.put("errorMsg",   t.getErrorMsg());
+                m.put("nodeId", t.getNodeId());
+                m.put("nodeType", t.getNodeType());
+                m.put("nodeName", t.getNodeName());
+                m.put("status", t.getStatus());
+                m.put("errorMsg", t.getErrorMsg());
                 m.put("outputData", t.getOutputData());   // API 调用结果等
                 // 优先用存储的 durationMs，无则从 startedAt/finishedAt 计算
                 if (t.getDurationMs() != null) {
                     m.put("durationMs", t.getDurationMs());
                 } else if (t.getStartedAt() != null && t.getFinishedAt() != null) {
                     m.put("durationMs",
-                            java.time.Duration.between(t.getStartedAt(), t.getFinishedAt()).toMillis());
+                            Duration.between(t.getStartedAt(), t.getFinishedAt()).toMillis());
                 }
                 return m;
-            }).collect(java.util.stream.Collectors.toList());
-        }).subscribeOn(reactor.core.scheduler.Schedulers.boundedElastic()).map(R::ok);
+            }).collect(Collectors.toList());
+        }).subscribeOn(Schedulers.boundedElastic()).map(R::ok);
     }
 
-    /** 
+    /**
      * 画布最近 N 次执行记录（用于前端执行轨迹选择器）
-     * @param id 画布 ID
+     *
+     * @param id   画布 ID
      * @param size 记录数量
      * @return 执行记录列表
      */
@@ -92,11 +96,11 @@ public class CanvasStatsController {
                                     .last("LIMIT " + Math.min(size, 100)));
             return execs.stream().map(e -> {
                 Map<String, Object> m = new java.util.LinkedHashMap<>();
-                m.put("id",          e.getId());
+                m.put("id", e.getId());
                 m.put("triggerType", e.getTriggerType());
-                m.put("status",      e.getStatus());
-                m.put("userId",      e.getUserId());
-                m.put("createdAt",   e.getCreatedAt() != null ? e.getCreatedAt().toString() : null);
+                m.put("status", e.getStatus());
+                m.put("userId", e.getUserId());
+                m.put("createdAt", e.getCreatedAt() != null ? e.getCreatedAt().toString() : null);
                 return m;
             }).collect(java.util.stream.Collectors.toList());
         }).subscribeOn(reactor.core.scheduler.Schedulers.boundedElastic()).map(R::ok);
@@ -118,10 +122,10 @@ public class CanvasStatsController {
                             .ge(CanvasExecution::getCreatedAt, sinceDate.atStartOfDay())
                             .le(CanvasExecution::getCreatedAt, untilDate.plusDays(1).atStartOfDay()));
 
-            long total   = executions.size();
+            long total = executions.size();
             long success = executions.stream().filter(e -> e.getStatus() == 2).count();
-            long failed  = executions.stream().filter(e -> e.getStatus() == 3).count();
-            long paused  = executions.stream().filter(e -> e.getStatus() == 1).count();
+            long failed = executions.stream().filter(e -> e.getStatus() == 3).count();
+            long paused = executions.stream().filter(e -> e.getStatus() == 1).count();
 
             Set<String> uniqueUsers = new HashSet<>();
             executions.stream()
@@ -129,10 +133,10 @@ public class CanvasStatsController {
                     .forEach(e -> uniqueUsers.add(e.getUserId()));
 
             Map<String, Object> result = new LinkedHashMap<>();
-            result.put("total",      total);
-            result.put("success",    success);
-            result.put("failed",     failed);
-            result.put("paused",     paused);
+            result.put("total", total);
+            result.put("success", success);
+            result.put("failed", failed);
+            result.put("paused", paused);
             result.put("successRate", total > 0 ? String.format("%.1f%%", success * 100.0 / total) : "0%");
             result.put("uniqueUsers", uniqueUsers.size());
             return result;
@@ -142,6 +146,7 @@ public class CanvasStatsController {
     /**
      * 节点漏斗（设计文档 21.3节）：聚合每个节点的进入/成功/失败/跳过次数。
      * 前端按此数据在画布上叠加漏斗可视化。
+     *
      * @param id 画布 ID
      * @return 节点统计列表
      */
@@ -154,7 +159,8 @@ public class CanvasStatsController {
 
     /**
      * 每日执行量趋势（按天聚合）
-     * @param id 画布 ID
+     *
+     * @param id   画布 ID
      * @param days 查询天数范围
      * @return 执行趋势列表
      */

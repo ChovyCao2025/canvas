@@ -34,14 +34,20 @@ public class MqDefinitionController {
 
     @PostMapping
     public Mono<R<MqMessageDefinition>> create(@RequestBody MqMessageDefinition body) {
-        return Mono.fromCallable(() -> { mapper.insert(body); return R.ok(body); })
+        return Mono.fromCallable(() -> {
+                    mapper.insert(body);
+                    return R.ok(body);
+                })
                 .subscribeOn(Schedulers.boundedElastic());
     }
 
     @PutMapping("/{id}")
     public Mono<R<Void>> update(@PathVariable Long id, @RequestBody MqMessageDefinition body) {
         body.setId(id);
-        return Mono.fromCallable(() -> { mapper.updateById(body); return R.<Void>ok(); })
+        return Mono.fromCallable(() -> {
+                    mapper.updateById(body);
+                    return R.<Void>ok();
+                })
                 .subscribeOn(Schedulers.boundedElastic());
     }
 
