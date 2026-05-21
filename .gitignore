@@ -34,3 +34,4 @@ backend/canvas-engine/target/
 
 # npm lock（本地环境差异大，不提交）
 frontend/package-lock.json
+.superpowers/
