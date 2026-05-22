@@ -7,6 +7,7 @@ import lombok.ToString;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * 单次画布执行的上下文。
@@ -33,10 +34,10 @@ public class ExecutionContext {
     private Map<String, Object> triggerPayload = new HashMap<>();
 
     /** 各节点产出数据历史（nodeId → {fieldKey → value}），供轨迹查询 */
-    private Map<String, Map<String, Object>> nodeOutputs = new LinkedHashMap<>();
+    private final Map<String, Map<String, Object>> nodeOutputs = new ConcurrentHashMap<>();
 
     /** 扁平化快速查找 Map，O(1)。由 putNodeOutput 维护 */
-    private Map<String, Object> flatContext = new HashMap<>();
+    private final Map<String, Object> flatContext = new ConcurrentHashMap<>();
 
     /** 各节点执行状态（需持久化，多阶段恢复时 LOGIC_RELATION 依赖此状态） */
     private Map<String, NodeStatus> nodeStatuses = new ConcurrentHashMap<>();
@@ -72,7 +73,7 @@ public class ExecutionContext {
 
     /** 累计估算大小（字节），@JsonIgnore 不参与序列化 */
     @JsonIgnore
-    private int approxSizeBytes = 0;
+    private final AtomicInteger approxSizeBytes = new AtomicInteger(0);
 
     private static final int MAX_SIZE_BYTES  = 1024 * 1024; // 1MB（设计文档 13.7节）
     private static final int WARN_SIZE_BYTES = 512 * 1024;  // 512KB 预警
@@ -91,21 +92,21 @@ public class ExecutionContext {
         // 大小监控：累加估算字节数（设计文档 13.7节）
         // 使用轻量累加而非每次 JSON 序列化，避免 O(n) 开销
         output.forEach((k, v) ->
-            approxSizeBytes += k.length() + (v != null ? v.toString().length() : 4));
+            approxSizeBytes.addAndGet(k.length() + (v != null ? v.toString().length() : 4)));
 
-        if (approxSizeBytes > MAX_SIZE_BYTES) {
+        if (approxSizeBytes.get() > MAX_SIZE_BYTES) {
             // 不截断（截断可能破坏防资损逻辑），仅记录 WARN
             // 调用方可通过检查 isOversized() 决定是否中止
-        } else if (approxSizeBytes > WARN_SIZE_BYTES) {
+        } else if (approxSizeBytes.get() > WARN_SIZE_BYTES) {
             // 超过 512KB 提前预警，便于排查超大字段
         }
     }
 
     /** 是否超过 1MB 上限 */
-    public boolean isOversized() { return approxSizeBytes > MAX_SIZE_BYTES; }
+    public boolean isOversized() { return approxSizeBytes.get() > MAX_SIZE_BYTES; }
 
     /** 获取估算大小（字节） */
-    public int getApproxSizeBytes() { return approxSizeBytes; }
+    public int getApproxSizeBytes() { return approxSizeBytes.get(); }
 
     // ── 读取上下文字段，O(1) ─────────────────────────────────────
 
