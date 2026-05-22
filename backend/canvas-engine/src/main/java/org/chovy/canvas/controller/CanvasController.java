@@ -105,6 +105,15 @@ public class CanvasController {
                 .thenReturn(R.ok());
     }
 
+    @PostMapping("/{id}/archive")
+    public Mono<R<Void>> archive(
+            @PathVariable Long id,
+            @RequestParam(defaultValue = "system") String operator) {
+        return Mono.<Void>fromRunnable(() -> canvasService.archive(id, operator))
+                .subscribeOn(Schedulers.boundedElastic())
+                .thenReturn(R.ok());
+    }
+
     /**
      * 获取画布历史版本
      *
