@@ -52,6 +52,8 @@ function deriveEdges(backendNodes: BackendNode[]): Edge[] {
     push(c.elseNodeId,    'else')
     push(c.approveNodeId, 'approve')
     push(c.rejectNodeId,  'reject')
+    push(c.hitNextNodeId, 'hit')
+    push(c.missNextNodeId, 'miss')
     c.branches?.forEach((b, i) => push(b.nextNodeId, `branch-${i}`))
     c.priorities?.forEach((p, i) => push(p.nextNodeId, `priority-${i}`))
     c.groups?.forEach(g => push(g.nextNodeId, `group-${g.groupKey}`))
@@ -86,6 +88,8 @@ function patchBizConfig(
   else if (sourceHandle === 'else')     next.elseNodeId    = target
   else if (sourceHandle === 'approve')  next.approveNodeId = target
   else if (sourceHandle === 'reject')   next.rejectNodeId  = target
+  else if (sourceHandle === 'hit')      next.hitNextNodeId = target
+  else if (sourceHandle === 'miss')     next.missNextNodeId = target
   else if (sourceHandle.startsWith('branch-')) {
     const idx = parseInt(sourceHandle.split('-')[1], 10)
     next.branches = (next.branches ?? []).map((b, i) =>
@@ -118,6 +122,8 @@ function cleanRefs(cfg: Record<string, unknown>, deletedIds: Set<string>): BizCo
     successNodeId: clean(biz.successNodeId) as string | undefined,
     failNodeId:    clean(biz.failNodeId)    as string | undefined,
     elseNodeId:    clean(biz.elseNodeId)    as string | undefined,
+    hitNextNodeId: clean(biz.hitNextNodeId) as string | undefined,
+    missNextNodeId: clean(biz.missNextNodeId) as string | undefined,
     branches:   biz.branches?.map(b   => ({ ...b, nextNodeId: clean(b.nextNodeId) as string | undefined })),
     priorities: biz.priorities?.map(p => ({ ...p, nextNodeId: clean(p.nextNodeId) as string | undefined })),
     groups:     biz.groups?.map(g     => ({ ...g, nextNodeId: clean(g.nextNodeId) as string | undefined })),

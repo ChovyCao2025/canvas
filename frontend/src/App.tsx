@@ -13,6 +13,8 @@ import AbExperimentPage from './pages/ab-experiment'
 import TagConfigPage from './pages/tag-config'
 import MqConfigPage from './pages/mq-config'
 import EventConfigPage from './pages/event-config'
+import AudienceListPage from './pages/audience-list'
+import AudienceEditPage from './pages/audience-edit'
 
 export default function App() {
   return (
@@ -41,6 +43,9 @@ export default function App() {
               <Route path="/api-config"     element={<ApiConfigPage />} />
               <Route path="/ab-experiments" element={<AbExperimentPage />} />
               <Route path="/tag-config"     element={<TagConfigPage />} />
+              <Route path="/audiences"      element={<AudienceListPage />} />
+              <Route path="/audiences/new"  element={<AudienceEditPage />} />
+              <Route path="/audiences/:id/edit" element={<AudienceEditPage />} />
               <Route path="/mq-config"      element={<MqConfigPage />} />
               <Route path="/event-config"   element={<EventConfigPage />} />
             </Route>

@@ -60,6 +60,7 @@ const CanvasNode = memo(({ data, id, selected }: NodeProps) => {
   const isTerminal  = TERMINAL_TYPES.has(d.nodeType)
   const isStart     = d.nodeType === 'START'
   const isEnd       = d.nodeType === 'END'
+  const isAudienceTagger = d.nodeType === 'TAGGER' && d.bizConfig?.mode === 'audience'
 
   const branchHandles = getBranchHandles(d.nodeType, d.bizConfig ?? {})
   const isBranching   = branchHandles.length > 0
@@ -114,6 +115,11 @@ const CanvasNode = memo(({ data, id, selected }: NodeProps) => {
         </div>
         <div style={{ background: '#fff', padding: '8px 10px', fontSize: 13, color: '#262626', lineHeight: 1.4, minHeight: 36 }}>
           {d.name || '未命名'}
+          {isAudienceTagger && (
+            <div style={{ marginTop: 6, fontSize: 11, color: '#8c8c8c' }}>
+              人群 ID: {String(d.bizConfig?.audienceId ?? '未配置')}
+            </div>
+          )}
         </div>
         {!isTerminal && (
           isBranching ? (

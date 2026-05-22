@@ -35,6 +35,16 @@ export function getBranchHandles(
         { id: 'reject',  label: '拒绝', color: '#f5222d' },
       ]
 
+    case 'TAGGER': {
+      if (bizConfig.mode === 'audience') {
+        return [
+          { id: 'hit', label: '命中', color: '#52c41a' },
+          { id: 'miss', label: '未命中', color: '#f5222d' },
+        ]
+      }
+      return []
+    }
+
     // API_CALL 暂不实现分支 Handle，保留单路 default 输出
     case 'SELECTOR': {
       const branches = (bizConfig.branches as { label?: string }[]) ?? []

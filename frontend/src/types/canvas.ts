@@ -23,6 +23,8 @@ export interface BizConfig {
   elseNodeId?:    string
   approveNodeId?: string
   rejectNodeId?:  string
+  hitNextNodeId?: string
+  missNextNodeId?: string
   branches?:      Branch[]
   priorities?:    Priority[]
   groups?:        AbGroup[]

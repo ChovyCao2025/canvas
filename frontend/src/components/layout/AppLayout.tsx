@@ -37,6 +37,7 @@ export default function AppLayout() {
     if (location.pathname.startsWith('/api-config'))     return 'api-config'
     if (location.pathname.startsWith('/ab-experiments')) return 'ab-experiments'
     if (location.pathname.startsWith('/tag-config'))     return 'tag-config'
+    if (location.pathname.startsWith('/audiences'))      return 'audiences'
     if (location.pathname.startsWith('/mq-config'))      return 'mq-config'
     if (location.pathname.startsWith('/event-config'))   return 'event-config'
     if (location.pathname.startsWith('/admin/users'))    return 'admin-users'
@@ -90,6 +91,12 @@ export default function AppLayout() {
           icon: <TagsOutlined />,
           label: '标签配置',
           onClick: () => navigate('/tag-config'),
+        },
+        {
+          key: 'audiences',
+          icon: <TeamOutlined />,
+          label: '人群管理',
+          onClick: () => navigate('/audiences'),
         },
         {
           key: 'mq-config',
