@@ -262,7 +262,21 @@ public class CanvasService {
         if (CanvasStatusEnum.ARCHIVED.getCode().equals(canvas.getStatus())) {
             throw new IllegalStateException("画布已归档: " + id);
         }
+        Long publishedVersionId = canvas.getPublishedVersionId();
         canvasTransactionService.archiveDb(id);
+        // If was PUBLISHED, clean up external state exactly like offline() does
+        if (CanvasStatusEnum.PUBLISHED.getCode().equals(canvas.getStatus())) {
+            if (publishedVersionId != null) {
+                CanvasVersion v = canvasVersionMapper.selectById(publishedVersionId);
+                if (v != null) {
+                    DagGraph graph = dagParser.parse(v.getGraphJson());
+                    clearTriggerRoutesFromGraph(id, graph);          // Redis 路由清理
+                    schedulerService.cancelScheduledTriggers(id, graph); // Scheduler 取消
+                    configCache.invalidate(id, publishedVersionId);      // 缓存失效
+                    canvasExecutionService.invalidateCanvas(id);          // 驱逐 Canvas 实体缓存
+                }
+            }
+        }
     }
 
 
