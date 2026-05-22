@@ -1,6 +1,8 @@
 package org.chovy.canvas.controller;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.github.benmanes.caffeine.cache.Cache;
+import com.github.benmanes.caffeine.cache.Caffeine;
 import org.chovy.canvas.domain.constant.NodeType;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -24,6 +26,7 @@ import reactor.core.scheduler.Schedulers;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 
 /**
  * 事件定义管理 + 事件上报接口。
@@ -44,6 +47,12 @@ public class EventDefinitionController {
     private final CanvasDisruptorService disruptorService;
     private final TriggerRouteService triggerRouteService;
     private final ObjectMapper objectMapper;
+
+    /** 事件定义本地缓存：eventCode → EventDefinition。TTL=10min，最多200条。 */
+    private final Cache<String, EventDefinition> eventDefCache = Caffeine.newBuilder()
+            .maximumSize(200)
+            .expireAfterWrite(10, TimeUnit.MINUTES)
+            .build();
 
     // ── 事件定义 CRUD ────────────────────────────────────────────
 
@@ -75,6 +84,9 @@ public class EventDefinitionController {
         body.setId(id);
         return Mono.fromCallable(() -> {
                     eventMapper.updateById(body);
+                    if (body.getEventCode() != null) {
+                        eventDefCache.invalidate(body.getEventCode());
+                    }
                     return R.ok();
                 })
                 .subscribeOn(Schedulers.boundedElastic());
@@ -101,12 +113,12 @@ public class EventDefinitionController {
                     if (req.getUserId() == null || req.getUserId().isBlank())
                         throw new IllegalArgumentException("userId 不能为空");
 
-                    // 1. 验证事件定义存在
-                    // FIXME: 事件定义会频繁上报导致查询, 事件查询应该有缓存机制
-                    EventDefinition def = eventMapper.selectOne(
-                            new LambdaQueryWrapper<EventDefinition>()
-                                    .eq(EventDefinition::getEventCode, req.getEventCode())
-                                    .eq(EventDefinition::getEnabled, CanvasStatusEnum.PUBLISHED.getCode()));
+                    // 1. 验证事件定义存在（走本地缓存，TTL=10min）
+                    EventDefinition def = eventDefCache.get(req.getEventCode(), code ->
+                            eventMapper.selectOne(
+                                    new LambdaQueryWrapper<EventDefinition>()
+                                            .eq(EventDefinition::getEventCode, code)
+                                            .eq(EventDefinition::getEnabled, CanvasStatusEnum.PUBLISHED.getCode())));
                     if (def == null)
                         throw new IllegalArgumentException("事件未定义或已禁用: " + req.getEventCode());
 

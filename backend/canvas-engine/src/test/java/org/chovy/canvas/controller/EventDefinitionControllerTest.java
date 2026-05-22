@@ -20,6 +20,8 @@ import java.util.Set;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 class EventDefinitionControllerTest {
@@ -102,5 +104,30 @@ class EventDefinitionControllerTest {
         EventLog insertedLog = captor.getValue();
         assertThat(insertedLog.getCanvasTriggered()).isEqualTo(0);
         assertThat(insertedLog.getCanvasCount()).isEqualTo(0);
+    }
+
+    @Test
+    void reportEvent_usesEventDefinitionCache_onSecondCall() {
+        // Arrange: valid event definition exists
+        EventDefinition def = new EventDefinition();
+        def.setEventCode("CACHED_EVENT");
+        def.setEnabled(CanvasStatusEnum.PUBLISHED.getCode());
+        when(eventMapper.selectOne(any())).thenReturn(def);
+
+        when(triggerRouteService.getCanvasByBehavior("CACHED_EVENT"))
+                .thenReturn(Set.of());
+
+        doAnswer(invocation -> null).when(logMapper).insert(any(EventLog.class));
+
+        EventReportReq req = new EventReportReq();
+        req.setEventCode("CACHED_EVENT");
+        req.setUserId("user-cache-test");
+
+        // Act: call reportEvent twice with the same eventCode
+        controller.reportEvent(req).block();
+        controller.reportEvent(req).block();
+
+        // Assert: DB was only hit once; second call served from cache
+        verify(eventMapper, times(1)).selectOne(any());
     }
 }
