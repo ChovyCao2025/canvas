@@ -1,0 +1,110 @@
+package org.chovy.canvas.engine.trigger;
+
+import org.chovy.canvas.domain.canvas.Canvas;
+import org.chovy.canvas.domain.canvas.CanvasMapper;
+import org.chovy.canvas.domain.execution.CanvasUserQuota;
+import org.chovy.canvas.domain.execution.CanvasUserQuotaMapper;
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.data.redis.core.ValueOperations;
+
+import java.time.LocalDate;
+
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.assertThatCode;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.*;
+
+@ExtendWith(MockitoExtension.class)
+class TriggerPreCheckServiceTest {
+
+    // Constant mirrored from TriggerPreCheckService — must stay in sync
+    private static final String QUOTA_KEY = "canvas:quota:";
+
+    @Mock
+    CanvasMapper canvasMapper;
+
+    @Mock
+    CanvasUserQuotaMapper quotaMapper;
+
+    @Mock
+    StringRedisTemplate redis;
+
+    @Mock
+    ValueOperations<String, String> valueOps;
+
+    @InjectMocks
+    TriggerPreCheckService service;
+
+    private static final Long   CANVAS_ID = 42L;
+    private static final String USER_ID   = "user-1";
+
+    @BeforeEach
+    void setUp() {
+        when(redis.opsForValue()).thenReturn(valueOps);
+    }
+
+    /** Builds a minimal published Canvas with only perUserTotalLimit set. */
+    private Canvas canvasWithTotalLimit(int limit) {
+        Canvas c = new Canvas();
+        c.setId(CANVAS_ID);
+        c.setStatus(1);                      // PUBLISHED
+        c.setPerUserTotalLimit(limit);
+        // All other limits null — only check #5 is exercised
+        return c;
+    }
+
+    // ─── perUserTotalLimit ───────────────────────────────────────────────────
+
+    @Test
+    void perUserTotalLimit_rejectsWhenAtLimit() {
+        int limit = 3;
+        Canvas canvas = canvasWithTotalLimit(limit);
+
+        String today = LocalDate.now().toString();
+        String key   = QUOTA_KEY + "total:" + CANVAS_ID + ":" + USER_ID + ":" + today;
+
+        // INCR returns limit+1 — over quota
+        when(valueOps.increment(key)).thenReturn((long) limit + 1);
+
+        assertThatThrownBy(() -> service.check(canvas, USER_ID))
+                .isInstanceOf(TriggerPreCheckService.TriggerRejectedException.class)
+                .hasMessageContaining("用户总触发次数已达上限")
+                .extracting(e -> ((TriggerPreCheckService.TriggerRejectedException) e).getCode())
+                .isEqualTo("QUOTA_002");
+
+        // Rollback decrement must be called exactly once
+        verify(valueOps, times(1)).decrement(key);
+    }
+
+    @Test
+    void perUserTotalLimit_allowsWhenUnderLimit() {
+        int limit = 3;
+        Canvas canvas = canvasWithTotalLimit(limit);
+
+        String today = LocalDate.now().toString();
+        String key   = QUOTA_KEY + "total:" + CANVAS_ID + ":" + USER_ID + ":" + today;
+
+        // INCR returns 2 — still under limit
+        when(valueOps.increment(key)).thenReturn(2L);
+        // quotaMapper stubbed to return null (no existing quota) for the cooldown check
+        // (cooldownSeconds is null on this canvas so quotaMapper is never called for #6)
+        // updateQuotaAsync fires on a virtual thread; stub selectOne to avoid NPE there
+        when(quotaMapper.selectOne(any(LambdaQueryWrapper.class))).thenReturn(null);
+
+        assertThatCode(() -> service.check(canvas, USER_ID))
+                .doesNotThrowAnyException();
+
+        // No rollback decrement should occur
+        verify(valueOps, never()).decrement(key);
+    }
+}

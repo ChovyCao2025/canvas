@@ -75,17 +75,13 @@ public class TriggerPreCheckService {
             }
         }
 
-        // 5. 用户总触发上限（从 MySQL 查询，允许轻微超配）
-        // FIXME: 此处修改成不允许超配
+        // 5. 用户总触发上限（Redis INCR 原子扣减，与 perUserDailyLimit 同日维度）
         if (canvas.getPerUserTotalLimit() != null) {
-            CanvasUserQuota quota = quotaMapper.selectOne(
-                    new LambdaQueryWrapper<CanvasUserQuota>()
-                            .eq(CanvasUserQuota::getCanvasId, canvasId)
-                            .eq(CanvasUserQuota::getUserId, userId)
-                            .eq(CanvasUserQuota::getTriggerDate, LocalDate.now())
-            );
-            int total = quota != null ? quota.getTotalCount() : 0;
-            if (total >= canvas.getPerUserTotalLimit()) {
+            String key = QUOTA_KEY + "total:" + canvasId + ":" + userId + ":" + today;
+            Long total = redis.opsForValue().increment(key);
+            redis.expire(key, Duration.ofDays(2));
+            if (total != null && total > canvas.getPerUserTotalLimit()) {
+                redis.opsForValue().decrement(key);
                 throw new TriggerRejectedException("QUOTA_002", "用户总触发次数已达上限");
             }
         }
