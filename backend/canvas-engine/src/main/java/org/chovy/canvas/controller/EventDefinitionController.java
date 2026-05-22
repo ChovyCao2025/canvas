@@ -110,21 +110,7 @@ public class EventDefinitionController {
                     if (def == null)
                         throw new IllegalArgumentException("事件未定义或已禁用: " + req.getEventCode());
 
-                    // 2. 记录事件日志
-                    // FIXME: 此处数量统计实际上是没有生效的, 相关的统计值都被设置为0
-                    EventLog eventLog = new EventLog();
-                    eventLog.setEventCode(req.getEventCode());
-                    eventLog.setUserId(req.getUserId());
-                    try {
-                        eventLog.setAttributes(req.getAttributes() != null
-                                ? objectMapper.writeValueAsString(req.getAttributes()) : null);
-                    } catch (Exception ignored) {
-                    }
-                    eventLog.setCanvasTriggered(0);
-                    eventLog.setCanvasCount(0);
-                    logMapper.insert(eventLog);
-
-                    // 3. 从路由表查所有监听此事件的已发布画布，逐一触发
+                    // 2. 从路由表查所有监听此事件的已发布画布，逐一触发
                     // FIXME: Redis 异常意味着整个链路都无法推进, 考虑降级方案以及是否有做好缓存刷新问题
                     Set<String> canvasIds = triggerRouteService.getCanvasByBehavior(req.getEventCode());
                     // FIXME: 使用雪花算法代替
@@ -148,6 +134,19 @@ public class EventDefinitionController {
                     if (canvasIds.isEmpty()) {
                         log.info("[EVENT] 无已发布画布订阅事件 eventCode={}", req.getEventCode());
                     }
+
+                    // 3. 记录事件日志（在获取 canvasIds 之后，以写入真实触发数量）
+                    EventLog eventLog = new EventLog();
+                    eventLog.setEventCode(req.getEventCode());
+                    eventLog.setUserId(req.getUserId());
+                    try {
+                        eventLog.setAttributes(req.getAttributes() != null
+                                ? objectMapper.writeValueAsString(req.getAttributes()) : null);
+                    } catch (Exception ignored) {
+                    }
+                    eventLog.setCanvasTriggered(canvasIds.size());
+                    eventLog.setCanvasCount(canvasIds.size());
+                    logMapper.insert(eventLog);
 
                     Map<String, Object> resp = new java.util.LinkedHashMap<>();
                     resp.put("eventLogId", eventLog.getId());
