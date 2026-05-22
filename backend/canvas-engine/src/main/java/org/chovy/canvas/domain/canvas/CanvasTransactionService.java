@@ -24,6 +24,14 @@ public class CanvasTransactionService {
         return publishedVersionId;
     }
 
+    @Transactional
+    void archiveDb(Long id) {
+        Canvas canvas = canvasMapper.selectById(id);
+        if (canvas == null) throw new IllegalArgumentException("画布不存在: " + id);
+        canvas.setStatus(CanvasStatusEnum.ARCHIVED.getCode());
+        canvasMapper.updateById(canvas);
+    }
+
 
 
 }

@@ -132,6 +132,7 @@ public class CanvasService {
     public PageResult<Canvas> list(CanvasListQuery q) {
         LambdaQueryWrapper<Canvas> wrapper = new LambdaQueryWrapper<Canvas>()
                 .eq(q.getStatus() != null, Canvas::getStatus, q.getStatus())
+                .ne(q.getStatus() == null, Canvas::getStatus, CanvasStatusEnum.ARCHIVED.getCode())
                 .like(q.getName() != null && !q.getName().isBlank(), Canvas::getName, q.getName())
                 .orderByDesc(Canvas::getCreatedAt);
 
@@ -253,6 +254,15 @@ public class CanvasService {
                 canvasExecutionService.invalidateCanvas(id);          // 驱逐 Canvas 实体缓存
             }
         }
+    }
+
+    public void archive(Long id, String operator) {
+        Canvas canvas = canvasMapper.selectById(id);
+        if (canvas == null) throw new IllegalArgumentException("画布不存在: " + id);
+        if (CanvasStatusEnum.ARCHIVED.getCode().equals(canvas.getStatus())) {
+            throw new IllegalStateException("画布已归档: " + id);
+        }
+        canvasTransactionService.archiveDb(id);
     }
 
 
