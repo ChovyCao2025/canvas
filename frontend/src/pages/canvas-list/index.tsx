@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react'
 import {
   Button, Table, Tag, Space, Modal, Form, Input,
-  message, Typography, Tooltip,
+  message, Typography, Tooltip, Dropdown,
 } from 'antd'
 import {
   PlusOutlined, EditOutlined, CloudUploadOutlined,
   StopOutlined, CopyOutlined, ThunderboltOutlined, BarChartOutlined, EyeOutlined,
+  MoreOutlined,
 } from '@ant-design/icons'
 import { useNavigate } from 'react-router-dom'
 import type { ColumnsType } from 'antd/es/table'
@@ -98,6 +99,29 @@ export default function CanvasListPage() {
     fetchList()
   }
 
+  const handleArchive = (id: number, name: string) => {
+    Modal.confirm({
+      title: '归档画布',
+      content: (
+        <div>
+          <p>确认将「{name}」归档？</p>
+          <ul style={{ color: '#8c8c8c', fontSize: 13, paddingLeft: 16, margin: '8px 0 0' }}>
+            <li>画布将从列表中隐藏</li>
+            <li>正在运行中的流程不受影响</li>
+            <li>可联系管理员恢复</li>
+          </ul>
+        </div>
+      ),
+      okText: '确认归档',
+      okType: 'danger',
+      onOk: async () => {
+        await canvasApi.archive(id)
+        message.success('已归档')
+        fetchList()
+      },
+    })
+  }
+
   const columns: ColumnsType<Canvas> = [
     { title: 'ID', dataIndex: 'id', width: 80 },
     {
@@ -169,6 +193,21 @@ export default function CanvasListPage() {
             <Button size="small" icon={<BarChartOutlined />}
               onClick={() => navigate(`/canvas/${record.id}/stats`)} />
           </Tooltip>
+
+          <Dropdown
+            menu={{
+              items: [
+                {
+                  key: 'archive',
+                  label: <span style={{ color: '#ff4d4f' }}>归档画布</span>,
+                  onClick: () => handleArchive(record.id, record.name),
+                },
+              ],
+            }}
+            trigger={['click']}
+          >
+            <Button size="small" icon={<MoreOutlined />} />
+          </Dropdown>
         </Space>
       ),
     },

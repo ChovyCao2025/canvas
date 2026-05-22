@@ -92,6 +92,9 @@ export const canvasApi = {
   kill: (id: number, mode = 'GRACEFUL') =>
     http.post<R<void>, R<void>>(`/canvas/${id}/kill?mode=${mode}`),
 
+  archive: (id: number) =>
+    http.post<R<void>, R<void>>(`/canvas/${id}/archive`),
+
   canary: (id: number, percent: number) =>
     http.post<R<void>, R<void>>(`/canvas/${id}/canary?percent=${percent}`),
 
