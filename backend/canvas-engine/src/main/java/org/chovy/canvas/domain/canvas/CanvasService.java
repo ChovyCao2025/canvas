@@ -13,6 +13,7 @@ import org.chovy.canvas.engine.dag.DagGraph;
 import org.chovy.canvas.engine.dag.DagParser;
 import org.chovy.canvas.engine.handlers.GroovyHandler;
 import org.chovy.canvas.engine.trigger.CanvasSchedulerService;
+import org.chovy.canvas.engine.trigger.CanvasExecutionService;
 import org.chovy.canvas.infra.cache.CanvasConfigCache;
 import org.chovy.canvas.infra.redis.TriggerRouteService;
 import lombok.RequiredArgsConstructor;
@@ -35,6 +36,7 @@ public class CanvasService {
     private final TriggerRouteService triggerRouteService;
     private final CanvasSchedulerService schedulerService;
     private final CanvasConfigCache configCache;
+    private final CanvasExecutionService canvasExecutionService;
     private final GroovyHandler groovyHandler;
     private final org.chovy.canvas.engine.handlers.MqTriggerHandler mqTriggerHandler;
     private final org.springframework.data.redis.core.StringRedisTemplate redis;
@@ -192,6 +194,8 @@ public class CanvasService {
             if (canvas.getPublishedVersionId() != null) {
                 configCache.invalidate(canvas.getId(), canvas.getPublishedVersionId());
             }
+            // 发布后驱逐 Canvas 实体缓存，下次 trigger() 读到最新 publishedVersionId/status
+            canvasExecutionService.invalidateCanvas(id);
             // Groovy 脚本预编译（off-path，12.9节）
             precompileGroovyNodes(canvas.getId(), graph);
 
@@ -246,6 +250,7 @@ public class CanvasService {
                 clearTriggerRoutesFromGraph(id, graph);          // Step 2: 事务外 Redis
                 schedulerService.cancelScheduledTriggers(id, graph); // 事务外 Scheduler
                 configCache.invalidate(id, publishedVersionId);      // 事务外缓存
+                canvasExecutionService.invalidateCanvas(id);          // 驱逐 Canvas 实体缓存
             }
         }
     }

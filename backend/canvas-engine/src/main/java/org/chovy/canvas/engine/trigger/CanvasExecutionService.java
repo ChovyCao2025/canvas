@@ -1,6 +1,8 @@
 package org.chovy.canvas.engine.trigger;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.github.benmanes.caffeine.cache.Cache;
+import com.github.benmanes.caffeine.cache.Caffeine;
 import org.chovy.canvas.domain.constant.NodeType;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import org.chovy.canvas.domain.canvas.Canvas;
@@ -27,6 +29,7 @@ import reactor.core.scheduler.Schedulers;
 
 import java.time.Duration;
 import java.util.*;
+import java.util.concurrent.TimeUnit;
 
 /**
  * 画布执行编排器：dedup → ctx 加载/初始化 → DAG 执行 → 结果写入 DB。
@@ -47,6 +50,12 @@ public class CanvasExecutionService {
     private final TriggerPreCheckService preCheckService;
     private final InFlightExecutionRegistry executionRegistry;
     private final org.chovy.canvas.domain.execution.CanvasExecutionStatsMapper statsMapper;
+
+    /** Canvas 实体本地缓存：canvasId → Canvas。TTL=5min，最多500条。 */
+    private final Cache<Long, Canvas> canvasCache = Caffeine.newBuilder()
+            .maximumSize(500)
+            .expireAfterWrite(5, TimeUnit.MINUTES)
+            .build();
 
 
     @Value("${canvas.execution.context-ttl-sec:86400}")
@@ -144,8 +153,7 @@ public class CanvasExecutionService {
         return Mono.fromCallable(() -> {
 
                     // 1. 加载画布（草稿在 dry-run 时可用，正式触发只允许已发布）
-                    // FIXME: 此处调用量可能很大, 可以借助缓存提高性能优化
-                    Canvas canvas = canvasMapper.selectById(canvasId);
+                    Canvas canvas = canvasCache.get(canvasId, id -> canvasMapper.selectById(id));
                     if (canvas == null) {
                         throw new IllegalStateException("画布不存在: " + canvasId);
                     }
@@ -281,6 +289,18 @@ public class CanvasExecutionService {
                                 ));
                             });
                 });
+    }
+
+    // ── 缓存失效 ──────────────────────────────────────────────────
+
+    /**
+     * 画布发布/下线时主动驱逐 Canvas 实体缓存，
+     * 确保下次 trigger() 读到最新状态（已发布/已下线）。
+     *
+     * @param canvasId 画布 ID
+     */
+    public void invalidateCanvas(Long canvasId) {
+        canvasCache.invalidate(canvasId);
     }
 
     // ── 私有帮助方法 ──────────────────────────────────────────────
