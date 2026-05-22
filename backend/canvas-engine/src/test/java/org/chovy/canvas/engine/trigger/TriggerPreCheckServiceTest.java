@@ -11,6 +11,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.mockito.Mockito;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.ValueOperations;
 
@@ -96,10 +97,9 @@ class TriggerPreCheckServiceTest {
 
         // INCR returns 2 — still under limit
         when(valueOps.increment(key)).thenReturn(2L);
-        // quotaMapper stubbed to return null (no existing quota) for the cooldown check
-        // (cooldownSeconds is null on this canvas so quotaMapper is never called for #6)
-        // updateQuotaAsync fires on a virtual thread; stub selectOne to avoid NPE there
-        when(quotaMapper.selectOne(any(LambdaQueryWrapper.class))).thenReturn(null);
+        // quotaMapper stubbed to return null defensively for the async updateQuotaAsync() virtual thread
+        // (cooldownSeconds is null on this canvas so quotaMapper.selectOne() for check #6 is not called)
+        Mockito.lenient().when(quotaMapper.selectOne(any(LambdaQueryWrapper.class))).thenReturn(null);
 
         assertThatCode(() -> service.check(canvas, USER_ID))
                 .doesNotThrowAnyException();
