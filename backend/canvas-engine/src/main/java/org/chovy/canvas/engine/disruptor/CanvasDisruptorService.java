@@ -115,14 +115,6 @@ public class CanvasDisruptorService {
         }
     }
 
-    /**
-     * 剩余可用容量（用于监控背压）
-     */
-    // FIXME: 没有实际使用到
-    public long remainingCapacity() {
-        return ringBuffer.remainingCapacity();
-    }
-
     @PreDestroy
     public void shutdown() {
         disruptor.shutdown();
