@@ -178,8 +178,65 @@ public class CanvasConfigCache {
 
 ---
 
+---
+
+## 缓存三大问题防护
+
+### 缓存穿透（Cache Penetration）
+
+**问题**：查询不存在的 key，Loader 返回 null，不写 L2，每次请求都穿透到 L3。
+
+**防护**：空值缓存（Null Sentinel）。Loader 返回 null 时向 L2 写入哨兵 `__NULL__`，TTL 使用更短的 `nullValueTtl`（默认 5 分钟）。后续请求读到哨兵直接返回 `Optional.empty()`，不再调用 Loader。
+
+Builder 配置：`.nullValueTtl(Duration.ofMinutes(5))`（默认开启）
+
+### 缓存击穿（Cache Breakdown / Hotspot）
+
+**问题**：热点 key 的 L1 被驱逐且 L2 同时过期，多个实例并发穿透 L3。
+
+**Caffeine 的保证**：`LoadingCache` 在单实例内对同一 key 只执行一次 load，其他线程等待结果。**分布式场景无法覆盖**。
+
+**防护**：L2 miss 时通过 Redis SETNX 获取分布式锁，仅一个实例执行 Loader：
+- 获锁成功 → 调 L3 → 写 L2 → 释放锁
+- 获锁失败 → 等待最多 500ms（轮询 L2），等待超时后降级直调 L3
+
+Builder 配置：`.hotspotProtection(true)`（默认 `false`，热点场景按需开启）
+
+### 缓存雪崩（Cache Avalanche）
+
+**问题**：大量 key 使用相同 L2 TTL，批量写入后（如重启预热）同时到期，L3 瞬间被打满。
+
+**防护**：L2 TTL 加随机 Jitter，打散过期时间：
+
+```
+actualTtl = l2Ttl + random(0, l2Ttl × jitterRatio)
+```
+
+Builder 配置：`.l2TtlJitter(0.1)`（默认 0.1，即 0~10% 随机偏移）
+
+---
+
+## Builder 完整示例（含防护配置）
+
+```java
+TieredCache<Long, DagGraph> cache = TieredCache.<Long, DagGraph>builder()
+    .name("canvas-config")
+    .l1MaxSize(500)
+    .l1RefreshAfterWrite(Duration.ofHours(2))
+    .l2KeyPrefix("canvas:config:")
+    .l2Ttl(Duration.ofHours(24))
+    .l2TtlJitter(0.1)                        // 缓存雪崩防护
+    .nullValueTtl(Duration.ofMinutes(5))      // 缓存穿透防护
+    .hotspotProtection(true)                  // 缓存击穿防护（热点场景）
+    .loader(id -> loadFromDb(id))
+    .valueType(DagGraph.class)
+    .build(manager);
+```
+
+---
+
 ## 不在范围内
 
-- 分布式锁防 Cache Stampede（Dog-pile effect）：当前 Caffeine refreshAfterWrite 的异步刷新机制已基本缓解
 - 多 L2 后端（Memcached 等）：Redis 是当前唯一 L2
 - 缓存预热（Warmup）：由各业务自行决定
+- Bloom Filter 防穿透（适用于海量随机 key 场景，当前 key 空间可控）
