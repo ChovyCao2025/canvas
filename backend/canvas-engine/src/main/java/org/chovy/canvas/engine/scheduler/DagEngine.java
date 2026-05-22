@@ -487,8 +487,7 @@ public class DagEngine {
 
             // LOGIC_RELATION 等待超时（与 Hub 类似，防止第二触发永不到来）
             // config 中可选配置 timeout 字段（秒），默认等于全局执行超时
-            if (!ctx.getScheduledHubTimeouts().contains("lr:" + nodeId)) {
-                ctx.getScheduledHubTimeouts().add("lr:" + nodeId);
+            if (ctx.getScheduledHubTimeouts().add("lr:" + nodeId)) {
                 ctx.getHubStartTimes().putIfAbsent("lr:" + nodeId, System.currentTimeMillis());
                 int timeoutSec = config.get("timeout") instanceof Number n
                         ? n.intValue() : (int) globalTimeout;
@@ -570,8 +569,7 @@ public class DagEngine {
         // 所有上游未完成：进入等待态
         if (!HubHandler.allUpstreamDone(upstreamIds, ctx)) {
             ctx.setNodeStatus(nodeId, NodeStatus.WAITING);  // 设 WAITING 供 isPaused 检测
-            if (!ctx.getScheduledHubTimeouts().contains(nodeId)) {
-                ctx.getScheduledHubTimeouts().add(nodeId);
+            if (ctx.getScheduledHubTimeouts().add(nodeId)) {
                 ctx.getHubStartTimes().putIfAbsent(nodeId, System.currentTimeMillis());
                 int timeoutSec = HubHandler.getTimeoutSeconds(config);
 
@@ -631,8 +629,7 @@ public class DagEngine {
         if (!HubHandler.allUpstreamDone(upstreamIds, ctx)) {
             ctx.setNodeStatus(nodeId, NodeStatus.WAITING);
             String timerKey = "ag:" + nodeId;
-            if (!ctx.getScheduledHubTimeouts().contains(timerKey)) {
-                ctx.getScheduledHubTimeouts().add(timerKey);
+            if (ctx.getScheduledHubTimeouts().add(timerKey)) {
                 ctx.getHubStartTimes().putIfAbsent(timerKey, System.currentTimeMillis());
                 int timeoutSec = config.get("timeout") instanceof Number n ? n.intValue() : (int) globalTimeout;
 
@@ -672,8 +669,7 @@ public class DagEngine {
     private void scheduleThresholdTimeoutIfNeeded(String nodeId, Map<String, Object> config,
                                                   ExecutionContext ctx) {
         String timerKey = "th:" + nodeId;
-        if (ctx.getScheduledHubTimeouts().contains(timerKey)) return;
-        ctx.getScheduledHubTimeouts().add(timerKey);
+        if (!ctx.getScheduledHubTimeouts().add(timerKey)) return;
         int timeoutSec = config.get("timeout") instanceof Number n ? n.intValue() : (int) globalTimeout;
         Mono.delay(Duration.ofSeconds(timeoutSec), VIRTUAL)
                 .subscribe(__ -> {
