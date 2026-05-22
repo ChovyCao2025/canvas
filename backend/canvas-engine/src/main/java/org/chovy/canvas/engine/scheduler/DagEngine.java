@@ -705,6 +705,7 @@ public class DagEngine {
 
         writeTraceStart(ctx, node);
         NodeHandler handler = handlerRegistry.get(node.getType());
+        long nodeStartMs = System.currentTimeMillis(); // 记录节点开始时间
 
         return executeHandlerWithRepeat(handler, config, ctx, nodeGate,
                 nodeId, node.getType())
@@ -715,7 +716,8 @@ public class DagEngine {
                     if (!result.success()) {
                         nodeGate.executing.set(false); // 释放锁（FAILED 路径）
                         ctx.setNodeStatus(nodeId, NodeStatus.FAILED);
-                        writeTraceEnd(ctx, node, result);
+                        long durationMs = System.currentTimeMillis() - nodeStartMs;
+                        writeTraceEnd(ctx, node, result, durationMs);
                         if (ctx.isBenefitGranted() || ctx.isUserReached()) return Mono.just(Map.of());
                         return Mono.error(new RuntimeException("节点 " + nodeId + " 失败: " + result.errorMessage()));
                     }
@@ -734,7 +736,10 @@ public class DagEngine {
                         ctx.putNodeOutput(nodeId, result.output());
                     }
                     ctx.setNodeStatus(nodeId, NodeStatus.SUCCESS);
-                    writeTraceEnd(ctx, node, result);
+                    long durationMs = System.currentTimeMillis() - nodeStartMs;
+                    writeTraceEnd(ctx, node, result, durationMs);
+                    metrics.recordNodeExecution(node.getType(), NodeStatus.SUCCESS.name(), durationMs);
+                    log.debug("[ENGINE] 节点完成 nodeId={} type={}", nodeId, node.getType());
                     return triggerDownstream(graph, result, nodeId, node.getType(), ctx, depth);
                 })
                 .onErrorResume(e -> {
