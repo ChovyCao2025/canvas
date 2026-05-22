@@ -77,8 +77,70 @@ canvas:
 
 ---
 
+## 补充设计：边界问题修正
+
+### 1. retryCount 字段设计修正（严重）
+
+原设计用消息体的 `retryCount` 判断是否超限，但 RocketMQ 自动重试时消息体不变，`retryCount` 永远不递增，限制形同虚设。
+
+**修正**：使用 `MessageExt.getReconsumeTimes()`（RocketMQ 内置重试计数）：
+
+```java
+// OverflowRetryConsumer.onMessage()
+if (message.getReconsumeTimes() >= priorityConfig.getOverflowMaxRetry()) {
+    log.warn("[OVERFLOW_RETRY] 超过最大重试 canvasId={}", msg.getCanvasId());
+    dlqService.record(msg.getCanvasId(), msg.getUserId(), "overflow_max_retry");
+    return; // ACK，不再重试
+}
+```
+
+`OverflowRetryMessage` 中的 `retryCount` 字段**改为记录跨越 `sendOverflowRetry` 调用的累计次数**（解决下方无限循环问题），与 `getReconsumeTimes()` 相加共同判断：
+
+```java
+int totalRetry = message.getReconsumeTimes() + msg.getChainRetryCount();
+if (totalRetry >= priorityConfig.getOverflowMaxRetry()) { ... }
+```
+
+### 2. 溢出 → 重试 → 再溢出无限循环修正（严重）
+
+`OverflowRetryConsumer` 投入 Disruptor，Disruptor worker 再调 `trigger()`，若仍超限则再次 `sendOverflowRetry(retryCount=0)`，产生全新消息，`getReconsumeTimes()` 重置为 0，`maxRetry` 完全失效。
+
+**修正**：`OverflowRetryMessage` 新增 `chainRetryCount` 字段，`CanvasExecutionService.sendOverflowRetry()` 从上下文读取并递增传入；`trigger()` 的 payload 中携带此字段：
+
+```java
+// trigger() 内溢出分支
+int chainRetry = (int) payload.getOrDefault("__overflowChainRetry", 0);
+sendOverflowRetry(canvasId, userId, triggerType, ..., chainRetry);
+
+// sendOverflowRetry()
+OverflowRetryMessage msg = new OverflowRetryMessage(..., chainRetryCount = chainRetry + 1);
+```
+
+### 3. HIGH 优先级上限修正
+
+完全无限制的 HIGH 优先级在结算日批量支付回调场景下会打满引擎。修正为独立的 `highMaxConcurrencyRatio`：
+
+```yaml
+canvas.execution.priority:
+  high-max-concurrency-ratio: 2.0  # HIGH 使用 maxConc × 2，而非真正无限制
+```
+
+```java
+case HIGH:
+    int highMax = (int)(maxConc * priorityConfig.getHighMaxConcurrencyRatio());
+    if (active < highMax) break; // 未超 HIGH 上限，直接执行
+    // 超 HIGH 上限：打 warn，仍执行（HIGH 不丢弃，但记录告警）
+    log.error("[ENGINE] HIGH 优先级超并发上限 canvasId={} active={}/{}", canvasId, active, highMax);
+```
+
+### 4. 溢出超限写 DLQ 实现补全
+
+原 Plan 里 `OverflowRetryConsumer` 只打 warn 日志，未实际写 DLQ 表。补全调用 `CanvasExecutionDlqService.record()` 写入 `canvas_execution_dlq`，与现有 DLQ 基础设施对接。
+
+---
+
 ## 不在范围内
 
-- Disruptor 内部优先级队列（实现复杂度高，当前 Ring Buffer + 优先级路由已满足需求）
+- Disruptor 内部优先级队列（复杂度高，当前方案已满足需求）
 - 分布式优先级队列（跨实例排序）
-- 可视化队列积压监控（Micrometer 指标预留即可）
+- 可视化队列积压监控（Micrometer 指标预留）

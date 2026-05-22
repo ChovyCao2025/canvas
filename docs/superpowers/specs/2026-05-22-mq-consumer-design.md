@@ -110,8 +110,49 @@ canvas:
 
 ---
 
+## 补充设计：边界问题
+
+### 1. 消费者启动时序竞态
+
+`CanvasRouteInitializer`（`@PostConstruct`）与 RocketMQ Consumer 启动无顺序保证。若 Consumer 先就绪，路由表为空，消息被 ACK 后静默丢弃。
+
+修复：`TriggerRouteService` 增加 `routeTableReady` 原子标志位，`CanvasRouteInitializer` 完成后置 `true`。Consumer 消费时若标志为 false，抛异常触发 `RECONSUME_LATER`：
+
+```java
+if (canvasIds.isEmpty()) {
+    if (!routeService.isRouteTableReady()) {
+        throw new IllegalStateException("路由表未就绪，RECONSUME_LATER");
+    }
+    log.warn("[MQ_CONSUMER] tag={} 无匹配画布，正常丢弃", tag);
+    return; // 路由表已就绪但确实无匹配，ACK
+}
+```
+
+### 2. SEND_MQ 循环触发防护
+
+画布若在 MQ_TRIGGER 执行路径中又发 SEND_MQ 到同一 topic，会产生无限循环。
+
+修复：消息体加 `executionDepth` 字段（默认 0），`SendMqHandler` 发送时递增，`MqTriggerConsumer` 传入执行上下文，`CanvasExecutionService.trigger()` 超过阈值（默认 5）时拒绝并写内部 DLQ：
+
+```json
+{ "userId": "u_123", "messageCode": "order_paid", "payload": {}, "executionDepth": 1 }
+```
+
+配置：`canvas.mq.max-execution-depth: 5`
+
+### 3. RocketMQ DLQ 桥接
+
+消息超过 16 次重试后进入 `%DLQ%GID_CANVAS_ENGINE`，若无监控则成黑洞。
+
+修复：增加 `RocketMqDlqBridgeConsumer`，订阅 `%DLQ%GID_CANVAS_ENGINE`，将失败消息写入现有 `canvas_execution_dlq` 表，复用 `DlqController` 的查询和重放 UI。
+
+### 4. 生产环境 Topic 预创建
+
+`autoCreateTopicEnable=true` 仅用于开发，默认 4 队列。生产环境必须预创建 `CANVAS_MQ_TRIGGER`（8 队列）和 `CANVAS_TRIGGER_OVERFLOW`（4 队列），否则吞吐量受限且无法动态调整。运维必须在部署前执行 Topic 创建脚本。
+
+---
+
 ## 不在范围内
 
 - 顺序消息（Orderly）：画布触发不需要严格顺序
 - 事务消息：SendMqHandler 仅发普通消息，事务由业务层保证
-- DLQ 手动重放 UI（现有 DlqController 架构可扩展）
