@@ -20,6 +20,7 @@ const STATUS_MAP: Record<number, { label: string; color: string }> = {
   0: { label: '草稿',   color: 'default' },
   1: { label: '已发布', color: 'green' },
   2: { label: '已下线', color: 'red' },
+  3: { label: '已归档', color: 'orange' },
   4: { label: '已停止', color: 'volcano' },
 }
 

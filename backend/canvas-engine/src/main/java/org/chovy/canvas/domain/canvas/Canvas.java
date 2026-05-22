@@ -25,7 +25,7 @@ public class Canvas {
 
     /**
      * 画布状态，见 {@link org.chovy.canvas.domain.constant.CanvasStatusEnum}。
-     * DRAFT=0, PUBLISHED=1, OFFLINE=2, KILLED=4
+     * DRAFT=0, PUBLISHED=1, OFFLINE=2, ARCHIVED=3, KILLED=4
      */
     private Integer status;
 
