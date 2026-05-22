@@ -188,7 +188,6 @@ public class CanvasService {
             registerTriggerRoutes(canvas.getId(), graph);
             // 注册定时调度任务
             schedulerService.registerScheduledTriggers(canvas.getId(), graph);
-            // FIXME: 如果有多台机器的话, 本地缓存如何失效处理保障一致性
             // 使旧版本缓存失效（含 L1 Caffeine 广播）
             if (canvas.getPublishedVersionId() != null) {
                 configCache.invalidate(canvas.getId(), canvas.getPublishedVersionId());
