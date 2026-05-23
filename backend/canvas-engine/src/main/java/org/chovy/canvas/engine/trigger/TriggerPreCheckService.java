@@ -35,6 +35,15 @@ public class TriggerPreCheckService {
      * @throws TriggerRejectedException 任意检查不通过时抛出（含错误码）
      */
     public void check(Canvas canvas, String userId) {
+        checkWithoutQuotaAccounting(canvas, userId);
+        consumeQuotaAndRecord(canvas, userId);
+    }
+
+    /**
+     * 只校验不会扣减配额的触发资格。
+     * 用于溢出重试，避免同一个事件在排队期间重复消耗配额。
+     */
+    public void checkWithoutQuotaAccounting(Canvas canvas, String userId) {
         Long canvasId = canvas.getId();
 
         // 1. 画布状态
@@ -50,6 +59,33 @@ public class TriggerPreCheckService {
         if (canvas.getValidEnd() != null && now.isAfter(canvas.getValidEnd())) {
             throw new TriggerRejectedException("QUOTA_006", "活动已结束");
         }
+
+        // 6. 冷却期（距上次触发间隔）
+        if (canvas.getCooldownSeconds() != null) {
+            CanvasUserQuota quota = quotaMapper.selectOne(
+                    new LambdaQueryWrapper<CanvasUserQuota>()
+                            .eq(CanvasUserQuota::getCanvasId, canvasId)
+                            .eq(CanvasUserQuota::getUserId, userId)
+                            .orderByDesc(CanvasUserQuota::getTriggerDate)
+                            .last("LIMIT 1")
+            );
+            if (quota != null && quota.getLastTriggerAt() != null) {
+                long elapsed = java.time.Duration.between(quota.getLastTriggerAt(), now).getSeconds();
+                if (elapsed < canvas.getCooldownSeconds()) {
+                    throw new TriggerRejectedException("QUOTA_003",
+                            "冷却期内，距上次触发仅 " + elapsed + "s，需等待 " +
+                                    canvas.getCooldownSeconds() + "s");
+                }
+            }
+        }
+    }
+
+    /**
+     * 扣减配额并记录用量。
+     * CanvasExecutionService 在确认本次触发会被执行后调用，避免溢出排队事件提前刷新冷却期。
+     */
+    public void consumeQuotaAndRecord(Canvas canvas, String userId) {
+        Long canvasId = canvas.getId();
 
         // 3. 全局执行量上限
         if (canvas.getMaxTotalExecutions() != null) {
@@ -83,25 +119,6 @@ public class TriggerPreCheckService {
             if (total != null && total > canvas.getPerUserTotalLimit()) {
                 redis.opsForValue().decrement(key);
                 throw new TriggerRejectedException("QUOTA_002", "用户总触发次数已达上限");
-            }
-        }
-
-        // 6. 冷却期（距上次触发间隔）
-        if (canvas.getCooldownSeconds() != null) {
-            CanvasUserQuota quota = quotaMapper.selectOne(
-                    new LambdaQueryWrapper<CanvasUserQuota>()
-                            .eq(CanvasUserQuota::getCanvasId, canvasId)
-                            .eq(CanvasUserQuota::getUserId, userId)
-                            .orderByDesc(CanvasUserQuota::getTriggerDate)
-                            .last("LIMIT 1")
-            );
-            if (quota != null && quota.getLastTriggerAt() != null) {
-                long elapsed = java.time.Duration.between(quota.getLastTriggerAt(), now).getSeconds();
-                if (elapsed < canvas.getCooldownSeconds()) {
-                    throw new TriggerRejectedException("QUOTA_003",
-                            "冷却期内，距上次触发仅 " + elapsed + "s，需等待 " +
-                                    canvas.getCooldownSeconds() + "s");
-                }
             }
         }
 

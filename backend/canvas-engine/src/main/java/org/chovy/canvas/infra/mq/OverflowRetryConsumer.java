@@ -60,34 +60,33 @@ public class OverflowRetryConsumer implements RocketMQListener<MessageExt> {
         if (totalRetry >= priorityConfig.getOverflowMaxRetry()) {
             log.warn("[OVERFLOW_RETRY] 超过最大重试次数 canvasId={} userId={} retryCount={}, 写入DLQ",
                     msg.getCanvasId(), msg.getUserId(), totalRetry);
-            writeDlq(msg, totalRetry);
+            writeDlq(msg, totalRetry, message.getMsgId());
             return;
         }
 
-        Map<String, Object> payload = withChainRetryCount(msg.getPayload(), totalRetry);
+        Map<String, Object> payload = copyPayload(msg.getPayload());
         log.info("[OVERFLOW_RETRY] 重试投递 canvasId={} userId={} retryCount={}",
                 msg.getCanvasId(), msg.getUserId(), totalRetry);
 
-        disruptor.publish(
+        disruptor.publishOverflowRetry(
                 msg.getCanvasId(), msg.getUserId(), msg.getTriggerType(),
                 msg.getTriggerNodeType(), msg.getMatchKey(),
-                payload, msg.getMsgId()
+                payload, msg.getMsgId(), totalRetry
         );
     }
 
-    private Map<String, Object> withChainRetryCount(Map<String, Object> payload, int totalRetry) {
+    private Map<String, Object> copyPayload(Map<String, Object> payload) {
         Map<String, Object> copy = new HashMap<>();
         if (payload != null) {
             copy.putAll(payload);
         }
-        copy.put(OverflowRetryMessage.CHAIN_RETRY_PAYLOAD_KEY, totalRetry);
         return copy;
     }
 
-    private void writeDlq(OverflowRetryMessage msg, int totalRetry) {
+    private void writeDlq(OverflowRetryMessage msg, int totalRetry, String rocketMqMsgId) {
         try {
             CanvasExecutionDlq dlq = CanvasExecutionDlq.builder()
-                    .executionId(msg.getMsgId())
+                    .executionId(nonBlank(msg.getMsgId()) ? msg.getMsgId() : rocketMqMsgId)
                     .canvasId(msg.getCanvasId())
                     .userId(msg.getUserId())
                     .failedNodeId(DLQ_FAILED_NODE_ID)
@@ -106,5 +105,9 @@ public class OverflowRetryConsumer implements RocketMQListener<MessageExt> {
                     msg.getCanvasId(), msg.getMsgId(), e.getMessage());
             throw new IllegalStateException("溢出重试DLQ写入失败", e);
         }
+    }
+
+    private boolean nonBlank(String value) {
+        return value != null && !value.isBlank();
     }
 }

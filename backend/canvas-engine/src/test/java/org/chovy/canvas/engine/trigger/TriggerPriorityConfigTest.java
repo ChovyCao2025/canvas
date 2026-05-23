@@ -22,6 +22,7 @@ class TriggerPriorityConfigTest {
 
         assertThat(config.of(null)).isEqualTo(TriggerPriorityConfig.Priority.NORMAL);
         assertThat(config.of("DIRECT_CALL")).isEqualTo(TriggerPriorityConfig.Priority.HIGH);
+        assertThat(config.of("EVENT")).isEqualTo(TriggerPriorityConfig.Priority.NORMAL);
         assertThat(config.of("SCHEDULED")).isEqualTo(TriggerPriorityConfig.Priority.LOW);
         assertThat(config.of("UNKNOWN")).isEqualTo(TriggerPriorityConfig.Priority.NORMAL);
     }
@@ -40,9 +41,11 @@ class TriggerPriorityConfigTest {
     void configuredListsOverrideDefaultClassification() {
         TriggerPriorityConfig config = new TriggerPriorityConfig();
         config.setHigh(List.of("VIP"));
-        config.setLow(List.of("BATCH"));
+        config.setNormal(List.of("STANDARD"));
+        config.setLow(List.of("BATCH", "STANDARD"));
 
         assertThat(config.of("VIP")).isEqualTo(TriggerPriorityConfig.Priority.HIGH);
+        assertThat(config.of("STANDARD")).isEqualTo(TriggerPriorityConfig.Priority.NORMAL);
         assertThat(config.of("BATCH")).isEqualTo(TriggerPriorityConfig.Priority.LOW);
         assertThat(config.of("DIRECT_CALL")).isEqualTo(TriggerPriorityConfig.Priority.NORMAL);
     }
@@ -61,7 +64,7 @@ class TriggerPriorityConfigTest {
                 .orElseThrow(() -> new AssertionError("canvas.execution.priority should bind from application.yml"));
 
         assertThat(config.getHigh()).containsExactly("DIRECT_CALL");
-        assertThat(config.getNormal()).containsExactly("MQ", "BEHAVIOR", "EVENT_TRIGGER", "API_CALL");
+        assertThat(config.getNormal()).containsExactly("MQ", "BEHAVIOR", "EVENT", "EVENT_TRIGGER", "API_CALL");
         assertThat(config.getLow()).containsExactly("SCHEDULED");
         assertThat(config.getLowRatio()).isEqualTo(0.5);
         assertThat(config.getHighMaxConcurrencyRatio()).isEqualTo(2.0);

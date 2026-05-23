@@ -18,6 +18,7 @@ import java.util.Map;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -61,18 +62,19 @@ class OverflowRetryConsumerTest {
 
         @SuppressWarnings("unchecked")
         ArgumentCaptor<Map<String, Object>> payloadCaptor = ArgumentCaptor.forClass(Map.class);
-        verify(disruptor).publish(
+        verify(disruptor).publishOverflowRetry(
                 eq(100L),
                 eq("user-1"),
                 eq("MQ"),
                 eq("MQ_TRIGGER"),
                 eq("topic-a"),
                 payloadCaptor.capture(),
-                eq("business-msg-1")
+                eq("business-msg-1"),
+                eq(2)
         );
         assertThat(payloadCaptor.getValue())
                 .containsEntry("orderId", "o-1")
-                .containsEntry(OverflowRetryMessage.CHAIN_RETRY_PAYLOAD_KEY, 2);
+                .doesNotContainKey(OverflowRetryMessage.CHAIN_RETRY_PAYLOAD_KEY);
         verify(dlqMapper, never()).insert(org.mockito.ArgumentMatchers.any(CanvasExecutionDlq.class));
     }
 
@@ -92,14 +94,15 @@ class OverflowRetryConsumerTest {
 
         consumer.onMessage(message);
 
-        verify(disruptor, never()).publish(
+        verify(disruptor, never()).publishOverflowRetry(
                 org.mockito.ArgumentMatchers.any(),
                 org.mockito.ArgumentMatchers.any(),
                 org.mockito.ArgumentMatchers.any(),
                 org.mockito.ArgumentMatchers.any(),
                 org.mockito.ArgumentMatchers.any(),
                 org.mockito.ArgumentMatchers.any(),
-                org.mockito.ArgumentMatchers.any()
+                org.mockito.ArgumentMatchers.any(),
+                anyInt()
         );
         ArgumentCaptor<CanvasExecutionDlq> dlqCaptor = ArgumentCaptor.forClass(CanvasExecutionDlq.class);
         verify(dlqMapper).insert(dlqCaptor.capture());
@@ -119,6 +122,28 @@ class OverflowRetryConsumerTest {
     }
 
     @Test
+    void recordsDlqWithRocketMqMsgIdWhenBusinessMsgIdMissing() throws Exception {
+        OverflowRetryMessage retryMessage = new OverflowRetryMessage(
+                201L,
+                "user-2",
+                "BEHAVIOR",
+                "EVENT_TRIGGER",
+                "event-a",
+                Map.of("eventId", "e-1"),
+                null,
+                3
+        );
+        MessageExt message = messageExt(retryMessage, 0);
+        message.setMsgId("rocket-msg-without-business-id");
+
+        consumer.onMessage(message);
+
+        ArgumentCaptor<CanvasExecutionDlq> dlqCaptor = ArgumentCaptor.forClass(CanvasExecutionDlq.class);
+        verify(dlqMapper).insert(dlqCaptor.capture());
+        assertThat(dlqCaptor.getValue().getExecutionId()).isEqualTo("rocket-msg-without-business-id");
+    }
+
+    @Test
     void parseFailureThrowsForRocketMqRetryOrBrokerDlq() {
         MessageExt message = new MessageExt();
         message.setBody("{not-json".getBytes(java.nio.charset.StandardCharsets.UTF_8));
@@ -128,14 +153,15 @@ class OverflowRetryConsumerTest {
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("溢出重试消息体格式错误");
 
-        verify(disruptor, never()).publish(
+        verify(disruptor, never()).publishOverflowRetry(
                 org.mockito.ArgumentMatchers.any(),
                 org.mockito.ArgumentMatchers.any(),
                 org.mockito.ArgumentMatchers.any(),
                 org.mockito.ArgumentMatchers.any(),
                 org.mockito.ArgumentMatchers.any(),
                 org.mockito.ArgumentMatchers.any(),
-                org.mockito.ArgumentMatchers.any()
+                org.mockito.ArgumentMatchers.any(),
+                anyInt()
         );
         verify(dlqMapper, never()).insert(org.mockito.ArgumentMatchers.any(CanvasExecutionDlq.class));
     }
@@ -159,14 +185,15 @@ class OverflowRetryConsumerTest {
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("溢出重试DLQ写入失败");
 
-        verify(disruptor, never()).publish(
+        verify(disruptor, never()).publishOverflowRetry(
                 org.mockito.ArgumentMatchers.any(),
                 org.mockito.ArgumentMatchers.any(),
                 org.mockito.ArgumentMatchers.any(),
                 org.mockito.ArgumentMatchers.any(),
                 org.mockito.ArgumentMatchers.any(),
                 org.mockito.ArgumentMatchers.any(),
-                org.mockito.ArgumentMatchers.any()
+                org.mockito.ArgumentMatchers.any(),
+                anyInt()
         );
     }
 

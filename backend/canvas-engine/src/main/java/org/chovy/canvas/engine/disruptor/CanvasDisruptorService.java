@@ -54,10 +54,10 @@ public class CanvasDisruptorService {
         Arrays.fill(workers, (WorkHandler<CanvasExecutionEvent>) event -> {
             try {
                 // 实际执行逻辑
-                executionService.trigger(
+                executionService.triggerFromDisruptor(
                                 event.canvasId, event.userId, event.triggerType,
                                 event.triggerNodeType, event.matchKey,
-                                event.payload, event.msgId, false)
+                                event.payload, event.msgId, event.dispatchOptions)
                         .subscribe(
                                 null,
                                 e -> log.error("[DISRUPTOR] 执行失败 canvasId={} userId={}: {}",
@@ -100,6 +100,32 @@ public class CanvasDisruptorService {
     public void publish(Long canvasId, String userId, String triggerType,
                         String triggerNodeType, String matchKey,
                         Map<String, Object> payload, String msgId) {
+        publish(canvasId, userId, triggerType, triggerNodeType, matchKey, payload, msgId,
+                DispatchOptions.NORMAL);
+    }
+
+    /**
+     * 发布由溢出重试消费者重放的触发事件。
+     * 该标记不来自业务 payload，避免外部调用方伪造重试状态绕过前置检查。
+     */
+    public void publishOverflowRetry(Long canvasId, String userId, String triggerType,
+                                     String triggerNodeType, String matchKey,
+                                     Map<String, Object> payload, String msgId) {
+        publishOverflowRetry(canvasId, userId, triggerType, triggerNodeType, matchKey, payload, msgId, 0);
+    }
+
+    public void publishOverflowRetry(Long canvasId, String userId, String triggerType,
+                                     String triggerNodeType, String matchKey,
+                                     Map<String, Object> payload, String msgId,
+                                     int overflowChainRetryCount) {
+        publish(canvasId, userId, triggerType, triggerNodeType, matchKey, payload, msgId,
+                DispatchOptions.overflowRetry(overflowChainRetryCount));
+    }
+
+    private void publish(Long canvasId, String userId, String triggerType,
+                         String triggerNodeType, String matchKey,
+                         Map<String, Object> payload, String msgId,
+                         DispatchOptions dispatchOptions) {
         long sequence = ringBuffer.next();
         try {
             CanvasExecutionEvent event = ringBuffer.get(sequence);
@@ -110,6 +136,7 @@ public class CanvasDisruptorService {
             event.matchKey = matchKey;
             event.payload = payload != null ? new java.util.HashMap<>(payload) : java.util.Map.of();
             event.msgId = msgId;
+            event.dispatchOptions = dispatchOptions;
         } finally {
             ringBuffer.publish(sequence);
         }
@@ -119,5 +146,37 @@ public class CanvasDisruptorService {
     public void shutdown() {
         disruptor.shutdown();
         log.info("[DISRUPTOR] 已关闭");
+    }
+
+    /**
+     * Disruptor-only dispatch metadata. Instances are not publicly constructible,
+     * so external trigger payloads cannot opt into internal replay behavior.
+     */
+    public static final class DispatchOptions {
+        private static final DispatchOptions NORMAL = new DispatchOptions(false);
+
+        private final boolean overflowRetry;
+        private final int overflowChainRetryCount;
+
+        private DispatchOptions(boolean overflowRetry) {
+            this(overflowRetry, 0);
+        }
+
+        private DispatchOptions(boolean overflowRetry, int overflowChainRetryCount) {
+            this.overflowRetry = overflowRetry;
+            this.overflowChainRetryCount = Math.max(0, overflowChainRetryCount);
+        }
+
+        static DispatchOptions overflowRetry(int overflowChainRetryCount) {
+            return new DispatchOptions(true, overflowChainRetryCount);
+        }
+
+        public boolean isOverflowRetry() {
+            return overflowRetry;
+        }
+
+        public int getOverflowChainRetryCount() {
+            return overflowChainRetryCount;
+        }
     }
 }

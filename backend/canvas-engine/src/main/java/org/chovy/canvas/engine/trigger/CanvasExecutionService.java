@@ -3,6 +3,10 @@ package org.chovy.canvas.engine.trigger;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
+import org.apache.rocketmq.common.message.Message;
+import org.apache.rocketmq.client.producer.SendResult;
+import org.apache.rocketmq.client.producer.SendStatus;
+import org.apache.rocketmq.spring.core.RocketMQTemplate;
 import org.chovy.canvas.domain.constant.NodeType;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import org.chovy.canvas.domain.canvas.Canvas;
@@ -12,13 +16,17 @@ import org.chovy.canvas.domain.canvas.CanvasVersionMapper;
 import org.chovy.canvas.domain.constant.CanvasStatusEnum;
 import org.chovy.canvas.domain.constant.ExecutionStatus;
 import org.chovy.canvas.domain.constant.TriggerType;
+import org.chovy.canvas.domain.execution.CanvasExecutionDlq;
+import org.chovy.canvas.domain.execution.CanvasExecutionDlqMapper;
 import org.chovy.canvas.domain.execution.CanvasExecution;
 import org.chovy.canvas.domain.execution.CanvasExecutionMapper;
 import org.chovy.canvas.engine.context.ExecutionContext;
 import org.chovy.canvas.engine.dag.DagGraph;
 import org.chovy.canvas.engine.dag.DagParser;
+import org.chovy.canvas.engine.disruptor.CanvasDisruptorService;
 import org.chovy.canvas.engine.scheduler.DagEngine;
 import org.chovy.canvas.infra.cache.CanvasConfigCache;
+import org.chovy.canvas.infra.mq.OverflowRetryMessage;
 import org.chovy.canvas.infra.redis.ContextPersistenceService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -28,6 +36,7 @@ import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
 
 import java.time.Duration;
+import java.time.LocalDateTime;
 import java.util.*;
 import java.util.concurrent.TimeUnit;
 
@@ -50,6 +59,10 @@ public class CanvasExecutionService {
     private final TriggerPreCheckService preCheckService;
     private final InFlightExecutionRegistry executionRegistry;
     private final org.chovy.canvas.domain.execution.CanvasExecutionStatsMapper statsMapper;
+    private final CanvasExecutionDlqMapper dlqMapper;
+    private final TriggerPriorityConfig priorityConfig;
+    private final RocketMQTemplate rocketMQTemplate;
+    private final ObjectMapper objectMapper;
 
     /** Canvas 实体本地缓存：canvasId → Canvas。TTL=5min，最多500条。 */
     private final Cache<Long, Canvas> canvasCache = Caffeine.newBuilder()
@@ -149,6 +162,32 @@ public class CanvasExecutionService {
             Long canvasId, String userId, String triggerType,
             String triggerNodeType, String matchKey,
             Map<String, Object> payload, String msgId, boolean dryRun) {
+        return triggerInternal(canvasId, userId, triggerType, triggerNodeType, matchKey,
+                payload, msgId, dryRun, false, 0);
+    }
+
+    /**
+     * Internal Disruptor entrypoint. The dispatch options token is not publicly
+     * constructible, so business payloads cannot forge overflow-retry status.
+     */
+    public Mono<Map<String, Object>> triggerFromDisruptor(
+            Long canvasId, String userId, String triggerType,
+            String triggerNodeType, String matchKey,
+            Map<String, Object> payload, String msgId,
+            CanvasDisruptorService.DispatchOptions dispatchOptions) {
+        boolean overflowRetry = dispatchOptions != null && dispatchOptions.isOverflowRetry();
+        int overflowChainRetryCount = dispatchOptions != null
+                ? dispatchOptions.getOverflowChainRetryCount()
+                : 0;
+        return triggerInternal(canvasId, userId, triggerType, triggerNodeType, matchKey,
+                payload, msgId, false, overflowRetry, overflowChainRetryCount);
+    }
+
+    private Mono<Map<String, Object>> triggerInternal(
+            Long canvasId, String userId, String triggerType,
+            String triggerNodeType, String matchKey,
+            Map<String, Object> payload, String msgId, boolean dryRun,
+            boolean overflowRetry, int overflowChainRetryCount) {
         // ...
         return Mono.fromCallable(() -> {
 
@@ -161,31 +200,11 @@ public class CanvasExecutionService {
                         throw new IllegalStateException("画布未发布，请先发布后再触发: " + canvasId);
                     }
 
-                    // 2. 前置检查（有效期 / 配额 / 冷却期）—— dry-run 跳过
-                    if (!dryRun) {
-                        // FIXME: 前端没有对应的位置配置此系列属性
-                        preCheckService.check(canvas, userId);
-                    }
-
-                    // 2.5 单画布并发执行上限（设计文档 12.4节）
-                    // 防止同一画布被大量并发触发（如大促瞬间流量）打爆执行引擎
-                    if (!dryRun) {
-                        int active = executionRegistry.activeCount(canvasId);
-                        int maxConc = canvas.getMaxTotalExecutions() != null
-                                ? Math.min(canvas.getMaxTotalExecutions(), globalMaxConcurrency)
-                                : globalMaxConcurrency;
-                        if (active >= maxConc) {
-                            log.warn("[ENGINE] 画布并发上限已达 canvasId={} active={}/{}", canvasId, active, maxConc);
-                            return Map.of("overflow", "concurrency_limit_reached",
-                                    "active", active, "limit", maxConc);
-                        }
-                    }
-
-                    // 3. dedup 检查
-                    if (!dryRun && msgId != null) {
+                    // 2. dedup 检查先于冷却/并发路由，重复投递不应触发冷却拒绝或溢出重排。
+                    boolean isResume = !dryRun && ctxStore.exists(canvasId, userId);
+                    if (!dryRun && !overflowRetry && msgId != null) {
                         // FIXME: 此处控制不足够精细, 可能会影响后续订单去重时间
                         // FIXME: 目前幂等时间默认是24小时, 但是如果在挂起期间有第二个订单进入流程的话, 幂等时间会被设置为20分钟
-                        boolean isResume = ctxStore.exists(canvasId, userId);
                         Duration dedupTtl = isResume
                                 ? Duration.ofSeconds(globalTimeoutSec + 600)
                                 : Duration.ofHours(24);
@@ -196,42 +215,100 @@ public class CanvasExecutionService {
                         }
                     }
 
+                    // 2.5 前置资格检查（状态 / 有效期 / 冷却期）—— dry-run 跳过
+                    if (!dryRun) {
+                        preCheckService.checkWithoutQuotaAccounting(canvas, userId);
+                        if (overflowRetry) {
+                            log.debug("[ENGINE] 溢出重试先跳过配额扣减 canvasId={} userId={}", canvasId, userId);
+                        }
+                    }
+
+                    // 2.6 单画布并发执行上限（优先级感知）
+                    if (!dryRun) {
+                        TriggerPriorityConfig.Priority priority = priorityConfig.of(triggerType);
+                        int active = executionRegistry.activeCount(canvasId);
+                        int maxConc = canvas.getMaxTotalExecutions() != null
+                                ? Math.min(canvas.getMaxTotalExecutions(), globalMaxConcurrency)
+                                : globalMaxConcurrency;
+                        if (priority == TriggerPriorityConfig.Priority.HIGH) {
+                            int highMax = Math.max(1, (int) (maxConc * priorityConfig.getHighMaxConcurrencyRatio()));
+                            if (active >= highMax) {
+                                log.error("[ENGINE] HIGH优先级超并发告警 canvasId={} active={}/{}",
+                                        canvasId, active, highMax);
+                            }
+                        } else {
+                            int effectiveMax = priority == TriggerPriorityConfig.Priority.LOW
+                                    ? Math.max(1, (int) (maxConc * priorityConfig.getLowRatio()))
+                                    : maxConc;
+
+                            if (active >= effectiveMax) {
+                                log.warn("[ENGINE] 并发上限 canvasId={} active={}/{} priority={}",
+                                        canvasId, active, effectiveMax, priority);
+                                if (priority == TriggerPriorityConfig.Priority.NORMAL) {
+                                    boolean queued = sendOverflowRetry(canvasId, userId, triggerType, triggerNodeType,
+                                            matchKey, payload, msgId, overflowChainRetryCount);
+                                    return Map.of("overflow", queued ? "queued_for_retry" : "retry_enqueue_failed");
+                                }
+                                return Map.of("overflow", "dropped_low_priority");
+                            }
+                        }
+                    }
+
                     // 4. 加载/恢复 ExecutionContext
                     // FIXME: 如果同一个用户针对同一个画布在挂起期间重新被触发, 恢复的上下文可能会有错误
                     ExecutionContext ctx;
-                    boolean isResume = ctxStore.exists(canvasId, userId);
-                    if (isResume && !dryRun) {
-                        // 恢复锁
-                        String instanceId = UUID.randomUUID().toString();
-                        if (!ctxStore.acquireResumeLock(canvasId, userId, instanceId, globalTimeoutSec)) {
-                            log.warn("[ENGINE] resume-lock 竞争失败，放弃本次触发 canvasId={}", canvasId);
-                            return Map.<String, Object>of("skipped", "resume-lock");
+                    boolean resumeLockAcquired = false;
+                    try {
+                        if (isResume && !dryRun) {
+                            // 恢复锁
+                            String instanceId = UUID.randomUUID().toString();
+                            if (!ctxStore.acquireResumeLock(canvasId, userId, instanceId, globalTimeoutSec)) {
+                                log.warn("[ENGINE] resume-lock 竞争失败，放弃本次触发 canvasId={}", canvasId);
+                                return Map.<String, Object>of("skipped", "resume-lock");
+                            }
+                            resumeLockAcquired = true;
+                            ctx = ctxStore.load(canvasId, userId);
+                            if (ctx == null)
+                                ctx = newContext(canvasId, resolveVersionId(canvas, userId, false), userId, triggerType);
+                        } else {
+                            ctx = newContext(canvasId, resolveVersionId(canvas, userId, dryRun), userId, triggerType);
                         }
-                        ctx = ctxStore.load(canvasId, userId);
-                        if (ctx == null)
-                            ctx = newContext(canvasId, resolveVersionId(canvas, userId, false), userId, triggerType);
-                    } else {
-                        ctx = newContext(canvasId, resolveVersionId(canvas, userId, dryRun), userId, triggerType);
+
+                        ctx.setTriggerType(triggerType);
+                        ctx.setTriggerNodeType(triggerNodeType);
+                        ctx.setMatchKey(matchKey);
+
+                        // 合并本次 payload
+                        if (payload != null) ctx.getTriggerPayload().putAll(payload);
+
+                        // 5. 加载 DAG 配置（版本锁定：用 ctx 中的 versionId，不用当前发布版本）
+                        DagGraph graph = configCache.get(canvasId, ctx.getVersionId());
+
+                        // 6. 找触发器节点（按类型和 matchKey）
+                        String triggerNodeId = findTriggerNode(graph, triggerNodeType, matchKey);
+                        if (triggerNodeId == null) {
+                            throw new IllegalStateException(
+                                    "找不到触发器节点 type=" + triggerNodeType + " key=" + matchKey);
+                        }
+
+                        if (!dryRun) {
+                            preCheckService.consumeQuotaAndRecord(canvas, userId);
+                        }
+
+                        return Map.of("ctx", ctx, "graph", graph, "triggerNodeId", triggerNodeId,
+                                "isResume", isResume, "canvas", canvas);
+                    } catch (RuntimeException e) {
+                        if (resumeLockAcquired) {
+                            ctxStore.releaseResumeLock(canvasId, userId);
+                        }
+                        throw e;
                     }
-
-                    // 合并本次 payload
-                    if (payload != null) ctx.getTriggerPayload().putAll(payload);
-
-                    // 5. 加载 DAG 配置（版本锁定：用 ctx 中的 versionId，不用当前发布版本）
-                    DagGraph graph = configCache.get(canvasId, ctx.getVersionId());
-
-                    // 6. 找触发器节点（按类型和 matchKey）
-                    String triggerNodeId = findTriggerNode(graph, triggerNodeType, matchKey);
-                    if (triggerNodeId == null) {
-                        throw new IllegalStateException(
-                                "找不到触发器节点 type=" + triggerNodeType + " key=" + matchKey);
-                    }
-
-                    return Map.of("ctx", ctx, "graph", graph, "triggerNodeId", triggerNodeId,
-                            "isResume", isResume, "canvas", canvas);
                 })
                 .subscribeOn(Schedulers.boundedElastic())
                 .flatMap(prep -> {
+                    if (!prep.containsKey("ctx")) {
+                        return Mono.just(new HashMap<String, Object>(prep));
+                    }
                     ExecutionContext ctx = (ExecutionContext) prep.get("ctx");
                     DagGraph graph = (DagGraph) prep.get("graph");
                     String triggerNodeId = (String) prep.get("triggerNodeId");
@@ -418,6 +495,79 @@ public class CanvasExecutionService {
                 .anyMatch(s -> s == org.chovy.canvas.engine.context.NodeStatus.WAITING);
     }
 
+    private boolean sendOverflowRetry(Long canvasId, String userId, String triggerType,
+                                      String triggerNodeType, String matchKey,
+                                      Map<String, Object> payload, String msgId, int chainRetryCount) {
+        try {
+            String effectiveMsgId = nonBlank(msgId)
+                    ? msgId
+                    : "overflow-" + UUID.randomUUID();
+            OverflowRetryMessage msg = new OverflowRetryMessage(
+                    canvasId, userId, triggerType, triggerNodeType,
+                    matchKey, payload, effectiveMsgId, chainRetryCount + 1);
+            String tag = triggerType != null ? triggerType : TriggerPriorityConfig.Priority.NORMAL.name();
+            Message rocketMsg = new Message(
+                    "CANVAS_TRIGGER_OVERFLOW",
+                    tag,
+                    objectMapper.writeValueAsBytes(msg)
+            );
+            rocketMsg.setDeliverTimeMs(System.currentTimeMillis() + priorityConfig.getOverflowRetryDelayMs());
+            SendResult sendResult = rocketMQTemplate.getProducer().send(rocketMsg);
+            if (sendResult == null || sendResult.getSendStatus() != SendStatus.SEND_OK) {
+                log.error("[ENGINE] 溢出消息发送未确认成功 canvasId={} status={}",
+                        canvasId, sendResult == null ? null : sendResult.getSendStatus());
+                writeOverflowEnqueueDlq(msg, "overflow_retry_enqueue_failed:"
+                        + (sendResult == null ? "null" : sendResult.getSendStatus()));
+                return false;
+            }
+            log.info("[ENGINE] 溢出事件入队重试 canvasId={} userId={} retryCount={}",
+                    canvasId, userId, chainRetryCount + 1);
+            return true;
+        } catch (Exception e) {
+            log.error("[ENGINE] 溢出消息发送失败，事件丢失 canvasId={}: {}", canvasId, e.getMessage());
+            OverflowRetryMessage msg = new OverflowRetryMessage(
+                    canvasId, userId, triggerType, triggerNodeType,
+                    matchKey, payload, nonBlank(msgId) ? msgId : "overflow-" + UUID.randomUUID(),
+                    chainRetryCount + 1);
+            writeOverflowEnqueueDlq(msg, "overflow_retry_enqueue_failed:" + e.getMessage());
+            return false;
+        }
+    }
+
+    private void writeOverflowEnqueueDlq(OverflowRetryMessage msg, String errorMsg) {
+        try {
+            CanvasExecutionDlq dlq = CanvasExecutionDlq.builder()
+                    .executionId(msg.getMsgId())
+                    .canvasId(msg.getCanvasId())
+                    .userId(msg.getUserId())
+                    .failedNodeId("OVERFLOW_ENQUEUE")
+                    .failedNodeType(msg.getTriggerNodeType())
+                    .errorMsg(truncate(errorMsg, 500))
+                    .retryCount(msg.getChainRetryCount())
+                    .triggerPayload(objectMapper.writeValueAsString(msg.getPayload()))
+                    .triggerType(msg.getTriggerType())
+                    .triggerNodeType(msg.getTriggerNodeType())
+                    .matchKey(msg.getMatchKey())
+                    .failedAt(LocalDateTime.now())
+                    .build();
+            dlqMapper.insert(dlq);
+        } catch (Exception e) {
+            log.error("[ENGINE] 溢出入队失败写DLQ失败 canvasId={} msgId={}: {}",
+                    msg.getCanvasId(), msg.getMsgId(), e.getMessage());
+        }
+    }
+
+    private boolean nonBlank(String value) {
+        return value != null && !value.isBlank();
+    }
+
+    private String truncate(String value, int maxLength) {
+        if (value == null) {
+            return null;
+        }
+        return value.substring(0, Math.min(maxLength, value.length()));
+    }
+
     /**
      * 创建执行记录对象
      *
@@ -446,7 +596,7 @@ public class CanvasExecutionService {
         if (exec == null) return;
         exec.setStatus(status);
         try {
-            exec.setResult(new ObjectMapper().writeValueAsString(result));
+            exec.setResult(objectMapper.writeValueAsString(result));
         } catch (Exception ignored) {
         }
         Mono.fromRunnable(() -> executionMapper.updateById(exec))

@@ -18,7 +18,7 @@ import java.util.List;
 public class TriggerPriorityConfig {
 
     private List<String> high = List.of("DIRECT_CALL");
-    private List<String> normal = List.of("MQ", "BEHAVIOR", "EVENT_TRIGGER", "API_CALL");
+    private List<String> normal = List.of("MQ", "BEHAVIOR", "EVENT", "EVENT_TRIGGER", "API_CALL");
     private List<String> low = List.of("SCHEDULED");
 
     /** LOW 优先级并发系数，默认 0.5（即 maxConc x 0.5）。 */
@@ -41,6 +41,9 @@ public class TriggerPriorityConfig {
         }
         if (high.contains(triggerType)) {
             return Priority.HIGH;
+        }
+        if (normal.contains(triggerType)) {
+            return Priority.NORMAL;
         }
         if (low.contains(triggerType)) {
             return Priority.LOW;

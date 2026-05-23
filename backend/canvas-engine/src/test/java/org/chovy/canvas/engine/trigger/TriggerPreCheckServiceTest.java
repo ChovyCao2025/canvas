@@ -16,6 +16,7 @@ import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.ValueOperations;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.assertThatCode;
@@ -51,7 +52,7 @@ class TriggerPreCheckServiceTest {
 
     @BeforeEach
     void setUp() {
-        when(redis.opsForValue()).thenReturn(valueOps);
+        lenient().when(redis.opsForValue()).thenReturn(valueOps);
     }
 
     /** Builds a minimal published Canvas with only perUserTotalLimit set. */
@@ -62,6 +63,82 @@ class TriggerPreCheckServiceTest {
         c.setPerUserTotalLimit(limit);
         // All other limits null — only check #5 is exercised
         return c;
+    }
+
+    private Canvas canvasWithAllQuotaLimits() {
+        Canvas c = new Canvas();
+        c.setId(CANVAS_ID);
+        c.setStatus(1);
+        c.setMaxTotalExecutions(10);
+        c.setPerUserDailyLimit(3);
+        c.setPerUserTotalLimit(5);
+        return c;
+    }
+
+    // ─── checkWithoutQuotaAccounting ────────────────────────────────────────
+
+    @Test
+    void checkWithoutQuotaAccounting_doesNotConsumeRedisOrPersistQuotaCounters() {
+        Canvas canvas = canvasWithAllQuotaLimits();
+
+        assertThatCode(() -> service.checkWithoutQuotaAccounting(canvas, USER_ID))
+                .doesNotThrowAnyException();
+
+        verify(redis, never()).opsForValue();
+        verifyNoInteractions(valueOps);
+        verify(quotaMapper, never()).insert(any(CanvasUserQuota.class));
+        verify(quotaMapper, never()).update(any(CanvasUserQuota.class), any());
+    }
+
+    @Test
+    void checkWithoutQuotaAccounting_rejectsUnpublishedCanvas() {
+        Canvas canvas = canvasWithAllQuotaLimits();
+        canvas.setStatus(0);
+
+        assertThatThrownBy(() -> service.checkWithoutQuotaAccounting(canvas, USER_ID))
+                .isInstanceOf(TriggerPreCheckService.TriggerRejectedException.class)
+                .hasMessageContaining("画布未发布")
+                .extracting(e -> ((TriggerPreCheckService.TriggerRejectedException) e).getCode())
+                .isEqualTo("QUOTA_006");
+
+        verify(redis, never()).opsForValue();
+        verifyNoInteractions(valueOps);
+    }
+
+    @Test
+    void checkWithoutQuotaAccounting_rejectsFutureValidStart() {
+        Canvas canvas = canvasWithAllQuotaLimits();
+        canvas.setValidStart(LocalDateTime.now().plusMinutes(1));
+
+        assertThatThrownBy(() -> service.checkWithoutQuotaAccounting(canvas, USER_ID))
+                .isInstanceOf(TriggerPreCheckService.TriggerRejectedException.class)
+                .hasMessageContaining("活动尚未开始")
+                .extracting(e -> ((TriggerPreCheckService.TriggerRejectedException) e).getCode())
+                .isEqualTo("QUOTA_005");
+
+        verify(redis, never()).opsForValue();
+        verifyNoInteractions(valueOps);
+    }
+
+    @Test
+    void checkWithoutQuotaAccounting_rejectsCooldownWithoutConsumingQuota() {
+        Canvas canvas = canvasWithAllQuotaLimits();
+        canvas.setCooldownSeconds(60);
+        CanvasUserQuota quota = new CanvasUserQuota();
+        quota.setLastTriggerAt(LocalDateTime.now().minusSeconds(5));
+        when(quotaMapper.selectOne(any(LambdaQueryWrapper.class))).thenReturn(quota);
+
+        assertThatThrownBy(() -> service.checkWithoutQuotaAccounting(canvas, USER_ID))
+                .isInstanceOf(TriggerPreCheckService.TriggerRejectedException.class)
+                .hasMessageContaining("冷却期内")
+                .extracting(e -> ((TriggerPreCheckService.TriggerRejectedException) e).getCode())
+                .isEqualTo("QUOTA_003");
+
+        verify(redis, never()).opsForValue();
+        verifyNoInteractions(valueOps);
+        verify(quotaMapper).selectOne(any(LambdaQueryWrapper.class));
+        verify(quotaMapper, never()).insert(any(CanvasUserQuota.class));
+        verify(quotaMapper, never()).update(any(CanvasUserQuota.class), any());
     }
 
     // ─── perUserTotalLimit ───────────────────────────────────────────────────

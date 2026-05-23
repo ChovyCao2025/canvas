@@ -12,6 +12,11 @@ import java.util.Map;
 @AllArgsConstructor
 public class OverflowRetryMessage {
 
+    /**
+     * Legacy payload marker kept only so old/forged payloads can be tested and ignored.
+     * Retry control state is carried by this DTO field and Disruptor dispatch metadata.
+     */
+    @Deprecated
     public static final String CHAIN_RETRY_PAYLOAD_KEY = "__overflowChainRetry";
 
     private Long canvasId;
