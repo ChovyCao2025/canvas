@@ -15,6 +15,7 @@ import org.springframework.web.bind.annotation.RestController;
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
 
+import java.util.ArrayList;
 import java.util.List;
 
 @RestController
@@ -26,26 +27,26 @@ public class AudienceDataSourceController {
 
     @GetMapping
     public Mono<R<List<AudienceDataSource>>> list() {
-        return Mono.fromCallable(() -> R.ok(service.list()))
+        return Mono.fromCallable(() -> R.ok(mask(service.list())))
                 .subscribeOn(Schedulers.boundedElastic());
     }
 
     @GetMapping("/{id}")
     public Mono<R<AudienceDataSource>> get(@PathVariable Long id) {
-        return Mono.fromCallable(() -> R.ok(service.get(id)))
+        return Mono.fromCallable(() -> R.ok(mask(service.get(id))))
                 .subscribeOn(Schedulers.boundedElastic());
     }
 
     @PostMapping
     public Mono<R<AudienceDataSource>> create(@RequestBody AudienceDataSource body) {
-        return Mono.fromCallable(() -> R.ok(service.create(body)))
+        return Mono.fromCallable(() -> R.ok(mask(service.create(body))))
                 .subscribeOn(Schedulers.boundedElastic());
     }
 
     @PutMapping("/{id}")
     public Mono<R<AudienceDataSource>> update(@PathVariable Long id, @RequestBody AudienceDataSource body) {
         body.setId(id);
-        return Mono.fromCallable(() -> R.ok(service.update(body)))
+        return Mono.fromCallable(() -> R.ok(mask(service.update(body))))
                 .subscribeOn(Schedulers.boundedElastic());
     }
 
@@ -55,5 +56,32 @@ public class AudienceDataSourceController {
             service.delete(id);
             return R.<Void>ok();
         }).subscribeOn(Schedulers.boundedElastic());
+    }
+
+    private List<AudienceDataSource> mask(List<AudienceDataSource> dataSources) {
+        List<AudienceDataSource> masked = new ArrayList<>(dataSources.size());
+        for (AudienceDataSource dataSource : dataSources) {
+            masked.add(mask(dataSource));
+        }
+        return masked;
+    }
+
+    private AudienceDataSource mask(AudienceDataSource dataSource) {
+        if (dataSource == null) {
+            return null;
+        }
+        AudienceDataSource masked = new AudienceDataSource();
+        masked.setId(dataSource.getId());
+        masked.setName(dataSource.getName());
+        masked.setDescription(dataSource.getDescription());
+        masked.setUrl(dataSource.getUrl());
+        masked.setUsername(dataSource.getUsername());
+        masked.setDriverClassName(dataSource.getDriverClassName());
+        masked.setEnabled(dataSource.getEnabled());
+        masked.setCreatedBy(dataSource.getCreatedBy());
+        masked.setReferenceCount(dataSource.getReferenceCount());
+        masked.setCreatedAt(dataSource.getCreatedAt());
+        masked.setUpdatedAt(dataSource.getUpdatedAt());
+        return masked;
     }
 }
