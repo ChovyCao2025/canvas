@@ -4,6 +4,13 @@
 
 `CanvasConfigCache` 实现了 L1(Caffeine) + L2(Redis) + L3(Loader) + Pub/Sub 失效广播的三级缓存模式，但强耦合于业务。本 SDK 将该模式**泛型化、零业务依赖地抽离为独立 Maven 模块**，任意服务 3 行 Builder 即可接入。
 
+SDK 对外提供两种使用方式：
+
+- 显式 API：注入 `TieredCache<K,V>` 后手动调用 `get/put/invalidate/refresh/safeWrite`，适合复杂缓存和需要精细控制的场景。
+- 显式注解：在具体方法上声明 `@TieredCached` / `@TieredCacheEvict` / `@TieredCachePut`，调用方仍按原方法调用，缓存读写由 AOP 接管。
+
+不提供 Mapper 类级别自动缓存，不自动缓存所有 `BaseMapper` 方法。缓存边界必须由方法级注解或 Builder 显式声明，避免隐藏失效规则。
+
 ---
 
 ## Maven 模块结构
@@ -11,13 +18,21 @@
 ```
 backend/
 ├── pom.xml                          ← 聚合父 pom
-├── canvas-cache-sdk/                ← SDK 模块（仅依赖 Redis/Caffeine/Jackson）
+├── canvas-cache-sdk/                ← SDK 模块（依赖 Redis/Caffeine/Jackson/Spring AOP/Micrometer）
 │   └── src/main/java/org/chovy/cache/
 │       ├── TieredCache.java              ← 核心接口（同步）
 │       ├── ReactiveTieredCache.java      ← 响应式视图接口
 │       ├── TieredCacheImpl.java          ← 实现（同步 + 异步共享 L1/L2）
 │       ├── TieredCacheBuilder.java       ← Fluent Builder
 │       ├── TieredCacheManager.java       ← Spring Bean，管理 Pub/Sub + 实例注册
+│       ├── annotation/
+│       │   ├── TieredCached.java         ← 方法级读缓存注解
+│       │   ├── TieredCacheEvict.java     ← 方法级失效注解
+│       │   └── TieredCachePut.java       ← 方法级写入注解
+│       ├── aop/
+│       │   ├── TieredCacheAspect.java    ← 注解拦截器
+│       │   ├── AnnotationCacheResolver.java ← 注解缓存解析/注册
+│       │   └── SpelKeyEvaluator.java     ← SpEL key 解析
 │       ├── strategy/
 │       │   ├── LoaderFailureStrategy.java
 │       │   ├── RedisFailureStrategy.java
@@ -38,11 +53,16 @@ backend/
 ### TieredCache\<K, V\>（同步）
 
 ```java
+import java.util.function.Supplier;
+
 public interface TieredCache<K, V> {
     String name();
 
     /** L1 → L2 → Loader 三级查找，自动回填上级 */
     Optional<V> get(K key);
+
+    /** L1 → L2 → 本次调用提供的 Loader。用于注解拦截方法，保留底层缓存能力。 */
+    Optional<V> get(K key, Supplier<V> loaderOverride);
 
     /** 写 L2 → 写 L1（L2 失败则 L1 不写，保证 L1 ⊆ L2） */
     void put(K key, V value);
@@ -77,6 +97,131 @@ public interface ReactiveTieredCache<K, V> {
 ```
 
 **内部实现**：L1 始终同步（Caffeine 不支持响应式），L2 走 `ReactiveStringRedisTemplate`，Loader 用 `Mono.fromCallable(...).subscribeOn(Schedulers.boundedElastic())` 包装。
+
+---
+
+## 方法级注解 API
+
+注解层是 SDK 的可选 Spring 便捷层，目标是“显式声明、调用无感”。业务代码必须在具体方法上显式声明缓存行为；调用方只调用该方法，不直接感知缓存命中、回源、回填和失效。
+
+### @TieredCached — 读缓存
+
+```java
+@Target(ElementType.METHOD)
+@Retention(RetentionPolicy.RUNTIME)
+public @interface TieredCached {
+    String name();
+    String key();                         // SpEL，例如 "#versionId"、"#req.eventCode"
+    Class<?> valueType();
+
+    int l1MaxSize() default 1000;
+    String l1RefreshAfterWrite() default "1h";
+    String l2KeyPrefix() default "cache:";
+    String l2Ttl() default "24h";
+    double l2TtlJitter() default 0.1;
+    int keySchemaVersion() default 1;
+    String nullValueTtl() default "5m";
+    boolean hotspotProtection() default false;
+
+    LoaderFailureStrategy onLoaderFailure() default LoaderFailureStrategy.THROW;
+    RedisFailureStrategy onRedisReadFailure() default RedisFailureStrategy.FALLTHROUGH;
+    RedisFailureStrategy onRedisWriteFailure() default RedisFailureStrategy.FALLTHROUGH;
+    DeserializeFailureStrategy onDeserializeFailure() default DeserializeFailureStrategy.FALLTHROUGH_TO_L3;
+}
+```
+
+执行流程：
+
+1. AOP 拦截被注解方法。
+2. 使用 SpEL 从方法参数计算 key。
+3. 调用 `TieredCache.get(key, loaderOverride)`。
+4. L1/L2 命中时直接返回；miss 时执行原方法作为本次 Loader。
+5. 原方法返回值写入 L2 + L1；返回 `null` 时按 Null Sentinel 规则写入空值哨兵。
+
+示例：
+
+```java
+@Service
+public class CanvasQueryService {
+    private final CanvasMapper canvasMapper;
+
+    @TieredCached(
+        name = "canvas",
+        key = "#canvasId",
+        valueType = Canvas.class,
+        l1RefreshAfterWrite = "5m",
+        l2Ttl = "30m"
+    )
+    public Canvas getCanvas(Long canvasId) {
+        return canvasMapper.selectById(canvasId);
+    }
+}
+```
+
+Mapper 自定义方法也可以直接标注：
+
+```java
+@Mapper
+public interface EventDefinitionMapper extends BaseMapper<EventDefinition> {
+
+    // SQL 由 Mapper XML 或 @Select 提供；缓存注解只负责拦截和缓存。
+    @TieredCached(
+        name = "event-definition-by-code",
+        key = "#eventCode",
+        valueType = EventDefinition.class,
+        l1RefreshAfterWrite = "10m",
+        l2Ttl = "1h"
+    )
+    EventDefinition selectPublishedByCode(@Param("eventCode") String eventCode);
+}
+```
+
+### @TieredCacheEvict — 写后失效
+
+```java
+@Target(ElementType.METHOD)
+@Retention(RetentionPolicy.RUNTIME)
+public @interface TieredCacheEvict {
+    String name();
+    String key();
+    boolean beforeInvocation() default false;
+    boolean afterCommit() default true;
+}
+```
+
+默认 `afterCommit = true`：如果当前线程存在 Spring 事务，方法成功并提交后再失效缓存；如果没有事务，方法正常返回后失效。这样避免 DB 回滚但缓存已经被删除或写入的边界问题。
+
+```java
+@TieredCacheEvict(name = "canvas", key = "#canvas.id", afterCommit = true)
+@Transactional
+public void updateCanvas(Canvas canvas) {
+    canvasMapper.updateById(canvas);
+}
+```
+
+### @TieredCachePut — 显式写入
+
+`@TieredCachePut` 用于方法成功返回后把返回值写入缓存。它适合“写方法返回最新实体”的场景；普通 DB 更新仍优先使用 `@TieredCacheEvict`。
+
+```java
+@Target(ElementType.METHOD)
+@Retention(RetentionPolicy.RUNTIME)
+public @interface TieredCachePut {
+    String name();
+    String key();
+    boolean afterCommit() default true;
+}
+```
+
+`@TieredCachePut` 只操作已存在的命名缓存。缓存可以来自同名 `@TieredCached` 方法，也可以来自手动 Builder 注册的 `TieredCache` Bean；如果找不到同名缓存，启动或调用时应快速失败。
+
+### 注解边界
+
+- 只支持方法级注解，不支持 `@TieredCacheMapper` 这类 Mapper 类级自动缓存。
+- 不自动缓存所有 `BaseMapper.selectById/selectOne/selectList`。
+- `selectOne(LambdaQueryWrapper)`、`selectList(...)` 等复杂查询必须用方法级注解显式命名缓存和 key。
+- 第一版注解只支持同步返回值；响应式方法继续使用 `ReactiveTieredCache` 手动接入。
+- 注解方法应返回具体对象或 `null`；`Optional<T>` 返回值不作为第一版目标。
 
 ---
 
