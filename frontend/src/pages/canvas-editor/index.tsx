@@ -414,27 +414,30 @@ function EditorInner({ detail, onStatusChange }: {
           return { kind: 'placeholder', sourceId: ph.sourceId, handleId: ph.handleId } as const
         })()
       : null
-    const resolvedContext = insertContext?.kind === 'edge'
+    const defaultBizConfig = buildDefaultBizConfig(nodeType)
+    const branchHandles = getBranchHandles(nodeType, defaultBizConfig)
+    const fallbackContext = placeholderContext ?? { kind: 'blank' as const }
+    const edgeInsertActive = insertContext?.kind === 'edge'
+    const edgeEligible = branchHandles.length === 0
+    const resolvedContext = edgeInsertActive && edgeEligible
       ? insertContext
-      : placeholderContext ?? { kind: 'blank' as const }
+      : fallbackContext
     const newPos: XYPosition = resolvedContext.kind === 'placeholder' && hitPlaceholder
       ? hitPlaceholder.position
       : dropPos
-    const defaultBizConfig = buildDefaultBizConfig(nodeType)
-    const branchHandles = getBranchHandles(nodeType, defaultBizConfig)
-    const selectedEdge = resolvedContext.kind === 'edge'
-      ? getEdges().find(item => item.id === resolvedContext.edgeId)
+    const selectedEdge = edgeInsertActive && edgeEligible && insertContext?.kind === 'edge'
+      ? getEdges().find(item => item.id === insertContext.edgeId)
       : null
 
-    if (resolvedContext.kind === 'edge') {
+    if (edgeInsertActive && !edgeEligible) {
+      setInsertContext(null)
+      message.info('该节点会按实际落点处理：拖到分支占位点可自动挂接，拖到空白处会独立创建。', 3)
+    }
+
+    if (edgeInsertActive && edgeEligible) {
       if (!selectedEdge) {
         setInsertContext(null)
         message.warning('所选连线已变化，请重新选择插入位置。', 2)
-        return
-      }
-      if (branchHandles.length > 0) {
-        setInsertContext(null)
-        message.info('分支节点不能直接插入到连线上，请拖到具体分支占位点或空白画布。', 3)
         return
       }
     }
@@ -925,7 +928,9 @@ function EditorInner({ detail, onStatusChange }: {
       deleteNode: deleteNodeById,
       copyNode: copyNodeById,
       deleteEdge: deleteEdgeById,
+      canInsertOnEdge: !readonly,
       startInsertOnEdge: edgeId => {
+        if (readonly) return
         setInsertContext({ kind: 'edge', edgeId })
         setSelectedNodeId(null)
         message.info({

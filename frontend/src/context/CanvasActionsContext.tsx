@@ -5,6 +5,7 @@ export interface CanvasActions {
   copyNode:   (id: string) => void
   deleteEdge: (id: string) => void
   startInsertOnEdge: (id: string) => void
+  canInsertOnEdge: boolean
 }
 
 export const CanvasActionsContext = createContext<CanvasActions>({
@@ -12,6 +13,7 @@ export const CanvasActionsContext = createContext<CanvasActions>({
   copyNode:   () => {},
   deleteEdge: () => {},
   startInsertOnEdge: () => {},
+  canInsertOnEdge: false,
 })
 
 export const useCanvasActions = () => useContext(CanvasActionsContext)

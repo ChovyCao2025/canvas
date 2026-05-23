@@ -9,7 +9,7 @@ export default function HoverEdge({
   selected, label, style, markerEnd,
 }: EdgeProps) {
   const [hovered, setHovered] = useState(false)
-  const { deleteEdge, startInsertOnEdge } = useCanvasActions()
+  const { deleteEdge, startInsertOnEdge, canInsertOnEdge } = useCanvasActions()
 
   const [edgePath, labelX, labelY] = getBezierPath({
     sourceX, sourceY, sourcePosition,
@@ -53,7 +53,7 @@ export default function HoverEdge({
           </div>
         )}
 
-        {highlighted && (
+        {highlighted && canInsertOnEdge && (
           <button
             type="button"
             className="nopan nodrag"
