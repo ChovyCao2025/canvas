@@ -1,5 +1,4 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
-import { Result } from 'antd'
 import { AuthProvider } from './context/AuthContext'
 import { RequireAuth, RequireAdmin } from './auth/guards'
 import AppLayout from './components/layout/AppLayout'
@@ -13,14 +12,11 @@ import ApiConfigPage from './pages/api-config'
 import AbExperimentPage from './pages/ab-experiment'
 import TagConfigPage from './pages/tag-config'
 import IdentityTypesPage from './pages/identity-types'
+import TagImportPage from './pages/tag-import'
 import MqConfigPage from './pages/mq-config'
 import EventConfigPage from './pages/event-config'
 import AudienceListPage from './pages/audience-list'
 import AudienceEditPage from './pages/audience-edit'
-
-function TagImportPage() {
-  return <Result status="info" title="标签导入页面待接入" />
-}
 
 export default function App() {
   return (
