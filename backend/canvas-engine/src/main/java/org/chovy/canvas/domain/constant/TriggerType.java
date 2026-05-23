@@ -14,6 +14,10 @@ public final class TriggerType {
     public static final String LOGIC_RELATION_TIMEOUT  = "LOGIC_RELATION_TIMEOUT";
     public static final String AGGREGATE_TIMEOUT       = "AGGREGATE_TIMEOUT";
     public static final String THRESHOLD_TIMEOUT       = "THRESHOLD_TIMEOUT";
+    public static final String WAIT_RESUME             = "WAIT_RESUME";
+    public static final String WAIT_TIMEOUT            = "WAIT_TIMEOUT";
+    public static final String GOAL_CHECK_RESUME       = "GOAL_CHECK_RESUME";
+    public static final String GOAL_CHECK_TIMEOUT      = "GOAL_CHECK_TIMEOUT";
     public static final String SUB_FLOW_REF            = "SUB_FLOW_REF";
 
     private TriggerType() {}

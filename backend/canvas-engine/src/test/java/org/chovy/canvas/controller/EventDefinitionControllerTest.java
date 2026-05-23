@@ -9,6 +9,7 @@ import org.chovy.canvas.domain.meta.EventLog;
 import org.chovy.canvas.domain.meta.EventLogMapper;
 import org.chovy.canvas.dto.EventReportReq;
 import org.chovy.canvas.engine.disruptor.CanvasDisruptorService;
+import org.chovy.canvas.engine.wait.WaitResumeService;
 import org.chovy.canvas.infra.redis.TriggerRouteService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -32,6 +33,7 @@ class EventDefinitionControllerTest {
     private CanvasDisruptorService disruptorService;
     private TriggerRouteService triggerRouteService;
     private EventDefinitionCacheService eventDefinitionCacheService;
+    private WaitResumeService waitResumeService;
     private EventDefinitionController controller;
 
     @BeforeEach
@@ -41,9 +43,10 @@ class EventDefinitionControllerTest {
         disruptorService = Mockito.mock(CanvasDisruptorService.class);
         triggerRouteService = Mockito.mock(TriggerRouteService.class);
         eventDefinitionCacheService = Mockito.mock(EventDefinitionCacheService.class);
+        waitResumeService = Mockito.mock(WaitResumeService.class);
         controller = new EventDefinitionController(
                 eventMapper, logMapper, disruptorService, triggerRouteService, new ObjectMapper(),
-                eventDefinitionCacheService);
+                eventDefinitionCacheService, waitResumeService);
     }
 
     @Test

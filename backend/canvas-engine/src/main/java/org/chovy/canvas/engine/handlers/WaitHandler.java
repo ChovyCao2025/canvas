@@ -16,6 +16,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.ZoneId;
+import java.time.format.DateTimeParseException;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
@@ -56,42 +57,62 @@ public class WaitHandler implements NodeHandler {
         String waitType = waitType(config);
         return switch (waitType) {
             case "UNTIL_EVENT" -> Mono.just(waitUntilEvent(config, ctx));
-            case "UNTIL_DATE" -> Mono.just(waitUntilDate(config));
-            case "RELATIVE_TIME" -> Mono.just(waitUntilRelativeTime(config));
-            case "TIME_WINDOW" -> Mono.just(waitForTimeWindow(config));
-            case "DURATION" -> Mono.just(waitForDuration(config));
+            case "UNTIL_DATE" -> Mono.just(waitUntilDate(config, ctx));
+            case "RELATIVE_TIME" -> Mono.just(waitUntilRelativeTime(config, ctx));
+            case "TIME_WINDOW" -> Mono.just(waitForTimeWindow(config, ctx));
+            case "DURATION" -> Mono.just(waitForDuration(config, ctx));
             default -> Mono.just(NodeResult.fail("未知 WAIT 类型: " + waitType));
         };
     }
 
-    private NodeResult waitForDuration(Map<String, Object> config) {
-        return pendingAt(now().plus(durationFrom(config.get("duration"), config)));
+    private NodeResult waitForDuration(Map<String, Object> config, ExecutionContext ctx) {
+        Duration duration = durationFrom(config.get("duration"), config);
+        if (duration.isZero() || duration.isNegative()) {
+            return NodeResult.fail("WAIT DURATION 的等待时长必须大于 0");
+        }
+        return pendingAt(config, ctx, "DURATION", now().plus(duration));
     }
 
-    private NodeResult waitUntilDate(Map<String, Object> config) {
-        LocalDateTime until = parseDateTime(string(config, "untilDate", null));
+    private NodeResult waitUntilDate(Map<String, Object> config, ExecutionContext ctx) {
+        LocalDateTime until;
+        try {
+            until = parseDateTime(string(config, "untilDate", null));
+        } catch (DateTimeParseException e) {
+            return NodeResult.fail("WAIT UNTIL_DATE 的 untilDate 格式不正确");
+        }
         if (until == null || !until.isAfter(now())) {
             return success(config);
         }
-        return pendingAt(until);
+        return pendingAt(config, ctx, "UNTIL_DATE", until);
     }
 
-    private NodeResult waitUntilRelativeTime(Map<String, Object> config) {
-        LocalTime targetTime = parseTime(string(config, "time", null), LocalTime.of(9, 0));
+    private NodeResult waitUntilRelativeTime(Map<String, Object> config, ExecutionContext ctx) {
+        LocalTime targetTime;
+        try {
+            targetTime = parseTime(string(config, "time", null), LocalTime.of(9, 0));
+        } catch (DateTimeParseException e) {
+            return NodeResult.fail("WAIT RELATIVE_TIME 的 time 格式不正确");
+        }
         LocalDateTime candidate = LocalDateTime.of(LocalDate.now(clock), targetTime);
         if (!candidate.isAfter(now())) {
             candidate = candidate.plusDays(1);
         }
-        return pendingAt(candidate);
+        return pendingAt(config, ctx, "RELATIVE_TIME", candidate);
     }
 
     @SuppressWarnings("unchecked")
-    private NodeResult waitForTimeWindow(Map<String, Object> config) {
+    private NodeResult waitForTimeWindow(Map<String, Object> config, ExecutionContext ctx) {
         Map<String, Object> window = config.get("timeWindow") instanceof Map<?, ?> map
                 ? (Map<String, Object>) map
                 : Map.of();
-        LocalTime start = parseTime(string(window, "start", string(config, "windowStart", null)), LocalTime.of(9, 0));
-        LocalTime end = parseTime(string(window, "end", string(config, "windowEnd", null)), LocalTime.of(20, 0));
+        LocalTime start;
+        LocalTime end;
+        try {
+            start = parseTime(string(window, "start", string(config, "windowStart", null)), LocalTime.of(9, 0));
+            end = parseTime(string(window, "end", string(config, "windowEnd", null)), LocalTime.of(20, 0));
+        } catch (DateTimeParseException e) {
+            return NodeResult.fail("WAIT TIME_WINDOW 的时间窗口格式不正确");
+        }
         LocalTime current = LocalTime.now(clock);
 
         if (insideWindow(current, start, end)) {
@@ -103,7 +124,7 @@ public class WaitHandler implements NodeHandler {
         if (!nextStart.isAfter(now())) {
             nextStart = nextStart.plusDays(1);
         }
-        return pendingAt(nextStart);
+        return pendingAt(config, ctx, "TIME_WINDOW", nextStart);
     }
 
     private NodeResult waitUntilEvent(Map<String, Object> config, ExecutionContext ctx) {
@@ -139,14 +160,37 @@ public class WaitHandler implements NodeHandler {
                 resumePayload,
                 expiresAt
         );
-        return pendingAt(expiresAt);
+        return pending(expiresAt);
     }
 
     private NodeResult success(Map<String, Object> config) {
-        return NodeResult.ok(string(config, "nextNodeId", null), Map.of());
+        return NodeResult.ok(string(config, "nextNodeId", null), Map.of("waitStatus", "COMPLETED"));
     }
 
-    private NodeResult pendingAt(LocalDateTime resumeAt) {
+    private NodeResult pendingAt(
+            Map<String, Object> config,
+            ExecutionContext ctx,
+            String waitType,
+            LocalDateTime resumeAt
+    ) {
+        String nodeId = string(config, "__nodeId", null);
+        if (nodeId == null || nodeId.isBlank()) {
+            return NodeResult.fail("WAIT 节点未注入 __nodeId");
+        }
+        waitSubscriptionService.createTimeWait(
+                ctx.getExecutionId(),
+                ctx.getCanvasId(),
+                ctx.getVersionId(),
+                ctx.getUserId(),
+                nodeId,
+                waitType,
+                toJson(resumePayload(nodeId, config)),
+                resumeAt
+        );
+        return pending(resumeAt);
+    }
+
+    private NodeResult pending(LocalDateTime resumeAt) {
         return NodeResult.pending(
                 resumeAt.atZone(zone()).toInstant().toEpochMilli(),
                 "WAIT_PENDING",

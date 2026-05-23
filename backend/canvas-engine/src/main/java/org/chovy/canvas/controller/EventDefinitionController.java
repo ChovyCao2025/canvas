@@ -14,6 +14,7 @@ import org.chovy.canvas.domain.meta.EventLog;
 import org.chovy.canvas.domain.meta.EventLogMapper;
 import org.chovy.canvas.dto.EventReportReq;
 import org.chovy.canvas.engine.disruptor.CanvasDisruptorService;
+import org.chovy.canvas.engine.wait.WaitResumeService;
 import org.chovy.canvas.infra.redis.TriggerRouteService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -45,6 +46,7 @@ public class EventDefinitionController {
     private final TriggerRouteService triggerRouteService;
     private final ObjectMapper objectMapper;
     private final EventDefinitionCacheService eventDefinitionCacheService;
+    private final WaitResumeService waitResumeService;
 
     // ── 事件定义 CRUD ────────────────────────────────────────────
 
@@ -148,11 +150,19 @@ public class EventDefinitionController {
                     eventLog.setCanvasCount(canvasIds.size());
                     logMapper.insert(eventLog);
 
+                    int waitsResumed = waitResumeService.resumeEventWaits(
+                            req.getEventCode(),
+                            req.getUserId(),
+                            payload,
+                            eventId
+                    );
+
                     Map<String, Object> resp = new java.util.LinkedHashMap<>();
                     resp.put("eventLogId", eventLog.getId());
                     resp.put("eventCode", req.getEventCode());
                     resp.put("userId", req.getUserId());
                     resp.put("canvasTriggered", canvasIds.size());
+                    resp.put("waitsResumed", waitsResumed);
                     resp.put("status", "ACCEPTED");
                     return resp;
                 }).subscribeOn(Schedulers.boundedElastic())

@@ -69,6 +69,11 @@ public record NodeResult(
                 NodeOutcome.SKIPPED, route("skipped", skippedNodeId), reasonCode, reasonMessage, null);
     }
 
+    public static NodeResult routed(String routeHandle, String nodeId, Map<String, Object> output) {
+        return new NodeResult(null, null, null, null, null, output == null ? Map.of() : output,
+                true, null, false, NodeOutcome.SUCCESS, route(routeHandle, nodeId), null, null, null);
+    }
+
     public static NodeResult pending(Long resumeAtEpochMs, String reasonCode, String reasonMessage) {
         return new NodeResult(null, null, null, null, null, Map.of(), true, null, true,
                 NodeOutcome.PENDING, Map.of(), reasonCode, reasonMessage, resumeAtEpochMs);

@@ -100,6 +100,9 @@ public class CanvasExecutionService {
                 })
                 .subscribeOn(Schedulers.boundedElastic())
                 .flatMap(prep -> {
+                    if (!prep.containsKey("ctx")) {
+                        return Mono.just(prep);
+                    }
                     ExecutionContext ctx = (ExecutionContext) prep.get("ctx");
                     DagGraph graph = (DagGraph) prep.get("graph");
                     String triggerNodeId = (String) prep.get("triggerNodeId");
@@ -282,7 +285,7 @@ public class CanvasExecutionService {
                                     }
                                     Map<String, Object> resp = new HashMap<>(result);
                                     resp.put("executionId", ctx.getExecutionId());
-                                    return updateExecution(finalExec, ExecutionStatus.PAUSED.getCode(), Map.of())
+                                    return updateExecution(finalExec, ExecutionStatus.PAUSED.getCode(), result)
                                             .thenReturn(resp);
                                 }
                                 if (!dryRun) {
@@ -301,7 +304,10 @@ public class CanvasExecutionService {
                                 boolean paused = isPaused(ctx, graph);
                                 Mono<Void> updateMono;
                                 if (paused) {
-                                    if (!dryRun) ctxStore.save(ctx);
+                                    if (!dryRun) {
+                                        ctxStore.save(ctx);
+                                        if (isResume) ctxStore.releaseResumeLock(ctx.getCanvasId(), ctx.getUserId());
+                                    }
                                     updateMono = updateExecution(finalExec, ExecutionStatus.PAUSED.getCode(), Map.of()); // PAUSED
                                     if (!dryRun) incrementStats(ctx.getCanvasId(), ExecutionStatus.PAUSED.getCode(), ctx.getUserId());
                                 } else {
@@ -430,6 +436,10 @@ public class CanvasExecutionService {
         for (String nodeId : graph.allNodeIds()) {
             DagParser.CanvasNode node = graph.getNode(nodeId);
             if (node == null || !triggerNodeType.equals(node.getType())) continue;
+            if (NodeType.WAIT.equals(triggerNodeType) || NodeType.GOAL_CHECK.equals(triggerNodeType)) {
+                if (matchKey == null || nodeId.equals(matchKey)) return nodeId;
+                continue;
+            }
             if (matchKey == null) return nodeId;
             Map<String, Object> cfg = new HashMap<>();
             if (node.getBizConfig() != null) cfg.putAll(node.getBizConfig());

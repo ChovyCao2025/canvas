@@ -46,6 +46,8 @@ public final class NodeType {
     public static final String MANUAL_APPROVAL    = "MANUAL_APPROVAL";
     /** 增强等待节点 */
     public static final String WAIT               = "WAIT";
+    /** 目标检测节点 */
+    public static final String GOAL_CHECK         = "GOAL_CHECK";
     /** 延时节点 */
     public static final String DELAY              = "DELAY";
     /** 流程终止节点 */

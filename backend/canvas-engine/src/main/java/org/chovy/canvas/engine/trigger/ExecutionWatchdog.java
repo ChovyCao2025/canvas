@@ -11,6 +11,7 @@ import org.chovy.canvas.domain.constant.TriggerType;
 import org.chovy.canvas.domain.execution.CanvasExecution;
 import org.chovy.canvas.domain.execution.CanvasExecutionMapper;
 import org.chovy.canvas.engine.handlers.ManualApprovalHandler;
+import org.chovy.canvas.engine.wait.WaitResumeService;
 import org.chovy.canvas.infra.redis.ContextPersistenceService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -38,6 +39,7 @@ public class ExecutionWatchdog {
     private final CanvasManualApprovalMapper approvalMapper;
     private final ContextPersistenceService  ctxStore;
     private final CanvasExecutionService     executionService;
+    private final WaitResumeService          waitResumeService;
 
     @Value("${canvas.execution.global-timeout-sec:600}")
     private long globalTimeoutSec;
@@ -45,9 +47,13 @@ public class ExecutionWatchdog {
     @Value("${canvas.watchdog.zombie-resume-threshold-min:10}")
     private int zombieThresholdMin;
 
+    @Value("${canvas.watchdog.wait-expire-batch-size:200}")
+    private int waitExpireBatchSize;
+
     @Scheduled(fixedDelay = 30_000)
     public void scan() {
         scanZombieCtx();
+        scanWaitSubscriptions();
         scanApprovalTimeout();
     }
 
@@ -70,6 +76,13 @@ public class ExecutionWatchdog {
             exec.setLastDedupKey(null);
             executionMapper.updateById(exec);
             log.info("[WATCHDOG] 僵尸 ctx 已清理 executionId={}", exec.getId());
+        }
+    }
+
+    private void scanWaitSubscriptions() {
+        int resumed = waitResumeService.resumeDueWaits(waitExpireBatchSize);
+        if (resumed > 0) {
+            log.info("[WATCHDOG] 恢复到期 WAIT/GOAL 订阅 count={}", resumed);
         }
     }
 
