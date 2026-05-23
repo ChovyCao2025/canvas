@@ -49,20 +49,20 @@ public class AudienceBatchComputeService {
 
     public AudienceComputeResult compute(Long audienceId) {
         String lockKey = COMPUTE_LOCK_PREFIX + audienceId;
-        AudienceDefinition definition = definitionMapper.selectById(audienceId);
-        String audienceName = definition == null ? null : definition.getName();
         boolean locked = Boolean.TRUE.equals(redis.opsForValue().setIfAbsent(lockKey, "1", Duration.ofHours(2)));
         if (!locked) {
             log.warn("[AUDIENCE] compute skipped because lock exists audienceId={}", audienceId);
-            return AudienceComputeResult.failed(audienceId, audienceName, "已有计算任务正在运行");
+            return AudienceComputeResult.failed(audienceId, safeAudienceName(audienceId), "已有计算任务正在运行");
         }
 
-        updateStat(audienceId, "COMPUTING", null, null, null);
+        String audienceName = fallbackAudienceName(audienceId);
         try {
+            updateStat(audienceId, "COMPUTING", null, null, null);
+            AudienceDefinition definition = definitionMapper.selectById(audienceId);
             if (definition == null || definition.getEnabled() == null || definition.getEnabled() == 0) {
                 throw new IllegalArgumentException("Audience not found or disabled: " + audienceId);
             }
-            audienceName = definition.getName();
+            audienceName = displayName(definition.getName(), audienceId);
 
             RoaringBitmap bitmap = switch (definition.getDataSourceType()) {
                 case "JDBC" -> computeViaJdbc(definition);
@@ -79,14 +79,19 @@ public class AudienceBatchComputeService {
             long estimatedSize = bitmap.getCardinality();
             int bitmapSizeKb = bos.size() / 1024;
             updateStat(audienceId, "READY", estimatedSize, bitmapSizeKb, null);
-            return AudienceComputeResult.ready(audienceId, definition.getName(), estimatedSize, bitmapSizeKb);
+            return AudienceComputeResult.ready(audienceId, audienceName, estimatedSize, bitmapSizeKb);
         } catch (Exception e) {
             String error = trimError(e.getMessage());
             log.error("[AUDIENCE] compute failed audienceId={}: {}", audienceId, e.getMessage(), e);
-            updateStat(audienceId, "FAILED", null, null, error);
+            try {
+                updateStat(audienceId, "FAILED", null, null, error);
+            } catch (Exception statException) {
+                log.error("[AUDIENCE] failed to update compute failure stat audienceId={}: {}",
+                        audienceId, statException.getMessage(), statException);
+            }
             return AudienceComputeResult.failed(audienceId, audienceName, error);
         } finally {
-            redis.delete(lockKey);
+            releaseLock(lockKey, audienceId);
         }
     }
 
@@ -249,6 +254,32 @@ public class AudienceBatchComputeService {
             return null;
         }
         return message.length() <= 500 ? message : message.substring(0, 500);
+    }
+
+    private String safeAudienceName(Long audienceId) {
+        try {
+            AudienceDefinition definition = definitionMapper.selectById(audienceId);
+            return displayName(definition == null ? null : definition.getName(), audienceId);
+        } catch (Exception e) {
+            log.warn("[AUDIENCE] failed to fetch audience name audienceId={}: {}", audienceId, e.getMessage(), e);
+            return fallbackAudienceName(audienceId);
+        }
+    }
+
+    private String displayName(String audienceName, Long audienceId) {
+        return audienceName == null || audienceName.isBlank() ? fallbackAudienceName(audienceId) : audienceName;
+    }
+
+    private String fallbackAudienceName(Long audienceId) {
+        return "人群 " + audienceId;
+    }
+
+    private void releaseLock(String lockKey, Long audienceId) {
+        try {
+            redis.delete(lockKey);
+        } catch (Exception e) {
+            log.error("[AUDIENCE] failed to release compute lock audienceId={}: {}", audienceId, e.getMessage(), e);
+        }
     }
 
     public List<AudienceDefinition> listReadyDefinitions() {
