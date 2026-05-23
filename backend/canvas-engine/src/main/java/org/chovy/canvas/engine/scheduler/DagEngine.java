@@ -806,6 +806,10 @@ public class DagEngine {
             if (fallbackNextId != null) {
                 ctx.setNodeStatus(priorityNodeId, NodeStatus.PARTIAL_FAIL);
                 log.debug("[PRIORITY] 所有分支失败，走 fallback nextId={}", fallbackNextId);
+                if (ctx.isNodeDone(fallbackNextId)) {
+                    log.debug("[PRIORITY] fallback 已作为分支执行过，按节点幂等跳过 nextId={}", fallbackNextId);
+                    return Mono.just(Map.of());
+                }
                 return executeNode(graph, fallbackNextId, ctx, depth);
             }
             log.debug("[PRIORITY] 所有分支失败，无 fallback，整体 FAILED");
@@ -814,13 +818,23 @@ public class DagEngine {
 
         String currentBranchId = branches.getFirst();
         return executeNode(graph, currentBranchId, ctx, depth)
-                .flatMap(__ -> {
+                .<Map<String, Object>>flatMap(__ -> {
                     if (ctx.getNodeStatus(currentBranchId) == NodeStatus.SUCCESS) {
                         log.debug("[PRIORITY] 分支成功，停止 branchId={}", currentBranchId);
                         return Mono.just(Map.of());
                     }
                     // 当前分支失败，尝试下一个
                     log.debug("[PRIORITY] 分支失败，尝试下一个 branchId={}", currentBranchId);
+                    return tryPrioritySequentially(
+                            branches.subList(1, branches.size()),
+                            fallbackNextId, priorityNodeId, graph, ctx, depth);
+                })
+                .onErrorResume(e -> {
+                    if (!ctx.isNodeDone(currentBranchId)) {
+                        return Mono.<Map<String, Object>>error(e);
+                    }
+                    log.debug("[PRIORITY] 分支异常结束，尝试下一个 branchId={} reason={}",
+                            currentBranchId, e.getMessage());
                     return tryPrioritySequentially(
                             branches.subList(1, branches.size()),
                             fallbackNextId, priorityNodeId, graph, ctx, depth);
