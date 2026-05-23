@@ -1,0 +1,53 @@
+package org.chovy.canvas.engine.handlers;
+
+import org.chovy.canvas.domain.constant.NodeType;
+import org.chovy.canvas.engine.context.ExecutionContext;
+import org.chovy.canvas.engine.handler.NodeHandler;
+import org.chovy.canvas.engine.handler.NodeHandlerType;
+import org.chovy.canvas.engine.handler.NodeResult;
+import org.springframework.stereotype.Component;
+import reactor.core.publisher.Mono;
+
+import java.util.Map;
+
+@Component
+@NodeHandlerType(NodeType.LOOP)
+public class LoopHandler implements NodeHandler {
+    @Override
+    public Mono<NodeResult> executeAsync(Map<String, Object> config, ExecutionContext ctx) {
+        String nodeId = string(config, "__nodeId", "loop");
+        int maxIterations = number(config.get("maxIterations"), 1);
+        if (maxIterations <= 0) {
+            return Mono.just(NodeResult.fail("LOOP 必须配置 maxIterations > 0"));
+        }
+        int nextCount = ctx.getLoopIterations().merge(nodeId, 1, Integer::sum);
+        boolean exit = exitConditionMet(config, ctx);
+        if (exit) {
+            return Mono.just(NodeResult.routed("exit", string(config, "exitNodeId", string(config, "nextNodeId", null)),
+                    Map.of("loopIterations", nextCount, "loopExited", true)));
+        }
+        if (nextCount > maxIterations) {
+            return Mono.just(NodeResult.routed("max_exceeded", string(config, "maxExceededNodeId", null),
+                    Map.of("loopIterations", nextCount, "loopExceeded", true)));
+        }
+        return Mono.just(NodeResult.routed("loop", string(config, "loopStartNodeId", null),
+                Map.of("loopIterations", nextCount)));
+    }
+
+    private boolean exitConditionMet(Map<String, Object> config, ExecutionContext ctx) {
+        String field = string(config, "exitField", null);
+        if (field == null) return false;
+        Object actual = ctx.getContextValue(field);
+        Object expected = config.get("exitValue");
+        return expected == null ? actual != null : expected.toString().equals(String.valueOf(actual));
+    }
+
+    private int number(Object value, int fallback) {
+        return value instanceof Number number ? number.intValue() : fallback;
+    }
+
+    private String string(Map<String, Object> config, String key, String fallback) {
+        Object value = config.get(key);
+        return value == null ? fallback : value.toString();
+    }
+}

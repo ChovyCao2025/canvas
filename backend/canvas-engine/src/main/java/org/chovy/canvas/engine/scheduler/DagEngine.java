@@ -190,7 +190,9 @@ public class DagEngine {
                     || NodeType.SEND_PUSH.equals(node.getType())
                     || NodeType.SEND_IN_APP.equals(node.getType())
                     || NodeType.SEND_WECHAT.equals(node.getType())
-                    || NodeType.POINTS_OPERATION.equals(node.getType());
+                    || NodeType.POINTS_OPERATION.equals(node.getType())
+                    || NodeType.LOOP.equals(node.getType())
+                    || NodeType.GOTO.equals(node.getType());
             Map<String, Object> config = needsNodeId
                     ? resolveConfigWithNodeId(rawConfig, ctx, nodeId, node.getType())
                     : resolveConfig(rawConfig, ctx);

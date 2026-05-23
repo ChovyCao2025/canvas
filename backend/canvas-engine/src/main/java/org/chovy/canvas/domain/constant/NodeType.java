@@ -44,6 +44,14 @@ public final class NodeType {
     public static final String AI_NEXT_BEST_ACTION = "AI_NEXT_BEST_ACTION";
     /** 汇聚节点（等待多条上游汇入一条） */
     public static final String HUB                = "HUB";
+    /** 产品化合并节点 */
+    public static final String MERGE              = "MERGE";
+    /** 受控循环节点 */
+    public static final String LOOP               = "LOOP";
+    /** 受控跳转节点 */
+    public static final String GOTO               = "GOTO";
+    /** 跳转到其他旅程 */
+    public static final String TRANSFER_JOURNEY   = "TRANSFER_JOURNEY";
     /** 聚合评估节点：等待所有上游完成，基于上游结果评估条件，路由到成功或失败分支 */
     public static final String AGGREGATE          = "AGGREGATE";
     /**

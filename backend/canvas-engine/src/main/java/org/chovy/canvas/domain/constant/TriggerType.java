@@ -18,6 +18,7 @@ public final class TriggerType {
     public static final String WAIT_TIMEOUT            = "WAIT_TIMEOUT";
     public static final String GOAL_CHECK_RESUME       = "GOAL_CHECK_RESUME";
     public static final String GOAL_CHECK_TIMEOUT      = "GOAL_CHECK_TIMEOUT";
+    public static final String TRANSFER_JOURNEY        = "TRANSFER_JOURNEY";
     public static final String SUB_FLOW_REF            = "SUB_FLOW_REF";
 
     private TriggerType() {}
