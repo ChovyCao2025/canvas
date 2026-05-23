@@ -3,6 +3,7 @@ import { Button, Table, Tag, Space, Modal, Form, Input, Select, Switch, message,
 import { PlusOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
 import { tagDefinitionApi } from '../../services/api'
+import { useSystemOptions } from '../../hooks/useSystemOptions'
 
 const { Title } = Typography
 
@@ -42,6 +43,7 @@ export default function TagConfigPage() {
   const [editing,  setEditing]  = useState<TagDef | null>(null)
   const [form] = Form.useForm()
   const [saving, setSaving] = useState(false)
+  const { options: tagTypeOptions } = useSystemOptions('tag_type')
 
   // 获取标签定义列表
   const fetchList = async (p = page) => {
@@ -134,7 +136,7 @@ export default function TagConfigPage() {
             <Input placeholder="如：new_user" />
           </Form.Item>
           <Form.Item name="tagType" label="类型" rules={[{ required: true }]}>
-            <Select options={[{ value: 'offline', label: '离线标签' }, { value: 'realtime', label: '实时标签' }]} />
+            <Select options={tagTypeOptions} />
           </Form.Item>
           <Form.Item name="description" label="说明">
             <Input.TextArea rows={2} />

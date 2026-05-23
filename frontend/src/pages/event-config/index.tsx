@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react'
-import { Button, Table, Tag, Space, Modal, Form, Input, Switch, message, Typography, Popconfirm, Divider, Alert } from 'antd'
+import { Button, Table, Tag, Space, Modal, Form, Input, Select, Switch, message, Typography, Popconfirm, Divider, Alert } from 'antd'
 import { PlusOutlined, EditOutlined, DeleteOutlined, CodeOutlined } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
 import http from '../../services/api'
-import { PARAM_TYPES, type ApiParam } from '../api-config'
+import type { ApiParam } from '../api-config'
+import { useSystemOptions } from '../../hooks/useSystemOptions'
 
 const { Title, Text } = Typography
 
@@ -42,9 +43,12 @@ interface AttrSchemaEditorProps {
 
   /** 属性定义变更回调。 */
   onChange?: (v: ApiParam[]) => void
+
+  /** 属性类型选项。 */
+  attrTypeOptions: { value: string; label: string }[]
 }
 
-function AttrSchemaEditor({ value, onChange }: AttrSchemaEditorProps) {
+function AttrSchemaEditor({ value, onChange, attrTypeOptions }: AttrSchemaEditorProps) {
   const attrs: ApiParam[] = value ?? []
   const set = (next: ApiParam[]) => onChange?.(next)
   const add = () => set([...attrs, { name: '', displayName: '', type: 'STRING', required: false }])
@@ -60,11 +64,13 @@ function AttrSchemaEditor({ value, onChange }: AttrSchemaEditorProps) {
             onChange={e => update(i, { name: e.target.value })} />
           <Input size="small" style={{ width: 80 }} placeholder="显示名" value={p.displayName}
             onChange={e => update(i, { displayName: e.target.value })} />
-          <select style={{ fontSize: 12, padding: '1px 4px', borderRadius: 4, border: '1px solid #d9d9d9' }}
-            value={p.type} onChange={e => update(i, { type: e.target.value })}>
-            {PARAM_TYPES.filter(t => ['STRING', 'NUMBER', 'DATE'].includes(t.value))
-              .map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
-          </select>
+          <Select
+            size="small"
+            style={{ width: 108 }}
+            value={p.type}
+            options={attrTypeOptions}
+            onChange={type => update(i, { type })}
+          />
           <label style={{ fontSize: 12, display: 'flex', alignItems: 'center', gap: 4 }}>
             <input type="checkbox" checked={p.required} onChange={e => update(i, { required: e.target.checked })} />
             必填
@@ -89,6 +95,7 @@ export default function EventConfigPage() {
   const [editing, setEditing] = useState<EventDef | null>(null)
   const [form] = Form.useForm()
   const [saving, setSaving] = useState(false)
+  const { options: attrTypeOptions } = useSystemOptions('event_attr_type')
 
   const fetchList = async (p = page) => {
     setLoading(true)
@@ -204,7 +211,7 @@ export default function EventConfigPage() {
             属性类型：文本（STRING）/ 数值（NUMBER）/ 日期（DATE），上报时作为上下文变量传入画布
           </div>
           <Form.Item name="attributes" style={{ marginBottom: 0 }}>
-            <AttrSchemaEditor />
+            <AttrSchemaEditor attrTypeOptions={attrTypeOptions} />
           </Form.Item>
         </Form>
       </Modal>

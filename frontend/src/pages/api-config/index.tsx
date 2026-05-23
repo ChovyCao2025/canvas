@@ -7,6 +7,7 @@ import {
 import { PlusOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
 import { apiDefinitionApi } from '../../services/api'
+import { useSystemOptions } from '../../hooks/useSystemOptions'
 import {
   buildApiReceiptPreview,
   buildApiRequestPreview,
@@ -18,14 +19,6 @@ import type { ApiReceiptStatus } from './requestPreview'
 const { Title } = Typography
 const DEFAULT_RECEIPT_EXPIRE_MINUTES = 1440
 const DEFAULT_RECEIPT_STATUSES: ApiReceiptStatus[] = [{ code: '200', label: '成功' }]
-
-export const PARAM_TYPES = [
-  { value: 'STRING',       label: '字符型' },
-  { value: 'NUMBER',       label: '数值型' },
-  { value: 'TEXT',         label: '文本型' },
-  { value: 'DATE',         label: '日期型' },
-  { value: 'STRING_PARAM', label: '字符型（参数调用）' },
-]
 
 export interface ApiParam {
   name:        string
@@ -60,8 +53,9 @@ function parseArrayField<T>(raw: string | undefined, fallback: T[]): T[] {
 }
 
 // ── 参数定义子表格 ───────────────────────────────────────────────
-function ParamSchemaEditor({ value, onChange }: {
+function ParamSchemaEditor({ value, onChange, paramTypeOptions }: {
   value?: ApiParam[]; onChange?: (v: ApiParam[]) => void
+  paramTypeOptions: { value: string; label: string }[]
 }) {
   const params: ApiParam[] = value ?? []
 
@@ -90,7 +84,7 @@ function ParamSchemaEditor({ value, onChange }: {
       title: '类型', dataIndex: 'type', width: 160,
       render: (v, _, i) => (
         <Select size="small" style={{ width: '100%' }} value={v}
-          options={PARAM_TYPES}
+          options={paramTypeOptions}
           onChange={t => update(i, { type: t })} />
       ),
     },
@@ -188,6 +182,8 @@ export default function ApiConfigPage() {
   const [editingRecord, setEditingRecord] = useState<ApiDefinition | null>(null)
   const [form] = Form.useForm()
   const [submitting, setSubmitting] = useState(false)
+  const { options: paramTypeOptions } = useSystemOptions('param_type')
+  const { options: methodOptions } = useSystemOptions('http_method')
   const requestSchemaPreview = Form.useWatch('requestSchema', form) as ApiParam[] | undefined
   const includeContextPayloadPreview = Form.useWatch('includeContextPayload', form) as boolean | undefined
   const receiptEnabledPreview = Form.useWatch('receiptEnabled', form) as boolean | undefined
@@ -342,7 +338,7 @@ export default function ApiConfigPage() {
                   <Input placeholder="https://api.example.com/v1/user" />
                 </Form.Item>
                 <Form.Item name="method" label="方法" style={{ width: 100 }} rules={[{ required: true }]}>
-                  <Select options={[{ value: 'GET', label: 'GET' }, { value: 'POST', label: 'POST' }]} />
+                  <Select options={methodOptions} />
                 </Form.Item>
               </Space>
               <Form.Item name="description" label="说明">
@@ -380,7 +376,7 @@ export default function ApiConfigPage() {
 
               <Divider style={{ margin: '16px 0 12px' }}>请求参数定义</Divider>
               <Form.Item name="requestSchema" style={{ marginBottom: 0 }}>
-                <ParamSchemaEditor />
+                <ParamSchemaEditor paramTypeOptions={paramTypeOptions} />
               </Form.Item>
             </div>
             <div style={{ position: 'sticky', top: 0, alignSelf: 'start', border: '1px solid #e5e7eb', borderRadius: 8, background: '#fafafa', padding: 12 }}>

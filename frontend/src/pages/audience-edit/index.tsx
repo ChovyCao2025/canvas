@@ -5,20 +5,10 @@ import { QueryBuilder, type RuleGroupType } from 'react-querybuilder'
 import { QueryBuilderAntD } from '@react-querybuilder/antd'
 import { audienceApi, type AudienceDefinition } from '../../services/audienceApi'
 import { tagDefinitionApi } from '../../services/api'
+import { useSystemOptions } from '../../hooks/useSystemOptions'
 import 'react-querybuilder/dist/query-builder.css'
 
 const { Title } = Typography
-
-// QueryBuilder 的操作符集合，需要和后端规则引擎支持的语义保持一致。
-const operators = [
-  { name: '=', label: '等于' },
-  { name: '!=', label: '不等于' },
-  { name: '>', label: '大于' },
-  { name: '>=', label: '大于等于' },
-  { name: '<', label: '小于' },
-  { name: '<=', label: '小于等于' },
-  { name: 'in', label: '包含于' },
-]
 
 /**
  * 人群编辑页表单模型。
@@ -165,9 +155,22 @@ export default function AudienceEditPage() {
   /** 保存按钮 loading。 */
   const [loading, setLoading] = useState(false)
   const isEdit = Boolean(id)
+  const { options: dataSourceOptions } = useSystemOptions('audience_data_source_type')
+  const { options: evaluationOptions } = useSystemOptions('audience_evaluation_strategy')
+  const { options: engineOptions } = useSystemOptions('audience_engine_type')
+  const { options: combinatorOptions } = useSystemOptions('query_combinator')
+  const { options: audienceOperatorOptions } = useSystemOptions('audience_condition_operator')
 
   const dataSourceType = Form.useWatch('dataSourceType', form) ?? 'TAGGER_API'
   const enabled = Form.useWatch('enabled', form) ?? true
+  const queryOperators = useMemo(
+    () => audienceOperatorOptions.map(option => ({ name: option.value, label: option.label })),
+    [audienceOperatorOptions],
+  )
+  const queryCombinators = useMemo(
+    () => combinatorOptions.map(option => ({ name: option.value, label: option.label })),
+    [combinatorOptions],
+  )
 
   // 加载标签定义：同时用于规则字段和种子标签下拉选项。
   useEffect(() => {
@@ -264,7 +267,7 @@ export default function AudienceEditPage() {
 
         <Card title="数据源配置" style={{ marginBottom: 16 }}>
           <Form.Item name="dataSourceType" label="数据源类型">
-            <Select options={[{ value: 'TAGGER_API', label: 'Tagger API' }, { value: 'JDBC', label: 'JDBC' }]} />
+            <Select options={dataSourceOptions} />
           </Form.Item>
 
           {dataSourceType === 'TAGGER_API' && (
@@ -304,10 +307,10 @@ export default function AudienceEditPage() {
           <QueryBuilderAntD>
             <QueryBuilder
               fields={fields}
-              operators={operators}
+              operators={queryOperators}
               query={query}
               onQueryChange={next => setQuery(next as RuleGroupType)}
-              combinators={[{ name: 'and', label: '且（AND）' }, { name: 'or', label: '或（OR）' }]}
+              combinators={queryCombinators}
             />
           </QueryBuilderAntD>
           <div style={{ marginTop: 12 }}>
@@ -318,17 +321,10 @@ export default function AudienceEditPage() {
 
         <Card title="计算配置">
           <Form.Item name="evaluationStrategy" label="计算策略">
-            <Select options={[
-              { value: 'OFFLINE_BATCH', label: '离线批量' },
-              { value: 'ONLINE', label: '实时计算' },
-              { value: 'HYBRID', label: '混合' },
-            ]} />
+            <Select options={evaluationOptions} />
           </Form.Item>
           <Form.Item name="engineType" label="规则引擎">
-            <Select options={[
-              { value: 'AVIATOR', label: 'AviatorScript' },
-              { value: 'QL', label: 'QLExpress' },
-            ]} />
+            <Select options={engineOptions} />
           </Form.Item>
           <Form.Item name="cronExpression" label="定时计算 Cron">
             <Input placeholder="例：0 2 * * *" />

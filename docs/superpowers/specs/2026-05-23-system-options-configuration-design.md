@@ -105,6 +105,9 @@ AB 实验分组属于具体实验，不放入全局字典。
 | `message_code_in_app` | 当前端内消息编码 |
 | `message_code_mq` | 当前 MQ 消息编码 |
 | `mq_topic_legacy` | 当前旧 `/meta/mq-topics` 三项，保留兼容旧 schema |
+| `canvas_trigger_type` | `REALTIME`, `SCHEDULED` |
+| `start_trigger_type` | `DIRECT`, `EVENT`, `SCHEDULED`, `MQ` |
+| `behavior_trigger_type` | `inapp`, `direct` |
 
 不进入字典但已配置化或领域化的来源：
 

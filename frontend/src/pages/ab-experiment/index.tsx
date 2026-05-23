@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react'
 import {
-  Button, Table, Tag, Space, Modal, Form, Input,
+  Button, Table, Tag, Space, Modal, Form, Input, InputNumber, Drawer,
   Switch, message, Typography, Popconfirm,
 } from 'antd'
-import { PlusOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons'
+import { PlusOutlined, EditOutlined, DeleteOutlined, PartitionOutlined } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
 import { abExperimentApi } from '../../services/api'
+import type { AbExperimentGroup } from '../../types'
 
 const { Title } = Typography
 
@@ -41,7 +42,13 @@ export default function AbExperimentPage() {
   const [modalVisible, setModalVisible] = useState(false)
   const [editingRecord, setEditingRecord] = useState<AbExperiment | null>(null)
   const [form] = Form.useForm()
+  const [groupForm] = Form.useForm()
   const [submitting, setSubmitting] = useState(false)
+  const [groupDrawerOpen, setGroupDrawerOpen] = useState(false)
+  const [selectedExperiment, setSelectedExperiment] = useState<AbExperiment | null>(null)
+  const [groups, setGroups] = useState<AbExperimentGroup[]>([])
+  const [groupsLoading, setGroupsLoading] = useState(false)
+  const [editingGroup, setEditingGroup] = useState<AbExperimentGroup | null>(null)
 
   // 拉取实验定义分页列表
   const fetchList = async (p = page) => {
@@ -101,6 +108,68 @@ export default function AbExperimentPage() {
     fetchList(page)
   }
 
+  const loadGroups = async (experiment: AbExperiment) => {
+    setGroupsLoading(true)
+    try {
+      const res = await abExperimentApi.groups(experiment.id, true)
+      setGroups(res.data)
+    } finally {
+      setGroupsLoading(false)
+    }
+  }
+
+  const openGroups = (record: AbExperiment) => {
+    setSelectedExperiment(record)
+    setGroupDrawerOpen(true)
+    setEditingGroup(null)
+    groupForm.resetFields()
+    groupForm.setFieldsValue({ enabled: true, sortOrder: 0 })
+    loadGroups(record)
+  }
+
+  const startEditGroup = (group: AbExperimentGroup) => {
+    setEditingGroup(group)
+    groupForm.setFieldsValue({
+      groupKey: group.groupKey,
+      label: group.label,
+      sortOrder: group.sortOrder,
+      enabled: group.enabled === 1,
+    })
+  }
+
+  const resetGroupForm = () => {
+    setEditingGroup(null)
+    groupForm.resetFields()
+    groupForm.setFieldsValue({ enabled: true, sortOrder: 0 })
+  }
+
+  const saveGroup = async () => {
+    if (!selectedExperiment) return
+    const values = await groupForm.validateFields()
+    const body = {
+      groupKey: values.groupKey,
+      label: values.label,
+      sortOrder: values.sortOrder,
+      enabled: values.enabled ? 1 as const : 0 as const,
+    }
+    if (editingGroup) {
+      await abExperimentApi.updateGroup(selectedExperiment.id, editingGroup.id, body)
+      message.success('分组已更新')
+    } else {
+      await abExperimentApi.createGroup(selectedExperiment.id, body)
+      message.success('分组已创建')
+    }
+    resetGroupForm()
+    loadGroups(selectedExperiment)
+  }
+
+  const disableGroup = async (group: AbExperimentGroup) => {
+    if (!selectedExperiment) return
+    await abExperimentApi.deleteGroup(selectedExperiment.id, group.id)
+    message.success('分组已禁用')
+    loadGroups(selectedExperiment)
+  }
+
   const columns: ColumnsType<AbExperiment> = [
     { title: 'ID', dataIndex: 'id', width: 70 },
     { title: '实验名称', dataIndex: 'name' },
@@ -116,9 +185,16 @@ export default function AbExperimentPage() {
     },
     {
       title: '操作',
-      width: 120,
+      width: 160,
       render: (_, record) => (
         <Space size={4}>
+          <Button
+            size="small"
+            icon={<PartitionOutlined />}
+            onClick={() => openGroups(record)}
+          >
+            分组
+          </Button>
           <Button
             size="small"
             icon={<EditOutlined />}
@@ -132,6 +208,36 @@ export default function AbExperimentPage() {
             cancelText="取消"
           >
             <Button size="small" danger icon={<DeleteOutlined />} />
+          </Popconfirm>
+        </Space>
+      ),
+    },
+  ]
+
+  const groupColumns: ColumnsType<AbExperimentGroup> = [
+    { title: 'Key', dataIndex: 'groupKey', width: 100 },
+    { title: '显示名', dataIndex: 'label' },
+    { title: '排序', dataIndex: 'sortOrder', width: 80 },
+    {
+      title: '状态',
+      dataIndex: 'enabled',
+      width: 80,
+      render: value => value === 1 ? <Tag color="green">启用</Tag> : <Tag>禁用</Tag>,
+    },
+    {
+      title: '操作',
+      width: 120,
+      render: (_, record) => (
+        <Space size={4}>
+          <Button size="small" icon={<EditOutlined />} onClick={() => startEditGroup(record)} />
+          <Popconfirm
+            title="确认禁用该分组？"
+            onConfirm={() => disableGroup(record)}
+            okText="禁用"
+            okType="danger"
+            cancelText="取消"
+          >
+            <Button size="small" danger icon={<DeleteOutlined />} disabled={record.enabled !== 1} />
           </Popconfirm>
         </Space>
       ),
@@ -185,6 +291,39 @@ export default function AbExperimentPage() {
           </Form.Item>
         </Form>
       </Modal>
+
+      <Drawer
+        title={selectedExperiment ? `${selectedExperiment.name} 分组` : '分组管理'}
+        open={groupDrawerOpen}
+        onClose={() => setGroupDrawerOpen(false)}
+        width={620}
+      >
+        <Form form={groupForm} layout="inline" style={{ marginBottom: 16 }} onFinish={saveGroup}>
+          <Form.Item name="groupKey" rules={[{ required: true, message: '请输入 Key' }]}>
+            <Input placeholder="Key" style={{ width: 96 }} disabled={!!editingGroup} />
+          </Form.Item>
+          <Form.Item name="label" rules={[{ required: true, message: '请输入显示名' }]}>
+            <Input placeholder="显示名" style={{ width: 160 }} />
+          </Form.Item>
+          <Form.Item name="sortOrder">
+            <InputNumber placeholder="排序" style={{ width: 92 }} />
+          </Form.Item>
+          <Form.Item name="enabled" valuePropName="checked">
+            <Switch checkedChildren="启用" unCheckedChildren="禁用" />
+          </Form.Item>
+          <Space>
+            <Button type="primary" htmlType="submit">{editingGroup ? '保存' : '新增'}</Button>
+            {editingGroup && <Button onClick={resetGroupForm}>取消</Button>}
+          </Space>
+        </Form>
+        <Table
+          rowKey="id"
+          dataSource={groups}
+          columns={groupColumns}
+          loading={groupsLoading}
+          pagination={false}
+        />
+      </Drawer>
     </div>
   )
 }

@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Select } from 'antd'
 import { ClockCircleOutlined } from '@ant-design/icons'
 
@@ -8,16 +8,16 @@ type Freq = 'daily' | 'weekly' | 'monthly' | 'hourly'
  * 简单模式支持的频率枚举。
  */
 const FREQ_OPTIONS = [
-  { value: 'daily',   label: '每天' },
-  { value: 'weekly',  label: '每周' },
-  { value: 'monthly', label: '每月' },
-  { value: 'hourly',  label: '每小时' },
+  { value: 'daily',   label: 'daily' },
+  { value: 'weekly',  label: 'weekly' },
+  { value: 'monthly', label: 'monthly' },
+  { value: 'hourly',  label: 'hourly' },
 ]
 const WEEKDAY_OPTIONS = [
-  { value: 1, label: '周一' }, { value: 2, label: '周二' },
-  { value: 3, label: '周三' }, { value: 4, label: '周四' },
-  { value: 5, label: '周五' }, { value: 6, label: '周六' },
-  { value: 0, label: '周日' },
+  { value: 1, label: '1' }, { value: 2, label: '2' },
+  { value: 3, label: '3' }, { value: 4, label: '4' },
+  { value: 5, label: '5' }, { value: 6, label: '6' },
+  { value: 0, label: '0' },
 ]
 const HOUR_OPTIONS   = Array.from({ length: 24 }, (_, h) => ({ value: h, label: String(h).padStart(2, '0') }))
 const MINUTE_OPTIONS = Array.from({ length: 60 }, (_, m) => ({ value: m, label: String(m).padStart(2, '0') }))
@@ -56,6 +56,8 @@ interface Props {
 
   /** cron 变更回调。 */
   onChange?: (cron: string) => void
+  frequencyOptions?: { label: string; value: string }[]
+  weekdayOptions?: { label: string; value: number }[]
 }
 
 // 绿框选择器（频率/周几/几号）
@@ -94,7 +96,7 @@ function TimeSelect({ hour, minute, onHourChange, onMinuteChange }: {
   )
 }
 
-export default function CronBuilder({ value, onChange }: Props) {
+export default function CronBuilder({ value, onChange, frequencyOptions, weekdayOptions }: Props) {
   // 初始值优先尝试解析为“简单模式”状态
   const init   = value ? parseCron(value) : null
   // 简单模式状态
@@ -109,6 +111,24 @@ export default function CronBuilder({ value, onChange }: Props) {
   const [manualCron, setManualCron] = useState(value ?? '')
   // 从高级模式尝试回退简单模式失败时，提示并保持高级模式
   const [parseError, setParseError] = useState(false)
+
+  useEffect(() => {
+    const parsed = value ? parseCron(value) : null
+    if (parsed) {
+      setFreq(parsed.freq)
+      setHour(parsed.hour)
+      setMinute(parsed.minute)
+      setWeekday(parsed.weekday)
+      setDayOfMonth(parsed.dayOfMonth)
+      setAdvanced(false)
+      setParseError(false)
+      setManualCron(value ?? '')
+      return
+    }
+    setAdvanced(!!value)
+    setManualCron(value ?? '')
+    setParseError(false)
+  }, [value])
 
   const computed = useMemo(
     () => buildCron(freq, hour, minute, weekday, dayOfMonth),
@@ -160,11 +180,15 @@ export default function CronBuilder({ value, onChange }: Props) {
 
           <GreenSelect
             value={freq} onChange={v => handleFreq(v as Freq)}
-            options={FREQ_OPTIONS}
+            options={frequencyOptions?.length ? frequencyOptions : FREQ_OPTIONS}
           />
 
           {freq === 'weekly' && (
-            <GreenSelect value={weekday} onChange={v => handleWd(+(v as number))} options={WEEKDAY_OPTIONS} />
+            <GreenSelect
+              value={weekday}
+              onChange={v => handleWd(+(v as number))}
+              options={weekdayOptions?.length ? weekdayOptions : WEEKDAY_OPTIONS}
+            />
           )}
           {freq === 'monthly' && (
             <GreenSelect value={dayOfMonth} onChange={v => handleDom(+(v as number))} options={DAY_OPTIONS} />

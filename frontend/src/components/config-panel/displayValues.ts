@@ -6,6 +6,7 @@ export interface DisplayValueField {
   key: string
   type: string
   options?: RawOption[]
+  optionCategory?: string
 }
 
 export function normalizeFieldOptions(
@@ -33,6 +34,7 @@ export function resolveDisplayValue(
     const stringValue = String(value)
     const looseMatch = normalizedOptions.find((option) => String(option.value) === stringValue)
     if (looseMatch?.label) return looseMatch.label
+    if (normalizedOptions.length > 0) return `已禁用：${stringValue}`
   }
 
   return typeof value === 'string' ? value : String(value)

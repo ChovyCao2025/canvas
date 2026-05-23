@@ -29,7 +29,7 @@ cd frontend && npm run build
 
 Backend files to create:
 
-- `backend/canvas-engine/src/main/resources/db/migration/V50__system_options_and_ab_groups.sql`: tables, seed options, schema migration, AB default groups.
+- `backend/canvas-engine/src/main/resources/db/migration/V53__system_options_and_ab_groups.sql`: tables, seed options, schema migration, AB default groups.
 - `backend/canvas-engine/src/main/java/org/chovy/canvas/domain/meta/SystemOption.java`: MyBatis entity.
 - `backend/canvas-engine/src/main/java/org/chovy/canvas/domain/meta/SystemOptionMapper.java`: mapper.
 - `backend/canvas-engine/src/main/java/org/chovy/canvas/domain/meta/SystemOptionService.java`: lookup, admin update, label fallback, validation.
@@ -110,6 +110,9 @@ behavior_strategy_type: BROWSE_DURATION=浏览时长, BROWSE_COUNT=浏览次数,
 message_code_in_app: international_hotel_coupon_popup=国际酒店领券弹窗, flight_coupon_banner=机票优惠Banner
 message_code_mq: ivr_project=IVR项目消息, reward_notify=奖励通知消息
 mq_topic_legacy: flight_order_status_change=机票订单状态变化, hotel_order_status_change=酒店订单状态变化, train_order_status_change=火车票订单状态变化
+canvas_trigger_type: REALTIME=实时触发, SCHEDULED=定时触发
+start_trigger_type: DIRECT=手动直调, EVENT=事件触发, SCHEDULED=定时触发, MQ=MQ消息
+behavior_trigger_type: inapp=端内行为事件（监听 MQ）, direct=业务直调（HTTP 推送）
 ```
 
 ---
@@ -117,7 +120,7 @@ mq_topic_legacy: flight_order_status_change=机票订单状态变化, hotel_orde
 ### Task 1: Database Migration
 
 **Files:**
-- Create: `backend/canvas-engine/src/main/resources/db/migration/V50__system_options_and_ab_groups.sql`
+- Create: `backend/canvas-engine/src/main/resources/db/migration/V53__system_options_and_ab_groups.sql`
 
 - [ ] **Step 1: Write migration with tables**
 
@@ -227,7 +230,7 @@ Expected: Maven compiles resources without XML or SQL resource parsing errors.
 - [ ] **Step 6: Commit migration**
 
 ```bash
-git add backend/canvas-engine/src/main/resources/db/migration/V50__system_options_and_ab_groups.sql
+git add backend/canvas-engine/src/main/resources/db/migration/V53__system_options_and_ab_groups.sql
 git commit -m "feat: add system option migration"
 ```
 
@@ -1559,7 +1562,7 @@ rg -n "const operators|const ops|PARAM_TYPES|options=\\[|<option|List\\.of\\(|ge
 Expected remaining matches:
 
 - Test fixtures.
-- Migration seed data in `V50__system_options_and_ab_groups.sql`.
+- Migration seed data in `V53__system_options_and_ab_groups.sql`.
 - Generated numeric range options in `CronBuilder`.
 - `field.options` fallback support in config panel and display helpers.
 - Domain-specific table data sources such as API, MQ, event, tag, audience.

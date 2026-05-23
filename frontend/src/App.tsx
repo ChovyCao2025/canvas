@@ -16,6 +16,7 @@ import EventConfigPage from './pages/event-config'
 import AudienceListPage from './pages/audience-list'
 import AudienceEditPage from './pages/audience-edit'
 import ApiDocsPage from './pages/api-docs'
+import SystemOptionsPage from './pages/system-options'
 
 /**
  * 全局路由入口。
@@ -82,6 +83,7 @@ export default function App() {
               <Route path="/mq-config"      element={<MqConfigPage />} />
               <Route path="/event-config"   element={<EventConfigPage />} />
               <Route path="/api-docs"       element={<ApiDocsPage />} />
+              <Route path="/system-options" element={<SystemOptionsPage />} />
             </Route>
           </Route>
         </Routes>

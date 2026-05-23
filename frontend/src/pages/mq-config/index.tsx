@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react'
-import { Button, Table, Tag, Space, Modal, Form, Input, Switch, message, Typography, Popconfirm, Divider } from 'antd'
+import { Button, Table, Tag, Space, Modal, Form, Input, Select, Switch, message, Typography, Popconfirm, Divider } from 'antd'
 import { PlusOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
 import http from '../../services/api'
-import { PARAM_TYPES, type ApiParam } from '../api-config'
+import type { ApiParam } from '../api-config'
+import { useSystemOptions } from '../../hooks/useSystemOptions'
 
 const { Title } = Typography
 
@@ -45,9 +46,12 @@ interface ParamSchemaEditorProps {
 
   /** 参数变更回调。 */
   onChange?: (v: ApiParam[]) => void
+
+  /** 参数类型选项。 */
+  paramTypeOptions: { value: string; label: string }[]
 }
 
-function ParamSchemaEditor({ value, onChange }: ParamSchemaEditorProps) {
+function ParamSchemaEditor({ value, onChange, paramTypeOptions }: ParamSchemaEditorProps) {
   const params: ApiParam[] = value ?? []
   const set = (next: ApiParam[]) => onChange?.(next)
   const add = () => set([...params, { name: '', displayName: '', type: 'STRING', required: false }])
@@ -63,10 +67,13 @@ function ParamSchemaEditor({ value, onChange }: ParamSchemaEditorProps) {
             onChange={e => update(i, { name: e.target.value })} />
           <Input size="small" style={{ width: 80 }} placeholder="显示名" value={p.displayName}
             onChange={e => update(i, { displayName: e.target.value })} />
-          <select style={{ fontSize: 12, padding: '1px 4px' }} value={p.type}
-            onChange={e => update(i, { type: e.target.value })}>
-            {PARAM_TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
-          </select>
+          <Select
+            size="small"
+            style={{ width: 132 }}
+            value={p.type}
+            options={paramTypeOptions}
+            onChange={type => update(i, { type })}
+          />
           <Button size="small" type="text" danger icon={<DeleteOutlined />} onClick={() => remove(i)} />
         </Space>
       ))}
@@ -87,6 +94,7 @@ export default function MqConfigPage() {
   const [editing, setEditing] = useState<MqDef | null>(null)
   const [form] = Form.useForm()
   const [saving, setSaving] = useState(false)
+  const { options: paramTypeOptions } = useSystemOptions('param_type')
 
   const fetchList = async (p = page) => {
     setLoading(true)
@@ -186,7 +194,7 @@ export default function MqConfigPage() {
           </Form.Item>
           <Divider style={{ margin: '8px 0 12px' }}>消息参数定义</Divider>
           <Form.Item name="requestSchema" style={{ marginBottom: 0 }}>
-            <ParamSchemaEditor />
+            <ParamSchemaEditor paramTypeOptions={paramTypeOptions} />
           </Form.Item>
         </Form>
       </Modal>

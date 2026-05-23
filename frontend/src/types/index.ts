@@ -232,6 +232,32 @@ export interface StubOption {
   label: string
 }
 
+export interface SystemOption {
+  id: number
+  category: string
+  optionKey: string
+  label: string
+  description?: string
+  sortOrder: number
+  enabled: 0 | 1
+  systemBuiltin: 0 | 1
+  createdAt?: string
+  updatedAt?: string
+}
+
+export interface AbExperimentGroup {
+  id: number
+  experimentId: number
+  groupKey: string
+  label: string
+  sortOrder: number
+  enabled: 0 | 1
+  createdAt?: string
+  updatedAt?: string
+}
+
+export type SelectOption = { label: string; value: string }
+
 /** 表单 Schema 字段（config_schema 解析结果） */
 export interface SchemaField {
   /** 字段 key。 */
@@ -254,6 +280,9 @@ export interface SchemaField {
 
   /** 远程数据源 URL。 */
   dataSource?: string
+
+  /** 系统选项分类。 */
+  optionCategory?: string
 
   /** 显隐表达式。 */
   visible?: string

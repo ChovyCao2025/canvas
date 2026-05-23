@@ -76,13 +76,13 @@ export function getBranchHandles(
     }
 
     case 'AB_SPLIT': {
-      const groups = (bizConfig.groups as { groupKey: string }[]) ?? []
+      const groups = (bizConfig.groups as { groupKey: string; label?: string }[]) ?? []
       if (groups.length === 0) return []
       // 仅用于 UI 标签展示，最后一组吃掉余数，保证总和=100%
       const bucketSize = Math.floor(100 / groups.length)
       return groups.map((g, i) => ({
         id:    `group-${g.groupKey}`,
-        label: `${g.groupKey} ${i === groups.length - 1 ? 100 - bucketSize * i : bucketSize}%`,
+        label: `${g.label ?? g.groupKey} ${i === groups.length - 1 ? 100 - bucketSize * i : bucketSize}%`,
         color: GROUP_COLORS[i % GROUP_COLORS.length],
       }))
     }

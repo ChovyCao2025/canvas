@@ -5,11 +5,15 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import org.chovy.canvas.common.PageResult;
 import org.chovy.canvas.common.R;
 import org.chovy.canvas.domain.meta.AbExperiment;
+import org.chovy.canvas.domain.meta.AbExperimentGroup;
+import org.chovy.canvas.domain.meta.AbExperimentGroupService;
 import org.chovy.canvas.domain.meta.AbExperimentMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
+
+import java.util.List;
 
 /**
  * AB 实验定义管理控制器。
@@ -25,6 +29,7 @@ public class AbExperimentController {
 
     /** AB 实验表访问层。 */
     private final AbExperimentMapper abExperimentMapper;
+    private final AbExperimentGroupService abExperimentGroupService;
 
     /**
      * 分页查询 AB 实验列表
@@ -61,6 +66,7 @@ public class AbExperimentController {
             // 默认启用：新建后可立即被 AB_SPLIT 节点选择
             if (body.getEnabled() == null) body.setEnabled(1);
             abExperimentMapper.insert(body);
+            abExperimentGroupService.ensureDefaultGroups(body.getId());
             return body;
         }).subscribeOn(Schedulers.boundedElastic()).map(R::ok);
     }
@@ -90,6 +96,41 @@ public class AbExperimentController {
         return Mono.<Void>fromRunnable(() -> abExperimentMapper.deleteById(id))
                 .subscribeOn(Schedulers.boundedElastic())
                 .thenReturn(R.<Void>ok());
+    }
+
+    @GetMapping("/{id}/groups")
+    public Mono<R<List<AbExperimentGroup>>> listGroups(
+            @PathVariable Long id,
+            @RequestParam(defaultValue = "false") boolean includeDisabled) {
+        return Mono.fromCallable(() -> abExperimentGroupService.list(id, includeDisabled))
+                .subscribeOn(Schedulers.boundedElastic())
+                .map(R::ok);
+    }
+
+    @PostMapping("/{id}/groups")
+    public Mono<R<AbExperimentGroup>> createGroup(
+            @PathVariable Long id,
+            @RequestBody AbExperimentGroup body) {
+        return Mono.fromCallable(() -> abExperimentGroupService.create(id, body))
+                .subscribeOn(Schedulers.boundedElastic())
+                .map(R::ok);
+    }
+
+    @PutMapping("/{id}/groups/{groupId}")
+    public Mono<R<Void>> updateGroup(
+            @PathVariable Long id,
+            @PathVariable Long groupId,
+            @RequestBody AbExperimentGroup body) {
+        return Mono.<Void>fromRunnable(() -> abExperimentGroupService.update(id, groupId, body))
+                .subscribeOn(Schedulers.boundedElastic())
+                .thenReturn(R.ok());
+    }
+
+    @DeleteMapping("/{id}/groups/{groupId}")
+    public Mono<R<Void>> deleteGroup(@PathVariable Long id, @PathVariable Long groupId) {
+        return Mono.<Void>fromRunnable(() -> abExperimentGroupService.disable(id, groupId))
+                .subscribeOn(Schedulers.boundedElastic())
+                .thenReturn(R.ok());
     }
 
 }

@@ -52,6 +52,7 @@ export default function AppLayout() {
     if (location.pathname.startsWith('/mq-config'))      return 'mq-config'
     if (location.pathname.startsWith('/event-config'))   return 'event-config'
     if (location.pathname.startsWith('/api-docs'))       return 'api-docs'
+    if (location.pathname.startsWith('/system-options')) return 'system-options'
     if (location.pathname.startsWith('/admin/users'))    return 'admin-users'
     return 'canvas'
   })()
@@ -66,6 +67,7 @@ export default function AppLayout() {
       'audiences',
       'mq-config',
       'event-config',
+      'system-options',
       'admin-users',
     ].includes(selectedKey)) return ['settings']
     if (selectedKey === 'home') return []
@@ -151,6 +153,12 @@ export default function AppLayout() {
           icon: <ThunderboltOutlined />,
           label: '事件配置',
           onClick: () => navigate('/event-config'),
+        },
+        {
+          key: 'system-options',
+          icon: <SettingOutlined />,
+          label: '系统选项配置',
+          onClick: () => navigate('/system-options'),
         },
         ...(isAdmin ? [{
           // 管理员才显示用户管理入口

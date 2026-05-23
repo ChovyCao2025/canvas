@@ -4,6 +4,7 @@ import { PlusOutlined, StopOutlined } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
 import { adminApi } from '../../services/api'
 import type { SysUser } from '../../services/api'
+import { useSystemOptions } from '../../hooks/useSystemOptions'
 
 const { Title } = Typography
 
@@ -21,6 +22,7 @@ export default function AdminUsersPage() {
   const [loading, setLoading] = useState(false)
   const [createVisible, setCreateVisible] = useState(false)
   const [form] = Form.useForm()
+  const { options: roleOptions } = useSystemOptions('user_role')
 
   // 拉取全部用户：作为列表唯一数据源，创建/禁用后都回调它刷新
   const fetchUsers = async () => {
@@ -110,10 +112,7 @@ export default function AdminUsersPage() {
             <Input />
           </Form.Item>
           <Form.Item name="role" label="角色" rules={[{ required: true }]} initialValue="OPERATOR">
-            <Select options={[
-              { label: 'ADMIN（管理员）', value: 'ADMIN' },
-              { label: 'OPERATOR（运营）', value: 'OPERATOR' },
-            ]} />
+            <Select options={roleOptions} />
           </Form.Item>
         </Form>
       </Modal>

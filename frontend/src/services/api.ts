@@ -2,7 +2,7 @@ import axios from 'axios'
 import type {
   R, PageResult,
   Canvas, CanvasDetail, CanvasVersion,
-  NodeTypeRegistry, ContextField, StubOption,
+  NodeTypeRegistry, ContextField, StubOption, AbExperimentGroup,
 } from '../types'
 
 /**
@@ -283,6 +283,8 @@ export const metaApi = {
   getCouponTypes: () => http.get<R<StubOption[]>, R<StubOption[]>>('/meta/coupon-types'),
   getReachScenes: () => http.get<R<StubOption[]>, R<StubOption[]>>('/meta/reach-scenes'),
   getAbExperiments: () => http.get<R<StubOption[]>, R<StubOption[]>>('/meta/ab-experiments'),
+  getAbExperimentGroups: (key: string) =>
+    http.get<R<StubOption[]>, R<StubOption[]>>(`/meta/ab-experiments/${key}/groups`),
   getApiDefinitions: () => http.get<R<StubOption[]>, R<StubOption[]>>('/meta/api-definitions'),
   getTaggerTags: (type: 'realtime' | 'offline') =>
     http.get<R<StubOption[]>, R<StubOption[]>>(`/meta/tagger-tags?type=${type}`),
@@ -313,6 +315,16 @@ export const abExperimentApi = {
     http.put<R<void>, R<void>>(`/canvas/ab-experiments/${id}`, body),
   delete: (id: number) =>
     http.delete<R<void>, R<void>>(`/canvas/ab-experiments/${id}`),
+  groups: (id: number, includeDisabled = false) =>
+    http.get<R<AbExperimentGroup[]>, R<AbExperimentGroup[]>>(`/canvas/ab-experiments/${id}/groups`, {
+      params: { includeDisabled },
+    }),
+  createGroup: (id: number, body: Partial<AbExperimentGroup>) =>
+    http.post<R<AbExperimentGroup>, R<AbExperimentGroup>>(`/canvas/ab-experiments/${id}/groups`, body),
+  updateGroup: (id: number, groupId: number, body: Partial<AbExperimentGroup>) =>
+    http.put<R<void>, R<void>>(`/canvas/ab-experiments/${id}/groups/${groupId}`, body),
+  deleteGroup: (id: number, groupId: number) =>
+    http.delete<R<void>, R<void>>(`/canvas/ab-experiments/${id}/groups/${groupId}`),
 }
 
 export const tagDefinitionApi = {

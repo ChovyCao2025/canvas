@@ -20,6 +20,7 @@ import type { CanvasDetail } from '../../types'
 import CanvasNodeCmp from '../../components/canvas/CanvasNode'
 import BranchPlaceholderNode, { type PlaceholderData, PLACEHOLDER_W as PH_W, PLACEHOLDER_H as PH_H } from '../../components/canvas/BranchPlaceholderNode'
 import { useBranchPlaceholders } from '../../hooks/useBranchPlaceholders'
+import { useSystemOptions } from '../../hooks/useSystemOptions'
 import NodePanel from '../../components/node-panel'
 import ConfigPanel from '../../components/config-panel'
 import ExecutionTracePanel from '../../components/canvas/ExecutionTracePanel'
@@ -44,6 +45,10 @@ import {
 import { applyInsertIntoEdge, buildDetachedNode, buildPlaceholderEdge } from './insertNode'
 
 const { RangePicker } = DatePicker
+const TRIGGER_TYPE_HELP: Record<string, string> = {
+  REALTIME: '用户满足条件后立即进入当前画布。',
+  SCHEDULED: '按固定周期统一执行，适合批处理场景。',
+}
 
 function normalizeCanvasTriggerType(triggerType?: string): CanvasTriggerType {
   return triggerType === 'SCHEDULED' ? 'SCHEDULED' : 'REALTIME'
@@ -275,6 +280,10 @@ function EditorInner({ detail, onStatusChange, onCanvasNameChange }: {
   const [searchParams] = useSearchParams()
   const readonly = searchParams.get('readonly') === 'true'
   const { screenToFlowPosition, getNodes, getEdges, fitView } = useReactFlow()
+  const { options: triggerTypeOptions } = useSystemOptions('canvas_trigger_type', detail.canvas.triggerType)
+  const { options: cronFrequencyOptions } = useSystemOptions('cron_frequency')
+  const { raw: weekdayRows } = useSystemOptions('weekday')
+  const weekdayOptions = weekdayRows.map(option => ({ label: option.label, value: Number(option.key) }))
 
   const [nodes, setNodes, onNodesChange] = useNodesState<Node>([])
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([])
@@ -366,7 +375,7 @@ function EditorInner({ detail, onStatusChange, onCanvasNameChange }: {
       return { priorities: [{ order: 1, nextNodeId: undefined }] }
     }
     if (nodeType === 'AB_SPLIT') {
-      return { groups: [{ groupKey: 'A', nextNodeId: undefined }] }
+      return { groups: [] }
     }
     return {}
   }, [])
@@ -1605,14 +1614,14 @@ function EditorInner({ detail, onStatusChange, onCanvasNameChange }: {
             </div>
             <Form.Item name="triggerType" initialValue="REALTIME" className="canvas-settings-trigger-group">
               <Radio.Group className="canvas-settings-trigger-options">
-                <Radio value="REALTIME" className="canvas-settings-trigger-option">
-                  <span className="canvas-settings-trigger-option-title">实时触发</span>
-                  <span className="canvas-settings-trigger-option-help">用户满足条件后立即进入当前画布。</span>
-                </Radio>
-                <Radio value="SCHEDULED" className="canvas-settings-trigger-option">
-                  <span className="canvas-settings-trigger-option-title">定时触发</span>
-                  <span className="canvas-settings-trigger-option-help">按固定周期统一执行，适合批处理场景。</span>
-                </Radio>
+                {triggerTypeOptions.map(option => (
+                  <Radio key={option.value} value={option.value} className="canvas-settings-trigger-option">
+                    <span className="canvas-settings-trigger-option-title">{option.label}</span>
+                    <span className="canvas-settings-trigger-option-help">
+                      {TRIGGER_TYPE_HELP[option.value] ?? option.value}
+                    </span>
+                  </Radio>
+                ))}
               </Radio.Group>
             </Form.Item>
             {liveSettings.triggerType === 'SCHEDULED' ? (
@@ -1625,6 +1634,8 @@ function EditorInner({ detail, onStatusChange, onCanvasNameChange }: {
                 >
                   <CronBuilder
                     onChange={cron => settingsForm.setFieldValue('cronExpression', cron)}
+                    frequencyOptions={cronFrequencyOptions}
+                    weekdayOptions={weekdayOptions}
                   />
                 </Form.Item>
               </div>

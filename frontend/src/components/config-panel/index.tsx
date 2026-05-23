@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useRef } from 'react'
 import type { Node } from '@xyflow/react'
 import {
   Form, Input, InputNumber, Select, Switch, Button,
@@ -9,7 +9,9 @@ import http, { metaApi, canvasApi } from '../../services/api'
 import type { NodeTypeRegistry, ContextField, StubOption, Canvas } from '../../types'
 import type { CanvasNodeData } from '../canvas/constants'
 import { CATEGORY_SOLID } from '../canvas/constants'
-import { PARAM_TYPES } from '../../pages/api-config'
+import { systemOptionsApi } from '../../services/systemOptions'
+import { useSystemOptions } from '../../hooks/useSystemOptions'
+import CronBuilder from './CronBuilder'
 import {
   BranchRouteCard,
   ConfigSectionCard,
@@ -37,6 +39,7 @@ interface Props {
 // 统一缓存，彻底替代 apiDefsCache + optionsCache + dataSourceFetcher 分散逻辑
 const schemaCache   = new Map<string, NodeTypeRegistry>()
 const rawCache      = new Map<string, any[]>()         // key = dataSource URL
+const systemOptionCache = new Map<string, StubOption[]>()
 let contextFieldsCache: ContextField[] | null = null
 
 function renderControlLabel(label: string): React.ReactNode {
@@ -62,6 +65,17 @@ function toSelectOptions(data: any[]): StubOption[] {
   }))
 }
 
+async function loadSystemOptionCategory(category: string): Promise<StubOption[]> {
+  if (systemOptionCache.has(category)) return systemOptionCache.get(category)!
+  const res = await systemOptionsApi.meta(category)
+  systemOptionCache.set(category, res.data)
+  return res.data
+}
+
+function selectOptionsFromStubs(options: StubOption[]) {
+  return options.map(option => ({ label: option.label, value: option.key }))
+}
+
 export default function ConfigPanel({ nodeId, nodeData, onChange, nodes, readonly }: Props) {
   const [schema,   setSchema]   = useState<NodeTypeRegistry | null>(null)
   const [options,  setOptions]  = useState<Record<string, StubOption[]>>({})
@@ -70,6 +84,23 @@ export default function ConfigPanel({ nodeId, nodeData, onChange, nodes, readonl
   const [formValues, setFormValues] = useState<Record<string, unknown>>({})
   const [form] = Form.useForm()
   const controlChrome = getControlChrome()
+  const { raw: conditionOps } = useSystemOptions('condition_operator')
+  const { raw: logicRelations } = useSystemOptions('logic_relation')
+  const { raw: contextValueTypes } = useSystemOptions('context_value_type')
+  const { raw: paramTypes } = useSystemOptions('param_type')
+  const { raw: delayUnits } = useSystemOptions('delay_unit')
+  const { raw: cronFrequencies } = useSystemOptions('cron_frequency')
+  const { raw: weekdays } = useSystemOptions('weekday')
+
+  const sharedOptions = {
+    conditionOps: selectOptionsFromStubs(conditionOps),
+    logicRelations: selectOptionsFromStubs(logicRelations),
+    contextValueTypes: selectOptionsFromStubs(contextValueTypes),
+    paramTypes: selectOptionsFromStubs(paramTypes),
+    delayUnits: selectOptionsFromStubs(delayUnits),
+    cronFrequencies: selectOptionsFromStubs(cronFrequencies),
+    weekdays: weekdays.map(option => ({ label: option.label, value: Number(option.key) })),
+  }
 
   const getNodeName = (id: string | undefined): string | null => {
     if (!id || !nodes) return null
@@ -127,7 +158,7 @@ export default function ConfigPanel({ nodeId, nodeData, onChange, nodes, readonl
       .finally(() => setLoading(false))
   }, [nodeData?.nodeType, ctxSignature])
 
-  // 加载 select 下拉选项：任何带 dataSource 的 select 字段，统一走 loadDataSource
+  // 加载 select 下拉选项：dataSource 优先，其次 optionCategory，最后保留 field.options 兜底
   useEffect(() => {
     if (!schema) return
     const fields = parseSchema(schema.configSchema)
@@ -141,6 +172,17 @@ export default function ConfigPanel({ nodeId, nodeData, onChange, nodes, readonl
         setOptions(prev => ({ ...prev, [f.key]: toSelectOptions(data) }))
       )
     })
+    fields.filter(f => (f.type === 'select' || f.type === 'radio') && f.optionCategory && !f.dataSource)
+      .forEach(f => {
+        const category = f.optionCategory!
+        if (systemOptionCache.has(category)) {
+          setOptions(prev => ({ ...prev, [f.key]: systemOptionCache.get(category)! }))
+          return
+        }
+        loadSystemOptionCategory(category).then(data =>
+          setOptions(prev => ({ ...prev, [f.key]: data }))
+        )
+      })
   }, [schema])
 
   // 同步表单初始值
@@ -163,6 +205,17 @@ export default function ConfigPanel({ nodeId, nodeData, onChange, nodes, readonl
       bizConfig: rest,
     })
   }, [nodeId, onChange])
+
+  const applyFormPatch = useCallback((patch: Record<string, unknown>) => {
+    if (!nodeId || !nodeData) return
+    const all = { ...form.getFieldsValue(true), ...patch }
+    setFormValues(all)
+    const { name, ...rest } = all
+    onChange(nodeId, {
+      ...(name !== undefined ? { name: name as string } : {}),
+      bizConfig: rest,
+    })
+  }, [form, nodeData, nodeId, onChange])
 
   if (!nodeId || !nodeData) {
     return (
@@ -234,7 +287,7 @@ export default function ConfigPanel({ nodeId, nodeData, onChange, nodes, readonl
             return (
               <Form.Item key={field.key} name={field.key} label={renderControlLabel(field.label)}
                 rules={field.required ? [{ required: true, message: `请填写${field.label}` }] : []}>
-                {renderControl(field, options, ctxFields, form, getNodeName, nodeData)}
+                {renderControl(field, options, ctxFields, form, sharedOptions, applyFormPatch, nodeId, getNodeName, nodeData)}
               </Form.Item>
             )
           })}
@@ -280,6 +333,9 @@ function renderControl(
   options: Record<string, StubOption[]>,
   ctxFields: ContextField[],
   _form: ReturnType<typeof Form.useForm>[0],
+  sharedOptions: SharedConfigOptions,
+  applyFormPatch: (patch: Record<string, unknown>) => void,
+  nodeId?: string | null,
   getNodeName?: (id: string | undefined) => string | null,
   nodeData?: CanvasNodeData | null,
 ): React.ReactNode {
@@ -322,22 +378,9 @@ function renderControl(
         />
       )
     case 'cron':
-      return (
-        <div>
-          <Input
-            placeholder="如：0 9 * * *（每天 9 点）"
-            style={{ ...controlChrome, fontFamily: 'monospace' }}
-          />
-          <div style={{ fontSize: 11, color: '#8c8c8c', marginTop: 4, lineHeight: 1.6 }}>
-            格式：<code>分 时 日 月 周</code>，常见示例：
-            <br />· <code>0 9 * * *</code> — 每天 09:00
-            <br />· <code>0 9 * * 1</code> — 每周一 09:00
-            <br />· <code>0 9 1 * *</code> — 每月 1 日 09:00
-          </div>
-        </div>
-      )
+      return <CronBuilder frequencyOptions={sharedOptions.cronFrequencies} weekdayOptions={sharedOptions.weekdays} />
     case 'delay-input':
-      return <DelayInput />
+      return <DelayInput unitOptions={sharedOptions.delayUnits} />
     case 'event-attr-preview':
       return <EventAttrPreview />
     case 'edge-hint': {
@@ -354,15 +397,25 @@ function renderControl(
       )
     }
     case 'condition-rule-list':
-      return <ConditionRuleList ctxFields={ctxFields} />
+      return <ConditionRuleList ctxFields={ctxFields} operatorOptions={sharedOptions.conditionOps} />
     case 'context-value-list':
-      return <ContextValueList ctxFields={ctxFields} />
+      return <ContextValueList ctxFields={ctxFields} valueTypeOptions={sharedOptions.contextValueTypes} />
     case 'param-define-list':
-      return <ParamDefineList />
+      return <ParamDefineList paramTypeOptions={sharedOptions.paramTypes} />
     case 'branch-list':
-      return <BranchList ctxFields={ctxFields} />
+      return <BranchList
+        ctxFields={ctxFields}
+        operatorOptions={sharedOptions.conditionOps}
+        relationOptions={sharedOptions.logicRelations}
+      />
     case 'ab-group-list':
-      return <AbGroupList getNodeName={getNodeName ?? (() => null)} />
+      return (
+        <AbGroupList
+          nodeId={nodeId}
+          getNodeName={getNodeName ?? (() => null)}
+          onGroupsChange={groups => applyFormPatch({ groups })}
+        />
+      )
     case 'priority-list':
       return <PriorityList />
     case 'key-value':
@@ -377,14 +430,26 @@ function renderControl(
 }
 
 // ── 条件规则列表控件（IF判断 / SELECTOR / MQ_TRIGGER 等）─────────
+interface SharedConfigOptions {
+  conditionOps: { label: string; value: string }[]
+  logicRelations: { label: string; value: string }[]
+  contextValueTypes: { label: string; value: string }[]
+  paramTypes: { label: string; value: string }[]
+  delayUnits: { label: string; value: string }[]
+  cronFrequencies: { label: string; value: string }[]
+  weekdays: { label: string; value: number }[]
+}
+
 interface ConditionRule {
   field: string; operator: string; value: string; isCustom: boolean
 }
-function ConditionRuleList({ ctxFields }: { ctxFields: ContextField[] }) {
+function ConditionRuleList({ ctxFields, operatorOptions }: {
+  ctxFields: ContextField[]
+  operatorOptions: { label: string; value: string }[]
+}) {
   const form = Form.useFormInstance()
   const fieldKey = 'rules'
   const rules: ConditionRule[] = Form.useWatch(fieldKey, form) ?? []
-  const ops = ['EQ', 'NEQ', 'CONTAINS', 'GT', 'LT', 'GTE', 'LTE']
   const controlChrome = getControlChrome()
 
   const add = () => form.setFieldValue(fieldKey,
@@ -405,7 +470,7 @@ function ConditionRuleList({ ctxFields }: { ctxFields: ContextField[] }) {
             options={ctxFields.map(f => ({ label: f.fieldName, value: f.fieldKey }))}
             onChange={v => update(i, 'field', v)} showSearch />
           <Select size="small" style={{ ...controlChrome, width: 80 }} value={rule.operator}
-            options={ops.map(o => ({ label: o, value: o }))}
+            options={operatorOptions}
             onChange={v => update(i, 'operator', v)} />
           <AutoComplete size="small" style={{ ...controlChrome, width: 110 }}
             placeholder="值或 ${key}"
@@ -426,7 +491,10 @@ function ConditionRuleList({ ctxFields }: { ctxFields: ContextField[] }) {
 
 // ── 上下文引用值列表控件（IN_APP_NOTIFY / GROOVY inputParams 等）─
 interface ContextValueItem { name: string; valueType: 'CUSTOM' | 'CONTEXT'; value: string }
-function ContextValueList({ ctxFields }: { ctxFields: ContextField[] }) {
+function ContextValueList({ ctxFields, valueTypeOptions }: {
+  ctxFields: ContextField[]
+  valueTypeOptions: { label: string; value: string }[]
+}) {
   const form = Form.useFormInstance()
   const fieldKey = 'bizData'
   const items: ContextValueItem[] = Form.useWatch(fieldKey, form) ?? []
@@ -448,7 +516,7 @@ function ContextValueList({ ctxFields }: { ctxFields: ContextField[] }) {
           <Input size="small" style={{ ...controlChrome, width: 80 }} placeholder="字段名"
             value={item.name} onChange={e => update(i, 'name', e.target.value)} />
           <Select size="small" style={{ ...controlChrome, width: 80 }} value={item.valueType}
-            options={[{ label: '自定义', value: 'CUSTOM' }, { label: '上下文', value: 'CONTEXT' }]}
+            options={valueTypeOptions}
             onChange={v => update(i, 'valueType', v)} />
           {item.valueType === 'CONTEXT'
             ? <AutoComplete size="small" style={{ ...controlChrome, width: 110 }}
@@ -470,7 +538,7 @@ function ContextValueList({ ctxFields }: { ctxFields: ContextField[] }) {
 
 // ── 参数定义列表控件（DIRECT_CALL inputParams / GROOVY outputParams）
 interface ParamDef { name: string; description?: string; dataType: string; required?: boolean }
-function ParamDefineList() {
+function ParamDefineList({ paramTypeOptions }: { paramTypeOptions: { label: string; value: string }[] }) {
   const form = Form.useFormInstance()
   const fieldKey = 'inputParams'
   const items: ParamDef[] = Form.useWatch(fieldKey, form) ?? []
@@ -492,7 +560,7 @@ function ParamDefineList() {
           <Input size="small" style={{ ...controlChrome, width: 90 }} placeholder="参数名"
             value={p.name} onChange={e => update(i, 'name', e.target.value)} />
           <Select size="small" style={{ ...controlChrome, width: 80 }} value={p.dataType}
-            options={['STRING','NUMBER','BOOLEAN','LIST'].map(t => ({ label: t, value: t }))}
+            options={paramTypeOptions}
             onChange={v => update(i, 'dataType', v)} />
           <Switch size="small" checked={!!p.required}
             onChange={v => update(i, 'required', v)} />
@@ -507,10 +575,13 @@ function ParamDefineList() {
 
 // ── SELECTOR 分支列表控件（branch-list）────────────────────────────
 interface BranchItem { label: string; strategyRelation: string; conditions: ConditionRule[]; nextNodeId?: string }
-function BranchList({ ctxFields }: { ctxFields: ContextField[] }) {
+function BranchList({ ctxFields, operatorOptions, relationOptions }: {
+  ctxFields: ContextField[]
+  operatorOptions: { label: string; value: string }[]
+  relationOptions: { label: string; value: string }[]
+}) {
   const form = Form.useFormInstance()
   const branches: BranchItem[] = Form.useWatch('branches', form) ?? []
-  const ops = ['EQ', 'NEQ', 'CONTAINS', 'GT', 'LT', 'GTE', 'LTE']
   const controlChrome = getControlChrome()
 
   const LABELS = ['如果', '否则如果', '否则如果', '否则如果', '否则如果']
@@ -545,8 +616,8 @@ function BranchList({ ctxFields }: { ctxFields: ContextField[] }) {
           {/* 分支标题行 */}
           <div style={{ background: '#fafafa', padding: '6px 10px', display: 'flex', alignItems: 'center', gap: 8, borderBottom: b.conditions?.length ? '1px solid #f0f0f0' : 'none' }}>
             <Tag color={LABEL_COLORS[b.label] ?? 'default'} style={{ margin: 0 }}>{b.label}</Tag>
-            <Select size="small" style={{ ...controlChrome, width: 64 }} value={b.strategyRelation}
-              options={[{ label: 'AND 全满足', value: 'AND' }, { label: 'OR 任一', value: 'OR' }]}
+            <Select size="small" style={{ ...controlChrome, width: 92 }} value={b.strategyRelation}
+              options={relationOptions}
               onChange={v => updateBranch(i, 'strategyRelation', v)} />
             <span style={{ flex: 1, fontSize: 11, color: '#999' }}>
               {b.conditions?.length
@@ -564,7 +635,7 @@ function BranchList({ ctxFields }: { ctxFields: ContextField[] }) {
                   options={ctxFields.map(f => ({ label: f.fieldName, value: f.fieldKey }))}
                   onChange={v => updateCondition(i, ci, 'field', v)} showSearch />
                 <Select size="small" style={{ ...controlChrome, width: 72 }} value={c.operator}
-                  options={ops.map(o => ({ label: o, value: o }))}
+                  options={operatorOptions}
                   onChange={v => updateCondition(i, ci, 'operator', v)} />
                 <AutoComplete size="small" style={{ ...controlChrome, width: 100 }}
                   placeholder="值或 ${key}"
@@ -595,18 +666,73 @@ function BranchList({ ctxFields }: { ctxFields: ContextField[] }) {
 }
 
 // ── AB 分流分组路由控件（ab-group-list）────────────────────────────
-interface AbGroup { groupKey: string; nextNodeId?: string }
-function AbGroupList({ getNodeName }: { getNodeName: (id: string | undefined) => string | null }) {
+interface AbGroup { groupKey: string; label?: string; nextNodeId?: string }
+function AbGroupList({ nodeId, getNodeName, onGroupsChange }: {
+  nodeId?: string | null
+  getNodeName: (id: string | undefined) => string | null
+  onGroupsChange: (groups: AbGroup[]) => void
+}) {
   const form = Form.useFormInstance()
   const groups: AbGroup[] = Form.useWatch('groups', form) ?? []
-  const controlChrome = getControlChrome()
-  const add = () => form.setFieldValue('groups', [...groups, { groupKey: `G${groups.length + 1}`, nextNodeId: undefined }])
-  const remove = (i: number) => { const n = [...groups]; n.splice(i, 1); form.setFieldValue('groups', n) }
-  const update = (i: number, k: keyof AbGroup, v: string) => {
-    const n = [...groups]; (n[i] as any)[k] = v; form.setFieldValue('groups', n)
-  }
+  const experimentKey = Form.useWatch('experimentKey', form)
+  const [loading, setLoading] = useState(false)
+  const [loadError, setLoadError] = useState(false)
+  const previousExperimentKeyRef = useRef<string>()
+
+  useEffect(() => {
+    previousExperimentKeyRef.current = undefined
+  }, [nodeId])
+
+  useEffect(() => {
+    if (!experimentKey) return
+    const currentExperimentKey = String(experimentKey)
+    const previousExperimentKey = previousExperimentKeyRef.current
+    const experimentChanged = previousExperimentKey !== undefined && previousExperimentKey !== currentExperimentKey
+    setLoading(true)
+    setLoadError(false)
+    metaApi.getAbExperimentGroups(currentExperimentKey)
+      .then(res => {
+        const existing: AbGroup[] = form.getFieldValue('groups') ?? []
+        const existingByKey = new Map(existing.map(group => [group.groupKey, group]))
+        const loaded = res.data.map(option => ({
+          groupKey: option.key,
+          label: option.label,
+          nextNodeId: existingByKey.get(option.key)?.nextNodeId,
+        }))
+        const loadedKeys = new Set(loaded.map(group => group.groupKey))
+        const disabledHistory = experimentChanged
+          ? []
+          : existing
+              .filter(group => group.groupKey && !loadedKeys.has(group.groupKey))
+              .map(group => ({
+                ...group,
+                label: group.label ?? `已禁用：${group.groupKey}`,
+              }))
+        const next = [...loaded, ...disabledHistory]
+        previousExperimentKeyRef.current = currentExperimentKey
+        if (JSON.stringify(existing) !== JSON.stringify(next)) {
+          form.setFieldValue('groups', next)
+          onGroupsChange(next)
+        }
+      })
+      .catch(() => setLoadError(true))
+      .finally(() => setLoading(false))
+  }, [experimentKey, form, onGroupsChange])
 
   const bucketSize = groups.length > 0 ? Math.floor(100 / groups.length) : 0
+
+  if (!experimentKey) {
+    return <Text type="secondary" style={{ fontSize: 12 }}>请先选择实验</Text>
+  }
+  if (loading) {
+    return <Spin size="small" />
+  }
+  if (loadError) {
+    return <Text type="danger" style={{ fontSize: 12 }}>分组加载失败</Text>
+  }
+  if (!groups.length) {
+    return <Text type="secondary" style={{ fontSize: 12 }}>该实验未配置启用分组</Text>
+  }
 
   return (
     <div>
@@ -618,14 +744,14 @@ function AbGroupList({ getNodeName }: { getNodeName: (id: string | undefined) =>
           <div key={i} style={{ marginBottom: 8, padding: '6px 8px', background: '#fafafa', borderRadius: 6, border: '1px solid #f0f0f0' }}>
             <Space style={{ width: '100%', justifyContent: 'space-between' }}>
               <Space size={4}>
-                <Tag color="blue" style={{ fontSize: 11 }}>{g.groupKey || `G${i+1}`}</Tag>
+                <Tag color={g.label?.startsWith('已禁用') ? 'default' : 'blue'} style={{ fontSize: 11 }}>
+                  {g.label ?? g.groupKey}
+                </Tag>
+                <Text code style={{ fontSize: 11 }}>{g.groupKey}</Text>
                 <Text style={{ fontSize: 11, color: '#8c8c8c' }}>bucket {start}–{end}%</Text>
               </Space>
-              <Button size="small" type="text" danger icon={<DeleteOutlined />} onClick={() => remove(i)} />
             </Space>
             <Space style={{ marginTop: 4 }} size={4}>
-              <Input size="small" style={{ ...controlChrome, width: 80 }} placeholder="分组Key（如 A）"
-                value={g.groupKey} onChange={e => update(i, 'groupKey', e.target.value)} />
               {successorName
                 ? <Tag color="blue" style={{ fontSize: 11 }}>→ {successorName}</Tag>
                 : <Tag color="warning" style={{ fontSize: 11 }}>⚠ 未连线</Tag>
@@ -634,9 +760,8 @@ function AbGroupList({ getNodeName }: { getNodeName: (id: string | undefined) =>
           </div>
         )
       })}
-      <Button size="small" type="dashed" icon={<PlusOutlined />} onClick={add}>添加分组</Button>
       <div style={{ fontSize: 11, color: '#8c8c8c', marginTop: 6 }}>
-        按 Hash(userId:experimentKey) % 100 分桶，等比分配；连线时边上会显示分组 Key
+        分组来自 AB 实验管理；连线时边上会显示分组 Key
       </div>
     </div>
   )
@@ -743,7 +868,7 @@ function CanvasSelector() {
 
 interface SchemaField {
   key: string; label: string; type: string
-  required?: boolean; options?: any[]; dataSource?: string
+  required?: boolean; options?: any[]; dataSource?: string; optionCategory?: string
   visible?: string; showWhen?: string; defaultValue?: unknown
   hint?: string; icon?: string          // edge-hint 使用
   apiKeyField?: string                   // api-input-params 使用，默认 apiKey
@@ -760,6 +885,7 @@ function EventAttrPreview() {
   const form   = Form.useFormInstance()
   const evCode = Form.useWatch('eventCode', form)
   const [attrs, setAttrs] = useState<ApiParamDef[]>([])
+  const { options: eventAttrTypes } = useSystemOptions('event_attr_type')
 
   useEffect(() => {
     if (!evCode) { setAttrs([]); return }
@@ -775,7 +901,7 @@ function EventAttrPreview() {
   if (!evCode) return <Text type="secondary" style={{ fontSize: 12 }}>请先选择触发事件</Text>
   if (!attrs.length) return <Text type="secondary" style={{ fontSize: 12 }}>该事件未定义属性</Text>
 
-  const TYPE_LABEL: Record<string, string> = { STRING: '字符型', NUMBER: '数值型', DATE: '日期型' }
+  const typeLabel = (type: string) => eventAttrTypes.find(option => option.value === type)?.label ?? type
 
   return (
     <div style={{ background: '#f0f7ff', border: '1px solid #bae0ff', borderRadius: 6, padding: '8px 12px' }}>
@@ -788,7 +914,7 @@ function EventAttrPreview() {
             ${'{' + a.name + '}'}
           </code>
           <Text style={{ fontSize: 12 }}>{a.displayName || a.name}</Text>
-          <Tag style={{ fontSize: 10, margin: 0 }}>{TYPE_LABEL[a.type] ?? a.type}</Tag>
+          <Tag style={{ fontSize: 10, margin: 0 }}>{typeLabel(a.type)}</Tag>
           {a.required && <Text type="danger" style={{ fontSize: 10 }}>必填</Text>}
         </div>
       ))}
@@ -801,7 +927,7 @@ function EventAttrPreview() {
 
 // ── 延迟时长复合控件 ─────────────────────────────────────────────
 // 存储格式：{ duration: number, unit: 'SECOND'|'MINUTE'|'HOUR' }
-function DelayInput() {
+function DelayInput({ unitOptions }: { unitOptions: { label: string; value: string }[] }) {
   const form = Form.useFormInstance()
   const delay = Form.useWatch('duration', form) ?? {}
   const dur  = typeof delay === 'object' ? (delay.duration ?? '') : ''
@@ -831,11 +957,7 @@ function DelayInput() {
         <Select
           style={{ ...controlChrome, width: 90 }}
           value={unit}
-          options={[
-            { value: 'SECOND', label: '秒' },
-            { value: 'MINUTE', label: '分钟' },
-            { value: 'HOUR',   label: '小时' },
-          ]}
+          options={unitOptions}
           onChange={u => set({ unit: u })}
         />
       </Space.Compact>
@@ -861,6 +983,7 @@ function ApiCallInputParams({ label, apiKeyField = 'apiKey', defsSource = '/meta
   const apiKey = Form.useWatch(apiKeyField, form)
   const [params, setParams] = useState<ApiParamDef[]>([])
   const controlChrome = getControlChrome()
+  const { options: paramTypeOptions } = useSystemOptions('param_type')
 
   useEffect(() => {
     if (!apiKey) { setParams([]); return }
@@ -882,7 +1005,7 @@ function ApiCallInputParams({ label, apiKeyField = 'apiKey', defsSource = '/meta
     loadDataSource(defsSource).then(pick)
   }, [apiKey, defsSource]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  const typeLabel = (t: string) => PARAM_TYPES.find(p => p.value === t)?.label ?? t
+  const typeLabel = (t: string) => paramTypeOptions.find(p => p.value === t)?.label ?? t
 
   return (
     <div>
