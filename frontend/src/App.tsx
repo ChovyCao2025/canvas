@@ -1,4 +1,5 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
+import { Result } from 'antd'
 import { AuthProvider } from './context/AuthContext'
 import { RequireAuth, RequireAdmin } from './auth/guards'
 import AppLayout from './components/layout/AppLayout'
@@ -15,6 +16,14 @@ import MqConfigPage from './pages/mq-config'
 import EventConfigPage from './pages/event-config'
 import AudienceListPage from './pages/audience-list'
 import AudienceEditPage from './pages/audience-edit'
+
+function IdentityTypesPage() {
+  return <Result status="info" title="ID 类型配置页面待接入" />
+}
+
+function TagImportPage() {
+  return <Result status="info" title="标签导入页面待接入" />
+}
 
 export default function App() {
   return (
@@ -43,6 +52,8 @@ export default function App() {
               <Route path="/api-config"     element={<ApiConfigPage />} />
               <Route path="/ab-experiments" element={<AbExperimentPage />} />
               <Route path="/tag-config"     element={<TagConfigPage />} />
+              <Route path="/identity-types" element={<IdentityTypesPage />} />
+              <Route path="/tag-import"     element={<TagImportPage />} />
               <Route path="/audiences"      element={<AudienceListPage />} />
               <Route path="/audiences/new"  element={<AudienceEditPage />} />
               <Route path="/audiences/:id/edit" element={<AudienceEditPage />} />

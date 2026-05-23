@@ -3,6 +3,8 @@ import type {
   R, PageResult,
   Canvas, CanvasDetail, CanvasVersion,
   NodeTypeRegistry, ContextField, StubOption,
+  IdentityType, TagValueDefinition, TagImportBatch, TagImportError,
+  TagImportResult, TagImportRow, TagImportSource,
 } from '../types'
 
 const http = axios.create({ baseURL: '/' })
@@ -212,6 +214,53 @@ export const tagDefinitionApi = {
     http.put<R<void>, R<void>>(`/canvas/tag-definitions/${id}`, body),
   delete: (id: number) =>
     http.delete<R<void>, R<void>>(`/canvas/tag-definitions/${id}`),
+}
+
+export const identityTypeApi = {
+  list: (params?: { enabled?: number; allowImport?: number }) =>
+    http.get<R<PageResult<IdentityType>>, R<PageResult<IdentityType>>>('/canvas/identity-types', { params }),
+  create: (body: Partial<IdentityType>) =>
+    http.post<R<IdentityType>, R<IdentityType>>('/canvas/identity-types', body),
+  update: (id: number, body: Partial<IdentityType>) =>
+    http.put<R<void>, R<void>>(`/canvas/identity-types/${id}`, body),
+  delete: (id: number) =>
+    http.delete<R<void>, R<void>>(`/canvas/identity-types/${id}`),
+}
+
+export const tagValueApi = {
+  list: (tagCode: string, params?: { enabled?: number }) =>
+    http.get<R<TagValueDefinition[]>, R<TagValueDefinition[]>>(`/canvas/tag-definitions/${tagCode}/values`, { params }),
+  create: (tagCode: string, body: Partial<TagValueDefinition>) =>
+    http.post<R<TagValueDefinition>, R<TagValueDefinition>>(`/canvas/tag-definitions/${tagCode}/values`, body),
+  update: (id: number, body: Partial<TagValueDefinition>) =>
+    http.put<R<void>, R<void>>(`/canvas/tag-definitions/values/${id}`, body),
+  delete: (id: number) =>
+    http.delete<R<void>, R<void>>(`/canvas/tag-definitions/values/${id}`),
+}
+
+export const tagImportApi = {
+  apiPush: (rows: TagImportRow[]) =>
+    http.post<R<TagImportResult>, R<TagImportResult>>('/canvas/tag-imports/api-push', { rows }),
+  batches: () =>
+    http.get<R<TagImportBatch[]>, R<TagImportBatch[]>>('/canvas/tag-imports/batches'),
+  errors: (batchId: number) =>
+    http.get<R<TagImportError[]>, R<TagImportError[]>>(`/canvas/tag-imports/batches/${batchId}/errors`),
+  excelTemplateUrl: '/canvas/tag-imports/excel-template',
+  uploadExcel: (file: File) => {
+    const form = new FormData()
+    form.append('file', file)
+    return http.post<R<TagImportResult>, R<TagImportResult>>('/canvas/tag-imports/excel', form)
+  },
+  sources: () =>
+    http.get<R<PageResult<TagImportSource>>, R<PageResult<TagImportSource>>>('/canvas/tag-import-sources'),
+  createSource: (body: Partial<TagImportSource>) =>
+    http.post<R<TagImportSource>, R<TagImportSource>>('/canvas/tag-import-sources', body),
+  updateSource: (id: number, body: Partial<TagImportSource>) =>
+    http.put<R<void>, R<void>>(`/canvas/tag-import-sources/${id}`, body),
+  deleteSource: (id: number) =>
+    http.delete<R<void>, R<void>>(`/canvas/tag-import-sources/${id}`),
+  runSource: (id: number) =>
+    http.post<R<TagImportResult>, R<TagImportResult>>(`/canvas/tag-import-sources/${id}/run`),
 }
 
 export default http
