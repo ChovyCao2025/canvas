@@ -11,7 +11,15 @@ public final class NodeRouteResolver {
     public static List<String> resolveTargets(NodeResult result) {
         List<String> targets = new ArrayList<>();
         if (result.routes() != null && !result.routes().isEmpty()) {
-            result.routes().values().forEach(target -> addIfPresent(targets, target));
+            String elseTarget = null;
+            for (Map.Entry<String, String> entry : result.routes().entrySet()) {
+                if ("__else".equals(entry.getKey())) {
+                    elseTarget = entry.getValue();
+                } else {
+                    addIfPresent(targets, entry.getValue());
+                }
+            }
+            addIfPresent(targets, elseTarget);
             return targets;
         }
         addIfPresent(targets, result.nextNodeId());

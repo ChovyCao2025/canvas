@@ -45,4 +45,19 @@ class NodeRouteResolverTest {
 
         assertThat(NodeRouteResolver.resolveTargets(result)).containsExactly("branch_else", "fallback_else");
     }
+
+    @Test
+    void resolver_moves_reserved_else_route_to_the_end() {
+        Map<String, String> routes = new LinkedHashMap<>();
+        routes.put("__else", "fallback_else");
+        routes.put("A", "node_a");
+        routes.put("B", "node_b");
+
+        NodeResult result = new NodeResult(
+                null, null, null, null, null, Map.of(), true, null, false,
+                NodeOutcome.SUCCESS, routes, null, null, null
+        );
+
+        assertThat(NodeRouteResolver.resolveTargets(result)).containsExactly("node_a", "node_b", "fallback_else");
+    }
 }
