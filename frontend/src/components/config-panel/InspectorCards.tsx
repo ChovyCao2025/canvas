@@ -1,36 +1,26 @@
 import type { CSSProperties, ReactNode } from 'react'
 import { Tag, Typography } from 'antd'
 
+const PANEL_SURFACE = '#f5f5f7'
+const PANEL_CARD = '#ffffff'
+const PANEL_BORDER = '#c7c7cc'
+
 /**
- * 配置面板摘要卡片的基础视觉样式。
+ * 配置面板普通卡片的基础视觉样式。
  */
 const CARD_STYLE: CSSProperties = {
-  background: '#fff',
-  border: '1px solid #e8eaef',
-  borderRadius: 14,
-  boxShadow: '0 6px 18px rgba(15, 23, 42, 0.06)',
+  background: PANEL_CARD,
+  border: `1px solid ${PANEL_BORDER}`,
+  borderRadius: 22,
+  boxShadow: '0 10px 28px rgba(0, 0, 0, 0.045)',
 }
 
 /**
  * TAGGER 节点的专属配色。
  */
 const TAGGER_STYLES = {
-  shell: {
-    background: '#e9f0f7',
-    border: '1px solid #d9e4ef',
-  },
-  badge: {
-    background: '#f6f9fc',
-    color: '#345472',
-    border: '1px solid #d4e1ee',
-  },
-  status: {
-    background: '#f6f9fc',
-    color: '#345472',
-    border: '1px solid #d4e1ee',
-  },
-  title: '#17324d',
-  description: '#6e8093',
+  title: '#1d1d1f',
+  description: '#6f7c91',
 }
 
 /**
@@ -78,14 +68,19 @@ export interface NodeHeaderCardProps {
 function getHeaderPillStyles(color: string) {
   return {
     badge: {
-      background: `${color}14`,
+      background: `${color}12`,
       color,
       border: `1px solid ${color}33`,
     },
     status: {
+      background: `${color}10`,
+      color,
+      border: `1px solid ${color}30`,
+    },
+    meta: {
       background: `${color}0d`,
-      color: `${color}cc`,
-      border: `1px solid ${color}26`,
+      color,
+      border: `1px solid ${color}24`,
     },
   }
 }
@@ -100,74 +95,90 @@ export function NodeHeaderCard({
   categoryColor,
 }: NodeHeaderCardProps) {
   const isTagger = tone === 'tagger'
-  // TAGGER 节点使用更高识别度主题，普通节点保持中性展示
-  const shellStyle = isTagger ? TAGGER_STYLES.shell : {}
   const resolvedCategoryColor = categoryColor ?? '#475569'
   const pillStyles = getHeaderPillStyles(resolvedCategoryColor)
+  const headerBackground = isTagger
+    ? `linear-gradient(135deg, ${resolvedCategoryColor}0f 0%, #f8fbff 56%, ${resolvedCategoryColor}08 100%)`
+    : PANEL_CARD
 
   return (
     <div
       style={{
-        ...CARD_STYLE,
-        padding: 14,
-        marginBottom: 12,
-        ...shellStyle,
+        marginBottom: 16,
+        padding: '24px 24px 26px',
+        background: headerBackground,
+        border: `1px solid ${resolvedCategoryColor}35`,
+        borderRadius: 26,
+        boxShadow: `0 12px 32px ${resolvedCategoryColor}14`,
+        overflow: 'hidden',
       }}
     >
-      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }}>
-        <div style={{ minWidth: 0 }}>
-          <Tag
-            style={{
-              margin: 0,
-              borderRadius: 999,
-              padding: '0 10px',
-              ...pillStyles.badge,
-            }}
-          >
-            {typeBadge}
-          </Tag>
-          <Typography.Title level={5} style={{ margin: '10px 0 6px', color: isTagger ? TAGGER_STYLES.title : '#0f172a' }}>
-            {title}
-          </Typography.Title>
-          {description && (
-            <div style={{ color: isTagger ? TAGGER_STYLES.description : '#64748b', fontSize: 12, lineHeight: 1.6 }}>
-              {description}
-            </div>
-          )}
-        </div>
-
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+        <Tag
+          style={{
+            margin: 0,
+            borderRadius: 999,
+            height: 36,
+            lineHeight: '34px',
+            padding: '0 17px',
+            fontSize: 14,
+            fontWeight: 700,
+            letterSpacing: '.01em',
+            ...pillStyles.badge,
+          }}
+        >
+          {typeBadge}
+        </Tag>
         <div
           style={{
             flexShrink: 0,
             borderRadius: 999,
-            padding: '4px 10px',
-            fontSize: 12,
-            fontWeight: 600,
+            height: 36,
+            lineHeight: '34px',
+            padding: '0 17px',
+            fontSize: 14,
+            fontWeight: 700,
             color: pillStyles.status.color,
             background: pillStyles.status.background,
             border: pillStyles.status.border,
+            whiteSpace: 'nowrap',
           }}
         >
           {statusLabel}
         </div>
       </div>
 
+      <Typography.Title level={5} style={{
+        margin: '22px 0 0',
+        color: isTagger ? TAGGER_STYLES.title : '#1d1d1f',
+        fontSize: 20,
+        lineHeight: 1.35,
+        fontWeight: 700,
+        letterSpacing: '-0.025em',
+      }}>
+        {title}
+      </Typography.Title>
+
+      {description && (
+        <div style={{ color: isTagger ? TAGGER_STYLES.description : '#6e6e73', fontSize: 14, fontWeight: 600, lineHeight: 1.7, marginTop: 14 }}>
+          {description}
+        </div>
+      )}
+
       {!!metaBadges.length && (
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 12 }}>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, marginTop: 24 }}>
           {metaBadges.map((badge) => (
             <Tag
               key={badge}
               style={{
                 margin: 0,
+                height: 34,
+                lineHeight: '32px',
                 borderRadius: 999,
-                padding: '0 10px',
-                ...(isTagger
-                  ? { background: '#f6f9fc', color: '#345472', border: '1px solid #d4e1ee' }
-                  : {
-                      background: '#f8fafc',
-                      color: resolvedCategoryColor,
-                      border: `1px solid ${resolvedCategoryColor}33`,
-                    }),
+                padding: '0 17px',
+                fontSize: 14,
+                fontWeight: 650,
+                ...pillStyles.meta,
               }}
             >
               {badge}
@@ -192,10 +203,21 @@ export interface ConfigSectionCardProps {
 
 export function ConfigSectionCard({ title, children }: ConfigSectionCardProps) {
   return (
-    <section style={{ ...CARD_STYLE, padding: 14, marginBottom: 12 }}>
-      <div style={{ marginBottom: 12, fontSize: 13, fontWeight: 600, color: '#0f172a' }}>
+    <section style={{ ...CARD_STYLE, padding: '20px 20px 22px', marginBottom: 16 }}>
+      <div style={{ marginBottom: 16, fontSize: 14, fontWeight: 650, color: '#1d1d1f' }}>
         {title}
       </div>
+      {children}
+    </section>
+  )
+}
+
+/**
+ * 无标题表单容器，避免“配置详情”标题增加冗余层级。
+ */
+export function ConfigFormCard({ children }: { children: ReactNode }) {
+  return (
+    <section style={{ ...CARD_STYLE, padding: '20px 20px 6px', marginBottom: 16 }}>
       {children}
     </section>
   )
@@ -212,24 +234,37 @@ export interface FieldSummaryRowProps {
   value: string
 }
 
+export interface ConfigSummaryListProps {
+  /** 摘要行列表。 */
+  rows: FieldSummaryRowProps[]
+}
+
+export function ConfigSummaryList({ rows }: ConfigSummaryListProps) {
+  return (
+    <section style={{ ...CARD_STYLE, padding: 18, marginBottom: 16 }}>
+      <div style={{ display: 'grid', gap: 10 }}>
+        {rows.map((row) => (
+          <FieldSummaryRow key={row.label} label={row.label} value={row.value} />
+        ))}
+      </div>
+    </section>
+  )
+}
+
 export function FieldSummaryRow({ label, value }: FieldSummaryRowProps) {
   return (
     <div
       style={{
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        gap: 12,
-        padding: '10px 12px',
-        background: '#f8fafc',
-        border: '1px solid #e8eaef',
-        borderRadius: 10,
+        padding: '16px 18px',
+        background: PANEL_SURFACE,
+        border: '1px solid #dedee5',
+        borderRadius: 17,
       }}
     >
-      <div style={{ color: '#64748b', fontSize: 12, flexShrink: 0 }}>
+      <div style={{ color: '#6e6e73', fontSize: 14, fontWeight: 600, marginBottom: 6, lineHeight: 1.35 }}>
         {label}
       </div>
-      <div style={{ color: '#0f172a', fontSize: 12, fontWeight: 500, textAlign: 'right', wordBreak: 'break-word' }}>
+      <div style={{ color: '#1d1d1f', fontSize: 14, fontWeight: 500, lineHeight: 1.35, wordBreak: 'break-word' }}>
         {value}
       </div>
     </div>
@@ -256,21 +291,17 @@ export function BranchRouteCard({ label, value, tone }: BranchRouteCardProps) {
   return (
     <div
       style={{
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        gap: 12,
-        padding: '12px 14px',
-        borderRadius: 12,
-        background: styles.background,
-        border: styles.border,
+        padding: '16px 18px',
+        borderRadius: 17,
+        background: PANEL_SURFACE,
+        border: '1px solid #dedee5',
       }}
     >
       <div style={{ minWidth: 0 }}>
-        <div style={{ color: styles.title, fontSize: 12, fontWeight: 600, marginBottom: 4 }}>
+        <div style={{ color: styles.title, fontSize: 14, fontWeight: 600, marginBottom: 6, lineHeight: 1.35 }}>
           {label}
         </div>
-        <div style={{ color: styles.value, fontSize: 13, fontWeight: 500, wordBreak: 'break-word' }}>
+        <div style={{ color: styles.value, fontSize: 14, fontWeight: 500, lineHeight: 1.35, wordBreak: 'break-word' }}>
           {value}
         </div>
       </div>
