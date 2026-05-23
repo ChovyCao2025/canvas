@@ -33,4 +33,13 @@ describe('outlet schema', () => {
     expect(getOutletTargetField('success', schema)).toBe('nextNodeId')
     expect(getOutletTargetField('success')).toBe('successNodeId')
   })
+
+  it('does not render custom dynamic handles without target fields', () => {
+    expect(parseOutletSchema(JSON.stringify([
+      { id: 'continue', label: '继续' },
+      { id: 'timeout', label: '超时' },
+    ]))).toEqual([
+      { id: 'timeout', label: '超时', color: '#1677ff' },
+    ])
+  })
 })

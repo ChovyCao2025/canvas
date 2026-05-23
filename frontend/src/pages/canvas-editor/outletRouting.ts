@@ -25,6 +25,17 @@ function edgeId(sourceId: string, targetId: string, sourceHandle: string): strin
     : `${sourceId}->${targetId}::${sourceHandle}`
 }
 
+function legacyFieldForHandle(sourceHandle: string): OutletTargetField | undefined {
+  return FIELD_HANDLES.find(item => item.handleId === sourceHandle)?.field
+}
+
+function clearShadowedLegacyField(next: BizConfig, sourceHandle: string, field: OutletTargetField): void {
+  const legacyField = legacyFieldForHandle(sourceHandle)
+  if (legacyField && legacyField !== field) {
+    next[legacyField] = undefined
+  }
+}
+
 function patchIndexedOutlet(next: BizConfig, sourceHandle: string, target: string): boolean {
   if (sourceHandle.startsWith('branch-')) {
     const idx = parseInt(sourceHandle.split('-')[1], 10)
@@ -80,7 +91,6 @@ export function deriveEdges(backendNodes: BackendNode[]): Edge[] {
 
   backendNodes.forEach(node => {
     const config = (node.config ?? {}) as BizConfig
-    const consumedFields = new Set<OutletTargetField>()
     const push = (target: unknown, sourceHandle: string) => {
       if (typeof target !== 'string' || target.length === 0) return
       edges.push({
@@ -91,17 +101,18 @@ export function deriveEdges(backendNodes: BackendNode[]): Edge[] {
       })
     }
 
-    parseOutletSchemaItems(node.outletSchema).forEach(item => {
+    const dynamicItems = parseOutletSchemaItems(node.outletSchema)
+    dynamicItems.forEach(item => {
       const field = getOutletTargetField(item.id, node.outletSchema)
       if (!field) return
-      consumedFields.add(field)
       push(config[field], item.id)
     })
 
-    FIELD_HANDLES.forEach(({ field, handleId }) => {
-      if (consumedFields.has(field)) return
-      push(config[field], handleId)
-    })
+    if (dynamicItems.length === 0) {
+      FIELD_HANDLES.forEach(({ field, handleId }) => {
+        push(config[field], handleId)
+      })
+    }
 
     config.branches?.forEach((branch, index) => push(branch.nextNodeId, `branch-${index}`))
     config.priorities?.forEach((priority, index) => push(priority.nextNodeId, `priority-${index}`))
@@ -120,8 +131,17 @@ export function patchBizConfig(
   const next = { ...cfg } as BizConfig
   if (patchIndexedOutlet(next, sourceHandle, target)) return next
 
-  const field = getOutletTargetField(sourceHandle, outletSchema) ?? 'nextNodeId'
+  const dynamicItems = parseOutletSchemaItems(outletSchema)
+  if (dynamicItems.length > 0 && !dynamicItems.some(item => item.id === sourceHandle)) {
+    return next
+  }
+
+  const field = getOutletTargetField(sourceHandle, outletSchema)
+    ?? (dynamicItems.length === 0 ? 'nextNodeId' : undefined)
+  if (!field) return next
+
   next[field] = target
+  clearShadowedLegacyField(next, sourceHandle, field)
   return next
 }
 
@@ -134,7 +154,16 @@ export function clearEdgeRef(
   const sourceHandle = edge.sourceHandle ?? 'default'
   if (clearIndexedOutlet(next, sourceHandle)) return next
 
-  const field = getOutletTargetField(sourceHandle, outletSchema) ?? 'nextNodeId'
+  const dynamicItems = parseOutletSchemaItems(outletSchema)
+  if (dynamicItems.length > 0 && !dynamicItems.some(item => item.id === sourceHandle)) {
+    return next
+  }
+
+  const field = getOutletTargetField(sourceHandle, outletSchema)
+    ?? (dynamicItems.length === 0 ? 'nextNodeId' : undefined)
+  if (!field) return next
+
   next[field] = undefined
+  clearShadowedLegacyField(next, sourceHandle, field)
   return next
 }

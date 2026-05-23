@@ -70,11 +70,13 @@ export function parseOutletSchemaItems(raw: string | undefined): OutletSchemaIte
 }
 
 export function parseOutletSchema(raw: string | undefined): BranchHandle[] {
-  return parseOutletSchemaItems(raw).map(item => ({
-    id: item.id,
-    label: item.label,
-    color: item.color ?? '#1677ff',
-  }))
+  return parseOutletSchemaItems(raw)
+    .filter(item => item.targetField || DEFAULT_TARGET_FIELDS[item.id])
+    .map(item => ({
+      id: item.id,
+      label: item.label,
+      color: item.color ?? '#1677ff',
+    }))
 }
 
 export function getOutletHandles(input: {
