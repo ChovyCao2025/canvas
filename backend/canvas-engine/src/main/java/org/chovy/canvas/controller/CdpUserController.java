@@ -2,8 +2,10 @@ package org.chovy.canvas.controller;
 
 import lombok.RequiredArgsConstructor;
 import org.chovy.canvas.common.R;
+import org.chovy.canvas.domain.cdp.CdpUserDirectoryService;
 import org.chovy.canvas.domain.cdp.CdpTagService;
 import org.chovy.canvas.domain.cdp.CdpUserService;
+import org.chovy.canvas.dto.cdp.CanvasUserRowDTO;
 import org.chovy.canvas.dto.cdp.CdpTagWriteReq;
 import org.chovy.canvas.dto.cdp.CdpUserDetailDTO;
 import org.chovy.canvas.dto.cdp.CdpUserTagDTO;
@@ -25,8 +27,15 @@ import java.util.List;
 @RequiredArgsConstructor
 public class CdpUserController {
 
+    private final CdpUserDirectoryService directoryService;
     private final CdpUserService userService;
     private final CdpTagService tagService;
+
+    @GetMapping
+    public Mono<R<List<CanvasUserRowDTO>>> list(@org.springframework.web.bind.annotation.RequestParam(required = false) String keyword) {
+        return Mono.fromCallable(() -> R.ok(directoryService.listUsers(keyword)))
+                .subscribeOn(Schedulers.boundedElastic());
+    }
 
     @GetMapping("/{userId}")
     public Mono<R<CdpUserDetailDTO>> get(@PathVariable String userId) {

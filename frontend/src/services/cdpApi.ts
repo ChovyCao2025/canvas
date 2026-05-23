@@ -69,6 +69,9 @@ export interface BatchTagPayload {
 }
 
 export const cdpApi = {
+  listUsers: (keyword?: string) =>
+    http.get<R<CanvasUserRow[]>, R<CanvasUserRow[]>>('/cdp/users', { params: keyword ? { keyword } : undefined }),
+
   getUser: (userId: string) =>
     http.get<R<CdpUserDetail>, R<CdpUserDetail>>(`/cdp/users/${encodeURIComponent(userId)}`),
 

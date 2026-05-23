@@ -12,14 +12,23 @@ export default function CdpUsersPage() {
   const navigate = useNavigate()
   const [keyword, setKeyword] = useState('')
   const [rows, setRows] = useState<CanvasUserRow[]>([])
+  const [loading, setLoading] = useState(false)
   const [batchOpen, setBatchOpen] = useState(false)
   const [form] = Form.useForm()
 
-  useEffect(() => {
-    setRows([])
-  }, [])
+  const load = async (searchKeyword = '') => {
+    setLoading(true)
+    try {
+      const res = await cdpApi.listUsers(searchKeyword || undefined)
+      setRows(res.data ?? [])
+    } finally {
+      setLoading(false)
+    }
+  }
 
-  const filtered = rows.filter(row => !keyword || row.userId.includes(keyword))
+  useEffect(() => {
+    load()
+  }, [])
 
   const submitBatch = async () => {
     const values = await form.validateFields()
@@ -42,11 +51,17 @@ export default function CdpUsersPage() {
       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 20, gap: 12, flexWrap: 'wrap' }}>
         <Title level={4} style={{ margin: 0 }}>CDP 用户中心</Title>
         <Space>
-          <Input.Search placeholder="搜索 userId" value={keyword} onChange={e => setKeyword(e.target.value)} style={{ width: 240 }} />
+          <Input.Search
+            placeholder="搜索 userId"
+            value={keyword}
+            onChange={e => setKeyword(e.target.value)}
+            onSearch={value => load(value.trim())}
+            style={{ width: 240 }}
+          />
           <Button icon={<TagsOutlined />} onClick={() => setBatchOpen(true)}>批量打标</Button>
         </Space>
       </div>
-      <Table rowKey="userId" columns={columns} dataSource={filtered} loading={false} />
+      <Table rowKey="userId" columns={columns} dataSource={rows} loading={loading} />
 
       <Modal title="批量打标" open={batchOpen} onOk={submitBatch} onCancel={() => setBatchOpen(false)} okText="提交" cancelText="取消">
         <Form form={form} layout="vertical" initialValues={{ operationType: 'BATCH_SET' }}>
