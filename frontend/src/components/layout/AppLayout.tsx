@@ -52,6 +52,8 @@ export default function AppLayout() {
     if (location.pathname.startsWith('/data-source-config')) return 'data-source-config'
     if (location.pathname.startsWith('/ab-experiments')) return 'ab-experiments'
     if (location.pathname.startsWith('/tag-config'))     return 'tag-config'
+    if (location.pathname.startsWith('/identity-types')) return 'identity-types'
+    if (location.pathname.startsWith('/tag-import'))     return 'tag-import'
     if (location.pathname.startsWith('/audiences'))      return 'audiences'
     if (location.pathname.startsWith('/mq-config'))      return 'mq-config'
     if (location.pathname.startsWith('/event-config'))   return 'event-config'
@@ -70,6 +72,8 @@ export default function AppLayout() {
       'data-source-config',
       'ab-experiments',
       'tag-config',
+      'identity-types',
+      'tag-import',
       'audiences',
       'mq-config',
       'event-config',
@@ -153,6 +157,18 @@ export default function AppLayout() {
           icon: <TagsOutlined />,
           label: '标签配置',
           onClick: () => navigate('/tag-config'),
+        },
+        {
+          key: 'identity-types',
+          icon: <UserOutlined />,
+          label: 'ID 类型配置',
+          onClick: () => navigate('/identity-types'),
+        },
+        {
+          key: 'tag-import',
+          icon: <TagsOutlined />,
+          label: '标签导入',
+          onClick: () => navigate('/tag-import'),
         },
         {
           key: 'audiences',

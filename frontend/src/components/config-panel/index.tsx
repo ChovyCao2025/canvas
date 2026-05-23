@@ -49,6 +49,29 @@ const rawCache      = new Map<string, any[]>()         // key = dataSource URL
 const systemOptionCache = new Map<string, StubOption[]>()
 let contextFieldsCache: ContextField[] | null = null
 
+export function getDataSourceDependencies(src?: string): string[] {
+  if (!src) return []
+  return [...src.matchAll(/\{(\w+)\}/g)].map((match) => match[1])
+}
+
+function isBlankDependencyValue(value: unknown): boolean {
+  return value == null || (typeof value === 'string' && value.trim() === '')
+}
+
+export function resolveDataSourceTemplate(src: string, values: Record<string, unknown>): string | null {
+  let unresolved = false
+  const resolved = src.replace(/\{(\w+)\}/g, (_match, key: string) => {
+    const value = values[key]
+    if (isBlankDependencyValue(value)) {
+      unresolved = true
+      return ''
+    }
+    return encodeURIComponent(String(value))
+  })
+
+  return unresolved ? null : resolved
+}
+
 function renderControlLabel(label: string): React.ReactNode {
   return <div style={{ ...getControlLabelStyle(), margin: '0 6px 6px' }}>{label}</div>
 }
@@ -168,16 +191,22 @@ export default function ConfigPanel({ nodeId, nodeData, onChange, nodes, readonl
   // 加载 select 下拉选项：dataSource 优先，其次 optionCategory，最后保留 field.options 兜底
   useEffect(() => {
     if (!schema) return
+    let cancelled = false
     const fields = parseSchema(schema.configSchema)
     fields.filter(f => f.type === 'select' && f.dataSource).forEach(f => {
-      const src = f.dataSource!
+      const src = resolveDataSourceTemplate(f.dataSource!, formValues)
+      if (!src) {
+        setOptions(prev => ({ ...prev, [f.key]: [] }))
+        return
+      }
       if (rawCache.has(src)) {
         setOptions(prev => ({ ...prev, [f.key]: toSelectOptions(rawCache.get(src)!) }))
         return
       }
-      loadDataSource(src).then(data =>
+      loadDataSource(src).then(data => {
+        if (cancelled) return
         setOptions(prev => ({ ...prev, [f.key]: toSelectOptions(data) }))
-      )
+      })
     })
     fields.filter(f => (f.type === 'select' || f.type === 'radio') && f.optionCategory && !f.dataSource)
       .forEach(f => {
@@ -190,7 +219,8 @@ export default function ConfigPanel({ nodeId, nodeData, onChange, nodes, readonl
           setOptions(prev => ({ ...prev, [f.key]: data }))
         )
       })
-  }, [schema])
+    return () => { cancelled = true }
+  }, [formValues, schema])
 
   // 同步表单初始值
   useEffect(() => {
@@ -201,17 +231,34 @@ export default function ConfigPanel({ nodeId, nodeData, onChange, nodes, readonl
     }
   }, [nodeId, nodeData, form])
 
-  const handleValuesChange = useCallback((_changed: Record<string, unknown>, all: Record<string, unknown>) => {
+  const handleValuesChange = useCallback((changed: Record<string, unknown>, all: Record<string, unknown>) => {
     if (!nodeId || !nodeData) return
-    setFormValues(all)
+    const schemaFields = parseSchema(schema?.configSchema)
+    const changedKeys = new Set(Object.keys(changed))
+    const clearedFields = schemaFields
+      .filter((field) =>
+        !!field.dataSource &&
+        getDataSourceDependencies(field.dataSource).some((dependency) => changedKeys.has(dependency)),
+      )
+      .map((field) => field.key)
+      .filter((fieldKey) => !changedKeys.has(fieldKey) && !isBlankDependencyValue(all[fieldKey]))
+
+    const nextValues = { ...all } as Record<string, unknown>
+    if (clearedFields.length > 0) {
+      const clearedPatch = Object.fromEntries(clearedFields.map((fieldKey) => [fieldKey, undefined]))
+      Object.assign(nextValues, clearedPatch)
+      form.setFieldsValue(clearedPatch)
+    }
+
+    setFormValues(nextValues)
     // 用 all（全量）而非 changed（增量）：nested Form.Item（如 inputParams.xxx）每次只在 changed
     // 里携带单个子字段，用 changed 会导致其他子字段被丢弃；all 是表单当前完整状态
-    const { name, ...rest } = all
+    const { name, ...rest } = nextValues
     onChange(nodeId, {
       ...(name !== undefined ? { name: name as string } : {}),
       bizConfig: rest,
     })
-  }, [nodeId, onChange])
+  }, [form, nodeData, nodeId, onChange, schema])
 
   const applyFormPatch = useCallback((patch: Record<string, unknown>) => {
     if (!nodeId || !nodeData) return

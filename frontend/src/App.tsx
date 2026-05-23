@@ -16,6 +16,8 @@ const ApiConfigPage = lazy(() => import('./pages/api-config'))
 const DataSourceConfigPage = lazy(() => import('./pages/data-source-config'))
 const AbExperimentPage = lazy(() => import('./pages/ab-experiment'))
 const TagConfigPage = lazy(() => import('./pages/tag-config'))
+const IdentityTypesPage = lazy(() => import('./pages/identity-types'))
+const TagImportPage = lazy(() => import('./pages/tag-import'))
 const MqConfigPage = lazy(() => import('./pages/mq-config'))
 const EventConfigPage = lazy(() => import('./pages/event-config'))
 const AudienceListPage = lazy(() => import('./pages/audience-list'))
@@ -60,6 +62,8 @@ export default function App() {
                   <Route path="/data-source-config" element={<DataSourceConfigPage />} />
                   <Route path="/ab-experiments" element={<AbExperimentPage />} />
                   <Route path="/tag-config" element={<TagConfigPage />} />
+                  <Route path="/identity-types" element={<IdentityTypesPage />} />
+                  <Route path="/tag-import" element={<TagImportPage />} />
                   <Route path="/audiences" element={<AudienceListPage />} />
                   <Route path="/audiences/new" element={<AudienceEditPage />} />
                   <Route path="/audiences/:id/edit" element={<AudienceEditPage />} />

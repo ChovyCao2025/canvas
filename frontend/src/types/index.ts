@@ -308,3 +308,111 @@ export interface SchemaField {
   /** 显隐表达式。 */
   visible?: string
 }
+
+export interface IdentityType {
+  id: number
+  code: string
+  name: string
+  description?: string
+  enabled: 0 | 1
+  allowImport: 0 | 1
+  multiValue: 0 | 1
+  priority: number
+  participateMapping: 0 | 1
+  createdBy?: string
+  createdAt?: string
+  updatedAt?: string
+}
+
+export interface TagDefinition {
+  id: number
+  name: string
+  tagCode: string
+  tagType: 'offline' | 'realtime'
+  valueType: 'STRING' | 'NUMBER' | 'BOOLEAN' | 'JSON'
+  description?: string
+  enabled: 0 | 1
+  manualEnabled?: 0 | 1
+  defaultTtlDays?: number
+  category?: string
+  owner?: string
+  writePolicy?: string
+  createdBy?: string
+  createdAt?: string
+  updatedAt?: string
+}
+
+export interface TagValueDefinition {
+  id: number
+  tagCode: string
+  value: string
+  label: string
+  sortOrder: number
+  enabled: 0 | 1
+  source: string
+  description?: string
+  createdAt?: string
+  updatedAt?: string
+}
+
+export interface TagImportRow {
+  rowNo?: number
+  idType: string
+  idValue: string
+  tagCode: string
+  tagValue: string
+  tagTime?: string
+}
+
+export interface TagImportResult {
+  batchId: number
+  status: string
+  totalRows: number
+  successRows: number
+  failedRows: number
+}
+
+export interface TagImportBatch {
+  id: number
+  sourceType: string
+  status: string
+  fileName?: string
+  externalUrl?: string
+  totalRows: number
+  successRows: number
+  failedRows: number
+  createdBy?: string
+  startedAt?: string
+  finishedAt?: string
+  errorMessage?: string
+  createdAt?: string
+  updatedAt?: string
+}
+
+export interface TagImportError {
+  id: number
+  batchId: number
+  rowNo: number
+  rawPayload?: string
+  errorCode: string
+  errorMsg: string
+  createdAt?: string
+}
+
+export interface TagImportSource {
+  id: number
+  name: string
+  url: string
+  method: string
+  headersJson?: string
+  bodyTemplate?: string
+  pageParam?: string
+  pageSizeParam?: string
+  pageSize?: number
+  recordsPath?: string
+  fieldMapping?: string
+  enabled: 0 | 1
+  createdBy?: string
+  createdAt?: string
+  updatedAt?: string
+}

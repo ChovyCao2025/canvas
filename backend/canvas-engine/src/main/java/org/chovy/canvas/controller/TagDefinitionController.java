@@ -1,15 +1,16 @@
 package org.chovy.canvas.controller;
 
-import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import org.chovy.canvas.common.PageResult;
 import org.chovy.canvas.common.R;
 import org.chovy.canvas.domain.meta.TagDefinition;
-import org.chovy.canvas.domain.meta.TagDefinitionMapper;
+import org.chovy.canvas.domain.meta.TagDefinitionService;
+import org.chovy.canvas.domain.meta.TagValueDefinition;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
+
+import java.util.List;
 
 /**
  * 标签定义管理接口。
@@ -23,8 +24,7 @@ import reactor.core.scheduler.Schedulers;
 @RequiredArgsConstructor
 public class TagDefinitionController {
 
-    /** 标签定义 Mapper。 */
-    private final TagDefinitionMapper mapper;
+    private final TagDefinitionService tagDefinitionService;
 
     /** 分页查询标签定义。 */
     @GetMapping
@@ -33,23 +33,16 @@ public class TagDefinitionController {
             @RequestParam(defaultValue = "20") int size,
             @RequestParam(required = false) String tagType,
             @RequestParam(required = false) Integer enabled) {
-        return Mono.fromCallable(() -> {
-            // 按需拼接筛选条件，避免前端未传参数导致“误过滤”
-            var wrapper = new LambdaQueryWrapper<TagDefinition>()
-                    .eq(tagType != null, TagDefinition::getTagType, tagType)
-                    .eq(enabled != null, TagDefinition::getEnabled, enabled)
-                    .orderByAsc(TagDefinition::getId);
-            Page<TagDefinition> p = mapper.selectPage(new Page<>(page, size), wrapper);
-            return R.ok(PageResult.of(p.getTotal(), p.getRecords()));
-        }).subscribeOn(Schedulers.boundedElastic());
+        return Mono.fromCallable(() -> tagDefinitionService.page(page, size, tagType, enabled))
+                .subscribeOn(Schedulers.boundedElastic())
+                .map(R::ok);
     }
 
     /** 创建标签定义。 */
     @PostMapping
     public Mono<R<TagDefinition>> create(@RequestBody TagDefinition body) {
         return Mono.fromCallable(() -> {
-                    mapper.insert(body);
-                    return R.ok(body);
+                    return R.ok(tagDefinitionService.create(body));
                 })
                 .subscribeOn(Schedulers.boundedElastic());
     }
@@ -57,20 +50,46 @@ public class TagDefinitionController {
     /** 更新标签定义。 */
     @PutMapping("/{id}")
     public Mono<R<Void>> update(@PathVariable Long id, @RequestBody TagDefinition body) {
-        // 与其他配置接口保持一致：路径参数优先
-        body.setId(id);
-        return Mono.fromCallable(() -> {
-                    mapper.updateById(body);
-                    return R.<Void>ok();
-                })
-                .subscribeOn(Schedulers.boundedElastic());
+        return Mono.<Void>fromRunnable(() -> tagDefinitionService.update(id, body))
+                .subscribeOn(Schedulers.boundedElastic())
+                .thenReturn(R.ok());
     }
 
     /** 删除标签定义。 */
     @DeleteMapping("/{id}")
     public Mono<R<Void>> delete(@PathVariable Long id) {
-        return Mono.<R<Void>>fromRunnable(() -> mapper.deleteById(id))
+        return Mono.<Void>fromRunnable(() -> tagDefinitionService.delete(id))
                 .subscribeOn(Schedulers.boundedElastic())
-                .then(Mono.just(R.ok()));
+                .thenReturn(R.ok());
+    }
+
+    @GetMapping("/{tagCode}/values")
+    public Mono<R<List<TagValueDefinition>>> listValues(
+            @PathVariable String tagCode,
+            @RequestParam(required = false) Integer enabled) {
+        return Mono.fromCallable(() -> tagDefinitionService.listValues(tagCode, enabled))
+                .subscribeOn(Schedulers.boundedElastic())
+                .map(R::ok);
+    }
+
+    @PostMapping("/{tagCode}/values")
+    public Mono<R<TagValueDefinition>> createValue(@PathVariable String tagCode, @RequestBody TagValueDefinition body) {
+        return Mono.fromCallable(() -> tagDefinitionService.createValue(tagCode, body))
+                .subscribeOn(Schedulers.boundedElastic())
+                .map(R::ok);
+    }
+
+    @PutMapping("/values/{id}")
+    public Mono<R<Void>> updateValue(@PathVariable Long id, @RequestBody TagValueDefinition body) {
+        return Mono.<Void>fromRunnable(() -> tagDefinitionService.updateValue(id, body))
+                .subscribeOn(Schedulers.boundedElastic())
+                .thenReturn(R.ok());
+    }
+
+    @DeleteMapping("/values/{id}")
+    public Mono<R<Void>> deleteValue(@PathVariable Long id) {
+        return Mono.<Void>fromRunnable(() -> tagDefinitionService.deleteValue(id))
+                .subscribeOn(Schedulers.boundedElastic())
+                .thenReturn(R.ok());
     }
 }

@@ -1,36 +1,23 @@
 import { useEffect, useState } from 'react'
-import { Button, Table, Tag, Space, Modal, Form, Input, Select, Switch, message, Typography, Popconfirm } from 'antd'
-import { PlusOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons'
+import { Button, Divider, Form, Input, InputNumber, Modal, Popconfirm, Select, Space, Switch, Table, Tag, Typography, message } from 'antd'
+import { DeleteOutlined, EditOutlined, PlusOutlined } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
 import { tagDefinitionApi } from '../../services/api'
 import { useSystemOptions } from '../../hooks/useSystemOptions'
 import { normalizeTagDefinitionPayload } from './tagConfigPayload'
+import type { TagConfigRecord, TagFormValues } from './tagTypes'
+import TagValueEditor from './tagValueEditor'
 
 const { Title } = Typography
 
-interface TagDef {
-  id: number
-  name: string
-  tagCode: string
-  tagType: string
-  description?: string
-  enabled: number
-  valueType?: string
-  manualEnabled?: number
-  defaultTtlDays?: number
-  category?: string
-  owner?: string
-  writePolicy?: string
-}
-
 export default function TagConfigPage() {
-  const [data, setData] = useState<TagDef[]>([])
+  const [data, setData] = useState<TagConfigRecord[]>([])
   const [total, setTotal] = useState(0)
   const [loading, setLoading] = useState(false)
   const [page, setPage] = useState(1)
   const [visible, setVisible] = useState(false)
-  const [editing, setEditing] = useState<TagDef | null>(null)
-  const [form] = Form.useForm()
+  const [editing, setEditing] = useState<TagConfigRecord | null>(null)
+  const [form] = Form.useForm<TagFormValues>()
   const [saving, setSaving] = useState(false)
   const { options: tagTypeOptions } = useSystemOptions('tag_type')
 
@@ -60,7 +47,7 @@ export default function TagConfigPage() {
     setVisible(true)
   }
 
-  const openEdit = (record: TagDef) => {
+  const openEdit = (record: TagConfigRecord) => {
     setEditing(record)
     form.setFieldsValue({
       ...record,
@@ -89,7 +76,7 @@ export default function TagConfigPage() {
     }
   }
 
-  const columns: ColumnsType<TagDef> = [
+  const columns: ColumnsType<TagConfigRecord> = [
     { title: 'ID', dataIndex: 'id', width: 60 },
     { title: '名称', dataIndex: 'name' },
     { title: '标签编码', dataIndex: 'tagCode', ellipsis: true },
@@ -99,13 +86,15 @@ export default function TagConfigPage() {
       width: 90,
       render: (value: string) => <Tag color={value === 'offline' ? 'blue' : 'green'}>{value === 'offline' ? '离线' : '实时'}</Tag>,
     },
-    { title: '值类型', dataIndex: 'valueType', width: 90, render: value => value || 'STRING' },
+    { title: '值类型', dataIndex: 'valueType', width: 90, render: value => <Tag>{value || 'STRING'}</Tag> },
     {
       title: '人工打标',
       dataIndex: 'manualEnabled',
       width: 90,
       render: value => <Tag color={value === 0 ? 'default' : 'green'}>{value === 0 ? '关闭' : '允许'}</Tag>,
     },
+    { title: '分类', dataIndex: 'category', width: 110, ellipsis: true },
+    { title: '负责人', dataIndex: 'owner', width: 100, ellipsis: true },
     { title: '说明', dataIndex: 'description', ellipsis: true },
     {
       title: '状态',
@@ -153,6 +142,7 @@ export default function TagConfigPage() {
         onOk={handleOk}
         onCancel={() => setVisible(false)}
         confirmLoading={saving}
+        width={760}
         okText={editing ? '保存' : '创建'}
         cancelText="取消"
       >
@@ -178,7 +168,7 @@ export default function TagConfigPage() {
             <Switch checkedChildren="允许" unCheckedChildren="关闭" />
           </Form.Item>
           <Form.Item name="defaultTtlDays" label="默认有效期（天）">
-            <Input type="number" min={1} placeholder="留空表示长期有效" />
+            <InputNumber style={{ width: '100%' }} min={1} placeholder="留空表示长期有效" />
           </Form.Item>
           <Form.Item name="category" label="分类">
             <Input placeholder="如：生命周期" />
@@ -195,6 +185,12 @@ export default function TagConfigPage() {
           <Form.Item name="enabled" label="状态" valuePropName="checked">
             <Switch checkedChildren="启用" unCheckedChildren="禁用" />
           </Form.Item>
+          {editing?.tagCode ? (
+            <>
+              <Divider style={{ margin: '8px 0 16px' }}>标签值管理</Divider>
+              <TagValueEditor tagCode={editing.tagCode} />
+            </>
+          ) : null}
         </Form>
       </Modal>
     </div>
