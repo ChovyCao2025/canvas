@@ -14,6 +14,8 @@ CREATE TABLE async_task (
     finished_at DATETIME,
     created_at DATETIME,
     updated_at DATETIME,
+    active_key VARCHAR(200) GENERATED ALWAYS AS (CASE WHEN status IN ('QUEUED','RUNNING') THEN CONCAT(task_type, ':', biz_type, ':', biz_id) ELSE NULL END) STORED,
+    UNIQUE KEY uk_async_task_active (active_key),
     INDEX idx_async_task_biz (biz_type, biz_id),
     INDEX idx_async_task_status (status),
     INDEX idx_async_task_creator (created_by, created_at)

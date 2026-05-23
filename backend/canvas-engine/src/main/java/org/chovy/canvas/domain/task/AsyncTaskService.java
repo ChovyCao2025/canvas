@@ -2,6 +2,7 @@ package org.chovy.canvas.domain.task;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import lombok.RequiredArgsConstructor;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
@@ -12,18 +13,13 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class AsyncTaskService {
 
-    private static final int ERROR_MSG_LIMIT = 1000;
+    private static final int TEXT_LIMIT = 1000;
 
     private final AsyncTaskMapper mapper;
 
     public AsyncTaskCreateResult createOrReuseRunning(
             String taskType, String bizType, String bizId, String title, String createdBy) {
-        AsyncTask existing = mapper.selectOne(new LambdaQueryWrapper<AsyncTask>()
-                .eq(AsyncTask::getTaskType, taskType)
-                .eq(AsyncTask::getBizType, bizType)
-                .eq(AsyncTask::getBizId, bizId)
-                .in(AsyncTask::getStatus, AsyncTaskStatus.QUEUED.name(), AsyncTaskStatus.RUNNING.name())
-                .last("LIMIT 1"));
+        AsyncTask existing = findActive(taskType, bizType, bizId);
         if (existing != null) {
             return new AsyncTaskCreateResult(existing, false);
         }
@@ -37,7 +33,15 @@ public class AsyncTaskService {
         task.setStatus(AsyncTaskStatus.QUEUED.name());
         task.setProgress(0);
         task.setCreatedBy(createdBy);
-        mapper.insert(task);
+        try {
+            mapper.insert(task);
+        } catch (DuplicateKeyException e) {
+            AsyncTask concurrent = findActive(taskType, bizType, bizId);
+            if (concurrent != null) {
+                return new AsyncTaskCreateResult(concurrent, false);
+            }
+            throw e;
+        }
         return new AsyncTaskCreateResult(task, true);
     }
 
@@ -53,7 +57,7 @@ public class AsyncTaskService {
         AsyncTask task = requireByTaskId(taskId);
         task.setStatus(AsyncTaskStatus.SUCCEEDED.name());
         task.setProgress(100);
-        task.setResultSummary(resultSummary);
+        task.setResultSummary(trimToLimit(resultSummary));
         task.setErrorMsg(null);
         task.setFinishedAt(LocalDateTime.now());
         mapper.updateById(task);
@@ -63,7 +67,7 @@ public class AsyncTaskService {
         AsyncTask task = requireByTaskId(taskId);
         task.setStatus(AsyncTaskStatus.FAILED.name());
         task.setProgress(100);
-        task.setErrorMsg(trimError(errorMsg));
+        task.setErrorMsg(trimToLimit(errorMsg));
         task.setFinishedAt(LocalDateTime.now());
         mapper.updateById(task);
     }
@@ -71,6 +75,15 @@ public class AsyncTaskService {
     public AsyncTask getByTaskId(String taskId) {
         return mapper.selectOne(new LambdaQueryWrapper<AsyncTask>()
                 .eq(AsyncTask::getTaskId, taskId)
+                .last("LIMIT 1"));
+    }
+
+    private AsyncTask findActive(String taskType, String bizType, String bizId) {
+        return mapper.selectOne(new LambdaQueryWrapper<AsyncTask>()
+                .eq(AsyncTask::getTaskType, taskType)
+                .eq(AsyncTask::getBizType, bizType)
+                .eq(AsyncTask::getBizId, bizId)
+                .in(AsyncTask::getStatus, AsyncTaskStatus.QUEUED.name(), AsyncTaskStatus.RUNNING.name())
                 .last("LIMIT 1"));
     }
 
@@ -87,10 +100,10 @@ public class AsyncTaskService {
                 + UUID.randomUUID().toString().replace("-", "");
     }
 
-    private String trimError(String errorMsg) {
-        if (errorMsg == null || errorMsg.length() <= ERROR_MSG_LIMIT) {
-            return errorMsg;
+    private String trimToLimit(String value) {
+        if (value == null || value.length() <= TEXT_LIMIT) {
+            return value;
         }
-        return errorMsg.substring(0, ERROR_MSG_LIMIT);
+        return value.substring(0, TEXT_LIMIT);
     }
 }

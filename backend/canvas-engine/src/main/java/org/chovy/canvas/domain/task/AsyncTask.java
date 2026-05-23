@@ -1,6 +1,7 @@
 package org.chovy.canvas.domain.task;
 
 import com.baomidou.mybatisplus.annotation.FieldFill;
+import com.baomidou.mybatisplus.annotation.FieldStrategy;
 import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
@@ -23,10 +24,14 @@ public class AsyncTask {
     private String title;
     private String status;
     private Integer progress;
+    @TableField(updateStrategy = FieldStrategy.ALWAYS)
     private String resultSummary;
+    @TableField(updateStrategy = FieldStrategy.ALWAYS)
     private String errorMsg;
     private String createdBy;
+    @TableField(updateStrategy = FieldStrategy.ALWAYS)
     private LocalDateTime startedAt;
+    @TableField(updateStrategy = FieldStrategy.ALWAYS)
     private LocalDateTime finishedAt;
 
     @TableField(fill = FieldFill.INSERT)

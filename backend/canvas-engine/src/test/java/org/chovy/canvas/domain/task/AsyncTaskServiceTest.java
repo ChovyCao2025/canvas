@@ -5,6 +5,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.dao.DuplicateKeyException;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -53,6 +54,22 @@ class AsyncTaskServiceTest {
     }
 
     @Test
+    void createOrReuseRunningTask_returnsExistingWhenConcurrentInsertWins() {
+        AsyncTask existing = new AsyncTask();
+        existing.setTaskId("task_existing");
+        existing.setStatus(AsyncTaskStatus.RUNNING.name());
+        when(mapper.selectOne(any())).thenReturn(null, existing);
+        when(mapper.insert(any(AsyncTask.class))).thenThrow(new DuplicateKeyException("duplicate active task"));
+        AsyncTaskService service = new AsyncTaskService(mapper);
+
+        AsyncTaskCreateResult result = service.createOrReuseRunning(
+                "AUDIENCE_COMPUTE", "AUDIENCE", "7", "计算人群：VIP", "operator");
+
+        assertThat(result.created()).isFalse();
+        assertThat(result.task()).isSameAs(existing);
+    }
+
+    @Test
     void markSucceeded_setsFinishedFields() {
         AsyncTask task = new AsyncTask();
         task.setTaskId("task_1");
@@ -65,6 +82,19 @@ class AsyncTaskServiceTest {
         assertThat(task.getProgress()).isEqualTo(100);
         assertThat(task.getResultSummary()).isEqualTo("{\"estimatedSize\":12}");
         assertThat(task.getFinishedAt()).isNotNull();
+        verify(mapper).updateById(task);
+    }
+
+    @Test
+    void markSucceeded_trimsResultSummaryToColumnLimit() {
+        AsyncTask task = new AsyncTask();
+        task.setTaskId("task_1");
+        when(mapper.selectOne(any())).thenReturn(task);
+        AsyncTaskService service = new AsyncTaskService(mapper);
+
+        service.markSucceeded("task_1", "x".repeat(1001));
+
+        assertThat(task.getResultSummary()).hasSize(1000);
         verify(mapper).updateById(task);
     }
 
