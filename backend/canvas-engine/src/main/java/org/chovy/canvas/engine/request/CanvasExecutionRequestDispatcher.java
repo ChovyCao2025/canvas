@@ -61,49 +61,6 @@ public class CanvasExecutionRequestDispatcher {
         this.adaptiveHighPriorityCanvasBonus = Math.max(0, adaptiveHighPriorityCanvasBonus);
     }
 
-    public CanvasExecutionRequestDispatcher(CanvasExecutionRequestMapper mapper,
-                                            CanvasDisruptorService disruptorService,
-                                            int batchSize,
-                                            long runningStaleSeconds) {
-        this(mapper, disruptorService, null, batchSize, runningStaleSeconds, 0);
-    }
-
-    public CanvasExecutionRequestDispatcher(CanvasExecutionRequestMapper mapper,
-                                            CanvasDisruptorService disruptorService,
-                                            int batchSize,
-                                            long runningStaleSeconds,
-                                            int perCanvasBatchLimit) {
-        this(mapper, disruptorService, null, new TriggerPriorityConfig(),
-                batchSize, runningStaleSeconds, perCanvasBatchLimit,
-                true, 2, 50, 1, 2);
-    }
-
-    public CanvasExecutionRequestDispatcher(CanvasExecutionRequestMapper mapper,
-                                            CanvasDisruptorService disruptorService,
-                                            CanvasMetrics metrics,
-                                            TriggerPriorityConfig priorityConfig,
-                                            int batchSize,
-                                            long runningStaleSeconds,
-                                            int perCanvasBatchLimit,
-                                            boolean adaptivePerCanvasLimitEnabled,
-                                            int adaptiveHotCanvasThresholdMultiplier,
-                                            int adaptiveHotCanvasReductionPercent,
-                                            int adaptiveIdleCanvasBonus,
-                                            int adaptiveHighPriorityCanvasBonus) {
-        this.mapper = mapper;
-        this.disruptorService = disruptorService;
-        this.metrics = metrics;
-        this.priorityConfig = priorityConfig;
-        this.batchSize = batchSize;
-        this.runningStaleSeconds = runningStaleSeconds;
-        this.perCanvasBatchLimit = normalizePerCanvasLimit(perCanvasBatchLimit);
-        this.adaptivePerCanvasLimitEnabled = adaptivePerCanvasLimitEnabled;
-        this.adaptiveHotCanvasThresholdMultiplier = Math.max(1, adaptiveHotCanvasThresholdMultiplier);
-        this.adaptiveHotCanvasReductionPercent = Math.max(1, Math.min(100, adaptiveHotCanvasReductionPercent));
-        this.adaptiveIdleCanvasBonus = Math.max(0, adaptiveIdleCanvasBonus);
-        this.adaptiveHighPriorityCanvasBonus = Math.max(0, adaptiveHighPriorityCanvasBonus);
-    }
-
     @Scheduled(fixedDelayString = "${canvas.execution-request.dispatch-fixed-delay-ms:1000}")
     public void dispatchDueRequests() {
         LocalDateTime now = LocalDateTime.now();

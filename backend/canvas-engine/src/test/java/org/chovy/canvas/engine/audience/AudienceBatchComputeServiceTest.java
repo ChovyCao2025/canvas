@@ -46,7 +46,8 @@ class AudienceBatchComputeServiceTest {
                 redis,
                 new ObjectMapper(),
                 mock(SqlWhereGenerator.class),
-                mock(AudienceEvaluationContextFetcher.class)
+                mock(AudienceEvaluationContextFetcher.class),
+                mock(JdbcConfigResolver.class)
         );
 
         AudienceComputeResult result = service.compute(
@@ -54,7 +55,8 @@ class AudienceBatchComputeServiceTest {
                 "perf_20260523_001",
                 "perf_20260523_001:audience:1");
 
-        assertThat(result.ready()).isFalse();
+        assertThat(result.success()).isFalse();
+        assertThat(result.status()).isEqualTo("FAILED");
         var runCaptor = org.mockito.ArgumentCaptor.forClass(AudienceComputeRun.class);
         verify(computeRunMapper).updateById(runCaptor.capture());
         assertThat(runCaptor.getValue().getStatus()).isEqualTo("SKIPPED_LOCK");

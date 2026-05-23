@@ -1,4 +1,4 @@
--- V49: CDP core user profile, tag instances, tag history, batch tagging, and tag write node
+-- V74: CDP core user profile, tag instances, tag history, batch tagging, and tag write node
 
 ALTER TABLE tag_definition
     ADD COLUMN value_type VARCHAR(20) NOT NULL DEFAULT 'STRING' COMMENT 'STRING/NUMBER/BOOLEAN/JSON',
