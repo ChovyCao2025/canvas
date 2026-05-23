@@ -5,6 +5,7 @@ import {
   ExperimentOutlined, TeamOutlined, LogoutOutlined,
   UserOutlined, MenuFoldOutlined, MenuUnfoldOutlined,
   RocketOutlined, HomeOutlined, TagsOutlined, NotificationOutlined, ThunderboltOutlined,
+  BookOutlined,
 } from '@ant-design/icons'
 import { Outlet, useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
@@ -40,11 +41,13 @@ export default function AppLayout() {
     if (location.pathname.startsWith('/audiences'))      return 'audiences'
     if (location.pathname.startsWith('/mq-config'))      return 'mq-config'
     if (location.pathname.startsWith('/event-config'))   return 'event-config'
+    if (location.pathname.startsWith('/api-docs'))       return 'api-docs'
     if (location.pathname.startsWith('/admin/users'))    return 'admin-users'
     return 'canvas'
   })()
 
   const defaultOpenKeys = (() => {
+    if (selectedKey === 'api-docs') return ['developer']
     if (['api-config', 'ab-experiments', 'admin-users'].includes(selectedKey)) return ['marketing', 'settings']
     return ['marketing']
   })()
@@ -66,6 +69,19 @@ export default function AppLayout() {
           icon: <ApartmentOutlined />,
           label: '旅程管理',
           onClick: () => navigate('/canvas'),
+        },
+      ],
+    },
+    {
+      key: 'developer',
+      icon: <BookOutlined />,
+      label: '开发者文档',
+      children: [
+        {
+          key: 'api-docs',
+          icon: <ApiOutlined />,
+          label: 'API 说明',
+          onClick: () => navigate('/api-docs'),
         },
       ],
     },

@@ -15,6 +15,7 @@ import MqConfigPage from './pages/mq-config'
 import EventConfigPage from './pages/event-config'
 import AudienceListPage from './pages/audience-list'
 import AudienceEditPage from './pages/audience-edit'
+import ApiDocsPage from './pages/api-docs'
 
 export default function App() {
   return (
@@ -48,6 +49,7 @@ export default function App() {
               <Route path="/audiences/:id/edit" element={<AudienceEditPage />} />
               <Route path="/mq-config"      element={<MqConfigPage />} />
               <Route path="/event-config"   element={<EventConfigPage />} />
+              <Route path="/api-docs"       element={<ApiDocsPage />} />
             </Route>
           </Route>
         </Routes>
