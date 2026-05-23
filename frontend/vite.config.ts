@@ -10,6 +10,7 @@ export default defineConfig({
     port: 3000,
     proxy: {
       '/auth': { target: 'http://localhost:8080', changeOrigin: true },
+      '/admin': { target: 'http://localhost:8080', changeOrigin: true },
       '/meta':  { target: 'http://localhost:8080', changeOrigin: true },
       '/canvas': {
         target: 'http://localhost:8080',
@@ -25,4 +26,3 @@ export default defineConfig({
     },
   },
 })
-

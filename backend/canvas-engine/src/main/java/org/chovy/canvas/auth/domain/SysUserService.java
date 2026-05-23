@@ -2,15 +2,19 @@ package org.chovy.canvas.auth.domain;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import lombok.RequiredArgsConstructor;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Set;
 
 @Service
 @RequiredArgsConstructor
 public class SysUserService {
+
+    private static final Set<String> ALLOWED_ROLES = Set.of("ADMIN", "OPERATOR");
 
     private final SysUserMapper sysUserMapper;
     private final BCryptPasswordEncoder encoder;
@@ -37,13 +41,26 @@ public class SysUserService {
     }
 
     public SysUser create(String username, String rawPassword, String displayName, String role) {
+        String normalizedUsername = requireText(username, "用户名");
+        String normalizedDisplayName = requireText(displayName, "显示名");
+        String normalizedRole = requireRole(role);
+        requirePassword(rawPassword);
+
+        if (findByUsername(normalizedUsername) != null) {
+            throw new IllegalArgumentException("用户名已存在: " + normalizedUsername);
+        }
+
         SysUser user = new SysUser();
-        user.setUsername(username);
+        user.setUsername(normalizedUsername);
         user.setPassword(encoder.encode(rawPassword));
-        user.setDisplayName(displayName);
-        user.setRole(role);
+        user.setDisplayName(normalizedDisplayName);
+        user.setRole(normalizedRole);
         user.setEnabled(1);
-        sysUserMapper.insert(user);
+        try {
+            sysUserMapper.insert(user);
+        } catch (DuplicateKeyException e) {
+            throw new IllegalArgumentException("用户名已存在: " + normalizedUsername, e);
+        }
         return user;
     }
 
@@ -65,5 +82,26 @@ public class SysUserService {
 
     public boolean checkPassword(SysUser user, String rawPassword) {
         return encoder.matches(rawPassword, user.getPassword());
+    }
+
+    private String requireText(String value, String fieldName) {
+        if (value == null || value.isBlank()) {
+            throw new IllegalArgumentException(fieldName + "不能为空");
+        }
+        return value.trim();
+    }
+
+    private void requirePassword(String rawPassword) {
+        if (rawPassword == null || rawPassword.length() < 6) {
+            throw new IllegalArgumentException("密码长度不能少于 6 位");
+        }
+    }
+
+    private String requireRole(String role) {
+        String normalizedRole = requireText(role, "角色");
+        if (!ALLOWED_ROLES.contains(normalizedRole)) {
+            throw new IllegalArgumentException("角色只能是 ADMIN 或 OPERATOR");
+        }
+        return normalizedRole;
     }
 }

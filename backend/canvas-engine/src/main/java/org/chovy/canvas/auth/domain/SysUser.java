@@ -1,6 +1,7 @@
 package org.chovy.canvas.auth.domain;
 
 import com.baomidou.mybatisplus.annotation.*;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import lombok.Data;
 import java.time.LocalDateTime;
 
@@ -14,6 +15,7 @@ public class SysUser {
     private String username;
 
     /** BCrypt 加密密码，查询时不返回给前端 */
+    @JsonIgnore
     @TableField(select = false)
     private String password;
 
