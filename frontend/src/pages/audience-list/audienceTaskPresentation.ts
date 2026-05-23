@@ -1,11 +1,13 @@
 import type { AudienceStat } from '../../services/audienceApi'
 import type { AsyncTask, AsyncTaskStatus } from '../../services/taskApi'
 
+type AudienceTaskLike = Pick<AsyncTask, 'status'> & Partial<Pick<AsyncTask, 'taskId' | 'bizId'>>
+
 export function isTerminalTaskStatus(status: AsyncTaskStatus) {
   return status === 'SUCCEEDED' || status === 'FAILED' || status === 'CANCELED'
 }
 
-export function hasRunningAudienceTasks(tasks: Pick<AsyncTask, 'status'>[]) {
+export function hasRunningAudienceTasks(tasks: AudienceTaskLike[]) {
   return tasks.some(task => !isTerminalTaskStatus(task.status))
 }
 
