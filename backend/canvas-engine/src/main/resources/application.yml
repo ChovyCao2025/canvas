@@ -59,6 +59,9 @@ canvas:
     retry-max-delay-ms: 30000
   node:
     timeout-ms: 3000
+  mq:
+    topic: CANVAS_MQ_TRIGGER
+    consume-thread-number: ${CANVAS_MQ_CONSUME_THREAD:20}
   # Groovy 沙箱（12.9节，预编译缓存）
   groovy:
     timeout-ms: 5000
@@ -100,3 +103,12 @@ management:
 # canvas.execution.global-timeout-sec: 600
 # canvas.execution.max-retry: 3
 # canvas.groovy.timeout-ms: 5000
+
+rocketmq:
+  name-server: ${ROCKETMQ_NAME_SERVER:localhost:9876}
+  producer:
+    group: PID_CANVAS_ENGINE
+    send-message-timeout: 3000
+    retry-times-when-send-failed: 2
+  consumer:
+    group: GID_CANVAS_ENGINE

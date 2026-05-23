@@ -189,6 +189,8 @@ public class CanvasService {
             published.setCreatedBy(operator);
             canvasVersionMapper.insert(published);
 
+            clearPublishedExternalState(canvas);
+
             canvas.setStatus(CanvasStatusEnum.PUBLISHED.getCode());
             canvas.setPublishedVersionId(published.getId());
             canvasMapper.updateById(canvas);
@@ -424,6 +426,16 @@ public class CanvasService {
         CanvasVersion v = canvasVersionMapper.selectById(canvas.getPublishedVersionId());
         if (v == null) return;
         clearTriggerRoutesFromGraph(canvasId, dagParser.parse(v.getGraphJson()));
+    }
+
+    private void clearPublishedExternalState(Canvas canvas) {
+        if (canvas.getPublishedVersionId() == null) return;
+        CanvasVersion v = canvasVersionMapper.selectById(canvas.getPublishedVersionId());
+        if (v == null) return;
+        DagGraph graph = dagParser.parse(v.getGraphJson());
+        clearTriggerRoutesFromGraph(canvas.getId(), graph);
+        schedulerService.cancelScheduledTriggers(canvas.getId(), graph);
+        configCache.invalidate(canvas.getId(), canvas.getPublishedVersionId());
     }
 
     /**

@@ -15,6 +15,7 @@ import org.chovy.canvas.domain.execution.CanvasExecutionMapper;
 import org.chovy.canvas.engine.context.ExecutionContext;
 import org.chovy.canvas.engine.dag.DagGraph;
 import org.chovy.canvas.engine.dag.DagParser;
+import org.chovy.canvas.engine.handlers.MqTriggerHandler;
 import org.chovy.canvas.engine.scheduler.DagEngine;
 import org.chovy.canvas.infra.cache.CanvasEntityCache;
 import org.chovy.canvas.infra.cache.CanvasConfigCache;
@@ -49,6 +50,7 @@ public class CanvasExecutionService {
     private final InFlightExecutionRegistry executionRegistry;
     private final org.chovy.canvas.domain.execution.CanvasExecutionStatsMapper statsMapper;
     private final CanvasEntityCache canvasEntityCache;
+    private final MqTriggerHandler mqTriggerHandler;
 
     @Value("${canvas.execution.context-ttl-sec:86400}")
     private long ctxTtlSec;
@@ -390,7 +392,10 @@ public class CanvasExecutionService {
             Map<String, Object> cfg = new HashMap<>();
             if (node.getBizConfig() != null) cfg.putAll(node.getBizConfig());
             if (node.getConfig() != null) cfg.putAll(node.getConfig());
-            String cfgKey = (String) cfg.getOrDefault("eventCode", cfg.getOrDefault("topicKey", ""));
+            String cfgKey = switch (triggerNodeType) {
+                case NodeType.MQ_TRIGGER -> mqTriggerHandler.resolveTopic(cfg);
+                default -> (String) cfg.getOrDefault("eventCode", cfg.getOrDefault("topicKey", ""));
+            };
             if (matchKey.equals(cfgKey)) return nodeId;
         }
         return null;

@@ -35,6 +35,31 @@ services:
     volumes:
       - ./wiremock:/home/wiremock
 
+  rocketmq-namesrv:
+    image: apache/rocketmq:5.3.1
+    command: sh mqnamesrv
+    ports:
+      - "9876:9876"
+
+  rocketmq-broker:
+    image: apache/rocketmq:5.3.1
+    command: sh mqbroker -c /home/rocketmq/rocketmq-5.3.1/conf/broker.conf
+    environment:
+      - NAMESRV_ADDR=rocketmq-namesrv:9876
+      - JAVA_OPT_EXT=-Xms512m -Xmx512m
+    depends_on:
+      - rocketmq-namesrv
+    ports:
+      - "10909:10909"
+      - "10911:10911"
+      - "10912:10912"
+    volumes:
+      - ./rocketmq/broker.conf:/home/rocketmq/rocketmq-5.3.1/conf/broker.conf
+      - canvas-rocketmq-logs:/home/rocketmq/logs
+      - canvas-rocketmq-store:/home/rocketmq/store
+
 volumes:
   canvas-mysql-data:
   canvas-redis-data:
+  canvas-rocketmq-logs:
+  canvas-rocketmq-store:

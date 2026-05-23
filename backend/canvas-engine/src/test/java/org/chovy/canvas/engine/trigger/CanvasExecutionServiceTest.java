@@ -5,6 +5,7 @@ import org.chovy.canvas.domain.canvas.CanvasVersionMapper;
 import org.chovy.canvas.domain.execution.CanvasExecutionMapper;
 import org.chovy.canvas.domain.execution.CanvasExecutionStatsMapper;
 import org.chovy.canvas.engine.dag.DagParser;
+import org.chovy.canvas.engine.handlers.MqTriggerHandler;
 import org.chovy.canvas.engine.scheduler.DagEngine;
 import org.chovy.canvas.infra.cache.CanvasConfigCache;
 import org.chovy.canvas.infra.cache.CanvasEntityCache;
@@ -32,6 +33,7 @@ class CanvasExecutionServiceTest {
     @Mock InFlightExecutionRegistry executionRegistry;
     @Mock CanvasExecutionStatsMapper statsMapper;
     @Mock CanvasEntityCache canvasEntityCache;
+    @Mock MqTriggerHandler mqTriggerHandler;
 
     CanvasExecutionService sut;
 
@@ -48,7 +50,8 @@ class CanvasExecutionServiceTest {
                 preCheckService,
                 executionRegistry,
                 statsMapper,
-                canvasEntityCache
+                canvasEntityCache,
+                mqTriggerHandler
         );
         ReflectionTestUtils.setField(sut, "ctxTtlSec", 86400L);
         ReflectionTestUtils.setField(sut, "globalTimeoutSec", 600L);
