@@ -80,3 +80,9 @@ WHERE definition_row.data_source_type = 'JDBC'
   AND JSON_EXTRACT(definition_row.data_source_config, '$.url') IS NOT NULL
   AND JSON_EXTRACT(definition_row.data_source_config, '$.username') IS NOT NULL
   AND JSON_EXTRACT(definition_row.data_source_config, '$.password') IS NOT NULL;
+
+UPDATE audience_definition
+SET enabled = 0
+WHERE data_source_type = 'JDBC'
+  AND data_source_id IS NULL
+  AND data_source_config IS NOT NULL;
