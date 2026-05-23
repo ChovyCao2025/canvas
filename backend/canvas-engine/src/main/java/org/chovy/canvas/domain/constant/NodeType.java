@@ -89,6 +89,12 @@ public final class NodeType {
 
     /** 子流程引用（嵌套调用另一个画布） */
     public static final String SUB_FLOW_REF       = "SUB_FLOW_REF";
+    /** 产品化子流程节点 */
+    public static final String SUBFLOW            = "SUBFLOW";
+    /** UI 分组节点 */
+    public static final String GROUP              = "GROUP";
+    /** 模板占位节点 */
+    public static final String TEMPLATE_NODE      = "TEMPLATE_NODE";
     /** 发送应用内通知 */
     public static final String IN_APP_NOTIFY      = "IN_APP_NOTIFY";
     /** 发送 MQ 消息 */
