@@ -2,7 +2,7 @@ import { useEffect, useState, useCallback } from 'react'
 import type { Node } from '@xyflow/react'
 import {
   Form, Input, InputNumber, Select, Switch, Button,
-  Typography, Spin, Divider, Space, Tag, Tooltip, AutoComplete, DatePicker,
+  Typography, Spin, Space, Tag, Tooltip, AutoComplete, DatePicker,
 } from 'antd'
 import { PlusOutlined, DeleteOutlined, QuestionCircleOutlined } from '@ant-design/icons'
 import http, { metaApi, canvasApi } from '../../services/api'
@@ -53,6 +53,29 @@ function toSelectOptions(data: any[]): StubOption[] {
     key:   String(item.value ?? item.key ?? item.code ?? item.id ?? ''),
     label: String(item.label ?? item.name ?? item.displayName ?? item.value ?? ''),
   }))
+}
+
+function normalizeFieldOptions(field: SchemaField, options: Record<string, StubOption[]>) {
+  return (options[field.key] ?? field.options ?? []).map((option: any) => ({
+    label: String(option.label ?? option.option_name ?? option.name ?? option.displayName ?? option.value ?? option.key ?? ''),
+    value: option.key ?? option.value,
+  }))
+}
+
+function resolveDisplayValue(field: SchemaField, value: unknown, options: Record<string, StubOption[]>) {
+  if (value === undefined || value === null) return undefined
+
+  if (field.type === 'select' || field.type === 'radio') {
+    const normalizedOptions = normalizeFieldOptions(field, options)
+    const matchedOption = normalizedOptions.find((option) => option.value === value)
+    if (matchedOption?.label) return matchedOption.label
+
+    const stringValue = String(value)
+    const looseMatch = normalizedOptions.find((option) => String(option.value) === stringValue)
+    if (looseMatch?.label) return looseMatch.label
+  }
+
+  return typeof value === 'string' ? value : String(value)
 }
 
 export default function ConfigPanel({ nodeId, nodeData, onChange, nodes, readonly }: Props) {
@@ -169,70 +192,75 @@ export default function ConfigPanel({ nodeId, nodeData, onChange, nodes, readonl
     evaluateVisible(f.visible, formValues) &&
     evaluateVisible(f.showWhen, formValues)
   )
+  const displayValues = Object.fromEntries(
+    visibleFields.map((field) => [
+      field.key,
+      resolveDisplayValue(field, formValues[field.key], options),
+    ]),
+  )
   const presentation = buildConfigPanelPresentation({
     nodeData,
     formValues,
-    displayValues: {},
+    displayValues,
     fields: visibleFields.map(({ key, label, type }) => ({ key, label, type })),
     getNodeName,
   })
 
   return (
-    <div style={{ padding: '12px 12px 0', overflowY: 'auto', height: '100%' }}>
+    <div style={{ padding: '14px 14px 8px', overflowY: 'auto', height: '100%', background: '#f6f7f9' }}>
       {loading && <Spin size="small" style={{ display: 'block', marginBottom: 8 }} />}
+
       <NodeHeaderCard {...presentation.header} />
-      {!!presentation.summaryRows.length && (
-        <ConfigSectionCard title="配置摘要">
-          <div style={{ display: 'grid', gap: 10 }}>
-            {presentation.summaryRows.map((row) => (
-              <FieldSummaryRow key={row.label} label={row.label} value={row.value} />
-            ))}
-          </div>
-        </ConfigSectionCard>
-      )}
-      {!!presentation.branchRoutes.length && (
-        <ConfigSectionCard title="分支去向">
-          <div style={{ display: 'grid', gap: 10 }}>
-            {presentation.branchRoutes.map((route) => (
-              <BranchRouteCard
-                key={route.label}
-                label={route.label}
-                value={route.value}
-                tone={route.tone}
-              />
-            ))}
-          </div>
-        </ConfigSectionCard>
-      )}
-      <Divider style={{ margin: '8px 0 14px' }} />
 
       <Form form={form} layout="vertical" size="small" onValuesChange={handleValuesChange} disabled={readonly}>
-        <Form.Item name="name" label="节点名称" rules={[{ required: true }]}>
-          <Input />
-        </Form.Item>
+        {presentation.summaryRows.length > 0 && (
+          <ConfigSectionCard title="核心配置">
+            <div style={{ display: 'grid', gap: 10 }}>
+              {presentation.summaryRows.map((row) => (
+                <FieldSummaryRow key={row.label} label={row.label} value={row.value} />
+              ))}
+            </div>
+          </ConfigSectionCard>
+        )}
 
-        {visibleFields.map(field => {
-          // api-input-params / event-attr-preview 自己管理渲染，不能被外层 Form.Item 包住
-          if (field.type === 'api-input-params') {
-            return <ApiCallInputParams key={field.key} label={field.label}
-              apiKeyField={field.apiKeyField ?? 'apiKey'}
-              defsSource={field.defsSource ?? '/meta/api-definitions'} />
-          }
-          if (field.type === 'event-attr-preview') {
+        <ConfigSectionCard title="配置详情">
+          <Form.Item name="name" label="节点名称" rules={[{ required: true }]}>
+            <Input />
+          </Form.Item>
+
+          {visibleFields.map(field => {
+            // api-input-params / event-attr-preview 自己管理渲染，不能被外层 Form.Item 包住
+            if (field.type === 'api-input-params') {
+              return <ApiCallInputParams key={field.key} label={field.label}
+                apiKeyField={field.apiKeyField ?? 'apiKey'}
+                defsSource={field.defsSource ?? '/meta/api-definitions'} />
+            }
+            if (field.type === 'event-attr-preview') {
+              return (
+                <div key={field.key} style={{ marginBottom: 16 }}>
+                  <div style={{ fontSize: 12, color: '#595959', marginBottom: 6 }}>{field.label}</div>
+                  <EventAttrPreview />
+                </div>
+              )
+            }
             return (
-              <div key={field.key} style={{ marginBottom: 16 }}>
-                <div style={{ fontSize: 12, color: '#595959', marginBottom: 6 }}>{field.label}</div>
-                <EventAttrPreview />
-              </div>
+              <Form.Item key={field.key} name={field.key} label={field.label}
+                rules={field.required ? [{ required: true, message: `请填写${field.label}` }] : []}>
+                {renderControl(field, options, ctxFields, form, getNodeName, nodeData)}
+              </Form.Item>
             )
-          }
-          return (
-            <Form.Item key={field.key} name={field.key} label={field.label}
-              rules={field.required ? [{ required: true, message: `请填写${field.label}` }] : []}>
-              {renderControl(field, options, ctxFields, form, getNodeName, nodeData)}
-            </Form.Item>
-          )
-        })}
+          })}
+        </ConfigSectionCard>
+
+        {presentation.branchRoutes.length > 0 && (
+          <ConfigSectionCard title="分支结果">
+            <div style={{ display: 'grid', gap: 10 }}>
+              {presentation.branchRoutes.map((route) => (
+                <BranchRouteCard key={route.label} {...route} />
+              ))}
+            </div>
+          </ConfigSectionCard>
+        )}
       </Form>
     </div>
   )

@@ -80,6 +80,19 @@ describe('buildConfigPanelPresentation', () => {
     ])
   })
 
+  it('keeps the tagger supporting copy weak and non-interactive', () => {
+    const model = buildConfigPanelPresentation({
+      nodeData: taggerNode(),
+      formValues: { mode: 'audience' },
+      displayValues: { mode: '人群圈选' },
+      fields: [],
+      getNodeName: () => null,
+    })
+
+    expect(model.header.description).toBe('标签判断节点，根据圈选人群决定后续分支流向')
+    expect(model.header.metaBadges).toContain('Audience Segment')
+  })
+
   it('keeps non-tagger nodes on the default inspector path', () => {
     const model = buildConfigPanelPresentation({
       nodeData: {
