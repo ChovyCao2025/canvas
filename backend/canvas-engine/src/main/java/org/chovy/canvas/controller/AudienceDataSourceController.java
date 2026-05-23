@@ -55,7 +55,13 @@ public class AudienceDataSourceController {
     @PutMapping("/{id}")
     public Mono<R<AudienceDataSource>> update(@PathVariable Long id, @RequestBody AudienceDataSource body) {
         body.setId(id);
-        return Mono.fromCallable(() -> R.ok(mask(service.update(body))))
+        return Mono.fromCallable(() -> {
+            AudienceDataSource dataSource = service.update(body);
+            if (dataSource == null) {
+                throw new ResponseStatusException(NOT_FOUND, "Audience data source not found: " + id);
+            }
+            return R.ok(mask(dataSource));
+        })
                 .subscribeOn(Schedulers.boundedElastic());
     }
 

@@ -21,7 +21,7 @@ class AudienceDataSourceServiceTest {
 
     @Test
     void deleteRejectsWhenDefinitionReferencesDataSource() {
-        AudienceDataSourceMapper dataSourceMapper = dataSourceMapper(List.of(), 0);
+        AudienceDataSourceMapper dataSourceMapper = dataSourceMapper(List.of(), 0, 0, null);
         DefinitionMapperStub definitionMapper = definitionMapper(1L, List.of());
         AudienceDataSourceService service = new AudienceDataSourceService(dataSourceMapper, definitionMapper.mapper());
 
@@ -41,7 +41,7 @@ class AudienceDataSourceServiceTest {
         AudienceDataSource sourceTwo = new AudienceDataSource();
         sourceTwo.setId(12L);
         sourceTwo.setName("Other DS");
-        AudienceDataSourceMapper dataSourceMapper = dataSourceMapper(List.of(sourceOne, sourceTwo), 0);
+        AudienceDataSourceMapper dataSourceMapper = dataSourceMapper(List.of(sourceOne, sourceTwo), 0, 0, null);
         DefinitionMapperStub definitionMapper = definitionMapper(
                 0L,
                 List.of(definitionWithDataSourceId(9L), definitionWithDataSourceId(9L), definitionWithDataSourceId(12L))
@@ -55,13 +55,26 @@ class AudienceDataSourceServiceTest {
         assertJdbcDataSourceQuery(definitionMapper.listWrappers.getFirst(), List.of(9L, 12L));
     }
 
-    private AudienceDataSourceMapper dataSourceMapper(List<AudienceDataSource> dataSources, int deleteResult) {
+    @Test
+    void updateReturnsNullWhenDataSourceDoesNotExist() {
+        AudienceDataSource source = new AudienceDataSource();
+        source.setId(99L);
+        AudienceDataSourceMapper dataSourceMapper = dataSourceMapper(List.of(), 0, 0, null);
+        DefinitionMapperStub definitionMapper = definitionMapper(0L, List.of());
+        AudienceDataSourceService service = new AudienceDataSourceService(dataSourceMapper, definitionMapper.mapper());
+
+        assertThat(service.update(source)).isNull();
+    }
+
+    private AudienceDataSourceMapper dataSourceMapper(List<AudienceDataSource> dataSources, int deleteResult, int updateResult, AudienceDataSource selectedDataSource) {
         return (AudienceDataSourceMapper) Proxy.newProxyInstance(
                 AudienceDataSourceMapper.class.getClassLoader(),
                 new Class[]{AudienceDataSourceMapper.class},
                 (proxy, method, args) -> switch (method.getName()) {
                     case "selectList" -> dataSources;
                     case "deleteById" -> deleteResult;
+                    case "updateById" -> updateResult;
+                    case "selectById" -> selectedDataSource;
                     case "toString" -> "AudienceDataSourceMapperStub";
                     case "hashCode" -> System.identityHashCode(proxy);
                     case "equals" -> proxy == args[0];

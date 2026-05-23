@@ -42,7 +42,9 @@ public class AudienceDataSourceService {
     }
 
     public AudienceDataSource update(AudienceDataSource dataSource) {
-        dataSourceMapper.updateById(dataSource);
+        if (dataSourceMapper.updateById(dataSource) == 0) {
+            return null;
+        }
         return get(dataSource.getId());
     }
 
