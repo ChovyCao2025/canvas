@@ -10,17 +10,23 @@ import org.chovy.canvas.infra.cache.CanvasConfigCache;
 import jakarta.annotation.PreDestroy;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import reactor.core.Disposable;
+import reactor.core.Disposables;
+import reactor.core.publisher.Mono;
 import org.springframework.scheduling.TaskScheduler;
 import org.springframework.scheduling.annotation.EnableScheduling;
 import org.springframework.scheduling.support.CronTrigger;
 import org.springframework.stereotype.Service;
 
+import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * 画布定时调度服务（设计文档 18.1 节）。
@@ -59,6 +65,10 @@ public class CanvasSchedulerService {
 
     /** 已注册的调度任务（canvasId:nodeId → ScheduledFuture） */
     private final Map<String, ScheduledFuture<?>> activeTasks = new ConcurrentHashMap<>();
+    /** 等待 jitter 后触发的回调（canvasId:nodeId → pending subscriptions） */
+    private final Map<String, PendingJitterGroup> pendingJitterTasks = new ConcurrentHashMap<>();
+    private final Object lifecycleLock = new Object();
+    private boolean closed;
 
     // ── 注册 ─────────────────────────────────────────────────────
 
@@ -74,23 +84,35 @@ public class CanvasSchedulerService {
             String taskKey = canvasId + ":" + nodeId;
             cancelTask(taskKey);
 
-            Runnable job = () -> triggerForAllUsers(canvasId, nodeId, cfg);
-
             String cronExpr       = (String) cfg.get("cronExpression");
             String triggerTimeStr = (String) cfg.get("triggerTime");
             String timezone       = (String) cfg.getOrDefault("timezone", "Asia/Shanghai");
 
             if (cronExpr != null && !cronExpr.isBlank()) {
-                ScheduledFuture<?> future = taskScheduler.schedule(
-                        job, new CronTrigger(cronExpr, TimeZone.getTimeZone(timezone)));
-                activeTasks.put(taskKey, future);
-                log.info("[SCHEDULER] 注册 CRON 任务 canvasId={} nodeId={} cron={}", canvasId, nodeId, cronExpr);
+                ScheduleInstallResult result = installSchedule(taskKey,
+                        group -> taskScheduler.schedule(
+                                () -> triggerForAllUsers(canvasId, nodeId, cfg, group),
+                                new CronTrigger(cronExpr, TimeZone.getTimeZone(timezone))));
+                if (activateSchedule(taskKey, result.group(), result.future())) {
+                    log.info("[SCHEDULER] 注册 CRON 任务 canvasId={} nodeId={} cron={}", canvasId, nodeId, cronExpr);
+                }
             } else if (triggerTimeStr != null) {
-                LocalDateTime ldt = LocalDateTime.parse(triggerTimeStr);
-                Instant instant   = ldt.atZone(ZoneId.of("Asia/Shanghai")).toInstant();
-                ScheduledFuture<?> future = taskScheduler.schedule(job, instant);
-                activeTasks.put(taskKey, future);
-                log.info("[SCHEDULER] 注册 ONCE 任务 canvasId={} nodeId={} at={}", canvasId, nodeId, ldt);
+                ScheduleInstallResult result = installSchedule(taskKey, group -> {
+                    LocalDateTime ldt = LocalDateTime.parse(triggerTimeStr);
+                    Instant instant   = ldt.atZone(ZoneId.of("Asia/Shanghai")).toInstant();
+                    return taskScheduler.schedule(
+                            () -> {
+                                try {
+                                    triggerForAllUsers(canvasId, nodeId, cfg, group);
+                                } finally {
+                                    group.closeWhenIdle(() -> cleanupOneShotTask(taskKey, group));
+                                }
+                            }, instant);
+                });
+                if (activateSchedule(taskKey, result.group(), result.future())) {
+                    LocalDateTime ldt = LocalDateTime.parse(triggerTimeStr);
+                    log.info("[SCHEDULER] 注册 ONCE 任务 canvasId={} nodeId={} at={}", canvasId, nodeId, ldt);
+                }
             }
         }
     }
@@ -107,19 +129,36 @@ public class CanvasSchedulerService {
 
     @PreDestroy
     public void cancelAll() {
-        activeTasks.values().forEach(f -> f.cancel(false));
+        List<ScheduledFuture<?>> futures;
+        List<PendingJitterGroup> groups;
+        synchronized (lifecycleLock) {
+            closed = true;
+            futures = new ArrayList<>(activeTasks.values());
+            groups = new ArrayList<>(pendingJitterTasks.values());
+            groups.forEach(PendingJitterGroup::terminate);
+            activeTasks.clear();
+            pendingJitterTasks.clear();
+        }
+        futures.forEach(f -> f.cancel(false));
+        groups.forEach(PendingJitterGroup::dispose);
         log.info("[SCHEDULER] 所有定时任务已取消");
     }
 
     // ── 内部 ─────────────────────────────────────────────────────
 
-    private void cancelTask(String taskKey) {
-        ScheduledFuture<?> old = activeTasks.remove(taskKey);
-        if (old != null) old.cancel(false);
+    void cancelTask(String taskKey) {
+        PendingJitterGroup pending = null;
+        synchronized (lifecycleLock) {
+            ScheduledFuture<?> old = activeTasks.remove(taskKey);
+            if (old != null) old.cancel(false);
+            pending = pendingJitterTasks.remove(taskKey);
+            if (pending != null) pending.terminate();
+        }
+        if (pending != null) pending.dispose();
     }
 
     @SuppressWarnings("unchecked")
-    private void triggerForAllUsers(Long canvasId, String nodeId, Map<String, Object> cfg) {
+    private void triggerForAllUsers(Long canvasId, String nodeId, Map<String, Object> cfg, PendingJitterGroup group) {
         Map<String, Object> src = (Map<String, Object>) cfg.getOrDefault("userSource", Map.of());
         String sourceType       = (String) src.getOrDefault("type", "USER_LIST");
         List<String> userIds    = resolveUserIds(sourceType, src);
@@ -127,15 +166,128 @@ public class CanvasSchedulerService {
         log.info("[SCHEDULER] 定时触发 canvasId={} 用户数={}", canvasId, userIds.size());
 
         for (String userId : userIds) {
-            executionService.trigger(
-                    canvasId, userId, TriggerType.SCHEDULED,
-                    NodeType.SCHEDULED_TRIGGER, null,
-                    Map.of(), java.util.UUID.randomUUID().toString(), false)
-                    .subscribe(
-                            null,
-                            e -> log.warn("[SCHEDULER] 用户触发失败 userId={}: {}", userId, e.getMessage())
-                    );
+            scheduleTriggerWithJitter(group, canvasId, userId, calcJitter(jitterMaxMs));
         }
+    }
+
+    PendingJitterGroup createPendingJitterGroup(String taskKey) {
+        synchronized (lifecycleLock) {
+            if (closed) {
+                return null;
+            }
+            PendingJitterGroup group = new PendingJitterGroup(taskKey);
+            pendingJitterTasks.put(taskKey, group);
+            return group;
+        }
+    }
+
+    ScheduleInstallResult installSchedule(String taskKey, ScheduleInstaller installer) {
+        PendingJitterGroup group = createPendingJitterGroup(taskKey);
+        if (group == null) {
+            return new ScheduleInstallResult(null, null);
+        }
+        try {
+            ScheduledFuture<?> future = installer.install(group);
+            if (future == null) {
+                removePendingJitterGroup(taskKey, group);
+            }
+            return new ScheduleInstallResult(group, future);
+        } catch (RuntimeException e) {
+            removePendingJitterGroup(taskKey, group);
+            throw e;
+        }
+    }
+
+    boolean hasPendingJitterGroup(String taskKey) {
+        synchronized (lifecycleLock) {
+            return pendingJitterTasks.containsKey(taskKey);
+        }
+    }
+
+    boolean hasActiveTask(String taskKey) {
+        synchronized (lifecycleLock) {
+            return activeTasks.containsKey(taskKey);
+        }
+    }
+
+    boolean isCurrentPendingJitterGroup(String taskKey, PendingJitterGroup group) {
+        synchronized (lifecycleLock) {
+            return pendingJitterTasks.get(taskKey) == group;
+        }
+    }
+
+    boolean activateSchedule(String taskKey, PendingJitterGroup group, ScheduledFuture<?> future) {
+        if (group == null || future == null) {
+            return false;
+        }
+        synchronized (lifecycleLock) {
+            if (!closed && pendingJitterTasks.get(taskKey) == group) {
+                activeTasks.put(taskKey, future);
+                return true;
+            }
+        }
+        future.cancel(false);
+        return false;
+    }
+
+    void removePendingJitterGroup(String taskKey, PendingJitterGroup group) {
+        boolean removed = false;
+        synchronized (lifecycleLock) {
+            if (pendingJitterTasks.remove(taskKey, group)) {
+                group.terminate();
+                removed = true;
+            }
+        }
+        if (removed) group.dispose();
+    }
+
+    void cleanupOneShotTask(String taskKey, PendingJitterGroup group) {
+        boolean removed = false;
+        synchronized (lifecycleLock) {
+            if (pendingJitterTasks.remove(taskKey, group)) {
+                activeTasks.remove(taskKey);
+                group.terminate();
+                removed = true;
+            }
+        }
+        if (removed) group.dispose();
+    }
+
+    Disposable scheduleTriggerWithJitter(PendingJitterGroup group, Long canvasId, String userId, Duration jitter) {
+        if (jitter.isZero() || jitter.isNegative()) {
+            if (!group.canScheduleImmediate()) {
+                return Disposables.disposed();
+            }
+            dispatchScheduledTrigger(group, canvasId, userId);
+            return Disposables.disposed();
+        }
+
+        Disposable.Swap pending = Disposables.swap();
+        if (!group.add(pending)) {
+            return Disposables.disposed();
+        }
+
+        pending.update(Mono.delay(jitter)
+                .doFinally(signalType -> group.remove(pending))
+                .subscribe(
+                        ignored -> dispatchScheduledTrigger(group, canvasId, userId),
+                        e -> log.warn("[SCHEDULER] jitter 调度失败 taskKey={} userId={}: {}", group.taskKey, userId, e.getMessage())
+                ));
+        return pending;
+    }
+
+    void dispatchScheduledTrigger(PendingJitterGroup group, Long canvasId, String userId) {
+        if (group.isTerminated()) {
+            return;
+        }
+        executionService.trigger(
+                        canvasId, userId, TriggerType.SCHEDULED,
+                        NodeType.SCHEDULED_TRIGGER, null,
+                        Map.of(), java.util.UUID.randomUUID().toString(), false)
+                .subscribe(
+                        null,
+                        e -> log.warn("[SCHEDULER] 用户触发失败 userId={}: {}", userId, e.getMessage())
+                );
     }
 
     @SuppressWarnings("unchecked")
@@ -201,4 +353,91 @@ public class CanvasSchedulerService {
             }
         };
     }
+
+    /** 生成 [0, jitterMaxMs) 区间内的随机延迟；jitterMaxMs=0 时返回 ZERO。可静态调用，便于单测。 */
+    static Duration calcJitter(long jitterMaxMs) {
+        if (jitterMaxMs <= 0) return Duration.ZERO;
+        return Duration.ofMillis(java.util.concurrent.ThreadLocalRandom.current().nextLong(0, jitterMaxMs));
+    }
+
+    static final class PendingJitterGroup {
+        private final String taskKey;
+        private final Set<Disposable> pending = ConcurrentHashMap.newKeySet();
+        private final AtomicInteger size = new AtomicInteger();
+        private final AtomicBoolean closeWhenIdle = new AtomicBoolean(false);
+        private final AtomicBoolean terminated = new AtomicBoolean(false);
+        private final AtomicBoolean cleanupTriggered = new AtomicBoolean(false);
+        private volatile Runnable onIdle;
+
+        private PendingJitterGroup(String taskKey) {
+            this.taskKey = taskKey;
+        }
+
+        boolean add(Disposable disposable) {
+            if (terminated.get() || closeWhenIdle.get()) {
+                return false;
+            }
+            if (!pending.add(disposable)) {
+                return false;
+            }
+            size.incrementAndGet();
+            if (terminated.get() || closeWhenIdle.get()) {
+                if (pending.remove(disposable)) {
+                    size.decrementAndGet();
+                }
+                disposable.dispose();
+                return false;
+            }
+            return true;
+        }
+
+        void remove(Disposable disposable) {
+            if (pending.remove(disposable)) {
+                size.decrementAndGet();
+                cleanupIfIdle();
+            }
+        }
+
+        void closeWhenIdle(Runnable onIdle) {
+            this.onIdle = onIdle;
+            closeWhenIdle.set(true);
+            cleanupIfIdle();
+        }
+
+        private void cleanupIfIdle() {
+            Runnable cleanup = onIdle;
+            if (closeWhenIdle.get() && size.get() == 0 && cleanup != null
+                    && cleanupTriggered.compareAndSet(false, true)) {
+                cleanup.run();
+            }
+        }
+
+        void terminate() {
+            terminated.set(true);
+        }
+
+        boolean isTerminated() {
+            return terminated.get();
+        }
+
+        boolean canScheduleImmediate() {
+            return !terminated.get() && !closeWhenIdle.get();
+        }
+
+        void dispose() {
+            terminated.set(true);
+            for (Disposable disposable : pending) {
+                disposable.dispose();
+            }
+            pending.clear();
+            size.set(0);
+        }
+    }
+
+    @FunctionalInterface
+    interface ScheduleInstaller {
+        ScheduledFuture<?> install(PendingJitterGroup group);
+    }
+
+    record ScheduleInstallResult(PendingJitterGroup group, ScheduledFuture<?> future) {}
 }
