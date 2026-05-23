@@ -58,7 +58,8 @@ class CanvasServicePublishTest {
                 groovyHandler,
                 mqTriggerHandler,
                 redis,
-                canvasTransactionService
+                canvasTransactionService,
+                new CanvasExamplesProperties()
         );
         when(redis.opsForValue()).thenReturn(valueOperations);
         when(valueOperations.setIfAbsent(any(), any(), any(Duration.class))).thenReturn(true);

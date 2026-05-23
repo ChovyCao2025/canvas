@@ -10,11 +10,11 @@ describe('getBranchHandles', () => {
     expect(getBranchHandles('API_CALL', {})).toEqual([])
   })
 
-  it('IF_CONDITION returns fixed success+else handles', () => {
+  it('IF_CONDITION returns fixed success+fail handles', () => {
     const handles = getBranchHandles('IF_CONDITION', {})
     expect(handles).toHaveLength(2)
-    expect(handles[0].id).toBe('success')
-    expect(handles[1].id).toBe('else')
+    expect(handles[0]).toEqual({ id: 'success', label: '条件成立', color: '#52c41a' })
+    expect(handles[1]).toEqual({ id: 'fail', label: '否则', color: '#8c8c8c' })
   })
 
   it('MANUAL_APPROVAL returns approve+reject', () => {

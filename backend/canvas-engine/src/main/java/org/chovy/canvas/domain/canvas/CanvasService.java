@@ -51,6 +51,7 @@ public class CanvasService {
     private final org.chovy.canvas.engine.handlers.MqTriggerHandler mqTriggerHandler;
     private final org.springframework.data.redis.core.StringRedisTemplate redis;
     private final CanvasTransactionService canvasTransactionService;
+    private final CanvasExamplesProperties examplesProperties;
 
     /**
      * 创建画布
@@ -149,6 +150,7 @@ public class CanvasService {
         LambdaQueryWrapper<Canvas> wrapper = new LambdaQueryWrapper<Canvas>()
                 .eq(q.getStatus() != null, Canvas::getStatus, q.getStatus())
                 .ne(q.getStatus() == null, Canvas::getStatus, CanvasStatusEnum.ARCHIVED.getCode())
+                .eq(!examplesProperties.isEnabled(), Canvas::getIsExample, 0)
                 .like(q.getName() != null && !q.getName().isBlank(), Canvas::getName, q.getName())
                 .orderByDesc(Canvas::getCreatedAt);
 

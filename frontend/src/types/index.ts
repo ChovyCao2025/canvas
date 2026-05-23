@@ -53,6 +53,12 @@ export interface Canvas {
   /** 创建人。 */
   createdBy?: string
 
+  /** 是否官方示例画布。 */
+  isExample?: 0 | 1
+
+  /** 来源官方模板 key。 */
+  sourceTemplateKey?: string
+
   /** 创建时间。 */
   createdAt: string
 

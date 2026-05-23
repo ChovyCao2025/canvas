@@ -23,6 +23,27 @@ public class CanvasTemplate {
     /** 模板分类。 */
     private String category;
 
+    /** 官方模板稳定唯一键。 */
+    private String templateKey;
+
+    /** 公司类型。 */
+    private String companyType;
+
+    /** 营销场景。 */
+    private String marketingScenario;
+
+    /** 示例难度。 */
+    private String difficulty;
+
+    /** 覆盖的节点类型，逗号分隔。 */
+    private String coveredNodeTypes;
+
+    /** 官方模板排序。 */
+    private Integer sortOrder;
+
+    /** 模板是否启用：1=启用。 */
+    private Integer enabled;
+
     /** 模板图结构 JSON。 */
     private String graphJson;
 

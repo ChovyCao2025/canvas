@@ -25,7 +25,7 @@ Expected: no `UU` or `AA` entries before starting task work.
 ## File Structure
 
 Backend schema and models:
-- Create: `backend/canvas-engine/src/main/resources/db/migration/V49__canvas_example_library_schema.sql`
+- Create: `backend/canvas-engine/src/main/resources/db/migration/V54__canvas_example_library_schema.sql`
 - Modify: `backend/canvas-engine/src/main/java/org/chovy/canvas/domain/canvas/Canvas.java`
 - Modify: `backend/canvas-engine/src/main/java/org/chovy/canvas/domain/canvas/CanvasTemplate.java`
 
@@ -41,7 +41,7 @@ Backend service behavior:
 
 Backend template data:
 - Create: `backend/canvas-engine/scripts/generate-canvas-example-sql.mjs`
-- Create: `backend/canvas-engine/src/main/resources/db/migration/V50__canvas_example_templates.sql`
+- Create: `backend/canvas-engine/src/main/resources/db/migration/V55__canvas_example_templates.sql`
 
 Backend tests:
 - Create: `backend/canvas-engine/src/test/java/org/chovy/canvas/domain/canvas/CanvasExampleLibrarySchemaTest.java`
@@ -128,7 +128,7 @@ git commit -m "fix: align if branch handle with fail route"
 ### Task 2: Add Example Schema Migration and Entity Fields
 
 **Files:**
-- Create: `backend/canvas-engine/src/main/resources/db/migration/V49__canvas_example_library_schema.sql`
+- Create: `backend/canvas-engine/src/main/resources/db/migration/V54__canvas_example_library_schema.sql`
 - Modify: `backend/canvas-engine/src/main/java/org/chovy/canvas/domain/canvas/Canvas.java`
 - Modify: `backend/canvas-engine/src/main/java/org/chovy/canvas/domain/canvas/CanvasTemplate.java`
 - Create: `backend/canvas-engine/src/test/java/org/chovy/canvas/domain/canvas/CanvasExampleLibrarySchemaTest.java`
@@ -152,7 +152,7 @@ class CanvasExampleLibrarySchemaTest {
     @Test
     void migrationAddsTemplateAndCanvasExampleColumns() throws Exception {
         ClassPathResource migration =
-                new ClassPathResource("db/migration/V49__canvas_example_library_schema.sql");
+                new ClassPathResource("db/migration/V54__canvas_example_library_schema.sql");
 
         String sql = migration.getContentAsString(StandardCharsets.UTF_8);
 
@@ -178,14 +178,14 @@ cd backend/canvas-engine
 mvn -Dtest=CanvasExampleLibrarySchemaTest test
 ```
 
-Expected: FAIL because `V49__canvas_example_library_schema.sql` does not exist.
+Expected: FAIL because `V54__canvas_example_library_schema.sql` does not exist.
 
 - [ ] **Step 3: Add the migration**
 
-Create `backend/canvas-engine/src/main/resources/db/migration/V49__canvas_example_library_schema.sql`:
+Create `backend/canvas-engine/src/main/resources/db/migration/V54__canvas_example_library_schema.sql`:
 
 ```sql
--- V49: official canvas example library metadata.
+-- V54: official canvas example library metadata.
 
 ALTER TABLE canvas_template
   ADD COLUMN template_key VARCHAR(100) NULL COMMENT '官方模板稳定唯一键',
@@ -205,7 +205,7 @@ ALTER TABLE canvas
 UPDATE canvas
 SET is_example = 1
 WHERE name LIKE '示例：%'
-  AND (created_by = 'system' OR created_by IS NULL);
+  AND created_by = 'system';
 ```
 
 - [ ] **Step 4: Add entity fields**
@@ -244,7 +244,7 @@ Expected: PASS.
 - [ ] **Step 6: Commit**
 
 ```bash
-git add backend/canvas-engine/src/main/resources/db/migration/V49__canvas_example_library_schema.sql \
+git add backend/canvas-engine/src/main/resources/db/migration/V54__canvas_example_library_schema.sql \
   backend/canvas-engine/src/main/java/org/chovy/canvas/domain/canvas/Canvas.java \
   backend/canvas-engine/src/main/java/org/chovy/canvas/domain/canvas/CanvasTemplate.java \
   backend/canvas-engine/src/test/java/org/chovy/canvas/domain/canvas/CanvasExampleLibrarySchemaTest.java
@@ -984,7 +984,7 @@ git commit -m "fix: create draft canvases from templates"
 
 **Files:**
 - Create: `backend/canvas-engine/scripts/generate-canvas-example-sql.mjs`
-- Create: `backend/canvas-engine/src/main/resources/db/migration/V50__canvas_example_templates.sql`
+- Create: `backend/canvas-engine/src/main/resources/db/migration/V55__canvas_example_templates.sql`
 - Create: `backend/canvas-engine/src/test/java/org/chovy/canvas/domain/canvas/CanvasExampleTemplateMigrationTest.java`
 
 - [ ] **Step 1: Write migration content test**
@@ -1005,7 +1005,7 @@ class CanvasExampleTemplateMigrationTest {
 
     @Test
     void templateMigrationContainsAllOfficialTemplateKeys() throws Exception {
-        String sql = new ClassPathResource("db/migration/V50__canvas_example_templates.sql")
+        String sql = new ClassPathResource("db/migration/V55__canvas_example_templates.sql")
                 .getContentAsString(StandardCharsets.UTF_8);
 
         assertThat(sql).contains("INSERT INTO canvas_template");
@@ -1052,7 +1052,7 @@ cd backend/canvas-engine
 mvn -Dtest=CanvasExampleTemplateMigrationTest test
 ```
 
-Expected: FAIL because `V50__canvas_example_templates.sql` does not exist.
+Expected: FAIL because `V55__canvas_example_templates.sql` does not exist.
 
 - [ ] **Step 3: Add the SQL generator**
 
@@ -1062,7 +1062,7 @@ Create `backend/canvas-engine/scripts/generate-canvas-example-sql.mjs`:
 import fs from 'node:fs'
 import path from 'node:path'
 
-const out = path.resolve('src/main/resources/db/migration/V50__canvas_example_templates.sql')
+const out = path.resolve('src/main/resources/db/migration/V55__canvas_example_templates.sql')
 
 const templates = [
   ['component_event_if_coupon', '组件教学', '拉新转化', '入门', '示例：事件触发新客领券', 'EVENT_TRIGGER,IF_CONDITION,COUPON', 'event_if_coupon'],
@@ -1328,7 +1328,7 @@ const rows = templates.map((item, index) => {
   ].join(', ')})`
 })
 
-const sql = `-- V50: official canvas example templates.
+const sql = `-- V55: official canvas example templates.
 
 INSERT INTO canvas_template
   (template_key, name, description, category, graph_json, thumbnail,
@@ -1366,7 +1366,7 @@ cd backend/canvas-engine
 node scripts/generate-canvas-example-sql.mjs
 ```
 
-Expected: prints `Wrote 48 canvas example templates to ...V50__canvas_example_templates.sql`.
+Expected: prints `Wrote 48 canvas example templates to ...V55__canvas_example_templates.sql`.
 
 - [ ] **Step 5: Run the migration test**
 
@@ -1381,7 +1381,7 @@ Expected: PASS.
 
 ```bash
 git add backend/canvas-engine/scripts/generate-canvas-example-sql.mjs \
-  backend/canvas-engine/src/main/resources/db/migration/V50__canvas_example_templates.sql \
+  backend/canvas-engine/src/main/resources/db/migration/V55__canvas_example_templates.sql \
   backend/canvas-engine/src/test/java/org/chovy/canvas/domain/canvas/CanvasExampleTemplateMigrationTest.java
 git commit -m "feat: seed official canvas example templates"
 ```
@@ -1702,7 +1702,7 @@ Expected: both commands pass.
 - [ ] **Step 4: Inspect generated SQL count**
 
 ```bash
-rg -o "'[a-z0-9_]+'," backend/canvas-engine/src/main/resources/db/migration/V50__canvas_example_templates.sql | wc -l
+rg -o "'[a-z0-9_]+'," backend/canvas-engine/src/main/resources/db/migration/V55__canvas_example_templates.sql | wc -l
 ```
 
 Expected: output is at least `48`.

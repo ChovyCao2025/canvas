@@ -5,6 +5,7 @@ import org.chovy.canvas.domain.canvas.*;
 import org.chovy.canvas.domain.approval.*;
 import org.chovy.canvas.domain.constant.ApprovalStatus;
 import org.chovy.canvas.domain.constant.CanvasStatusEnum;
+import org.chovy.canvas.domain.constant.VersionStatus;
 import org.chovy.canvas.infra.cache.CanvasConfigCache;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import lombok.Data;
@@ -122,7 +123,17 @@ public class OpsController {
             canvas.setDescription(tpl.getDescription());
             canvas.setStatus(CanvasStatusEnum.DRAFT.getCode());
             canvas.setCreatedBy("current_user");
+            canvas.setIsExample(0);
+            canvas.setSourceTemplateKey(null);
             canvasMapper.insert(canvas);
+
+            CanvasVersion version = new CanvasVersion();
+            version.setCanvasId(canvas.getId());
+            version.setVersion(1);
+            version.setGraphJson(tpl.getGraphJson());
+            version.setStatus(VersionStatus.DRAFT.getCode());
+            version.setCreatedBy("current_user");
+            canvasVersionMapper.insert(version);
 
             // 更新模板使用次数
             tpl.setUseCount(tpl.getUseCount() + 1);

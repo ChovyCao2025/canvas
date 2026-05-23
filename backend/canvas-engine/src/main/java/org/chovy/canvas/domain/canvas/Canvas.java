@@ -35,6 +35,12 @@ public class Canvas {
     /** 创建人 */
     private String createdBy;
 
+    /** 1=官方示例画布，受 canvas.examples.enabled 控制展示 */
+    private Integer isExample;
+
+    /** 来源官方模板 key，用于启动导入幂等判断 */
+    private String sourceTemplateKey;
+
     // ── 执行约束（V3）────────────────────────────────────────────────
 
     /** 画布有效期开始时间，null 表示不限制 */

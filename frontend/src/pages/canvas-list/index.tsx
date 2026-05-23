@@ -146,9 +146,12 @@ export default function CanvasListPage() {
       title: '名称',
       dataIndex: 'name',
       render: (name, record) => (
-        <Button type="link" onClick={() => navigate(`/canvas/${record.id}/edit`)}>
-          {name}
-        </Button>
+        <Space size={6}>
+          <Button type="link" onClick={() => navigate(`/canvas/${record.id}/edit`)}>
+            {name}
+          </Button>
+          {record.isExample === 1 && <Tag color="blue">示例</Tag>}
+        </Space>
       ),
     },
     { title: '描述', dataIndex: 'description', ellipsis: true },

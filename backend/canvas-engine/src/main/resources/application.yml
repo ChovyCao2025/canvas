@@ -46,6 +46,8 @@ server:
   port: 8080
 
 canvas:
+  examples:
+    enabled: ${CANVAS_EXAMPLES_ENABLED:true}
   jwt:
     secret: canvas-engine-jwt-secret-key-must-be-at-least-256-bits-long
     expiry-hours: 24
@@ -110,8 +112,6 @@ canvas:
     tagger-service-url: http://localhost:8099/mock/tagger
     reach-platform-url: http://localhost:8099/mock/reach
     api-call-base-url: http://localhost:8099/mock/api
-  examples:
-    enabled: ${CANVAS_EXAMPLES_ENABLED:true}
 
 springdoc:
   api-docs:
