@@ -29,6 +29,8 @@ export interface Canvas {
   canaryVersionId?: number
   canaryPercent?: number
   createdBy?: string
+  isExample?: 0 | 1
+  sourceTemplateKey?: string
   createdAt: string
   updatedAt: string
   triggerType?:    string
