@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Button, Card, Empty, Input, Space, Switch, Table, Tag, Tooltip, Typography, message } from 'antd'
 import { CopyOutlined, SearchOutlined } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
@@ -48,8 +48,16 @@ function CodeExample({ title, value }: { title: string; value: unknown }) {
   const code = formatJsonExample(value)
 
   const copyCode = async () => {
-    await navigator.clipboard.writeText(code)
-    message.success('已复制')
+    try {
+      if (!navigator.clipboard?.writeText) {
+        throw new Error('Clipboard API is unavailable')
+      }
+
+      await navigator.clipboard.writeText(code)
+      message.success('已复制')
+    } catch {
+      message.error('复制失败')
+    }
   }
 
   return (
@@ -147,6 +155,13 @@ export default function ApiDocsPage() {
   )
 
   const selectedCategory = categorySummaries.some(summary => summary.key === category) ? category : undefined
+
+  useEffect(() => {
+    if (category && !selectedCategory) {
+      setCategory(undefined)
+    }
+  }, [category, selectedCategory])
+
   const endpoints = useMemo(() => filterApiDocEndpoints({
     showInternal,
     keyword,
