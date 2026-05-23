@@ -27,12 +27,13 @@
 | Docker | 24+ | 本地依赖容器化 |
 | MySQL | **8.0** | 生产建议 8.0.35+ |
 | Redis | **7** | 支持 ReactiveRedis + Pub/Sub |
+| RocketMQ | **5.x** | 本地通过 `docker-compose.local.yml` 启动 |
 
 ---
 
 ## 2. 本地开发启动
 
-### 2.1 启动基础依赖（MySQL + Redis + WireMock）
+### 2.1 启动基础依赖（MySQL + Redis + WireMock + RocketMQ）
 
 ```bash
 # 在项目根目录
@@ -47,6 +48,11 @@ docker compose -f docker-compose.local.yml ps
 | MySQL 8.0 | 3306 | 数据库，自动创建 `canvas_db` |
 | Redis 7 | 6379 | 缓存 + 路由表 + ctx 持久化 |
 | WireMock | 8099 | Mock 外部系统（券系统 / Tagger / 触达平台） |
+| RocketMQ Namesrv | 9876 | MQ 触发消费、SEND_MQ 节点发送 |
+| RocketMQ Broker | 10909 / 10911 / 10912 | 本地 broker，自动创建 topic |
+
+后端默认使用 `ROCKETMQ_NAME_SERVER=localhost:9876`。如果只启动 MySQL/Redis/WireMock，
+`MqTriggerConsumer` 会在启动阶段连接 RocketMQ 失败，导致后端退出。
 
 ### 2.2 启动后端
 
@@ -347,6 +353,7 @@ Flyway 在**服务启动时自动执行**，无需手动操作。
 |--------|--------|------|
 | `SPRING_DATASOURCE_URL` | localhost:3306/canvas_db | MySQL 连接串 |
 | `SPRING_DATA_REDIS_HOST` | localhost | Redis 主机 |
+| `ROCKETMQ_NAME_SERVER` | localhost:9876 | RocketMQ namesrv 地址 |
 | `CANVAS_JWT_SECRET` | （内置，需替换）| JWT 签名密钥，**生产必须更换** |
 | `CANVAS_JWT_EXPIRY_HOURS` | 24 | Token 有效期（小时） |
 | `CANVAS_EXECUTION_GLOBAL_TIMEOUT_SEC` | 600 | 单次执行超时（秒） |
@@ -410,7 +417,8 @@ canvas/
 │       └── services/api.ts         所有 API 调用封装
 │
 ├── wiremock/mappings/              本地 Mock 外部系统响应
-├── docker-compose.local.yml        本地依赖（MySQL + Redis + WireMock）
+├── rocketmq/broker.conf            本地 RocketMQ broker 配置
+├── docker-compose.local.yml        本地依赖（MySQL + Redis + WireMock + RocketMQ）
 ├── BLUEPRINT.md                    技术蓝图与开发计划（15 个 Phase）
 └── README.md                       本文件
 ```
@@ -425,6 +433,20 @@ canvas/
 ```bash
 docker compose -f docker-compose.local.yml ps
 # 确认 canvas-mysql 状态为 Up
+```
+
+### Q: 启动报错 `RocketMQMessageListenerBeanPostProcessor` 或 `RemotingConnectException`
+
+后端默认会启动 MQ 触发消费者，必须先启动本地 RocketMQ：
+```bash
+docker compose -f docker-compose.local.yml up -d rocketmq-namesrv rocketmq-broker
+docker compose -f docker-compose.local.yml ps
+```
+
+确认 `rocketmq-namesrv` 和 `rocketmq-broker` 为 running，且 `9876`、`10911` 端口未被其他进程占用。
+如果连接外部 RocketMQ，设置：
+```bash
+ROCKETMQ_NAME_SERVER=your-rocketmq-host:9876 mvn spring-boot:run
 ```
 
 ### Q: Flyway 报错 `Found non-empty schema(s) ... without schema history table`

@@ -1,7 +1,6 @@
-version: '3.8'
-
 # 本地开发依赖（设计文档附录 D）
 # 启动：docker compose -f docker-compose.local.yml up -d
+# 后端默认依赖 RocketMQ：rocketmq.name-server=localhost:9876
 
 services:
   mysql:
@@ -41,6 +40,20 @@ services:
     ports:
       - "9876:9876"
 
+  # 官方镜像中的 broker 以 uid=3000(rocketmq) 运行；named volume 初始为 root:root。
+  # 启动 broker 前先修正 logs/store 权限，避免 broker 初始化持久化目录失败。
+  rocketmq-init:
+    image: apache/rocketmq:5.3.1
+    user: root
+    command: >
+      sh -c "mkdir -p /home/rocketmq/logs /home/rocketmq/store
+      && chown -R 3000:3000 /home/rocketmq/logs /home/rocketmq/store"
+    volumes:
+      - canvas-rocketmq-logs:/home/rocketmq/logs
+      - canvas-rocketmq-store:/home/rocketmq/store
+
+  # RocketMQ：MQ 触发消费和 SEND_MQ 节点发送都依赖本地 namesrv/broker。
+  # brokerIP1=127.0.0.1 写在 rocketmq/broker.conf，保证宿主机后端能连到 10911。
   rocketmq-broker:
     image: apache/rocketmq:5.3.1
     command: sh mqbroker -c /home/rocketmq/rocketmq-5.3.1/conf/broker.conf
@@ -48,7 +61,10 @@ services:
       - NAMESRV_ADDR=rocketmq-namesrv:9876
       - JAVA_OPT_EXT=-Xms512m -Xmx512m
     depends_on:
-      - rocketmq-namesrv
+      rocketmq-namesrv:
+        condition: service_started
+      rocketmq-init:
+        condition: service_completed_successfully
     ports:
       - "10909:10909"
       - "10911:10911"

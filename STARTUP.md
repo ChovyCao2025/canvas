@@ -10,7 +10,7 @@ node --version    # 需要 Node 18+
 docker --version  # 需要 Docker 24+
 ```
 
-## 1. 启动依赖（MySQL + Redis + WireMock）
+## 1. 启动依赖（MySQL + Redis + WireMock + RocketMQ）
 
 ```bash
 cd /Users/photonpay/project/canvas
@@ -20,8 +20,11 @@ docker compose -f docker-compose.local.yml up -d
 确认启动：
 ```bash
 docker compose -f docker-compose.local.yml ps
-# 预期：canvas-mysql、canvas-redis、canvas-wiremock 均为 running
+# 预期：mysql、redis、wiremock、rocketmq-namesrv、rocketmq-broker 均为 running
 ```
+
+后端默认连接 `ROCKETMQ_NAME_SERVER=localhost:9876`。如果 `rocketmq-broker` 未启动，
+`MqTriggerConsumer` 会在 Spring Boot 启动阶段连接 RocketMQ 失败并退出。
 
 ## 2. 建库
 
@@ -67,9 +70,10 @@ docker compose -f docker-compose.local.yml down
 ## 环境变量（覆盖默认值）
 
 ```bash
-# 后端连接外部 MySQL/Redis
+# 后端连接外部 MySQL/Redis/RocketMQ
 SPRING_DATASOURCE_URL="jdbc:mysql://host:3306/canvas_db?..." \
 SPRING_DATA_REDIS_HOST=host \
+ROCKETMQ_NAME_SERVER=host:9876 \
 CANVAS_JWT_SECRET=your-secret \
 mvn spring-boot:run
 ```
