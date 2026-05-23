@@ -2,6 +2,9 @@ package org.chovy.canvas.engine.handler;
 
 import org.junit.jupiter.api.Test;
 
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -45,5 +48,30 @@ class NodeResultV2Test {
         assertThat(result.outcome()).isEqualTo(NodeOutcome.SKIPPED);
         assertThat(result.routes()).containsEntry("skipped", "after_skip");
         assertThat(result.success()).isTrue();
+    }
+
+    @Test
+    void multiNext_preserves_branch_named_else_and_adds_fallback_route() {
+        Map<String, String> branchMap = new LinkedHashMap<>();
+        branchMap.put("vip", "vip_node");
+        branchMap.put("else", "business_else_node");
+
+        NodeResult result = NodeResult.multiNext(branchMap, "fallback_else_node");
+
+        assertThat(result.routes()).containsEntry("else", "business_else_node");
+        assertThat(result.routes()).containsEntry("__else", "fallback_else_node");
+    }
+
+    @Test
+    void multiNext_preserves_branch_insertion_order_before_fallback_route() {
+        Map<String, String> branchMap = new LinkedHashMap<>();
+        branchMap.put("first", "first_node");
+        branchMap.put("else", "business_else_node");
+        branchMap.put("second", "second_node");
+
+        NodeResult result = NodeResult.multiNext(branchMap, "fallback_else_node");
+
+        assertThat(new ArrayList<>(result.routes().keySet()))
+                .isEqualTo(List.of("first", "else", "second", "__else"));
     }
 }

@@ -1,5 +1,6 @@
 package org.chovy.canvas.engine.handler;
 
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
@@ -90,9 +91,9 @@ public record NodeResult(
             });
         }
         if (!isBlank(elseNodeId)) {
-            routes.put("else", elseNodeId);
+            routes.put("__else", elseNodeId);
         }
-        return Map.copyOf(routes);
+        return Collections.unmodifiableMap(new LinkedHashMap<>(routes));
     }
 
     private static boolean isBlank(String value) {
