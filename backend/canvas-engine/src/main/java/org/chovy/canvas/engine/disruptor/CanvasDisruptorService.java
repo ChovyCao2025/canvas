@@ -94,13 +94,18 @@ public class CanvasDisruptorService {
 
     /**
      * 发布触发事件到 Ring Buffer（设计文档 12.8节）。
-     * 非阻塞，当 Ring Buffer 满时 next() 自旋等待（YieldingWaitStrategy）。
+     * 非阻塞，当 Ring Buffer 满时快速失败，调用方可触发上游重试/限流。
      * 仅用于异步触发（MQ / 行为 / 定时），直调触发绕过 Disruptor 直接执行。
      */
     public void publish(Long canvasId, String userId, String triggerType,
                         String triggerNodeType, String matchKey,
                         Map<String, Object> payload, String msgId) {
-        long sequence = ringBuffer.next();
+        long sequence;
+        try {
+            sequence = ringBuffer.tryNext();
+        } catch (InsufficientCapacityException e) {
+            throw new IllegalStateException("Disruptor Ring Buffer is full", e);
+        }
         try {
             CanvasExecutionEvent event = ringBuffer.get(sequence);
             event.canvasId = canvasId;
