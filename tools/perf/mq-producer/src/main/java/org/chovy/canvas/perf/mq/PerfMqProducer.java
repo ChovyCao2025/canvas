@@ -6,6 +6,7 @@ import org.apache.rocketmq.common.message.Message;
 import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Set;
 
 public class PerfMqProducer {
     private static final String DEFAULT_NAME_SERVER = "localhost:9876";
@@ -13,29 +14,41 @@ public class PerfMqProducer {
     private static final String DEFAULT_TAG = "PERF_MQ";
     private static final int DEFAULT_COUNT = 1000;
     private static final int DEFAULT_USER_MODULO = 1000;
+    private static final Set<String> ARG_NAMES = Set.of(
+            "--name-server",
+            "--topic",
+            "--tag",
+            "--perf-run-id",
+            "--count",
+            "--user-modulo");
 
     public static void main(String[] args) throws Exception {
         Config config = Config.fromArgs(args);
+        run(config, RocketMqProducerClient::new);
+    }
+
+    static int run(Config config, ProducerFactory producerFactory) throws Exception {
         if (!config.shouldSend()) {
-            return;
+            return 0;
         }
 
-        DefaultMQProducer producer = new DefaultMQProducer("PID_CANVAS_PERF");
-        producer.setNamesrvAddr(config.nameServer());
+        ProducerClient producer = producerFactory.create(config.nameServer());
+        int sent = 0;
         try {
             producer.start();
             for (int seq : sequences(config.count())) {
                 String userId = "perf_user_" + (seq % config.userModulo());
-                Message message = new Message(
+                producer.send(
                         config.topic(),
                         config.tag(),
                         sourceMsgId(config.perfRunId(), seq),
                         messageBody(config.perfRunId(), userId, seq).getBytes(StandardCharsets.UTF_8));
-                producer.send(message);
+                sent++;
             }
         } finally {
-            producer.shutdown();
+            producer.close();
         }
+        return sent;
     }
 
     static String sourceMsgId(String perfRunId, int seq) {
@@ -66,6 +79,9 @@ public class PerfMqProducer {
             String key = args[i];
             if (!key.startsWith("--")) {
                 throw new IllegalArgumentException("Unexpected argument: " + key);
+            }
+            if (!ARG_NAMES.contains(key)) {
+                throw new IllegalArgumentException("Unknown argument: " + key);
             }
             if (i + 1 >= args.length || args[i + 1].startsWith("--")) {
                 throw new IllegalArgumentException("Missing value for " + key);
@@ -145,6 +161,43 @@ public class PerfMqProducer {
 
         boolean shouldSend() {
             return count > 0;
+        }
+    }
+
+    interface ProducerFactory {
+        ProducerClient create(String nameServer);
+    }
+
+    interface ProducerClient extends AutoCloseable {
+        void start() throws Exception;
+
+        void send(String topic, String tag, String key, byte[] body) throws Exception;
+
+        @Override
+        void close();
+    }
+
+    private static final class RocketMqProducerClient implements ProducerClient {
+        private final DefaultMQProducer producer;
+
+        private RocketMqProducerClient(String nameServer) {
+            this.producer = new DefaultMQProducer("PID_CANVAS_PERF");
+            this.producer.setNamesrvAddr(nameServer);
+        }
+
+        @Override
+        public void start() throws Exception {
+            producer.start();
+        }
+
+        @Override
+        public void send(String topic, String tag, String key, byte[] body) throws Exception {
+            producer.send(new Message(topic, tag, key, body));
+        }
+
+        @Override
+        public void close() {
+            producer.shutdown();
         }
     }
 }

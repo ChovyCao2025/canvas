@@ -35,6 +35,29 @@ class PerfMqProducerTest {
     }
 
     @Test
+    void zeroCountDoesNotCreateProducer() throws Exception {
+        PerfMqProducer.Config config = PerfMqProducer.Config.fromArgs(new String[]{
+                "--perf-run-id", "perf_test",
+                "--count", "0"
+        });
+
+        int sent = PerfMqProducer.run(config, nameServer -> {
+            throw new AssertionError("producer factory should not be called");
+        });
+
+        assertThat(sent).isZero();
+    }
+
+    @Test
+    void unknownArgumentIsRejected() {
+        assertThatThrownBy(() -> PerfMqProducer.Config.fromArgs(new String[]{
+                "--perf-run-id", "perf_test",
+                "--user-modlou", "10"
+        })).isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Unknown argument: --user-modlou");
+    }
+
+    @Test
     void negativeCountIsRejected() {
         assertThatThrownBy(() -> PerfMqProducer.Config.fromArgs(new String[]{
                 "--perf-run-id", "perf_test",
