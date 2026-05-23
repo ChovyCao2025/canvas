@@ -12,6 +12,9 @@ spring:
     enabled: true
     locations: classpath:db/migration
     baseline-on-migrate: true
+    placeholders:
+      orderId: '${orderId}'
+      amount: '${amount}'
   data:
     redis:
       host: localhost
