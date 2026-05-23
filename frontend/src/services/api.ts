@@ -77,7 +77,7 @@ export const canvasApi = {
     graphJson?: string
     editVersion?: number
     triggerType?: string
-    cronExpression?: string
+    cronExpression?: string | null
     validStart?: string | null
     validEnd?: string | null
     maxTotalExecutions?: number | null

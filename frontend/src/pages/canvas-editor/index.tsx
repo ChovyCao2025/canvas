@@ -6,10 +6,11 @@ import {
   type Connection, type Node, type Edge, type NodeChange, type EdgeChange,
 } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
+import './settingsPanel.css'
 import dagre from '@dagrejs/dagre'
 import { Button, DatePicker, Divider, Drawer, Form, Input, InputNumber, message, Modal, Radio, Slider, Space, Spin, Tag, Tooltip } from 'antd'
 import {
-  ArrowLeftOutlined, CaretRightOutlined, CloudUploadOutlined, SaveOutlined, ApartmentOutlined, UndoOutlined, RedoOutlined, SyncOutlined, DeleteOutlined, QuestionCircleOutlined, HistoryOutlined, SettingOutlined, ExperimentOutlined, CheckOutlined, CloseOutlined,
+  ArrowLeftOutlined, CaretRightOutlined, CloudUploadOutlined, DownOutlined, SaveOutlined, ApartmentOutlined, UndoOutlined, RedoOutlined, SyncOutlined, DeleteOutlined, QuestionCircleOutlined, HistoryOutlined, SettingOutlined, ExperimentOutlined, CheckOutlined, CloseOutlined,
 } from '@ant-design/icons'
 import dayjs from 'dayjs'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
@@ -32,9 +33,19 @@ import { CanvasActionsContext } from '../../context/CanvasActionsContext'
 import { useAuth } from '../../context/AuthContext'
 import { getCanvasGraphReloadKey } from './graphReloadKey'
 import { buildCanvasNameUpdate, shouldShowCanvasNameActions } from './canvasNameUpdate'
+import {
+  type CanvasTriggerType,
+  getExecutionLimitsSummary,
+  getTriggerTypeSummary,
+  type CanvasSettingsLike,
+  shouldExpandExecutionLimits,
+} from './settingsPresentation'
 
 const { RangePicker } = DatePicker
 
+function normalizeCanvasTriggerType(triggerType?: string): CanvasTriggerType {
+  return triggerType === 'SCHEDULED' ? 'SCHEDULED' : 'REALTIME'
+}
 
 const nodeTypes = {
   canvasNode:        CanvasNodeCmp,
@@ -210,8 +221,8 @@ function EditorInner({ detail, onStatusChange, onCanvasNameChange }: {
   const displayEdges  = useMemo(() => [...edges,     ...phEdges],  [edges,     phEdges])
 
   const [canvasName, setCanvasName] = useState(detail.canvas.name)
-  const [canvasSettings, setCanvasSettings] = useState({
-    triggerType: detail.canvas.triggerType,
+  const [canvasSettings, setCanvasSettings] = useState<CanvasSettingsLike>({
+    triggerType: normalizeCanvasTriggerType(detail.canvas.triggerType),
     cronExpression: detail.canvas.cronExpression,
     validStart: detail.canvas.validStart,
     validEnd: detail.canvas.validEnd,
@@ -237,10 +248,38 @@ function EditorInner({ detail, onStatusChange, onCanvasNameChange }: {
   const [historyLoading, setHistoryLoading] = useState(false)
   // Canvas settings / trigger type (EF-8)
   const [settingsOpen, setSettingsOpen] = useState(false)
+  const [limitsExpanded, setLimitsExpanded] = useState(false)
   const [settingsForm] = Form.useForm()
   const editVersion   = useRef(detail.canvas.editVersion ?? 0)
   const autoSaveTimer = useRef<ReturnType<typeof setTimeout>>()
   const savedCanvasName = useRef(detail.canvas.name)
+  const limitsSectionId = 'canvas-settings-execution-limits'
+  const watchedTriggerType = Form.useWatch('triggerType', settingsForm)
+  const watchedCronExpression = Form.useWatch('cronExpression', settingsForm)
+  const watchedValidRange = Form.useWatch('validRange', settingsForm) as [dayjs.Dayjs | null | undefined, dayjs.Dayjs | null | undefined] | undefined
+  const watchedMaxTotalExecutions = Form.useWatch('maxTotalExecutions', settingsForm)
+  const watchedPerUserDailyLimit = Form.useWatch('perUserDailyLimit', settingsForm)
+  const watchedPerUserTotalLimit = Form.useWatch('perUserTotalLimit', settingsForm)
+  const watchedCooldownSeconds = Form.useWatch('cooldownSeconds', settingsForm)
+  const normalizedTriggerType = normalizeCanvasTriggerType(watchedTriggerType)
+  const liveSettings = useMemo<CanvasSettingsLike>(() => ({
+    triggerType: normalizedTriggerType,
+    cronExpression: watchedCronExpression ?? '',
+    validStart: watchedValidRange?.[0]?.format('YYYY-MM-DDTHH:mm:ss') ?? undefined,
+    validEnd: watchedValidRange?.[1]?.format('YYYY-MM-DDTHH:mm:ss') ?? undefined,
+    maxTotalExecutions: watchedMaxTotalExecutions ?? undefined,
+    perUserDailyLimit: watchedPerUserDailyLimit ?? undefined,
+    perUserTotalLimit: watchedPerUserTotalLimit ?? undefined,
+    cooldownSeconds: watchedCooldownSeconds ?? undefined,
+  }), [
+    watchedCooldownSeconds,
+    watchedCronExpression,
+    watchedMaxTotalExecutions,
+    normalizedTriggerType,
+    watchedPerUserDailyLimit,
+    watchedPerUserTotalLimit,
+    watchedValidRange,
+  ])
 
   const { snapshot, undo, redo, canUndo, canRedo, undoLabel, redoLabel } = useHistory(nodes as Node<CanvasNodeData>[], edges)
   const graphReloadKey = getCanvasGraphReloadKey(detail)
@@ -592,7 +631,7 @@ function EditorInner({ detail, onStatusChange, onCanvasNameChange }: {
         graphJson: JSON.stringify({ nodes: backendNodes }),
         editVersion: editVersion.current,
         triggerType: canvasSettings.triggerType,
-        cronExpression: canvasSettings.cronExpression,
+        cronExpression: canvasSettings.cronExpression ?? null,
         validStart: canvasSettings.validStart ?? null,
         validEnd: canvasSettings.validEnd ?? null,
         maxTotalExecutions: canvasSettings.maxTotalExecutions ?? null,
@@ -767,17 +806,28 @@ function EditorInner({ detail, onStatusChange, onCanvasNameChange }: {
 
   // 画布设置（EF-8）
   const openSettings = () => {
-    const validStart = detail.canvas.validStart ? dayjs(detail.canvas.validStart) : null
-    const validEnd = detail.canvas.validEnd ? dayjs(detail.canvas.validEnd) : null
+    const nextSettings: CanvasSettingsLike = {
+      triggerType: canvasSettings.triggerType ?? 'REALTIME',
+      cronExpression: canvasSettings.cronExpression ?? '',
+      validStart: canvasSettings.validStart,
+      validEnd: canvasSettings.validEnd,
+      maxTotalExecutions: canvasSettings.maxTotalExecutions,
+      perUserDailyLimit: canvasSettings.perUserDailyLimit,
+      perUserTotalLimit: canvasSettings.perUserTotalLimit,
+      cooldownSeconds: canvasSettings.cooldownSeconds,
+    }
+    const validStart = nextSettings.validStart ? dayjs(nextSettings.validStart) : null
+    const validEnd = nextSettings.validEnd ? dayjs(nextSettings.validEnd) : null
     settingsForm.setFieldsValue({
-      triggerType:        detail.canvas.triggerType ?? 'REALTIME',
-      cronExpression:     detail.canvas.cronExpression ?? '',
+      triggerType:        nextSettings.triggerType,
+      cronExpression:     nextSettings.cronExpression,
       validRange:         validStart || validEnd ? [validStart, validEnd] : undefined,
-      maxTotalExecutions: detail.canvas.maxTotalExecutions ?? undefined,
-      perUserDailyLimit:  detail.canvas.perUserDailyLimit ?? undefined,
-      perUserTotalLimit:  detail.canvas.perUserTotalLimit ?? undefined,
-      cooldownSeconds:    detail.canvas.cooldownSeconds ?? undefined,
+      maxTotalExecutions: nextSettings.maxTotalExecutions ?? undefined,
+      perUserDailyLimit:  nextSettings.perUserDailyLimit ?? undefined,
+      perUserTotalLimit:  nextSettings.perUserTotalLimit ?? undefined,
+      cooldownSeconds:    nextSettings.cooldownSeconds ?? undefined,
     })
+    setLimitsExpanded(shouldExpandExecutionLimits(nextSettings))
     setSettingsOpen(true)
   }
   const saveSettings = async () => {
@@ -787,7 +837,7 @@ function EditorInner({ detail, onStatusChange, onCanvasNameChange }: {
       name: canvasName,
       description: detail.canvas.description,
       triggerType: vals.triggerType,
-      cronExpression: vals.triggerType === 'SCHEDULED' ? vals.cronExpression : undefined,
+      cronExpression: vals.triggerType === 'SCHEDULED' ? vals.cronExpression : null,
       validStart: validRange?.[0]?.format('YYYY-MM-DDTHH:mm:ss') ?? undefined,
       validEnd: validRange?.[1]?.format('YYYY-MM-DDTHH:mm:ss') ?? undefined,
       maxTotalExecutions: vals.maxTotalExecutions ?? null,
@@ -797,7 +847,7 @@ function EditorInner({ detail, onStatusChange, onCanvasNameChange }: {
     }
     await canvasApi.update(canvasId, payload)
     setCanvasSettings({
-      triggerType: vals.triggerType,
+      triggerType: normalizeCanvasTriggerType(vals.triggerType),
       cronExpression: vals.triggerType === 'SCHEDULED' ? vals.cronExpression : undefined,
       validStart: payload.validStart ?? undefined,
       validEnd: payload.validEnd ?? undefined,
@@ -1277,17 +1327,33 @@ function EditorInner({ detail, onStatusChange, onCanvasNameChange }: {
       {/* 触发方式设置 Modal（EF-8） */}
       <Modal title="画布设置" open={settingsOpen}
         onOk={saveSettings} onCancel={() => setSettingsOpen(false)}
-        okText="保存" cancelText="取消" width={480}>
-        <Form form={settingsForm} layout="vertical" style={{ marginTop: 16 }}>
-          <Form.Item label="触发方式" name="triggerType" initialValue="REALTIME">
-            <Radio.Group>
-              <Radio value="REALTIME">实时触发</Radio>
-              <Radio value="SCHEDULED">定时触发</Radio>
-            </Radio.Group>
-          </Form.Item>
-          <Form.Item noStyle shouldUpdate={(prev, cur) => prev.triggerType !== cur.triggerType}>
-            {({ getFieldValue }) =>
-              getFieldValue('triggerType') === 'SCHEDULED' ? (
+        okText="保存" cancelText="取消" width={560}>
+        <Form form={settingsForm} layout="vertical" className="canvas-settings-form">
+          <section className="canvas-settings-card">
+            <div className="canvas-settings-section-header">
+              <div>
+                <div className="canvas-settings-section-title">触发方式</div>
+                <div className="canvas-settings-section-help">决定旅程是实时进入，还是按计划批量执行。</div>
+              </div>
+              <span className="canvas-settings-summary-tag">
+                {getTriggerTypeSummary(liveSettings.triggerType)}
+              </span>
+            </div>
+            <Form.Item name="triggerType" initialValue="REALTIME" className="canvas-settings-trigger-group">
+              <Radio.Group className="canvas-settings-trigger-options">
+                <Radio value="REALTIME" className="canvas-settings-trigger-option">
+                  <span className="canvas-settings-trigger-option-title">实时触发</span>
+                  <span className="canvas-settings-trigger-option-help">用户满足条件后立即进入当前画布。</span>
+                </Radio>
+                <Radio value="SCHEDULED" className="canvas-settings-trigger-option">
+                  <span className="canvas-settings-trigger-option-title">定时触发</span>
+                  <span className="canvas-settings-trigger-option-help">按固定周期统一执行，适合批处理场景。</span>
+                </Radio>
+              </Radio.Group>
+            </Form.Item>
+            {liveSettings.triggerType === 'SCHEDULED' ? (
+              <div className="canvas-settings-inline-panel">
+                <div className="canvas-settings-inline-title">执行计划</div>
                 <Form.Item
                   name="cronExpression"
                   rules={[{ required: true, message: '请配置触发时间' }]}
@@ -1297,30 +1363,61 @@ function EditorInner({ detail, onStatusChange, onCanvasNameChange }: {
                     onChange={cron => settingsForm.setFieldValue('cronExpression', cron)}
                   />
                 </Form.Item>
-              ) : null
-            }
-          </Form.Item>
-          <Divider orientation="left">执行限制（留空表示不限制）</Divider>
-          <Form.Item label="有效期" name="validRange">
-            <RangePicker
-              showTime
-              format="YYYY-MM-DD HH:mm"
-              placeholder={['开始时间', '结束时间']}
-              style={{ width: '100%' }}
-            />
-          </Form.Item>
-          <Form.Item label="总执行次数上限" name="maxTotalExecutions">
-            <InputNumber min={1} style={{ width: '100%' }} placeholder="不限制" />
-          </Form.Item>
-          <Form.Item label="用户每日上限" name="perUserDailyLimit">
-            <InputNumber min={1} style={{ width: '100%' }} placeholder="不限制" />
-          </Form.Item>
-          <Form.Item label="用户总上限" name="perUserTotalLimit">
-            <InputNumber min={1} style={{ width: '100%' }} placeholder="不限制" />
-          </Form.Item>
-          <Form.Item label="冷却秒数" name="cooldownSeconds">
-            <InputNumber min={0} style={{ width: '100%' }} placeholder="不限制" />
-          </Form.Item>
+              </div>
+            ) : null}
+          </section>
+
+          <section className="canvas-settings-card">
+            <button
+              type="button"
+              className="canvas-settings-collapse"
+              onClick={() => setLimitsExpanded(prev => !prev)}
+              aria-expanded={limitsExpanded}
+              aria-controls={limitsSectionId}
+            >
+              <div className="canvas-settings-collapse-copy">
+                <div className="canvas-settings-section-title">执行限制</div>
+                <div className="canvas-settings-section-help">留空表示不限制，可按需控制有效期、频次和总量。</div>
+              </div>
+              <div className="canvas-settings-collapse-actions">
+                <span className="canvas-settings-summary-tag">
+                  {getExecutionLimitsSummary(liveSettings)}
+                </span>
+                {limitsExpanded ? <DownOutlined /> : <CaretRightOutlined />}
+              </div>
+            </button>
+            <div
+              id={limitsSectionId}
+              className="canvas-settings-limits-content"
+              hidden={!limitsExpanded}
+            >
+                <div className="canvas-settings-tip">
+                  限制仅影响执行窗口与配额，不会改变现有触发逻辑。
+                </div>
+                <Form.Item label="有效期" name="validRange">
+                  <RangePicker
+                    showTime
+                    format="YYYY-MM-DD HH:mm"
+                    placeholder={['开始时间', '结束时间']}
+                    style={{ width: '100%' }}
+                  />
+                </Form.Item>
+                <div className="canvas-settings-grid">
+                  <Form.Item label="总执行次数上限" name="maxTotalExecutions">
+                    <InputNumber min={1} style={{ width: '100%' }} placeholder="不限制" />
+                  </Form.Item>
+                  <Form.Item label="用户每日上限" name="perUserDailyLimit">
+                    <InputNumber min={1} style={{ width: '100%' }} placeholder="不限制" />
+                  </Form.Item>
+                  <Form.Item label="用户总上限" name="perUserTotalLimit">
+                    <InputNumber min={1} style={{ width: '100%' }} placeholder="不限制" />
+                  </Form.Item>
+                  <Form.Item label="冷却秒数" name="cooldownSeconds">
+                    <InputNumber min={0} style={{ width: '100%' }} placeholder="不限制" />
+                  </Form.Item>
+                </div>
+              </div>
+          </section>
         </Form>
       </Modal>
 
