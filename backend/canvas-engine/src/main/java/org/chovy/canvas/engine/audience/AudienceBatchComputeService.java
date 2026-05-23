@@ -87,12 +87,14 @@ public class AudienceBatchComputeService {
     }
 
     public AudienceDefinition create(AudienceDefinition definition) {
+        validateWritableDataSource(definition);
         definitionMapper.insert(definition);
         compute(definition.getId());
         return definition;
     }
 
     public void update(AudienceDefinition definition) {
+        validateWritableDataSource(definition);
         definitionMapper.updateById(definition);
         compute(definition.getId());
     }
@@ -191,6 +193,22 @@ public class AudienceBatchComputeService {
             }
         }
         return userIds;
+    }
+
+    void validateWritableDataSource(AudienceDefinition definition) {
+        if (definition == null || !"JDBC".equals(definition.getDataSourceType())) {
+            return;
+        }
+        if (definition.getDataSourceId() == null) {
+            throw new IllegalArgumentException("dataSourceId is required for JDBC");
+        }
+        AudienceDataSource dataSource = dataSourceMapper.selectById(definition.getDataSourceId());
+        if (dataSource == null) {
+            throw new IllegalArgumentException("Audience data source not found: " + definition.getDataSourceId());
+        }
+        if (dataSource.getEnabled() != null && dataSource.getEnabled() == 0) {
+            throw new IllegalArgumentException("Audience data source is disabled: " + definition.getDataSourceId());
+        }
     }
 
     JdbcConfig parseJdbcConfig(AudienceDefinition definition, AudienceDataSource dataSource) throws Exception {

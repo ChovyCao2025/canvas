@@ -3,8 +3,12 @@ package org.chovy.canvas.engine.audience;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.chovy.canvas.domain.audience.AudienceDataSource;
 import org.chovy.canvas.domain.audience.AudienceDefinition;
+import org.chovy.canvas.domain.audience.AudienceDataSourceMapper;
 import org.junit.jupiter.api.Test;
 
+import java.lang.reflect.Proxy;
+
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.assertThat;
 
 class AudienceBatchComputeServiceJdbcConfigTest {
@@ -18,7 +22,7 @@ class AudienceBatchComputeServiceJdbcConfigTest {
             new ObjectMapper(),
             null,
             null,
-            null
+            dataSourceMapper(null)
     );
 
     @Test
@@ -60,5 +64,45 @@ class AudienceBatchComputeServiceJdbcConfigTest {
         AudienceBatchComputeService.JdbcConfig config = service.parseJdbcConfig(definition, dataSource);
 
         assertThat(config.driverClassName()).isEqualTo("com.mysql.cj.jdbc.Driver");
+    }
+
+    @Test
+    void validateWritableDataSourceRejectsDisabledSourceForNewBindings() {
+        AudienceDataSource disabledDataSource = new AudienceDataSource();
+        disabledDataSource.setId(11L);
+        disabledDataSource.setEnabled(0);
+        AudienceBatchComputeService validatingService = new AudienceBatchComputeService(
+                null,
+                null,
+                null,
+                null,
+                null,
+                new ObjectMapper(),
+                null,
+                null,
+                dataSourceMapper(disabledDataSource)
+        );
+
+        AudienceDefinition definition = new AudienceDefinition();
+        definition.setDataSourceType("JDBC");
+        definition.setDataSourceId(11L);
+
+        assertThatThrownBy(() -> validatingService.validateWritableDataSource(definition))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("disabled");
+    }
+
+    private static AudienceDataSourceMapper dataSourceMapper(AudienceDataSource result) {
+        return (AudienceDataSourceMapper) Proxy.newProxyInstance(
+                AudienceDataSourceMapper.class.getClassLoader(),
+                new Class[]{AudienceDataSourceMapper.class},
+                (proxy, method, args) -> switch (method.getName()) {
+                    case "selectById" -> result;
+                    case "toString" -> "AudienceDataSourceMapperStub";
+                    case "hashCode" -> System.identityHashCode(proxy);
+                    case "equals" -> proxy == args[0];
+                    default -> throw new UnsupportedOperationException(method.getName());
+                }
+        );
     }
 }
