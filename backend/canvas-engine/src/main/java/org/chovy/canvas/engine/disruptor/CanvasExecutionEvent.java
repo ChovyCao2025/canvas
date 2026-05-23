@@ -16,9 +16,11 @@ public class CanvasExecutionEvent {
     public Map<String, Object> payload;
     public String msgId;
     public String requestId;
+    public CanvasDisruptorService.DispatchOptions dispatchOptions;
 
     public void reset() {
         canvasId = null; userId = null; triggerType = null;
-        triggerNodeType = null; matchKey = null; payload = null; msgId = null; requestId = null;
+        triggerNodeType = null; matchKey = null; payload = null; msgId = null;
+        requestId = null; dispatchOptions = null;
     }
 }

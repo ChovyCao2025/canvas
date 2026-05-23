@@ -49,6 +49,22 @@ export interface NodeHeaderCardProps {
   metaBadges: string[]
   description?: string
   statusLabel: string
+  categoryColor?: string
+}
+
+function getHeaderPillStyles(color: string) {
+  return {
+    badge: {
+      background: `${color}14`,
+      color,
+      border: `1px solid ${color}33`,
+    },
+    status: {
+      background: `${color}0d`,
+      color: `${color}cc`,
+      border: `1px solid ${color}26`,
+    },
+  }
 }
 
 export function NodeHeaderCard({
@@ -58,9 +74,12 @@ export function NodeHeaderCard({
   metaBadges,
   description,
   statusLabel,
+  categoryColor,
 }: NodeHeaderCardProps) {
   const isTagger = tone === 'tagger'
   const shellStyle = isTagger ? TAGGER_STYLES.shell : {}
+  const resolvedCategoryColor = categoryColor ?? '#475569'
+  const pillStyles = getHeaderPillStyles(resolvedCategoryColor)
 
   return (
     <div
@@ -78,7 +97,7 @@ export function NodeHeaderCard({
               margin: 0,
               borderRadius: 999,
               padding: '0 10px',
-              ...(isTagger ? TAGGER_STYLES.badge : { background: '#f8fafc', color: '#475569', border: '1px solid #e2e8f0' }),
+              ...pillStyles.badge,
             }}
           >
             {typeBadge}
@@ -100,9 +119,9 @@ export function NodeHeaderCard({
             padding: '4px 10px',
             fontSize: 12,
             fontWeight: 600,
-            color: isTagger ? TAGGER_STYLES.status.color : '#475569',
-            background: isTagger ? TAGGER_STYLES.status.background : '#f8fafc',
-            border: isTagger ? TAGGER_STYLES.status.border : '1px solid #e2e8f0',
+            color: pillStyles.status.color,
+            background: pillStyles.status.background,
+            border: pillStyles.status.border,
           }}
         >
           {statusLabel}
@@ -120,7 +139,11 @@ export function NodeHeaderCard({
                 padding: '0 10px',
                 ...(isTagger
                   ? { background: '#f6f9fc', color: '#345472', border: '1px solid #d4e1ee' }
-                  : { background: '#f8fafc', color: '#334155', border: '1px solid #e2e8f0' }),
+                  : {
+                      background: '#f8fafc',
+                      color: resolvedCategoryColor,
+                      border: `1px solid ${resolvedCategoryColor}33`,
+                    }),
               }}
             >
               {badge}

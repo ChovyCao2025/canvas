@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest'
+import type { ReactElement, ReactNode } from 'react'
 import type { CanvasNodeData } from '../../types/canvas'
+import { CATEGORY_SOLID } from '../canvas/constants'
+import { NodeHeaderCard } from './InspectorCards'
 import { buildConfigPanelPresentation } from './presentation'
 
 const taggerNode = (overrides: Partial<CanvasNodeData> = {}): CanvasNodeData => ({
@@ -18,6 +21,25 @@ const taggerNode = (overrides: Partial<CanvasNodeData> = {}): CanvasNodeData => 
 const taggerRouteNames: Record<string, string> = {
   'api-node': '接口调用',
   'city-node': '是否高频消费城市用户',
+}
+
+function asElement(node: ReactNode): ReactElement {
+  expect(node).toBeTruthy()
+  return node as ReactElement
+}
+
+function getHeaderStyles(props: Parameters<typeof NodeHeaderCard>[0]) {
+  const card = asElement(NodeHeaderCard(props))
+  const topRow = asElement(card.props.children[0])
+  const leftColumn = asElement(topRow.props.children[0])
+  const typeBadge = asElement(leftColumn.props.children[0])
+  const statusPill = asElement(topRow.props.children[1])
+
+  return {
+    cardStyle: card.props.style as Record<string, string>,
+    badgeStyle: typeBadge.props.style as Record<string, string>,
+    statusStyle: statusPill.props.style as Record<string, string>,
+  }
 }
 
 describe('buildConfigPanelPresentation', () => {
@@ -122,5 +144,43 @@ describe('buildConfigPanelPresentation', () => {
     expect(model.header.tone).toBe('default')
     expect(model.summaryRows).toEqual([])
     expect(model.branchRoutes).toEqual([])
+  })
+
+  it('keeps the tagger shell mist-blue while colorizing its badge and status pill by category', () => {
+    const styles = getHeaderStyles({
+      tone: 'tagger',
+      typeBadge: 'Tagger',
+      title: '是否高价值近30天活跃用户',
+      metaBadges: [],
+      description: '标签判断节点，根据圈选人群决定后续分支流向',
+      statusLabel: '已配置',
+      categoryColor: CATEGORY_SOLID['逻辑分支'],
+    })
+
+    expect(styles.cardStyle.background).toBe('#e9f0f7')
+    expect(styles.badgeStyle.color).toBe(CATEGORY_SOLID['逻辑分支'])
+    expect(styles.statusStyle.color).toBe(`${CATEGORY_SOLID['逻辑分支']}cc`)
+    expect(styles.badgeStyle.background).toBe(`${CATEGORY_SOLID['逻辑分支']}14`)
+    expect(styles.statusStyle.background).toBe(`${CATEGORY_SOLID['逻辑分支']}0d`)
+    expect(styles.badgeStyle.border).toBe(`1px solid ${CATEGORY_SOLID['逻辑分支']}33`)
+    expect(styles.statusStyle.border).toBe(`1px solid ${CATEGORY_SOLID['逻辑分支']}26`)
+  })
+
+  it('reuses the node category color for non-tagger badge and keeps the configured pill visually weaker', () => {
+    const styles = getHeaderStyles({
+      tone: 'default',
+      typeBadge: 'API_CALL',
+      title: '接口调用',
+      metaBadges: [],
+      statusLabel: '已配置',
+      categoryColor: CATEGORY_SOLID['行为策略'],
+    })
+
+    expect(styles.badgeStyle.color).toBe(CATEGORY_SOLID['行为策略'])
+    expect(styles.statusStyle.color).toBe(`${CATEGORY_SOLID['行为策略']}cc`)
+    expect(styles.badgeStyle.background).toBe(`${CATEGORY_SOLID['行为策略']}14`)
+    expect(styles.statusStyle.background).toBe(`${CATEGORY_SOLID['行为策略']}0d`)
+    expect(styles.badgeStyle.border).toBe(`1px solid ${CATEGORY_SOLID['行为策略']}33`)
+    expect(styles.statusStyle.border).toBe(`1px solid ${CATEGORY_SOLID['行为策略']}26`)
   })
 })

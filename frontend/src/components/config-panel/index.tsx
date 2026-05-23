@@ -8,6 +8,7 @@ import { PlusOutlined, DeleteOutlined, QuestionCircleOutlined } from '@ant-desig
 import http, { metaApi, canvasApi } from '../../services/api'
 import type { NodeTypeRegistry, ContextField, StubOption, Canvas } from '../../types'
 import type { CanvasNodeData } from '../canvas/constants'
+import { CATEGORY_SOLID } from '../canvas/constants'
 import { PARAM_TYPES } from '../../pages/api-config'
 import {
   BranchRouteCard,
@@ -194,7 +195,10 @@ export default function ConfigPanel({ nodeId, nodeData, onChange, nodes, readonl
     <div style={{ padding: '14px 14px 8px', overflowY: 'auto', height: '100%', background: '#f6f7f9' }}>
       {loading && <Spin size="small" style={{ display: 'block', marginBottom: 8 }} />}
 
-      <NodeHeaderCard {...presentation.header} />
+      <NodeHeaderCard
+        {...presentation.header}
+        categoryColor={CATEGORY_SOLID[nodeData.category] ?? '#475569'}
+      />
 
       <Form form={form} layout="vertical" size="small" onValuesChange={handleValuesChange} disabled={readonly}>
         {presentation.summaryRows.length > 0 && (
