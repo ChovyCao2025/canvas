@@ -121,7 +121,7 @@ public class TriggerRouteService {
         if (ids == null || ids.isEmpty()) {
             return Set.of();
         }
-        return Set.copyOf(new HashSet<>(ids));
+        return sanitizeCanvasIds(ids);
     }
 
     private List<String> scanMqRouteKeys() {
@@ -145,6 +145,16 @@ public class TriggerRouteService {
         return canvasIds.stream()
                 .filter(Objects::nonNull)
                 .filter(id -> !id.isBlank())
+                .map(String::trim)
+                .filter(this::isPositiveLong)
                 .collect(Collectors.toUnmodifiableSet());
+    }
+
+    private boolean isPositiveLong(String value) {
+        try {
+            return Long.parseLong(value) > 0;
+        } catch (NumberFormatException e) {
+            return false;
+        }
     }
 }

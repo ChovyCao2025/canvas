@@ -150,7 +150,20 @@ public class CanvasExecutionService {
             String triggerNodeType, String matchKey,
             Map<String, Object> payload, String msgId, boolean dryRun) {
         return triggerInternal(canvasId, userId, triggerType, triggerNodeType, matchKey,
-                payload, msgId, dryRun, false, 0);
+                payload, msgId, dryRun, false, 0, false);
+    }
+
+    /**
+     * Persistent execution request entrypoint.
+     * Overflow is returned to the request table retry policy instead of creating
+     * an additional RocketMQ overflow message.
+     */
+    public Mono<Map<String, Object>> triggerFromExecutionRequest(
+            Long canvasId, String userId, String triggerType,
+            String triggerNodeType, String matchKey,
+            Map<String, Object> payload, String msgId) {
+        return triggerInternal(canvasId, userId, triggerType, triggerNodeType, matchKey,
+                payload, msgId, false, false, 0, true);
     }
 
     /**
@@ -167,14 +180,15 @@ public class CanvasExecutionService {
                 ? dispatchOptions.getOverflowChainRetryCount()
                 : 0;
         return triggerInternal(canvasId, userId, triggerType, triggerNodeType, matchKey,
-                payload, msgId, false, overflowRetry, overflowChainRetryCount);
+                payload, msgId, false, overflowRetry, overflowChainRetryCount, false);
     }
 
     private Mono<Map<String, Object>> triggerInternal(
             Long canvasId, String userId, String triggerType,
             String triggerNodeType, String matchKey,
             Map<String, Object> payload, String msgId, boolean dryRun,
-            boolean overflowRetry, int overflowChainRetryCount) {
+            boolean overflowRetry, int overflowChainRetryCount,
+            boolean persistentRequest) {
         return Mono.fromCallable(() -> {
 
                     Canvas canvas = canvasEntityCache.get(canvasId);
@@ -230,6 +244,9 @@ public class CanvasExecutionService {
                                 log.warn("[ENGINE] 并发上限 canvasId={} active={}/{} priority={}",
                                         canvasId, active, effectiveMax, priority);
                                 if (priority == TriggerPriorityConfig.Priority.NORMAL) {
+                                    if (persistentRequest) {
+                                        return Map.of("overflow", "request_retry");
+                                    }
                                     boolean queued = sendOverflowRetry(canvasId, userId, triggerType, triggerNodeType,
                                             matchKey, payload, msgId, overflowChainRetryCount);
                                     return Map.of("overflow", queued ? "queued_for_retry" : "retry_enqueue_failed");

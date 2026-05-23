@@ -8,8 +8,11 @@ import org.apache.rocketmq.spring.annotation.RocketMQMessageListener;
 import org.apache.rocketmq.spring.annotation.SelectorType;
 import org.chovy.canvas.domain.constant.NodeType;
 import org.chovy.canvas.domain.constant.TriggerType;
+import org.chovy.canvas.domain.execution.CanvasMqTriggerRejected;
+import org.chovy.canvas.domain.execution.CanvasMqTriggerRejectedMapper;
 import org.chovy.canvas.engine.disruptor.CanvasDisruptorService;
 import org.chovy.canvas.engine.request.CanvasExecutionRequestService;
+import org.chovy.canvas.engine.scheduler.CanvasMetrics;
 import org.chovy.canvas.infra.redis.TriggerRouteService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -34,6 +37,8 @@ class MqTriggerConsumerTest {
     private TriggerRouteService routeService;
     private CanvasDisruptorService disruptorService;
     private CanvasExecutionRequestService requestService;
+    private CanvasMqTriggerRejectedMapper rejectedMapper;
+    private CanvasMetrics metrics;
     private MqTriggerConsumer consumer;
 
     @BeforeEach
@@ -41,7 +46,10 @@ class MqTriggerConsumerTest {
         routeService = mock(TriggerRouteService.class);
         disruptorService = mock(CanvasDisruptorService.class);
         requestService = mock(CanvasExecutionRequestService.class);
-        consumer = new MqTriggerConsumer(new ObjectMapper(), routeService, disruptorService, requestService);
+        rejectedMapper = mock(CanvasMqTriggerRejectedMapper.class);
+        metrics = mock(CanvasMetrics.class);
+        consumer = new MqTriggerConsumer(new ObjectMapper(), routeService, disruptorService, requestService,
+                rejectedMapper, metrics);
     }
 
     @Test
@@ -90,28 +98,39 @@ class MqTriggerConsumerTest {
     }
 
     @Test
-    void onMessageThrowsWhenBodyIsInvalidJsonSoRocketMqCanRetry() {
-        assertThatThrownBy(() -> consumer.onMessage(message("ORDER_PAID", "MSG-3", "{bad-json")))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("Invalid MQ trigger message body");
+    void onMessageStoresRejectedMessageAndAcksWhenBodyIsInvalidJson() {
+        consumer.onMessage(message("ORDER_PAID", "MSG-3", "{bad-json"));
+
+        verify(metrics).recordMqTriggerRejected("INVALID_BODY", "ORDER_PAID");
+        ArgumentCaptor<CanvasMqTriggerRejected> captor = ArgumentCaptor.forClass(CanvasMqTriggerRejected.class);
+        verify(rejectedMapper).insert(captor.capture());
+        assertThat(captor.getValue().getMsgId()).isEqualTo("MSG-3");
+        assertThat(captor.getValue().getTag()).isEqualTo("ORDER_PAID");
+        assertThat(captor.getValue().getReason()).isEqualTo("INVALID_BODY");
+        verify(disruptorService, never()).publishRequest(any());
     }
 
     @Test
-    void onMessageThrowsWhenRequiredFieldsAreMissingSoRocketMqCanRetry() {
-        assertThatThrownBy(() -> consumer.onMessage(message("ORDER_PAID", "MSG-5",
-                "{\"userId\":\"\",\"messageCode\":\"PAYMENT\",\"payload\":{}}")))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("userId is required");
+    void onMessageStoresRejectedMessageAndAcksWhenRequiredFieldsAreMissing() {
+        consumer.onMessage(message("ORDER_PAID", "MSG-5",
+                "{\"userId\":\"\",\"messageCode\":\"PAYMENT\",\"payload\":{}}"));
 
-        assertThatThrownBy(() -> consumer.onMessage(message("ORDER_PAID", "MSG-6",
-                "{\"userId\":\"user-9\",\"messageCode\":\"\",\"payload\":{}}")))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("messageCode is required");
+        verify(metrics).recordMqTriggerRejected("INVALID_MESSAGE", "ORDER_PAID");
+        verify(rejectedMapper).insert(any(CanvasMqTriggerRejected.class));
+        verify(disruptorService, never()).publishRequest(any());
+    }
 
-        assertThatThrownBy(() -> consumer.onMessage(message("ORDER_PAID", "MSG-7",
-                "{\"userId\":\"user-9\",\"messageCode\":\"PAYMENT\",\"payload\":null}")))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("payload is required");
+    @Test
+    void onMessageSkipsDirtyRouteIdsAndStillPublishesValidRoutes() {
+        when(routeService.getCanvasByMqTopic("ORDER_PAID")).thenReturn(Set.of("bad-route", "101"));
+        when(requestService.enqueue(eq(101L), eq("user-7"), eq(TriggerType.MQ), eq(NodeType.MQ_TRIGGER),
+                eq("ORDER_PAID"), any(), eq("MSG-8"))).thenReturn("req-101");
+
+        consumer.onMessage(message("ORDER_PAID", "MSG-8",
+                "{\"userId\":\"user-7\",\"messageCode\":\"PAYMENT\",\"payload\":{\"orderId\":\"O-8\"}}"));
+
+        verify(metrics).recordMqRouteRejected("INVALID_CANVAS_ID", "ORDER_PAID");
+        verify(disruptorService).publishRequest("req-101");
     }
 
     @Test

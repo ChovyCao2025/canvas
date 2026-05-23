@@ -182,6 +182,30 @@ class CanvasExecutionServiceTest {
     }
 
     @Test
+    void executionRequestOverflowReturnsRetrySignalWithoutRocketMqOverflowMessage() {
+        Canvas canvas = publishedCanvas(42L, 10);
+        when(canvasEntityCache.get(42L)).thenReturn(canvas);
+        when(ctxStore.acquireDedup(eq(42L), eq("user-13"), eq("msg-13"), any())).thenReturn(true);
+        when(executionRegistry.activeCount(42L)).thenReturn(10);
+
+        Map<String, Object> result = sut.triggerFromExecutionRequest(
+                42L,
+                "user-13",
+                TriggerType.MQ,
+                NodeType.MQ_TRIGGER,
+                "topic-request",
+                Map.of("orderId", "o-13"),
+                "msg-13"
+        ).block();
+
+        assertThat(result).containsEntry("overflow", "request_retry");
+        verify(preCheckService).checkWithoutQuotaAccounting(eq(canvas), eq("user-13"));
+        verify(preCheckService, never()).consumeQuotaAndRecord(any(), any());
+        verify(rocketMQTemplate, never()).getProducer();
+        verify(dagEngine, never()).execute(any(), any(), any());
+    }
+
+    @Test
     void overflowRetryDisruptorMetadataUsesNonMutatingCheckThenConsumesQuotaWhenAccepted() {
         Canvas canvas = publishedCanvas(34L, 10);
         when(canvasEntityCache.get(34L)).thenReturn(canvas);

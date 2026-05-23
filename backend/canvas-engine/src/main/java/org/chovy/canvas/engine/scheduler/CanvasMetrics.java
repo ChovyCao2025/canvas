@@ -5,7 +5,10 @@ import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicLong;
 
 /**
  * 画布执行引擎核心监控指标（设计文档第 14.1 节）。
@@ -20,6 +23,7 @@ import java.util.concurrent.TimeUnit;
 public class CanvasMetrics {
 
     private final MeterRegistry registry;
+    private final ConcurrentMap<String, AtomicLong> executionRequestBacklog = new ConcurrentHashMap<>();
 
     // ── 执行层指标 ────────────────────────────────────────────────
 
@@ -118,6 +122,37 @@ public class CanvasMetrics {
         Counter.builder("canvas.execution.request.transition.total")
                 .tag("status", status != null ? status : "UNKNOWN")
                 .tag("triggerType", triggerType != null ? triggerType : "UNKNOWN")
+                .register(registry)
+                .increment();
+    }
+
+    /** 执行请求积压水位，按状态分组。 */
+    public void setExecutionRequestBacklog(String status, long count) {
+        String normalizedStatus = status != null ? status : "UNKNOWN";
+        AtomicLong gauge = executionRequestBacklog.computeIfAbsent(normalizedStatus, key -> {
+            AtomicLong value = new AtomicLong();
+            Gauge.builder("canvas.execution.request.backlog", value, AtomicLong::get)
+                    .tag("status", key)
+                    .register(registry);
+            return value;
+        });
+        gauge.set(Math.max(0L, count));
+    }
+
+    /** RocketMQ 触发消息被消费端拒绝的计数。 */
+    public void recordMqTriggerRejected(String reason, String tag) {
+        Counter.builder("canvas.mq.trigger.rejected.total")
+                .tag("reason", reason != null ? reason : "UNKNOWN")
+                .tag("tag", tag != null ? tag : "UNKNOWN")
+                .register(registry)
+                .increment();
+    }
+
+    /** MQ 路由表脏数据被消费端跳过的计数。 */
+    public void recordMqRouteRejected(String reason, String tag) {
+        Counter.builder("canvas.mq.route.rejected.total")
+                .tag("reason", reason != null ? reason : "UNKNOWN")
+                .tag("tag", tag != null ? tag : "UNKNOWN")
                 .register(registry)
                 .increment();
     }

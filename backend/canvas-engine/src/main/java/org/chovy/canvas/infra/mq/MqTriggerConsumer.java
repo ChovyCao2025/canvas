@@ -11,12 +11,16 @@ import org.apache.rocketmq.spring.annotation.SelectorType;
 import org.apache.rocketmq.spring.core.RocketMQListener;
 import org.chovy.canvas.domain.constant.NodeType;
 import org.chovy.canvas.domain.constant.TriggerType;
+import org.chovy.canvas.domain.execution.CanvasMqTriggerRejected;
+import org.chovy.canvas.domain.execution.CanvasMqTriggerRejectedMapper;
 import org.chovy.canvas.engine.disruptor.CanvasDisruptorService;
 import org.chovy.canvas.engine.request.CanvasExecutionRequestService;
+import org.chovy.canvas.engine.scheduler.CanvasMetrics;
 import org.chovy.canvas.infra.redis.TriggerRouteService;
 import org.springframework.stereotype.Service;
 
 import java.nio.charset.StandardCharsets;
+import java.time.LocalDateTime;
 import java.util.Set;
 
 /**
@@ -43,6 +47,8 @@ public class MqTriggerConsumer implements RocketMQListener<MessageExt> {
     private final TriggerRouteService routeService;
     private final CanvasDisruptorService disruptorService;
     private final CanvasExecutionRequestService requestService;
+    private final CanvasMqTriggerRejectedMapper rejectedMapper;
+    private final CanvasMetrics metrics;
 
     @Override
     public void onMessage(MessageExt message) {
@@ -57,9 +63,17 @@ public class MqTriggerConsumer implements RocketMQListener<MessageExt> {
             triggerMessage = objectMapper.readValue(body, MqTriggerMessage.class);
         } catch (Exception e) {
             log.error("[MQ_CONSUMER] 消息体解析失败 msgId={} body={}: {}", msgId, body, e.getMessage());
-            throw new IllegalArgumentException("Invalid MQ trigger message body: " + e.getMessage(), e);
+            recordRejected("INVALID_BODY", tag);
+            storeRejected(msgId, tag, "INVALID_BODY", e.getMessage(), body);
+            return;
         }
-        validateMessage(triggerMessage);
+        try {
+            validateMessage(triggerMessage);
+        } catch (IllegalArgumentException e) {
+            recordRejected("INVALID_MESSAGE", tag);
+            storeRejected(msgId, tag, "INVALID_MESSAGE", e.getMessage(), body);
+            return;
+        }
 
         Set<String> canvasIds = routeService.getCanvasByMqTopic(tag);
         if (canvasIds.isEmpty()) {
@@ -68,7 +82,10 @@ public class MqTriggerConsumer implements RocketMQListener<MessageExt> {
         }
 
         for (String canvasIdStr : canvasIds) {
-            Long canvasId = Long.parseLong(canvasIdStr);
+            Long canvasId = parseCanvasId(canvasIdStr, tag);
+            if (canvasId == null) {
+                continue;
+            }
             String requestId = requestService.enqueue(
                     canvasId,
                     triggerMessage.getUserId(),
@@ -84,6 +101,20 @@ public class MqTriggerConsumer implements RocketMQListener<MessageExt> {
         }
     }
 
+    private Long parseCanvasId(String canvasIdStr, String tag) {
+        try {
+            long canvasId = Long.parseLong(canvasIdStr);
+            if (canvasId <= 0) {
+                throw new NumberFormatException("non-positive canvasId");
+            }
+            return canvasId;
+        } catch (RuntimeException e) {
+            log.warn("[MQ_CONSUMER] 跳过非法路由 canvasId={} tag={}", canvasIdStr, tag);
+            recordRouteRejected("INVALID_CANVAS_ID", tag);
+            return null;
+        }
+    }
+
     private void validateMessage(MqTriggerMessage message) {
         if (message.getUserId() == null || message.getUserId().isBlank()) {
             throw new IllegalArgumentException("Invalid MQ trigger message body: userId is required");
@@ -94,5 +125,44 @@ public class MqTriggerConsumer implements RocketMQListener<MessageExt> {
         if (message.getPayload() == null) {
             throw new IllegalArgumentException("Invalid MQ trigger message body: payload is required");
         }
+    }
+
+    private void recordRejected(String reason, String tag) {
+        try {
+            metrics.recordMqTriggerRejected(reason, tag);
+        } catch (RuntimeException ignored) {
+            // Metrics must not affect RocketMQ retry semantics.
+        }
+    }
+
+    private void recordRouteRejected(String reason, String tag) {
+        try {
+            metrics.recordMqRouteRejected(reason, tag);
+        } catch (RuntimeException ignored) {
+            // Metrics must not affect RocketMQ retry semantics.
+        }
+    }
+
+    private void storeRejected(String msgId, String tag, String reason, String errorMsg, String body) {
+        try {
+            CanvasMqTriggerRejected rejected = new CanvasMqTriggerRejected();
+            rejected.setMsgId(trim(msgId, 255));
+            rejected.setTag(trim(tag, 128));
+            rejected.setReason(trim(reason, 64));
+            rejected.setErrorMsg(trim(errorMsg, 500));
+            rejected.setBody(trim(body, 4000));
+            rejected.setCreatedAt(LocalDateTime.now());
+            rejectedMapper.insert(rejected);
+        } catch (RuntimeException e) {
+            log.error("[MQ_CONSUMER] rejected 消息落库失败 msgId={} reason={}: {}",
+                    msgId, reason, e.getMessage(), e);
+        }
+    }
+
+    private String trim(String value, int maxLength) {
+        if (value == null) {
+            return null;
+        }
+        return value.length() <= maxLength ? value : value.substring(0, maxLength);
     }
 }
