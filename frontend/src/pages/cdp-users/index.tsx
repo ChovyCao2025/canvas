@@ -76,6 +76,15 @@ export default function CdpUsersPage() {
     setSelectedOperation(res.data)
   }
 
+  const retryFailedUsers = async () => {
+    if (!selectedOperation) return
+    const res = await cdpApi.retryFailedTagOperation(selectedOperation.id)
+    message.success(`已创建重试任务 #${res.data.id}`)
+    setWatchOperationId(res.data.id)
+    setSelectedOperation(res.data)
+    loadOperations()
+  }
+
   const columns: ColumnsType<CanvasUserRow> = [
     { title: '用户 ID', dataIndex: 'userId', render: v => <Button type="link" onClick={() => navigate(`/cdp/users/${encodeURIComponent(v)}`)}>{v}</Button> },
     { title: '执行次数', dataIndex: 'executionCount', width: 100, align: 'right' },
@@ -165,7 +174,16 @@ export default function CdpUsersPage() {
         open={!!selectedOperation}
         width={680}
         onClose={() => setSelectedOperation(null)}
-        extra={selectedOperation ? <Button size="small" onClick={() => openOperation(selectedOperation.id)}>刷新</Button> : null}
+        extra={selectedOperation ? (
+          <Space>
+            {selectedOperation.failCount > 0 && (
+              <Button size="small" onClick={retryFailedUsers}>
+                重试失败用户
+              </Button>
+            )}
+            <Button size="small" onClick={() => openOperation(selectedOperation.id)}>刷新</Button>
+          </Space>
+        ) : null}
       >
         {selectedOperation && (
           <Space direction="vertical" size={16} style={{ width: '100%' }}>

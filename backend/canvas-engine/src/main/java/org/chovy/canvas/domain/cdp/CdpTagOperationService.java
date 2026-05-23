@@ -5,8 +5,10 @@ import org.chovy.canvas.dto.cdp.CdpBatchTagReq;
 import org.chovy.canvas.dto.cdp.CdpTagWriteReq;
 import org.springframework.stereotype.Service;
 
+import java.util.Arrays;
 import java.util.List;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -49,6 +51,23 @@ public class CdpTagOperationService {
                 .last("LIMIT " + Math.max(1, Math.min(limit, 100))));
     }
 
+    public CdpTagOperation retryFailed(Long id, String operator) {
+        CdpTagOperation existing = get(id);
+        List<String> failedUserIds = extractFailedUserIds(existing.getErrorMsg());
+        if (failedUserIds.isEmpty()) {
+            throw new IllegalArgumentException("任务没有可重试的失败用户: " + id);
+        }
+        String resolvedOperator = operator == null || operator.isBlank() ? existing.getCreatedBy() : operator.trim();
+        return create(new CdpBatchTagReq(
+                existing.getOperationType(),
+                existing.getTagCode(),
+                existing.getTagValue(),
+                failedUserIds,
+                "retry failed users from operation #" + id,
+                resolvedOperator
+        ));
+    }
+
     private void run(CdpTagOperation op, List<String> userIds, CdpBatchTagReq req) {
         int success = 0;
         int fail = 0;
@@ -75,5 +94,21 @@ public class CdpTagOperationService {
         op.setStatus(fail == 0 ? "SUCCESS" : "PARTIAL_FAILED");
         op.setErrorMsg(errors.isEmpty() ? null : errors.toString());
         operationMapper.updateById(op);
+    }
+
+    private List<String> extractFailedUserIds(String errorMsg) {
+        if (errorMsg == null || errorMsg.isBlank()) {
+            return List.of();
+        }
+        return Arrays.stream(errorMsg.split(";"))
+                .map(String::trim)
+                .filter(item -> !item.isBlank())
+                .map(item -> {
+                    int idx = item.indexOf(':');
+                    return idx > 0 ? item.substring(0, idx).trim() : "";
+                })
+                .filter(item -> !item.isBlank())
+                .distinct()
+                .collect(Collectors.toList());
     }
 }

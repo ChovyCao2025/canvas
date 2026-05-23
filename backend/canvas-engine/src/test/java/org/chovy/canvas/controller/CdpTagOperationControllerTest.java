@@ -34,4 +34,15 @@ class CdpTagOperationControllerTest {
 
         assertThat(controller.list(10).block().getData()).isEmpty();
     }
+
+    @Test
+    void retryFailedReturnsNewOperation() {
+        CdpTagOperationService service = Mockito.mock(CdpTagOperationService.class);
+        CdpTagOperationController controller = new CdpTagOperationController(service);
+        CdpTagOperation op = new CdpTagOperation();
+        op.setId(9L);
+        when(service.retryFailed(7L, null)).thenReturn(op);
+
+        assertThat(controller.retryFailed(7L).block().getData().getId()).isEqualTo(9L);
+    }
 }

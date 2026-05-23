@@ -39,4 +39,10 @@ public class CdpTagOperationController {
         return Mono.fromCallable(() -> R.ok(service.get(id)))
                 .subscribeOn(Schedulers.boundedElastic());
     }
+
+    @PostMapping("/{id}/retry-failed")
+    public Mono<R<CdpTagOperation>> retryFailed(@PathVariable Long id) {
+        return Mono.fromCallable(() -> R.ok(service.retryFailed(id, null)))
+                .subscribeOn(Schedulers.boundedElastic());
+    }
 }

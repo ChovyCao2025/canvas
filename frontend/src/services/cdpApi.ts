@@ -132,6 +132,9 @@ export const cdpApi = {
   getBatchTagOperation: (id: number) =>
     http.get<R<CdpTagOperation>, R<CdpTagOperation>>(`/cdp/tag-operations/${id}`),
 
+  retryFailedTagOperation: (id: number) =>
+    http.post<R<CdpTagOperation>, R<CdpTagOperation>>(`/cdp/tag-operations/${id}/retry-failed`),
+
   listCanvasUsers: (canvasId: number) =>
     http.get<R<CanvasUserRow[]>, R<CanvasUserRow[]>>(`/canvas/${canvasId}/users`),
 
