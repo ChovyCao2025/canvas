@@ -15,7 +15,7 @@ import {
   FieldSummaryRow,
   NodeHeaderCard,
 } from './InspectorCards'
-import { resolveDisplayValue } from './displayValues'
+import { normalizeFieldOptions, resolveDisplayValue } from './displayValues'
 import { buildConfigPanelPresentation } from './presentation'
 
 interface ApiParamDef { name: string; displayName: string; type: string; required: boolean }
@@ -277,8 +277,7 @@ function renderControl(
     case 'select':
       return (
         <Select
-          options={(options[field.key] ?? field.options ?? []).map((o: any) =>
-            ({ label: o.label ?? o.option_name, value: o.key ?? o.value }))}
+          options={normalizeFieldOptions(field, options)}
           placeholder={`请选择${field.label}`}
           showSearch filterOption={(v, opt) =>
             String(opt?.label ?? '').toLowerCase().includes(v.toLowerCase())}
@@ -290,7 +289,7 @@ function renderControl(
       return <Switch />
     case 'radio':
       return (
-        <Select options={(field.options ?? []).map((o: any) => ({ label: o.label, value: o.value }))}
+        <Select options={normalizeFieldOptions(field, options)}
           placeholder={`请选择${field.label}`} />
       )
     case 'code-editor':
