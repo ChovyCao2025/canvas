@@ -10,15 +10,21 @@ const CARD_STYLE: CSSProperties = {
 
 const TAGGER_STYLES = {
   shell: {
-    background: '#eff6ff',
-    border: '1px solid #dbeafe',
+    background: '#e9f0f7',
+    border: '1px solid #d9e4ef',
   },
   badge: {
-    background: '#dbeafe',
-    color: '#1d4ed8',
-    border: '1px solid #bfdbfe',
+    background: '#f6f9fc',
+    color: '#345472',
+    border: '1px solid #d4e1ee',
   },
-  accent: '#1d4ed8',
+  status: {
+    background: '#f6f9fc',
+    color: '#345472',
+    border: '1px solid #d4e1ee',
+  },
+  title: '#17324d',
+  description: '#6e8093',
 }
 
 const ROUTE_STYLES = {
@@ -38,23 +44,29 @@ const ROUTE_STYLES = {
 
 export interface NodeHeaderCardProps {
   tone: 'default' | 'tagger'
-  typeBadge: string
+  badgeLabel?: string
+  typeBadge?: string
   title: string
   metaBadges: string[]
   description?: string
-  statusLabel: string
+  statusBadgeLabel?: string
+  statusLabel?: string
 }
 
 export function NodeHeaderCard({
   tone,
+  badgeLabel,
   typeBadge,
   title,
   metaBadges,
   description,
+  statusBadgeLabel,
   statusLabel,
 }: NodeHeaderCardProps) {
   const isTagger = tone === 'tagger'
   const shellStyle = isTagger ? TAGGER_STYLES.shell : {}
+  const resolvedBadgeLabel = badgeLabel ?? typeBadge ?? ''
+  const resolvedStatusLabel = statusBadgeLabel ?? statusLabel ?? ''
 
   return (
     <div
@@ -75,13 +87,13 @@ export function NodeHeaderCard({
               ...(isTagger ? TAGGER_STYLES.badge : { background: '#f8fafc', color: '#475569', border: '1px solid #e2e8f0' }),
             }}
           >
-            {typeBadge}
+            {resolvedBadgeLabel}
           </Tag>
-          <Typography.Title level={5} style={{ margin: '10px 0 6px', color: '#0f172a' }}>
+          <Typography.Title level={5} style={{ margin: '10px 0 6px', color: isTagger ? TAGGER_STYLES.title : '#0f172a' }}>
             {title}
           </Typography.Title>
           {description && (
-            <div style={{ color: '#64748b', fontSize: 12, lineHeight: 1.6 }}>
+            <div style={{ color: isTagger ? TAGGER_STYLES.description : '#64748b', fontSize: 12, lineHeight: 1.6 }}>
               {description}
             </div>
           )}
@@ -94,12 +106,12 @@ export function NodeHeaderCard({
             padding: '4px 10px',
             fontSize: 12,
             fontWeight: 600,
-            color: isTagger ? TAGGER_STYLES.accent : '#475569',
-            background: isTagger ? '#eff6ff' : '#f8fafc',
-            border: `1px solid ${isTagger ? '#bfdbfe' : '#e2e8f0'}`,
+            color: isTagger ? TAGGER_STYLES.status.color : '#475569',
+            background: isTagger ? TAGGER_STYLES.status.background : '#f8fafc',
+            border: isTagger ? TAGGER_STYLES.status.border : '1px solid #e2e8f0',
           }}
         >
-          {statusLabel}
+          {resolvedStatusLabel}
         </div>
       </div>
 
@@ -113,7 +125,7 @@ export function NodeHeaderCard({
                 borderRadius: 999,
                 padding: '0 10px',
                 ...(isTagger
-                  ? { background: '#eff6ff', color: '#1d4ed8', border: '1px solid #dbeafe' }
+                  ? { background: '#f6f9fc', color: '#345472', border: '1px solid #d4e1ee' }
                   : { background: '#f8fafc', color: '#334155', border: '1px solid #e2e8f0' }),
               }}
             >
