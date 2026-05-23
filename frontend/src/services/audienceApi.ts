@@ -26,6 +26,11 @@ export interface AudienceStat {
   errorMsg?: string
 }
 
+export interface ComputeTaskResp {
+  taskId: string
+  status: 'QUEUED' | 'RUNNING' | 'SUCCEEDED' | 'FAILED' | 'CANCELED'
+}
+
 export const audienceApi = {
   list: (page = 1, size = 20) =>
     http.get<R<PageResult<AudienceDefinition>>, R<PageResult<AudienceDefinition>>>('/canvas/audiences', { params: { page, size } }),
@@ -40,7 +45,7 @@ export const audienceApi = {
   delete: (id: number) =>
     http.delete<R<void>, R<void>>(`/canvas/audiences/${id}`),
   compute: (id: number) =>
-    http.post<R<void>, R<void>>(`/canvas/audiences/${id}/compute`),
+    http.post<R<ComputeTaskResp>, R<ComputeTaskResp>>(`/canvas/audiences/${id}/compute`),
   stat: (id: number) =>
     http.get<R<AudienceStat>, R<AudienceStat>>(`/canvas/audiences/${id}/stat`),
 }
