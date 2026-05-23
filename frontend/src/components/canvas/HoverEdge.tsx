@@ -18,6 +18,7 @@ export default function HoverEdge({
 
   const highlighted = hovered || !!selected
   const deleteOffsetY = labelY + 30
+  const isPlaceholderHelperEdge = id.startsWith('__phe_')
 
   return (
     <>
@@ -53,7 +54,7 @@ export default function HoverEdge({
           </div>
         )}
 
-        {highlighted && canInsertOnEdge && (
+        {highlighted && canInsertOnEdge && !isPlaceholderHelperEdge && (
           <button
             type="button"
             className="nopan nodrag"

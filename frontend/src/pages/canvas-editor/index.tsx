@@ -449,12 +449,10 @@ function EditorInner({ detail, onStatusChange }: {
       : null
     const defaultBizConfig = buildDefaultBizConfig(nodeType)
     const branchHandles = getBranchHandles(nodeType, defaultBizConfig)
-    const fallbackContext = placeholderContext ?? { kind: 'blank' as const }
     const edgeInsertActive = insertContext?.kind === 'edge'
     const edgeEligible = branchHandles.length === 0
-    const resolvedContext = edgeInsertActive && edgeEligible
-      ? insertContext
-      : fallbackContext
+    const resolvedContext = placeholderContext
+      ?? (edgeInsertActive && edgeEligible ? insertContext : { kind: 'blank' as const })
     const newPos: XYPosition = resolvedContext.kind === 'placeholder' && hitPlaceholder
       ? hitPlaceholder.position
       : dropPos
