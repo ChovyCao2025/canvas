@@ -12,7 +12,9 @@ import org.chovy.canvas.engine.context.NodeStatus;
 import org.chovy.canvas.engine.dag.DagGraph;
 import org.chovy.canvas.engine.dag.DagParser;
 import org.chovy.canvas.engine.handler.HandlerRegistry;
+import org.chovy.canvas.engine.handler.NodeOutcome;
 import org.chovy.canvas.engine.handler.NodeHandler;
+import org.chovy.canvas.engine.handler.NodeRouteResolver;
 import org.chovy.canvas.engine.handler.NodeResult;
 import org.chovy.canvas.engine.handlers.HubHandler;
 import org.chovy.canvas.engine.handlers.LogicRelationHandler;
@@ -263,10 +265,11 @@ public class DagEngine {
                             ctx.putNodeOutput(nodeId, result.output());
                         }
 
-                        ctx.setNodeStatus(nodeId, NodeStatus.SUCCESS);
+                        NodeStatus status = statusForOutcome(result.outcome());
+                        ctx.setNodeStatus(nodeId, status);
                         long durationMs = System.currentTimeMillis() - nodeStartMs;
                         writeTraceEnd(ctx, node, result, durationMs);
-                        metrics.recordNodeExecution(node.getType(), NodeStatus.SUCCESS.name(), durationMs);
+                        metrics.recordNodeExecution(node.getType(), status.name(), durationMs);
                         log.debug("[ENGINE] 节点完成 nodeId={} type={}", nodeId, node.getType());
 
                         // 触发下游逻辑执行
@@ -727,7 +730,7 @@ public class DagEngine {
                     // executeHandlerWithRepeat 对 success=true 的结果会走 repeat 检查，
                     // 检查完后已执行 nodeGate.executing.set(false) 释放锁，此处不需再操作。
                     if (result.pending()) {
-                        ctx.setNodeStatus(nodeId, NodeStatus.WAITING);
+                        ctx.setNodeStatus(nodeId, statusForOutcome(result.outcome()));
                         return Mono.just(Map.of()); // 不触发下游，等待更多上游
                     }
                     // ── 路径C：SUCCESS ────────────────────────────────────────
@@ -737,10 +740,11 @@ public class DagEngine {
                     if (result.output() != null && !result.output().isEmpty()) {
                         ctx.putNodeOutput(nodeId, result.output());
                     }
-                    ctx.setNodeStatus(nodeId, NodeStatus.SUCCESS);
+                    NodeStatus status = statusForOutcome(result.outcome());
+                    ctx.setNodeStatus(nodeId, status);
                     long durationMs = System.currentTimeMillis() - nodeStartMs;
                     writeTraceEnd(ctx, node, result, durationMs);
-                    metrics.recordNodeExecution(node.getType(), NodeStatus.SUCCESS.name(), durationMs);
+                    metrics.recordNodeExecution(node.getType(), status.name(), durationMs);
                     log.debug("[ENGINE] 节点完成 nodeId={} type={}", nodeId, node.getType());
                     return triggerDownstream(graph, result, nodeId, node.getType(), ctx, depth);
                 })
@@ -769,9 +773,18 @@ public class DagEngine {
 
         // PRIORITY 节点：串行依序尝试，第一个成功则停止（4.6节）
         if (NodeType.PRIORITY.equals(sourceType) && result.branchMap() != null) {
-            List<String> orderedBranches = result.branchMap().values().stream()
-                    .filter(Objects::nonNull).toList();
+            List<String> orderedTargets = hasRoutes(result)
+                    ? NodeRouteResolver.resolveTargets(result)
+                    : result.branchMap().values().stream().filter(Objects::nonNull).toList();
             String fallbackNextId = result.elseNodeId();
+            List<String> orderedBranches = orderedTargets;
+            if (hasRoutes(result) && result.routes().containsKey("__else")) {
+                fallbackNextId = result.routes().get("__else");
+                orderedBranches = new ArrayList<>(orderedTargets);
+                if (!orderedBranches.isEmpty()) {
+                    orderedBranches.remove(orderedBranches.size() - 1);
+                }
+            }
             return tryPrioritySequentially(orderedBranches, fallbackNextId, sourceNodeId,
                     graph, ctx, depth + 1);
         }
@@ -913,6 +926,9 @@ public class DagEngine {
      * 从 NodeResult 收集所有下游节点 ID（排除 null）
      */
     private List<String> collectNextIds(NodeResult result) {
+        if (hasRoutes(result)) {
+            return NodeRouteResolver.resolveTargets(result);
+        }
         List<String> ids = new ArrayList<>();
         if (result.nextNodeId() != null) ids.add(result.nextNodeId());
         if (result.successNodeId() != null) ids.add(result.successNodeId());
@@ -920,6 +936,22 @@ public class DagEngine {
         if (result.elseNodeId() != null) ids.add(result.elseNodeId());
         if (result.branchMap() != null) ids.addAll(result.branchMap().values());
         return ids.stream().filter(Objects::nonNull).distinct().collect(Collectors.toList());
+    }
+
+    private boolean hasRoutes(NodeResult result) {
+        return result.routes() != null && !result.routes().isEmpty();
+    }
+
+    private NodeStatus statusForOutcome(NodeOutcome outcome) {
+        if (outcome == null) return NodeStatus.SUCCESS;
+        return switch (outcome) {
+            case FAIL -> NodeStatus.FAILED;
+            case TIMEOUT -> NodeStatus.TIMEOUT;
+            case SUPPRESSED -> NodeStatus.SUPPRESSED;
+            case SKIPPED -> NodeStatus.SKIPPED;
+            case PENDING -> NodeStatus.WAITING;
+            case SUCCESS -> NodeStatus.SUCCESS;
+        };
     }
 
     /**

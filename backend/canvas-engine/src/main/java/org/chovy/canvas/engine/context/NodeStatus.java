@@ -7,6 +7,8 @@ public enum NodeStatus {
     WAITING,
     SUCCESS,
     FAILED,
+    TIMEOUT,
+    SUPPRESSED,
     SKIPPED,
     PARTIAL_FAIL   // PRIORITY 所有分支失败但有 nextNodeId
 }
