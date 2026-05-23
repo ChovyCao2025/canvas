@@ -8,6 +8,7 @@ export interface AudienceDefinition {
   ruleJson: string
   engineType: 'AVIATOR' | 'QL'
   dataSourceType: 'TAGGER_API' | 'JDBC'
+  dataSourceId?: number
   dataSourceConfig?: string
   evaluationStrategy: 'ONLINE' | 'OFFLINE_BATCH' | 'HYBRID'
   cronExpression?: string

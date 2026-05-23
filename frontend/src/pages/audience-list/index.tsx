@@ -112,9 +112,12 @@ export default function AudienceListPage() {
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 20 }}>
         <Title level={4} style={{ margin: 0 }}>人群管理</Title>
-        <Button type="primary" icon={<PlusOutlined />} onClick={() => navigate('/audiences/new')}>
-          新建人群
-        </Button>
+        <Space>
+          <Button onClick={() => navigate('/audiences/data-sources')}>数据源管理</Button>
+          <Button type="primary" icon={<PlusOutlined />} onClick={() => navigate('/audiences/new')}>
+            新建人群
+          </Button>
+        </Space>
       </div>
       <Table rowKey="id" dataSource={data} columns={columns} loading={loading} />
     </div>
