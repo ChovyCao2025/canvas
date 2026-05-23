@@ -6,6 +6,7 @@ import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Locale;
 import java.util.UUID;
 
@@ -76,6 +77,27 @@ public class AsyncTaskService {
         return mapper.selectOne(new LambdaQueryWrapper<AsyncTask>()
                 .eq(AsyncTask::getTaskId, taskId)
                 .last("LIMIT 1"));
+    }
+
+    public List<AsyncTask> list(String taskType, String bizType, List<String> bizIds, List<String> statuses, String createdBy, boolean admin) {
+        LambdaQueryWrapper<AsyncTask> query = new LambdaQueryWrapper<AsyncTask>()
+                .orderByDesc(AsyncTask::getCreatedAt);
+        if (taskType != null && !taskType.isBlank()) {
+            query.eq(AsyncTask::getTaskType, taskType);
+        }
+        if (bizType != null && !bizType.isBlank()) {
+            query.eq(AsyncTask::getBizType, bizType);
+        }
+        if (bizIds != null && !bizIds.isEmpty()) {
+            query.in(AsyncTask::getBizId, bizIds);
+        }
+        if (statuses != null && !statuses.isEmpty()) {
+            query.in(AsyncTask::getStatus, statuses);
+        }
+        if (!admin) {
+            query.eq(AsyncTask::getCreatedBy, createdBy);
+        }
+        return mapper.selectList(query);
     }
 
     private AsyncTask findActive(String taskType, String bizType, String bizId) {
