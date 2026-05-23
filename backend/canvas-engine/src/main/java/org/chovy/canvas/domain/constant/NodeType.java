@@ -77,6 +77,16 @@ public final class NodeType {
     public static final String COUPON             = "COUPON";
     /** 触达平台（短信/Push 等） */
     public static final String REACH_PLATFORM     = "REACH_PLATFORM";
+    /** 产品化邮件触达 */
+    public static final String SEND_EMAIL         = "SEND_EMAIL";
+    /** 产品化短信触达 */
+    public static final String SEND_SMS           = "SEND_SMS";
+    /** 产品化 Push 触达 */
+    public static final String SEND_PUSH          = "SEND_PUSH";
+    /** 产品化站内信触达 */
+    public static final String SEND_IN_APP        = "SEND_IN_APP";
+    /** 产品化微信触达 */
+    public static final String SEND_WECHAT        = "SEND_WECHAT";
     /** Groovy 脚本节点 */
     public static final String GROOVY             = "GROOVY";
     /** 实时打标签 */

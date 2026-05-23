@@ -184,7 +184,12 @@ public class DagEngine {
                     || NodeType.API_CALL.equals(node.getType())
                     || NodeType.WAIT.equals(node.getType())
                     || NodeType.GOAL_CHECK.equals(node.getType())
-                    || NodeType.FREQUENCY_CAP.equals(node.getType());
+                    || NodeType.FREQUENCY_CAP.equals(node.getType())
+                    || NodeType.SEND_EMAIL.equals(node.getType())
+                    || NodeType.SEND_SMS.equals(node.getType())
+                    || NodeType.SEND_PUSH.equals(node.getType())
+                    || NodeType.SEND_IN_APP.equals(node.getType())
+                    || NodeType.SEND_WECHAT.equals(node.getType());
             Map<String, Object> config = needsNodeId
                     ? resolveConfigWithNodeId(rawConfig, ctx, nodeId, node.getType())
                     : resolveConfig(rawConfig, ctx);
