@@ -773,17 +773,12 @@ public class DagEngine {
 
         // PRIORITY 节点：串行依序尝试，第一个成功则停止（4.6节）
         if (NodeType.PRIORITY.equals(sourceType) && result.branchMap() != null) {
-            List<String> orderedTargets = hasRoutes(result)
-                    ? NodeRouteResolver.resolveTargets(result)
-                    : result.branchMap().values().stream().filter(Objects::nonNull).toList();
-            String fallbackNextId = result.elseNodeId();
-            List<String> orderedBranches = orderedTargets;
-            if (hasRoutes(result) && result.routes().containsKey("__else")) {
-                fallbackNextId = result.routes().get("__else");
-                orderedBranches = new ArrayList<>(orderedTargets);
-                if (!orderedBranches.isEmpty()) {
-                    orderedBranches.remove(orderedBranches.size() - 1);
-                }
+            String fallbackNextId = resolveFallbackTarget(result);
+            List<String> orderedBranches = new ArrayList<>(NodeRouteResolver.resolveTargets(result));
+            if (fallbackNextId != null && !fallbackNextId.isBlank()
+                    && !orderedBranches.isEmpty()
+                    && fallbackNextId.equals(orderedBranches.get(orderedBranches.size() - 1))) {
+                orderedBranches.remove(orderedBranches.size() - 1);
             }
             return tryPrioritySequentially(orderedBranches, fallbackNextId, sourceNodeId,
                     graph, ctx, depth + 1);
@@ -926,20 +921,16 @@ public class DagEngine {
      * 从 NodeResult 收集所有下游节点 ID（排除 null）
      */
     private List<String> collectNextIds(NodeResult result) {
-        if (hasRoutes(result)) {
-            return NodeRouteResolver.resolveTargets(result);
-        }
-        List<String> ids = new ArrayList<>();
-        if (result.nextNodeId() != null) ids.add(result.nextNodeId());
-        if (result.successNodeId() != null) ids.add(result.successNodeId());
-        if (result.failNodeId() != null) ids.add(result.failNodeId());
-        if (result.elseNodeId() != null) ids.add(result.elseNodeId());
-        if (result.branchMap() != null) ids.addAll(result.branchMap().values());
-        return ids.stream().filter(Objects::nonNull).distinct().collect(Collectors.toList());
+        return NodeRouteResolver.resolveTargets(result).stream()
+                .distinct()
+                .collect(Collectors.toList());
     }
 
-    private boolean hasRoutes(NodeResult result) {
-        return result.routes() != null && !result.routes().isEmpty();
+    private String resolveFallbackTarget(NodeResult result) {
+        if (result.routes() != null && result.routes().containsKey("__else")) {
+            return result.routes().get("__else");
+        }
+        return result.elseNodeId();
     }
 
     private NodeStatus statusForOutcome(NodeOutcome outcome) {
