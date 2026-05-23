@@ -97,13 +97,11 @@ public class AudienceBatchComputeService {
 
     public AudienceDefinition create(AudienceDefinition definition) {
         definitionMapper.insert(definition);
-        compute(definition.getId());
         return definition;
     }
 
     public void update(AudienceDefinition definition) {
         definitionMapper.updateById(definition);
-        compute(definition.getId());
     }
 
     public void delete(Long audienceId) {
