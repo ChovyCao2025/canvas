@@ -57,6 +57,14 @@ canvas:
     max-retry: 3
     retry-base-delay-ms: 1000
     retry-max-delay-ms: 30000
+    priority:
+      high: [DIRECT_CALL]
+      normal: [MQ, BEHAVIOR, EVENT_TRIGGER, API_CALL]
+      low: [SCHEDULED]
+      low-ratio: 0.5
+      high-max-concurrency-ratio: 2.0
+      overflow-retry-delay-ms: 5000
+      overflow-max-retry: 3
   node:
     timeout-ms: 3000
   # Groovy 沙箱（12.9节，预编译缓存）
