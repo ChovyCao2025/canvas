@@ -1,5 +1,9 @@
 #!/usr/bin/env node
 
+import { spawnSync } from 'node:child_process'
+import { mkdirSync, writeFileSync } from 'node:fs'
+import os from 'node:os'
+import path from 'node:path'
 import { pathToFileURL } from 'node:url'
 
 const DEFAULT_ARGS = {
@@ -13,6 +17,8 @@ const DEFAULT_ARGS = {
   audienceId: '',
   userPrefix: 'perf_user_',
   userModulo: 1000,
+  duplicateRate: 0,
+  summaryFile: '',
 }
 
 const FLAG_NAMES = {
@@ -26,6 +32,8 @@ const FLAG_NAMES = {
   '--audience-id': 'audienceId',
   '--user-prefix': 'userPrefix',
   '--user-modulo': 'userModulo',
+  '--duplicate-rate': 'duplicateRate',
+  '--summary-file': 'summaryFile',
 }
 
 const NUMBER_ARGS = new Set(['count', 'concurrency', 'userModulo'])
@@ -40,6 +48,19 @@ function parseIntegerArg(flag, value, { allowZero }) {
   }
 
   return Number(value)
+}
+
+function parseDuplicateRate(flag, value) {
+  if (!/^(0|0?\.\d+)$/.test(value)) {
+    throw new Error(`${flag} must be >= 0 and < 1`)
+  }
+
+  const parsed = Number(value)
+  if (!Number.isFinite(parsed) || parsed < 0 || parsed >= 1) {
+    throw new Error(`${flag} must be >= 0 and < 1`)
+  }
+
+  return parsed
 }
 
 function validateArgs(args) {
@@ -70,6 +91,10 @@ function validateArgs(args) {
   if (args.mode === 'audience' && !args.audienceId) {
     throw new Error('--audience-id is required for audience mode')
   }
+
+  if (args.mode !== 'direct' && args.duplicateRate > 0) {
+    throw new Error('--duplicate-rate is only supported for direct mode')
+  }
 }
 
 export function parseRunnerArgs(argv) {
@@ -90,6 +115,8 @@ export function parseRunnerArgs(argv) {
     const value = argv[index + 1]
     if (NUMBER_ARGS.has(name)) {
       args[name] = parseIntegerArg(flag, value, { allowZero: name === 'count' })
+    } else if (name === 'duplicateRate') {
+      args[name] = parseDuplicateRate(flag, value)
     } else {
       args[name] = value
     }
@@ -131,6 +158,18 @@ export function buildDirectPayload({ perfRunId, userPrefix, seq, userModulo }) {
   }
 }
 
+export function duplicateCountFor(count, duplicateRate) {
+  return Math.floor(count * duplicateRate)
+}
+
+export function logicalSeqForRequest(seq, count, duplicateCount) {
+  if (duplicateCount <= 0 || seq <= count - duplicateCount) {
+    return seq
+  }
+
+  return seq - (count - duplicateCount)
+}
+
 export function* chunkSeq(count, concurrency) {
   for (let start = 1; start <= count; start += concurrency) {
     const chunk = []
@@ -163,12 +202,14 @@ function buildRequest(args, seq) {
       throw new Error('--canvas-id is required for direct mode')
     }
 
+    const logicalSeq = logicalSeqForRequest(seq, args.count, args.duplicateCount || 0)
+
     return {
       url: `${args.baseUrl}/canvas/execute/direct/${args.canvasId}`,
       body: buildDirectPayload({
         perfRunId: args.perfRunId,
         userPrefix: args.userPrefix,
-        seq,
+        seq: logicalSeq,
         userModulo: args.userModulo,
       }),
     }
@@ -191,9 +232,49 @@ function buildRequest(args, seq) {
   throw new Error(`Unsupported mode: ${args.mode}`)
 }
 
-async function sendRequest(args, seq) {
+function safeSpawnOutput(command, args) {
+  const result = spawnSync(command, args, {
+    encoding: 'utf8',
+    timeout: 3000,
+  })
+
+  if (result.error) {
+    return ''
+  }
+
+  return `${result.stdout || ''}${result.stderr || ''}`.trim()
+}
+
+function javaVersion() {
+  return safeSpawnOutput('java', ['-version']).split(/\r?\n/).at(0) || ''
+}
+
+function machineMetadata() {
+  const cpus = os.cpus()
+  const cpuModels = [...new Set(cpus.map((cpu) => cpu.model).filter(Boolean))]
+  const cpuSpeedsMhz = [...new Set(cpus.map((cpu) => cpu.speed).filter((speed) => speed > 0))]
+
+  return {
+    hostname: os.hostname(),
+    platform: os.platform(),
+    arch: os.arch(),
+    cpuCount: cpus.length,
+    cpuModels,
+    cpuSpeedsMhz,
+    totalMemBytes: os.totalmem(),
+    nodeVersion: process.version,
+    nodeExecArgv: process.execArgv,
+    javaVersion: javaVersion(),
+    javaHome: process.env.JAVA_HOME || '',
+    javaToolOptions: process.env.JAVA_TOOL_OPTIONS || '',
+    jdkJavaOptions: process.env.JDK_JAVA_OPTIONS || '',
+    mavenOpts: process.env.MAVEN_OPTS || '',
+  }
+}
+
+async function sendRequest(args, seq, { performanceNow }) {
   const request = buildRequest(args, seq)
-  const startedAt = performance.now()
+  const startedAt = performanceNow()
 
   try {
     const response = await fetch(request.url, {
@@ -206,28 +287,56 @@ async function sendRequest(args, seq) {
 
     return {
       ok: response.ok,
-      durationMs: performance.now() - startedAt,
+      durationMs: performanceNow() - startedAt,
     }
   } catch (error) {
     return {
       ok: false,
-      durationMs: performance.now() - startedAt,
+      durationMs: performanceNow() - startedAt,
       error,
     }
   }
 }
 
-export async function run(args) {
+function summarySettings(args) {
+  return {
+    mode: args.mode,
+    baseUrl: args.baseUrl,
+    count: args.count,
+    concurrency: args.concurrency,
+    eventCode: args.eventCode,
+    canvasId: args.canvasId,
+    audienceId: args.audienceId,
+    userPrefix: args.userPrefix,
+    userModulo: args.userModulo,
+    duplicateRate: args.duplicateRate || 0,
+    duplicateCount: args.duplicateCount || 0,
+  }
+}
+
+export async function run(args, deps = {}) {
+  const now = deps.now || (() => new Date().toISOString())
+  const performanceNow = deps.performanceNow || (() => performance.now())
+  const getMachineMetadata = deps.machineMetadata || machineMetadata
+  const duplicateCount = args.mode === 'direct'
+    ? duplicateCountFor(args.count, args.duplicateRate || 0)
+    : 0
+  const runArgs = {
+    ...args,
+    duplicateCount,
+  }
+  const startedAt = now()
+  const startedPerf = performanceNow()
   let sent = 0
   let success = 0
   let failed = 0
   const durations = []
 
-  for (const chunk of chunkSeq(args.count, args.concurrency)) {
+  for (const chunk of chunkSeq(runArgs.count, runArgs.concurrency)) {
     const results = await Promise.all(
       chunk.map(async (seq) => {
         sent += 1
-        return sendRequest(args, seq)
+        return sendRequest(runArgs, seq, { performanceNow })
       }),
     )
 
@@ -248,14 +357,21 @@ export async function run(args) {
     Math.max(0, Math.ceil(durations.length * 0.95) - 1),
   )
   const p95Ms = durations.length === 0 ? 0 : durations[p95Index]
+  const finishedAt = now()
+  const durationMs = performanceNow() - startedPerf
 
   return {
-    perfRunId: args.perfRunId,
-    mode: args.mode,
+    perfRunId: runArgs.perfRunId,
+    mode: runArgs.mode,
     sent,
     success,
     failed,
     p95Ms,
+    startedAt,
+    finishedAt,
+    durationMs,
+    settings: summarySettings(runArgs),
+    machine: getMachineMetadata(),
   }
 }
 
@@ -267,9 +383,21 @@ export function isCliEntrypoint(moduleUrl, argvPath) {
   return Boolean(argvPath) && moduleUrl === pathToFileURL(argvPath).href
 }
 
+function writeSummaryFile(summaryFile, summary) {
+  const directory = path.dirname(summaryFile)
+  if (directory && directory !== '.') {
+    mkdirSync(directory, { recursive: true })
+  }
+  writeFileSync(summaryFile, `${JSON.stringify(summary, null, 2)}\n`)
+}
+
 async function main() {
   const args = parseRunnerArgs(process.argv.slice(2))
   const summary = await run(args)
+
+  if (args.summaryFile) {
+    writeSummaryFile(args.summaryFile, summary)
+  }
 
   console.log(JSON.stringify(summary, null, 2))
   process.exitCode = exitCodeForSummary(summary)

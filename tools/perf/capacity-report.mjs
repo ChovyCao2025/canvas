@@ -5,6 +5,7 @@ import { pathToFileURL } from 'node:url'
 const DEFAULT_ARGS = {
   cpuEfficiencyFactor: 0.75,
   safetyFactor: 0.5,
+  verifierVerdict: 'PASS',
 }
 
 const FLAG_NAMES = {
@@ -21,7 +22,10 @@ const FLAG_NAMES = {
   '--downstream-calls-per-event': 'downstreamCallsPerEvent',
   '--cpu-efficiency-factor': 'cpuEfficiencyFactor',
   '--safety-factor': 'safetyFactor',
+  '--verifier-verdict': 'verifierVerdict',
 }
+
+const VERIFIER_VERDICTS = new Set(['PASS', 'PASS_WITH_EXPECTED_FAILURES', 'FAIL'])
 
 const REQUIRED_POSITIVE_ARGS = [
   'localStableQps',
@@ -60,10 +64,25 @@ function requirePositive(input, name) {
   return value
 }
 
+function requireVerifierVerdict(input) {
+  const verdict = input.verifierVerdict || DEFAULT_ARGS.verifierVerdict
+
+  if (!VERIFIER_VERDICTS.has(verdict)) {
+    throw new Error('verifierVerdict must be one of PASS, PASS_WITH_EXPECTED_FAILURES, FAIL')
+  }
+
+  if (verdict === 'FAIL') {
+    throw new Error('Cannot estimate capacity when verifierVerdict is FAIL')
+  }
+
+  return verdict
+}
+
 export function estimateCapacity(input) {
   for (const name of REQUIRED_POSITIVE_ARGS) {
     requirePositive(input, name)
   }
+  const verifierVerdict = requireVerifierVerdict(input)
 
   const appCpuCapacity = input.localStableQps
     * (input.prodAppCoresTotal / input.localAppCores)
@@ -86,6 +105,7 @@ export function estimateCapacity(input) {
   const recommendedCapacity = Math.floor(rawCapacity * input.safetyFactor)
 
   return {
+    verifierVerdict,
     bottleneck: bottleneck.name,
     rawCapacity,
     recommendedCapacity,
@@ -112,12 +132,17 @@ export function parseCapacityArgs(argv) {
       throw new Error(`Missing value for ${flag}`)
     }
 
-    args[name] = parsePositiveNumber(flag, argv[index + 1])
+    if (name === 'verifierVerdict') {
+      args[name] = argv[index + 1]
+    } else {
+      args[name] = parsePositiveNumber(flag, argv[index + 1])
+    }
   }
 
   for (const name of REQUIRED_POSITIVE_ARGS) {
     requirePositive(args, name)
   }
+  requireVerifierVerdict(args)
 
   return args
 }
