@@ -5,6 +5,8 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.chovy.canvas.domain.audience.AudienceDataSource;
+import org.chovy.canvas.domain.audience.AudienceDataSourceMapper;
 import org.chovy.canvas.domain.audience.AudienceDefinition;
 import org.chovy.canvas.domain.audience.AudienceDefinitionMapper;
 import org.chovy.canvas.domain.audience.AudienceStat;
@@ -43,6 +45,7 @@ public class AudienceBatchComputeService {
     private final ObjectMapper objectMapper;
     private final SqlWhereGenerator sqlWhereGenerator;
     private final AudienceEvaluationContextFetcher contextFetcher;
+    private final AudienceDataSourceMapper dataSourceMapper;
 
     @Value("${canvas.integration.tagger-service-url}")
     private String taggerUrl;
@@ -101,14 +104,21 @@ public class AudienceBatchComputeService {
     }
 
     private RoaringBitmap computeViaJdbc(AudienceDefinition definition) throws Exception {
-        JdbcConfig jdbcConfig = parseJdbcConfig(definition.getDataSourceConfig());
-        DataSource dataSource = DataSourceBuilder.create()
+        if (definition.getDataSourceId() == null) {
+            throw new IllegalArgumentException("dataSourceId is required for JDBC");
+        }
+        AudienceDataSource audienceDataSource = dataSourceMapper.selectById(definition.getDataSourceId());
+        if (audienceDataSource == null) {
+            throw new IllegalArgumentException("Audience data source not found: " + definition.getDataSourceId());
+        }
+        JdbcConfig jdbcConfig = parseJdbcConfig(definition, audienceDataSource);
+        DataSource jdbcDataSource = DataSourceBuilder.create()
                 .driverClassName(jdbcConfig.driverClassName())
                 .url(jdbcConfig.url())
                 .username(jdbcConfig.username())
                 .password(jdbcConfig.password())
                 .build();
-        NamedParameterJdbcTemplate jdbcTemplate = new NamedParameterJdbcTemplate(dataSource);
+        NamedParameterJdbcTemplate jdbcTemplate = new NamedParameterJdbcTemplate(jdbcDataSource);
         SqlWhereGenerator.SqlWhere where = sqlWhereGenerator.generate(definition.getRuleJson());
         String sql = "SELECT " + jdbcConfig.userIdColumn() + " FROM " + jdbcConfig.baseTable() +
                 " WHERE " + where.sql();
@@ -183,17 +193,19 @@ public class AudienceBatchComputeService {
         return userIds;
     }
 
-    private JdbcConfig parseJdbcConfig(String configJson) throws Exception {
-        if (configJson == null || configJson.isBlank()) {
-            throw new IllegalArgumentException("dataSourceConfig is required for JDBC");
-        }
-        Map<String, Object> config = objectMapper.readValue(configJson, new TypeReference<>() {});
+    JdbcConfig parseJdbcConfig(AudienceDefinition definition, AudienceDataSource dataSource) throws Exception {
+        Map<String, Object> config = objectMapper.readValue(
+                definition.getDataSourceConfig() == null || definition.getDataSourceConfig().isBlank()
+                        ? "{}"
+                        : definition.getDataSourceConfig(),
+                new TypeReference<>() {}
+        );
         String baseTable = stringValue(config, "baseTable");
-        String url = stringValue(config, "url");
-        String username = stringValue(config, "username");
-        String password = stringValue(config, "password");
+        String url = requiredDataSourceValue(dataSource.getUrl(), "url");
+        String username = requiredDataSourceValue(dataSource.getUsername(), "username");
+        String password = requiredDataSourceValue(dataSource.getPassword(), "password");
         String userIdColumn = stringValue(config, "userIdColumn", "user_id");
-        String driverClassName = stringValue(config, "driverClassName", "com.mysql.cj.jdbc.Driver");
+        String driverClassName = optionalDataSourceValue(dataSource.getDriverClassName(), "com.mysql.cj.jdbc.Driver");
         Integer maxRows = config.get("maxRows") instanceof Number number ? number.intValue() : null;
         if (!baseTable.matches("[A-Za-z_][A-Za-z0-9_]*") || !userIdColumn.matches("[A-Za-z_][A-Za-z0-9_]*")) {
             throw new IllegalArgumentException("Illegal table or column name in JDBC config");
@@ -212,6 +224,17 @@ public class AudienceBatchComputeService {
     private String stringValue(Map<String, Object> config, String key, String defaultValue) {
         Object value = config.get(key);
         return value == null ? defaultValue : String.valueOf(value);
+    }
+
+    private String requiredDataSourceValue(String value, String key) {
+        if (value == null || value.isBlank()) {
+            throw new IllegalArgumentException("Missing JDBC config field: " + key);
+        }
+        return value;
+    }
+
+    private String optionalDataSourceValue(String value, String defaultValue) {
+        return value == null || value.isBlank() ? defaultValue : value;
     }
 
     private void updateStat(Long audienceId, String status, Long size, Integer sizeKb, String errorMsg) {
@@ -257,7 +280,7 @@ public class AudienceBatchComputeService {
                 .orderByAsc(AudienceDefinition::getId));
     }
 
-    private record JdbcConfig(
+    record JdbcConfig(
             String baseTable,
             String url,
             String username,
