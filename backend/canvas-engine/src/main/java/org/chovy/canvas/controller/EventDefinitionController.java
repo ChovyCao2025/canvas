@@ -17,6 +17,7 @@ import org.chovy.canvas.engine.disruptor.CanvasDisruptorService;
 import org.chovy.canvas.infra.redis.TriggerRouteService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.chovy.canvas.perf.PerfRunContext;
 import org.springframework.web.bind.annotation.*;
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
@@ -139,6 +140,7 @@ public class EventDefinitionController {
                     EventLog eventLog = new EventLog();
                     eventLog.setEventCode(req.getEventCode());
                     eventLog.setUserId(req.getUserId());
+                    eventLog.setPerfRunId(PerfRunContext.extract(payload));
                     try {
                         eventLog.setAttributes(req.getAttributes() != null
                                 ? objectMapper.writeValueAsString(req.getAttributes()) : null);

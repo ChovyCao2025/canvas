@@ -33,6 +33,7 @@ public class ExecutionController {
             @RequestBody DirectCallReq req) {
         // 设计文档 13.1节：调用方应提供 idempotencyKey，网络超时重试时保持相同值可防重复执行
         // 未提供时生成随机 UUID（不保证幂等，业务方需知晓风险）
+        // 压测请求通过 inputParams.perfRunId 贯穿账本，通过 idempotencyKey 控制唯一输入键。
         String dedupKey = (req.getIdempotencyKey() != null && !req.getIdempotencyKey().isBlank())
                 ? req.getIdempotencyKey()
                 : UUID.randomUUID().toString();

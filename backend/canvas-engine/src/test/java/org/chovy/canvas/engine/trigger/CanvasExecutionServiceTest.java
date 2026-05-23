@@ -21,8 +21,12 @@ import org.chovy.canvas.engine.context.ExecutionContext;
 import org.chovy.canvas.engine.dag.DagGraph;
 import org.chovy.canvas.engine.dag.DagParser;
 import org.chovy.canvas.engine.disruptor.CanvasDisruptorService;
+import org.chovy.canvas.engine.handler.HandlerRegistry;
 import org.chovy.canvas.engine.handlers.MqTriggerHandler;
+import org.chovy.canvas.engine.scheduler.CanvasMetrics;
+import org.chovy.canvas.engine.scheduler.CircuitBreakerRegistry;
 import org.chovy.canvas.engine.scheduler.DagEngine;
+import org.chovy.canvas.engine.scheduler.TraceWriteBuffer;
 import org.chovy.canvas.infra.cache.CanvasConfigCache;
 import org.chovy.canvas.infra.cache.CanvasEntityCache;
 import org.chovy.canvas.infra.mq.OverflowRetryMessage;
@@ -431,7 +435,7 @@ class CanvasExecutionServiceTest {
                 TriggerType.MQ,
                 NodeType.MQ_TRIGGER,
                 "topic-timeout",
-                Map.of("orderId", "o-8"),
+                Map.of("orderId", "o-8", "perfRunId", "perf_20260523_003"),
                 "msg-8",
                 false
         ).block();
@@ -442,6 +446,7 @@ class CanvasExecutionServiceTest {
         ArgumentCaptor<CanvasExecutionDlq> dlqCaptor = ArgumentCaptor.forClass(CanvasExecutionDlq.class);
         verify(dlqMapper).insert(dlqCaptor.capture());
         assertThat(dlqCaptor.getValue().getExecutionId()).isEqualTo("msg-8");
+        assertThat(dlqCaptor.getValue().getPerfRunId()).isEqualTo("perf_20260523_003");
         assertThat(dlqCaptor.getValue().getFailedNodeId()).isEqualTo("OVERFLOW_ENQUEUE");
         assertThat(dlqCaptor.getValue().getErrorMsg()).contains("FLUSH_DISK_TIMEOUT");
         verify(dagEngine, never()).execute(any(), any(), any());
@@ -528,6 +533,91 @@ class CanvasExecutionServiceTest {
         verify(preCheckService).consumeQuotaAndRecord(eq(canvas), eq("user-3"));
         verify(rocketMQTemplate, never()).getProducer();
         verify(dagEngine).execute(eq(graph), eq("trigger"), any());
+    }
+
+    @Test
+    void triggerPersistsExecutionPerfRunIdFromTriggerPayload() {
+        Canvas canvas = publishedCanvas(43L, 10);
+        when(canvasEntityCache.get(43L)).thenReturn(canvas);
+        when(executionRegistry.activeCount(43L)).thenReturn(1);
+        when(ctxStore.exists(43L, "user-14")).thenReturn(false);
+        DagGraph graph = graphWithTriggerNode(NodeType.DIRECT_CALL, null);
+        when(configCache.get(43L, 101L)).thenReturn(graph);
+        when(executionRegistry.tryAcquire(eq(43L), any(), eq(1000), eq(1000)))
+                .thenReturn(Optional.of(Disposables.swap()));
+        when(dagEngine.execute(eq(graph), eq("trigger"), any())).thenReturn(Mono.just(Map.of("ok", true)));
+
+        Map<String, Object> result = sut.trigger(
+                43L,
+                "user-14",
+                TriggerType.DIRECT_CALL,
+                NodeType.DIRECT_CALL,
+                null,
+                Map.of("perfRunId", "perf_20260523_001", "amount", 88),
+                null,
+                false
+        ).block();
+
+        assertThat(result).containsEntry("ok", true);
+        ArgumentCaptor<CanvasExecution> executionCaptor = ArgumentCaptor.forClass(CanvasExecution.class);
+        verify(executionMapper).insert(executionCaptor.capture());
+        assertThat(executionCaptor.getValue().getPerfRunId()).isEqualTo("perf_20260523_001");
+    }
+
+    @Test
+    void triggerDryRunPersistsExecutionPerfRunIdFromTriggerPayload() {
+        Canvas canvas = publishedCanvas(44L, 10);
+        when(canvasMapper.selectById(44L)).thenReturn(canvas);
+        DagGraph graph = graphWithTriggerNode(NodeType.DIRECT_CALL, null);
+        when(dagParser.parse("graph-json")).thenReturn(graph);
+        when(dagEngine.execute(eq(graph), eq("trigger"), any())).thenReturn(Mono.just(Map.of("ok", true)));
+
+        Map<String, Object> result = sut.triggerDryRun(
+                44L,
+                "user-15",
+                Map.of("perfRunId", "perf_20260523_002", "amount", 99),
+                "graph-json"
+        ).block();
+
+        assertThat(result).containsEntry("ok", true);
+        ArgumentCaptor<CanvasExecution> executionCaptor = ArgumentCaptor.forClass(CanvasExecution.class);
+        verify(executionMapper).insert(executionCaptor.capture());
+        assertThat(executionCaptor.getValue().getPerfRunId()).isEqualTo("perf_20260523_002");
+    }
+
+    @Test
+    void dagEngineDlqPersistsPerfRunIdFromExecutionContext() throws Exception {
+        CanvasExecutionDlqMapper mapper = mock(CanvasExecutionDlqMapper.class);
+        DagEngine engine = new DagEngine(
+                mock(HandlerRegistry.class),
+                mock(TraceWriteBuffer.class),
+                mapper,
+                mock(CircuitBreakerRegistry.class),
+                mock(CanvasMetrics.class),
+                objectMapper,
+                mock(ContextPersistenceService.class),
+                mock(CanvasExecutionService.class)
+        );
+        ReflectionTestUtils.setField(engine, "maxRetry", 3);
+
+        ExecutionContext ctx = new ExecutionContext();
+        ctx.setExecutionId("exec-99");
+        ctx.setCanvasId(99L);
+        ctx.setUserId("user-99");
+        ctx.setPerfRunId("perf_20260523_004");
+        ctx.setTriggerType(TriggerType.MQ);
+        ctx.setTriggerNodeType(NodeType.MQ_TRIGGER);
+        ctx.setMatchKey("topic-dlq");
+        ctx.getTriggerPayload().put("orderId", "o-99");
+
+        Method writeDlq = DagEngine.class.getDeclaredMethod(
+                "writeDlq", ExecutionContext.class, String.class, String.class, Throwable.class);
+        writeDlq.setAccessible(true);
+        writeDlq.invoke(engine, ctx, "node-1", NodeType.API_CALL, new RuntimeException("node failed"));
+
+        ArgumentCaptor<CanvasExecutionDlq> dlqCaptor = ArgumentCaptor.forClass(CanvasExecutionDlq.class);
+        verify(mapper, timeout(1_000)).insert(dlqCaptor.capture());
+        assertThat(dlqCaptor.getValue().getPerfRunId()).isEqualTo("perf_20260523_004");
     }
 
     private SendResult sendResult(SendStatus status) {

@@ -443,6 +443,7 @@ public class DagEngine {
                     .executionId(ctx.getExecutionId())
                     .canvasId(ctx.getCanvasId())
                     .userId(ctx.getUserId())
+                    .perfRunId(ctx.getPerfRunId())
                     .failedNodeId(nodeId)
                     .failedNodeType(nodeType)
                     .errorMsg(msg.substring(0, Math.min(500, msg.length())))

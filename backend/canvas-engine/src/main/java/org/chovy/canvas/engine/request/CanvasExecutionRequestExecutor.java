@@ -6,6 +6,7 @@ import org.chovy.canvas.domain.execution.CanvasExecutionRequest;
 import org.chovy.canvas.domain.execution.CanvasExecutionRequestMapper;
 import org.chovy.canvas.engine.scheduler.CanvasMetrics;
 import org.chovy.canvas.engine.trigger.CanvasExecutionService;
+import org.chovy.canvas.perf.PerfRunContext;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -13,6 +14,7 @@ import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
 
 import java.time.LocalDateTime;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
 
@@ -80,6 +82,10 @@ public class CanvasExecutionRequestExecutor {
                                 }
                                 return Mono.defer(() -> {
                                             Map<String, Object> payload = parsePayload(request.getPayloadJson());
+                                            if (request.getPerfRunId() != null
+                                                    && PerfRunContext.extract(payload) == null) {
+                                                payload.put("perfRunId", request.getPerfRunId());
+                                            }
                                             return executionService.triggerFromExecutionRequest(
                                                 request.getCanvasId(),
                                                 request.getUserId(),
@@ -147,10 +153,10 @@ public class CanvasExecutionRequestExecutor {
     private Map<String, Object> parsePayload(String payloadJson) {
         try {
             if (payloadJson == null || payloadJson.isBlank()) {
-                return Map.of();
+                return new HashMap<>();
             }
-            return objectMapper.readValue(payloadJson, new TypeReference<>() {
-            });
+            return new HashMap<>(objectMapper.readValue(payloadJson, new TypeReference<>() {
+            }));
         } catch (Exception e) {
             throw new IllegalArgumentException("Execution request payload parse failed", e);
         }

@@ -28,6 +28,7 @@ import org.chovy.canvas.infra.cache.CanvasConfigCache;
 import org.chovy.canvas.infra.cache.CanvasEntityCache;
 import org.chovy.canvas.infra.mq.OverflowRetryMessage;
 import org.chovy.canvas.infra.redis.ContextPersistenceService;
+import org.chovy.canvas.perf.PerfRunContext;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -93,6 +94,7 @@ public class CanvasExecutionService {
 
                     ExecutionContext ctx = newContext(canvasId, -1L, userId, TriggerType.DRY_RUN);
                     ctx.getTriggerPayload().putAll(sanitizePayload(payload));
+                    ctx.setPerfRunId(PerfRunContext.extract(ctx.getTriggerPayload()));
 
                     DagGraph graph;
                     if (graphJson != null && !graphJson.isBlank()) {
@@ -278,6 +280,7 @@ public class CanvasExecutionService {
                         ctx.setTriggerNodeType(triggerNodeType);
                         ctx.setMatchKey(matchKey);
                         ctx.getTriggerPayload().putAll(sanitizePayload(payload));
+                        ctx.setPerfRunId(PerfRunContext.extract(ctx.getTriggerPayload()));
 
                         DagGraph graph = configCache.get(canvasId, ctx.getVersionId());
                         String triggerNodeId = findTriggerNode(graph, triggerNodeType, matchKey);
@@ -534,6 +537,7 @@ public class CanvasExecutionService {
                     .executionId(msg.getMsgId())
                     .canvasId(msg.getCanvasId())
                     .userId(msg.getUserId())
+                    .perfRunId(PerfRunContext.extract(msg.getPayload()))
                     .failedNodeId("OVERFLOW_ENQUEUE")
                     .failedNodeType(msg.getTriggerNodeType())
                     .errorMsg(truncate(errorMsg, 500))
@@ -568,6 +572,7 @@ public class CanvasExecutionService {
         exec.setCanvasId(ctx.getCanvasId());
         exec.setVersionId(ctx.getVersionId());
         exec.setUserId(ctx.getUserId());
+        exec.setPerfRunId(ctx.getPerfRunId());
         exec.setTriggerType(ctx.getTriggerType());
         exec.setStatus(ExecutionStatus.RUNNING.getCode());
         return exec;

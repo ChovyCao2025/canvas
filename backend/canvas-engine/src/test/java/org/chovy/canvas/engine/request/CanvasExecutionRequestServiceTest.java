@@ -29,7 +29,7 @@ class CanvasExecutionRequestServiceTest {
                 TriggerType.MQ,
                 NodeType.MQ_TRIGGER,
                 "order.paid",
-                Map.of("orderId", "O-1"),
+                Map.of("orderId", "O-1", "perfRunId", "perf_20260523_001"),
                 "MSG-1"
         );
 
@@ -44,6 +44,7 @@ class CanvasExecutionRequestServiceTest {
         assertThat(request.getTriggerNodeType()).isEqualTo(NodeType.MQ_TRIGGER);
         assertThat(request.getMatchKey()).isEqualTo("order.paid");
         assertThat(request.getPayloadJson()).contains("\"orderId\":\"O-1\"");
+        assertThat(request.getPerfRunId()).isEqualTo("perf_20260523_001");
         assertThat(request.getSourceMsgId()).isEqualTo("MSG-1");
         assertThat(request.getStatus()).isEqualTo(CanvasExecutionRequestStatus.PENDING);
         assertThat(request.getAttemptCount()).isZero();
