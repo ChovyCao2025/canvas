@@ -3,7 +3,7 @@ import {
   ReactFlow, ReactFlowProvider,
   addEdge, useNodesState, useEdgesState,
   useReactFlow, Background, Controls, MiniMap,
-  type Connection, type Node, type Edge, type NodeChange, type EdgeChange,
+  type Connection, type Node, type Edge, type NodeChange, type EdgeChange, type XYPosition,
 } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
 import dagre from '@dagrejs/dagre'
@@ -23,13 +23,14 @@ import NodePanel from '../../components/node-panel'
 import ConfigPanel from '../../components/config-panel'
 import ExecutionTracePanel from '../../components/canvas/ExecutionTracePanel'
 import {
-  DEFAULT_NAMES, TRIGGER_TYPES, TERMINAL_TYPES,
+  TRIGGER_TYPES, TERMINAL_TYPES,
 } from '../../components/canvas/constants'
 
 import HoverEdge from '../../components/canvas/HoverEdge'
 import CronBuilder from '../../components/config-panel/CronBuilder'
 import { CanvasActionsContext } from '../../context/CanvasActionsContext'
 import { useAuth } from '../../context/AuthContext'
+import { applyInsertIntoEdge, buildDetachedNode, buildPlaceholderEdge } from './insertNode'
 
 const { RangePicker } = DatePicker
 
@@ -138,6 +139,12 @@ function cleanRefs(cfg: Record<string, unknown>, deletedIds: Set<string>): BizCo
 
 interface Snapshot { nodes: Node<CanvasNodeData>[]; edges: Edge[]; actionName: string }
 
+type InsertContext =
+  | { kind: 'edge'; edgeId: string }
+  | { kind: 'placeholder'; sourceId: string; handleId: string }
+  | { kind: 'blank' }
+  | null
+
 function useHistory(nodes: Node<CanvasNodeData>[], edges: Edge[]) {
   const [history, setHistory] = useState<Snapshot[]>([])
   const [future,  setFuture]  = useState<Snapshot[]>([])
@@ -218,6 +225,7 @@ function EditorInner({ detail, onStatusChange }: {
     cooldownSeconds: detail.canvas.cooldownSeconds,
   })
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null)
+  const [insertContext, setInsertContext] = useState<InsertContext>(null)
   const [saving, setSaving]         = useState(false)
   const [isDirty, setIsDirty]       = useState(false)
   const [clipboard, setClipboard]   = useState<Node<CanvasNodeData>[]>([])
@@ -239,6 +247,22 @@ function EditorInner({ detail, onStatusChange }: {
   const autoSaveTimer = useRef<ReturnType<typeof setTimeout>>()
 
   const { snapshot, undo, redo, canUndo, canRedo, undoLabel, redoLabel } = useHistory(nodes as Node<CanvasNodeData>[], edges)
+
+  const buildDefaultBizConfig = useCallback((nodeType: string): BizConfig => {
+    if (nodeType === 'SELECTOR') {
+      return { branches: [{ label: '如果', nextNodeId: undefined }] }
+    }
+    if (nodeType === 'IF_CONDITION') {
+      return { rules: [] }
+    }
+    if (nodeType === 'PRIORITY') {
+      return { priorities: [{ order: 1, nextNodeId: undefined }] }
+    }
+    if (nodeType === 'AB_SPLIT') {
+      return { groups: [{ groupKey: 'A', nextNodeId: undefined }] }
+    }
+    return {}
+  }, [])
 
   // ── Auto-save：最后一次改动 3s 后静默保存 ─────────────────────
   useEffect(() => {
@@ -341,6 +365,8 @@ function EditorInner({ detail, onStatusChange }: {
   // 拖拽节点入画布
   const onDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault()
+    if (readonly) return
+
     const nodeType = e.dataTransfer.getData('application/canvas-node-type')
     const category = e.dataTransfer.getData('application/canvas-node-category')
     if (!nodeType) return
@@ -355,47 +381,77 @@ function EditorInner({ detail, onStatusChange }: {
     })
 
     snapshot('添加节点')
-    const newPos: { x: number; y: number } = hitPlaceholder?.position ?? dropPos
-
-    const defaultBizConfig: BizConfig = nodeType === 'SELECTOR'
-      ? { branches: [{ label: '如果', nextNodeId: undefined }] }
-      : nodeType === 'IF_CONDITION'
-      ? { rules: [] }
-      : nodeType === 'PRIORITY'
-      ? { priorities: [{ order: 1, nextNodeId: undefined }] }
-      : nodeType === 'AB_SPLIT'
-      ? { groups: [{ groupKey: 'A', nextNodeId: undefined }] }
-      : {}
-
     const newId = crypto.randomUUID().replace(/-/g, '').slice(0, 12)
-    const newNode: Node = {
-      id: newId,
-      type: 'canvasNode',
-      position: newPos,
-      data: {
-        nodeType, name: DEFAULT_NAMES[nodeType] ?? nodeType,
-        category, bizConfig: defaultBizConfig,
-      } as CanvasNodeData,
-    }
+    const placeholderContext = hitPlaceholder
+      ? (() => {
+          const ph = hitPlaceholder.data as PlaceholderData
+          return { kind: 'placeholder', sourceId: ph.sourceId, handleId: ph.handleId } as const
+        })()
+      : null
+    const resolvedContext = insertContext?.kind === 'edge'
+      ? insertContext
+      : placeholderContext ?? { kind: 'blank' as const }
+    const newPos: XYPosition = resolvedContext.kind === 'placeholder' && hitPlaceholder
+      ? hitPlaceholder.position
+      : dropPos
+    const newNode = buildDetachedNode(newId, nodeType, category, newPos)
+    newNode.data.bizConfig = buildDefaultBizConfig(nodeType)
+
     setNodes(prev => [...prev.filter(n => !(n.data as any)?._placeholder), newNode])
 
-    if (hitPlaceholder) {
-      const ph = hitPlaceholder.data as PlaceholderData
-      setNodes(prev => prev.map(n => {
-        if (n.id !== ph.sourceId) return n
-        const d = n.data as CanvasNodeData
-        return { ...n, data: { ...d, bizConfig: patchBizConfig(d.bizConfig, ph.handleId, newId) } }
+    if (resolvedContext.kind === 'edge') {
+      const edge = getEdges().find(item => item.id === resolvedContext.edgeId)
+      if (edge) {
+        try {
+          const { removeEdgeId, newEdges } = applyInsertIntoEdge(edge, newId)
+          setEdges(current => [...current.filter(item => item.id !== removeEdgeId), ...newEdges])
+          setNodes(current => current.map(node => {
+            if (node.id !== edge.source) return node
+            const data = node.data as CanvasNodeData
+            return {
+              ...node,
+              data: {
+                ...data,
+                bizConfig: patchBizConfig(data.bizConfig, edge.sourceHandle ?? 'default', newId),
+              },
+            }
+          }))
+        } catch {
+          // Branching edges stay as blank drops until a branch-specific insert flow exists.
+        }
+      }
+    } else if (resolvedContext.kind === 'placeholder') {
+      setNodes(current => current.map(node => {
+        if (node.id !== resolvedContext.sourceId) return node
+        const data = node.data as CanvasNodeData
+        return {
+          ...node,
+          data: {
+            ...data,
+            bizConfig: patchBizConfig(data.bizConfig, resolvedContext.handleId, newId),
+          },
+        }
       }))
-      setEdges(prev => addEdge({
-        id:           `${ph.sourceId}->${newId}`,
-        source:       ph.sourceId,
-        sourceHandle: ph.handleId,
-        target:       newId,
-        targetHandle: 'input',
-      }, prev))
+      setEdges(current => addEdge(
+        buildPlaceholderEdge(resolvedContext.sourceId, resolvedContext.handleId, newId),
+        current,
+      ))
     }
+
+    setInsertContext(null)
+    setIsDirty(true)
     setSelectedNodeId(newId)
-  }, [placeholders, snapshot, screenToFlowPosition, setNodes, setEdges])
+  }, [
+    buildDefaultBizConfig,
+    getEdges,
+    insertContext,
+    placeholders,
+    readonly,
+    screenToFlowPosition,
+    setEdges,
+    setNodes,
+    snapshot,
+  ])
 
   const onDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault()
@@ -405,6 +461,7 @@ function EditorInner({ detail, onStatusChange }: {
   // 拖已有节点到占位框上：松手时检测命中并自动连线
   const onNodeDragStop = useCallback((_: React.MouseEvent, draggedNode: Node) => {
     setDraggingNodeId(null)
+    if (readonly) return
     const d = draggedNode.data as CanvasNodeData
     if ((d as any)?._placeholder) return
 
@@ -434,14 +491,9 @@ function EditorInner({ detail, onStatusChange }: {
       const nd = n.data as CanvasNodeData
       return { ...n, data: { ...nd, bizConfig: patchBizConfig(nd.bizConfig, ph.handleId, draggedNode.id) } }
     }))
-    setEdges(prev => addEdge({
-      id:           `${ph.sourceId}->${draggedNode.id}`,
-      source:       ph.sourceId,
-      sourceHandle: ph.handleId,
-      target:       draggedNode.id,
-      targetHandle: 'input',
-    }, prev))
-  }, [placeholders, snapshot, setNodes, setEdges])
+    setEdges(prev => addEdge(buildPlaceholderEdge(ph.sourceId, ph.handleId, draggedNode.id), prev))
+    setIsDirty(true)
+  }, [placeholders, readonly, snapshot, setNodes, setEdges])
 
   // 连线
   const onConnect = useCallback((conn: Connection) => {
@@ -812,6 +864,7 @@ function EditorInner({ detail, onStatusChange }: {
 
   const deleteEdgeById = (edgeId: string) => {
     snapshot('删除连线')
+    setInsertContext(current => current?.kind === 'edge' && current.edgeId === edgeId ? null : current)
     setEdges(prev => {
       const edge = prev.find(e => e.id === edgeId)
       if (edge) {
@@ -824,10 +877,19 @@ function EditorInner({ detail, onStatusChange }: {
       }
       return prev.filter(e => e.id !== edgeId)
     })
+    setIsDirty(true)
   }
 
   return (
-    <CanvasActionsContext.Provider value={{ deleteNode: deleteNodeById, copyNode: copyNodeById, deleteEdge: deleteEdgeById }}>
+    <CanvasActionsContext.Provider value={{
+      deleteNode: deleteNodeById,
+      copyNode: copyNodeById,
+      deleteEdge: deleteEdgeById,
+      startInsertOnEdge: edgeId => {
+        setInsertContext({ kind: 'edge', edgeId })
+        setSelectedNodeId(null)
+      },
+    }}>
     <div style={{ display: 'flex', flexDirection: 'column', height: '100vh' }}>
 
       {/* 顶部工具栏 */}
@@ -1126,8 +1188,14 @@ function EditorInner({ detail, onStatusChange }: {
             onEdgesChange={onEdgesChangeWrapped}
             onConnect={onConnect}
             isValidConnection={isValidConnection as any}
-            onNodeClick={(_, node) => setSelectedNodeId(node.id)}
-            onPaneClick={() => setSelectedNodeId(null)}
+            onNodeClick={(_, node) => {
+              setSelectedNodeId(node.id)
+              setInsertContext(null)
+            }}
+            onPaneClick={() => {
+              setSelectedNodeId(null)
+              setInsertContext(null)
+            }}
             onNodeDrag={(_, node) => setDraggingNodeId(node.id)}
             onNodeDragStop={onNodeDragStop}
             fitView
