@@ -9,7 +9,7 @@ import '@xyflow/react/dist/style.css'
 import dagre from '@dagrejs/dagre'
 import { Button, DatePicker, Divider, Drawer, Form, Input, InputNumber, message, Modal, Radio, Slider, Space, Spin, Tag, Tooltip } from 'antd'
 import {
-  ArrowLeftOutlined, CaretRightOutlined, CloudUploadOutlined, SaveOutlined, ApartmentOutlined, UndoOutlined, RedoOutlined, SyncOutlined, DeleteOutlined, QuestionCircleOutlined, HistoryOutlined, SettingOutlined, ExperimentOutlined,
+  ArrowLeftOutlined, CaretRightOutlined, CloudUploadOutlined, SaveOutlined, ApartmentOutlined, UndoOutlined, RedoOutlined, SyncOutlined, DeleteOutlined, QuestionCircleOutlined, HistoryOutlined, SettingOutlined, ExperimentOutlined, CheckOutlined, CloseOutlined,
 } from '@ant-design/icons'
 import dayjs from 'dayjs'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
@@ -30,6 +30,8 @@ import HoverEdge from '../../components/canvas/HoverEdge'
 import CronBuilder from '../../components/config-panel/CronBuilder'
 import { CanvasActionsContext } from '../../context/CanvasActionsContext'
 import { useAuth } from '../../context/AuthContext'
+import { getCanvasGraphReloadKey } from './graphReloadKey'
+import { buildCanvasNameUpdate, shouldShowCanvasNameActions } from './canvasNameUpdate'
 
 const { RangePicker } = DatePicker
 
@@ -183,9 +185,10 @@ const divStyle: React.CSSProperties = {
 
 // ── 主编辑器（内部，需要 ReactFlowProvider 包裹）─────────────
 
-function EditorInner({ detail, onStatusChange }: {
+function EditorInner({ detail, onStatusChange, onCanvasNameChange }: {
   detail: CanvasDetail
   onStatusChange: (status: number) => void
+  onCanvasNameChange: (name: string) => void
 }) {
   const { id } = useParams<{ id: string }>()
   const canvasId = Number(id)
@@ -237,8 +240,11 @@ function EditorInner({ detail, onStatusChange }: {
   const [settingsForm] = Form.useForm()
   const editVersion   = useRef(detail.canvas.editVersion ?? 0)
   const autoSaveTimer = useRef<ReturnType<typeof setTimeout>>()
+  const savedCanvasName = useRef(detail.canvas.name)
 
   const { snapshot, undo, redo, canUndo, canRedo, undoLabel, redoLabel } = useHistory(nodes as Node<CanvasNodeData>[], edges)
+  const graphReloadKey = getCanvasGraphReloadKey(detail)
+  const showCanvasNameActions = shouldShowCanvasNameActions(canvasName, savedCanvasName.current)
 
   // ── Auto-save：最后一次改动 3s 后静默保存 ─────────────────────
   useEffect(() => {
@@ -283,7 +289,7 @@ function EditorInner({ detail, onStatusChange }: {
     setNodes(layouted)
     setEdges(rfEdges)
     requestAnimationFrame(() => fitView({ padding: 0.15, duration: 300 }))
-  }, [detail, setNodes, setEdges])
+  }, [graphReloadKey, detail.graphJson, fitView, setNodes, setEdges])
 
   // 键盘快捷键（含复制/粘贴）
   useEffect(() => {
@@ -595,6 +601,7 @@ function EditorInner({ detail, onStatusChange }: {
         cooldownSeconds: canvasSettings.cooldownSeconds ?? null,
       })
       editVersion.current += 1
+      savedCanvasName.current = canvasName.trim()
       setIsDirty(false)
       if (!silent) message.success('保存成功')
     } catch (err: any) {
@@ -612,6 +619,45 @@ function EditorInner({ detail, onStatusChange }: {
       setSaving(false)
     }
   }, [canvasId, canvasName, canvasSettings, detail.canvas.description, getNodes])
+
+  const handleSaveCanvasName = useCallback(async () => {
+    const update = buildCanvasNameUpdate(canvasName, savedCanvasName.current)
+    if ('unchanged' in update) {
+      setCanvasName(savedCanvasName.current)
+      return
+    }
+    if ('error' in update) {
+      message.error(update.error)
+      setCanvasName(savedCanvasName.current)
+      return
+    }
+
+    try {
+      await canvasApi.update(canvasId, {
+        name: update.name,
+        description: detail.canvas.description,
+        triggerType: canvasSettings.triggerType,
+        cronExpression: canvasSettings.cronExpression,
+        validStart: canvasSettings.validStart ?? null,
+        validEnd: canvasSettings.validEnd ?? null,
+        maxTotalExecutions: canvasSettings.maxTotalExecutions ?? null,
+        perUserDailyLimit: canvasSettings.perUserDailyLimit ?? null,
+        perUserTotalLimit: canvasSettings.perUserTotalLimit ?? null,
+        cooldownSeconds: canvasSettings.cooldownSeconds ?? null,
+      })
+      savedCanvasName.current = update.name
+      setCanvasName(update.name)
+      onCanvasNameChange(update.name)
+      message.success('名称已保存')
+    } catch (e: any) {
+      message.error(e?.response?.data?.message ?? '名称保存失败')
+      setCanvasName(savedCanvasName.current)
+    }
+  }, [canvasId, canvasName, canvasSettings, detail.canvas.description, onCanvasNameChange])
+
+  const handleCancelCanvasName = useCallback(() => {
+    setCanvasName(savedCanvasName.current)
+  }, [])
 
   /** 发布（或重新发布）：先保存草稿，再创建新版本上线 */
   const handlePublish = useCallback(async () => {
@@ -848,13 +894,38 @@ function EditorInner({ detail, onStatusChange }: {
         <Divider type="vertical" style={{ margin: '0 4px' }} />
 
         {/* 画布名 + 状态 */}
-        <Input
-          value={canvasName}
-          onChange={e => { setCanvasName(e.target.value); setIsDirty(true) }}
-          variant="borderless"
-          style={{ width: 240, fontWeight: 600, fontSize: 14, padding: 0 }}
-          disabled={readonly}
-        />
+        <Space.Compact size="small" style={{ alignItems: 'center' }}>
+          <Input
+            value={canvasName}
+            onPressEnter={handleSaveCanvasName}
+            onKeyDown={e => {
+              if (e.key === 'Escape') handleCancelCanvasName()
+            }}
+            onChange={e => { setCanvasName(e.target.value) }}
+            style={{ width: 240, fontWeight: 600, fontSize: 14, borderRadius: showCanvasNameActions ? '8px 0 0 8px' : 8 }}
+            disabled={readonly}
+          />
+          {!readonly && showCanvasNameActions && (
+            <>
+              <Tooltip title="保存名称">
+                <Button
+                  icon={<CheckOutlined />}
+                  onMouseDown={e => e.preventDefault()}
+                  onClick={handleSaveCanvasName}
+                  style={{ color: '#389e0d' }}
+                />
+              </Tooltip>
+              <Tooltip title="取消修改">
+                <Button
+                  icon={<CloseOutlined />}
+                  onMouseDown={e => e.preventDefault()}
+                  onClick={handleCancelCanvasName}
+                  style={{ color: '#8c8c8c', borderRadius: '0 8px 8px 0' }}
+                />
+              </Tooltip>
+            </>
+          )}
+        </Space.Compact>
         <Tag color={statusMap[status]?.color} style={{ borderRadius: 6, fontSize: 11 }}>
           {statusMap[status]?.label}
         </Tag>
@@ -1282,6 +1353,8 @@ export default function CanvasEditorPage() {
     <ReactFlowProvider>
       <EditorInner detail={detail} onStatusChange={status =>
         setDetail(prev => prev ? ({ ...prev, canvas: { ...prev.canvas, status } } as typeof prev) : prev)
+      } onCanvasNameChange={name =>
+        setDetail(prev => prev ? ({ ...prev, canvas: { ...prev.canvas, name } } as typeof prev) : prev)
       } />
     </ReactFlowProvider>
   )
