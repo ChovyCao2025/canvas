@@ -9,7 +9,7 @@ import org.springframework.stereotype.Service;
 public class CanvasEntityCache {
     private final TieredCache<Long, Canvas> cache;
 
-    public CanvasEntityCache(@Qualifier("canvasEntityCache") TieredCache<Long, Canvas> cache) {
+    public CanvasEntityCache(@Qualifier("canvasEntityTieredCache") TieredCache<Long, Canvas> cache) {
         this.cache = cache;
     }
 

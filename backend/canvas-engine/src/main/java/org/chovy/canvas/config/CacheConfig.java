@@ -38,7 +38,7 @@ public class CacheConfig {
                 .build(manager);
     }
 
-    @Bean("canvasEntityCache")
+    @Bean("canvasEntityTieredCache")
     TieredCache<Long, Canvas> canvasEntityCache(TieredCacheManager manager,
                                                 CanvasMapper mapper) {
         return TieredCacheBuilder.<Long, Canvas>builder()

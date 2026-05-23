@@ -8,6 +8,8 @@ import org.chovy.cache.aop.SpelKeyEvaluator;
 import org.chovy.cache.aop.TieredCacheAspect;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
+import org.springframework.boot.autoconfigure.data.redis.RedisAutoConfiguration;
+import org.springframework.boot.autoconfigure.data.redis.RedisReactiveAutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.context.annotation.Bean;
@@ -15,7 +17,7 @@ import org.springframework.data.redis.connection.ReactiveRedisConnectionFactory;
 import org.springframework.data.redis.core.ReactiveStringRedisTemplate;
 import org.springframework.data.redis.core.StringRedisTemplate;
 
-@AutoConfiguration
+@AutoConfiguration(after = {RedisAutoConfiguration.class, RedisReactiveAutoConfiguration.class})
 public class TieredCacheAutoConfiguration {
     @Bean
     @ConditionalOnMissingBean
