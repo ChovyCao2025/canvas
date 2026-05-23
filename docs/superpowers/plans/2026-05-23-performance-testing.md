@@ -24,7 +24,7 @@ If the command prints conflicted files, resolve or park those conflicts first. T
 
 ## File Structure
 
-- Modify: `backend/canvas-engine/src/main/resources/db/migration/V50__perf_run_tracking.sql`
+- Modify: `backend/canvas-engine/src/main/resources/db/migration/V72__perf_run_tracking.sql`
   - Adds nullable `perf_run_id` columns and indexes to existing ledgers.
 - Modify: `backend/canvas-engine/src/main/java/org/chovy/canvas/domain/meta/EventLog.java`
   - Maps `event_log.perf_run_id`.
@@ -78,7 +78,7 @@ If the command prints conflicted files, resolve or park those conflicts first. T
 ## Task 1: Schema And Entity Mapping
 
 **Files:**
-- Create: `backend/canvas-engine/src/main/resources/db/migration/V50__perf_run_tracking.sql`
+- Create: `backend/canvas-engine/src/main/resources/db/migration/V72__perf_run_tracking.sql`
 - Modify: `backend/canvas-engine/src/main/java/org/chovy/canvas/domain/meta/EventLog.java`
 - Modify: `backend/canvas-engine/src/main/java/org/chovy/canvas/domain/execution/CanvasExecution.java`
 - Modify: `backend/canvas-engine/src/main/java/org/chovy/canvas/domain/execution/CanvasExecutionRequest.java`
@@ -105,7 +105,7 @@ class PerfRunTrackingSchemaTest {
 
     @Test
     void migrationAddsPerfRunIdToAllPerformanceLedgers() throws Exception {
-        ClassPathResource migration = new ClassPathResource("db/migration/V50__perf_run_tracking.sql");
+        ClassPathResource migration = new ClassPathResource("db/migration/V72__perf_run_tracking.sql");
 
         String sql = migration.getContentAsString(StandardCharsets.UTF_8);
 
@@ -180,11 +180,11 @@ Run:
 cd backend && mvn -pl canvas-engine -Dtest=PerfRunTrackingSchemaTest,PerfRunEntityMappingTest test
 ```
 
-Expected: FAIL because `V50__perf_run_tracking.sql` and `perfRunId` properties do not exist.
+Expected: FAIL because `V72__perf_run_tracking.sql` and `perfRunId` properties do not exist.
 
 - [ ] **Step 4: Add the migration**
 
-Create `backend/canvas-engine/src/main/resources/db/migration/V50__perf_run_tracking.sql`:
+Create `backend/canvas-engine/src/main/resources/db/migration/V72__perf_run_tracking.sql`:
 
 ```sql
 ALTER TABLE `event_log`
@@ -267,7 +267,7 @@ Expected: PASS.
 Run:
 
 ```bash
-git add backend/canvas-engine/src/main/resources/db/migration/V50__perf_run_tracking.sql \
+git add backend/canvas-engine/src/main/resources/db/migration/V72__perf_run_tracking.sql \
   backend/canvas-engine/src/main/java/org/chovy/canvas/domain/meta/EventLog.java \
   backend/canvas-engine/src/main/java/org/chovy/canvas/domain/execution/CanvasExecution.java \
   backend/canvas-engine/src/main/java/org/chovy/canvas/domain/execution/CanvasExecutionRequest.java \
@@ -1736,6 +1736,7 @@ node tools/perf/capacity-report.mjs \
   --redis-ops-per-event 3 \
   --prod-redis-safe-ops 30000 \
   --rocketmq-capacity 7000 \
+  --disruptor-worker-capacity 9000 \
   --downstream-rate-limit-per-sec 5000 \
   --downstream-calls-per-event 1
 ```
@@ -1839,7 +1840,7 @@ Run:
 find backend/canvas-engine/src/main/resources/db/migration -maxdepth 1 -name 'V*.sql' -print | sort | tail -10
 ```
 
-Expected: `V50__perf_run_tracking.sql` appears after existing migrations and no other migration uses `V50`.
+Expected: `V72__perf_run_tracking.sql` appears after existing migrations and no other migration uses `V72`.
 
 - [ ] **Step 6: Commit any final doc corrections**
 

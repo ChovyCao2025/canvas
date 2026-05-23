@@ -2,6 +2,8 @@ package org.chovy.canvas.controller;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.chovy.canvas.domain.constant.CanvasStatusEnum;
+import org.chovy.canvas.domain.constant.NodeType;
+import org.chovy.canvas.domain.constant.TriggerType;
 import org.chovy.canvas.domain.meta.EventDefinition;
 import org.chovy.canvas.domain.meta.EventDefinitionCacheService;
 import org.chovy.canvas.domain.meta.EventDefinitionMapper;
@@ -21,6 +23,8 @@ import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -136,5 +140,37 @@ class EventDefinitionControllerTest {
 
         // Assert: controller delegates definition lookup to the cache service.
         verify(eventDefinitionCacheService, times(2)).getPublishedByCode("CACHED_EVENT");
+    }
+
+    @Test
+    void reportEventPersistsPerfRunIdAndPublishesOriginalPayload() {
+        EventDefinition def = new EventDefinition();
+        def.setEventCode("PERF_EVENT");
+        def.setEnabled(CanvasStatusEnum.PUBLISHED.getCode());
+        when(eventDefinitionCacheService.getPublishedByCode("PERF_EVENT")).thenReturn(def);
+        when(triggerRouteService.getCanvasByBehavior("PERF_EVENT")).thenReturn(Set.of("42"));
+
+        ArgumentCaptor<EventLog> logCaptor = ArgumentCaptor.forClass(EventLog.class);
+        doAnswer(invocation -> null).when(logMapper).insert(logCaptor.capture());
+
+        Map<String, Object> attributes = Map.of("perfRunId", "perf_20260523_001", "amount", 88);
+        EventReportReq req = new EventReportReq();
+        req.setEventCode("PERF_EVENT");
+        req.setUserId("user-99");
+        req.setAttributes(attributes);
+
+        controller.reportEvent(req).block();
+
+        assertThat(logCaptor.getValue().getPerfRunId()).isEqualTo("perf_20260523_001");
+        ArgumentCaptor<Map<String, Object>> payloadCaptor = ArgumentCaptor.forClass(Map.class);
+        verify(disruptorService).publish(
+                eq(42L),
+                eq("user-99"),
+                eq(TriggerType.EVENT),
+                eq(NodeType.EVENT_TRIGGER),
+                eq("PERF_EVENT"),
+                payloadCaptor.capture(),
+                anyString());
+        assertThat(payloadCaptor.getValue()).isSameAs(attributes);
     }
 }

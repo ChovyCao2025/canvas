@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import org.chovy.canvas.domain.execution.CanvasExecutionRequest;
 import org.chovy.canvas.domain.execution.CanvasExecutionRequestMapper;
+import org.chovy.canvas.perf.PerfRunContext;
 import org.springframework.stereotype.Service;
 
 import java.nio.charset.StandardCharsets;
@@ -32,6 +33,7 @@ public class CanvasExecutionRequestService {
         request.setId(requestId);
         request.setCanvasId(canvasId);
         request.setUserId(userId);
+        request.setPerfRunId(PerfRunContext.extract(payload));
         request.setTriggerType(triggerType);
         request.setTriggerNodeType(triggerNodeType);
         request.setMatchKey(matchKey);

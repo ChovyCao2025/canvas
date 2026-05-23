@@ -86,7 +86,7 @@ class OverflowRetryConsumerTest {
                 "BEHAVIOR",
                 "EVENT_TRIGGER",
                 "event-a",
-                Map.of("eventId", "e-1"),
+                Map.of("eventId", "e-1", "perfRunId", "perf_20260523_005"),
                 "business-msg-2",
                 2
         );
@@ -110,6 +110,7 @@ class OverflowRetryConsumerTest {
         assertThat(dlq.getExecutionId()).isEqualTo("business-msg-2");
         assertThat(dlq.getCanvasId()).isEqualTo(200L);
         assertThat(dlq.getUserId()).isEqualTo("user-2");
+        assertThat(dlq.getPerfRunId()).isEqualTo("perf_20260523_005");
         assertThat(dlq.getFailedNodeId()).isEqualTo("OVERFLOW_RETRY");
         assertThat(dlq.getFailedNodeType()).isEqualTo("EVENT_TRIGGER");
         assertThat(dlq.getErrorMsg()).contains("overflow_max_retry");

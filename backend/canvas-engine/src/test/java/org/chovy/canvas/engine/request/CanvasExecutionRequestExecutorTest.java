@@ -51,6 +51,36 @@ class CanvasExecutionRequestExecutorTest {
     }
 
     @Test
+    void executeAddsRequestPerfRunIdToPayloadWhenStoredPayloadLacksIt() {
+        CanvasExecutionRequestMapper mapper = mock(CanvasExecutionRequestMapper.class);
+        CanvasExecutionService executionService = mock(CanvasExecutionService.class);
+        CanvasExecutionRequestExecutor executor = new CanvasExecutionRequestExecutor(
+                mapper, executionService, new ObjectMapper());
+
+        CanvasExecutionRequest request = request();
+        request.setPerfRunId("perf_20260523_001");
+        when(mapper.selectById("req-1")).thenReturn(request);
+        when(mapper.markRunning(eq("req-1"), any(), any(), anyString())).thenReturn(1);
+        when(executionService.triggerFromExecutionRequest(any(), any(), any(), any(), any(), any(), any()))
+                .thenReturn(Mono.just(Map.of("executionId", "exec-1")));
+
+        executor.execute("req-1").block();
+
+        ArgumentCaptor<Map<String, Object>> payloadCaptor = ArgumentCaptor.forClass(Map.class);
+        verify(executionService).triggerFromExecutionRequest(
+                eq(10L),
+                eq("user-7"),
+                eq(TriggerType.MQ),
+                eq(NodeType.MQ_TRIGGER),
+                eq("order.paid"),
+                payloadCaptor.capture(),
+                eq("MSG-1"));
+        assertThat(payloadCaptor.getValue())
+                .containsEntry("orderId", "O-1")
+                .containsEntry("perfRunId", "perf_20260523_001");
+    }
+
+    @Test
     void executeMarksRequestRetryWhenCanvasTriggerReportsOverflow() {
         CanvasExecutionRequestMapper mapper = mock(CanvasExecutionRequestMapper.class);
         CanvasExecutionService executionService = mock(CanvasExecutionService.class);

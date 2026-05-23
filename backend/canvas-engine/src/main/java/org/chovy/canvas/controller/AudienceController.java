@@ -3,6 +3,7 @@ package org.chovy.canvas.controller;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import io.jsonwebtoken.Claims;
+import lombok.Data;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.chovy.canvas.common.PageResult;
@@ -20,6 +21,7 @@ import org.chovy.canvas.dto.task.ComputeTaskResp;
 import org.chovy.canvas.engine.audience.AudienceBatchComputeService;
 import org.chovy.canvas.engine.audience.AudienceComputeTaskRunner;
 import org.chovy.canvas.engine.audience.AudienceSchedulerService;
+import org.chovy.canvas.perf.PerfRunContext;
 import org.springframework.security.core.context.ReactiveSecurityContextHolder;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -33,7 +35,9 @@ import org.springframework.web.bind.annotation.RestController;
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
 
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 @Slf4j
 @RestController
@@ -123,7 +127,18 @@ public class AudienceController {
 
     /** 手动触发一次异步计算。 */
     @PostMapping("/{id}/compute")
-    public Mono<R<ComputeTaskResp>> compute(@PathVariable Long id) {
+    public Mono<R<ComputeTaskResp>> compute(@PathVariable Long id, @RequestBody(required = false) ComputeReq req) {
+        String perfRunId = extractPerfRunId(req);
+        if (perfRunId != null) {
+            String perfInputId = req == null || req.getPerfInputId() == null || req.getPerfInputId().isBlank()
+                    ? null
+                    : req.getPerfInputId();
+            return Mono.fromRunnable(() -> Thread.ofVirtual().start(
+                            () -> computeService.compute(id, perfRunId, perfInputId)))
+                    .subscribeOn(Schedulers.boundedElastic())
+                    .thenReturn(R.ok(new ComputeTaskResp(perfTaskId(perfRunId, perfInputId), "QUEUED")));
+        }
+
         return currentUser().flatMap(operator ->
                 Mono.fromCallable(() -> {
                     AudienceDefinition definition = definitionMapper.selectById(id);
@@ -135,6 +150,10 @@ public class AudienceController {
                     }
                     return R.ok(enqueueCompute(definition, operator));
                 }).subscribeOn(Schedulers.boundedElastic()));
+    }
+
+    public Mono<R<ComputeTaskResp>> compute(Long id) {
+        return compute(id, null);
     }
 
     /** 查询人群计算状态统计。 */
@@ -209,5 +228,24 @@ public class AudienceController {
 
     private String defaultIfBlank(String value, String fallback) {
         return value == null || value.isBlank() ? fallback : value;
+    }
+
+    private String perfTaskId(String perfRunId, String perfInputId) {
+        return "perf:" + defaultIfBlank(perfInputId, perfRunId);
+    }
+
+    private String extractPerfRunId(ComputeReq req) {
+        if (req == null) {
+            return null;
+        }
+        Map<String, Object> payload = new HashMap<>();
+        payload.put("perfRunId", req.getPerfRunId());
+        return PerfRunContext.extract(payload);
+    }
+
+    @Data
+    static class ComputeReq {
+        private String perfRunId;
+        private String perfInputId;
     }
 }

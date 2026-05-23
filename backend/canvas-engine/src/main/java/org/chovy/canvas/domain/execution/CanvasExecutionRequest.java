@@ -17,6 +17,7 @@ public class CanvasExecutionRequest {
 
     private Long canvasId;
     private String userId;
+    private String perfRunId;
     private String triggerType;
     private String triggerNodeType;
     private String matchKey;

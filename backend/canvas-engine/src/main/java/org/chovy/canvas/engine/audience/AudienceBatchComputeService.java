@@ -6,6 +6,8 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.chovy.canvas.domain.audience.AudienceDefinition;
 import org.chovy.canvas.domain.audience.AudienceDefinitionMapper;
+import org.chovy.canvas.domain.audience.AudienceComputeRun;
+import org.chovy.canvas.domain.audience.AudienceComputeRunMapper;
 import org.chovy.canvas.domain.audience.AudienceStat;
 import org.chovy.canvas.domain.audience.AudienceStatMapper;
 import org.roaringbitmap.RoaringBitmap;
@@ -36,6 +38,7 @@ public class AudienceBatchComputeService {
 
     private final AudienceDefinitionMapper definitionMapper;
     private final AudienceStatMapper statMapper;
+    private final AudienceComputeRunMapper computeRunMapper;
     private final RuleEvaluatorRouter ruleEvaluatorRouter;
     private final AudienceBitmapStore bitmapStore;
     private final StringRedisTemplate redis;
@@ -48,10 +51,19 @@ public class AudienceBatchComputeService {
     private String taggerUrl;
 
     public AudienceComputeResult compute(Long audienceId) {
+        return compute(audienceId, null, null);
+    }
+
+    public AudienceComputeResult compute(Long audienceId, String perfRunId, String perfInputId) {
+        AudienceComputeRun run = startRun(audienceId, perfRunId, perfInputId);
         String lockKey = COMPUTE_LOCK_PREFIX + audienceId;
         boolean locked = Boolean.TRUE.equals(redis.opsForValue().setIfAbsent(lockKey, "1", Duration.ofHours(2)));
         if (!locked) {
             log.warn("[AUDIENCE] compute skipped because lock exists audienceId={}", audienceId);
+            finishRun(run, "SKIPPED_LOCK", null, null, "已有计算任务正在运行");
+            if (run != null) {
+                return AudienceComputeResult.failed(audienceId, safeAudienceName(audienceId), "已有计算任务正在运行");
+            }
             return AudienceComputeResult.inProgress(audienceId, safeAudienceName(audienceId), "已有计算任务正在运行");
         }
 
@@ -79,6 +91,7 @@ public class AudienceBatchComputeService {
             long estimatedSize = bitmap.getCardinality();
             int bitmapSizeKb = bos.size() / 1024;
             updateStat(audienceId, "READY", estimatedSize, bitmapSizeKb, null);
+            finishRun(run, "READY", estimatedSize, bitmapSizeKb, null);
             return AudienceComputeResult.ready(audienceId, audienceName, estimatedSize, bitmapSizeKb);
         } catch (Exception e) {
             String error = trimError(e.getMessage());
@@ -89,6 +102,7 @@ public class AudienceBatchComputeService {
                 log.error("[AUDIENCE] failed to update compute failure stat audienceId={}: {}",
                         audienceId, statException.getMessage(), statException);
             }
+            finishRun(run, "FAILED", null, null, error);
             return AudienceComputeResult.failed(audienceId, audienceName, error);
         } finally {
             releaseLock(lockKey, audienceId);
@@ -214,6 +228,33 @@ public class AudienceBatchComputeService {
         } else {
             statMapper.insert(stat);
         }
+    }
+
+    private AudienceComputeRun startRun(Long audienceId, String perfRunId, String perfInputId) {
+        if (perfRunId == null || perfRunId.isBlank()) {
+            return null;
+        }
+        AudienceComputeRun run = new AudienceComputeRun();
+        run.setAudienceId(audienceId);
+        run.setPerfRunId(perfRunId);
+        run.setPerfInputId(perfInputId);
+        run.setStatus("COMPUTING");
+        run.setCreatedAt(LocalDateTime.now());
+        run.setUpdatedAt(run.getCreatedAt());
+        computeRunMapper.insert(run);
+        return run;
+    }
+
+    private void finishRun(AudienceComputeRun run, String status, Long size, Integer sizeKb, String errorMsg) {
+        if (run == null) {
+            return;
+        }
+        run.setStatus(status);
+        run.setEstimatedSize(size);
+        run.setBitmapSizeKb(sizeKb);
+        run.setErrorMsg(errorMsg);
+        run.setUpdatedAt(LocalDateTime.now());
+        computeRunMapper.updateById(run);
     }
 
     private String trimError(String message) {

@@ -28,6 +28,9 @@ public class CanvasExecutionDlq {
     /** 触发用户 ID */
     private String userId;
 
+    /** 压测批次 ID，普通业务流量为空 */
+    private String perfRunId;
+
     /** 首次失败的节点 ID */
     private String failedNodeId;
 
