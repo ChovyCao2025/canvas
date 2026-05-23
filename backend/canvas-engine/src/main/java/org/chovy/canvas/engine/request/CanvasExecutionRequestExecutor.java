@@ -9,9 +9,12 @@ import org.chovy.canvas.engine.trigger.CanvasExecutionService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import reactor.core.Disposable;
+import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
 
+import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.Map;
 import java.util.UUID;
@@ -27,11 +30,12 @@ public class CanvasExecutionRequestExecutor {
     private final int maxAttempts;
     private final long runningStaleSeconds;
     private final long maxRetryDelayMs;
+    private final long heartbeatIntervalMs;
 
     public CanvasExecutionRequestExecutor(CanvasExecutionRequestMapper mapper,
                                           CanvasExecutionService executionService,
                                           ObjectMapper objectMapper) {
-        this(mapper, executionService, objectMapper, null, 5_000L, 5, 300L, 60_000L);
+        this(mapper, executionService, objectMapper, null, 5_000L, 5, 300L, 60_000L, 60_000L);
     }
 
     public CanvasExecutionRequestExecutor(CanvasExecutionRequestMapper mapper,
@@ -40,7 +44,7 @@ public class CanvasExecutionRequestExecutor {
                                           long retryDelayMs,
                                           int maxAttempts,
                                           long runningStaleSeconds) {
-        this(mapper, executionService, objectMapper, null, retryDelayMs, maxAttempts, runningStaleSeconds, 60_000L);
+        this(mapper, executionService, objectMapper, null, retryDelayMs, maxAttempts, runningStaleSeconds, 60_000L, 60_000L);
     }
 
     @Autowired
@@ -51,7 +55,8 @@ public class CanvasExecutionRequestExecutor {
                                           @Value("${canvas.execution-request.retry-delay-ms:5000}") long retryDelayMs,
                                           @Value("${canvas.execution-request.max-attempts:5}") int maxAttempts,
                                           @Value("${canvas.execution-request.running-stale-sec:300}") long runningStaleSeconds,
-                                          @Value("${canvas.execution-request.max-retry-delay-ms:60000}") long maxRetryDelayMs) {
+                                          @Value("${canvas.execution-request.max-retry-delay-ms:60000}") long maxRetryDelayMs,
+                                          @Value("${canvas.execution-request.heartbeat-interval-ms:60000}") long heartbeatIntervalMs) {
         this.mapper = mapper;
         this.executionService = executionService;
         this.objectMapper = objectMapper;
@@ -60,6 +65,19 @@ public class CanvasExecutionRequestExecutor {
         this.maxAttempts = maxAttempts;
         this.runningStaleSeconds = runningStaleSeconds;
         this.maxRetryDelayMs = maxRetryDelayMs;
+        this.heartbeatIntervalMs = heartbeatIntervalMs;
+    }
+
+    public CanvasExecutionRequestExecutor(CanvasExecutionRequestMapper mapper,
+                                          CanvasExecutionService executionService,
+                                          ObjectMapper objectMapper,
+                                          CanvasMetrics metrics,
+                                          long retryDelayMs,
+                                          int maxAttempts,
+                                          long runningStaleSeconds,
+                                          long maxRetryDelayMs) {
+        this(mapper, executionService, objectMapper, metrics, retryDelayMs, maxAttempts,
+                runningStaleSeconds, maxRetryDelayMs, 60_000L);
     }
 
     public Mono<Void> execute(String requestId) {
@@ -80,7 +98,8 @@ public class CanvasExecutionRequestExecutor {
                                 }
                                 return Mono.defer(() -> {
                                             Map<String, Object> payload = parsePayload(request.getPayloadJson());
-                                            return executionService.triggerFromExecutionRequest(
+                                            return withRunningHeartbeat(request.getId(), runToken,
+                                                    executionService.triggerFromExecutionRequest(
                                                 request.getCanvasId(),
                                                 request.getUserId(),
                                                 request.getTriggerType(),
@@ -88,13 +107,35 @@ public class CanvasExecutionRequestExecutor {
                                                 request.getMatchKey(),
                                                 payload,
                                                 request.getSourceMsgId()
-                                            );
+                                            ));
                                         })
                                         .flatMap(result -> finish(request, result, runToken))
-                                        .onErrorResume(e -> retryOrFail(request, e.getMessage(), runToken));
+                                        .onErrorResume(e -> {
+                                            if (isNonRecoverable(e)) {
+                                                return fail(request, e.getMessage(), runToken);
+                                            }
+                                            return retryOrFail(request, e.getMessage(), runToken);
+                                        });
                             });
                 })
                 .then();
+    }
+
+    private <T> Mono<T> withRunningHeartbeat(String requestId, String runToken, Mono<T> source) {
+        return Mono.defer(() -> {
+            Disposable heartbeat = startHeartbeat(requestId, runToken);
+            return source.doFinally(signal -> heartbeat.dispose());
+        });
+    }
+
+    private Disposable startHeartbeat(String requestId, String runToken) {
+        long intervalMs = Math.max(1L, heartbeatIntervalMs);
+        return Flux.interval(Duration.ofMillis(intervalMs))
+                .flatMap(ignored -> Mono.fromCallable(() ->
+                                mapper.touchRunning(requestId, LocalDateTime.now(), runToken))
+                        .subscribeOn(Schedulers.boundedElastic())
+                        .onErrorResume(e -> Mono.empty()))
+                .subscribe();
     }
 
     private Mono<Void> finish(CanvasExecutionRequest request, Map<String, Object> result, String runToken) {
@@ -119,14 +160,7 @@ public class CanvasExecutionRequestExecutor {
         int nextAttempt = request.getAttemptCount() == null ? 1 : request.getAttemptCount() + 1;
         LocalDateTime now = LocalDateTime.now();
         if (nextAttempt >= maxAttempts) {
-            return Mono.fromCallable(() -> mapper.markFailed(request.getId(), trim(error), now, runToken))
-                    .subscribeOn(Schedulers.boundedElastic())
-                    .doOnNext(updated -> {
-                        if (updated > 0) {
-                            recordTransition(CanvasExecutionRequestStatus.FAILED, request.getTriggerType());
-                        }
-                    })
-                    .then();
+            return fail(request, error, runToken);
         }
         LocalDateTime nextRetryAt = now.plusNanos(calculateRetryDelayMs(nextAttempt) * 1_000_000L);
         return Mono.fromCallable(() -> mapper.markRetry(request.getId(), trim(error), nextRetryAt, now, runToken))
@@ -137,6 +171,21 @@ public class CanvasExecutionRequestExecutor {
                     }
                 })
                 .then();
+    }
+
+    private Mono<Void> fail(CanvasExecutionRequest request, String error, String runToken) {
+        return Mono.fromCallable(() -> mapper.markFailed(request.getId(), trim(error), LocalDateTime.now(), runToken))
+                .subscribeOn(Schedulers.boundedElastic())
+                .doOnNext(updated -> {
+                    if (updated > 0) {
+                        recordTransition(CanvasExecutionRequestStatus.FAILED, request.getTriggerType());
+                    }
+                })
+                .then();
+    }
+
+    private boolean isNonRecoverable(Throwable error) {
+        return error instanceof IllegalArgumentException;
     }
 
     private boolean isTerminal(String status) {

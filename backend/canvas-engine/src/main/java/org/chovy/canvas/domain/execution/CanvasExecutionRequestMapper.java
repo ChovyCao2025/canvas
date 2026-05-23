@@ -45,6 +45,17 @@ public interface CanvasExecutionRequestMapper extends BaseMapper<CanvasExecution
 
     @Update("""
             UPDATE canvas_execution_request
+            SET updated_at = #{now}
+            WHERE id = #{id}
+              AND status = 'RUNNING'
+              AND run_token = #{runToken}
+            """)
+    int touchRunning(@Param("id") String id,
+                     @Param("now") LocalDateTime now,
+                     @Param("runToken") String runToken);
+
+    @Update("""
+            UPDATE canvas_execution_request
             SET status = 'SUCCEEDED',
                 result_json = #{resultJson},
                 last_error = NULL,
@@ -135,4 +146,22 @@ public interface CanvasExecutionRequestMapper extends BaseMapper<CanvasExecution
     List<String> selectDue(@Param("limit") int limit,
                            @Param("now") LocalDateTime now,
                            @Param("staleBefore") LocalDateTime staleBefore);
+
+    @Select("""
+            SELECT id, canvas_id
+            FROM canvas_execution_request
+            WHERE (
+                    status IN ('PENDING', 'RETRY')
+                    AND (next_retry_at IS NULL OR next_retry_at <= #{now})
+                  )
+               OR (
+                    status = 'RUNNING'
+                    AND updated_at < #{staleBefore}
+                  )
+            ORDER BY updated_at ASC
+            LIMIT #{limit}
+            """)
+    List<CanvasExecutionRequest> selectDueRequests(@Param("limit") int limit,
+                                                   @Param("now") LocalDateTime now,
+                                                   @Param("staleBefore") LocalDateTime staleBefore);
 }

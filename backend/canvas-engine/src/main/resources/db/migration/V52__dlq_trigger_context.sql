@@ -1,4 +1,4 @@
--- V48: Persist trigger context needed for DLQ replay.
+-- V52: Persist trigger context needed for DLQ replay.
 ALTER TABLE `canvas_execution_dlq`
   ADD COLUMN `trigger_type`      VARCHAR(32)  NULL COMMENT '原始触发类型',
   ADD COLUMN `trigger_node_type` VARCHAR(64)  NULL COMMENT '原始触发节点类型',

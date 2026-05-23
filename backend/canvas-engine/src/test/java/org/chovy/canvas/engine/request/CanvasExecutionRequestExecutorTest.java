@@ -11,6 +11,7 @@ import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import reactor.core.publisher.Mono;
 
+import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.Map;
 
@@ -18,6 +19,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -96,7 +98,7 @@ class CanvasExecutionRequestExecutorTest {
     }
 
     @Test
-    void executeMarksRetryWhenStoredPayloadCannotBeParsed() {
+    void executeMarksFailedWhenStoredPayloadCannotBeParsed() {
         CanvasExecutionRequestMapper mapper = mock(CanvasExecutionRequestMapper.class);
         CanvasExecutionService executionService = mock(CanvasExecutionService.class);
         CanvasExecutionRequestExecutor executor = new CanvasExecutionRequestExecutor(
@@ -109,9 +111,34 @@ class CanvasExecutionRequestExecutorTest {
 
         executor.execute("req-1").block();
 
-        verify(mapper).markRetry(eq("req-1"), org.mockito.ArgumentMatchers.contains("payload parse failed"),
-                any(), any(), anyString());
+        verify(mapper).markFailed(eq("req-1"), org.mockito.ArgumentMatchers.contains("payload parse failed"),
+                any(), anyString());
+        verify(mapper, never()).markRetry(anyString(), anyString(), any(), any(), anyString());
         verify(executionService, never()).triggerFromExecutionRequest(any(), any(), any(), any(), any(), any(), any());
+    }
+
+    @Test
+    void executeRefreshesRunningLeaseWhileTriggerIsStillRunning() {
+        CanvasExecutionRequestMapper mapper = mock(CanvasExecutionRequestMapper.class);
+        CanvasExecutionService executionService = mock(CanvasExecutionService.class);
+        CanvasExecutionRequestExecutor executor = new CanvasExecutionRequestExecutor(
+                mapper, executionService, new ObjectMapper(), null, 1_000L, 5, 300L, 60_000L, 10L);
+
+        CanvasExecutionRequest request = request();
+        when(mapper.selectById("req-1")).thenReturn(request);
+        when(mapper.markRunning(eq("req-1"), any(), any(), anyString())).thenReturn(1);
+        when(mapper.touchRunning(eq("req-1"), any(), anyString())).thenReturn(1);
+        when(mapper.markSucceeded(eq("req-1"), anyString(), any(), anyString())).thenReturn(1);
+        when(executionService.triggerFromExecutionRequest(eq(10L), eq("user-7"), eq(TriggerType.MQ),
+                eq(NodeType.MQ_TRIGGER), eq("order.paid"), eq(Map.of("orderId", "O-1")),
+                eq("MSG-1")))
+                .thenReturn(Mono.delay(Duration.ofMillis(50)).thenReturn(Map.of("executionId", "exec-1")));
+
+        executor.execute("req-1").block();
+
+        ArgumentCaptor<String> token = ArgumentCaptor.forClass(String.class);
+        verify(mapper).markRunning(eq("req-1"), any(), any(), token.capture());
+        verify(mapper, atLeastOnce()).touchRunning(eq("req-1"), any(), eq(token.getValue()));
     }
 
     @Test
