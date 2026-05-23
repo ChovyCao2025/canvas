@@ -35,6 +35,9 @@ public class RedisKeyUtil {
     public String quota(Long canvasId, String userId, String date) {
         return prefix + ":quota:" + canvasId + ":" + userId + ":" + date;
     }
+    public String apiRateLimit(String apiKey, long epochSecond) {
+        return prefix + ":ratelimit:" + apiKey + ":" + epochSecond;
+    }
 
     // ── 并发锁 ─────────────────────────────────────────────────────
     public String publishLock(Long canvasId) { return prefix + ":publish:lock:" + canvasId; }

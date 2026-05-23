@@ -1,7 +1,10 @@
 package org.chovy.canvas.controller;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.chovy.canvas.common.PageResult;
 import org.chovy.canvas.common.R;
 import org.chovy.canvas.domain.meta.ApiDefinition;
@@ -18,6 +21,7 @@ import reactor.core.scheduler.Schedulers;
 public class ApiDefinitionController {
 
     private final ApiDefinitionMapper apiDefinitionMapper;
+    private final ObjectMapper objectMapper;
 
     /**
      * 分页查询 API 定义列表
@@ -50,6 +54,7 @@ public class ApiDefinitionController {
     @PostMapping
     public Mono<R<ApiDefinition>> create(@RequestBody ApiDefinition body) {
         return Mono.fromCallable(() -> {
+            validateRateLimit(body);
             if (body.getEnabled() == null) body.setEnabled(1);
             apiDefinitionMapper.insert(body);
             return body;
@@ -59,14 +64,24 @@ public class ApiDefinitionController {
     /**
      * 更新 API 定义
      * @param id API 定义 ID
-     * @param body API 定义信息
+     * @param bodyNode API 定义信息
      * @return 成功响应
      */
     @PutMapping("/{id}")
-    public Mono<R<Void>> update(@PathVariable Long id, @RequestBody ApiDefinition body) {
+    public Mono<R<Void>> update(@PathVariable Long id, @RequestBody JsonNode bodyNode) {
         return Mono.<Void>fromRunnable(() -> {
-            body.setId(id);
-            apiDefinitionMapper.updateById(body);
+            ApiDefinition body = objectMapper.convertValue(bodyNode, ApiDefinition.class);
+            validateRateLimit(body);
+            if (hasExplicitNullRateLimit(bodyNode)) {
+                body.setId(null);
+                apiDefinitionMapper.update(body,
+                        new LambdaUpdateWrapper<ApiDefinition>()
+                                .eq(ApiDefinition::getId, id)
+                                .set(ApiDefinition::getRateLimitPerSec, null));
+            } else {
+                body.setId(id);
+                apiDefinitionMapper.updateById(body);
+            }
         }).subscribeOn(Schedulers.boundedElastic()).thenReturn(R.ok());
     }
 
@@ -82,4 +97,13 @@ public class ApiDefinitionController {
             .thenReturn(R.ok());
     }
 
+    private static void validateRateLimit(ApiDefinition body) {
+        if (body.getRateLimitPerSec() != null && body.getRateLimitPerSec() <= 0) {
+            throw new IllegalArgumentException("rateLimitPerSec 必须大于 0");
+        }
+    }
+
+    private static boolean hasExplicitNullRateLimit(JsonNode bodyNode) {
+        return bodyNode.has("rateLimitPerSec") && bodyNode.get("rateLimitPerSec").isNull();
+    }
 }
