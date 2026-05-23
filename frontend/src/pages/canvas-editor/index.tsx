@@ -128,12 +128,45 @@ function cleanRefs(cfg: Record<string, unknown>, deletedIds: Set<string>): BizCo
     successNodeId: clean(biz.successNodeId) as string | undefined,
     failNodeId:    clean(biz.failNodeId)    as string | undefined,
     elseNodeId:    clean(biz.elseNodeId)    as string | undefined,
+    approveNodeId: clean(biz.approveNodeId) as string | undefined,
+    rejectNodeId:  clean(biz.rejectNodeId)  as string | undefined,
     hitNextNodeId: clean(biz.hitNextNodeId) as string | undefined,
     missNextNodeId: clean(biz.missNextNodeId) as string | undefined,
     branches:   biz.branches?.map(b   => ({ ...b, nextNodeId: clean(b.nextNodeId) as string | undefined })),
     priorities: biz.priorities?.map(p => ({ ...p, nextNodeId: clean(p.nextNodeId) as string | undefined })),
     groups:     biz.groups?.map(g     => ({ ...g, nextNodeId: clean(g.nextNodeId) as string | undefined })),
   }
+}
+
+function clearEdgeRef(cfg: Record<string, unknown>, edge: Edge): BizConfig {
+  const next = { ...(cfg as BizConfig) }
+  const sourceHandle = edge.sourceHandle ?? 'default'
+  if (sourceHandle === 'success') next.successNodeId = undefined
+  else if (sourceHandle === 'fail') next.failNodeId = undefined
+  else if (sourceHandle === 'else') next.elseNodeId = undefined
+  else if (sourceHandle === 'approve') next.approveNodeId = undefined
+  else if (sourceHandle === 'reject') next.rejectNodeId = undefined
+  else if (sourceHandle === 'hit') next.hitNextNodeId = undefined
+  else if (sourceHandle === 'miss') next.missNextNodeId = undefined
+  else if (sourceHandle.startsWith('branch-')) {
+    const idx = parseInt(sourceHandle.split('-')[1], 10)
+    next.branches = (next.branches ?? []).map((branch, i) =>
+      i === idx ? { ...branch, nextNodeId: undefined } : branch,
+    )
+  } else if (sourceHandle.startsWith('priority-')) {
+    const idx = parseInt(sourceHandle.split('-')[1], 10)
+    next.priorities = (next.priorities ?? []).map((priority, i) =>
+      i === idx ? { ...priority, nextNodeId: undefined } : priority,
+    )
+  } else if (sourceHandle.startsWith('group-')) {
+    const key = sourceHandle.replace('group-', '')
+    next.groups = (next.groups ?? []).map(group =>
+      group.groupKey === key ? { ...group, nextNodeId: undefined } : group,
+    )
+  } else {
+    next.nextNodeId = undefined
+  }
+  return next
 }
 
 // ── 撤销/重做历史 ─────────────────────────────────────────────
@@ -524,6 +557,15 @@ function EditorInner({ detail, onStatusChange }: {
     if (!hit) return
 
     const ph = hit.data as import('../../components/canvas/BranchPlaceholderNode').PlaceholderData
+    const sourceNode = getNodes().find(node => node.id === ph.sourceId)?.data as CanvasNodeData | undefined
+    if (!sourceNode) return
+    if (TRIGGER_TYPES.has(d.nodeType)) {
+      message.warning('START 是流程唯一入口，不能有上游节点。', 3)
+      return
+    }
+    if (TERMINAL_TYPES.has(sourceNode.nodeType)) return
+    if (ph.sourceId === draggedNode.id) return
+
     snapshot('连线')
     setNodes(prev => prev.map(n => {
       if (n.id === draggedNode.id) {
@@ -536,7 +578,7 @@ function EditorInner({ detail, onStatusChange }: {
     }))
     setEdges(prev => addEdge(buildPlaceholderEdge(ph.sourceId, ph.handleId, draggedNode.id), prev))
     setIsDirty(true)
-  }, [placeholders, readonly, snapshot, setNodes, setEdges])
+  }, [getNodes, placeholders, readonly, snapshot, setNodes, setEdges])
 
   // 连线
   const onConnect = useCallback((conn: Connection) => {
@@ -584,10 +626,36 @@ function EditorInner({ detail, onStatusChange }: {
   }, [nodes, snapshot, setNodes, setEdges, onNodesChange])
 
   const onEdgesChangeWrapped = useCallback((changes: EdgeChange[]) => {
+    const removedIds = changes
+      .filter((change): change is EdgeChange & { type: 'remove'; id: string } => change.type === 'remove')
+      .map(change => change.id)
+
+    if (removedIds.length > 0) {
+      snapshot('删除连线')
+      setInsertContext(current => (
+        current?.kind === 'edge' && removedIds.includes(current.edgeId) ? null : current
+      ))
+      const removedEdges = edges.filter(edge => removedIds.includes(edge.id))
+      if (removedEdges.length > 0) {
+        setNodes(prev => prev.map(node => {
+          const outgoing = removedEdges.filter(edge => edge.source === node.id)
+          if (outgoing.length === 0) return node
+          const data = node.data as CanvasNodeData
+          return {
+            ...node,
+            data: {
+              ...data,
+              bizConfig: outgoing.reduce((cfg, edge) => clearEdgeRef(cfg, edge), data.bizConfig ?? {}),
+            },
+          }
+        }))
+      }
+    }
+
     onEdgesChange(changes)
     const significant = changes.some(c => c.type === 'add' || c.type === 'remove')
     if (significant) setIsDirty(true)
-  }, [onEdgesChange])
+  }, [edges, onEdgesChange, setNodes, snapshot])
 
   // 连线规则
   const isValidConnection = useCallback((conn: Connection) => {
@@ -914,8 +982,7 @@ function EditorInner({ detail, onStatusChange }: {
         setNodes(nodes => nodes.map(n => {
           if (n.id !== edge.source) return n
           const d = n.data as CanvasNodeData
-          const ids = new Set([edge.target])
-          return { ...n, data: { ...d, bizConfig: cleanRefs(d.bizConfig ?? {}, ids) } }
+          return { ...n, data: { ...d, bizConfig: clearEdgeRef(d.bizConfig ?? {}, edge) } }
         }))
       }
       return prev.filter(e => e.id !== edgeId)
