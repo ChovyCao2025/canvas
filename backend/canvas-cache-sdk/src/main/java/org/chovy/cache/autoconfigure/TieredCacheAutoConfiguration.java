@@ -1,7 +1,11 @@
 package org.chovy.cache.autoconfigure;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import io.micrometer.core.instrument.MeterRegistry;
 import org.chovy.cache.TieredCacheManager;
+import org.chovy.cache.aop.AnnotationCacheResolver;
+import org.chovy.cache.aop.SpelKeyEvaluator;
+import org.chovy.cache.aop.TieredCacheAspect;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
@@ -22,5 +26,27 @@ public class TieredCacheAutoConfiguration {
                                                  ObjectProvider<MeterRegistry> meterRegistry) {
         return new TieredCacheManager(redis, reactiveRedis.getIfAvailable(),
                 meterRegistry.getIfAvailable(), reactiveFactory.getIfAvailable());
+    }
+
+    @Bean
+    @ConditionalOnMissingBean
+    public SpelKeyEvaluator spelKeyEvaluator() {
+        return new SpelKeyEvaluator();
+    }
+
+    @Bean
+    @ConditionalOnMissingBean
+    @ConditionalOnBean(TieredCacheManager.class)
+    public AnnotationCacheResolver annotationCacheResolver(TieredCacheManager manager,
+                                                           ObjectProvider<ObjectMapper> objectMapper) {
+        return new AnnotationCacheResolver(manager, objectMapper.getIfAvailable(ObjectMapper::new));
+    }
+
+    @Bean
+    @ConditionalOnMissingBean
+    @ConditionalOnBean(AnnotationCacheResolver.class)
+    public TieredCacheAspect tieredCacheAspect(AnnotationCacheResolver resolver,
+                                               SpelKeyEvaluator keyEvaluator) {
+        return new TieredCacheAspect(resolver, keyEvaluator);
     }
 }
