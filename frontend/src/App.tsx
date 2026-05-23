@@ -12,14 +12,11 @@ import AdminUsersPage from './pages/admin'
 import ApiConfigPage from './pages/api-config'
 import AbExperimentPage from './pages/ab-experiment'
 import TagConfigPage from './pages/tag-config'
+import IdentityTypesPage from './pages/identity-types'
 import MqConfigPage from './pages/mq-config'
 import EventConfigPage from './pages/event-config'
 import AudienceListPage from './pages/audience-list'
 import AudienceEditPage from './pages/audience-edit'
-
-function IdentityTypesPage() {
-  return <Result status="info" title="ID 类型配置页面待接入" />
-}
 
 function TagImportPage() {
   return <Result status="info" title="标签导入页面待接入" />
