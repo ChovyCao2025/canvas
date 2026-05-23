@@ -3,23 +3,21 @@ import { Popover, Typography } from 'antd'
 
 import type { NodeTypeRegistry } from '../../types'
 
-const { Paragraph, Text } = Typography
+const { Text } = Typography
 
 interface Props {
   categoryColor: string
   node: NodeTypeRegistry
-  summary: string
+  detail: string
   onDragStart: (event: DragEvent<HTMLDivElement>, node: NodeTypeRegistry) => void
 }
 
 export default function NodeLibraryItem({
   categoryColor,
   node,
-  summary,
+  detail,
   onDragStart,
 }: Props) {
-  const detail = (node.description ?? '').trim() || summary
-
   return (
     <div
       draggable
@@ -28,8 +26,8 @@ export default function NodeLibraryItem({
         display: 'flex',
         alignItems: 'stretch',
         gap: 0,
-        border: '1px solid #f0f0f0',
-        borderRadius: 6,
+        border: '1px solid #e6e9ef',
+        borderRadius: 10,
         background: '#fff',
         cursor: 'grab',
         overflow: 'hidden',
@@ -51,42 +49,32 @@ export default function NodeLibraryItem({
           width: 4,
           flex: '0 0 4px',
           background: categoryColor,
+          opacity: 0.9,
         }}
       />
       <div
         style={{
           flex: 1,
           minWidth: 0,
-          padding: '8px 10px',
+          padding: '12px 16px',
           display: 'flex',
-          alignItems: 'flex-start',
+          alignItems: 'center',
           justifyContent: 'space-between',
-          gap: 8,
+          gap: 12,
         }}
       >
-        <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center' }}>
           <Text
             strong
             style={{
               display: 'block',
               color: '#1f1f1f',
-              fontSize: 13,
-              lineHeight: '20px',
+              fontSize: 14,
+              lineHeight: '22px',
             }}
           >
             {node.typeName}
           </Text>
-          <Paragraph
-            ellipsis={{ rows: 1, tooltip: summary }}
-            style={{
-              margin: 0,
-              color: '#8c8c8c',
-              fontSize: 12,
-              lineHeight: '18px',
-            }}
-          >
-            {summary}
-          </Paragraph>
         </div>
         <Popover
           trigger="click"
@@ -111,17 +99,17 @@ export default function NodeLibraryItem({
               height: 20,
               flex: '0 0 20px',
               borderRadius: '50%',
-              border: '1px solid #d9d9d9',
-              background: '#fff',
-              color: '#8c8c8c',
-              fontSize: 12,
+              border: '1px solid #dce3eb',
+              background: '#f7f9fc',
+              color: '#a0acba',
+              fontSize: 11,
               lineHeight: '18px',
               textAlign: 'center',
               padding: 0,
               cursor: 'pointer',
             }}
           >
-            ?
+            i
           </button>
         </Popover>
       </div>

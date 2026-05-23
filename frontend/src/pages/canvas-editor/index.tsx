@@ -1282,7 +1282,7 @@ function EditorInner({ detail, onStatusChange }: {
 
         {/* 左侧节点面板 */}
         <div style={{
-          width: 220, borderRight: '1px solid #f0f0f0',
+          width: 320, borderRight: '1px solid #f0f0f0',
           background: '#fafafa', flexShrink: 0,
         }}>
           <NodePanel onDragStart={() => {}} />
