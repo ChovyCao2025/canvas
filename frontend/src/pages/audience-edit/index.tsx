@@ -103,6 +103,24 @@ function parseDataSourceConfig(value?: string) {
   }
 }
 
+function mergeJdbcSources(
+  current: AudienceDataSource[],
+  next: AudienceDataSource[],
+): AudienceDataSource[] {
+  const merged = new Map<number, AudienceDataSource>()
+  current.forEach(item => {
+    if (item.id != null) {
+      merged.set(item.id, item)
+    }
+  })
+  next.forEach(item => {
+    if (item.id != null) {
+      merged.set(item.id, item)
+    }
+  })
+  return Array.from(merged.values())
+}
+
 export default function AudienceEditPage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
@@ -132,7 +150,7 @@ export default function AudienceEditPage() {
       setTagOptions(tags.map(item => ({ label: item.label, value: item.name })))
     })
     audienceDataSourceApi.list().then(res => {
-      setJdbcSources(res.data)
+      setJdbcSources(prev => mergeJdbcSources(prev, res.data))
     })
   }, [])
 
@@ -152,7 +170,7 @@ export default function AudienceEditPage() {
       setQuery(toRuleGroup(current.ruleJson))
       if (current.dataSourceType === 'JDBC' && current.dataSourceId != null) {
         audienceDataSourceApi.get(current.dataSourceId).then(sourceRes => {
-          setJdbcSources(prev => prev.some(item => item.id === sourceRes.data.id) ? prev : [...prev, sourceRes.data])
+          setJdbcSources(prev => mergeJdbcSources(prev, [sourceRes.data]))
         })
       }
     })
