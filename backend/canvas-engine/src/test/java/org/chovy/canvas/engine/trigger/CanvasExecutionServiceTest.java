@@ -7,6 +7,7 @@ import org.chovy.canvas.domain.constant.CanvasStatusEnum;
 import org.chovy.canvas.domain.constant.NodeType;
 import org.chovy.canvas.domain.constant.TriggerType;
 import org.chovy.canvas.domain.execution.CanvasExecution;
+import org.chovy.canvas.domain.execution.CanvasExecutionDlqMapper;
 import org.chovy.canvas.domain.execution.CanvasExecutionMapper;
 import org.chovy.canvas.domain.execution.CanvasExecutionStatsMapper;
 import org.chovy.canvas.engine.dag.DagGraph;
@@ -16,6 +17,7 @@ import org.chovy.canvas.engine.scheduler.DagEngine;
 import org.chovy.canvas.infra.cache.CanvasConfigCache;
 import org.chovy.canvas.infra.cache.CanvasEntityCache;
 import org.chovy.canvas.infra.redis.ContextPersistenceService;
+import org.apache.rocketmq.spring.core.RocketMQTemplate;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -50,6 +52,9 @@ class CanvasExecutionServiceTest {
     @Mock CanvasExecutionStatsMapper statsMapper;
     @Mock CanvasEntityCache canvasEntityCache;
     @Mock MqTriggerHandler mqTriggerHandler;
+    @Mock CanvasExecutionDlqMapper dlqMapper;
+    @Mock TriggerPriorityConfig priorityConfig;
+    @Mock RocketMQTemplate rocketMQTemplate;
 
     CanvasExecutionService sut;
 
@@ -67,7 +72,11 @@ class CanvasExecutionServiceTest {
                 executionRegistry,
                 statsMapper,
                 canvasEntityCache,
-                mqTriggerHandler
+                mqTriggerHandler,
+                dlqMapper,
+                priorityConfig,
+                rocketMQTemplate,
+                new com.fasterxml.jackson.databind.ObjectMapper()
         );
         ReflectionTestUtils.setField(sut, "ctxTtlSec", 86400L);
         ReflectionTestUtils.setField(sut, "globalTimeoutSec", 600L);

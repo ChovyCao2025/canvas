@@ -30,6 +30,7 @@ public class MetaController {
     private final TagDefinitionMapper tagDefinitionMapper;
     private final MqMessageDefinitionMapper mqMapper;
     private final EventDefinitionMapper eventDefinitionMapper;
+    private final IdentityTypeService identityTypeService;
     private final ObjectMapper objectMapper;
 
     @Value("${canvas.integration.tagger-service-url}")
@@ -225,6 +226,16 @@ public class MetaController {
     @GetMapping("/biz-lines")
     public Mono<R<List<StubOption>>> getBizLines() {
         return Mono.just(R.ok(metaService.getBizLines()));
+    }
+
+    @GetMapping("/identity-types")
+    public Mono<R<List<StubOption>>> getIdentityTypes(
+            @RequestParam(defaultValue = "1") Integer allowImport) {
+        return Mono.fromCallable(() -> identityTypeService.list(1, allowImport).stream()
+                        .map(item -> new StubOption(item.getCode(), item.getName()))
+                        .collect(Collectors.toList()))
+                .subscribeOn(Schedulers.boundedElastic())
+                .map(R::ok);
     }
 
     /**

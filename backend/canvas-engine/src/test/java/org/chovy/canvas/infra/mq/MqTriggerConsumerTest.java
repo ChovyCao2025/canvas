@@ -6,10 +6,12 @@ import org.apache.rocketmq.spring.annotation.ConsumeMode;
 import org.apache.rocketmq.spring.annotation.MessageModel;
 import org.apache.rocketmq.spring.annotation.RocketMQMessageListener;
 import org.apache.rocketmq.spring.annotation.SelectorType;
+import org.chovy.canvas.domain.execution.CanvasMqTriggerRejectedMapper;
 import org.chovy.canvas.domain.constant.NodeType;
 import org.chovy.canvas.domain.constant.TriggerType;
 import org.chovy.canvas.engine.disruptor.CanvasDisruptorService;
 import org.chovy.canvas.engine.request.CanvasExecutionRequestService;
+import org.chovy.canvas.engine.scheduler.CanvasMetrics;
 import org.chovy.canvas.infra.redis.TriggerRouteService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -34,6 +36,8 @@ class MqTriggerConsumerTest {
     private TriggerRouteService routeService;
     private CanvasDisruptorService disruptorService;
     private CanvasExecutionRequestService requestService;
+    private CanvasMqTriggerRejectedMapper rejectedMapper;
+    private CanvasMetrics metrics;
     private MqTriggerConsumer consumer;
 
     @BeforeEach
@@ -41,7 +45,15 @@ class MqTriggerConsumerTest {
         routeService = mock(TriggerRouteService.class);
         disruptorService = mock(CanvasDisruptorService.class);
         requestService = mock(CanvasExecutionRequestService.class);
-        consumer = new MqTriggerConsumer(new ObjectMapper(), routeService, disruptorService, requestService);
+        rejectedMapper = mock(CanvasMqTriggerRejectedMapper.class);
+        metrics = mock(CanvasMetrics.class);
+        consumer = new MqTriggerConsumer(
+                new ObjectMapper(),
+                routeService,
+                disruptorService,
+                requestService,
+                rejectedMapper,
+                metrics);
     }
 
     @Test

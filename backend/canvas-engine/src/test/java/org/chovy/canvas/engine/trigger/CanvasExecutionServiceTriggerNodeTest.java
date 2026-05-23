@@ -5,6 +5,7 @@ import org.chovy.canvas.domain.canvas.CanvasMapper;
 import org.chovy.canvas.domain.canvas.CanvasVersionMapper;
 import org.chovy.canvas.domain.constant.NodeType;
 import org.chovy.canvas.domain.execution.CanvasExecutionMapper;
+import org.chovy.canvas.domain.execution.CanvasExecutionDlqMapper;
 import org.chovy.canvas.domain.execution.CanvasExecutionStatsMapper;
 import org.chovy.canvas.domain.meta.MqMessageDefinition;
 import org.chovy.canvas.domain.meta.MqMessageDefinitionMapper;
@@ -15,6 +16,7 @@ import org.chovy.canvas.engine.scheduler.DagEngine;
 import org.chovy.canvas.infra.cache.CanvasConfigCache;
 import org.chovy.canvas.infra.cache.CanvasEntityCache;
 import org.chovy.canvas.infra.redis.ContextPersistenceService;
+import org.apache.rocketmq.spring.core.RocketMQTemplate;
 import org.junit.jupiter.api.Test;
 import org.springframework.test.util.ReflectionTestUtils;
 
@@ -98,7 +100,11 @@ class CanvasExecutionServiceTriggerNodeTest {
                 mock(InFlightExecutionRegistry.class),
                 mock(CanvasExecutionStatsMapper.class),
                 mock(CanvasEntityCache.class),
-                mqTriggerHandler
+                mqTriggerHandler,
+                mock(CanvasExecutionDlqMapper.class),
+                mock(TriggerPriorityConfig.class),
+                mock(RocketMQTemplate.class),
+                new ObjectMapper()
         );
     }
 }
