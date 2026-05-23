@@ -28,7 +28,7 @@ Event ingestion, advanced ID merge UI, rule-tag computation, CDP user 360 insigh
 
 ### Backend Create
 
-- `backend/canvas-engine/src/main/resources/db/migration/V48__cdp_core.sql`  
+- `backend/canvas-engine/src/main/resources/db/migration/V49__cdp_core.sql`  
   Adds CDP tables, extends `tag_definition`, seeds `CDP_TAG_WRITE` node type.
 
 - `backend/canvas-engine/src/main/java/org/chovy/canvas/domain/cdp/CdpUserProfile.java`  
@@ -162,7 +162,7 @@ Event ingestion, advanced ID merge UI, rule-tag computation, CDP user 360 insigh
 ### Task 1: Database Migration and Tag Definition Model
 
 **Files:**
-- Create: `backend/canvas-engine/src/main/resources/db/migration/V48__cdp_core.sql`
+- Create: `backend/canvas-engine/src/main/resources/db/migration/V49__cdp_core.sql`
 - Modify: `backend/canvas-engine/src/main/java/org/chovy/canvas/domain/meta/TagDefinition.java`
 - Test: `backend/canvas-engine/src/test/java/org/chovy/canvas/domain/meta/TagDefinitionCdpFieldsTest.java`
 
@@ -240,10 +240,10 @@ Modify `backend/canvas-engine/src/main/java/org/chovy/canvas/domain/meta/TagDefi
 
 - [ ] **Step 4: Add Flyway migration**
 
-Create `backend/canvas-engine/src/main/resources/db/migration/V48__cdp_core.sql`:
+Create `backend/canvas-engine/src/main/resources/db/migration/V49__cdp_core.sql`:
 
 ```sql
--- V48: CDP core user profile, tag instances, tag history, batch tagging, and tag write node
+-- V49: CDP core user profile, tag instances, tag history, batch tagging, and tag write node
 
 ALTER TABLE tag_definition
     ADD COLUMN value_type VARCHAR(20) NOT NULL DEFAULT 'STRING' COMMENT 'STRING/NUMBER/BOOLEAN/JSON',
@@ -377,7 +377,7 @@ Expected: PASS.
 - [ ] **Step 6: Commit**
 
 ```bash
-git add backend/canvas-engine/src/main/resources/db/migration/V48__cdp_core.sql \
+git add backend/canvas-engine/src/main/resources/db/migration/V49__cdp_core.sql \
   backend/canvas-engine/src/main/java/org/chovy/canvas/domain/meta/TagDefinition.java \
   backend/canvas-engine/src/test/java/org/chovy/canvas/domain/meta/TagDefinitionCdpFieldsTest.java
 git commit -m "feat: add cdp schema foundation"
