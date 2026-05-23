@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { buildCanvasNameUpdate, shouldShowCanvasNameActions } from './canvasNameUpdate'
+import { buildCanvasNameUpdate, getCanvasNameStatusGap, shouldShowCanvasNameActions } from './canvasNameUpdate'
 
 describe('buildCanvasNameUpdate', () => {
   it('trims the canvas name before saving', () => {
@@ -17,5 +17,10 @@ describe('buildCanvasNameUpdate', () => {
   it('shows save/cancel actions as soon as title editing starts', () => {
     expect(shouldShowCanvasNameActions(true)).toBe(true)
     expect(shouldShowCanvasNameActions(false)).toBe(false)
+  })
+
+  it('moves the status tag away only while title editing', () => {
+    expect(getCanvasNameStatusGap(true)).toBe(16)
+    expect(getCanvasNameStatusGap(false)).toBe(0)
   })
 })

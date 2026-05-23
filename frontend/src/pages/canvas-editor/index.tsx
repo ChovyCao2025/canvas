@@ -32,7 +32,7 @@ import CronBuilder from '../../components/config-panel/CronBuilder'
 import { CanvasActionsContext } from '../../context/CanvasActionsContext'
 import { useAuth } from '../../context/AuthContext'
 import { getCanvasGraphReloadKey } from './graphReloadKey'
-import { buildCanvasNameUpdate, shouldShowCanvasNameActions } from './canvasNameUpdate'
+import { buildCanvasNameUpdate, getCanvasNameStatusGap, shouldShowCanvasNameActions } from './canvasNameUpdate'
 import {
   type CanvasTriggerType,
   getExecutionLimitsSummary,
@@ -285,6 +285,7 @@ function EditorInner({ detail, onStatusChange, onCanvasNameChange }: {
   const { snapshot, undo, redo, canUndo, canRedo, undoLabel, redoLabel } = useHistory(nodes as Node<CanvasNodeData>[], edges)
   const graphReloadKey = getCanvasGraphReloadKey(detail)
   const showCanvasNameActions = shouldShowCanvasNameActions(isEditingCanvasName)
+  const statusTagGap = getCanvasNameStatusGap(isEditingCanvasName && !readonly)
 
   // ── Auto-save：最后一次改动 3s 后静默保存 ─────────────────────
   useEffect(() => {
@@ -1056,7 +1057,7 @@ function EditorInner({ detail, onStatusChange, onCanvasNameChange }: {
             </button>
           </Tooltip>
         )}
-        <Tag color={statusMap[status]?.color} style={{ borderRadius: 6, fontSize: 11 }}>
+        <Tag color={statusMap[status]?.color} style={{ borderRadius: 6, fontSize: 11, marginLeft: statusTagGap }}>
           {statusMap[status]?.label}
         </Tag>
         {readonly && <Tag color="default" style={{ borderRadius: 6, fontSize: 11 }}>只读</Tag>}

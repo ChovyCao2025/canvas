@@ -13,3 +13,7 @@ export function buildCanvasNameUpdate(inputName: string, savedName: string): Can
 export function shouldShowCanvasNameActions(isEditing: boolean): boolean {
   return isEditing
 }
+
+export function getCanvasNameStatusGap(isEditing: boolean): number {
+  return isEditing ? 16 : 0
+}
