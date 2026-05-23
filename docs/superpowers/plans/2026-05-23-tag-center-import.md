@@ -18,7 +18,7 @@ The feature spans backend metadata, import processing, Excel parsing, external p
 
 Backend files to create:
 
-- `backend/canvas-engine/src/main/resources/db/migration/V49__tag_center_import.sql`  
+- `backend/canvas-engine/src/main/resources/db/migration/V60__tag_center_import.sql`  
   Creates `identity_type`, reshapes `tag_definition`, and adds tag value/import tables.
 - `backend/canvas-engine/src/main/java/org/chovy/canvas/domain/meta/IdentityType.java`
 - `backend/canvas-engine/src/main/java/org/chovy/canvas/domain/meta/IdentityTypeMapper.java`
@@ -98,13 +98,13 @@ Frontend files to modify:
 ### Task 1: Database Migration And Metadata Models
 
 **Files:**
-- Create: `backend/canvas-engine/src/main/resources/db/migration/V49__tag_center_import.sql`
+- Create: `backend/canvas-engine/src/main/resources/db/migration/V60__tag_center_import.sql`
 - Modify: `backend/canvas-engine/src/main/java/org/chovy/canvas/domain/meta/TagDefinition.java`
 - Create domain and mapper files listed in the File Structure backend creation list.
 
 - [ ] **Step 1: Add the Flyway migration**
 
-Create `backend/canvas-engine/src/main/resources/db/migration/V49__tag_center_import.sql` with:
+Create `backend/canvas-engine/src/main/resources/db/migration/V60__tag_center_import.sql` with:
 
 ```sql
 ALTER TABLE tag_definition
@@ -339,7 +339,7 @@ Expected: build succeeds with no Java compilation errors.
 - [ ] **Step 6: Commit**
 
 ```bash
-git add backend/canvas-engine/src/main/resources/db/migration/V49__tag_center_import.sql \
+git add backend/canvas-engine/src/main/resources/db/migration/V60__tag_center_import.sql \
   backend/canvas-engine/src/main/java/org/chovy/canvas/domain/meta
 git commit -m "feat: add tag center data model"
 ```
@@ -1599,13 +1599,13 @@ git commit -m "feat: add tag import api pull sources"
 ### Task 7: TAGGER Node Schema And Dependent Data Sources
 
 **Files:**
-- Create: `backend/canvas-engine/src/main/resources/db/migration/V50__tagger_tag_value_schema.sql`
+- Create: `backend/canvas-engine/src/main/resources/db/migration/V61__tagger_tag_value_schema.sql`
 - Modify: `frontend/src/components/config-panel/index.tsx`
 - Test: `frontend/src/components/config-panel/dataSource.test.ts`
 
 - [ ] **Step 1: Add node schema migration**
 
-Create `V50__tagger_tag_value_schema.sql`:
+Create `V61__tagger_tag_value_schema.sql`:
 
 ```sql
 UPDATE node_type_registry
@@ -1708,7 +1708,7 @@ Expected: PASS.
 - [ ] **Step 7: Commit**
 
 ```bash
-git add backend/canvas-engine/src/main/resources/db/migration/V50__tagger_tag_value_schema.sql \
+git add backend/canvas-engine/src/main/resources/db/migration/V61__tagger_tag_value_schema.sql \
   frontend/src/components/config-panel/index.tsx \
   frontend/src/components/config-panel/dataSource.test.ts
 git commit -m "feat: support tag value data source dependencies"
