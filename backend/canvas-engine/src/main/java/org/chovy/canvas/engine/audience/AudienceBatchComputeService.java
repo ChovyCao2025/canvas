@@ -47,20 +47,22 @@ public class AudienceBatchComputeService {
     @Value("${canvas.integration.tagger-service-url}")
     private String taggerUrl;
 
-    public void compute(Long audienceId) {
+    public AudienceComputeResult compute(Long audienceId) {
         String lockKey = COMPUTE_LOCK_PREFIX + audienceId;
+        AudienceDefinition definition = definitionMapper.selectById(audienceId);
+        String audienceName = definition == null ? null : definition.getName();
         boolean locked = Boolean.TRUE.equals(redis.opsForValue().setIfAbsent(lockKey, "1", Duration.ofHours(2)));
         if (!locked) {
             log.warn("[AUDIENCE] compute skipped because lock exists audienceId={}", audienceId);
-            return;
+            return AudienceComputeResult.failed(audienceId, audienceName, "已有计算任务正在运行");
         }
 
         updateStat(audienceId, "COMPUTING", null, null, null);
         try {
-            AudienceDefinition definition = definitionMapper.selectById(audienceId);
             if (definition == null || definition.getEnabled() == null || definition.getEnabled() == 0) {
                 throw new IllegalArgumentException("Audience not found or disabled: " + audienceId);
             }
+            audienceName = definition.getName();
 
             RoaringBitmap bitmap = switch (definition.getDataSourceType()) {
                 case "JDBC" -> computeViaJdbc(definition);
@@ -74,10 +76,15 @@ public class AudienceBatchComputeService {
                 bitmap.serialize(dos);
                 dos.flush();
             }
-            updateStat(audienceId, "READY", (long) bitmap.getCardinality(), bos.size() / 1024, null);
+            long estimatedSize = bitmap.getCardinality();
+            int bitmapSizeKb = bos.size() / 1024;
+            updateStat(audienceId, "READY", estimatedSize, bitmapSizeKb, null);
+            return AudienceComputeResult.ready(audienceId, definition.getName(), estimatedSize, bitmapSizeKb);
         } catch (Exception e) {
+            String error = trimError(e.getMessage());
             log.error("[AUDIENCE] compute failed audienceId={}: {}", audienceId, e.getMessage(), e);
-            updateStat(audienceId, "FAILED", null, null, trimError(e.getMessage()));
+            updateStat(audienceId, "FAILED", null, null, error);
+            return AudienceComputeResult.failed(audienceId, audienceName, error);
         } finally {
             redis.delete(lockKey);
         }
