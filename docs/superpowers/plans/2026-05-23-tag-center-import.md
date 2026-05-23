@@ -331,7 +331,7 @@ Repeat the same pattern for `TagValueDefinitionMapper`, `UserTagCurrentMapper`, 
 Run:
 
 ```bash
-mvn -pl canvas-engine -am -DskipTests compile
+mvn -f backend/pom.xml -pl canvas-engine -am -DskipTests compile
 ```
 
 Expected: build succeeds with no Java compilation errors.
@@ -435,7 +435,7 @@ class IdentityTypeServiceTest {
 Run:
 
 ```bash
-mvn -pl canvas-engine -Dtest=IdentityTypeServiceTest test
+mvn -f backend/pom.xml -pl canvas-engine -am -Dtest=IdentityTypeServiceTest test
 ```
 
 Expected: compilation fails because `IdentityTypeService` does not exist.
@@ -619,7 +619,7 @@ public Mono<R<List<StubOption>>> getIdentityTypes(
 Run:
 
 ```bash
-mvn -pl canvas-engine -Dtest=IdentityTypeServiceTest test
+mvn -f backend/pom.xml -pl canvas-engine -am -Dtest=IdentityTypeServiceTest test
 ```
 
 Expected: PASS.
@@ -739,7 +739,7 @@ class TagDefinitionServiceTest {
 Run:
 
 ```bash
-mvn -pl canvas-engine -Dtest=TagDefinitionServiceTest test
+mvn -f backend/pom.xml -pl canvas-engine -am -Dtest=TagDefinitionServiceTest test
 ```
 
 Expected: compilation fails because `TagDefinitionService` does not exist.
@@ -982,7 +982,7 @@ Update existing `/meta/tagger-tags` DB path to call `tagDefinitionService.list(t
 Run:
 
 ```bash
-mvn -pl canvas-engine -Dtest=TagDefinitionServiceTest test
+mvn -f backend/pom.xml -pl canvas-engine -am -Dtest=TagDefinitionServiceTest test
 ```
 
 Expected: PASS.
@@ -1191,7 +1191,7 @@ class TagImportServiceTest {
 Run:
 
 ```bash
-mvn -pl canvas-engine -Dtest=TagImportServiceTest test
+mvn -f backend/pom.xml -pl canvas-engine -am -Dtest=TagImportServiceTest test
 ```
 
 Expected: compilation fails because `TagImportService` does not exist.
@@ -1294,7 +1294,7 @@ public class TagImportController {
 Run:
 
 ```bash
-mvn -pl canvas-engine -Dtest=TagImportServiceTest test
+mvn -f backend/pom.xml -pl canvas-engine -am -Dtest=TagImportServiceTest test
 ```
 
 Expected: PASS.
@@ -1443,7 +1443,7 @@ private static String value(Map<String, ?> map, String key) {
 Run:
 
 ```bash
-mvn -pl canvas-engine -Dtest=TagImportControllerTest,TagImportServiceTest test
+mvn -f backend/pom.xml -pl canvas-engine -am -Dtest=TagImportControllerTest,TagImportServiceTest test
 ```
 
 Expected: PASS.
@@ -1580,7 +1580,7 @@ public class TagImportSourceController {
 Run:
 
 ```bash
-mvn -pl canvas-engine -Dtest=TagImportSourceServiceTest test
+mvn -f backend/pom.xml -pl canvas-engine -am -Dtest=TagImportSourceServiceTest test
 ```
 
 Expected: PASS.
@@ -2197,7 +2197,7 @@ git commit -m "feat: add tag import management page"
 Run:
 
 ```bash
-mvn -pl canvas-engine test
+mvn -f backend/pom.xml -pl canvas-engine -am test
 ```
 
 Expected: all backend tests pass.
@@ -2227,7 +2227,7 @@ Expected: TypeScript and Vite build pass.
 Run:
 
 ```bash
-mvn -pl canvas-engine -am -DskipTests compile
+mvn -f backend/pom.xml -pl canvas-engine -am -DskipTests compile
 ```
 
 Expected: backend modules compile.
