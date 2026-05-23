@@ -52,6 +52,10 @@ describe('api docs data helpers', () => {
     )
   })
 
+  it('formats undefined examples with a safe string fallback', () => {
+    expect(formatJsonExample(undefined)).toBe('undefined')
+  })
+
   it('does not duplicate endpoint ids', () => {
     const ids = API_DOCS.map(endpoint => endpoint.id)
 
