@@ -42,6 +42,7 @@ import {
   shouldExpandExecutionLimits,
 } from './settingsPresentation'
 import { applyInsertIntoEdge, buildDetachedNode, buildPlaceholderEdge } from './insertNode'
+import { clearEdgeRef, deriveEdges, patchBizConfig } from './outletRouting'
 
 const { RangePicker } = DatePicker
 
@@ -55,37 +56,6 @@ const nodeTypes = {
 }
 const edgeTypes = { default: HoverEdge }
 
-// ── 从后端节点 config 推导 ReactFlow edges ──────────────────
-
-function deriveEdges(backendNodes: BackendNode[]): Edge[] {
-  const edges: Edge[] = []
-  backendNodes.forEach(n => {
-    const c = (n.config ?? {}) as BizConfig
-    const push = (target: string | undefined, sourceHandle: string) => {
-      if (!target) return
-      edges.push({ id: `${n.id}->${target}`, source: n.id, target, sourceHandle })
-    }
-    push(c.nextNodeId,    'default')
-    push(c.successNodeId, 'success')
-    push(c.failNodeId,    'fail')
-    push(c.elseNodeId,    'else')
-    push(c.approveNodeId, 'approve')
-    push(c.rejectNodeId,  'reject')
-    push(c.hitNextNodeId, 'hit')
-    push(c.missNextNodeId, 'miss')
-    push(c.timeoutNodeId, 'timeout')
-    push(c.suppressedNodeId, 'suppressed')
-    push(c.skippedNodeId, 'skipped')
-    push(c.maxExceededNodeId, 'max_exceeded')
-    push(c.goalMetNodeId, 'goal_met')
-    push(c.goalNotMetNodeId, 'goal_not_met')
-    c.branches?.forEach((b, i) => push(b.nextNodeId, `branch-${i}`))
-    c.priorities?.forEach((p, i) => push(p.nextNodeId, `priority-${i}`))
-    c.groups?.forEach(g => push(g.nextNodeId, `group-${g.groupKey}`))
-  })
-  return edges
-}
-
 // ── 自动 Dagre 布局 ───────────────────────────────────────────
 
 function applyDagreLayout(nodes: Node[], edges: Edge[]) {
@@ -98,48 +68,6 @@ function applyDagreLayout(nodes: Node[], edges: Edge[]) {
     const { x, y } = g.node(n.id)
     return { ...n, position: { x: x - 100, y: y - 38 } }
   })
-}
-
-// ── 更新源节点 bizConfig（按 sourceHandle 分发）──────────────
-
-function patchBizConfig(
-  cfg: Record<string, unknown>,
-  sourceHandle: string,
-  target: string,
-): BizConfig {
-  const next = { ...cfg } as BizConfig
-  if (sourceHandle === 'success')       next.successNodeId = target
-  else if (sourceHandle === 'fail')     next.failNodeId    = target
-  else if (sourceHandle === 'else')     next.elseNodeId    = target
-  else if (sourceHandle === 'approve')  next.approveNodeId = target
-  else if (sourceHandle === 'reject')   next.rejectNodeId  = target
-  else if (sourceHandle === 'hit')      next.hitNextNodeId = target
-  else if (sourceHandle === 'miss')     next.missNextNodeId = target
-  else if (sourceHandle === 'timeout')  next.timeoutNodeId = target
-  else if (sourceHandle === 'suppressed') next.suppressedNodeId = target
-  else if (sourceHandle === 'skipped')  next.skippedNodeId = target
-  else if (sourceHandle === 'max_exceeded') next.maxExceededNodeId = target
-  else if (sourceHandle === 'goal_met') next.goalMetNodeId = target
-  else if (sourceHandle === 'goal_not_met') next.goalNotMetNodeId = target
-  else if (sourceHandle.startsWith('branch-')) {
-    const idx = parseInt(sourceHandle.split('-')[1], 10)
-    next.branches = (next.branches ?? []).map((b, i) =>
-      i === idx ? { ...b, nextNodeId: target } : b
-    )
-  } else if (sourceHandle.startsWith('priority-')) {
-    const idx = parseInt(sourceHandle.split('-')[1], 10)
-    next.priorities = (next.priorities ?? []).map((p, i) =>
-      i === idx ? { ...p, nextNodeId: target } : p
-    )
-  } else if (sourceHandle.startsWith('group-')) {
-    const key = sourceHandle.replace('group-', '')
-    next.groups = (next.groups ?? []).map(g =>
-      g.groupKey === key ? { ...g, nextNodeId: target } : g
-    )
-  } else {
-    next.nextNodeId = target
-  }
-  return next
 }
 
 // ── 清理被删节点的引用 ────────────────────────────────────────
@@ -167,43 +95,6 @@ function cleanRefs(cfg: Record<string, unknown>, deletedIds: Set<string>): BizCo
     priorities: biz.priorities?.map(p => ({ ...p, nextNodeId: clean(p.nextNodeId) as string | undefined })),
     groups:     biz.groups?.map(g     => ({ ...g, nextNodeId: clean(g.nextNodeId) as string | undefined })),
   }
-}
-
-function clearEdgeRef(cfg: Record<string, unknown>, edge: Edge): BizConfig {
-  const next = { ...(cfg as BizConfig) }
-  const sourceHandle = edge.sourceHandle ?? 'default'
-  if (sourceHandle === 'success') next.successNodeId = undefined
-  else if (sourceHandle === 'fail') next.failNodeId = undefined
-  else if (sourceHandle === 'else') next.elseNodeId = undefined
-  else if (sourceHandle === 'approve') next.approveNodeId = undefined
-  else if (sourceHandle === 'reject') next.rejectNodeId = undefined
-  else if (sourceHandle === 'hit') next.hitNextNodeId = undefined
-  else if (sourceHandle === 'miss') next.missNextNodeId = undefined
-  else if (sourceHandle === 'timeout') next.timeoutNodeId = undefined
-  else if (sourceHandle === 'suppressed') next.suppressedNodeId = undefined
-  else if (sourceHandle === 'skipped') next.skippedNodeId = undefined
-  else if (sourceHandle === 'max_exceeded') next.maxExceededNodeId = undefined
-  else if (sourceHandle === 'goal_met') next.goalMetNodeId = undefined
-  else if (sourceHandle === 'goal_not_met') next.goalNotMetNodeId = undefined
-  else if (sourceHandle.startsWith('branch-')) {
-    const idx = parseInt(sourceHandle.split('-')[1], 10)
-    next.branches = (next.branches ?? []).map((branch, i) =>
-      i === idx ? { ...branch, nextNodeId: undefined } : branch,
-    )
-  } else if (sourceHandle.startsWith('priority-')) {
-    const idx = parseInt(sourceHandle.split('-')[1], 10)
-    next.priorities = (next.priorities ?? []).map((priority, i) =>
-      i === idx ? { ...priority, nextNodeId: undefined } : priority,
-    )
-  } else if (sourceHandle.startsWith('group-')) {
-    const key = sourceHandle.replace('group-', '')
-    next.groups = (next.groups ?? []).map(group =>
-      group.groupKey === key ? { ...group, nextNodeId: undefined } : group,
-    )
-  } else {
-    next.nextNodeId = undefined
-  }
-  return next
 }
 
 // ── 撤销/重做历史 ─────────────────────────────────────────────
@@ -564,7 +455,7 @@ function EditorInner({ detail, onStatusChange, onCanvasNameChange }: {
           ...node,
           data: {
             ...data,
-            bizConfig: patchBizConfig(data.bizConfig, selectedEdge.sourceHandle ?? 'default', newId),
+            bizConfig: patchBizConfig(data.bizConfig, selectedEdge.sourceHandle ?? 'default', newId, data.outletSchema),
           },
         }
       }))
@@ -576,7 +467,7 @@ function EditorInner({ detail, onStatusChange, onCanvasNameChange }: {
           ...node,
           data: {
             ...data,
-            bizConfig: patchBizConfig(data.bizConfig, resolvedContext.handleId, newId),
+            bizConfig: patchBizConfig(data.bizConfig, resolvedContext.handleId, newId, data.outletSchema),
           },
         }
       }))
@@ -646,7 +537,7 @@ function EditorInner({ detail, onStatusChange, onCanvasNameChange }: {
       }
       if (n.id !== ph.sourceId) return n
       const nd = n.data as CanvasNodeData
-      return { ...n, data: { ...nd, bizConfig: patchBizConfig(nd.bizConfig, ph.handleId, draggedNode.id) } }
+      return { ...n, data: { ...nd, bizConfig: patchBizConfig(nd.bizConfig, ph.handleId, draggedNode.id, nd.outletSchema) } }
     }))
     setEdges(prev => addEdge(buildPlaceholderEdge(ph.sourceId, ph.handleId, draggedNode.id), prev))
     setIsDirty(true)
@@ -660,9 +551,10 @@ function EditorInner({ detail, onStatusChange, onCanvasNameChange }: {
     setNodes(prev => prev.map(n => {
       if (n.id !== source) return n
       const d = n.data as CanvasNodeData
-      return { ...n, data: { ...d, bizConfig: patchBizConfig(d.bizConfig, sourceHandle, target) } }
+      return { ...n, data: { ...d, bizConfig: patchBizConfig(d.bizConfig, sourceHandle, target, d.outletSchema) } }
     }))
     setEdges(prev => addEdge({ ...conn }, prev))
+    setIsDirty(true)
   }, [snapshot, setNodes, setEdges])
 
   // 节点删除时清理引用
@@ -717,7 +609,7 @@ function EditorInner({ detail, onStatusChange, onCanvasNameChange }: {
             ...node,
             data: {
               ...data,
-              bizConfig: outgoing.reduce((cfg, edge) => clearEdgeRef(cfg, edge), data.bizConfig ?? {}),
+              bizConfig: outgoing.reduce((cfg, edge) => clearEdgeRef(cfg, edge, data.outletSchema), data.bizConfig ?? {}),
             },
           }
         }))
@@ -1125,7 +1017,7 @@ function EditorInner({ detail, onStatusChange, onCanvasNameChange }: {
         setNodes(nodes => nodes.map(n => {
           if (n.id !== edge.source) return n
           const d = n.data as CanvasNodeData
-          return { ...n, data: { ...d, bizConfig: clearEdgeRef(d.bizConfig ?? {}, edge) } }
+          return { ...n, data: { ...d, bizConfig: clearEdgeRef(d.bizConfig ?? {}, edge, d.outletSchema) } }
         }))
       }
       return prev.filter(e => e.id !== edgeId)

@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest'
-import { getOutletHandles, parseOutletSchema } from './outletSchema'
+import { getOutletHandles, getOutletTargetField, parseOutletSchema } from './outletSchema'
 
 describe('outlet schema', () => {
   it('parses dynamic outlet handles from registry json', () => {
     const schema = JSON.stringify([
-      { id: 'success', label: '通过', color: '#52c41a' },
+      { id: 'success', label: '通过', color: '#52c41a', targetField: 'nextNodeId' },
       { id: 'suppressed', label: '被抑制', color: '#f5222d' },
     ])
 
@@ -23,5 +23,14 @@ describe('outlet schema', () => {
       { id: 'success', label: '条件成立', color: '#52c41a' },
       { id: 'else', label: '否则', color: '#8c8c8c' },
     ])
+  })
+
+  it('resolves explicit target fields before legacy handle defaults', () => {
+    const schema = JSON.stringify([
+      { id: 'success', label: '继续', targetField: 'nextNodeId' },
+    ])
+
+    expect(getOutletTargetField('success', schema)).toBe('nextNodeId')
+    expect(getOutletTargetField('success')).toBe('successNodeId')
   })
 })

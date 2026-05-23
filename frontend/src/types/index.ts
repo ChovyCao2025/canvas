@@ -80,6 +80,7 @@ export interface CanvasNode {
   type: string
   name: string
   config: Record<string, unknown>
+  outletSchema?: string
   /** 画布坐标（仅前端展示用） */
   x?: number
   y?: number
