@@ -6,6 +6,10 @@ export type BranchHandle = {
 
 const GROUP_COLORS = ['#1677ff', '#52c41a', '#fa8c16', '#722ed1', '#eb2f96', '#13c2c2']
 
+function stringValue(value: unknown, fallback: string): string {
+  return value == null || value === '' ? fallback : String(value)
+}
+
 export function getBranchHandles(
   nodeType: string,
   bizConfig: Record<string, unknown>,
@@ -66,6 +70,48 @@ export function getBranchHandles(
         label: `${g.groupKey} ${i === groups.length - 1 ? 100 - bucketSize * i : bucketSize}%`,
         color: GROUP_COLORS[i % GROUP_COLORS.length],
       }))
+    }
+
+    case 'RANDOM_SPLIT': {
+      const paths = (bizConfig.paths as Array<Record<string, unknown>>) ?? []
+      return paths.map((path, i) => {
+        const pathId = stringValue(path.pathId ?? path.id, `path_${i + 1}`)
+        const weight = path.weight == null ? '' : ` ${path.weight}%`
+        return {
+          id: `path-${pathId}`,
+          label: `${stringValue(path.label, `路径 ${i + 1}`)}${weight}`,
+          color: GROUP_COLORS[i % GROUP_COLORS.length],
+        }
+      })
+    }
+
+    case 'EXPERIMENT': {
+      const variants = (bizConfig.variants as Array<Record<string, unknown>>) ?? []
+      return variants.map((variant, i) => {
+        const variantId = stringValue(variant.variantId ?? variant.id, `variant_${i + 1}`)
+        const control = variant.isControl === true ? ' 对照' : ''
+        const weight = variant.weight == null ? '' : ` ${variant.weight}%`
+        return {
+          id: `variant-${variantId}`,
+          label: `${stringValue(variant.label, `方案 ${variantId}`)}${control}${weight}`,
+          color: GROUP_COLORS[i % GROUP_COLORS.length],
+        }
+      })
+    }
+
+    case 'SCORING': {
+      const bands = (bizConfig.bands as Array<Record<string, unknown>>) ?? []
+      if (bands.length === 0) return []
+      const handles: BranchHandle[] = bands.map((band, i) => {
+        const bandId = stringValue(band.bandId ?? band.id, `band_${i + 1}`)
+        return {
+          id: `band-${bandId}`,
+          label: stringValue(band.label, `分数段 ${i + 1}`),
+          color: GROUP_COLORS[i % GROUP_COLORS.length],
+        }
+      })
+      handles.push({ id: 'default', label: '未命中', color: '#8c8c8c' })
+      return handles
     }
 
     case 'PRIORITY': {

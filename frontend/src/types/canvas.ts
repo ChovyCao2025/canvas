@@ -30,12 +30,25 @@ export interface BizConfig {
   timeoutNodeId?: string
   suppressedNodeId?: string
   skippedNodeId?: string
+  allowedNodeId?: string
+  quietNodeId?: string
+  availableNodeId?: string
+  unavailableNodeId?: string
+  passNodeId?: string
+  cappedNodeId?: string
+  fallbackNodeId?: string
+  exitNodeId?: string
+  loopStartNodeId?: string
+  targetNodeId?: string
   maxExceededNodeId?: string
   goalMetNodeId?: string
   goalNotMetNodeId?: string
   branches?:      Branch[]
   priorities?:    Priority[]
   groups?:        AbGroup[]
+  paths?:         Branch[]
+  variants?:      Branch[]
+  bands?:         Branch[]
   [key: string]:  unknown
 }
 

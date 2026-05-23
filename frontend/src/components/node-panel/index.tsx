@@ -110,6 +110,9 @@ export default function NodePanel({ onDragStart }: Props) {
   const handleNodeDragStart = (event: DragEvent<HTMLDivElement>, node: NodeTypeRegistry) => {
     event.dataTransfer.setData('application/canvas-node-type', node.typeKey)
     event.dataTransfer.setData('application/canvas-node-category', node.category)
+    if (node.configSchema) {
+      event.dataTransfer.setData('application/canvas-node-config-schema', node.configSchema)
+    }
     if (node.outletSchema) {
       event.dataTransfer.setData('application/canvas-node-outlet-schema', node.outletSchema)
     }

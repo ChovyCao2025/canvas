@@ -14,6 +14,16 @@ const FIELD_HANDLES: Array<{ field: OutletTargetField; handleId: string }> = [
   { field: 'timeoutNodeId', handleId: 'timeout' },
   { field: 'suppressedNodeId', handleId: 'suppressed' },
   { field: 'skippedNodeId', handleId: 'skipped' },
+  { field: 'allowedNodeId', handleId: 'allowed' },
+  { field: 'quietNodeId', handleId: 'quiet' },
+  { field: 'availableNodeId', handleId: 'available' },
+  { field: 'unavailableNodeId', handleId: 'unavailable' },
+  { field: 'passNodeId', handleId: 'pass' },
+  { field: 'cappedNodeId', handleId: 'capped' },
+  { field: 'fallbackNodeId', handleId: 'fallback' },
+  { field: 'exitNodeId', handleId: 'exit' },
+  { field: 'loopStartNodeId', handleId: 'loop' },
+  { field: 'targetNodeId', handleId: 'goto' },
   { field: 'maxExceededNodeId', handleId: 'max_exceeded' },
   { field: 'goalMetNodeId', handleId: 'goal_met' },
   { field: 'goalNotMetNodeId', handleId: 'goal_not_met' },
@@ -58,6 +68,30 @@ function patchIndexedOutlet(next: BizConfig, sourceHandle: string, target: strin
     )
     return true
   }
+  if (sourceHandle.startsWith('path-')) {
+    const key = sourceHandle.replace('path-', '')
+    next.paths = (next.paths ?? []).map(path => {
+      const id = String(path.pathId ?? path.id ?? '')
+      return id === key ? { ...path, nextNodeId: target } : path
+    })
+    return true
+  }
+  if (sourceHandle.startsWith('variant-')) {
+    const key = sourceHandle.replace('variant-', '')
+    next.variants = (next.variants ?? []).map(variant => {
+      const id = String(variant.variantId ?? variant.id ?? '')
+      return id === key ? { ...variant, nextNodeId: target } : variant
+    })
+    return true
+  }
+  if (sourceHandle.startsWith('band-')) {
+    const key = sourceHandle.replace('band-', '')
+    next.bands = (next.bands ?? []).map(band => {
+      const id = String(band.bandId ?? band.id ?? '')
+      return id === key ? { ...band, nextNodeId: target } : band
+    })
+    return true
+  }
   return false
 }
 
@@ -81,6 +115,30 @@ function clearIndexedOutlet(next: BizConfig, sourceHandle: string): boolean {
     next.groups = (next.groups ?? []).map(group =>
       group.groupKey === key ? { ...group, nextNodeId: undefined } : group,
     )
+    return true
+  }
+  if (sourceHandle.startsWith('path-')) {
+    const key = sourceHandle.replace('path-', '')
+    next.paths = (next.paths ?? []).map(path => {
+      const id = String(path.pathId ?? path.id ?? '')
+      return id === key ? { ...path, nextNodeId: undefined } : path
+    })
+    return true
+  }
+  if (sourceHandle.startsWith('variant-')) {
+    const key = sourceHandle.replace('variant-', '')
+    next.variants = (next.variants ?? []).map(variant => {
+      const id = String(variant.variantId ?? variant.id ?? '')
+      return id === key ? { ...variant, nextNodeId: undefined } : variant
+    })
+    return true
+  }
+  if (sourceHandle.startsWith('band-')) {
+    const key = sourceHandle.replace('band-', '')
+    next.bands = (next.bands ?? []).map(band => {
+      const id = String(band.bandId ?? band.id ?? '')
+      return id === key ? { ...band, nextNodeId: undefined } : band
+    })
     return true
   }
   return false
@@ -117,6 +175,15 @@ export function deriveEdges(backendNodes: BackendNode[]): Edge[] {
     config.branches?.forEach((branch, index) => push(branch.nextNodeId, `branch-${index}`))
     config.priorities?.forEach((priority, index) => push(priority.nextNodeId, `priority-${index}`))
     config.groups?.forEach(group => push(group.nextNodeId, `group-${group.groupKey}`))
+    config.paths?.forEach((path, index) =>
+      push(path.nextNodeId, `path-${String(path.pathId ?? path.id ?? `path_${index + 1}`)}`),
+    )
+    config.variants?.forEach((variant, index) =>
+      push(variant.nextNodeId, `variant-${String(variant.variantId ?? variant.id ?? `variant_${index + 1}`)}`),
+    )
+    config.bands?.forEach((band, index) =>
+      push(band.nextNodeId, `band-${String(band.bandId ?? band.id ?? `band_${index + 1}`)}`),
+    )
   })
 
   return edges
