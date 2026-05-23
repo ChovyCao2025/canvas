@@ -55,6 +55,16 @@ describe('AudienceDataSourcePage', () => {
       expect(list).toHaveBeenCalledTimes(1)
       expect(container.textContent).toContain('人群数据源')
       expect(container.textContent).toContain('新建数据源')
+      expect(container.textContent).toContain('暂无数据源')
+
+      const createButton = container.querySelector('button')
+      expect(createButton).not.toBeNull()
+
+      await act(async () => {
+        createButton?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+      })
+
+      expect(document.body.textContent).toContain('JDBC URL')
     } finally {
       root.unmount()
       container.remove()
