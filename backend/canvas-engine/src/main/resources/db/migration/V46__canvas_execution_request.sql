@@ -1,0 +1,21 @@
+CREATE TABLE IF NOT EXISTS `canvas_execution_request` (
+  `id` VARCHAR(80) NOT NULL,
+  `canvas_id` BIGINT NOT NULL,
+  `user_id` VARCHAR(128) NOT NULL,
+  `trigger_type` VARCHAR(64) NOT NULL,
+  `trigger_node_type` VARCHAR(64) NOT NULL,
+  `match_key` VARCHAR(255) DEFAULT NULL,
+  `payload_json` JSON DEFAULT NULL,
+  `source_msg_id` VARCHAR(255) DEFAULT NULL,
+  `status` VARCHAR(32) NOT NULL,
+  `attempt_count` INT NOT NULL DEFAULT 0,
+  `next_retry_at` DATETIME DEFAULT NULL,
+  `last_error` VARCHAR(500) DEFAULT NULL,
+  `result_json` JSON DEFAULT NULL,
+  `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `idx_execution_request_due` (`status`, `next_retry_at`, `updated_at`),
+  KEY `idx_execution_request_canvas` (`canvas_id`, `status`, `updated_at`),
+  KEY `idx_execution_request_msg` (`source_msg_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

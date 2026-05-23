@@ -3,6 +3,7 @@ package org.chovy.canvas.engine.audience;
 import lombok.extern.slf4j.Slf4j;
 import org.chovy.canvas.domain.notification.NotificationService;
 import org.chovy.canvas.domain.task.AsyncTaskService;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.time.Duration;
@@ -21,6 +22,7 @@ public class AudienceComputeTaskRunner {
     private final NotificationService notificationService;
     private final Duration lockRetryDelay;
 
+    @Autowired
     public AudienceComputeTaskRunner(
             AudienceBatchComputeService computeService,
             AsyncTaskService asyncTaskService,
