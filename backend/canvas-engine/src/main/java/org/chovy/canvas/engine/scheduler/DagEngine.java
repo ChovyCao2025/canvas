@@ -775,10 +775,8 @@ public class DagEngine {
         if (NodeType.PRIORITY.equals(sourceType) && result.branchMap() != null) {
             String fallbackNextId = resolveFallbackTarget(result);
             List<String> orderedBranches = new ArrayList<>(NodeRouteResolver.resolveTargets(result));
-            if (fallbackNextId != null && !fallbackNextId.isBlank()
-                    && !orderedBranches.isEmpty()
-                    && fallbackNextId.equals(orderedBranches.get(orderedBranches.size() - 1))) {
-                orderedBranches.remove(orderedBranches.size() - 1);
+            if (fallbackNextId != null) {
+                orderedBranches.removeIf(fallbackNextId::equals);
             }
             return tryPrioritySequentially(orderedBranches, fallbackNextId, sourceNodeId,
                     graph, ctx, depth + 1);
@@ -927,10 +925,13 @@ public class DagEngine {
     }
 
     private String resolveFallbackTarget(NodeResult result) {
+        String target;
         if (result.routes() != null && result.routes().containsKey("__else")) {
-            return result.routes().get("__else");
+            target = result.routes().get("__else");
+        } else {
+            target = result.elseNodeId();
         }
-        return result.elseNodeId();
+        return target == null || target.isBlank() ? null : target;
     }
 
     private NodeStatus statusForOutcome(NodeOutcome outcome) {
