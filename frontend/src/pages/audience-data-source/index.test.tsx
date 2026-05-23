@@ -4,17 +4,18 @@ import { act } from 'react'
 import { createRoot } from 'react-dom/client'
 import { MemoryRouter } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import AudienceDataSourcePage from './index'
+import AudienceDataSourcePage, { toAudienceDataSourceBody } from './index'
 
-const { list } = vi.hoisted(() => ({
+const { list, update } = vi.hoisted(() => ({
   list: vi.fn().mockResolvedValue({ data: [] }),
+  update: vi.fn().mockResolvedValue({ data: {} }),
 }))
 
 vi.mock('../../services/audienceDataSourceApi', () => ({
   audienceDataSourceApi: {
     list,
     create: vi.fn(),
-    update: vi.fn(),
+    update,
     delete: vi.fn(),
   },
 }))
@@ -23,6 +24,8 @@ describe('AudienceDataSourcePage', () => {
   beforeEach(() => {
     list.mockReset()
     list.mockResolvedValue({ data: [] })
+    update.mockReset()
+    update.mockResolvedValue({ data: {} })
   })
 
   it('shows management title and create button', async () => {
@@ -126,5 +129,18 @@ describe('AudienceDataSourcePage', () => {
       root.unmount()
       container.remove()
     }
+  })
+
+  it('omits password from the submit payload when the field is blank in edit mode', () => {
+    const body = toAudienceDataSourceBody({
+      name: '编辑中的数据源',
+      description: '历史描述',
+      url: 'jdbc:mysql://demo',
+      username: 'root',
+      password: '',
+      enabled: true,
+    })
+
+    expect(body.password).toBeUndefined()
   })
 })

@@ -10,6 +10,18 @@ type AudienceDataSourceFormValues = Omit<AudienceDataSource, 'enabled'> & {
   enabled?: boolean
 }
 
+export function toAudienceDataSourceBody(values: AudienceDataSourceFormValues): AudienceDataSource {
+  return {
+    name: values.name,
+    description: values.description,
+    url: values.url,
+    username: values.username,
+    password: values.password && values.password.trim() ? values.password : undefined,
+    driverClassName: values.driverClassName,
+    enabled: values.enabled ? 1 : 0,
+  }
+}
+
 export default function AudienceDataSourcePage() {
   const [data, setData] = useState<AudienceDataSource[]>([])
   const [loading, setLoading] = useState(false)
@@ -57,15 +69,7 @@ export default function AudienceDataSourcePage() {
     const values = await form.validateFields()
     setSaving(true)
     try {
-      const body: AudienceDataSource = {
-        name: values.name,
-        description: values.description,
-        url: values.url,
-        username: values.username,
-        password: values.password,
-        driverClassName: values.driverClassName,
-        enabled: values.enabled ? 1 : 0,
-      }
+      const body = toAudienceDataSourceBody(values)
       if (editing?.id != null) {
         await audienceDataSourceApi.update(editing.id, body)
         message.success('更新成功')
