@@ -3,7 +3,7 @@
 import { act } from 'react'
 import { createRoot } from 'react-dom/client'
 import { MemoryRouter } from 'react-router-dom'
-import { describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import AudienceDataSourcePage from './index'
 
 const { list } = vi.hoisted(() => ({
@@ -20,6 +20,11 @@ vi.mock('../../services/audienceDataSourceApi', () => ({
 }))
 
 describe('AudienceDataSourcePage', () => {
+  beforeEach(() => {
+    list.mockReset()
+    list.mockResolvedValue({ data: [] })
+  })
+
   it('shows management title and create button', async () => {
     Object.defineProperty(window, 'matchMedia', {
       writable: true,
@@ -65,6 +70,58 @@ describe('AudienceDataSourcePage', () => {
       })
 
       expect(document.body.textContent).toContain('JDBC URL')
+    } finally {
+      root.unmount()
+      container.remove()
+    }
+  })
+
+  it('disables delete action when the data source is referenced', async () => {
+    list.mockResolvedValueOnce({
+      data: [
+        {
+          id: 1,
+          name: '已引用数据源',
+          url: 'jdbc:mysql://demo',
+          username: 'root',
+          enabled: 1,
+          referenceCount: 2,
+        },
+      ],
+    })
+    Object.defineProperty(window, 'matchMedia', {
+      writable: true,
+      value: vi.fn().mockImplementation((query: string) => ({
+        matches: false,
+        media: query,
+        onchange: null,
+        addListener: vi.fn(),
+        removeListener: vi.fn(),
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+        dispatchEvent: vi.fn(),
+      })),
+    })
+    ;(globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true
+
+    const container = document.createElement('div')
+    document.body.appendChild(container)
+    const root = createRoot(container)
+
+    try {
+      await act(async () => {
+        root.render(
+          <MemoryRouter>
+            <AudienceDataSourcePage />
+          </MemoryRouter>,
+        )
+      })
+      await act(async () => {
+        await Promise.resolve()
+      })
+
+      expect(container.textContent).toContain('已引用数据源')
+      expect(container.querySelector('button[disabled]')).not.toBeNull()
     } finally {
       root.unmount()
       container.remove()

@@ -44,6 +44,7 @@ export default function AudienceDataSourcePage() {
 
   const openEdit = (record: AudienceDataSource) => {
     setEditing(record)
+    form.resetFields()
     form.setFieldsValue({
       ...record,
       password: undefined,
