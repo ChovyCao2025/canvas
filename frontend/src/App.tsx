@@ -15,6 +15,9 @@ import MqConfigPage from './pages/mq-config'
 import EventConfigPage from './pages/event-config'
 import AudienceListPage from './pages/audience-list'
 import AudienceEditPage from './pages/audience-edit'
+import CdpUsersPage from './pages/cdp-users'
+import CdpUserDetailPage from './pages/cdp-user-detail'
+import CanvasUsersPage from './pages/canvas-users'
 
 export default function App() {
   return (
@@ -29,11 +32,14 @@ export default function App() {
               <Route path="/" element={<Navigate to="/home" replace />} />
               <Route path="/home"   element={<HomePage />} />
               <Route path="/canvas" element={<CanvasListPage />} />
+              <Route path="/cdp/users" element={<CdpUsersPage />} />
+              <Route path="/cdp/users/:userId" element={<CdpUserDetailPage />} />
             </Route>
 
             {/* 编辑器 / 统计保持全屏，无侧边栏 */}
             <Route path="/canvas/:id/edit"  element={<CanvasEditorPage />} />
             <Route path="/canvas/:id/stats" element={<CanvasStatsPage />} />
+            <Route path="/canvas/:id/users" element={<CanvasUsersPage />} />
           </Route>
 
           {/* 需要 ADMIN——带侧边栏布局 */}

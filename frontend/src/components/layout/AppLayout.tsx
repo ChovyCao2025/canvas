@@ -5,6 +5,7 @@ import {
   ExperimentOutlined, TeamOutlined, LogoutOutlined,
   UserOutlined, MenuFoldOutlined, MenuUnfoldOutlined,
   RocketOutlined, HomeOutlined, TagsOutlined, NotificationOutlined, ThunderboltOutlined,
+  IdcardOutlined,
 } from '@ant-design/icons'
 import { Outlet, useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
@@ -41,6 +42,7 @@ export default function AppLayout() {
     if (location.pathname.startsWith('/mq-config'))      return 'mq-config'
     if (location.pathname.startsWith('/event-config'))   return 'event-config'
     if (location.pathname.startsWith('/admin/users'))    return 'admin-users'
+    if (location.pathname.startsWith('/cdp/users'))      return 'cdp-users'
     return 'canvas'
   })()
 
@@ -66,6 +68,12 @@ export default function AppLayout() {
           icon: <ApartmentOutlined />,
           label: '旅程管理',
           onClick: () => navigate('/canvas'),
+        },
+        {
+          key: 'cdp-users',
+          icon: <IdcardOutlined />,
+          label: 'CDP 用户中心',
+          onClick: () => navigate('/cdp/users'),
         },
       ],
     },

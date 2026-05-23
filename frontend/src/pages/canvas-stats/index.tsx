@@ -124,15 +124,18 @@ export default function CanvasStatsPage() {
           <Button type="text" icon={<ArrowLeftOutlined />} onClick={() => navigate(-1)} />
           <Title level={4} style={{ margin:0 }}>活动效果看板</Title>
         </Space>
-        <RangePicker
-          value={range}
-          presets={PRESETS}
-          onChange={v => { if (v?.[0] && v?.[1]) setRange([v[0], v[1]]) }}
-          allowClear={false}
-          format="YYYY.MM.DD"
-          suffixIcon={<CalendarOutlined />}
-          style={{ borderRadius:8 }}
-        />
+        <Space>
+          <Button onClick={() => navigate(`/canvas/${id}/users`)}>用户明细</Button>
+          <RangePicker
+            value={range}
+            presets={PRESETS}
+            onChange={v => { if (v?.[0] && v?.[1]) setRange([v[0], v[1]]) }}
+            allowClear={false}
+            format="YYYY.MM.DD"
+            suffixIcon={<CalendarOutlined />}
+            style={{ borderRadius:8 }}
+          />
+        </Space>
       </div>
 
       {/* ── KPI 卡片 ── */}

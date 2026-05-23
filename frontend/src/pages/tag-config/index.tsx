@@ -3,10 +3,24 @@ import { Button, Table, Tag, Space, Modal, Form, Input, Select, Switch, message,
 import { PlusOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
 import { tagDefinitionApi } from '../../services/api'
+import { normalizeTagDefinitionPayload } from './tagConfigPayload'
 
 const { Title } = Typography
 
-interface TagDef { id: number; name: string; tagCode: string; tagType: string; description?: string; enabled: number }
+interface TagDef {
+  id: number
+  name: string
+  tagCode: string
+  tagType: string
+  description?: string
+  enabled: number
+  valueType?: string
+  manualEnabled?: number
+  defaultTtlDays?: number
+  category?: string
+  owner?: string
+  writePolicy?: string
+}
 
 export default function TagConfigPage() {
   const [data,     setData]     = useState<TagDef[]>([])
@@ -32,13 +46,13 @@ export default function TagConfigPage() {
   const openCreate = () => {
     setEditing(null)
     form.resetFields()
-    form.setFieldsValue({ tagType: 'offline', enabled: true })
+    form.setFieldsValue({ tagType: 'offline', enabled: true, valueType: 'STRING', manualEnabled: true, writePolicy: 'UPSERT' })
     setVisible(true)
   }
 
   const openEdit = (r: TagDef) => {
     setEditing(r)
-    form.setFieldsValue({ ...r, enabled: r.enabled === 1 })
+    form.setFieldsValue({ ...r, enabled: r.enabled === 1, manualEnabled: r.manualEnabled !== 0 })
     setVisible(true)
   }
 
@@ -46,7 +60,7 @@ export default function TagConfigPage() {
     const values = await form.validateFields()
     setSaving(true)
     try {
-      const body = { ...values, enabled: values.enabled ? 1 : 0 }
+      const body = normalizeTagDefinitionPayload(values)
       if (editing) {
         await tagDefinitionApi.update(editing.id, body)
         message.success('更新成功')
@@ -66,6 +80,11 @@ export default function TagConfigPage() {
     {
       title: '类型', dataIndex: 'tagType', width: 90,
       render: (v: string) => <Tag color={v === 'offline' ? 'blue' : 'green'}>{v === 'offline' ? '离线' : '实时'}</Tag>,
+    },
+    { title: '值类型', dataIndex: 'valueType', width: 90, render: v => v || 'STRING' },
+    {
+      title: '人工打标', dataIndex: 'manualEnabled', width: 90,
+      render: v => <Tag color={v === 0 ? 'default' : 'green'}>{v === 0 ? '关闭' : '允许'}</Tag>,
     },
     { title: '说明', dataIndex: 'description', ellipsis: true },
     {
@@ -106,6 +125,29 @@ export default function TagConfigPage() {
           </Form.Item>
           <Form.Item name="tagType" label="类型" rules={[{ required: true }]}>
             <Select options={[{ value: 'offline', label: '离线标签' }, { value: 'realtime', label: '实时标签' }]} />
+          </Form.Item>
+          <Form.Item name="valueType" label="标签值类型" rules={[{ required: true }]}>
+            <Select options={[
+              { value: 'STRING', label: '字符串' },
+              { value: 'NUMBER', label: '数字' },
+              { value: 'BOOLEAN', label: '布尔' },
+              { value: 'JSON', label: 'JSON' },
+            ]} />
+          </Form.Item>
+          <Form.Item name="manualEnabled" label="允许人工打标" valuePropName="checked">
+            <Switch checkedChildren="允许" unCheckedChildren="关闭" />
+          </Form.Item>
+          <Form.Item name="defaultTtlDays" label="默认有效期（天）">
+            <Input type="number" min={1} placeholder="留空表示长期有效" />
+          </Form.Item>
+          <Form.Item name="category" label="分类">
+            <Input placeholder="如：生命周期" />
+          </Form.Item>
+          <Form.Item name="owner" label="负责人">
+            <Input placeholder="如：growth" />
+          </Form.Item>
+          <Form.Item name="writePolicy" label="写入策略">
+            <Select disabled options={[{ value: 'UPSERT', label: '覆盖当前值' }]} />
           </Form.Item>
           <Form.Item name="description" label="说明">
             <Input.TextArea rows={2} />
