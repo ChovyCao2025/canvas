@@ -10,23 +10,23 @@ import lombok.Data;
 import java.time.LocalDateTime;
 
 @Data
-@TableName("audience_definition")
-public class AudienceDefinition {
+@TableName("audience_data_source")
+public class AudienceDataSource {
 
     @TableId(type = IdType.AUTO)
     private Long id;
 
     private String name;
     private String description;
-    private String ruleJson;
-    private String engineType;
-    private String dataSourceType;
-    private Long dataSourceId;
-    private String dataSourceConfig;
-    private String evaluationStrategy;
-    private String cronExpression;
+    private String url;
+    private String username;
+    private String password;
+    private String driverClassName;
     private Integer enabled;
     private String createdBy;
+
+    @TableField(exist = false)
+    private Long referenceCount;
 
     @TableField(fill = FieldFill.INSERT)
     private LocalDateTime createdAt;
