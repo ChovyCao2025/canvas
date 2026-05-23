@@ -6,6 +6,7 @@ import org.chovy.canvas.common.PageResult;
 import org.chovy.canvas.common.R;
 import org.chovy.canvas.domain.meta.MqMessageDefinition;
 import org.chovy.canvas.domain.meta.MqMessageDefinitionMapper;
+import org.chovy.canvas.infra.redis.MqRouteRefreshService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 import reactor.core.publisher.Mono;
@@ -17,6 +18,7 @@ import reactor.core.scheduler.Schedulers;
 public class MqDefinitionController {
 
     private final MqMessageDefinitionMapper mapper;
+    private final MqRouteRefreshService routeRefreshService;
 
     @GetMapping
     public Mono<R<PageResult<MqMessageDefinition>>> list(
@@ -36,6 +38,7 @@ public class MqDefinitionController {
     public Mono<R<MqMessageDefinition>> create(@RequestBody MqMessageDefinition body) {
         return Mono.fromCallable(() -> {
                     mapper.insert(body);
+                    routeRefreshService.rebuildMqRoutes();
                     return R.ok(body);
                 })
                 .subscribeOn(Schedulers.boundedElastic());
@@ -46,6 +49,7 @@ public class MqDefinitionController {
         body.setId(id);
         return Mono.fromCallable(() -> {
                     mapper.updateById(body);
+                    routeRefreshService.rebuildMqRoutes();
                     return R.<Void>ok();
                 })
                 .subscribeOn(Schedulers.boundedElastic());
@@ -53,7 +57,10 @@ public class MqDefinitionController {
 
     @DeleteMapping("/{id}")
     public Mono<R<Void>> delete(@PathVariable Long id) {
-        return Mono.<R<Void>>fromRunnable(() -> mapper.deleteById(id))
+        return Mono.<R<Void>>fromRunnable(() -> {
+                    mapper.deleteById(id);
+                    routeRefreshService.rebuildMqRoutes();
+                })
                 .subscribeOn(Schedulers.boundedElastic())
                 .then(Mono.just(R.ok()));
     }

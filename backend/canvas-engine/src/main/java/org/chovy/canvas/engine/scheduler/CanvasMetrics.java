@@ -96,4 +96,29 @@ public class CanvasMetrics {
                 .register(registry)
                 .increment();
     }
+
+    /** Disruptor 投递成功计数 */
+    public void recordDisruptorPublished(String triggerType) {
+        Counter.builder("canvas.disruptor.published.total")
+                .tag("triggerType", triggerType)
+                .register(registry)
+                .increment();
+    }
+
+    /** Disruptor Ring Buffer 满导致的溢出计数 */
+    public void recordDisruptorOverflow(String triggerType) {
+        Counter.builder("canvas.disruptor.overflow.total")
+                .tag("triggerType", triggerType)
+                .register(registry)
+                .increment();
+    }
+
+    /** 执行请求状态迁移计数（MQ/行为等异步触发的可靠投递层） */
+    public void recordExecutionRequestTransition(String status, String triggerType) {
+        Counter.builder("canvas.execution.request.transition.total")
+                .tag("status", status != null ? status : "UNKNOWN")
+                .tag("triggerType", triggerType != null ? triggerType : "UNKNOWN")
+                .register(registry)
+                .increment();
+    }
 }

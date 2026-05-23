@@ -12,6 +12,7 @@ import org.apache.rocketmq.spring.core.RocketMQListener;
 import org.chovy.canvas.domain.constant.NodeType;
 import org.chovy.canvas.domain.constant.TriggerType;
 import org.chovy.canvas.engine.disruptor.CanvasDisruptorService;
+import org.chovy.canvas.engine.request.CanvasExecutionRequestService;
 import org.chovy.canvas.infra.redis.TriggerRouteService;
 import org.springframework.stereotype.Service;
 
@@ -32,7 +33,7 @@ import java.util.Set;
         consumerGroup = "${rocketmq.consumer.group:GID_CANVAS_ENGINE}",
         selectorType = SelectorType.TAG,
         selectorExpression = "*",
-        consumeMode = ConsumeMode.CONCURRENTLY,
+        consumeMode = ConsumeMode.ORDERLY,
         messageModel = MessageModel.CLUSTERING,
         consumeThreadNumber = 20
 )
@@ -41,6 +42,7 @@ public class MqTriggerConsumer implements RocketMQListener<MessageExt> {
     private final ObjectMapper objectMapper;
     private final TriggerRouteService routeService;
     private final CanvasDisruptorService disruptorService;
+    private final CanvasExecutionRequestService requestService;
 
     @Override
     public void onMessage(MessageExt message) {
@@ -67,7 +69,7 @@ public class MqTriggerConsumer implements RocketMQListener<MessageExt> {
 
         for (String canvasIdStr : canvasIds) {
             Long canvasId = Long.parseLong(canvasIdStr);
-            disruptorService.publish(
+            String requestId = requestService.enqueue(
                     canvasId,
                     triggerMessage.getUserId(),
                     TriggerType.MQ,
@@ -76,6 +78,7 @@ public class MqTriggerConsumer implements RocketMQListener<MessageExt> {
                     triggerMessage.getPayload(),
                     msgId
             );
+            disruptorService.publishRequest(requestId);
             log.info("[MQ_CONSUMER] 投递到 Disruptor canvasId={} userId={} tag={}",
                     canvasId, triggerMessage.getUserId(), tag);
         }

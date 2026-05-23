@@ -9,6 +9,7 @@ import org.chovy.canvas.common.PageResult;
 import org.chovy.canvas.common.R;
 import org.chovy.canvas.domain.meta.ApiDefinition;
 import org.chovy.canvas.domain.meta.ApiDefinitionMapper;
+import org.chovy.canvas.infra.cache.ApiDefinitionCache;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 import reactor.core.publisher.Mono;
@@ -21,6 +22,7 @@ import reactor.core.scheduler.Schedulers;
 public class ApiDefinitionController {
 
     private final ApiDefinitionMapper apiDefinitionMapper;
+    private final ApiDefinitionCache apiDefinitionCache;
     private final ObjectMapper objectMapper;
 
     /**
@@ -56,7 +58,12 @@ public class ApiDefinitionController {
         return Mono.fromCallable(() -> {
             validateRateLimit(body);
             if (body.getEnabled() == null) body.setEnabled(1);
+            if (body.getIncludeContextPayload() == null) body.setIncludeContextPayload(0);
+            if (body.getReceiptEnabled() == null) body.setReceiptEnabled(0);
+            if (body.getReceiptExpireMinutes() == null) body.setReceiptExpireMinutes(1440);
+            if (body.getReceiptStatuses() == null) body.setReceiptStatuses("[]");
             apiDefinitionMapper.insert(body);
+            apiDefinitionCache.invalidate(body.getApiKey());
             return body;
         }).subscribeOn(Schedulers.boundedElastic()).map(R::ok);
     }
@@ -82,6 +89,7 @@ public class ApiDefinitionController {
                 body.setId(id);
                 apiDefinitionMapper.updateById(body);
             }
+            apiDefinitionCache.invalidateAll();
         }).subscribeOn(Schedulers.boundedElastic()).thenReturn(R.ok());
     }
 
@@ -92,7 +100,10 @@ public class ApiDefinitionController {
      */
     @DeleteMapping("/{id}")
     public Mono<R<Void>> delete(@PathVariable Long id) {
-        return Mono.<Void>fromRunnable(() -> apiDefinitionMapper.deleteById(id))
+        return Mono.<Void>fromRunnable(() -> {
+                apiDefinitionMapper.deleteById(id);
+                apiDefinitionCache.invalidateAll();
+            })
             .subscribeOn(Schedulers.boundedElastic())
             .thenReturn(R.ok());
     }

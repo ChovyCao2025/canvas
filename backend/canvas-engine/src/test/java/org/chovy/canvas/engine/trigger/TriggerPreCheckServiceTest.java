@@ -2,27 +2,21 @@ package org.chovy.canvas.engine.trigger;
 
 import org.chovy.canvas.domain.canvas.Canvas;
 import org.chovy.canvas.domain.canvas.CanvasMapper;
-import org.chovy.canvas.domain.execution.CanvasUserQuota;
 import org.chovy.canvas.domain.execution.CanvasUserQuotaMapper;
-import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.mockito.Mockito;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.ValueOperations;
 
-import java.time.LocalDate;
+import java.time.Duration;
 
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.assertThatCode;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -71,8 +65,7 @@ class TriggerPreCheckServiceTest {
         int limit = 3;
         Canvas canvas = canvasWithTotalLimit(limit);
 
-        String today = LocalDate.now().toString();
-        String key   = QUOTA_KEY + "total:" + CANVAS_ID + ":" + USER_ID + ":" + today;
+        String key = QUOTA_KEY + "total:" + CANVAS_ID + ":" + USER_ID;
 
         // INCR returns limit+1 — over quota
         when(valueOps.increment(key)).thenReturn((long) limit + 1);
@@ -92,19 +85,35 @@ class TriggerPreCheckServiceTest {
         int limit = 3;
         Canvas canvas = canvasWithTotalLimit(limit);
 
-        String today = LocalDate.now().toString();
-        String key   = QUOTA_KEY + "total:" + CANVAS_ID + ":" + USER_ID + ":" + today;
+        String key = QUOTA_KEY + "total:" + CANVAS_ID + ":" + USER_ID;
 
         // INCR returns 2 — still under limit
         when(valueOps.increment(key)).thenReturn(2L);
-        // quotaMapper stubbed to return null defensively for the async updateQuotaAsync() virtual thread
-        // (cooldownSeconds is null on this canvas so quotaMapper.selectOne() for check #6 is not called)
-        Mockito.lenient().when(quotaMapper.selectOne(any(LambdaQueryWrapper.class))).thenReturn(null);
 
         assertThatCode(() -> service.check(canvas, USER_ID))
                 .doesNotThrowAnyException();
 
         // No rollback decrement should occur
         verify(valueOps, never()).decrement(key);
+    }
+
+    @Test
+    void cooldownRejectsWithRedisSetNxBeforeQuotaCounters() {
+        Canvas canvas = new Canvas();
+        canvas.setId(CANVAS_ID);
+        canvas.setStatus(1);
+        canvas.setCooldownSeconds(60);
+        canvas.setPerUserDailyLimit(10);
+
+        String cooldownKey = QUOTA_KEY + "cooldown:" + CANVAS_ID + ":" + USER_ID;
+        when(valueOps.setIfAbsent(cooldownKey, "1", Duration.ofSeconds(60))).thenReturn(false);
+
+        assertThatThrownBy(() -> service.check(canvas, USER_ID))
+                .isInstanceOf(TriggerPreCheckService.TriggerRejectedException.class)
+                .hasMessageContaining("冷却期内")
+                .extracting(e -> ((TriggerPreCheckService.TriggerRejectedException) e).getCode())
+                .isEqualTo("QUOTA_003");
+
+        verify(valueOps, never()).increment(anyString());
     }
 }

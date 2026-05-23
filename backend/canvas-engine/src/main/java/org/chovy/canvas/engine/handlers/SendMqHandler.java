@@ -64,7 +64,7 @@ public class SendMqHandler implements NodeHandler {
                     MqTriggerMessage message = new MqTriggerMessage(ctx.getUserId(), messageCodeKey, payload);
                     String destination = mqTopic + ":" + def.getTopic().trim();
 
-                    SendResult sendResult = rocketMQTemplate.syncSend(destination, message);
+                    SendResult sendResult = rocketMQTemplate.syncSendOrderly(destination, message, ctx.getUserId());
                     if (sendResult == null || sendResult.getSendStatus() != SendStatus.SEND_OK) {
                         SendStatus status = sendResult != null ? sendResult.getSendStatus() : null;
                         throw new IllegalStateException("RocketMQ send status=" + status);

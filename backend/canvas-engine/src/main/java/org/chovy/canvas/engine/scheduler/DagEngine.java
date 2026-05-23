@@ -178,7 +178,9 @@ public class DagEngine {
             if (node.getBizConfig() != null) rawConfig.putAll(node.getBizConfig());
             if (node.getConfig() != null) rawConfig.putAll(node.getConfig());
 
-            Map<String, Object> config = NodeType.MANUAL_APPROVAL.equals(node.getType())
+            boolean needsNodeId = NodeType.MANUAL_APPROVAL.equals(node.getType())
+                    || NodeType.API_CALL.equals(node.getType());
+            Map<String, Object> config = needsNodeId
                     ? resolveConfigWithNodeId(rawConfig, ctx, nodeId)
                     : resolveConfig(rawConfig, ctx);
 

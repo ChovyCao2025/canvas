@@ -23,6 +23,7 @@ public class RedisKeyUtil {
     public String triggerMq(String topicKey)       { return prefix + ":trigger:mq:" + topicKey; }
     public String triggerBehavior(String code)     { return prefix + ":trigger:behavior:" + code; }
     public String triggerTagger(String tagCodeKey) { return prefix + ":trigger:tagger:" + tagCodeKey; }
+    public String triggerMqPattern()               { return prefix + ":trigger:mq:*"; }
     public String triggerPattern()                 { return prefix + ":trigger:*"; }
 
     // ── 执行上下文 ─────────────────────────────────────────────────

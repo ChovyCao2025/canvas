@@ -15,9 +15,10 @@ public class CanvasExecutionEvent {
     public String matchKey;
     public Map<String, Object> payload;
     public String msgId;
+    public String requestId;
 
     public void reset() {
         canvasId = null; userId = null; triggerType = null;
-        triggerNodeType = null; matchKey = null; payload = null; msgId = null;
+        triggerNodeType = null; matchKey = null; payload = null; msgId = null; requestId = null;
     }
 }

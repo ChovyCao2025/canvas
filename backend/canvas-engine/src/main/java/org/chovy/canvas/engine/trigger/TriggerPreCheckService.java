@@ -2,9 +2,7 @@ package org.chovy.canvas.engine.trigger;
 
 import org.chovy.canvas.domain.canvas.Canvas;
 import org.chovy.canvas.domain.canvas.CanvasMapper;
-import org.chovy.canvas.domain.execution.CanvasUserQuota;
 import org.chovy.canvas.domain.execution.CanvasUserQuotaMapper;
-import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.StringRedisTemplate;
@@ -13,6 +11,8 @@ import org.springframework.stereotype.Service;
 import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * 触发前置检查（设计文档第 15.2 节）。
@@ -36,107 +36,100 @@ public class TriggerPreCheckService {
      */
     public void check(Canvas canvas, String userId) {
         Long canvasId = canvas.getId();
+        List<String> acquiredCounterKeys = new ArrayList<>();
+        String acquiredCooldownKey = null;
 
-        // 1. 画布状态
-        if (canvas.getStatus() != 1) {
-            throw new TriggerRejectedException("QUOTA_006", "画布未发布");
-        }
-
-        // 2. 有效期
-        LocalDateTime now = LocalDateTime.now();
-        if (canvas.getValidStart() != null && now.isBefore(canvas.getValidStart())) {
-            throw new TriggerRejectedException("QUOTA_005", "活动尚未开始");
-        }
-        if (canvas.getValidEnd() != null && now.isAfter(canvas.getValidEnd())) {
-            throw new TriggerRejectedException("QUOTA_006", "活动已结束");
-        }
-
-        // 3. 全局执行量上限
-        if (canvas.getMaxTotalExecutions() != null) {
-            String key = GLOBAL_COUNT_KEY + canvasId;
-            Long count = redis.opsForValue().increment(key);
-            if (count == null || count > canvas.getMaxTotalExecutions()) {
-                // 超配回滚
-                redis.opsForValue().decrement(key);
-                throw new TriggerRejectedException("QUOTA_004", "活动全局触发量已达上限");
+        try {
+            // 1. 画布状态
+            if (canvas.getStatus() != 1) {
+                throw new TriggerRejectedException("QUOTA_006", "画布未发布");
             }
-        }
 
-        String today = LocalDate.now().toString();
-
-        // 4. 用户每日触发上限（Redis INCR 原子扣减）
-        if (canvas.getPerUserDailyLimit() != null) {
-            String key = QUOTA_KEY + canvasId + ":" + userId + ":" + today;
-            Long daily = redis.opsForValue().increment(key);
-            redis.expire(key, Duration.ofDays(2)); // TTL 2天，自然隔离
-            if (daily != null && daily > canvas.getPerUserDailyLimit()) {
-                redis.opsForValue().decrement(key);
-                throw new TriggerRejectedException("QUOTA_001", "用户今日触发次数已达上限");
+            // 2. 有效期
+            LocalDateTime now = LocalDateTime.now();
+            if (canvas.getValidStart() != null && now.isBefore(canvas.getValidStart())) {
+                throw new TriggerRejectedException("QUOTA_005", "活动尚未开始");
             }
-        }
-
-        // 5. 用户总触发上限（Redis INCR 原子扣减，与 perUserDailyLimit 同日维度）
-        if (canvas.getPerUserTotalLimit() != null) {
-            String key = QUOTA_KEY + "total:" + canvasId + ":" + userId + ":" + today;
-            Long total = redis.opsForValue().increment(key);
-            redis.expire(key, Duration.ofDays(2));
-            if (total != null && total > canvas.getPerUserTotalLimit()) {
-                redis.opsForValue().decrement(key);
-                throw new TriggerRejectedException("QUOTA_002", "用户总触发次数已达上限");
+            if (canvas.getValidEnd() != null && now.isAfter(canvas.getValidEnd())) {
+                throw new TriggerRejectedException("QUOTA_006", "活动已结束");
             }
-        }
 
-        // 6. 冷却期（距上次触发间隔）
-        if (canvas.getCooldownSeconds() != null) {
-            CanvasUserQuota quota = quotaMapper.selectOne(
-                    new LambdaQueryWrapper<CanvasUserQuota>()
-                            .eq(CanvasUserQuota::getCanvasId, canvasId)
-                            .eq(CanvasUserQuota::getUserId, userId)
-                            .orderByDesc(CanvasUserQuota::getTriggerDate)
-                            .last("LIMIT 1")
-            );
-            if (quota != null && quota.getLastTriggerAt() != null) {
-                long elapsed = java.time.Duration.between(quota.getLastTriggerAt(), now).getSeconds();
-                if (elapsed < canvas.getCooldownSeconds()) {
-                    throw new TriggerRejectedException("QUOTA_003",
-                            "冷却期内，距上次触发仅 " + elapsed + "s，需等待 " +
-                                    canvas.getCooldownSeconds() + "s");
+            // 3. 冷却期（Redis SET NX 原子准入，避免并发读旧 MySQL lastTriggerAt）
+            if (canvas.getCooldownSeconds() != null && canvas.getCooldownSeconds() > 0) {
+                String key = QUOTA_KEY + "cooldown:" + canvasId + ":" + userId;
+                boolean acquired = Boolean.TRUE.equals(redis.opsForValue()
+                        .setIfAbsent(key, "1", Duration.ofSeconds(canvas.getCooldownSeconds())));
+                if (!acquired) {
+                    throw new TriggerRejectedException("QUOTA_003", "冷却期内，请稍后重试");
                 }
+                acquiredCooldownKey = key;
             }
-        }
 
-        // 检查通过后异步更新用量记录
-        updateQuotaAsync(canvasId, userId);
+            // 4. 全局执行量上限
+            if (canvas.getMaxTotalExecutions() != null) {
+                incrementWithinLimit(GLOBAL_COUNT_KEY + canvasId, canvas.getMaxTotalExecutions(),
+                        null, acquiredCounterKeys, "QUOTA_004", "活动全局触发量已达上限");
+            }
+
+            String today = LocalDate.now().toString();
+
+            // 5. 用户每日触发上限（Redis INCR 原子扣减）
+            if (canvas.getPerUserDailyLimit() != null) {
+                String key = QUOTA_KEY + canvasId + ":" + userId + ":" + today;
+                incrementWithinLimit(key, canvas.getPerUserDailyLimit(), Duration.ofDays(2),
+                        acquiredCounterKeys, "QUOTA_001", "用户今日触发次数已达上限");
+            }
+
+            // 6. 用户总触发上限（不按天切分）
+            if (canvas.getPerUserTotalLimit() != null) {
+                String key = QUOTA_KEY + "total:" + canvasId + ":" + userId;
+                Duration ttl = canvas.getValidEnd() != null && canvas.getValidEnd().isAfter(now)
+                        ? Duration.between(now, canvas.getValidEnd().plusDays(1))
+                        : null;
+                incrementWithinLimit(key, canvas.getPerUserTotalLimit(), ttl,
+                        acquiredCounterKeys, "QUOTA_002", "用户总触发次数已达上限");
+            }
+
+            // 检查通过后异步更新用量记录
+            updateQuotaAsync(canvasId, userId);
+        } catch (TriggerRejectedException e) {
+            rollbackCounters(acquiredCounterKeys);
+            if (acquiredCooldownKey != null) redis.delete(acquiredCooldownKey);
+            throw e;
+        } catch (RuntimeException e) {
+            rollbackCounters(acquiredCounterKeys);
+            if (acquiredCooldownKey != null) redis.delete(acquiredCooldownKey);
+            throw e;
+        }
+    }
+
+    private void incrementWithinLimit(String key, int limit, Duration ttl,
+                                      List<String> acquiredCounterKeys,
+                                      String rejectCode, String rejectMessage) {
+        Long count = redis.opsForValue().increment(key);
+        if (count != null && count == 1L && ttl != null) {
+            redis.expire(key, ttl);
+        }
+        if (count == null || count > limit) {
+            if (count != null) {
+                redis.opsForValue().decrement(key);
+            }
+            throw new TriggerRejectedException(rejectCode, rejectMessage);
+        }
+        acquiredCounterKeys.add(key);
+    }
+
+    private void rollbackCounters(List<String> counterKeys) {
+        for (String key : counterKeys) {
+            redis.opsForValue().decrement(key);
+        }
     }
 
     private void updateQuotaAsync(Long canvasId, String userId) {
         // 虚拟线程异步写 MySQL，不阻塞触发链路
         Thread.ofVirtual().start(() -> {
             try {
-                LocalDate today = LocalDate.now();
-                CanvasUserQuota existing = quotaMapper.selectOne(
-                        new LambdaQueryWrapper<CanvasUserQuota>()
-                                .eq(CanvasUserQuota::getCanvasId, canvasId)
-                                .eq(CanvasUserQuota::getUserId, userId)
-                                .eq(CanvasUserQuota::getTriggerDate, today));
-
-                if (existing == null) {
-                    CanvasUserQuota q = new CanvasUserQuota();
-                    q.setCanvasId(canvasId); q.setUserId(userId);
-                    q.setTriggerDate(today); q.setDailyCount(1); q.setTotalCount(1);
-                    q.setLastTriggerAt(LocalDateTime.now());
-                    quotaMapper.insert(q);
-                } else {
-                    existing.setDailyCount(existing.getDailyCount() + 1);
-                    existing.setTotalCount(existing.getTotalCount() + 1);
-                    existing.setLastTriggerAt(LocalDateTime.now());
-                    // 复合主键：不能用 updateById()，用 update(entity, wrapper)
-                    quotaMapper.update(existing,
-                            new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<CanvasUserQuota>()
-                                    .eq(CanvasUserQuota::getCanvasId, canvasId)
-                                    .eq(CanvasUserQuota::getUserId, userId)
-                                    .eq(CanvasUserQuota::getTriggerDate, today));
-                }
+                quotaMapper.upsertUsage(canvasId, userId, LocalDate.now(), LocalDateTime.now());
             } catch (Exception e) {
                 log.warn("[QUOTA] 用量更新失败: {}", e.getMessage());
             }

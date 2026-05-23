@@ -8,6 +8,14 @@ spring:
     username: root
     password: root
     driver-class-name: com.mysql.cj.jdbc.Driver
+    hikari:
+      maximum-pool-size: 33
+      minimum-idle: 8
+      connection-timeout: 3000
+      validation-timeout: 1000
+      idle-timeout: 600000
+      max-lifetime: 1800000
+      keepalive-time: 60000
   flyway:
     enabled: true
     locations: classpath:db/migration
@@ -16,11 +24,14 @@ spring:
     redis:
       host: localhost
       port: 6379
+      timeout: 1000ms
       # password: （无密码时注释掉）
       lettuce:
         pool:
-          max-active: 16
-          max-idle: 8
+          max-active: 64
+          max-idle: 32
+          min-idle: 8
+          max-wait: 100ms
 
 mybatis-plus:
   configuration:
@@ -62,6 +73,18 @@ canvas:
   mq:
     topic: CANVAS_MQ_TRIGGER
     consume-thread-number: ${CANVAS_MQ_CONSUME_THREAD:20}
+  scheduler:
+    jitter-max-ms: 300000
+    trigger-concurrency: 100
+  delay:
+    jitter-max-ms: 0
+  http-client:
+    max-connections: 500
+    pending-acquire-max-count: 2000
+    pending-acquire-timeout-ms: 1000
+    connect-timeout-ms: 1000
+    response-timeout-ms: 3000
+    write-timeout-ms: 3000
   # Groovy 沙箱（12.9节，预编译缓存）
   groovy:
     timeout-ms: 5000

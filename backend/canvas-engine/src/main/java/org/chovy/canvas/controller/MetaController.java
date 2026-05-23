@@ -172,6 +172,7 @@ public class MetaController {
                 m.put("value", def.getApiKey());
                 m.put("label", def.getName());
                 m.put("requestSchema", def.getRequestSchema() != null ? def.getRequestSchema() : "[]");
+                m.put("includeContextPayload", def.getIncludeContextPayload() != null ? def.getIncludeContextPayload() : 0);
                 return m;
             }).collect(Collectors.toList());
         }).subscribeOn(Schedulers.boundedElastic()).map(R::ok);

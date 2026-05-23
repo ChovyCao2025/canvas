@@ -19,6 +19,7 @@ describe('controlChrome', () => {
 
     expect(chrome.height).toBe(52)
     expect(chrome.borderRadius).toBe(18)
+    expect(chrome.paddingInline).toBe(16)
   })
 
   it('returns a subdued field label style', () => {

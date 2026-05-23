@@ -24,6 +24,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import reactor.core.Disposable;
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
 
@@ -104,25 +105,25 @@ public class CanvasExecutionService {
                     String triggerNodeId = (String) prep.get("triggerNodeId");
 
                     CanvasExecution exec = createExecution(ctx);
-                    Mono.fromRunnable(() -> executionMapper.insert(exec))
-                            .subscribeOn(Schedulers.boundedElastic()).subscribe();
 
-                    return dagEngine.execute(graph, triggerNodeId, ctx)
+                    return insertExecution(exec)
+                            .then(dagEngine.execute(graph, triggerNodeId, ctx)
                             .timeout(Duration.ofSeconds(globalTimeoutSec))
                             .flatMap(result -> {
-                                updateExecution(exec, ExecutionStatus.SUCCESS.getCode(), result);
                                 Map<String, Object> resp = new HashMap<>(result);
                                 resp.put("executionId", ctx.getExecutionId());
-                                return Mono.just(resp);
+                                return updateExecution(exec, ExecutionStatus.SUCCESS.getCode(), result)
+                                        .thenReturn(resp);
                             })
                             .onErrorResume(e -> {
                                 log.error("[DRY_RUN] 执行失败: {}", e.getMessage());
-                                updateExecution(exec, ExecutionStatus.FAILED.getCode(), Map.of("error", e.getMessage()));
-                                return Mono.just(Map.of(
+                                Map<String, Object> resp = Map.of(
                                         "error", e.getMessage(),
                                         "executionId", ctx.getExecutionId()
-                                ));
-                            });
+                                );
+                                return updateExecution(exec, ExecutionStatus.FAILED.getCode(), Map.of("error", e.getMessage()))
+                                        .thenReturn(resp);
+                            }));
                 });
     }
 
@@ -155,27 +156,8 @@ public class CanvasExecutionService {
                         throw new IllegalStateException("画布未发布，请先发布后再触发: " + canvasId);
                     }
 
-                    // 2. 前置检查（有效期 / 配额 / 冷却期）—— dry-run 跳过
-                    if (!dryRun) {
-                        // FIXME: 前端没有对应的位置配置此系列属性
-                        preCheckService.check(canvas, userId);
-                    }
-
-                    // 2.5 单画布并发执行上限（设计文档 12.4节）
-                    // 防止同一画布被大量并发触发（如大促瞬间流量）打爆执行引擎
-                    if (!dryRun) {
-                        int active = executionRegistry.activeCount(canvasId);
-                        int maxConc = canvas.getMaxTotalExecutions() != null
-                                ? Math.min(canvas.getMaxTotalExecutions(), globalMaxConcurrency)
-                                : globalMaxConcurrency;
-                        if (active >= maxConc) {
-                            log.warn("[ENGINE] 画布并发上限已达 canvasId={} active={}/{}", canvasId, active, maxConc);
-                            return Map.of("overflow", "concurrency_limit_reached",
-                                    "active", active, "limit", maxConc);
-                        }
-                    }
-
                     // 3. dedup 检查
+                    String acquiredDedupKey = null;
                     if (!dryRun && msgId != null) {
                         // FIXME: 此处控制不足够精细, 可能会影响后续订单去重时间
                         // FIXME: 目前幂等时间默认是24小时, 但是如果在挂起期间有第二个订单进入流程的话, 幂等时间会被设置为20分钟
@@ -188,6 +170,7 @@ public class CanvasExecutionService {
                             log.debug("[ENGINE] dedup 拦截 canvasId={} userId={} msgId={}", canvasId, userId, msgId);
                             return Map.<String, Object>of("deduplicated", true);
                         }
+                        acquiredDedupKey = ctxStore.buildDedupKey(canvasId, userId, msgId);
                     }
 
                     // 4. 加载/恢复 ExecutionContext
@@ -221,8 +204,14 @@ public class CanvasExecutionService {
                                 "找不到触发器节点 type=" + triggerNodeType + " key=" + matchKey);
                     }
 
-                    return Map.of("ctx", ctx, "graph", graph, "triggerNodeId", triggerNodeId,
-                            "isResume", isResume, "canvas", canvas);
+                    Map<String, Object> prep = new HashMap<>();
+                    prep.put("ctx", ctx);
+                    prep.put("graph", graph);
+                    prep.put("triggerNodeId", triggerNodeId);
+                    prep.put("isResume", isResume);
+                    prep.put("canvas", canvas);
+                    if (acquiredDedupKey != null) prep.put("dedupKey", acquiredDedupKey);
+                    return prep;
                 })
                 .subscribeOn(Schedulers.boundedElastic())
                 .flatMap(prep -> {
@@ -231,29 +220,59 @@ public class CanvasExecutionService {
                     String triggerNodeId = (String) prep.get("triggerNodeId");
                     boolean isResume = (Boolean) prep.get("isResume");
                     Canvas canvas = (Canvas) prep.get("canvas");
+                    String acquiredDedupKey = (String) prep.get("dedupKey");
+
+                    Disposable.Swap executionSlot = null;
+                    if (!dryRun) {
+                        int canvasLimit = canvas.getMaxTotalExecutions() != null
+                                ? Math.min(canvas.getMaxTotalExecutions(), globalMaxConcurrency)
+                                : globalMaxConcurrency;
+                        var acquired = executionRegistry.tryAcquire(
+                                canvasId, ctx.getExecutionId(), canvasLimit, globalMaxConcurrency);
+                        if (acquired.isEmpty()) {
+                            int active = executionRegistry.activeCount(canvasId);
+                            log.warn("[ENGINE] 画布并发上限已达 canvasId={} active={}/{} global={}/{}",
+                                    canvasId, active, canvasLimit,
+                                    executionRegistry.totalActiveCount(), globalMaxConcurrency);
+                            if (isResume) ctxStore.releaseResumeLock(ctx.getCanvasId(), ctx.getUserId());
+                            if (acquiredDedupKey != null) ctxStore.releaseDedup(acquiredDedupKey);
+                            return Mono.just(Map.of("overflow", "concurrency_limit_reached",
+                                    "active", active, "limit", canvasLimit));
+                        }
+                        executionSlot = acquired.get();
+                    }
+                    final Disposable.Swap finalExecutionSlot = executionSlot;
+
+                    if (!dryRun) {
+                        try {
+                            preCheckService.check(canvas, userId);
+                        } catch (RuntimeException e) {
+                            if (finalExecutionSlot != null) {
+                                executionRegistry.deregister(canvasId, ctx.getExecutionId());
+                            }
+                            if (isResume) ctxStore.releaseResumeLock(ctx.getCanvasId(), ctx.getUserId());
+                            if (acquiredDedupKey != null) ctxStore.releaseDedup(acquiredDedupKey);
+                            return Mono.error(e);
+                        }
+                    }
 
                     // 7. 写执行记录（开始）
                     // dry-run 也写记录，这样执行轨迹面板能看到测试运行的 trace；
                     // 只是不统计、不写 ctxStore、不注册到 kill 注册表
                     final CanvasExecution finalExec = createExecution(ctx);
-                    Mono.fromRunnable(() -> executionMapper.insert(finalExec))
-                            .subscribeOn(Schedulers.boundedElastic()).subscribe();
 
                     // 8. 实际执行 DAG，并向注册表注册 Disposable（供 Kill Switch FORCE 模式使用）
                     Mono<Map<String, Object>> executionMono = dagEngine.execute(graph, triggerNodeId, ctx)
                             .timeout(Duration.ofSeconds(globalTimeoutSec));
 
-                    return executionMono
+                    Mono<Map<String, Object>> runMono = insertExecution(finalExec).then(executionMono
                             .doOnSubscribe(sub -> {
-                                if (!dryRun) {
-                                    executionRegistry.register(canvasId, ctx.getExecutionId(),
-                                            reactor.core.Disposables.single());
+                                if (finalExecutionSlot != null) {
+                                    finalExecutionSlot.update(sub::cancel);
                                 }
                             })
-                            .doFinally(signal -> executionRegistry.deregister(canvasId, ctx.getExecutionId()))
                             .flatMap(result -> {
                                 // 9. 执行完成，更新执行记录
-                                updateExecution(finalExec, ExecutionStatus.SUCCESS.getCode(), result); // SUCCESS
                                 if (!dryRun) {
                                     ctxStore.delete(ctx.getCanvasId(), ctx.getUserId());
                                     if (isResume) ctxStore.releaseResumeLock(ctx.getCanvasId(), ctx.getUserId());
@@ -262,26 +281,37 @@ public class CanvasExecutionService {
                                 // 将 executionId 合入返回结果，便于前端定位执行轨迹
                                 Map<String, Object> resp = new HashMap<>(result);
                                 resp.put("executionId", ctx.getExecutionId());
-                                return Mono.just(resp);
+                                return updateExecution(finalExec, ExecutionStatus.SUCCESS.getCode(), result)
+                                        .thenReturn(resp);
                             })
                             .onErrorResume(e -> {
                                 log.error("[ENGINE] 执行失败 executionId={}: {}", ctx.getExecutionId(), e.getMessage());
                                 boolean paused = isPaused(ctx, graph);
+                                Mono<Void> updateMono;
                                 if (paused) {
                                     if (!dryRun) ctxStore.save(ctx);
-                                    updateExecution(finalExec, ExecutionStatus.PAUSED.getCode(), Map.of()); // PAUSED
+                                    updateMono = updateExecution(finalExec, ExecutionStatus.PAUSED.getCode(), Map.of()); // PAUSED
+                                    if (!dryRun) incrementStats(ctx.getCanvasId(), ExecutionStatus.PAUSED.getCode(), ctx.getUserId());
                                 } else {
                                     if (!dryRun) {
                                         ctxStore.delete(ctx.getCanvasId(), ctx.getUserId());
                                         if (isResume) ctxStore.releaseResumeLock(ctx.getCanvasId(), ctx.getUserId());
                                     }
-                                    updateExecution(finalExec, 3, Map.of("error", e.getMessage())); // FAILED
+                                    updateMono = updateExecution(finalExec, ExecutionStatus.FAILED.getCode(), Map.of("error", e.getMessage())); // FAILED
+                                    if (!dryRun) incrementStats(ctx.getCanvasId(), ExecutionStatus.FAILED.getCode(), ctx.getUserId());
                                 }
-                                return Mono.just(Map.of(
+                                Map<String, Object> resp = Map.of(
                                         "error", e.getMessage(),
                                         "executionId", ctx.getExecutionId()
-                                ));
-                            });
+                                );
+                                return updateMono.thenReturn(resp);
+                            }));
+                    return runMono.doOnError(e -> {
+                        if (isResume) ctxStore.releaseResumeLock(ctx.getCanvasId(), ctx.getUserId());
+                        if (acquiredDedupKey != null) ctxStore.releaseDedup(acquiredDedupKey);
+                    }).doFinally(signal -> {
+                        if (!dryRun) executionRegistry.deregister(canvasId, ctx.getExecutionId());
+                    });
                 });
     }
 
@@ -439,15 +469,22 @@ public class CanvasExecutionService {
      * @param status 状态码
      * @param result 执行结果 Map
      */
-    private void updateExecution(CanvasExecution exec, int status, Map<String, Object> result) {
-        if (exec == null) return;
+    private Mono<Void> insertExecution(CanvasExecution exec) {
+        return Mono.fromRunnable(() -> executionMapper.insert(exec))
+                .subscribeOn(Schedulers.boundedElastic())
+                .then();
+    }
+
+    private Mono<Void> updateExecution(CanvasExecution exec, int status, Map<String, Object> result) {
+        if (exec == null) return Mono.empty();
         exec.setStatus(status);
         try {
             exec.setResult(new ObjectMapper().writeValueAsString(result));
         } catch (Exception ignored) {
         }
-        Mono.fromRunnable(() -> executionMapper.updateById(exec))
-                .subscribeOn(Schedulers.boundedElastic()).subscribe();
+        return Mono.fromRunnable(() -> executionMapper.updateById(exec))
+                .subscribeOn(Schedulers.boundedElastic())
+                .then();
     }
 
 
@@ -458,36 +495,7 @@ public class CanvasExecutionService {
     private void incrementStats(Long canvasId, int finalStatus, String userId) {
         Thread.ofVirtual().start(() -> {
             try {
-                java.time.LocalDate today = java.time.LocalDate.now();
-                // 查已有记录
-                org.chovy.canvas.domain.execution.CanvasExecutionStats stats =
-                        statsMapper.selectOne(new com.baomidou.mybatisplus.core.conditions.query
-                                .LambdaQueryWrapper<org.chovy.canvas.domain.execution.CanvasExecutionStats>()
-                                .eq(org.chovy.canvas.domain.execution.CanvasExecutionStats::getCanvasId, canvasId)
-                                .eq(org.chovy.canvas.domain.execution.CanvasExecutionStats::getStatDate, today));
-                if (stats == null) {
-                    stats = new org.chovy.canvas.domain.execution.CanvasExecutionStats();
-                    stats.setCanvasId(canvasId);
-                    stats.setStatDate(today);
-                    stats.setTotalCount(0);
-                    stats.setSuccessCount(0);
-                    stats.setFailCount(0);
-                    stats.setPausedCount(0);
-                    stats.setUniqueUsers(0);
-                    statsMapper.insert(stats);
-                    stats = statsMapper.selectOne(new com.baomidou.mybatisplus.core.conditions.query
-                            .LambdaQueryWrapper<org.chovy.canvas.domain.execution.CanvasExecutionStats>()
-                            .eq(org.chovy.canvas.domain.execution.CanvasExecutionStats::getCanvasId, canvasId)
-                            .eq(org.chovy.canvas.domain.execution.CanvasExecutionStats::getStatDate, today));
-                }
-                if (stats == null) return;
-                stats.setTotalCount(stats.getTotalCount() + 1);
-                if (finalStatus == ExecutionStatus.SUCCESS.getCode())
-                    stats.setSuccessCount(stats.getSuccessCount() + 1);
-                else if (finalStatus == ExecutionStatus.FAILED.getCode()) stats.setFailCount(stats.getFailCount() + 1);
-                else if (finalStatus == ExecutionStatus.PAUSED.getCode())
-                    stats.setPausedCount(stats.getPausedCount() + 1);
-                statsMapper.updateById(stats);
+                statsMapper.upsertDailyIncrement(canvasId, java.time.LocalDate.now(), finalStatus);
             } catch (Exception e) {
                 log.warn("[STATS] 更新统计失败 canvasId={}: {}", canvasId, e.getMessage());
             }

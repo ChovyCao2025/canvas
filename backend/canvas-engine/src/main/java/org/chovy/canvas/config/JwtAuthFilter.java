@@ -16,6 +16,7 @@ import org.springframework.web.server.ServerWebExchange;
 import org.springframework.web.server.WebFilter;
 import org.springframework.web.server.WebFilterChain;
 import reactor.core.publisher.Mono;
+import reactor.core.scheduler.Schedulers;
 
 import java.util.List;
 
@@ -39,18 +40,22 @@ public class JwtAuthFilter implements WebFilter {
 
             // 检查 JWT 黑名单（服务端登出，设计文档 19.6.1节）
             String hash = AuthController.tokenHash(token);
-            if (Boolean.TRUE.equals(redis.hasKey("canvas:jwt:revoked:" + hash))) {
-                exchange.getResponse().setStatusCode(HttpStatus.UNAUTHORIZED);
-                return exchange.getResponse().setComplete();
-            }
+            return Mono.fromCallable(() -> Boolean.TRUE.equals(redis.hasKey("canvas:jwt:revoked:" + hash)))
+                    .subscribeOn(Schedulers.boundedElastic())
+                    .flatMap(revoked -> {
+                        if (revoked) {
+                            exchange.getResponse().setStatusCode(HttpStatus.UNAUTHORIZED);
+                            return exchange.getResponse().setComplete();
+                        }
 
-            String role = claims.get("role", String.class);
-            UsernamePasswordAuthenticationToken auth = new UsernamePasswordAuthenticationToken(
-                    claims, null,
-                    List.of(new SimpleGrantedAuthority("ROLE_" + role))
-            );
-            return chain.filter(exchange)
-                    .contextWrite(ReactiveSecurityContextHolder.withAuthentication(auth));
+                        String role = claims.get("role", String.class);
+                        UsernamePasswordAuthenticationToken auth = new UsernamePasswordAuthenticationToken(
+                                claims, null,
+                                List.of(new SimpleGrantedAuthority("ROLE_" + role))
+                        );
+                        return chain.filter(exchange)
+                                .contextWrite(ReactiveSecurityContextHolder.withAuthentication(auth));
+                    });
         } catch (JwtException e) {
             exchange.getResponse().setStatusCode(HttpStatus.UNAUTHORIZED);
             return exchange.getResponse().setComplete();

@@ -51,7 +51,7 @@ class SendMqHandlerTest {
         assertThat(result.success()).isFalse();
         assertThat(result.errorMessage()).isEqualTo("SEND_MQ: messageCodeKey 未配置");
         verify(mqMapper, never()).selectOne(any());
-        verify(rocketMQTemplate, never()).syncSend(anyString(), any(Object.class));
+        verify(rocketMQTemplate, never()).syncSendOrderly(anyString(), any(Object.class), anyString());
     }
 
     @Test
@@ -62,7 +62,7 @@ class SendMqHandlerTest {
 
         assertThat(result.success()).isFalse();
         assertThat(result.errorMessage()).isEqualTo("SEND_MQ: 找不到消息定义 messageCode=order_paid");
-        verify(rocketMQTemplate, never()).syncSend(anyString(), any(Object.class));
+        verify(rocketMQTemplate, never()).syncSendOrderly(anyString(), any(Object.class), anyString());
     }
 
     @Test
@@ -72,7 +72,8 @@ class SendMqHandlerTest {
         definition.setTopic("order.paid");
         definition.setEnabled(1);
         when(mqMapper.selectOne(any())).thenReturn(definition);
-        when(rocketMQTemplate.syncSend(anyString(), any(Object.class))).thenReturn(sendResult(SendStatus.SEND_OK));
+        when(rocketMQTemplate.syncSendOrderly(anyString(), any(Object.class), anyString()))
+                .thenReturn(sendResult(SendStatus.SEND_OK));
 
         Map<String, Object> config = Map.of(
                 "messageCodeKey", "order_paid",
@@ -91,7 +92,10 @@ class SendMqHandlerTest {
         assertThat(result.output()).containsEntry("mqSent", true);
 
         ArgumentCaptor<MqTriggerMessage> messageCaptor = ArgumentCaptor.forClass(MqTriggerMessage.class);
-        verify(rocketMQTemplate).syncSend(eq("CANVAS_MQ_TRIGGER:order.paid"), messageCaptor.capture());
+        verify(rocketMQTemplate).syncSendOrderly(
+                eq("CANVAS_MQ_TRIGGER:order.paid"),
+                messageCaptor.capture(),
+                eq("user-7"));
 
         MqTriggerMessage message = messageCaptor.getValue();
         assertThat(message.getUserId()).isEqualTo("user-7");
@@ -107,7 +111,7 @@ class SendMqHandlerTest {
         definition.setTopic("order.paid");
         definition.setEnabled(1);
         when(mqMapper.selectOne(any())).thenReturn(definition);
-        when(rocketMQTemplate.syncSend(anyString(), any(Object.class)))
+        when(rocketMQTemplate.syncSendOrderly(anyString(), any(Object.class), anyString()))
                 .thenThrow(new RuntimeException("broker down"));
 
         NodeResult result = handler.executeAsync(Map.of("messageCodeKey", "order_paid"), context).block();
@@ -120,7 +124,8 @@ class SendMqHandlerTest {
     void executeAsyncBuildsPayloadFromUiInputParamsShape() {
         MqMessageDefinition definition = enabledDefinition("order.paid");
         when(mqMapper.selectOne(any())).thenReturn(definition);
-        when(rocketMQTemplate.syncSend(anyString(), any(Object.class))).thenReturn(sendResult(SendStatus.SEND_OK));
+        when(rocketMQTemplate.syncSendOrderly(anyString(), any(Object.class), anyString()))
+                .thenReturn(sendResult(SendStatus.SEND_OK));
 
         Map<String, Object> config = Map.of(
                 "messageCodeKey", "order_paid",
@@ -136,7 +141,10 @@ class SendMqHandlerTest {
         assertThat(result.success()).isTrue();
 
         ArgumentCaptor<MqTriggerMessage> messageCaptor = ArgumentCaptor.forClass(MqTriggerMessage.class);
-        verify(rocketMQTemplate).syncSend(eq("CANVAS_MQ_TRIGGER:order.paid"), messageCaptor.capture());
+        verify(rocketMQTemplate).syncSendOrderly(
+                eq("CANVAS_MQ_TRIGGER:order.paid"),
+                messageCaptor.capture(),
+                eq("user-7"));
         assertThat(messageCaptor.getValue().getPayload())
                 .containsEntry("orderId", "O-1")
                 .containsEntry("amount", 12)
@@ -147,7 +155,8 @@ class SendMqHandlerTest {
     void executeAsyncBuildsPayloadFromMapShapedParams() {
         MqMessageDefinition definition = enabledDefinition("order.paid");
         when(mqMapper.selectOne(any())).thenReturn(definition);
-        when(rocketMQTemplate.syncSend(anyString(), any(Object.class))).thenReturn(sendResult(SendStatus.SEND_OK));
+        when(rocketMQTemplate.syncSendOrderly(anyString(), any(Object.class), anyString()))
+                .thenReturn(sendResult(SendStatus.SEND_OK));
 
         NodeResult result = handler.executeAsync(Map.of(
                 "messageCodeKey", "order_paid",
@@ -157,7 +166,10 @@ class SendMqHandlerTest {
         assertThat(result.success()).isTrue();
 
         ArgumentCaptor<MqTriggerMessage> messageCaptor = ArgumentCaptor.forClass(MqTriggerMessage.class);
-        verify(rocketMQTemplate).syncSend(eq("CANVAS_MQ_TRIGGER:order.paid"), messageCaptor.capture());
+        verify(rocketMQTemplate).syncSendOrderly(
+                eq("CANVAS_MQ_TRIGGER:order.paid"),
+                messageCaptor.capture(),
+                eq("user-7"));
         assertThat(messageCaptor.getValue().getPayload()).containsEntry("orderId", "O-1");
     }
 
@@ -165,7 +177,7 @@ class SendMqHandlerTest {
     void executeAsyncFailsWhenRocketMqReturnsNonOkStatus() {
         MqMessageDefinition definition = enabledDefinition("order.paid");
         when(mqMapper.selectOne(any())).thenReturn(definition);
-        when(rocketMQTemplate.syncSend(anyString(), any(Object.class)))
+        when(rocketMQTemplate.syncSendOrderly(anyString(), any(Object.class), anyString()))
                 .thenReturn(sendResult(SendStatus.FLUSH_DISK_TIMEOUT));
 
         NodeResult result = handler.executeAsync(Map.of("messageCodeKey", "order_paid"), context).block();
@@ -183,7 +195,7 @@ class SendMqHandlerTest {
 
         assertThat(result.success()).isFalse();
         assertThat(result.errorMessage()).isEqualTo("SEND_MQ: 消息定义 topic 未配置 messageCode=order_paid");
-        verify(rocketMQTemplate, never()).syncSend(anyString(), any(Object.class));
+        verify(rocketMQTemplate, never()).syncSendOrderly(anyString(), any(Object.class), anyString());
     }
 
     private static MqMessageDefinition enabledDefinition(String topic) {

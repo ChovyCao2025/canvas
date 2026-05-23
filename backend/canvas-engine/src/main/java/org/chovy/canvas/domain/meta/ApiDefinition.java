@@ -47,10 +47,22 @@ public class ApiDefinition {
      */
     private String responseSchema;
 
+    /** 是否携带旅程环境信息，1=携带，0=不携带 */
+    private Integer includeContextPayload;
+
+    /** 是否开启回执等待，1=开启，0=不开启 */
+    private Integer receiptEnabled;
+
+    /** 回执等待过期时间（分钟） */
+    private Integer receiptExpireMinutes;
+
+    /** 视为回执完成的状态列表 JSON */
+    private String receiptStatuses;
+
     /** 接口描述 */
     private String description;
 
-    /** 每秒最大调用次数，null 表示不限制（对应 TriggerPreCheckService 外的速率保护） */
+    /** 每秒最大调用次数，null 表示不限制 */
     private Integer rateLimitPerSec;
 
     /** 是否启用，1=启用，0=禁用 */

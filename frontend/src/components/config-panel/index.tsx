@@ -322,7 +322,7 @@ function renderControl(
         <div>
           <Input
             placeholder="如：0 9 * * *（每天 9 点）"
-            style={{ fontFamily: 'monospace' }}
+            style={{ ...controlChrome, fontFamily: 'monospace' }}
           />
           <div style={{ fontSize: 11, color: '#8c8c8c', marginTop: 4, lineHeight: 1.6 }}>
             格式：<code>分 时 日 月 周</code>，常见示例：
@@ -381,6 +381,7 @@ function ConditionRuleList({ ctxFields }: { ctxFields: ContextField[] }) {
   const fieldKey = 'rules'
   const rules: ConditionRule[] = Form.useWatch(fieldKey, form) ?? []
   const ops = ['EQ', 'NEQ', 'CONTAINS', 'GT', 'LT', 'GTE', 'LTE']
+  const controlChrome = getControlChrome()
 
   const add = () => form.setFieldValue(fieldKey,
     [...rules, { field: '', operator: 'EQ', value: '', isCustom: true }])
@@ -395,14 +396,14 @@ function ConditionRuleList({ ctxFields }: { ctxFields: ContextField[] }) {
     <div>
       {rules.map((rule, i) => (
         <Space key={i} style={{ display: 'flex', marginBottom: 4 }} align="center">
-          <Select size="small" style={{ width: 100 }} placeholder="字段"
+          <Select size="small" style={{ ...controlChrome, width: 100 }} placeholder="字段"
             value={rule.field || undefined}
             options={ctxFields.map(f => ({ label: f.fieldName, value: f.fieldKey }))}
             onChange={v => update(i, 'field', v)} showSearch />
-          <Select size="small" style={{ width: 80 }} value={rule.operator}
+          <Select size="small" style={{ ...controlChrome, width: 80 }} value={rule.operator}
             options={ops.map(o => ({ label: o, value: o }))}
             onChange={v => update(i, 'operator', v)} />
-          <AutoComplete size="small" style={{ width: 110 }}
+          <AutoComplete size="small" style={{ ...controlChrome, width: 110 }}
             placeholder="值或 ${key}"
             value={rule.value}
             options={ctxFields.map(f => ({ value: '${' + f.fieldKey + '}', label: f.fieldName }))}
@@ -425,6 +426,7 @@ function ContextValueList({ ctxFields }: { ctxFields: ContextField[] }) {
   const form = Form.useFormInstance()
   const fieldKey = 'bizData'
   const items: ContextValueItem[] = Form.useWatch(fieldKey, form) ?? []
+  const controlChrome = getControlChrome()
 
   const add = () => form.setFieldValue(fieldKey,
     [...items, { name: '', valueType: 'CUSTOM', value: '' }])
@@ -439,19 +441,19 @@ function ContextValueList({ ctxFields }: { ctxFields: ContextField[] }) {
     <div>
       {items.map((item, i) => (
         <Space key={i} style={{ display: 'flex', marginBottom: 4 }} align="center">
-          <Input size="small" style={{ width: 80 }} placeholder="字段名"
+          <Input size="small" style={{ ...controlChrome, width: 80 }} placeholder="字段名"
             value={item.name} onChange={e => update(i, 'name', e.target.value)} />
-          <Select size="small" style={{ width: 80 }} value={item.valueType}
+          <Select size="small" style={{ ...controlChrome, width: 80 }} value={item.valueType}
             options={[{ label: '自定义', value: 'CUSTOM' }, { label: '上下文', value: 'CONTEXT' }]}
             onChange={v => update(i, 'valueType', v)} />
           {item.valueType === 'CONTEXT'
-            ? <AutoComplete size="small" style={{ width: 110 }}
+            ? <AutoComplete size="small" style={{ ...controlChrome, width: 110 }}
                 placeholder="${key} 或字段名"
                 value={item.value || undefined}
                 options={ctxFields.map(f => ({ value: '${' + f.fieldKey + '}', label: f.fieldName }))}
                 onChange={v => update(i, 'value', v)}
                 filterOption={(input, opt) => String(opt?.label ?? '').toLowerCase().includes(input.toLowerCase())} />
-            : <Input size="small" style={{ width: 110 }} placeholder="值"
+            : <Input size="small" style={{ ...controlChrome, width: 110 }} placeholder="值"
                 value={item.value} onChange={e => update(i, 'value', e.target.value)} />
           }
           <Button size="small" danger icon={<DeleteOutlined />} onClick={() => remove(i)} />
@@ -468,6 +470,7 @@ function ParamDefineList() {
   const form = Form.useFormInstance()
   const fieldKey = 'inputParams'
   const items: ParamDef[] = Form.useWatch(fieldKey, form) ?? []
+  const controlChrome = getControlChrome()
 
   const add = () => form.setFieldValue(fieldKey,
     [...items, { name: '', dataType: 'STRING', required: false }])
@@ -482,9 +485,9 @@ function ParamDefineList() {
     <div>
       {items.map((p, i) => (
         <Space key={i} style={{ display: 'flex', marginBottom: 4 }} align="center">
-          <Input size="small" style={{ width: 90 }} placeholder="参数名"
+          <Input size="small" style={{ ...controlChrome, width: 90 }} placeholder="参数名"
             value={p.name} onChange={e => update(i, 'name', e.target.value)} />
-          <Select size="small" style={{ width: 80 }} value={p.dataType}
+          <Select size="small" style={{ ...controlChrome, width: 80 }} value={p.dataType}
             options={['STRING','NUMBER','BOOLEAN','LIST'].map(t => ({ label: t, value: t }))}
             onChange={v => update(i, 'dataType', v)} />
           <Switch size="small" checked={!!p.required}
@@ -504,6 +507,7 @@ function BranchList({ ctxFields }: { ctxFields: ContextField[] }) {
   const form = Form.useFormInstance()
   const branches: BranchItem[] = Form.useWatch('branches', form) ?? []
   const ops = ['EQ', 'NEQ', 'CONTAINS', 'GT', 'LT', 'GTE', 'LTE']
+  const controlChrome = getControlChrome()
 
   const LABELS = ['如果', '否则如果', '否则如果', '否则如果', '否则如果']
   const addBranch = () => form.setFieldValue('branches', [
@@ -537,7 +541,7 @@ function BranchList({ ctxFields }: { ctxFields: ContextField[] }) {
           {/* 分支标题行 */}
           <div style={{ background: '#fafafa', padding: '6px 10px', display: 'flex', alignItems: 'center', gap: 8, borderBottom: b.conditions?.length ? '1px solid #f0f0f0' : 'none' }}>
             <Tag color={LABEL_COLORS[b.label] ?? 'default'} style={{ margin: 0 }}>{b.label}</Tag>
-            <Select size="small" style={{ width: 64 }} value={b.strategyRelation}
+            <Select size="small" style={{ ...controlChrome, width: 64 }} value={b.strategyRelation}
               options={[{ label: 'AND 全满足', value: 'AND' }, { label: 'OR 任一', value: 'OR' }]}
               onChange={v => updateBranch(i, 'strategyRelation', v)} />
             <span style={{ flex: 1, fontSize: 11, color: '#999' }}>
@@ -551,14 +555,14 @@ function BranchList({ ctxFields }: { ctxFields: ContextField[] }) {
           <div style={{ padding: '6px 10px' }}>
             {b.conditions?.map((c, ci) => (
               <Space key={ci} style={{ display: 'flex', marginBottom: 4 }}>
-                <Select size="small" style={{ width: 90 }} placeholder="字段"
+                <Select size="small" style={{ ...controlChrome, width: 90 }} placeholder="字段"
                   value={c.field || undefined}
                   options={ctxFields.map(f => ({ label: f.fieldName, value: f.fieldKey }))}
                   onChange={v => updateCondition(i, ci, 'field', v)} showSearch />
-                <Select size="small" style={{ width: 72 }} value={c.operator}
+                <Select size="small" style={{ ...controlChrome, width: 72 }} value={c.operator}
                   options={ops.map(o => ({ label: o, value: o }))}
                   onChange={v => updateCondition(i, ci, 'operator', v)} />
-                <AutoComplete size="small" style={{ width: 100 }}
+                <AutoComplete size="small" style={{ ...controlChrome, width: 100 }}
                   placeholder="值或 ${key}"
                   value={c.value}
                   options={ctxFields.map(f => ({ value: '${' + f.fieldKey + '}', label: f.fieldName }))}
@@ -591,6 +595,7 @@ interface AbGroup { groupKey: string; nextNodeId?: string }
 function AbGroupList({ getNodeName }: { getNodeName: (id: string | undefined) => string | null }) {
   const form = Form.useFormInstance()
   const groups: AbGroup[] = Form.useWatch('groups', form) ?? []
+  const controlChrome = getControlChrome()
   const add = () => form.setFieldValue('groups', [...groups, { groupKey: `G${groups.length + 1}`, nextNodeId: undefined }])
   const remove = (i: number) => { const n = [...groups]; n.splice(i, 1); form.setFieldValue('groups', n) }
   const update = (i: number, k: keyof AbGroup, v: string) => {
@@ -615,7 +620,7 @@ function AbGroupList({ getNodeName }: { getNodeName: (id: string | undefined) =>
               <Button size="small" type="text" danger icon={<DeleteOutlined />} onClick={() => remove(i)} />
             </Space>
             <Space style={{ marginTop: 4 }} size={4}>
-              <Input size="small" style={{ width: 80 }} placeholder="分组Key（如 A）"
+              <Input size="small" style={{ ...controlChrome, width: 80 }} placeholder="分组Key（如 A）"
                 value={g.groupKey} onChange={e => update(i, 'groupKey', e.target.value)} />
               {successorName
                 ? <Tag color="blue" style={{ fontSize: 11 }}>→ {successorName}</Tag>
@@ -638,6 +643,7 @@ interface PriorityItem { order: number; nextNodeId?: string }
 function PriorityList() {
   const form = Form.useFormInstance()
   const priorities: PriorityItem[] = Form.useWatch('priorities', form) ?? []
+  const controlChrome = getControlChrome()
   const add = () => form.setFieldValue('priorities', [...priorities, { order: priorities.length + 1, nextNodeId: undefined }])
   const remove = (i: number) => { const n = [...priorities]; n.splice(i, 1); form.setFieldValue('priorities', n) }
   const update = (i: number, k: keyof PriorityItem, v: string | number) => {
@@ -648,9 +654,9 @@ function PriorityList() {
     <div>
       {priorities.map((p, i) => (
         <Space key={i} style={{ display: 'flex', marginBottom: 4 }}>
-          <InputNumber size="small" style={{ width: 60 }} placeholder="优先级"
+          <InputNumber size="small" style={{ ...controlChrome, width: 60 }} placeholder="优先级"
             value={p.order} onChange={v => update(i, 'order', v ?? i + 1)} min={1} />
-          <Input size="small" style={{ width: 110 }} placeholder="后继节点ID"
+          <Input size="small" style={{ ...controlChrome, width: 110 }} placeholder="后继节点ID"
             value={p.nextNodeId ?? ''} onChange={e => update(i, 'nextNodeId', e.target.value)} />
           <Button size="small" danger icon={<DeleteOutlined />} onClick={() => remove(i)} />
         </Space>
@@ -668,6 +674,7 @@ function KeyValueMapping({ fieldKey, ctxFields }: { fieldKey: string; ctxFields:
   const form = Form.useFormInstance()
   const mapping: Record<string, string> = Form.useWatch(fieldKey, form) ?? {}
   const entries = Object.entries(mapping)
+  const controlChrome = getControlChrome()
 
   const add = () => form.setFieldValue(fieldKey, { ...mapping, '': '' })
   const remove = (k: string) => {
@@ -684,10 +691,10 @@ function KeyValueMapping({ fieldKey, ctxFields }: { fieldKey: string; ctxFields:
     <div>
       {entries.map(([k, v], i) => (
         <Space key={i} style={{ display: 'flex', marginBottom: 4 }}>
-          <Input size="small" style={{ width: 90 }} placeholder="子流程字段名"
+          <Input size="small" style={{ ...controlChrome, width: 90 }} placeholder="子流程字段名"
             value={k} onChange={e => updateKey(k, e.target.value)} />
           <span style={{ fontSize: 12 }}>←</span>
-          <AutoComplete size="small" style={{ width: 130 }}
+          <AutoComplete size="small" style={{ ...controlChrome, width: 130 }}
             placeholder="${key} 或固定值"
             value={v || undefined}
             options={ctxFields.map(f => ({ value: '${' + f.fieldKey + '}', label: f.fieldName }))}
@@ -707,6 +714,7 @@ let canvasListCache: Canvas[] | null = null
 function CanvasSelector() {
   const [canvases, setCanvases] = useState<Canvas[]>(canvasListCache ?? [])
   const [loading, setLoading] = useState(!canvasListCache)
+  const controlChrome = getControlChrome()
 
   useEffect(() => {
     if (canvasListCache) return
@@ -718,6 +726,7 @@ function CanvasSelector() {
 
   return (
     <Select
+      style={controlChrome}
       loading={loading}
       showSearch
       placeholder="搜索并选择已发布画布"
@@ -803,19 +812,20 @@ function DelayInput() {
     { label: '30分', d: 30, u: 'MINUTE' },
     { label: '1小时', d: 1, u: 'HOUR' },
   ]
+  const controlChrome = getControlChrome()
 
   return (
     <div>
       <Space.Compact style={{ width: '100%' }}>
         <InputNumber
-          style={{ flex: 1 }}
+          style={{ ...controlChrome, flex: 1 }}
           min={1}
           placeholder="时长"
           value={dur as number}
           onChange={v => set({ duration: v })}
         />
         <Select
-          style={{ width: 90 }}
+          style={{ ...controlChrome, width: 90 }}
           value={unit}
           options={[
             { value: 'SECOND', label: '秒' },

@@ -3,6 +3,8 @@ package org.chovy.canvas.engine.disruptor;
 import com.lmax.disruptor.*;
 import com.lmax.disruptor.dsl.*;
 import com.lmax.disruptor.util.DaemonThreadFactory;
+import org.chovy.canvas.engine.scheduler.CanvasMetrics;
+import org.chovy.canvas.engine.request.CanvasExecutionRequestExecutor;
 import org.chovy.canvas.engine.trigger.CanvasExecutionService;
 import jakarta.annotation.PreDestroy;
 import lombok.extern.slf4j.Slf4j;
@@ -28,12 +30,16 @@ public class CanvasDisruptorService {
 
     private final Disruptor<CanvasExecutionEvent> disruptor;
     private final RingBuffer<CanvasExecutionEvent> ringBuffer;
+    private final CanvasMetrics metrics;
 
     // 初始化配置
     public CanvasDisruptorService(
             CanvasExecutionService executionService,
+            CanvasExecutionRequestExecutor requestExecutor,
+            CanvasMetrics metrics,
             @Value("${canvas.disruptor.ring-buffer-size:65536}") int ringBufferSize,
             @Value("${canvas.disruptor.consumers:0}") int configuredConsumers) {
+        this.metrics = metrics;
 
         // consumers=0 时自动使用 CPU 核数
         int consumers = configuredConsumers > 0
@@ -53,16 +59,25 @@ public class CanvasDisruptorService {
         WorkHandler<CanvasExecutionEvent>[] workers = new WorkHandler[consumers];
         Arrays.fill(workers, (WorkHandler<CanvasExecutionEvent>) event -> {
             try {
-                // 实际执行逻辑
-                executionService.trigger(
-                                event.canvasId, event.userId, event.triggerType,
-                                event.triggerNodeType, event.matchKey,
-                                event.payload, event.msgId, false)
-                        .subscribe(
-                                null,
-                                e -> log.error("[DISRUPTOR] 执行失败 canvasId={} userId={}: {}",
-                                        event.canvasId, event.userId, e.getMessage())
-                        );
+                if (event.requestId != null) {
+                    String requestId = event.requestId;
+                    requestExecutor.execute(requestId)
+                            .subscribe(
+                                    null,
+                                    e -> log.error("[DISRUPTOR] request 执行失败 requestId={}: {}",
+                                            requestId, e.getMessage())
+                            );
+                } else {
+                    executionService.trigger(
+                                    event.canvasId, event.userId, event.triggerType,
+                                    event.triggerNodeType, event.matchKey,
+                                    event.payload, event.msgId, false)
+                            .subscribe(
+                                    null,
+                                    e -> log.error("[DISRUPTOR] 执行失败 canvasId={} userId={}: {}",
+                                            event.canvasId, event.userId, e.getMessage())
+                            );
+                }
             } finally {
                 event.reset(); // 归还事件对象（Ring Buffer 复用）
             }
@@ -104,6 +119,7 @@ public class CanvasDisruptorService {
         try {
             sequence = ringBuffer.tryNext();
         } catch (InsufficientCapacityException e) {
+            metrics.recordDisruptorOverflow(triggerType);
             throw new IllegalStateException("Disruptor Ring Buffer is full", e);
         }
         try {
@@ -118,6 +134,24 @@ public class CanvasDisruptorService {
         } finally {
             ringBuffer.publish(sequence);
         }
+        metrics.recordDisruptorPublished(triggerType);
+    }
+
+    public void publishRequest(String requestId) {
+        long sequence;
+        try {
+            sequence = ringBuffer.tryNext();
+        } catch (InsufficientCapacityException e) {
+            metrics.recordDisruptorOverflow("REQUEST");
+            throw new IllegalStateException("Disruptor Ring Buffer is full", e);
+        }
+        try {
+            CanvasExecutionEvent event = ringBuffer.get(sequence);
+            event.requestId = requestId;
+        } finally {
+            ringBuffer.publish(sequence);
+        }
+        metrics.recordDisruptorPublished("REQUEST");
     }
 
     @PreDestroy
