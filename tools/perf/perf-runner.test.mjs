@@ -4,6 +4,7 @@ import {
   buildEventPayload,
   buildDirectPayload,
   chunkSeq,
+  exitCodeForSummary,
   parseRunnerArgs,
   run,
 } from './perf-runner.mjs'
@@ -54,6 +55,33 @@ test('parseRunnerArgs reads required flags', () => {
   assert.equal(args.perfRunId, 'perf_20260523_001')
   assert.equal(args.count, 10)
   assert.equal(args.concurrency, 2)
+})
+
+test('parseRunnerArgs throws for unsupported mode', () => {
+  assert.throws(() => parseRunnerArgs([
+    '--mode', 'batch',
+    '--perf-run-id', 'perf_20260523_001',
+    '--count', '0',
+  ]), /--mode must be one of event, direct, audience/)
+})
+
+test('parseRunnerArgs throws for zero concurrency', () => {
+  assert.throws(() => parseRunnerArgs([
+    '--perf-run-id', 'perf_20260523_001',
+    '--concurrency', '0',
+  ]), /--concurrency must be a positive integer/)
+})
+
+test('parseRunnerArgs throws for invalid count', () => {
+  assert.throws(() => parseRunnerArgs([
+    '--perf-run-id', 'perf_20260523_001',
+    '--count', 'abc',
+  ]), /--count must be a non-negative integer/)
+})
+
+test('exitCodeForSummary maps failed requests to exit code 2', () => {
+  assert.equal(exitCodeForSummary({ failed: 1 }), 2)
+  assert.equal(exitCodeForSummary({ failed: 0 }), 0)
 })
 
 test('run includes metadata in zero-count summary', async () => {

@@ -29,6 +29,40 @@ const FLAG_NAMES = {
 }
 
 const NUMBER_ARGS = new Set(['count', 'concurrency', 'userModulo'])
+const MODES = new Set(['event', 'direct', 'audience'])
+
+function parseIntegerArg(flag, value, { allowZero }) {
+  const pattern = allowZero ? /^(0|[1-9]\d*)$/ : /^[1-9]\d*$/
+
+  if (!pattern.test(value)) {
+    const kind = allowZero ? 'a non-negative integer' : 'a positive integer'
+    throw new Error(`${flag} must be ${kind}`)
+  }
+
+  return Number(value)
+}
+
+function validateArgs(args) {
+  if (!MODES.has(args.mode)) {
+    throw new Error('--mode must be one of event, direct, audience')
+  }
+
+  if (!Number.isSafeInteger(args.count) || args.count < 0) {
+    throw new Error('--count must be a non-negative integer')
+  }
+
+  if (!Number.isSafeInteger(args.concurrency) || args.concurrency < 1) {
+    throw new Error('--concurrency must be a positive integer')
+  }
+
+  if (!Number.isSafeInteger(args.userModulo) || args.userModulo < 1) {
+    throw new Error('--user-modulo must be a positive integer')
+  }
+
+  if (!args.perfRunId) {
+    throw new Error('--perf-run-id is required')
+  }
+}
 
 export function parseRunnerArgs(argv) {
   const args = { ...DEFAULT_ARGS }
@@ -41,17 +75,19 @@ export function parseRunnerArgs(argv) {
       throw new Error(`Unknown flag: ${flag}`)
     }
 
-    if (index + 1 >= argv.length) {
+    if (index + 1 >= argv.length || argv[index + 1] === '' || argv[index + 1].startsWith('--')) {
       throw new Error(`Missing value for ${flag}`)
     }
 
     const value = argv[index + 1]
-    args[name] = NUMBER_ARGS.has(name) ? Number(value) : value
+    if (NUMBER_ARGS.has(name)) {
+      args[name] = parseIntegerArg(flag, value, { allowZero: name === 'count' })
+    } else {
+      args[name] = value
+    }
   }
 
-  if (!args.perfRunId) {
-    throw new Error('--perf-run-id is required')
-  }
+  validateArgs(args)
 
   return args
 }
@@ -215,11 +251,16 @@ export async function run(args) {
   }
 }
 
+export function exitCodeForSummary(summary) {
+  return summary.failed > 0 ? 2 : 0
+}
+
 async function main() {
   const args = parseRunnerArgs(process.argv.slice(2))
   const summary = await run(args)
 
   console.log(JSON.stringify(summary, null, 2))
+  process.exitCode = exitCodeForSummary(summary)
 }
 
 if (import.meta.url === pathToFileURL(process.argv[1]).href) {
