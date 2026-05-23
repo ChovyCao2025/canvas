@@ -33,11 +33,11 @@ public class TieredCacheAspect {
         Method method = ((MethodSignature) pjp.getSignature()).getMethod();
         Object key = keyEvaluator.evaluate(annotation.key(), method, pjp.getArgs());
         if (annotation.beforeInvocation()) {
-            resolver.getExisting(annotation.name()).invalidate(key);
+            resolver.evictIfPresent(annotation.name(), key);
             return proceed(pjp);
         }
         Object result = proceed(pjp);
-        runAfterCommit(annotation.afterCommit(), () -> resolver.getExisting(annotation.name()).invalidate(key));
+        runAfterCommit(annotation.afterCommit(), () -> resolver.evictIfPresent(annotation.name(), key));
         return result;
     }
 

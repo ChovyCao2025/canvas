@@ -53,6 +53,17 @@ public class AnnotationCacheResolver {
                 .orElseThrow(() -> new IllegalStateException("Unknown tiered cache: " + name));
     }
 
+    @SuppressWarnings("unchecked")
+    public void evictIfPresent(String name, Object key) {
+        TieredCache<Object, Object> cache = caches.get(name);
+        if (cache == null) {
+            cache = (TieredCache<Object, Object>) manager.getCache(name).orElse(null);
+        }
+        if (cache != null) {
+            cache.invalidate(key);
+        }
+    }
+
     private Duration parseDuration(String value) {
         String normalized = value.trim().toLowerCase(Locale.ROOT);
         if (normalized.startsWith("p")) {

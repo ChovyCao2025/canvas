@@ -1,16 +1,14 @@
 package org.chovy.canvas.controller;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import com.github.benmanes.caffeine.cache.Cache;
-import com.github.benmanes.caffeine.cache.Caffeine;
 import org.chovy.canvas.domain.constant.NodeType;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.chovy.canvas.common.PageResult;
 import org.chovy.canvas.common.R;
-import org.chovy.canvas.domain.constant.CanvasStatusEnum;
 import org.chovy.canvas.domain.constant.TriggerType;
 import org.chovy.canvas.domain.meta.EventDefinition;
+import org.chovy.canvas.domain.meta.EventDefinitionCacheService;
 import org.chovy.canvas.domain.meta.EventDefinitionMapper;
 import org.chovy.canvas.domain.meta.EventLog;
 import org.chovy.canvas.domain.meta.EventLogMapper;
@@ -26,7 +24,6 @@ import reactor.core.scheduler.Schedulers;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
-import java.util.concurrent.TimeUnit;
 
 /**
  * 事件定义管理 + 事件上报接口。
@@ -47,12 +44,7 @@ public class EventDefinitionController {
     private final CanvasDisruptorService disruptorService;
     private final TriggerRouteService triggerRouteService;
     private final ObjectMapper objectMapper;
-
-    /** 事件定义本地缓存：eventCode → EventDefinition。TTL=10min，最多200条。 */
-    private final Cache<String, EventDefinition> eventDefCache = Caffeine.newBuilder()
-            .maximumSize(200)
-            .expireAfterWrite(10, TimeUnit.MINUTES)
-            .build();
+    private final EventDefinitionCacheService eventDefinitionCacheService;
 
     // ── 事件定义 CRUD ────────────────────────────────────────────
 
@@ -85,7 +77,7 @@ public class EventDefinitionController {
         return Mono.fromCallable(() -> {
                     eventMapper.updateById(body);
                     if (body.getEventCode() != null) {
-                        eventDefCache.invalidate(body.getEventCode());
+                        eventDefinitionCacheService.invalidatePublishedByCode(body.getEventCode());
                     }
                     return R.ok();
                 })
@@ -113,12 +105,8 @@ public class EventDefinitionController {
                     if (req.getUserId() == null || req.getUserId().isBlank())
                         throw new IllegalArgumentException("userId 不能为空");
 
-                    // 1. 验证事件定义存在（走本地缓存，TTL=10min）
-                    EventDefinition def = eventDefCache.get(req.getEventCode(), code ->
-                            eventMapper.selectOne(
-                                    new LambdaQueryWrapper<EventDefinition>()
-                                            .eq(EventDefinition::getEventCode, code)
-                                            .eq(EventDefinition::getEnabled, CanvasStatusEnum.PUBLISHED.getCode())));
+                    // 1. 验证事件定义存在（走 cache SDK，TTL=10min）
+                    EventDefinition def = eventDefinitionCacheService.getPublishedByCode(req.getEventCode());
                     if (def == null)
                         throw new IllegalArgumentException("事件未定义或已禁用: " + req.getEventCode());
 

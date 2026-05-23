@@ -3,6 +3,7 @@ package org.chovy.canvas.controller;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.chovy.canvas.domain.constant.CanvasStatusEnum;
 import org.chovy.canvas.domain.meta.EventDefinition;
+import org.chovy.canvas.domain.meta.EventDefinitionCacheService;
 import org.chovy.canvas.domain.meta.EventDefinitionMapper;
 import org.chovy.canvas.domain.meta.EventLog;
 import org.chovy.canvas.domain.meta.EventLogMapper;
@@ -30,6 +31,7 @@ class EventDefinitionControllerTest {
     private EventLogMapper logMapper;
     private CanvasDisruptorService disruptorService;
     private TriggerRouteService triggerRouteService;
+    private EventDefinitionCacheService eventDefinitionCacheService;
     private EventDefinitionController controller;
 
     @BeforeEach
@@ -38,8 +40,10 @@ class EventDefinitionControllerTest {
         logMapper = Mockito.mock(EventLogMapper.class);
         disruptorService = Mockito.mock(CanvasDisruptorService.class);
         triggerRouteService = Mockito.mock(TriggerRouteService.class);
+        eventDefinitionCacheService = Mockito.mock(EventDefinitionCacheService.class);
         controller = new EventDefinitionController(
-                eventMapper, logMapper, disruptorService, triggerRouteService, new ObjectMapper());
+                eventMapper, logMapper, disruptorService, triggerRouteService, new ObjectMapper(),
+                eventDefinitionCacheService);
     }
 
     @Test
@@ -48,7 +52,7 @@ class EventDefinitionControllerTest {
         EventDefinition def = new EventDefinition();
         def.setEventCode("ORDER_COMPLETE");
         def.setEnabled(CanvasStatusEnum.PUBLISHED.getCode());
-        when(eventMapper.selectOne(any())).thenReturn(def);
+        when(eventDefinitionCacheService.getPublishedByCode("ORDER_COMPLETE")).thenReturn(def);
 
         // Two canvases are subscribed to this event
         when(triggerRouteService.getCanvasByBehavior("ORDER_COMPLETE"))
@@ -85,7 +89,7 @@ class EventDefinitionControllerTest {
         EventDefinition def = new EventDefinition();
         def.setEventCode("UNUSED_EVENT");
         def.setEnabled(CanvasStatusEnum.PUBLISHED.getCode());
-        when(eventMapper.selectOne(any())).thenReturn(def);
+        when(eventDefinitionCacheService.getPublishedByCode("UNUSED_EVENT")).thenReturn(def);
 
         when(triggerRouteService.getCanvasByBehavior("UNUSED_EVENT"))
                 .thenReturn(Set.of());
@@ -107,12 +111,12 @@ class EventDefinitionControllerTest {
     }
 
     @Test
-    void reportEvent_usesEventDefinitionCache_onSecondCall() {
+    void reportEvent_usesEventDefinitionCacheService_onEveryCall() {
         // Arrange: valid event definition exists
         EventDefinition def = new EventDefinition();
         def.setEventCode("CACHED_EVENT");
         def.setEnabled(CanvasStatusEnum.PUBLISHED.getCode());
-        when(eventMapper.selectOne(any())).thenReturn(def);
+        when(eventDefinitionCacheService.getPublishedByCode("CACHED_EVENT")).thenReturn(def);
 
         when(triggerRouteService.getCanvasByBehavior("CACHED_EVENT"))
                 .thenReturn(Set.of());
@@ -127,7 +131,7 @@ class EventDefinitionControllerTest {
         controller.reportEvent(req).block();
         controller.reportEvent(req).block();
 
-        // Assert: DB was only hit once; second call served from cache
-        verify(eventMapper, times(1)).selectOne(any());
+        // Assert: controller delegates definition lookup to the cache service.
+        verify(eventDefinitionCacheService, times(2)).getPublishedByCode("CACHED_EVENT");
     }
 }

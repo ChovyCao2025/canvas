@@ -84,6 +84,15 @@ class TieredCacheAspectTest {
         verify(beans.values()).set(eq("annotation:v1:item"), contains("fresh"), any(java.time.Duration.class));
     }
 
+    @Test
+    void tieredCacheEvictIsNoOpWhenCacheHasNotBeenCreatedYet() {
+        CachedService service = startContext().service();
+
+        service.evictMissing("item");
+
+        assertThat(service.loads()).isZero();
+    }
+
     private TestBeans startContext() {
         context = new AnnotationConfigApplicationContext(TestConfig.class);
         return new TestBeans(
@@ -162,6 +171,10 @@ class TieredCacheAspectTest {
         @TieredCachePut(name = "annotation", key = "#p0", afterCommit = false)
         public SampleValue replace(String key, String value) {
             return new SampleValue(value);
+        }
+
+        @TieredCacheEvict(name = "missing-cache", key = "#p0", afterCommit = false)
+        public void evictMissing(String key) {
         }
 
         int loads() {
