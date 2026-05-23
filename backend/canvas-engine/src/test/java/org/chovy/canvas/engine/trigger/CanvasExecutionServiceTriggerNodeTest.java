@@ -13,6 +13,7 @@ import org.chovy.canvas.engine.dag.DagParser;
 import org.chovy.canvas.engine.handlers.MqTriggerHandler;
 import org.chovy.canvas.engine.scheduler.DagEngine;
 import org.chovy.canvas.infra.cache.CanvasConfigCache;
+import org.chovy.canvas.infra.cache.CanvasEntityCache;
 import org.chovy.canvas.infra.redis.ContextPersistenceService;
 import org.junit.jupiter.api.Test;
 import org.springframework.test.util.ReflectionTestUtils;
@@ -96,6 +97,7 @@ class CanvasExecutionServiceTriggerNodeTest {
                 mock(TriggerPreCheckService.class),
                 mock(InFlightExecutionRegistry.class),
                 mock(CanvasExecutionStatsMapper.class),
+                mock(CanvasEntityCache.class),
                 mqTriggerHandler
         );
     }
