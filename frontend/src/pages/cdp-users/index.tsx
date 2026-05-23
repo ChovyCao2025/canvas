@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react'
-import { Button, Input, Space, Table, Tag, Typography, Modal, Form, message } from 'antd'
+import { Button, Input, Space, Table, Tag, Typography, Modal, Form, message, Card } from 'antd'
 import { TagsOutlined } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
 import { useNavigate } from 'react-router-dom'
-import { cdpApi, type CanvasUserRow } from '../../services/cdpApi'
+import { cdpApi, type CanvasUserRow, type CdpTagOperation } from '../../services/cdpApi'
 import { buildBatchTagPayload, formatDateTime, formatExecutionStatus, tagColor } from './cdpPresentation'
 
 const { Title } = Typography
@@ -13,7 +13,9 @@ export default function CdpUsersPage() {
   const [keyword, setKeyword] = useState('')
   const [rows, setRows] = useState<CanvasUserRow[]>([])
   const [loading, setLoading] = useState(false)
+  const [operations, setOperations] = useState<CdpTagOperation[]>([])
   const [batchOpen, setBatchOpen] = useState(false)
+  const [watchOperationId, setWatchOperationId] = useState<number | null>(null)
   const [form] = Form.useForm()
 
   const load = async (searchKeyword = '') => {
@@ -26,16 +28,41 @@ export default function CdpUsersPage() {
     }
   }
 
+  const loadOperations = async () => {
+    const res = await cdpApi.listTagOperations(20)
+    setOperations(res.data ?? [])
+    return res.data ?? []
+  }
+
   useEffect(() => {
     load()
+    loadOperations()
   }, [])
+
+  useEffect(() => {
+    const shouldPoll = watchOperationId != null || operations.some(item => item.status === 'RUNNING')
+    if (!shouldPoll) return
+    const timer = window.setInterval(() => {
+      loadOperations().then(items => {
+        if (watchOperationId != null) {
+          const current = items.find(item => item.id === watchOperationId)
+          if (current && current.status !== 'RUNNING') {
+            setWatchOperationId(null)
+          }
+        }
+      })
+    }, 2000)
+    return () => window.clearInterval(timer)
+  }, [operations, watchOperationId])
 
   const submitBatch = async () => {
     const values = await form.validateFields()
-    await cdpApi.createBatchTagOperation(buildBatchTagPayload(values))
-    message.success('批量打标任务已创建')
+    const res = await cdpApi.createBatchTagOperation(buildBatchTagPayload(values))
+    message.success(`批量打标任务已创建 #${res.data.id}`)
+    setWatchOperationId(res.data.id)
     setBatchOpen(false)
     form.resetFields()
+    loadOperations()
   }
 
   const columns: ColumnsType<CanvasUserRow> = [
@@ -44,6 +71,25 @@ export default function CdpUsersPage() {
     { title: '最近状态', dataIndex: 'latestStatus', width: 100, render: v => { const s = formatExecutionStatus(v); return <Tag color={s.color}>{s.label}</Tag> } },
     { title: '当前标签', dataIndex: 'tags', render: (tags?: CanvasUserRow['tags']) => tags?.map(tag => <Tag key={tag.tagCode} color={tagColor(tag.tagCode)}>{tag.tagName || tag.tagCode}</Tag>) },
     { title: '最近进入', dataIndex: 'lastEnteredAt', width: 180, render: formatDateTime },
+  ]
+
+  const operationColumns: ColumnsType<CdpTagOperation> = [
+    { title: '任务 ID', dataIndex: 'id', width: 90 },
+    { title: '操作', dataIndex: 'operationType', width: 120 },
+    { title: '标签', dataIndex: 'tagCode', width: 140 },
+    {
+      title: '状态',
+      dataIndex: 'status',
+      width: 120,
+      render: value => {
+        const status = formatExecutionStatus(value === 'PARTIAL_FAILED' ? 'FAILED' : value)
+        return <Tag color={status.color}>{value === 'PARTIAL_FAILED' ? '部分失败' : status.label}</Tag>
+      },
+    },
+    { title: '成功/总数', width: 120, render: (_, row) => `${row.successCount}/${row.totalCount}` },
+    { title: '失败', dataIndex: 'failCount', width: 80, align: 'right' },
+    { title: '创建时间', dataIndex: 'createdAt', width: 180, render: formatDateTime },
+    { title: '错误摘要', dataIndex: 'errorMsg', ellipsis: true },
   ]
 
   return (
@@ -62,6 +108,14 @@ export default function CdpUsersPage() {
         </Space>
       </div>
       <Table rowKey="userId" columns={columns} dataSource={rows} loading={loading} />
+
+      <Card
+        title="批量任务"
+        extra={<Button size="small" onClick={() => loadOperations()}>刷新</Button>}
+        style={{ marginTop: 16 }}
+      >
+        <Table rowKey="id" columns={operationColumns} dataSource={operations} pagination={false} size="small" />
+      </Card>
 
       <Modal title="批量打标" open={batchOpen} onOk={submitBatch} onCancel={() => setBatchOpen(false)} okText="提交" cancelText="取消">
         <Form form={form} layout="vertical" initialValues={{ operationType: 'BATCH_SET' }}>

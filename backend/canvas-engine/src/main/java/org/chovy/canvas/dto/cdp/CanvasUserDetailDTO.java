@@ -6,5 +6,5 @@ public record CanvasUserDetailDTO(
         String userId,
         CdpUserDetailDTO profile,
         List<CdpUserTagDTO> tags,
-        List<CanvasUserRowDTO> canvasRows
+        List<CdpUserCanvasSummaryDTO> canvasRows
 ) {}

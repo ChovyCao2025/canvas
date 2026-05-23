@@ -25,4 +25,13 @@ class CdpTagOperationControllerTest {
         CdpBatchTagReq req = new CdpBatchTagReq("BATCH_SET", "vip", "true", List.of("u1"), "reason", "admin");
         assertThat(controller.create(req).block().getData().getId()).isEqualTo(7L);
     }
+
+    @Test
+    void listReturnsRecentOperations() {
+        CdpTagOperationService service = Mockito.mock(CdpTagOperationService.class);
+        CdpTagOperationController controller = new CdpTagOperationController(service);
+        when(service.listRecent(10)).thenReturn(List.of());
+
+        assertThat(controller.list(10).block().getData()).isEmpty();
+    }
 }

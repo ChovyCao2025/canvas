@@ -2,8 +2,8 @@ import { useEffect, useState } from 'react'
 import { Button, Card, Form, Input, Modal, Popconfirm, Space, Table, Tag, Typography, message } from 'antd'
 import { ArrowLeftOutlined, PlusOutlined } from '@ant-design/icons'
 import { useNavigate, useParams } from 'react-router-dom'
-import { cdpApi, type CdpUserDetail, type CdpUserTag, type CdpUserTagHistory } from '../../services/cdpApi'
-import { buildTagWritePayload, formatDateTime, tagColor } from '../cdp-users/cdpPresentation'
+import { cdpApi, type CdpUserCanvasSummary, type CdpUserDetail, type CdpUserTag, type CdpUserTagHistory } from '../../services/cdpApi'
+import { buildTagWritePayload, formatDateTime, formatExecutionStatus, tagColor } from '../cdp-users/cdpPresentation'
 
 const { Title, Text } = Typography
 
@@ -13,17 +13,18 @@ export default function CdpUserDetailPage() {
   const [detail, setDetail] = useState<CdpUserDetail | null>(null)
   const [tags, setTags] = useState<CdpUserTag[]>([])
   const [history, setHistory] = useState<CdpUserTagHistory[]>([])
+  const [canvasRows, setCanvasRows] = useState<CdpUserCanvasSummary[]>([])
   const [modalOpen, setModalOpen] = useState(false)
   const [form] = Form.useForm()
 
   const load = async () => {
-    const [u, t, h] = await Promise.all([
-      cdpApi.getUser(userId),
-      cdpApi.listUserTags(userId),
+    const [insight, h] = await Promise.all([
+      cdpApi.getUserInsight(userId),
       cdpApi.listUserTagHistory(userId),
     ])
-    setDetail(u.data)
-    setTags(t.data ?? [])
+    setDetail(insight.data.profile)
+    setTags(insight.data.tags ?? [])
+    setCanvasRows(insight.data.canvasRows ?? [])
     setHistory(h.data ?? [])
   }
 
@@ -82,6 +83,37 @@ export default function CdpUserDetailPage() {
             { title: '来源', dataIndex: 'sourceType' },
             { title: '时间', dataIndex: 'operatedAt', render: formatDateTime },
           ]} />
+      </Card>
+
+      <Card title="触达画布" style={{ marginTop: 16 }}>
+        <Table
+          rowKey="canvasId"
+          dataSource={canvasRows}
+          pagination={false}
+          size="small"
+          columns={[
+            {
+              title: '画布',
+              dataIndex: 'canvasName',
+              render: (_, row) => (
+                <Button type="link" onClick={() => navigate(`/canvas/${row.canvasId}/users`)}>
+                  {row.canvasName}
+                </Button>
+              ),
+            },
+            { title: '执行次数', dataIndex: 'executionCount', width: 100, align: 'right' },
+            {
+              title: '最近状态',
+              dataIndex: 'latestStatus',
+              width: 100,
+              render: value => {
+                const status = formatExecutionStatus(value)
+                return <Tag color={status.color}>{status.label}</Tag>
+              },
+            },
+            { title: '最近进入', dataIndex: 'lastEnteredAt', width: 180, render: formatDateTime },
+          ]}
+        />
       </Card>
 
       <Modal title="打标签" open={modalOpen} onOk={saveTag} onCancel={() => setModalOpen(false)} okText="保存" cancelText="取消">

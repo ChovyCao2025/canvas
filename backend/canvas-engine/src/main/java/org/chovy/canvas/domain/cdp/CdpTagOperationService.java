@@ -6,6 +6,7 @@ import org.chovy.canvas.dto.cdp.CdpTagWriteReq;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 
 @Service
 @RequiredArgsConstructor
@@ -40,6 +41,12 @@ public class CdpTagOperationService {
             throw new IllegalArgumentException("批量标签任务不存在: " + id);
         }
         return op;
+    }
+
+    public List<CdpTagOperation> listRecent(int limit) {
+        return operationMapper.selectList(new LambdaQueryWrapper<CdpTagOperation>()
+                .orderByDesc(CdpTagOperation::getCreatedAt)
+                .last("LIMIT " + Math.max(1, Math.min(limit, 100))));
     }
 
     private void run(CdpTagOperation op, List<String> userIds, CdpBatchTagReq req) {

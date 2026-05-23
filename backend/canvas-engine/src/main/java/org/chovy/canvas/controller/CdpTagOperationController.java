@@ -13,6 +13,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
+import java.util.List;
 
 @RestController
 @RequestMapping("/cdp/tag-operations")
@@ -24,6 +25,12 @@ public class CdpTagOperationController {
     @PostMapping
     public Mono<R<CdpTagOperation>> create(@RequestBody CdpBatchTagReq req) {
         return Mono.fromCallable(() -> R.ok(service.create(req)))
+                .subscribeOn(Schedulers.boundedElastic());
+    }
+
+    @GetMapping
+    public Mono<R<List<CdpTagOperation>>> list(@org.springframework.web.bind.annotation.RequestParam(defaultValue = "20") int limit) {
+        return Mono.fromCallable(() -> R.ok(service.listRecent(limit)))
                 .subscribeOn(Schedulers.boundedElastic());
     }
 

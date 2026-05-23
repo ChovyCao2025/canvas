@@ -2,6 +2,7 @@ package org.chovy.canvas.controller;
 
 import org.chovy.canvas.domain.cdp.CdpTagService;
 import org.chovy.canvas.domain.cdp.CdpUserDirectoryService;
+import org.chovy.canvas.domain.cdp.CdpUserInsightService;
 import org.chovy.canvas.domain.cdp.CdpUserProfile;
 import org.chovy.canvas.domain.cdp.CdpUserService;
 import org.chovy.canvas.dto.cdp.CdpTagWriteReq;
@@ -21,6 +22,7 @@ class CdpUserControllerTest {
     private CdpUserService userService;
     private CdpTagService tagService;
     private CdpUserDirectoryService directoryService;
+    private CdpUserInsightService insightService;
     private CdpUserController controller;
 
     @BeforeEach
@@ -28,7 +30,8 @@ class CdpUserControllerTest {
         userService = Mockito.mock(CdpUserService.class);
         tagService = Mockito.mock(CdpTagService.class);
         directoryService = Mockito.mock(CdpUserDirectoryService.class);
-        controller = new CdpUserController(directoryService, userService, tagService);
+        insightService = Mockito.mock(CdpUserInsightService.class);
+        controller = new CdpUserController(directoryService, insightService, userService, tagService);
     }
 
     @Test

@@ -4,7 +4,9 @@ import lombok.RequiredArgsConstructor;
 import org.chovy.canvas.common.R;
 import org.chovy.canvas.domain.cdp.CdpUserDirectoryService;
 import org.chovy.canvas.domain.cdp.CdpTagService;
+import org.chovy.canvas.domain.cdp.CdpUserInsightService;
 import org.chovy.canvas.domain.cdp.CdpUserService;
+import org.chovy.canvas.dto.cdp.CanvasUserDetailDTO;
 import org.chovy.canvas.dto.cdp.CanvasUserRowDTO;
 import org.chovy.canvas.dto.cdp.CdpTagWriteReq;
 import org.chovy.canvas.dto.cdp.CdpUserDetailDTO;
@@ -28,6 +30,7 @@ import java.util.List;
 public class CdpUserController {
 
     private final CdpUserDirectoryService directoryService;
+    private final CdpUserInsightService insightService;
     private final CdpUserService userService;
     private final CdpTagService tagService;
 
@@ -40,6 +43,12 @@ public class CdpUserController {
     @GetMapping("/{userId}")
     public Mono<R<CdpUserDetailDTO>> get(@PathVariable String userId) {
         return Mono.fromCallable(() -> R.ok(userService.toDetail(userService.getRequiredProfile(userId))))
+                .subscribeOn(Schedulers.boundedElastic());
+    }
+
+    @GetMapping("/{userId}/insight")
+    public Mono<R<CanvasUserDetailDTO>> getInsight(@PathVariable String userId) {
+        return Mono.fromCallable(() -> R.ok(insightService.getUserInsight(userId)))
                 .subscribeOn(Schedulers.boundedElastic());
     }
 

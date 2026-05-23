@@ -36,6 +36,24 @@ export interface CdpUserTagHistory {
   operatedAt?: string | null
 }
 
+export interface CdpUserCanvasSummary {
+  canvasId: number
+  canvasName: string
+  executionCount: number
+  successCount: number
+  failedCount: number
+  latestStatus: string
+  firstEnteredAt?: string | null
+  lastEnteredAt?: string | null
+}
+
+export interface CanvasUserDetail {
+  userId: string
+  profile: CdpUserDetail
+  tags: CdpUserTag[]
+  canvasRows: CdpUserCanvasSummary[]
+}
+
 export interface CanvasUserRow {
   userId: string
   displayName: string
@@ -68,12 +86,30 @@ export interface BatchTagPayload {
   operator?: string | null
 }
 
+export interface CdpTagOperation {
+  id: number
+  operationType: string
+  tagCode: string
+  tagValue?: string | null
+  totalCount: number
+  successCount: number
+  failCount: number
+  status: string
+  errorMsg?: string | null
+  createdBy?: string | null
+  createdAt?: string | null
+  updatedAt?: string | null
+}
+
 export const cdpApi = {
   listUsers: (keyword?: string) =>
     http.get<R<CanvasUserRow[]>, R<CanvasUserRow[]>>('/cdp/users', { params: keyword ? { keyword } : undefined }),
 
   getUser: (userId: string) =>
     http.get<R<CdpUserDetail>, R<CdpUserDetail>>(`/cdp/users/${encodeURIComponent(userId)}`),
+
+  getUserInsight: (userId: string) =>
+    http.get<R<CanvasUserDetail>, R<CanvasUserDetail>>(`/cdp/users/${encodeURIComponent(userId)}/insight`),
 
   listUserTags: (userId: string) =>
     http.get<R<CdpUserTag[]>, R<CdpUserTag[]>>(`/cdp/users/${encodeURIComponent(userId)}/tags`),
@@ -88,10 +124,13 @@ export const cdpApi = {
     http.delete<R<void>, R<void>>(`/cdp/users/${encodeURIComponent(userId)}/tags/${encodeURIComponent(tagCode)}`),
 
   createBatchTagOperation: (body: BatchTagPayload) =>
-    http.post<R<any>, R<any>>('/cdp/tag-operations', body),
+    http.post<R<CdpTagOperation>, R<CdpTagOperation>>('/cdp/tag-operations', body),
+
+  listTagOperations: (limit = 20) =>
+    http.get<R<CdpTagOperation[]>, R<CdpTagOperation[]>>('/cdp/tag-operations', { params: { limit } }),
 
   getBatchTagOperation: (id: number) =>
-    http.get<R<any>, R<any>>(`/cdp/tag-operations/${id}`),
+    http.get<R<CdpTagOperation>, R<CdpTagOperation>>(`/cdp/tag-operations/${id}`),
 
   listCanvasUsers: (canvasId: number) =>
     http.get<R<CanvasUserRow[]>, R<CanvasUserRow[]>>(`/canvas/${canvasId}/users`),
