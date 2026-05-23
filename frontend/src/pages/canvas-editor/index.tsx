@@ -234,6 +234,7 @@ function EditorInner({ detail, onStatusChange, onCanvasNameChange }: {
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null)
   const [saving, setSaving]         = useState(false)
   const [isDirty, setIsDirty]       = useState(false)
+  const [isEditingCanvasName, setIsEditingCanvasName] = useState(false)
   const [clipboard, setClipboard]   = useState<Node<CanvasNodeData>[]>([])
   const [, setTraceColorMap] = useState<Record<string, string>>({})
   const [testModalOpen, setTestModalOpen] = useState(false)
@@ -283,7 +284,7 @@ function EditorInner({ detail, onStatusChange, onCanvasNameChange }: {
 
   const { snapshot, undo, redo, canUndo, canRedo, undoLabel, redoLabel } = useHistory(nodes as Node<CanvasNodeData>[], edges)
   const graphReloadKey = getCanvasGraphReloadKey(detail)
-  const showCanvasNameActions = shouldShowCanvasNameActions(canvasName, savedCanvasName.current)
+  const showCanvasNameActions = shouldShowCanvasNameActions(isEditingCanvasName)
 
   // ── Auto-save：最后一次改动 3s 后静默保存 ─────────────────────
   useEffect(() => {
@@ -663,6 +664,7 @@ function EditorInner({ detail, onStatusChange, onCanvasNameChange }: {
     const update = buildCanvasNameUpdate(canvasName, savedCanvasName.current)
     if ('unchanged' in update) {
       setCanvasName(savedCanvasName.current)
+      setIsEditingCanvasName(false)
       return
     }
     if ('error' in update) {
@@ -686,6 +688,7 @@ function EditorInner({ detail, onStatusChange, onCanvasNameChange }: {
       })
       savedCanvasName.current = update.name
       setCanvasName(update.name)
+      setIsEditingCanvasName(false)
       onCanvasNameChange(update.name)
       message.success('名称已保存')
     } catch (e: any) {
@@ -696,7 +699,24 @@ function EditorInner({ detail, onStatusChange, onCanvasNameChange }: {
 
   const handleCancelCanvasName = useCallback(() => {
     setCanvasName(savedCanvasName.current)
+    setIsEditingCanvasName(false)
   }, [])
+
+  const confirmSaveCanvasName = useCallback(() => {
+    const update = buildCanvasNameUpdate(canvasName, savedCanvasName.current)
+    if ('unchanged' in update || 'error' in update) {
+      void handleSaveCanvasName()
+      return
+    }
+
+    Modal.confirm({
+      title: '确认修改画布名称？',
+      content: `将画布名称修改为「${update.name}」。此操作不会影响线上发布版本。`,
+      okText: '确认保存',
+      cancelText: '取消',
+      onOk: handleSaveCanvasName,
+    })
+  }, [canvasName, handleSaveCanvasName])
 
   /** 发布（或重新发布）：先保存草稿，再创建新版本上线 */
   const handlePublish = useCallback(async () => {
@@ -944,38 +964,98 @@ function EditorInner({ detail, onStatusChange, onCanvasNameChange }: {
         <Divider type="vertical" style={{ margin: '0 4px' }} />
 
         {/* 画布名 + 状态 */}
-        <Space.Compact size="small" style={{ alignItems: 'center' }}>
-          <Input
-            value={canvasName}
-            onPressEnter={handleSaveCanvasName}
-            onKeyDown={e => {
-              if (e.key === 'Escape') handleCancelCanvasName()
-            }}
-            onChange={e => { setCanvasName(e.target.value) }}
-            style={{ width: 240, fontWeight: 600, fontSize: 14, borderRadius: showCanvasNameActions ? '8px 0 0 8px' : 8 }}
-            disabled={readonly}
-          />
-          {!readonly && showCanvasNameActions && (
-            <>
-              <Tooltip title="保存名称">
-                <Button
-                  icon={<CheckOutlined />}
-                  onMouseDown={e => e.preventDefault()}
-                  onClick={handleSaveCanvasName}
-                  style={{ color: '#389e0d' }}
-                />
-              </Tooltip>
-              <Tooltip title="取消修改">
-                <Button
-                  icon={<CloseOutlined />}
-                  onMouseDown={e => e.preventDefault()}
-                  onClick={handleCancelCanvasName}
-                  style={{ color: '#8c8c8c', borderRadius: '0 8px 8px 0' }}
-                />
-              </Tooltip>
-            </>
-          )}
-        </Space.Compact>
+        {isEditingCanvasName && !readonly ? (
+          <div style={{
+            width: 300,
+            height: 38,
+            display: 'flex',
+            alignItems: 'center',
+            overflow: 'hidden',
+            border: '1px solid #b8d7f5',
+            borderRadius: 999,
+            background: 'linear-gradient(180deg, #ffffff 0%, #f8fbff 100%)',
+            boxShadow: '0 0 0 3px rgba(22, 119, 255, .08)',
+          }}>
+            <Input
+              autoFocus
+              value={canvasName}
+              onPressEnter={confirmSaveCanvasName}
+              onKeyDown={e => {
+                if (e.key === 'Escape') handleCancelCanvasName()
+              }}
+              onChange={e => { setCanvasName(e.target.value) }}
+              style={{
+                flex: 1,
+                height: '100%',
+                fontWeight: 700,
+                fontSize: 14,
+                border: 0,
+                boxShadow: 'none',
+                background: 'transparent',
+                paddingLeft: 14,
+              }}
+            />
+            {showCanvasNameActions && (
+              <>
+                <Tooltip title="保存名称">
+                  <Button
+                    icon={<CheckOutlined />}
+                    onMouseDown={e => e.preventDefault()}
+                    onClick={confirmSaveCanvasName}
+                    style={{
+                      width: 44,
+                      height: '100%',
+                      color: '#237804',
+                      background: '#f6ffed',
+                      border: 0,
+                      borderLeft: '1px solid #b7eb8f',
+                      borderRadius: 0,
+                    }}
+                  />
+                </Tooltip>
+                <Tooltip title="取消修改">
+                  <Button
+                    icon={<CloseOutlined />}
+                    onMouseDown={e => e.preventDefault()}
+                    onClick={handleCancelCanvasName}
+                    style={{
+                      width: 44,
+                      height: '100%',
+                      color: '#cf1322',
+                      background: '#fff1f0',
+                      border: 0,
+                      borderLeft: '1px solid #ffa39e',
+                      borderRadius: 0,
+                    }}
+                  />
+                </Tooltip>
+              </>
+            )}
+          </div>
+        ) : (
+          <Tooltip title={readonly ? undefined : '点击编辑画布名称'}>
+            <button
+              type="button"
+              disabled={readonly}
+              onClick={() => setIsEditingCanvasName(true)}
+              style={{
+                width: 250,
+                height: 36,
+                border: '1px solid transparent',
+                background: 'transparent',
+                borderRadius: 999,
+                padding: '0 12px',
+                textAlign: 'left',
+                fontWeight: 700,
+                fontSize: 14,
+                color: '#172033',
+                cursor: readonly ? 'default' : 'text',
+              }}
+            >
+              {savedCanvasName.current}
+            </button>
+          </Tooltip>
+        )}
         <Tag color={statusMap[status]?.color} style={{ borderRadius: 6, fontSize: 11 }}>
           {statusMap[status]?.label}
         </Tag>

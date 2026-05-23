@@ -14,8 +14,8 @@ describe('buildCanvasNameUpdate', () => {
     expect(buildCanvasNameUpdate('   ', '旧名称')).toEqual({ error: '画布名称不能为空' })
   })
 
-  it('shows save/cancel actions only when the visible name changed', () => {
-    expect(shouldShowCanvasNameActions('  旧名称  ', '旧名称')).toBe(false)
-    expect(shouldShowCanvasNameActions('新名称', '旧名称')).toBe(true)
+  it('shows save/cancel actions as soon as title editing starts', () => {
+    expect(shouldShowCanvasNameActions(true)).toBe(true)
+    expect(shouldShowCanvasNameActions(false)).toBe(false)
   })
 })

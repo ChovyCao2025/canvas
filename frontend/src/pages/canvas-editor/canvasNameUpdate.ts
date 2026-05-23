@@ -10,6 +10,6 @@ export function buildCanvasNameUpdate(inputName: string, savedName: string): Can
   return { name }
 }
 
-export function shouldShowCanvasNameActions(inputName: string, savedName: string): boolean {
-  return inputName.trim() !== savedName
+export function shouldShowCanvasNameActions(isEditing: boolean): boolean {
+  return isEditing
 }
