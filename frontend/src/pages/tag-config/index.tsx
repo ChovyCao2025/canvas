@@ -1,21 +1,21 @@
 import { useEffect, useState } from 'react'
-import { Button, Table, Tag, Space, Modal, Form, Input, Select, Switch, message, Typography, Popconfirm } from 'antd'
+import { Button, Table, Tag, Space, Modal, Form, Input, Select, Switch, message, Typography, Popconfirm, Divider } from 'antd'
 import { PlusOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
 import { tagDefinitionApi } from '../../services/api'
+import type { TagConfigRecord, TagFormValues } from './tagTypes'
+import TagValueEditor from './tagValueEditor'
 
 const { Title } = Typography
 
-interface TagDef { id: number; name: string; tagCode: string; tagType: string; description?: string; enabled: number }
-
 export default function TagConfigPage() {
-  const [data,     setData]     = useState<TagDef[]>([])
+  const [data,     setData]     = useState<TagConfigRecord[]>([])
   const [total,    setTotal]    = useState(0)
   const [loading,  setLoading]  = useState(false)
   const [page,     setPage]     = useState(1)
   const [visible,  setVisible]  = useState(false)
-  const [editing,  setEditing]  = useState<TagDef | null>(null)
-  const [form] = Form.useForm()
+  const [editing,  setEditing]  = useState<TagConfigRecord | null>(null)
+  const [form] = Form.useForm<TagFormValues>()
   const [saving, setSaving] = useState(false)
 
   const fetchList = async (p = page) => {
@@ -32,11 +32,11 @@ export default function TagConfigPage() {
   const openCreate = () => {
     setEditing(null)
     form.resetFields()
-    form.setFieldsValue({ tagType: 'offline', enabled: true })
+    form.setFieldsValue({ tagType: 'offline', valueType: 'STRING', enabled: true })
     setVisible(true)
   }
 
-  const openEdit = (r: TagDef) => {
+  const openEdit = (r: TagConfigRecord) => {
     setEditing(r)
     form.setFieldsValue({ ...r, enabled: r.enabled === 1 })
     setVisible(true)
@@ -59,13 +59,19 @@ export default function TagConfigPage() {
     } finally { setSaving(false) }
   }
 
-  const columns: ColumnsType<TagDef> = [
+  const columns: ColumnsType<TagConfigRecord> = [
     { title: 'ID',       dataIndex: 'id',       width: 60 },
     { title: '名称',     dataIndex: 'name' },
     { title: '标签编码', dataIndex: 'tagCode',  ellipsis: true },
     {
       title: '类型', dataIndex: 'tagType', width: 90,
       render: (v: string) => <Tag color={v === 'offline' ? 'blue' : 'green'}>{v === 'offline' ? '离线' : '实时'}</Tag>,
+    },
+    {
+      title: '标签值类型',
+      dataIndex: 'valueType',
+      width: 110,
+      render: (v: TagConfigRecord['valueType']) => <Tag>{v}</Tag>,
     },
     { title: '说明', dataIndex: 'description', ellipsis: true },
     {
@@ -89,14 +95,15 @@ export default function TagConfigPage() {
   return (
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-        <Title level={4} style={{ margin: 0 }}>标签配置</Title>
+        <Title level={4} style={{ margin: 0 }}>标签中心</Title>
         <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>新建标签</Button>
       </div>
       <Table rowKey="id" dataSource={data} columns={columns} loading={loading}
         pagination={{ total, pageSize: 20, current: page, onChange: p => { setPage(p); fetchList(p) } }} />
 
       <Modal title={editing ? '编辑标签' : '新建标签'} open={visible} onOk={handleOk}
-        onCancel={() => setVisible(false)} confirmLoading={saving} okText={editing ? '保存' : '创建'} cancelText="取消">
+        onCancel={() => setVisible(false)} confirmLoading={saving} width={760}
+        okText={editing ? '保存' : '创建'} cancelText="取消">
         <Form form={form} layout="vertical" style={{ marginTop: 16 }}>
           <Form.Item name="name" label="标签名称" rules={[{ required: true }]}>
             <Input placeholder="如：新客标签" />
@@ -107,12 +114,25 @@ export default function TagConfigPage() {
           <Form.Item name="tagType" label="类型" rules={[{ required: true }]}>
             <Select options={[{ value: 'offline', label: '离线标签' }, { value: 'realtime', label: '实时标签' }]} />
           </Form.Item>
+          <Form.Item name="valueType" label="标签值类型" rules={[{ required: true }]}>
+            <Select options={[
+              { value: 'STRING', label: 'STRING' },
+              { value: 'NUMBER', label: 'NUMBER' },
+              { value: 'BOOLEAN', label: 'BOOLEAN' },
+            ]} />
+          </Form.Item>
           <Form.Item name="description" label="说明">
             <Input.TextArea rows={2} />
           </Form.Item>
           <Form.Item name="enabled" label="状态" valuePropName="checked">
             <Switch checkedChildren="启用" unCheckedChildren="禁用" />
           </Form.Item>
+          {editing?.tagCode ? (
+            <>
+              <Divider style={{ margin: '8px 0 16px' }}>标签值管理</Divider>
+              <TagValueEditor tagCode={editing.tagCode} />
+            </>
+          ) : null}
         </Form>
       </Modal>
     </div>
