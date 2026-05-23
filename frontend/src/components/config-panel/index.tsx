@@ -15,6 +15,7 @@ import {
   FieldSummaryRow,
   NodeHeaderCard,
 } from './InspectorCards'
+import { resolveDisplayValue } from './displayValues'
 import { buildConfigPanelPresentation } from './presentation'
 
 interface ApiParamDef { name: string; displayName: string; type: string; required: boolean }
@@ -53,29 +54,6 @@ function toSelectOptions(data: any[]): StubOption[] {
     key:   String(item.value ?? item.key ?? item.code ?? item.id ?? ''),
     label: String(item.label ?? item.name ?? item.displayName ?? item.value ?? ''),
   }))
-}
-
-function normalizeFieldOptions(field: SchemaField, options: Record<string, StubOption[]>) {
-  return (options[field.key] ?? field.options ?? []).map((option: any) => ({
-    label: String(option.label ?? option.option_name ?? option.name ?? option.displayName ?? option.value ?? option.key ?? ''),
-    value: option.key ?? option.value,
-  }))
-}
-
-function resolveDisplayValue(field: SchemaField, value: unknown, options: Record<string, StubOption[]>) {
-  if (value === undefined || value === null) return undefined
-
-  if (field.type === 'select' || field.type === 'radio') {
-    const normalizedOptions = normalizeFieldOptions(field, options)
-    const matchedOption = normalizedOptions.find((option) => option.value === value)
-    if (matchedOption?.label) return matchedOption.label
-
-    const stringValue = String(value)
-    const looseMatch = normalizedOptions.find((option) => String(option.value) === stringValue)
-    if (looseMatch?.label) return looseMatch.label
-  }
-
-  return typeof value === 'string' ? value : String(value)
 }
 
 export default function ConfigPanel({ nodeId, nodeData, onChange, nodes, readonly }: Props) {
