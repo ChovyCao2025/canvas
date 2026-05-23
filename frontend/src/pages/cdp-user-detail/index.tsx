@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Button, Card, Form, Input, Modal, Popconfirm, Space, Table, Tag, Typography, message } from 'antd'
+import { Button, Card, Drawer, Form, Input, Modal, Popconfirm, Space, Table, Tag, Typography, message } from 'antd'
 import { ArrowLeftOutlined, PlusOutlined } from '@ant-design/icons'
 import { useNavigate, useParams } from 'react-router-dom'
 import { cdpApi, type CdpUserCanvasSummary, type CdpUserDetail, type CdpUserTag, type CdpUserTagHistory } from '../../services/cdpApi'
@@ -14,6 +14,8 @@ export default function CdpUserDetailPage() {
   const [tags, setTags] = useState<CdpUserTag[]>([])
   const [history, setHistory] = useState<CdpUserTagHistory[]>([])
   const [canvasRows, setCanvasRows] = useState<CdpUserCanvasSummary[]>([])
+  const [selectedCanvas, setSelectedCanvas] = useState<CdpUserCanvasSummary | null>(null)
+  const [canvasExecutions, setCanvasExecutions] = useState<any[]>([])
   const [modalOpen, setModalOpen] = useState(false)
   const [form] = Form.useForm()
 
@@ -43,6 +45,12 @@ export default function CdpUserDetailPage() {
     await cdpApi.removeUserTag(userId, tagCode)
     message.success('标签已移除')
     load()
+  }
+
+  const openCanvasExecutions = async (row: CdpUserCanvasSummary) => {
+    setSelectedCanvas(row)
+    const res = await cdpApi.listCanvasUserExecutions(row.canvasId, userId)
+    setCanvasExecutions(res.data ?? [])
   }
 
   return (
@@ -96,9 +104,14 @@ export default function CdpUserDetailPage() {
               title: '画布',
               dataIndex: 'canvasName',
               render: (_, row) => (
-                <Button type="link" onClick={() => navigate(`/canvas/${row.canvasId}/users`)}>
-                  {row.canvasName}
-                </Button>
+                <Space>
+                  <Button type="link" onClick={() => navigate(`/canvas/${row.canvasId}/users`)}>
+                    {row.canvasName}
+                  </Button>
+                  <Button size="small" onClick={() => openCanvasExecutions(row)}>
+                    执行明细
+                  </Button>
+                </Space>
               ),
             },
             { title: '执行次数', dataIndex: 'executionCount', width: 100, align: 'right' },
@@ -129,6 +142,47 @@ export default function CdpUserDetailPage() {
           </Form.Item>
         </Form>
       </Modal>
+
+      <Drawer
+        title={selectedCanvas ? `${selectedCanvas.canvasName} · 执行明细` : '执行明细'}
+        open={!!selectedCanvas}
+        width={720}
+        onClose={() => setSelectedCanvas(null)}
+      >
+        <Space direction="vertical" style={{ width: '100%' }}>
+          {selectedCanvas && (
+            <Card size="small">
+              <Space split={<span>|</span>} wrap>
+                <span>执行次数 {selectedCanvas.executionCount}</span>
+                <span>成功 {selectedCanvas.successCount}</span>
+                <span>失败 {selectedCanvas.failedCount}</span>
+                <span>最近进入 {formatDateTime(selectedCanvas.lastEnteredAt)}</span>
+              </Space>
+            </Card>
+          )}
+          <Table
+            rowKey="id"
+            dataSource={canvasExecutions}
+            pagination={false}
+            size="small"
+            columns={[
+              { title: '执行 ID', dataIndex: 'id', ellipsis: true },
+              {
+                title: '状态',
+                dataIndex: 'status',
+                width: 120,
+                render: value => {
+                  const status = formatExecutionStatus(value === 2 ? 'SUCCESS' : value === 3 ? 'FAILED' : value === 1 ? 'PAUSED' : value === 0 ? 'RUNNING' : String(value))
+                  return <Tag color={status.color}>{status.label}</Tag>
+                },
+              },
+              { title: '触发类型', dataIndex: 'triggerType', width: 140 },
+              { title: '创建时间', dataIndex: 'createdAt', width: 180, render: formatDateTime },
+              { title: '更新时间', dataIndex: 'updatedAt', width: 180, render: formatDateTime },
+            ]}
+          />
+        </Space>
+      </Drawer>
     </div>
   )
 }
