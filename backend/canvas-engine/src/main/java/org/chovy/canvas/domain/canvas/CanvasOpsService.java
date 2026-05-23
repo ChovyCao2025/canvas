@@ -164,6 +164,8 @@ public class CanvasOpsService {
         copy.setDescription(src.getDescription());
         copy.setStatus(CanvasStatusEnum.DRAFT.getCode());
         copy.setCreatedBy(operator);
+        copy.setIsExample(0);
+        copy.setSourceTemplateKey(null);
         canvasMapper.insert(copy);
 
         if (srcDraft != null) {
