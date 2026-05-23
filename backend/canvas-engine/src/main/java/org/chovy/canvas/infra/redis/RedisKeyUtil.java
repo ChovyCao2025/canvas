@@ -17,7 +17,7 @@ public class RedisKeyUtil {
 
     @Getter
     @Value("${canvas.redis.key-prefix:canvas}")
-    private String prefix;
+    private String prefix = "canvas";
 
     // ── 触发路由 ─────────────────────────────────────────────────
     public String triggerMq(String topicKey)       { return prefix + ":trigger:mq:" + topicKey; }
@@ -53,4 +53,8 @@ public class RedisKeyUtil {
     // ── Kill Switch ────────────────────────────────────────────────
     public String killChannel(Long canvasId)    { return prefix + ":kill:" + canvasId; }
     public String killPattern()                 { return prefix + ":kill:*"; }
+
+    // ── 消息中心 ───────────────────────────────────────────────────
+    public String notificationWsTicket(String ticket) { return prefix + ":notification:ws-ticket:" + ticket; }
+    public String notificationChannel()              { return prefix + ":notification:events"; }
 }

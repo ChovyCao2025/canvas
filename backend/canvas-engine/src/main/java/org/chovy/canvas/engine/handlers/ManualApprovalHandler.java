@@ -5,6 +5,7 @@ import org.chovy.canvas.domain.approval.CanvasManualApproval;
 import org.chovy.canvas.domain.approval.CanvasManualApprovalMapper;
 import org.chovy.canvas.domain.constant.ApprovalOnTimeoutAction;
 import org.chovy.canvas.domain.constant.ApprovalStatus;
+import org.chovy.canvas.domain.notification.NotificationEventService;
 import org.chovy.canvas.engine.context.ExecutionContext;
 import org.chovy.canvas.engine.context.NodeStatus;
 import org.chovy.canvas.engine.handler.NodeHandler;
@@ -35,6 +36,7 @@ public class ManualApprovalHandler implements NodeHandler {
 
     private final CanvasManualApprovalMapper approvalMapper;
     private final ObjectMapper objectMapper;
+    private final NotificationEventService notificationEventService;
 
     /** ctx 中审批结果的 key */
     public static final String APPROVAL_RESULT_KEY = "__approval_result_";
@@ -82,7 +84,7 @@ public class ManualApprovalHandler implements NodeHandler {
             approvalMapper.insert(approval);
             log.info("[MANUAL_APPROVAL] 创建审批 approvalId={} approvers={} timeout={}h",
                     approvalId, approvers, timeoutHours);
-            // TODO: 发送审批通知（钉钉/邮件），Phase 13 接入
+            notificationEventService.approvalPending(approval, approvers);
         } catch (Exception e) {
             log.error("[MANUAL_APPROVAL] 创建审批记录失败: {}", e.getMessage());
         }

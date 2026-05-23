@@ -17,11 +17,22 @@ public class Notification {
     private String notificationId;
     private String userId;
     private String type;
+    private String category;
+    private String severity;
+    private String status;
     private String title;
     private String content;
     private String targetUrl;
+    private String actionLabel;
+    private String actionUrl;
     private String taskId;
+    private String bizType;
+    private String bizId;
+    private String dedupKey;
+    private String payloadJson;
     private LocalDateTime readAt;
+    private LocalDateTime archivedAt;
+    private LocalDateTime deliveredAt;
     @TableField(fill = FieldFill.INSERT)
     private LocalDateTime createdAt;
 }

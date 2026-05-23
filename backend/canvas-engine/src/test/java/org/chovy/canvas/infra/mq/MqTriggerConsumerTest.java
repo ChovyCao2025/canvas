@@ -8,6 +8,7 @@ import org.apache.rocketmq.spring.annotation.RocketMQMessageListener;
 import org.apache.rocketmq.spring.annotation.SelectorType;
 import org.chovy.canvas.domain.constant.NodeType;
 import org.chovy.canvas.domain.constant.TriggerType;
+import org.chovy.canvas.domain.notification.NotificationEventService;
 import org.chovy.canvas.engine.disruptor.CanvasDisruptorService;
 import org.chovy.canvas.infra.redis.TriggerRouteService;
 import org.junit.jupiter.api.BeforeEach;
@@ -32,13 +33,19 @@ class MqTriggerConsumerTest {
 
     private TriggerRouteService routeService;
     private CanvasDisruptorService disruptorService;
+    private NotificationEventService notificationEventService;
     private MqTriggerConsumer consumer;
 
     @BeforeEach
     void setUp() {
         routeService = mock(TriggerRouteService.class);
         disruptorService = mock(CanvasDisruptorService.class);
-        consumer = new MqTriggerConsumer(new ObjectMapper(), routeService, disruptorService);
+        notificationEventService = mock(NotificationEventService.class);
+        consumer = new MqTriggerConsumer(
+                new ObjectMapper(),
+                routeService,
+                disruptorService,
+                notificationEventService);
     }
 
     @Test
@@ -80,6 +87,15 @@ class MqTriggerConsumerTest {
                 "{\"userId\":\"user-8\",\"messageCode\":\"NOOP\",\"payload\":{\"k\":\"v\"}}"));
 
         verify(disruptorService, never()).publish(any(), any(), any(), any(), any(), any(), any());
+        verify(notificationEventService).systemAlert(
+                eq("MQ_TRIGGER_NO_ROUTE"),
+                eq("MQ 触发无匹配画布"),
+                any(),
+                eq("/mq-config"),
+                eq("MQ_TRIGGER"),
+                eq("UNUSED"),
+                eq("mq:no-route:UNUSED"),
+                eq(null));
     }
 
     @Test
