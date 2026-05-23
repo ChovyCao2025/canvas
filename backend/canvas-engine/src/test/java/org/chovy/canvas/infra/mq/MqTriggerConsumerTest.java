@@ -18,6 +18,7 @@ import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 
 import java.nio.charset.StandardCharsets;
+import java.time.LocalDateTime;
 import java.util.Map;
 import java.util.Set;
 
@@ -103,27 +104,42 @@ class MqTriggerConsumerTest {
 
     @Test
     void onMessageThrowsWhenBodyIsInvalidJsonSoRocketMqCanRetry() {
-        assertThatThrownBy(() -> consumer.onMessage(message("ORDER_PAID", "MSG-3", "{bad-json")))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("Invalid MQ trigger message body");
+        consumer.onMessage(message("ORDER_PAID", "MSG-3", "{bad-json"));
+
+        ArgumentCaptor<org.chovy.canvas.domain.execution.CanvasMqTriggerRejected> captor =
+                ArgumentCaptor.forClass(org.chovy.canvas.domain.execution.CanvasMqTriggerRejected.class);
+        verify(rejectedMapper).insert(captor.capture());
+        assertThat(captor.getValue().getMsgId()).isEqualTo("MSG-3");
+        assertThat(captor.getValue().getTag()).isEqualTo("ORDER_PAID");
+        assertThat(captor.getValue().getReason()).isEqualTo("INVALID_BODY");
+        assertThat(captor.getValue().getBody()).isEqualTo("{bad-json");
+        assertThat(captor.getValue().getCreatedAt()).isInstanceOf(LocalDateTime.class);
+        verify(metrics).recordMqTriggerRejected("INVALID_BODY", "ORDER_PAID");
+        verify(disruptorService, never()).publishRequest(any());
     }
 
     @Test
     void onMessageThrowsWhenRequiredFieldsAreMissingSoRocketMqCanRetry() {
-        assertThatThrownBy(() -> consumer.onMessage(message("ORDER_PAID", "MSG-5",
-                "{\"userId\":\"\",\"messageCode\":\"PAYMENT\",\"payload\":{}}")))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("userId is required");
+        consumer.onMessage(message("ORDER_PAID", "MSG-5",
+                "{\"userId\":\"\",\"messageCode\":\"PAYMENT\",\"payload\":{}}"));
+        consumer.onMessage(message("ORDER_PAID", "MSG-6",
+                "{\"userId\":\"user-9\",\"messageCode\":\"\",\"payload\":{}}"));
+        consumer.onMessage(message("ORDER_PAID", "MSG-7",
+                "{\"userId\":\"user-9\",\"messageCode\":\"PAYMENT\",\"payload\":null}"));
 
-        assertThatThrownBy(() -> consumer.onMessage(message("ORDER_PAID", "MSG-6",
-                "{\"userId\":\"user-9\",\"messageCode\":\"\",\"payload\":{}}")))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("messageCode is required");
-
-        assertThatThrownBy(() -> consumer.onMessage(message("ORDER_PAID", "MSG-7",
-                "{\"userId\":\"user-9\",\"messageCode\":\"PAYMENT\",\"payload\":null}")))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("payload is required");
+        ArgumentCaptor<org.chovy.canvas.domain.execution.CanvasMqTriggerRejected> captor =
+                ArgumentCaptor.forClass(org.chovy.canvas.domain.execution.CanvasMqTriggerRejected.class);
+        verify(rejectedMapper, org.mockito.Mockito.times(3)).insert(captor.capture());
+        assertThat(captor.getAllValues())
+                .extracting(org.chovy.canvas.domain.execution.CanvasMqTriggerRejected::getReason)
+                .containsExactly("INVALID_MESSAGE", "INVALID_MESSAGE", "INVALID_MESSAGE");
+        assertThat(captor.getAllValues())
+                .extracting(org.chovy.canvas.domain.execution.CanvasMqTriggerRejected::getErrorMsg)
+                .anyMatch(msg -> String.valueOf(msg).contains("userId is required"))
+                .anyMatch(msg -> String.valueOf(msg).contains("messageCode is required"))
+                .anyMatch(msg -> String.valueOf(msg).contains("payload is required"));
+        verify(metrics, org.mockito.Mockito.times(3)).recordMqTriggerRejected("INVALID_MESSAGE", "ORDER_PAID");
+        verify(disruptorService, never()).publishRequest(any());
     }
 
     @Test
