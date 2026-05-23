@@ -13,6 +13,10 @@ import java.util.Map;
 
 /**
  * IF 判断节点：所有 rules 均满足 → successNodeId，否则 → failNodeId
+ *
+ * 规则语义：
+ * - 多条规则之间是 AND 关系（allMatch）；
+ * - 每条规则支持上下文字段与常量比较。
  */
 @Component
 @NodeHandlerType("IF_CONDITION")
@@ -25,6 +29,7 @@ public class IfConditionHandler implements NodeHandler {
         String successNodeId = (String) config.get("successNodeId");
         String failNodeId    = (String) config.get("failNodeId");
 
+        // rules 为空时按“无约束”为 true，直接走 success 分支
         boolean allMatch = rules == null || rules.stream().allMatch(r -> evaluate(r, ctx));
         return Mono.just(NodeResult.ifResult(allMatch, successNodeId, failNodeId));
     }
@@ -46,6 +51,7 @@ public class IfConditionHandler implements NodeHandler {
             case "LT"       -> numericCompare(actual, expected) < 0;
             case "GTE"      -> numericCompare(actual, expected) >= 0;
             case "LTE"      -> numericCompare(actual, expected) <= 0;
+            // 未知操作符视为不匹配，避免误放行
             default         -> false;
         };
     }

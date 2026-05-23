@@ -27,6 +27,10 @@ import java.util.Map;
  * Watchdog：每 30s 扫描两类异常状态
  * 1. 僵尸 ctx（Section 9.8）：PAUSED + last_dedup_key 超时 → 清理 dedup 允许 MQ 重投
  * 2. ManualApproval 超时（Section 18.2）：PENDING 审批超过 timeoutAt → 按 onTimeout 策略处理
+ *
+ * 设计意图：
+ * - 不依赖人工介入即可自动修复“卡死”执行；
+ * - 把恢复动作统一收敛到 trigger() 主链路，复用幂等/并发保护。
  */
 @Slf4j
 @Component
@@ -47,6 +51,7 @@ public class ExecutionWatchdog {
 
     @Scheduled(fixedDelay = 30_000)
     public void scan() {
+        // 两类扫描彼此独立，避免一类异常阻断另一类修复
         scanZombieCtx();
         scanApprovalTimeout();
     }
@@ -66,6 +71,7 @@ public class ExecutionWatchdog {
         for (CanvasExecution exec : zombies) {
             log.warn("[WATCHDOG] 僵尸 ctx executionId={} dedupKey={}",
                     exec.getId(), exec.getLastDedupKey());
+            // 释放 dedup 后，相同消息可再次触发，避免永久卡死
             ctxStore.releaseDedup(exec.getLastDedupKey());
             exec.setLastDedupKey(null);
             executionMapper.updateById(exec);
@@ -101,12 +107,13 @@ public class ExecutionWatchdog {
     }
 
     private void processApprovalTimeout(CanvasManualApproval approval, String result) {
+        // 1) 审批实例落 TIMEOUT，审计可追踪
         approval.setStatus(ApprovalStatus.TIMEOUT);
         approval.setResultBy("watchdog");
         approval.setResultAt(LocalDateTime.now());
         approvalMapper.updateById(approval);
 
-        // 向 ctx 写入超时结果，触发恢复执行
+        // 2) 向 ctx 写入超时判定，让 DAG 在 MANUAL_APPROVAL 节点继续路由
         var ctx = ctxStore.load(approval.getCanvasId(), approval.getUserId());
         if (ctx == null) {
             log.warn("[WATCHDOG] ctx 不存在，跳过恢复 executionId={}", approval.getExecutionId());
@@ -114,9 +121,11 @@ public class ExecutionWatchdog {
         }
 
         String resultKey = ManualApprovalHandler.APPROVAL_RESULT_KEY + approval.getNodeId();
+        // 通过约定 key 把“超时决策结果”传给审批节点后续路由逻辑
         ctx.getFlatContext().put(resultKey, result);
         ctxStore.save(ctx);
 
+        // 3) 复用 trigger() 恢复执行，走统一幂等/并发保护链路
         executionService.trigger(
                         approval.getCanvasId(), approval.getUserId(),
                         TriggerType.MANUAL_APPROVAL_TIMEOUT, NodeType.MANUAL_APPROVAL,

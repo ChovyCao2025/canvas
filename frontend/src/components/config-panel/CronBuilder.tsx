@@ -4,6 +4,9 @@ import { ClockCircleOutlined } from '@ant-design/icons'
 
 type Freq = 'daily' | 'weekly' | 'monthly' | 'hourly'
 
+/**
+ * 简单模式支持的频率枚举。
+ */
 const FREQ_OPTIONS = [
   { value: 'daily',   label: '每天' },
   { value: 'weekly',  label: '每周' },
@@ -48,7 +51,10 @@ function buildCron(freq: Freq, hour: number, minute: number, weekday: number, da
 }
 
 interface Props {
+  /** 当前 cron 值。 */
   value?: string
+
+  /** cron 变更回调。 */
   onChange?: (cron: string) => void
 }
 
@@ -89,17 +95,19 @@ function TimeSelect({ hour, minute, onHourChange, onMinuteChange }: {
 }
 
 export default function CronBuilder({ value, onChange }: Props) {
+  // 初始值优先尝试解析为“简单模式”状态
   const init   = value ? parseCron(value) : null
+  // 简单模式状态
   const [freq,       setFreq]       = useState<Freq>(init?.freq       ?? 'daily')
   const [hour,       setHour]       = useState(init?.hour             ?? 9)
   const [minute,     setMinute]     = useState(init?.minute           ?? 0)
   const [weekday,    setWeekday]    = useState(init?.weekday          ?? 1)
   const [dayOfMonth, setDayOfMonth] = useState(init?.dayOfMonth       ?? 1)
 
-  // 高级模式：初始 cron 无法解析时自动展开
+  // 高级模式：初始 cron 无法映射为简单模式时自动打开
   const [advanced,   setAdvanced]   = useState(!init && !!value)
   const [manualCron, setManualCron] = useState(value ?? '')
-  // 高级模式回退到简单模式时，如无法解析则锁定在高级模式
+  // 从高级模式尝试回退简单模式失败时，提示并保持高级模式
   const [parseError, setParseError] = useState(false)
 
   const computed = useMemo(
@@ -107,7 +115,7 @@ export default function CronBuilder({ value, onChange }: Props) {
     [freq, hour, minute, weekday, dayOfMonth]
   )
 
-  // UI 变化 → emit cron
+  // 简单模式中任一选项变化时，都重算并抛出 cron
   const emitComputed = (f = freq, h = hour, m = minute, wd = weekday, dom = dayOfMonth) => {
     if (!advanced) onChange?.(buildCron(f, h, m, wd, dom))
   }
@@ -119,6 +127,7 @@ export default function CronBuilder({ value, onChange }: Props) {
   const handleDom  = (v: number) => { setDayOfMonth(v); emitComputed(freq, hour, minute, weekday, v) }
 
   const openAdvanced = () => {
+    // 进入高级模式时带入当前简单模式生成值，便于继续手改
     setManualCron(computed)
     setAdvanced(true)
     setParseError(false)
@@ -127,6 +136,7 @@ export default function CronBuilder({ value, onChange }: Props) {
   const closeAdvanced = () => {
     const p = parseCron(manualCron)
     if (p) {
+      // 能解析回简单模式：同步所有 UI 状态
       setFreq(p.freq); setHour(p.hour); setMinute(p.minute)
       setWeekday(p.weekday); setDayOfMonth(p.dayOfMonth)
       setParseError(false)

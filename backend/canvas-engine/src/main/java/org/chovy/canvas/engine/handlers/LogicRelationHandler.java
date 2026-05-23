@@ -23,6 +23,7 @@ public class LogicRelationHandler implements NodeHandler {
 
     @Override
     public Mono<NodeResult> executeAsync(Map<String, Object> config, ExecutionContext ctx) {
+        // 关系判断已在调度器完成，这里只负责输出下一跳
         String nextNodeId = (String) config.get("nextNodeId");
         return Mono.just(NodeResult.ok(nextNodeId, Map.of()));
     }
@@ -39,6 +40,7 @@ public class LogicRelationHandler implements NodeHandler {
         if (upstreamIds == null || upstreamIds.isEmpty()) return true;
 
         if ("OR".equals(relation)) {
+            // OR：任意上游成功即可放行
             return upstreamIds.stream()
                     .anyMatch(id -> ctx.getNodeStatus(id) == NodeStatus.SUCCESS);
         }

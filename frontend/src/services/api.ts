@@ -5,20 +5,28 @@ import type {
   NodeTypeRegistry, ContextField, StubOption,
 } from '../types'
 
+/**
+ * 统一 HTTP 客户端。
+ * 约定：后端统一返回 R<T> 包装，调用方直接拿到解包后的对象。
+ */
 const http = axios.create({ baseURL: '/' })
 
 // 请求拦截：自动带 JWT token
 http.interceptors.request.use((config) => {
   const token = localStorage.getItem('canvas_token')
+  // 仅在 token 存在时注入 Authorization，避免污染匿名请求
   if (token) config.headers.Authorization = `Bearer ${token}`
   return config
 })
 
 // 响应拦截：解包 R<T>；401 跳转登录
 http.interceptors.response.use(
+  // 后端返回结构统一为 { code, message, data }
+  // 这里直接返回 res.data，业务侧不需要每次再写一次 .data
   (res) => res.data,
   (err) => {
     if (err.response?.status === 401) {
+      // token 失效后强制回到登录页，避免页面在无权限状态下继续操作
       localStorage.removeItem('canvas_token')
       localStorage.removeItem('canvas_user')
       window.location.href = '/login'
@@ -30,19 +38,64 @@ http.interceptors.response.use(
 // ── 认证 ─────────────────────────────────────────────────────
 
 export interface LoginResp {
+  /** JWT 令牌。 */
   token: string
+
+  /** 用户 ID。 */
   userId: number
+
+  /** 用户名。 */
   username: string
+
+  /** 展示名。 */
   displayName: string
+
+  /** 角色。 */
   role: 'ADMIN' | 'OPERATOR'
 }
 
 export interface SysUser {
+  /** 用户 ID。 */
   id: number
+
+  /** 用户名。 */
   username: string
+
+  /** 展示名。 */
   displayName: string
+
+  /** 角色。 */
   role: 'ADMIN' | 'OPERATOR'
+
+  /** 启用状态：1 启用，0 禁用。 */
   enabled: 0 | 1
+}
+
+/** 管理员创建用户请求体。 */
+interface AdminCreateUserReq {
+  /** 登录用户名。 */
+  username: string
+
+  /** 初始密码。 */
+  password: string
+
+  /** 展示名称。 */
+  displayName: string
+
+  /** 用户角色。 */
+  role: string
+}
+
+/** 管理员更新用户请求体。 */
+interface AdminUpdateUserReq {
+  /** 展示名称。 */
+  displayName?: string
+
+  /** 重置密码。 */
+  password?: string
+
+  /** 调整角色。 */
+  role?: string
 }
 
 export const authApi = {
@@ -54,9 +107,9 @@ export const authApi = {
 
 export const adminApi = {
   listUsers: () => http.get<R<SysUser[]>, R<SysUser[]>>('/admin/users'),
-  createUser: (body: { username: string; password: string; displayName: string; role: string }) =>
+  createUser: (body: AdminCreateUserReq) =>
     http.post<R<SysUser>, R<SysUser>>('/admin/users', body),
-  updateUser: (id: number, body: { displayName?: string; password?: string; role?: string }) =>
+  updateUser: (id: number, body: AdminUpdateUserReq) =>
     http.put<R<void>, R<void>>(`/admin/users/${id}`, body),
   disableUser: (id: number) =>
     http.put<R<void>, R<void>>(`/admin/users/${id}/disable`),
@@ -64,30 +117,83 @@ export const adminApi = {
 
 // ── 画布管理 ─────────────────────────────────────────────────
 
+/** 创建画布请求体。 */
+interface CanvasCreateReq {
+  /** 画布名称。 */
+  name: string
+
+  /** 画布描述。 */
+  description?: string
+
+  /** 初始化图结构。 */
+  graphJson?: string
+}
+
+/** 更新画布请求体（草稿保存 + 设置更新共用）。 */
+interface CanvasUpdateReq {
+  /** 画布名称。 */
+  name?: string
+
+  /** 画布描述。 */
+  description?: string
+
+  /** 图结构 JSON。 */
+  graphJson?: string
+
+  /** 乐观锁版本。 */
+  editVersion?: number
+
+  /** 触发类型。 */
+  triggerType?: string
+
+  /** cron 表达式（非定时时传 null）。 */
+  cronExpression?: string | null
+
+  /** 生效开始时间。 */
+  validStart?: string | null
+
+  /** 生效结束时间。 */
+  validEnd?: string | null
+
+  /** 总执行次数上限。 */
+  maxTotalExecutions?: number | null
+
+  /** 用户每日上限。 */
+  perUserDailyLimit?: number | null
+
+  /** 用户总上限。 */
+  perUserTotalLimit?: number | null
+
+  /** 冷却秒数。 */
+  cooldownSeconds?: number | null
+}
+
+/** 画布列表查询参数。 */
+interface CanvasListQuery {
+  /** 页码。 */
+  page?: number
+
+  /** 每页数量。 */
+  size?: number
+
+  /** 状态筛选。 */
+  status?: number
+
+  /** 名称模糊查询。 */
+  name?: string
+}
+
 export const canvasApi = {
-  create: (body: { name: string; description?: string; graphJson?: string }) =>
+  create: (body: CanvasCreateReq) =>
     http.post<R<Canvas>, R<Canvas>>('/canvas', body),
 
   get: (id: number) =>
     http.get<R<CanvasDetail>, R<CanvasDetail>>(`/canvas/${id}`),
 
-  update: (id: number, body: {
-    name?: string
-    description?: string
-    graphJson?: string
-    editVersion?: number
-    triggerType?: string
-    cronExpression?: string | null
-    validStart?: string | null
-    validEnd?: string | null
-    maxTotalExecutions?: number | null
-    perUserDailyLimit?: number | null
-    perUserTotalLimit?: number | null
-    cooldownSeconds?: number | null
-  }) =>
+  update: (id: number, body: CanvasUpdateReq) =>
     http.put<R<void>, R<void>>(`/canvas/${id}`, body),
 
-  list: (params: { page?: number; size?: number; status?: number; name?: string }) =>
+  list: (params: CanvasListQuery) =>
     http.get<R<PageResult<Canvas>>, R<PageResult<Canvas>>>('/canvas/list', { params }),
 
   publish: (id: number) =>
@@ -129,6 +235,7 @@ export const canvasApi = {
       { userId, inputParams: payload },
     ),
 
+  // dry-run 允许前端带 graphJson，便于“未保存草稿”场景下做即时调试
   dryRun: (id: number, userId: string, payload: Record<string, unknown>, graphJson?: string) =>
     http.post<R<Record<string, unknown>>, R<Record<string, unknown>>>(
       `/canvas/execute/dry-run/${id}`,
@@ -150,13 +257,18 @@ export const metaApi = {
 
   /** 根据画布中的 EVENT_TRIGGER / API_CALL 节点动态推导可用上下文字段 */
   getCanvasContextFields: (params: {
+    /** 画布中事件触发节点引用的 eventCode 列表。 */
     eventCodes?: string[]
+
+    /** 画布中 API 节点引用的 apiKey 列表。 */
     apiKeys?: string[]
+
+    /** API 输出前缀列表。 */
     outputPrefixes?: string[]
   }) =>
     http.get<R<ContextField[]>, R<ContextField[]>>('/meta/canvas-context-fields', {
       params,
-      // axios 默认把数组序列化为 key[]=v，Spring 需要 key=v1&key=v2
+      // axios 默认数组格式是 key[]=v，后端 Spring Controller 这里按重复 key 接收
       paramsSerializer: (p) => {
         const parts: string[] = []
         for (const [k, v] of Object.entries(p)) {

@@ -14,12 +14,22 @@ const STATUS_MAP: Record<string, { label: string; color: string }> = {
   FAILED: { label: '失败', color: 'error' },
 }
 
+/**
+ * 人群列表页：展示计算状态并提供重算/删除能力。
+ *
+ * 数据来源：
+ * - `AudienceDefinition`：名称、规则等静态定义；
+ * - `AudienceStat`：状态、规模、计算时间等运行态信息。
+ */
 export default function AudienceListPage() {
   const navigate = useNavigate()
+  // 列表与统计分开维护：列表来自 definition，状态/规模来自 stat
   const [data, setData] = useState<AudienceDefinition[]>([])
   const [stats, setStats] = useState<Record<number, AudienceStat>>({})
   const [loading, setLoading] = useState(false)
 
+  // 拉取定义列表并并发查询每个人群的统计状态。
+  // 这里用 Promise.allSettled，避免单个人群 stat 失败导致整表失败。
   const fetchList = async () => {
     setLoading(true)
     try {
@@ -29,6 +39,7 @@ export default function AudienceListPage() {
       const statResults = await Promise.allSettled(
         list.filter(item => item.id != null).map(item => audienceApi.stat(item.id!)),
       )
+      // 将 stat 结果重组为 id -> stat，便于表格列 O(1) 读取
       const nextStats: Record<number, AudienceStat> = {}
       statResults.forEach((result, index) => {
         const id = list[index]?.id
@@ -46,6 +57,7 @@ export default function AudienceListPage() {
     fetchList()
   }, [])
 
+  // 手动触发重算：只发“开始计算”指令，实际计算异步进行。
   const handleCompute = async (id: number) => {
     await audienceApi.compute(id)
     message.success('已触发计算，请稍后刷新查看结果')
@@ -58,6 +70,8 @@ export default function AudienceListPage() {
     fetchList()
   }
 
+  // 列表列定义：状态/规模/最后计算时间都来自 stat 表。
+  // 因为 stat 是异步补充的，所以列渲染要能容忍 stat 未加载完成。
   const columns: ColumnsType<AudienceDefinition> = [
     { title: '名称', dataIndex: 'name' },
     { title: '计算策略', dataIndex: 'evaluationStrategy', width: 120 },

@@ -10,7 +10,10 @@ const V_GAP       = 80
 const MIN_SPACING = PLACEHOLDER_W + 12
 
 export type PlaceholderResult = {
+  /** 需要渲染的占位节点集合。 */
   nodes: Node<PlaceholderData>[]
+
+  /** 占位虚线边集合。 */
   edges: Edge[]
 }
 
@@ -44,6 +47,8 @@ export function useBranchPlaceholders(
   draggingNodeId: string | null,
 ): PlaceholderResult {
   return useMemo(() => {
+    // 已连线出口集合：sourceId:sourceHandle
+    // 用于判断哪些出口仍需显示“可连线占位框”
     const connected = new Set(
       edges
         .filter(e => e.source && e.sourceHandle)
@@ -54,6 +59,7 @@ export function useBranchPlaceholders(
     const phEdges: Edge[] = []
 
     for (const node of nodes) {
+      // 占位符节点是派生状态，不能再参与下一轮占位推导
       if ((node.data as unknown as PlaceholderData)?._placeholder) continue
       if (TERMINAL_TYPES.has(node.data.nodeType))                   continue
 
@@ -110,6 +116,7 @@ export function useBranchPlaceholders(
       })
     }
 
+    // 返回派生出的占位节点/虚线边，交由编辑器与真实图层做合并渲染
     return { nodes: phNodes, edges: phEdges }
   }, [nodes, edges, draggingNodeId])
 }

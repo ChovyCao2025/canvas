@@ -19,6 +19,10 @@ import reactor.core.scheduler.Schedulers;
 
 import java.time.Duration;
 
+/**
+ * 认证控制器：
+ * 负责登录、登出与当前用户信息查询。
+ */
 @Slf4j
 @RestController
 @RequestMapping("/auth")
@@ -34,6 +38,10 @@ public class AuthController {
     private static final String LOCK_KEY_PREFIX = "canvas:login:locked:";
     private final JwtUtil jwtUtil;
 
+    /**
+     * 登录：
+     * 校验锁定状态 -> 用户凭证校验 -> 生成 JWT -> 返回登录信息。
+     */
     @PostMapping("/login")
     public Mono<R<LoginResp>> login(@RequestBody LoginReq req) {
         return Mono.fromCallable(() -> {
@@ -121,6 +129,7 @@ public class AuthController {
         }
     }
 
+    /** 获取当前登录用户信息（从 JWT claims 反查用户）。 */
     @GetMapping("/me")
     public Mono<R<LoginResp>> me() {
         return ReactiveSecurityContextHolder.getContext()

@@ -33,6 +33,7 @@ public class CanvasVersionCleanupJob {
         log.info("[VERSION_CLEANUP] 开始执行版本清理，maxKeepCount={}", maxKeepCount);
         int totalCleaned = 0;
 
+        // 全量画布逐个清理，单画布失败不影响其他画布
         List<Canvas> canvases = canvasMapper.selectList(null);
         for (Canvas canvas : canvases) {
             try {
@@ -58,6 +59,7 @@ public class CanvasVersionCleanupJob {
                         .orderByDesc(CanvasVersion::getVersion)
         );
 
+        // 发布版本数未超过保留上限，无需清理
         if (published.size() <= maxKeepCount) return 0;
 
         // 超出 maxKeepCount 的版本：清空 graph_json（保留 id/version/status/created_at）
@@ -65,6 +67,7 @@ public class CanvasVersionCleanupJob {
         int count = 0;
         for (CanvasVersion v : toClean) {
             if (v.getGraphJson() != null && !v.getGraphJson().isBlank()) {
+                // 只清空 graphJson，保留元数据用于审计与回溯
                 v.setGraphJson(null);
                 canvasVersionMapper.updateById(v);
                 count++;

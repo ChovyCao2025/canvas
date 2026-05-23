@@ -11,15 +11,31 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * 人群规则评估上下文拉取器。
+ *
+ * <p>根据规则 JSON 自动提取所需字段，再向标签系统批量查询，减少无关字段拉取。
+ * 该组件只负责“取数”，不负责规则求值。
+ */
 @Component
 @RequiredArgsConstructor
 public class AudienceEvaluationContextFetcher {
 
+    /** 规则 JSON 解析器。 */
     private final ObjectMapper objectMapper;
 
+    /**
+     * 拉取某用户的人群评估上下文。
+     *
+     * @param client   标签服务客户端
+     * @param userId   用户标识
+     * @param ruleJson 人群规则 JSON
+     * @return 字段名到字段值的映射
+     */
     public Map<String, Object> fetch(WebClient client, String userId, String ruleJson) throws Exception {
         List<String> fields = extractFields(ruleJson);
         if (fields.isEmpty()) {
+            // 规则不依赖任何字段时，返回空上下文即可
             return Map.of();
         }
         Map<String, Object> response = client.post()
@@ -30,6 +46,7 @@ public class AudienceEvaluationContextFetcher {
                 .block();
         Object tags = response == null ? null : response.get("tags");
         if (!(tags instanceof Map<?, ?> tagMap)) {
+            // 标签服务返回结构异常时降级为空上下文
             return Map.of();
         }
         Map<String, Object> result = new HashMap<>();
@@ -37,6 +54,7 @@ public class AudienceEvaluationContextFetcher {
         return result;
     }
 
+    /** 从规则 JSON 提取所有字段名（去重后返回）。 */
     private List<String> extractFields(String ruleJson) throws Exception {
         Map<String, Object> rule = objectMapper.readValue(ruleJson, new TypeReference<>() {});
         List<String> fields = new ArrayList<>();
@@ -46,6 +64,7 @@ public class AudienceEvaluationContextFetcher {
 
     @SuppressWarnings("unchecked")
     private void collectFields(Map<String, Object> group, List<String> fields) {
+        // 当前层条件字段
         Object conditionsObj = group.get("conditions");
         if (conditionsObj instanceof List<?> conditions) {
             for (Object item : conditions) {
@@ -54,6 +73,7 @@ public class AudienceEvaluationContextFetcher {
                 }
             }
         }
+        // 递归子分组字段
         Object groupsObj = group.get("groups");
         if (groupsObj instanceof List<?> groups) {
             for (Object item : groups) {

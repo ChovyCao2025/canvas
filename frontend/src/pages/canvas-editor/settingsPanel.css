@@ -1,3 +1,4 @@
+/** 设置页整体纵向布局：卡片之间保持固定间距。 */
 .canvas-settings-form {
   margin-top: 16px;
   display: flex;
@@ -5,6 +6,7 @@
   gap: 16px;
 }
 
+/** 单个设置分区的卡片外观。 */
 .canvas-settings-card {
   border: 1px solid #f0f0f0;
   border-radius: 8px;
@@ -12,6 +14,7 @@
   padding: 20px;
 }
 
+/** 分区标题区：左侧标题文案 + 右侧摘要状态。 */
 .canvas-settings-section-header {
   display: flex;
   align-items: flex-start;
@@ -51,6 +54,7 @@
   margin-bottom: 0;
 }
 
+/** 触发方式（实时/定时）选项区：桌面双列，移动端单列。 */
 .canvas-settings-trigger-options {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -76,6 +80,7 @@
   transition: border-color 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
 }
 
+/** 选中触发方式后的高亮态，统一使用主色浅底。 */
 .canvas-settings-trigger-option.ant-radio-wrapper-checked {
   border-color: #1677ff;
   background: #f5f9ff;
@@ -120,6 +125,7 @@
   font-weight: 600;
 }
 
+/** 折叠块标题行：左侧文案 + 右侧动作。 */
 .canvas-settings-collapse {
   width: 100%;
   display: flex;
@@ -187,6 +193,7 @@
   height: 100%;
 }
 
+/** 响应式断点：小屏幕改为单列，避免拥挤。 */
 @media (max-width: 640px) {
   .canvas-settings-trigger-options,
   .canvas-settings-grid {

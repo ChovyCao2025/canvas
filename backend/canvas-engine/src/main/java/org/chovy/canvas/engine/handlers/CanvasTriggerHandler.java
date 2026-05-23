@@ -46,24 +46,29 @@ public class CanvasTriggerHandler implements NodeHandler {
     @Override
     @SuppressWarnings("unchecked")
     public Mono<NodeResult> executeAsync(Map<String, Object> config, ExecutionContext ctx) {
+        // 1) 读取目标子画布 ID
         Object targetId = config.get("targetCanvasId");
         if (targetId == null) return Mono.just(NodeResult.fail("CANVAS_TRIGGER 缺少 targetCanvasId"));
         Long targetCanvasId = Long.parseLong(String.valueOf(targetId));
 
+        // 2) 读取调用模式和参数映射规则
         String invokeMode = (String) config.getOrDefault("invokeMode", "SYNC");
         String nextNodeId = (String) config.get("nextNodeId");
         Map<String, Object> paramMapping =
                 (Map<String, Object>) config.getOrDefault("paramMapping", Map.of());
 
+        // 3) 防止循环调用导致无限递归（A -> B -> A）
         if (ctx.getCallStack().contains(targetCanvasId)) {
             return Mono.just(NodeResult.fail("CANVAS_TRIGGER 检测到循环调用: " + targetCanvasId));
         }
 
+        // 4) 校验目标画布存在且已发布（只有发布版本可被调用）
         Canvas target = canvasMapper.selectById(targetCanvasId);
         if (target == null || target.getStatus() != 1) {
             return Mono.just(NodeResult.fail("目标画布未发布: " + targetCanvasId));
         }
 
+        // 5) 构造子执行上下文，继承用户与调用链信息
         ExecutionContext childCtx = new ExecutionContext();
         childCtx.setExecutionId(ctx.getExecutionId() + ":sub:" + UUID.randomUUID().toString().substring(0, 8));
         childCtx.setCanvasId(targetCanvasId);
@@ -71,15 +76,18 @@ public class CanvasTriggerHandler implements NodeHandler {
         childCtx.setUserId(ctx.getUserId());
         childCtx.setTriggerType("CANVAS_TRIGGER");
 
+        // 6) 按映射规则把父上下文字段写入子触发载荷
         paramMapping.forEach((childKey, parentKeyObj) -> {
             String parentKey = String.valueOf(parentKeyObj).replace("ctx.", "");
             Object val = ctx.getContextValue(parentKey);
             if (val != null) childCtx.getTriggerPayload().put(childKey, val);
         });
 
+        // 7) 追加调用栈（用于下一层继续防循环）
         childCtx.getCallStack().addAll(ctx.getCallStack());
         childCtx.getCallStack().add(ctx.getCanvasId());
 
+        // 8) 获取目标发布图并定位入口触发节点
         DagGraph childGraph = configCache.get(targetCanvasId, target.getPublishedVersionId());
         String triggerNodeId = childGraph.entryNodes().isEmpty() ? null : childGraph.entryNodes().get(0);
         if (triggerNodeId == null) return Mono.just(NodeResult.fail("目标画布无触发器节点"));

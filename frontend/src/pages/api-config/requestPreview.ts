@@ -80,7 +80,6 @@ export function formatApiRequestPreview(preview: unknown): string {
 export function buildApiReceiptPreview(input: BuildApiReceiptPreviewInput): unknown[] {
   if (!input.receiptEnabled) return []
   const status = input.receiptStatuses?.find(item => item.code?.trim())?.code.trim() || '200'
-
   return [
     {
       msg_id: '业务侧唯一ID',

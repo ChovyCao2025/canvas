@@ -152,13 +152,29 @@ public class OpsController {
 
     // ── DTOs ──────────────────────────────────────────────────────
 
+    /**
+     * 保存模板请求体。
+     */
     @Data
     static class SaveTemplateReq {
-        private String name, description, category;
+
+        /** 模板名称。 */
+        private String name;
+
+        /** 模板描述。 */
+        private String description;
+
+        /** 模板分类。 */
+        private String category;
     }
 
+    /**
+     * 从模板创建画布请求体。
+     */
     @Data
     static class FromTemplateReq {
+
+        /** 新建画布名称（可选，不传则使用模板名 + 副本后缀）。 */
         private String name;
     }
 }

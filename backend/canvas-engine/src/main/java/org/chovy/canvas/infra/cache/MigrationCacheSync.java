@@ -37,6 +37,7 @@ public class MigrationCacheSync implements ApplicationRunner {
 
     @Override
     public void run(ApplicationArguments args) {
+        // 仅检查“已应用迁移列表”中的最新一条，避免每次启动重复全量失效
         MigrationInfo[] applied = flyway.info().applied();
         if (applied == null || applied.length == 0) return;
 
@@ -66,6 +67,7 @@ public class MigrationCacheSync implements ApplicationRunner {
         Canvas canvas = canvasMapper.selectById(canvasId);
         if (canvas == null) return;
         if (canvas.getPublishedVersionId() != null) {
+            // 复用 CanvasConfigCache 统一失效逻辑（含跨实例广播）
             configCache.invalidate(canvasId, canvas.getPublishedVersionId());
             log.info("[MIGRATION_CACHE_SYNC] 已失效画布缓存 canvasId={} versionId={}",
                     canvasId, canvas.getPublishedVersionId());
@@ -73,6 +75,7 @@ public class MigrationCacheSync implements ApplicationRunner {
     }
 
     private void invalidateAllPublishedCanvases() {
+        // 仅处理已发布版本：草稿不参与执行链路，无需失效
         canvasMapper.selectList(
                 new LambdaQueryWrapper<Canvas>()
                         .eq(Canvas::getStatus, CanvasStatusEnum.PUBLISHED.getCode())

@@ -1,6 +1,9 @@
 import type { CSSProperties, ReactNode } from 'react'
 import { Tag, Typography } from 'antd'
 
+/**
+ * 配置面板摘要卡片的基础视觉样式。
+ */
 const CARD_STYLE: CSSProperties = {
   background: '#fff',
   border: '1px solid #e8eaef',
@@ -8,6 +11,9 @@ const CARD_STYLE: CSSProperties = {
   boxShadow: '0 6px 18px rgba(15, 23, 42, 0.06)',
 }
 
+/**
+ * TAGGER 节点的专属配色。
+ */
 const TAGGER_STYLES = {
   shell: {
     background: '#e9f0f7',
@@ -27,6 +33,9 @@ const TAGGER_STYLES = {
   description: '#6e8093',
 }
 
+/**
+ * 分支路由卡片配色（成功分支 / 失败分支）。
+ */
 const ROUTE_STYLES = {
   success: {
     background: '#eff6ff',
@@ -42,12 +51,26 @@ const ROUTE_STYLES = {
   },
 } as const
 
+/**
+ * 节点头卡片视图模型。
+ */
 export interface NodeHeaderCardProps {
+  /** 头卡主题。 */
   tone: 'default' | 'tagger'
+
+  /** 节点类型标签。 */
   typeBadge: string
+
+  /** 节点标题。 */
   title: string
+
+  /** 头卡辅助标签。 */
   metaBadges: string[]
+
+  /** 节点说明。 */
   description?: string
+
+  /** 右上角状态文案。 */
   statusLabel: string
   categoryColor?: string
 }
@@ -77,6 +100,7 @@ export function NodeHeaderCard({
   categoryColor,
 }: NodeHeaderCardProps) {
   const isTagger = tone === 'tagger'
+  // TAGGER 节点使用更高识别度主题，普通节点保持中性展示
   const shellStyle = isTagger ? TAGGER_STYLES.shell : {}
   const resolvedCategoryColor = categoryColor ?? '#475569'
   const pillStyles = getHeaderPillStyles(resolvedCategoryColor)
@@ -155,8 +179,14 @@ export function NodeHeaderCard({
   )
 }
 
+/**
+ * 通用分节容器卡片。
+ */
 export interface ConfigSectionCardProps {
+  /** 分节标题。 */
   title: string
+
+  /** 分节内容。 */
   children: ReactNode
 }
 
@@ -171,8 +201,14 @@ export function ConfigSectionCard({ title, children }: ConfigSectionCardProps) {
   )
 }
 
+/**
+ * 字段摘要行（左侧字段名 + 右侧值）。
+ */
 export interface FieldSummaryRowProps {
+  /** 字段标签。 */
   label: string
+
+  /** 字段值。 */
   value: string
 }
 
@@ -200,9 +236,17 @@ export function FieldSummaryRow({ label, value }: FieldSummaryRowProps) {
   )
 }
 
+/**
+ * 分支去向摘要卡片。
+ */
 export interface BranchRouteCardProps {
+  /** 路由标签。 */
   label: string
+
+  /** 路由目标名称。 */
   value: string
+
+  /** 卡片风格（成功/失败语义）。 */
   tone: 'success' | 'danger'
 }
 

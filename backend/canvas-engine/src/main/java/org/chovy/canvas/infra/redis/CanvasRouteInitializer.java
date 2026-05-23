@@ -44,6 +44,10 @@ public class CanvasRouteInitializer {
 
     private static final String REBUILD_LOCK = "canvas:route-init:lock";
 
+    /**
+     * 启动阶段路由初始化。
+     * 仅在“路由表为空”时重建，避免每次重启都全量扫描发布画布。
+     */
     @PostConstruct
     public void initTriggerRoutes() {
         if (!triggerRouteService.isRouteTableEmpty()) {
@@ -102,6 +106,7 @@ public class CanvasRouteInitializer {
 
     @SuppressWarnings("unchecked")
     private void registerRoutes(Long canvasId, DagGraph graph) {
+        // 与 CanvasService.publish 的注册逻辑保持同构，保证“启动重建”和“发布增量”行为一致
         for (String nodeId : graph.allNodeIds()) {
             DagParser.CanvasNode node = graph.getNode(nodeId);
             if (node == null) continue;
@@ -109,8 +114,11 @@ public class CanvasRouteInitializer {
             if (node.getBizConfig() != null) cfg.putAll(node.getBizConfig());
             if (node.getConfig()    != null) cfg.putAll(node.getConfig());
             switch (node.getType()) {
+                // EVENT_TRIGGER：eventCode 精确路由
                 case NodeType.EVENT_TRIGGER -> { String k = (String) cfg.get("eventCode"); if (k != null) triggerRouteService.registerBehavior(canvasId, k); }
+                // MQ_TRIGGER：topicKey 可能来自不同字段，复用 handler 的解析逻辑
                 case NodeType.MQ_TRIGGER       -> { String k = mqTriggerHandler.resolveTopic(cfg); if (!k.isEmpty()) triggerRouteService.registerMq(canvasId, k); }
+                // TAGGER_REALTIME：tagCodeKey 路由
                 case NodeType.TAGGER_REALTIME  -> { String k = (String) cfg.get("tagCodeKey"); if (k != null) triggerRouteService.registerTagger(canvasId, k); }
                 default -> {}
             }

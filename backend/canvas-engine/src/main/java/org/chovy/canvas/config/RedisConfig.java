@@ -5,6 +5,16 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.data.redis.connection.ReactiveRedisConnectionFactory;
 import org.springframework.data.redis.core.ReactiveStringRedisTemplate;
 
+/**
+ * Redis 相关 Bean 配置。
+ *
+ * <p>区分 reactive 与 blocking 模板，避免在响应式链路中误用阻塞 API。
+ * 该类仅做 Bean 装配，不承载业务缓存 key 规则。
+ *
+ * 读代码提示：
+ * - key 命名规则在各业务服务中定义（如 trigger/quota/context）；
+ * - 本类只解决“用什么客户端实例访问 Redis”。
+ */
 @Configuration
 public class RedisConfig {
 
@@ -15,6 +25,8 @@ public class RedisConfig {
     @Bean
     public ReactiveStringRedisTemplate reactiveStringRedisTemplate(
             ReactiveRedisConnectionFactory factory) {
+        // 用于 Pub/Sub 与轻量 reactive KV 访问
+        // 业务上仍可按需注入 StringRedisTemplate 做阻塞查询
         return new ReactiveStringRedisTemplate(factory);
     }
 }

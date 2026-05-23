@@ -25,14 +25,23 @@ import java.util.Map;
 @NodeHandlerType("AB_SPLIT")
 public class AbSplitHandler implements NodeHandler {
 
+    /**
+     * AB 分流执行。
+     *
+     * <p>输入依赖：
+     * - `experimentKey`：实验标识；
+     * - `groups`：分组列表，每项至少包含 `groupKey` 与 `nextNodeId`。
+     */
     @Override
     @SuppressWarnings("unchecked")
     public Mono<NodeResult> executeAsync(Map<String, Object> config, ExecutionContext ctx) {
+        // experimentKey 参与 hash，保证同一用户在同一实验内分流稳定
         String experimentKey = (String) config.get("experimentKey");
         List<Map<String, Object>> groups =
                 (List<Map<String, Object>>) config.get("groups");
 
         if (groups == null || groups.isEmpty()) {
+            // 无分组配置时终止，避免进入未知分支
             return Mono.just(NodeResult.terminal(Map.of()));
         }
 
@@ -47,6 +56,7 @@ public class AbSplitHandler implements NodeHandler {
         String nextNodeId = (String) matched.get("nextNodeId");
         String groupKey   = (String) matched.getOrDefault("groupKey", String.valueOf(groupIndex));
 
+        // 将分组结果写入输出，供后续节点做实验分组埋点/差异化处理
         return Mono.just(NodeResult.ok(nextNodeId, Map.of("abGroup", groupKey)));
     }
 }
