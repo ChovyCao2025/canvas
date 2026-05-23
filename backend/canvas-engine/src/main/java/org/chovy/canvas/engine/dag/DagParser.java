@@ -71,6 +71,12 @@ public class DagParser {
         addIfPresent(targets, c.get("elseNodeId"));
         addIfPresent(targets, c.get("approveNodeId"));
         addIfPresent(targets, c.get("rejectNodeId"));
+        addIfPresent(targets, c.get("timeoutNodeId"));
+        addIfPresent(targets, c.get("suppressedNodeId"));
+        addIfPresent(targets, c.get("skippedNodeId"));
+        addIfPresent(targets, c.get("maxExceededNodeId"));
+        addIfPresent(targets, c.get("goalMetNodeId"));
+        addIfPresent(targets, c.get("goalNotMetNodeId"));
 
         List<?> branches = (List<?>) c.get("branches");
         if (branches != null) branches.forEach(b ->

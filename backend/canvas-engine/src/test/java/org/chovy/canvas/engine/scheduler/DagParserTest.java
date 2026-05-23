@@ -81,14 +81,20 @@ class DagParserTest {
             {"nodes":[
               {"id":"n1","type":"WAIT","name":"等待",
                "outletSchema":"[{\\\"id\\\":\\\"success\\\",\\\"label\\\":\\\"继续\\\"}]",
-               "config":{"nextNodeId":"n2"}},
-              {"id":"n2","type":"END","config":{}}
+               "config":{"timeoutNodeId":"n2","suppressedNodeId":"n3","skippedNodeId":"n4",
+                         "maxExceededNodeId":"n5","goalMetNodeId":"n6","goalNotMetNodeId":"n7"}},
+              {"id":"n2","type":"END","config":{}},
+              {"id":"n3","type":"END","config":{}},
+              {"id":"n4","type":"END","config":{}},
+              {"id":"n5","type":"END","config":{}},
+              {"id":"n6","type":"END","config":{}},
+              {"id":"n7","type":"END","config":{}}
             ]}
             """;
 
         DagGraph g = parser.parse(json);
 
         assertThat(g.getNode("n1").getOutletSchema()).contains("success");
-        assertThat(g.downstream("n1")).containsExactly("n2");
+        assertThat(g.downstream("n1")).containsExactlyInAnyOrder("n2", "n3", "n4", "n5", "n6", "n7");
     }
 }
