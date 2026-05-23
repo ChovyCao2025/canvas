@@ -14,3 +14,6 @@ CREATE TABLE audience_data_source (
 
 ALTER TABLE audience_definition
     ADD COLUMN data_source_id BIGINT NULL AFTER data_source_type;
+
+CREATE INDEX idx_audience_definition_source_type_id
+    ON audience_definition (data_source_type, data_source_id);
