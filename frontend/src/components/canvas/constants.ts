@@ -1,18 +1,20 @@
 /** 节点类别 → CSS 颜色 */
 export const CATEGORY_COLORS: Record<string, string> = {
-  '行为策略': 'linear-gradient(135deg, #13c2c2, #1677ff)',
+  '行为策略': 'linear-gradient(135deg, #14b8a6, #06b6d4)',
   '逻辑分支': '#1677ff',
-  '权益发放': 'linear-gradient(135deg, #f5222d, #eb2f96)',
-  '用户触达': '#faad14',
-  '其他':     '#722ed1',
+  '流程控制': '#4f46e5',
+  '权益发放': 'linear-gradient(135deg, #ef4444, #ec4899)',
+  '用户触达': '#f59e0b',
+  '其他':     '#64748b',
 }
 
 export const CATEGORY_SOLID: Record<string, string> = {
-  '行为策略': '#13c2c2',
+  '行为策略': '#14b8a6',
   '逻辑分支': '#1677ff',
-  '权益发放': '#f5222d',
-  '用户触达': '#faad14',
-  '其他':     '#722ed1',
+  '流程控制': '#4f46e5',
+  '权益发放': '#ef4444',
+  '用户触达': '#f59e0b',
+  '其他':     '#64748b',
 }
 
 /** 不能有上游节点的节点类型（START 是流程唯一入口）

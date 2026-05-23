@@ -17,6 +17,9 @@ interface Props {
   onDragStart: (nodeType: string, category: string) => void
 }
 
+const DEFAULT_EXPANDED_CATEGORIES = new Set(['其他', '逻辑分支'])
+const COLLAPSE_STATE_KEY = 'canvas_node_panel_collapsed_groups_v1'
+
 export default function NodePanel({ onDragStart }: Props) {
   const [nodes, setNodes] = useState<NodeTypeRegistry[]>([])
   const [loading, setLoading] = useState(true)
@@ -30,6 +33,17 @@ export default function NodePanel({ onDragStart }: Props) {
         setNodes(res.data)
       })
       .finally(() => setLoading(false))
+  }, [])
+
+  useEffect(() => {
+    try {
+      const saved = window.localStorage.getItem(COLLAPSE_STATE_KEY)
+      if (!saved) return
+      const parsed = JSON.parse(saved) as Record<string, boolean>
+      setCollapsedGroups(parsed)
+    } catch {
+      // ignore invalid local cache
+    }
   }, [])
 
   const categories = useMemo(() => buildCategoryOptions(nodes), [nodes])
@@ -57,7 +71,7 @@ export default function NodePanel({ onDragStart }: Props) {
     setCollapsedGroups((current) => {
       const next = { ...current }
       for (const category of visibleCategories) {
-        if (next[category] == null) next[category] = false
+        if (next[category] == null) next[category] = !DEFAULT_EXPANDED_CATEGORIES.has(category)
         if (keyword.trim() || activeCategory !== '全部') next[category] = false
       }
       return next
@@ -77,6 +91,11 @@ export default function NodePanel({ onDragStart }: Props) {
       [category]: !current[category],
     }))
   }
+
+  useEffect(() => {
+    if (!Object.keys(collapsedGroups).length) return
+    window.localStorage.setItem(COLLAPSE_STATE_KEY, JSON.stringify(collapsedGroups))
+  }, [collapsedGroups])
 
   if (loading) {
     return (
@@ -110,6 +129,8 @@ export default function NodePanel({ onDragStart }: Props) {
             height: 40,
             borderRadius: 10,
             background: '#fff',
+            borderColor: '#d9e0ea',
+            boxShadow: '0 1px 2px rgba(15,23,42,.04)',
           }}
         />
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>

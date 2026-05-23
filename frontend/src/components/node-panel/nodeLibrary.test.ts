@@ -42,11 +42,22 @@ const nodes: NodeTypeRegistry[] = [
     description: '根据条件决定后续分支',
     enabled: 1,
   },
+  {
+    typeKey: 'START',
+    typeName: '开始',
+    category: '流程控制',
+    configSchema: '[]',
+    outputSchema: '[]',
+    isTrigger: 1,
+    isTerminal: 0,
+    description: '流程唯一入口',
+    enabled: 1,
+  },
 ]
 
 describe('nodeLibrary helpers', () => {
-  it('always includes 全部 category first', () => {
-    expect(buildCategoryOptions(nodes)).toEqual(['全部', '其他', '逻辑分支'])
+  it('always includes 全部 first and keeps the preferred category order', () => {
+    expect(buildCategoryOptions(nodes)).toEqual(['全部', '其他', '逻辑分支', '流程控制'])
   })
 
   it('filters by category and keyword together', () => {

@@ -8,6 +8,14 @@ export const DEFAULT_COMMON_NODE_TYPES = [
 ]
 
 const ALL_CATEGORIES_LABEL = '全部'
+const CATEGORY_ORDER = [
+  '其他',
+  '逻辑分支',
+  '流程控制',
+  '行为策略',
+  '用户触达',
+  '权益发放',
+]
 
 const SUMMARY_FALLBACK: Record<string, string> = {
   API_CALL: '请求外部服务并拿回结果',
@@ -20,7 +28,14 @@ const SUMMARY_FALLBACK: Record<string, string> = {
 }
 
 export function buildCategoryOptions(nodes: NodeTypeRegistry[]) {
-  const categories = Array.from(new Set(nodes.map(node => node.category)))
+  const categories = Array.from(new Set(nodes.map(node => node.category))).sort((a, b) => {
+    const aIdx = CATEGORY_ORDER.indexOf(a)
+    const bIdx = CATEGORY_ORDER.indexOf(b)
+    if (aIdx === -1 && bIdx === -1) return a.localeCompare(b, 'zh-CN')
+    if (aIdx === -1) return 1
+    if (bIdx === -1) return -1
+    return aIdx - bIdx
+  })
   return [ALL_CATEGORIES_LABEL, ...categories]
 }
 
