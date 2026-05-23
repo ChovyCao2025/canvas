@@ -14,6 +14,7 @@ import org.chovy.canvas.domain.constant.CanvasStatusEnum;
 import org.chovy.canvas.domain.constant.ExecutionStatus;
 import org.chovy.canvas.domain.constant.NodeType;
 import org.chovy.canvas.domain.constant.TriggerType;
+import org.chovy.canvas.domain.cdp.CdpUserService;
 import org.chovy.canvas.domain.execution.CanvasExecution;
 import org.chovy.canvas.domain.execution.CanvasExecutionDlq;
 import org.chovy.canvas.domain.execution.CanvasExecutionDlqMapper;
@@ -68,6 +69,7 @@ public class CanvasExecutionService {
     private final TriggerPriorityConfig priorityConfig;
     private final RocketMQTemplate rocketMQTemplate;
     private final ObjectMapper objectMapper;
+    private final CdpUserService cdpUserService;
 
     @Value("${canvas.execution.context-ttl-sec:86400}")
     private long ctxTtlSec;
@@ -118,6 +120,7 @@ public class CanvasExecutionService {
                     DagGraph graph = (DagGraph) prep.get("graph");
                     String triggerNodeId = (String) prep.get("triggerNodeId");
 
+                    ensureCdpUser(ctx);
                     CanvasExecution exec = createExecution(ctx);
 
                     return insertExecution(exec)
@@ -332,6 +335,7 @@ public class CanvasExecutionService {
                         }
                     }
 
+                    ensureCdpUser(ctx);
                     final CanvasExecution finalExec = createExecution(ctx);
                     Mono<Map<String, Object>> executionMono = dagEngine.execute(graph, triggerNodeId, ctx)
                             .timeout(Duration.ofSeconds(globalTimeoutSec));
@@ -406,6 +410,12 @@ public class CanvasExecutionService {
         ctx.setTriggerType(triggerType);
         if (userId != null) ctx.getTriggerPayload().put("userId", userId);
         return ctx;
+    }
+
+    private void ensureCdpUser(ExecutionContext ctx) {
+        if (ctx.getUserId() != null && !ctx.getUserId().isBlank()) {
+            cdpUserService.ensureUser(ctx.getUserId(), "CANVAS_EXECUTION", ctx.getExecutionId());
+        }
     }
 
     private Long resolveVersionId(Canvas canvas, String userId, boolean dryRun) {

@@ -12,6 +12,7 @@ import org.chovy.canvas.domain.canvas.CanvasVersionMapper;
 import org.chovy.canvas.domain.constant.CanvasStatusEnum;
 import org.chovy.canvas.domain.constant.NodeType;
 import org.chovy.canvas.domain.constant.TriggerType;
+import org.chovy.canvas.domain.cdp.CdpUserService;
 import org.chovy.canvas.domain.execution.CanvasExecution;
 import org.chovy.canvas.domain.execution.CanvasExecutionDlq;
 import org.chovy.canvas.domain.execution.CanvasExecutionDlqMapper;
@@ -66,6 +67,7 @@ class CanvasExecutionServiceTest {
     @Mock CanvasExecutionDlqMapper dlqMapper;
     @Mock RocketMQTemplate rocketMQTemplate;
     @Mock DefaultMQProducer rocketProducer;
+    @Mock CdpUserService cdpUserService;
 
     TriggerPriorityConfig priorityConfig;
     ObjectMapper objectMapper;
@@ -91,7 +93,8 @@ class CanvasExecutionServiceTest {
                 dlqMapper,
                 priorityConfig,
                 rocketMQTemplate,
-                objectMapper
+                objectMapper,
+                cdpUserService
         );
         ReflectionTestUtils.setField(sut, "ctxTtlSec", 86400L);
         ReflectionTestUtils.setField(sut, "globalTimeoutSec", 600L);
