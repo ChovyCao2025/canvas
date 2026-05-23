@@ -11,7 +11,7 @@ class CanvasExecutionDlqSchemaTest {
 
     @Test
     void dlqMigrationIncludesTriggerReplayContextColumns() throws Exception {
-        ClassPathResource migration = new ClassPathResource("db/migration/V44__dlq_trigger_context.sql");
+        ClassPathResource migration = new ClassPathResource("db/migration/V48__dlq_trigger_context.sql");
 
         String sql = migration.getContentAsString(StandardCharsets.UTF_8);
 
