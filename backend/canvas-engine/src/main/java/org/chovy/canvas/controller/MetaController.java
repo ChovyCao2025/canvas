@@ -27,7 +27,7 @@ public class MetaController {
     private final MetaService metaService;
     private final ApiDefinitionMapper apiDefinitionMapper;
     private final AbExperimentMapper abExperimentMapper;
-    private final TagDefinitionMapper tagDefinitionMapper;
+    private final TagDefinitionService tagDefinitionService;
     private final MqMessageDefinitionMapper mqMapper;
     private final EventDefinitionMapper eventDefinitionMapper;
     private final IdentityTypeService identityTypeService;
@@ -190,12 +190,7 @@ public class MetaController {
         // 优先从 tag_definition 表读取（管理员自定义标签）
         return Mono.fromCallable(() -> {
                     List<org.chovy.canvas.domain.meta.TagDefinition> defs =
-                            tagDefinitionMapper.selectList(
-                                    new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<
-                                            org.chovy.canvas.domain.meta.TagDefinition>()
-                                            .eq(org.chovy.canvas.domain.meta.TagDefinition::getTagType, type)
-                                            .eq(org.chovy.canvas.domain.meta.TagDefinition::getEnabled, 1)
-                                            .orderByAsc(org.chovy.canvas.domain.meta.TagDefinition::getId));
+                            tagDefinitionService.list(type, 1);
                     if (!defs.isEmpty()) {
                         return defs.stream()
                                 .map(d -> new StubOption(d.getTagCode(), d.getName()))
@@ -221,6 +216,15 @@ public class MetaController {
                                 return Mono.just(R.ok(metaService.getTaggerTags(type)));
                             });
                 });
+    }
+
+    @GetMapping("/tagger-tag-values")
+    public Mono<R<List<StubOption>>> getTaggerTagValues(@RequestParam String tagCode) {
+        return Mono.fromCallable(() -> tagDefinitionService.listValues(tagCode, 1).stream()
+                        .map(item -> new StubOption(item.getValue(), item.getLabel()))
+                        .collect(Collectors.toList()))
+                .subscribeOn(Schedulers.boundedElastic())
+                .map(R::ok);
     }
 
     @GetMapping("/biz-lines")
