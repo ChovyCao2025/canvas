@@ -407,7 +407,6 @@ function EditorInner({ detail, onStatusChange }: {
           && dropPos.y >= y && dropPos.y <= y + PH_H
     })
 
-    snapshot('添加节点')
     const newId = crypto.randomUUID().replace(/-/g, '').slice(0, 12)
     const placeholderContext = hitPlaceholder
       ? (() => {
@@ -439,6 +438,8 @@ function EditorInner({ detail, onStatusChange }: {
         return
       }
     }
+
+    snapshot('添加节点')
 
     const newNode = buildDetachedNode(newId, nodeType, category, newPos)
     newNode.data.bizConfig = defaultBizConfig
@@ -927,6 +928,11 @@ function EditorInner({ detail, onStatusChange }: {
       startInsertOnEdge: edgeId => {
         setInsertContext({ kind: 'edge', edgeId })
         setSelectedNodeId(null)
+        message.info({
+          key: 'edge-insert-guidance',
+          content: '连线插入仅支持单输出节点；分支节点请拖到具体分支占位点或空白画布。',
+          duration: 2.5,
+        })
       },
     }}>
     <div style={{ display: 'flex', flexDirection: 'column', height: '100vh' }}>
