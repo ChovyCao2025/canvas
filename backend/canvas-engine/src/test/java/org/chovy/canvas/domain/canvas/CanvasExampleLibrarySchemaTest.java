@@ -26,6 +26,8 @@ class CanvasExampleLibrarySchemaTest {
                 .contains("ALTER TABLE canvas")
                 .contains("is_example")
                 .contains("source_template_key")
-                .contains("idx_example_template");
+                .contains("idx_example_template")
+                .contains("created_by = 'system'")
+                .doesNotContain("created_by IS NULL");
     }
 }

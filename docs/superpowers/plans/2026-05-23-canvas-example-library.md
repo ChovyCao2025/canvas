@@ -205,7 +205,7 @@ ALTER TABLE canvas
 UPDATE canvas
 SET is_example = 1
 WHERE name LIKE '示例：%'
-  AND (created_by = 'system' OR created_by IS NULL);
+  AND created_by = 'system';
 ```
 
 - [ ] **Step 4: Add entity fields**
