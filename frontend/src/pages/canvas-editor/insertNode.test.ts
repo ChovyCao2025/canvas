@@ -20,6 +20,28 @@ describe('insertNode helpers', () => {
     ])
   })
 
+  it('treats an undefined sourceHandle as default', () => {
+    const result = applyInsertIntoEdge({
+      id: 'a->b',
+      source: 'a',
+      target: 'b',
+    }, 'new_node')
+
+    expect(result.newEdges).toEqual([
+      { id: 'a->new_node', source: 'a', target: 'new_node', sourceHandle: 'default' },
+      { id: 'new_node->b', source: 'new_node', target: 'b', sourceHandle: 'default' },
+    ])
+  })
+
+  it('rejects non-default source handles', () => {
+    expect(() => applyInsertIntoEdge({
+      id: 'if_1->b',
+      source: 'if_1',
+      target: 'b',
+      sourceHandle: 'success',
+    }, 'new_node')).toThrow('applyInsertIntoEdge only supports default sourceHandle edges')
+  })
+
   it('creates a detached node when dropped on blank canvas', () => {
     const node = buildDetachedNode('new_node', 'GROOVY', '其他', { x: 120, y: 80 })
 

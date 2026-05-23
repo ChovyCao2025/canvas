@@ -5,6 +5,9 @@ import type { CanvasNodeData } from '../../types/canvas'
 // Task 3 only covers splitting a linear/default edge; branch-specific routing is handled later in editor integration.
 export function applyInsertIntoEdge(edge: Edge, nodeId: string) {
   const sourceHandle = edge.sourceHandle ?? 'default'
+  if (sourceHandle !== 'default') {
+    throw new Error('applyInsertIntoEdge only supports default sourceHandle edges')
+  }
 
   return {
     removeEdgeId: edge.id,
