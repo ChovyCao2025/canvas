@@ -60,4 +60,28 @@ class NodeRouteResolverTest {
 
         assertThat(NodeRouteResolver.resolveTargets(result)).containsExactly("node_a", "node_b", "fallback_else");
     }
+
+    @Test
+    void resolves_priority_branches_by_route_identity_not_target_value() {
+        Map<String, String> routes = new LinkedHashMap<>();
+        routes.put("__else", "shared_node");
+        routes.put("A", "shared_node");
+        routes.put("B", "node_b");
+
+        NodeResult result = new NodeResult(
+                null, null, null, null, null, Map.of(), true, null, false,
+                NodeOutcome.SUCCESS, routes, null, null, null
+        );
+
+        assertThat(NodeRouteResolver.resolvePriorityBranchTargets(result)).containsExactly("shared_node", "node_b");
+        assertThat(NodeRouteResolver.resolveFallbackTarget(result)).isEqualTo("shared_node");
+    }
+
+    @Test
+    void ignores_blank_priority_fallback() {
+        NodeResult result = NodeResult.multiNext(Map.of("A", "node_a"), "");
+
+        assertThat(NodeRouteResolver.resolvePriorityBranchTargets(result)).containsExactly("node_a");
+        assertThat(NodeRouteResolver.resolveFallbackTarget(result)).isNull();
+    }
 }

@@ -773,11 +773,8 @@ public class DagEngine {
 
         // PRIORITY 节点：串行依序尝试，第一个成功则停止（4.6节）
         if (NodeType.PRIORITY.equals(sourceType) && result.branchMap() != null) {
-            String fallbackNextId = resolveFallbackTarget(result);
-            List<String> orderedBranches = new ArrayList<>(NodeRouteResolver.resolveTargets(result));
-            if (fallbackNextId != null) {
-                orderedBranches.removeIf(fallbackNextId::equals);
-            }
+            String fallbackNextId = NodeRouteResolver.resolveFallbackTarget(result);
+            List<String> orderedBranches = NodeRouteResolver.resolvePriorityBranchTargets(result);
             return tryPrioritySequentially(orderedBranches, fallbackNextId, sourceNodeId,
                     graph, ctx, depth + 1);
         }
@@ -922,16 +919,6 @@ public class DagEngine {
         return NodeRouteResolver.resolveTargets(result).stream()
                 .distinct()
                 .collect(Collectors.toList());
-    }
-
-    private String resolveFallbackTarget(NodeResult result) {
-        String target;
-        if (result.routes() != null && result.routes().containsKey("__else")) {
-            target = result.routes().get("__else");
-        } else {
-            target = result.elseNodeId();
-        }
-        return target == null || target.isBlank() ? null : target;
     }
 
     private NodeStatus statusForOutcome(NodeOutcome outcome) {

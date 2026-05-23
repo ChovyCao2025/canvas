@@ -128,6 +128,7 @@ public class ExecutionContext {
     public boolean isNodeDone(String nodeId) {
         NodeStatus s = getNodeStatus(nodeId);
         return s == NodeStatus.SUCCESS || s == NodeStatus.FAILED
+                || s == NodeStatus.TIMEOUT || s == NodeStatus.SUPPRESSED
                 || s == NodeStatus.SKIPPED || s == NodeStatus.PARTIAL_FAIL;
     }
 
