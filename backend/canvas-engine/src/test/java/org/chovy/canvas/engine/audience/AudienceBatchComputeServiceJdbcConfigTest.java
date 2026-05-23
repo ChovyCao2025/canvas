@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.chovy.canvas.domain.audience.AudienceDataSource;
 import org.chovy.canvas.domain.audience.AudienceDefinition;
 import org.chovy.canvas.domain.audience.AudienceDataSourceMapper;
+import org.chovy.canvas.domain.audience.AudienceDefinitionMapper;
 import org.junit.jupiter.api.Test;
 
 import java.lang.reflect.Proxy;
@@ -72,7 +73,7 @@ class AudienceBatchComputeServiceJdbcConfigTest {
         disabledDataSource.setId(11L);
         disabledDataSource.setEnabled(0);
         AudienceBatchComputeService validatingService = new AudienceBatchComputeService(
-                null,
+                definitionMapper(null),
                 null,
                 null,
                 null,
@@ -92,6 +93,35 @@ class AudienceBatchComputeServiceJdbcConfigTest {
                 .hasMessageContaining("disabled");
     }
 
+    @Test
+    void validateWritableDataSourceAllowsUpdateWhenAudienceAlreadyUsesDisabledSource() {
+        AudienceDataSource disabledDataSource = new AudienceDataSource();
+        disabledDataSource.setId(11L);
+        disabledDataSource.setEnabled(0);
+        AudienceDefinition existingDefinition = new AudienceDefinition();
+        existingDefinition.setId(7L);
+        existingDefinition.setDataSourceType("JDBC");
+        existingDefinition.setDataSourceId(11L);
+        AudienceBatchComputeService validatingService = new AudienceBatchComputeService(
+                definitionMapper(existingDefinition),
+                null,
+                null,
+                null,
+                null,
+                new ObjectMapper(),
+                null,
+                null,
+                dataSourceMapper(disabledDataSource)
+        );
+
+        AudienceDefinition definition = new AudienceDefinition();
+        definition.setId(7L);
+        definition.setDataSourceType("JDBC");
+        definition.setDataSourceId(11L);
+
+        validatingService.validateWritableDataSource(definition);
+    }
+
     private static AudienceDataSourceMapper dataSourceMapper(AudienceDataSource result) {
         return (AudienceDataSourceMapper) Proxy.newProxyInstance(
                 AudienceDataSourceMapper.class.getClassLoader(),
@@ -99,6 +129,20 @@ class AudienceBatchComputeServiceJdbcConfigTest {
                 (proxy, method, args) -> switch (method.getName()) {
                     case "selectById" -> result;
                     case "toString" -> "AudienceDataSourceMapperStub";
+                    case "hashCode" -> System.identityHashCode(proxy);
+                    case "equals" -> proxy == args[0];
+                    default -> throw new UnsupportedOperationException(method.getName());
+                }
+        );
+    }
+
+    private static AudienceDefinitionMapper definitionMapper(AudienceDefinition result) {
+        return (AudienceDefinitionMapper) Proxy.newProxyInstance(
+                AudienceDefinitionMapper.class.getClassLoader(),
+                new Class[]{AudienceDefinitionMapper.class},
+                (proxy, method, args) -> switch (method.getName()) {
+                    case "selectById" -> result;
+                    case "toString" -> "AudienceDefinitionMapperStub";
                     case "hashCode" -> System.identityHashCode(proxy);
                     case "equals" -> proxy == args[0];
                     default -> throw new UnsupportedOperationException(method.getName());

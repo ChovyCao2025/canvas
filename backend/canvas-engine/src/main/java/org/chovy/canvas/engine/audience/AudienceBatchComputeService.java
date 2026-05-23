@@ -28,6 +28,7 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 
 @Slf4j
 @Service
@@ -207,6 +208,14 @@ public class AudienceBatchComputeService {
             throw new IllegalArgumentException("Audience data source not found: " + definition.getDataSourceId());
         }
         if (dataSource.getEnabled() != null && dataSource.getEnabled() == 0) {
+            if (definition.getId() != null) {
+                AudienceDefinition existing = definitionMapper.selectById(definition.getId());
+                if (existing != null
+                        && "JDBC".equals(existing.getDataSourceType())
+                        && Objects.equals(existing.getDataSourceId(), definition.getDataSourceId())) {
+                    return;
+                }
+            }
             throw new IllegalArgumentException("Audience data source is disabled: " + definition.getDataSourceId());
         }
     }
