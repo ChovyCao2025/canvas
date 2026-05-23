@@ -10,9 +10,14 @@ import org.chovy.canvas.engine.handler.NodeHandlerType;
 import org.chovy.canvas.engine.handler.NodeResult;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.chovy.canvas.infra.redis.RedisKeyUtil;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Mono;
+import reactor.core.scheduler.Schedulers;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.*;
 
 /**
@@ -32,17 +37,31 @@ public class ApiCallHandler implements NodeHandler {
     private final ApiDefinitionMapper apiDefinitionMapper;
     private final WebClient.Builder   webClientBuilder;
     private final ObjectMapper        objectMapper;
+    private final StringRedisTemplate redis;
+    private final RedisKeyUtil        keys;
 
     @Override
-    @SuppressWarnings("unchecked")
     public Mono<NodeResult> executeAsync(Map<String, Object> config, ExecutionContext ctx) {
         String apiKey       = (String) config.get("apiKey");
-        String outputPrefix = (String) config.getOrDefault("outputPrefix", "");
-        String nextNodeId   = (String) config.get("nextNodeId");
 
         if (apiKey == null || apiKey.isBlank()) {
             return Mono.just(NodeResult.fail("API_CALL: apiKey 未配置"));
         }
+
+        return Mono.fromCallable(() -> prepareApiCall(config, ctx, apiKey))
+            .subscribeOn(Schedulers.boundedElastic())
+            .flatMap(prepared -> {
+                if (prepared.failure() != null) {
+                    return Mono.just(prepared.failure());
+                }
+                return executePreparedCall(prepared);
+            });
+    }
+
+    @SuppressWarnings("unchecked")
+    private PreparedApiCall prepareApiCall(Map<String, Object> config, ExecutionContext ctx, String apiKey) {
+        String outputPrefix = (String) config.getOrDefault("outputPrefix", "");
+        String nextNodeId   = (String) config.get("nextNodeId");
 
         ApiDefinition def = apiDefinitionMapper.selectOne(
             new LambdaQueryWrapper<ApiDefinition>()
@@ -50,9 +69,43 @@ public class ApiCallHandler implements NodeHandler {
                 .eq(ApiDefinition::getEnabled, 1)
         );
         if (def == null) {
-            return Mono.just(NodeResult.fail("API_CALL: 找不到接口定义 apiKey=" + apiKey));
+            return PreparedApiCall.failure(NodeResult.fail("API_CALL: 找不到接口定义 apiKey=" + apiKey));
         }
 
+        // 速率限制检查
+        if (def.getRateLimitPerSec() != null) {
+            if (def.getRateLimitPerSec() <= 0) {
+                return PreparedApiCall.failure(NodeResult.fail(
+                        "API_CALL: 接口 " + apiKey + " 速率限制配置无效"));
+            }
+            RateLimitCheck rateLimitCheck;
+            String rateLimitKey = keys.apiRateLimit(apiKey, Instant.now().getEpochSecond());
+            try {
+                rateLimitCheck = checkRateLimit(redis, rateLimitKey, def.getRateLimitPerSec());
+            } catch (Exception e) {
+                log.error("[API_CALL] 速率限制检查失败 apiKey={} key={}", apiKey, rateLimitKey, e);
+                return PreparedApiCall.failure(NodeResult.fail(
+                        "API_CALL: 接口 " + apiKey + " 速率限制检查失败"));
+            }
+            if (rateLimitCheck == RateLimitCheck.CHECK_FAILED) {
+                log.error("[API_CALL] 速率限制检查失败 apiKey={} key={}", apiKey, rateLimitKey);
+                return PreparedApiCall.failure(NodeResult.fail(
+                        "API_CALL: 接口 " + apiKey + " 速率限制检查失败"));
+            }
+            if (rateLimitCheck == RateLimitCheck.EXCEEDED) {
+                log.warn("[API_CALL] 速率限制 apiKey={} limit={}/s", apiKey, def.getRateLimitPerSec());
+                return PreparedApiCall.failure(NodeResult.fail(
+                        "API_CALL: 接口 " + apiKey + " 调用已达速率限制（" + def.getRateLimitPerSec() + " req/s）"));
+            }
+        }
+
+        return buildPreparedCall(config, ctx, apiKey, outputPrefix, nextNodeId, def);
+    }
+
+    @SuppressWarnings("unchecked")
+    private PreparedApiCall buildPreparedCall(Map<String, Object> config, ExecutionContext ctx,
+                                              String apiKey, String outputPrefix, String nextNodeId,
+                                              ApiDefinition def) {
         // 构建请求体，值若为 ${ctxKey} 则从上下文取
         Map<String, Object> inputParams = (Map<String, Object>) config.getOrDefault("inputParams", Map.of());
         Map<String, Object> reqBody = new HashMap<>();
@@ -67,6 +120,16 @@ public class ApiCallHandler implements NodeHandler {
             }
             reqBody.put(entry.getKey(), val);
         }
+
+        return new PreparedApiCall(null, apiKey, outputPrefix, nextNodeId, def, reqBody);
+    }
+
+    private Mono<NodeResult> executePreparedCall(PreparedApiCall prepared) {
+        String apiKey = prepared.apiKey();
+        String outputPrefix = prepared.outputPrefix();
+        String nextNodeId = prepared.nextNodeId();
+        ApiDefinition def = prepared.def();
+        Map<String, Object> reqBody = prepared.reqBody();
 
         String method = def.getMethod() == null ? "POST" : def.getMethod().toUpperCase();
         String url    = def.getUrl();
@@ -104,5 +167,51 @@ public class ApiCallHandler implements NodeHandler {
                 log.error("[API_CALL] ✗ apiKey={} url={} error={}", apiKey, url, e.getMessage());
                 return Mono.just(NodeResult.fail("接口调用异常: " + e.getMessage()));
             });
+    }
+
+    /**
+     * Fixed Window Counter 速率检查。
+     * @return true = 超限（应拒绝），false = 未超限（允许通过）
+     */
+    static boolean isRateLimitExceeded(StringRedisTemplate redis,
+                                        String apiKey, int limitPerSec, Instant now) {
+        String key = "canvas:ratelimit:" + apiKey + ":" + now.getEpochSecond();
+        RateLimitCheck check = checkRateLimit(redis, key, limitPerSec);
+        return check == RateLimitCheck.EXCEEDED || check == RateLimitCheck.CHECK_FAILED;
+    }
+
+    private static RateLimitCheck checkRateLimit(StringRedisTemplate redis, String key, int limitPerSec) {
+        if (limitPerSec <= 0) {
+            return RateLimitCheck.CHECK_FAILED;
+        }
+        Long count = redis.opsForValue().increment(key);
+        if (count == null) {
+            return RateLimitCheck.CHECK_FAILED;
+        }
+        if (count == 1) {
+            return Boolean.TRUE.equals(redis.expire(key, Duration.ofSeconds(2)))
+                    ? RateLimitCheck.ALLOWED
+                    : RateLimitCheck.CHECK_FAILED;
+        }
+        return count > limitPerSec ? RateLimitCheck.EXCEEDED : RateLimitCheck.ALLOWED;
+    }
+
+    private enum RateLimitCheck {
+        ALLOWED,
+        EXCEEDED,
+        CHECK_FAILED
+    }
+
+    private record PreparedApiCall(
+            NodeResult failure,
+            String apiKey,
+            String outputPrefix,
+            String nextNodeId,
+            ApiDefinition def,
+            Map<String, Object> reqBody
+    ) {
+        static PreparedApiCall failure(NodeResult failure) {
+            return new PreparedApiCall(failure, null, null, null, null, null);
+        }
     }
 }
