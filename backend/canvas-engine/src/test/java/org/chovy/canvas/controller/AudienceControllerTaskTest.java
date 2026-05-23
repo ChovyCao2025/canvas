@@ -16,10 +16,12 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.same;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -81,6 +83,30 @@ class AudienceControllerTaskTest {
     }
 
     @Test
+    void compute_rejectsMissingAudienceWithoutEnqueueing() {
+        when(definitionMapper.selectById(7L)).thenReturn(null);
+        AudienceController controller = controller();
+
+        assertThatThrownBy(() -> controller.compute(7L).block())
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("Audience not found: 7");
+        verifyNoInteractions(taskService, runner);
+    }
+
+    @Test
+    void compute_rejectsDisabledAudienceWithoutEnqueueing() {
+        AudienceDefinition definition = audience(7L, "VIP 人群");
+        definition.setEnabled(0);
+        when(definitionMapper.selectById(7L)).thenReturn(definition);
+        AudienceController controller = controller();
+
+        assertThatThrownBy(() -> controller.compute(7L).block())
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("Audience disabled: 7");
+        verifyNoInteractions(taskService, runner);
+    }
+
+    @Test
     void create_setsCreatedByAndEnqueuesCompute() {
         AudienceDefinition body = audience(null, "新建人群");
         AudienceDefinition created = audience(11L, "新建人群");
@@ -106,6 +132,7 @@ class AudienceControllerTaskTest {
     void update_persistsAndEnqueuesSavedDefinition() {
         AudienceDefinition body = audience(null, "请求名称");
         AudienceDefinition saved = audience(12L, "保存后名称");
+        when(computeService.update(body)).thenReturn(true);
         when(definitionMapper.selectById(12L)).thenReturn(saved);
         when(taskService.createOrReuseRunning(
                 "AUDIENCE_COMPUTE",
@@ -123,6 +150,20 @@ class AudienceControllerTaskTest {
         verify(computeService).update(body);
         verify(schedulerService).refresh(same(saved), any(Runnable.class));
         verify(runner).start("task_update", 12L, "保存后名称", "system");
+    }
+
+    @Test
+    void update_rejectsMissingAudienceWithoutSchedulingOrEnqueueing() {
+        AudienceDefinition body = audience(null, "请求名称");
+        when(computeService.update(body)).thenReturn(false);
+        AudienceController controller = controller();
+
+        assertThatThrownBy(() -> controller.update(12L, body).block())
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("Audience not found: 12");
+        assertThat(body.getId()).isEqualTo(12L);
+        verify(computeService).update(body);
+        verifyNoInteractions(schedulerService, taskService, runner);
     }
 
     @Test

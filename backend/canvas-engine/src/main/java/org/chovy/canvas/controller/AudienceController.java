@@ -86,11 +86,16 @@ public class AudienceController {
         return currentUser().flatMap(operator ->
                 Mono.fromCallable(() -> {
                     body.setId(id);
-                    computeService.update(body);
+                    boolean updated = computeService.update(body);
+                    if (!updated) {
+                        throw new IllegalArgumentException("Audience not found: " + id);
+                    }
                     AudienceDefinition saved = definitionMapper.selectById(id);
-                    AudienceDefinition definition = saved == null ? body : saved;
-                    schedulerService.refresh(definition, () -> computeService.compute(definition.getId()));
-                    enqueueCompute(definition, operator);
+                    if (saved == null) {
+                        throw new IllegalArgumentException("Audience not found: " + id);
+                    }
+                    schedulerService.refresh(saved, () -> computeService.compute(saved.getId()));
+                    enqueueCompute(saved, operator);
                     return R.<Void>ok();
                 }).subscribeOn(Schedulers.boundedElastic()));
     }
@@ -110,8 +115,10 @@ public class AudienceController {
                 Mono.fromCallable(() -> {
                     AudienceDefinition definition = definitionMapper.selectById(id);
                     if (definition == null) {
-                        definition = new AudienceDefinition();
-                        definition.setId(id);
+                        throw new IllegalArgumentException("Audience not found: " + id);
+                    }
+                    if (definition.getEnabled() == null || definition.getEnabled() == 0) {
+                        throw new IllegalStateException("Audience disabled: " + id);
                     }
                     return R.ok(enqueueCompute(definition, operator));
                 }).subscribeOn(Schedulers.boundedElastic()));

@@ -100,8 +100,8 @@ public class AudienceBatchComputeService {
         return definition;
     }
 
-    public void update(AudienceDefinition definition) {
-        definitionMapper.updateById(definition);
+    public boolean update(AudienceDefinition definition) {
+        return definitionMapper.updateById(definition) > 0;
     }
 
     public void delete(Long audienceId) {
