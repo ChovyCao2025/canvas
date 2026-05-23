@@ -30,27 +30,14 @@ public class IdentityTypeService {
 
     public IdentityType create(IdentityType body) {
         validateAndNormalize(body);
-        if (body.getEnabled() == null) {
-            body.setEnabled(1);
-        }
-        if (body.getAllowImport() == null) {
-            body.setAllowImport(1);
-        }
-        if (body.getMultiValue() == null) {
-            body.setMultiValue(0);
-        }
-        if (body.getPriority() == null) {
-            body.setPriority(100);
-        }
-        if (body.getParticipateMapping() == null) {
-            body.setParticipateMapping(0);
-        }
+        applyDefaults(body);
         identityTypeMapper.insert(body);
         return body;
     }
 
     public void update(Long id, IdentityType body) {
         validateAndNormalize(body);
+        applyDefaults(body);
         body.setId(id);
         identityTypeMapper.updateById(body);
     }
@@ -95,6 +82,24 @@ public class IdentityTypeService {
         }
         body.setCode(normalizedCode);
         body.setName(body.getName().trim());
+    }
+
+    private static void applyDefaults(IdentityType body) {
+        if (body.getEnabled() == null) {
+            body.setEnabled(1);
+        }
+        if (body.getAllowImport() == null) {
+            body.setAllowImport(1);
+        }
+        if (body.getMultiValue() == null) {
+            body.setMultiValue(0);
+        }
+        if (body.getPriority() == null) {
+            body.setPriority(100);
+        }
+        if (body.getParticipateMapping() == null) {
+            body.setParticipateMapping(0);
+        }
     }
 
     private static String normalizeCode(String code) {

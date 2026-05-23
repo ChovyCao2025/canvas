@@ -46,6 +46,26 @@ class IdentityTypeServiceTest {
     }
 
     @Test
+    void update_appliesDefaultsBeforePersisting() {
+        IdentityTypeService service = new IdentityTypeService(identityTypeMapper, userTagCurrentMapper);
+        IdentityType body = new IdentityType();
+        body.setCode("mobile");
+        body.setName("Mobile");
+
+        service.update(42L, body);
+
+        ArgumentCaptor<IdentityType> captor = ArgumentCaptor.forClass(IdentityType.class);
+        verify(identityTypeMapper).updateById(captor.capture());
+        IdentityType updated = captor.getValue();
+        assertThat(updated.getId()).isEqualTo(42L);
+        assertThat(updated.getEnabled()).isEqualTo(1);
+        assertThat(updated.getAllowImport()).isEqualTo(1);
+        assertThat(updated.getMultiValue()).isEqualTo(0);
+        assertThat(updated.getPriority()).isEqualTo(100);
+        assertThat(updated.getParticipateMapping()).isEqualTo(0);
+    }
+
+    @Test
     void requireImportable_rejectsDisabledType() {
         IdentityType disabled = new IdentityType();
         disabled.setCode("email");
