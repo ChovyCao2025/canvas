@@ -32,6 +32,9 @@ public class TagDefinition {
      */
     private String tagType;
 
+    /** 标签值类型：STRING / NUMBER / BOOLEAN */
+    private String valueType;
+
     /** 标签描述 */
     private String description;
 
