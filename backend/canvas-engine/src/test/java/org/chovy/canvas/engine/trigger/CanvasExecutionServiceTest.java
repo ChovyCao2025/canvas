@@ -4,11 +4,14 @@ import org.chovy.canvas.domain.canvas.CanvasMapper;
 import org.chovy.canvas.domain.canvas.CanvasVersionMapper;
 import org.chovy.canvas.domain.canvas.Canvas;
 import org.chovy.canvas.domain.constant.CanvasStatusEnum;
+import org.chovy.canvas.domain.constant.ExecutionStatus;
 import org.chovy.canvas.domain.constant.NodeType;
 import org.chovy.canvas.domain.constant.TriggerType;
 import org.chovy.canvas.domain.execution.CanvasExecution;
 import org.chovy.canvas.domain.execution.CanvasExecutionMapper;
 import org.chovy.canvas.domain.execution.CanvasExecutionStatsMapper;
+import org.chovy.canvas.engine.context.ExecutionContext;
+import org.chovy.canvas.engine.context.NodeStatus;
 import org.chovy.canvas.engine.dag.DagGraph;
 import org.chovy.canvas.engine.dag.DagParser;
 import org.chovy.canvas.engine.handlers.MqTriggerHandler;
@@ -29,10 +32,11 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.*;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -120,5 +124,51 @@ class CanvasExecutionServiceTest {
                 .hasMessageContaining("db down");
 
         verify(ctxStore).releaseDedup("dedup-key");
+    }
+
+    @Test
+    void triggerPersistsContextAndMarksExecutionPausedWhenDagCompletesWithWaitingNode() {
+        Canvas canvas = new Canvas();
+        canvas.setId(10L);
+        canvas.setStatus(CanvasStatusEnum.PUBLISHED.getCode());
+        canvas.setPublishedVersionId(100L);
+        when(canvasEntityCache.get(10L)).thenReturn(canvas);
+        when(ctxStore.exists(10L, "user-7")).thenReturn(false);
+
+        DagParser.CanvasNode start = new DagParser.CanvasNode();
+        start.setId("start");
+        start.setType(NodeType.DIRECT_CALL);
+        DagGraph graph = new DagGraph(
+                Map.of("start", start),
+                Map.of("start", List.of()),
+                Map.of("start", List.of()),
+                Map.of("start", 0));
+        when(configCache.get(10L, 100L)).thenReturn(graph);
+        when(executionRegistry.tryAcquire(eq(10L), any(), eq(1000), eq(1000)))
+                .thenReturn(Optional.of(Disposables.swap()));
+        when(dagEngine.execute(eq(graph), eq("start"), any()))
+                .thenAnswer(invocation -> {
+                    ExecutionContext ctx = invocation.getArgument(2);
+                    ctx.setNodeStatus("wait-1", NodeStatus.WAITING);
+                    return Mono.just(Map.of());
+                });
+
+        Map<String, Object> result = sut.trigger(
+                10L,
+                "user-7",
+                TriggerType.DIRECT_CALL,
+                NodeType.DIRECT_CALL,
+                null,
+                Map.of(),
+                null,
+                false).block();
+
+        assertThat(result).containsKey("executionId");
+        verify(ctxStore).save(any(ExecutionContext.class));
+        verify(ctxStore, never()).delete(10L, "user-7");
+
+        var captor = org.mockito.ArgumentCaptor.forClass(CanvasExecution.class);
+        verify(executionMapper).updateById(captor.capture());
+        assertThat(captor.getValue().getStatus()).isEqualTo(ExecutionStatus.PAUSED.getCode());
     }
 }

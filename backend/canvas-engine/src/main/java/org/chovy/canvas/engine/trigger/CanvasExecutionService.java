@@ -272,7 +272,19 @@ public class CanvasExecutionService {
                                 }
                             })
                             .flatMap(result -> {
-                                // 9. 执行完成，更新执行记录
+                                // 9. 执行完成或挂起，更新执行记录
+                                boolean paused = isPaused(ctx, graph);
+                                if (paused) {
+                                    if (!dryRun) {
+                                        ctxStore.save(ctx);
+                                        if (isResume) ctxStore.releaseResumeLock(ctx.getCanvasId(), ctx.getUserId());
+                                        incrementStats(ctx.getCanvasId(), ExecutionStatus.PAUSED.getCode(), ctx.getUserId());
+                                    }
+                                    Map<String, Object> resp = new HashMap<>(result);
+                                    resp.put("executionId", ctx.getExecutionId());
+                                    return updateExecution(finalExec, ExecutionStatus.PAUSED.getCode(), Map.of())
+                                            .thenReturn(resp);
+                                }
                                 if (!dryRun) {
                                     ctxStore.delete(ctx.getCanvasId(), ctx.getUserId());
                                     if (isResume) ctxStore.releaseResumeLock(ctx.getCanvasId(), ctx.getUserId());

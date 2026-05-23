@@ -140,7 +140,7 @@ public class DagEngine {
                                              ExecutionContext ctx) {
         // 从起始节点开始执行画布相关节点
         return executeNode(graph, triggerNodeId, ctx, 0)
-                .doFinally(__ -> writeSkippedNodes(graph, ctx))
+                .doFinally(__ -> writeSkippedNodesIfComplete(graph, ctx))
                 .onErrorResume(e -> {
                     log.error("[ENGINE] 执行出错 executionId={}: {}",
                             ctx.getExecutionId(), e.getMessage(), e);
@@ -181,7 +181,8 @@ public class DagEngine {
             if (node.getConfig() != null) rawConfig.putAll(node.getConfig());
 
             boolean needsNodeId = NodeType.MANUAL_APPROVAL.equals(node.getType())
-                    || NodeType.API_CALL.equals(node.getType());
+                    || NodeType.API_CALL.equals(node.getType())
+                    || NodeType.WAIT.equals(node.getType());
             Map<String, Object> config = needsNodeId
                     ? resolveConfigWithNodeId(rawConfig, ctx, nodeId)
                     : resolveConfig(rawConfig, ctx);
@@ -871,6 +872,18 @@ public class DagEngine {
             // 批量异步写入（TraceWriteBuffer 批量刷盘，不阻塞主执行链路）
             skippedTraces.forEach(traceBuffer::offer);
         }
+    }
+
+    private void writeSkippedNodesIfComplete(DagGraph graph, ExecutionContext ctx) {
+        if (hasWaitingNodes(ctx)) {
+            log.debug("[ENGINE] 执行已挂起，暂不批量写入 SKIPPED executionId={}", ctx.getExecutionId());
+            return;
+        }
+        writeSkippedNodes(graph, ctx);
+    }
+
+    private boolean hasWaitingNodes(ExecutionContext ctx) {
+        return ctx.getNodeStatuses().values().stream().anyMatch(status -> status == NodeStatus.WAITING);
     }
 
     // ══════════════════════════════════════════════════════════════

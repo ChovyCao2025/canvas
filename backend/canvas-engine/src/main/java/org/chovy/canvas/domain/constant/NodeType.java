@@ -44,6 +44,8 @@ public final class NodeType {
     public static final String SELECTOR           = "SELECTOR";
     /** 人工审批节点（挂起执行，等待人工操作） */
     public static final String MANUAL_APPROVAL    = "MANUAL_APPROVAL";
+    /** 增强等待节点 */
+    public static final String WAIT               = "WAIT";
     /** 延时节点 */
     public static final String DELAY              = "DELAY";
     /** 流程终止节点 */
