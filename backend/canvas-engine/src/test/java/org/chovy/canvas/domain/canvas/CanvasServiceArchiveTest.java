@@ -46,6 +46,8 @@ class CanvasServiceArchiveTest {
     private org.chovy.canvas.engine.handlers.MqTriggerHandler mqTriggerHandler;
     @Mock
     private org.springframework.data.redis.core.StringRedisTemplate redis;
+    @Mock
+    private CanvasExamplesProperties examplesProperties;
 
     @InjectMocks
     private CanvasService canvasService;
