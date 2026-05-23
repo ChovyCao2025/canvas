@@ -45,8 +45,9 @@ function resolveDisplayValue(input: {
   return toDisplayValue(input.formValues[input.key])
 }
 
-function resolveTaggerMetaBadges(mode: unknown): string[] {
+function resolveTaggerMetaBadges(mode: unknown, displayMode: string | undefined): string[] {
   if (mode === 'audience') return ['人群圈选', 'Audience Segment']
+  if (typeof displayMode === 'string' && displayMode.trim()) return [displayMode.trim()]
   if (typeof mode === 'string' && mode.trim()) return [mode.trim()]
   if (typeof mode === 'number' || typeof mode === 'boolean') return [String(mode)]
   return []
@@ -85,7 +86,7 @@ export function buildConfigPanelPresentation(input: BuildConfigPanelPresentation
       tone: isTagger ? 'tagger' : 'default',
       typeBadge: isTagger ? 'Tagger' : nodeData.nodeType,
       title: nodeData.name,
-      metaBadges: isTagger ? resolveTaggerMetaBadges(formValues.mode) : [],
+      metaBadges: isTagger ? resolveTaggerMetaBadges(formValues.mode, displayValues.mode) : [],
       description: isTagger ? '标签判断节点，根据圈选人群决定后续分支流向' : nodeData.category,
       statusLabel: '已配置',
     },

@@ -93,6 +93,18 @@ describe('buildConfigPanelPresentation', () => {
     expect(model.header.metaBadges).toContain('Audience Segment')
   })
 
+  it('prefers display labels for non-audience tagger mode badges', () => {
+    const model = buildConfigPanelPresentation({
+      nodeData: taggerNode(),
+      formValues: { mode: 'realtime' },
+      displayValues: { mode: '实时触发（监听 MQ 事件）' },
+      fields: [],
+      getNodeName: () => null,
+    })
+
+    expect(model.header.metaBadges).toEqual(['实时触发（监听 MQ 事件）'])
+  })
+
   it('keeps non-tagger nodes on the default inspector path', () => {
     const model = buildConfigPanelPresentation({
       nodeData: {
