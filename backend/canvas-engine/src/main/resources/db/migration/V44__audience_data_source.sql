@@ -44,6 +44,8 @@ FROM (
     WHERE data_source_type = 'JDBC'
       AND data_source_config IS NOT NULL
       AND JSON_EXTRACT(data_source_config, '$.url') IS NOT NULL
+      AND JSON_EXTRACT(data_source_config, '$.username') IS NOT NULL
+      AND JSON_EXTRACT(data_source_config, '$.password') IS NOT NULL
 ) config
 LEFT JOIN audience_data_source existing
     ON existing.url = config.url
@@ -75,4 +77,6 @@ SET definition_row.data_source_id = data_source.id,
     )
 WHERE definition_row.data_source_type = 'JDBC'
   AND definition_row.data_source_config IS NOT NULL
-  AND JSON_EXTRACT(definition_row.data_source_config, '$.url') IS NOT NULL;
+  AND JSON_EXTRACT(definition_row.data_source_config, '$.url') IS NOT NULL
+  AND JSON_EXTRACT(definition_row.data_source_config, '$.username') IS NOT NULL
+  AND JSON_EXTRACT(definition_row.data_source_config, '$.password') IS NOT NULL;
