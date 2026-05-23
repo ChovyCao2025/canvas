@@ -27,12 +27,19 @@ export function buildCleanupSql(perfRunId) {
   const id = escapeSql(perfRunId)
 
   return `
+DROP TEMPORARY TABLE IF EXISTS perf_cleanup_execution_ids;
+CREATE TEMPORARY TABLE perf_cleanup_execution_ids (
+  id VARCHAR(64) NOT NULL PRIMARY KEY
+);
+INSERT INTO perf_cleanup_execution_ids (id)
+SELECT id FROM canvas_execution WHERE perf_run_id = '${id}';
+
 SELECT COUNT(*) AS before_event_log_rows FROM event_log WHERE perf_run_id = '${id}';
 SELECT COUNT(*) AS before_execution_rows FROM canvas_execution WHERE perf_run_id = '${id}';
 SELECT COUNT(*) AS before_execution_trace_rows
 FROM canvas_execution_trace
 WHERE execution_id IN (
-  SELECT id FROM canvas_execution WHERE perf_run_id = '${id}'
+  SELECT id FROM perf_cleanup_execution_ids
 );
 SELECT COUNT(*) AS before_request_rows FROM canvas_execution_request WHERE perf_run_id = '${id}';
 SELECT COUNT(*) AS before_dlq_rows FROM canvas_execution_dlq WHERE perf_run_id = '${id}';
@@ -41,7 +48,7 @@ SELECT COUNT(*) AS before_perf_mq_definitions FROM mq_message_definition WHERE m
 
 DELETE FROM canvas_execution_trace
 WHERE execution_id IN (
-  SELECT id FROM canvas_execution WHERE perf_run_id = '${id}'
+  SELECT id FROM perf_cleanup_execution_ids
 );
 DELETE FROM canvas_execution_dlq WHERE perf_run_id = '${id}';
 DELETE FROM canvas_execution_request WHERE perf_run_id = '${id}';
@@ -56,12 +63,14 @@ SELECT COUNT(*) AS after_execution_rows FROM canvas_execution WHERE perf_run_id 
 SELECT COUNT(*) AS after_execution_trace_rows
 FROM canvas_execution_trace
 WHERE execution_id IN (
-  SELECT id FROM canvas_execution WHERE perf_run_id = '${id}'
+  SELECT id FROM perf_cleanup_execution_ids
 );
 SELECT COUNT(*) AS after_request_rows FROM canvas_execution_request WHERE perf_run_id = '${id}';
 SELECT COUNT(*) AS after_dlq_rows FROM canvas_execution_dlq WHERE perf_run_id = '${id}';
 SELECT COUNT(*) AS after_perf_event_definitions FROM event_definition WHERE event_code LIKE 'PERF_%';
 SELECT COUNT(*) AS after_perf_mq_definitions FROM mq_message_definition WHERE message_code LIKE 'PERF_%';
+
+DROP TEMPORARY TABLE IF EXISTS perf_cleanup_execution_ids;
 `.trim()
 }
 

@@ -24,6 +24,19 @@ test('buildCleanupSql prints counts before and after cleanup', () => {
   assert.match(sql, /after_event_log_rows/)
 })
 
+test('buildCleanupSql preserves execution ids for post-cleanup trace count', () => {
+  const sql = buildCleanupSql('perf_20260523_001')
+  const traceDeleteIndex = sql.indexOf('DELETE FROM canvas_execution_trace')
+  const executionDeleteIndex = sql.indexOf('DELETE FROM canvas_execution WHERE')
+  const afterTraceCountIndex = sql.indexOf('after_execution_trace_rows')
+
+  assert.match(sql, /CREATE TEMPORARY TABLE perf_cleanup_execution_ids/)
+  assert.match(sql, /FROM perf_cleanup_execution_ids/)
+  assert.ok(traceDeleteIndex > -1)
+  assert.ok(executionDeleteIndex > traceDeleteIndex)
+  assert.ok(afterTraceCountIndex > executionDeleteIndex)
+})
+
 test('parseCleanupArgs defaults to dry run', () => {
   const args = parseCleanupArgs([
     '--perf-run-id', 'perf_20260523_001',
