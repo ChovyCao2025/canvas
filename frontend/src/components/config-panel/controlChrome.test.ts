@@ -14,6 +14,13 @@ describe('controlChrome', () => {
     )
   })
 
+  it('keeps enough horizontal padding for select affordances', () => {
+    const chrome = getControlChrome()
+
+    expect(chrome.height).toBe(52)
+    expect(chrome.borderRadius).toBe(18)
+  })
+
   it('returns a subdued field label style', () => {
     const labelStyle = getControlLabelStyle()
 

@@ -15,6 +15,7 @@ import {
   FieldSummaryRow,
   NodeHeaderCard,
 } from './InspectorCards'
+import { getControlChrome, getControlLabelStyle } from './controlChrome'
 import { normalizeFieldOptions, resolveDisplayValue } from './displayValues'
 import { buildConfigPanelPresentation } from './presentation'
 
@@ -36,6 +37,10 @@ interface Props {
 const schemaCache   = new Map<string, NodeTypeRegistry>()
 const rawCache      = new Map<string, any[]>()         // key = dataSource URL
 let contextFieldsCache: ContextField[] | null = null
+
+function renderControlLabel(label: string): React.ReactNode {
+  return <div style={{ ...getControlLabelStyle(), margin: '0 6px 6px' }}>{label}</div>
+}
 
 /** 通用数据源加载：任意 dataSource URL，自动缓存，无需逐个注册 */
 async function loadDataSource(src: string): Promise<any[]> {
@@ -63,6 +68,7 @@ export default function ConfigPanel({ nodeId, nodeData, onChange, nodes, readonl
   const [loading,  setLoading]  = useState(false)
   const [formValues, setFormValues] = useState<Record<string, unknown>>({})
   const [form] = Form.useForm()
+  const controlChrome = getControlChrome()
 
   const getNodeName = (id: string | undefined): string | null => {
     if (!id || !nodes) return null
@@ -202,8 +208,8 @@ export default function ConfigPanel({ nodeId, nodeData, onChange, nodes, readonl
         )}
 
         <ConfigSectionCard title="配置详情">
-          <Form.Item name="name" label="节点名称" rules={[{ required: true }]}>
-            <Input />
+          <Form.Item name="name" label={renderControlLabel('节点名称')} rules={[{ required: true }]}>
+            <Input style={controlChrome} />
           </Form.Item>
 
           {visibleFields.map(field => {
@@ -216,13 +222,13 @@ export default function ConfigPanel({ nodeId, nodeData, onChange, nodes, readonl
             if (field.type === 'event-attr-preview') {
               return (
                 <div key={field.key} style={{ marginBottom: 16 }}>
-                  <div style={{ fontSize: 12, color: '#595959', marginBottom: 6 }}>{field.label}</div>
+                  {renderControlLabel(field.label)}
                   <EventAttrPreview />
                 </div>
               )
             }
             return (
-              <Form.Item key={field.key} name={field.key} label={field.label}
+              <Form.Item key={field.key} name={field.key} label={renderControlLabel(field.label)}
                 rules={field.required ? [{ required: true, message: `请填写${field.label}` }] : []}>
                 {renderControl(field, options, ctxFields, form, getNodeName, nodeData)}
               </Form.Item>
@@ -273,10 +279,13 @@ function renderControl(
   getNodeName?: (id: string | undefined) => string | null,
   nodeData?: CanvasNodeData | null,
 ): React.ReactNode {
+  const controlChrome = getControlChrome()
+
   switch (field.type) {
     case 'select':
       return (
         <Select
+          style={controlChrome}
           options={normalizeFieldOptions(field, options)}
           placeholder={`请选择${field.label}`}
           showSearch filterOption={(v, opt) =>
@@ -284,12 +293,13 @@ function renderControl(
         />
       )
     case 'number':
-      return <InputNumber style={{ width: '100%' }} defaultValue={field.defaultValue as number} />
+      return <InputNumber style={{ ...controlChrome, width: '100%' }} defaultValue={field.defaultValue as number} />
     case 'toggle':
       return <Switch />
     case 'radio':
       return (
         <Select options={normalizeFieldOptions(field, options)}
+          style={controlChrome}
           placeholder={`请选择${field.label}`} />
       )
     case 'code-editor':
@@ -356,9 +366,9 @@ function renderControl(
     case 'canvas-select':
       return <CanvasSelector />
     case 'node-select':
-      return <Input placeholder="节点 ID（连线后自动填入）" />
+      return <Input style={controlChrome} placeholder="节点 ID（连线后自动填入）" />
     default:
-      return <Input placeholder={field.label} />
+      return <Input style={controlChrome} placeholder={field.label} />
   }
 }
 
@@ -836,6 +846,7 @@ function ApiCallInputParams({ label, apiKeyField = 'apiKey', defsSource = '/meta
   const form   = Form.useFormInstance()
   const apiKey = Form.useWatch(apiKeyField, form)
   const [params, setParams] = useState<ApiParamDef[]>([])
+  const controlChrome = getControlChrome()
 
   useEffect(() => {
     if (!apiKey) { setParams([]); return }
@@ -861,7 +872,7 @@ function ApiCallInputParams({ label, apiKeyField = 'apiKey', defsSource = '/meta
 
   return (
     <div>
-      <div style={{ fontSize: 12, color: '#595959', marginBottom: 6 }}>{label}</div>
+      {renderControlLabel(label)}
       {!apiKey && <Text type="secondary" style={{ fontSize: 12 }}>请先选择接口</Text>}
       {apiKey && !params.length && <Text type="secondary" style={{ fontSize: 12 }}>该接口未定义请求参数</Text>}
       {params.map(p => (
@@ -869,7 +880,7 @@ function ApiCallInputParams({ label, apiKeyField = 'apiKey', defsSource = '/meta
           key={p.name}
           name={['inputParams', p.name]}
           label={
-            <span>
+            <span style={getControlLabelStyle()}>
               {p.displayName || p.name}
               {p.required && <span style={{ color: '#f5222d', marginLeft: 2 }}>*</span>}
               <Tag style={{ marginLeft: 6, fontSize: 10 }}>{typeLabel(p.type)}</Tag>
@@ -883,11 +894,14 @@ function ApiCallInputParams({ label, apiKeyField = 'apiKey', defsSource = '/meta
           style={{ marginBottom: 8 }}
         >
           {p.type === 'NUMBER' ? (
-            <InputNumber style={{ width: '100%' }} />
+            <InputNumber style={{ ...controlChrome, width: '100%' }} />
           ) : p.type === 'TEXT' ? (
             <Input.TextArea rows={2} />
           ) : (
-            <Input placeholder={p.type === 'STRING_PARAM' ? '如：${userId} 或固定值' : ''} />
+            <Input
+              style={controlChrome}
+              placeholder={p.type === 'STRING_PARAM' ? '如：${userId} 或固定值' : ''}
+            />
           )}
         </Form.Item>
       ))}
