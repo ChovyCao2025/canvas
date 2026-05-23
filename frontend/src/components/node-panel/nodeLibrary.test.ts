@@ -70,6 +70,16 @@ describe('nodeLibrary helpers', () => {
     expect(view.filteredNodes.map(node => node.typeKey)).toEqual(['API_CALL', 'GROOVY'])
   })
 
+  it('keeps category color ownership outside the helper layer', () => {
+    const view = buildNodeLibraryView(nodes, {
+      activeCategory: '全部',
+      keyword: '',
+      commonTypeKeys: DEFAULT_COMMON_NODE_TYPES,
+    })
+
+    expect(view.filteredNodes[0].category).toBe('其他')
+  })
+
   it('falls back to generic summary when description is empty', () => {
     expect(getNodeSummary(nodes[1])).toBe('处理复杂逻辑或字段加工')
   })
