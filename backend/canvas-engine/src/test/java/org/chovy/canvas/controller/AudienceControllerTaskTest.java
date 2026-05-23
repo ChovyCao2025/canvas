@@ -3,6 +3,7 @@ package org.chovy.canvas.controller;
 import org.chovy.canvas.domain.audience.AudienceDefinition;
 import org.chovy.canvas.domain.audience.AudienceDefinitionMapper;
 import org.chovy.canvas.domain.audience.AudienceStatMapper;
+import org.chovy.canvas.domain.notification.NotificationService;
 import org.chovy.canvas.domain.task.AsyncTask;
 import org.chovy.canvas.domain.task.AsyncTaskCreateResult;
 import org.chovy.canvas.domain.task.AsyncTaskService;
@@ -39,6 +40,8 @@ class AudienceControllerTaskTest {
     private AsyncTaskService taskService;
     @Mock
     private AudienceComputeTaskRunner runner;
+    @Mock
+    private NotificationService notificationService;
 
     @Test
     void compute_returnsTaskIdAndStartsRunnerWhenTaskCreated() {
@@ -80,6 +83,33 @@ class AudienceControllerTaskTest {
         assertThat(response.getData().taskId()).isEqualTo("task_existing");
         assertThat(response.getData().status()).isEqualTo("RUNNING");
         verify(runner, never()).start(any(), any(), any(), any());
+    }
+
+    @Test
+    void compute_reusedTerminalTaskCreatesCatchUpNotificationWithoutStartingRunner() {
+        AudienceDefinition definition = audience(7L, "VIP 人群");
+        when(definitionMapper.selectById(7L)).thenReturn(definition);
+        when(taskService.createOrReuseRunning(
+                "AUDIENCE_COMPUTE",
+                "AUDIENCE",
+                "7",
+                "计算人群：VIP 人群",
+                "system"))
+                .thenReturn(new AsyncTaskCreateResult(task("task_existing", "SUCCEEDED"), false));
+        AudienceController controller = controller();
+
+        var response = controller.compute(7L).block();
+
+        assertThat(response.getData().taskId()).isEqualTo("task_existing");
+        assertThat(response.getData().status()).isEqualTo("SUCCEEDED");
+        verify(runner, never()).start(any(), any(), any(), any());
+        verify(notificationService).createForTask(
+                "system",
+                "TASK_SUCCEEDED",
+                "人群计算完成",
+                "VIP 人群 · 任务已完成",
+                "/audiences?highlight=7&taskId=task_existing",
+                "task_existing");
     }
 
     @Test
@@ -202,7 +232,14 @@ class AudienceControllerTaskTest {
     }
 
     private AudienceController controller() {
-        return new AudienceController(definitionMapper, statMapper, computeService, schedulerService, taskService, runner);
+        return new AudienceController(
+                definitionMapper,
+                statMapper,
+                computeService,
+                schedulerService,
+                taskService,
+                runner,
+                notificationService);
     }
 
     private AudienceDefinition audience(Long id, String name) {

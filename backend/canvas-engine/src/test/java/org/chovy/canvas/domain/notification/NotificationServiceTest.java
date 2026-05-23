@@ -7,6 +7,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.dao.DuplicateKeyException;
 
 import java.util.List;
 
@@ -58,6 +59,25 @@ class NotificationServiceTest {
         ArgumentCaptor<Notification> captor = ArgumentCaptor.forClass(Notification.class);
         verify(mapper).insert(captor.capture());
         assertThat(captor.getValue().getTitle()).hasSize(200);
+    }
+
+    @Test
+    void createForTask_returnsExistingNotificationWhenTaskUserTypeAlreadyExists() {
+        Notification existing = new Notification();
+        existing.setNotificationId("ntf_existing");
+        when(mapper.insert(any(Notification.class))).thenThrow(new DuplicateKeyException("duplicate notification"));
+        when(mapper.selectOne(any())).thenReturn(existing);
+        NotificationService service = new NotificationService(mapper);
+
+        Notification notification = service.createForTask(
+                "operator",
+                "TASK_SUCCEEDED",
+                "人群计算完成",
+                "VIP 人群 · 12 人",
+                "/audiences?highlight=7&taskId=task_1",
+                "task_1");
+
+        assertThat(notification).isSameAs(existing);
     }
 
     @Test

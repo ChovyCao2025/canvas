@@ -3,6 +3,7 @@ package org.chovy.canvas.domain.task;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 
@@ -11,6 +12,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.UUID;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class AsyncTaskService {
@@ -25,7 +27,7 @@ public class AsyncTaskService {
         AsyncTask existing = findActive(taskType, bizType, bizId);
         if (existing != null) {
             subscribe(existing.getTaskId(), createdBy);
-            return new AsyncTaskCreateResult(existing, false);
+            return new AsyncTaskCreateResult(refresh(existing), false);
         }
 
         AsyncTask task = new AsyncTask();
@@ -43,7 +45,7 @@ public class AsyncTaskService {
             AsyncTask concurrent = findActive(taskType, bizType, bizId);
             if (concurrent != null) {
                 subscribe(concurrent.getTaskId(), createdBy);
-                return new AsyncTaskCreateResult(concurrent, false);
+                return new AsyncTaskCreateResult(refresh(concurrent), false);
             }
             throw e;
         }
@@ -156,6 +158,11 @@ public class AsyncTaskService {
         return task;
     }
 
+    private AsyncTask refresh(AsyncTask task) {
+        AsyncTask latest = getByTaskId(task.getTaskId());
+        return latest == null ? task : latest;
+    }
+
     private String newTaskId(String taskType) {
         return "task_" + taskType.toLowerCase(Locale.ROOT) + "_"
                 + UUID.randomUUID().toString().replace("-", "");
@@ -179,6 +186,8 @@ public class AsyncTaskService {
             subscriptionMapper.insert(subscription);
         } catch (DuplicateKeyException ignored) {
             // Multiple clicks or racing requests can subscribe the same user twice.
+        } catch (Exception e) {
+            log.error("[ASYNC_TASK] failed to subscribe user={} to task={}: {}", userId, taskId, e.getMessage(), e);
         }
     }
 

@@ -4,14 +4,18 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import io.jsonwebtoken.Claims;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.chovy.canvas.common.PageResult;
 import org.chovy.canvas.common.R;
 import org.chovy.canvas.domain.audience.AudienceDefinition;
 import org.chovy.canvas.domain.audience.AudienceDefinitionMapper;
 import org.chovy.canvas.domain.audience.AudienceStat;
 import org.chovy.canvas.domain.audience.AudienceStatMapper;
+import org.chovy.canvas.domain.notification.NotificationService;
+import org.chovy.canvas.domain.task.AsyncTask;
 import org.chovy.canvas.domain.task.AsyncTaskCreateResult;
 import org.chovy.canvas.domain.task.AsyncTaskService;
+import org.chovy.canvas.domain.task.AsyncTaskStatus;
 import org.chovy.canvas.dto.task.ComputeTaskResp;
 import org.chovy.canvas.engine.audience.AudienceBatchComputeService;
 import org.chovy.canvas.engine.audience.AudienceComputeTaskRunner;
@@ -31,6 +35,7 @@ import reactor.core.scheduler.Schedulers;
 
 import java.util.List;
 
+@Slf4j
 @RestController
 @RequestMapping("/canvas/audiences")
 @RequiredArgsConstructor
@@ -42,6 +47,7 @@ public class AudienceController {
     private final AudienceSchedulerService schedulerService;
     private final AsyncTaskService taskService;
     private final AudienceComputeTaskRunner computeTaskRunner;
+    private final NotificationService notificationService;
 
     @GetMapping
     public Mono<R<PageResult<AudienceDefinition>>> list(
@@ -142,8 +148,39 @@ public class AudienceController {
         String taskId = result.task().getTaskId();
         if (result.created()) {
             computeTaskRunner.start(taskId, definition.getId(), displayName, operator);
+        } else {
+            createCatchUpNotificationIfTerminal(result.task(), definition.getId(), displayName, operator);
         }
         return new ComputeTaskResp(taskId, result.task().getStatus());
+    }
+
+    private void createCatchUpNotificationIfTerminal(AsyncTask task, Long audienceId, String displayName, String operator) {
+        if (task == null || !isTerminal(task.getStatus())) {
+            return;
+        }
+        String type = AsyncTaskStatus.SUCCEEDED.name().equals(task.getStatus()) ? "TASK_SUCCEEDED" : "TASK_FAILED";
+        String title = AsyncTaskStatus.SUCCEEDED.name().equals(task.getStatus()) ? "人群计算完成" : "人群计算失败";
+        String detail = AsyncTaskStatus.SUCCEEDED.name().equals(task.getStatus())
+                ? "任务已完成"
+                : defaultIfBlank(task.getErrorMsg(), "计算失败");
+        try {
+            notificationService.createForTask(
+                    operator,
+                    type,
+                    title,
+                    displayName + " · " + detail,
+                    "/audiences?highlight=" + audienceId + "&taskId=" + task.getTaskId(),
+                    task.getTaskId());
+        } catch (Exception e) {
+            log.error("[AUDIENCE] failed to create catch-up notification taskId={} user={}: {}",
+                    task.getTaskId(), operator, e.getMessage(), e);
+        }
+    }
+
+    private boolean isTerminal(String status) {
+        return AsyncTaskStatus.SUCCEEDED.name().equals(status)
+                || AsyncTaskStatus.FAILED.name().equals(status)
+                || AsyncTaskStatus.CANCELED.name().equals(status);
     }
 
     private Mono<String> currentUser() {

@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import lombok.RequiredArgsConstructor;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
@@ -30,7 +31,15 @@ public class NotificationService {
         notification.setContent(trimToLimit(content, CONTENT_LIMIT));
         notification.setTargetUrl(trimToLimit(targetUrl, TARGET_URL_LIMIT));
         notification.setTaskId(taskId);
-        mapper.insert(notification);
+        try {
+            mapper.insert(notification);
+        } catch (DuplicateKeyException e) {
+            Notification existing = findForTask(userId, type, taskId);
+            if (existing != null) {
+                return existing;
+            }
+            throw e;
+        }
         return notification;
     }
 
@@ -73,6 +82,17 @@ public class NotificationService {
 
     private String newNotificationId() {
         return "ntf_" + UUID.randomUUID().toString().replace("-", "");
+    }
+
+    private Notification findForTask(String userId, String type, String taskId) {
+        if (userId == null || type == null || taskId == null) {
+            return null;
+        }
+        return mapper.selectOne(new LambdaQueryWrapper<Notification>()
+                .eq(Notification::getUserId, userId)
+                .eq(Notification::getType, type)
+                .eq(Notification::getTaskId, taskId)
+                .last("LIMIT 1"));
     }
 
     private String trimToLimit(String value, int limit) {

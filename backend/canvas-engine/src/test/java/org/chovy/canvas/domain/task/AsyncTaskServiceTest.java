@@ -12,6 +12,7 @@ import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -74,6 +75,40 @@ class AsyncTaskServiceTest {
         assertThat(result.created()).isFalse();
         assertThat(result.task()).isSameAs(existing);
         assertSubscriptionInserted("task_existing", "operator");
+    }
+
+    @Test
+    void createOrReuseRunningTask_stillReturnsCreatedTaskWhenSubscriptionInsertFails() {
+        when(mapper.selectOne(any())).thenReturn(null);
+        doThrow(new RuntimeException("subscription down"))
+                .when(subscriptionMapper).insert(any(AsyncTaskSubscription.class));
+        AsyncTaskService service = service();
+
+        AsyncTaskCreateResult result = service.createOrReuseRunning(
+                "AUDIENCE_COMPUTE", "AUDIENCE", "7", "计算人群：VIP", "operator");
+
+        assertThat(result.created()).isTrue();
+        assertThat(result.task().getStatus()).isEqualTo(AsyncTaskStatus.QUEUED.name());
+        verify(mapper).insert(result.task());
+    }
+
+    @Test
+    void createOrReuseRunningTask_refreshesReusedTaskAfterSubscribing() {
+        AsyncTask running = new AsyncTask();
+        running.setTaskId("task_existing");
+        running.setStatus(AsyncTaskStatus.RUNNING.name());
+        AsyncTask succeeded = new AsyncTask();
+        succeeded.setTaskId("task_existing");
+        succeeded.setStatus(AsyncTaskStatus.SUCCEEDED.name());
+        when(mapper.selectOne(any())).thenReturn(running, succeeded);
+        AsyncTaskService service = service();
+
+        AsyncTaskCreateResult result = service.createOrReuseRunning(
+                "AUDIENCE_COMPUTE", "AUDIENCE", "7", "计算人群：VIP", "bob");
+
+        assertThat(result.created()).isFalse();
+        assertThat(result.task()).isSameAs(succeeded);
+        assertSubscriptionInserted("task_existing", "bob");
     }
 
     @Test
