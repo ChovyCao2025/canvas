@@ -44,6 +44,8 @@ public class CanvasSchedulerService {
     private String taggerUrl;
     @org.springframework.beans.factory.annotation.Value("${canvas.integration.api-call-base-url}")
     private String apiCallUrl;
+    @org.springframework.beans.factory.annotation.Value("${canvas.scheduler.jitter-max-ms:300000}")
+    private long jitterMaxMs;
 
     // WebClient 懒建，避免循环依赖
     private org.springframework.web.reactive.function.client.WebClient taggerClient;
