@@ -11,6 +11,7 @@ export interface AudienceDataSource {
   driverClassName?: string
   enabled: number
   referenceCount?: number
+  updatedAt?: string
 }
 
 export const audienceDataSourceApi = {

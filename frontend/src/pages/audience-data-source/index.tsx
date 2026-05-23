@@ -99,6 +99,12 @@ export default function AudienceDataSourcePage() {
     },
     { title: '引用数', dataIndex: 'referenceCount', width: 90 },
     {
+      title: '更新时间',
+      dataIndex: 'updatedAt',
+      width: 180,
+      render: (value?: string) => (value ? value.replace('T', ' ').slice(0, 19) : '-'),
+    },
+    {
       title: '操作',
       width: 100,
       render: (_, record) => (
