@@ -24,6 +24,8 @@ public class ExecutionContext {
     private Long   canvasId;
     private Long   versionId;
     private String userId;
+    /** 压测批次 ID，普通业务流量为空 */
+    private String perfRunId;
     private String triggerType;
     /** 触发器节点类型（MQ_TRIGGER / EVENT_TRIGGER 等），DLQ 重放时需要 */
     private String triggerNodeType;
