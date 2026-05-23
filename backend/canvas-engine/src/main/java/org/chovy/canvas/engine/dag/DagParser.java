@@ -129,6 +129,7 @@ public class DagParser {
         private String name;
         private Map<String, Object> config;
         private Map<String, Object> bizConfig;
+        private String outletSchema;
         private Double x;
         private Double y;
     }

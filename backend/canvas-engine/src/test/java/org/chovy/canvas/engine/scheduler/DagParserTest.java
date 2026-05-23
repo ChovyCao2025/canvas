@@ -73,4 +73,22 @@ class DagParserTest {
         assertThat(g.upstream("n3")).containsExactly("n2");
         assertThat(g.upstream("n4")).containsExactly("n2");
     }
+
+    @Test
+    @DisplayName("节点运行时 UI 元数据不影响 DAG 解析")
+    void outlet_schema_metadata_parses() {
+        String json = """
+            {"nodes":[
+              {"id":"n1","type":"WAIT","name":"等待",
+               "outletSchema":"[{\\\"id\\\":\\\"success\\\",\\\"label\\\":\\\"继续\\\"}]",
+               "config":{"nextNodeId":"n2"}},
+              {"id":"n2","type":"END","config":{}}
+            ]}
+            """;
+
+        DagGraph g = parser.parse(json);
+
+        assertThat(g.getNode("n1").getOutletSchema()).contains("success");
+        assertThat(g.downstream("n1")).containsExactly("n2");
+    }
 }
