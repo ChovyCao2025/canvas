@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Layout, Menu, Avatar, Dropdown, Tooltip, type MenuProps } from 'antd'
 import {
   ApartmentOutlined, SettingOutlined, ApiOutlined,
@@ -46,11 +46,26 @@ export default function AppLayout() {
     return 'canvas'
   })()
 
-  const defaultOpenKeys = (() => {
+  const getDesiredOpenKeys = () => {
     if (selectedKey === 'api-docs') return ['developer']
-    if (['api-config', 'ab-experiments', 'admin-users'].includes(selectedKey)) return ['marketing', 'settings']
+    if ([
+      'api-config',
+      'ab-experiments',
+      'tag-config',
+      'audiences',
+      'mq-config',
+      'event-config',
+      'admin-users',
+    ].includes(selectedKey)) return ['settings']
+    if (selectedKey === 'home') return []
     return ['marketing']
-  })()
+  }
+
+  const [openKeys, setOpenKeys] = useState<string[]>(getDesiredOpenKeys)
+
+  useEffect(() => {
+    if (!collapsed) setOpenKeys(getDesiredOpenKeys())
+  }, [collapsed, selectedKey])
 
   const menuItems: MenuProps['items'] = [
     {
@@ -72,7 +87,7 @@ export default function AppLayout() {
         },
       ],
     },
-    {
+    ...(isAdmin ? [{
       key: 'developer',
       icon: <BookOutlined />,
       label: '开发者文档',
@@ -84,7 +99,7 @@ export default function AppLayout() {
           onClick: () => navigate('/api-docs'),
         },
       ],
-    },
+    }] : []),
     {
       key: 'settings',
       icon: <SettingOutlined />,
@@ -221,7 +236,8 @@ export default function AppLayout() {
           <Menu
             mode="inline"
             selectedKeys={[selectedKey]}
-            defaultOpenKeys={collapsed ? [] : defaultOpenKeys}
+            openKeys={collapsed ? [] : openKeys}
+            onOpenChange={keys => setOpenKeys(keys as string[])}
             items={menuItems}
             style={{ background: 'transparent', border: 'none' }}
             theme="dark"
