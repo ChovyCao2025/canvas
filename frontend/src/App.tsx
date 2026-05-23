@@ -15,6 +15,7 @@ import MqConfigPage from './pages/mq-config'
 import EventConfigPage from './pages/event-config'
 import AudienceListPage from './pages/audience-list'
 import AudienceEditPage from './pages/audience-edit'
+import AudienceDataSourcePage from './pages/audience-data-source'
 
 export default function App() {
   return (
@@ -44,6 +45,7 @@ export default function App() {
               <Route path="/ab-experiments" element={<AbExperimentPage />} />
               <Route path="/tag-config"     element={<TagConfigPage />} />
               <Route path="/audiences"      element={<AudienceListPage />} />
+              <Route path="/audiences/data-sources" element={<AudienceDataSourcePage />} />
               <Route path="/audiences/new"  element={<AudienceEditPage />} />
               <Route path="/audiences/:id/edit" element={<AudienceEditPage />} />
               <Route path="/mq-config"      element={<MqConfigPage />} />
