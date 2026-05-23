@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import org.chovy.canvas.domain.execution.CanvasWaitSubscription;
 import org.chovy.canvas.domain.execution.CanvasWaitSubscriptionMapper;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.time.Clock;
@@ -24,6 +25,7 @@ public class WaitSubscriptionService {
     private final CanvasWaitSubscriptionMapper mapper;
     private final Clock clock;
 
+    @Autowired
     public WaitSubscriptionService(CanvasWaitSubscriptionMapper mapper) {
         this(mapper, Clock.systemDefaultZone());
     }

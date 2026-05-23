@@ -10,6 +10,7 @@ import org.chovy.canvas.engine.handler.NodeHandler;
 import org.chovy.canvas.engine.handler.NodeHandlerType;
 import org.chovy.canvas.engine.handler.NodeResult;
 import org.chovy.canvas.engine.wait.WaitSubscriptionService;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import reactor.core.publisher.Mono;
 
@@ -29,6 +30,7 @@ public class GoalCheckHandler implements NodeHandler {
     private final ObjectMapper objectMapper;
     private final Clock clock;
 
+    @Autowired
     public GoalCheckHandler(
             EventLogMapper eventLogMapper,
             WaitSubscriptionService waitSubscriptionService,
