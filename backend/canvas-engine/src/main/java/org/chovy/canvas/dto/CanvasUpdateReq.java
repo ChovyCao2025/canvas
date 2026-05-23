@@ -1,5 +1,6 @@
 package org.chovy.canvas.dto;
 
+import java.time.LocalDateTime;
 import lombok.Data;
 
 @Data
@@ -12,5 +13,10 @@ public class CanvasUpdateReq {
     /** REALTIME | SCHEDULED */
     private String triggerType;
     private String cronExpression;
+    private LocalDateTime validStart;
+    private LocalDateTime validEnd;
+    private Integer maxTotalExecutions;
+    private Integer perUserDailyLimit;
+    private Integer perUserTotalLimit;
+    private Integer cooldownSeconds;
 }
-

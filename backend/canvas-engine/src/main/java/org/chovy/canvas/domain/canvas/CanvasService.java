@@ -103,6 +103,12 @@ public class CanvasService {
         canvas.setDescription(req.getDescription());
         if (req.getTriggerType() != null) canvas.setTriggerType(req.getTriggerType());
         if (req.getCronExpression() != null) canvas.setCronExpression(req.getCronExpression());
+        canvas.setValidStart(req.getValidStart());
+        canvas.setValidEnd(req.getValidEnd());
+        canvas.setMaxTotalExecutions(req.getMaxTotalExecutions());
+        canvas.setPerUserDailyLimit(req.getPerUserDailyLimit());
+        canvas.setPerUserTotalLimit(req.getPerUserTotalLimit());
+        canvas.setCooldownSeconds(req.getCooldownSeconds());
         canvasMapper.updateById(canvas);
 
         if (req.getGraphJson() == null) return;

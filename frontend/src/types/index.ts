@@ -26,11 +26,20 @@ export interface Canvas {
   description?: string
   status: CanvasStatus
   publishedVersionId?: number
+  canaryVersionId?: number
+  canaryPercent?: number
   createdBy?: string
   createdAt: string
   updatedAt: string
   triggerType?:    string
   cronExpression?: string
+  editVersion?: number
+  validStart?: string
+  validEnd?: string
+  maxTotalExecutions?: number
+  perUserDailyLimit?: number
+  perUserTotalLimit?: number
+  cooldownSeconds?: number
 }
 
 export interface CanvasDetail {

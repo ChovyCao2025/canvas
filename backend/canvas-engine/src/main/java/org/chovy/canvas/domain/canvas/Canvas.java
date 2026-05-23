@@ -38,21 +38,27 @@ public class Canvas {
     // ── 执行约束（V3）────────────────────────────────────────────────
 
     /** 画布有效期开始时间，null 表示不限制 */
+    @TableField(updateStrategy = FieldStrategy.ALWAYS)
     private LocalDateTime validStart;
 
     /** 画布有效期结束时间，null 表示不限制 */
+    @TableField(updateStrategy = FieldStrategy.ALWAYS)
     private LocalDateTime validEnd;
 
     /** 单用户全生命周期最大执行次数，null 表示不限制 */
+    @TableField(updateStrategy = FieldStrategy.ALWAYS)
     private Integer perUserTotalLimit;
 
     /** 单用户每日最大执行次数，null 表示不限制 */
+    @TableField(updateStrategy = FieldStrategy.ALWAYS)
     private Integer perUserDailyLimit;
 
     /** 单用户两次执行之间的冷却时间（秒），null 表示不限制 */
+    @TableField(updateStrategy = FieldStrategy.ALWAYS)
     private Integer cooldownSeconds;
 
     /** 画布全局最大并发执行数，null 时使用全局默认值 */
+    @TableField(updateStrategy = FieldStrategy.ALWAYS)
     private Integer maxTotalExecutions;
 
     // ── 灰度发布（V3）──────────────────────────────────────────────

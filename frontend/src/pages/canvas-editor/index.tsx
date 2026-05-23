@@ -3,14 +3,15 @@ import {
   ReactFlow, ReactFlowProvider,
   addEdge, useNodesState, useEdgesState,
   useReactFlow, Background, Controls, MiniMap,
-  type Connection, type Node, type Edge, type NodeChange,
+  type Connection, type Node, type Edge, type NodeChange, type EdgeChange,
 } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
 import dagre from '@dagrejs/dagre'
-import { Button, Divider, Drawer, Form, Input, message, Modal, Radio, Space, Spin, Tag, Tooltip } from 'antd'
+import { Button, DatePicker, Divider, Drawer, Form, Input, InputNumber, message, Modal, Radio, Slider, Space, Spin, Tag, Tooltip } from 'antd'
 import {
-  ArrowLeftOutlined, CaretRightOutlined, CloudUploadOutlined, SaveOutlined, ApartmentOutlined, UndoOutlined, RedoOutlined, SyncOutlined, DeleteOutlined, QuestionCircleOutlined, HistoryOutlined, SettingOutlined,
+  ArrowLeftOutlined, CaretRightOutlined, CloudUploadOutlined, SaveOutlined, ApartmentOutlined, UndoOutlined, RedoOutlined, SyncOutlined, DeleteOutlined, QuestionCircleOutlined, HistoryOutlined, SettingOutlined, ExperimentOutlined,
 } from '@ant-design/icons'
+import dayjs from 'dayjs'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import type { BackendNode, BizConfig, CanvasNodeData } from '../../types/canvas'
 import { canvasApi } from '../../services/api'
@@ -28,6 +29,9 @@ import {
 import HoverEdge from '../../components/canvas/HoverEdge'
 import CronBuilder from '../../components/config-panel/CronBuilder'
 import { CanvasActionsContext } from '../../context/CanvasActionsContext'
+import { useAuth } from '../../context/AuthContext'
+
+const { RangePicker } = DatePicker
 
 
 const nodeTypes = {
@@ -186,6 +190,7 @@ function EditorInner({ detail, onStatusChange }: {
   const { id } = useParams<{ id: string }>()
   const canvasId = Number(id)
   const navigate = useNavigate()
+  const { isAdmin } = useAuth()
   const [searchParams] = useSearchParams()
   const readonly = searchParams.get('readonly') === 'true'
   const { screenToFlowPosition, getNodes, getEdges, fitView } = useReactFlow()
@@ -202,6 +207,16 @@ function EditorInner({ detail, onStatusChange }: {
   const displayEdges  = useMemo(() => [...edges,     ...phEdges],  [edges,     phEdges])
 
   const [canvasName, setCanvasName] = useState(detail.canvas.name)
+  const [canvasSettings, setCanvasSettings] = useState({
+    triggerType: detail.canvas.triggerType,
+    cronExpression: detail.canvas.cronExpression,
+    validStart: detail.canvas.validStart,
+    validEnd: detail.canvas.validEnd,
+    maxTotalExecutions: detail.canvas.maxTotalExecutions,
+    perUserDailyLimit: detail.canvas.perUserDailyLimit,
+    perUserTotalLimit: detail.canvas.perUserTotalLimit,
+    cooldownSeconds: detail.canvas.cooldownSeconds,
+  })
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null)
   const [saving, setSaving]         = useState(false)
   const [isDirty, setIsDirty]       = useState(false)
@@ -211,6 +226,8 @@ function EditorInner({ detail, onStatusChange }: {
   const [testUserId,    setTestUserId]    = useState('user_test_001')
   const [testPayload,   setTestPayload]   = useState('{}')
   const [testRunning,   setTestRunning]   = useState(false)
+  const [canaryModalOpen, setCanaryModalOpen] = useState(false)
+  const [canaryPercent, setCanaryPercent] = useState(20)
   // Version history (EF-7)
   const [historyOpen,    setHistoryOpen]    = useState(false)
   const [versionList,    setVersionList]    = useState<import('../../types').CanvasVersion[]>([])
@@ -218,7 +235,7 @@ function EditorInner({ detail, onStatusChange }: {
   // Canvas settings / trigger type (EF-8)
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [settingsForm] = Form.useForm()
-  const editVersion   = useRef(0)
+  const editVersion   = useRef(detail.canvas.editVersion ?? 0)
   const autoSaveTimer = useRef<ReturnType<typeof setTimeout>>()
 
   const { snapshot, undo, redo, canUndo, canRedo, undoLabel, redoLabel } = useHistory(nodes as Node<CanvasNodeData>[], edges)
@@ -471,6 +488,12 @@ function EditorInner({ detail, onStatusChange }: {
     if (significant) setIsDirty(true)
   }, [nodes, snapshot, setNodes, setEdges, onNodesChange])
 
+  const onEdgesChangeWrapped = useCallback((changes: EdgeChange[]) => {
+    onEdgesChange(changes)
+    const significant = changes.some(c => c.type === 'add' || c.type === 'remove')
+    if (significant) setIsDirty(true)
+  }, [onEdgesChange])
+
   // 连线规则
   const isValidConnection = useCallback((conn: Connection) => {
     const allNodes = getNodes()
@@ -559,20 +582,36 @@ function EditorInner({ detail, onStatusChange }: {
       })
       await canvasApi.update(canvasId, {
         name: canvasName,
+        description: detail.canvas.description,
         graphJson: JSON.stringify({ nodes: backendNodes }),
         editVersion: editVersion.current,
+        triggerType: canvasSettings.triggerType,
+        cronExpression: canvasSettings.cronExpression,
+        validStart: canvasSettings.validStart ?? null,
+        validEnd: canvasSettings.validEnd ?? null,
+        maxTotalExecutions: canvasSettings.maxTotalExecutions ?? null,
+        perUserDailyLimit: canvasSettings.perUserDailyLimit ?? null,
+        perUserTotalLimit: canvasSettings.perUserTotalLimit ?? null,
+        cooldownSeconds: canvasSettings.cooldownSeconds ?? null,
       })
       editVersion.current += 1
       setIsDirty(false)
       if (!silent) message.success('保存成功')
     } catch (err: any) {
-      if (err?.response?.status === 409)
-        message.error('画布已被他人修改，请刷新后重试')
+      if (err?.response?.status === 409) {
+        Modal.confirm({
+          title: '画布已被他人修改',
+          content: '当前画布已有新版本，刷新后你的未保存内容将丢失。是否立即刷新？',
+          okText: '立即刷新',
+          cancelText: '暂不刷新',
+          onOk: () => window.location.reload(),
+        })
+      }
       else if (!silent) message.error('保存失败')
     } finally {
       setSaving(false)
     }
-  }, [canvasId, canvasName, getNodes])
+  }, [canvasId, canvasName, canvasSettings, detail.canvas.description, getNodes])
 
   /** 发布（或重新发布）：先保存草稿，再创建新版本上线 */
   const handlePublish = useCallback(async () => {
@@ -587,6 +626,67 @@ function EditorInner({ detail, onStatusChange }: {
       message.error(e?.response?.data?.message ?? '发布失败')
     }
   }, [canvasId, getNodes, handleSave, validateBeforePublish])
+
+  const handleStartCanary = async () => {
+    try {
+      const hasExisting = !!detail.canvas.canaryVersionId
+      if (hasExisting) {
+        const confirmed = await new Promise<boolean>(resolve =>
+          Modal.confirm({
+            title: '覆盖灰度版本',
+            content: `当前已有灰度版本（${detail.canvas.canaryPercent}%），确认覆盖？`,
+            okText: '确认覆盖',
+            okButtonProps: { danger: true },
+            cancelText: '取消',
+            onOk: () => resolve(true),
+            onCancel: () => resolve(false),
+          })
+        )
+        if (!confirmed) return
+      }
+      await canvasApi.canary(canvasId, canaryPercent)
+      message.success(`灰度发布成功，${canaryPercent}% 用户将收到新版本`)
+      setCanaryModalOpen(false)
+      window.location.reload()
+    } catch {
+      message.error('灰度发布失败，请稍后重试')
+    }
+  }
+
+  const handlePromoteCanary = () => {
+    Modal.confirm({
+      title: '晋升灰度为全量',
+      content: '灰度版本将成为正式版本，所有用户切换到新版本。确认晋升？',
+      okText: '确认晋升',
+      onOk: async () => {
+        try {
+          await canvasApi.promoteCanary(canvasId)
+          message.success('已晋升为全量版本')
+          window.location.reload()
+        } catch {
+          message.error('晋升灰度失败，请稍后重试')
+        }
+      },
+    })
+  }
+
+  const handleRollbackCanary = () => {
+    Modal.confirm({
+      title: '回滚灰度',
+      content: '灰度版本将被丢弃，所有用户恢复到正式版本。确认回滚？',
+      okType: 'danger',
+      okText: '确认回滚',
+      onOk: async () => {
+        try {
+          await canvasApi.rollbackCanary(canvasId)
+          message.warning('灰度已回滚')
+          window.location.reload()
+        } catch {
+          message.error('回滚灰度失败，请稍后重试')
+        }
+      },
+    })
+  }
 
   // 整理布局
   const onLayout = useCallback(() => {
@@ -621,17 +721,44 @@ function EditorInner({ detail, onStatusChange }: {
 
   // 画布设置（EF-8）
   const openSettings = () => {
+    const validStart = detail.canvas.validStart ? dayjs(detail.canvas.validStart) : null
+    const validEnd = detail.canvas.validEnd ? dayjs(detail.canvas.validEnd) : null
     settingsForm.setFieldsValue({
-      triggerType:    detail.canvas.triggerType    ?? 'REALTIME',
-      cronExpression: detail.canvas.cronExpression ?? '',
+      triggerType:        detail.canvas.triggerType ?? 'REALTIME',
+      cronExpression:     detail.canvas.cronExpression ?? '',
+      validRange:         validStart || validEnd ? [validStart, validEnd] : undefined,
+      maxTotalExecutions: detail.canvas.maxTotalExecutions ?? undefined,
+      perUserDailyLimit:  detail.canvas.perUserDailyLimit ?? undefined,
+      perUserTotalLimit:  detail.canvas.perUserTotalLimit ?? undefined,
+      cooldownSeconds:    detail.canvas.cooldownSeconds ?? undefined,
     })
     setSettingsOpen(true)
   }
   const saveSettings = async () => {
-    const vals = settingsForm.getFieldsValue()
-    await canvasApi.update(canvasId, {
-      triggerType:    vals.triggerType,
+    const vals = await settingsForm.validateFields()
+    const validRange = vals.validRange as [dayjs.Dayjs | null | undefined, dayjs.Dayjs | null | undefined] | undefined
+    const payload = {
+      name: canvasName,
+      description: detail.canvas.description,
+      triggerType: vals.triggerType,
       cronExpression: vals.triggerType === 'SCHEDULED' ? vals.cronExpression : undefined,
+      validStart: validRange?.[0]?.format('YYYY-MM-DDTHH:mm:ss') ?? undefined,
+      validEnd: validRange?.[1]?.format('YYYY-MM-DDTHH:mm:ss') ?? undefined,
+      maxTotalExecutions: vals.maxTotalExecutions ?? null,
+      perUserDailyLimit: vals.perUserDailyLimit ?? null,
+      perUserTotalLimit: vals.perUserTotalLimit ?? null,
+      cooldownSeconds: vals.cooldownSeconds ?? null,
+    }
+    await canvasApi.update(canvasId, payload)
+    setCanvasSettings({
+      triggerType: vals.triggerType,
+      cronExpression: vals.triggerType === 'SCHEDULED' ? vals.cronExpression : undefined,
+      validStart: payload.validStart ?? undefined,
+      validEnd: payload.validEnd ?? undefined,
+      maxTotalExecutions: payload.maxTotalExecutions ?? undefined,
+      perUserDailyLimit: payload.perUserDailyLimit ?? undefined,
+      perUserTotalLimit: payload.perUserTotalLimit ?? undefined,
+      cooldownSeconds: payload.cooldownSeconds ?? undefined,
     })
     message.success('设置已保存')
     setSettingsOpen(false)
@@ -644,6 +771,7 @@ function EditorInner({ detail, onStatusChange }: {
     setNodes(prev => prev.map(n =>
       n.id === nid ? { ...n, data: { ...n.data as CanvasNodeData, ...patch } } : n
     ))
+    setIsDirty(true)
   }, [setNodes])
 
   const selectedData = selectedNodeId
@@ -722,7 +850,7 @@ function EditorInner({ detail, onStatusChange }: {
         {/* 画布名 + 状态 */}
         <Input
           value={canvasName}
-          onChange={e => setCanvasName(e.target.value)}
+          onChange={e => { setCanvasName(e.target.value); setIsDirty(true) }}
           variant="borderless"
           style={{ width: 240, fontWeight: 600, fontSize: 14, padding: 0 }}
           disabled={readonly}
@@ -819,35 +947,75 @@ function EditorInner({ detail, onStatusChange }: {
           </Button>
           )}
 
-          {!readonly && (status !== 1 ? (
-            <Space size={4}>
-              <Button size="small" icon={<CloudUploadOutlined />} onClick={handlePublish}
-                style={{
-                  background: '#1677ff', color: '#fff', border: 'none',
-                  borderRadius: 20, padding: '0 14px', fontWeight: 500, fontSize: 12,
-                  boxShadow: '0 2px 6px rgba(22,119,255,.35)',
-                }}>
-                发布
-              </Button>
-              <Tooltip title="发布后线上版本立即生效；下线过程中已进入旅程的用户实例将执行完毕后自然结束，不会被强制中断">
-                <QuestionCircleOutlined style={{ color: '#8c8c8c', fontSize: 13 }} />
+          {!readonly && (status === 1 && detail.canvas.canaryVersionId ? (
+            <Space>
+              {isAdmin && (
+                <Tooltip title="保存当前草稿并重新发布，更新线上版本">
+                  <Button size="small" icon={<SyncOutlined />} onClick={handlePublish}
+                    style={{
+                      background: '#52c41a', color: '#fff', border: 'none',
+                      borderRadius: 20, padding: '0 14px', fontWeight: 500, fontSize: 12,
+                      boxShadow: '0 2px 6px rgba(82,196,26,.35)',
+                    }}>
+                    更新发布
+                  </Button>
+                </Tooltip>
+              )}
+              <Tag color="orange" style={{ fontSize: 13, padding: '2px 10px' }}>
+                灰度中 {detail.canvas.canaryPercent}%
+              </Tag>
+              <Tooltip title="将灰度版本晋升为全量正式版本">
+                <Button size="small" type="primary" onClick={handlePromoteCanary}>
+                  晋升全量
+                </Button>
+              </Tooltip>
+              <Tooltip title="丢弃灰度版本，恢复全量走正式版本">
+                <Button size="small" danger onClick={handleRollbackCanary}>
+                  回滚
+                </Button>
               </Tooltip>
             </Space>
           ) : (
-            <Space size={4}>
-              <Tooltip title="保存当前草稿并重新发布，更新线上版本">
-                <Button size="small" icon={<SyncOutlined />} onClick={handlePublish}
-                  style={{
-                    background: '#52c41a', color: '#fff', border: 'none',
-                    borderRadius: 20, padding: '0 14px', fontWeight: 500, fontSize: 12,
-                    boxShadow: '0 2px 6px rgba(82,196,26,.35)',
-                  }}>
-                  更新发布
-                </Button>
-              </Tooltip>
-              <Tooltip title="发布后线上版本立即生效；下线过程中已进入旅程的用户实例将执行完毕后自然结束，不会被强制中断">
-                <QuestionCircleOutlined style={{ color: '#8c8c8c', fontSize: 13 }} />
-              </Tooltip>
+            <Space>
+              {status !== 1 && isAdmin && (
+                <Space size={4}>
+                  <Button size="small" icon={<CloudUploadOutlined />} onClick={() => handlePublish()}
+                    style={{
+                      background: '#1677ff', color: '#fff', border: 'none',
+                      borderRadius: 20, padding: '0 14px', fontWeight: 500, fontSize: 12,
+                      boxShadow: '0 2px 6px rgba(22,119,255,.35)',
+                    }}>
+                    发布
+                  </Button>
+                  <Tooltip title="发布后线上版本立即生效；下线过程中已进入旅程的用户实例将执行完毕后自然结束，不会被强制中断">
+                    <QuestionCircleOutlined style={{ color: '#8c8c8c', fontSize: 13 }} />
+                  </Tooltip>
+                </Space>
+              )}
+              {status === 1 && isAdmin && (
+                <>
+                  <Tooltip title="保存当前草稿并重新发布，更新线上版本">
+                    <Button size="small" icon={<SyncOutlined />} onClick={handlePublish}
+                      style={{
+                        background: '#52c41a', color: '#fff', border: 'none',
+                        borderRadius: 20, padding: '0 14px', fontWeight: 500, fontSize: 12,
+                        boxShadow: '0 2px 6px rgba(82,196,26,.35)',
+                      }}>
+                      更新发布
+                    </Button>
+                  </Tooltip>
+                  <Tooltip title={isDirty ? '请先保存草稿再灰度发布' : '将当前草稿作为灰度版本发布'}>
+                    <Button
+                      size="small"
+                      icon={<ExperimentOutlined />}
+                      disabled={isDirty}
+                      onClick={() => setCanaryModalOpen(true)}
+                    >
+                      灰度发布
+                    </Button>
+                  </Tooltip>
+                </>
+              )}
             </Space>
           ))}
         </div>
@@ -904,6 +1072,34 @@ function EditorInner({ detail, onStatusChange }: {
             </Space>
           </Modal>
 
+      <Modal
+        title="灰度发布"
+        open={canaryModalOpen}
+        onOk={handleStartCanary}
+        onCancel={() => setCanaryModalOpen(false)}
+        okText="确认灰度发布"
+        width={460}
+      >
+        <div style={{ padding: '8px 0' }}>
+          <div style={{ marginBottom: 8, fontWeight: 500 }}>
+            灰度比例：<span style={{ color: '#1890ff', fontSize: 18 }}>{canaryPercent}%</span>
+          </div>
+          <Slider
+            min={1}
+            max={99}
+            value={canaryPercent}
+            onChange={setCanaryPercent}
+            marks={{ 1: '1%', 10: '10%', 30: '30%', 50: '50%', 99: '99%' }}
+            style={{ marginBottom: 24 }}
+          />
+          <div style={{ color: '#8c8c8c', fontSize: 12, lineHeight: '20px' }}>
+            <div>· {canaryPercent}% 的用户将收到新版本画布</div>
+            <div>· 用户分配基于 hash，同一用户始终命中同一版本</div>
+            <div>· 灰度期间可随时晋升全量或回滚</div>
+          </div>
+        </div>
+      </Modal>
+
       {/* 三栏主体 */}
       <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
 
@@ -927,7 +1123,7 @@ function EditorInner({ detail, onStatusChange }: {
             nodesConnectable={!readonly}
             elementsSelectable={!readonly}
             onNodesChange={onNodesChangeWrapped}
-            onEdgesChange={onEdgesChange}
+            onEdgesChange={onEdgesChangeWrapped}
             onConnect={onConnect}
             isValidConnection={isValidConnection as any}
             onNodeClick={(_, node) => setSelectedNodeId(node.id)}
@@ -1008,7 +1204,7 @@ function EditorInner({ detail, onStatusChange }: {
       </Drawer>
 
       {/* 触发方式设置 Modal（EF-8） */}
-      <Modal title="触发方式设置" open={settingsOpen}
+      <Modal title="画布设置" open={settingsOpen}
         onOk={saveSettings} onCancel={() => setSettingsOpen(false)}
         okText="保存" cancelText="取消" width={480}>
         <Form form={settingsForm} layout="vertical" style={{ marginTop: 16 }}>
@@ -1032,6 +1228,27 @@ function EditorInner({ detail, onStatusChange }: {
                 </Form.Item>
               ) : null
             }
+          </Form.Item>
+          <Divider orientation="left">执行限制（留空表示不限制）</Divider>
+          <Form.Item label="有效期" name="validRange">
+            <RangePicker
+              showTime
+              format="YYYY-MM-DD HH:mm"
+              placeholder={['开始时间', '结束时间']}
+              style={{ width: '100%' }}
+            />
+          </Form.Item>
+          <Form.Item label="总执行次数上限" name="maxTotalExecutions">
+            <InputNumber min={1} style={{ width: '100%' }} placeholder="不限制" />
+          </Form.Item>
+          <Form.Item label="用户每日上限" name="perUserDailyLimit">
+            <InputNumber min={1} style={{ width: '100%' }} placeholder="不限制" />
+          </Form.Item>
+          <Form.Item label="用户总上限" name="perUserTotalLimit">
+            <InputNumber min={1} style={{ width: '100%' }} placeholder="不限制" />
+          </Form.Item>
+          <Form.Item label="冷却秒数" name="cooldownSeconds">
+            <InputNumber min={0} style={{ width: '100%' }} placeholder="不限制" />
           </Form.Item>
         </Form>
       </Modal>

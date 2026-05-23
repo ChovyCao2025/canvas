@@ -71,7 +71,20 @@ export const canvasApi = {
   get: (id: number) =>
     http.get<R<CanvasDetail>, R<CanvasDetail>>(`/canvas/${id}`),
 
-  update: (id: number, body: { name?: string; description?: string; graphJson?: string; editVersion?: number; triggerType?: string; cronExpression?: string }) =>
+  update: (id: number, body: {
+    name?: string
+    description?: string
+    graphJson?: string
+    editVersion?: number
+    triggerType?: string
+    cronExpression?: string
+    validStart?: string | null
+    validEnd?: string | null
+    maxTotalExecutions?: number | null
+    perUserDailyLimit?: number | null
+    perUserTotalLimit?: number | null
+    cooldownSeconds?: number | null
+  }) =>
     http.put<R<void>, R<void>>(`/canvas/${id}`, body),
 
   list: (params: { page?: number; size?: number; status?: number; name?: string }) =>
@@ -100,6 +113,9 @@ export const canvasApi = {
 
   promoteCanary: (id: number) =>
     http.post<R<void>, R<void>>(`/canvas/${id}/promote-canary`),
+
+  rollbackCanary: (id: number) =>
+    http.post<R<void>, R<void>>(`/canvas/${id}/rollback-canary`),
 
   rollback: (id: number) =>
     http.post<R<void>, R<void>>(`/canvas/${id}/rollback`),
