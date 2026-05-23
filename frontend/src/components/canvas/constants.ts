@@ -5,7 +5,7 @@ export const CATEGORY_COLORS: Record<string, string> = {
   '流程控制': '#4f46e5',
   '权益发放': 'linear-gradient(135deg, #ef4444, #ec4899)',
   '用户触达': '#f59e0b',
-  '其他':     '#64748b',
+  '其他':     '#6d5efc',
 }
 
 export const CATEGORY_SOLID: Record<string, string> = {
@@ -14,7 +14,7 @@ export const CATEGORY_SOLID: Record<string, string> = {
   '流程控制': '#4f46e5',
   '权益发放': '#ef4444',
   '用户触达': '#f59e0b',
-  '其他':     '#64748b',
+  '其他':     '#6d5efc',
 }
 
 /** 不能有上游节点的节点类型（START 是流程唯一入口）

@@ -1,5 +1,6 @@
 import type { DragEvent } from 'react'
 import { Popover, Typography } from 'antd'
+import { RightOutlined } from '@ant-design/icons'
 
 import type { NodeTypeRegistry } from '../../types'
 
@@ -78,7 +79,7 @@ export default function NodeLibraryItem({
         </div>
         <Popover
           trigger="click"
-          placement="leftTop"
+          placement="rightTop"
           content={
             <div style={{ maxWidth: 260 }}>
               <Text strong style={{ display: 'block', marginBottom: 4 }}>
@@ -98,18 +99,20 @@ export default function NodeLibraryItem({
               width: 20,
               height: 20,
               flex: '0 0 20px',
-              borderRadius: '50%',
-              border: '1px solid #dce3eb',
-              background: '#f7f9fc',
-              color: '#a0acba',
-              fontSize: 11,
-              lineHeight: '18px',
+              border: 'none',
+              background: 'transparent',
+              color: '#b6c0cd',
+              fontSize: 12,
+              lineHeight: '20px',
               textAlign: 'center',
               padding: 0,
               cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
             }}
           >
-            i
+            <RightOutlined style={{ fontSize: 12 }} />
           </button>
         </Popover>
       </div>
