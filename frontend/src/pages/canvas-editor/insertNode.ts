@@ -8,6 +8,7 @@ export function applyInsertIntoEdge(edge: Edge, nodeId: string) {
   if (sourceHandle !== 'default') {
     throw new Error('applyInsertIntoEdge only supports default sourceHandle edges')
   }
+  const targetHandle = edge.targetHandle
 
   return {
     removeEdgeId: edge.id,
@@ -17,12 +18,14 @@ export function applyInsertIntoEdge(edge: Edge, nodeId: string) {
         source: edge.source,
         target: nodeId,
         sourceHandle,
+        targetHandle: 'input',
       },
       {
         id: `${nodeId}->${edge.target}`,
         source: nodeId,
         target: edge.target,
         sourceHandle: 'default',
+        targetHandle,
       },
     ] satisfies Edge[],
   }
@@ -34,6 +37,7 @@ export function buildPlaceholderEdge(sourceId: string, handleId: string, nodeId:
     source: sourceId,
     target: nodeId,
     sourceHandle: handleId,
+    targetHandle: 'input',
   }
 }
 

@@ -15,7 +15,7 @@ describe('insertNode helpers', () => {
 
     expect(result.removeEdgeId).toBe('a->b')
     expect(result.newEdges).toEqual([
-      { id: 'a->new_node', source: 'a', target: 'new_node', sourceHandle: 'default' },
+      { id: 'a->new_node', source: 'a', target: 'new_node', sourceHandle: 'default', targetHandle: 'input' },
       { id: 'new_node->b', source: 'new_node', target: 'b', sourceHandle: 'default' },
     ])
   })
@@ -28,8 +28,23 @@ describe('insertNode helpers', () => {
     }, 'new_node')
 
     expect(result.newEdges).toEqual([
-      { id: 'a->new_node', source: 'a', target: 'new_node', sourceHandle: 'default' },
+      { id: 'a->new_node', source: 'a', target: 'new_node', sourceHandle: 'default', targetHandle: 'input' },
       { id: 'new_node->b', source: 'new_node', target: 'b', sourceHandle: 'default' },
+    ])
+  })
+
+  it('preserves the original targetHandle on the downstream replacement edge', () => {
+    const result = applyInsertIntoEdge({
+      id: 'a->b',
+      source: 'a',
+      target: 'b',
+      sourceHandle: 'default',
+      targetHandle: 'input',
+    }, 'new_node')
+
+    expect(result.newEdges).toEqual([
+      { id: 'a->new_node', source: 'a', target: 'new_node', sourceHandle: 'default', targetHandle: 'input' },
+      { id: 'new_node->b', source: 'new_node', target: 'b', sourceHandle: 'default', targetHandle: 'input' },
     ])
   })
 
@@ -56,6 +71,7 @@ describe('insertNode helpers', () => {
       source: 'if_1',
       target: 'new_node',
       sourceHandle: 'success',
+      targetHandle: 'input',
     })
   })
 })
