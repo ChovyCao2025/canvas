@@ -91,6 +91,15 @@ springdoc:
     enabled: true
     path: /swagger-ui.html
 
+rocketmq:
+  name-server: ${ROCKETMQ_NAME_SERVER:localhost:9876}
+  producer:
+    group: PID_CANVAS_ENGINE
+    send-message-timeout: 3000
+    retry-times-when-send-failed: 2
+  consumer:
+    group: GID_CANVAS_ENGINE
+
 management:
   endpoints:
     web:
