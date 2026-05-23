@@ -15,11 +15,11 @@ public interface CanvasExecutionRequestMapper extends BaseMapper<CanvasExecution
 
     @Insert("""
             INSERT IGNORE INTO canvas_execution_request
-            (id, canvas_id, user_id, trigger_type, trigger_node_type, match_key,
+            (id, canvas_id, user_id, perf_run_id, trigger_type, trigger_node_type, match_key,
              payload_json, source_msg_id, status, attempt_count, next_retry_at,
              last_error, result_json, created_at, updated_at)
             VALUES
-            (#{id}, #{canvasId}, #{userId}, #{triggerType}, #{triggerNodeType}, #{matchKey},
+            (#{id}, #{canvasId}, #{userId}, #{perfRunId}, #{triggerType}, #{triggerNodeType}, #{matchKey},
              #{payloadJson}, #{sourceMsgId}, #{status}, #{attemptCount}, #{nextRetryAt},
              #{lastError}, #{resultJson}, NOW(), NOW())
             """)

@@ -27,6 +27,9 @@ public class CanvasExecution {
     /** 触发该执行的用户 ID */
     private String userId;
 
+    /** 压测批次 ID，普通业务流量为空 */
+    private String perfRunId;
+
     /**
      * 触发类型，见 {@link org.chovy.canvas.domain.constant.TriggerType}。
      * 如 MQ、DIRECT_CALL、BEHAVIOR、DRY_RUN、DLQ_REPLAY 等。

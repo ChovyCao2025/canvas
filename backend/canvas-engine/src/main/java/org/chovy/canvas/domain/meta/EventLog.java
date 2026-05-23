@@ -23,6 +23,9 @@ public class EventLog {
     /** 触发用户 ID */
     private String userId;
 
+    /** 压测批次 ID，普通业务流量为空 */
+    private String perfRunId;
+
     /**
      * 上报携带的业务属性，JSON 对象字符串。
      * 内容与 EventDefinition.attributes 中定义的字段对应，
