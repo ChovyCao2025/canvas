@@ -101,9 +101,6 @@ canvas:
     tagger-service-url: http://localhost:8099/mock/tagger
     reach-platform-url: http://localhost:8099/mock/reach
     api-call-base-url: http://localhost:8099/mock/api
-  scheduler:
-    # 定时任务触发的最大随机抖动时间（毫秒），0 表示不抖动（默认 5 分钟）
-    jitter-max-ms: 300000
 
 springdoc:
   api-docs:

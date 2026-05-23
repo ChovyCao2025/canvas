@@ -7,6 +7,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.chovy.canvas.domain.meta.ApiDefinition;
 import org.chovy.canvas.domain.meta.ApiDefinitionMapper;
+import org.chovy.canvas.infra.cache.ApiDefinitionCache;
 import org.apache.ibatis.builder.MapperBuilderAssistant;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
@@ -21,6 +22,7 @@ import static org.mockito.Mockito.verify;
 class ApiDefinitionControllerTest {
 
     private ApiDefinitionMapper apiDefinitionMapper;
+    private ApiDefinitionCache apiDefinitionCache;
     private ApiDefinitionController controller;
     private ObjectMapper objectMapper;
 
@@ -34,8 +36,9 @@ class ApiDefinitionControllerTest {
     @BeforeEach
     void setUp() {
         apiDefinitionMapper = Mockito.mock(ApiDefinitionMapper.class);
+        apiDefinitionCache = Mockito.mock(ApiDefinitionCache.class);
         objectMapper = new ObjectMapper();
-        controller = new ApiDefinitionController(apiDefinitionMapper, objectMapper);
+        controller = new ApiDefinitionController(apiDefinitionMapper, apiDefinitionCache, objectMapper);
     }
 
     @Test

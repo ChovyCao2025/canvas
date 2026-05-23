@@ -1,9 +1,9 @@
 package org.chovy.canvas.engine.handlers;
 
 import org.chovy.canvas.domain.meta.ApiDefinition;
-import org.chovy.canvas.domain.meta.ApiDefinitionMapper;
 import org.chovy.canvas.engine.context.ExecutionContext;
 import org.chovy.canvas.engine.handler.NodeResult;
+import org.chovy.canvas.infra.cache.ApiDefinitionCache;
 import org.chovy.canvas.infra.redis.RedisKeyUtil;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -24,6 +24,7 @@ import reactor.core.publisher.Mono;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.util.List;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.*;
@@ -35,13 +36,16 @@ class ApiCallHandlerRateLimitTest {
 
     @Mock StringRedisTemplate redis;
     @Mock ValueOperations<String, String> valueOps;
-    @Mock ApiDefinitionMapper apiDefinitionMapper;
+    @Mock ApiDefinitionCache apiDefinitionCache;
+    @Mock ApiCallPayloadBuilder payloadBuilder;
     @Mock WebClient.Builder webClientBuilder;
     @Mock ExecutionContext ctx;
 
     @BeforeEach
     void setUp() {
         lenient().when(redis.opsForValue()).thenReturn(valueOps);
+        lenient().when(payloadBuilder.build(anyMap(), any(), anyString(), anyBoolean()))
+                .thenReturn(List.of(Map.of("params", Map.of())));
         clearInvocations(redis);
     }
 
@@ -144,11 +148,11 @@ class ApiCallHandlerRateLimitTest {
     @DisplayName("Redis 限流检查异常时返回失败结果且不调用下游 HTTP")
     void executeAsync_returns_failure_when_redis_rate_limit_check_throws() {
         ApiDefinition def = enabledDefinition(10);
-        when(apiDefinitionMapper.selectOne(any())).thenReturn(def);
+        when(apiDefinitionCache.getEnabled("test_api")).thenReturn(def);
         when(valueOps.increment(anyString())).thenThrow(new RuntimeException("redis down"));
         ApiCallHandler handler = new ApiCallHandler(
-                apiDefinitionMapper, webClientBuilder, new com.fasterxml.jackson.databind.ObjectMapper(), redis,
-                defaultKeys());
+                apiDefinitionCache, webClientBuilder, new com.fasterxml.jackson.databind.ObjectMapper(),
+                payloadBuilder, redis, defaultKeys());
 
         NodeResult result = handler.executeAsync(Map.of("apiKey", "test_api"), ctx).block();
 
@@ -161,11 +165,11 @@ class ApiCallHandlerRateLimitTest {
     @DisplayName("请求准备异常不应被误报为 Redis 限流检查失败")
     void executeAsync_propagates_request_preparation_errors_after_rate_limit_passes() {
         ApiDefinition def = enabledDefinition(10);
-        when(apiDefinitionMapper.selectOne(any())).thenReturn(def);
+        when(apiDefinitionCache.getEnabled("test_api")).thenReturn(def);
         when(valueOps.increment(anyString())).thenReturn(2L);
         ApiCallHandler handler = new ApiCallHandler(
-                apiDefinitionMapper, webClientBuilder, new com.fasterxml.jackson.databind.ObjectMapper(), redis,
-                defaultKeys());
+                apiDefinitionCache, webClientBuilder, new com.fasterxml.jackson.databind.ObjectMapper(),
+                payloadBuilder, redis, defaultKeys());
 
         assertThatThrownBy(() -> handler.executeAsync(
                 Map.of("apiKey", "test_api", "inputParams", "not-a-map"), ctx).block())
@@ -177,10 +181,10 @@ class ApiCallHandlerRateLimitTest {
     @DisplayName("持久化非法限制值时返回失败结果且不调用 Redis 或下游 HTTP")
     void executeAsync_returns_failure_when_persisted_rate_limit_is_invalid() {
         ApiDefinition def = enabledDefinition(0);
-        when(apiDefinitionMapper.selectOne(any())).thenReturn(def);
+        when(apiDefinitionCache.getEnabled("test_api")).thenReturn(def);
         ApiCallHandler handler = new ApiCallHandler(
-                apiDefinitionMapper, webClientBuilder, new com.fasterxml.jackson.databind.ObjectMapper(), redis,
-                defaultKeys());
+                apiDefinitionCache, webClientBuilder, new com.fasterxml.jackson.databind.ObjectMapper(),
+                payloadBuilder, redis, defaultKeys());
 
         NodeResult result = handler.executeAsync(Map.of("apiKey", "test_api"), ctx).block();
 
@@ -194,7 +198,7 @@ class ApiCallHandlerRateLimitTest {
     @DisplayName("未超限时执行下游 HTTP 并解析 JSON 输出")
     void executeAsync_calls_downstream_and_parses_json_when_under_limit() {
         ApiDefinition def = enabledDefinition(10);
-        when(apiDefinitionMapper.selectOne(any())).thenReturn(def);
+        when(apiDefinitionCache.getEnabled("test_api")).thenReturn(def);
         when(valueOps.increment(anyString())).thenReturn(1L);
         when(redis.expire(anyString(), any())).thenReturn(true);
         ExchangeFunction exchangeFunction = request -> Mono.just(ClientResponse.create(HttpStatus.OK)
@@ -202,8 +206,8 @@ class ApiCallHandlerRateLimitTest {
                 .body("{\"accepted\":true}")
                 .build());
         ApiCallHandler handler = new ApiCallHandler(
-                apiDefinitionMapper, WebClient.builder().exchangeFunction(exchangeFunction),
-                new com.fasterxml.jackson.databind.ObjectMapper(), redis, defaultKeys());
+                apiDefinitionCache, WebClient.builder().exchangeFunction(exchangeFunction),
+                new com.fasterxml.jackson.databind.ObjectMapper(), payloadBuilder, redis, defaultKeys());
 
         NodeResult result = handler.executeAsync(Map.of("apiKey", "test_api"), ctx).block();
 
@@ -221,11 +225,11 @@ class ApiCallHandlerRateLimitTest {
     @DisplayName("Redis 计数为空时生产路径返回限流检查失败且不调用下游 HTTP")
     void executeAsync_returns_check_failed_when_redis_increment_returns_null() {
         ApiDefinition def = enabledDefinition(10);
-        when(apiDefinitionMapper.selectOne(any())).thenReturn(def);
+        when(apiDefinitionCache.getEnabled("test_api")).thenReturn(def);
         when(valueOps.increment(anyString())).thenReturn(null);
         ApiCallHandler handler = new ApiCallHandler(
-                apiDefinitionMapper, webClientBuilder, new com.fasterxml.jackson.databind.ObjectMapper(), redis,
-                defaultKeys());
+                apiDefinitionCache, webClientBuilder, new com.fasterxml.jackson.databind.ObjectMapper(),
+                payloadBuilder, redis, defaultKeys());
 
         NodeResult result = handler.executeAsync(Map.of("apiKey", "test_api"), ctx).block();
 
@@ -238,12 +242,12 @@ class ApiCallHandlerRateLimitTest {
     @DisplayName("第一次请求 TTL 设置失败时生产路径返回限流检查失败且不调用下游 HTTP")
     void executeAsync_returns_check_failed_when_first_expire_returns_false() {
         ApiDefinition def = enabledDefinition(10);
-        when(apiDefinitionMapper.selectOne(any())).thenReturn(def);
+        when(apiDefinitionCache.getEnabled("test_api")).thenReturn(def);
         when(valueOps.increment(anyString())).thenReturn(1L);
         when(redis.expire(anyString(), any())).thenReturn(false);
         ApiCallHandler handler = new ApiCallHandler(
-                apiDefinitionMapper, webClientBuilder, new com.fasterxml.jackson.databind.ObjectMapper(), redis,
-                defaultKeys());
+                apiDefinitionCache, webClientBuilder, new com.fasterxml.jackson.databind.ObjectMapper(),
+                payloadBuilder, redis, defaultKeys());
 
         NodeResult result = handler.executeAsync(Map.of("apiKey", "test_api"), ctx).block();
 
@@ -256,12 +260,12 @@ class ApiCallHandlerRateLimitTest {
     @DisplayName("第一次请求 TTL 设置结果为空时生产路径返回限流检查失败且不调用下游 HTTP")
     void executeAsync_returns_check_failed_when_first_expire_returns_null() {
         ApiDefinition def = enabledDefinition(10);
-        when(apiDefinitionMapper.selectOne(any())).thenReturn(def);
+        when(apiDefinitionCache.getEnabled("test_api")).thenReturn(def);
         when(valueOps.increment(anyString())).thenReturn(1L);
         when(redis.expire(anyString(), any())).thenReturn(null);
         ApiCallHandler handler = new ApiCallHandler(
-                apiDefinitionMapper, webClientBuilder, new com.fasterxml.jackson.databind.ObjectMapper(), redis,
-                defaultKeys());
+                apiDefinitionCache, webClientBuilder, new com.fasterxml.jackson.databind.ObjectMapper(),
+                payloadBuilder, redis, defaultKeys());
 
         NodeResult result = handler.executeAsync(Map.of("apiKey", "test_api"), ctx).block();
 
@@ -274,15 +278,15 @@ class ApiCallHandlerRateLimitTest {
     @DisplayName("生产路径使用配置的 Redis key 前缀")
     void executeAsync_uses_configured_redis_key_prefix_when_under_limit() {
         ApiDefinition def = enabledDefinition(10);
-        when(apiDefinitionMapper.selectOne(any())).thenReturn(def);
+        when(apiDefinitionCache.getEnabled("test_api")).thenReturn(def);
         when(valueOps.increment(anyString())).thenReturn(2L);
         ExchangeFunction exchangeFunction = request -> Mono.just(ClientResponse.create(HttpStatus.OK)
                 .header("Content-Type", MediaType.APPLICATION_JSON_VALUE)
                 .body("{\"accepted\":true}")
                 .build());
         ApiCallHandler handler = new ApiCallHandler(
-                apiDefinitionMapper, WebClient.builder().exchangeFunction(exchangeFunction),
-                new com.fasterxml.jackson.databind.ObjectMapper(), redis, keysWithPrefix("testenv"));
+                apiDefinitionCache, WebClient.builder().exchangeFunction(exchangeFunction),
+                new com.fasterxml.jackson.databind.ObjectMapper(), payloadBuilder, redis, keysWithPrefix("testenv"));
 
         NodeResult result = handler.executeAsync(Map.of("apiKey", "test_api"), ctx).block();
 
