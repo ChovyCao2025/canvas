@@ -4,6 +4,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.chovy.canvas.domain.execution.CanvasExecutionRequest;
 import org.chovy.canvas.domain.execution.CanvasExecutionRequestMapper;
 import org.chovy.canvas.engine.disruptor.CanvasDisruptorService;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
@@ -23,6 +24,7 @@ public class CanvasExecutionRequestDispatcher {
     private final long runningStaleSeconds;
     private final int perCanvasBatchLimit;
 
+    @Autowired
     public CanvasExecutionRequestDispatcher(CanvasExecutionRequestMapper mapper,
                                             CanvasDisruptorService disruptorService,
                                             @Value("${canvas.execution-request.dispatch-batch-size:200}") int batchSize,

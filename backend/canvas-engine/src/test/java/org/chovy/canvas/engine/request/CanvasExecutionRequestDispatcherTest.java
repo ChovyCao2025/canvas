@@ -4,10 +4,13 @@ import org.chovy.canvas.domain.execution.CanvasExecutionRequestMapper;
 import org.chovy.canvas.domain.execution.CanvasExecutionRequest;
 import org.chovy.canvas.engine.disruptor.CanvasDisruptorService;
 import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
 
+import java.lang.reflect.Constructor;
 import java.time.LocalDateTime;
 import java.util.List;
 
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
@@ -16,6 +19,17 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 class CanvasExecutionRequestDispatcherTest {
+
+    @Test
+    void springInjectionConstructorIsExplicitWhenMultipleConstructorsExist() {
+        Constructor<?>[] constructors = CanvasExecutionRequestDispatcher.class.getDeclaredConstructors();
+
+        assertTrue(
+                java.util.Arrays.stream(constructors)
+                        .filter(constructor -> constructor.getParameterCount() == 5)
+                        .anyMatch(constructor -> constructor.isAnnotationPresent(Autowired.class))
+        );
+    }
 
     @Test
     void dispatchDueRequestsPublishesEachDueRequestToDisruptor() {
