@@ -12,6 +12,10 @@ import reactor.core.publisher.Mono;
 import java.util.Map;
 import java.util.UUID;
 
+/**
+ * 画布执行控制器：
+ * 提供直调执行、行为触发异步投递与 dry-run 调试入口。
+ */
 @RestController
 @RequestMapping("/canvas")
 @RequiredArgsConstructor
@@ -77,23 +81,44 @@ public class ExecutionController {
     }
 
 
+    /**
+     * 直调/干运行请求体。
+     */
     @Data
     static class DirectCallReq {
+
+        /** 触发用户 ID。 */
         private String userId;
+
+        /** 输入参数（注入到执行上下文 triggerPayload）。 */
         private Map<String, Object> inputParams;
+
+        /** 幂等键（建议调用方传入，便于重试去重）。 */
         private String idempotencyKey;
-        /**
-         * dry-run 时传入当前画布 graphJson，直接使用而不读 DB draft
-         */
+
+        /** dry-run 时传入当前画布 graphJson，直接使用而不读 DB draft。 */
         private String graphJson;
     }
 
+    /**
+     * 行为触发请求体（异步投递 Disruptor）。
+     */
     @Data
     static class BehaviorTriggerReq {
+
+        /** 目标画布 ID。 */
         private Long canvasId;
+
+        /** 触发用户 ID。 */
         private String userId;
+
+        /** 行为事件编码。 */
         private String eventCode;
+
+        /** 事件唯一 ID（用于幂等去重）。 */
         private String eventId;
+
+        /** 行为事件载荷。 */
         private Map<String, Object> behaviorData;
     }
 }

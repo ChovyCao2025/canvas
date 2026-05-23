@@ -28,6 +28,8 @@ public class MqTriggerHandler implements NodeHandler {
     @Override
     @SuppressWarnings("unchecked")
     public Mono<NodeResult> executeAsync(Map<String, Object> config, ExecutionContext ctx) {
+        // 消息入站解析与 payload 合并已在 Trigger 消费链路完成
+        // validateResult=true 时才执行配置的规则校验
         Boolean validateResult = (Boolean) config.get("validateResult");
         List<Map<String, Object>> rules = (List<Map<String, Object>>) config.get("validateRules");
         String nextNodeId = (String) config.get("nextNodeId");
@@ -63,4 +65,3 @@ public class MqTriggerHandler implements NodeHandler {
         return (String) config.getOrDefault("topicKey", "");
     }
 }
-

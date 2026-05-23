@@ -10,14 +10,22 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
+/**
+ * 节点处理器注册中心。
+ * 启动时扫描所有 {@link NodeHandler} 实现，按 {@link NodeHandlerType#value()} 建立索引。
+ */
 @Slf4j
 @Component
 @RequiredArgsConstructor
 public class HandlerRegistry {
 
+    /** Spring 注入的全部 NodeHandler 实现。 */
     private final List<NodeHandler> handlers;
+
+    /** type_key -> handler 实例映射。 */
     private final Map<String, NodeHandler> registry = new ConcurrentHashMap<>();
 
+    /** Spring 容器初始化后执行一次，完成类型到处理器的映射。 */
     @PostConstruct
     void init() {
         for (NodeHandler handler : handlers) {
@@ -29,9 +37,11 @@ public class HandlerRegistry {
                         handler.getClass().getSimpleName());
             }
         }
+        // 若某节点类型未注册，后续 get(typeKey) 会快速失败并提示配置问题
         log.info("HandlerRegistry 初始化完成，共 {} 个 Handler", registry.size());
     }
 
+    /** 按节点类型获取处理器；未注册视为配置错误，直接快速失败。 */
     public NodeHandler get(String typeKey) {
         NodeHandler h = registry.get(typeKey);
         if (h == null) {
@@ -42,6 +52,7 @@ public class HandlerRegistry {
     }
 
     public boolean has(String typeKey) {
+        // 常用于启动检查或兼容分支判断
         return registry.containsKey(typeKey);
     }
 }

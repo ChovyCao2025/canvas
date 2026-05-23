@@ -12,6 +12,10 @@ import { authApi } from '../../services/api'
 
 const { Sider, Content } = Layout
 
+/**
+ * 侧边栏 children 需要强制变成纵向 flex：
+ * 这样菜单区可滚动、底部用户区可固定。
+ */
 // Ant Design Sider 内部包了一层 .ant-layout-sider-children，需要让它也是 flex column
 const siderChildrenStyle = `
   .app-sider > .ant-layout-sider-children {
@@ -26,12 +30,18 @@ const SIDER_DARK  = '#0d1117'
 const SIDER_HOVER = '#1f2d45'
 const ACCENT      = '#4f8ef7'
 
+/**
+ * 主框架布局：
+ * - 左侧固定导航栏
+ * - 右侧内容区根据 collapsed 自适应左边距
+ */
 export default function AppLayout() {
   const navigate = useNavigate()
   const location = useLocation()
   const { user, isAdmin, logout } = useAuth()
   const [collapsed, setCollapsed] = useState(false)
 
+  // 根据当前 URL 计算菜单高亮 key
   const selectedKey = (() => {
     if (location.pathname === '/' || location.pathname === '/home') return 'home'
     if (location.pathname.startsWith('/api-config'))     return 'api-config'
@@ -45,6 +55,7 @@ export default function AppLayout() {
   })()
 
   const defaultOpenKeys = (() => {
+    // 保证进入子页面时，父菜单分组默认展开，减少额外点击
     if (['api-config', 'ab-experiments', 'admin-users'].includes(selectedKey)) return ['marketing', 'settings']
     return ['marketing']
   })()
@@ -111,6 +122,7 @@ export default function AppLayout() {
           onClick: () => navigate('/event-config'),
         },
         ...(isAdmin ? [{
+          // 管理员才显示用户管理入口
           key: 'admin-users',
           icon: <TeamOutlined />,
           label: '用户管理',
@@ -121,6 +133,7 @@ export default function AppLayout() {
   ]
 
   const handleLogout = async () => {
+    // 先尝试通知后端登出，再清本地认证态，接口失败也不阻断退出
     try { await authApi.logout() } catch { /* ignore */ }
     logout()
     navigate('/login')

@@ -7,12 +7,22 @@ import type { SysUser } from '../../services/api'
 
 const { Title } = Typography
 
+/**
+ * 管理后台用户管理页。
+ *
+ * 页面职责：
+ * 1) 展示用户列表；
+ * 2) 提供新建用户入口；
+ * 3) 提供禁用用户操作（软禁用，不删除记录）。
+ */
 export default function AdminUsersPage() {
+  // 列表与弹窗状态
   const [users, setUsers] = useState<SysUser[]>([])
   const [loading, setLoading] = useState(false)
   const [createVisible, setCreateVisible] = useState(false)
   const [form] = Form.useForm()
 
+  // 拉取全部用户：作为列表唯一数据源，创建/禁用后都回调它刷新
   const fetchUsers = async () => {
     setLoading(true)
     try {
@@ -25,6 +35,7 @@ export default function AdminUsersPage() {
 
   useEffect(() => { fetchUsers() }, [])
 
+  // 创建用户：先做表单校验，再调用后端接口
   const handleCreate = async () => {
     const values = await form.validateFields()
     await adminApi.createUser(values)
@@ -34,6 +45,7 @@ export default function AdminUsersPage() {
     fetchUsers()
   }
 
+  // 禁用用户（软禁用）
   const handleDisable = async (id: number) => {
     Modal.confirm({
       title: '确认禁用该用户？',
@@ -46,6 +58,8 @@ export default function AdminUsersPage() {
     })
   }
 
+  // 表格列定义与后端 SysUser 字段一一对应
+  // 便于读代码时从前端字段快速映射到后端模型。
   const columns: ColumnsType<SysUser> = [
     { title: 'ID', dataIndex: 'id', width: 80 },
     { title: '用户名', dataIndex: 'username' },

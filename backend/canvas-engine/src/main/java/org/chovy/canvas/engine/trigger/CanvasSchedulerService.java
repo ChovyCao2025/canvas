@@ -45,7 +45,7 @@ public class CanvasSchedulerService {
     @org.springframework.beans.factory.annotation.Value("${canvas.integration.api-call-base-url}")
     private String apiCallUrl;
 
-    // WebClient 懒建，避免循环依赖
+    // WebClient 懒建，避免启动期外部依赖未就绪导致 Bean 构造失败
     private org.springframework.web.reactive.function.client.WebClient taggerClient;
     private org.springframework.web.reactive.function.client.WebClient apiCallClient;
 
@@ -55,11 +55,12 @@ public class CanvasSchedulerService {
         apiCallClient = org.springframework.web.reactive.function.client.WebClient.builder().baseUrl(apiCallUrl).build();
     }
 
-    /** 已注册的调度任务（canvasId:nodeId → ScheduledFuture） */
+    /** 已注册的调度任务（canvasId:nodeId -> ScheduledFuture），用于覆盖更新与下线清理。 */
     private final Map<String, ScheduledFuture<?>> activeTasks = new ConcurrentHashMap<>();
 
     // ── 注册 ─────────────────────────────────────────────────────
 
+    /** 注册画布内全部 SCHEDULED_TRIGGER 节点的调度任务。 */
     public void registerScheduledTriggers(Long canvasId, DagGraph graph) {
         for (String nodeId : graph.allNodeIds()) {
             DagParser.CanvasNode node = graph.getNode(nodeId);
@@ -79,11 +80,13 @@ public class CanvasSchedulerService {
             String timezone       = (String) cfg.getOrDefault("timezone", "Asia/Shanghai");
 
             if (cronExpr != null && !cronExpr.isBlank()) {
+                // 周期任务：由 CronTrigger 驱动
                 ScheduledFuture<?> future = taskScheduler.schedule(
                         job, new CronTrigger(cronExpr, TimeZone.getTimeZone(timezone)));
                 activeTasks.put(taskKey, future);
                 log.info("[SCHEDULER] 注册 CRON 任务 canvasId={} nodeId={} cron={}", canvasId, nodeId, cronExpr);
             } else if (triggerTimeStr != null) {
+                // 单次任务：到点触发一次后自然结束
                 LocalDateTime ldt = LocalDateTime.parse(triggerTimeStr);
                 Instant instant   = ldt.atZone(ZoneId.of("Asia/Shanghai")).toInstant();
                 ScheduledFuture<?> future = taskScheduler.schedule(job, instant);
@@ -95,6 +98,7 @@ public class CanvasSchedulerService {
 
     // ── 注销 ─────────────────────────────────────────────────────
 
+    /** 取消画布内全部 SCHEDULED_TRIGGER 节点的调度任务。 */
     public void cancelScheduledTriggers(Long canvasId, DagGraph graph) {
         for (String nodeId : graph.allNodeIds()) {
             DagParser.CanvasNode node = graph.getNode(nodeId);
@@ -113,9 +117,11 @@ public class CanvasSchedulerService {
 
     private void cancelTask(String taskKey) {
         ScheduledFuture<?> old = activeTasks.remove(taskKey);
+        // mayInterruptIfRunning=false：不打断正在执行中的任务，只取消后续调度
         if (old != null) old.cancel(false);
     }
 
+    /** 批量用户触发入口：解析用户源并逐个触发画布执行。 */
     @SuppressWarnings("unchecked")
     private void triggerForAllUsers(Long canvasId, String nodeId, Map<String, Object> cfg) {
         Map<String, Object> src = (Map<String, Object>) cfg.getOrDefault("userSource", Map.of());
@@ -125,6 +131,7 @@ public class CanvasSchedulerService {
         log.info("[SCHEDULER] 定时触发 canvasId={} 用户数={}", canvasId, userIds.size());
 
         for (String userId : userIds) {
+            // 每个用户独立触发；失败互不影响
             executionService.trigger(
                     canvasId, userId, TriggerType.SCHEDULED,
                     NodeType.SCHEDULED_TRIGGER, null,
@@ -136,8 +143,10 @@ public class CanvasSchedulerService {
         }
     }
 
+    /** 根据 userSource 配置解析用户 ID 列表。 */
     @SuppressWarnings("unchecked")
     private List<String> resolveUserIds(String sourceType, Map<String, Object> src) {
+        // sourceType 用于声明“用户列表来源”，可扩展更多 provider
         return switch (sourceType) {
             case "USER_LIST" -> (List<String>) src.getOrDefault("userIds", List.of());
 

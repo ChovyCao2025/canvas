@@ -12,11 +12,20 @@ import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
 
 
+/**
+ * API 定义管理控制器：
+ * 提供 API 定义的分页查询、创建、更新、删除接口。
+ *
+ * 角色定位：
+ * - 这是配置中心接口，不直接发起真实业务 API 调用；
+ * - 运行时节点（如 API_CALL）会按 apiKey/配置引用这些定义。
+ */
 @RestController
 @RequestMapping("/canvas/api-definitions")
 @RequiredArgsConstructor
 public class ApiDefinitionController {
 
+    /** API 定义表访问层。 */
     private final ApiDefinitionMapper apiDefinitionMapper;
 
     /**
@@ -32,6 +41,7 @@ public class ApiDefinitionController {
             @RequestParam(defaultValue = "20") int size,
             @RequestParam(required = false) Integer enabled) {
         return Mono.fromCallable(() -> {
+            // 默认按 ID 倒序，保证最近维护的配置排在前面
             LambdaQueryWrapper<ApiDefinition> wrapper = new LambdaQueryWrapper<ApiDefinition>()
                     .orderByDesc(ApiDefinition::getId);
             if (enabled != null) {
@@ -50,6 +60,7 @@ public class ApiDefinitionController {
     @PostMapping
     public Mono<R<ApiDefinition>> create(@RequestBody ApiDefinition body) {
         return Mono.fromCallable(() -> {
+            // 默认启用：新建后可立即被配置面板选择
             if (body.getEnabled() == null) body.setEnabled(1);
             apiDefinitionMapper.insert(body);
             return body;
@@ -65,6 +76,7 @@ public class ApiDefinitionController {
     @PutMapping("/{id}")
     public Mono<R<Void>> update(@PathVariable Long id, @RequestBody ApiDefinition body) {
         return Mono.<Void>fromRunnable(() -> {
+            // URL 中的 id 优先，避免请求体篡改跨记录更新
             body.setId(id);
             apiDefinitionMapper.updateById(body);
         }).subscribeOn(Schedulers.boundedElastic()).thenReturn(R.ok());

@@ -20,13 +20,24 @@ import java.util.concurrent.atomic.AtomicInteger;
 @ToString(exclude = {"nodeLocks", "scheduledHubTimeouts"})
 public class ExecutionContext {
 
+    /** 执行实例 ID（UUID）。 */
     private String executionId;
-    private Long   canvasId;
-    private Long   versionId;
+
+    /** 画布 ID。 */
+    private Long canvasId;
+
+    /** 执行时锁定的版本 ID。 */
+    private Long versionId;
+
+    /** 触发用户 ID。 */
     private String userId;
+
+    /** 触发类型（DIRECT_CALL/MQ/BEHAVIOR/DRY_RUN...）。 */
     private String triggerType;
+
     /** 触发器节点类型（MQ_TRIGGER / EVENT_TRIGGER 等），DLQ 重放时需要 */
     private String triggerNodeType;
+
     /** 路由匹配 key（MQ=topicKey，BEHAVIOR=eventCode），DLQ 重放时需要 */
     private String matchKey;
 

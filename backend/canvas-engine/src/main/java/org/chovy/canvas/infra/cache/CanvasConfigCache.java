@@ -38,7 +38,10 @@ public class CanvasConfigCache {
     private final CanvasVersionMapper             canvasVersionMapper;
     private final DagParser                       dagParser;
 
-    /** L1: JVM 本地缓存，最多 500 条，永不过期（依赖主动失效） */
+    /**
+     * L1: JVM 本地缓存（实例内）。
+     * 存放 DagGraph 对象，减少 Redis/DB 压力与 JSON 反序列化成本。
+     */
     private Cache<String, DagGraph> l1;
 
     static final String INVALIDATE_CHANNEL = "canvas:cache:invalidate";
@@ -53,6 +56,7 @@ public class CanvasConfigCache {
                 .expireAfterWrite(2, java.util.concurrent.TimeUnit.HOURS)
                 .build();
         // 订阅 Redis Pub/Sub 失效广播（12.7节）
+        // 目标：任一实例发布后，其他实例的 L1 能尽快一致失效
         subscribeInvalidation();
     }
 
@@ -81,7 +85,7 @@ public class CanvasConfigCache {
         DagGraph cached = l1.getIfPresent(l1Key);
         if (cached != null) return cached;
 
-        // L2 Redis
+        // L2 Redis（字符串 graph_json）
         String redisKey = "canvas:" + canvasId + ":v" + versionId + ":config";
         String json = redis.opsForValue().get(redisKey);
         if (json != null) {
@@ -90,7 +94,7 @@ public class CanvasConfigCache {
             return graph;
         }
 
-        // L3 MySQL
+        // L3 MySQL（回源）
         var version = canvasVersionMapper.selectById(versionId);
         if (version == null) throw new IllegalArgumentException("版本不存在: " + versionId);
 
@@ -102,6 +106,7 @@ public class CanvasConfigCache {
         }
 
         DagGraph graph = dagParser.parse(version.getGraphJson());
+        // 回填 L2 + L1，形成后续热路径
         redis.opsForValue().set(redisKey, version.getGraphJson(), L2_TTL);
         l1.put(l1Key, graph);
         log.debug("[CACHE] MISS → MySQL canvasId={} versionId={}", canvasId, versionId);

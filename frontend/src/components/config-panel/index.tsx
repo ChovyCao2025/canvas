@@ -17,15 +17,41 @@ import {
 } from './InspectorCards'
 import { buildConfigPanelPresentation } from './presentation'
 
-interface ApiParamDef { name: string; displayName: string; type: string; required: boolean }
+/**
+ * API / Event 请求参数定义。
+ * 该结构来自后端 `requestSchema` JSON。
+ */
+interface ApiParamDef {
+  /** 参数键（上下文引用与后端入参都依赖该值）。 */
+  name: string
+
+  /** 参数展示名。 */
+  displayName: string
+
+  /** 参数类型（STRING/NUMBER/TEXT/STRING_PARAM 等）。 */
+  type: string
+
+  /** 是否必填。 */
+  required: boolean
+}
 
 const { Text } = Typography
 
+/** 配置面板入参：由画布编辑器在选中节点变化时传入。 */
 interface Props {
-  nodeId:    string | null
-  nodeData:  CanvasNodeData | null
-  onChange:  (nodeId: string, patch: Partial<CanvasNodeData>) => void
-  nodes?:    Node<CanvasNodeData>[]
+  /** 当前选中的节点 ID。 */
+  nodeId: string | null
+
+  /** 当前选中的节点完整数据。 */
+  nodeData: CanvasNodeData | null
+
+  /** 子组件配置变化回调，回写到画布节点。 */
+  onChange: (nodeId: string, patch: Partial<CanvasNodeData>) => void
+
+  /** 当前画布节点列表（用于关联节点名、动态上下文字段推导）。 */
+  nodes?: Node<CanvasNodeData>[]
+
+  /** 只读模式（线上查看/只读链接）。 */
   readonly?: boolean
 }
 
@@ -56,13 +82,23 @@ function toSelectOptions(data: any[]): StubOption[] {
 }
 
 export default function ConfigPanel({ nodeId, nodeData, onChange, nodes, readonly }: Props) {
-  const [schema,   setSchema]   = useState<NodeTypeRegistry | null>(null)
-  const [options,  setOptions]  = useState<Record<string, StubOption[]>>({})
+  /** 当前节点类型对应 schema（决定渲染哪些字段、字段类型及显示条件）。 */
+  const [schema, setSchema] = useState<NodeTypeRegistry | null>(null)
+
+  /** 下拉字段选项缓存（key = schema field key）。 */
+  const [options, setOptions] = useState<Record<string, StubOption[]>>({})
+
+  /** 运行时上下文字段（用于条件、参数映射自动补全）。 */
   const [ctxFields, setCtxFields] = useState<ContextField[]>([])
-  const [loading,  setLoading]  = useState(false)
+
+  /** schema 或数据源加载中态。 */
+  const [loading, setLoading] = useState(false)
+
+  /** 当前 Form 全量值快照，用于 visible/showWhen 动态显隐。 */
   const [formValues, setFormValues] = useState<Record<string, unknown>>({})
   const [form] = Form.useForm()
 
+  /** 将节点 ID 映射为节点名称，用于分支去向摘要展示。 */
   const getNodeName = (id: string | undefined): string | null => {
     if (!id || !nodes) return null
     return nodes.find(n => n.id === id)?.data.name ?? null
@@ -75,6 +111,7 @@ export default function ConfigPanel({ nodeId, nodeData, onChange, nodes, readonl
     .sort()
     .join('|') ?? ''
 
+  // 每次节点类型变更时：加载 schema + 推导上下文字段。
   useEffect(() => {
     if (!nodeData?.nodeType) { setSchema(null); return }
     setLoading(true)
@@ -119,7 +156,7 @@ export default function ConfigPanel({ nodeId, nodeData, onChange, nodes, readonl
       .finally(() => setLoading(false))
   }, [nodeData?.nodeType, ctxSignature])
 
-  // 加载 select 下拉选项：任何带 dataSource 的 select 字段，统一走 loadDataSource
+  // 加载 select 下拉选项：任何带 dataSource 的字段都走统一数据源加载器。
   useEffect(() => {
     if (!schema) return
     const fields = parseSchema(schema.configSchema)
@@ -135,7 +172,7 @@ export default function ConfigPanel({ nodeId, nodeData, onChange, nodes, readonl
     })
   }, [schema])
 
-  // 同步表单初始值
+  // 同步表单初始值：选中节点变化时把节点配置注入右侧表单。
   useEffect(() => {
     if (nodeData) {
       const vals = { name: nodeData.name, ...nodeData.bizConfig }
@@ -169,6 +206,8 @@ export default function ConfigPanel({ nodeId, nodeData, onChange, nodes, readonl
     evaluateVisible(f.visible, formValues) &&
     evaluateVisible(f.showWhen, formValues)
   )
+
+  // 统一构建“摘要区 + 分支去向区”展示模型，避免渲染层散落计算逻辑。
   const presentation = buildConfigPanelPresentation({
     nodeData,
     formValues,
@@ -359,7 +398,17 @@ function renderControl(
 
 // ── 条件规则列表控件（IF判断 / SELECTOR / MQ_TRIGGER 等）─────────
 interface ConditionRule {
-  field: string; operator: string; value: string; isCustom: boolean
+  /** 上下文字段 key。 */
+  field: string
+
+  /** 条件运算符。 */
+  operator: string
+
+  /** 比较值，可为固定值或 `${contextKey}`。 */
+  value: string
+
+  /** 是否手工配置（兼容历史数据）。 */
+  isCustom: boolean
 }
 function ConditionRuleList({ ctxFields }: { ctxFields: ContextField[] }) {
   const form = Form.useFormInstance()
@@ -405,7 +454,16 @@ function ConditionRuleList({ ctxFields }: { ctxFields: ContextField[] }) {
 }
 
 // ── 上下文引用值列表控件（IN_APP_NOTIFY / GROOVY inputParams 等）─
-interface ContextValueItem { name: string; valueType: 'CUSTOM' | 'CONTEXT'; value: string }
+interface ContextValueItem {
+  /** 输出字段名。 */
+  name: string
+
+  /** 取值方式：固定值或上下文引用。 */
+  valueType: 'CUSTOM' | 'CONTEXT'
+
+  /** 具体值。 */
+  value: string
+}
 function ContextValueList({ ctxFields }: { ctxFields: ContextField[] }) {
   const form = Form.useFormInstance()
   const fieldKey = 'bizData'
@@ -448,7 +506,19 @@ function ContextValueList({ ctxFields }: { ctxFields: ContextField[] }) {
 }
 
 // ── 参数定义列表控件（DIRECT_CALL inputParams / GROOVY outputParams）
-interface ParamDef { name: string; description?: string; dataType: string; required?: boolean }
+interface ParamDef {
+  /** 参数名。 */
+  name: string
+
+  /** 参数描述。 */
+  description?: string
+
+  /** 参数类型。 */
+  dataType: string
+
+  /** 是否必填。 */
+  required?: boolean
+}
 function ParamDefineList() {
   const form = Form.useFormInstance()
   const fieldKey = 'inputParams'
@@ -484,7 +554,19 @@ function ParamDefineList() {
 }
 
 // ── SELECTOR 分支列表控件（branch-list）────────────────────────────
-interface BranchItem { label: string; strategyRelation: string; conditions: ConditionRule[]; nextNodeId?: string }
+interface BranchItem {
+  /** 分支标签（如果/否则如果/否则）。 */
+  label: string
+
+  /** 分支内条件关系（AND/OR）。 */
+  strategyRelation: string
+
+  /** 分支条件集合。 */
+  conditions: ConditionRule[]
+
+  /** 分支命中后后继节点 ID（由连线自动维护）。 */
+  nextNodeId?: string
+}
 function BranchList({ ctxFields }: { ctxFields: ContextField[] }) {
   const form = Form.useFormInstance()
   const branches: BranchItem[] = Form.useWatch('branches', form) ?? []
@@ -572,7 +654,13 @@ function BranchList({ ctxFields }: { ctxFields: ContextField[] }) {
 }
 
 // ── AB 分流分组路由控件（ab-group-list）────────────────────────────
-interface AbGroup { groupKey: string; nextNodeId?: string }
+interface AbGroup {
+  /** 分组标识（用于 hash 分桶匹配与边标签展示）。 */
+  groupKey: string
+
+  /** 分组命中后节点 ID。 */
+  nextNodeId?: string
+}
 function AbGroupList({ getNodeName }: { getNodeName: (id: string | undefined) => string | null }) {
   const form = Form.useFormInstance()
   const groups: AbGroup[] = Form.useWatch('groups', form) ?? []
@@ -619,7 +707,13 @@ function AbGroupList({ getNodeName }: { getNodeName: (id: string | undefined) =>
 }
 
 // ── 优先级列表控件（priority-list）────────────────────────────────
-interface PriorityItem { order: number; nextNodeId?: string }
+interface PriorityItem {
+  /** 执行顺序，数字越小优先级越高。 */
+  order: number
+
+  /** 当前优先级命中后的后继节点。 */
+  nextNodeId?: string
+}
 function PriorityList() {
   const form = Form.useFormInstance()
   const priorities: PriorityItem[] = Form.useWatch('priorities', form) ?? []
@@ -714,14 +808,47 @@ function CanvasSelector() {
 }
 
 interface SchemaField {
-  key: string; label: string; type: string
-  required?: boolean; options?: any[]; dataSource?: string
-  visible?: string; showWhen?: string; defaultValue?: unknown
-  hint?: string; icon?: string          // edge-hint 使用
-  apiKeyField?: string                   // api-input-params 使用，默认 apiKey
-  defsSource?: string                    // api-input-params 使用，默认 /meta/api-definitions
+  /** 表单字段 key，对应节点 bizConfig 字段名。 */
+  key: string
+
+  /** 字段标题。 */
+  label: string
+
+  /** 字段控件类型。 */
+  type: string
+
+  /** 是否必填。 */
+  required?: boolean
+
+  /** 固定选项。 */
+  options?: any[]
+
+  /** 远程选项数据源 URL。 */
+  dataSource?: string
+
+  /** 旧版显隐表达式。 */
+  visible?: string
+
+  /** 新版显隐表达式。 */
+  showWhen?: string
+
+  /** 默认值。 */
+  defaultValue?: unknown
+
+  /** 字段提示。 */
+  hint?: string
+
+  /** 图标标识（edge-hint 用）。 */
+  icon?: string
+
+  /** 读取 apiKey 的字段名（api-input-params 用）。 */
+  apiKeyField?: string
+
+  /** 接口定义数据源（api-input-params 用）。 */
+  defsSource?: string
 }
 
+/** 后端 schema JSON 字符串 -> 前端可渲染字段定义。 */
 function parseSchema(raw: string | undefined): SchemaField[] {
   try { return raw ? JSON.parse(raw) : [] } catch { return [] }
 }
@@ -825,9 +952,22 @@ function DelayInput() {
 // ── API_CALL 动态入参编辑器 ─────────────────────────────────────────
 // 每个参数渲染独立的 Form.Item name={['inputParams', paramName]}
 // 这样 onChange 会正常触发，值会回写到 canvas 节点 config
-function ApiCallInputParams({ label, apiKeyField = 'apiKey', defsSource = '/meta/api-definitions' }: {
-  label: string; apiKeyField?: string; defsSource?: string
-}) {
+interface ApiCallInputParamsProps {
+  /** 分组标题。 */
+  label: string
+
+  /** 读取当前接口 key 的表单字段名。 */
+  apiKeyField?: string
+
+  /** 接口定义列表数据源。 */
+  defsSource?: string
+}
+
+function ApiCallInputParams({
+  label,
+  apiKeyField = 'apiKey',
+  defsSource = '/meta/api-definitions',
+}: ApiCallInputParamsProps) {
   const form   = Form.useFormInstance()
   const apiKey = Form.useWatch(apiKeyField, form)
   const [params, setParams] = useState<ApiParamDef[]>([])

@@ -13,9 +13,11 @@ import lombok.Data;
 @AllArgsConstructor
 public class StubOption {
 
-    /** 选项值，存储到节点 bizConfig 的字段值 */
+    /** 选项值，存储到节点 bizConfig 的字段值。 */
     private String key;
 
-    /** 选项显示文本，展示在下拉菜单中 */
+    /** 选项显示文本，展示在下拉菜单中。 */
     private String label;
+
+    // 该结构刻意保持最小字段，便于被不同前端表单组件复用。
 }

@@ -27,6 +27,9 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * 人群批量计算服务。
+ */
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -47,6 +50,10 @@ public class AudienceBatchComputeService {
     @Value("${canvas.integration.tagger-service-url}")
     private String taggerUrl;
 
+    /**
+     * 触发人群计算主流程：
+     * 加锁 -> 标记计算中 -> 执行计算 -> 写入 bitmap/stat -> 解锁。
+     */
     public void compute(Long audienceId) {
         String lockKey = COMPUTE_LOCK_PREFIX + audienceId;
         boolean locked = Boolean.TRUE.equals(redis.opsForValue().setIfAbsent(lockKey, "1", Duration.ofHours(2)));
@@ -83,23 +90,27 @@ public class AudienceBatchComputeService {
         }
     }
 
+    /** 创建人群定义并立即触发一次计算。 */
     public AudienceDefinition create(AudienceDefinition definition) {
         definitionMapper.insert(definition);
         compute(definition.getId());
         return definition;
     }
 
+    /** 更新人群定义并立即触发重算。 */
     public void update(AudienceDefinition definition) {
         definitionMapper.updateById(definition);
         compute(definition.getId());
     }
 
+    /** 删除人群定义、统计信息与 bitmap。 */
     public void delete(Long audienceId) {
         definitionMapper.deleteById(audienceId);
         statMapper.deleteById(audienceId);
         bitmapStore.delete(audienceId);
     }
 
+    /** JDBC 数据源计算：SQL 拉取用户后按 UID 写入 bitmap。 */
     private RoaringBitmap computeViaJdbc(AudienceDefinition definition) throws Exception {
         JdbcConfig jdbcConfig = parseJdbcConfig(definition.getDataSourceConfig());
         DataSource dataSource = DataSourceBuilder.create()
@@ -125,6 +136,7 @@ public class AudienceBatchComputeService {
         return bitmap;
     }
 
+    /** Tagger 数据源计算：分页拉取用户并执行规则过滤。 */
     private RoaringBitmap computeViaTaggerApi(AudienceDefinition definition) throws Exception {
         Map<String, Object> config = objectMapper.readValue(
                 definition.getDataSourceConfig() == null || definition.getDataSourceConfig().isBlank()
@@ -169,6 +181,7 @@ public class AudienceBatchComputeService {
         return bitmap;
     }
 
+    /** 从 Tagger 接口响应中提取 userIds 字段。 */
     private List<String> extractUserIds(Map<String, Object> response) {
         Object raw = response == null ? null : response.get("userIds");
         if (!(raw instanceof List<?> list)) {
@@ -183,6 +196,7 @@ public class AudienceBatchComputeService {
         return userIds;
     }
 
+    /** 解析 JDBC 配置并做基础合法性校验。 */
     private JdbcConfig parseJdbcConfig(String configJson) throws Exception {
         if (configJson == null || configJson.isBlank()) {
             throw new IllegalArgumentException("dataSourceConfig is required for JDBC");
@@ -201,6 +215,7 @@ public class AudienceBatchComputeService {
         return new JdbcConfig(baseTable, url, username, password, userIdColumn, driverClassName, maxRows);
     }
 
+    /** 读取必填字符串字段，不存在则抛异常。 */
     private String stringValue(Map<String, Object> config, String key) {
         String value = stringValue(config, key, null);
         if (value == null || value.isBlank()) {
@@ -209,11 +224,13 @@ public class AudienceBatchComputeService {
         return value;
     }
 
+    /** 读取可选字符串字段，允许默认值。 */
     private String stringValue(Map<String, Object> config, String key, String defaultValue) {
         Object value = config.get(key);
         return value == null ? defaultValue : String.valueOf(value);
     }
 
+    /** 更新人群计算状态统计。 */
     private void updateStat(Long audienceId, String status, Long size, Integer sizeKb, String errorMsg) {
         AudienceStat stat = statMapper.selectById(audienceId);
         boolean exists = stat != null;
@@ -237,6 +254,7 @@ public class AudienceBatchComputeService {
         }
     }
 
+    /** 截断错误信息，避免超长文本污染统计表。 */
     private String trimError(String message) {
         if (message == null) {
             return null;
@@ -244,6 +262,7 @@ public class AudienceBatchComputeService {
         return message.length() <= 500 ? message : message.substring(0, 500);
     }
 
+    /** 查询“已就绪且启用”的人群定义列表。 */
     public List<AudienceDefinition> listReadyDefinitions() {
         List<AudienceStat> readyStats = statMapper.selectList(new LambdaQueryWrapper<AudienceStat>()
                 .eq(AudienceStat::getStatus, "READY"));
@@ -258,12 +277,19 @@ public class AudienceBatchComputeService {
     }
 
     private record JdbcConfig(
+            /** 数据源基础表。 */
             String baseTable,
+            /** JDBC URL。 */
             String url,
+            /** 用户名。 */
             String username,
+            /** 密码。 */
             String password,
+            /** 用户 ID 列。 */
             String userIdColumn,
+            /** 驱动类。 */
             String driverClassName,
+            /** 最大扫描行数。 */
             Integer maxRows
     ) {
     }

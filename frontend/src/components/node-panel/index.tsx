@@ -6,15 +6,30 @@ import { CATEGORY_SOLID } from '../canvas/constants'
 
 const { Text } = Typography
 
+/**
+ * 节点面板 props：
+ * onDragStart 用于通知编辑器“开始拖拽某类节点”。
+ */
 interface Props {
   onDragStart: (nodeType: string, category: string) => void
 }
 
+/**
+ * 左侧节点面板：
+ * 1. 拉取后端 node-type 元数据；
+ * 2. 按 category 分组；
+ * 3. 通过 HTML5 DnD 把节点类型信息放入 dataTransfer。
+ * 4. drop 区按约定 MIME key 解析节点类型并创建实例。
+ *
+ * 这层不参与节点实例化逻辑，只负责提供“可拖拽元数据”。
+ */
 export default function NodePanel({ onDragStart }: Props) {
+  // groups 结构：{ [category]: NodeTypeRegistry[] }
   const [groups, setGroups] = useState<Record<string, NodeTypeRegistry[]>>({})
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
+    // 初始化加载可用节点类型，并按分类聚合
     metaApi.getNodeTypes().then((res) => {
       const map: Record<string, NodeTypeRegistry[]> = {}
       for (const nt of res.data) {
@@ -25,8 +40,10 @@ export default function NodePanel({ onDragStart }: Props) {
     }).finally(() => setLoading(false))
   }, [])
 
+  // 首屏加载元数据时显示轻量 loading
   if (loading) return <div style={{ padding: 16 }}><Spin /></div>
 
+  // 把分组数据转换成 Collapse 组件可消费的 items 结构
   const items = Object.entries(groups).map(([category, nodes]) => ({
     key: category,
     label: (
@@ -46,6 +63,8 @@ export default function NodePanel({ onDragStart }: Props) {
             <div
               draggable
               onDragStart={(e) => {
+                // 约定：编辑器 drop 区读取这两个 MIME key 来创建节点
+                // key 名字在编辑器和面板之间是“协议”，不要随意改动。
                 e.dataTransfer.setData('application/canvas-node-type', nt.typeKey)
                 e.dataTransfer.setData('application/canvas-node-category', nt.category)
                 e.dataTransfer.effectAllowed = 'move'
@@ -70,6 +89,7 @@ export default function NodePanel({ onDragStart }: Props) {
   }))
 
   return (
+    // 面板高度跟随容器，内部自己滚动
     <div style={{ height: '100%', overflowY: 'auto' }}>
       <Collapse items={items} defaultActiveKey={Object.keys(groups)} ghost size="small" />
     </div>

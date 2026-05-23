@@ -7,9 +7,47 @@ import { PARAM_TYPES, type ApiParam } from '../api-config'
 
 const { Title } = Typography
 
-interface MqDef { id: number; name: string; messageCode: string; topic: string; requestSchema?: string; description?: string; enabled: number }
+/**
+ * MQ 消息定义模型。
+ */
+interface MqDef {
+  /** 消息定义 ID。 */
+  id: number
 
-function ParamSchemaEditor({ value, onChange }: { value?: ApiParam[]; onChange?: (v: ApiParam[]) => void }) {
+  /** 消息名称。 */
+  name: string
+
+  /** 消息编码。 */
+  messageCode: string
+
+  /** 所属 Topic。 */
+  topic: string
+
+  /** 请求参数 schema（JSON 字符串）。 */
+  requestSchema?: string
+
+  /** 消息说明。 */
+  description?: string
+
+  /** 启用状态：1 启用，0 禁用。 */
+  enabled: number
+}
+
+/**
+ * MQ 参数 Schema 编辑器。
+ *
+ * 与 API 配置页复用同一种参数结构（ApiParam），
+ * 最终写入 `requestSchema`（JSON 字符串）字段。
+ */
+interface ParamSchemaEditorProps {
+  /** 当前参数定义数组。 */
+  value?: ApiParam[]
+
+  /** 参数变更回调。 */
+  onChange?: (v: ApiParam[]) => void
+}
+
+function ParamSchemaEditor({ value, onChange }: ParamSchemaEditorProps) {
   const params: ApiParam[] = value ?? []
   const set = (next: ApiParam[]) => onChange?.(next)
   const add = () => set([...params, { name: '', displayName: '', type: 'STRING', required: false }])
@@ -37,6 +75,9 @@ function ParamSchemaEditor({ value, onChange }: { value?: ApiParam[]; onChange?:
   )
 }
 
+/**
+ * MQ 配置页。
+ */
 export default function MqConfigPage() {
   const [data, setData] = useState<MqDef[]>([])
   const [total, setTotal] = useState(0)
@@ -62,6 +103,7 @@ export default function MqConfigPage() {
     form.setFieldsValue({ enabled: true, requestSchema: [] }); setVisible(true)
   }
   const openEdit = (r: MqDef) => {
+    // 字符串 schema -> 数组，供 Form 内部编辑器渲染
     setEditing(r)
     let schema: ApiParam[] = []
     try { schema = JSON.parse(r.requestSchema || '[]') } catch {}
@@ -72,7 +114,11 @@ export default function MqConfigPage() {
     const values = await form.validateFields()
     setSaving(true)
     try {
-      const body = { ...values, enabled: values.enabled ? 1 : 0, requestSchema: JSON.stringify(values.requestSchema ?? []) }
+      const body = {
+        ...values,
+        enabled: values.enabled ? 1 : 0,
+        requestSchema: JSON.stringify(values.requestSchema ?? []),
+      }
       if (editing) { await http.put(`/canvas/mq-definitions/${editing.id}`, body); message.success('更新成功') }
       else { await http.post('/canvas/mq-definitions', body); message.success('创建成功') }
       setVisible(false); fetchList(editing ? page : 1)

@@ -40,15 +40,34 @@ import java.util.concurrent.TimeUnit;
 @RequiredArgsConstructor
 public class CanvasExecutionService {
 
+    /** 画布主表访问层。 */
     private final CanvasMapper canvasMapper;
+
+    /** 画布版本表访问层。 */
     private final CanvasVersionMapper canvasVersionMapper;
+
+    /** 执行主记录表访问层。 */
     private final CanvasExecutionMapper executionMapper;
+
+    /** DAG 配置缓存（versionId 粒度）。 */
     private final CanvasConfigCache configCache;
+
+    /** graphJson -> DagGraph 解析器。 */
     private final DagParser dagParser;
+
+    /** 上下文快照存储（Redis）。 */
     private final ContextPersistenceService ctxStore;
+
+    /** DAG 执行引擎。 */
     private final DagEngine dagEngine;
+
+    /** 触发前置检查服务（配额/有效期/冷却）。 */
     private final TriggerPreCheckService preCheckService;
+
+    /** 运行中执行注册表（用于并发计数和强制取消）。 */
     private final InFlightExecutionRegistry executionRegistry;
+
+    /** 每日统计聚合表访问层。 */
     private final org.chovy.canvas.domain.execution.CanvasExecutionStatsMapper statsMapper;
 
     /** Canvas 实体本地缓存：canvasId → Canvas。TTL=5min，最多500条。 */
@@ -149,7 +168,9 @@ public class CanvasExecutionService {
             Long canvasId, String userId, String triggerType,
             String triggerNodeType, String matchKey,
             Map<String, Object> payload, String msgId, boolean dryRun) {
-        // ...
+        // 主流程拆两段：
+        // 1) fromCallable 准备阶段（读库/判重/装配上下文）；
+        // 2) flatMap 执行阶段（写执行记录/跑 DAG/落结果）。
         return Mono.fromCallable(() -> {
 
                     // 1. 加载画布（草稿在 dry-run 时可用，正式触发只允许已发布）
@@ -171,6 +192,7 @@ public class CanvasExecutionService {
                     // 防止同一画布被大量并发触发（如大促瞬间流量）打爆执行引擎
                     if (!dryRun) {
                         int active = executionRegistry.activeCount(canvasId);
+                        // 优先使用画布配置上限，再受全局保护上限兜底
                         int maxConc = canvas.getMaxTotalExecutions() != null
                                 ? Math.min(canvas.getMaxTotalExecutions(), globalMaxConcurrency)
                                 : globalMaxConcurrency;
@@ -192,6 +214,7 @@ public class CanvasExecutionService {
                         // 幂等校验处理
                         if (!ctxStore.acquireDedup(canvasId, userId, msgId, dedupTtl)) {
                             log.debug("[ENGINE] dedup 拦截 canvasId={} userId={} msgId={}", canvasId, userId, msgId);
+                            // 返回轻量标记，让上游快速结束本次重复触发
                             return Map.<String, Object>of("deduplicated", true);
                         }
                     }
@@ -205,6 +228,7 @@ public class CanvasExecutionService {
                         String instanceId = UUID.randomUUID().toString();
                         if (!ctxStore.acquireResumeLock(canvasId, userId, instanceId, globalTimeoutSec)) {
                             log.warn("[ENGINE] resume-lock 竞争失败，放弃本次触发 canvasId={}", canvasId);
+                            // 并发恢复竞争失败时直接跳过，避免双协程同时推进同一上下文
                             return Map.<String, Object>of("skipped", "resume-lock");
                         }
                         ctx = ctxStore.load(canvasId, userId);
@@ -252,6 +276,7 @@ public class CanvasExecutionService {
                     return executionMono
                             .doOnSubscribe(sub -> {
                                 if (!dryRun) {
+                                    // 注册后可被 Kill Switch FORCE 模式检索并取消
                                     executionRegistry.register(canvasId, ctx.getExecutionId(),
                                             reactor.core.Disposables.single());
                                 }

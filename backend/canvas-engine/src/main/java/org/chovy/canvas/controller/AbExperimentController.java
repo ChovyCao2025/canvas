@@ -11,11 +11,19 @@ import org.springframework.web.bind.annotation.*;
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
 
+/**
+ * AB 实验定义管理控制器。
+ *
+ * 定位：
+ * - 管理实验元数据（名称、分流配置、启停状态）；
+ * - 不负责实验流量分配，分配逻辑在执行引擎节点中完成。
+ */
 @RestController
 @RequestMapping("/canvas/ab-experiments")
 @RequiredArgsConstructor
 public class AbExperimentController {
 
+    /** AB 实验表访问层。 */
     private final AbExperimentMapper abExperimentMapper;
 
     /**
@@ -31,6 +39,7 @@ public class AbExperimentController {
             @RequestParam(defaultValue = "20") int size,
             @RequestParam(required = false) Integer enabled) {
         return Mono.fromCallable(() -> {
+            // 默认按 ID 倒序，便于运营优先看到最近维护的实验
             LambdaQueryWrapper<AbExperiment> wrapper = new LambdaQueryWrapper<AbExperiment>()
                     .orderByDesc(AbExperiment::getId);
             if (enabled != null) {
@@ -49,6 +58,7 @@ public class AbExperimentController {
     @PostMapping
     public Mono<R<AbExperiment>> create(@RequestBody AbExperiment body) {
         return Mono.fromCallable(() -> {
+            // 默认启用：新建后可立即被 AB_SPLIT 节点选择
             if (body.getEnabled() == null) body.setEnabled(1);
             abExperimentMapper.insert(body);
             return body;
@@ -64,6 +74,7 @@ public class AbExperimentController {
     @PutMapping("/{id}")
     public Mono<R<Void>> update(@PathVariable Long id, @RequestBody AbExperiment body) {
         return Mono.<Void>fromRunnable(() -> {
+            // 强制使用路径参数，防止请求体带错 id 更新到其他记录
             body.setId(id);
             abExperimentMapper.updateById(body);
         }).subscribeOn(Schedulers.boundedElastic()).thenReturn(R.<Void>ok());

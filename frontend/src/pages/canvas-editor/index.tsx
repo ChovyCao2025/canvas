@@ -43,6 +43,10 @@ import {
 
 const { RangePicker } = DatePicker
 
+/**
+ * 画布触发类型标准化：
+ * 后端可能返回空值/历史值，前端统一降级为 REALTIME，避免设置面板出现不一致状态。
+ */
 function normalizeCanvasTriggerType(triggerType?: string): CanvasTriggerType {
   return triggerType === 'SCHEDULED' ? 'SCHEDULED' : 'REALTIME'
 }
@@ -54,6 +58,7 @@ const nodeTypes = {
 const edgeTypes = { default: HoverEdge }
 
 // ── 从后端节点 config 推导 ReactFlow edges ──────────────────
+// 后端存储的是“节点内后继字段”，ReactFlow 需要“独立边列表”，这里做单向转换。
 
 function deriveEdges(backendNodes: BackendNode[]): Edge[] {
   const edges: Edge[] = []
@@ -93,6 +98,7 @@ function applyDagreLayout(nodes: Node[], edges: Edge[]) {
 }
 
 // ── 更新源节点 bizConfig（按 sourceHandle 分发）──────────────
+// 连接线在编辑器里只维护 source/target，真正落库时仍写回每个节点的 bizConfig 字段。
 
 function patchBizConfig(
   cfg: Record<string, unknown>,
@@ -129,6 +135,7 @@ function patchBizConfig(
 }
 
 // ── 清理被删节点的引用 ────────────────────────────────────────
+// 删除节点或边后，需要把其它节点里的 next/success/fail 等引用同步置空，避免悬挂引用。
 
 function cleanRefs(cfg: Record<string, unknown>, deletedIds: Set<string>): BizConfig {
   const clean = (v: unknown) => (typeof v === 'string' && deletedIds.has(v) ? undefined : v)
@@ -149,7 +156,17 @@ function cleanRefs(cfg: Record<string, unknown>, deletedIds: Set<string>): BizCo
 
 // ── 撤销/重做历史 ─────────────────────────────────────────────
 
-interface Snapshot { nodes: Node<CanvasNodeData>[]; edges: Edge[]; actionName: string }
+/** 历史快照：用于撤销/重做。 */
+interface Snapshot {
+  /** 当时的节点列表。 */
+  nodes: Node<CanvasNodeData>[]
+
+  /** 当时的边列表。 */
+  edges: Edge[]
+
+  /** 操作名称，用于 tooltip 提示。 */
+  actionName: string
+}
 
 function useHistory(nodes: Node<CanvasNodeData>[], edges: Edge[]) {
   const [history, setHistory] = useState<Snapshot[]>([])
@@ -195,6 +212,10 @@ const divStyle: React.CSSProperties = {
 }
 
 // ── 主编辑器（内部，需要 ReactFlowProvider 包裹）─────────────
+// 文件阅读建议：
+// 1) 先看初始化 useEffect（后端图 -> ReactFlow 图）
+// 2) 再看编辑行为（拖拽、连线、删除、快捷键、保存发布）
+// 3) 最后看底部 JSX（工具栏、三栏主体、各类弹窗）
 
 function EditorInner({ detail, onStatusChange, onCanvasNameChange }: {
   detail: CanvasDetail
@@ -209,6 +230,7 @@ function EditorInner({ detail, onStatusChange, onCanvasNameChange }: {
   const readonly = searchParams.get('readonly') === 'true'
   const { screenToFlowPosition, getNodes, getEdges, fitView } = useReactFlow()
 
+  // ReactFlow 原始状态（只存真实节点 + 真实边；占位节点是派生态）。
   const [nodes, setNodes, onNodesChange] = useNodesState<Node>([])
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([])
 
@@ -221,6 +243,8 @@ function EditorInner({ detail, onStatusChange, onCanvasNameChange }: {
   const displayEdges  = useMemo(() => [...edges,     ...phEdges],  [edges,     phEdges])
 
   const [canvasName, setCanvasName] = useState(detail.canvas.name)
+
+  /** 画布级运行设置（触发方式、有效期、配额）。 */
   const [canvasSettings, setCanvasSettings] = useState<CanvasSettingsLike>({
     triggerType: normalizeCanvasTriggerType(detail.canvas.triggerType),
     cronExpression: detail.canvas.cronExpression,
@@ -232,10 +256,10 @@ function EditorInner({ detail, onStatusChange, onCanvasNameChange }: {
     cooldownSeconds: detail.canvas.cooldownSeconds,
   })
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null)
-  const [saving, setSaving]         = useState(false)
-  const [isDirty, setIsDirty]       = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [isDirty, setIsDirty] = useState(false)
   const [isEditingCanvasName, setIsEditingCanvasName] = useState(false)
-  const [clipboard, setClipboard]   = useState<Node<CanvasNodeData>[]>([])
+  const [clipboard, setClipboard] = useState<Node<CanvasNodeData>[]>([])
   const [, setTraceColorMap] = useState<Record<string, string>>({})
   const [testModalOpen, setTestModalOpen] = useState(false)
   const [testUserId,    setTestUserId]    = useState('user_test_001')
@@ -251,6 +275,7 @@ function EditorInner({ detail, onStatusChange, onCanvasNameChange }: {
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [limitsExpanded, setLimitsExpanded] = useState(false)
   const [settingsForm] = Form.useForm()
+  // 乐观锁版本号：每次成功保存后 +1，后端据此避免多人编辑覆盖。
   const editVersion   = useRef(detail.canvas.editVersion ?? 0)
   const autoSaveTimer = useRef<ReturnType<typeof setTimeout>>()
   const savedCanvasName = useRef(detail.canvas.name)
@@ -263,6 +288,8 @@ function EditorInner({ detail, onStatusChange, onCanvasNameChange }: {
   const watchedPerUserTotalLimit = Form.useWatch('perUserTotalLimit', settingsForm)
   const watchedCooldownSeconds = Form.useWatch('cooldownSeconds', settingsForm)
   const normalizedTriggerType = normalizeCanvasTriggerType(watchedTriggerType)
+
+  // 设置弹窗实时摘要数据：用于顶部“当前策略”文案，不影响实际保存值。
   const liveSettings = useMemo<CanvasSettingsLike>(() => ({
     triggerType: normalizedTriggerType,
     cronExpression: watchedCronExpression ?? '',
@@ -297,7 +324,8 @@ function EditorInner({ detail, onStatusChange, onCanvasNameChange }: {
     return () => clearTimeout(autoSaveTimer.current)
   })
 
-  // 初始化加载
+  // 初始化加载：
+  // 后端 graphJson -> ReactFlow nodes/edges；空画布自动注入 START 节点。
   useEffect(() => {
     const backendNodes: BackendNode[] = JSON.parse(detail.graphJson || '{"nodes":[]}').nodes ?? []
 
@@ -332,7 +360,8 @@ function EditorInner({ detail, onStatusChange, onCanvasNameChange }: {
     requestAnimationFrame(() => fitView({ padding: 0.15, duration: 300 }))
   }, [graphReloadKey, detail.graphJson, fitView, setNodes, setEdges])
 
-  // 键盘快捷键（含复制/粘贴）
+  // 键盘快捷键（含复制/粘贴）：
+  // 输入框聚焦时不拦截，避免影响普通文本编辑体验。
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       // 焦点在输入框时不拦截，让浏览器正常处理文字粘贴
@@ -385,7 +414,8 @@ function EditorInner({ detail, onStatusChange, onCanvasNameChange }: {
     return () => window.removeEventListener('keydown', onKey)
   })
 
-  // 拖拽节点入画布
+  // 拖拽节点入画布：
+  // 若命中分支占位框，则创建节点后自动完成连线并写回源节点 bizConfig。
   const onDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault()
     const nodeType = e.dataTransfer.getData('application/canvas-node-type')
@@ -449,7 +479,7 @@ function EditorInner({ detail, onStatusChange, onCanvasNameChange }: {
     e.dataTransfer.dropEffect = 'move'
   }, [])
 
-  // 拖已有节点到占位框上：松手时检测命中并自动连线
+  // 拖已有节点到占位框上：松手时检测命中并自动连线。
   const onNodeDragStop = useCallback((_: React.MouseEvent, draggedNode: Node) => {
     setDraggingNodeId(null)
     const d = draggedNode.data as CanvasNodeData
@@ -490,7 +520,7 @@ function EditorInner({ detail, onStatusChange, onCanvasNameChange }: {
     }, prev))
   }, [placeholders, snapshot, setNodes, setEdges])
 
-  // 连线
+  // 新建连线：更新边列表 + 更新源节点 bizConfig 后继字段。
   const onConnect = useCallback((conn: Connection) => {
     const { source, sourceHandle, target } = conn
     if (!source || !target || !sourceHandle) return
@@ -503,7 +533,7 @@ function EditorInner({ detail, onStatusChange, onCanvasNameChange }: {
     setEdges(prev => addEdge({ ...conn }, prev))
   }, [snapshot, setNodes, setEdges])
 
-  // 节点删除时清理引用
+  // 节点删除时清理引用：保证删除后图结构与 bizConfig 一致。
   const onNodesChangeWrapped = useCallback((changes: NodeChange[]) => {
     // Protect START node from deletion
     const safeChanges = changes.filter(c => {
@@ -541,7 +571,7 @@ function EditorInner({ detail, onStatusChange, onCanvasNameChange }: {
     if (significant) setIsDirty(true)
   }, [onEdgesChange])
 
-  // 连线规则
+  // 连线规则：禁止给 START 加上游、禁止终止节点出边、禁止自环。
   const isValidConnection = useCallback((conn: Connection) => {
     const allNodes = getNodes()
     const src = allNodes.find(n => n.id === conn.source)?.data as CanvasNodeData | undefined
@@ -556,7 +586,8 @@ function EditorInner({ detail, onStatusChange, onCanvasNameChange }: {
     return true
   }, [getNodes])
 
-  // 保存
+  // 保存：
+  // 以当前内存图为准序列化并落库，避免“面板未保存但画布已改动”造成状态不一致。
   /** 发布前本地校验（减少不必要的服务端请求）*/
   const validateBeforePublish = useCallback((rfNodes: Node<CanvasNodeData>[]): string[] => {
     const errors: string[] = []
@@ -719,7 +750,7 @@ function EditorInner({ detail, onStatusChange, onCanvasNameChange }: {
     })
   }, [canvasName, handleSaveCanvasName])
 
-  /** 发布（或重新发布）：先保存草稿，再创建新版本上线 */
+  /** 发布（或重新发布）：先保存草稿，再创建新版本上线。 */
   const handlePublish = useCallback(async () => {
     const errors = validateBeforePublish(getNodes().filter(n => !(n.data as any)?._placeholder) as Node<CanvasNodeData>[])
     if (errors.length > 0) { message.error({ content: errors.join('\n'), duration: 5 }); return }
@@ -794,14 +825,14 @@ function EditorInner({ detail, onStatusChange, onCanvasNameChange }: {
     })
   }
 
-  // 整理布局
+  // 整理布局：只改变坐标，不改业务配置。
   const onLayout = useCallback(() => {
     snapshot('整理布局')
     const layouted = applyDagreLayout(getNodes(), getEdges())
     setNodes([...layouted])
   }, [snapshot, getNodes, getEdges, setNodes])
 
-  // 版本历史（EF-7）
+  // 版本历史（EF-7）：按时间倒序展示，可回退到任意历史版本。
   const openHistory = async () => {
     setHistoryOpen(true)
     setHistoryLoading(true)
@@ -825,7 +856,7 @@ function EditorInner({ detail, onStatusChange, onCanvasNameChange }: {
     })
   }
 
-  // 画布设置（EF-8）
+  // 画布设置（EF-8）：管理触发方式、有效期和执行限制，不直接改节点图结构。
   const openSettings = () => {
     const nextSettings: CanvasSettingsLike = {
       triggerType: canvasSettings.triggerType ?? 'REALTIME',
@@ -883,7 +914,7 @@ function EditorInner({ detail, onStatusChange, onCanvasNameChange }: {
 
 
 
-  // 节点数据更新（来自配置面板）
+  // 节点数据更新（来自右侧配置面板）。
   const onNodeDataChange = useCallback((nid: string, patch: Partial<CanvasNodeData>) => {
     setNodes(prev => prev.map(n =>
       n.id === nid ? { ...n, data: { ...n.data as CanvasNodeData, ...patch } } : n
@@ -902,6 +933,7 @@ function EditorInner({ detail, onStatusChange, onCanvasNameChange }: {
     2: { label: '已下线', color: 'red' },
   }
 
+  // 提供给节点/边快捷操作菜单的动作集合。
   const deleteNodeById = (nodeId: string) => {
     snapshot('删除节点')
     const ids = new Set([nodeId])

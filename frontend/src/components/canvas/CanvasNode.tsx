@@ -7,6 +7,10 @@ import { CATEGORY_COLORS, TRIGGER_TYPES, TERMINAL_TYPES } from './constants'
 import { getBranchHandles } from './branchHandles'
 import { useCanvasActions } from '../../context/CanvasActionsContext'
 
+/**
+ * 节点悬停态管理：
+ * 鼠标离开后延迟隐藏工具栏，避免用户移动到工具栏时闪烁。
+ */
 function useHover() {
   const [hovered, setHovered] = useState(false)
   const timer = useRef<ReturnType<typeof setTimeout>>()
@@ -16,6 +20,9 @@ function useHover() {
   return { hovered, enter, leave }
 }
 
+/**
+ * 节点悬浮操作条（复制 / 删除）。
+ */
 function Toolbar({ onCopy, onDelete, enter, leave }: {
   onCopy: () => void; onDelete: () => void
   enter: () => void; leave: () => void
@@ -49,6 +56,15 @@ function Toolbar({ onCopy, onDelete, enter, leave }: {
   )
 }
 
+/**
+ * ReactFlow 节点渲染组件。
+ *
+ * 说明：
+ * 1. START/END 渲染为圆形节点；
+ * 2. 普通节点渲染为矩形卡片；
+ * 3. 分支节点会在底部渲染多个 source handle；
+ * 4. 所有删除/复制行为通过 CanvasActionsContext 分发。
+ */
 const CanvasNode = memo(({ data, id, selected }: NodeProps) => {
   const d = data as CanvasNodeData & { traceColor?: string }
   const { deleteNode, copyNode } = useCanvasActions()
@@ -62,9 +78,11 @@ const CanvasNode = memo(({ data, id, selected }: NodeProps) => {
   const isEnd       = d.nodeType === 'END'
   const isAudienceTagger = d.nodeType === 'TAGGER' && d.bizConfig?.mode === 'audience'
 
+  // 根据节点类型和配置动态计算当前节点应该暴露哪些分支出口
   const branchHandles = getBranchHandles(d.nodeType, d.bizConfig ?? {})
   const isBranching   = branchHandles.length > 0
 
+  // START / END 使用独立视觉样式，且只保留单向连接点
   if (isStart || isEnd) {
     const color = isStart ? '#52c41a' : '#f5222d'
     return (
@@ -105,6 +123,7 @@ const CanvasNode = memo(({ data, id, selected }: NodeProps) => {
         }}
       >
         {!isTrigger && (
+          // 非触发器节点允许从上游连入
           <Handle type="target" position={Position.Top} id="input"
             style={{ background: '#fff', border: '2px solid #bbb', width: 10, height: 10 }} />
         )}
@@ -123,6 +142,7 @@ const CanvasNode = memo(({ data, id, selected }: NodeProps) => {
         </div>
         {!isTerminal && (
           isBranching ? (
+            // 多分支节点：每个分支单独暴露 source handle，并显示分支标签
             <div style={{ paddingBottom: 18 }}>
               {branchHandles.map((h, i) => {
                 const pct = ((i + 1) / (branchHandles.length + 1)) * 100
@@ -157,6 +177,7 @@ const CanvasNode = memo(({ data, id, selected }: NodeProps) => {
               })}
             </div>
           ) : (
+            // 单出口节点：统一使用 default handle
             <Handle
               type="source"
               position={Position.Bottom}

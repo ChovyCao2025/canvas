@@ -19,4 +19,6 @@ public final class NodeGate {
 
     /** repeat 信号，true=有并发协程需要 repeat */
     public final AtomicBoolean repeatPending = new AtomicBoolean(false);
+
+    // 该类仅是轻量状态容器，不承载业务逻辑。
 }

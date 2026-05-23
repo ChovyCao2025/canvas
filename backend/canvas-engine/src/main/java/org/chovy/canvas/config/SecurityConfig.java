@@ -12,15 +12,21 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.web.server.SecurityWebFilterChain;
 import reactor.core.publisher.Mono;
 
+/**
+ * WebFlux 安全配置：
+ * 定义认证入口、接口权限策略以及 JWT 过滤器挂载顺序。
+ */
 @Configuration
 @EnableWebFluxSecurity
 public class SecurityConfig {
 
+    /** 密码编码器（BCrypt）。 */
     @Bean
     public BCryptPasswordEncoder bCryptPasswordEncoder() {
         return new BCryptPasswordEncoder();
     }
 
+    /** 主安全过滤链。 */
     @Bean
     public SecurityWebFilterChain securityWebFilterChain(
             ServerHttpSecurity http, JwtAuthFilter jwtAuthFilter) {

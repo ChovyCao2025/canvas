@@ -25,6 +25,9 @@ import reactor.core.scheduler.Schedulers;
 
 import java.util.List;
 
+/**
+ * 人群定义与计算管理接口。
+ */
 @RestController
 @RequestMapping("/canvas/audiences")
 @RequiredArgsConstructor
@@ -35,6 +38,7 @@ public class AudienceController {
     private final AudienceBatchComputeService computeService;
     private final AudienceSchedulerService schedulerService;
 
+    /** 分页查询人群定义。 */
     @GetMapping
     public Mono<R<PageResult<AudienceDefinition>>> list(
             @RequestParam(defaultValue = "1") int page,
@@ -49,18 +53,21 @@ public class AudienceController {
         }).subscribeOn(Schedulers.boundedElastic());
     }
 
+    /** 查询单个人群定义详情。 */
     @GetMapping("/{id}")
     public Mono<R<AudienceDefinition>> get(@PathVariable Long id) {
         return Mono.fromCallable(() -> R.ok(definitionMapper.selectById(id)))
                 .subscribeOn(Schedulers.boundedElastic());
     }
 
+    /** 查询可用于实时判断的“READY 人群”列表。 */
     @GetMapping("/ready")
     public Mono<R<List<AudienceDefinition>>> listReady() {
         return Mono.fromCallable(() -> R.ok(computeService.listReadyDefinitions()))
                 .subscribeOn(Schedulers.boundedElastic());
     }
 
+    /** 创建人群并触发首次计算，同时注册调度任务。 */
     @PostMapping
     public Mono<R<AudienceDefinition>> create(@RequestBody AudienceDefinition body) {
         return Mono.fromCallable(() -> {
@@ -70,6 +77,7 @@ public class AudienceController {
         }).subscribeOn(Schedulers.boundedElastic());
     }
 
+    /** 更新人群并触发重算，同时刷新调度任务。 */
     @PutMapping("/{id}")
     public Mono<R<Void>> update(@PathVariable Long id, @RequestBody AudienceDefinition body) {
         body.setId(id);
@@ -80,6 +88,7 @@ public class AudienceController {
         }).subscribeOn(Schedulers.boundedElastic());
     }
 
+    /** 删除人群定义、统计数据与调度任务。 */
     @DeleteMapping("/{id}")
     public Mono<R<Void>> delete(@PathVariable Long id) {
         return Mono.fromCallable(() -> {
@@ -89,6 +98,7 @@ public class AudienceController {
         }).subscribeOn(Schedulers.boundedElastic());
     }
 
+    /** 手动触发一次异步计算。 */
     @PostMapping("/{id}/compute")
     public Mono<R<Void>> compute(@PathVariable Long id) {
         return Mono.fromRunnable(() -> Thread.ofVirtual().start(() -> computeService.compute(id)))
@@ -96,6 +106,7 @@ public class AudienceController {
                 .thenReturn(R.ok());
     }
 
+    /** 查询人群计算状态统计。 */
     @GetMapping("/{id}/stat")
     public Mono<R<AudienceStat>> stat(@PathVariable Long id) {
         return Mono.fromCallable(() -> R.ok(statMapper.selectById(id)))

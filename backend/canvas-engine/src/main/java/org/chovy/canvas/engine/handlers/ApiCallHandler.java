@@ -29,8 +29,13 @@ import java.util.*;
 @NodeHandlerType("API_CALL")
 public class ApiCallHandler implements NodeHandler {
 
+    /** API 定义元数据表访问层。 */
     private final ApiDefinitionMapper apiDefinitionMapper;
+
+    /** WebClient 构建器（按调用目标动态构造客户端）。 */
     private final WebClient.Builder   webClientBuilder;
+
+    /** JSON 序列化工具。 */
     private final ObjectMapper        objectMapper;
 
     @Override
@@ -85,6 +90,7 @@ public class ApiCallHandler implements NodeHandler {
         return rawCall
             .defaultIfEmpty("")
             .flatMap(body -> {
+                // 统一把 HTTP 返回转成上下文字段，供下游节点消费
                 log.info("[API_CALL] ← apiKey={} body={}", apiKey, body.length() > 200 ? body.substring(0, 200) + "..." : body);
                 Map<String, Object> out = new HashMap<>();
                 // 尝试解 JSON，失败就把原始 body 存入 output
@@ -102,6 +108,7 @@ public class ApiCallHandler implements NodeHandler {
             })
             .onErrorResume(e -> {
                 log.error("[API_CALL] ✗ apiKey={} url={} error={}", apiKey, url, e.getMessage());
+                // 调用异常直接标记节点失败，由 DagEngine 统一走失败分支
                 return Mono.just(NodeResult.fail("接口调用异常: " + e.getMessage()));
             });
     }

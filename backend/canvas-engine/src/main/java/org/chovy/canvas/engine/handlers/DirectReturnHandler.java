@@ -13,6 +13,9 @@ import java.util.Map;
 
 /**
  * 直调返回节点：从上下文 / 自定义值构建同步返回给业务方的数据结构。
+ *
+ * <p>常见于 DIRECT_CALL 流程尾部，用于把流程内字段映射成业务 API 需要的响应结构。
+ * 映射规则通常由前端配置面板维护。
  */
 @Component
 @NodeHandlerType("DIRECT_RETURN")
@@ -21,6 +24,7 @@ public class DirectReturnHandler implements NodeHandler {
     @Override
     @SuppressWarnings("unchecked")
     public Mono<NodeResult> executeAsync(Map<String, Object> config, ExecutionContext ctx) {
+        // data 每一项描述一个“返回字段映射规则”
         List<Map<String, Object>> data = (List<Map<String, Object>>) config.get("data");
         Map<String, Object> result = new HashMap<>();
 
@@ -29,9 +33,13 @@ public class DirectReturnHandler implements NodeHandler {
                 String name      = (String) item.get("name");
                 String valueType = (String) item.get("valueType");
                 String value     = (String) item.get("value");
+                // name 作为响应字段名，value 作为字段来源或常量值
+                // CONTEXT: 从上下文读取；其他类型按字面值回传
                 if ("CONTEXT".equals(valueType)) {
+                    // 从上下文取值时，value 表示字段 key
                     result.put(name, ctx.getContextValue(value));
                 } else {
+                    // 非 CONTEXT 视作常量值直接透传
                     result.put(name, value);
                 }
             }

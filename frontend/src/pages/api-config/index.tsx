@@ -10,6 +10,10 @@ import { apiDefinitionApi } from '../../services/api'
 
 const { Title } = Typography
 
+/**
+ * 参数类型下拉选项：
+ * 与后端元数据约定保持一致，最终落库到 requestSchema 字段中。
+ */
 export const PARAM_TYPES = [
   { value: 'STRING',       label: '字符型' },
   { value: 'NUMBER',       label: '数值型' },
@@ -18,31 +22,75 @@ export const PARAM_TYPES = [
   { value: 'STRING_PARAM', label: '字符型（参数调用）' },
 ]
 
+/**
+ * API 参数 schema 的单项结构。
+ */
 export interface ApiParam {
-  name:        string
+  /** 参数名（调用方传参 key）。 */
+  name: string
+
+  /** 参数展示名（给运营同学看的文案）。 */
   displayName: string
-  type:        string
-  required:    boolean
+
+  /** 参数类型（受 PARAM_TYPES 约束）。 */
+  type: string
+
+  /** 是否必填。 */
+  required: boolean
 }
 
+/**
+ * API 定义列表项模型。
+ */
 interface ApiDefinition {
+  /** 主键 ID。 */
   id: number
+
+  /** 接口名称。 */
   name: string
+
+  /** 接口唯一业务编码。 */
   apiKey: string
+
+  /** 请求地址。 */
   url: string
+
+  /** 请求方法。 */
   method: string
+
+  /** 业务线。 */
   bizLine?: string
+
+  /** 描述。 */
   description?: string
+
+  /** 请求参数 schema（JSON 字符串）。 */
   requestSchema?: string
+
+  /** 启用状态：1 启用，0 禁用。 */
   enabled: number
 }
 
 // ── 参数定义子表格 ───────────────────────────────────────────────
-function ParamSchemaEditor({ value, onChange }: {
-  value?: ApiParam[]; onChange?: (v: ApiParam[]) => void
-}) {
+/**
+ * 参数 schema 编辑器。
+ *
+ * 这是一个“受控组件”：
+ * - value 来自 Form.Item
+ * - onChange 把更新后的数组回传给 Form
+ */
+interface ParamSchemaEditorProps {
+  /** 当前参数数组。 */
+  value?: ApiParam[]
+
+  /** 参数变更回调。 */
+  onChange?: (v: ApiParam[]) => void
+}
+
+function ParamSchemaEditor({ value, onChange }: ParamSchemaEditorProps) {
   const params: ApiParam[] = value ?? []
 
+  // 小工具函数：所有改动都走 set(next) 回传，保持单向数据流
   const set = (next: ApiParam[]) => onChange?.(next)
   const add = () => set([...params, { name: '', displayName: '', type: 'STRING', required: false }])
   const remove = (i: number) => set(params.filter((_, idx) => idx !== i))
@@ -105,6 +153,9 @@ function ParamSchemaEditor({ value, onChange }: {
 }
 
 // ── 主页面 ────────────────────────────────────────────────────────
+/**
+ * API 配置页。
+ */
 export default function ApiConfigPage() {
   const [data,          setData]          = useState<ApiDefinition[]>([])
   const [total,         setTotal]         = useState(0)
@@ -136,6 +187,7 @@ export default function ApiConfigPage() {
   }
 
   const openEdit = (record: ApiDefinition) => {
+    // requestSchema 存储为 JSON 字符串，编辑时需要反序列化回数组
     setEditingRecord(record)
     let schema: ApiParam[] = []
     try { schema = JSON.parse(record.requestSchema || '[]') } catch {}
@@ -150,6 +202,7 @@ export default function ApiConfigPage() {
       const body = {
         ...values,
         enabled: values.enabled ? 1 : 0,
+        // 后端字段是字符串，因此这里序列化数组
         requestSchema: JSON.stringify(values.requestSchema ?? []),
       }
       if (editingRecord) {

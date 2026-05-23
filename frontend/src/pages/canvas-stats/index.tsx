@@ -13,19 +13,72 @@ import type { R } from '../../types'
 const { Title, Text } = Typography
 const { RangePicker } = DatePicker
 
+/** 统计总览数据。 */
 interface StatsData {
-  total: number; success: number; failed: number; paused: number
-  successRate: string; uniqueUsers: number
-}
-interface FunnelRow {
-  nodeId: string; nodeType: string; nodeName: string
-  totalEntered: number; totalSuccess: number; totalFailed: number
-  totalSkipped: number; avgDurationSec: number
-}
-interface TrendPoint { date: string; count: number }
+  /** 触发总次数。 */
+  total: number
 
+  /** 成功次数。 */
+  success: number
+
+  /** 失败次数。 */
+  failed: number
+
+  /** 挂起次数。 */
+  paused: number
+
+  /** 成功率（服务端已格式化）。 */
+  successRate: string
+
+  /** 去重用户数。 */
+  uniqueUsers: number
+}
+
+/** 节点漏斗行数据。 */
+interface FunnelRow {
+  /** 节点 ID。 */
+  nodeId: string
+
+  /** 节点类型编码。 */
+  nodeType: string
+
+  /** 节点展示名。 */
+  nodeName: string
+
+  /** 进入次数。 */
+  totalEntered: number
+
+  /** 成功次数。 */
+  totalSuccess: number
+
+  /** 失败次数。 */
+  totalFailed: number
+
+  /** 跳过次数。 */
+  totalSkipped: number
+
+  /** 平均耗时（秒）。 */
+  avgDurationSec: number
+}
+
+/** 趋势图单日数据点。 */
+interface TrendPoint {
+  /** 日期（YYYY-MM-DD）。 */
+  date: string
+
+  /** 当日执行次数。 */
+  count: number
+}
+
+/**
+ * Dayjs -> API 日期字符串（YYYY-MM-DD）。
+ */
 function formatDate(d: Dayjs) { return d.format('YYYY-MM-DD') }
 
+/**
+ * KPI 环比徽章：
+ * curr 当前值，prev 对比区间值。
+ */
 function CompBadge({ curr, prev }: { curr: number; prev: number | null }) {
   if (prev === null) return <span style={{ display: 'inline-block', height: 21 }} />
   const delta = curr - prev
@@ -41,6 +94,10 @@ const BS = {
   neutral: { display:'inline-flex', gap:3, padding:'2px 0', fontSize:11, color:'#94a3b8', fontWeight:500 },
 }
 
+/**
+ * KPI 卡片定义：
+ * key 对应 StatsData 字段，format 负责值展示。
+ */
 const KPI_DEFS = [
   { key:'uniqueUsers', label:'触达用户数', bg:'#eff6ff', iconBg:'#dbeafe', icon:<TeamOutlined style={{ fontSize:16, color:'#3b82f6' }} />, format:(v:number|string) => Number(v).toLocaleString() },
   { key:'successRate', label:'执行成功率', bg:'#f0fdf4', iconBg:'#dcfce7', icon:<CheckCircleOutlined style={{ fontSize:16, color:'#22c55e' }} />, format:(v:number|string) => String(v) },
@@ -52,7 +109,7 @@ const KPI_DEFS = [
 // 默认展示的关键节点类型（去掉 END）
 const KEY_NODE_TYPES = new Set(['TRIGGER','CRON_TRIGGER','MQ_TRIGGER','SEND_MQ','API_CALL'])
 
-const PRESETS: { label:string; value:[Dayjs,Dayjs] }[] = [
+const PRESETS: { label: string; value: [Dayjs, Dayjs] }[] = [
   { label:'最近7天',   value:[dayjs().subtract(6,'day'), dayjs()] },
   { label:'最近30天',  value:[dayjs().subtract(29,'day'), dayjs()] },
   { label:'最近90天',  value:[dayjs().subtract(89,'day'), dayjs()] },
@@ -60,18 +117,26 @@ const PRESETS: { label:string; value:[Dayjs,Dayjs] }[] = [
   { label:'最近1年',   value:[dayjs().subtract(364,'day'), dayjs()] },
 ]
 
+/**
+ * 画布统计页：
+ * 1) 查询统计总览；
+ * 2) 查询上期对比；
+ * 3) 查询节点漏斗；
+ * 4) 查询按天趋势。
+ */
 export default function CanvasStatsPage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
 
-  const [range, setRange]         = useState<[Dayjs,Dayjs]>([dayjs().subtract(6,'day'), dayjs()])
-  const [stats, setStats]         = useState<StatsData|null>(null)
-  const [prevStats, setPrev]      = useState<StatsData|null>(null)
-  const [funnel, setFunnel]       = useState<FunnelRow[]>([])
-  const [trend, setTrend]         = useState<TrendPoint[]>([])
-  const [loading, setLoading]     = useState(true)
-  const [expanded, setExpanded]   = useState(false)
+  const [range, setRange] = useState<[Dayjs, Dayjs]>([dayjs().subtract(6, 'day'), dayjs()])
+  const [stats, setStats] = useState<StatsData | null>(null)
+  const [prevStats, setPrev] = useState<StatsData | null>(null)
+  const [funnel, setFunnel] = useState<FunnelRow[]>([])
+  const [trend, setTrend] = useState<TrendPoint[]>([])
+  const [loading, setLoading] = useState(true)
+  const [expanded, setExpanded] = useState(false)
 
+  // 主加载流程：并行拉取 4 份统计数据
   const load = useCallback(() => {
     if (!id) return
     const [start, end] = range
@@ -93,6 +158,7 @@ export default function CanvasStatsPage() {
 
   useEffect(() => { load() }, [load])
 
+  // 默认只展示关键节点，展开后展示完整漏斗
   const displayFunnel = expanded ? funnel : funnel.filter(r => KEY_NODE_TYPES.has(r.nodeType))
 
   const funnelColumns: ColumnsType<FunnelRow> = [

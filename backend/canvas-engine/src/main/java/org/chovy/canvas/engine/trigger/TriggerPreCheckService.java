@@ -27,7 +27,9 @@ public class TriggerPreCheckService {
     private final CanvasUserQuotaMapper quotaMapper;
     private final StringRedisTemplate   redis;
 
+    /** 全局执行量计数键前缀：按 canvasId 聚合。 */
     private static final String GLOBAL_COUNT_KEY = "canvas:global_count:";
+    /** 用户维度配额键前缀：按 canvasId + userId (+ date) 聚合。 */
     private static final String QUOTA_KEY        = "canvas:quota:";
 
     /**
@@ -76,6 +78,8 @@ public class TriggerPreCheckService {
         }
 
         // 5. 用户总触发上限（Redis INCR 原子扣减，与 perUserDailyLimit 同日维度）
+        // 说明：当前实现按“天分桶”记录 total，适合运营日维度限流场景；
+        // 若后续需要跨天全生命周期总限，应改为不带 date 的单键累加。
         if (canvas.getPerUserTotalLimit() != null) {
             String key = QUOTA_KEY + "total:" + canvasId + ":" + userId + ":" + today;
             Long total = redis.opsForValue().increment(key);
@@ -121,12 +125,14 @@ public class TriggerPreCheckService {
                                 .eq(CanvasUserQuota::getTriggerDate, today));
 
                 if (existing == null) {
+                    // 首次触发：初始化当日统计
                     CanvasUserQuota q = new CanvasUserQuota();
                     q.setCanvasId(canvasId); q.setUserId(userId);
                     q.setTriggerDate(today); q.setDailyCount(1); q.setTotalCount(1);
                     q.setLastTriggerAt(LocalDateTime.now());
                     quotaMapper.insert(q);
                 } else {
+                    // 同日累计：增量更新每日/总计与最后触发时间
                     existing.setDailyCount(existing.getDailyCount() + 1);
                     existing.setTotalCount(existing.getTotalCount() + 1);
                     existing.setLastTriggerAt(LocalDateTime.now());
