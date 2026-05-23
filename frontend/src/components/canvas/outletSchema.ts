@@ -1,0 +1,125 @@
+import { getBranchHandles, type BranchHandle } from './branchHandles'
+
+export const OUTLET_TARGET_FIELDS = [
+  'nextNodeId',
+  'successNodeId',
+  'failNodeId',
+  'elseNodeId',
+  'approveNodeId',
+  'rejectNodeId',
+  'hitNextNodeId',
+  'missNextNodeId',
+  'timeoutNodeId',
+  'suppressedNodeId',
+  'skippedNodeId',
+  'allowedNodeId',
+  'quietNodeId',
+  'availableNodeId',
+  'unavailableNodeId',
+  'passNodeId',
+  'cappedNodeId',
+  'fallbackNodeId',
+  'exitNodeId',
+  'loopStartNodeId',
+  'targetNodeId',
+  'maxExceededNodeId',
+  'goalMetNodeId',
+  'goalNotMetNodeId',
+] as const
+
+export type OutletTargetField = typeof OUTLET_TARGET_FIELDS[number]
+
+export interface OutletSchemaItem {
+  id: string
+  label: string
+  color?: string
+  targetField?: OutletTargetField
+}
+
+const DEFAULT_TARGET_FIELDS: Record<string, OutletTargetField> = {
+  default: 'nextNodeId',
+  success: 'successNodeId',
+  fail: 'failNodeId',
+  else: 'elseNodeId',
+  approve: 'approveNodeId',
+  reject: 'rejectNodeId',
+  hit: 'hitNextNodeId',
+  miss: 'missNextNodeId',
+  timeout: 'timeoutNodeId',
+  suppressed: 'suppressedNodeId',
+  skipped: 'skippedNodeId',
+  allowed: 'allowedNodeId',
+  quiet: 'quietNodeId',
+  available: 'availableNodeId',
+  unavailable: 'unavailableNodeId',
+  pass: 'passNodeId',
+  capped: 'cappedNodeId',
+  fallback: 'fallbackNodeId',
+  exit: 'exitNodeId',
+  loop: 'loopStartNodeId',
+  goto: 'targetNodeId',
+  max_exceeded: 'maxExceededNodeId',
+  goal_met: 'goalMetNodeId',
+  goal_not_met: 'goalNotMetNodeId',
+}
+
+function isOutletTargetField(value: unknown): value is OutletTargetField {
+  return typeof value === 'string' && (OUTLET_TARGET_FIELDS as readonly string[]).includes(value)
+}
+
+export function parseOutletSchemaItems(raw: string | undefined): OutletSchemaItem[] {
+  if (!raw) return []
+  try {
+    const parsed = JSON.parse(raw) as unknown
+    if (!Array.isArray(parsed)) return []
+    return parsed
+      .filter((item): item is OutletSchemaItem => {
+        if (item == null || typeof item !== 'object') return false
+        const candidate = item as Record<string, unknown>
+        return typeof candidate.id === 'string' && typeof candidate.label === 'string'
+      })
+      .map(item => ({
+        id: item.id,
+        label: item.label,
+        color: typeof item.color === 'string' ? item.color : undefined,
+        targetField: isOutletTargetField(item.targetField) ? item.targetField : undefined,
+      }))
+  } catch {
+    return []
+  }
+}
+
+export function parseOutletSchema(raw: string | undefined): BranchHandle[] {
+  return parseOutletSchemaItems(raw)
+    .filter(item => item.targetField || DEFAULT_TARGET_FIELDS[item.id])
+    .map(item => ({
+      id: item.id,
+      label: item.label,
+      color: item.color ?? '#1677ff',
+    }))
+}
+
+export function hasOutletSchema(raw: string | undefined): boolean {
+  return parseOutletSchemaItems(raw).length > 0
+}
+
+export function getOutletHandles(input: {
+  nodeType: string
+  bizConfig: Record<string, unknown>
+  outletSchema?: string
+}): BranchHandle[] {
+  const dynamic = parseOutletSchema(input.outletSchema)
+  if (dynamic.length > 0) return dynamic
+  if (hasOutletSchema(input.outletSchema)) return []
+  return getBranchHandles(input.nodeType, input.bizConfig)
+}
+
+export function getOutletTargetField(
+  handleId: string,
+  outletSchema?: string,
+): OutletTargetField | undefined {
+  const dynamic = parseOutletSchemaItems(outletSchema)
+  const item = dynamic.find(candidate => candidate.id === handleId)
+  if (item?.targetField) return item.targetField
+  return DEFAULT_TARGET_FIELDS[handleId]
+}

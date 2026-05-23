@@ -166,6 +166,9 @@ export interface CanvasNode {
   /** 节点配置。 */
   config: Record<string, unknown>
 
+  /** 动态出口 schema。 */
+  outletSchema?: string
+
   /** 画布坐标（仅前端展示用） */
   x?: number
 
@@ -196,6 +199,18 @@ export interface NodeTypeRegistry {
 
   /** 输出 schema。 */
   outputSchema: string
+
+  /** 动态出口 schema。 */
+  outletSchema?: string
+
+  /** 摘要模板。 */
+  summaryTemplate?: string
+
+  /** 运行策略 schema。 */
+  runtimePolicySchema?: string
+
+  /** 风险等级。 */
+  riskLevel?: 'LOW' | 'MEDIUM' | 'HIGH' | string
 
   /** 是否触发器节点。 */
   isTrigger: 0 | 1

@@ -1,0 +1,20 @@
+CREATE TABLE `message_send_record` (
+  `id`                  BIGINT        NOT NULL AUTO_INCREMENT,
+  `execution_id`        VARCHAR(64)   NOT NULL,
+  `canvas_id`           BIGINT        NOT NULL,
+  `user_id`             VARCHAR(128)  NOT NULL,
+  `node_id`             VARCHAR(64)   NOT NULL,
+  `channel`             VARCHAR(32)   NOT NULL,
+  `template_id`         VARCHAR(128)  NULL,
+  `idempotency_key`     VARCHAR(255)  NOT NULL,
+  `request_payload`     TEXT          NULL,
+  `status`              VARCHAR(32)   NOT NULL,
+  `external_message_id` VARCHAR(128)  NULL,
+  `error_message`       VARCHAR(500)  NULL,
+  `created_at`          DATETIME      NOT NULL,
+  `updated_at`          DATETIME      NOT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_message_send_idempotency` (`idempotency_key`),
+  INDEX `idx_message_send_execution` (`execution_id`, `node_id`),
+  INDEX `idx_message_send_user_channel` (`user_id`, `channel`, `created_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='营销触达发送记录';

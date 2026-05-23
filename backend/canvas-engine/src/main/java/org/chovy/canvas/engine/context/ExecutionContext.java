@@ -68,6 +68,12 @@ public class ExecutionContext {
      */
     private Map<String, Long> hubStartTimes = new ConcurrentHashMap<>();
 
+    /** LOOP 节点迭代次数（nodeId → count），持久化以支持挂起恢复后的边界控制。 */
+    private Map<String, Integer> loopIterations = new ConcurrentHashMap<>();
+
+    /** GOTO 节点跳转次数（nodeId → count），持久化以防无界跳转。 */
+    private Map<String, Integer> jumpCounts = new ConcurrentHashMap<>();
+
     /**
      * 每节点的执行门控，分离互斥锁与 repeat 信号。
      * 不序列化：恢复时通过 {@link #getGate(String)} 懒建。
@@ -139,6 +145,7 @@ public class ExecutionContext {
     public boolean isNodeDone(String nodeId) {
         NodeStatus s = getNodeStatus(nodeId);
         return s == NodeStatus.SUCCESS || s == NodeStatus.FAILED
+                || s == NodeStatus.TIMEOUT || s == NodeStatus.SUPPRESSED
                 || s == NodeStatus.SKIPPED || s == NodeStatus.PARTIAL_FAIL;
     }
 

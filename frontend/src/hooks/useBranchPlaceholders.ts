@@ -3,7 +3,7 @@ import type { Node, Edge } from '@xyflow/react'
 import type { CanvasNodeData }  from '../components/canvas/constants'
 import type { PlaceholderData } from '../components/canvas/BranchPlaceholderNode'
 import { PLACEHOLDER_W, PLACEHOLDER_H } from '../components/canvas/BranchPlaceholderNode'
-import { getBranchHandles }    from '../components/canvas/branchHandles'
+import { getOutletHandles }    from '../components/canvas/outletSchema'
 import { TERMINAL_TYPES }      from '../components/canvas/constants'
 
 const V_GAP       = 80
@@ -63,7 +63,11 @@ export function useBranchPlaceholders(
       if ((node.data as unknown as PlaceholderData)?._placeholder) continue
       if (TERMINAL_TYPES.has(node.data.nodeType))                   continue
 
-      const handles = getBranchHandles(node.data.nodeType, node.data.bizConfig ?? {})
+      const handles = getOutletHandles({
+        nodeType: node.data.nodeType,
+        bizConfig: node.data.bizConfig ?? {},
+        outletSchema: node.data.outletSchema,
+      })
       if (handles.length === 0) continue
 
       const nodeW = node.width  ?? PLACEHOLDER_W

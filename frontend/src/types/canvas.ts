@@ -23,6 +23,7 @@ export interface BackendNode {
 
   /** 历史兼容字段（旧版本可能写到这里）。 */
   bizConfig?: Record<string, unknown>
+  outletSchema?: string
 }
 
 // 各节点 config 中连接分支的子类型
@@ -85,6 +86,24 @@ export interface BizConfig {
   /** 阈值未命中分支后继。 */
   missNextNodeId?: string
 
+  runtimePolicy?: Record<string, unknown>
+  timeoutNodeId?: string
+  suppressedNodeId?: string
+  skippedNodeId?: string
+  allowedNodeId?: string
+  quietNodeId?: string
+  availableNodeId?: string
+  unavailableNodeId?: string
+  passNodeId?: string
+  cappedNodeId?: string
+  fallbackNodeId?: string
+  exitNodeId?: string
+  loopStartNodeId?: string
+  targetNodeId?: string
+  maxExceededNodeId?: string
+  goalMetNodeId?: string
+  goalNotMetNodeId?: string
+
   /** 条件分支列表（SELECTOR 等节点使用）。 */
   branches?: Branch[]
 
@@ -93,6 +112,10 @@ export interface BizConfig {
 
   /** AB 分流分组列表。 */
   groups?: AbGroup[]
+
+  paths?: Branch[]
+  variants?: Branch[]
+  bands?: Branch[]
 
   /** 其余节点特有配置。 */
   [key: string]: unknown
@@ -112,6 +135,9 @@ export interface CanvasNodeData {
 
   /** 业务配置。 */
   bizConfig: BizConfig
+
+  /** 动态出口 schema。 */
+  outletSchema?: string
 
   /** 轨迹调试高亮色。 */
   traceColor?: string

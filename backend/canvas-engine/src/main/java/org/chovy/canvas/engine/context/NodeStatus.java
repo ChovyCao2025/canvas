@@ -19,6 +19,12 @@ public enum NodeStatus {
     /** 执行失败。 */
     FAILED,
 
+    /** 等待/目标节点超时。 */
+    TIMEOUT,
+
+    /** 被营销授权、抑制名单或策略保护拦截。 */
+    SUPPRESSED,
+
     /** 被策略跳过（如 PRIORITY 未命中）。 */
     SKIPPED,
 

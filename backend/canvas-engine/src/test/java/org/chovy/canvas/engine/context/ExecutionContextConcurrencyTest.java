@@ -1,6 +1,7 @@
 package org.chovy.canvas.engine.context;
 
 import org.junit.jupiter.api.RepeatedTest;
+import org.junit.jupiter.api.Test;
 import java.util.Map;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
@@ -8,6 +9,19 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatNoException;
 
 class ExecutionContextConcurrencyTest {
+
+    @Test
+    void timeout_and_suppressed_are_terminal_node_states() {
+        ExecutionContext ctx = new ExecutionContext();
+
+        ctx.setNodeStatus("timeout-node", NodeStatus.TIMEOUT);
+        ctx.setNodeStatus("suppressed-node", NodeStatus.SUPPRESSED);
+        ctx.setNodeStatus("waiting-node", NodeStatus.WAITING);
+
+        assertThat(ctx.isNodeDone("timeout-node")).isTrue();
+        assertThat(ctx.isNodeDone("suppressed-node")).isTrue();
+        assertThat(ctx.isNodeDone("waiting-node")).isFalse();
+    }
 
     @RepeatedTest(20)
     void concurrentPutNodeOutput_doesNotCorrupt() throws InterruptedException {

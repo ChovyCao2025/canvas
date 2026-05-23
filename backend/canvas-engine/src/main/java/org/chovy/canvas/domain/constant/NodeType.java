@@ -19,6 +19,10 @@ public final class NodeType {
     public static final String DIRECT_CALL        = "DIRECT_CALL";
     /** 子画布触发节点（被父画布调用时的入口） */
     public static final String CANVAS_TRIGGER     = "CANVAS_TRIGGER";
+    /** 产品化 API 触发节点 */
+    public static final String API_TRIGGER        = "API_TRIGGER";
+    /** 受众进入/离开触发节点 */
+    public static final String AUDIENCE_TRIGGER   = "AUDIENCE_TRIGGER";
 
     // ── 控制流节点 ────────────────────────────────────────────────────
 
@@ -28,8 +32,26 @@ public final class NodeType {
     public static final String PRIORITY           = "PRIORITY";
     /** A/B 分流 */
     public static final String AB_SPLIT           = "AB_SPLIT";
+    /** 随机分流 */
+    public static final String RANDOM_SPLIT       = "RANDOM_SPLIT";
+    /** 实验节点 */
+    public static final String EXPERIMENT         = "EXPERIMENT";
+    /** 评分节点 */
+    public static final String SCORING            = "SCORING";
+    /** 推荐节点 */
+    public static final String RECOMMENDATION     = "RECOMMENDATION";
+    /** AI 下一步最佳动作 */
+    public static final String AI_NEXT_BEST_ACTION = "AI_NEXT_BEST_ACTION";
     /** 汇聚节点（等待多条上游汇入一条） */
     public static final String HUB                = "HUB";
+    /** 产品化合并节点 */
+    public static final String MERGE              = "MERGE";
+    /** 受控循环节点 */
+    public static final String LOOP               = "LOOP";
+    /** 受控跳转节点 */
+    public static final String GOTO               = "GOTO";
+    /** 跳转到其他旅程 */
+    public static final String TRANSFER_JOURNEY   = "TRANSFER_JOURNEY";
     /** 聚合评估节点：等待所有上游完成，基于上游结果评估条件，路由到成功或失败分支 */
     public static final String AGGREGATE          = "AGGREGATE";
     /**
@@ -44,6 +66,18 @@ public final class NodeType {
     public static final String SELECTOR           = "SELECTOR";
     /** 人工审批节点（挂起执行，等待人工操作） */
     public static final String MANUAL_APPROVAL    = "MANUAL_APPROVAL";
+    /** 增强等待节点 */
+    public static final String WAIT               = "WAIT";
+    /** 目标检测节点 */
+    public static final String GOAL_CHECK         = "GOAL_CHECK";
+    /** 营销抑制/授权检查 */
+    public static final String SUPPRESSION_CHECK  = "SUPPRESSION_CHECK";
+    /** 静默时段检查 */
+    public static final String QUIET_HOURS        = "QUIET_HOURS";
+    /** 渠道可达性检查 */
+    public static final String CHANNEL_AVAILABILITY = "CHANNEL_AVAILABILITY";
+    /** 频率限制检查 */
+    public static final String FREQUENCY_CAP      = "FREQUENCY_CAP";
     /** 延时节点 */
     public static final String DELAY              = "DELAY";
     /** 流程终止节点 */
@@ -55,6 +89,12 @@ public final class NodeType {
 
     /** 子流程引用（嵌套调用另一个画布） */
     public static final String SUB_FLOW_REF       = "SUB_FLOW_REF";
+    /** 产品化子流程节点 */
+    public static final String SUBFLOW            = "SUBFLOW";
+    /** UI 分组节点 */
+    public static final String GROUP              = "GROUP";
+    /** 模板占位节点 */
+    public static final String TEMPLATE_NODE      = "TEMPLATE_NODE";
     /** 发送应用内通知 */
     public static final String IN_APP_NOTIFY      = "IN_APP_NOTIFY";
     /** 发送 MQ 消息 */
@@ -65,6 +105,16 @@ public final class NodeType {
     public static final String COUPON             = "COUPON";
     /** 触达平台（短信/Push 等） */
     public static final String REACH_PLATFORM     = "REACH_PLATFORM";
+    /** 产品化邮件触达 */
+    public static final String SEND_EMAIL         = "SEND_EMAIL";
+    /** 产品化短信触达 */
+    public static final String SEND_SMS           = "SEND_SMS";
+    /** 产品化 Push 触达 */
+    public static final String SEND_PUSH          = "SEND_PUSH";
+    /** 产品化站内信触达 */
+    public static final String SEND_IN_APP        = "SEND_IN_APP";
+    /** 产品化微信触达 */
+    public static final String SEND_WECHAT        = "SEND_WECHAT";
     /** Groovy 脚本节点 */
     public static final String GROOVY             = "GROOVY";
     /** 实时打标签 */
@@ -73,6 +123,16 @@ public final class NodeType {
     public static final String TAGGER_OFFLINE     = "TAGGER_OFFLINE";
     /** 通用打标（tagger 合并版） */
     public static final String TAGGER             = "TAGGER";
+    /** 更新用户属性 */
+    public static final String UPDATE_PROFILE     = "UPDATE_PROFILE";
+    /** 本地标签操作 */
+    public static final String TAG_OPERATION      = "TAG_OPERATION";
+    /** 积分操作 */
+    public static final String POINTS_OPERATION   = "POINTS_OPERATION";
+    /** 创建人工任务 */
+    public static final String CREATE_TASK        = "CREATE_TASK";
+    /** 记录事件 */
+    public static final String TRACK_EVENT        = "TRACK_EVENT";
 
     private NodeType() {}
 }

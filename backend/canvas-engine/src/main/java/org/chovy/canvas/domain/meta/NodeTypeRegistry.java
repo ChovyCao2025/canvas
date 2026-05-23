@@ -40,6 +40,18 @@ public class NodeTypeRegistry {
      */
     private String outputSchema;
 
+    /** 节点出口定义，驱动前端 handle 和发布校验 */
+    private String outletSchema;
+
+    /** 画布卡片摘要模板 */
+    private String summaryTemplate;
+
+    /** 节点通用运行策略配置 schema */
+    private String runtimePolicySchema;
+
+    /** LOW/MEDIUM/HIGH */
+    private String riskLevel;
+
     /**
      * 是否为触发器节点，1=是。
      * 触发器节点在 DAG 中无入边，只能作为流程入口。

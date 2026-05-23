@@ -47,6 +47,20 @@ class LogicRelationHandlerTest {
             ExecutionContext ctx = buildCtx("n1", NodeStatus.SUCCESS, "n2", NodeStatus.SKIPPED);
             assertThat(LogicRelationHandler.shouldFailImmediately("AND", List.of("n1", "n2"), ctx)).isTrue();
         }
+
+        @Test
+        @DisplayName("有上游 TIMEOUT → shouldFailImmediately 为 true")
+        void timeout_upstream_blocks_and() {
+            ExecutionContext ctx = buildCtx("n1", NodeStatus.SUCCESS, "n2", NodeStatus.TIMEOUT);
+            assertThat(LogicRelationHandler.shouldFailImmediately("AND", List.of("n1", "n2"), ctx)).isTrue();
+        }
+
+        @Test
+        @DisplayName("有上游 SUPPRESSED → shouldFailImmediately 为 true")
+        void suppressed_upstream_blocks_and() {
+            ExecutionContext ctx = buildCtx("n1", NodeStatus.SUCCESS, "n2", NodeStatus.SUPPRESSED);
+            assertThat(LogicRelationHandler.shouldFailImmediately("AND", List.of("n1", "n2"), ctx)).isTrue();
+        }
     }
 
     @Nested

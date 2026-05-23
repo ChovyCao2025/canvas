@@ -28,11 +28,13 @@ public class EventTriggerHandler implements NodeHandler {
      */
     @Override
     public Mono<NodeResult> executeAsync(Map<String, Object> config, ExecutionContext ctx) {
-        // 事件触发节点配置仅包含 nextNodeId
+        // 若节点配置了 eventCode，运行时再做一次轻量保护，避免错误事件推进流程。
+        String expectedEvent = (String) config.get("eventCode");
+        Object actualEvent = ctx.getContextValue("eventCode");
+        if (expectedEvent != null && actualEvent != null && !expectedEvent.equals(actualEvent.toString())) {
+            return Mono.just(NodeResult.terminal(Map.of("eventMatched", false)));
+        }
         String nextNodeId = (String) config.get("nextNodeId");
-        // 触发 payload 已在 ctx.triggerPayload，无需重复输出到 result
-        // 不在此处做事件字段转换，保持触发载荷原样可追踪
-        //（若后续需要字段标准化，建议在上报入口统一做）
-        return Mono.just(NodeResult.ok(nextNodeId, Map.of()));
+        return Mono.just(NodeResult.ok(nextNodeId, Map.of("eventMatched", true)));
     }
 }

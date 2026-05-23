@@ -12,7 +12,9 @@ import org.chovy.canvas.engine.context.NodeStatus;
 import org.chovy.canvas.engine.dag.DagGraph;
 import org.chovy.canvas.engine.dag.DagParser;
 import org.chovy.canvas.engine.handler.HandlerRegistry;
+import org.chovy.canvas.engine.handler.NodeOutcome;
 import org.chovy.canvas.engine.handler.NodeHandler;
+import org.chovy.canvas.engine.handler.NodeRouteResolver;
 import org.chovy.canvas.engine.handler.NodeResult;
 import org.chovy.canvas.engine.handlers.HubHandler;
 import org.chovy.canvas.engine.handlers.LogicRelationHandler;
@@ -138,7 +140,7 @@ public class DagEngine {
                                              ExecutionContext ctx) {
         // 从起始节点开始执行画布相关节点
         return executeNode(graph, triggerNodeId, ctx, 0)
-                .doFinally(__ -> writeSkippedNodes(graph, ctx))
+                .doFinally(__ -> writeSkippedNodesIfComplete(graph, ctx))
                 .onErrorResume(e -> {
                     log.error("[ENGINE] 执行出错 executionId={}: {}",
                             ctx.getExecutionId(), e.getMessage(), e);
@@ -179,9 +181,20 @@ public class DagEngine {
             if (node.getConfig() != null) rawConfig.putAll(node.getConfig());
 
             boolean needsNodeId = NodeType.MANUAL_APPROVAL.equals(node.getType())
-                    || NodeType.API_CALL.equals(node.getType());
+                    || NodeType.API_CALL.equals(node.getType())
+                    || NodeType.WAIT.equals(node.getType())
+                    || NodeType.GOAL_CHECK.equals(node.getType())
+                    || NodeType.FREQUENCY_CAP.equals(node.getType())
+                    || NodeType.SEND_EMAIL.equals(node.getType())
+                    || NodeType.SEND_SMS.equals(node.getType())
+                    || NodeType.SEND_PUSH.equals(node.getType())
+                    || NodeType.SEND_IN_APP.equals(node.getType())
+                    || NodeType.SEND_WECHAT.equals(node.getType())
+                    || NodeType.POINTS_OPERATION.equals(node.getType())
+                    || NodeType.LOOP.equals(node.getType())
+                    || NodeType.GOTO.equals(node.getType());
             Map<String, Object> config = needsNodeId
-                    ? resolveConfigWithNodeId(rawConfig, ctx, nodeId)
+                    ? resolveConfigWithNodeId(rawConfig, ctx, nodeId, node.getType())
                     : resolveConfig(rawConfig, ctx);
 
             // ──────────────────────────────────────────────────────
@@ -263,11 +276,16 @@ public class DagEngine {
                             ctx.putNodeOutput(nodeId, result.output());
                         }
 
-                        ctx.setNodeStatus(nodeId, NodeStatus.SUCCESS);
+                        NodeStatus status = statusForOutcome(result.outcome());
+                        ctx.setNodeStatus(nodeId, status);
                         long durationMs = System.currentTimeMillis() - nodeStartMs;
                         writeTraceEnd(ctx, node, result, durationMs);
-                        metrics.recordNodeExecution(node.getType(), NodeStatus.SUCCESS.name(), durationMs);
+                        metrics.recordNodeExecution(node.getType(), status.name(), durationMs);
                         log.debug("[ENGINE] 节点完成 nodeId={} type={}", nodeId, node.getType());
+
+                        if (result.pending()) {
+                            return Mono.just(pendingResponse(nodeId, node.getType(), result));
+                        }
 
                         // 触发下游逻辑执行
                         return triggerDownstream(graph, result, nodeId, node.getType(), ctx, depth);
@@ -727,8 +745,15 @@ public class DagEngine {
                     // executeHandlerWithRepeat 对 success=true 的结果会走 repeat 检查，
                     // 检查完后已执行 nodeGate.executing.set(false) 释放锁，此处不需再操作。
                     if (result.pending()) {
-                        ctx.setNodeStatus(nodeId, NodeStatus.WAITING);
-                        return Mono.just(Map.of()); // 不触发下游，等待更多上游
+                        if (result.output() != null && !result.output().isEmpty()) {
+                            ctx.putNodeOutput(nodeId, result.output());
+                        }
+                        NodeStatus status = statusForOutcome(result.outcome());
+                        ctx.setNodeStatus(nodeId, status);
+                        long durationMs = System.currentTimeMillis() - nodeStartMs;
+                        writeTraceEnd(ctx, node, result, durationMs);
+                        metrics.recordNodeExecution(node.getType(), status.name(), durationMs);
+                        return Mono.just(pendingResponse(nodeId, node.getType(), result)); // 不触发下游，等待恢复
                     }
                     // ── 路径C：SUCCESS ────────────────────────────────────────
                     // 同路径B，锁已在 executeHandlerWithRepeat 中释放。
@@ -737,10 +762,11 @@ public class DagEngine {
                     if (result.output() != null && !result.output().isEmpty()) {
                         ctx.putNodeOutput(nodeId, result.output());
                     }
-                    ctx.setNodeStatus(nodeId, NodeStatus.SUCCESS);
+                    NodeStatus status = statusForOutcome(result.outcome());
+                    ctx.setNodeStatus(nodeId, status);
                     long durationMs = System.currentTimeMillis() - nodeStartMs;
                     writeTraceEnd(ctx, node, result, durationMs);
-                    metrics.recordNodeExecution(node.getType(), NodeStatus.SUCCESS.name(), durationMs);
+                    metrics.recordNodeExecution(node.getType(), status.name(), durationMs);
                     log.debug("[ENGINE] 节点完成 nodeId={} type={}", nodeId, node.getType());
                     return triggerDownstream(graph, result, nodeId, node.getType(), ctx, depth);
                 })
@@ -769,9 +795,8 @@ public class DagEngine {
 
         // PRIORITY 节点：串行依序尝试，第一个成功则停止（4.6节）
         if (NodeType.PRIORITY.equals(sourceType) && result.branchMap() != null) {
-            List<String> orderedBranches = result.branchMap().values().stream()
-                    .filter(Objects::nonNull).toList();
-            String fallbackNextId = result.elseNodeId();
+            String fallbackNextId = NodeRouteResolver.resolveFallbackTarget(result);
+            List<String> orderedBranches = NodeRouteResolver.resolvePriorityBranchTargets(result);
             return tryPrioritySequentially(orderedBranches, fallbackNextId, sourceNodeId,
                     graph, ctx, depth + 1);
         }
@@ -803,6 +828,10 @@ public class DagEngine {
             if (fallbackNextId != null) {
                 ctx.setNodeStatus(priorityNodeId, NodeStatus.PARTIAL_FAIL);
                 log.debug("[PRIORITY] 所有分支失败，走 fallback nextId={}", fallbackNextId);
+                if (ctx.isNodeDone(fallbackNextId)) {
+                    log.debug("[PRIORITY] fallback 已作为分支执行过，按节点幂等跳过 nextId={}", fallbackNextId);
+                    return Mono.just(Map.of());
+                }
                 return executeNode(graph, fallbackNextId, ctx, depth);
             }
             log.debug("[PRIORITY] 所有分支失败，无 fallback，整体 FAILED");
@@ -811,13 +840,23 @@ public class DagEngine {
 
         String currentBranchId = branches.getFirst();
         return executeNode(graph, currentBranchId, ctx, depth)
-                .flatMap(__ -> {
+                .<Map<String, Object>>flatMap(__ -> {
                     if (ctx.getNodeStatus(currentBranchId) == NodeStatus.SUCCESS) {
                         log.debug("[PRIORITY] 分支成功，停止 branchId={}", currentBranchId);
                         return Mono.just(Map.of());
                     }
                     // 当前分支失败，尝试下一个
                     log.debug("[PRIORITY] 分支失败，尝试下一个 branchId={}", currentBranchId);
+                    return tryPrioritySequentially(
+                            branches.subList(1, branches.size()),
+                            fallbackNextId, priorityNodeId, graph, ctx, depth);
+                })
+                .onErrorResume(e -> {
+                    if (!ctx.isNodeDone(currentBranchId)) {
+                        return Mono.<Map<String, Object>>error(e);
+                    }
+                    log.debug("[PRIORITY] 分支异常结束，尝试下一个 branchId={} reason={}",
+                            currentBranchId, e.getMessage());
                     return tryPrioritySequentially(
                             branches.subList(1, branches.size()),
                             fallbackNextId, priorityNodeId, graph, ctx, depth);
@@ -856,6 +895,18 @@ public class DagEngine {
         }
     }
 
+    private void writeSkippedNodesIfComplete(DagGraph graph, ExecutionContext ctx) {
+        if (hasWaitingNodes(ctx)) {
+            log.debug("[ENGINE] 执行已挂起，暂不批量写入 SKIPPED executionId={}", ctx.getExecutionId());
+            return;
+        }
+        writeSkippedNodes(graph, ctx);
+    }
+
+    private boolean hasWaitingNodes(ExecutionContext ctx) {
+        return ctx.getNodeStatuses().values().stream().anyMatch(status -> status == NodeStatus.WAITING);
+    }
+
     // ══════════════════════════════════════════════════════════════
     // ══════════════════════════════════════════════════════════════
     // 执行轨迹写入（通过 TraceWriteBuffer 异步批量写，12.10节）
@@ -878,7 +929,7 @@ public class DagEngine {
      */
     private void writeTraceEnd(ExecutionContext ctx, DagParser.CanvasNode node,
                                NodeResult result, long durationMs) {
-        int status = result.success() ? 1 : 2;
+        int status = traceStatus(result);
         String outputJson = null;
         try {
             if (result.output() != null && !result.output().isEmpty()) {
@@ -913,13 +964,52 @@ public class DagEngine {
      * 从 NodeResult 收集所有下游节点 ID（排除 null）
      */
     private List<String> collectNextIds(NodeResult result) {
-        List<String> ids = new ArrayList<>();
-        if (result.nextNodeId() != null) ids.add(result.nextNodeId());
-        if (result.successNodeId() != null) ids.add(result.successNodeId());
-        if (result.failNodeId() != null) ids.add(result.failNodeId());
-        if (result.elseNodeId() != null) ids.add(result.elseNodeId());
-        if (result.branchMap() != null) ids.addAll(result.branchMap().values());
-        return ids.stream().filter(Objects::nonNull).distinct().collect(Collectors.toList());
+        return NodeRouteResolver.resolveTargets(result).stream()
+                .distinct()
+                .collect(Collectors.toList());
+    }
+
+    private NodeStatus statusForOutcome(NodeOutcome outcome) {
+        if (outcome == null) return NodeStatus.SUCCESS;
+        return switch (outcome) {
+            case FAIL -> NodeStatus.FAILED;
+            case TIMEOUT -> NodeStatus.TIMEOUT;
+            case SUPPRESSED -> NodeStatus.SUPPRESSED;
+            case SKIPPED -> NodeStatus.SKIPPED;
+            case PENDING -> NodeStatus.WAITING;
+            case SUCCESS -> NodeStatus.SUCCESS;
+        };
+    }
+
+    private int traceStatus(NodeResult result) {
+        if (!result.success()) {
+            return 2;
+        }
+        if (result.outcome() == NodeOutcome.PENDING) {
+            return 0;
+        }
+        if (result.outcome() == NodeOutcome.SKIPPED) {
+            return 3;
+        }
+        return 1;
+    }
+
+    private Map<String, Object> pendingResponse(String nodeId, String nodeType, NodeResult result) {
+        Map<String, Object> response = new LinkedHashMap<>();
+        response.put("pending", true);
+        response.put("nodeId", nodeId);
+        response.put("nodeType", nodeType);
+        response.put("outcome", result.outcome().name());
+        if (result.resumeAtEpochMs() != null) {
+            response.put("resumeAtEpochMs", result.resumeAtEpochMs());
+        }
+        if (result.reasonCode() != null) {
+            response.put("reasonCode", result.reasonCode());
+        }
+        if (result.reasonMessage() != null) {
+            response.put("reasonMessage", result.reasonMessage());
+        }
+        return response;
     }
 
     /**
@@ -974,10 +1064,29 @@ public class DagEngine {
      * nodeId 注入版（ManualApprovalHandler 需要知道自身 nodeId）
      */
     private Map<String, Object> resolveConfigWithNodeId(Map<String, Object> config,
-                                                        ExecutionContext ctx, String nodeId) {
+                                                        ExecutionContext ctx, String nodeId,
+                                                        String nodeType) {
         Map<String, Object> resolved = new HashMap<>(resolveConfig(config, ctx));
         resolved.put("__nodeId", nodeId);
+        enrichWaitResumePayload(resolved, ctx, nodeId, nodeType);
         return resolved;
+    }
+
+    private void enrichWaitResumePayload(Map<String, Object> resolved,
+                                         ExecutionContext ctx,
+                                         String nodeId,
+                                         String nodeType) {
+        Map<String, Object> payload = ctx.getTriggerPayload();
+        Object sourceNodeId = payload.get("sourceNodeId");
+        if (sourceNodeId != null && !nodeId.equals(sourceNodeId.toString())) {
+            return;
+        }
+        if (NodeType.WAIT.equals(nodeType) && payload.containsKey("__waitResumeStatus")) {
+            resolved.put("__waitResumeStatus", payload.get("__waitResumeStatus"));
+        }
+        if (NodeType.GOAL_CHECK.equals(nodeType) && payload.containsKey("__goalResumeStatus")) {
+            resolved.put("__goalResumeStatus", payload.get("__goalResumeStatus"));
+        }
     }
 
     /**

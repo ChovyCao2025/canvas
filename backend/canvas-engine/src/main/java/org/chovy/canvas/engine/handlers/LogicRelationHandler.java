@@ -44,23 +44,31 @@ public class LogicRelationHandler implements NodeHandler {
             return upstreamIds.stream()
                     .anyMatch(id -> ctx.getNodeStatus(id) == NodeStatus.SUCCESS);
         }
-        // AND：所有上游 SUCCESS；任意 SKIPPED 或 FAILED 则立即失败
+        // AND：所有上游 SUCCESS；任意终态非成功则立即失败
         for (String id : upstreamIds) {
             NodeStatus s = ctx.getNodeStatus(id);
-            if (s == NodeStatus.FAILED || s == NodeStatus.SKIPPED) return false;
+            if (isTerminalNonSuccess(s)) return false;
             if (s != NodeStatus.SUCCESS) return false; // 还未完成
         }
         return true;
     }
 
     /**
-     * 判断 AND 模式下是否应立即 FAILED（上游有 FAILED 或 SKIPPED）
+     * 判断 AND 模式下是否应立即 FAILED（上游有终态非成功）
      */
     public static boolean shouldFailImmediately(String relation, List<String> upstreamIds, ExecutionContext ctx) {
         if (!"AND".equals(relation)) return false;
         return upstreamIds.stream().anyMatch(id -> {
             NodeStatus s = ctx.getNodeStatus(id);
-            return s == NodeStatus.FAILED || s == NodeStatus.SKIPPED;
+            return isTerminalNonSuccess(s);
         });
+    }
+
+    private static boolean isTerminalNonSuccess(NodeStatus status) {
+        return status == NodeStatus.FAILED
+                || status == NodeStatus.TIMEOUT
+                || status == NodeStatus.SUPPRESSED
+                || status == NodeStatus.SKIPPED
+                || status == NodeStatus.PARTIAL_FAIL;
     }
 }

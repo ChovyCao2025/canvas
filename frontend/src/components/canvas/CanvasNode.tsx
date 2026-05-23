@@ -4,7 +4,7 @@ import { Tooltip } from 'antd'
 import { CopyOutlined, DeleteOutlined } from '@ant-design/icons'
 import type { CanvasNodeData } from './constants'
 import { CATEGORY_COLORS, TRIGGER_TYPES, TERMINAL_TYPES } from './constants'
-import { getBranchHandles } from './branchHandles'
+import { getOutletHandles, hasOutletSchema } from './outletSchema'
 import { useCanvasActions } from '../../context/CanvasActionsContext'
 
 /**
@@ -79,8 +79,13 @@ const CanvasNode = memo(({ data, id, selected }: NodeProps) => {
   const isAudienceTagger = d.nodeType === 'TAGGER' && d.bizConfig?.mode === 'audience'
 
   // 根据节点类型和配置动态计算当前节点应该暴露哪些分支出口
-  const branchHandles = getBranchHandles(d.nodeType, d.bizConfig ?? {})
+  const branchHandles = getOutletHandles({
+    nodeType: d.nodeType,
+    bizConfig: d.bizConfig ?? {},
+    outletSchema: d.outletSchema,
+  })
   const isBranching   = branchHandles.length > 0
+  const suppressDefaultSource = hasOutletSchema(d.outletSchema)
 
   // START / END 使用独立视觉样式，且只保留单向连接点
   if (isStart || isEnd) {
@@ -176,8 +181,7 @@ const CanvasNode = memo(({ data, id, selected }: NodeProps) => {
                 )
               })}
             </div>
-          ) : (
-            // 单出口节点：统一使用 default handle
+          ) : suppressDefaultSource ? null : (
             <Handle
               type="source"
               position={Position.Bottom}

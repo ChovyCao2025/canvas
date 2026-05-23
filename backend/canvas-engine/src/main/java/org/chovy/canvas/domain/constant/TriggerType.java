@@ -36,6 +36,21 @@ public final class TriggerType {
     /** 阈值节点超时兜底触发。 */
     public static final String THRESHOLD_TIMEOUT       = "THRESHOLD_TIMEOUT";
 
+    /** WAIT 节点恢复触发。 */
+    public static final String WAIT_RESUME             = "WAIT_RESUME";
+
+    /** WAIT 节点超时触发。 */
+    public static final String WAIT_TIMEOUT            = "WAIT_TIMEOUT";
+
+    /** 目标检测节点恢复触发。 */
+    public static final String GOAL_CHECK_RESUME       = "GOAL_CHECK_RESUME";
+
+    /** 目标检测节点超时触发。 */
+    public static final String GOAL_CHECK_TIMEOUT      = "GOAL_CHECK_TIMEOUT";
+
+    /** 跳转旅程触发。 */
+    public static final String TRANSFER_JOURNEY        = "TRANSFER_JOURNEY";
+
     /** 子流程引用节点触发。 */
     public static final String SUB_FLOW_REF            = "SUB_FLOW_REF";
 

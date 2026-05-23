@@ -29,7 +29,7 @@ import {
 } from '../../components/canvas/constants'
 
 import HoverEdge from '../../components/canvas/HoverEdge'
-import { getBranchHandles } from '../../components/canvas/branchHandles'
+import { getOutletHandles } from '../../components/canvas/outletSchema'
 import CronBuilder from '../../components/config-panel/CronBuilder'
 import { CanvasActionsContext } from '../../context/CanvasActionsContext'
 import { useAuth } from '../../context/AuthContext'
@@ -42,7 +42,8 @@ import {
   type CanvasSettingsLike,
   shouldExpandExecutionLimits,
 } from './settingsPresentation'
-import { applyInsertIntoEdge, buildDetachedNode, buildPlaceholderEdge } from './insertNode'
+import { applyInsertIntoEdge, buildConfigDefaultsFromSchema, buildNodeExpansion, buildPlaceholderEdge } from './insertNode'
+import { clearEdgeRef, deriveEdges, patchBizConfig } from './outletRouting'
 
 const { RangePicker } = DatePicker
 const TRIGGER_TYPE_HELP: Record<string, string> = {
@@ -60,31 +61,6 @@ const nodeTypes = {
 }
 const edgeTypes = { default: HoverEdge }
 
-// ── 从后端节点 config 推导 ReactFlow edges ──────────────────
-
-function deriveEdges(backendNodes: BackendNode[]): Edge[] {
-  const edges: Edge[] = []
-  backendNodes.forEach(n => {
-    const c = (n.config ?? {}) as BizConfig
-    const push = (target: string | undefined, sourceHandle: string) => {
-      if (!target) return
-      edges.push({ id: `${n.id}->${target}`, source: n.id, target, sourceHandle })
-    }
-    push(c.nextNodeId,    'default')
-    push(c.successNodeId, 'success')
-    push(c.failNodeId,    'fail')
-    push(c.elseNodeId,    'else')
-    push(c.approveNodeId, 'approve')
-    push(c.rejectNodeId,  'reject')
-    push(c.hitNextNodeId, 'hit')
-    push(c.missNextNodeId, 'miss')
-    c.branches?.forEach((b, i) => push(b.nextNodeId, `branch-${i}`))
-    c.priorities?.forEach((p, i) => push(p.nextNodeId, `priority-${i}`))
-    c.groups?.forEach(g => push(g.nextNodeId, `group-${g.groupKey}`))
-  })
-  return edges
-}
-
 // ── 自动 Dagre 布局 ───────────────────────────────────────────
 
 function applyDagreLayout(nodes: Node[], edges: Edge[]) {
@@ -97,42 +73,6 @@ function applyDagreLayout(nodes: Node[], edges: Edge[]) {
     const { x, y } = g.node(n.id)
     return { ...n, position: { x: x - 100, y: y - 38 } }
   })
-}
-
-// ── 更新源节点 bizConfig（按 sourceHandle 分发）──────────────
-
-function patchBizConfig(
-  cfg: Record<string, unknown>,
-  sourceHandle: string,
-  target: string,
-): BizConfig {
-  const next = { ...cfg } as BizConfig
-  if (sourceHandle === 'success')       next.successNodeId = target
-  else if (sourceHandle === 'fail')     next.failNodeId    = target
-  else if (sourceHandle === 'else')     next.elseNodeId    = target
-  else if (sourceHandle === 'approve')  next.approveNodeId = target
-  else if (sourceHandle === 'reject')   next.rejectNodeId  = target
-  else if (sourceHandle === 'hit')      next.hitNextNodeId = target
-  else if (sourceHandle === 'miss')     next.missNextNodeId = target
-  else if (sourceHandle.startsWith('branch-')) {
-    const idx = parseInt(sourceHandle.split('-')[1], 10)
-    next.branches = (next.branches ?? []).map((b, i) =>
-      i === idx ? { ...b, nextNodeId: target } : b
-    )
-  } else if (sourceHandle.startsWith('priority-')) {
-    const idx = parseInt(sourceHandle.split('-')[1], 10)
-    next.priorities = (next.priorities ?? []).map((p, i) =>
-      i === idx ? { ...p, nextNodeId: target } : p
-    )
-  } else if (sourceHandle.startsWith('group-')) {
-    const key = sourceHandle.replace('group-', '')
-    next.groups = (next.groups ?? []).map(g =>
-      g.groupKey === key ? { ...g, nextNodeId: target } : g
-    )
-  } else {
-    next.nextNodeId = target
-  }
-  return next
 }
 
 // ── 清理被删节点的引用 ────────────────────────────────────────
@@ -150,41 +90,29 @@ function cleanRefs(cfg: Record<string, unknown>, deletedIds: Set<string>): BizCo
     rejectNodeId:  clean(biz.rejectNodeId)  as string | undefined,
     hitNextNodeId: clean(biz.hitNextNodeId) as string | undefined,
     missNextNodeId: clean(biz.missNextNodeId) as string | undefined,
+    timeoutNodeId: clean(biz.timeoutNodeId) as string | undefined,
+    suppressedNodeId: clean(biz.suppressedNodeId) as string | undefined,
+    skippedNodeId: clean(biz.skippedNodeId) as string | undefined,
+    allowedNodeId: clean(biz.allowedNodeId) as string | undefined,
+    quietNodeId: clean(biz.quietNodeId) as string | undefined,
+    availableNodeId: clean(biz.availableNodeId) as string | undefined,
+    unavailableNodeId: clean(biz.unavailableNodeId) as string | undefined,
+    passNodeId: clean(biz.passNodeId) as string | undefined,
+    cappedNodeId: clean(biz.cappedNodeId) as string | undefined,
+    fallbackNodeId: clean(biz.fallbackNodeId) as string | undefined,
+    exitNodeId: clean(biz.exitNodeId) as string | undefined,
+    loopStartNodeId: clean(biz.loopStartNodeId) as string | undefined,
+    targetNodeId: clean(biz.targetNodeId) as string | undefined,
+    maxExceededNodeId: clean(biz.maxExceededNodeId) as string | undefined,
+    goalMetNodeId: clean(biz.goalMetNodeId) as string | undefined,
+    goalNotMetNodeId: clean(biz.goalNotMetNodeId) as string | undefined,
     branches:   biz.branches?.map(b   => ({ ...b, nextNodeId: clean(b.nextNodeId) as string | undefined })),
     priorities: biz.priorities?.map(p => ({ ...p, nextNodeId: clean(p.nextNodeId) as string | undefined })),
     groups:     biz.groups?.map(g     => ({ ...g, nextNodeId: clean(g.nextNodeId) as string | undefined })),
+    paths:      biz.paths?.map(p      => ({ ...p, nextNodeId: clean(p.nextNodeId) as string | undefined })),
+    variants:   biz.variants?.map(v   => ({ ...v, nextNodeId: clean(v.nextNodeId) as string | undefined })),
+    bands:      biz.bands?.map(b      => ({ ...b, nextNodeId: clean(b.nextNodeId) as string | undefined })),
   }
-}
-
-function clearEdgeRef(cfg: Record<string, unknown>, edge: Edge): BizConfig {
-  const next = { ...(cfg as BizConfig) }
-  const sourceHandle = edge.sourceHandle ?? 'default'
-  if (sourceHandle === 'success') next.successNodeId = undefined
-  else if (sourceHandle === 'fail') next.failNodeId = undefined
-  else if (sourceHandle === 'else') next.elseNodeId = undefined
-  else if (sourceHandle === 'approve') next.approveNodeId = undefined
-  else if (sourceHandle === 'reject') next.rejectNodeId = undefined
-  else if (sourceHandle === 'hit') next.hitNextNodeId = undefined
-  else if (sourceHandle === 'miss') next.missNextNodeId = undefined
-  else if (sourceHandle.startsWith('branch-')) {
-    const idx = parseInt(sourceHandle.split('-')[1], 10)
-    next.branches = (next.branches ?? []).map((branch, i) =>
-      i === idx ? { ...branch, nextNodeId: undefined } : branch,
-    )
-  } else if (sourceHandle.startsWith('priority-')) {
-    const idx = parseInt(sourceHandle.split('-')[1], 10)
-    next.priorities = (next.priorities ?? []).map((priority, i) =>
-      i === idx ? { ...priority, nextNodeId: undefined } : priority,
-    )
-  } else if (sourceHandle.startsWith('group-')) {
-    const key = sourceHandle.replace('group-', '')
-    next.groups = (next.groups ?? []).map(group =>
-      group.groupKey === key ? { ...group, nextNodeId: undefined } : group,
-    )
-  } else {
-    next.nextNodeId = undefined
-  }
-  return next
 }
 
 // ── 撤销/重做历史 ─────────────────────────────────────────────
@@ -197,26 +125,53 @@ type InsertContext =
   | { kind: 'blank' }
   | null
 
-function splitSelectedEdge(edge: Edge, nodeId: string): { removeEdgeId: string; newEdges: Edge[] } {
+function downstreamEdgeId(sourceId: string, targetId: string, sourceHandle: string): string {
+  return sourceHandle === 'default'
+    ? `${sourceId}->${targetId}`
+    : `${sourceId}->${targetId}::${sourceHandle}`
+}
+
+function splitSelectedEdge(edge: Edge, entryNodeId: string, exitNodeId = entryNodeId, exitHandleId = 'default'): { removeEdgeId: string; newEdges: Edge[] } {
   if ((edge.sourceHandle ?? 'default') === 'default') {
-    return applyInsertIntoEdge(edge, nodeId)
+    if (entryNodeId === exitNodeId && exitHandleId === 'default') {
+      return applyInsertIntoEdge(edge, entryNodeId)
+    }
+    return {
+      removeEdgeId: edge.id,
+      newEdges: [
+        {
+          id: `${edge.source}->${entryNodeId}`,
+          source: edge.source,
+          target: entryNodeId,
+          sourceHandle: 'default',
+          targetHandle: 'input',
+        },
+        {
+          id: downstreamEdgeId(exitNodeId, edge.target, exitHandleId),
+          source: exitNodeId,
+          target: edge.target,
+          sourceHandle: exitHandleId,
+          targetHandle: edge.targetHandle,
+        },
+      ],
+    }
   }
 
   return {
     removeEdgeId: edge.id,
     newEdges: [
       {
-        id: `${edge.source}->${nodeId}::${edge.sourceHandle}`,
+        id: `${edge.source}->${entryNodeId}::${edge.sourceHandle}`,
         source: edge.source,
-        target: nodeId,
+        target: entryNodeId,
         sourceHandle: edge.sourceHandle,
         targetHandle: 'input',
       },
       {
-        id: `${nodeId}->${edge.target}`,
-        source: nodeId,
+        id: downstreamEdgeId(exitNodeId, edge.target, exitHandleId),
+        source: exitNodeId,
         target: edge.target,
-        sourceHandle: 'default',
+        sourceHandle: exitHandleId,
         targetHandle: edge.targetHandle,
       },
     ],
@@ -375,7 +330,35 @@ function EditorInner({ detail, onStatusChange, onCanvasNameChange }: {
       return { priorities: [{ order: 1, nextNodeId: undefined }] }
     }
     if (nodeType === 'AB_SPLIT') {
-      return { groups: [] }
+      return { groups: [{ groupKey: 'A', nextNodeId: undefined }, { groupKey: 'B', nextNodeId: undefined }] }
+    }
+    if (nodeType === 'RANDOM_SPLIT') {
+      return {
+        allocationStrategy: 'CONSISTENT',
+        paths: [
+          { pathId: 'path_a', label: '路径 A', weight: 50, nextNodeId: undefined },
+          { pathId: 'path_b', label: '路径 B', weight: 50, nextNodeId: undefined },
+        ],
+      }
+    }
+    if (nodeType === 'EXPERIMENT') {
+      return {
+        experimentKey: 'experiment',
+        allocationStrategy: 'CONSISTENT',
+        variants: [
+          { variantId: 'A', label: '方案 A', weight: 50, isControl: true, nextNodeId: undefined },
+          { variantId: 'B', label: '方案 B', weight: 50, nextNodeId: undefined },
+        ],
+      }
+    }
+    if (nodeType === 'SCORING') {
+      return {
+        rules: [],
+        bands: [
+          { bandId: 'high', label: '高分', min: 80, max: 2147483647, nextNodeId: undefined },
+          { bandId: 'low', label: '低分', min: -2147483648, max: 79, nextNodeId: undefined },
+        ],
+      }
     }
     return {}
   }, [])
@@ -415,6 +398,7 @@ function EditorInner({ detail, onStatusChange, onCanvasNameChange }: {
         nodeType: n.type, name: n.name,
         category: n.category ?? '',
         bizConfig: n.config ?? {},
+        outletSchema: n.outletSchema,
       } as CanvasNodeData,
     }))
     const rfEdges = deriveEdges(backendNodes)
@@ -454,6 +438,7 @@ function EditorInner({ detail, onStatusChange, onCanvasNameChange }: {
         // 粘贴节点（偏移 +20px，重置 ID 和 traceColor）
         if (e.key === 'v' && clipboard.length > 0) {
           snapshot('粘贴节点')
+          const existingIds = new Set(getNodes().map(node => node.id))
           const pasted = clipboard.map(n => ({
             ...n,
             id: crypto.randomUUID().replace(/-/g, '').slice(0, 12),
@@ -463,10 +448,7 @@ function EditorInner({ detail, onStatusChange, onCanvasNameChange }: {
               ...(n.data as CanvasNodeData),
               name: (n.data as CanvasNodeData).name + ' (副本)',
               traceColor: undefined,           // 不继承轨迹颜色
-              bizConfig: { ...(n.data as CanvasNodeData).bizConfig,
-                nextNodeId: undefined, successNodeId: undefined,
-                failNodeId: undefined,          // 连线关系不复制
-              },
+              bizConfig: cleanRefs((n.data as CanvasNodeData).bizConfig, existingIds), // 连线关系不复制
             },
           }))
           setNodes(prev => [...prev, ...pasted])
@@ -485,6 +467,8 @@ function EditorInner({ detail, onStatusChange, onCanvasNameChange }: {
 
     const nodeType = e.dataTransfer.getData('application/canvas-node-type')
     const category = e.dataTransfer.getData('application/canvas-node-category')
+    const configSchema = e.dataTransfer.getData('application/canvas-node-config-schema') || undefined
+    const outletSchema = e.dataTransfer.getData('application/canvas-node-outlet-schema') || undefined
     if (!nodeType) return
 
     const dropPos = screenToFlowPosition({ x: e.clientX, y: e.clientY })
@@ -503,10 +487,13 @@ function EditorInner({ detail, onStatusChange, onCanvasNameChange }: {
           return { kind: 'placeholder', sourceId: ph.sourceId, handleId: ph.handleId } as const
         })()
       : null
-    const defaultBizConfig = buildDefaultBizConfig(nodeType)
-    const branchHandles = getBranchHandles(nodeType, defaultBizConfig)
+    const defaultBizConfig = {
+      ...buildConfigDefaultsFromSchema(configSchema),
+      ...buildDefaultBizConfig(nodeType),
+    }
+    const branchHandles = getOutletHandles({ nodeType, bizConfig: defaultBizConfig, outletSchema })
     const edgeInsertActive = insertContext?.kind === 'edge'
-    const edgeEligible = branchHandles.length === 0
+    const edgeEligible = branchHandles.length === 0 || nodeType === 'TEMPLATE_NODE'
     const resolvedContext = placeholderContext
       ?? (edgeInsertActive && edgeEligible ? insertContext : { kind: 'blank' as const })
     const newPos: XYPosition = resolvedContext.kind === 'placeholder' && hitPlaceholder
@@ -531,24 +518,41 @@ function EditorInner({ detail, onStatusChange, onCanvasNameChange }: {
 
     snapshot('添加节点')
 
-    const newNode = buildDetachedNode(newId, nodeType, category, newPos)
-    newNode.data.bizConfig = defaultBizConfig
+    const expansion = buildNodeExpansion({
+      nodeId: newId,
+      nodeType,
+      category,
+      position: newPos,
+      bizConfig: defaultBizConfig,
+      outletSchema,
+    })
 
-    setNodes(prev => [...prev.filter(n => !(n.data as any)?._placeholder), newNode])
+    setNodes(prev => [...prev.filter(n => !(n.data as any)?._placeholder), ...expansion.nodes])
 
     if (resolvedContext.kind === 'edge' && selectedEdge) {
-      const { removeEdgeId, newEdges } = splitSelectedEdge(selectedEdge, newId)
-      setEdges(current => [...current.filter(item => item.id !== removeEdgeId), ...newEdges])
+      const { removeEdgeId, newEdges } = splitSelectedEdge(selectedEdge, expansion.entryNodeId, expansion.exitNodeId, expansion.exitHandleId)
+      setEdges(current => [...current.filter(item => item.id !== removeEdgeId), ...expansion.edges, ...newEdges])
       setNodes(current => current.map(node => {
-        if (node.id !== selectedEdge.source) return node
         const data = node.data as CanvasNodeData
-        return {
-          ...node,
-          data: {
-            ...data,
-            bizConfig: patchBizConfig(data.bizConfig, selectedEdge.sourceHandle ?? 'default', newId),
-          },
+        if (node.id === selectedEdge.source) {
+          return {
+            ...node,
+            data: {
+              ...data,
+              bizConfig: patchBizConfig(data.bizConfig, selectedEdge.sourceHandle ?? 'default', expansion.entryNodeId, data.outletSchema),
+            },
+          }
         }
+        if (node.id === expansion.exitNodeId) {
+          return {
+            ...node,
+            data: {
+              ...data,
+              bizConfig: patchBizConfig(data.bizConfig, expansion.exitHandleId, selectedEdge.target, data.outletSchema),
+            },
+          }
+        }
+        return node
       }))
     } else if (resolvedContext.kind === 'placeholder') {
       setNodes(current => current.map(node => {
@@ -558,19 +562,21 @@ function EditorInner({ detail, onStatusChange, onCanvasNameChange }: {
           ...node,
           data: {
             ...data,
-            bizConfig: patchBizConfig(data.bizConfig, resolvedContext.handleId, newId),
+            bizConfig: patchBizConfig(data.bizConfig, resolvedContext.handleId, expansion.entryNodeId, data.outletSchema),
           },
         }
       }))
-      setEdges(current => addEdge(
-        buildPlaceholderEdge(resolvedContext.sourceId, resolvedContext.handleId, newId),
-        current,
-      ))
+      setEdges(current => [
+        ...addEdge(buildPlaceholderEdge(resolvedContext.sourceId, resolvedContext.handleId, expansion.entryNodeId), current),
+        ...expansion.edges,
+      ])
+    } else if (expansion.edges.length > 0) {
+      setEdges(current => [...current, ...expansion.edges])
     }
 
     setInsertContext(null)
     setIsDirty(true)
-    setSelectedNodeId(newId)
+    setSelectedNodeId(expansion.entryNodeId)
   }, [
     buildDefaultBizConfig,
     getEdges,
@@ -628,7 +634,7 @@ function EditorInner({ detail, onStatusChange, onCanvasNameChange }: {
       }
       if (n.id !== ph.sourceId) return n
       const nd = n.data as CanvasNodeData
-      return { ...n, data: { ...nd, bizConfig: patchBizConfig(nd.bizConfig, ph.handleId, draggedNode.id) } }
+      return { ...n, data: { ...nd, bizConfig: patchBizConfig(nd.bizConfig, ph.handleId, draggedNode.id, nd.outletSchema) } }
     }))
     setEdges(prev => addEdge(buildPlaceholderEdge(ph.sourceId, ph.handleId, draggedNode.id), prev))
     setIsDirty(true)
@@ -642,9 +648,10 @@ function EditorInner({ detail, onStatusChange, onCanvasNameChange }: {
     setNodes(prev => prev.map(n => {
       if (n.id !== source) return n
       const d = n.data as CanvasNodeData
-      return { ...n, data: { ...d, bizConfig: patchBizConfig(d.bizConfig, sourceHandle, target) } }
+      return { ...n, data: { ...d, bizConfig: patchBizConfig(d.bizConfig, sourceHandle, target, d.outletSchema) } }
     }))
     setEdges(prev => addEdge({ ...conn }, prev))
+    setIsDirty(true)
   }, [snapshot, setNodes, setEdges])
 
   // 节点删除时清理引用
@@ -699,7 +706,7 @@ function EditorInner({ detail, onStatusChange, onCanvasNameChange }: {
             ...node,
             data: {
               ...data,
-              bizConfig: outgoing.reduce((cfg, edge) => clearEdgeRef(cfg, edge), data.bizConfig ?? {}),
+              bizConfig: outgoing.reduce((cfg, edge) => clearEdgeRef(cfg, edge, data.outletSchema), data.bizConfig ?? {}),
             },
           }
         }))
@@ -730,10 +737,10 @@ function EditorInner({ detail, onStatusChange, onCanvasNameChange }: {
   /** 发布前本地校验（减少不必要的服务端请求）*/
   const validateBeforePublish = useCallback((rfNodes: Node<CanvasNodeData>[]): string[] => {
     const errors: string[] = []
-    // START 之后必须连接一个触发器节点（事件/MQ/定时/直调）
-    const TRIGGER_NODE_TYPES = new Set(['EVENT_TRIGGER', 'MQ_TRIGGER', 'SCHEDULED_TRIGGER', 'DIRECT_CALL'])
+    // START 之后必须连接一个触发器节点（事件/MQ/定时/直调/API/受众）
+    const TRIGGER_NODE_TYPES = new Set(['EVENT_TRIGGER', 'MQ_TRIGGER', 'SCHEDULED_TRIGGER', 'DIRECT_CALL', 'API_TRIGGER', 'AUDIENCE_TRIGGER'])
     const hasTrigger = rfNodes.some(n => TRIGGER_NODE_TYPES.has(n.data.nodeType))
-    if (!hasTrigger) errors.push('画布必须包含至少一个触发器节点（事件触发 / MQ 触发 / 定时触发 / 直调）')
+    if (!hasTrigger) errors.push('画布必须包含至少一个触发器节点（事件触发 / MQ 触发 / 定时触发 / 直调 / API / 受众）')
 
     rfNodes.forEach(n => {
       const d = n.data as CanvasNodeData
@@ -795,6 +802,7 @@ function EditorInner({ detail, onStatusChange, onCanvasNameChange }: {
           id: n.id, type: d.nodeType, name: d.name, category: d.category,
           x: Math.round(n.position.x), y: Math.round(n.position.y),
           config: d.bizConfig,
+          outletSchema: d.outletSchema,
         }
       })
       await canvasApi.update(canvasId, {
@@ -1088,12 +1096,17 @@ function EditorInner({ detail, onStatusChange, onCanvasNameChange }: {
     if (!node) return
     snapshot('复制节点')
     const newId = crypto.randomUUID().replace(/-/g, '').slice(0, 12)
+    const existingIds = new Set(nodes.map(item => item.id))
     setNodes(prev => [...prev, {
       ...node,
       id: newId,
       position: { x: node.position.x + 30, y: node.position.y + 30 },
       selected: false,
-      data: { ...(node.data as CanvasNodeData), traceColor: undefined },
+      data: {
+        ...(node.data as CanvasNodeData),
+        traceColor: undefined,
+        bizConfig: cleanRefs((node.data as CanvasNodeData).bizConfig ?? {}, existingIds),
+      },
     }])
   }
 
@@ -1106,7 +1119,7 @@ function EditorInner({ detail, onStatusChange, onCanvasNameChange }: {
         setNodes(nodes => nodes.map(n => {
           if (n.id !== edge.source) return n
           const d = n.data as CanvasNodeData
-          return { ...n, data: { ...d, bizConfig: clearEdgeRef(d.bizConfig ?? {}, edge) } }
+          return { ...n, data: { ...d, bizConfig: clearEdgeRef(d.bizConfig ?? {}, edge, d.outletSchema) } }
         }))
       }
       return prev.filter(e => e.id !== edgeId)
@@ -1429,7 +1442,7 @@ function EditorInner({ detail, onStatusChange, onCanvasNameChange }: {
                   nodes: getNodes().map(n => {
                     const d = n.data as CanvasNodeData
                     return { id: n.id, type: d.nodeType, name: d.name, category: d.category,
-                             x: Math.round(n.position.x), y: Math.round(n.position.y), config: d.bizConfig, bizConfig: d.bizConfig }
+                             x: Math.round(n.position.x), y: Math.round(n.position.y), config: d.bizConfig, bizConfig: d.bizConfig, outletSchema: d.outletSchema }
                   })
                 })
                 const res = await canvasApi.dryRun(canvasId, testUserId, payload, currentGraphJson)

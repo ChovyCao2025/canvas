@@ -82,6 +82,18 @@ public class DagParser {
         addIfPresent(targets, c.get("elseNodeId"));
         addIfPresent(targets, c.get("approveNodeId"));
         addIfPresent(targets, c.get("rejectNodeId"));
+        addIfPresent(targets, c.get("timeoutNodeId"));
+        addIfPresent(targets, c.get("suppressedNodeId"));
+        addIfPresent(targets, c.get("allowedNodeId"));
+        addIfPresent(targets, c.get("quietNodeId"));
+        addIfPresent(targets, c.get("availableNodeId"));
+        addIfPresent(targets, c.get("unavailableNodeId"));
+        addIfPresent(targets, c.get("passNodeId"));
+        addIfPresent(targets, c.get("cappedNodeId"));
+        addIfPresent(targets, c.get("skippedNodeId"));
+        addIfPresent(targets, c.get("maxExceededNodeId"));
+        addIfPresent(targets, c.get("goalMetNodeId"));
+        addIfPresent(targets, c.get("goalNotMetNodeId"));
 
         List<?> branches = (List<?>) c.get("branches");
         if (branches != null) branches.forEach(b ->
@@ -94,6 +106,18 @@ public class DagParser {
         List<?> groups = (List<?>) c.get("groups");
         if (groups != null) groups.forEach(g ->
                 addIfPresent(targets, ((Map<?, ?>) g).get("nextNodeId")));
+
+        List<?> paths = (List<?>) c.get("paths");
+        if (paths != null) paths.forEach(p ->
+                addIfPresent(targets, ((Map<?, ?>) p).get("nextNodeId")));
+
+        List<?> variants = (List<?>) c.get("variants");
+        if (variants != null) variants.forEach(v ->
+                addIfPresent(targets, ((Map<?, ?>) v).get("nextNodeId")));
+
+        List<?> bands = (List<?>) c.get("bands");
+        if (bands != null) bands.forEach(b ->
+                addIfPresent(targets, ((Map<?, ?>) b).get("nextNodeId")));
 
         // 保持原顺序返回，便于调试时与原始 JSON 对齐
         return targets;
@@ -157,6 +181,9 @@ public class DagParser {
 
         /** 节点业务配置（历史字段，解析时与 config 合并）。 */
         private Map<String, Object> bizConfig;
+
+        /** 动态出口 schema（前端用于渲染和保存多出口字段）。 */
+        private String outletSchema;
 
         /** 画布坐标 X。 */
         private Double x;
