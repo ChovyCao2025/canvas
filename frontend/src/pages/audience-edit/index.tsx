@@ -4,6 +4,7 @@ import { Button, Card, Form, Input, InputNumber, Select, Space, Switch, Typograp
 import { QueryBuilder, type RuleGroupType } from 'react-querybuilder'
 import { QueryBuilderAntD } from '@react-querybuilder/antd'
 import { audienceApi, type AudienceDefinition } from '../../services/audienceApi'
+import { audienceDataSourceApi, type AudienceDataSource } from '../../services/audienceDataSourceApi'
 import { tagDefinitionApi } from '../../services/api'
 import 'react-querybuilder/dist/query-builder.css'
 
@@ -25,12 +26,8 @@ type AudienceEditFormValues = Omit<AudienceDefinition, 'enabled'> & {
     seedTagCode?: string
   }
   jdbcConfig?: {
-    url?: string
-    username?: string
-    password?: string
     baseTable?: string
     userIdColumn?: string
-    driverClassName?: string
     maxRows?: number
   }
 }
@@ -113,6 +110,7 @@ export default function AudienceEditPage() {
   const [query, setQuery] = useState<RuleGroupType>({ combinator: 'and', rules: [] })
   const [fields, setFields] = useState<{ name: string; label: string; value: string }[]>([])
   const [tagOptions, setTagOptions] = useState<{ label: string; value: string }[]>([])
+  const [jdbcSources, setJdbcSources] = useState<AudienceDataSource[]>([])
   const [loading, setLoading] = useState(false)
   const isEdit = Boolean(id)
 
@@ -124,6 +122,9 @@ export default function AudienceEditPage() {
       const tags = res.data.list.map((item: any) => ({ name: item.tagCode, label: item.name, value: item.tagCode }))
       setFields(tags)
       setTagOptions(tags.map(item => ({ label: item.label, value: item.name })))
+    })
+    audienceDataSourceApi.list().then(res => {
+      setJdbcSources(res.data.filter(item => item.enabled === 1))
     })
   }, [])
 
@@ -159,6 +160,7 @@ export default function AudienceEditPage() {
         ruleJson: JSON.stringify(serializeGroup(query)),
         engineType: values.engineType,
         dataSourceType: values.dataSourceType,
+        dataSourceId: values.dataSourceType === 'JDBC' ? values.dataSourceId : undefined,
         dataSourceConfig: JSON.stringify(config ?? {}),
         evaluationStrategy: values.evaluationStrategy,
         cronExpression: values.cronExpression,
@@ -189,7 +191,7 @@ export default function AudienceEditPage() {
           evaluationStrategy: 'OFFLINE_BATCH',
           enabled: true,
           taggerConfig: { seedTagCode: undefined },
-          jdbcConfig: { userIdColumn: 'user_id', driverClassName: 'com.mysql.cj.jdbc.Driver' },
+          jdbcConfig: { userIdColumn: 'user_id' },
         }}
       >
         <Card title="基本信息" style={{ marginBottom: 16 }}>
@@ -217,23 +219,17 @@ export default function AudienceEditPage() {
 
           {dataSourceType === 'JDBC' && (
             <>
-              <Form.Item name={['jdbcConfig', 'url']} label="JDBC URL" rules={[{ required: true, message: '请输入 JDBC URL' }]}>
-                <Input placeholder="jdbc:mysql://host:3306/db" />
-              </Form.Item>
-              <Form.Item name={['jdbcConfig', 'username']} label="用户名" rules={[{ required: true, message: '请输入用户名' }]}>
-                <Input />
-              </Form.Item>
-              <Form.Item name={['jdbcConfig', 'password']} label="密码" rules={[{ required: true, message: '请输入密码' }]}>
-                <Input.Password />
+              <Form.Item name="dataSourceId" label="人群数据源" rules={[{ required: true, message: '请选择人群数据源' }]}>
+                <Select
+                  options={jdbcSources.map(item => ({ value: item.id, label: item.name }))}
+                  placeholder={jdbcSources.length ? '选择数据源' : '暂无可用数据源，请先创建'}
+                />
               </Form.Item>
               <Form.Item name={['jdbcConfig', 'baseTable']} label="基础表名" rules={[{ required: true, message: '请输入基础表名' }]}>
-                <Input placeholder="user_profile" />
+                <Input placeholder="audience_demo_user" />
               </Form.Item>
               <Form.Item name={['jdbcConfig', 'userIdColumn']} label="用户 ID 列名" rules={[{ required: true, message: '请输入用户 ID 列名' }]}>
                 <Input placeholder="user_id" />
-              </Form.Item>
-              <Form.Item name={['jdbcConfig', 'driverClassName']} label="Driver Class">
-                <Input placeholder="com.mysql.cj.jdbc.Driver" />
               </Form.Item>
               <Form.Item name={['jdbcConfig', 'maxRows']} label="最大扫描行数">
                 <InputNumber style={{ width: '100%' }} min={1} placeholder="可选，如 500000" />
