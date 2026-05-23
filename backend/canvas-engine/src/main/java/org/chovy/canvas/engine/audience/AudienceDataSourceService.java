@@ -33,17 +33,17 @@ public class AudienceDataSourceService {
     }
 
     public AudienceDataSource get(Long id) {
-        return dataSourceMapper.selectById(id);
+        return withReferenceCount(dataSourceMapper.selectById(id));
     }
 
     public AudienceDataSource create(AudienceDataSource dataSource) {
         dataSourceMapper.insert(dataSource);
-        return dataSource;
+        return get(dataSource.getId());
     }
 
     public AudienceDataSource update(AudienceDataSource dataSource) {
         dataSourceMapper.updateById(dataSource);
-        return dataSource;
+        return get(dataSource.getId());
     }
 
     public void delete(Long id) {
@@ -76,5 +76,13 @@ public class AudienceDataSourceService {
         return definitionMapper.selectCount(new QueryWrapper<AudienceDefinition>()
                 .eq(COLUMN_DATA_SOURCE_ID, id)
                 .eq(COLUMN_DATA_SOURCE_TYPE, JDBC_DATA_SOURCE_TYPE));
+    }
+
+    private AudienceDataSource withReferenceCount(AudienceDataSource dataSource) {
+        if (dataSource == null || dataSource.getId() == null) {
+            return dataSource;
+        }
+        dataSource.setReferenceCount(countReferences(dataSource.getId()));
+        return dataSource;
     }
 }
