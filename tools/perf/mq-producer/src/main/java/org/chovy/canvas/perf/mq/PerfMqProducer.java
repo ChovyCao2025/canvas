@@ -24,7 +24,7 @@ public class PerfMqProducer {
         producer.setNamesrvAddr(config.nameServer());
         try {
             producer.start();
-            for (int seq = 0; seq < config.count(); seq++) {
+            for (int seq : sequences(config.count())) {
                 String userId = "perf_user_" + (seq % config.userModulo());
                 Message message = new Message(
                         config.topic(),
@@ -50,6 +50,14 @@ public class PerfMqProducer {
                 + "\"perfInputId\":\"" + escapeJson(sourceMsgId(perfRunId, seq)) + "\","
                 + "\"seq\":" + seq
                 + "}}";
+    }
+
+    static int[] sequences(int count) {
+        int[] sequences = new int[count];
+        for (int i = 0; i < count; i++) {
+            sequences[i] = i + 1;
+        }
+        return sequences;
     }
 
     private static Map<String, String> parseArgs(String[] args) {

@@ -13,7 +13,7 @@
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <junit.jupiter.version>5.10.2</junit.jupiter.version>
         <assertj.version>3.24.2</assertj.version>
-        <rocketmq.client.version>5.3.0</rocketmq.client.version>
+        <rocketmq.client.version>5.3.1</rocketmq.client.version>
     </properties>
 
     <dependencies>

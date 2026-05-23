@@ -32,4 +32,10 @@ class PerfMqProducerTest {
 
         assertThat(config.shouldSend()).isFalse();
     }
+
+    @Test
+    void sequencesAreOneBasedThroughCount() {
+        assertThat(PerfMqProducer.sequences(3))
+                .containsExactly(1, 2, 3);
+    }
 }
