@@ -13,6 +13,7 @@ import org.chovy.canvas.domain.execution.CanvasExecutionDlq;
 import org.chovy.canvas.domain.execution.CanvasExecutionDlqMapper;
 import org.chovy.canvas.engine.disruptor.CanvasDisruptorService;
 import org.chovy.canvas.engine.trigger.TriggerPriorityConfig;
+import org.chovy.canvas.perf.PerfRunContext;
 import org.springframework.stereotype.Service;
 
 import java.nio.charset.StandardCharsets;
@@ -90,6 +91,7 @@ public class OverflowRetryConsumer implements RocketMQListener<MessageExt> {
                     .executionId(nonBlank(msg.getMsgId()) ? msg.getMsgId() : rocketMqMsgId)
                     .canvasId(msg.getCanvasId())
                     .userId(msg.getUserId())
+                    .perfRunId(PerfRunContext.extract(msg.getPayload()))
                     .failedNodeId(DLQ_FAILED_NODE_ID)
                     .failedNodeType(msg.getTriggerNodeType())
                     .errorMsg("overflow_max_retry")
