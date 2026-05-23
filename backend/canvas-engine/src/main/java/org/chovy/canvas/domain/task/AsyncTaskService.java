@@ -1,6 +1,7 @@
 package org.chovy.canvas.domain.task;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
@@ -80,6 +81,19 @@ public class AsyncTaskService {
     }
 
     public List<AsyncTask> list(String taskType, String bizType, List<String> bizIds, List<String> statuses, String createdBy, boolean admin) {
+        return list(taskType, bizType, bizIds, statuses, createdBy, admin, 1, 100);
+    }
+
+    public List<AsyncTask> list(
+            String taskType,
+            String bizType,
+            List<String> bizIds,
+            List<String> statuses,
+            String createdBy,
+            boolean admin,
+            int page,
+            int size
+    ) {
         LambdaQueryWrapper<AsyncTask> query = new LambdaQueryWrapper<AsyncTask>()
                 .orderByDesc(AsyncTask::getCreatedAt);
         if (taskType != null && !taskType.isBlank()) {
@@ -97,7 +111,7 @@ public class AsyncTaskService {
         if (!admin) {
             query.eq(AsyncTask::getCreatedBy, createdBy);
         }
-        return mapper.selectList(query);
+        return mapper.selectPage(new Page<>(page, size), query).getRecords();
     }
 
     private AsyncTask findActive(String taskType, String bizType, String bizId) {

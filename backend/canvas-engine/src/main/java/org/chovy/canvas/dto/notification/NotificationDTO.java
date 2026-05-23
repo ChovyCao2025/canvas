@@ -5,7 +5,6 @@ import org.chovy.canvas.domain.notification.Notification;
 import java.time.LocalDateTime;
 
 public record NotificationDTO(
-        Long id,
         String notificationId,
         String type,
         String title,
@@ -17,7 +16,6 @@ public record NotificationDTO(
 ) {
     public static NotificationDTO from(Notification notification) {
         return new NotificationDTO(
-                notification.getId(),
                 notification.getNotificationId(),
                 notification.getType(),
                 notification.getTitle(),

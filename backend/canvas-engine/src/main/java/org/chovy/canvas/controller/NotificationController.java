@@ -31,8 +31,10 @@ public class NotificationController {
             @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "20") int size
     ) {
+        int safePage = Math.max(1, page);
+        int safeSize = clamp(size, 1, 100);
         return currentUser().flatMap(userId ->
-                Mono.fromCallable(() -> notificationService.list(userId, unreadOnly, page, size)
+                Mono.fromCallable(() -> notificationService.list(userId, unreadOnly, safePage, safeSize)
                                 .stream()
                                 .map(NotificationDTO::from)
                                 .toList())
@@ -67,7 +69,15 @@ public class NotificationController {
         return ReactiveSecurityContextHolder.getContext()
                 .map(ctx -> ctx.getAuthentication().getPrincipal())
                 .cast(Claims.class)
-                .map(claims -> claims.get("username", String.class))
+                .map(claims -> defaultIfBlank(claims.get("username", String.class), "system"))
                 .defaultIfEmpty("system");
+    }
+
+    private int clamp(int value, int min, int max) {
+        return Math.max(min, Math.min(max, value));
+    }
+
+    private String defaultIfBlank(String value, String fallback) {
+        return value == null || value.isBlank() ? fallback : value;
     }
 }

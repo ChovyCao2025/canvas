@@ -28,10 +28,14 @@ public class AsyncTaskController {
             @RequestParam(required = false) String taskType,
             @RequestParam(required = false) String bizType,
             @RequestParam(required = false) String bizIds,
-            @RequestParam(required = false) String statuses
+            @RequestParam(required = false) String statuses,
+            @RequestParam(defaultValue = "1") int page,
+            @RequestParam(defaultValue = "100") int size
     ) {
         List<String> parsedBizIds = parseCsv(bizIds);
         List<String> parsedStatuses = parseCsv(statuses);
+        int safePage = Math.max(1, page);
+        int safeSize = clamp(size, 1, 200);
         return currentUser().flatMap(user ->
                 Mono.fromCallable(() -> taskService.list(
                                 taskType,
@@ -39,7 +43,9 @@ public class AsyncTaskController {
                                 parsedBizIds,
                                 parsedStatuses,
                                 user.username(),
-                                "ADMIN".equals(user.role()))
+                                "ADMIN".equals(user.role()),
+                                safePage,
+                                safeSize)
                         .stream()
                         .map(AsyncTaskDTO::from)
                         .toList())
@@ -52,8 +58,8 @@ public class AsyncTaskController {
                 .map(ctx -> ctx.getAuthentication().getPrincipal())
                 .cast(Claims.class)
                 .map(claims -> new CurrentUser(
-                        claims.get("username", String.class),
-                        claims.get("role", String.class)))
+                        defaultIfBlank(claims.get("username", String.class), "system"),
+                        defaultIfBlank(claims.get("role", String.class), "OPERATOR")))
                 .defaultIfEmpty(new CurrentUser("system", "OPERATOR"));
     }
 
@@ -65,6 +71,14 @@ public class AsyncTaskController {
                 .map(String::trim)
                 .filter(item -> !item.isBlank())
                 .toList();
+    }
+
+    private int clamp(int value, int min, int max) {
+        return Math.max(min, Math.min(max, value));
+    }
+
+    private String defaultIfBlank(String value, String fallback) {
+        return value == null || value.isBlank() ? fallback : value;
     }
 
     private record CurrentUser(String username, String role) {
