@@ -91,8 +91,44 @@ public class PerfMqProducer {
         }
     }
 
+    private static int parseNonNegativeInt(String value, String key) {
+        int parsed = parseInt(value, key);
+        if (parsed < 0) {
+            throw new IllegalArgumentException(key + " must be >= 0");
+        }
+        return parsed;
+    }
+
+    private static int parsePositiveInt(String value, String key) {
+        int parsed = parseInt(value, key);
+        if (parsed <= 0) {
+            throw new IllegalArgumentException(key + " must be > 0");
+        }
+        return parsed;
+    }
+
     private static String escapeJson(String value) {
-        return value.replace("\\", "\\\\").replace("\"", "\\\"");
+        StringBuilder escaped = new StringBuilder(value.length());
+        for (int i = 0; i < value.length(); i++) {
+            char ch = value.charAt(i);
+            switch (ch) {
+                case '\\' -> escaped.append("\\\\");
+                case '"' -> escaped.append("\\\"");
+                case '\b' -> escaped.append("\\b");
+                case '\f' -> escaped.append("\\f");
+                case '\n' -> escaped.append("\\n");
+                case '\r' -> escaped.append("\\r");
+                case '\t' -> escaped.append("\\t");
+                default -> {
+                    if (ch < 0x20) {
+                        escaped.append(String.format("\\u%04x", (int) ch));
+                    } else {
+                        escaped.append(ch);
+                    }
+                }
+            }
+        }
+        return escaped.toString();
     }
 
     record Config(String nameServer, String topic, String tag, String perfRunId, int count, int userModulo) {
@@ -103,8 +139,8 @@ public class PerfMqProducer {
                     parsedArgs.getOrDefault("--topic", DEFAULT_TOPIC),
                     parsedArgs.getOrDefault("--tag", DEFAULT_TAG),
                     require(parsedArgs, "--perf-run-id"),
-                    parseInt(parsedArgs.getOrDefault("--count", Integer.toString(DEFAULT_COUNT)), "--count"),
-                    parseInt(parsedArgs.getOrDefault("--user-modulo", Integer.toString(DEFAULT_USER_MODULO)), "--user-modulo"));
+                    parseNonNegativeInt(parsedArgs.getOrDefault("--count", Integer.toString(DEFAULT_COUNT)), "--count"),
+                    parsePositiveInt(parsedArgs.getOrDefault("--user-modulo", Integer.toString(DEFAULT_USER_MODULO)), "--user-modulo"));
         }
 
         boolean shouldSend() {

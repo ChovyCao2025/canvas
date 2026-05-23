@@ -3,6 +3,7 @@ package org.chovy.canvas.perf.mq;
 import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class PerfMqProducerTest {
 
@@ -31,6 +32,35 @@ class PerfMqProducerTest {
         });
 
         assertThat(config.shouldSend()).isFalse();
+    }
+
+    @Test
+    void negativeCountIsRejected() {
+        assertThatThrownBy(() -> PerfMqProducer.Config.fromArgs(new String[]{
+                "--perf-run-id", "perf_test",
+                "--count", "-1"
+        })).isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("--count must be >= 0");
+    }
+
+    @Test
+    void userModuloMustBePositive() {
+        assertThatThrownBy(() -> PerfMqProducer.Config.fromArgs(new String[]{
+                "--perf-run-id", "perf_test",
+                "--user-modulo", "0"
+        })).isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("--user-modulo must be > 0");
+    }
+
+    @Test
+    void messageBodyEscapesJsonControlCharacters() {
+        String body = PerfMqProducer.messageBody("perf\n\t\"\\", "perf_user\n\t\"\\", 12);
+
+        assertThat(body)
+                .contains("\"userId\":\"perf_user\\n\\t\\\"\\\\\"")
+                .contains("\"perfRunId\":\"perf\\n\\t\\\"\\\\\"")
+                .doesNotContain("\n")
+                .doesNotContain("\t");
     }
 
     @Test
