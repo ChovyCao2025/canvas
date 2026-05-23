@@ -50,6 +50,9 @@ public class ApiDefinition {
     /** 接口描述 */
     private String description;
 
+    /** 每秒最大调用次数，null 表示不限制（对应 TriggerPreCheckService 外的速率保护） */
+    private Integer rateLimitPerSec;
+
     /** 是否启用，1=启用，0=禁用 */
     private Integer enabled;
 
