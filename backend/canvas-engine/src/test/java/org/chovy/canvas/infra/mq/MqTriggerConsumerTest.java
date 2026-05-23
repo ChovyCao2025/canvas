@@ -10,6 +10,7 @@ import org.chovy.canvas.domain.constant.NodeType;
 import org.chovy.canvas.domain.constant.TriggerType;
 import org.chovy.canvas.domain.execution.CanvasMqTriggerRejected;
 import org.chovy.canvas.domain.execution.CanvasMqTriggerRejectedMapper;
+import org.chovy.canvas.domain.notification.NotificationEventService;
 import org.chovy.canvas.engine.disruptor.CanvasDisruptorService;
 import org.chovy.canvas.engine.request.CanvasExecutionRequestService;
 import org.chovy.canvas.engine.scheduler.CanvasMetrics;
@@ -39,6 +40,7 @@ class MqTriggerConsumerTest {
     private CanvasExecutionRequestService requestService;
     private CanvasMqTriggerRejectedMapper rejectedMapper;
     private CanvasMetrics metrics;
+    private NotificationEventService notificationEventService;
     private MqTriggerConsumer consumer;
 
     @BeforeEach
@@ -48,8 +50,15 @@ class MqTriggerConsumerTest {
         requestService = mock(CanvasExecutionRequestService.class);
         rejectedMapper = mock(CanvasMqTriggerRejectedMapper.class);
         metrics = mock(CanvasMetrics.class);
-        consumer = new MqTriggerConsumer(new ObjectMapper(), routeService, disruptorService, requestService,
-                rejectedMapper, metrics);
+        notificationEventService = mock(NotificationEventService.class);
+        consumer = new MqTriggerConsumer(
+                new ObjectMapper(),
+                routeService,
+                disruptorService,
+                requestService,
+                rejectedMapper,
+                metrics,
+                notificationEventService);
     }
 
     @Test
@@ -95,6 +104,15 @@ class MqTriggerConsumerTest {
                 "{\"userId\":\"user-8\",\"messageCode\":\"NOOP\",\"payload\":{\"k\":\"v\"}}"));
 
         verify(disruptorService, never()).publishRequest(any());
+        verify(notificationEventService).systemAlert(
+                eq("MQ_TRIGGER_NO_ROUTE"),
+                eq("MQ 触发无匹配画布"),
+                any(),
+                eq("/mq-config"),
+                eq("MQ_TRIGGER"),
+                eq("UNUSED"),
+                eq("mq:no-route:UNUSED"),
+                eq(null));
     }
 
     @Test
@@ -107,6 +125,15 @@ class MqTriggerConsumerTest {
         assertThat(captor.getValue().getMsgId()).isEqualTo("MSG-3");
         assertThat(captor.getValue().getTag()).isEqualTo("ORDER_PAID");
         assertThat(captor.getValue().getReason()).isEqualTo("INVALID_BODY");
+        verify(notificationEventService).systemAlert(
+                eq("MQ_TRIGGER_PARSE_FAILED"),
+                eq("MQ 触发消息解析失败"),
+                any(),
+                eq("/mq-config"),
+                eq("MQ_TRIGGER"),
+                eq("MSG-3"),
+                eq("mq:parse:MSG-3"),
+                eq(null));
         verify(disruptorService, never()).publishRequest(any());
     }
 
@@ -117,6 +144,15 @@ class MqTriggerConsumerTest {
 
         verify(metrics).recordMqTriggerRejected("INVALID_MESSAGE", "ORDER_PAID");
         verify(rejectedMapper).insert(any(CanvasMqTriggerRejected.class));
+        verify(notificationEventService).systemAlert(
+                eq("MQ_TRIGGER_VALIDATE_FAILED"),
+                eq("MQ 触发消息校验失败"),
+                any(),
+                eq("/mq-config"),
+                eq("MQ_TRIGGER"),
+                eq("MSG-5"),
+                eq("mq:validate:MSG-5"),
+                eq(null));
         verify(disruptorService, never()).publishRequest(any());
     }
 

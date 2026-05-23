@@ -10,6 +10,7 @@ import {
 import { Outlet, useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
 import { authApi } from '../../services/api'
+import NotificationBell from '../notifications/NotificationBell'
 
 const { Sider, Content } = Layout
 
@@ -267,34 +268,44 @@ export default function AppLayout() {
 
         {/* 用户信息——固定在最底部 */}
         <div style={{ borderTop: '1px solid rgba(255,255,255,.06)', padding: '12px 8px', flexShrink: 0 }}>
-          <Dropdown menu={{ items: userMenu }} placement="topLeft" trigger={['click']}>
-            <div
-              style={{
-                display: 'flex', alignItems: 'center', gap: 10,
-                padding: collapsed ? '8px 10px' : '8px 12px',
-                borderRadius: 8, cursor: 'pointer', transition: 'background .15s',
-              }}
-              onMouseEnter={e => (e.currentTarget.style.background = SIDER_HOVER)}
-              onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
-            >
-              <Avatar
-                size={32}
-                style={{ background: `linear-gradient(135deg, ${ACCENT}, #7c3aed)`, flexShrink: 0, fontSize: 13, fontWeight: 700 }}
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: collapsed ? 6 : 8,
+            flexDirection: collapsed ? 'column' : 'row',
+          }}>
+            <NotificationBell />
+            <Dropdown menu={{ items: userMenu }} placement="topLeft" trigger={['click']}>
+              <div
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 10,
+                  padding: collapsed ? '8px 10px' : '8px 12px',
+                  borderRadius: 8, cursor: 'pointer', transition: 'background .15s',
+                  flex: collapsed ? 'none' : 1,
+                  minWidth: 0,
+                }}
+                onMouseEnter={e => (e.currentTarget.style.background = SIDER_HOVER)}
+                onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
               >
-                {user?.displayName?.[0] ?? <UserOutlined />}
-              </Avatar>
-              {!collapsed && (
-                <div style={{ overflow: 'hidden', flex: 1 }}>
-                  <div style={{ color: 'rgba(255,255,255,.9)', fontSize: 13, fontWeight: 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                    {user?.displayName}
+                <Avatar
+                  size={32}
+                  style={{ background: `linear-gradient(135deg, ${ACCENT}, #7c3aed)`, flexShrink: 0, fontSize: 13, fontWeight: 700 }}
+                >
+                  {user?.displayName?.[0] ?? <UserOutlined />}
+                </Avatar>
+                {!collapsed && (
+                  <div style={{ overflow: 'hidden', flex: 1 }}>
+                    <div style={{ color: 'rgba(255,255,255,.9)', fontSize: 13, fontWeight: 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                      {user?.displayName}
+                    </div>
+                    <div style={{ color: 'rgba(255,255,255,.38)', fontSize: 11, marginTop: 1 }}>
+                      {user?.role === 'ADMIN' ? '管理员' : '操作员'}
+                    </div>
                   </div>
-                  <div style={{ color: 'rgba(255,255,255,.38)', fontSize: 11, marginTop: 1 }}>
-                    {user?.role === 'ADMIN' ? '管理员' : '操作员'}
-                  </div>
-                </div>
-              )}
-            </div>
-          </Dropdown>
+                )}
+              </div>
+            </Dropdown>
+          </div>
         </div>
       </Sider>
 

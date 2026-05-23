@@ -8,6 +8,7 @@ import org.chovy.canvas.common.R;
 import org.chovy.canvas.domain.approval.CanvasManualApproval;
 import org.chovy.canvas.domain.approval.CanvasManualApprovalMapper;
 import org.chovy.canvas.domain.constant.ApprovalStatus;
+import org.chovy.canvas.domain.notification.NotificationEventService;
 import org.chovy.canvas.engine.handlers.ManualApprovalHandler;
 import org.chovy.canvas.engine.trigger.CanvasExecutionService;
 import org.chovy.canvas.infra.redis.ContextPersistenceService;
@@ -39,6 +40,7 @@ public class CanvasExecutionManagementController {
     private final ContextPersistenceService ctxStore;
     private final CanvasExecutionService executionService;
     private final ObjectMapper objectMapper;
+    private final NotificationEventService notificationEventService;
 
     /**
      * 人工审批通过（设计文档 18.2节）。
@@ -113,6 +115,7 @@ public class CanvasExecutionManagementController {
         approval.setResultBy(approver);
         approval.setResultAt(LocalDateTime.now());
         approvalMapper.updateById(approval);
+        notificationEventService.approvalResult(approval, result, approver);
 
         // 3. 从 Redis 恢复 ctx，写入审批结果
         var ctx = ctxStore.load(approval.getCanvasId(), approval.getUserId());

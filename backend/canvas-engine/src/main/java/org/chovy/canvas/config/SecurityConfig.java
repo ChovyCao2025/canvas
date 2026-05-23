@@ -52,6 +52,8 @@ public class SecurityConfig {
                         // OpenAPI：事件上报无需登录（业务系统直接调用）
                         .pathMatchers(HttpMethod.POST, "/canvas/events/report").permitAll()
                         .pathMatchers(HttpMethod.POST, "/canvas/execute/direct/**").permitAll()
+                        // WebSocket 使用一次性票据鉴权；票据接口本身仍要求登录。
+                        .pathMatchers("/canvas/ws/notifications").permitAll()
                         // 运维接口：无需登录（内网调用，不对外暴露）
                         .pathMatchers("/ops/**").permitAll()
                         // 仅 ADMIN 可发布/下线/Kill/灰度/回滚

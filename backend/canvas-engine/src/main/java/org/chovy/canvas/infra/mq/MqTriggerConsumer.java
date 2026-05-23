@@ -13,6 +13,7 @@ import org.chovy.canvas.domain.constant.NodeType;
 import org.chovy.canvas.domain.constant.TriggerType;
 import org.chovy.canvas.domain.execution.CanvasMqTriggerRejected;
 import org.chovy.canvas.domain.execution.CanvasMqTriggerRejectedMapper;
+import org.chovy.canvas.domain.notification.NotificationEventService;
 import org.chovy.canvas.engine.disruptor.CanvasDisruptorService;
 import org.chovy.canvas.engine.request.CanvasExecutionRequestService;
 import org.chovy.canvas.engine.scheduler.CanvasMetrics;
@@ -23,12 +24,6 @@ import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
 import java.util.Set;
 
-/**
- * RocketMQ MQ 触发消费者。
- *
- * 消费链路：RocketMQ CANVAS_MQ_TRIGGER -> 按 Tag 路由 -> Disruptor Ring Buffer -> DagEngine。
- * 发布到 Disruptor 或路由读取失败时向上抛出，让 RocketMQ 重新消费。
- */
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -43,12 +38,15 @@ import java.util.Set;
 )
 public class MqTriggerConsumer implements RocketMQListener<MessageExt> {
 
+    private static final int ALERT_CONTENT_LIMIT = 900;
+
     private final ObjectMapper objectMapper;
     private final TriggerRouteService routeService;
     private final CanvasDisruptorService disruptorService;
     private final CanvasExecutionRequestService requestService;
     private final CanvasMqTriggerRejectedMapper rejectedMapper;
     private final CanvasMetrics metrics;
+    private final NotificationEventService notificationEventService;
 
     @Override
     public void onMessage(MessageExt message) {
@@ -65,6 +63,15 @@ public class MqTriggerConsumer implements RocketMQListener<MessageExt> {
             log.error("[MQ_CONSUMER] 消息体解析失败 msgId={} body={}: {}", msgId, body, e.getMessage());
             recordRejected("INVALID_BODY", tag);
             storeRejected(msgId, tag, "INVALID_BODY", e.getMessage(), body);
+            notificationEventService.systemAlert(
+                    "MQ_TRIGGER_PARSE_FAILED",
+                    "MQ 触发消息解析失败",
+                    trimAlert("tag=" + tag + " msgId=" + msgId + " error=" + e.getMessage() + " body=" + body),
+                    "/mq-config",
+                    "MQ_TRIGGER",
+                    msgId,
+                    "mq:parse:" + msgId,
+                    null);
             return;
         }
         try {
@@ -72,12 +79,30 @@ public class MqTriggerConsumer implements RocketMQListener<MessageExt> {
         } catch (IllegalArgumentException e) {
             recordRejected("INVALID_MESSAGE", tag);
             storeRejected(msgId, tag, "INVALID_MESSAGE", e.getMessage(), body);
+            notificationEventService.systemAlert(
+                    "MQ_TRIGGER_VALIDATE_FAILED",
+                    "MQ 触发消息校验失败",
+                    trimAlert("tag=" + tag + " msgId=" + msgId + " error=" + e.getMessage()),
+                    "/mq-config",
+                    "MQ_TRIGGER",
+                    msgId,
+                    "mq:validate:" + msgId,
+                    null);
             return;
         }
 
         Set<String> canvasIds = routeService.getCanvasByMqTopic(tag);
         if (canvasIds.isEmpty()) {
             log.warn("[MQ_CONSUMER] tag={} 无匹配画布，丢弃消息 msgId={}", tag, msgId);
+            notificationEventService.systemAlert(
+                    "MQ_TRIGGER_NO_ROUTE",
+                    "MQ 触发无匹配画布",
+                    "tag=" + tag + " msgId=" + msgId + " 未匹配到已发布画布",
+                    "/mq-config",
+                    "MQ_TRIGGER",
+                    tag,
+                    "mq:no-route:" + tag,
+                    null);
             return;
         }
 
@@ -131,7 +156,6 @@ public class MqTriggerConsumer implements RocketMQListener<MessageExt> {
         try {
             metrics.recordMqTriggerRejected(reason, tag);
         } catch (RuntimeException ignored) {
-            // Metrics must not affect RocketMQ retry semantics.
         }
     }
 
@@ -139,7 +163,6 @@ public class MqTriggerConsumer implements RocketMQListener<MessageExt> {
         try {
             metrics.recordMqRouteRejected(reason, tag);
         } catch (RuntimeException ignored) {
-            // Metrics must not affect RocketMQ retry semantics.
         }
     }
 
@@ -164,5 +187,12 @@ public class MqTriggerConsumer implements RocketMQListener<MessageExt> {
             return null;
         }
         return value.length() <= maxLength ? value : value.substring(0, maxLength);
+    }
+
+    private String trimAlert(String value) {
+        if (value == null || value.length() <= ALERT_CONTENT_LIMIT) {
+            return value;
+        }
+        return value.substring(0, ALERT_CONTENT_LIMIT);
     }
 }
