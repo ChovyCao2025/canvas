@@ -19,6 +19,10 @@ public final class NodeType {
     public static final String DIRECT_CALL        = "DIRECT_CALL";
     /** 子画布触发节点（被父画布调用时的入口） */
     public static final String CANVAS_TRIGGER     = "CANVAS_TRIGGER";
+    /** 产品化 API 触发节点 */
+    public static final String API_TRIGGER        = "API_TRIGGER";
+    /** 受众进入/离开触发节点 */
+    public static final String AUDIENCE_TRIGGER   = "AUDIENCE_TRIGGER";
 
     // ── 控制流节点 ────────────────────────────────────────────────────
 
@@ -95,6 +99,16 @@ public final class NodeType {
     public static final String TAGGER_OFFLINE     = "TAGGER_OFFLINE";
     /** 通用打标（tagger 合并版） */
     public static final String TAGGER             = "TAGGER";
+    /** 更新用户属性 */
+    public static final String UPDATE_PROFILE     = "UPDATE_PROFILE";
+    /** 本地标签操作 */
+    public static final String TAG_OPERATION      = "TAG_OPERATION";
+    /** 积分操作 */
+    public static final String POINTS_OPERATION   = "POINTS_OPERATION";
+    /** 创建人工任务 */
+    public static final String CREATE_TASK        = "CREATE_TASK";
+    /** 记录事件 */
+    public static final String TRACK_EVENT        = "TRACK_EVENT";
 
     private NodeType() {}
 }

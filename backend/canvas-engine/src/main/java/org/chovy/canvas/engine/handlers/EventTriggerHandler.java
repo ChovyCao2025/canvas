@@ -22,7 +22,12 @@ public class EventTriggerHandler implements NodeHandler {
 
     @Override
     public Mono<NodeResult> executeAsync(Map<String, Object> config, ExecutionContext ctx) {
+        String expectedEvent = (String) config.get("eventCode");
+        Object actualEvent = ctx.getContextValue("eventCode");
+        if (expectedEvent != null && actualEvent != null && !expectedEvent.equals(actualEvent.toString())) {
+            return Mono.just(NodeResult.terminal(Map.of("eventMatched", false)));
+        }
         String nextNodeId = (String) config.get("nextNodeId");
-        return Mono.just(NodeResult.ok(nextNodeId, Map.of()));
+        return Mono.just(NodeResult.ok(nextNodeId, Map.of("eventMatched", true)));
     }
 }

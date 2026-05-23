@@ -73,6 +73,12 @@ public class DagParser {
         addIfPresent(targets, c.get("rejectNodeId"));
         addIfPresent(targets, c.get("timeoutNodeId"));
         addIfPresent(targets, c.get("suppressedNodeId"));
+        addIfPresent(targets, c.get("allowedNodeId"));
+        addIfPresent(targets, c.get("quietNodeId"));
+        addIfPresent(targets, c.get("availableNodeId"));
+        addIfPresent(targets, c.get("unavailableNodeId"));
+        addIfPresent(targets, c.get("passNodeId"));
+        addIfPresent(targets, c.get("cappedNodeId"));
         addIfPresent(targets, c.get("skippedNodeId"));
         addIfPresent(targets, c.get("maxExceededNodeId"));
         addIfPresent(targets, c.get("goalMetNodeId"));
