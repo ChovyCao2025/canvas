@@ -62,4 +62,12 @@ describe('settingsPresentation', () => {
   it('expands advanced section when any execution limit is configured', () => {
     expect(shouldExpandExecutionLimits({ perUserDailyLimit: 1 })).toBe(true)
   })
+
+  it('expands advanced section when only validStart is configured', () => {
+    expect(
+      shouldExpandExecutionLimits({
+        validStart: '2026-05-23T00:00:00Z',
+      }),
+    ).toBe(true)
+  })
 })
