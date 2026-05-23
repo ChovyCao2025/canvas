@@ -6,9 +6,34 @@ import { tagDefinitionApi } from '../../services/api'
 
 const { Title } = Typography
 
-interface TagDef { id: number; name: string; tagCode: string; tagType: string; description?: string; enabled: number }
+/**
+ * 标签定义表单模型。
+ */
+interface TagDef {
+  /** 标签定义 ID。 */
+  id: number
 
+  /** 标签名称。 */
+  name: string
+
+  /** 标签编码。 */
+  tagCode: string
+
+  /** 标签类型（offline/realtime）。 */
+  tagType: string
+
+  /** 标签说明。 */
+  description?: string
+
+  /** 启用状态：1 启用，0 禁用。 */
+  enabled: number
+}
+
+/**
+ * 标签配置页。
+ */
 export default function TagConfigPage() {
+  // 列表态
   const [data,     setData]     = useState<TagDef[]>([])
   const [total,    setTotal]    = useState(0)
   const [loading,  setLoading]  = useState(false)
@@ -18,6 +43,7 @@ export default function TagConfigPage() {
   const [form] = Form.useForm()
   const [saving, setSaving] = useState(false)
 
+  // 获取标签定义列表
   const fetchList = async (p = page) => {
     setLoading(true)
     try {
@@ -29,6 +55,7 @@ export default function TagConfigPage() {
 
   useEffect(() => { fetchList(1) }, [])
 
+  // 打开“新建标签”弹窗并设置默认值
   const openCreate = () => {
     setEditing(null)
     form.resetFields()
@@ -36,12 +63,14 @@ export default function TagConfigPage() {
     setVisible(true)
   }
 
+  // 打开“编辑标签”弹窗并回填已有数据
   const openEdit = (r: TagDef) => {
     setEditing(r)
     form.setFieldsValue({ ...r, enabled: r.enabled === 1 })
     setVisible(true)
   }
 
+  // 新建/编辑统一提交入口
   const handleOk = async () => {
     const values = await form.validateFields()
     setSaving(true)

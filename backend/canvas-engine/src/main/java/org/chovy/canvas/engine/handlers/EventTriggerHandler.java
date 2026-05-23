@@ -15,14 +15,24 @@ import java.util.Map;
  * 画布收到业务事件后，从 START 节点路由到此节点开始执行。
  * 触发 payload（eventCode、attributes 等）已由执行引擎注入 ctx.triggerPayload，
  * 此节点直接透传并路由到下游。
+ * 与 MqTrigger/ScheduledTrigger 类似，属于轻量触发器节点。
  */
 @Component
 @NodeHandlerType("EVENT_TRIGGER")
 public class EventTriggerHandler implements NodeHandler {
 
+    /**
+     * 事件触发节点本身不做业务判断，仅把流程推进到 nextNodeId。
+     *
+     * <p>事件有效性（事件编码、属性结构）由上游上报入口和事件定义校验。
+     */
     @Override
     public Mono<NodeResult> executeAsync(Map<String, Object> config, ExecutionContext ctx) {
+        // 事件触发节点配置仅包含 nextNodeId
         String nextNodeId = (String) config.get("nextNodeId");
+        // 触发 payload 已在 ctx.triggerPayload，无需重复输出到 result
+        // 不在此处做事件字段转换，保持触发载荷原样可追踪
+        //（若后续需要字段标准化，建议在上报入口统一做）
         return Mono.just(NodeResult.ok(nextNodeId, Map.of()));
     }
 }

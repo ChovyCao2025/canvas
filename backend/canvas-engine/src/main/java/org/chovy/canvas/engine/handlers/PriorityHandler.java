@@ -20,13 +20,20 @@ import java.util.Map;
 @NodeHandlerType("PRIORITY")
 public class PriorityHandler implements NodeHandler {
 
+    /**
+     * 优先级节点执行入口。
+     *
+     * <p>本节点不直接执行子分支，只返回有序分支集合给调度器逐个尝试。
+     */
     @Override
     @SuppressWarnings("unchecked")
     public Mono<NodeResult> executeAsync(Map<String, Object> config, ExecutionContext ctx) {
+        // priorities 中每个元素对应一个候选分支，按 order 升序尝试
         List<Map<String, Object>> priorities = (List<Map<String, Object>>) config.get("priorities");
         String nextNodeId = (String) config.get("nextNodeId");
 
         if (priorities == null || priorities.isEmpty()) {
+            // 未配置优先级分支时：有兜底 next 则走兜底，否则终止
             return nextNodeId != null ? Mono.just(NodeResult.ok(nextNodeId, Map.of())) : Mono.just(NodeResult.terminal(Map.of()));
         }
 
@@ -37,13 +44,14 @@ public class PriorityHandler implements NodeHandler {
             return Integer.compare(oa, ob);
         });
 
-        // 返回所有子节点 ID，调度器按顺序依次尝试
+        // 返回“有序候选分支集合”，由调度器逐个执行直到命中成功分支
         Map<String, String> branchMap = new HashMap<>();
         for (int i = 0; i < priorities.size(); i++) {
             String tid = (String) priorities.get(i).get("nextNodeId");
             if (tid != null) branchMap.put("priority-" + i, tid);
         }
 
+        // nextNodeId 作为“全部候选失败时”的兜底出口
         return Mono.just(NodeResult.multiNext(branchMap, nextNodeId));
     }
 }

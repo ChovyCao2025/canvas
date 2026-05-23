@@ -62,5 +62,6 @@ public class CanvasManualApproval {
     /** 审批操作时间，null 表示尚未处理 */
     private LocalDateTime resultAt;
 
+    /** 记录创建时间。 */
     private LocalDateTime createdAt;
 }

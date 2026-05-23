@@ -9,6 +9,7 @@ import 'react-querybuilder/dist/query-builder.css'
 
 const { Title } = Typography
 
+// QueryBuilder 的操作符集合，需要和后端规则引擎支持的语义保持一致。
 const operators = [
   { name: '=', label: '等于' },
   { name: '!=', label: '不等于' },
@@ -19,22 +20,51 @@ const operators = [
   { name: 'in', label: '包含于' },
 ]
 
+/**
+ * 人群编辑页表单模型。
+ * 说明：
+ * 1) 后端 `enabled` 使用 0/1，这里改为 boolean 便于 Switch 组件绑定。
+ * 2) `dataSourceConfig` 在后端是 JSON 字符串，这里拆成两种子配置分别编辑。
+ */
 type AudienceEditFormValues = Omit<AudienceDefinition, 'enabled'> & {
+  /** UI 层启用状态（保存时转换成 0/1）。 */
   enabled?: boolean
+
+  /** TAGGER_API 数据源配置。 */
   taggerConfig?: {
+    /** 初始圈选标签编码。 */
     seedTagCode?: string
   }
+
+  /** JDBC 数据源配置。 */
   jdbcConfig?: {
+    /** JDBC 连接串。 */
     url?: string
+
+    /** 数据库用户名。 */
     username?: string
+
+    /** 数据库密码。 */
     password?: string
+
+    /** 人群筛选的基础表名。 */
     baseTable?: string
+
+    /** 用户主键列名。 */
     userIdColumn?: string
+
+    /** JDBC 驱动类。 */
     driverClassName?: string
+
+    /** 最大扫描行数，防止全表无上限扫描。 */
     maxRows?: number
   }
 }
 
+/**
+ * 后端规则 JSON -> QueryBuilder 结构。
+ * 解析失败时返回空规则，避免页面因历史脏数据崩溃。
+ */
 function toRuleGroup(ruleJson?: string): RuleGroupType {
   if (!ruleJson) {
     return { combinator: 'and', rules: [] }
@@ -47,6 +77,12 @@ function toRuleGroup(ruleJson?: string): RuleGroupType {
   }
 }
 
+/**
+ * 递归归一化后端规则组：
+ * - `logic` 统一映射为 and/or
+ * - `IN` 运算符在编辑器里用 `in`
+ * - 数组值转成逗号分隔字符串，便于文本输入
+ */
 function normalizeGroup(group: any): RuleGroupType {
   const rules = [
     ...((group.conditions ?? []).map((condition: any) => ({
@@ -62,6 +98,10 @@ function normalizeGroup(group: any): RuleGroupType {
   }
 }
 
+/**
+ * QueryBuilder 结构 -> 后端规则 JSON 对象。
+ * 这里不直接 stringify，便于预览和后续复用。
+ */
 function serializeGroup(group: RuleGroupType): any {
   const conditions: any[] = []
   const groups: any[] = []
@@ -85,6 +125,7 @@ function serializeGroup(group: RuleGroupType): any {
   }
 }
 
+/** 将文本输入值还原成基础类型，减少后端二次类型推断。 */
 function normalizeScalarValue(value: unknown) {
   if (typeof value !== 'string') {
     return value
@@ -95,6 +136,7 @@ function normalizeScalarValue(value: unknown) {
   return value
 }
 
+/** 解析数据源配置 JSON，容错历史空值/非法值。 */
 function parseDataSourceConfig(value?: string) {
   if (!value) {
     return {}
@@ -110,15 +152,24 @@ export default function AudienceEditPage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
   const [form] = Form.useForm<AudienceEditFormValues>()
+
+  /** QueryBuilder 当前编辑态规则。 */
   const [query, setQuery] = useState<RuleGroupType>({ combinator: 'and', rules: [] })
+
+  /** QueryBuilder 字段（来自标签定义）。 */
   const [fields, setFields] = useState<{ name: string; label: string; value: string }[]>([])
+
+  /** Select 组件的标签选项。 */
   const [tagOptions, setTagOptions] = useState<{ label: string; value: string }[]>([])
+
+  /** 保存按钮 loading。 */
   const [loading, setLoading] = useState(false)
   const isEdit = Boolean(id)
 
   const dataSourceType = Form.useWatch('dataSourceType', form) ?? 'TAGGER_API'
   const enabled = Form.useWatch('enabled', form) ?? true
 
+  // 加载标签定义：同时用于规则字段和种子标签下拉选项。
   useEffect(() => {
     tagDefinitionApi.list({ page: 1, size: 100, enabled: 1 }).then(res => {
       const tags = res.data.list.map((item: any) => ({ name: item.tagCode, label: item.name, value: item.tagCode }))
@@ -127,6 +178,7 @@ export default function AudienceEditPage() {
     })
   }, [])
 
+  // 编辑态回填：包含基本字段、数据源配置拆分以及规则 JSON 反序列化。
   useEffect(() => {
     if (!isEdit || !id) {
       return
@@ -144,15 +196,19 @@ export default function AudienceEditPage() {
     })
   }, [form, id, isEdit])
 
+  // 规则实时预览：方便排查复杂条件最终落库格式。
   const querySummary = useMemo(() => JSON.stringify(serializeGroup(query), null, 2), [query])
 
+  // 保存链路：校验 -> 组装后端 DTO -> 创建/更新。
   const handleSave = async () => {
     const values = await form.validateFields()
     setLoading(true)
     try {
+      // dataSourceConfig 在后端为 JSON 字符串，按当前数据源类型序列化。
       const config = values.dataSourceType === 'JDBC'
         ? values.jdbcConfig
         : values.taggerConfig
+
       const body: AudienceDefinition = {
         name: values.name,
         description: values.description,
@@ -164,6 +220,8 @@ export default function AudienceEditPage() {
         cronExpression: values.cronExpression,
         enabled: values.enabled ? 1 : 0,
       }
+
+      // 编辑成功后保持当前页；新建成功后跳转到编辑页继续细化配置。
       if (isEdit && id) {
         await audienceApi.update(Number(id), body)
         message.success('保存成功，已自动重新计算')

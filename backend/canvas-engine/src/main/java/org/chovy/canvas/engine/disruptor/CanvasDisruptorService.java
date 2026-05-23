@@ -28,7 +28,10 @@ import java.util.Map;
 @Service
 public class CanvasDisruptorService {
 
+    /** Disruptor 主实例，负责 worker 生命周期管理。 */
     private final Disruptor<CanvasExecutionEvent> disruptor;
+
+    /** RingBuffer 发布端，供外部触发源写入执行事件。 */
     private final RingBuffer<CanvasExecutionEvent> ringBuffer;
     private final CanvasMetrics metrics;
 
@@ -111,6 +114,9 @@ public class CanvasDisruptorService {
      * 发布触发事件到 Ring Buffer（设计文档 12.8节）。
      * 非阻塞，当 Ring Buffer 满时快速失败，调用方可触发上游重试/限流。
      * 仅用于异步触发（MQ / 行为 / 定时），直调触发绕过 Disruptor 直接执行。
+     *
+     * <p>注意：
+     * payload 会复制成新 Map，避免调用方后续修改原对象影响消费侧读取。
      */
     public void publish(Long canvasId, String userId, String triggerType,
                         String triggerNodeType, String matchKey,

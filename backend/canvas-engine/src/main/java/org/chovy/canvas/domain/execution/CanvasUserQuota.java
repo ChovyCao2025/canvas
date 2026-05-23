@@ -13,10 +13,21 @@ import java.time.LocalDateTime;
 @TableName("canvas_user_quota")
 public class CanvasUserQuota {
 
-    private Long      canvasId;
-    private String    userId;
+    /** 画布 ID。 */
+    private Long canvasId;
+
+    /** 用户 ID。 */
+    private String userId;
+
+    /** 触发日期（日粒度统计分桶）。 */
     private LocalDate triggerDate;
-    private Integer   dailyCount;
-    private Integer   totalCount;
+
+    /** 当日触发次数。 */
+    private Integer dailyCount;
+
+    /** 当日累计总触发次数（当前实现按日分桶）。 */
+    private Integer totalCount;
+
+    /** 最近一次触发时间。 */
     private LocalDateTime lastTriggerAt;
 }

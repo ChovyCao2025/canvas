@@ -1,4 +1,10 @@
-/** 节点类别 → CSS 颜色 */
+/**
+ * 节点类别 -> 头部背景色（可渐变）。
+ *
+ * 用途：
+ * - `CanvasNode` 顶部色带；
+ * - 同类节点视觉分组，帮助快速扫图。
+ */
 export const CATEGORY_COLORS: Record<string, string> = {
   '行为策略': 'linear-gradient(135deg, #14b8a6, #06b6d4)',
   '逻辑分支': '#1677ff',
@@ -17,17 +23,24 @@ export const CATEGORY_SOLID: Record<string, string> = {
   '其他':     '#6d5efc',
 }
 
-/** 不能有上游节点的节点类型（START 是流程唯一入口）
- *  BEHAVIOR_TRIGGER / MQ_TRIGGER / SCHEDULED_TRIGGER 虽然是触发器，
- *  但它们放在 START 之后，需要有 target handle 接受 START 的连线。
- *  TAGGER 的 isTrigger 是动态的（mode=realtime 时），在 CanvasNode 里单独处理。
+/**
+ * 不能有上游节点的节点类型（START 是流程唯一入口）。
+ *
+ * 说明：
+ * - BEHAVIOR_TRIGGER / MQ_TRIGGER / SCHEDULED_TRIGGER 虽然是触发器，
+ *   但它们放在 START 之后，需要有 target handle 接受 START 连线；
+ * - TAGGER 的触发属性是动态的（`mode=realtime`），在 `CanvasNode` 内单独判断。
  */
 export const TRIGGER_TYPES = new Set(['START'])
 
-/** 是否为终止节点 */
+/** 终止节点类型：没有后继出口。 */
 export const TERMINAL_TYPES = new Set(['DIRECT_RETURN', 'END'])
 
-/** 各节点类型显示名称 */
+/**
+ * 节点类型编码 -> 默认显示名。
+ *
+ * 当节点未自定义名称时，编辑器使用此映射做兜底文案。
+ */
 export const DEFAULT_NAMES: Record<string, string> = {
   TAGGER:            'Tagger 标签',
   EVENT_TRIGGER:     '事件触发',
@@ -58,8 +71,15 @@ export const DEFAULT_NAMES: Record<string, string> = {
 }
 
 export type CanvasNodeData = {
+  /** 节点类型编码（与后端 node_type_registry.type_key 对齐）。 */
   nodeType: string
+
+  /** 节点展示名（可由用户重命名）。 */
   name: string
+
+  /** 节点分类（用于面板分组与颜色主题）。 */
   category: string
+
+  /** 节点业务配置（后继分支、参数映射、脚本等）。 */
   bizConfig: Record<string, unknown>
 }

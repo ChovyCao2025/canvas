@@ -19,6 +19,10 @@ public class DagParser {
 
     private final ObjectMapper objectMapper;
 
+    /**
+     * 入口：将前端保存的 graph_json 反序列化并构造成运行期图结构。
+     * 失败时抛 IllegalArgumentException，交由上层接口统一转换错误码/文案。
+     */
     public DagGraph parse(String graphJson) {
         try {
             CanvasGraph graph = objectMapper.readValue(graphJson, CanvasGraph.class);
@@ -28,6 +32,13 @@ public class DagParser {
         }
     }
 
+    /**
+     * 构建三份核心索引：
+     * 1) nodeMap（节点定义）
+     * 2) forward（下游邻接表）
+     * 3) reverse（上游邻接表）
+     * 并在末尾做一次环检测，保证运行期不会遇到显式环路。
+     */
     private DagGraph buildGraph(List<CanvasNode> nodes) {
         Map<String, CanvasNode> nodeMap = new LinkedHashMap<>();
         Map<String, List<String>> forward = new HashMap<>();  // nodeId → [下游]
@@ -41,7 +52,7 @@ public class DagParser {
             inDegree.put(n.getId(), 0);
         }
 
-        // 从节点 config 中提取边
+        // 从节点配置提取边，忽略“指向不存在节点”的脏引用
         for (CanvasNode n : nodes) {
             for (String target : extractTargets(n)) {
                 if (!nodeMap.containsKey(target)) continue;
@@ -84,6 +95,7 @@ public class DagParser {
         if (groups != null) groups.forEach(g ->
                 addIfPresent(targets, ((Map<?, ?>) g).get("nextNodeId")));
 
+        // 保持原顺序返回，便于调试时与原始 JSON 对齐
         return targets;
     }
 
@@ -94,6 +106,7 @@ public class DagParser {
     private void validateNoCycle(Map<String, CanvasNode> nodeMap,
                                   Map<String, List<String>> forward,
                                   Map<String, Integer> inDegree) {
+        // Kahn：拷贝一份入度，避免污染原始索引（entryNodes 后续还要用）
         Queue<String> queue = new LinkedList<>();
         Map<String, Integer> degree = new HashMap<>(inDegree);
         degree.forEach((id, deg) -> { if (deg == 0) queue.add(id); });
@@ -109,6 +122,7 @@ public class DagParser {
         }
 
         if (processed < nodeMap.size()) {
+            // 剩余入度 > 0 的节点即为环上节点（或受环影响节点）
             Set<String> cycleNodes = new HashSet<>(nodeMap.keySet());
             degree.forEach((id, d) -> { if (d == 0) cycleNodes.remove(id); });
             throw new IllegalArgumentException("画布存在循环连接，涉及节点: " + cycleNodes);
@@ -117,19 +131,37 @@ public class DagParser {
 
     // ── 内部 DTO ─────────────────────────────────────────────────
 
+    /** graph_json 根对象。 */
     @Data
     public static class CanvasGraph {
+
+        /** 节点列表。 */
         private List<CanvasNode> nodes = new ArrayList<>();
     }
 
+    /** 节点定义，与前端 graph_json 节点结构对齐。 */
     @Data
     public static class CanvasNode {
+
+        /** 节点 ID（前端生成的唯一标识）。 */
         private String id;
+
+        /** 节点类型（对应 NodeType 常量）。 */
         private String type;
+
+        /** 节点展示名称。 */
         private String name;
+
+        /** 节点配置（运行时主配置）。 */
         private Map<String, Object> config;
+
+        /** 节点业务配置（历史字段，解析时与 config 合并）。 */
         private Map<String, Object> bizConfig;
+
+        /** 画布坐标 X。 */
         private Double x;
+
+        /** 画布坐标 Y。 */
         private Double y;
     }
 }

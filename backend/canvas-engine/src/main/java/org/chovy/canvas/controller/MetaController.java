@@ -18,6 +18,10 @@ import java.util.stream.Collectors;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 
+/**
+ * 元数据聚合控制器：
+ * 为前端节点配置面板提供下拉选项、schema 和上下文字段能力。
+ */
 @Slf4j
 @RestController
 @RequestMapping("/meta")
@@ -222,6 +226,7 @@ public class MetaController {
                 });
     }
 
+    /** 获取业务线列表。 */
     @GetMapping("/biz-lines")
     public Mono<R<List<StubOption>>> getBizLines() {
         return Mono.just(R.ok(metaService.getBizLines()));
@@ -249,16 +254,19 @@ public class MetaController {
         }).subscribeOn(reactor.core.scheduler.Schedulers.boundedElastic()).map(R::ok);
     }
 
+    /** 获取业务线对应可选 API 列表。 */
     @GetMapping("/biz-lines/{key}/apis")
     public Mono<R<List<StubOption>>> getBizLineApis(@PathVariable String key) {
         return Mono.just(R.ok(metaService.getBizLineApis(key)));
     }
 
+    /** 获取行为策略类型列表。 */
     @GetMapping("/behavior-strategy-types")
     public Mono<R<List<StubOption>>> getBehaviorStrategyTypes() {
         return Mono.just(R.ok(metaService.getBehaviorStrategyTypes()));
     }
 
+    /** 按类型获取消息编码列表。 */
     @GetMapping("/message-codes")
     public Mono<R<List<StubOption>>> getMessageCodes(
             @RequestParam(defaultValue = "IN_APP") String type) {

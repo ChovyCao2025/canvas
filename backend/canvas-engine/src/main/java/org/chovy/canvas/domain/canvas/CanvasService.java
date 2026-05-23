@@ -25,6 +25,16 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
+/**
+ * 画布主服务：负责画布生命周期与版本管理。
+ *
+ * <p>核心职责：
+ * <ul>
+ *   <li>草稿创建/更新与分页查询</li>
+ *   <li>发布/下线/归档时的 DB 状态切换与外部副作用协调</li>
+ *   <li>版本回退、历史版本查询</li>
+ * </ul>
+ */
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -264,6 +274,13 @@ public class CanvasService {
         }
     }
 
+    /**
+     * 归档画布：
+     * <ol>
+     *   <li>事务内只修改 DB 状态为 ARCHIVED</li>
+     *   <li>若归档前处于已发布状态，则在事务外清理路由/调度/缓存</li>
+     * </ol>
+     */
     public void archive(Long id, String operator) {
         Canvas canvas = canvasMapper.selectById(id);
         if (canvas == null) throw new IllegalArgumentException("画布不存在: " + id);
@@ -287,7 +304,9 @@ public class CanvasService {
         }
     }
 
-
+    /**
+     * 分页查询画布版本历史（按版本号倒序）。
+     */
     public PageResult<CanvasVersion> getVersions(Long canvasId, int page, int size) {
         com.baomidou.mybatisplus.extension.plugins.pagination.Page<CanvasVersion> p =
                 new com.baomidou.mybatisplus.extension.plugins.pagination.Page<>(page, size);
@@ -311,6 +330,9 @@ public class CanvasService {
         );
     }
 
+    /**
+     * 查询单个画布版本详情。
+     */
     public CanvasVersion getVersion(Long canvasId, Long versionId) {
         return canvasVersionMapper.selectOne(
                 new LambdaQueryWrapper<CanvasVersion>()
@@ -321,6 +343,7 @@ public class CanvasService {
 
     // ── private helpers ──────────────────────────────────────
 
+    /** 查询最新草稿版本。 */
     private CanvasVersion latestDraft(Long canvasId) {
         return canvasVersionMapper.selectOne(
                 new LambdaQueryWrapper<CanvasVersion>()
@@ -331,6 +354,7 @@ public class CanvasService {
         );
     }
 
+    /** 计算下一个版本号（max + 1）。 */
     private int nextVersionNumber(Long canvasId) {
         CanvasVersion max = canvasVersionMapper.selectOne(
                 new LambdaQueryWrapper<CanvasVersion>()

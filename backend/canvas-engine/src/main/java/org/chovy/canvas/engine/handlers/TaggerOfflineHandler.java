@@ -11,17 +11,28 @@ import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Mono;
 import java.util.Map;
 
-/** Tagger 离线标签：响应式 HTTP，无 block() */
+/**
+ * Tagger 离线标签节点（TAGGER_OFFLINE）。
+ *
+ * <p>调用标签系统离线查询接口，根据返回标签值决定是否放行：
+ * - 为空：视为不满足，拦截流程；
+ * - 配置了 expectedVal 且不相等：拦截流程；
+ * - 其余情况：继续执行并输出 tagValue。
+ * 该节点用于“离线标签判定”，不消费实时标签流。
+ */
 @Slf4j @Component @NodeHandlerType("TAGGER_OFFLINE")
 public class TaggerOfflineHandler implements NodeHandler {
 
+    /** Tagger 离线查询客户端。 */
     private final WebClient webClient;
     public TaggerOfflineHandler(@Value("${canvas.integration.tagger-service-url}") String url) {
+        // 与实时标签服务共用同一基础地址时，可通过路由路径区分接口
         this.webClient = WebClient.builder().baseUrl(url).build();
     }
 
     @Override @SuppressWarnings("unchecked")
     public Mono<NodeResult> executeAsync(Map<String, Object> config, ExecutionContext ctx) {
+        // tagCodeKey 表示标签编码，params.tagValue 可作为期望值做二次校验
         String tagCodeKey   = (String) config.get("tagCodeKey");
         Map<String, Object> params = (Map<String, Object>) config.getOrDefault("params", Map.of());
         String nextNodeId   = (String) config.get("nextNodeId");
@@ -33,10 +44,13 @@ public class TaggerOfflineHandler implements NodeHandler {
                 .bodyToMono(Map.class)
                 .flatMap(resp -> {
                     Object tagValue = resp.get("tagValue");
+                    // 离线标签不存在时按未命中处理，直接失败终止
                     if (tagValue == null || tagValue.toString().isBlank())
                         return Mono.just(NodeResult.fail("Tagger 离线标签为空，拦截流程"));
+                    // 配置了期望值则必须严格匹配
                     if (expectedVal != null && !expectedVal.equals(tagValue.toString()))
                         return Mono.just(NodeResult.fail("Tagger 离线标签值不匹配"));
+                    // 把命中的标签值写回上下文，供下游条件节点复用
                     return Mono.just(NodeResult.ok(nextNodeId, Map.of("tagValue", tagValue)));
                 })
                 .onErrorResume(e -> {

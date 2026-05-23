@@ -12,6 +12,10 @@ import reactor.core.scheduler.Schedulers;
 
 import java.util.Map;
 
+/**
+ * 画布主控制器：
+ * 负责画布 CRUD、版本管理、发布下线以及运营管控入口。
+ */
 @RestController
 @RequestMapping("/canvas")
 @RequiredArgsConstructor
@@ -285,6 +289,7 @@ public class CanvasController {
 
     // ── helpers ───────────────────────────────────────────────────
 
+    /** 从安全上下文读取当前用户名，缺失时回退 system。 */
     private Mono<String> currentUser() {
         return ReactiveSecurityContextHolder.getContext()
                 .map(ctx -> ctx.getAuthentication().getPrincipal())

@@ -22,6 +22,10 @@ import java.util.UUID;
 /**
  * DLQ 死信队列管理 API（设计文档 13.3节）。
  * 运营/研发通过此接口查看失败执行并手动触发重放。
+ *
+ * 约束：
+ * - 重放请求只负责“再次触发”，不自动删除原死信；
+ * - 是否删除死信由调用方在确认结果后显式操作。
  */
 @Slf4j
 @RestController
@@ -29,8 +33,13 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class DlqController {
 
+    /** DLQ 明细表访问层。 */
     private final CanvasExecutionDlqMapper dlqMapper;
+
+    /** 执行引擎入口，用于把死信重新送入执行链路。 */
     private final CanvasExecutionService executionService;
+
+    /** payload 反序列化器。 */
     private final ObjectMapper objectMapper;
 
     /**
@@ -87,6 +96,7 @@ public class DlqController {
                 })
                 .subscribeOn(Schedulers.boundedElastic())
                 .flatMap(payload -> {
+                    // 再次读取记录，确保重放阶段使用的是最新死信元信息
                     CanvasExecutionDlq dlq = dlqMapper.selectById(id);
                     // 使用原始触发类型重放，不写死 DIRECT_CALL
                     String triggerType = dlq.getTriggerType() != null ? dlq.getTriggerType() : TriggerType.DLQ_REPLAY;

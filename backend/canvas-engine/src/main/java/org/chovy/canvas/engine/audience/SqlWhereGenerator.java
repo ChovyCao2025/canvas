@@ -11,12 +11,19 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 
+/**
+ * 规则 JSON 转 SQL WHERE 片段生成器。
+ *
+ * <p>用于批处理人群计算，把规则下推给数据库执行。
+ */
 @Component
 @RequiredArgsConstructor
 public class SqlWhereGenerator {
 
+    /** 规则 JSON 解析器。 */
     private final ObjectMapper objectMapper;
 
+    /** 生成 SQL 片段与参数集合。 */
     public SqlWhere generate(String ruleJson) throws Exception {
         Map<String, Object> rule = objectMapper.readValue(ruleJson, new TypeReference<>() {});
         AtomicInteger counter = new AtomicInteger();
@@ -29,6 +36,7 @@ public class SqlWhereGenerator {
     private String buildGroup(Map<String, Object> group,
                               MapSqlParameterSource params,
                               AtomicInteger counter) {
+        // 组内条件按 logic 拼接，并递归处理子分组
         String logic = String.valueOf(group.getOrDefault("logic", "AND"));
         String joiner = "OR".equalsIgnoreCase(logic) ? " OR " : " AND ";
         List<String> parts = new ArrayList<>();
@@ -60,6 +68,7 @@ public class SqlWhereGenerator {
     private String buildCondition(Map<String, Object> condition,
                                   MapSqlParameterSource params,
                                   AtomicInteger counter) {
+        // 字段名做白名单校验，防止通过规则注入非法 SQL 标识符
         String field = sanitizeIdentifier(String.valueOf(condition.get("field")));
         String op = String.valueOf(condition.get("op"));
         Object value = condition.get("value");
@@ -90,6 +99,7 @@ public class SqlWhereGenerator {
                           String paramName,
                           Object value,
                           MapSqlParameterSource params) {
+        // IN 空集合等价于“不可能命中”
         if (!(value instanceof List<?> list) || list.isEmpty()) {
             return "1=0";
         }
@@ -105,5 +115,7 @@ public class SqlWhereGenerator {
     }
 
     public record SqlWhere(String sql, MapSqlParameterSource params) {
+        // sql: 仅 WHERE 片段（不含 "WHERE" 关键字）
+        // params: 与命名参数占位符一一对应
     }
 }

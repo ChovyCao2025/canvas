@@ -14,6 +14,10 @@ import java.util.Map;
 /**
  * 集线器：等待所有上游完成（SUCCESS + FAILED 均计入），再继续执行下游。
  * timeout 配置防止并行分支永久阻塞。
+ *
+ * 说明：
+ * - Hub 关注“是否完成”，不关注“成功/失败结果值”；
+ * - 真正的等待与超时控制在 DagEngine 调度层实现。
  */
 @Component
 @NodeHandlerType("HUB")
@@ -21,7 +25,9 @@ public class HubHandler implements NodeHandler {
 
     @Override
     public Mono<NodeResult> executeAsync(Map<String, Object> config, ExecutionContext ctx) {
+        // HUB 的等待逻辑在调度器层，handler 只负责“通过后去哪”
         String nextNodeId = (String) config.get("nextNodeId");
+        // 无额外输出，纯路由型节点
         return Mono.just(NodeResult.ok(nextNodeId, Map.of()));
     }
 
@@ -31,6 +37,7 @@ public class HubHandler implements NodeHandler {
      */
     public static boolean allUpstreamDone(List<String> upstreamIds, ExecutionContext ctx) {
         if (upstreamIds == null || upstreamIds.isEmpty()) return true;
+        // isNodeDone 把 SUCCESS/FAILED/SKIPPED 都视作“完成”
         return upstreamIds.stream().allMatch(ctx::isNodeDone);
     }
 

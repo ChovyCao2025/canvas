@@ -1,31 +1,71 @@
 import type { R, PageResult } from '../types'
 import http from './api'
 
+/**
+ * 人群定义。ruleJson 由前端规则编辑器生成，后端按 engineType 解释执行。
+ */
 export interface AudienceDefinition {
+  /** 人群 ID（新建时为空）。 */
   id?: number
+
+  /** 人群名称。 */
   name: string
+
+  /** 人群描述。 */
   description?: string
+
+  /** 规则 JSON（树结构）。 */
   ruleJson: string
+
+  /** 规则引擎类型。 */
   engineType: 'AVIATOR' | 'QL'
+
+  /** 数据源类型。 */
   dataSourceType: 'TAGGER_API' | 'JDBC'
+
+  /** 数据源配置 JSON 字符串。 */
   dataSourceConfig?: string
+
+  /** 计算策略。 */
   evaluationStrategy: 'ONLINE' | 'OFFLINE_BATCH' | 'HYBRID'
+
+  /** 定时策略 cron（按策略可选）。 */
   cronExpression?: string
+
+  /** 启用状态：1 启用，0 禁用。 */
   enabled: number
+
+  /** 创建人。 */
   createdBy?: string
+
+  /** 创建时间。 */
   createdAt?: string
+
+  /** 更新时间。 */
   updatedAt?: string
 }
 
 export interface AudienceStat {
+  /** 人群 ID。 */
   audienceId: number
+
+  /** 估算人群规模。 */
   estimatedSize?: number
+
+  /** bitmap 占用大小（KB）。 */
   bitmapSizeKb?: number
+
+  /** 计算状态。 */
   status: 'PENDING' | 'COMPUTING' | 'READY' | 'FAILED'
+
+  /** 最近一次计算完成时间。 */
   computedAt?: string
+
+  /** 失败原因。 */
   errorMsg?: string
 }
 
+/** 人群中心 API（定义管理 + 计算触发 + 结果查询）。 */
 export const audienceApi = {
   list: (page = 1, size = 20) =>
     http.get<R<PageResult<AudienceDefinition>>, R<PageResult<AudienceDefinition>>>('/canvas/audiences', { params: { page, size } }),

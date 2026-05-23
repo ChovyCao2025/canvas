@@ -55,11 +55,13 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class AggregateHandler implements NodeHandler {
 
+    /** script 模式复用 Groovy 表达式执行能力。 */
     private final GroovyHandler groovyHandler;
 
     @Override
     @SuppressWarnings("unchecked")
     public Mono<NodeResult> executeAsync(Map<String, Object> config, ExecutionContext ctx) {
+        // __upstreamIds / __nodeId 为调度器注入的内部字段
         List<String> upstreamIds = (List<String>) config.get("__upstreamIds");
         String evaluateMode      = (String) config.getOrDefault("evaluateMode", "count");
         String successNodeId     = (String) config.get("successNodeId");
@@ -101,6 +103,7 @@ public class AggregateHandler implements NodeHandler {
                 binding.setVariable("successRate",  Math.round(successRate * 10) / 10.0);
                 binding.setVariable("outputs",      outputs);
                 try {
+                    // 脚本返回 true/false，非 true 一律按不通过处理
                     Object result = groovyHandler.evaluateExpression(script, binding);
                     yield Boolean.TRUE.equals(result);
                 } catch (Exception e) {

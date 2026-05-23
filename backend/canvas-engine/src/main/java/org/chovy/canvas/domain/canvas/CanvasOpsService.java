@@ -37,6 +37,7 @@ public class CanvasOpsService {
         int updated = canvasMapper.updateEditVersion(id, editVersion, editVersion + 1, name, description);
         if (updated == 0) throw new IllegalStateException("CANVAS_010");  // 409 冲突
 
+        // graphJson 为空时仅更新元数据（名称/描述）
         if (graphJson != null) {
             CanvasVersion draft = latestDraft(id);
             if (draft != null) {
@@ -84,7 +85,7 @@ public class CanvasOpsService {
         Canvas canvas = require(id);
         if (canvas.getStatus() != CanvasStatusEnum.PUBLISHED.getCode()) throw new IllegalStateException("画布未在发布状态");
 
-        // 生成灰度版本快照（复用当前草稿）
+        // 生成灰度版本快照（复用当前草稿），与正式发布一样保留不可变版本
         CanvasVersion draft = latestDraft(id);
         if (draft == null) throw new IllegalStateException("无草稿可灰度");
 
@@ -216,7 +217,7 @@ public class CanvasOpsService {
                 .map(n -> java.util.Map.of("nodeId", n.get("id"), "type", n.get("type"), "name", n.get("name")))
                 .collect(java.util.stream.Collectors.toList());
 
-        // modified: 两个版本都有但配置不同的节点
+        // modified: 两个版本都有但配置或节点名称不同的节点
         java.util.List<Object> modified = nodes2.stream()
                 .filter(n -> map1.containsKey(n.get("id")))
                 .filter(n -> {
@@ -281,6 +282,7 @@ public class CanvasOpsService {
     }
 
     private void clearRoutes(Long id, Canvas canvas) {
-        // 简化：触发路由清理（完整实现在 CanvasService.clearTriggerRoutes）
+        // 简化：触发路由清理（完整实现在 CanvasService.clearTriggerRoutesFromGraph）
+        // 当前 kill 流程主要依赖 Redis kill channel 通知执行侧快速停机。
     }
 }

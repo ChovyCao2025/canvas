@@ -7,6 +7,11 @@ import org.apache.ibatis.annotations.Param;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * 节点执行轨迹 Mapper（表：canvas_execution_trace）。
+ *
+ * <p>用于执行链路明细查询与漏斗统计。
+ */
 @Mapper
 public interface CanvasExecutionTraceMapper extends BaseMapper<CanvasExecutionTrace> {
 
@@ -21,4 +26,7 @@ public interface CanvasExecutionTraceMapper extends BaseMapper<CanvasExecutionTr
      * SQL 在 CanvasExecutionTraceMapper.xml 中定义。
      */
     List<Map<String, Object>> selectFunnelByCanvasId(@Param("canvasId") Long canvasId);
+
+    // TraceWriteBuffer 聚合写入可显著降低高并发场景下的单条 insert 压力。
+    // 轨迹表通常数据量最大，查询时建议带 canvasId/time 范围条件。
 }

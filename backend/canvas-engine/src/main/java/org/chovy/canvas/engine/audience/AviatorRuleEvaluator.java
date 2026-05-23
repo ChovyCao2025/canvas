@@ -12,11 +12,17 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * 基于 Aviator 的人群规则求值器。
+ *
+ * <p>将规则树转成 Aviator 表达式执行，适合在线快速判断场景。
+ */
 @Slf4j
 @Component("AVIATOR")
 @RequiredArgsConstructor
 public class AviatorRuleEvaluator implements RuleEvaluator {
 
+    /** 规则 JSON 解析器。 */
     private final ObjectMapper objectMapper;
 
     @Override
@@ -24,11 +30,14 @@ public class AviatorRuleEvaluator implements RuleEvaluator {
         try {
             Map<String, Object> rule = objectMapper.readValue(ruleJson, new TypeReference<>() {
             });
+            // 运行态上下文会在 IN 操作符场景附加临时 list 变量
             Map<String, Object> runtimeContext = new HashMap<>(context);
             String expression = toExpression(rule, runtimeContext);
+            // Aviator 求值结果约定应为 Boolean
             Object result = AviatorEvaluator.execute(expression, runtimeContext);
             return Boolean.TRUE.equals(result);
         } catch (Exception e) {
+            // 引擎异常统一按“未命中”处理，避免影响整体流程稳定性
             log.error("[AUDIENCE][AVIATOR] evaluate failed: {}", e.getMessage());
             return false;
         }
@@ -36,6 +45,7 @@ public class AviatorRuleEvaluator implements RuleEvaluator {
 
     @SuppressWarnings("unchecked")
     private String toExpression(Map<String, Object> rule, Map<String, Object> context) {
+        // 每个分组通过 logic 决定条件拼接关系（AND/OR）
         String logic = String.valueOf(rule.getOrDefault("logic", "AND"));
         String joinOp = "OR".equalsIgnoreCase(logic) ? " || " : " && ";
         List<String> parts = new ArrayList<>();
@@ -73,6 +83,7 @@ public class AviatorRuleEvaluator implements RuleEvaluator {
             case "IN" -> {
                 String listKey = field + "_list";
                 context.put(listKey, value instanceof List<?> list ? list : List.of());
+                // Aviator include(list, value) 语义：value 是否在 list 中
                 yield "include(" + listKey + ", " + field + ")";
             }
             default -> "true";

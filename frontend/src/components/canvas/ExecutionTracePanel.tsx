@@ -9,18 +9,40 @@ import type { R } from '../../types'
 
 const { Text } = Typography
 
+/**
+ * 节点轨迹状态码（与后端 trace.status 对齐）。
+ */
 export type TraceStatus = 0 | 1 | 2 | 3 // 执行中 / 成功 / 失败 / 跳过
 
+/**
+ * 单个节点的执行轨迹结构。
+ */
 export interface NodeTrace {
-  nodeId:      string
-  nodeType:    string
-  nodeName:    string
-  status:      TraceStatus
+  /** 节点 ID。 */
+  nodeId: string
+
+  /** 节点类型。 */
+  nodeType: string
+
+  /** 节点名称。 */
+  nodeName: string
+
+  /** 执行状态。 */
+  status: TraceStatus
+
+  /** 执行耗时（毫秒）。 */
   durationMs?: number
-  errorMsg?:   string
+
+  /** 错误信息。 */
+  errorMsg?: string
+
+  /** 节点输出（通常是 JSON 字符串）。 */
   outputData?: string
 }
 
+/**
+ * 节点着色：轨迹状态 -> 节点边框/头部颜色。
+ */
 export const TRACE_NODE_COLOR: Record<TraceStatus, string> = {
   0: '#faad14',
   1: '#52c41a',
@@ -28,6 +50,9 @@ export const TRACE_NODE_COLOR: Record<TraceStatus, string> = {
   3: '#d9d9d9',
 }
 
+/**
+ * 轨迹状态的标签展示配置。
+ */
 const STATUS_LABEL: Record<TraceStatus, [string, string]> = {
   0: ['processing', '执行中'],
   1: ['success',    '成功'],
@@ -36,17 +61,34 @@ const STATUS_LABEL: Record<TraceStatus, [string, string]> = {
 }
 
 interface Props {
+  /** 当前画布 ID。 */
   canvasId: number
+
+  /**
+   * 把“nodeId -> color”映射回传给编辑器父组件，
+   * 让画布上的节点按本次执行结果着色。
+   */
   onTraceLoaded: (colorMap: Record<string, string>) => void
 }
 
+/**
+ * 执行轨迹面板：
+ * 1) 加载最近执行记录；
+ * 2) 选择某次执行后加载节点轨迹；
+ * 3) 把轨迹颜色映射同步给画布主视图。
+ */
 export default function ExecutionTracePanel({ canvasId, onTraceLoaded }: Props) {
+  // 执行记录下拉选项数据
   const [executions,    setExecutions]    = useState<any[]>([])
+  // 当前执行的节点轨迹列表
   const [traces,        setTraces]        = useState<NodeTrace[]>([])
+  // 弹窗与加载状态
   const [visible,       setVisible]       = useState(false)
   const [loading,       setLoading]       = useState(false)
+  // 当前选中的 executionId
   const [selectedExecId, setSelectedExecId] = useState<string | null>(null)
 
+  // 打开弹窗并加载最近执行记录
   const open = useCallback(async () => {
     setVisible(true)
     setLoading(true)
@@ -56,6 +98,7 @@ export default function ExecutionTracePanel({ canvasId, onTraceLoaded }: Props) 
     } catch { /* ignore */ } finally { setLoading(false) }
   }, [canvasId])
 
+  // 加载某次执行的节点轨迹，并把颜色映射回传父层
   const loadTrace = useCallback(async (executionId: string) => {
     setSelectedExecId(executionId)
     setLoading(true)
@@ -64,6 +107,7 @@ export default function ExecutionTracePanel({ canvasId, onTraceLoaded }: Props) 
         `/canvas/${canvasId}/execution/${executionId}/trace`)
       const data = res.data ?? []
       setTraces(data)
+      // nodeId -> color 映射供画布渲染使用
       const colorMap: Record<string, string> = {}
       data.forEach(t => { colorMap[t.nodeId] = TRACE_NODE_COLOR[t.status] })
       onTraceLoaded(colorMap)
@@ -72,6 +116,7 @@ export default function ExecutionTracePanel({ canvasId, onTraceLoaded }: Props) 
     } finally { setLoading(false) }
   }, [canvasId, onTraceLoaded])
 
+  // 关闭/切换执行记录时重置轨迹高亮
   const clearTrace = () => {
     setSelectedExecId(null)
     setTraces([])
@@ -101,6 +146,7 @@ export default function ExecutionTracePanel({ canvasId, onTraceLoaded }: Props) 
       render: (v?: string) => {
         if (!v) return '-'
         try {
+          // 优先按 JSON 美化展示，方便排查节点输出字段
           const parsed = JSON.parse(v)
           return (
             <Collapse size="small" ghost items={[{
@@ -114,6 +160,7 @@ export default function ExecutionTracePanel({ canvasId, onTraceLoaded }: Props) 
             }]} />
           )
         } catch {
+          // 非 JSON 时兜底显示原始字符串截断
           return <Text style={{ fontSize: 11 }}>{v.slice(0, 80)}</Text>
         }
       },

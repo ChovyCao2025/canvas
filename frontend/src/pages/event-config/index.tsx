@@ -7,12 +7,44 @@ import { PARAM_TYPES, type ApiParam } from '../api-config'
 
 const { Title, Text } = Typography
 
+/**
+ * 事件定义模型。
+ */
 interface EventDef {
-  id: number; name: string; eventCode: string
-  attributes?: string; description?: string; enabled: number
+  /** 事件定义 ID。 */
+  id: number
+
+  /** 事件名称。 */
+  name: string
+
+  /** 事件编码（上报时使用）。 */
+  eventCode: string
+
+  /** 事件属性 schema（JSON 字符串）。 */
+  attributes?: string
+
+  /** 事件说明。 */
+  description?: string
+
+  /** 启用状态：1 启用，0 禁用。 */
+  enabled: number
 }
 
-function AttrSchemaEditor({ value, onChange }: { value?: ApiParam[]; onChange?: (v: ApiParam[]) => void }) {
+/**
+ * 事件属性 Schema 编辑器。
+ *
+ * 用于定义上报事件可携带的 attributes 结构，
+ * 后续在 EVENT_TRIGGER 节点里可作为上下文字段引用。
+ */
+interface AttrSchemaEditorProps {
+  /** 当前属性定义数组。 */
+  value?: ApiParam[]
+
+  /** 属性定义变更回调。 */
+  onChange?: (v: ApiParam[]) => void
+}
+
+function AttrSchemaEditor({ value, onChange }: AttrSchemaEditorProps) {
   const attrs: ApiParam[] = value ?? []
   const set = (next: ApiParam[]) => onChange?.(next)
   const add = () => set([...attrs, { name: '', displayName: '', type: 'STRING', required: false }])
@@ -45,6 +77,9 @@ function AttrSchemaEditor({ value, onChange }: { value?: ApiParam[]; onChange?: 
   )
 }
 
+/**
+ * 事件配置页。
+ */
 export default function EventConfigPage() {
   const [data,    setData]    = useState<EventDef[]>([])
   const [total,   setTotal]   = useState(0)
@@ -70,6 +105,7 @@ export default function EventConfigPage() {
     form.setFieldsValue({ enabled: true, attributes: [] }); setVisible(true)
   }
   const openEdit = (r: EventDef) => {
+    // 后端存储为 JSON 字符串，编辑时反序列化为数组
     setEditing(r)
     let attrs: ApiParam[] = []
     try { attrs = JSON.parse(r.attributes || '[]') } catch {}
@@ -80,7 +116,11 @@ export default function EventConfigPage() {
     const values = await form.validateFields()
     setSaving(true)
     try {
-      const body = { ...values, enabled: values.enabled ? 1 : 0, attributes: JSON.stringify(values.attributes ?? []) }
+      const body = {
+        ...values,
+        enabled: values.enabled ? 1 : 0,
+        attributes: JSON.stringify(values.attributes ?? []),
+      }
       if (editing) { await http.put(`/canvas/event-definitions/${editing.id}`, body); message.success('更新成功') }
       else { await http.post('/canvas/event-definitions', body); message.success('创建成功') }
       setVisible(false); fetchList(editing ? page : 1)

@@ -24,16 +24,26 @@ const STATUS_MAP: Record<number, { label: string; color: string }> = {
   4: { label: '已停止', color: 'volcano' },
 }
 
+/**
+ * 画布列表页：提供创建、发布、下线、克隆、归档等运营操作入口。
+ *
+ * 交互原则：
+ * - 高风险动作（发布/下线/紧急停止/归档）都走确认弹窗；
+ * - 列表页只负责“操作入口”，具体编排在编辑器页完成。
+ */
 export default function CanvasListPage() {
   const navigate = useNavigate()
   const { isAdmin } = useAuth()
+  // 列表数据与分页态
   const [data, setData] = useState<Canvas[]>([])
   const [total, setTotal] = useState(0)
   const [loading, setLoading] = useState(false)
   const [page, setPage] = useState(1)
+  // 创建弹窗态
   const [createVisible, setCreateVisible] = useState(false)
   const [form] = Form.useForm()
 
+  // 拉取画布分页列表：是所有列表变更后的统一刷新入口。
   const fetchList = async (p = page) => {
     setLoading(true)
     try {
@@ -47,6 +57,7 @@ export default function CanvasListPage() {
 
   useEffect(() => { fetchList(1) }, [])
 
+  // 创建新画布：成功后回到第一页刷新列表
   const handleCreate = async () => {
     const values = await form.validateFields()
     await canvasApi.create({ ...values })
@@ -56,6 +67,7 @@ export default function CanvasListPage() {
     fetchList(1)
   }
 
+  // 发布：把当前草稿版本设为线上生效版本。
   const handlePublish = async (id: number) => {
     Modal.confirm({
       title: '确认发布？',
@@ -68,6 +80,7 @@ export default function CanvasListPage() {
     })
   }
 
+  // 下线后不再接收新触发。
   const handleOffline = async (id: number) => {
     Modal.confirm({
       title: '确认下线？',
@@ -80,6 +93,7 @@ export default function CanvasListPage() {
     })
   }
 
+  // 紧急停止：用于事故处理，优先保证“快速止血”。
   const handleKill = async (id: number) => {
     Modal.confirm({
       title: '紧急停止',
@@ -94,6 +108,7 @@ export default function CanvasListPage() {
     })
   }
 
+  // 克隆会复制草稿图结构，创建一份新的 DRAFT 画布。
   const handleClone = async (id: number) => {
     const res = await canvasApi.clone(id)
     message.success(`克隆成功，新画布 ID: ${res.data.id}`)
@@ -123,6 +138,8 @@ export default function CanvasListPage() {
     })
   }
 
+  // 表格列定义：状态 + 操作按钮集中在列表页。
+  // 按钮展示会根据状态和角色动态收敛，减少误操作。
   const columns: ColumnsType<Canvas> = [
     { title: 'ID', dataIndex: 'id', width: 80 },
     {

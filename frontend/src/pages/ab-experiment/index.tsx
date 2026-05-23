@@ -9,15 +9,31 @@ import { abExperimentApi } from '../../services/api'
 
 const { Title } = Typography
 
+/**
+ * AB 实验定义模型。
+ */
 interface AbExperiment {
+  /** 实验定义 ID。 */
   id: number
+
+  /** 实验名称。 */
   name: string
+
+  /** 实验业务键（运行时分桶依据）。 */
   experimentKey: string
+
+  /** 实验描述。 */
   description?: string
+
+  /** 启用状态：1 启用，0 禁用。 */
   enabled: number
 }
 
+/**
+ * AB 实验管理页。
+ */
 export default function AbExperimentPage() {
+  // 列表与弹窗状态
   const [data, setData] = useState<AbExperiment[]>([])
   const [total, setTotal] = useState(0)
   const [loading, setLoading] = useState(false)
@@ -27,6 +43,7 @@ export default function AbExperimentPage() {
   const [form] = Form.useForm()
   const [submitting, setSubmitting] = useState(false)
 
+  // 拉取实验定义分页列表
   const fetchList = async (p = page) => {
     setLoading(true)
     try {
@@ -40,6 +57,7 @@ export default function AbExperimentPage() {
 
   useEffect(() => { fetchList(1) }, [])
 
+  // 新建模式
   const openCreate = () => {
     setEditingRecord(null)
     form.resetFields()
@@ -47,6 +65,7 @@ export default function AbExperimentPage() {
     setModalVisible(true)
   }
 
+  // 编辑模式（表单回填）
   const openEdit = (record: AbExperiment) => {
     setEditingRecord(record)
     form.setFieldsValue({
@@ -56,6 +75,7 @@ export default function AbExperimentPage() {
     setModalVisible(true)
   }
 
+  // 新建/编辑提交
   const handleOk = async () => {
     const values = await form.validateFields()
     setSubmitting(true)
