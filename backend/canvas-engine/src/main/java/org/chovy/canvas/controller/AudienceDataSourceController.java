@@ -30,6 +30,12 @@ public class AudienceDataSourceController {
                 .subscribeOn(Schedulers.boundedElastic());
     }
 
+    @GetMapping("/{id}")
+    public Mono<R<AudienceDataSource>> get(@PathVariable Long id) {
+        return Mono.fromCallable(() -> R.ok(service.get(id)))
+                .subscribeOn(Schedulers.boundedElastic());
+    }
+
     @PostMapping
     public Mono<R<AudienceDataSource>> create(@RequestBody AudienceDataSource body) {
         return Mono.fromCallable(() -> R.ok(service.create(body)))

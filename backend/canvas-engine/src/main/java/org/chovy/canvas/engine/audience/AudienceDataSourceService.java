@@ -32,6 +32,10 @@ public class AudienceDataSourceService {
         return dataSources;
     }
 
+    public AudienceDataSource get(Long id) {
+        return dataSourceMapper.selectById(id);
+    }
+
     public AudienceDataSource create(AudienceDataSource dataSource) {
         dataSourceMapper.insert(dataSource);
         return dataSource;
