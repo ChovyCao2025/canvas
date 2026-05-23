@@ -9,6 +9,13 @@ import http, { metaApi, canvasApi } from '../../services/api'
 import type { NodeTypeRegistry, ContextField, StubOption, Canvas } from '../../types'
 import type { CanvasNodeData } from '../canvas/constants'
 import { PARAM_TYPES } from '../../pages/api-config'
+import {
+  BranchRouteCard,
+  ConfigSectionCard,
+  FieldSummaryRow,
+  NodeHeaderCard,
+} from './InspectorCards'
+import { buildConfigPanelPresentation } from './presentation'
 
 interface ApiParamDef { name: string; displayName: string; type: string; required: boolean }
 
@@ -158,46 +165,74 @@ export default function ConfigPanel({ nodeId, nodeData, onChange, nodes, readonl
   }
 
   const fields = parseSchema(schema?.configSchema)
+  const visibleFields = fields.filter((f) =>
+    evaluateVisible(f.visible, formValues) &&
+    evaluateVisible(f.showWhen, formValues)
+  )
+  const presentation = buildConfigPanelPresentation({
+    nodeData,
+    formValues,
+    displayValues: {},
+    fields: visibleFields.map(({ key, label, type }) => ({ key, label, type })),
+    getNodeName,
+  })
 
   return (
     <div style={{ padding: '12px 12px 0', overflowY: 'auto', height: '100%' }}>
       {loading && <Spin size="small" style={{ display: 'block', marginBottom: 8 }} />}
-      <Text type="secondary" style={{ fontSize: 11 }}>{nodeData.nodeType}</Text>
-      <Divider style={{ margin: '8px 0' }} />
+      <NodeHeaderCard {...presentation.header} />
+      {!!presentation.summaryRows.length && (
+        <ConfigSectionCard title="配置摘要">
+          <div style={{ display: 'grid', gap: 10 }}>
+            {presentation.summaryRows.map((row) => (
+              <FieldSummaryRow key={row.label} label={row.label} value={row.value} />
+            ))}
+          </div>
+        </ConfigSectionCard>
+      )}
+      {!!presentation.branchRoutes.length && (
+        <ConfigSectionCard title="分支去向">
+          <div style={{ display: 'grid', gap: 10 }}>
+            {presentation.branchRoutes.map((route) => (
+              <BranchRouteCard
+                key={route.label}
+                label={route.label}
+                value={route.value}
+                tone={route.tone}
+              />
+            ))}
+          </div>
+        </ConfigSectionCard>
+      )}
+      <Divider style={{ margin: '8px 0 14px' }} />
 
       <Form form={form} layout="vertical" size="small" onValuesChange={handleValuesChange} disabled={readonly}>
         <Form.Item name="name" label="节点名称" rules={[{ required: true }]}>
           <Input />
         </Form.Item>
 
-        {fields
-          .filter(f =>
-            evaluateVisible(f.visible,  formValues) &&
-            evaluateVisible(f.showWhen, formValues)
-          )
-          .map(field => {
-            // api-input-params / event-attr-preview 自己管理渲染，不能被外层 Form.Item 包住
-            if (field.type === 'api-input-params') {
-              return <ApiCallInputParams key={field.key} label={field.label}
-                apiKeyField={field.apiKeyField ?? 'apiKey'}
-                defsSource={field.defsSource ?? '/meta/api-definitions'} />
-            }
-            if (field.type === 'event-attr-preview') {
-              return (
-                <div key={field.key} style={{ marginBottom: 16 }}>
-                  <div style={{ fontSize: 12, color: '#595959', marginBottom: 6 }}>{field.label}</div>
-                  <EventAttrPreview />
-                </div>
-              )
-            }
+        {visibleFields.map(field => {
+          // api-input-params / event-attr-preview 自己管理渲染，不能被外层 Form.Item 包住
+          if (field.type === 'api-input-params') {
+            return <ApiCallInputParams key={field.key} label={field.label}
+              apiKeyField={field.apiKeyField ?? 'apiKey'}
+              defsSource={field.defsSource ?? '/meta/api-definitions'} />
+          }
+          if (field.type === 'event-attr-preview') {
             return (
-              <Form.Item key={field.key} name={field.key} label={field.label}
-                rules={field.required ? [{ required: true, message: `请填写${field.label}` }] : []}>
-                {renderControl(field, options, ctxFields, form, getNodeName, nodeData)}
-              </Form.Item>
+              <div key={field.key} style={{ marginBottom: 16 }}>
+                <div style={{ fontSize: 12, color: '#595959', marginBottom: 6 }}>{field.label}</div>
+                <EventAttrPreview />
+              </div>
             )
-          })
-        }
+          }
+          return (
+            <Form.Item key={field.key} name={field.key} label={field.label}
+              rules={field.required ? [{ required: true, message: `请填写${field.label}` }] : []}>
+              {renderControl(field, options, ctxFields, form, getNodeName, nodeData)}
+            </Form.Item>
+          )
+        })}
       </Form>
     </div>
   )
