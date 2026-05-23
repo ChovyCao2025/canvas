@@ -115,7 +115,9 @@ export default function AudienceEditPage() {
   const isEdit = Boolean(id)
 
   const dataSourceType = Form.useWatch('dataSourceType', form) ?? 'TAGGER_API'
+  const selectedDataSourceId = Form.useWatch('dataSourceId', form)
   const enabled = Form.useWatch('enabled', form) ?? true
+  const selectedJdbcSource = jdbcSources.find(item => item.id === selectedDataSourceId)
 
   useEffect(() => {
     tagDefinitionApi.list({ page: 1, size: 100, enabled: 1 }).then(res => {
@@ -124,7 +126,7 @@ export default function AudienceEditPage() {
       setTagOptions(tags.map(item => ({ label: item.label, value: item.name })))
     })
     audienceDataSourceApi.list().then(res => {
-      setJdbcSources(res.data.filter(item => item.enabled === 1))
+      setJdbcSources(res.data)
     })
   }, [])
 
@@ -221,10 +223,18 @@ export default function AudienceEditPage() {
             <>
               <Form.Item name="dataSourceId" label="人群数据源" rules={[{ required: true, message: '请选择人群数据源' }]}>
                 <Select
-                  options={jdbcSources.map(item => ({ value: item.id, label: item.name }))}
+                  options={jdbcSources.map(item => ({
+                    value: item.id,
+                    label: item.enabled === 1 ? item.name : `${item.name}（已停用）`,
+                  }))}
                   placeholder={jdbcSources.length ? '选择数据源' : '暂无可用数据源，请先创建'}
                 />
               </Form.Item>
+              {selectedJdbcSource?.enabled === 0 && (
+                <div style={{ marginBottom: 12, color: '#d46b08', fontSize: 12 }}>
+                  当前人群引用的数据源已停用，可继续查看和保存，但新建人群不应再选择该数据源。
+                </div>
+              )}
               <Form.Item name={['jdbcConfig', 'baseTable']} label="基础表名" rules={[{ required: true, message: '请输入基础表名' }]}>
                 <Input placeholder="audience_demo_user" />
               </Form.Item>
