@@ -55,8 +55,12 @@ public record NodeResult(
     }
 
     public static NodeResult suppressed(String suppressedNodeId, String reasonCode, String reasonMessage) {
+        return suppressed("suppressed", suppressedNodeId, reasonCode, reasonMessage);
+    }
+
+    public static NodeResult suppressed(String routeHandle, String suppressedNodeId, String reasonCode, String reasonMessage) {
         return new NodeResult(null, null, null, null, null, Map.of(), true, null, false,
-                NodeOutcome.SUPPRESSED, route("suppressed", suppressedNodeId), reasonCode, reasonMessage, null);
+                NodeOutcome.SUPPRESSED, route(routeHandle, suppressedNodeId), reasonCode, reasonMessage, null);
     }
 
     public static NodeResult timeout(String timeoutNodeId, String reasonCode, String reasonMessage) {

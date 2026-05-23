@@ -183,7 +183,8 @@ public class DagEngine {
             boolean needsNodeId = NodeType.MANUAL_APPROVAL.equals(node.getType())
                     || NodeType.API_CALL.equals(node.getType())
                     || NodeType.WAIT.equals(node.getType())
-                    || NodeType.GOAL_CHECK.equals(node.getType());
+                    || NodeType.GOAL_CHECK.equals(node.getType())
+                    || NodeType.FREQUENCY_CAP.equals(node.getType());
             Map<String, Object> config = needsNodeId
                     ? resolveConfigWithNodeId(rawConfig, ctx, nodeId, node.getType())
                     : resolveConfig(rawConfig, ctx);

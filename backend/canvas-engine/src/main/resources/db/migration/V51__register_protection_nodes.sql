@@ -1,0 +1,96 @@
+INSERT INTO node_type_registry
+  (type_key, type_name, category, handler_class,
+   config_schema, output_schema, outlet_schema, summary_template, runtime_policy_schema,
+   risk_level, is_trigger, is_terminal, description, enabled)
+VALUES
+(
+  'SUPPRESSION_CHECK',
+  '抑制检查',
+  '合规保护',
+  'org.chovy.canvas.engine.handlers.SuppressionCheckHandler',
+  '[
+    {"key":"channel","label":"渠道","type":"select","defaultValue":"ALL","options":[{"label":"全部","value":"ALL"},{"label":"邮件","value":"EMAIL"},{"label":"短信","value":"SMS"},{"label":"Push","value":"PUSH"},{"label":"微信","value":"WECHAT"}]},
+    {"key":"requireConsent","label":"要求显式授权","type":"switch","defaultValue":true}
+  ]',
+  '[{"name":"policyAllowed","type":"BOOLEAN","label":"策略是否通过"}]',
+  '[
+    {"id":"allowed","label":"允许","color":"#52c41a","targetField":"allowedNodeId"},
+    {"id":"suppressed","label":"抑制","color":"#f5222d","targetField":"suppressedNodeId"}
+  ]',
+  '抑制检查（{{channel}}）',
+  '[]',
+  'HIGH',
+  0,
+  0,
+  '检查营销授权、退订和抑制名单，命中保护规则时走抑制出口。',
+  1
+),
+(
+  'QUIET_HOURS',
+  '静默时段',
+  '合规保护',
+  'org.chovy.canvas.engine.handlers.QuietHoursHandler',
+  '[
+    {"key":"start","label":"开始时间","type":"time","defaultValue":"22:00"},
+    {"key":"end","label":"结束时间","type":"time","defaultValue":"08:00"},
+    {"key":"timezone","label":"时区","type":"text","defaultValue":"USER_LOCAL"}
+  ]',
+  '[{"name":"quietHoursActive","type":"BOOLEAN","label":"是否静默时段"}]',
+  '[
+    {"id":"allowed","label":"可执行","color":"#52c41a","targetField":"allowedNodeId"},
+    {"id":"quiet","label":"静默","color":"#faad14","targetField":"quietNodeId"}
+  ]',
+  '静默时段（{{start}}-{{end}}）',
+  '[]',
+  'MEDIUM',
+  0,
+  0,
+  '根据用户本地时区判断当前是否处于静默时段。',
+  1
+),
+(
+  'CHANNEL_AVAILABILITY',
+  '渠道可达',
+  '合规保护',
+  'org.chovy.canvas.engine.handlers.ChannelAvailabilityHandler',
+  '[
+    {"key":"channel","label":"渠道","type":"select","required":true,"defaultValue":"EMAIL","options":[{"label":"邮件","value":"EMAIL"},{"label":"短信","value":"SMS"},{"label":"Push","value":"PUSH"},{"label":"站内信","value":"IN_APP"},{"label":"微信","value":"WECHAT"}]}
+  ]',
+  '[{"name":"channelAvailable","type":"BOOLEAN","label":"渠道是否可达"}]',
+  '[
+    {"id":"available","label":"可达","color":"#52c41a","targetField":"availableNodeId"},
+    {"id":"unavailable","label":"不可达","color":"#f5222d","targetField":"unavailableNodeId"}
+  ]',
+  '渠道可达（{{channel}}）',
+  '[]',
+  'MEDIUM',
+  0,
+  0,
+  '检查用户是否具备指定渠道的有效地址或 token。',
+  1
+),
+(
+  'FREQUENCY_CAP',
+  '频率限制',
+  '合规保护',
+  'org.chovy.canvas.engine.handlers.FrequencyCapHandler',
+  '[
+    {"key":"scope","label":"范围","type":"select","defaultValue":"JOURNEY","options":[{"label":"旅程","value":"JOURNEY"},{"label":"全局","value":"GLOBAL"},{"label":"渠道","value":"CHANNEL"},{"label":"节点","value":"NODE"}]},
+    {"key":"channel","label":"渠道","type":"select","defaultValue":"ALL","options":[{"label":"全部","value":"ALL"},{"label":"邮件","value":"EMAIL"},{"label":"短信","value":"SMS"},{"label":"Push","value":"PUSH"},{"label":"微信","value":"WECHAT"}]},
+    {"key":"maxCount","label":"最大次数","type":"number","required":true,"defaultValue":1},
+    {"key":"windowValue","label":"窗口值","type":"number","required":true,"defaultValue":1},
+    {"key":"windowUnit","label":"窗口单位","type":"select","defaultValue":"DAYS","options":[{"label":"分钟","value":"MINUTES"},{"label":"小时","value":"HOURS"},{"label":"天","value":"DAYS"}]}
+  ]',
+  '[{"name":"frequencyAllowed","type":"BOOLEAN","label":"频控是否通过"}]',
+  '[
+    {"id":"pass","label":"通过","color":"#52c41a","targetField":"passNodeId"},
+    {"id":"capped","label":"超频","color":"#f5222d","targetField":"cappedNodeId"}
+  ]',
+  '频控（{{maxCount}}/{{windowValue}}{{windowUnit}}）',
+  '[]',
+  'HIGH',
+  0,
+  0,
+  '按用户、旅程、渠道或节点维度进行固定窗口频率限制。',
+  1
+);

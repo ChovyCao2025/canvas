@@ -48,6 +48,14 @@ public final class NodeType {
     public static final String WAIT               = "WAIT";
     /** 目标检测节点 */
     public static final String GOAL_CHECK         = "GOAL_CHECK";
+    /** 营销抑制/授权检查 */
+    public static final String SUPPRESSION_CHECK  = "SUPPRESSION_CHECK";
+    /** 静默时段检查 */
+    public static final String QUIET_HOURS        = "QUIET_HOURS";
+    /** 渠道可达性检查 */
+    public static final String CHANNEL_AVAILABILITY = "CHANNEL_AVAILABILITY";
+    /** 频率限制检查 */
+    public static final String FREQUENCY_CAP      = "FREQUENCY_CAP";
     /** 延时节点 */
     public static final String DELAY              = "DELAY";
     /** 流程终止节点 */
