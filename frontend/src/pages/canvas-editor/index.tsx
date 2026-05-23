@@ -27,6 +27,7 @@ import {
 } from '../../components/canvas/constants'
 
 import HoverEdge from '../../components/canvas/HoverEdge'
+import { getBranchHandles } from '../../components/canvas/branchHandles'
 import CronBuilder from '../../components/config-panel/CronBuilder'
 import { CanvasActionsContext } from '../../context/CanvasActionsContext'
 import { useAuth } from '../../context/AuthContext'
@@ -144,6 +145,32 @@ type InsertContext =
   | { kind: 'placeholder'; sourceId: string; handleId: string }
   | { kind: 'blank' }
   | null
+
+function splitSelectedEdge(edge: Edge, nodeId: string): { removeEdgeId: string; newEdges: Edge[] } {
+  if ((edge.sourceHandle ?? 'default') === 'default') {
+    return applyInsertIntoEdge(edge, nodeId)
+  }
+
+  return {
+    removeEdgeId: edge.id,
+    newEdges: [
+      {
+        id: `${edge.source}->${nodeId}::${edge.sourceHandle}`,
+        source: edge.source,
+        target: nodeId,
+        sourceHandle: edge.sourceHandle,
+        targetHandle: 'input',
+      },
+      {
+        id: `${nodeId}->${edge.target}`,
+        source: nodeId,
+        target: edge.target,
+        sourceHandle: 'default',
+        targetHandle: edge.targetHandle,
+      },
+    ],
+  }
+}
 
 function useHistory(nodes: Node<CanvasNodeData>[], edges: Edge[]) {
   const [history, setHistory] = useState<Snapshot[]>([])
@@ -394,32 +421,44 @@ function EditorInner({ detail, onStatusChange }: {
     const newPos: XYPosition = resolvedContext.kind === 'placeholder' && hitPlaceholder
       ? hitPlaceholder.position
       : dropPos
+    const defaultBizConfig = buildDefaultBizConfig(nodeType)
+    const branchHandles = getBranchHandles(nodeType, defaultBizConfig)
+    const selectedEdge = resolvedContext.kind === 'edge'
+      ? getEdges().find(item => item.id === resolvedContext.edgeId)
+      : null
+
+    if (resolvedContext.kind === 'edge') {
+      if (!selectedEdge) {
+        setInsertContext(null)
+        message.warning('所选连线已变化，请重新选择插入位置。', 2)
+        return
+      }
+      if (branchHandles.length > 0) {
+        setInsertContext(null)
+        message.info('分支节点不能直接插入到连线上，请拖到具体分支占位点或空白画布。', 3)
+        return
+      }
+    }
+
     const newNode = buildDetachedNode(newId, nodeType, category, newPos)
-    newNode.data.bizConfig = buildDefaultBizConfig(nodeType)
+    newNode.data.bizConfig = defaultBizConfig
 
     setNodes(prev => [...prev.filter(n => !(n.data as any)?._placeholder), newNode])
 
-    if (resolvedContext.kind === 'edge') {
-      const edge = getEdges().find(item => item.id === resolvedContext.edgeId)
-      if (edge) {
-        try {
-          const { removeEdgeId, newEdges } = applyInsertIntoEdge(edge, newId)
-          setEdges(current => [...current.filter(item => item.id !== removeEdgeId), ...newEdges])
-          setNodes(current => current.map(node => {
-            if (node.id !== edge.source) return node
-            const data = node.data as CanvasNodeData
-            return {
-              ...node,
-              data: {
-                ...data,
-                bizConfig: patchBizConfig(data.bizConfig, edge.sourceHandle ?? 'default', newId),
-              },
-            }
-          }))
-        } catch {
-          // Branching edges stay as blank drops until a branch-specific insert flow exists.
+    if (resolvedContext.kind === 'edge' && selectedEdge) {
+      const { removeEdgeId, newEdges } = splitSelectedEdge(selectedEdge, newId)
+      setEdges(current => [...current.filter(item => item.id !== removeEdgeId), ...newEdges])
+      setNodes(current => current.map(node => {
+        if (node.id !== selectedEdge.source) return node
+        const data = node.data as CanvasNodeData
+        return {
+          ...node,
+          data: {
+            ...data,
+            bizConfig: patchBizConfig(data.bizConfig, selectedEdge.sourceHandle ?? 'default', newId),
+          },
         }
-      }
+      }))
     } else if (resolvedContext.kind === 'placeholder') {
       setNodes(current => current.map(node => {
         if (node.id !== resolvedContext.sourceId) return node

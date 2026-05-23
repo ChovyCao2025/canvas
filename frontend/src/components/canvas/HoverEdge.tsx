@@ -17,8 +17,7 @@ export default function HoverEdge({
   })
 
   const highlighted = hovered || !!selected
-  const canInsertOnEdge = !sourceHandleId || sourceHandleId === 'default'
-  const deleteOffsetY = canInsertOnEdge ? labelY + 30 : labelY
+  const deleteOffsetY = labelY + 30
 
   return (
     <>
@@ -54,7 +53,7 @@ export default function HoverEdge({
           </div>
         )}
 
-        {highlighted && canInsertOnEdge && (
+        {highlighted && (
           <button
             type="button"
             className="nopan nodrag"
@@ -81,6 +80,7 @@ export default function HoverEdge({
               e.stopPropagation()
               startInsertOnEdge(id)
             }}
+            aria-label={`插入到连线${sourceHandleId ? ` ${sourceHandleId}` : ''}`}
           >
             <PlusOutlined style={{ fontSize: 12 }} />
           </button>
