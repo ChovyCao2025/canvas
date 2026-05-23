@@ -15,25 +15,22 @@ public class PerfMqProducer {
     private static final int DEFAULT_USER_MODULO = 1000;
 
     public static void main(String[] args) throws Exception {
-        Map<String, String> parsedArgs = parseArgs(args);
-        String nameServer = parsedArgs.getOrDefault("--name-server", DEFAULT_NAME_SERVER);
-        String topic = parsedArgs.getOrDefault("--topic", DEFAULT_TOPIC);
-        String tag = parsedArgs.getOrDefault("--tag", DEFAULT_TAG);
-        String perfRunId = require(parsedArgs, "--perf-run-id");
-        int count = parseInt(parsedArgs.getOrDefault("--count", Integer.toString(DEFAULT_COUNT)), "--count");
-        int userModulo = parseInt(parsedArgs.getOrDefault("--user-modulo", Integer.toString(DEFAULT_USER_MODULO)), "--user-modulo");
+        Config config = Config.fromArgs(args);
+        if (!config.shouldSend()) {
+            return;
+        }
 
         DefaultMQProducer producer = new DefaultMQProducer("PID_CANVAS_PERF");
-        producer.setNamesrvAddr(nameServer);
+        producer.setNamesrvAddr(config.nameServer());
         try {
             producer.start();
-            for (int seq = 0; seq < count; seq++) {
-                String userId = "perf_user_" + (seq % userModulo);
+            for (int seq = 0; seq < config.count(); seq++) {
+                String userId = "perf_user_" + (seq % config.userModulo());
                 Message message = new Message(
-                        topic,
-                        tag,
-                        sourceMsgId(perfRunId, seq),
-                        messageBody(perfRunId, userId, seq).getBytes(StandardCharsets.UTF_8));
+                        config.topic(),
+                        config.tag(),
+                        sourceMsgId(config.perfRunId(), seq),
+                        messageBody(config.perfRunId(), userId, seq).getBytes(StandardCharsets.UTF_8));
                 producer.send(message);
             }
         } finally {
@@ -88,5 +85,22 @@ public class PerfMqProducer {
 
     private static String escapeJson(String value) {
         return value.replace("\\", "\\\\").replace("\"", "\\\"");
+    }
+
+    record Config(String nameServer, String topic, String tag, String perfRunId, int count, int userModulo) {
+        static Config fromArgs(String[] args) {
+            Map<String, String> parsedArgs = parseArgs(args);
+            return new Config(
+                    parsedArgs.getOrDefault("--name-server", DEFAULT_NAME_SERVER),
+                    parsedArgs.getOrDefault("--topic", DEFAULT_TOPIC),
+                    parsedArgs.getOrDefault("--tag", DEFAULT_TAG),
+                    require(parsedArgs, "--perf-run-id"),
+                    parseInt(parsedArgs.getOrDefault("--count", Integer.toString(DEFAULT_COUNT)), "--count"),
+                    parseInt(parsedArgs.getOrDefault("--user-modulo", Integer.toString(DEFAULT_USER_MODULO)), "--user-modulo"));
+        }
+
+        boolean shouldSend() {
+            return count > 0;
+        }
     }
 }

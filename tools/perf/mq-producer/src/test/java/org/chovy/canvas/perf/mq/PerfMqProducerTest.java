@@ -22,4 +22,14 @@ class PerfMqProducerTest {
                 .contains("\"perfRunId\":\"perf_20260523_001\"")
                 .contains("\"perfInputId\":\"perf_20260523_001:mq:12\"");
     }
+
+    @Test
+    void zeroCountDoesNotNeedRocketMqProducer() {
+        PerfMqProducer.Config config = PerfMqProducer.Config.fromArgs(new String[]{
+                "--perf-run-id", "perf_test",
+                "--count", "0"
+        });
+
+        assertThat(config.shouldSend()).isFalse();
+    }
 }
