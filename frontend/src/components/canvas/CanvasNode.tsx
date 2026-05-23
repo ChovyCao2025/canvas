@@ -4,7 +4,7 @@ import { Tooltip } from 'antd'
 import { CopyOutlined, DeleteOutlined } from '@ant-design/icons'
 import type { CanvasNodeData } from './constants'
 import { CATEGORY_COLORS, TRIGGER_TYPES, TERMINAL_TYPES } from './constants'
-import { getOutletHandles } from './outletSchema'
+import { getOutletHandles, hasOutletSchema } from './outletSchema'
 import { useCanvasActions } from '../../context/CanvasActionsContext'
 
 function useHover() {
@@ -68,6 +68,7 @@ const CanvasNode = memo(({ data, id, selected }: NodeProps) => {
     outletSchema: d.outletSchema,
   })
   const isBranching   = branchHandles.length > 0
+  const suppressDefaultSource = hasOutletSchema(d.outletSchema)
 
   if (isStart || isEnd) {
     const color = isStart ? '#52c41a' : '#f5222d'
@@ -160,7 +161,7 @@ const CanvasNode = memo(({ data, id, selected }: NodeProps) => {
                 )
               })}
             </div>
-          ) : (
+          ) : suppressDefaultSource ? null : (
             <Handle
               type="source"
               position={Position.Bottom}

@@ -79,6 +79,10 @@ export function parseOutletSchema(raw: string | undefined): BranchHandle[] {
     }))
 }
 
+export function hasOutletSchema(raw: string | undefined): boolean {
+  return parseOutletSchemaItems(raw).length > 0
+}
+
 export function getOutletHandles(input: {
   nodeType: string
   bizConfig: Record<string, unknown>
@@ -86,6 +90,7 @@ export function getOutletHandles(input: {
 }): BranchHandle[] {
   const dynamic = parseOutletSchema(input.outletSchema)
   if (dynamic.length > 0) return dynamic
+  if (hasOutletSchema(input.outletSchema)) return []
   return getBranchHandles(input.nodeType, input.bizConfig)
 }
 

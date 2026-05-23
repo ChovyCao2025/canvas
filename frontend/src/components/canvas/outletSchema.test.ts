@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { getOutletHandles, getOutletTargetField, parseOutletSchema } from './outletSchema'
+import { getOutletHandles, getOutletTargetField, hasOutletSchema, parseOutletSchema } from './outletSchema'
 
 describe('outlet schema', () => {
   it('parses dynamic outlet handles from registry json', () => {
@@ -41,5 +41,16 @@ describe('outlet schema', () => {
     ]))).toEqual([
       { id: 'timeout', label: '超时', color: '#1677ff' },
     ])
+  })
+
+  it('does not fall back to legacy handles when a dynamic schema is present but not routeable', () => {
+    const schema = JSON.stringify([{ id: 'continue', label: '继续' }])
+
+    expect(hasOutletSchema(schema)).toBe(true)
+    expect(getOutletHandles({
+      nodeType: 'IF_CONDITION',
+      bizConfig: {},
+      outletSchema: schema,
+    })).toEqual([])
   })
 })
