@@ -167,6 +167,22 @@ class AudienceControllerTaskTest {
     }
 
     @Test
+    void update_rejectsMissingSavedAudienceWithoutSchedulingOrEnqueueing() {
+        AudienceDefinition body = audience(null, "请求名称");
+        when(computeService.update(body)).thenReturn(true);
+        when(definitionMapper.selectById(12L)).thenReturn(null);
+        AudienceController controller = controller();
+
+        assertThatThrownBy(() -> controller.update(12L, body).block())
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("Audience not found: 12");
+        assertThat(body.getId()).isEqualTo(12L);
+        verify(computeService).update(body);
+        verify(definitionMapper).selectById(12L);
+        verifyNoInteractions(schedulerService, taskService, runner);
+    }
+
+    @Test
     void compute_usesFallbackNameWhenDefinitionNameIsBlank() {
         AudienceDefinition definition = audience(13L, " ");
         when(definitionMapper.selectById(13L)).thenReturn(definition);
