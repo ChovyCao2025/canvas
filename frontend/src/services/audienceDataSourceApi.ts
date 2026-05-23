@@ -17,6 +17,8 @@ export interface AudienceDataSource {
 export const audienceDataSourceApi = {
   list: () =>
     http.get<R<AudienceDataSource[]>, R<AudienceDataSource[]>>('/canvas/audience-data-sources'),
+  get: (id: number) =>
+    http.get<R<AudienceDataSource>, R<AudienceDataSource>>(`/canvas/audience-data-sources/${id}`),
   create: (body: AudienceDataSource) =>
     http.post<R<AudienceDataSource>, R<AudienceDataSource>>('/canvas/audience-data-sources', body),
   update: (id: number, body: AudienceDataSource) =>

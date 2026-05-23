@@ -118,6 +118,12 @@ export default function AudienceEditPage() {
   const selectedDataSourceId = Form.useWatch('dataSourceId', form)
   const enabled = Form.useWatch('enabled', form) ?? true
   const selectedJdbcSource = jdbcSources.find(item => item.id === selectedDataSourceId)
+  const jdbcSourceOptions = jdbcSources
+    .filter(item => item.enabled === 1 || item.id === selectedDataSourceId)
+    .map(item => ({
+      value: item.id,
+      label: item.enabled === 1 ? item.name : `${item.name}（已停用）`,
+    }))
 
   useEffect(() => {
     tagDefinitionApi.list({ page: 1, size: 100, enabled: 1 }).then(res => {
@@ -144,6 +150,11 @@ export default function AudienceEditPage() {
         jdbcConfig: config,
       } as any)
       setQuery(toRuleGroup(current.ruleJson))
+      if (current.dataSourceType === 'JDBC' && current.dataSourceId != null) {
+        audienceDataSourceApi.get(current.dataSourceId).then(sourceRes => {
+          setJdbcSources(prev => prev.some(item => item.id === sourceRes.data.id) ? prev : [...prev, sourceRes.data])
+        })
+      }
     })
   }, [form, id, isEdit])
 
@@ -223,11 +234,8 @@ export default function AudienceEditPage() {
             <>
               <Form.Item name="dataSourceId" label="人群数据源" rules={[{ required: true, message: '请选择人群数据源' }]}>
                 <Select
-                  options={jdbcSources.map(item => ({
-                    value: item.id,
-                    label: item.enabled === 1 ? item.name : `${item.name}（已停用）`,
-                  }))}
-                  placeholder={jdbcSources.length ? '选择数据源' : '暂无可用数据源，请先创建'}
+                  options={jdbcSourceOptions}
+                  placeholder={jdbcSourceOptions.length ? '选择数据源' : '暂无可用数据源，请先创建'}
                 />
               </Form.Item>
               {selectedJdbcSource?.enabled === 0 && (
