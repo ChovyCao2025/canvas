@@ -15,6 +15,11 @@ const taggerNode = (overrides: Partial<CanvasNodeData> = {}): CanvasNodeData => 
   ...overrides,
 })
 
+const taggerRouteNames: Record<string, string> = {
+  'api-node': '接口调用',
+  'city-node': '是否高频消费城市用户',
+}
+
 describe('buildConfigPanelPresentation', () => {
   it('builds the approved tagger header and summary rows from raw values plus display lookups', () => {
     const input = {
@@ -32,8 +37,7 @@ describe('buildConfigPanelPresentation', () => {
         { key: 'tagCodeKey', label: '标签', type: 'select' },
         { key: 'audienceId', label: '圈选对象', type: 'select' },
       ],
-      getNodeName: (id) =>
-        ({ 'api-node': '接口调用', 'city-node': '是否高频消费城市用户' }[id ?? ''] ?? null),
+      getNodeName: (id: string | undefined) => taggerRouteNames[id ?? ''] ?? null,
     }
     const model = buildConfigPanelPresentation(input)
 
