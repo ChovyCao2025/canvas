@@ -38,6 +38,24 @@ public class TagDefinition {
     /** 是否启用，1=启用，0=禁用 */
     private Integer enabled;
 
+    /** 标签值类型：STRING / NUMBER / BOOLEAN / JSON */
+    private String valueType;
+
+    /** 是否允许人工打标，1=允许，0=不允许 */
+    private Integer manualEnabled;
+
+    /** 默认有效期天数，null=长期有效 */
+    private Integer defaultTtlDays;
+
+    /** 标签分类 */
+    private String category;
+
+    /** 负责人 */
+    private String owner;
+
+    /** 第一批仅启用 UPSERT，APPEND 为后续多值标签预留 */
+    private String writePolicy;
+
     /** 创建人 */
     private String createdBy;
 

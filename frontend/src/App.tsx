@@ -22,6 +22,9 @@ const AudienceListPage = lazy(() => import('./pages/audience-list'))
 const AudienceEditPage = lazy(() => import('./pages/audience-edit'))
 const ApiDocsPage = lazy(() => import('./pages/api-docs'))
 const SystemOptionsPage = lazy(() => import('./pages/system-options'))
+const CdpUsersPage = lazy(() => import('./pages/cdp-users'))
+const CdpUserDetailPage = lazy(() => import('./pages/cdp-user-detail'))
+const CanvasUsersPage = lazy(() => import('./pages/canvas-users'))
 
 function RouteFallback() {
   return <Spin fullscreen />
@@ -41,10 +44,13 @@ export default function App() {
                   <Route path="/" element={<Navigate to="/home" replace />} />
                   <Route path="/home" element={<HomePage />} />
                   <Route path="/canvas" element={<CanvasListPage />} />
+                  <Route path="/cdp/users" element={<CdpUsersPage />} />
+                  <Route path="/cdp/users/:userId" element={<CdpUserDetailPage />} />
                 </Route>
 
                 <Route path="/canvas/:id/edit" element={<CanvasEditorPage />} />
                 <Route path="/canvas/:id/stats" element={<CanvasStatsPage />} />
+                <Route path="/canvas/:id/users" element={<CanvasUsersPage />} />
               </Route>
 
               <Route element={<RequireAdmin />}>

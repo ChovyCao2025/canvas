@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.chovy.canvas.domain.canvas.CanvasMapper;
 import org.chovy.canvas.domain.canvas.CanvasVersionMapper;
 import org.chovy.canvas.domain.constant.NodeType;
+import org.chovy.canvas.domain.cdp.CdpUserService;
 import org.chovy.canvas.domain.execution.CanvasExecutionDlqMapper;
 import org.chovy.canvas.domain.execution.CanvasExecutionMapper;
 import org.chovy.canvas.domain.execution.CanvasExecutionStatsMapper;
@@ -104,7 +105,8 @@ class CanvasExecutionServiceTriggerNodeTest {
                 mock(CanvasExecutionDlqMapper.class),
                 new TriggerPriorityConfig(),
                 mock(RocketMQTemplate.class),
-                new ObjectMapper()
+                new ObjectMapper(),
+                mock(CdpUserService.class)
         );
     }
 }

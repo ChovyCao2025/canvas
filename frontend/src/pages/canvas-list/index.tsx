@@ -214,6 +214,9 @@ export default function CanvasListPage() {
             <Button size="small" icon={<BarChartOutlined />}
               onClick={() => navigate(`/canvas/${record.id}/stats`)} />
           </Tooltip>
+          <Button size="small" onClick={() => navigate(`/canvas/${record.id}/users`)}>
+            用户数据
+          </Button>
 
           <Dropdown
             menu={{

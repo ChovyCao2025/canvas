@@ -1554,6 +1554,9 @@ function EditorInner({ detail, onStatusChange, onCanvasNameChange }: {
               })))
             }}
           />
+          <Button size="small" onClick={() => navigate(`/canvas/${canvasId}/users`)}>
+            用户
+          </Button>
           {!readonly && (
           <Tooltip title={isDirty ? '保存草稿（Ctrl+S）— 不影响线上' : '草稿已是最新'}>
             <Button size="small" icon={<SaveOutlined />} loading={saving}
