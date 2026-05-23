@@ -1,0 +1,77 @@
+import type { Edge } from '@xyflow/react'
+import { describe, expect, it } from 'vitest'
+import { applyInsertIntoEdge, buildDetachedNode, buildPlaceholderEdge } from './insertNode'
+
+describe('insertNode helpers', () => {
+  const edge: Edge = {
+    id: 'a->b',
+    source: 'a',
+    target: 'b',
+    sourceHandle: 'default',
+  }
+
+  it('splits one edge into two connected edges', () => {
+    const result = applyInsertIntoEdge(edge, 'new_node')
+
+    expect(result.removeEdgeId).toBe('a->b')
+    expect(result.newEdges).toEqual([
+      { id: 'a->new_node', source: 'a', target: 'new_node', sourceHandle: 'default', targetHandle: 'input' },
+      { id: 'new_node->b', source: 'new_node', target: 'b', sourceHandle: 'default' },
+    ])
+  })
+
+  it('treats an undefined sourceHandle as default', () => {
+    const result = applyInsertIntoEdge({
+      id: 'a->b',
+      source: 'a',
+      target: 'b',
+    }, 'new_node')
+
+    expect(result.newEdges).toEqual([
+      { id: 'a->new_node', source: 'a', target: 'new_node', sourceHandle: 'default', targetHandle: 'input' },
+      { id: 'new_node->b', source: 'new_node', target: 'b', sourceHandle: 'default' },
+    ])
+  })
+
+  it('preserves the original targetHandle on the downstream replacement edge', () => {
+    const result = applyInsertIntoEdge({
+      id: 'a->b',
+      source: 'a',
+      target: 'b',
+      sourceHandle: 'default',
+      targetHandle: 'input',
+    }, 'new_node')
+
+    expect(result.newEdges).toEqual([
+      { id: 'a->new_node', source: 'a', target: 'new_node', sourceHandle: 'default', targetHandle: 'input' },
+      { id: 'new_node->b', source: 'new_node', target: 'b', sourceHandle: 'default', targetHandle: 'input' },
+    ])
+  })
+
+  it('rejects non-default source handles', () => {
+    expect(() => applyInsertIntoEdge({
+      id: 'if_1->b',
+      source: 'if_1',
+      target: 'b',
+      sourceHandle: 'success',
+    }, 'new_node')).toThrow('applyInsertIntoEdge only supports default sourceHandle edges')
+  })
+
+  it('creates a detached node when dropped on blank canvas', () => {
+    const node = buildDetachedNode('new_node', 'GROOVY', '其他', { x: 120, y: 80 })
+
+    expect(node.position).toEqual({ x: 120, y: 80 })
+    expect(node.data.nodeType).toBe('GROOVY')
+    expect(node.data.bizConfig).toEqual({})
+  })
+
+  it('creates an edge from placeholder source and handle', () => {
+    expect(buildPlaceholderEdge('if_1', 'success', 'new_node')).toEqual({
+      id: 'if_1->new_node::success',
+      source: 'if_1',
+      target: 'new_node',
+      sourceHandle: 'success',
+      targetHandle: 'input',
+    })
+  })
+})

@@ -3,7 +3,7 @@ import {
   ReactFlow, ReactFlowProvider,
   addEdge, useNodesState, useEdgesState,
   useReactFlow, Background, Controls, MiniMap,
-  type Connection, type Node, type Edge, type NodeChange, type EdgeChange,
+  type Connection, type Node, type Edge, type NodeChange, type EdgeChange, type XYPosition,
 } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
 import './settingsPanel.css'
@@ -24,10 +24,11 @@ import NodePanel from '../../components/node-panel'
 import ConfigPanel from '../../components/config-panel'
 import ExecutionTracePanel from '../../components/canvas/ExecutionTracePanel'
 import {
-  DEFAULT_NAMES, TRIGGER_TYPES, TERMINAL_TYPES,
+  TRIGGER_TYPES, TERMINAL_TYPES,
 } from '../../components/canvas/constants'
 
 import HoverEdge from '../../components/canvas/HoverEdge'
+import { getBranchHandles } from '../../components/canvas/branchHandles'
 import CronBuilder from '../../components/config-panel/CronBuilder'
 import { CanvasActionsContext } from '../../context/CanvasActionsContext'
 import { useAuth } from '../../context/AuthContext'
@@ -40,6 +41,7 @@ import {
   type CanvasSettingsLike,
   shouldExpandExecutionLimits,
 } from './settingsPresentation'
+import { applyInsertIntoEdge, buildDetachedNode, buildPlaceholderEdge } from './insertNode'
 
 const { RangePicker } = DatePicker
 
@@ -139,6 +141,8 @@ function cleanRefs(cfg: Record<string, unknown>, deletedIds: Set<string>): BizCo
     successNodeId: clean(biz.successNodeId) as string | undefined,
     failNodeId:    clean(biz.failNodeId)    as string | undefined,
     elseNodeId:    clean(biz.elseNodeId)    as string | undefined,
+    approveNodeId: clean(biz.approveNodeId) as string | undefined,
+    rejectNodeId:  clean(biz.rejectNodeId)  as string | undefined,
     hitNextNodeId: clean(biz.hitNextNodeId) as string | undefined,
     missNextNodeId: clean(biz.missNextNodeId) as string | undefined,
     branches:   biz.branches?.map(b   => ({ ...b, nextNodeId: clean(b.nextNodeId) as string | undefined })),
@@ -147,9 +151,72 @@ function cleanRefs(cfg: Record<string, unknown>, deletedIds: Set<string>): BizCo
   }
 }
 
+function clearEdgeRef(cfg: Record<string, unknown>, edge: Edge): BizConfig {
+  const next = { ...(cfg as BizConfig) }
+  const sourceHandle = edge.sourceHandle ?? 'default'
+  if (sourceHandle === 'success') next.successNodeId = undefined
+  else if (sourceHandle === 'fail') next.failNodeId = undefined
+  else if (sourceHandle === 'else') next.elseNodeId = undefined
+  else if (sourceHandle === 'approve') next.approveNodeId = undefined
+  else if (sourceHandle === 'reject') next.rejectNodeId = undefined
+  else if (sourceHandle === 'hit') next.hitNextNodeId = undefined
+  else if (sourceHandle === 'miss') next.missNextNodeId = undefined
+  else if (sourceHandle.startsWith('branch-')) {
+    const idx = parseInt(sourceHandle.split('-')[1], 10)
+    next.branches = (next.branches ?? []).map((branch, i) =>
+      i === idx ? { ...branch, nextNodeId: undefined } : branch,
+    )
+  } else if (sourceHandle.startsWith('priority-')) {
+    const idx = parseInt(sourceHandle.split('-')[1], 10)
+    next.priorities = (next.priorities ?? []).map((priority, i) =>
+      i === idx ? { ...priority, nextNodeId: undefined } : priority,
+    )
+  } else if (sourceHandle.startsWith('group-')) {
+    const key = sourceHandle.replace('group-', '')
+    next.groups = (next.groups ?? []).map(group =>
+      group.groupKey === key ? { ...group, nextNodeId: undefined } : group,
+    )
+  } else {
+    next.nextNodeId = undefined
+  }
+  return next
+}
+
 // ── 撤销/重做历史 ─────────────────────────────────────────────
 
 interface Snapshot { nodes: Node<CanvasNodeData>[]; edges: Edge[]; actionName: string }
+
+type InsertContext =
+  | { kind: 'edge'; edgeId: string }
+  | { kind: 'placeholder'; sourceId: string; handleId: string }
+  | { kind: 'blank' }
+  | null
+
+function splitSelectedEdge(edge: Edge, nodeId: string): { removeEdgeId: string; newEdges: Edge[] } {
+  if ((edge.sourceHandle ?? 'default') === 'default') {
+    return applyInsertIntoEdge(edge, nodeId)
+  }
+
+  return {
+    removeEdgeId: edge.id,
+    newEdges: [
+      {
+        id: `${edge.source}->${nodeId}::${edge.sourceHandle}`,
+        source: edge.source,
+        target: nodeId,
+        sourceHandle: edge.sourceHandle,
+        targetHandle: 'input',
+      },
+      {
+        id: `${nodeId}->${edge.target}`,
+        source: nodeId,
+        target: edge.target,
+        sourceHandle: 'default',
+        targetHandle: edge.targetHandle,
+      },
+    ],
+  }
+}
 
 function useHistory(nodes: Node<CanvasNodeData>[], edges: Edge[]) {
   const [history, setHistory] = useState<Snapshot[]>([])
@@ -232,6 +299,7 @@ function EditorInner({ detail, onStatusChange, onCanvasNameChange }: {
     cooldownSeconds: detail.canvas.cooldownSeconds,
   })
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null)
+  const [insertContext, setInsertContext] = useState<InsertContext>(null)
   const [saving, setSaving]         = useState(false)
   const [isDirty, setIsDirty]       = useState(false)
   const [isEditingCanvasName, setIsEditingCanvasName] = useState(false)
@@ -286,6 +354,22 @@ function EditorInner({ detail, onStatusChange, onCanvasNameChange }: {
   const graphReloadKey = getCanvasGraphReloadKey(detail)
   const showCanvasNameActions = shouldShowCanvasNameActions(isEditingCanvasName)
   const statusTagGap = getCanvasNameStatusGap(isEditingCanvasName && !readonly)
+
+  const buildDefaultBizConfig = useCallback((nodeType: string): BizConfig => {
+    if (nodeType === 'SELECTOR') {
+      return { branches: [{ label: '如果', nextNodeId: undefined }] }
+    }
+    if (nodeType === 'IF_CONDITION') {
+      return { rules: [] }
+    }
+    if (nodeType === 'PRIORITY') {
+      return { priorities: [{ order: 1, nextNodeId: undefined }] }
+    }
+    if (nodeType === 'AB_SPLIT') {
+      return { groups: [{ groupKey: 'A', nextNodeId: undefined }] }
+    }
+    return {}
+  }, [])
 
   // ── Auto-save：最后一次改动 3s 后静默保存 ─────────────────────
   useEffect(() => {
@@ -388,6 +472,8 @@ function EditorInner({ detail, onStatusChange, onCanvasNameChange }: {
   // 拖拽节点入画布
   const onDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault()
+    if (readonly) return
+
     const nodeType = e.dataTransfer.getData('application/canvas-node-type')
     const category = e.dataTransfer.getData('application/canvas-node-category')
     if (!nodeType) return
@@ -401,48 +487,92 @@ function EditorInner({ detail, onStatusChange, onCanvasNameChange }: {
           && dropPos.y >= y && dropPos.y <= y + PH_H
     })
 
-    snapshot('添加节点')
-    const newPos: { x: number; y: number } = hitPlaceholder?.position ?? dropPos
-
-    const defaultBizConfig: BizConfig = nodeType === 'SELECTOR'
-      ? { branches: [{ label: '如果', nextNodeId: undefined }] }
-      : nodeType === 'IF_CONDITION'
-      ? { rules: [] }
-      : nodeType === 'PRIORITY'
-      ? { priorities: [{ order: 1, nextNodeId: undefined }] }
-      : nodeType === 'AB_SPLIT'
-      ? { groups: [{ groupKey: 'A', nextNodeId: undefined }] }
-      : {}
-
     const newId = crypto.randomUUID().replace(/-/g, '').slice(0, 12)
-    const newNode: Node = {
-      id: newId,
-      type: 'canvasNode',
-      position: newPos,
-      data: {
-        nodeType, name: DEFAULT_NAMES[nodeType] ?? nodeType,
-        category, bizConfig: defaultBizConfig,
-      } as CanvasNodeData,
+    const placeholderContext = hitPlaceholder
+      ? (() => {
+          const ph = hitPlaceholder.data as PlaceholderData
+          return { kind: 'placeholder', sourceId: ph.sourceId, handleId: ph.handleId } as const
+        })()
+      : null
+    const defaultBizConfig = buildDefaultBizConfig(nodeType)
+    const branchHandles = getBranchHandles(nodeType, defaultBizConfig)
+    const edgeInsertActive = insertContext?.kind === 'edge'
+    const edgeEligible = branchHandles.length === 0
+    const resolvedContext = placeholderContext
+      ?? (edgeInsertActive && edgeEligible ? insertContext : { kind: 'blank' as const })
+    const newPos: XYPosition = resolvedContext.kind === 'placeholder' && hitPlaceholder
+      ? hitPlaceholder.position
+      : dropPos
+    const selectedEdge = edgeInsertActive && edgeEligible && insertContext?.kind === 'edge'
+      ? getEdges().find(item => item.id === insertContext.edgeId)
+      : null
+
+    if (edgeInsertActive && !edgeEligible) {
+      setInsertContext(null)
+      message.info('该节点会按实际落点处理：拖到分支占位点可自动挂接，拖到空白处会独立创建。', 3)
     }
+
+    if (edgeInsertActive && edgeEligible) {
+      if (!selectedEdge) {
+        setInsertContext(null)
+        message.warning('所选连线已变化，请重新选择插入位置。', 2)
+        return
+      }
+    }
+
+    snapshot('添加节点')
+
+    const newNode = buildDetachedNode(newId, nodeType, category, newPos)
+    newNode.data.bizConfig = defaultBizConfig
+
     setNodes(prev => [...prev.filter(n => !(n.data as any)?._placeholder), newNode])
 
-    if (hitPlaceholder) {
-      const ph = hitPlaceholder.data as PlaceholderData
-      setNodes(prev => prev.map(n => {
-        if (n.id !== ph.sourceId) return n
-        const d = n.data as CanvasNodeData
-        return { ...n, data: { ...d, bizConfig: patchBizConfig(d.bizConfig, ph.handleId, newId) } }
+    if (resolvedContext.kind === 'edge' && selectedEdge) {
+      const { removeEdgeId, newEdges } = splitSelectedEdge(selectedEdge, newId)
+      setEdges(current => [...current.filter(item => item.id !== removeEdgeId), ...newEdges])
+      setNodes(current => current.map(node => {
+        if (node.id !== selectedEdge.source) return node
+        const data = node.data as CanvasNodeData
+        return {
+          ...node,
+          data: {
+            ...data,
+            bizConfig: patchBizConfig(data.bizConfig, selectedEdge.sourceHandle ?? 'default', newId),
+          },
+        }
       }))
-      setEdges(prev => addEdge({
-        id:           `${ph.sourceId}->${newId}`,
-        source:       ph.sourceId,
-        sourceHandle: ph.handleId,
-        target:       newId,
-        targetHandle: 'input',
-      }, prev))
+    } else if (resolvedContext.kind === 'placeholder') {
+      setNodes(current => current.map(node => {
+        if (node.id !== resolvedContext.sourceId) return node
+        const data = node.data as CanvasNodeData
+        return {
+          ...node,
+          data: {
+            ...data,
+            bizConfig: patchBizConfig(data.bizConfig, resolvedContext.handleId, newId),
+          },
+        }
+      }))
+      setEdges(current => addEdge(
+        buildPlaceholderEdge(resolvedContext.sourceId, resolvedContext.handleId, newId),
+        current,
+      ))
     }
+
+    setInsertContext(null)
+    setIsDirty(true)
     setSelectedNodeId(newId)
-  }, [placeholders, snapshot, screenToFlowPosition, setNodes, setEdges])
+  }, [
+    buildDefaultBizConfig,
+    getEdges,
+    insertContext,
+    placeholders,
+    readonly,
+    screenToFlowPosition,
+    setEdges,
+    setNodes,
+    snapshot,
+  ])
 
   const onDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault()
@@ -452,6 +582,7 @@ function EditorInner({ detail, onStatusChange, onCanvasNameChange }: {
   // 拖已有节点到占位框上：松手时检测命中并自动连线
   const onNodeDragStop = useCallback((_: React.MouseEvent, draggedNode: Node) => {
     setDraggingNodeId(null)
+    if (readonly) return
     const d = draggedNode.data as CanvasNodeData
     if ((d as any)?._placeholder) return
 
@@ -471,6 +602,15 @@ function EditorInner({ detail, onStatusChange, onCanvasNameChange }: {
     if (!hit) return
 
     const ph = hit.data as import('../../components/canvas/BranchPlaceholderNode').PlaceholderData
+    const sourceNode = getNodes().find(node => node.id === ph.sourceId)?.data as CanvasNodeData | undefined
+    if (!sourceNode) return
+    if (TRIGGER_TYPES.has(d.nodeType)) {
+      message.warning('START 是流程唯一入口，不能有上游节点。', 3)
+      return
+    }
+    if (TERMINAL_TYPES.has(sourceNode.nodeType)) return
+    if (ph.sourceId === draggedNode.id) return
+
     snapshot('连线')
     setNodes(prev => prev.map(n => {
       if (n.id === draggedNode.id) {
@@ -481,14 +621,9 @@ function EditorInner({ detail, onStatusChange, onCanvasNameChange }: {
       const nd = n.data as CanvasNodeData
       return { ...n, data: { ...nd, bizConfig: patchBizConfig(nd.bizConfig, ph.handleId, draggedNode.id) } }
     }))
-    setEdges(prev => addEdge({
-      id:           `${ph.sourceId}->${draggedNode.id}`,
-      source:       ph.sourceId,
-      sourceHandle: ph.handleId,
-      target:       draggedNode.id,
-      targetHandle: 'input',
-    }, prev))
-  }, [placeholders, snapshot, setNodes, setEdges])
+    setEdges(prev => addEdge(buildPlaceholderEdge(ph.sourceId, ph.handleId, draggedNode.id), prev))
+    setIsDirty(true)
+  }, [getNodes, placeholders, readonly, snapshot, setNodes, setEdges])
 
   // 连线
   const onConnect = useCallback((conn: Connection) => {
@@ -536,10 +671,36 @@ function EditorInner({ detail, onStatusChange, onCanvasNameChange }: {
   }, [nodes, snapshot, setNodes, setEdges, onNodesChange])
 
   const onEdgesChangeWrapped = useCallback((changes: EdgeChange[]) => {
+    const removedIds = changes
+      .filter((change): change is EdgeChange & { type: 'remove'; id: string } => change.type === 'remove')
+      .map(change => change.id)
+
+    if (removedIds.length > 0) {
+      snapshot('删除连线')
+      setInsertContext(current => (
+        current?.kind === 'edge' && removedIds.includes(current.edgeId) ? null : current
+      ))
+      const removedEdges = edges.filter(edge => removedIds.includes(edge.id))
+      if (removedEdges.length > 0) {
+        setNodes(prev => prev.map(node => {
+          const outgoing = removedEdges.filter(edge => edge.source === node.id)
+          if (outgoing.length === 0) return node
+          const data = node.data as CanvasNodeData
+          return {
+            ...node,
+            data: {
+              ...data,
+              bizConfig: outgoing.reduce((cfg, edge) => clearEdgeRef(cfg, edge), data.bizConfig ?? {}),
+            },
+          }
+        }))
+      }
+    }
+
     onEdgesChange(changes)
     const significant = changes.some(c => c.type === 'add' || c.type === 'remove')
     if (significant) setIsDirty(true)
-  }, [onEdgesChange])
+  }, [edges, onEdgesChange, setNodes, snapshot])
 
   // 连线规则
   const isValidConnection = useCallback((conn: Connection) => {
@@ -929,22 +1090,38 @@ function EditorInner({ detail, onStatusChange, onCanvasNameChange }: {
 
   const deleteEdgeById = (edgeId: string) => {
     snapshot('删除连线')
+    setInsertContext(current => current?.kind === 'edge' && current.edgeId === edgeId ? null : current)
     setEdges(prev => {
       const edge = prev.find(e => e.id === edgeId)
       if (edge) {
         setNodes(nodes => nodes.map(n => {
           if (n.id !== edge.source) return n
           const d = n.data as CanvasNodeData
-          const ids = new Set([edge.target])
-          return { ...n, data: { ...d, bizConfig: cleanRefs(d.bizConfig ?? {}, ids) } }
+          return { ...n, data: { ...d, bizConfig: clearEdgeRef(d.bizConfig ?? {}, edge) } }
         }))
       }
       return prev.filter(e => e.id !== edgeId)
     })
+    setIsDirty(true)
   }
 
   return (
-    <CanvasActionsContext.Provider value={{ deleteNode: deleteNodeById, copyNode: copyNodeById, deleteEdge: deleteEdgeById }}>
+    <CanvasActionsContext.Provider value={{
+      deleteNode: deleteNodeById,
+      copyNode: copyNodeById,
+      deleteEdge: deleteEdgeById,
+      canInsertOnEdge: !readonly,
+      startInsertOnEdge: edgeId => {
+        if (readonly) return
+        setInsertContext({ kind: 'edge', edgeId })
+        setSelectedNodeId(null)
+        message.info({
+          key: 'edge-insert-guidance',
+          content: '连线插入仅支持单输出节点；分支节点请拖到具体分支占位点或空白画布。',
+          duration: 2.5,
+        })
+      },
+    }}>
     <div style={{ display: 'flex', flexDirection: 'column', height: '100vh' }}>
 
       {/* 顶部工具栏 */}
@@ -1307,7 +1484,7 @@ function EditorInner({ detail, onStatusChange, onCanvasNameChange }: {
 
         {/* 左侧节点面板 */}
         <div style={{
-          width: 220, borderRight: '1px solid #f0f0f0',
+          width: 320, borderRight: '1px solid #f0f0f0',
           background: '#fafafa', flexShrink: 0,
         }}>
           <NodePanel onDragStart={() => {}} />
@@ -1328,8 +1505,14 @@ function EditorInner({ detail, onStatusChange, onCanvasNameChange }: {
             onEdgesChange={onEdgesChangeWrapped}
             onConnect={onConnect}
             isValidConnection={isValidConnection as any}
-            onNodeClick={(_, node) => setSelectedNodeId(node.id)}
-            onPaneClick={() => setSelectedNodeId(null)}
+            onNodeClick={(_, node) => {
+              setSelectedNodeId(node.id)
+              setInsertContext(null)
+            }}
+            onPaneClick={() => {
+              setSelectedNodeId(null)
+              setInsertContext(null)
+            }}
             onNodeDrag={(_, node) => setDraggingNodeId(node.id)}
             onNodeDragStop={onNodeDragStop}
             fitView
