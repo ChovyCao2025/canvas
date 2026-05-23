@@ -173,7 +173,7 @@ async function sendRequest(args, seq) {
   }
 }
 
-async function run(args) {
+export async function run(args) {
   let sent = 0
   let success = 0
   let failed = 0
@@ -206,6 +206,8 @@ async function run(args) {
   const p95Ms = durations.length === 0 ? 0 : durations[p95Index]
 
   return {
+    perfRunId: args.perfRunId,
+    mode: args.mode,
     sent,
     success,
     failed,

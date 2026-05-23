@@ -5,6 +5,7 @@ import {
   buildDirectPayload,
   chunkSeq,
   parseRunnerArgs,
+  run,
 } from './perf-runner.mjs'
 
 test('buildEventPayload produces deterministic perf input id', () => {
@@ -53,4 +54,19 @@ test('parseRunnerArgs reads required flags', () => {
   assert.equal(args.perfRunId, 'perf_20260523_001')
   assert.equal(args.count, 10)
   assert.equal(args.concurrency, 2)
+})
+
+test('run includes metadata in zero-count summary', async () => {
+  const summary = await run(parseRunnerArgs([
+    '--mode', 'event',
+    '--perf-run-id', 'perf_20260523_001',
+    '--count', '0',
+  ]))
+
+  assert.equal(summary.perfRunId, 'perf_20260523_001')
+  assert.equal(summary.mode, 'event')
+  assert.equal(summary.sent, 0)
+  assert.equal(summary.success, 0)
+  assert.equal(summary.failed, 0)
+  assert.equal(summary.p95Ms, 0)
 })
