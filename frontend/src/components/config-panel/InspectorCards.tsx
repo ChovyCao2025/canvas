@@ -44,29 +44,23 @@ const ROUTE_STYLES = {
 
 export interface NodeHeaderCardProps {
   tone: 'default' | 'tagger'
-  badgeLabel?: string
-  typeBadge?: string
+  typeBadge: string
   title: string
   metaBadges: string[]
   description?: string
-  statusBadgeLabel?: string
-  statusLabel?: string
+  statusLabel: string
 }
 
 export function NodeHeaderCard({
   tone,
-  badgeLabel,
   typeBadge,
   title,
   metaBadges,
   description,
-  statusBadgeLabel,
   statusLabel,
 }: NodeHeaderCardProps) {
   const isTagger = tone === 'tagger'
   const shellStyle = isTagger ? TAGGER_STYLES.shell : {}
-  const resolvedBadgeLabel = badgeLabel ?? typeBadge ?? ''
-  const resolvedStatusLabel = statusBadgeLabel ?? statusLabel ?? ''
 
   return (
     <div
@@ -87,7 +81,7 @@ export function NodeHeaderCard({
               ...(isTagger ? TAGGER_STYLES.badge : { background: '#f8fafc', color: '#475569', border: '1px solid #e2e8f0' }),
             }}
           >
-            {resolvedBadgeLabel}
+            {typeBadge}
           </Tag>
           <Typography.Title level={5} style={{ margin: '10px 0 6px', color: isTagger ? TAGGER_STYLES.title : '#0f172a' }}>
             {title}
@@ -111,7 +105,7 @@ export function NodeHeaderCard({
             border: isTagger ? TAGGER_STYLES.status.border : '1px solid #e2e8f0',
           }}
         >
-          {resolvedStatusLabel}
+          {statusLabel}
         </div>
       </div>
 
