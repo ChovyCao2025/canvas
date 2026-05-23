@@ -1,6 +1,7 @@
 package org.chovy.canvas.domain.notification;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -13,6 +14,10 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class NotificationService {
 
+    private static final int TITLE_LIMIT = 200;
+    private static final int CONTENT_LIMIT = 1000;
+    private static final int TARGET_URL_LIMIT = 500;
+
     private final NotificationMapper mapper;
 
     public Notification createForTask(
@@ -21,17 +26,18 @@ public class NotificationService {
         notification.setNotificationId(newNotificationId());
         notification.setUserId(userId);
         notification.setType(type);
-        notification.setTitle(title);
-        notification.setContent(content);
-        notification.setTargetUrl(targetUrl);
+        notification.setTitle(trimToLimit(title, TITLE_LIMIT));
+        notification.setContent(trimToLimit(content, CONTENT_LIMIT));
+        notification.setTargetUrl(trimToLimit(targetUrl, TARGET_URL_LIMIT));
         notification.setTaskId(taskId);
         mapper.insert(notification);
         return notification;
     }
 
-    public Page<Notification> list(String userId, boolean unreadOnly, int page, int size) {
+    public List<Notification> list(String userId, boolean unreadOnly, int page, int size) {
         return mapper.selectPage(new Page<>(page, size), baseUserQuery(userId, unreadOnly)
-                .orderByDesc(Notification::getCreatedAt));
+                        .orderByDesc(Notification::getCreatedAt))
+                .getRecords();
     }
 
     public long unreadCount(String userId) {
@@ -40,29 +46,20 @@ public class NotificationService {
     }
 
     public void markRead(String userId, String notificationId) {
-        Notification notification = mapper.selectOne(new LambdaQueryWrapper<Notification>()
+        Notification update = new Notification();
+        update.setReadAt(LocalDateTime.now());
+        mapper.update(update, new LambdaUpdateWrapper<Notification>()
                 .eq(Notification::getUserId, userId)
                 .eq(Notification::getNotificationId, notificationId)
-                .last("LIMIT 1"));
-        if (notification == null || notification.getReadAt() != null) {
-            return;
-        }
-
-        notification.setReadAt(LocalDateTime.now());
-        mapper.updateById(notification);
+                .isNull(Notification::getReadAt));
     }
 
     public void markAllRead(String userId) {
-        List<Notification> notifications = mapper.selectList(baseUserQuery(userId, true));
-        if (notifications.isEmpty()) {
-            return;
-        }
-
-        LocalDateTime now = LocalDateTime.now();
-        for (Notification notification : notifications) {
-            notification.setReadAt(now);
-            mapper.updateById(notification);
-        }
+        Notification update = new Notification();
+        update.setReadAt(LocalDateTime.now());
+        mapper.update(update, new LambdaUpdateWrapper<Notification>()
+                .eq(Notification::getUserId, userId)
+                .isNull(Notification::getReadAt));
     }
 
     private LambdaQueryWrapper<Notification> baseUserQuery(String userId, boolean unreadOnly) {
@@ -76,5 +73,12 @@ public class NotificationService {
 
     private String newNotificationId() {
         return "ntf_" + UUID.randomUUID().toString().replace("-", "");
+    }
+
+    private String trimToLimit(String value, int limit) {
+        if (value == null || value.length() <= limit) {
+            return value;
+        }
+        return value.substring(0, limit);
     }
 }
