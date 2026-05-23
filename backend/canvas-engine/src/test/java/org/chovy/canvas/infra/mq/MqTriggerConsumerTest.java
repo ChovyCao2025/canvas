@@ -90,6 +90,24 @@ class MqTriggerConsumerTest {
     }
 
     @Test
+    void onMessageThrowsWhenRequiredFieldsAreMissingSoRocketMqCanRetry() {
+        assertThatThrownBy(() -> consumer.onMessage(message("ORDER_PAID", "MSG-5",
+                "{\"userId\":\"\",\"messageCode\":\"PAYMENT\",\"payload\":{}}")))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("userId is required");
+
+        assertThatThrownBy(() -> consumer.onMessage(message("ORDER_PAID", "MSG-6",
+                "{\"userId\":\"user-9\",\"messageCode\":\"\",\"payload\":{}}")))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("messageCode is required");
+
+        assertThatThrownBy(() -> consumer.onMessage(message("ORDER_PAID", "MSG-7",
+                "{\"userId\":\"user-9\",\"messageCode\":\"PAYMENT\",\"payload\":null}")))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("payload is required");
+    }
+
+    @Test
     void onMessagePropagatesDisruptorFailureSoRocketMqCanRetry() {
         when(routeService.getCanvasByMqTopic("ORDER_PAID")).thenReturn(Set.of("101"));
         doThrow(new IllegalStateException("ring buffer unavailable"))

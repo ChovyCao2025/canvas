@@ -57,6 +57,7 @@ public class MqTriggerConsumer implements RocketMQListener<MessageExt> {
             log.error("[MQ_CONSUMER] 消息体解析失败 msgId={} body={}: {}", msgId, body, e.getMessage());
             throw new IllegalArgumentException("Invalid MQ trigger message body: " + e.getMessage(), e);
         }
+        validateMessage(triggerMessage);
 
         Set<String> canvasIds = routeService.getCanvasByMqTopic(tag);
         if (canvasIds.isEmpty()) {
@@ -77,6 +78,18 @@ public class MqTriggerConsumer implements RocketMQListener<MessageExt> {
             );
             log.info("[MQ_CONSUMER] 投递到 Disruptor canvasId={} userId={} tag={}",
                     canvasId, triggerMessage.getUserId(), tag);
+        }
+    }
+
+    private void validateMessage(MqTriggerMessage message) {
+        if (message.getUserId() == null || message.getUserId().isBlank()) {
+            throw new IllegalArgumentException("Invalid MQ trigger message body: userId is required");
+        }
+        if (message.getMessageCode() == null || message.getMessageCode().isBlank()) {
+            throw new IllegalArgumentException("Invalid MQ trigger message body: messageCode is required");
+        }
+        if (message.getPayload() == null) {
+            throw new IllegalArgumentException("Invalid MQ trigger message body: payload is required");
         }
     }
 }

@@ -7,6 +7,7 @@ import org.chovy.canvas.domain.constant.CanvasStatusEnum;
 import org.chovy.canvas.domain.execution.CanvasExecutionMapper;
 import org.chovy.canvas.domain.execution.CanvasExecutionStatsMapper;
 import org.chovy.canvas.engine.dag.DagParser;
+import org.chovy.canvas.engine.handlers.MqTriggerHandler;
 import org.chovy.canvas.engine.scheduler.DagEngine;
 import org.chovy.canvas.infra.cache.CanvasConfigCache;
 import org.chovy.canvas.infra.redis.ContextPersistenceService;
@@ -37,6 +38,7 @@ class CanvasExecutionServiceTest {
     @Mock TriggerPreCheckService preCheckService;
     @Mock InFlightExecutionRegistry executionRegistry;
     @Mock CanvasExecutionStatsMapper statsMapper;
+    @Mock MqTriggerHandler mqTriggerHandler;
 
     /** System under test — constructed manually so we can inject mocks via ReflectionTestUtils. */
     CanvasExecutionService sut;
@@ -53,7 +55,8 @@ class CanvasExecutionServiceTest {
                 dagEngine,
                 preCheckService,
                 executionRegistry,
-                statsMapper
+                statsMapper,
+                mqTriggerHandler
         );
         // Inject @Value fields with sensible defaults
         ReflectionTestUtils.setField(sut, "ctxTtlSec", 86400L);

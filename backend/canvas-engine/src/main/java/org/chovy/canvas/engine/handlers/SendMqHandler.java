@@ -3,6 +3,8 @@ package org.chovy.canvas.engine.handlers;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.rocketmq.client.producer.SendResult;
+import org.apache.rocketmq.client.producer.SendStatus;
 import org.apache.rocketmq.spring.core.RocketMQTemplate;
 import org.chovy.canvas.domain.meta.MqMessageDefinition;
 import org.chovy.canvas.domain.meta.MqMessageDefinitionMapper;
@@ -37,52 +39,89 @@ public class SendMqHandler implements NodeHandler {
     private String mqTopic;
 
     @Override
-    @SuppressWarnings("unchecked")
     public Mono<NodeResult> executeAsync(Map<String, Object> config, ExecutionContext ctx) {
-        String messageCodeKey = (String) config.get("messageCodeKey");
-        String nextNodeId     = (String) config.get("nextNodeId");
+        String rawMessageCodeKey = (String) config.get("messageCodeKey");
+        String messageCodeKey = rawMessageCodeKey != null ? rawMessageCodeKey.trim() : null;
+        String nextNodeId = (String) config.get("nextNodeId");
 
         if (messageCodeKey == null || messageCodeKey.isBlank()) {
             return Mono.just(NodeResult.fail("SEND_MQ: messageCodeKey 未配置"));
         }
 
-        MqMessageDefinition def = mqMapper.selectOne(
-                new LambdaQueryWrapper<MqMessageDefinition>()
-                        .eq(MqMessageDefinition::getMessageCode, messageCodeKey)
-                        .eq(MqMessageDefinition::getEnabled, 1));
-        if (def == null) {
-            return Mono.just(NodeResult.fail("SEND_MQ: 找不到消息定义 messageCode=" + messageCodeKey));
-        }
+        return Mono.fromCallable(() -> {
+                    MqMessageDefinition def = mqMapper.selectOne(
+                            new LambdaQueryWrapper<MqMessageDefinition>()
+                                    .eq(MqMessageDefinition::getMessageCode, messageCodeKey)
+                                    .eq(MqMessageDefinition::getEnabled, 1));
+                    if (def == null) {
+                        return NodeResult.fail("SEND_MQ: 找不到消息定义 messageCode=" + messageCodeKey);
+                    }
+                    if (def.getTopic() == null || def.getTopic().isBlank()) {
+                        return NodeResult.fail("SEND_MQ: 消息定义 topic 未配置 messageCode=" + messageCodeKey);
+                    }
 
-        List<Map<String, Object>> paramsList =
-                (List<Map<String, Object>>) config.getOrDefault("params", List.of());
-        Map<String, Object> payload = new HashMap<>();
-        for (Map<String, Object> param : paramsList) {
-            String key = (String) param.get("key");
-            Object value = param.get("value");
-            if (value instanceof String stringValue) {
-                String normalized = stringValue.startsWith("$${") ? stringValue.substring(1) : stringValue;
-                if (normalized.startsWith("${") && normalized.endsWith("}")) {
-                    value = ctx.getContextValue(normalized.substring(2, normalized.length() - 1));
-                }
-            }
-            if (key != null) {
-                payload.put(key, value);
-            }
-        }
+                    Map<String, Object> payload = buildPayload(config, ctx);
+                    MqTriggerMessage message = new MqTriggerMessage(ctx.getUserId(), messageCodeKey, payload);
+                    String destination = mqTopic + ":" + def.getTopic().trim();
 
-        MqTriggerMessage message = new MqTriggerMessage(ctx.getUserId(), messageCodeKey, payload);
-        String destination = mqTopic + ":" + def.getTopic();
+                    SendResult sendResult = rocketMQTemplate.syncSend(destination, message);
+                    if (sendResult == null || sendResult.getSendStatus() != SendStatus.SEND_OK) {
+                        SendStatus status = sendResult != null ? sendResult.getSendStatus() : null;
+                        throw new IllegalStateException("RocketMQ send status=" + status);
+                    }
 
-        return Mono.fromRunnable(() -> {
-                    rocketMQTemplate.syncSend(destination, message);
                     log.info("[SEND_MQ] 发送成功 destination={} userId={}", destination, ctx.getUserId());
+                    return NodeResult.ok(nextNodeId, Map.of("mqSent", true));
                 })
                 .subscribeOn(Schedulers.boundedElastic())
-                .thenReturn(NodeResult.ok(nextNodeId, Map.of("mqSent", true)))
                 .onErrorResume(e -> {
-                    log.error("[SEND_MQ] 发送失败 destination={}: {}", destination, e.getMessage());
+                    log.error("[SEND_MQ] 发送失败 messageCode={}: {}", messageCodeKey, e.getMessage(), e);
                     return Mono.just(NodeResult.fail("SEND_MQ: 消息发送失败: " + e.getMessage()));
                 });
+    }
+
+    @SuppressWarnings("unchecked")
+    private Map<String, Object> buildPayload(Map<String, Object> config, ExecutionContext ctx) {
+        Map<String, Object> payload = new HashMap<>();
+        copyParams(payload, config.get("params"), ctx);
+        copyParams(payload, config.get("inputParams"), ctx);
+        return payload;
+    }
+
+    private void copyParams(Map<String, Object> payload, Object rawParams, ExecutionContext ctx) {
+        if (rawParams == null) {
+            return;
+        }
+        if (rawParams instanceof Map<?, ?> paramsMap) {
+            paramsMap.forEach((key, value) -> {
+                if (key != null) {
+                    payload.put(String.valueOf(key), resolveValue(value, ctx));
+                }
+            });
+            return;
+        }
+        if (rawParams instanceof List<?> paramsList) {
+            for (Object item : paramsList) {
+                if (!(item instanceof Map<?, ?> param)) {
+                    throw new IllegalArgumentException("SEND_MQ: params 列表元素必须是对象");
+                }
+                Object key = param.get("key");
+                if (key != null) {
+                    payload.put(String.valueOf(key), resolveValue(param.get("value"), ctx));
+                }
+            }
+            return;
+        }
+        throw new IllegalArgumentException("SEND_MQ: params 必须是对象或列表");
+    }
+
+    private Object resolveValue(Object value, ExecutionContext ctx) {
+        if (value instanceof String stringValue) {
+            String normalized = stringValue.startsWith("$${") ? stringValue.substring(1) : stringValue;
+            if (normalized.startsWith("${") && normalized.endsWith("}")) {
+                return ctx.getContextValue(normalized.substring(2, normalized.length() - 1));
+            }
+        }
+        return value;
     }
 }

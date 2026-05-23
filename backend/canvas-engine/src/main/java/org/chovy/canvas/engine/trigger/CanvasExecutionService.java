@@ -17,6 +17,7 @@ import org.chovy.canvas.domain.execution.CanvasExecutionMapper;
 import org.chovy.canvas.engine.context.ExecutionContext;
 import org.chovy.canvas.engine.dag.DagGraph;
 import org.chovy.canvas.engine.dag.DagParser;
+import org.chovy.canvas.engine.handlers.MqTriggerHandler;
 import org.chovy.canvas.engine.scheduler.DagEngine;
 import org.chovy.canvas.infra.cache.CanvasConfigCache;
 import org.chovy.canvas.infra.redis.ContextPersistenceService;
@@ -50,6 +51,7 @@ public class CanvasExecutionService {
     private final TriggerPreCheckService preCheckService;
     private final InFlightExecutionRegistry executionRegistry;
     private final org.chovy.canvas.domain.execution.CanvasExecutionStatsMapper statsMapper;
+    private final MqTriggerHandler mqTriggerHandler;
 
     /** Canvas 实体本地缓存：canvasId → Canvas。TTL=5min，最多500条。 */
     private final Cache<Long, Canvas> canvasCache = Caffeine.newBuilder()
@@ -398,7 +400,10 @@ public class CanvasExecutionService {
             Map<String, Object> cfg = new HashMap<>();
             if (node.getBizConfig() != null) cfg.putAll(node.getBizConfig());
             if (node.getConfig() != null) cfg.putAll(node.getConfig());
-            String cfgKey = (String) cfg.getOrDefault("eventCode", cfg.getOrDefault("topicKey", ""));
+            String cfgKey = switch (triggerNodeType) {
+                case NodeType.MQ_TRIGGER -> mqTriggerHandler.resolveTopic(cfg);
+                default -> (String) cfg.getOrDefault("eventCode", cfg.getOrDefault("topicKey", ""));
+            };
             if (matchKey.equals(cfgKey)) return nodeId;
         }
         return null;

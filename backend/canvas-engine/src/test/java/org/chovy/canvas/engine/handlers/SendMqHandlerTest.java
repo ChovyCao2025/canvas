@@ -1,6 +1,8 @@
 package org.chovy.canvas.engine.handlers;
 
 import org.apache.rocketmq.spring.core.RocketMQTemplate;
+import org.apache.rocketmq.client.producer.SendResult;
+import org.apache.rocketmq.client.producer.SendStatus;
 import org.chovy.canvas.domain.meta.MqMessageDefinition;
 import org.chovy.canvas.domain.meta.MqMessageDefinitionMapper;
 import org.chovy.canvas.engine.context.ExecutionContext;
@@ -70,6 +72,7 @@ class SendMqHandlerTest {
         definition.setTopic("order.paid");
         definition.setEnabled(1);
         when(mqMapper.selectOne(any())).thenReturn(definition);
+        when(rocketMQTemplate.syncSend(anyString(), any(Object.class))).thenReturn(sendResult(SendStatus.SEND_OK));
 
         Map<String, Object> config = Map.of(
                 "messageCodeKey", "order_paid",
@@ -111,5 +114,89 @@ class SendMqHandlerTest {
 
         assertThat(result.success()).isFalse();
         assertThat(result.errorMessage()).isEqualTo("SEND_MQ: 消息发送失败: broker down");
+    }
+
+    @Test
+    void executeAsyncBuildsPayloadFromUiInputParamsShape() {
+        MqMessageDefinition definition = enabledDefinition("order.paid");
+        when(mqMapper.selectOne(any())).thenReturn(definition);
+        when(rocketMQTemplate.syncSend(anyString(), any(Object.class))).thenReturn(sendResult(SendStatus.SEND_OK));
+
+        Map<String, Object> config = Map.of(
+                "messageCodeKey", "order_paid",
+                "inputParams", Map.of(
+                        "orderId", "${orderId}",
+                        "amount", "$${amount}",
+                        "literal", "fixed"
+                )
+        );
+
+        NodeResult result = handler.executeAsync(config, context).block();
+
+        assertThat(result.success()).isTrue();
+
+        ArgumentCaptor<MqTriggerMessage> messageCaptor = ArgumentCaptor.forClass(MqTriggerMessage.class);
+        verify(rocketMQTemplate).syncSend(eq("CANVAS_MQ_TRIGGER:order.paid"), messageCaptor.capture());
+        assertThat(messageCaptor.getValue().getPayload())
+                .containsEntry("orderId", "O-1")
+                .containsEntry("amount", 12)
+                .containsEntry("literal", "fixed");
+    }
+
+    @Test
+    void executeAsyncBuildsPayloadFromMapShapedParams() {
+        MqMessageDefinition definition = enabledDefinition("order.paid");
+        when(mqMapper.selectOne(any())).thenReturn(definition);
+        when(rocketMQTemplate.syncSend(anyString(), any(Object.class))).thenReturn(sendResult(SendStatus.SEND_OK));
+
+        NodeResult result = handler.executeAsync(Map.of(
+                "messageCodeKey", "order_paid",
+                "params", Map.of("orderId", "${orderId}")
+        ), context).block();
+
+        assertThat(result.success()).isTrue();
+
+        ArgumentCaptor<MqTriggerMessage> messageCaptor = ArgumentCaptor.forClass(MqTriggerMessage.class);
+        verify(rocketMQTemplate).syncSend(eq("CANVAS_MQ_TRIGGER:order.paid"), messageCaptor.capture());
+        assertThat(messageCaptor.getValue().getPayload()).containsEntry("orderId", "O-1");
+    }
+
+    @Test
+    void executeAsyncFailsWhenRocketMqReturnsNonOkStatus() {
+        MqMessageDefinition definition = enabledDefinition("order.paid");
+        when(mqMapper.selectOne(any())).thenReturn(definition);
+        when(rocketMQTemplate.syncSend(anyString(), any(Object.class)))
+                .thenReturn(sendResult(SendStatus.FLUSH_DISK_TIMEOUT));
+
+        NodeResult result = handler.executeAsync(Map.of("messageCodeKey", "order_paid"), context).block();
+
+        assertThat(result.success()).isFalse();
+        assertThat(result.errorMessage()).isEqualTo("SEND_MQ: 消息发送失败: RocketMQ send status=FLUSH_DISK_TIMEOUT");
+    }
+
+    @Test
+    void executeAsyncFailsWhenMessageDefinitionTopicIsBlank() {
+        MqMessageDefinition definition = enabledDefinition(" ");
+        when(mqMapper.selectOne(any())).thenReturn(definition);
+
+        NodeResult result = handler.executeAsync(Map.of("messageCodeKey", " order_paid "), context).block();
+
+        assertThat(result.success()).isFalse();
+        assertThat(result.errorMessage()).isEqualTo("SEND_MQ: 消息定义 topic 未配置 messageCode=order_paid");
+        verify(rocketMQTemplate, never()).syncSend(anyString(), any(Object.class));
+    }
+
+    private static MqMessageDefinition enabledDefinition(String topic) {
+        MqMessageDefinition definition = new MqMessageDefinition();
+        definition.setMessageCode("order_paid");
+        definition.setTopic(topic);
+        definition.setEnabled(1);
+        return definition;
+    }
+
+    private static SendResult sendResult(SendStatus status) {
+        SendResult result = new SendResult();
+        result.setSendStatus(status);
+        return result;
     }
 }
