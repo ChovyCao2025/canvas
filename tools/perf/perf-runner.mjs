@@ -62,6 +62,14 @@ function validateArgs(args) {
   if (!args.perfRunId) {
     throw new Error('--perf-run-id is required')
   }
+
+  if (args.mode === 'direct' && !args.canvasId) {
+    throw new Error('--canvas-id is required for direct mode')
+  }
+
+  if (args.mode === 'audience' && !args.audienceId) {
+    throw new Error('--audience-id is required for audience mode')
+  }
 }
 
 export function parseRunnerArgs(argv) {
@@ -255,6 +263,10 @@ export function exitCodeForSummary(summary) {
   return summary.failed > 0 ? 2 : 0
 }
 
+export function isCliEntrypoint(moduleUrl, argvPath) {
+  return Boolean(argvPath) && moduleUrl === pathToFileURL(argvPath).href
+}
+
 async function main() {
   const args = parseRunnerArgs(process.argv.slice(2))
   const summary = await run(args)
@@ -263,7 +275,7 @@ async function main() {
   process.exitCode = exitCodeForSummary(summary)
 }
 
-if (import.meta.url === pathToFileURL(process.argv[1]).href) {
+if (isCliEntrypoint(import.meta.url, process.argv[1])) {
   main().catch((error) => {
     console.error(error.message)
     process.exitCode = 1

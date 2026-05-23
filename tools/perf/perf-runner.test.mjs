@@ -5,6 +5,7 @@ import {
   buildDirectPayload,
   chunkSeq,
   exitCodeForSummary,
+  isCliEntrypoint,
   parseRunnerArgs,
   run,
 } from './perf-runner.mjs'
@@ -79,9 +80,29 @@ test('parseRunnerArgs throws for invalid count', () => {
   ]), /--count must be a non-negative integer/)
 })
 
+test('parseRunnerArgs throws for direct mode without canvas id', () => {
+  assert.throws(() => parseRunnerArgs([
+    '--mode', 'direct',
+    '--perf-run-id', 'perf_20260523_001',
+    '--count', '0',
+  ]), /--canvas-id is required for direct mode/)
+})
+
+test('parseRunnerArgs throws for audience mode without audience id', () => {
+  assert.throws(() => parseRunnerArgs([
+    '--mode', 'audience',
+    '--perf-run-id', 'perf_20260523_001',
+    '--count', '0',
+  ]), /--audience-id is required for audience mode/)
+})
+
 test('exitCodeForSummary maps failed requests to exit code 2', () => {
   assert.equal(exitCodeForSummary({ failed: 1 }), 2)
   assert.equal(exitCodeForSummary({ failed: 0 }), 0)
+})
+
+test('isCliEntrypoint is safe when argv path is missing', () => {
+  assert.equal(isCliEntrypoint(import.meta.url, undefined), false)
 })
 
 test('run includes metadata in zero-count summary', async () => {
