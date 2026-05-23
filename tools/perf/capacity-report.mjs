@@ -80,12 +80,13 @@ export function estimateCapacity(input) {
 
   const bottleneck = candidates[0]
   const rawCapacity = Math.floor(bottleneck.capacity)
+  const recommendedCapacity = Math.floor(rawCapacity * input.safetyFactor)
 
   return {
     bottleneck: bottleneck.name,
     rawCapacity,
-    recommendedCapacity: Math.floor(rawCapacity * input.safetyFactor),
-    alertThreshold: Math.floor(rawCapacity * input.safetyFactor * 0.7),
+    recommendedCapacity,
+    alertThreshold: Math.floor(recommendedCapacity * 0.7),
     candidates: candidates.map((candidate) => ({
       name: candidate.name,
       capacity: Math.floor(candidate.capacity),

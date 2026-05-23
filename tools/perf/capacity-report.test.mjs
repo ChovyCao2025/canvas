@@ -50,6 +50,27 @@ test('estimateCapacity includes all bottleneck candidates', () => {
   ])
 })
 
+test('estimateCapacity calculates alert threshold from rounded recommendation', () => {
+  const result = estimateCapacity({
+    localStableQps: 100,
+    localAppCores: 1,
+    prodAppCoresTotal: 1,
+    writesPerEvent: 2,
+    prodDbSafeWriteQps: 10,
+    redisOpsPerEvent: 1,
+    prodRedisSafeOps: 100,
+    rocketmqCapacity: 100,
+    downstreamRateLimitPerSec: 100,
+    downstreamCallsPerEvent: 1,
+    cpuEfficiencyFactor: 1,
+    safetyFactor: 0.3,
+  })
+
+  assert.equal(result.rawCapacity, 5)
+  assert.equal(result.recommendedCapacity, 1)
+  assert.equal(result.alertThreshold, 0)
+})
+
 test('estimateCapacity rejects zero divisor inputs', () => {
   assert.throws(() => estimateCapacity({
     localStableQps: 1200,
