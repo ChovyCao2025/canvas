@@ -11,7 +11,7 @@ describe('insertNode helpers', () => {
   }
 
   it('splits one edge into two connected edges', () => {
-    const result = applyInsertIntoEdge(edge, 'GROOVY', 'new_node')
+    const result = applyInsertIntoEdge(edge, 'new_node')
 
     expect(result.removeEdgeId).toBe('a->b')
     expect(result.newEdges).toEqual([
@@ -26,19 +26,6 @@ describe('insertNode helpers', () => {
     expect(node.position).toEqual({ x: 120, y: 80 })
     expect(node.data.nodeType).toBe('GROOVY')
     expect(node.data.bizConfig).toEqual({})
-  })
-
-  it('seeds branching node config and routes downstream through its initial branch', () => {
-    const node = buildDetachedNode('new_node', 'AB_SPLIT', '逻辑分支', { x: 120, y: 80 })
-    const result = applyInsertIntoEdge(edge, 'AB_SPLIT', 'new_node')
-
-    expect(node.data.bizConfig).toEqual({
-      groups: [{ groupKey: 'A', nextNodeId: undefined }],
-    })
-    expect(result.newEdges).toEqual([
-      { id: 'a->new_node', source: 'a', target: 'new_node', sourceHandle: 'default' },
-      { id: 'new_node->b', source: 'new_node', target: 'b', sourceHandle: 'group-A' },
-    ])
   })
 
   it('creates an edge from placeholder source and handle', () => {
