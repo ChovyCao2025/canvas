@@ -1736,6 +1736,7 @@ node tools/perf/capacity-report.mjs \
   --redis-ops-per-event 3 \
   --prod-redis-safe-ops 30000 \
   --rocketmq-capacity 7000 \
+  --disruptor-worker-capacity 9000 \
   --downstream-rate-limit-per-sec 5000 \
   --downstream-calls-per-event 1
 ```

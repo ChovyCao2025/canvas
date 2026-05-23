@@ -353,6 +353,9 @@ public class CanvasExecutionService {
                     }
 
                     final CanvasExecution finalExec = createExecution(ctx);
+                    if (ctx.getPerfRunId() != null && acquiredDedupKey != null) {
+                        finalExec.setLastDedupKey(acquiredDedupKey);
+                    }
                     Mono<Map<String, Object>> executionMono = dagEngine.execute(graph, triggerNodeId, ctx)
                             .timeout(Duration.ofSeconds(globalTimeoutSec));
 

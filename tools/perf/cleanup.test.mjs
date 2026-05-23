@@ -10,6 +10,7 @@ test('buildCleanupSql deletes only perf run and PERF namespace rows', () => {
   const sql = buildCleanupSql('perf_20260523_001')
 
   assert.match(sql, /canvas_execution_trace/)
+  assert.match(sql, /audience_compute_run/)
   assert.match(sql, /perf_run_id = 'perf_20260523_001'/)
   assert.match(sql, /event_code LIKE 'PERF_%'/)
   assert.match(sql, /message_code LIKE 'PERF_%'/)
@@ -21,7 +22,9 @@ test('buildCleanupSql prints counts before and after cleanup', () => {
   const sql = buildCleanupSql('perf_20260523_001')
 
   assert.match(sql, /before_event_log_rows/)
+  assert.match(sql, /before_audience_compute_run_rows/)
   assert.match(sql, /after_event_log_rows/)
+  assert.match(sql, /after_audience_compute_run_rows/)
 })
 
 test('buildCleanupSql preserves execution ids for post-cleanup trace count', () => {

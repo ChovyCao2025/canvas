@@ -68,6 +68,7 @@ node tools/perf/perf-runner.mjs \
 ```
 
 Pass the expected audience size to the verifier when checking an audience run.
+Audience runs are isolated through `audience_compute_run.perf_run_id`.
 
 ## RocketMQ Test
 
@@ -133,6 +134,7 @@ node tools/perf/capacity-report.mjs \
   --redis-ops-per-event 3 \
   --prod-redis-safe-ops 30000 \
   --rocketmq-capacity 7000 \
+  --disruptor-worker-capacity 9000 \
   --downstream-rate-limit-per-sec 5000 \
   --downstream-calls-per-event 1
 ```
@@ -153,4 +155,4 @@ Execute cleanup:
 node tools/perf/cleanup.mjs --perf-run-id "$PERF_RUN_ID" --execute true
 ```
 
-Cleanup deletes only rows tied to the given `perfRunId` plus `PERF_%` event and MQ fixture definitions. It does not delete canvas definitions.
+Cleanup deletes only rows tied to the given `perfRunId`, including audience compute run ledgers, plus `PERF_%` event and MQ fixture definitions. It does not delete canvas definitions.

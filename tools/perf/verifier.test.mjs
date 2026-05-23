@@ -3,6 +3,7 @@ import assert from 'node:assert/strict'
 import {
   computeVerdict,
   duplicateInputSqlForMode,
+  expectedExecutionCount,
   parseTabularCount,
   parseVerifierArgs,
 } from './verifier.mjs'
@@ -215,4 +216,18 @@ test('duplicateInputSqlForMode groups available unique input keys', () => {
   assert.match(duplicateInputSqlForMode('event'), /perfInputId/)
   assert.match(duplicateInputSqlForMode('mq'), /source_msg_id/)
   assert.match(duplicateInputSqlForMode('direct'), /last_dedup_key/)
+})
+
+test('expectedExecutionCount subtracts intentional duplicates', () => {
+  assert.equal(expectedExecutionCount({
+    mode: 'direct',
+    sentSuccess: 100,
+    intentionalDuplicates: 2,
+    matchedCanvasCount: 1,
+  }), 98)
+})
+
+test('duplicateInputSqlForMode groups audience perf input ids', () => {
+  assert.match(duplicateInputSqlForMode('audience'), /audience_compute_run/)
+  assert.match(duplicateInputSqlForMode('audience'), /perf_input_id/)
 })

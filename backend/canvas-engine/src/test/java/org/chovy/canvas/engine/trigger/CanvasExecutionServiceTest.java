@@ -565,6 +565,41 @@ class CanvasExecutionServiceTest {
     }
 
     @Test
+    void triggerPersistsPerfDedupKeyForDirectVerification() {
+        Canvas canvas = publishedCanvas(45L, 10);
+        when(canvasEntityCache.get(45L)).thenReturn(canvas);
+        when(executionRegistry.activeCount(45L)).thenReturn(1);
+        when(ctxStore.exists(45L, "user-16")).thenReturn(false);
+        when(ctxStore.acquireDedup(eq(45L), eq("user-16"), eq("perf_20260523_005:direct:1"), any()))
+                .thenReturn(true);
+        when(ctxStore.buildDedupKey(45L, "user-16", "perf_20260523_005:direct:1"))
+                .thenReturn("dedup:45:user-16:perf_20260523_005:direct:1");
+        DagGraph graph = graphWithTriggerNode(NodeType.DIRECT_CALL, null);
+        when(configCache.get(45L, 101L)).thenReturn(graph);
+        when(executionRegistry.tryAcquire(eq(45L), any(), eq(1000), eq(1000)))
+                .thenReturn(Optional.of(Disposables.swap()));
+        when(dagEngine.execute(eq(graph), eq("trigger"), any())).thenReturn(Mono.just(Map.of("ok", true)));
+
+        Map<String, Object> result = sut.trigger(
+                45L,
+                "user-16",
+                TriggerType.DIRECT_CALL,
+                NodeType.DIRECT_CALL,
+                null,
+                Map.of("perfRunId", "perf_20260523_005", "amount", 88),
+                "perf_20260523_005:direct:1",
+                false
+        ).block();
+
+        assertThat(result).containsEntry("ok", true);
+        ArgumentCaptor<CanvasExecution> executionCaptor = ArgumentCaptor.forClass(CanvasExecution.class);
+        verify(executionMapper).insert(executionCaptor.capture());
+        assertThat(executionCaptor.getValue().getPerfRunId()).isEqualTo("perf_20260523_005");
+        assertThat(executionCaptor.getValue().getLastDedupKey())
+                .isEqualTo("dedup:45:user-16:perf_20260523_005:direct:1");
+    }
+
+    @Test
     void triggerDryRunPersistsExecutionPerfRunIdFromTriggerPayload() {
         Canvas canvas = publishedCanvas(44L, 10);
         when(canvasMapper.selectById(44L)).thenReturn(canvas);

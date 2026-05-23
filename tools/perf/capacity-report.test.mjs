@@ -12,6 +12,7 @@ test('estimateCapacity picks the minimum bottleneck and applies safety factor', 
     redisOpsPerEvent: 3,
     prodRedisSafeOps: 30000,
     rocketmqCapacity: 7000,
+    disruptorWorkerCapacity: 9000,
     downstreamRateLimitPerSec: 5000,
     downstreamCallsPerEvent: 1,
     cpuEfficiencyFactor: 0.75,
@@ -34,6 +35,7 @@ test('estimateCapacity includes all bottleneck candidates', () => {
     redisOpsPerEvent: 1,
     prodRedisSafeOps: 9000,
     rocketmqCapacity: 8000,
+    disruptorWorkerCapacity: 8500,
     downstreamRateLimitPerSec: 7000,
     downstreamCallsPerEvent: 1,
     cpuEfficiencyFactor: 1,
@@ -45,9 +47,32 @@ test('estimateCapacity includes all bottleneck candidates', () => {
     'APP_CPU',
     'DOWNSTREAM_API',
     'ROCKETMQ',
+    'DISRUPTOR_WORKER',
     'REDIS_OPS',
     'DB_WRITE',
   ])
+})
+
+test('estimateCapacity includes disruptor worker bottleneck', () => {
+  const result = estimateCapacity({
+    localStableQps: 1000,
+    localAppCores: 4,
+    prodAppCoresTotal: 8,
+    writesPerEvent: 1,
+    prodDbSafeWriteQps: 10000,
+    redisOpsPerEvent: 1,
+    prodRedisSafeOps: 9000,
+    rocketmqCapacity: 8000,
+    disruptorWorkerCapacity: 1200,
+    downstreamRateLimitPerSec: 7000,
+    downstreamCallsPerEvent: 1,
+    cpuEfficiencyFactor: 1,
+    safetyFactor: 0.5,
+  })
+
+  assert.equal(result.bottleneck, 'DISRUPTOR_WORKER')
+  assert.equal(result.rawCapacity, 1200)
+  assert.equal(result.recommendedCapacity, 600)
 })
 
 test('estimateCapacity calculates alert threshold from rounded recommendation', () => {
@@ -60,6 +85,7 @@ test('estimateCapacity calculates alert threshold from rounded recommendation', 
     redisOpsPerEvent: 1,
     prodRedisSafeOps: 100,
     rocketmqCapacity: 100,
+    disruptorWorkerCapacity: 100,
     downstreamRateLimitPerSec: 100,
     downstreamCallsPerEvent: 1,
     cpuEfficiencyFactor: 1,
@@ -81,6 +107,7 @@ test('estimateCapacity rejects zero divisor inputs', () => {
     redisOpsPerEvent: 3,
     prodRedisSafeOps: 30000,
     rocketmqCapacity: 7000,
+    disruptorWorkerCapacity: 9000,
     downstreamRateLimitPerSec: 5000,
     downstreamCallsPerEvent: 1,
   }), /localAppCores must be a positive number/)
@@ -96,6 +123,7 @@ test('parseCapacityArgs applies default safety factors', () => {
     '--redis-ops-per-event', '3',
     '--prod-redis-safe-ops', '30000',
     '--rocketmq-capacity', '7000',
+    '--disruptor-worker-capacity', '9000',
     '--downstream-rate-limit-per-sec', '5000',
     '--downstream-calls-per-event', '1',
   ])

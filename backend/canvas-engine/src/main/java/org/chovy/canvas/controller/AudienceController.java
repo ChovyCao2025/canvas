@@ -3,6 +3,7 @@ package org.chovy.canvas.controller;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import lombok.RequiredArgsConstructor;
+import lombok.Data;
 import org.chovy.canvas.common.PageResult;
 import org.chovy.canvas.common.R;
 import org.chovy.canvas.domain.audience.AudienceDefinition;
@@ -11,6 +12,7 @@ import org.chovy.canvas.domain.audience.AudienceStat;
 import org.chovy.canvas.domain.audience.AudienceStatMapper;
 import org.chovy.canvas.engine.audience.AudienceBatchComputeService;
 import org.chovy.canvas.engine.audience.AudienceSchedulerService;
+import org.chovy.canvas.perf.PerfRunContext;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -24,6 +26,8 @@ import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
 
 import java.util.List;
+import java.util.HashMap;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/canvas/audiences")
@@ -90,8 +94,13 @@ public class AudienceController {
     }
 
     @PostMapping("/{id}/compute")
-    public Mono<R<Void>> compute(@PathVariable Long id) {
-        return Mono.fromRunnable(() -> Thread.ofVirtual().start(() -> computeService.compute(id)))
+    public Mono<R<Void>> compute(@PathVariable Long id, @RequestBody(required = false) ComputeReq req) {
+        String perfRunId = extractPerfRunId(req);
+        String perfInputId = req == null || req.getPerfInputId() == null || req.getPerfInputId().isBlank()
+                ? null
+                : req.getPerfInputId();
+        return Mono.fromRunnable(() -> Thread.ofVirtual().start(
+                        () -> computeService.compute(id, perfRunId, perfInputId)))
                 .subscribeOn(Schedulers.boundedElastic())
                 .thenReturn(R.ok());
     }
@@ -100,5 +109,20 @@ public class AudienceController {
     public Mono<R<AudienceStat>> stat(@PathVariable Long id) {
         return Mono.fromCallable(() -> R.ok(statMapper.selectById(id)))
                 .subscribeOn(Schedulers.boundedElastic());
+    }
+
+    private String extractPerfRunId(ComputeReq req) {
+        if (req == null) {
+            return null;
+        }
+        Map<String, Object> payload = new HashMap<>();
+        payload.put("perfRunId", req.getPerfRunId());
+        return PerfRunContext.extract(payload);
+    }
+
+    @Data
+    static class ComputeReq {
+        private String perfRunId;
+        private String perfInputId;
     }
 }

@@ -16,6 +16,7 @@ const FLAG_NAMES = {
   '--redis-ops-per-event': 'redisOpsPerEvent',
   '--prod-redis-safe-ops': 'prodRedisSafeOps',
   '--rocketmq-capacity': 'rocketmqCapacity',
+  '--disruptor-worker-capacity': 'disruptorWorkerCapacity',
   '--downstream-rate-limit-per-sec': 'downstreamRateLimitPerSec',
   '--downstream-calls-per-event': 'downstreamCallsPerEvent',
   '--cpu-efficiency-factor': 'cpuEfficiencyFactor',
@@ -31,6 +32,7 @@ const REQUIRED_POSITIVE_ARGS = [
   'redisOpsPerEvent',
   'prodRedisSafeOps',
   'rocketmqCapacity',
+  'disruptorWorkerCapacity',
   'downstreamRateLimitPerSec',
   'downstreamCallsPerEvent',
   'cpuEfficiencyFactor',
@@ -75,6 +77,7 @@ export function estimateCapacity(input) {
     { name: 'DB_WRITE', capacity: dbWriteCapacity },
     { name: 'REDIS_OPS', capacity: redisOpsCapacity },
     { name: 'ROCKETMQ', capacity: input.rocketmqCapacity },
+    { name: 'DISRUPTOR_WORKER', capacity: input.disruptorWorkerCapacity },
     { name: 'DOWNSTREAM_API', capacity: downstreamCapacity },
   ].sort((left, right) => left.capacity - right.capacity)
 

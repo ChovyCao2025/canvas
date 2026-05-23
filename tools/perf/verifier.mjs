@@ -266,6 +266,19 @@ FROM (
 ) duplicate_inputs`
   }
 
+  if (mode === 'audience') {
+    return `
+SELECT COALESCE(SUM(extra_count), 0) AS count
+FROM (
+  SELECT GREATEST(COUNT(*) - 1, 0) AS extra_count
+  FROM audience_compute_run
+  WHERE perf_run_id = :perfRunId
+    AND perf_input_id IS NOT NULL
+  GROUP BY perf_input_id
+  HAVING COUNT(*) > 1
+) duplicate_inputs`
+  }
+
   return 'SELECT 0 AS count'
 }
 
@@ -310,6 +323,10 @@ function queryLedgers(args) {
     ...args,
     sql: duplicateInputSqlForMode(args.mode),
   })
+  const audienceRuns = queryCount({
+    ...args,
+    sql: 'SELECT COUNT(*) AS count FROM audience_compute_run WHERE perf_run_id = :perfRunId',
+  })
 
   return {
     eventLog,
@@ -322,6 +339,7 @@ function queryLedgers(args) {
     retryPending,
     rejectedWithRecord,
     duplicateInput,
+    audienceRuns,
   }
 }
 
@@ -335,7 +353,18 @@ function acceptedInputCount(args, ledgers) {
   if (args.mode === 'direct') {
     return ledgers.executions
   }
+  if (args.mode === 'audience') {
+    return ledgers.audienceRuns
+  }
   return args.sentSuccess
+}
+
+export function expectedExecutionCount(args) {
+  if (args.mode === 'audience') {
+    return 0
+  }
+  const uniqueInputs = Math.max(0, args.sentSuccess - (args.intentionalDuplicates || 0))
+  return uniqueInputs * args.matchedCanvasCount
 }
 
 export function verify(args) {
@@ -345,15 +374,21 @@ export function verify(args) {
   if (args.audienceId > 0 && args.expectedAudienceCount >= 0) {
     const actualAudienceCount = queryCount({
       ...args,
-      sql: `SELECT COALESCE(MAX(estimated_size), -1) AS count FROM audience_stat WHERE audience_id = ${args.audienceId}`,
+      sql: `SELECT COALESCE((
+        SELECT estimated_size
+        FROM audience_compute_run
+        WHERE perf_run_id = :perfRunId
+          AND audience_id = ${args.audienceId}
+          AND status = 'READY'
+        ORDER BY updated_at DESC
+        LIMIT 1
+      ), -1) AS count`,
     })
     wrongAudienceCount = actualAudienceCount === args.expectedAudienceCount ? 0 : 1
   }
 
   const accepted = acceptedInputCount(args, ledgers)
-  const expectedExecutions = args.mode === 'audience'
-    ? 0
-    : args.sentSuccess * args.matchedCanvasCount
+  const expectedExecutions = expectedExecutionCount(args)
 
   return computeVerdict({
     planned: args.sentSuccess,
