@@ -7,10 +7,12 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.time.Duration;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -139,5 +141,28 @@ class AudienceComputeTaskRunnerTest {
                 "VIP 人群 · 12 人",
                 "/audiences?highlight=7&taskId=task_shared",
                 "task_shared");
+    }
+
+    @Test
+    void runNow_retriesLockConflictWithoutMarkingTaskFailed() {
+        when(computeService.compute(7L))
+                .thenReturn(AudienceComputeResult.inProgress(7L, "VIP 人群", "已有计算任务正在运行"))
+                .thenReturn(AudienceComputeResult.ready(7L, "VIP 人群", 12L, 2));
+        when(asyncTaskService.subscribers("task_retry")).thenReturn(List.of("operator"));
+        AudienceComputeTaskRunner runner = new AudienceComputeTaskRunner(
+                computeService, asyncTaskService, notificationService, Duration.ZERO);
+
+        runner.runNow("task_retry", 7L, "VIP 人群", "operator");
+
+        verify(asyncTaskService).markRunning("task_retry");
+        verify(asyncTaskService).markSucceeded("task_retry", "{\"audienceId\":7,\"estimatedSize\":12,\"bitmapSizeKb\":2}");
+        verify(asyncTaskService, never()).markFailed("task_retry", "已有计算任务正在运行");
+        verify(notificationService, never()).createForTask(
+                "operator",
+                "TASK_FAILED",
+                "人群计算失败",
+                "VIP 人群 · 已有计算任务正在运行",
+                "/audiences?highlight=7&taskId=task_retry",
+                "task_retry");
     }
 }

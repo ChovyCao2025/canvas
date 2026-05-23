@@ -3,10 +3,12 @@ package org.chovy.canvas.controller;
 import io.jsonwebtoken.Claims;
 import lombok.RequiredArgsConstructor;
 import org.chovy.canvas.common.R;
+import org.chovy.canvas.domain.task.AsyncTask;
 import org.chovy.canvas.domain.task.AsyncTaskService;
 import org.chovy.canvas.dto.task.AsyncTaskDTO;
 import org.springframework.security.core.context.ReactiveSecurityContextHolder;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -22,6 +24,20 @@ import java.util.List;
 public class AsyncTaskController {
 
     private final AsyncTaskService taskService;
+
+    @GetMapping("/{taskId}")
+    public Mono<R<AsyncTaskDTO>> get(@PathVariable String taskId) {
+        return currentUser().flatMap(user ->
+                Mono.fromCallable(() -> {
+                    AsyncTask task = taskService.getByTaskId(taskId);
+                    if (task == null || !canView(task, user)) {
+                        throw new IllegalArgumentException("Async task not found: " + taskId);
+                    }
+                    return AsyncTaskDTO.from(task);
+                })
+                        .subscribeOn(Schedulers.boundedElastic())
+                        .map(R::ok));
+    }
 
     @GetMapping
     public Mono<R<List<AsyncTaskDTO>>> list(
@@ -79,6 +95,16 @@ public class AsyncTaskController {
 
     private String defaultIfBlank(String value, String fallback) {
         return value == null || value.isBlank() ? fallback : value;
+    }
+
+    private boolean canView(AsyncTask task, CurrentUser user) {
+        if ("ADMIN".equals(user.role())) {
+            return true;
+        }
+        if (user.username().equals(task.getCreatedBy())) {
+            return true;
+        }
+        return taskService.subscribers(task.getTaskId()).contains(user.username());
     }
 
     private record CurrentUser(String username, String role) {

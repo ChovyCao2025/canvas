@@ -33,16 +33,36 @@ export default function AudienceListPage() {
   const [loading, setLoading] = useState(false)
   const [pollFailureCount, setPollFailureCount] = useState(0)
   const pollTimerRef = useRef<number | null>(null)
+  const tasksRef = useRef<Record<number, AsyncTask>>({})
   const highlightedAudienceId = useMemo(() => {
     const value = new URLSearchParams(location.search).get('highlight')
-    return value ? Number(value) : undefined
+    if (!value) return undefined
+    const id = Number(value)
+    return Number.isFinite(id) ? id : undefined
   }, [location.search])
+  const linkedTaskId = useMemo(() => {
+    return new URLSearchParams(location.search).get('taskId') ?? undefined
+  }, [location.search])
+
+  useEffect(() => {
+    tasksRef.current = tasks
+  }, [tasks])
 
   const fetchList = useCallback(async () => {
     setLoading(true)
     try {
       const res = await audienceApi.list()
-      const list = res.data.list
+      let list = res.data.list
+      if (highlightedAudienceId != null && !list.some(item => item.id === highlightedAudienceId)) {
+        try {
+          const highlighted = await audienceApi.get(highlightedAudienceId)
+          if (highlighted.data) {
+            list = [highlighted.data, ...list]
+          }
+        } catch {
+          // The target may have been deleted; keep the normal first page usable.
+        }
+      }
       setData(list)
       const statTargets = list.filter((item): item is AudienceDefinition & { id: number } => item.id != null)
       const statResults = await Promise.allSettled(
@@ -59,7 +79,7 @@ export default function AudienceListPage() {
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [highlightedAudienceId])
 
   useEffect(() => {
     fetchList()
@@ -84,12 +104,35 @@ export default function AudienceListPage() {
         nextTasks[audienceId] = task
       }
     }
+    const completedAudienceIds = Object.entries(tasksRef.current)
+      .filter(([, task]) => task.status === 'QUEUED' || task.status === 'RUNNING')
+      .map(([audienceId]) => Number(audienceId))
+      .filter(audienceId => nextTasks[audienceId] == null)
     setTasks(nextTasks)
     setPollFailureCount(0)
-    if (refreshWhenIdle && !hasRunningAudienceTasks(res.data)) {
+    if (refreshWhenIdle && (completedAudienceIds.length > 0 || !hasRunningAudienceTasks(res.data))) {
       await fetchList()
     }
   }, [data, fetchList])
+
+  useEffect(() => {
+    if (!linkedTaskId) return
+    let canceled = false
+    taskApi.get(linkedTaskId)
+      .then(res => {
+        if (canceled || !res.data) return
+        const audienceId = Number(res.data.bizId)
+        if (Number.isNaN(audienceId)) return
+        setTasks(prev => ({ ...prev, [audienceId]: res.data }))
+        if (!data.some(item => item.id === audienceId)) {
+          fetchList().catch(() => undefined)
+        }
+      })
+      .catch(() => undefined)
+    return () => {
+      canceled = true
+    }
+  }, [data, fetchList, linkedTaskId])
 
   useEffect(() => {
     if (data.length === 0) return

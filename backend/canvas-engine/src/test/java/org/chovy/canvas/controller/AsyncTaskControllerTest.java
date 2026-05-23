@@ -108,4 +108,33 @@ class AsyncTaskControllerTest {
 
         verify(service).list(null, null, List.of(), List.of(), "system", false, 1, 200);
     }
+
+    @Test
+    void get_returnsTaskWhenCurrentUserSubscribed() {
+        AsyncTaskService service = mock(AsyncTaskService.class);
+        AsyncTask task = new AsyncTask();
+        task.setTaskId("task_1");
+        task.setTaskType("AUDIENCE_COMPUTE");
+        task.setBizType("AUDIENCE");
+        task.setBizId("7");
+        task.setTitle("计算人群：VIP 人群");
+        task.setStatus("RUNNING");
+        task.setProgress(5);
+        task.setCreatedBy("alice");
+        when(service.getByTaskId("task_1")).thenReturn(task);
+        when(service.subscribers("task_1")).thenReturn(List.of("bob"));
+        AsyncTaskController controller = new AsyncTaskController(service);
+        Claims claims = mock(Claims.class);
+        when(claims.get("username", String.class)).thenReturn("bob");
+        when(claims.get("role", String.class)).thenReturn("OPERATOR");
+        var auth = new UsernamePasswordAuthenticationToken(
+                claims, null, List.of(new SimpleGrantedAuthority("ROLE_OPERATOR")));
+
+        var response = controller.get("task_1")
+                .contextWrite(ReactiveSecurityContextHolder.withAuthentication(auth))
+                .block();
+
+        assertThat(response.getData().taskId()).isEqualTo("task_1");
+        assertThat(response.getData().bizId()).isEqualTo("7");
+    }
 }

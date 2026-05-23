@@ -1,24 +1,45 @@
 package org.chovy.canvas.engine.audience;
 
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.chovy.canvas.domain.notification.NotificationService;
 import org.chovy.canvas.domain.task.AsyncTaskService;
 import org.springframework.stereotype.Service;
 
+import java.time.Duration;
 import java.util.LinkedHashSet;
 import java.util.List;
 
 @Slf4j
 @Service
-@RequiredArgsConstructor
 public class AudienceComputeTaskRunner {
 
     private static final int ERROR_LIMIT = 1000;
+    private static final Duration DEFAULT_LOCK_RETRY_DELAY = Duration.ofSeconds(3);
 
     private final AudienceBatchComputeService computeService;
     private final AsyncTaskService asyncTaskService;
     private final NotificationService notificationService;
+    private final Duration lockRetryDelay;
+
+    public AudienceComputeTaskRunner(
+            AudienceBatchComputeService computeService,
+            AsyncTaskService asyncTaskService,
+            NotificationService notificationService
+    ) {
+        this(computeService, asyncTaskService, notificationService, DEFAULT_LOCK_RETRY_DELAY);
+    }
+
+    AudienceComputeTaskRunner(
+            AudienceBatchComputeService computeService,
+            AsyncTaskService asyncTaskService,
+            NotificationService notificationService,
+            Duration lockRetryDelay
+    ) {
+        this.computeService = computeService;
+        this.asyncTaskService = asyncTaskService;
+        this.notificationService = notificationService;
+        this.lockRetryDelay = lockRetryDelay;
+    }
 
     public void start(String taskId, Long audienceId, String audienceName, String operator) {
         Thread.ofVirtual().start(() -> runNow(taskId, audienceId, audienceName, operator));
@@ -28,7 +49,7 @@ public class AudienceComputeTaskRunner {
         asyncTaskService.markRunning(taskId);
         AudienceComputeResult result;
         try {
-            result = computeService.compute(audienceId);
+            result = computeWithLockRetry(audienceId, taskId);
         } catch (Exception e) {
             String error = errorMessage(e);
             log.error("[AUDIENCE] compute task failed taskId={} audienceId={}: {}", taskId, audienceId, error, e);
@@ -82,6 +103,25 @@ public class AudienceComputeTaskRunner {
             log.error("[AUDIENCE] failed to mark compute task failed taskId={}: {}",
                     taskId, markException.getMessage(), markException);
         }
+    }
+
+    private AudienceComputeResult computeWithLockRetry(Long audienceId, String taskId) throws InterruptedException {
+        while (true) {
+            AudienceComputeResult result = computeService.compute(audienceId);
+            if (!result.inProgress()) {
+                return result;
+            }
+            log.info("[AUDIENCE] compute task waiting for active lock taskId={} audienceId={}: {}",
+                    taskId, audienceId, result.errorMsg());
+            sleepBeforeLockRetry();
+        }
+    }
+
+    private void sleepBeforeLockRetry() throws InterruptedException {
+        if (lockRetryDelay.isZero() || lockRetryDelay.isNegative()) {
+            return;
+        }
+        Thread.sleep(lockRetryDelay.toMillis());
     }
 
     private void createNotificationBestEffort(

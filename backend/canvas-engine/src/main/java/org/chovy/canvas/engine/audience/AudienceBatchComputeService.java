@@ -52,7 +52,7 @@ public class AudienceBatchComputeService {
         boolean locked = Boolean.TRUE.equals(redis.opsForValue().setIfAbsent(lockKey, "1", Duration.ofHours(2)));
         if (!locked) {
             log.warn("[AUDIENCE] compute skipped because lock exists audienceId={}", audienceId);
-            return AudienceComputeResult.failed(audienceId, safeAudienceName(audienceId), "已有计算任务正在运行");
+            return AudienceComputeResult.inProgress(audienceId, safeAudienceName(audienceId), "已有计算任务正在运行");
         }
 
         String audienceName = fallbackAudienceName(audienceId);

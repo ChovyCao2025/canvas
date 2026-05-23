@@ -16,7 +16,15 @@ public record AudienceComputeResult(
         return new AudienceComputeResult(audienceId, audienceName, "FAILED", null, null, errorMsg);
     }
 
+    public static AudienceComputeResult inProgress(Long audienceId, String audienceName, String message) {
+        return new AudienceComputeResult(audienceId, audienceName, "IN_PROGRESS", null, null, message);
+    }
+
     public boolean success() {
         return "READY".equals(status);
+    }
+
+    public boolean inProgress() {
+        return "IN_PROGRESS".equals(status);
     }
 }

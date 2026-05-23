@@ -20,6 +20,8 @@ export interface AsyncTask {
 }
 
 export const taskApi = {
+  get: (taskId: string) =>
+    http.get<R<AsyncTask>, R<AsyncTask>>(`/canvas/async-tasks/${taskId}`),
   list: (params: { taskType?: string; bizType?: string; bizIds?: string; statuses?: string; page?: number; size?: number }) =>
     http.get<R<AsyncTask[]>, R<AsyncTask[]>>('/canvas/async-tasks', { params }),
 }
