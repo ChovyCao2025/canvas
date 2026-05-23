@@ -25,6 +25,13 @@ export interface BizConfig {
   rejectNodeId?:  string
   hitNextNodeId?: string
   missNextNodeId?: string
+  runtimePolicy?: Record<string, unknown>
+  timeoutNodeId?: string
+  suppressedNodeId?: string
+  skippedNodeId?: string
+  maxExceededNodeId?: string
+  goalMetNodeId?: string
+  goalNotMetNodeId?: string
   branches?:      Branch[]
   priorities?:    Priority[]
   groups?:        AbGroup[]

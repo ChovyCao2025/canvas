@@ -99,6 +99,10 @@ export interface NodeTypeRegistry {
   category: string
   configSchema: string   // JSON 字符串，解析后为 SchemaField[]
   outputSchema: string
+  outletSchema?: string
+  summaryTemplate?: string
+  runtimePolicySchema?: string
+  riskLevel?: 'LOW' | 'MEDIUM' | 'HIGH' | string
   isTrigger: 0 | 1
   isTerminal: 0 | 1
   description?: string
