@@ -121,10 +121,13 @@ const CanvasNode = memo(({ data, id, selected }: NodeProps) => {
       </NodeToolbar>
       <div
         style={{
-          width: 200, borderRadius: 8,
+          width: 200,
+          borderRadius: 8,
           border: `2px solid ${selected ? '#1677ff' : 'transparent'}`,
           boxShadow: hovered ? '0 4px 14px rgba(0,0,0,.18)' : '0 2px 8px rgba(0,0,0,.12)',
-          overflow: 'hidden', transition: 'box-shadow .15s',
+          overflow: 'visible',
+          transition: 'box-shadow .15s',
+          background: 'transparent',
         }}
       >
         {!isTrigger && (
@@ -132,12 +135,12 @@ const CanvasNode = memo(({ data, id, selected }: NodeProps) => {
           <Handle type="target" position={Position.Top} id="input"
             style={{ background: '#fff', border: '2px solid #bbb', width: 10, height: 10 }} />
         )}
-        <div style={{ background: bg, padding: '6px 10px' }}>
-          <span style={{ color: '#fff', fontSize: 11, fontWeight: 600, lineHeight: 1.2 }}>
+        <div style={{ background: bg, padding: '6px 10px', borderTopLeftRadius: 6, borderTopRightRadius: 6 }}>
+          <span style={{ color: '#fff', fontSize: 10, fontWeight: 600, lineHeight: 1.2 }}>
             {d.category} · {d.nodeType}
           </span>
         </div>
-        <div style={{ background: '#fff', padding: '8px 10px', fontSize: 13, color: '#262626', lineHeight: 1.4, minHeight: 36 }}>
+        <div style={{ background: '#fff', padding: '8px 10px', fontSize: 12, color: '#262626', lineHeight: 1.4, minHeight: 36, borderBottomLeftRadius: 6, borderBottomRightRadius: 6 }}>
           {d.name || '未命名'}
           {isAudienceTagger && (
             <div style={{ marginTop: 6, fontSize: 11, color: '#8c8c8c' }}>
@@ -170,7 +173,8 @@ const CanvasNode = memo(({ data, id, selected }: NodeProps) => {
                       top:       12,
                       left:      '50%',
                       transform: 'translateX(-50%)',
-                      fontSize:  9,
+                      fontSize:  10,
+                      fontWeight: 600,
                       color:     h.color,
                       whiteSpace: 'nowrap',
                       pointerEvents: 'none',

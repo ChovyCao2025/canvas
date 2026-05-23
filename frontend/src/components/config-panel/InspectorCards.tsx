@@ -1,5 +1,5 @@
 import type { CSSProperties, ReactNode } from 'react'
-import { Tag, Typography } from 'antd'
+import { Typography } from 'antd'
 
 const PANEL_SURFACE = '#f5f5f7'
 const PANEL_CARD = '#ffffff'
@@ -62,6 +62,7 @@ export interface NodeHeaderCardProps {
 
   /** 右上角状态文案。 */
   statusLabel: string
+  categoryLabel?: string
   categoryColor?: string
 }
 
@@ -87,18 +88,17 @@ function getHeaderPillStyles(color: string) {
 
 export function NodeHeaderCard({
   tone,
-  typeBadge,
   title,
-  metaBadges,
   description,
   statusLabel,
+  categoryLabel,
   categoryColor,
 }: NodeHeaderCardProps) {
   const isTagger = tone === 'tagger'
   const resolvedCategoryColor = categoryColor ?? '#475569'
   const pillStyles = getHeaderPillStyles(resolvedCategoryColor)
   const headerBackground = isTagger
-    ? `linear-gradient(135deg, ${resolvedCategoryColor}0f 0%, #f8fbff 56%, ${resolvedCategoryColor}08 100%)`
+    ? `linear-gradient(135deg, ${resolvedCategoryColor}12 0%, #ffffff 58%, ${resolvedCategoryColor}0a 100%)`
     : PANEL_CARD
 
   return (
@@ -113,30 +113,36 @@ export function NodeHeaderCard({
         overflow: 'hidden',
       }}
     >
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
-        <Tag
-          style={{
-            margin: 0,
-            borderRadius: 999,
-            height: 36,
-            lineHeight: '34px',
-            padding: '0 17px',
-            fontSize: 14,
-            fontWeight: 700,
-            letterSpacing: '.01em',
-            ...pillStyles.badge,
-          }}
-        >
-          {typeBadge}
-        </Tag>
+      <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'flex-start', gap: 10 }}>
+        {categoryLabel && (
+          <div
+            style={{
+              minWidth: 0,
+              maxWidth: 120,
+              borderRadius: 999,
+              minHeight: 34,
+              lineHeight: '18px',
+              padding: '7px 15px',
+              fontSize: 13,
+              fontWeight: 700,
+              color: pillStyles.meta.color,
+              background: pillStyles.meta.background,
+              border: pillStyles.meta.border,
+              whiteSpace: 'nowrap',
+            }}
+          >
+            {categoryLabel}
+          </div>
+        )}
         <div
           style={{
-            flexShrink: 0,
+            minWidth: 0,
+            maxWidth: 110,
             borderRadius: 999,
-            height: 36,
-            lineHeight: '34px',
-            padding: '0 17px',
-            fontSize: 14,
+            minHeight: 34,
+            lineHeight: '18px',
+            padding: '7px 15px',
+            fontSize: 13,
             fontWeight: 700,
             color: pillStyles.status.color,
             background: pillStyles.status.background,
@@ -151,10 +157,10 @@ export function NodeHeaderCard({
       <Typography.Title level={5} style={{
         margin: '22px 0 0',
         color: isTagger ? TAGGER_STYLES.title : '#1d1d1f',
-        fontSize: 20,
+        fontSize: 18,
         lineHeight: 1.35,
         fontWeight: 700,
-        letterSpacing: '-0.025em',
+        letterSpacing: 0,
       }}>
         {title}
       </Typography.Title>
@@ -165,27 +171,6 @@ export function NodeHeaderCard({
         </div>
       )}
 
-      {!!metaBadges.length && (
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, marginTop: 24 }}>
-          {metaBadges.map((badge) => (
-            <Tag
-              key={badge}
-              style={{
-                margin: 0,
-                height: 34,
-                lineHeight: '32px',
-                borderRadius: 999,
-                padding: '0 17px',
-                fontSize: 14,
-                fontWeight: 650,
-                ...pillStyles.meta,
-              }}
-            >
-              {badge}
-            </Tag>
-          ))}
-        </div>
-      )}
     </div>
   )
 }

@@ -22,27 +22,10 @@ export interface ConfigPanelPresentation {
     metaBadges: string[]
     description?: string
     statusLabel: string
+    categoryLabel?: string
   }
   summaryRows: Array<{ label: string; value: string }>
   branchRoutes: Array<{ label: string; value: string; tone: 'success' | 'danger' }>
-}
-
-const TAGGER_SUMMARY_KEYS = new Set(['mode', 'audienceId'])
-
-function toDisplayValue(value: unknown): string {
-  if (typeof value === 'string' && value.trim()) return value.trim()
-  if (typeof value === 'number' || typeof value === 'boolean') return String(value)
-  return '未设置'
-}
-
-function resolveDisplayValue(input: {
-  key: string
-  formValues: Record<string, unknown>
-  displayValues: Record<string, string | undefined>
-}): string {
-  const displayValue = input.displayValues[input.key]
-  if (typeof displayValue === 'string' && displayValue.trim()) return displayValue.trim()
-  return toDisplayValue(input.formValues[input.key])
 }
 
 function resolveTaggerMetaBadges(mode: unknown, displayMode: string | undefined): string[] {
@@ -54,17 +37,10 @@ function resolveTaggerMetaBadges(mode: unknown, displayMode: string | undefined)
 }
 
 export function buildConfigPanelPresentation(input: BuildConfigPanelPresentationInput): ConfigPanelPresentation {
-  const { nodeData, formValues, displayValues, fields, getNodeName } = input
+  const { nodeData, formValues, displayValues, getNodeName } = input
   const isTagger = nodeData.nodeType === 'TAGGER'
 
-  const summaryRows = isTagger
-    ? fields
-        .filter((field) => TAGGER_SUMMARY_KEYS.has(field.key))
-        .map((field) => ({
-          label: field.label,
-          value: resolveDisplayValue({ key: field.key, formValues, displayValues }),
-        }))
-    : []
+  const summaryRows: Array<{ label: string; value: string }> = []
 
   const branchRoutes = isTagger
     ? [
@@ -87,8 +63,9 @@ export function buildConfigPanelPresentation(input: BuildConfigPanelPresentation
       typeBadge: isTagger ? 'Tagger' : nodeData.nodeType,
       title: nodeData.name,
       metaBadges: isTagger ? resolveTaggerMetaBadges(formValues.mode, displayValues.mode) : [],
-      description: isTagger ? '标签判断节点，根据圈选人群决定后续分支流向' : nodeData.category,
+      description: isTagger ? '标签判断节点，根据圈选人群决定后续分支流向' : undefined,
       statusLabel: '已配置',
+      categoryLabel: nodeData.category,
     },
     summaryRows,
     branchRoutes,

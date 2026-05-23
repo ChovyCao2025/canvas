@@ -102,6 +102,9 @@ export const CONTROL_CHROME_SELECTOR_CSS = `
     font-size: 14px !important;
     font-weight: 500 !important;
     color: #1d1d1f !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    white-space: nowrap !important;
   }
 
   .config-panel-ios-select.ant-select-single .ant-select-selector .ant-select-selection-search,
@@ -119,7 +122,18 @@ export const CONTROL_CHROME_SELECTOR_CSS = `
 
   .config-panel-ios-input-number {
     width: 100%;
-    padding-inline: 18px !important;
+    padding-inline: 10px !important;
+  }
+
+  .config-panel-ios-input-number .ant-input-number-input {
+    padding-inline: 0 !important;
+    width: 100% !important;
+  }
+
+  .config-panel-ios-input-number .ant-input-number-input-wrap {
+    height: 100% !important;
+    display: flex !important;
+    align-items: center !important;
   }
 
   .config-panel-ios-input-number input,
@@ -129,6 +143,10 @@ export const CONTROL_CHROME_SELECTOR_CSS = `
     font-size: 14px;
     font-weight: 500;
     color: #1d1d1f;
+  }
+
+  .config-panel-ios-input-number input {
+    text-align: center !important;
   }
 
   .config-panel-ios-textarea,

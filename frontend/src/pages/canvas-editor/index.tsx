@@ -34,6 +34,7 @@ import CronBuilder from '../../components/config-panel/CronBuilder'
 import { CanvasActionsContext } from '../../context/CanvasActionsContext'
 import { useAuth } from '../../context/AuthContext'
 import { getCanvasGraphReloadKey } from './graphReloadKey'
+import { isLocalDraftDifferentFromServer, readCanvasLocalDraft, writeCanvasLocalDraft } from './localDraft'
 import { buildCanvasNameUpdate, getCanvasNameStatusGap, shouldShowCanvasNameActions } from './canvasNameUpdate'
 import {
   type CanvasTriggerType,
@@ -73,6 +74,37 @@ function applyDagreLayout(nodes: Node[], edges: Edge[]) {
     const { x, y } = g.node(n.id)
     return { ...n, position: { x: x - 100, y: y - 38 } }
   })
+}
+
+function normalizeCanvasSettingsFromDetail(detail: CanvasDetail): CanvasSettingsLike {
+  return {
+    triggerType: normalizeCanvasTriggerType(detail.canvas.triggerType),
+    cronExpression: detail.canvas.cronExpression,
+    validStart: detail.canvas.validStart,
+    validEnd: detail.canvas.validEnd,
+    maxTotalExecutions: detail.canvas.maxTotalExecutions,
+    perUserDailyLimit: detail.canvas.perUserDailyLimit,
+    perUserTotalLimit: detail.canvas.perUserTotalLimit,
+    cooldownSeconds: detail.canvas.cooldownSeconds,
+  }
+}
+
+function buildBackendNodesFromFlowNodes(nodes: Node[]): BackendNode[] {
+  return nodes
+    .filter(node => !(node.data as any)?._placeholder)
+    .map(node => {
+      const data = node.data as CanvasNodeData
+      return {
+        id: node.id,
+        type: data.nodeType,
+        name: data.name,
+        category: data.category,
+        x: Math.round(node.position.x),
+        y: Math.round(node.position.y),
+        config: data.bizConfig,
+        outletSchema: data.outletSchema,
+      }
+    })
 }
 
 // ── 清理被删节点的引用 ────────────────────────────────────────
@@ -286,6 +318,7 @@ function EditorInner({ detail, onStatusChange, onCanvasNameChange }: {
   const editVersion   = useRef(detail.canvas.editVersion ?? 0)
   const autoSaveTimer = useRef<ReturnType<typeof setTimeout>>()
   const savedCanvasName = useRef(detail.canvas.name)
+  const localDraftReadyRef = useRef(false)
   const limitsSectionId = 'canvas-settings-execution-limits'
   const watchedTriggerType = Form.useWatch('triggerType', settingsForm)
   const watchedCronExpression = Form.useWatch('cronExpression', settingsForm)
@@ -373,40 +406,105 @@ function EditorInner({ detail, onStatusChange, onCanvasNameChange }: {
     return () => clearTimeout(autoSaveTimer.current)
   })
 
+  const persistLocalDraft = useCallback((overrides?: {
+    graphJson?: string
+    name?: string
+    settings?: CanvasSettingsLike
+    editVersion?: number
+  }) => {
+    writeCanvasLocalDraft({
+      canvasId,
+      name: (overrides?.name ?? canvasName).trim(),
+      graphJson: overrides?.graphJson ?? JSON.stringify({ nodes: buildBackendNodesFromFlowNodes(getNodes()) }),
+      settings: overrides?.settings ?? canvasSettings,
+      editVersion: overrides?.editVersion ?? editVersion.current,
+      draftVersionId: detail.draftVersionId,
+      savedAt: Date.now(),
+    })
+  }, [canvasId, canvasName, canvasSettings, detail.draftVersionId, getNodes])
+
+  useEffect(() => {
+    if (!localDraftReadyRef.current || !isDirty || readonly) return
+    persistLocalDraft()
+  }, [canvasName, canvasSettings, isDirty, nodes, edges, persistLocalDraft, readonly])
+
   // 初始化加载
   useEffect(() => {
-    const backendNodes: BackendNode[] = JSON.parse(detail.graphJson || '{"nodes":[]}').nodes ?? []
+    localDraftReadyRef.current = false
 
-    // Auto-inject START node for brand-new empty canvases
-    if (backendNodes.length === 0) {
-      const startNode: Node<CanvasNodeData> = {
-        id: 'start_init',
-        type: 'canvasNode',
-        position: { x: 200, y: 100 },
-        data: { nodeType: 'START', name: '开始', category: '其他', bizConfig: {} },
+    const applyCanvasDraft = (graphJson: string, nextName: string, nextSettings: CanvasSettingsLike, nextEditVersion: number) => {
+      const backendNodes: BackendNode[] = JSON.parse(graphJson || '{"nodes":[]}').nodes ?? []
+      setCanvasName(nextName)
+      savedCanvasName.current = nextName
+      setCanvasSettings(nextSettings)
+      editVersion.current = nextEditVersion
+
+      if (backendNodes.length === 0) {
+        const startNode: Node<CanvasNodeData> = {
+          id: 'start_init',
+          type: 'canvasNode',
+          position: { x: 200, y: 100 },
+          data: { nodeType: 'START', name: '开始', category: '其他', bizConfig: {} },
+        }
+        setNodes([startNode])
+        setEdges([])
+        requestAnimationFrame(() => fitView({ padding: 0.3, duration: 300 }))
+        return
       }
-      setNodes([startNode])
-      setEdges([])
-      requestAnimationFrame(() => fitView({ padding: 0.3, duration: 300 }))
+
+      const rfNodes: Node[] = backendNodes.map(n => ({
+        id: n.id, type: 'canvasNode',
+        position: { x: n.x ?? 0, y: n.y ?? 0 },
+        data: {
+          nodeType: n.type, name: n.name,
+          category: n.category ?? '',
+          bizConfig: n.config ?? n.bizConfig ?? {},
+          outletSchema: n.outletSchema,
+        } as CanvasNodeData,
+      }))
+      const rfEdges = deriveEdges(backendNodes)
+      const layouted = rfNodes.every(n => n.position.x === 0 && n.position.y === 0)
+        ? applyDagreLayout(rfNodes, rfEdges) as Node<CanvasNodeData>[]
+        : rfNodes
+      setNodes(layouted)
+      setEdges(rfEdges)
+      requestAnimationFrame(() => fitView({ padding: 0.15, duration: 300 }))
+    }
+
+    const serverSettings = normalizeCanvasSettingsFromDetail(detail)
+    applyCanvasDraft(detail.graphJson, detail.canvas.name, serverSettings, detail.canvas.editVersion ?? 0)
+    setIsDirty(false)
+
+    if (readonly) {
+      localDraftReadyRef.current = true
       return
     }
 
-    const rfNodes: Node[] = backendNodes.map(n => ({
-      id: n.id, type: 'canvasNode',
-      position: { x: n.x ?? 0, y: n.y ?? 0 },
-      data: {
-        nodeType: n.type, name: n.name,
-        category: n.category ?? '',
-        bizConfig: n.config ?? {},
-        outletSchema: n.outletSchema,
-      } as CanvasNodeData,
-    }))
-    const rfEdges = deriveEdges(backendNodes)
-    const layouted = rfNodes.every(n => n.position.x === 0 && n.position.y === 0)
-      ? applyDagreLayout(rfNodes, rfEdges) as Node<CanvasNodeData>[] : rfNodes
-    setNodes(layouted)
-    setEdges(rfEdges)
-    requestAnimationFrame(() => fitView({ padding: 0.15, duration: 300 }))
+    const localDraft = readCanvasLocalDraft(canvasId)
+    if (!localDraft || !isLocalDraftDifferentFromServer(localDraft, detail)) {
+      localDraftReadyRef.current = true
+      return
+    }
+
+    Modal.confirm({
+      title: '检测到本地草稿',
+      content: `发现 ${new Date(localDraft.savedAt).toLocaleString('zh-CN')} 的本地草稿，是否恢复？`,
+      okText: '恢复本地草稿',
+      cancelText: '保持当前内容',
+      onOk: () => {
+        applyCanvasDraft(
+          localDraft.graphJson,
+          localDraft.name,
+          localDraft.settings,
+          localDraft.editVersion || detail.canvas.editVersion || 0,
+        )
+        setIsDirty(true)
+        localDraftReadyRef.current = true
+      },
+      onCancel: () => {
+        localDraftReadyRef.current = true
+      },
+    })
   }, [graphReloadKey, detail.graphJson, fitView, setNodes, setEdges])
 
   // 键盘快捷键（含复制/粘贴）
@@ -795,20 +893,12 @@ function EditorInner({ detail, onStatusChange, onCanvasNameChange }: {
   const handleSave = useCallback(async (silent = false) => {
     setSaving(true)
     try {
-      const rfNodes = getNodes().filter(n => !(n.data as any)?._placeholder)
-      const backendNodes = rfNodes.map(n => {
-        const d = n.data as CanvasNodeData
-        return {
-          id: n.id, type: d.nodeType, name: d.name, category: d.category,
-          x: Math.round(n.position.x), y: Math.round(n.position.y),
-          config: d.bizConfig,
-          outletSchema: d.outletSchema,
-        }
-      })
+      const backendNodes = buildBackendNodesFromFlowNodes(getNodes())
+      const graphJson = JSON.stringify({ nodes: backendNodes })
       await canvasApi.update(canvasId, {
         name: canvasName,
         description: detail.canvas.description,
-        graphJson: JSON.stringify({ nodes: backendNodes }),
+        graphJson,
         editVersion: editVersion.current,
         triggerType: canvasSettings.triggerType,
         cronExpression: canvasSettings.cronExpression ?? null,
@@ -821,6 +911,12 @@ function EditorInner({ detail, onStatusChange, onCanvasNameChange }: {
       })
       editVersion.current += 1
       savedCanvasName.current = canvasName.trim()
+      persistLocalDraft({
+        graphJson,
+        name: canvasName,
+        settings: canvasSettings,
+        editVersion: editVersion.current,
+      })
       setIsDirty(false)
       if (!silent) message.success('保存成功')
     } catch (err: any) {
@@ -837,7 +933,7 @@ function EditorInner({ detail, onStatusChange, onCanvasNameChange }: {
     } finally {
       setSaving(false)
     }
-  }, [canvasId, canvasName, canvasSettings, detail.canvas.description, getNodes])
+  }, [canvasId, canvasName, canvasSettings, detail.canvas.description, getNodes, persistLocalDraft])
 
   const handleSaveCanvasName = useCallback(async () => {
     const update = buildCanvasNameUpdate(canvasName, savedCanvasName.current)

@@ -79,6 +79,15 @@ canvas:
       high-max-concurrency-ratio: 2.0
       overflow-retry-delay-ms: 5000
       overflow-max-retry: 3
+  execution-request:
+    dispatch-batch-size: 200
+    dispatch-fixed-delay-ms: 1000
+    retry-delay-ms: 5000
+    max-attempts: 5
+    running-stale-sec: 300
+    max-retry-delay-ms: 60000
+    heartbeat-interval-ms: 60000
+    per-canvas-batch-limit: 0
   node:
     timeout-ms: 3000
   mq:

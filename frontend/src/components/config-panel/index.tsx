@@ -284,19 +284,32 @@ export default function ConfigPanel({ nodeId, nodeData, onChange, nodes, readonl
                 apiKeyField={field.apiKeyField ?? 'apiKey'}
                 defsSource={field.defsSource ?? '/meta/api-definitions'} />
             }
-            if (field.type === 'event-attr-preview') {
-              return (
-                <div key={field.key} style={{ marginBottom: 16 }}>
-                  {renderControlLabel(field.label)}
-                  <EventAttrPreview />
-                </div>
-              )
-            }
+          if (field.type === 'event-attr-preview') {
             return (
-              <Form.Item key={field.key} name={field.key} label={renderControlLabel(field.label)}
-                rules={field.required ? [{ required: true, message: `请填写${field.label}` }] : []}>
-                {renderControl(field, options, ctxFields, form, sharedOptions, applyFormPatch, nodeId, getNodeName, nodeData)}
-              </Form.Item>
+              <div key={field.key} style={{ marginBottom: 16 }}>
+                {renderControlLabel(field.label)}
+                <EventAttrPreview />
+              </div>
+            )
+          }
+          if (field.type === 'delay-input') {
+            return (
+              <div key={field.key} style={{ marginBottom: 16 }}>
+                {renderControlLabel(field.label)}
+                <DelayInput
+                  valueFieldKey={field.key}
+                  unitFieldKey="unit"
+                  unitOptions={sharedOptions.delayUnits}
+                  applyFormPatch={applyFormPatch}
+                />
+              </div>
+            )
+          }
+          return (
+            <Form.Item key={field.key} name={field.key} label={renderControlLabel(field.label)}
+              rules={field.required ? [{ required: true, message: `请填写${field.label}` }] : []}>
+              {renderControl(field, options, ctxFields, form, sharedOptions, applyFormPatch, nodeId, getNodeName, nodeData)}
+            </Form.Item>
             )
           })}
         </ConfigFormCard>
@@ -392,8 +405,6 @@ function renderControl(
       )
     case 'cron':
       return <CronBuilder frequencyOptions={sharedOptions.cronFrequencies} weekdayOptions={sharedOptions.weekdays} />
-    case 'delay-input':
-      return <DelayInput unitOptions={sharedOptions.delayUnits} />
     case 'event-attr-preview':
       return <EventAttrPreview />
     case 'edge-hint': {
@@ -922,13 +933,24 @@ function EventAttrPreview() {
         事件上报后，以下属性自动注入执行上下文，可在后续节点中直接引用：
       </div>
       {attrs.map(a => (
-        <div key={a.name} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-          <code style={{ fontSize: 12, background: '#e6f4ff', padding: '1px 6px', borderRadius: 4, color: '#0958d9' }}>
-            ${'{' + a.name + '}'}
-          </code>
-          <Text style={{ fontSize: 12 }}>{a.displayName || a.name}</Text>
-          <Tag style={{ fontSize: 10, margin: 0 }}>{typeLabel(a.type)}</Tag>
-          {a.required && <Text type="danger" style={{ fontSize: 10 }}>必填</Text>}
+        <div
+          key={a.name}
+          style={{
+            padding: '6px 0',
+            marginBottom: 6,
+            borderBottom: '1px solid rgba(9, 88, 217, 0.08)',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0, flexWrap: 'wrap' }}>
+            <code style={{ fontSize: 12, background: '#e6f4ff', padding: '1px 6px', borderRadius: 4, color: '#0958d9' }}>
+              ${'{' + a.name + '}'}
+            </code>
+            <Text style={{ fontSize: 12, minWidth: 0, wordBreak: 'break-word' }}>{a.displayName || a.name}</Text>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 6, flexWrap: 'wrap' }}>
+            <Tag style={{ fontSize: 10, margin: 0 }}>{typeLabel(a.type)}</Tag>
+            {a.required && <Text type="danger" style={{ fontSize: 10 }}>必填</Text>}
+          </div>
         </div>
       ))}
       <div style={{ fontSize: 11, color: '#8c8c8c', marginTop: 6 }}>
@@ -940,14 +962,25 @@ function EventAttrPreview() {
 
 // ── 延迟时长复合控件 ─────────────────────────────────────────────
 // 存储格式：{ duration: number, unit: 'SECOND'|'MINUTE'|'HOUR' }
-function DelayInput({ unitOptions }: { unitOptions: { label: string; value: string }[] }) {
+function DelayInput({
+  valueFieldKey,
+  unitFieldKey,
+  unitOptions,
+  applyFormPatch,
+}: {
+  valueFieldKey: string
+  unitFieldKey: string
+  unitOptions: { label: string; value: string }[]
+  applyFormPatch: (patch: Record<string, unknown>) => void
+}) {
   const form = Form.useFormInstance()
-  const delay = Form.useWatch('duration', form) ?? {}
-  const dur  = typeof delay === 'object' ? (delay.duration ?? '') : ''
-  const unit = typeof delay === 'object' ? (delay.unit ?? 'MINUTE') : 'MINUTE'
 
-  const set = (patch: object) =>
-    form.setFieldValue('duration', { duration: dur, unit, ...patch })
+  useEffect(() => {
+    if (form.getFieldValue(unitFieldKey) == null) {
+      form.setFieldValue(unitFieldKey, 'MINUTE')
+      applyFormPatch({ [unitFieldKey]: 'MINUTE' })
+    }
+  }, [applyFormPatch, form, unitFieldKey])
 
   const PRESETS = [
     { label: '30秒', d: 30, u: 'SECOND' },
@@ -956,31 +989,43 @@ function DelayInput({ unitOptions }: { unitOptions: { label: string; value: stri
     { label: '1小时', d: 1, u: 'HOUR' },
   ]
   const controlChrome = getControlChrome()
+  const displayUnitOptions = unitOptions.map((option) => {
+    const value = String(option.value)
+    if (value === 'SECOND') return { ...option, label: '秒' }
+    if (value === 'MINUTE') return { ...option, label: '分钟' }
+    if (value === 'HOUR') return { ...option, label: '小时' }
+    return option
+  })
 
   return (
     <div>
-      <Space.Compact style={{ width: '100%' }}>
-        <InputNumber
-          className="config-panel-ios-input-number"
-          style={{ ...controlChrome, flex: 1 }}
-          min={1}
-          placeholder="时长"
-          value={dur as number}
-          onChange={v => set({ duration: v })}
-        />
-        <Select
-          className="config-panel-ios-select"
-          classNames={CONTROL_SELECT_CLASS_NAMES}
-          style={{ height: controlChrome.height, width: 90 }}
-          value={unit}
-          options={unitOptions}
-          onChange={u => set({ unit: u })}
-        />
-      </Space.Compact>
+      <div style={{ display: 'flex', alignItems: 'stretch', gap: 12, width: '100%', flexWrap: 'nowrap' }}>
+        <Form.Item name={valueFieldKey} noStyle>
+          <InputNumber
+            className="config-panel-ios-input-number"
+            style={{ ...controlChrome, width: 88, minWidth: 88, flex: '0 0 88px' }}
+            min={1}
+            controls={false}
+            placeholder="时长"
+          />
+        </Form.Item>
+        <Form.Item name={unitFieldKey} noStyle>
+          <Select
+            className="config-panel-ios-select"
+            classNames={CONTROL_SELECT_CLASS_NAMES}
+            style={{ height: controlChrome.height, minWidth: 0, flex: '1 1 0' }}
+            options={displayUnitOptions}
+          />
+        </Form.Item>
+      </div>
       <Space style={{ marginTop: 6 }} size={4} wrap>
         {PRESETS.map(p => (
           <Button key={p.label} size="small"
-            onClick={() => form.setFieldValue('duration', { duration: p.d, unit: p.u })}>
+            onClick={() => {
+              form.setFieldValue(valueFieldKey, p.d)
+              form.setFieldValue(unitFieldKey, p.u)
+              applyFormPatch({ [valueFieldKey]: p.d, [unitFieldKey]: p.u })
+            }}>
             {p.label}
           </Button>
         ))}
