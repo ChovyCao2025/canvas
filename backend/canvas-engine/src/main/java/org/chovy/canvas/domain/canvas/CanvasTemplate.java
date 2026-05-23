@@ -14,6 +14,13 @@ public class CanvasTemplate {
     private String name;
     private String description;
     private String category;
+    private String templateKey;
+    private String companyType;
+    private String marketingScenario;
+    private String difficulty;
+    private String coveredNodeTypes;
+    private Integer sortOrder;
+    private Integer enabled;
     private String graphJson;
     private String thumbnail;
     private Integer isOfficial;
