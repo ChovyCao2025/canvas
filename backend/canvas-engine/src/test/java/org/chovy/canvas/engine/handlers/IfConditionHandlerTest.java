@@ -108,6 +108,14 @@ class IfConditionHandlerTest {
             Map<String, Object> rule = rule("amount", "LTE", "499");
             assertThat(IfConditionHandler.evaluate(rule, ctx)).isFalse();
         }
+
+        @Test
+        void invalid_numeric_values_do_not_match_order_comparisons() {
+            ctx.getFlatContext().put("amount", "unknown");
+            Map<String, Object> rule = rule("amount", "GT", "50");
+
+            assertThat(IfConditionHandler.evaluate(rule, ctx)).isFalse();
+        }
     }
 
     @Nested

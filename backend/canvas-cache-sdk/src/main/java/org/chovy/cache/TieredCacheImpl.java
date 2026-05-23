@@ -11,20 +11,34 @@ import io.micrometer.core.instrument.Tags;
 import io.micrometer.core.instrument.Timer;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
+import org.chovy.cache.strategy.AvalancheProtectionStrategy;
+import org.chovy.cache.strategy.BreakdownProtectionStrategy;
 import org.chovy.cache.strategy.DeserializeFailureStrategy;
 import org.chovy.cache.strategy.LoaderFailureStrategy;
+import org.chovy.cache.strategy.PenetrationProtectionStrategy;
 import org.chovy.cache.strategy.RedisFailureStrategy;
 import org.springframework.data.redis.core.ReactiveStringRedisTemplate;
 import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.data.redis.core.script.RedisScript;
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
 
 import java.time.Duration;
+import java.time.Instant;
+import java.util.Collection;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadLocalRandom;
+import java.util.UUID;
 import java.util.function.Function;
+import java.util.function.Predicate;
 import java.util.function.Supplier;
+import java.util.concurrent.atomic.LongAdder;
 
 @Slf4j
 public class TieredCacheImpl<K, V> implements TieredCache<K, V> {
@@ -36,7 +50,16 @@ public class TieredCacheImpl<K, V> implements TieredCache<K, V> {
     private final double l2TtlJitter;
     private final int keySchemaVersion;
     private final Duration nullValueTtl;
+    private final Duration emptyValueTtl;
+    private final Duration lockTtl;
+    private final Duration refreshAhead;
+    private final Duration staleTtl;
     private final boolean hotspotProtection;
+    private final PenetrationProtectionStrategy penetration;
+    private final BreakdownProtectionStrategy breakdown;
+    private final AvalancheProtectionStrategy avalanche;
+    private final Predicate<K> keyValidator;
+    private final CacheBloomFilter<K> bloomFilter;
     private final LoaderFailureStrategy loaderFailure;
     private final RedisFailureStrategy redisReadFailure;
     private final RedisFailureStrategy redisWriteFailure;
@@ -49,6 +72,15 @@ public class TieredCacheImpl<K, V> implements TieredCache<K, V> {
     private final ReactiveStringRedisTemplate reactiveRedis;
     final LoadingCache<K, Optional<V>> l1;
     private final ReactiveTieredCache<K, V> reactiveView;
+    private final Map<K, CompletableFuture<Optional<V>>> inFlightLoads = new ConcurrentHashMap<>();
+    private final Map<K, StaleValue<V>> staleValues = new ConcurrentHashMap<>();
+    private final LongAdder localL1Hits = new LongAdder();
+    private final LongAdder localL1Misses = new LongAdder();
+    private final LongAdder localL2Hits = new LongAdder();
+    private final LongAdder localL2Misses = new LongAdder();
+    private final LongAdder localL3Loads = new LongAdder();
+    private final LongAdder localPenetrationRejects = new LongAdder();
+    private final LongAdder localLoaderFailures = new LongAdder();
 
     private Counter l1Hits;
     private Counter l2Hits;
@@ -68,7 +100,16 @@ public class TieredCacheImpl<K, V> implements TieredCache<K, V> {
                     double l2TtlJitter,
                     int keySchemaVersion,
                     Duration nullValueTtl,
+                    Duration emptyValueTtl,
+                    Duration lockTtl,
+                    Duration refreshAhead,
+                    Duration staleTtl,
                     boolean hotspotProtection,
+                    PenetrationProtectionStrategy penetration,
+                    BreakdownProtectionStrategy breakdown,
+                    AvalancheProtectionStrategy avalanche,
+                    Predicate<K> keyValidator,
+                    CacheBloomFilter<K> bloomFilter,
                     LoaderFailureStrategy loaderFailure,
                     RedisFailureStrategy redisReadFailure,
                     RedisFailureStrategy redisWriteFailure,
@@ -85,7 +126,16 @@ public class TieredCacheImpl<K, V> implements TieredCache<K, V> {
         this.l2TtlJitter = l2TtlJitter;
         this.keySchemaVersion = keySchemaVersion;
         this.nullValueTtl = nullValueTtl;
+        this.emptyValueTtl = emptyValueTtl;
+        this.lockTtl = lockTtl;
+        this.refreshAhead = refreshAhead;
+        this.staleTtl = staleTtl;
         this.hotspotProtection = hotspotProtection;
+        this.penetration = penetration;
+        this.breakdown = breakdown;
+        this.avalanche = avalanche;
+        this.keyValidator = keyValidator;
+        this.bloomFilter = bloomFilter;
         this.loaderFailure = loaderFailure;
         this.redisReadFailure = redisReadFailure;
         this.redisWriteFailure = redisWriteFailure;
@@ -97,7 +147,6 @@ public class TieredCacheImpl<K, V> implements TieredCache<K, V> {
         this.reactiveRedis = reactiveRedis;
         this.l1 = Caffeine.newBuilder()
                 .maximumSize(l1MaxSize)
-                .refreshAfterWrite(l1RefreshAfterWrite)
                 .executor(Executors.newVirtualThreadPerTaskExecutor())
                 .build(buildCacheLoader());
         this.reactiveView = new ReactiveTieredCacheView<>(this);
@@ -113,10 +162,14 @@ public class TieredCacheImpl<K, V> implements TieredCache<K, V> {
 
     @Override
     public Optional<V> get(K key) {
+        if (isRejectedByPenetrationProtection(key)) {
+            return Optional.empty();
+        }
         Optional<V> cached = l1.getIfPresent(key);
         if (cached != null) {
             countHit("L1");
-            return l1.get(key);
+            maybeRefreshAhead(key);
+            return cached;
         }
         countMiss("L1");
         Optional<V> loaded = l1.get(key);
@@ -124,10 +177,29 @@ public class TieredCacheImpl<K, V> implements TieredCache<K, V> {
     }
 
     @Override
-    public Optional<V> get(K key, Supplier<V> loaderOverride) {
+    public Optional<V> getIfPresent(K key) {
+        if (isRejectedByPenetrationProtection(key)) {
+            return Optional.empty();
+        }
         Optional<V> cached = l1.getIfPresent(key);
         if (cached != null) {
             countHit("L1");
+            maybeRefreshAhead(key);
+            return cached;
+        }
+        countMiss("L1");
+        return readL2(key, true).value();
+    }
+
+    @Override
+    public Optional<V> get(K key, Supplier<V> loaderOverride) {
+        if (isRejectedByPenetrationProtection(key)) {
+            return Optional.empty();
+        }
+        Optional<V> cached = l1.getIfPresent(key);
+        if (cached != null) {
+            countHit("L1");
+            maybeRefreshAhead(key);
             return cached;
         }
         countMiss("L1");
@@ -140,7 +212,45 @@ public class TieredCacheImpl<K, V> implements TieredCache<K, V> {
     public void put(K key, V value) {
         if (writeL2(key, value)) {
             l1.put(key, Optional.ofNullable(value));
+            rememberStale(key, value);
         }
+    }
+
+    @Override
+    public Map<K, Optional<V>> getAll(Collection<K> keys, Function<Collection<K>, Map<K, V>> batchLoader) {
+        Map<K, Optional<V>> result = new LinkedHashMap<>();
+        List<K> misses = new java.util.ArrayList<>();
+        for (K key : keys) {
+            if (isRejectedByPenetrationProtection(key)) {
+                result.put(key, Optional.empty());
+                continue;
+            }
+            Optional<V> cached = l1.getIfPresent(key);
+            if (cached != null) {
+                countHit("L1");
+                result.put(key, cached);
+                continue;
+            }
+            countMiss("L1");
+            L2Lookup<V> l2Lookup = readL2(key, true);
+            if (l2Lookup.found()) {
+                result.put(key, l2Lookup.value());
+            } else {
+                misses.add(key);
+            }
+        }
+        if (!misses.isEmpty()) {
+            Map<K, V> loaded = batchLoader.apply(List.copyOf(misses));
+            for (K key : misses) {
+                V value = loaded.get(key);
+                writeL2(key, value);
+                Optional<V> optional = Optional.ofNullable(value);
+                l1.put(key, optional);
+                rememberStale(key, value);
+                result.put(key, optional);
+            }
+        }
+        return result;
     }
 
     @Override
@@ -182,6 +292,20 @@ public class TieredCacheImpl<K, V> implements TieredCache<K, V> {
         return reactiveView;
     }
 
+    @Override
+    public TieredCacheStats stats() {
+        return new TieredCacheStats(
+                name,
+                l1.estimatedSize(),
+                localL1Hits.sum(),
+                localL1Misses.sum(),
+                localL2Hits.sum(),
+                localL2Misses.sum(),
+                localL3Loads.sum(),
+                localPenetrationRejects.sum(),
+                localLoaderFailures.sum());
+    }
+
     void onInvalidateBroadcast(String rawKey) {
         l1.asMap().keySet().removeIf(key -> keyToString(key).equals(rawKey));
         log.debug("[TIERED_CACHE][{}] L1 evicted from pub/sub rawKey={}", name, rawKey);
@@ -216,40 +340,87 @@ public class TieredCacheImpl<K, V> implements TieredCache<K, V> {
     }
 
     private Optional<V> loadFromL2ThenL3(K key, Supplier<V> effectiveLoader) {
+        L2Lookup<V> l2Lookup = readL2(key, false);
+        if (l2Lookup.found()) {
+            return l2Lookup.value();
+        }
+        Supplier<Optional<V>> l3Call = () -> useDistributedLock()
+                ? loadFromL3WithLock(key, null, effectiveLoader)
+                : loadFromL3(key, null, effectiveLoader);
+        return useLocalSingleFlight() ? loadWithSingleFlight(key, l3Call) : l3Call.get();
+    }
+
+    private Optional<V> loadWithSingleFlight(K key, Supplier<Optional<V>> loaderCall) {
+        CompletableFuture<Optional<V>> created = new CompletableFuture<>();
+        CompletableFuture<Optional<V>> existing = inFlightLoads.putIfAbsent(key, created);
+        if (existing != null) {
+            return existing.join();
+        }
+        try {
+            Optional<V> result = loaderCall.get();
+            created.complete(result);
+            return result;
+        } catch (RuntimeException e) {
+            created.completeExceptionally(e);
+            throw e;
+        } finally {
+            inFlightLoads.remove(key, created);
+        }
+    }
+
+    private L2Lookup<V> readL2(K key, boolean cacheInL1) {
         try {
             String json = redis.opsForValue().get(l2Key(key));
-            if (json != null) {
-                if (NULL_SENTINEL.equals(json)) {
-                    countHit("L2");
-                    increment(penetrationHits);
-                    return Optional.empty();
-                }
-                V value = deserializeWithFallback(key, json);
-                if (value != null) {
-                    countHit("L2");
-                    return Optional.of(value);
-                }
-            }
-            countMiss("L2");
+            return handleL2Json(key, json, cacheInL1);
         } catch (Exception e) {
             if (redisReadFailure == RedisFailureStrategy.FAIL_FAST) {
                 throw asRuntime(e);
             }
             log.warn("[TIERED_CACHE][{}] Redis read failed, fallthrough to L3: {}", name, e.getMessage());
+            return new L2Lookup<>(false, Optional.empty());
         }
-        return hotspotProtection
-                ? loadFromL3WithLock(key, null, effectiveLoader)
-                : loadFromL3(key, null, effectiveLoader);
     }
+
+    private L2Lookup<V> handleL2Json(K key, String json, boolean cacheInL1) {
+        if (json != null) {
+            if (NULL_SENTINEL.equals(json)) {
+                countHit("L2");
+                increment(penetrationHits);
+                if (cacheInL1) {
+                    l1.put(key, Optional.empty());
+                }
+                return new L2Lookup<>(true, Optional.empty());
+            }
+            V value = deserializeWithFallback(key, json);
+            if (value != null) {
+                countHit("L2");
+                Optional<V> result = Optional.of(value);
+                if (cacheInL1) {
+                    l1.put(key, result);
+                }
+                return new L2Lookup<>(true, result);
+            }
+        }
+        countMiss("L2");
+        return new L2Lookup<>(false, Optional.empty());
+    }
+
+    private record L2Lookup<T>(boolean found, Optional<T> value) {}
 
     private Optional<V> loadFromL3(K key, Optional<V> staleValue, Supplier<V> effectiveLoader) {
         try {
             countHit("L3");
             V value = loadTimer != null ? loadTimer.record(effectiveLoader::get) : effectiveLoader.get();
             writeL2(key, value);
+            rememberStale(key, value);
             return Optional.ofNullable(value);
         } catch (Exception e) {
             increment(loaderFailures);
+            localLoaderFailures.increment();
+            Optional<V> stale = staleFor(key);
+            if (useStaleOnError() && stale.isPresent()) {
+                return stale;
+            }
             return switch (loaderFailure) {
                 case THROW -> throw asRuntime(e);
                 case RETURN_STALE -> staleValue != null ? staleValue : Optional.empty();
@@ -260,15 +431,30 @@ public class TieredCacheImpl<K, V> implements TieredCache<K, V> {
 
     private Optional<V> loadFromL3WithLock(K key, Optional<V> staleValue, Supplier<V> effectiveLoader) {
         String lockKey = "cache:lock:" + l2Key(key);
-        boolean locked = Boolean.TRUE.equals(redis.opsForValue().setIfAbsent(lockKey, "1", Duration.ofSeconds(30)));
+        String token = UUID.randomUUID().toString();
+        boolean locked = Boolean.TRUE.equals(redis.opsForValue().setIfAbsent(lockKey, token, lockTtl));
         if (locked) {
             try {
                 return loadFromL3(key, staleValue, effectiveLoader);
             } finally {
-                redis.delete(lockKey);
+                releaseOwnedLock(lockKey, token);
             }
         }
         return waitAndRetryL2(key, staleValue, effectiveLoader);
+    }
+
+    private void releaseOwnedLock(String lockKey, String token) {
+        String script = """
+                if redis.call('get', KEYS[1]) == ARGV[1] then
+                    return redis.call('del', KEYS[1])
+                end
+                return 0
+                """;
+        try {
+            redis.execute(RedisScript.of(script, Long.class), List.of(lockKey), token);
+        } catch (Exception e) {
+            log.warn("[TIERED_CACHE][{}] Redis lock release failed: {}", name, e.getMessage());
+        }
     }
 
     private Optional<V> waitAndRetryL2(K key, Optional<V> staleValue, Supplier<V> effectiveLoader) {
@@ -296,7 +482,11 @@ public class TieredCacheImpl<K, V> implements TieredCache<K, V> {
     private boolean writeL2(K key, V value) {
         try {
             if (value == null) {
-                redis.opsForValue().set(l2Key(key), NULL_SENTINEL, nullValueTtl);
+                if (cacheNullValues()) {
+                    redis.opsForValue().set(l2Key(key), NULL_SENTINEL, nullValueTtl);
+                }
+            } else if (isEmptyValue(value) && cacheEmptyValues()) {
+                redis.opsForValue().set(l2Key(key), serialize(value), emptyValueTtl);
             } else {
                 redis.opsForValue().set(l2Key(key), serialize(value), actualL2Ttl());
             }
@@ -342,7 +532,7 @@ public class TieredCacheImpl<K, V> implements TieredCache<K, V> {
     }
 
     private Duration actualL2Ttl() {
-        if (l2TtlJitter <= 0) {
+        if (l2TtlJitter <= 0 || !useTtlJitter()) {
             return l2Ttl;
         }
         long jitterMillis = (long) (l2Ttl.toMillis()
@@ -397,14 +587,14 @@ public class TieredCacheImpl<K, V> implements TieredCache<K, V> {
     }
 
     private void countHit(String level) {
-        if ("L1".equals(level)) increment(l1Hits);
-        if ("L2".equals(level)) increment(l2Hits);
-        if ("L3".equals(level)) increment(l3Hits);
+        if ("L1".equals(level)) { increment(l1Hits); localL1Hits.increment(); }
+        if ("L2".equals(level)) { increment(l2Hits); localL2Hits.increment(); }
+        if ("L3".equals(level)) { increment(l3Hits); localL3Loads.increment(); }
     }
 
     private void countMiss(String level) {
-        if ("L1".equals(level)) increment(l1Misses);
-        if ("L2".equals(level)) increment(l2Misses);
+        if ("L1".equals(level)) { increment(l1Misses); localL1Misses.increment(); }
+        if ("L2".equals(level)) { increment(l2Misses); localL2Misses.increment(); }
     }
 
     private void increment(Counter counter) {
@@ -412,6 +602,123 @@ public class TieredCacheImpl<K, V> implements TieredCache<K, V> {
             counter.increment();
         }
     }
+
+    private boolean isRejectedByPenetrationProtection(K key) {
+        boolean useValidator = penetration == PenetrationProtectionStrategy.KEY_VALIDATOR
+                || penetration == PenetrationProtectionStrategy.FULL;
+        if (useValidator && keyValidator != null && !keyValidator.test(key)) {
+            localPenetrationRejects.increment();
+            return true;
+        }
+        boolean useBloom = penetration == PenetrationProtectionStrategy.BLOOM_FILTER
+                || penetration == PenetrationProtectionStrategy.CACHE_NULL_AND_BLOOM
+                || penetration == PenetrationProtectionStrategy.FULL;
+        if (useBloom && bloomFilter != null && !bloomFilter.mightContain(key)) {
+            localPenetrationRejects.increment();
+            return true;
+        }
+        return false;
+    }
+
+    private boolean cacheNullValues() {
+        return penetration == PenetrationProtectionStrategy.CACHE_NULL_SHORT_TTL
+                || penetration == PenetrationProtectionStrategy.CACHE_NULL_AND_BLOOM
+                || penetration == PenetrationProtectionStrategy.FULL;
+    }
+
+    private boolean cacheEmptyValues() {
+        return penetration == PenetrationProtectionStrategy.CACHE_EMPTY_SHORT_TTL
+                || penetration == PenetrationProtectionStrategy.FULL;
+    }
+
+    private boolean useLocalSingleFlight() {
+        return breakdown == BreakdownProtectionStrategy.LOCAL_SINGLE_FLIGHT
+                || breakdown == BreakdownProtectionStrategy.LOCAL_AND_DISTRIBUTED
+                || breakdown == BreakdownProtectionStrategy.FULL;
+    }
+
+    private boolean useDistributedLock() {
+        return hotspotProtection
+                || breakdown == BreakdownProtectionStrategy.DISTRIBUTED_LOCK
+                || breakdown == BreakdownProtectionStrategy.LOCAL_AND_DISTRIBUTED
+                || breakdown == BreakdownProtectionStrategy.FULL;
+    }
+
+    private boolean useStaleOnError() {
+        return avalanche == AvalancheProtectionStrategy.STALE_ON_ERROR
+                || avalanche == AvalancheProtectionStrategy.FULL
+                || breakdown == BreakdownProtectionStrategy.STALE_WHILE_REVALIDATE
+                || breakdown == BreakdownProtectionStrategy.FULL;
+    }
+
+    private boolean useTtlJitter() {
+        return avalanche == AvalancheProtectionStrategy.TTL_JITTER
+                || avalanche == AvalancheProtectionStrategy.FULL;
+    }
+
+    private boolean isEmptyValue(V value) {
+        return value instanceof Collection<?> collection && collection.isEmpty()
+                || value instanceof Map<?, ?> map && map.isEmpty()
+                || value instanceof Optional<?> optional && optional.isEmpty();
+    }
+
+    private void rememberStale(K key, V value) {
+        if (value != null) {
+            staleValues.put(key, new StaleValue<>(value, Instant.now()));
+            if (bloomFilter != null) {
+                bloomFilter.put(key);
+            }
+        }
+    }
+
+    private Optional<V> staleFor(K key) {
+        StaleValue<V> stale = staleValues.get(key);
+        if (stale == null) {
+            return Optional.empty();
+        }
+        if (Instant.now().isAfter(stale.createdAt().plus(staleTtl))) {
+            staleValues.remove(key, stale);
+            return Optional.empty();
+        }
+        return Optional.of(stale.value());
+    }
+
+    private void maybeRefreshAhead(K key) {
+        if (refreshAhead.isZero() || refreshAhead.compareTo(l2Ttl) >= 0) {
+            return;
+        }
+        StaleValue<V> current = staleValues.get(key);
+        if (current == null) {
+            return;
+        }
+        Instant refreshAt = current.createdAt().plus(l2Ttl).minus(refreshAhead);
+        if (Instant.now().isBefore(refreshAt)) {
+            return;
+        }
+        CompletableFuture<Optional<V>> marker = new CompletableFuture<>();
+        if (inFlightLoads.putIfAbsent(key, marker) != null) {
+            return;
+        }
+        CompletableFuture.runAsync(() -> {
+            try {
+                L2Lookup<V> l2Lookup = readL2(key, false);
+                Optional<V> refreshed = l2Lookup.found()
+                        ? l2Lookup.value()
+                        : (useDistributedLock()
+                        ? loadFromL3WithLock(key, staleFor(key), () -> loader.apply(key))
+                        : loadFromL3(key, staleFor(key), () -> loader.apply(key)));
+                l1.put(key, refreshed);
+                marker.complete(refreshed);
+            } catch (RuntimeException e) {
+                marker.completeExceptionally(e);
+                log.warn("[TIERED_CACHE][{}] refreshAhead failed key={}: {}", name, key, e.getMessage());
+            } finally {
+                inFlightLoads.remove(key, marker);
+            }
+        });
+    }
+
+    private record StaleValue<T>(T value, Instant createdAt) {}
 
     private static class ReactiveTieredCacheView<K, V> implements ReactiveTieredCache<K, V> {
         private final TieredCacheImpl<K, V> delegate;
@@ -422,17 +729,75 @@ public class TieredCacheImpl<K, V> implements TieredCache<K, V> {
 
         @Override
         public Mono<Optional<V>> get(K key) {
-            return Mono.fromCallable(() -> delegate.get(key)).subscribeOn(Schedulers.boundedElastic());
+            Optional<V> cached = delegate.l1.getIfPresent(key);
+            if (cached != null) {
+                delegate.countHit("L1");
+                return Mono.just(cached);
+            }
+            delegate.countMiss("L1");
+            if (delegate.reactiveRedis == null) {
+                return Mono.fromCallable(() -> delegate.get(key)).subscribeOn(Schedulers.boundedElastic());
+            }
+            Mono<String> redisGet = delegate.reactiveRedis.opsForValue().get(delegate.l2Key(key));
+            if (redisGet == null) {
+                return Mono.fromCallable(() -> delegate.get(key)).subscribeOn(Schedulers.boundedElastic());
+            }
+            return redisGet
+                    .flatMap(json -> {
+                        L2Lookup<V> l2Value = delegate.handleL2Json(key, json, true);
+                        return Mono.just(l2Value.value());
+                    })
+                    .switchIfEmpty(Mono.fromCallable(() -> delegate.hotspotProtection
+                                    ? delegate.loadFromL3WithLock(key, null, () -> delegate.loader.apply(key))
+                                    : delegate.loadFromL3(key, null, () -> delegate.loader.apply(key)))
+                            .subscribeOn(Schedulers.boundedElastic()));
+        }
+
+        @Override
+        public Mono<Optional<V>> getIfPresent(K key) {
+            Optional<V> cached = delegate.l1.getIfPresent(key);
+            if (cached != null) {
+                delegate.countHit("L1");
+                return Mono.just(cached);
+            }
+            delegate.countMiss("L1");
+            if (delegate.reactiveRedis == null) {
+                return Mono.fromCallable(() -> delegate.getIfPresent(key)).subscribeOn(Schedulers.boundedElastic());
+            }
+            Mono<String> redisGet = delegate.reactiveRedis.opsForValue().get(delegate.l2Key(key));
+            if (redisGet == null) {
+                return Mono.fromCallable(() -> delegate.getIfPresent(key)).subscribeOn(Schedulers.boundedElastic());
+            }
+            return redisGet
+                    .map(json -> delegate.handleL2Json(key, json, true).value())
+                    .defaultIfEmpty(Optional.empty());
         }
 
         @Override
         public Mono<Void> put(K key, V value) {
-            return Mono.fromRunnable(() -> delegate.put(key, value)).subscribeOn(Schedulers.boundedElastic()).then();
+            if (delegate.reactiveRedis == null) {
+                return Mono.fromRunnable(() -> delegate.put(key, value)).subscribeOn(Schedulers.boundedElastic()).then();
+            }
+            String redisValue = value == null ? NULL_SENTINEL : delegate.serialize(value);
+            Duration ttl = value == null ? delegate.nullValueTtl : delegate.actualL2Ttl();
+            return delegate.reactiveRedis.opsForValue().set(delegate.l2Key(key), redisValue, ttl)
+                    .doOnNext(ok -> {
+                        if (Boolean.TRUE.equals(ok)) {
+                            delegate.l1.put(key, Optional.ofNullable(value));
+                        }
+                    })
+                    .then();
         }
 
         @Override
         public Mono<Void> invalidate(K key) {
-            return Mono.fromRunnable(() -> delegate.invalidate(key)).subscribeOn(Schedulers.boundedElastic()).then();
+            if (delegate.reactiveRedis == null) {
+                return Mono.fromRunnable(() -> delegate.invalidate(key)).subscribeOn(Schedulers.boundedElastic()).then();
+            }
+            delegate.l1.invalidate(key);
+            return delegate.reactiveRedis.delete(delegate.l2Key(key))
+                    .then(delegate.reactiveRedis.convertAndSend(delegate.invalidateChannel(), delegate.keyToString(key)))
+                    .then();
         }
 
         @Override

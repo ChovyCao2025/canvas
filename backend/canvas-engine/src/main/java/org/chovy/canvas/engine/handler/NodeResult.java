@@ -1,5 +1,7 @@
 package org.chovy.canvas.engine.handler;
 
+import org.chovy.canvas.common.MapFieldKeys;
+
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -114,7 +116,7 @@ public record NodeResult(
             });
         }
         if (!isBlank(elseNodeId)) {
-            routes.put("__else", elseNodeId);
+            routes.put(MapFieldKeys.ELSE, elseNodeId);
         }
         return Collections.unmodifiableMap(new LinkedHashMap<>(routes));
     }

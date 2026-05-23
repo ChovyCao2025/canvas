@@ -4,6 +4,7 @@ import type {
   Canvas, CanvasDetail, CanvasVersion,
   NodeTypeRegistry, ContextField, StubOption, AbExperimentGroup,
 } from '../types'
+import type { HomeOverview } from '../pages/home/homeOverview'
 
 /**
  * 统一 HTTP 客户端。
@@ -241,6 +242,11 @@ export const canvasApi = {
       `/canvas/execute/dry-run/${id}`,
       { userId, inputParams: payload, graphJson },
     ),
+}
+
+export const homeApi = {
+  overview: (days = 7) =>
+    http.get<R<HomeOverview>, R<HomeOverview>>('/canvas/home/overview', { params: { days } }),
 }
 
 // ── 元数据 ───────────────────────────────────────────────────

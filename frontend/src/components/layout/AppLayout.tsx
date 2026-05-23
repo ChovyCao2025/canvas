@@ -6,6 +6,7 @@ import {
   UserOutlined, MenuFoldOutlined, MenuUnfoldOutlined,
   RocketOutlined, HomeOutlined, TagsOutlined, NotificationOutlined, ThunderboltOutlined,
   BookOutlined,
+  DatabaseOutlined,
 } from '@ant-design/icons'
 import { Outlet, useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
@@ -47,6 +48,7 @@ export default function AppLayout() {
   const selectedKey = (() => {
     if (location.pathname === '/' || location.pathname === '/home') return 'home'
     if (location.pathname.startsWith('/api-config'))     return 'api-config'
+    if (location.pathname.startsWith('/data-source-config')) return 'data-source-config'
     if (location.pathname.startsWith('/ab-experiments')) return 'ab-experiments'
     if (location.pathname.startsWith('/tag-config'))     return 'tag-config'
     if (location.pathname.startsWith('/audiences'))      return 'audiences'
@@ -63,6 +65,7 @@ export default function AppLayout() {
     if (selectedKey === 'api-docs') return ['developer']
     if ([
       'api-config',
+      'data-source-config',
       'ab-experiments',
       'tag-config',
       'audiences',
@@ -124,6 +127,12 @@ export default function AppLayout() {
           icon: <ApiOutlined />,
           label: 'API 接口配置',
           onClick: () => navigate('/api-config'),
+        },
+        {
+          key: 'data-source-config',
+          icon: <DatabaseOutlined />,
+          label: '数据源配置',
+          onClick: () => navigate('/data-source-config'),
         },
         {
           key: 'ab-experiments',

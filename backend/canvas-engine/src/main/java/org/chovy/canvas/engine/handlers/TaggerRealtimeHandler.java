@@ -1,5 +1,6 @@
 package org.chovy.canvas.engine.handlers;
 
+import org.chovy.canvas.common.MapFieldKeys;
 import org.chovy.canvas.engine.context.ExecutionContext;
 import org.chovy.canvas.engine.handler.NodeHandler;
 import org.chovy.canvas.engine.handler.NodeHandlerType;
@@ -28,7 +29,7 @@ public class TaggerRealtimeHandler implements NodeHandler {
     @Override
     public Mono<NodeResult> executeAsync(Map<String, Object> config, ExecutionContext ctx) {
         // 实时模式也依赖 nextNodeId 显式指定后继节点
-        String nextNodeId = (String) config.get("nextNodeId");
+        String nextNodeId = (String) config.get(MapFieldKeys.NEXT_NODE_ID);
         // 复制 triggerPayload，避免下游误改原始上下文 map
         //（原始 payload 可能在追踪/审计链路中继续使用）
         // 该节点不额外补字段，保持上游事件原貌

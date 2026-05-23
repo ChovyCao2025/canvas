@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.Data;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.chovy.canvas.common.MapFieldKeys;
 import org.springframework.stereotype.Component;
 
 import java.util.*;
@@ -76,48 +77,48 @@ public class DagParser {
         if (node.getBizConfig() != null) c.putAll(node.getBizConfig());
         if (node.getConfig()    != null) c.putAll(node.getConfig());    // config 覆盖 bizConfig
 
-        addIfPresent(targets, c.get("nextNodeId"));
-        addIfPresent(targets, c.get("successNodeId"));
-        addIfPresent(targets, c.get("failNodeId"));
-        addIfPresent(targets, c.get("elseNodeId"));
-        addIfPresent(targets, c.get("approveNodeId"));
-        addIfPresent(targets, c.get("rejectNodeId"));
-        addIfPresent(targets, c.get("timeoutNodeId"));
-        addIfPresent(targets, c.get("suppressedNodeId"));
-        addIfPresent(targets, c.get("allowedNodeId"));
-        addIfPresent(targets, c.get("quietNodeId"));
-        addIfPresent(targets, c.get("availableNodeId"));
-        addIfPresent(targets, c.get("unavailableNodeId"));
-        addIfPresent(targets, c.get("passNodeId"));
-        addIfPresent(targets, c.get("cappedNodeId"));
-        addIfPresent(targets, c.get("skippedNodeId"));
-        addIfPresent(targets, c.get("maxExceededNodeId"));
-        addIfPresent(targets, c.get("goalMetNodeId"));
-        addIfPresent(targets, c.get("goalNotMetNodeId"));
+        addIfPresent(targets, c.get(MapFieldKeys.NEXT_NODE_ID));
+        addIfPresent(targets, c.get(MapFieldKeys.SUCCESS_NODE_ID));
+        addIfPresent(targets, c.get(MapFieldKeys.FAIL_NODE_ID));
+        addIfPresent(targets, c.get(MapFieldKeys.ELSE_NODE_ID));
+        addIfPresent(targets, c.get(MapFieldKeys.APPROVE_NODE_ID));
+        addIfPresent(targets, c.get(MapFieldKeys.REJECT_NODE_ID));
+        addIfPresent(targets, c.get(MapFieldKeys.TIMEOUT_NODE_ID));
+        addIfPresent(targets, c.get(MapFieldKeys.SUPPRESSED_NODE_ID));
+        addIfPresent(targets, c.get(MapFieldKeys.ALLOWED_NODE_ID));
+        addIfPresent(targets, c.get(MapFieldKeys.QUIET_NODE_ID));
+        addIfPresent(targets, c.get(MapFieldKeys.AVAILABLE_NODE_ID));
+        addIfPresent(targets, c.get(MapFieldKeys.UNAVAILABLE_NODE_ID));
+        addIfPresent(targets, c.get(MapFieldKeys.PASS_NODE_ID));
+        addIfPresent(targets, c.get(MapFieldKeys.CAPPED_NODE_ID));
+        addIfPresent(targets, c.get(MapFieldKeys.SKIPPED_NODE_ID));
+        addIfPresent(targets, c.get(MapFieldKeys.MAX_EXCEEDED_NODE_ID));
+        addIfPresent(targets, c.get(MapFieldKeys.GOAL_MET_NODE_ID));
+        addIfPresent(targets, c.get(MapFieldKeys.GOAL_NOT_MET_NODE_ID));
 
-        List<?> branches = (List<?>) c.get("branches");
+        List<?> branches = (List<?>) c.get(MapFieldKeys.BRANCHES);
         if (branches != null) branches.forEach(b ->
-                addIfPresent(targets, ((Map<?, ?>) b).get("nextNodeId")));
+                addIfPresent(targets, ((Map<?, ?>) b).get(MapFieldKeys.NEXT_NODE_ID)));
 
-        List<?> priorities = (List<?>) c.get("priorities");
+        List<?> priorities = (List<?>) c.get(MapFieldKeys.PRIORITIES);
         if (priorities != null) priorities.forEach(p ->
-                addIfPresent(targets, ((Map<?, ?>) p).get("nextNodeId")));
+                addIfPresent(targets, ((Map<?, ?>) p).get(MapFieldKeys.NEXT_NODE_ID)));
 
-        List<?> groups = (List<?>) c.get("groups");
+        List<?> groups = (List<?>) c.get(MapFieldKeys.GROUPS);
         if (groups != null) groups.forEach(g ->
-                addIfPresent(targets, ((Map<?, ?>) g).get("nextNodeId")));
+                addIfPresent(targets, ((Map<?, ?>) g).get(MapFieldKeys.NEXT_NODE_ID)));
 
-        List<?> paths = (List<?>) c.get("paths");
+        List<?> paths = (List<?>) c.get(MapFieldKeys.PATHS);
         if (paths != null) paths.forEach(p ->
-                addIfPresent(targets, ((Map<?, ?>) p).get("nextNodeId")));
+                addIfPresent(targets, ((Map<?, ?>) p).get(MapFieldKeys.NEXT_NODE_ID)));
 
-        List<?> variants = (List<?>) c.get("variants");
+        List<?> variants = (List<?>) c.get(MapFieldKeys.VARIANTS);
         if (variants != null) variants.forEach(v ->
-                addIfPresent(targets, ((Map<?, ?>) v).get("nextNodeId")));
+                addIfPresent(targets, ((Map<?, ?>) v).get(MapFieldKeys.NEXT_NODE_ID)));
 
-        List<?> bands = (List<?>) c.get("bands");
+        List<?> bands = (List<?>) c.get(MapFieldKeys.BANDS);
         if (bands != null) bands.forEach(b ->
-                addIfPresent(targets, ((Map<?, ?>) b).get("nextNodeId")));
+                addIfPresent(targets, ((Map<?, ?>) b).get(MapFieldKeys.NEXT_NODE_ID)));
 
         // 保持原顺序返回，便于调试时与原始 JSON 对齐
         return targets;

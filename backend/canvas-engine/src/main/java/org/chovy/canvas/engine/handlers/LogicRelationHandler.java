@@ -1,5 +1,6 @@
 package org.chovy.canvas.engine.handlers;
 
+import org.chovy.canvas.common.MapFieldKeys;
 import org.chovy.canvas.engine.context.ExecutionContext;
 import org.chovy.canvas.engine.context.NodeStatus;
 import org.chovy.canvas.engine.handler.NodeHandler;
@@ -24,7 +25,7 @@ public class LogicRelationHandler implements NodeHandler {
     @Override
     public Mono<NodeResult> executeAsync(Map<String, Object> config, ExecutionContext ctx) {
         // 关系判断已在调度器完成，这里只负责输出下一跳
-        String nextNodeId = (String) config.get("nextNodeId");
+        String nextNodeId = (String) config.get(MapFieldKeys.NEXT_NODE_ID);
         return Mono.just(NodeResult.ok(nextNodeId, Map.of()));
     }
 

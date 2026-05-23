@@ -1,6 +1,7 @@
 package org.chovy.canvas.engine.scheduler;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.chovy.canvas.common.MapFieldKeys;
 import org.chovy.canvas.domain.constant.NodeType;
 import org.chovy.canvas.domain.constant.TriggerType;
 import org.chovy.canvas.domain.execution.CanvasExecutionDlq;
@@ -144,7 +145,7 @@ public class DagEngine {
                 .onErrorResume(e -> {
                     log.error("[ENGINE] 执行出错 executionId={}: {}",
                             ctx.getExecutionId(), e.getMessage(), e);
-                    return Mono.just(Map.of("error", e.getMessage()));
+                    return Mono.just(Map.of(MapFieldKeys.ERROR, e.getMessage()));
                 });
     }
 
@@ -215,8 +216,8 @@ public class DagEngine {
                 // handler 在执行时才读 ctx 计数，这是 repeat 机制真正有用的场景：
                 // 持锁期间到来的上游信号通过 repeatPending 被捕获，repeat 重新评估后正确路由。
                 Map<String, Object> enrichedConfig = new HashMap<>(config);
-                enrichedConfig.put("__upstreamIds", graph.upstream(nodeId));
-                enrichedConfig.put("__nodeId", nodeId);
+                enrichedConfig.put(MapFieldKeys.UPSTREAM_IDS, graph.upstream(nodeId));
+                enrichedConfig.put(MapFieldKeys.NODE_ID_INTERNAL, nodeId);
                 scheduleThresholdTimeoutIfNeeded(nodeId, config, ctx);
                 return executeNodeAfterStage2(graph, nodeId, node, enrichedConfig, ctx, depth);
             }
@@ -675,7 +676,7 @@ public class DagEngine {
 
         // 所有上游完成：将 upstreamIds 注入 config，供 AggregateHandler 读取上游结果
         Map<String, Object> enrichedConfig = new HashMap<>(config);
-        enrichedConfig.put("__upstreamIds", upstreamIds);
+        enrichedConfig.put(MapFieldKeys.UPSTREAM_IDS, upstreamIds);
         return executeNodeAfterStage2(graph, nodeId, node, enrichedConfig, ctx, depth);
     }
 
@@ -996,18 +997,18 @@ public class DagEngine {
 
     private Map<String, Object> pendingResponse(String nodeId, String nodeType, NodeResult result) {
         Map<String, Object> response = new LinkedHashMap<>();
-        response.put("pending", true);
-        response.put("nodeId", nodeId);
-        response.put("nodeType", nodeType);
-        response.put("outcome", result.outcome().name());
+        response.put(MapFieldKeys.PENDING, true);
+        response.put(MapFieldKeys.NODE_ID, nodeId);
+        response.put(MapFieldKeys.NODE_TYPE, nodeType);
+        response.put(MapFieldKeys.OUTCOME, result.outcome().name());
         if (result.resumeAtEpochMs() != null) {
-            response.put("resumeAtEpochMs", result.resumeAtEpochMs());
+            response.put(MapFieldKeys.RESUME_AT_EPOCH_MS, result.resumeAtEpochMs());
         }
         if (result.reasonCode() != null) {
-            response.put("reasonCode", result.reasonCode());
+            response.put(MapFieldKeys.REASON_CODE, result.reasonCode());
         }
         if (result.reasonMessage() != null) {
-            response.put("reasonMessage", result.reasonMessage());
+            response.put(MapFieldKeys.REASON_MESSAGE, result.reasonMessage());
         }
         return response;
     }
@@ -1044,15 +1045,15 @@ public class DagEngine {
 
         // 性能优化：先检查是否有任何 CONTEXT 字段，无则直接返回原 Map 避免 HashMap 创建
         boolean hasContextField = config.values().stream().anyMatch(
-                v -> v instanceof Map<?, ?> m && "CONTEXT".equals(m.get("valueType")));
+                v -> v instanceof Map<?, ?> m && MapFieldKeys.CONTEXT.equals(m.get(MapFieldKeys.VALUE_TYPE)));
         if (!hasContextField) return config;   // O(n) 扫描，但避免了 HashMap allocation
 
         Map<String, Object> resolved = new HashMap<>(config);
         for (Map.Entry<String, Object> entry : config.entrySet()) {
             if (entry.getValue() instanceof Map<?, ?> m) {
-                String valueType = (String) ((Map<String, Object>) m).get("valueType");
-                String value = (String) ((Map<String, Object>) m).get("value");
-                if ("CONTEXT".equals(valueType) && value != null) {
+                String valueType = (String) ((Map<String, Object>) m).get(MapFieldKeys.VALUE_TYPE);
+                String value = (String) ((Map<String, Object>) m).get(MapFieldKeys.VALUE_KEY);
+                if (MapFieldKeys.CONTEXT.equals(valueType) && value != null) {
                     resolved.put(entry.getKey(), ctx.getContextValue(value));
                 }
             }
@@ -1067,7 +1068,7 @@ public class DagEngine {
                                                         ExecutionContext ctx, String nodeId,
                                                         String nodeType) {
         Map<String, Object> resolved = new HashMap<>(resolveConfig(config, ctx));
-        resolved.put("__nodeId", nodeId);
+        resolved.put(MapFieldKeys.NODE_ID_INTERNAL, nodeId);
         enrichWaitResumePayload(resolved, ctx, nodeId, nodeType);
         return resolved;
     }
@@ -1077,15 +1078,15 @@ public class DagEngine {
                                          String nodeId,
                                          String nodeType) {
         Map<String, Object> payload = ctx.getTriggerPayload();
-        Object sourceNodeId = payload.get("sourceNodeId");
+        Object sourceNodeId = payload.get(MapFieldKeys.SOURCE_NODE_ID);
         if (sourceNodeId != null && !nodeId.equals(sourceNodeId.toString())) {
             return;
         }
-        if (NodeType.WAIT.equals(nodeType) && payload.containsKey("__waitResumeStatus")) {
-            resolved.put("__waitResumeStatus", payload.get("__waitResumeStatus"));
+        if (NodeType.WAIT.equals(nodeType) && payload.containsKey(MapFieldKeys.WAIT_RESUME_STATUS)) {
+            resolved.put(MapFieldKeys.WAIT_RESUME_STATUS, payload.get(MapFieldKeys.WAIT_RESUME_STATUS));
         }
-        if (NodeType.GOAL_CHECK.equals(nodeType) && payload.containsKey("__goalResumeStatus")) {
-            resolved.put("__goalResumeStatus", payload.get("__goalResumeStatus"));
+        if (NodeType.GOAL_CHECK.equals(nodeType) && payload.containsKey(MapFieldKeys.GOAL_RESUME_STATUS)) {
+            resolved.put(MapFieldKeys.GOAL_RESUME_STATUS, payload.get(MapFieldKeys.GOAL_RESUME_STATUS));
         }
     }
 
@@ -1108,8 +1109,8 @@ public class DagEngine {
         if (NodeType.IF_CONDITION.equals(sourceType)) {
             // result 中只有被走的那条（另一条是 null）
             // 通过 config 找到"另一条"并标记 SKIPPED
-            String successId = (String) cfg.get("successNodeId");
-            String failId = (String) cfg.get("failNodeId");
+            String successId = (String) cfg.get(MapFieldKeys.SUCCESS_NODE_ID);
+            String failId = (String) cfg.get(MapFieldKeys.FAIL_NODE_ID);
             String takenId = result.successNodeId() != null ? result.successNodeId()
                     : result.failNodeId();
             String skippedId = takenId != null && takenId.equals(successId) ? failId : successId;
@@ -1118,12 +1119,12 @@ public class DagEngine {
         } else if ("SELECTOR".equals(sourceType)) {
             // 标记所有未走的 branch 入口
             java.util.List<Map<String, Object>> branches =
-                    (java.util.List<Map<String, Object>>) cfg.getOrDefault("branches", List.of());
-            String elseId = (String) cfg.get("elseNodeId");
+                    (java.util.List<Map<String, Object>>) cfg.getOrDefault(MapFieldKeys.BRANCHES, List.of());
+            String elseId = (String) cfg.get(MapFieldKeys.ELSE_NODE_ID);
             String takenId = result.nextNodeId(); // SELECTOR 走的那条
 
             branches.forEach(b -> {
-                String branchNext = (String) b.get("nextNodeId");
+                String branchNext = (String) b.get(MapFieldKeys.NEXT_NODE_ID);
                 if (branchNext != null && !branchNext.equals(takenId)) {
                     markSkipped(branchNext, ctx);
                 }

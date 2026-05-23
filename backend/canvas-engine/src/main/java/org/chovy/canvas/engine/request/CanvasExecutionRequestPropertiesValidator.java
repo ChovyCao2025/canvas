@@ -15,6 +15,8 @@ public class CanvasExecutionRequestPropertiesValidator {
     private final long maxRetryDelayMs;
     private final long heartbeatIntervalMs;
     private final int perCanvasBatchLimit;
+    private final int replaySinglePerMinute;
+    private final int replayBatchRequestsPerMinute;
 
     public CanvasExecutionRequestPropertiesValidator(
             @Value("${canvas.execution-request.dispatch-batch-size:200}") int dispatchBatchSize,
@@ -24,7 +26,9 @@ public class CanvasExecutionRequestPropertiesValidator {
             @Value("${canvas.execution-request.running-stale-sec:300}") long runningStaleSeconds,
             @Value("${canvas.execution-request.max-retry-delay-ms:60000}") long maxRetryDelayMs,
             @Value("${canvas.execution-request.heartbeat-interval-ms:60000}") long heartbeatIntervalMs,
-            @Value("${canvas.execution-request.per-canvas-batch-limit:0}") int perCanvasBatchLimit) {
+            @Value("${canvas.execution-request.per-canvas-batch-limit:0}") int perCanvasBatchLimit,
+            @Value("${canvas.execution-request.replay.single-per-minute:60}") int replaySinglePerMinute,
+            @Value("${canvas.execution-request.replay.batch-requests-per-minute:1000}") int replayBatchRequestsPerMinute) {
         this.dispatchBatchSize = dispatchBatchSize;
         this.dispatchFixedDelayMs = dispatchFixedDelayMs;
         this.retryDelayMs = retryDelayMs;
@@ -33,6 +37,8 @@ public class CanvasExecutionRequestPropertiesValidator {
         this.maxRetryDelayMs = maxRetryDelayMs;
         this.heartbeatIntervalMs = heartbeatIntervalMs;
         this.perCanvasBatchLimit = perCanvasBatchLimit;
+        this.replaySinglePerMinute = replaySinglePerMinute;
+        this.replayBatchRequestsPerMinute = replayBatchRequestsPerMinute;
     }
 
     @PostConstruct
@@ -59,6 +65,14 @@ public class CanvasExecutionRequestPropertiesValidator {
         if (perCanvasBatchLimit < 0) {
             throw new IllegalStateException(
                     "canvas.execution-request.per-canvas-batch-limit must be greater than or equal to 0");
+        }
+        if (replaySinglePerMinute < 0) {
+            throw new IllegalStateException(
+                    "canvas.execution-request.replay.single-per-minute must be greater than or equal to 0");
+        }
+        if (replayBatchRequestsPerMinute < 0) {
+            throw new IllegalStateException(
+                    "canvas.execution-request.replay.batch-requests-per-minute must be greater than or equal to 0");
         }
     }
 

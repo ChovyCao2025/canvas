@@ -4,6 +4,9 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import lombok.RequiredArgsConstructor;
 import org.chovy.cache.annotation.TieredCacheEvict;
 import org.chovy.cache.annotation.TieredCached;
+import org.chovy.cache.strategy.AvalancheProtectionStrategy;
+import org.chovy.cache.strategy.BreakdownProtectionStrategy;
+import org.chovy.cache.strategy.PenetrationProtectionStrategy;
 import org.chovy.canvas.domain.constant.CanvasStatusEnum;
 import org.springframework.stereotype.Service;
 
@@ -20,7 +23,10 @@ public class EventDefinitionCacheService {
             l1RefreshAfterWrite = "10m",
             l2KeyPrefix = "canvas:event-definition:",
             l2Ttl = "1h",
-            nullValueTtl = "5m")
+            nullValueTtl = "1m",
+            penetration = PenetrationProtectionStrategy.CACHE_NULL_SHORT_TTL,
+            breakdown = BreakdownProtectionStrategy.LOCAL_SINGLE_FLIGHT,
+            avalanche = AvalancheProtectionStrategy.TTL_JITTER)
     public EventDefinition getPublishedByCode(String eventCode) {
         return eventMapper.selectOne(new LambdaQueryWrapper<EventDefinition>()
                 .eq(EventDefinition::getEventCode, eventCode)

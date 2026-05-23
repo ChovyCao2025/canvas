@@ -88,6 +88,9 @@ canvas:
     max-retry-delay-ms: 60000
     heartbeat-interval-ms: 60000
     per-canvas-batch-limit: 0
+    replay:
+      single-per-minute: 60
+      batch-requests-per-minute: 1000
   node:
     timeout-ms: 3000
   mq:

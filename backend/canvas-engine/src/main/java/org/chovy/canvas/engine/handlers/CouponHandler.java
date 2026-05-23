@@ -1,5 +1,6 @@
 package org.chovy.canvas.engine.handlers;
 
+import org.chovy.canvas.common.MapFieldKeys;
 import org.chovy.canvas.engine.context.ExecutionContext;
 import org.chovy.canvas.engine.handler.NodeHandler;
 import org.chovy.canvas.engine.handler.NodeHandlerType;
@@ -36,15 +37,15 @@ public class CouponHandler implements NodeHandler {
     @SuppressWarnings("unchecked")
     public Mono<NodeResult> executeAsync(Map<String, Object> config, ExecutionContext ctx) {
         // 节点配置：券种、附加参数和下游节点
-        String couponTypeKey  = (String) config.get("couponTypeKey");
-        Map<String, Object> p = (Map<String, Object>) config.getOrDefault("params", Map.of());
-        String nextNodeId     = (String) config.get("nextNodeId");
+        String couponTypeKey  = (String) config.get(MapFieldKeys.COUPON_TYPE_KEY);
+        Map<String, Object> p = (Map<String, Object>) config.getOrDefault(MapFieldKeys.PARAMS, Map.of());
+        String nextNodeId     = (String) config.get(MapFieldKeys.NEXT_NODE_ID);
 
         // 组装调用体：executionId:coupon 作为幂等键，避免重试重复发券
         Map<String, Object> body = new HashMap<>(p);
-        body.put("couponTypeKey",  couponTypeKey);
-        body.put("userId",         ctx.getUserId());
-        body.put("idempotencyKey", ctx.getExecutionId() + ":coupon");
+        body.put(MapFieldKeys.COUPON_TYPE_KEY, couponTypeKey);
+        body.put(MapFieldKeys.USER_ID, ctx.getUserId());
+        body.put(MapFieldKeys.IDEMPOTENCY_KEY, ctx.getExecutionId() + ":coupon");
 
         return webClient.post().uri("/issue").bodyValue(body)
                 .retrieve()

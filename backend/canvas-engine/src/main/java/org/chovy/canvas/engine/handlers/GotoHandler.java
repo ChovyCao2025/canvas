@@ -1,5 +1,6 @@
 package org.chovy.canvas.engine.handlers;
 
+import org.chovy.canvas.common.MapFieldKeys;
 import org.chovy.canvas.domain.constant.NodeType;
 import org.chovy.canvas.engine.context.ExecutionContext;
 import org.chovy.canvas.engine.handler.NodeHandler;
@@ -23,10 +24,10 @@ public class GotoHandler implements NodeHandler {
         int nextCount = ctx.getJumpCounts().merge(nodeId, 1, Integer::sum);
         if (nextCount > maxJumps) {
             return Mono.just(NodeResult.routed("max_exceeded", string(config, "maxExceededNodeId", null),
-                    Map.of("jumpCount", nextCount, "jumpExceeded", true)));
+                    Map.of(MapFieldKeys.JUMP_COUNT, nextCount, MapFieldKeys.JUMP_EXCEEDED, true)));
         }
         return Mono.just(NodeResult.routed("goto", string(config, "targetNodeId", null),
-                Map.of("jumpCount", nextCount)));
+                Map.of(MapFieldKeys.JUMP_COUNT, nextCount)));
     }
 
     private int number(Object value, int fallback) {

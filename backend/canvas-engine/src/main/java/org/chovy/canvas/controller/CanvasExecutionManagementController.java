@@ -1,6 +1,7 @@
 package org.chovy.canvas.controller;
 
 import com.fasterxml.jackson.core.type.TypeReference;
+import org.chovy.canvas.common.MapFieldKeys;
 import org.chovy.canvas.domain.constant.NodeType;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.jsonwebtoken.Claims;
@@ -138,7 +139,7 @@ public class CanvasExecutionManagementController {
                         "MANUAL_APPROVAL_RESUME",
                         NodeType.MANUAL_APPROVAL,
                         null,
-                        Map.of("__approvalResult", result),
+                        Map.of(MapFieldKeys.APPROVAL_RESULT, result),
                         executionId + ":resume:" + result,
                         false)
                 .subscribe(

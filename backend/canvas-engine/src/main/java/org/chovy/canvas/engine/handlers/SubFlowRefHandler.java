@@ -1,6 +1,7 @@
 package org.chovy.canvas.engine.handlers;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.chovy.canvas.common.MapFieldKeys;
 import org.chovy.canvas.domain.constant.TriggerType;
 import org.chovy.canvas.domain.canvas.Canvas;
 import org.chovy.canvas.domain.canvas.CanvasMapper;
@@ -62,7 +63,7 @@ public class SubFlowRefHandler implements NodeHandler {
         Long   subFlowId      = Long.parseLong(String.valueOf(subFlowIdObj));
         int    subFlowVersion = config.get("subFlowVersion") instanceof Number n ? n.intValue() : -1;
         String outputPrefix   = (String) config.getOrDefault("outputPrefix", "sf");
-        String nextNodeId     = (String) config.get("nextNodeId");
+        String nextNodeId     = (String) config.get(MapFieldKeys.NEXT_NODE_ID);
         Map<String, Object> inputMapping =
                 (Map<String, Object>) config.getOrDefault("inputMapping", Map.of());
 

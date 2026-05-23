@@ -1,6 +1,7 @@
 package org.chovy.canvas.engine.handlers;
 
 import lombok.extern.slf4j.Slf4j;
+import org.chovy.canvas.common.MapFieldKeys;
 import org.chovy.canvas.engine.context.ExecutionContext;
 import org.chovy.canvas.engine.context.NodeStatus;
 import org.chovy.canvas.engine.handler.NodeHandler;
@@ -49,12 +50,12 @@ public class ThresholdHandler implements NodeHandler {
     @Override
     @SuppressWarnings("unchecked")
     public Mono<NodeResult> executeAsync(Map<String, Object> config, ExecutionContext ctx) {
-        List<String> upstreamIds = (List<String>) config.get("__upstreamIds");
-        String nodeId        = (String) config.get("__nodeId");
+        List<String> upstreamIds = (List<String>) config.get(MapFieldKeys.UPSTREAM_IDS);
+        String nodeId        = (String) config.get(MapFieldKeys.NODE_ID_INTERNAL);
         String thresholdMode = (String) config.getOrDefault("thresholdMode", "min_success");
         int    threshold     = config.get("threshold") instanceof Number n ? n.intValue() : 1;
-        String successNodeId = (String) config.get("successNodeId");
-        String failNodeId    = (String) config.get("failNodeId");
+        String successNodeId = (String) config.get(MapFieldKeys.SUCCESS_NODE_ID);
+        String failNodeId    = (String) config.get(MapFieldKeys.FAIL_NODE_ID);
 
         if (upstreamIds == null || upstreamIds.isEmpty()) {
             return Mono.just(NodeResult.ok(successNodeId, Map.of()));
@@ -84,18 +85,18 @@ public class ThresholdHandler implements NodeHandler {
 
         if (thresholdMet) {
             return Mono.just(NodeResult.ok(successNodeId, Map.of(
-                    "successCount", successCount,
-                    "doneCount",    doneCount,
-                    "totalCount",   totalCount
+                    MapFieldKeys.SUCCESS_COUNT, successCount,
+                    MapFieldKeys.DONE_COUNT, doneCount,
+                    MapFieldKeys.TOTAL_COUNT, totalCount
             )));
         }
 
         if (allDone) {
             // 所有上游完成但阈值未达：路由到失败分支
             return Mono.just(NodeResult.ok(failNodeId, Map.of(
-                    "successCount", successCount,
-                    "doneCount",    doneCount,
-                    "totalCount",   totalCount
+                    MapFieldKeys.SUCCESS_COUNT, successCount,
+                    MapFieldKeys.DONE_COUNT, doneCount,
+                    MapFieldKeys.TOTAL_COUNT, totalCount
             )));
         }
 

@@ -1,5 +1,6 @@
 package org.chovy.canvas.engine.handlers;
 
+import org.chovy.canvas.common.MapFieldKeys;
 import org.chovy.canvas.domain.constant.NodeType;
 import org.chovy.canvas.engine.context.ExecutionContext;
 import org.chovy.canvas.engine.handler.NodeHandler;
@@ -40,7 +41,7 @@ public class FrequencyCapHandler implements NodeHandler {
             return Mono.just(NodeResult.suppressed(
                     "capped", cappedNodeId, decision.reasonCode(), decision.reasonMessage()));
         }
-        return Mono.just(NodeResult.routed("pass", passNodeId, Map.of("frequencyAllowed", true)));
+        return Mono.just(NodeResult.routed("pass", passNodeId, Map.of(MapFieldKeys.FREQUENCY_ALLOWED, true)));
     }
 
     private int number(Object value, int fallback) {

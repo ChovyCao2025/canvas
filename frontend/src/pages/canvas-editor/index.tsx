@@ -15,8 +15,8 @@ import {
 import dayjs from 'dayjs'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import type { BackendNode, BizConfig, CanvasNodeData } from '../../types/canvas'
-import { canvasApi } from '../../services/api'
-import type { CanvasDetail } from '../../types'
+import { canvasApi, metaApi } from '../../services/api'
+import type { CanvasDetail, NodeTypeRegistry } from '../../types'
 import CanvasNodeCmp from '../../components/canvas/CanvasNode'
 import BranchPlaceholderNode, { type PlaceholderData, PLACEHOLDER_W as PH_W, PLACEHOLDER_H as PH_H } from '../../components/canvas/BranchPlaceholderNode'
 import { useBranchPlaceholders } from '../../hooks/useBranchPlaceholders'
@@ -34,7 +34,14 @@ import CronBuilder from '../../components/config-panel/CronBuilder'
 import { CanvasActionsContext } from '../../context/CanvasActionsContext'
 import { useAuth } from '../../context/AuthContext'
 import { getCanvasGraphReloadKey } from './graphReloadKey'
-import { isLocalDraftDifferentFromServer, readCanvasLocalDraft, writeCanvasLocalDraft } from './localDraft'
+import { hydrateBackendNodeOutletSchemas } from './graphHydration'
+import { CANVAS_CONNECTION_RADIUS } from './connectionInteraction'
+import {
+  clearCanvasLocalDraft,
+  isLocalDraftDifferentFromServer,
+  readCanvasLocalDraft,
+  writeCanvasLocalDraft,
+} from './localDraft'
 import { buildCanvasNameUpdate, getCanvasNameStatusGap, shouldShowCanvasNameActions } from './canvasNameUpdate'
 import {
   type CanvasTriggerType,
@@ -107,6 +114,34 @@ function buildBackendNodesFromFlowNodes(nodes: Node[]): BackendNode[] {
     })
 }
 
+interface SaveSnapshot {
+  nodes: Node[]
+  canvasName: string
+  canvasSettings: CanvasSettingsLike
+  description?: string
+}
+
+function buildSaveGraphJson(nodes: Node[]): string {
+  return JSON.stringify({ nodes: buildBackendNodesFromFlowNodes(nodes) })
+}
+
+function sameSaveSnapshot(a: {
+  graphJson: string
+  canvasName: string
+  canvasSettings: CanvasSettingsLike
+  description?: string
+}, b: {
+  graphJson: string
+  canvasName: string
+  canvasSettings: CanvasSettingsLike
+  description?: string
+}): boolean {
+  return a.graphJson === b.graphJson
+    && a.canvasName === b.canvasName
+    && JSON.stringify(a.canvasSettings) === JSON.stringify(b.canvasSettings)
+    && a.description === b.description
+}
+
 // ── 清理被删节点的引用 ────────────────────────────────────────
 
 function cleanRefs(cfg: Record<string, unknown>, deletedIds: Set<string>): BizConfig {
@@ -161,6 +196,16 @@ function downstreamEdgeId(sourceId: string, targetId: string, sourceHandle: stri
   return sourceHandle === 'default'
     ? `${sourceId}->${targetId}`
     : `${sourceId}->${targetId}::${sourceHandle}`
+}
+
+function replaceOutletEdge(edges: Edge[], edge: Edge): Edge[] {
+  const sourceHandle = edge.sourceHandle ?? 'default'
+  return addEdge(
+    edge,
+    edges.filter(item =>
+      item.source !== edge.source || (item.sourceHandle ?? 'default') !== sourceHandle,
+    ),
+  )
 }
 
 function splitSelectedEdge(edge: Edge, entryNodeId: string, exitNodeId = entryNodeId, exitHandleId = 'default'): { removeEdgeId: string; newEdges: Edge[] } {
@@ -319,6 +364,13 @@ function EditorInner({ detail, onStatusChange, onCanvasNameChange }: {
   const autoSaveTimer = useRef<ReturnType<typeof setTimeout>>()
   const savedCanvasName = useRef(detail.canvas.name)
   const localDraftReadyRef = useRef(false)
+  const savingPromiseRef = useRef<Promise<boolean> | null>(null)
+  const latestSaveSnapshotRef = useRef<SaveSnapshot>({
+    nodes: [],
+    canvasName: detail.canvas.name,
+    canvasSettings: normalizeCanvasSettingsFromDetail(detail),
+    description: detail.canvas.description,
+  })
   const limitsSectionId = 'canvas-settings-execution-limits'
   const watchedTriggerType = Form.useWatch('triggerType', settingsForm)
   const watchedCronExpression = Form.useWatch('cronExpression', settingsForm)
@@ -351,6 +403,15 @@ function EditorInner({ detail, onStatusChange, onCanvasNameChange }: {
   const graphReloadKey = getCanvasGraphReloadKey(detail)
   const showCanvasNameActions = shouldShowCanvasNameActions(isEditingCanvasName)
   const statusTagGap = getCanvasNameStatusGap(isEditingCanvasName && !readonly)
+
+  useEffect(() => {
+    latestSaveSnapshotRef.current = {
+      nodes,
+      canvasName,
+      canvasSettings,
+      description: detail.canvas.description,
+    }
+  }, [canvasName, canvasSettings, detail.canvas.description, nodes])
 
   const buildDefaultBizConfig = useCallback((nodeType: string): BizConfig => {
     if (nodeType === 'SELECTOR') {
@@ -412,28 +473,37 @@ function EditorInner({ detail, onStatusChange, onCanvasNameChange }: {
     settings?: CanvasSettingsLike
     editVersion?: number
   }) => {
+    const snapshot = latestSaveSnapshotRef.current
     writeCanvasLocalDraft({
       canvasId,
-      name: (overrides?.name ?? canvasName).trim(),
-      graphJson: overrides?.graphJson ?? JSON.stringify({ nodes: buildBackendNodesFromFlowNodes(getNodes()) }),
-      settings: overrides?.settings ?? canvasSettings,
+      name: (overrides?.name ?? snapshot.canvasName).trim(),
+      graphJson: overrides?.graphJson ?? buildSaveGraphJson(snapshot.nodes),
+      settings: overrides?.settings ?? snapshot.canvasSettings,
       editVersion: overrides?.editVersion ?? editVersion.current,
       draftVersionId: detail.draftVersionId,
       savedAt: Date.now(),
     })
-  }, [canvasId, canvasName, canvasSettings, detail.draftVersionId, getNodes])
+  }, [canvasId, detail.draftVersionId])
 
   useEffect(() => {
     if (!localDraftReadyRef.current || !isDirty || readonly) return
     persistLocalDraft()
-  }, [canvasName, canvasSettings, isDirty, nodes, edges, persistLocalDraft, readonly])
+  }, [canvasName, canvasSettings, isDirty, nodes, persistLocalDraft, readonly])
 
   // 初始化加载
   useEffect(() => {
     localDraftReadyRef.current = false
+    let cancelled = false
 
-    const applyCanvasDraft = (graphJson: string, nextName: string, nextSettings: CanvasSettingsLike, nextEditVersion: number) => {
-      const backendNodes: BackendNode[] = JSON.parse(graphJson || '{"nodes":[]}').nodes ?? []
+    const applyCanvasDraft = (
+      graphJson: string,
+      nextName: string,
+      nextSettings: CanvasSettingsLike,
+      nextEditVersion: number,
+      nodeTypes: NodeTypeRegistry[],
+    ) => {
+      const parsedNodes: BackendNode[] = JSON.parse(graphJson || '{"nodes":[]}').nodes ?? []
+      const backendNodes = hydrateBackendNodeOutletSchemas(parsedNodes, nodeTypes)
       setCanvasName(nextName)
       savedCanvasName.current = nextName
       setCanvasSettings(nextSettings)
@@ -471,41 +541,63 @@ function EditorInner({ detail, onStatusChange, onCanvasNameChange }: {
       requestAnimationFrame(() => fitView({ padding: 0.15, duration: 300 }))
     }
 
-    const serverSettings = normalizeCanvasSettingsFromDetail(detail)
-    applyCanvasDraft(detail.graphJson, detail.canvas.name, serverSettings, detail.canvas.editVersion ?? 0)
-    setIsDirty(false)
+    const loadCanvasDraft = async () => {
+      let nodeTypes: NodeTypeRegistry[] = []
+      try {
+        nodeTypes = (await metaApi.getNodeTypes()).data
+      } catch {
+        nodeTypes = []
+      }
+      if (cancelled) return
+      applyCanvasDraft(
+        detail.graphJson,
+        detail.canvas.name,
+        normalizeCanvasSettingsFromDetail(detail),
+        detail.canvas.editVersion ?? 0,
+        nodeTypes,
+      )
+      if (readonly) {
+        setIsDirty(false)
+        localDraftReadyRef.current = true
+        return
+      }
 
-    if (readonly) {
-      localDraftReadyRef.current = true
-      return
+      const localDraft = readCanvasLocalDraft(canvasId)
+      if (!localDraft || !isLocalDraftDifferentFromServer(localDraft, detail)) {
+        clearCanvasLocalDraft(canvasId)
+        setIsDirty(false)
+        localDraftReadyRef.current = true
+        return
+      }
+
+      Modal.confirm({
+        title: '检测到本地草稿',
+        content: `发现 ${new Date(localDraft.savedAt).toLocaleString('zh-CN')} 的本地草稿，是否恢复？`,
+        okText: '恢复本地草稿',
+        cancelText: '保持当前内容',
+        onOk: () => {
+          applyCanvasDraft(
+            localDraft.graphJson,
+            localDraft.name,
+            localDraft.settings,
+            localDraft.editVersion || detail.canvas.editVersion || 0,
+            nodeTypes,
+          )
+          setIsDirty(true)
+          localDraftReadyRef.current = true
+        },
+        onCancel: () => {
+          localDraftReadyRef.current = true
+        },
+      })
     }
 
-    const localDraft = readCanvasLocalDraft(canvasId)
-    if (!localDraft || !isLocalDraftDifferentFromServer(localDraft, detail)) {
-      localDraftReadyRef.current = true
-      return
-    }
+    void loadCanvasDraft()
 
-    Modal.confirm({
-      title: '检测到本地草稿',
-      content: `发现 ${new Date(localDraft.savedAt).toLocaleString('zh-CN')} 的本地草稿，是否恢复？`,
-      okText: '恢复本地草稿',
-      cancelText: '保持当前内容',
-      onOk: () => {
-        applyCanvasDraft(
-          localDraft.graphJson,
-          localDraft.name,
-          localDraft.settings,
-          localDraft.editVersion || detail.canvas.editVersion || 0,
-        )
-        setIsDirty(true)
-        localDraftReadyRef.current = true
-      },
-      onCancel: () => {
-        localDraftReadyRef.current = true
-      },
-    })
-  }, [graphReloadKey, detail.graphJson, fitView, setNodes, setEdges])
+    return () => {
+      cancelled = true
+    }
+  }, [canvasId, graphReloadKey, detail, detail.graphJson, fitView, readonly, setNodes, setEdges])
 
   // 键盘快捷键（含复制/粘贴）
   useEffect(() => {
@@ -665,7 +757,7 @@ function EditorInner({ detail, onStatusChange, onCanvasNameChange }: {
         }
       }))
       setEdges(current => [
-        ...addEdge(buildPlaceholderEdge(resolvedContext.sourceId, resolvedContext.handleId, expansion.entryNodeId), current),
+        ...replaceOutletEdge(current, buildPlaceholderEdge(resolvedContext.sourceId, resolvedContext.handleId, expansion.entryNodeId)),
         ...expansion.edges,
       ])
     } else if (expansion.edges.length > 0) {
@@ -734,7 +826,7 @@ function EditorInner({ detail, onStatusChange, onCanvasNameChange }: {
       const nd = n.data as CanvasNodeData
       return { ...n, data: { ...nd, bizConfig: patchBizConfig(nd.bizConfig, ph.handleId, draggedNode.id, nd.outletSchema) } }
     }))
-    setEdges(prev => addEdge(buildPlaceholderEdge(ph.sourceId, ph.handleId, draggedNode.id), prev))
+    setEdges(prev => replaceOutletEdge(prev, buildPlaceholderEdge(ph.sourceId, ph.handleId, draggedNode.id)))
     setIsDirty(true)
   }, [getNodes, placeholders, readonly, snapshot, setNodes, setEdges])
 
@@ -748,7 +840,13 @@ function EditorInner({ detail, onStatusChange, onCanvasNameChange }: {
       const d = n.data as CanvasNodeData
       return { ...n, data: { ...d, bizConfig: patchBizConfig(d.bizConfig, sourceHandle, target, d.outletSchema) } }
     }))
-    setEdges(prev => addEdge({ ...conn }, prev))
+    setEdges(prev => replaceOutletEdge(prev, {
+      id: downstreamEdgeId(source, target, sourceHandle),
+      source,
+      target,
+      sourceHandle,
+      targetHandle: conn.targetHandle,
+    }))
     setIsDirty(true)
   }, [snapshot, setNodes, setEdges])
 
@@ -822,10 +920,7 @@ function EditorInner({ detail, onStatusChange, onCanvasNameChange }: {
     const src = allNodes.find(n => n.id === conn.source)?.data as CanvasNodeData | undefined
     const tgt = allNodes.find(n => n.id === conn.target)?.data as CanvasNodeData | undefined
     if (!src || !tgt) return false
-    if (TRIGGER_TYPES.has(tgt.nodeType)) {
-      message.warning('START 是流程唯一入口，不能有上游节点。', 3)
-      return false
-    }
+    if (TRIGGER_TYPES.has(tgt.nodeType)) return false
     if (TERMINAL_TYPES.has(src.nodeType)) return false  // 终止节点无出边
     if (conn.source === conn.target) return false        // 禁止自环
     return true
@@ -891,34 +986,69 @@ function EditorInner({ detail, onStatusChange, onCanvasNameChange }: {
   }, [])
 
   const handleSave = useCallback(async (silent = false) => {
+    if (savingPromiseRef.current) {
+      try {
+        await savingPromiseRef.current
+      } catch {
+        // The leading save call owns user-facing error handling.
+      }
+      return
+    }
+
     setSaving(true)
+
+    const savePromise = (async () => {
+      let savedAny = false
+
+      while (true) {
+        const snapshot = latestSaveSnapshotRef.current
+        const graphJson = buildSaveGraphJson(snapshot.nodes)
+        const savedSnapshot = {
+          graphJson,
+          canvasName: snapshot.canvasName,
+          canvasSettings: snapshot.canvasSettings,
+          description: snapshot.description,
+        }
+
+        await canvasApi.update(canvasId, {
+          name: snapshot.canvasName,
+          description: snapshot.description,
+          graphJson,
+          editVersion: editVersion.current,
+          triggerType: snapshot.canvasSettings.triggerType,
+          cronExpression: snapshot.canvasSettings.cronExpression ?? null,
+          validStart: snapshot.canvasSettings.validStart ?? null,
+          validEnd: snapshot.canvasSettings.validEnd ?? null,
+          maxTotalExecutions: snapshot.canvasSettings.maxTotalExecutions ?? null,
+          perUserDailyLimit: snapshot.canvasSettings.perUserDailyLimit ?? null,
+          perUserTotalLimit: snapshot.canvasSettings.perUserTotalLimit ?? null,
+          cooldownSeconds: snapshot.canvasSettings.cooldownSeconds ?? null,
+        })
+        savedAny = true
+        editVersion.current += 1
+        savedCanvasName.current = snapshot.canvasName.trim()
+
+        const latestSnapshot = latestSaveSnapshotRef.current
+        const latestComparable = {
+          graphJson: buildSaveGraphJson(latestSnapshot.nodes),
+          canvasName: latestSnapshot.canvasName,
+          canvasSettings: latestSnapshot.canvasSettings,
+          description: latestSnapshot.description,
+        }
+        if (sameSaveSnapshot(savedSnapshot, latestComparable)) {
+          clearCanvasLocalDraft(canvasId)
+          setIsDirty(false)
+          return savedAny
+        }
+
+        setIsDirty(true)
+      }
+    })()
+
+    savingPromiseRef.current = savePromise
     try {
-      const backendNodes = buildBackendNodesFromFlowNodes(getNodes())
-      const graphJson = JSON.stringify({ nodes: backendNodes })
-      await canvasApi.update(canvasId, {
-        name: canvasName,
-        description: detail.canvas.description,
-        graphJson,
-        editVersion: editVersion.current,
-        triggerType: canvasSettings.triggerType,
-        cronExpression: canvasSettings.cronExpression ?? null,
-        validStart: canvasSettings.validStart ?? null,
-        validEnd: canvasSettings.validEnd ?? null,
-        maxTotalExecutions: canvasSettings.maxTotalExecutions ?? null,
-        perUserDailyLimit: canvasSettings.perUserDailyLimit ?? null,
-        perUserTotalLimit: canvasSettings.perUserTotalLimit ?? null,
-        cooldownSeconds: canvasSettings.cooldownSeconds ?? null,
-      })
-      editVersion.current += 1
-      savedCanvasName.current = canvasName.trim()
-      persistLocalDraft({
-        graphJson,
-        name: canvasName,
-        settings: canvasSettings,
-        editVersion: editVersion.current,
-      })
-      setIsDirty(false)
-      if (!silent) message.success('保存成功')
+      const saved = await savePromise
+      if (saved && !silent) message.success('保存成功')
     } catch (err: any) {
       if (err?.response?.status === 409) {
         Modal.confirm({
@@ -928,12 +1058,14 @@ function EditorInner({ detail, onStatusChange, onCanvasNameChange }: {
           cancelText: '暂不刷新',
           onOk: () => window.location.reload(),
         })
+      } else if (!silent) {
+        message.error('保存失败')
       }
-      else if (!silent) message.error('保存失败')
     } finally {
+      savingPromiseRef.current = null
       setSaving(false)
     }
-  }, [canvasId, canvasName, canvasSettings, detail.canvas.description, getNodes, persistLocalDraft])
+  }, [canvasId])
 
   const handleSaveCanvasName = useCallback(async () => {
     const update = buildCanvasNameUpdate(canvasName, savedCanvasName.current)
@@ -1073,6 +1205,7 @@ function EditorInner({ detail, onStatusChange, onCanvasNameChange }: {
     snapshot('整理布局')
     const layouted = applyDagreLayout(getNodes(), getEdges())
     setNodes([...layouted])
+    setIsDirty(true)
   }, [snapshot, getNodes, getEdges, setNodes])
 
   // 版本历史（EF-7）
@@ -1185,6 +1318,7 @@ function EditorInner({ detail, onStatusChange, onCanvasNameChange }: {
     )
     setEdges(prev => prev.filter(e => !ids.has(e.source) && !ids.has(e.target)))
     if (selectedNodeId === nodeId) setSelectedNodeId(null)
+    setIsDirty(true)
   }
 
   const copyNodeById = (nodeId: string) => {
@@ -1204,6 +1338,7 @@ function EditorInner({ detail, onStatusChange, onCanvasNameChange }: {
         bizConfig: cleanRefs((node.data as CanvasNodeData).bizConfig ?? {}, existingIds),
       },
     }])
+    setIsDirty(true)
   }
 
   const deleteEdgeById = (edgeId: string) => {
@@ -1279,7 +1414,10 @@ function EditorInner({ detail, onStatusChange, onCanvasNameChange }: {
               onKeyDown={e => {
                 if (e.key === 'Escape') handleCancelCanvasName()
               }}
-              onChange={e => { setCanvasName(e.target.value) }}
+              onChange={e => {
+                setCanvasName(e.target.value)
+                setIsDirty(true)
+              }}
               style={{
                 flex: 1,
                 height: '100%',
@@ -1383,6 +1521,7 @@ function EditorInner({ detail, onStatusChange, onCanvasNameChange }: {
                     snapshot('清空画布')
                     setNodes(prev => prev.filter(n => (n.data as CanvasNodeData).nodeType === 'START'))
                     setEdges([])
+                    setIsDirty(true)
                   },
                 })
               }}
@@ -1623,6 +1762,7 @@ function EditorInner({ detail, onStatusChange, onCanvasNameChange }: {
             onEdgesChange={onEdgesChangeWrapped}
             onConnect={onConnect}
             isValidConnection={isValidConnection as any}
+            connectionRadius={CANVAS_CONNECTION_RADIUS}
             onNodeClick={(_, node) => {
               setSelectedNodeId(node.id)
               setInsertContext(null)

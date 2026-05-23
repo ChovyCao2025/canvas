@@ -1,6 +1,7 @@
 package org.chovy.canvas.domain.canvas;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import org.chovy.canvas.common.MapFieldKeys;
 import org.chovy.canvas.domain.constant.CanvasStatusEnum;
 import org.chovy.canvas.domain.constant.VersionStatus;
 import org.chovy.canvas.infra.redis.TriggerRouteService;
@@ -210,13 +211,19 @@ public class CanvasOpsService {
         // added: 在 v2 有但 v1 没有的节点
         java.util.List<Object> added = nodes2.stream()
                 .filter(n -> !map1.containsKey(n.get("id")))
-                .map(n -> java.util.Map.of("nodeId", n.get("id"), "type", n.get("type"), "name", n.get("name")))
+                .map(n -> java.util.Map.of(
+                        MapFieldKeys.NODE_ID, n.get("id"),
+                        MapFieldKeys.TYPE, n.get("type"),
+                        MapFieldKeys.NAME, n.get("name")))
                 .collect(java.util.stream.Collectors.toList());
 
         // removed: 在 v1 有但 v2 没有的节点
         java.util.List<Object> removed = nodes1.stream()
                 .filter(n -> !map2.containsKey(n.get("id")))
-                .map(n -> java.util.Map.of("nodeId", n.get("id"), "type", n.get("type"), "name", n.get("name")))
+                .map(n -> java.util.Map.of(
+                        MapFieldKeys.NODE_ID, n.get("id"),
+                        MapFieldKeys.TYPE, n.get("type"),
+                        MapFieldKeys.NAME, n.get("name")))
                 .collect(java.util.stream.Collectors.toList());
 
         // modified: 两个版本都有但配置或节点名称不同的节点
@@ -227,20 +234,23 @@ public class CanvasOpsService {
                     return !java.util.Objects.equals(n.get("config"), old.get("config")) ||
                            !java.util.Objects.equals(n.get("name"), old.get("name"));
                 })
-                .map(n -> java.util.Map.of("nodeId", n.get("id"), "type", n.get("type"), "name", n.get("name")))
+                .map(n -> java.util.Map.of(
+                        MapFieldKeys.NODE_ID, n.get("id"),
+                        MapFieldKeys.TYPE, n.get("type"),
+                        MapFieldKeys.NAME, n.get("name")))
                 .collect(java.util.stream.Collectors.toList());
 
         return java.util.Map.of(
-                "v1", java.util.Map.of("versionId", v1Id, "version", v1.getVersion()),
-                "v2", java.util.Map.of("versionId", v2Id, "version", v2.getVersion()),
-                "added",    added,
-                "removed",  removed,
-                "modified", modified,
-                "summary", java.util.Map.of(
-                        "addedCount",   added.size(),
-                        "removedCount", removed.size(),
-                        "modifiedCount",modified.size(),
-                        "unchanged",    nodes2.size() - added.size() - modified.size()
+                MapFieldKeys.V1, java.util.Map.of(MapFieldKeys.VERSION_ID, v1Id, MapFieldKeys.VERSION, v1.getVersion()),
+                MapFieldKeys.V2, java.util.Map.of(MapFieldKeys.VERSION_ID, v2Id, MapFieldKeys.VERSION, v2.getVersion()),
+                MapFieldKeys.ADDED, added,
+                MapFieldKeys.REMOVED, removed,
+                MapFieldKeys.MODIFIED, modified,
+                MapFieldKeys.SUMMARY, java.util.Map.of(
+                        MapFieldKeys.ADDED_COUNT, added.size(),
+                        MapFieldKeys.REMOVED_COUNT, removed.size(),
+                        MapFieldKeys.MODIFIED_COUNT, modified.size(),
+                        MapFieldKeys.UNCHANGED, nodes2.size() - added.size() - modified.size()
                 )
         );
     }

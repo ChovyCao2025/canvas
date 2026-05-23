@@ -3,6 +3,7 @@ package org.chovy.canvas.engine.handlers;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.chovy.canvas.common.MapFieldKeys;
 import org.chovy.canvas.domain.constant.NodeType;
 import org.chovy.canvas.domain.customer.CustomerProfile;
 import org.chovy.canvas.domain.customer.CustomerProfileMapper;
@@ -56,7 +57,7 @@ public class UpdateProfileHandler implements NodeHandler {
         } else {
             profileMapper.updateById(profile);
         }
-        return Mono.just(NodeResult.ok(string(config, "nextNodeId", null), Map.of("profileUpdated", true)));
+        return Mono.just(NodeResult.ok(string(config, "nextNodeId", null), Map.of(MapFieldKeys.PROFILE_UPDATED, true)));
     }
 
     private void apply(CustomerProfile profile, Map<String, Object> attributes, Map<String, Object> op, ExecutionContext ctx) {

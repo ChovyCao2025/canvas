@@ -3,6 +3,7 @@ package org.chovy.canvas.engine.handlers;
 import groovy.lang.Binding;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.chovy.canvas.common.MapFieldKeys;
 import org.chovy.canvas.engine.context.ExecutionContext;
 import org.chovy.canvas.engine.context.NodeStatus;
 import org.chovy.canvas.engine.handler.NodeHandler;
@@ -62,10 +63,10 @@ public class AggregateHandler implements NodeHandler {
     @SuppressWarnings("unchecked")
     public Mono<NodeResult> executeAsync(Map<String, Object> config, ExecutionContext ctx) {
         // __upstreamIds / __nodeId 为调度器注入的内部字段
-        List<String> upstreamIds = (List<String>) config.get("__upstreamIds");
+        List<String> upstreamIds = (List<String>) config.get(MapFieldKeys.UPSTREAM_IDS);
         String evaluateMode      = (String) config.getOrDefault("evaluateMode", "count");
-        String successNodeId     = (String) config.get("successNodeId");
-        String failNodeId        = (String) config.get("failNodeId");
+        String successNodeId     = (String) config.get(MapFieldKeys.SUCCESS_NODE_ID);
+        String failNodeId        = (String) config.get(MapFieldKeys.FAIL_NODE_ID);
 
         // ── 统计上游结果 ──────────────────────────────────────────
         long totalCount   = upstreamIds != null ? upstreamIds.size() : 0;
@@ -107,7 +108,7 @@ public class AggregateHandler implements NodeHandler {
                     Object result = groovyHandler.evaluateExpression(script, binding);
                     yield Boolean.TRUE.equals(result);
                 } catch (Exception e) {
-                    log.error("[AGGREGATE] 脚本评估失败 nodeId={}: {}", config.get("__nodeId"), e.getMessage());
+                    log.error("[AGGREGATE] 脚本评估失败 nodeId={}: {}", config.get(MapFieldKeys.NODE_ID_INTERNAL), e.getMessage());
                     yield false;
                 }
             }
@@ -124,11 +125,11 @@ public class AggregateHandler implements NodeHandler {
                 Math.round(successRate), passed, nextNodeId);
 
         return Mono.just(NodeResult.ok(nextNodeId, Map.of(
-                "successCount", successCount,
-                "failCount",    failCount,
-                "totalCount",   totalCount,
-                "successRate",  Math.round(successRate * 10) / 10.0,
-                "passed",       passed
+                MapFieldKeys.SUCCESS_COUNT, successCount,
+                MapFieldKeys.FAIL_COUNT, failCount,
+                MapFieldKeys.TOTAL_COUNT, totalCount,
+                MapFieldKeys.SUCCESS_RATE, Math.round(successRate * 10) / 10.0,
+                MapFieldKeys.PASSED, passed
         )));
     }
 }

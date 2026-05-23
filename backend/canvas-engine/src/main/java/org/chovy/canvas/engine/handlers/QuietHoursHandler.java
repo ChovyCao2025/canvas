@@ -1,5 +1,6 @@
 package org.chovy.canvas.engine.handlers;
 
+import org.chovy.canvas.common.MapFieldKeys;
 import org.chovy.canvas.domain.constant.NodeType;
 import org.chovy.canvas.engine.context.ExecutionContext;
 import org.chovy.canvas.engine.handler.NodeHandler;
@@ -39,7 +40,7 @@ public class QuietHoursHandler implements NodeHandler {
             return Mono.just(NodeResult.suppressed(
                     "quiet", quietNodeId, decision.reasonCode(), decision.reasonMessage()));
         }
-        return Mono.just(NodeResult.routed("allowed", allowedNodeId, Map.of("quietHoursActive", false)));
+        return Mono.just(NodeResult.routed("allowed", allowedNodeId, Map.of(MapFieldKeys.QUIET_HOURS_ACTIVE, false)));
     }
 
     private String string(Map<String, Object> config, String key, String fallback) {

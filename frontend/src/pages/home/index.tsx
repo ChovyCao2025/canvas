@@ -1,34 +1,337 @@
-import { HomeOutlined } from '@ant-design/icons'
-import { Typography } from 'antd'
+import { useCallback, useEffect, useMemo, useState, type CSSProperties, type ReactNode } from 'react'
+import {
+  Alert,
+  Button,
+  Card,
+  Col,
+  Empty,
+  List,
+  Row,
+  Segmented,
+  Space,
+  Spin,
+  Table,
+  Tag,
+  Typography,
+} from 'antd'
+import {
+  ApiOutlined,
+  ApartmentOutlined,
+  BarChartOutlined,
+  DatabaseOutlined,
+  NotificationOutlined,
+  PlusOutlined,
+  ReloadOutlined,
+  TeamOutlined,
+  ThunderboltOutlined,
+} from '@ant-design/icons'
+import { useNavigate } from 'react-router-dom'
+import {
+  Area,
+  AreaChart,
+  CartesianGrid,
+  Legend,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from 'recharts'
+import type { ColumnsType } from 'antd/es/table'
+import { homeApi } from '../../services/api'
+import {
+  buildKpiCards,
+  getAttentionPresentation,
+  HOME_RANGE_OPTIONS,
+  type HomeAttentionItem,
+  type HomeOverview,
+  type HomeTopCanvas,
+} from './homeOverview'
 
-/**
- * 首页占位页。
- * 当前仅保留轻量提示，后续可替换为仪表盘入口。
- * 该页面不承载业务操作，主要承担路由落点作用。
- * 保持实现简单，避免与业务页共享复杂状态。
- *
- * 对前端初学者的阅读提示：
- * - 这是一个纯展示组件，不依赖接口和全局状态；
- * - 可以作为最小 React 页面模板参考（结构 + 样式 + 图标）。
- */
+const { Text, Title } = Typography
+
 export default function HomePage() {
-  // 这里不发请求、不依赖 context，确保首页始终可秒开。
+  const navigate = useNavigate()
+  const [days, setDays] = useState<number>(7)
+  const [overview, setOverview] = useState<HomeOverview | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  const load = useCallback(async () => {
+    setLoading(true)
+    setError(null)
+    try {
+      const res = await homeApi.overview(days)
+      setOverview(res.data)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : '首页数据加载失败')
+    } finally {
+      setLoading(false)
+    }
+  }, [days])
+
+  useEffect(() => { load() }, [load])
+
+  const kpiCards = useMemo(() => overview ? buildKpiCards(overview) : [], [overview])
+
+  const topColumns: ColumnsType<HomeTopCanvas> = [
+    {
+      title: '旅程',
+      dataIndex: 'name',
+      ellipsis: true,
+      render: (name: string, row) => (
+        <Button type="link" style={{ padding: 0 }} onClick={() => navigate(`/canvas/${row.canvasId}/stats`)}>
+          {name}
+        </Button>
+      ),
+    },
+    { title: '触发', dataIndex: 'total', width: 90, align: 'right', render: (v: number) => v.toLocaleString() },
+    { title: '用户', dataIndex: 'uniqueUsers', width: 90, align: 'right', render: (v: number) => v.toLocaleString() },
+    { title: '成功率', dataIndex: 'successRate', width: 90, align: 'right',
+      render: (v: string) => <Text style={{ color: '#16a34a', fontWeight: 600 }}>{v}</Text> },
+    { title: '失败', dataIndex: 'failed', width: 80, align: 'right',
+      render: (v: number) => v > 0 ? <Text type="danger">{v}</Text> : <Text type="secondary">0</Text> },
+  ]
+
   return (
-    // 当前阶段作为占位容器，后续可平滑替换为看板组件
-    // 保留页面骨架可避免路由切换出现“未实现页面”空白
-    <div style={{
-      minHeight: '80vh',
-      display: 'flex', flexDirection: 'column',
-      alignItems: 'center', justifyContent: 'center',
-      gap: 12,
-    }}>
-      {/* 图标 + 文案的最小信息结构，保证空态也有视觉锚点 */}
-      {/* 后续若改成仪表盘，可直接替换该容器内部内容。 */}
-      {/* HomeOutlined 来自 antd 图标库，和当前 UI 风格保持一致。 */}
-      <HomeOutlined style={{ fontSize: 48, color: '#d0d5e0' }} />
-      <Typography.Text type="secondary" style={{ fontSize: 16 }}>
-        首页内容建设中
-      </Typography.Text>
+    <div style={{ minHeight: '100vh', background: '#f6f8fb', padding: '24px 28px 32px' }}>
+      <div style={{
+        display: 'flex',
+        alignItems: 'flex-start',
+        justifyContent: 'space-between',
+        gap: 16,
+        marginBottom: 22,
+        flexWrap: 'wrap',
+      }}>
+        <div>
+          <Space size={10} align="center">
+            <div style={{
+              width: 38,
+              height: 38,
+              borderRadius: 10,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              background: 'linear-gradient(135deg, #2563eb 0%, #14b8a6 100%)',
+              color: '#fff',
+              boxShadow: '0 8px 22px rgba(37,99,235,.24)',
+            }}>
+              <ApartmentOutlined />
+            </div>
+            <Title level={3} style={{ margin: 0, color: '#0f172a' }}>运营驾驶舱</Title>
+          </Space>
+          <Text type="secondary" style={{ display: 'block', marginTop: 8 }}>
+            默认聚焦近 7 天活动表现，快速定位有效旅程和待处理异常
+          </Text>
+        </div>
+        <Space wrap>
+          <Segmented
+            value={days}
+            options={HOME_RANGE_OPTIONS.map(item => ({ label: item.label, value: item.value }))}
+            onChange={value => setDays(Number(value))}
+          />
+          <Button icon={<ReloadOutlined />} onClick={load}>刷新</Button>
+        </Space>
+      </div>
+
+      {error && (
+        <Alert
+          type="error"
+          showIcon
+          message="首页数据加载失败"
+          description={error}
+          action={<Button size="small" onClick={load}>重试</Button>}
+          style={{ marginBottom: 18 }}
+        />
+      )}
+
+      {loading && !overview ? (
+        <Spin size="large" style={{ display: 'block', margin: '96px auto' }} />
+      ) : overview ? (
+        <>
+          <Row gutter={[14, 14]} style={{ marginBottom: 18 }}>
+            {kpiCards.map(card => (
+              <Col key={card.key} flex={1} style={{ minWidth: 0, display: 'flex' }}>
+                <div style={{
+                  flex: 1,
+                  minHeight: 130,
+                  borderRadius: 12,
+                  padding: '18px 20px',
+                  background: card.bg,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  justifyContent: 'space-between',
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <div style={{
+                      width: 36,
+                      height: 36,
+                      borderRadius: 10,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      background: card.iconBg,
+                      color: card.color,
+                      fontSize: 17,
+                      flexShrink: 0,
+                    }}>
+                      {card.icon}
+                    </div>
+                    <div style={{ minWidth: 0 }}>
+                      <Text style={{ color: '#64748b', fontWeight: 500, fontSize: 12, lineHeight: 1.3 }}>
+                        {card.label}
+                      </Text>
+                      <Text type="secondary" style={{ display: 'block', fontSize: 12, marginTop: 4 }}>{card.hint}</Text>
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'end', justifyContent: 'space-between', gap: 10 }}>
+                    <div style={{ color: '#0f172a', fontSize: 28, lineHeight: 1, fontWeight: 700, whiteSpace: 'nowrap' }}>
+                      {card.value}
+                    </div>
+                    <div style={{ width: 36, height: 3, borderRadius: 999, background: card.color }} />
+                  </div>
+                </div>
+              </Col>
+            ))}
+          </Row>
+
+          <Row gutter={[16, 16]} style={{ marginBottom: 18 }}>
+            <Col xs={24} xl={16}>
+              <Card title="每日触发趋势" bordered={false} style={cardStyle} styles={{ body: { paddingTop: 6 } }}>
+                {overview.trend.length === 0 ? (
+                  <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="暂无趋势数据" />
+                ) : (
+                  <ResponsiveContainer width="100%" height={260}>
+                    <AreaChart data={overview.trend} margin={{ top: 10, right: 16, bottom: 0, left: 0 }}>
+                      <defs>
+                        <linearGradient id="homeTotal" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor="#2563eb" stopOpacity={0.22} />
+                          <stop offset="95%" stopColor="#2563eb" stopOpacity={0} />
+                        </linearGradient>
+                        <linearGradient id="homeFailed" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor="#e11d48" stopOpacity={0.18} />
+                          <stop offset="95%" stopColor="#e11d48" stopOpacity={0} />
+                        </linearGradient>
+                      </defs>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                      <XAxis dataKey="date" tick={{ fontSize: 11, fill: '#64748b' }}
+                        tickFormatter={value => String(value).slice(5)} axisLine={false} tickLine={false} />
+                      <YAxis tick={{ fontSize: 11, fill: '#64748b' }} width={42} axisLine={false} tickLine={false} />
+                      <Tooltip />
+                      <Legend />
+                      <Area type="monotone" dataKey="total" name="触发次数"
+                        stroke="#2563eb" strokeWidth={2.4} fill="url(#homeTotal)" />
+                      <Area type="monotone" dataKey="failed" name="失败次数"
+                        stroke="#e11d48" strokeWidth={2.2} fill="url(#homeFailed)" />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                )}
+              </Card>
+            </Col>
+            <Col xs={24} xl={8}>
+              <Card title="快捷入口" bordered={false} style={cardStyle}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 12 }}>
+                  <QuickAction icon={<PlusOutlined />} label="新建画布" color="#2563eb" onClick={() => navigate('/canvas')} />
+                  <QuickAction icon={<BarChartOutlined />} label="旅程管理" color="#7c3aed" onClick={() => navigate('/canvas')} />
+                  <QuickAction icon={<TeamOutlined />} label="人群管理" color="#059669" onClick={() => navigate('/audiences')} />
+                  <QuickAction icon={<ApiOutlined />} label="API 配置" color="#dc2626" onClick={() => navigate('/api-config')} />
+                  <QuickAction icon={<NotificationOutlined />} label="MQ 配置" color="#d97706" onClick={() => navigate('/mq-config')} />
+                  <QuickAction icon={<ThunderboltOutlined />} label="事件配置" color="#0891b2" onClick={() => navigate('/event-config')} />
+                </div>
+                <Button block icon={<DatabaseOutlined />} style={{ marginTop: 12 }} onClick={() => navigate('/data-source-config')}>
+                  数据源配置
+                </Button>
+              </Card>
+            </Col>
+          </Row>
+
+          <Row gutter={[16, 16]}>
+            <Col xs={24} xl={14}>
+              <Card title="Top 旅程" bordered={false} style={cardStyle}
+                extra={<Button type="link" onClick={() => navigate('/canvas')}>查看全部</Button>}>
+                {overview.topCanvases.length === 0 ? (
+                  <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="当前范围暂无触发数据" />
+                ) : (
+                  <Table
+                    rowKey="canvasId"
+                    size="small"
+                    pagination={false}
+                    columns={topColumns}
+                    dataSource={overview.topCanvases}
+                    scroll={{ x: 640 }}
+                  />
+                )}
+              </Card>
+            </Col>
+            <Col xs={24} xl={10}>
+              <Card title="需要关注" bordered={false} style={cardStyle}>
+                {overview.attentionItems.length === 0 ? (
+                  <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="暂无需要关注的旅程" />
+                ) : (
+                  <List
+                    dataSource={overview.attentionItems}
+                    renderItem={item => <AttentionItem item={item} onOpen={() => navigate(attentionUrl(item))} />}
+                  />
+                )}
+              </Card>
+            </Col>
+          </Row>
+        </>
+      ) : null}
     </div>
   )
+}
+
+function QuickAction({ icon, label, color, onClick }: {
+  icon: ReactNode
+  label: string
+  color: string
+  onClick: () => void
+}) {
+  return (
+    <Button
+      onClick={onClick}
+      style={{
+        height: 74,
+        borderRadius: 8,
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 6,
+        color,
+        borderColor: 'rgba(15,23,42,.08)',
+        background: '#fff',
+      }}
+      icon={<span style={{ fontSize: 18 }}>{icon}</span>}
+    >
+      <span style={{ color: '#334155', fontWeight: 600 }}>{label}</span>
+    </Button>
+  )
+}
+
+function AttentionItem({ item, onOpen }: { item: HomeAttentionItem; onOpen: () => void }) {
+  const presentation = getAttentionPresentation(item.severity)
+  return (
+    <List.Item
+      actions={[<Button key="open" type="link" onClick={onOpen}>查看</Button>]}
+      style={{ padding: '12px 0' }}
+    >
+      <List.Item.Meta
+        title={<Space size={8}><span>{item.name}</span><Tag color={presentation.color}>{presentation.label}</Tag></Space>}
+        description={<Text type="secondary">{item.message}</Text>}
+      />
+    </List.Item>
+  )
+}
+
+function attentionUrl(item: HomeAttentionItem) {
+  if (item.type === 'NO_RECENT_EXECUTIONS') return `/canvas/${item.canvasId}/edit`
+  return `/canvas/${item.canvasId}/stats`
+}
+
+const cardStyle: CSSProperties = {
+  height: '100%',
+  borderRadius: 8,
+  border: '1px solid #e5e7eb',
+  boxShadow: '0 8px 22px rgba(15,23,42,.05)',
 }

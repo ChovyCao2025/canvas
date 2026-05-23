@@ -1,27 +1,25 @@
 package org.chovy.canvas.engine.trigger;
 
-
-import org.chovy.canvas.domain.constant.NodeType;
-import org.chovy.canvas.domain.canvas.CanvasMapper;
+import org.chovy.canvas.common.MapFieldKeys;
 import org.chovy.canvas.domain.constant.TriggerType;
+import org.chovy.canvas.domain.constant.NodeType;
 import org.chovy.canvas.engine.dag.DagGraph;
 import org.chovy.canvas.engine.dag.DagParser;
-import org.chovy.canvas.infra.cache.CanvasConfigCache;
+import org.chovy.canvas.engine.schedule.ScheduleKey;
+import org.chovy.canvas.engine.schedule.ScheduleRegistrar;
+import org.chovy.canvas.engine.schedule.ScheduleRegistration;
 import jakarta.annotation.PreDestroy;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.scheduling.annotation.EnableScheduling;
+import org.springframework.stereotype.Service;
 import reactor.core.Disposable;
 import reactor.core.Disposables;
 import reactor.core.publisher.Mono;
-import org.springframework.scheduling.TaskScheduler;
-import org.springframework.scheduling.annotation.EnableScheduling;
-import org.springframework.scheduling.support.CronTrigger;
-import org.springframework.stereotype.Service;
 
 import java.time.Duration;
-import java.time.Instant;
 import java.time.LocalDateTime;
-import java.time.ZoneId;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ScheduledFuture;
@@ -33,7 +31,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
  *
  * 发布时注册 SCHEDULED_TRIGGER 节点的调度任务；
  * 下线时取消调度任务。
- * 使用 Spring TaskScheduler（底层 ScheduledExecutorService）管理任务生命周期。
+ * 默认本地实现由 LocalTaskScheduleRegistrar 提供，生产环境可替换 ScheduleRegistrar Bean。
  */
 @Slf4j
 @Service
@@ -41,10 +39,18 @@ import java.util.concurrent.atomic.AtomicBoolean;
 @RequiredArgsConstructor
 public class CanvasSchedulerService {
 
-    private final TaskScheduler          taskScheduler;
-    private final CanvasMapper           canvasMapper;
-    private final CanvasConfigCache      configCache;
     private final CanvasExecutionService executionService;
+    private final ScheduleRegistrar      scheduleRegistrar;
+
+    @Autowired
+    public CanvasSchedulerService(org.springframework.scheduling.TaskScheduler taskScheduler,
+                                  org.chovy.canvas.domain.canvas.CanvasMapper canvasMapper,
+                                  org.chovy.canvas.infra.cache.CanvasConfigCache configCache,
+                                  CanvasExecutionService executionService) {
+        this.executionService = executionService;
+        this.scheduleRegistrar = new LegacyTaskSchedulerRegistrar(taskScheduler);
+    }
+
 
     @org.springframework.beans.factory.annotation.Value("${canvas.integration.tagger-service-url}")
     private String taggerUrl;
@@ -63,8 +69,6 @@ public class CanvasSchedulerService {
         apiCallClient = org.springframework.web.reactive.function.client.WebClient.builder().baseUrl(apiCallUrl).build();
     }
 
-    /** 已注册的调度任务（canvasId:nodeId → ScheduledFuture） */
-    private final Map<String, ScheduledFuture<?>> activeTasks = new ConcurrentHashMap<>();
     /** 等待 jitter 后触发的回调（canvasId:nodeId → pending subscriptions） */
     private final Map<String, PendingJitterGroup> pendingJitterTasks = new ConcurrentHashMap<>();
     private final Object lifecycleLock = new Object();
@@ -81,38 +85,34 @@ public class CanvasSchedulerService {
             if (node.getBizConfig() != null) cfg.putAll(node.getBizConfig());
             if (node.getConfig()    != null) cfg.putAll(node.getConfig());
 
-            String taskKey = canvasId + ":" + nodeId;
-            cancelTask(taskKey);
+            ScheduleKey scheduleKey = scheduleKey(canvasId, nodeId);
+            cancelScheduledTrigger(scheduleKey);
 
             String cronExpr       = (String) cfg.get("cronExpression");
             String triggerTimeStr = (String) cfg.get("triggerTime");
             String timezone       = (String) cfg.getOrDefault("timezone", "Asia/Shanghai");
+            if ((cronExpr == null || cronExpr.isBlank()) && (triggerTimeStr == null || triggerTimeStr.isBlank())) {
+                log.warn("[SCHEDULER] 跳过未配置时间表达式的定时节点 canvasId={} nodeId={}", canvasId, nodeId);
+                continue;
+            }
 
-            if (cronExpr != null && !cronExpr.isBlank()) {
-                ScheduleInstallResult result = installSchedule(taskKey,
-                        group -> taskScheduler.schedule(
-                                () -> triggerForAllUsers(canvasId, nodeId, cfg, group),
-                                new CronTrigger(cronExpr, TimeZone.getTimeZone(timezone))));
-                if (activateSchedule(taskKey, result.group(), result.future())) {
+            PendingJitterGroup group = createPendingJitterGroup(scheduleKey.id());
+            if (group == null) {
+                continue;
+            }
+
+            try {
+                scheduleRegistrar.register(buildRegistration(
+                        scheduleKey, canvasId, nodeId, cfg, timezone, cronExpr, triggerTimeStr, group));
+                if (cronExpr != null && !cronExpr.isBlank()) {
                     log.info("[SCHEDULER] 注册 CRON 任务 canvasId={} nodeId={} cron={}", canvasId, nodeId, cronExpr);
+                } else if (triggerTimeStr != null) {
+                    log.info("[SCHEDULER] 注册 ONCE 任务 canvasId={} nodeId={} at={}",
+                            canvasId, nodeId, LocalDateTime.parse(triggerTimeStr));
                 }
-            } else if (triggerTimeStr != null) {
-                ScheduleInstallResult result = installSchedule(taskKey, group -> {
-                    LocalDateTime ldt = LocalDateTime.parse(triggerTimeStr);
-                    Instant instant   = ldt.atZone(ZoneId.of("Asia/Shanghai")).toInstant();
-                    return taskScheduler.schedule(
-                            () -> {
-                                try {
-                                    triggerForAllUsers(canvasId, nodeId, cfg, group);
-                                } finally {
-                                    group.closeWhenIdle(() -> cleanupOneShotTask(taskKey, group));
-                                }
-                            }, instant);
-                });
-                if (activateSchedule(taskKey, result.group(), result.future())) {
-                    LocalDateTime ldt = LocalDateTime.parse(triggerTimeStr);
-                    log.info("[SCHEDULER] 注册 ONCE 任务 canvasId={} nodeId={} at={}", canvasId, nodeId, ldt);
-                }
+            } catch (RuntimeException e) {
+                removePendingJitterGroup(scheduleKey.id(), group);
+                throw e;
             }
         }
     }
@@ -123,38 +123,45 @@ public class CanvasSchedulerService {
         for (String nodeId : graph.allNodeIds()) {
             DagParser.CanvasNode node = graph.getNode(nodeId);
             if (node == null || !NodeType.SCHEDULED_TRIGGER.equals(node.getType())) continue;
-            cancelTask(canvasId + ":" + nodeId);
+            cancelScheduledTrigger(scheduleKey(canvasId, nodeId));
         }
     }
 
     @PreDestroy
     public void cancelAll() {
-        List<ScheduledFuture<?>> futures;
         List<PendingJitterGroup> groups;
+        List<ScheduleKey> scheduleKeys;
         synchronized (lifecycleLock) {
             closed = true;
-            futures = new ArrayList<>(activeTasks.values());
             groups = new ArrayList<>(pendingJitterTasks.values());
+            scheduleKeys = pendingJitterTasks.keySet().stream()
+                    .map(taskKey -> new ScheduleKey("canvas", taskKey))
+                    .toList();
             groups.forEach(PendingJitterGroup::terminate);
-            activeTasks.clear();
             pendingJitterTasks.clear();
         }
-        futures.forEach(f -> f.cancel(false));
+        scheduleKeys.forEach(scheduleRegistrar::unregister);
         groups.forEach(PendingJitterGroup::dispose);
         log.info("[SCHEDULER] 所有定时任务已取消");
     }
 
     // ── 内部 ─────────────────────────────────────────────────────
 
-    void cancelTask(String taskKey) {
+    void cancelScheduledTrigger(ScheduleKey key) {
         PendingJitterGroup pending = null;
         synchronized (lifecycleLock) {
-            ScheduledFuture<?> old = activeTasks.remove(taskKey);
-            if (old != null) old.cancel(false);
-            pending = pendingJitterTasks.remove(taskKey);
+            pending = pendingJitterTasks.remove(key.id());
             if (pending != null) pending.terminate();
         }
+        scheduleRegistrar.unregister(key);
         if (pending != null) pending.dispose();
+    }
+
+    /**
+     * Backward-compatible test hook for legacy callers.
+     */
+    void cancelTask(String taskKey) {
+        cancelScheduledTrigger(new ScheduleKey("canvas", taskKey));
     }
 
     @SuppressWarnings("unchecked")
@@ -181,23 +188,6 @@ public class CanvasSchedulerService {
         }
     }
 
-    ScheduleInstallResult installSchedule(String taskKey, ScheduleInstaller installer) {
-        PendingJitterGroup group = createPendingJitterGroup(taskKey);
-        if (group == null) {
-            return new ScheduleInstallResult(null, null);
-        }
-        try {
-            ScheduledFuture<?> future = installer.install(group);
-            if (future == null) {
-                removePendingJitterGroup(taskKey, group);
-            }
-            return new ScheduleInstallResult(group, future);
-        } catch (RuntimeException e) {
-            removePendingJitterGroup(taskKey, group);
-            throw e;
-        }
-    }
-
     boolean hasPendingJitterGroup(String taskKey) {
         synchronized (lifecycleLock) {
             return pendingJitterTasks.containsKey(taskKey);
@@ -205,29 +195,16 @@ public class CanvasSchedulerService {
     }
 
     boolean hasActiveTask(String taskKey) {
-        synchronized (lifecycleLock) {
-            return activeTasks.containsKey(taskKey);
+        if (scheduleRegistrar instanceof TaskAwareScheduleRegistrar aware) {
+            return hasPendingJitterGroup(taskKey) && aware.hasTask(new ScheduleKey("canvas", taskKey));
         }
+        return hasPendingJitterGroup(taskKey);
     }
 
     boolean isCurrentPendingJitterGroup(String taskKey, PendingJitterGroup group) {
         synchronized (lifecycleLock) {
             return pendingJitterTasks.get(taskKey) == group;
         }
-    }
-
-    boolean activateSchedule(String taskKey, PendingJitterGroup group, ScheduledFuture<?> future) {
-        if (group == null || future == null) {
-            return false;
-        }
-        synchronized (lifecycleLock) {
-            if (!closed && pendingJitterTasks.get(taskKey) == group) {
-                activeTasks.put(taskKey, future);
-                return true;
-            }
-        }
-        future.cancel(false);
-        return false;
     }
 
     void removePendingJitterGroup(String taskKey, PendingJitterGroup group) {
@@ -241,16 +218,62 @@ public class CanvasSchedulerService {
         if (removed) group.dispose();
     }
 
-    void cleanupOneShotTask(String taskKey, PendingJitterGroup group) {
+    void cleanupOneShotTask(ScheduleKey scheduleKey, PendingJitterGroup group) {
         boolean removed = false;
         synchronized (lifecycleLock) {
-            if (pendingJitterTasks.remove(taskKey, group)) {
-                activeTasks.remove(taskKey);
+            if (pendingJitterTasks.remove(scheduleKey.id(), group)) {
                 group.terminate();
                 removed = true;
             }
         }
+        scheduleRegistrar.unregister(scheduleKey);
         if (removed) group.dispose();
+    }
+
+    private ScheduleRegistration buildRegistration(ScheduleKey scheduleKey,
+                                                   Long canvasId,
+                                                   String nodeId,
+                                                   Map<String, Object> cfg,
+                                                   String timezone,
+                                                   String cronExpr,
+                                                   String triggerTimeStr,
+                                                   PendingJitterGroup group) {
+        Runnable callback;
+        LocalDateTime triggerTime = null;
+        if (cronExpr != null && !cronExpr.isBlank()) {
+            callback = () -> triggerForAllUsers(canvasId, nodeId, cfg, group);
+        } else {
+            triggerTime = LocalDateTime.parse(triggerTimeStr);
+            callback = () -> {
+                try {
+                    triggerForAllUsers(canvasId, nodeId, cfg, group);
+                } finally {
+                    group.closeWhenIdle(() -> cleanupOneShotTask(scheduleKey, group));
+                }
+            };
+        }
+        Map<String, Object> metadata = new LinkedHashMap<>();
+        metadata.put("canvasId", canvasId);
+        metadata.put("nodeId", nodeId);
+        metadata.put("timezone", timezone);
+        if (cronExpr != null && !cronExpr.isBlank()) {
+            metadata.put("cronExpression", cronExpr);
+        }
+        if (triggerTimeStr != null && !triggerTimeStr.isBlank()) {
+            metadata.put("triggerTime", triggerTimeStr);
+        }
+        return new ScheduleRegistration(
+                scheduleKey,
+                cronExpr,
+                triggerTime,
+                timezone,
+                callback,
+                metadata
+        );
+    }
+
+    private ScheduleKey scheduleKey(Long canvasId, String nodeId) {
+        return new ScheduleKey("canvas", canvasId + ":" + nodeId);
     }
 
     Disposable scheduleTriggerWithJitter(PendingJitterGroup group, Long canvasId, String userId, Duration jitter) {
@@ -334,7 +357,9 @@ public class CanvasSchedulerService {
                     @SuppressWarnings("unchecked")
                     java.util.Map<String, Object> resp = apiCallClient.post()
                             .uri("/call")
-                            .bodyValue(java.util.Map.of("apiKey", apiKey, "params", src.getOrDefault("params", java.util.Map.of())))
+                            .bodyValue(java.util.Map.of(
+                                    MapFieldKeys.API_KEY, apiKey,
+                                    MapFieldKeys.PARAMS, src.getOrDefault(MapFieldKeys.PARAMS, java.util.Map.of())))
                             .retrieve()
                             .bodyToMono(java.util.Map.class)
                             .block();
@@ -434,10 +459,52 @@ public class CanvasSchedulerService {
         }
     }
 
-    @FunctionalInterface
-    interface ScheduleInstaller {
-        ScheduledFuture<?> install(PendingJitterGroup group);
+    private interface TaskAwareScheduleRegistrar {
+        boolean hasTask(ScheduleKey key);
     }
 
-    record ScheduleInstallResult(PendingJitterGroup group, ScheduledFuture<?> future) {}
+    private static final class LegacyTaskSchedulerRegistrar implements ScheduleRegistrar, TaskAwareScheduleRegistrar {
+        private final org.springframework.scheduling.TaskScheduler taskScheduler;
+        private final Map<ScheduleKey, ScheduledFuture<?>> tasks = new ConcurrentHashMap<>();
+        private final Set<ScheduleKey> cancelledDuringRegistration = ConcurrentHashMap.newKeySet();
+
+        private LegacyTaskSchedulerRegistrar(org.springframework.scheduling.TaskScheduler taskScheduler) {
+            this.taskScheduler = taskScheduler;
+        }
+
+        @Override
+        public void register(ScheduleRegistration registration) {
+            unregister(registration.key());
+            cancelledDuringRegistration.remove(registration.key());
+            ScheduledFuture<?> future = registration.cronExpression() != null && !registration.cronExpression().isBlank()
+                    ? taskScheduler.schedule(registration.callback(),
+                    new org.springframework.scheduling.support.CronTrigger(registration.cronExpression(),
+                            java.util.TimeZone.getTimeZone(registration.timezone())))
+                    : taskScheduler.schedule(registration.callback(),
+                    registration.triggerTime().atZone(java.time.ZoneId.of(registration.timezone())).toInstant());
+            if (future == null) {
+                throw new IllegalStateException("Local TaskScheduler returned null for " + registration.key());
+            }
+            if (cancelledDuringRegistration.remove(registration.key())) {
+                future.cancel(false);
+                return;
+            }
+            tasks.put(registration.key(), future);
+        }
+
+        @Override
+        public void unregister(ScheduleKey key) {
+            ScheduledFuture<?> future = tasks.remove(key);
+            if (future != null) {
+                future.cancel(false);
+            } else {
+                cancelledDuringRegistration.add(key);
+            }
+        }
+
+        @Override
+        public boolean hasTask(ScheduleKey key) {
+            return tasks.containsKey(key);
+        }
+    }
 }

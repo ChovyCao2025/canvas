@@ -21,7 +21,7 @@ describe('outlet schema', () => {
       outletSchema: undefined,
     })).toEqual([
       { id: 'success', label: '条件成立', color: '#52c41a' },
-      { id: 'else', label: '否则', color: '#8c8c8c' },
+      { id: 'fail', label: '否则', color: '#8c8c8c' },
     ])
   })
 

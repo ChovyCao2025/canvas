@@ -1,5 +1,6 @@
 package org.chovy.canvas.engine.handlers;
 
+import org.chovy.canvas.common.MapFieldKeys;
 import org.chovy.canvas.domain.canvas.Canvas;
 import org.chovy.canvas.domain.canvas.CanvasMapper;
 import org.chovy.canvas.engine.context.ExecutionContext;
@@ -53,7 +54,7 @@ public class CanvasTriggerHandler implements NodeHandler {
 
         // 2) 读取调用模式和参数映射规则
         String invokeMode = (String) config.getOrDefault("invokeMode", "SYNC");
-        String nextNodeId = (String) config.get("nextNodeId");
+        String nextNodeId = (String) config.get(MapFieldKeys.NEXT_NODE_ID);
         Map<String, Object> paramMapping =
                 (Map<String, Object>) config.getOrDefault("paramMapping", Map.of());
 

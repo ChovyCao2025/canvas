@@ -2,6 +2,7 @@ package org.chovy.canvas.engine.handlers;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.chovy.canvas.common.MapFieldKeys;
 import org.chovy.canvas.domain.constant.NodeType;
 import org.chovy.canvas.domain.meta.EventLog;
 import org.chovy.canvas.domain.meta.EventLogMapper;
@@ -53,7 +54,7 @@ public class GoalCheckHandler implements NodeHandler {
 
     @Override
     public Mono<NodeResult> executeAsync(Map<String, Object> config, ExecutionContext ctx) {
-        String resumeStatus = string(config, "__goalResumeStatus", "");
+        String resumeStatus = string(config, MapFieldKeys.GOAL_RESUME_STATUS, "");
         if ("TIMEOUT".equalsIgnoreCase(resumeStatus) || "EXPIRED".equalsIgnoreCase(resumeStatus)) {
             return Mono.just(NodeResult.timeout(
                     string(config, "timeoutNodeId", null),
@@ -121,19 +122,19 @@ public class GoalCheckHandler implements NodeHandler {
     }
 
     private NodeResult goalMet(Map<String, Object> config) {
-        return NodeResult.routed("goal_met", string(config, "goalMetNodeId", null), Map.of("goalMet", true));
+        return NodeResult.routed("goal_met", string(config, "goalMetNodeId", null), Map.of(MapFieldKeys.GOAL_MET, true));
     }
 
     private NodeResult goalNotMet(Map<String, Object> config) {
-        return NodeResult.routed("goal_not_met", string(config, "goalNotMetNodeId", null), Map.of("goalMet", false));
+        return NodeResult.routed("goal_not_met", string(config, "goalNotMetNodeId", null), Map.of(MapFieldKeys.GOAL_MET, false));
     }
 
     private Map<String, Object> resumePayload(String nodeId, Map<String, Object> config) {
         Map<String, Object> payload = new LinkedHashMap<>();
-        payload.put("sourceNodeId", nodeId);
-        payload.put("goalMetNodeId", string(config, "goalMetNodeId", null));
-        payload.put("goalNotMetNodeId", string(config, "goalNotMetNodeId", null));
-        payload.put("timeoutNodeId", string(config, "timeoutNodeId", null));
+        payload.put(MapFieldKeys.SOURCE_NODE_ID, nodeId);
+        payload.put(MapFieldKeys.GOAL_MET_NODE_ID, string(config, "goalMetNodeId", null));
+        payload.put(MapFieldKeys.GOAL_NOT_MET_NODE_ID, string(config, "goalNotMetNodeId", null));
+        payload.put(MapFieldKeys.TIMEOUT_NODE_ID, string(config, "timeoutNodeId", null));
         return payload;
     }
 

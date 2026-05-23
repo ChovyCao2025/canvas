@@ -1,6 +1,7 @@
 package org.chovy.canvas.engine.handlers;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import org.chovy.canvas.common.MapFieldKeys;
 import org.chovy.canvas.domain.meta.MqMessageDefinition;
 import org.chovy.canvas.domain.meta.MqMessageDefinitionMapper;
 import org.chovy.canvas.engine.context.ExecutionContext;
@@ -30,15 +31,15 @@ public class MqTriggerHandler implements NodeHandler {
     public Mono<NodeResult> executeAsync(Map<String, Object> config, ExecutionContext ctx) {
         // 消息入站解析与 payload 合并已在 Trigger 消费链路完成
         // validateResult=true 时才执行配置的规则校验
-        Boolean validateResult = (Boolean) config.get("validateResult");
-        List<Map<String, Object>> rules = (List<Map<String, Object>>) config.get("validateRules");
-        String nextNodeId = (String) config.get("nextNodeId");
+        Boolean validateResult = (Boolean) config.get(MapFieldKeys.VALIDATE_RESULT);
+        List<Map<String, Object>> rules = (List<Map<String, Object>>) config.get(MapFieldKeys.VALIDATE_RULES);
+        String nextNodeId = (String) config.get(MapFieldKeys.NEXT_NODE_ID);
 
         // 校验消息内容
         if (Boolean.TRUE.equals(validateResult) && rules != null) {
             for (Map<String, Object> rule : rules) {
                 if (!IfConditionHandler.evaluate(rule, ctx)) {
-                    return Mono.just(NodeResult.fail("MQ 消息校验不通过: " + rule.get("field")));
+                    return Mono.just(NodeResult.fail("MQ 消息校验不通过: " + rule.get(MapFieldKeys.FIELD)));
                 }
             }
         }
@@ -53,7 +54,7 @@ public class MqTriggerHandler implements NodeHandler {
      * Tries messageCodeKey first (new format after V29), falls back to topicKey (legacy).
      */
     public String resolveTopic(Map<String, Object> config) {
-        String messageCode = (String) config.get("messageCodeKey");
+        String messageCode = (String) config.get(MapFieldKeys.MESSAGE_CODE_KEY);
         if (messageCode != null && mqMessageDefinitionMapper != null) {
             MqMessageDefinition def = mqMessageDefinitionMapper.selectOne(
                 new LambdaQueryWrapper<MqMessageDefinition>()
@@ -62,6 +63,6 @@ public class MqTriggerHandler implements NodeHandler {
             if (def != null) return def.getTopic();
         }
         // Backward-compat: old canvases store topicKey directly
-        return (String) config.getOrDefault("topicKey", "");
+        return (String) config.getOrDefault(MapFieldKeys.TOPIC_KEY, "");
     }
 }

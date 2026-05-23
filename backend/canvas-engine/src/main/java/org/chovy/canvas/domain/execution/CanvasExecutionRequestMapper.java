@@ -148,7 +148,7 @@ public interface CanvasExecutionRequestMapper extends BaseMapper<CanvasExecution
                            @Param("staleBefore") LocalDateTime staleBefore);
 
     @Select("""
-            SELECT id, canvas_id
+            SELECT id, canvas_id, trigger_type
             FROM canvas_execution_request
             WHERE (
                     status IN ('PENDING', 'RETRY')

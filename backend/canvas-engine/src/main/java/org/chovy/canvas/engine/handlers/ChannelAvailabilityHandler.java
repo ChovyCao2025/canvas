@@ -1,5 +1,6 @@
 package org.chovy.canvas.engine.handlers;
 
+import org.chovy.canvas.common.MapFieldKeys;
 import org.chovy.canvas.domain.constant.NodeType;
 import org.chovy.canvas.engine.context.ExecutionContext;
 import org.chovy.canvas.engine.handler.NodeHandler;
@@ -32,7 +33,7 @@ public class ChannelAvailabilityHandler implements NodeHandler {
             return Mono.just(NodeResult.suppressed(
                     "unavailable", unavailableNodeId, decision.reasonCode(), decision.reasonMessage()));
         }
-        return Mono.just(NodeResult.routed("available", availableNodeId, Map.of("channelAvailable", true)));
+        return Mono.just(NodeResult.routed("available", availableNodeId, Map.of(MapFieldKeys.CHANNEL_AVAILABLE, true)));
     }
 
     private String string(Map<String, Object> config, String key, String fallback) {

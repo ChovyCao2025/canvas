@@ -222,6 +222,31 @@ class ApiCallHandlerRateLimitTest {
     }
 
     @Test
+    @DisplayName("开启 validateRules 时接口响应不满足规则则失败")
+    void executeAsync_returns_failure_when_response_validation_rules_do_not_match() {
+        ApiDefinition def = enabledDefinition(null);
+        when(apiDefinitionCache.getEnabled("test_api")).thenReturn(def);
+        ExchangeFunction exchangeFunction = request -> Mono.just(ClientResponse.create(HttpStatus.OK)
+                .header("Content-Type", MediaType.APPLICATION_JSON_VALUE)
+                .body("{\"accepted\":false}")
+                .build());
+        ApiCallHandler handler = new ApiCallHandler(
+                apiDefinitionCache, WebClient.builder().exchangeFunction(exchangeFunction),
+                new com.fasterxml.jackson.databind.ObjectMapper(), payloadBuilder, redis, defaultKeys());
+
+        NodeResult result = handler.executeAsync(Map.of(
+                "apiKey", "test_api",
+                "validateResult", true,
+                "validateRules", List.of(Map.of(
+                        "field", "accepted",
+                        "operator", "EQ",
+                        "value", "true"))), ctx).block();
+
+        assertThat(result.success()).isFalse();
+        assertThat(result.errorMessage()).contains("响应校验不通过");
+    }
+
+    @Test
     @DisplayName("Redis 计数为空时生产路径返回限流检查失败且不调用下游 HTTP")
     void executeAsync_returns_check_failed_when_redis_increment_returns_null() {
         ApiDefinition def = enabledDefinition(10);

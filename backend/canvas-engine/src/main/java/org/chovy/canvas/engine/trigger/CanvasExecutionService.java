@@ -6,6 +6,7 @@ import org.apache.rocketmq.client.producer.SendResult;
 import org.apache.rocketmq.client.producer.SendStatus;
 import org.apache.rocketmq.common.message.Message;
 import org.apache.rocketmq.spring.core.RocketMQTemplate;
+import org.chovy.canvas.common.MapFieldKeys;
 import org.chovy.canvas.domain.canvas.Canvas;
 import org.chovy.canvas.domain.canvas.CanvasMapper;
 import org.chovy.canvas.domain.canvas.CanvasVersion;
@@ -110,16 +111,19 @@ public class CanvasExecutionService {
                     if (triggerNodeId == null)
                         throw new IllegalStateException("画布没有入口节点，请确保存在触发器节点");
 
-                    return Map.of("ctx", ctx, "graph", graph, "triggerNodeId", triggerNodeId);
+                    return Map.of(
+                            MapFieldKeys.CTX, ctx,
+                            MapFieldKeys.GRAPH, graph,
+                            MapFieldKeys.TRIGGER_NODE_ID, triggerNodeId);
                 })
                 .subscribeOn(Schedulers.boundedElastic())
                 .flatMap(prep -> {
-                    if (!prep.containsKey("ctx")) {
+                    if (!prep.containsKey(MapFieldKeys.CTX)) {
                         return Mono.just(prep);
                     }
-                    ExecutionContext ctx = (ExecutionContext) prep.get("ctx");
-                    DagGraph graph = (DagGraph) prep.get("graph");
-                    String triggerNodeId = (String) prep.get("triggerNodeId");
+                    ExecutionContext ctx = (ExecutionContext) prep.get(MapFieldKeys.CTX);
+                    DagGraph graph = (DagGraph) prep.get(MapFieldKeys.GRAPH);
+                    String triggerNodeId = (String) prep.get(MapFieldKeys.TRIGGER_NODE_ID);
 
                     CanvasExecution exec = createExecution(ctx);
 
@@ -128,18 +132,18 @@ public class CanvasExecutionService {
                                     .timeout(Duration.ofSeconds(globalTimeoutSec))
                                     .flatMap(result -> {
                                         Map<String, Object> resp = new HashMap<>(result);
-                                        resp.put("executionId", ctx.getExecutionId());
+                                        resp.put(MapFieldKeys.EXECUTION_ID, ctx.getExecutionId());
                                         return updateExecution(exec, ExecutionStatus.SUCCESS.getCode(), result)
                                                 .thenReturn(resp);
                                     })
                                     .onErrorResume(e -> {
                                         log.error("[DRY_RUN] 执行失败: {}", e.getMessage());
                                         Map<String, Object> resp = Map.of(
-                                                "error", e.getMessage(),
-                                                "executionId", ctx.getExecutionId()
+                                                MapFieldKeys.ERROR, e.getMessage(),
+                                                MapFieldKeys.EXECUTION_ID, ctx.getExecutionId()
                                         );
                                         return updateExecution(exec, ExecutionStatus.FAILED.getCode(),
-                                                Map.of("error", e.getMessage()))
+                                                Map.of(MapFieldKeys.ERROR, e.getMessage()))
                                                 .thenReturn(resp);
                                     }));
                 });
@@ -210,7 +214,7 @@ public class CanvasExecutionService {
                                 : Duration.ofHours(24);
                         if (!ctxStore.acquireDedup(canvasId, userId, msgId, dedupTtl)) {
                             log.debug("[ENGINE] dedup 拦截 canvasId={} userId={} msgId={}", canvasId, userId, msgId);
-                            return Map.<String, Object>of("deduplicated", true);
+                            return Map.<String, Object>of(MapFieldKeys.DEDUPLICATED, true);
                         }
                         acquiredDedupKey = ctxStore.buildDedupKey(canvasId, userId, msgId);
                     }
@@ -248,13 +252,13 @@ public class CanvasExecutionService {
                                         canvasId, active, effectiveMax, priority);
                                 if (priority == TriggerPriorityConfig.Priority.NORMAL) {
                                     if (persistentRequest) {
-                                        return Map.of("overflow", "request_retry");
+                                        return Map.of(MapFieldKeys.OVERFLOW, "request_retry");
                                     }
                                     boolean queued = sendOverflowRetry(canvasId, userId, triggerType, triggerNodeType,
                                             matchKey, payload, msgId, overflowChainRetryCount);
-                                    return Map.of("overflow", queued ? "queued_for_retry" : "retry_enqueue_failed");
+                                    return Map.of(MapFieldKeys.OVERFLOW, queued ? "queued_for_retry" : "retry_enqueue_failed");
                                 }
-                                return Map.of("overflow", "dropped_low_priority");
+                                return Map.of(MapFieldKeys.OVERFLOW, "dropped_low_priority");
                             }
                         }
                     }
@@ -266,7 +270,7 @@ public class CanvasExecutionService {
                             String instanceId = UUID.randomUUID().toString();
                             if (!ctxStore.acquireResumeLock(canvasId, userId, instanceId, globalTimeoutSec)) {
                                 log.warn("[ENGINE] resume-lock 竞争失败，放弃本次触发 canvasId={}", canvasId);
-                                return Map.<String, Object>of("skipped", "resume-lock");
+                                return Map.<String, Object>of(MapFieldKeys.SKIPPED, "resume-lock");
                             }
                             resumeLockAcquired = true;
                             ctx = ctxStore.load(canvasId, userId);
@@ -290,13 +294,13 @@ public class CanvasExecutionService {
                         }
 
                         Map<String, Object> prep = new HashMap<>();
-                        prep.put("ctx", ctx);
-                        prep.put("graph", graph);
-                        prep.put("triggerNodeId", triggerNodeId);
-                        prep.put("isResume", isResume);
-                        prep.put("canvas", canvas);
-                        prep.put("admissionLimit", admissionLimit);
-                        if (acquiredDedupKey != null) prep.put("dedupKey", acquiredDedupKey);
+                        prep.put(MapFieldKeys.CTX, ctx);
+                        prep.put(MapFieldKeys.GRAPH, graph);
+                        prep.put(MapFieldKeys.TRIGGER_NODE_ID, triggerNodeId);
+                        prep.put(MapFieldKeys.IS_RESUME, isResume);
+                        prep.put(MapFieldKeys.CANVAS, canvas);
+                        prep.put(MapFieldKeys.ADMISSION_LIMIT, admissionLimit);
+                        if (acquiredDedupKey != null) prep.put(MapFieldKeys.DEDUP_KEY, acquiredDedupKey);
                         return prep;
                     } catch (RuntimeException e) {
                         if (resumeLockAcquired) {
@@ -310,16 +314,16 @@ public class CanvasExecutionService {
                 })
                 .subscribeOn(Schedulers.boundedElastic())
                 .flatMap(prep -> {
-                    if (!prep.containsKey("ctx")) {
+                    if (!prep.containsKey(MapFieldKeys.CTX)) {
                         return Mono.just(new HashMap<String, Object>(prep));
                     }
-                    ExecutionContext ctx = (ExecutionContext) prep.get("ctx");
-                    DagGraph graph = (DagGraph) prep.get("graph");
-                    String triggerNodeId = (String) prep.get("triggerNodeId");
-                    boolean isResume = (Boolean) prep.get("isResume");
-                    Canvas canvas = (Canvas) prep.get("canvas");
-                    String acquiredDedupKey = (String) prep.get("dedupKey");
-                    int admissionLimit = (Integer) prep.get("admissionLimit");
+                    ExecutionContext ctx = (ExecutionContext) prep.get(MapFieldKeys.CTX);
+                    DagGraph graph = (DagGraph) prep.get(MapFieldKeys.GRAPH);
+                    String triggerNodeId = (String) prep.get(MapFieldKeys.TRIGGER_NODE_ID);
+                    boolean isResume = (Boolean) prep.get(MapFieldKeys.IS_RESUME);
+                    Canvas canvas = (Canvas) prep.get(MapFieldKeys.CANVAS);
+                    String acquiredDedupKey = (String) prep.get(MapFieldKeys.DEDUP_KEY);
+                    int admissionLimit = (Integer) prep.get(MapFieldKeys.ADMISSION_LIMIT);
 
                     Disposable.Swap executionSlot = null;
                     if (!dryRun) {
@@ -332,8 +336,8 @@ public class CanvasExecutionService {
                                     executionRegistry.totalActiveCount(), globalMaxConcurrency);
                             if (isResume) ctxStore.releaseResumeLock(ctx.getCanvasId(), ctx.getUserId());
                             if (acquiredDedupKey != null) ctxStore.releaseDedup(acquiredDedupKey);
-                            return Mono.just(Map.of("overflow", "concurrency_limit_reached",
-                                    "active", active, "limit", admissionLimit));
+                            return Mono.just(Map.of(MapFieldKeys.OVERFLOW, "concurrency_limit_reached",
+                                    MapFieldKeys.ACTIVE, active, MapFieldKeys.LIMIT, admissionLimit));
                         }
                         executionSlot = acquired.get();
                     }
@@ -372,7 +376,7 @@ public class CanvasExecutionService {
                                         incrementStats(ctx.getCanvasId(), ExecutionStatus.PAUSED.getCode(), ctx.getUserId());
                                     }
                                     Map<String, Object> resp = new HashMap<>(result);
-                                    resp.put("executionId", ctx.getExecutionId());
+                                    resp.put(MapFieldKeys.EXECUTION_ID, ctx.getExecutionId());
                                     return updateExecution(finalExec, ExecutionStatus.PAUSED.getCode(), result)
                                             .thenReturn(resp);
                                 }
@@ -382,7 +386,7 @@ public class CanvasExecutionService {
                                     incrementStats(ctx.getCanvasId(), ExecutionStatus.SUCCESS.getCode(), ctx.getUserId());
                                 }
                                 Map<String, Object> resp = new HashMap<>(result);
-                                resp.put("executionId", ctx.getExecutionId());
+                                resp.put(MapFieldKeys.EXECUTION_ID, ctx.getExecutionId());
                                 return updateExecution(finalExec, ExecutionStatus.SUCCESS.getCode(), result)
                                         .thenReturn(resp);
                             })
@@ -403,12 +407,12 @@ public class CanvasExecutionService {
                                         if (isResume) ctxStore.releaseResumeLock(ctx.getCanvasId(), ctx.getUserId());
                                     }
                                     updateMono = updateExecution(finalExec, ExecutionStatus.FAILED.getCode(),
-                                            Map.of("error", e.getMessage()));
+                                            Map.of(MapFieldKeys.ERROR, e.getMessage()));
                                     if (!dryRun) incrementStats(ctx.getCanvasId(), ExecutionStatus.FAILED.getCode(), ctx.getUserId());
                                 }
                                 Map<String, Object> resp = Map.of(
-                                        "error", e.getMessage(),
-                                        "executionId", ctx.getExecutionId()
+                                        MapFieldKeys.ERROR, e.getMessage(),
+                                        MapFieldKeys.EXECUTION_ID, ctx.getExecutionId()
                                 );
                                 return updateMono.thenReturn(resp);
                             }));
@@ -440,7 +444,7 @@ public class CanvasExecutionService {
         ctx.setVersionId(versionId);
         ctx.setUserId(userId);
         ctx.setTriggerType(triggerType);
-        if (userId != null) ctx.getTriggerPayload().put("userId", userId);
+        if (userId != null) ctx.getTriggerPayload().put(MapFieldKeys.USER_ID, userId);
         return ctx;
     }
 

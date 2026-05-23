@@ -1,7 +1,6 @@
 package org.chovy.canvas.engine.audience;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -43,6 +42,7 @@ public class AudienceBatchComputeService {
     private final ObjectMapper objectMapper;
     private final SqlWhereGenerator sqlWhereGenerator;
     private final AudienceEvaluationContextFetcher contextFetcher;
+    private final JdbcConfigResolver jdbcConfigResolver;
 
     @Value("${canvas.integration.tagger-service-url}")
     private String taggerUrl;
@@ -111,7 +111,7 @@ public class AudienceBatchComputeService {
     }
 
     private RoaringBitmap computeViaJdbc(AudienceDefinition definition) throws Exception {
-        JdbcConfig jdbcConfig = parseJdbcConfig(definition.getDataSourceConfig());
+        JdbcConfig jdbcConfig = jdbcConfigResolver.resolve(definition.getDataSourceConfig());
         DataSource dataSource = DataSourceBuilder.create()
                 .driverClassName(jdbcConfig.driverClassName())
                 .url(jdbcConfig.url())
@@ -140,7 +140,7 @@ public class AudienceBatchComputeService {
                 definition.getDataSourceConfig() == null || definition.getDataSourceConfig().isBlank()
                         ? "{}"
                         : definition.getDataSourceConfig(),
-                new TypeReference<>() {}
+                new com.fasterxml.jackson.core.type.TypeReference<>() {}
         );
         String seedTagCode = String.valueOf(config.getOrDefault("seedTagCode", ""));
         if (seedTagCode.isBlank()) {
@@ -191,37 +191,6 @@ public class AudienceBatchComputeService {
             }
         }
         return userIds;
-    }
-
-    private JdbcConfig parseJdbcConfig(String configJson) throws Exception {
-        if (configJson == null || configJson.isBlank()) {
-            throw new IllegalArgumentException("dataSourceConfig is required for JDBC");
-        }
-        Map<String, Object> config = objectMapper.readValue(configJson, new TypeReference<>() {});
-        String baseTable = stringValue(config, "baseTable");
-        String url = stringValue(config, "url");
-        String username = stringValue(config, "username");
-        String password = stringValue(config, "password");
-        String userIdColumn = stringValue(config, "userIdColumn", "user_id");
-        String driverClassName = stringValue(config, "driverClassName", "com.mysql.cj.jdbc.Driver");
-        Integer maxRows = config.get("maxRows") instanceof Number number ? number.intValue() : null;
-        if (!baseTable.matches("[A-Za-z_][A-Za-z0-9_]*") || !userIdColumn.matches("[A-Za-z_][A-Za-z0-9_]*")) {
-            throw new IllegalArgumentException("Illegal table or column name in JDBC config");
-        }
-        return new JdbcConfig(baseTable, url, username, password, userIdColumn, driverClassName, maxRows);
-    }
-
-    private String stringValue(Map<String, Object> config, String key) {
-        String value = stringValue(config, key, null);
-        if (value == null || value.isBlank()) {
-            throw new IllegalArgumentException("Missing JDBC config field: " + key);
-        }
-        return value;
-    }
-
-    private String stringValue(Map<String, Object> config, String key, String defaultValue) {
-        Object value = config.get(key);
-        return value == null ? defaultValue : String.valueOf(value);
     }
 
     private void updateStat(Long audienceId, String status, Long size, Integer sizeKb, String errorMsg) {
@@ -291,16 +260,5 @@ public class AudienceBatchComputeService {
                 .in(AudienceDefinition::getId, audienceIds)
                 .eq(AudienceDefinition::getEnabled, 1)
                 .orderByAsc(AudienceDefinition::getId));
-    }
-
-    private record JdbcConfig(
-            String baseTable,
-            String url,
-            String username,
-            String password,
-            String userIdColumn,
-            String driverClassName,
-            Integer maxRows
-    ) {
     }
 }

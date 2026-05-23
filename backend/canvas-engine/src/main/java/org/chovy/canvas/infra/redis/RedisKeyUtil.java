@@ -39,6 +39,10 @@ public class RedisKeyUtil {
     public String apiRateLimit(String apiKey, long epochSecond) {
         return prefix + ":ratelimit:" + apiKey + ":" + epochSecond;
     }
+    public String executionRequestReplayRateLimit(String scope, String operator, long epochMinute) {
+        String normalizedOperator = operator == null || operator.isBlank() ? "system" : operator;
+        return prefix + ":execution-request:replay:" + scope + ":" + normalizedOperator + ":" + epochMinute;
+    }
 
     // ── 并发锁 ─────────────────────────────────────────────────────
     public String publishLock(Long canvasId) { return prefix + ":publish:lock:" + canvasId; }

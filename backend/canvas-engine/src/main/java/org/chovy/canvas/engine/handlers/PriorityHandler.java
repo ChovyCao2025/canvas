@@ -1,5 +1,6 @@
 package org.chovy.canvas.engine.handlers;
 
+import org.chovy.canvas.common.MapFieldKeys;
 import org.chovy.canvas.engine.context.ExecutionContext;
 import org.chovy.canvas.engine.handler.NodeHandler;
 import org.chovy.canvas.engine.handler.NodeHandlerType;
@@ -29,8 +30,8 @@ public class PriorityHandler implements NodeHandler {
     @SuppressWarnings("unchecked")
     public Mono<NodeResult> executeAsync(Map<String, Object> config, ExecutionContext ctx) {
         // priorities 中每个元素对应一个候选分支，按 order 升序尝试
-        List<Map<String, Object>> priorities = (List<Map<String, Object>>) config.get("priorities");
-        String nextNodeId = (String) config.get("nextNodeId");
+        List<Map<String, Object>> priorities = (List<Map<String, Object>>) config.get(MapFieldKeys.PRIORITIES);
+        String nextNodeId = (String) config.get(MapFieldKeys.NEXT_NODE_ID);
 
         if (priorities == null || priorities.isEmpty()) {
             // 未配置优先级分支时：有兜底 next 则走兜底，否则终止
@@ -47,7 +48,7 @@ public class PriorityHandler implements NodeHandler {
         // 返回“有序候选分支集合”，由调度器逐个执行直到命中成功分支
         Map<String, String> branchMap = new HashMap<>();
         for (int i = 0; i < priorities.size(); i++) {
-            String tid = (String) priorities.get(i).get("nextNodeId");
+            String tid = (String) priorities.get(i).get(MapFieldKeys.NEXT_NODE_ID);
             if (tid != null) branchMap.put("priority-" + i, tid);
         }
 

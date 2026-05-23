@@ -13,6 +13,7 @@ const CanvasEditorPage = lazy(() => import('./pages/canvas-editor'))
 const CanvasStatsPage = lazy(() => import('./pages/canvas-stats'))
 const AdminUsersPage = lazy(() => import('./pages/admin'))
 const ApiConfigPage = lazy(() => import('./pages/api-config'))
+const DataSourceConfigPage = lazy(() => import('./pages/data-source-config'))
 const AbExperimentPage = lazy(() => import('./pages/ab-experiment'))
 const TagConfigPage = lazy(() => import('./pages/tag-config'))
 const MqConfigPage = lazy(() => import('./pages/mq-config'))
@@ -50,6 +51,7 @@ export default function App() {
                 <Route element={<AppLayout />}>
                   <Route path="/admin/users" element={<AdminUsersPage />} />
                   <Route path="/api-config" element={<ApiConfigPage />} />
+                  <Route path="/data-source-config" element={<DataSourceConfigPage />} />
                   <Route path="/ab-experiments" element={<AbExperimentPage />} />
                   <Route path="/tag-config" element={<TagConfigPage />} />
                   <Route path="/audiences" element={<AudienceListPage />} />

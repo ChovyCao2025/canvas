@@ -4,6 +4,7 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.chovy.canvas.common.MapFieldKeys;
 import org.chovy.canvas.domain.constant.NodeType;
 import org.chovy.canvas.domain.constant.TriggerType;
 import org.chovy.canvas.domain.execution.CanvasWaitSubscription;
@@ -87,20 +88,20 @@ public class WaitResumeService {
             String eventId
     ) {
         Map<String, Object> payload = new LinkedHashMap<>(storedPayload(wait));
-        payload.put("sourceNodeId", wait.getNodeId());
-        payload.put("waitSubscriptionId", wait.getId());
-        payload.put("waitType", wait.getWaitType());
-        payload.put("eventCode", wait.getEventCode());
+        payload.put(MapFieldKeys.SOURCE_NODE_ID, wait.getNodeId());
+        payload.put(MapFieldKeys.WAIT_SUBSCRIPTION_ID, wait.getId());
+        payload.put(MapFieldKeys.WAIT_TYPE, wait.getWaitType());
+        payload.put(MapFieldKeys.EVENT_CODE, wait.getEventCode());
         if (eventId != null) {
-            payload.put("eventId", eventId);
+            payload.put(MapFieldKeys.EVENT_ID, eventId);
         }
         if (!eventAttributes.isEmpty()) {
-            payload.put("eventAttributes", eventAttributes);
+            payload.put(MapFieldKeys.EVENT_ATTRIBUTES, eventAttributes);
         }
         if (WaitSubscriptionService.WAIT_TYPE_GOAL.equals(wait.getWaitType())) {
-            payload.put("__goalResumeStatus", status);
+            payload.put(MapFieldKeys.GOAL_RESUME_STATUS, status);
         } else {
-            payload.put("__waitResumeStatus", status);
+            payload.put(MapFieldKeys.WAIT_RESUME_STATUS, status);
         }
         return payload;
     }

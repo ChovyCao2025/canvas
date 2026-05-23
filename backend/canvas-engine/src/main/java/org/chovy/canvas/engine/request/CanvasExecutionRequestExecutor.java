@@ -2,6 +2,7 @@ package org.chovy.canvas.engine.request;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.chovy.canvas.common.MapFieldKeys;
 import org.chovy.canvas.domain.execution.CanvasExecutionRequest;
 import org.chovy.canvas.domain.execution.CanvasExecutionRequestMapper;
 import org.chovy.canvas.engine.scheduler.CanvasMetrics;
@@ -139,8 +140,8 @@ public class CanvasExecutionRequestExecutor {
     }
 
     private Mono<Void> finish(CanvasExecutionRequest request, Map<String, Object> result, String runToken) {
-        if (result.containsKey("overflow")) {
-            return retryOrFail(request, String.valueOf(result.get("overflow")), runToken);
+        if (result.containsKey(MapFieldKeys.OVERFLOW)) {
+            return retryOrFail(request, String.valueOf(result.get(MapFieldKeys.OVERFLOW)), runToken);
         }
         return Mono.fromCallable(() -> mapper.markSucceeded(
                         request.getId(),

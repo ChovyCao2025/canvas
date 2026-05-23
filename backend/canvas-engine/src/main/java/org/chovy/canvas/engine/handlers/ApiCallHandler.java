@@ -1,6 +1,7 @@
 package org.chovy.canvas.engine.handlers;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.chovy.canvas.common.MapFieldKeys;
 import org.chovy.canvas.domain.meta.ApiDefinition;
 import org.chovy.canvas.engine.context.ExecutionContext;
 import org.chovy.canvas.engine.handler.NodeHandler;
@@ -42,7 +43,7 @@ public class ApiCallHandler implements NodeHandler {
 
     @Override
     public Mono<NodeResult> executeAsync(Map<String, Object> config, ExecutionContext ctx) {
-        String apiKey       = (String) config.get("apiKey");
+        String apiKey       = (String) config.get(MapFieldKeys.API_KEY);
 
         if (apiKey == null || apiKey.isBlank()) {
             return Mono.just(NodeResult.fail("API_CALL: apiKey 未配置"));
@@ -60,8 +61,8 @@ public class ApiCallHandler implements NodeHandler {
 
     @SuppressWarnings("unchecked")
     private PreparedApiCall prepareApiCall(Map<String, Object> config, ExecutionContext ctx, String apiKey) {
-        String outputPrefix = (String) config.getOrDefault("outputPrefix", "");
-        String nextNodeId   = (String) config.get("nextNodeId");
+        String outputPrefix = (String) config.getOrDefault(MapFieldKeys.OUTPUT_PREFIX, "");
+        String nextNodeId   = (String) config.get(MapFieldKeys.NEXT_NODE_ID);
 
         ApiDefinition def = apiDefinitionCache.getEnabled(apiKey);
         if (def == null) {
@@ -95,7 +96,7 @@ public class ApiCallHandler implements NodeHandler {
         }
 
         // 构建请求体，值若为 ${ctxKey} 则从上下文取
-        Map<String, Object> inputParams = (Map<String, Object>) config.getOrDefault("inputParams", Map.of());
+        Map<String, Object> inputParams = (Map<String, Object>) config.getOrDefault(MapFieldKeys.INPUT_PARAMS, Map.of());
         Map<String, Object> reqBody = new HashMap<>();
         for (Map.Entry<String, Object> entry : inputParams.entrySet()) {
             Object val = entry.getValue();
@@ -112,11 +113,11 @@ public class ApiCallHandler implements NodeHandler {
         String method = def.getMethod() == null ? "POST" : def.getMethod().toUpperCase();
         String url    = def.getUrl();
         boolean includeContextPayload = Integer.valueOf(1).equals(def.getIncludeContextPayload());
-        String currentNodeId = (String) config.getOrDefault("__nodeId", "");
+        String currentNodeId = (String) config.getOrDefault(MapFieldKeys.NODE_ID_INTERNAL, "");
         List<Map<String, Object>> requestBody = payloadBuilder.build(
                 reqBody, ctx, currentNodeId, includeContextPayload);
 
-        return new PreparedApiCall(null, apiKey, outputPrefix, nextNodeId, def, requestBody);
+        return new PreparedApiCall(null, apiKey, outputPrefix, nextNodeId, def, requestBody, config);
     }
 
     private Mono<NodeResult> executePreparedCall(PreparedApiCall prepared) {
@@ -125,6 +126,7 @@ public class ApiCallHandler implements NodeHandler {
         String nextNodeId = prepared.nextNodeId();
         ApiDefinition def = prepared.def();
         List<Map<String, Object>> requestBody = prepared.requestBody();
+        Map<String, Object> config = prepared.config();
 
         String method = def.getMethod() == null ? "POST" : def.getMethod().toUpperCase();
         String url    = def.getUrl();
@@ -152,16 +154,29 @@ public class ApiCallHandler implements NodeHandler {
                         parsed.forEach((k, v) -> out.put(prefix + k, v));
                     }
                 } catch (Exception ignored) {
-                    out.put(prefix + "body", body);
-                    out.put(prefix + "isJson", false);
+                    out.put(prefix + MapFieldKeys.BODY, body);
+                    out.put(prefix + MapFieldKeys.IS_JSON, false);
                 }
-                out.put(prefix + "httpStatus", "200");
+                out.put(prefix + MapFieldKeys.HTTP_STATUS, "200");
+                if (!validateResponse(config, out)) {
+                    return Mono.just(NodeResult.fail("API_CALL: 响应校验不通过"));
+                }
                 return Mono.just(NodeResult.ok(nextNodeId, out));
             })
             .onErrorResume(e -> {
                 log.error("[API_CALL] ✗ apiKey={} url={} error={}", apiKey, url, e.getMessage());
                 return Mono.just(NodeResult.fail("接口调用异常: " + e.getMessage()));
             });
+    }
+
+    @SuppressWarnings("unchecked")
+    private boolean validateResponse(Map<String, Object> config, Map<String, Object> output) {
+        if (!Boolean.TRUE.equals(config.get(MapFieldKeys.VALIDATE_RESULT))) {
+            return true;
+        }
+        List<Map<String, Object>> rules =
+                (List<Map<String, Object>>) config.get(MapFieldKeys.VALIDATE_RULES);
+        return ConditionEvaluator.allMatch(rules, output);
     }
 
     static boolean isRateLimitExceeded(StringRedisTemplate redis,
@@ -199,10 +214,11 @@ public class ApiCallHandler implements NodeHandler {
             String outputPrefix,
             String nextNodeId,
             ApiDefinition def,
-            List<Map<String, Object>> requestBody
+            List<Map<String, Object>> requestBody,
+            Map<String, Object> config
     ) {
         static PreparedApiCall failure(NodeResult failure) {
-            return new PreparedApiCall(failure, null, null, null, null, null);
+            return new PreparedApiCall(failure, null, null, null, null, null, Map.of());
         }
     }
 }

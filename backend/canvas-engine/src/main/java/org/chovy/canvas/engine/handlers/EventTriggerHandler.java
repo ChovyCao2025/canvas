@@ -1,5 +1,6 @@
 package org.chovy.canvas.engine.handlers;
 
+import org.chovy.canvas.common.MapFieldKeys;
 import org.chovy.canvas.engine.context.ExecutionContext;
 import org.chovy.canvas.engine.handler.NodeHandler;
 import org.chovy.canvas.engine.handler.NodeHandlerType;
@@ -32,9 +33,9 @@ public class EventTriggerHandler implements NodeHandler {
         String expectedEvent = (String) config.get("eventCode");
         Object actualEvent = ctx.getContextValue("eventCode");
         if (expectedEvent != null && actualEvent != null && !expectedEvent.equals(actualEvent.toString())) {
-            return Mono.just(NodeResult.terminal(Map.of("eventMatched", false)));
+            return Mono.just(NodeResult.terminal(Map.of(MapFieldKeys.EVENT_MATCHED, false)));
         }
-        String nextNodeId = (String) config.get("nextNodeId");
-        return Mono.just(NodeResult.ok(nextNodeId, Map.of("eventMatched", true)));
+        String nextNodeId = (String) config.get(MapFieldKeys.NEXT_NODE_ID);
+        return Mono.just(NodeResult.ok(nextNodeId, Map.of(MapFieldKeys.EVENT_MATCHED, true)));
     }
 }

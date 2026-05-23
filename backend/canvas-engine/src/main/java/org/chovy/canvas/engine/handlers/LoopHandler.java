@@ -1,5 +1,6 @@
 package org.chovy.canvas.engine.handlers;
 
+import org.chovy.canvas.common.MapFieldKeys;
 import org.chovy.canvas.domain.constant.NodeType;
 import org.chovy.canvas.engine.context.ExecutionContext;
 import org.chovy.canvas.engine.handler.NodeHandler;
@@ -24,14 +25,14 @@ public class LoopHandler implements NodeHandler {
         boolean exit = exitConditionMet(config, ctx);
         if (exit) {
             return Mono.just(NodeResult.routed("exit", string(config, "exitNodeId", string(config, "nextNodeId", null)),
-                    Map.of("loopIterations", nextCount, "loopExited", true)));
+                    Map.of(MapFieldKeys.LOOP_ITERATIONS, nextCount, MapFieldKeys.LOOP_EXITED, true)));
         }
         if (nextCount > maxIterations) {
             return Mono.just(NodeResult.routed("max_exceeded", string(config, "maxExceededNodeId", null),
-                    Map.of("loopIterations", nextCount, "loopExceeded", true)));
+                    Map.of(MapFieldKeys.LOOP_ITERATIONS, nextCount, MapFieldKeys.LOOP_EXCEEDED, true)));
         }
         return Mono.just(NodeResult.routed("loop", string(config, "loopStartNodeId", null),
-                Map.of("loopIterations", nextCount)));
+                Map.of(MapFieldKeys.LOOP_ITERATIONS, nextCount)));
     }
 
     private boolean exitConditionMet(Map<String, Object> config, ExecutionContext ctx) {

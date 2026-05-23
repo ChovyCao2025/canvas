@@ -1,5 +1,6 @@
 package org.chovy.canvas.engine.handlers;
 
+import org.chovy.canvas.common.MapFieldKeys;
 import org.chovy.canvas.engine.context.ExecutionContext;
 import org.chovy.canvas.engine.handler.NodeHandler;
 import org.chovy.canvas.engine.handler.NodeHandlerType;
@@ -28,15 +29,15 @@ public class SelectorHandler implements NodeHandler {
     @Override
     @SuppressWarnings("unchecked")
     public Mono<NodeResult> executeAsync(Map<String, Object> config, ExecutionContext ctx) {
-        List<Map<String, Object>> branches = (List<Map<String, Object>>) config.get("branches");
-        String elseNodeId = (String) config.get("elseNodeId");
+        List<Map<String, Object>> branches = (List<Map<String, Object>>) config.get(MapFieldKeys.BRANCHES);
+        String elseNodeId = (String) config.get(MapFieldKeys.ELSE_NODE_ID);
 
         // 分支按配置顺序短路匹配：命中第一条就停止
         if (branches != null) {
             for (int i = 0; i < branches.size(); i++) {
                 Map<String, Object> branch = branches.get(i);
                 if (branchMatches(branch, ctx)) {
-                    String next = (String) branch.get("nextNodeId");
+                    String next = (String) branch.get(MapFieldKeys.NEXT_NODE_ID);
                     return Mono.just(NodeResult.ok(next, Map.of()));
                 }
             }
@@ -51,12 +52,16 @@ public class SelectorHandler implements NodeHandler {
 
     @SuppressWarnings("unchecked")
     private boolean branchMatches(Map<String, Object> branch, ExecutionContext ctx) {
-        String relation = (String) branch.getOrDefault("strategyRelation", "AND");
-        List<Map<String, Object>> conditions = (List<Map<String, Object>>) branch.get("conditions");
+        String relation = (String) branch.getOrDefault(MapFieldKeys.STRATEGY_RELATION, MapFieldKeys.AND);
+        List<Map<String, Object>> conditions = (List<Map<String, Object>>) branch.get(MapFieldKeys.CONDITIONS);
+        if (conditions == null) {
+            // 兼容历史示例/存量数据：SELECTOR 分支曾使用 rules 字段。
+            conditions = (List<Map<String, Object>>) branch.get("rules");
+        }
         // 空条件分支视为“默认命中”
         if (conditions == null || conditions.isEmpty()) return true;
 
-        if ("OR".equals(relation)) {
+        if (MapFieldKeys.OR.equals(relation)) {
             return conditions.stream().anyMatch(c -> IfConditionHandler.evaluate(c, ctx));
         }
         return conditions.stream().allMatch(c -> IfConditionHandler.evaluate(c, ctx));

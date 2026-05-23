@@ -1,5 +1,6 @@
 package org.chovy.canvas.engine.handlers;
 
+import org.chovy.canvas.common.MapFieldKeys;
 import org.chovy.canvas.domain.constant.NodeType;
 import org.chovy.canvas.engine.context.ExecutionContext;
 import org.chovy.canvas.engine.handler.NodeHandler;
@@ -21,7 +22,7 @@ public class RecommendationHandler implements NodeHandler {
         int limit = config.get("limit") instanceof Number number ? number.intValue() : items.size();
         List<Object> selected = items.stream().limit(Math.max(0, limit)).toList();
         return Mono.just(NodeResult.routed("success", string(config, "successNodeId", string(config, "nextNodeId", null)),
-                Map.of("recommendations", selected)));
+                Map.of(MapFieldKeys.RECOMMENDATIONS, selected)));
     }
 
     private String string(Map<String, Object> config, String key, String fallback) {

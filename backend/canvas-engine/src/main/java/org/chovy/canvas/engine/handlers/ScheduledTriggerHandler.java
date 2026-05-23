@@ -1,5 +1,6 @@
 package org.chovy.canvas.engine.handlers;
 
+import org.chovy.canvas.common.MapFieldKeys;
 import org.chovy.canvas.engine.context.ExecutionContext;
 import org.chovy.canvas.engine.handler.NodeHandler;
 import org.chovy.canvas.engine.handler.NodeHandlerType;
@@ -35,7 +36,7 @@ public class ScheduledTriggerHandler implements NodeHandler {
     @Override
     public Mono<NodeResult> executeAsync(Map<String, Object> config, ExecutionContext ctx) {
         // nextNodeId 为定时触发节点的唯一出口
-        String nextNodeId = (String) config.get("nextNodeId");
+        String nextNodeId = (String) config.get(MapFieldKeys.NEXT_NODE_ID);
         // 触发载荷（userId、scheduleTime 等）已在 CanvasExecutionService 写入 triggerPayload，此处透传
         Map<String, Object> output = new HashMap<>(ctx.getTriggerPayload());
         // output 主要供下游节点读取调度时刻/用户信息

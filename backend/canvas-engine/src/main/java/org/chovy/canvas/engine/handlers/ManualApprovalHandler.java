@@ -1,6 +1,7 @@
 package org.chovy.canvas.engine.handlers;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.chovy.canvas.common.MapFieldKeys;
 import org.chovy.canvas.domain.approval.CanvasManualApproval;
 import org.chovy.canvas.domain.approval.CanvasManualApprovalMapper;
 import org.chovy.canvas.domain.constant.ApprovalOnTimeoutAction;
@@ -45,8 +46,8 @@ public class ManualApprovalHandler implements NodeHandler {
     @SuppressWarnings("unchecked")
     public Mono<NodeResult> executeAsync(Map<String, Object> config, ExecutionContext ctx) {
         String nodeId       = extractNodeId(config);  // 从 config 获取自身 nodeId（由调用方注入）
-        String approveNodeId = (String) config.get("approveNodeId");
-        String rejectNodeId  = (String) config.get("rejectNodeId");
+        String approveNodeId = (String) config.get(MapFieldKeys.APPROVE_NODE_ID);
+        String rejectNodeId  = (String) config.get(MapFieldKeys.REJECT_NODE_ID);
         String onTimeout     = (String) config.getOrDefault("onTimeout", ApprovalOnTimeoutAction.REJECT);
         int    timeoutHours  = config.get("timeoutHours") instanceof Number n ? n.intValue() : 24;
 
@@ -96,7 +97,7 @@ public class ManualApprovalHandler implements NodeHandler {
     }
 
     private String extractNodeId(Map<String, Object> config) {
-        Object id = config.get("__nodeId");
+        Object id = config.get(MapFieldKeys.NODE_ID_INTERNAL);
         if (id == null) {
             throw new IllegalStateException(
                 "MANUAL_APPROVAL 节点未注入 __nodeId，" +

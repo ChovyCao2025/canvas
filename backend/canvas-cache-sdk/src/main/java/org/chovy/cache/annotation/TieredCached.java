@@ -3,6 +3,9 @@ package org.chovy.cache.annotation;
 import org.chovy.cache.strategy.DeserializeFailureStrategy;
 import org.chovy.cache.strategy.LoaderFailureStrategy;
 import org.chovy.cache.strategy.RedisFailureStrategy;
+import org.chovy.cache.strategy.AvalancheProtectionStrategy;
+import org.chovy.cache.strategy.BreakdownProtectionStrategy;
+import org.chovy.cache.strategy.PenetrationProtectionStrategy;
 
 import java.lang.annotation.Documented;
 import java.lang.annotation.ElementType;
@@ -20,6 +23,18 @@ public @interface TieredCached {
 
     Class<?> valueType();
 
+    String condition() default "";
+
+    String unless() default "";
+
+    boolean cacheNull() default true;
+
+    PenetrationProtectionStrategy penetration() default PenetrationProtectionStrategy.CACHE_NULL_SHORT_TTL;
+
+    BreakdownProtectionStrategy breakdown() default BreakdownProtectionStrategy.LOCAL_SINGLE_FLIGHT;
+
+    AvalancheProtectionStrategy avalanche() default AvalancheProtectionStrategy.TTL_JITTER;
+
     int l1MaxSize() default 1000;
 
     String l1RefreshAfterWrite() default "1h";
@@ -32,7 +47,15 @@ public @interface TieredCached {
 
     int keySchemaVersion() default 1;
 
-    String nullValueTtl() default "5m";
+    String nullValueTtl() default "1m";
+
+    String emptyValueTtl() default "1m";
+
+    String lockTtl() default "30s";
+
+    String refreshAhead() default "0ms";
+
+    String staleTtl() default "30m";
 
     boolean hotspotProtection() default false;
 

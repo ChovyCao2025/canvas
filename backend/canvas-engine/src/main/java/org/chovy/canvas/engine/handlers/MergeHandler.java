@@ -1,5 +1,6 @@
 package org.chovy.canvas.engine.handlers;
 
+import org.chovy.canvas.common.MapFieldKeys;
 import org.chovy.canvas.domain.constant.NodeType;
 import org.chovy.canvas.engine.context.ExecutionContext;
 import org.chovy.canvas.engine.handler.NodeHandler;
@@ -15,7 +16,7 @@ import java.util.Map;
 public class MergeHandler implements NodeHandler {
     @Override
     public Mono<NodeResult> executeAsync(Map<String, Object> config, ExecutionContext ctx) {
-        return Mono.just(NodeResult.ok(string(config, "nextNodeId", null), Map.of("merged", true)));
+        return Mono.just(NodeResult.ok(string(config, "nextNodeId", null), Map.of(MapFieldKeys.MERGED, true)));
     }
 
     private String string(Map<String, Object> config, String key, String fallback) {

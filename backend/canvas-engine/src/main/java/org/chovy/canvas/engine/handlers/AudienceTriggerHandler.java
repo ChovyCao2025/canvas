@@ -1,5 +1,6 @@
 package org.chovy.canvas.engine.handlers;
 
+import org.chovy.canvas.common.MapFieldKeys;
 import org.chovy.canvas.domain.constant.NodeType;
 import org.chovy.canvas.engine.context.ExecutionContext;
 import org.chovy.canvas.engine.handler.NodeHandler;
@@ -20,12 +21,12 @@ public class AudienceTriggerHandler implements NodeHandler {
         Object actualSegment = ctx.getContextValue("segmentId");
         Object actualAction = ctx.getContextValue("audienceAction");
         if (expectedSegment != null && actualSegment != null && !expectedSegment.equals(actualSegment.toString())) {
-            return Mono.just(NodeResult.terminal(Map.of("audienceMatched", false)));
+            return Mono.just(NodeResult.terminal(Map.of(MapFieldKeys.AUDIENCE_MATCHED, false)));
         }
         if (actualAction != null && !triggerOn.equalsIgnoreCase(actualAction.toString())) {
-            return Mono.just(NodeResult.terminal(Map.of("audienceMatched", false)));
+            return Mono.just(NodeResult.terminal(Map.of(MapFieldKeys.AUDIENCE_MATCHED, false)));
         }
-        return Mono.just(NodeResult.ok(string(config, "nextNodeId", null), Map.of("audienceMatched", true)));
+        return Mono.just(NodeResult.ok(string(config, "nextNodeId", null), Map.of(MapFieldKeys.AUDIENCE_MATCHED, true)));
     }
 
     private String string(Map<String, Object> config, String key, String fallback) {

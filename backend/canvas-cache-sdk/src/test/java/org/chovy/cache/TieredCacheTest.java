@@ -7,17 +7,31 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.data.redis.core.ReactiveStringRedisTemplate;
+import org.springframework.data.redis.core.ReactiveValueOperations;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.ValueOperations;
+import org.springframework.data.redis.core.script.RedisScript;
+import reactor.core.publisher.Mono;
+import reactor.test.StepVerifier;
 
 import java.time.Duration;
+import java.util.Collection;
+import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
+import org.chovy.cache.strategy.AvalancheProtectionStrategy;
+import org.chovy.cache.strategy.BreakdownProtectionStrategy;
+import org.chovy.cache.strategy.PenetrationProtectionStrategy;
 
 @ExtendWith(MockitoExtension.class)
 class TieredCacheTest {
@@ -25,12 +39,14 @@ class TieredCacheTest {
     @Mock StringRedisTemplate redis;
     @Mock ReactiveStringRedisTemplate reactiveRedis;
     @Mock ValueOperations<String, String> values;
+    @Mock ReactiveValueOperations<String, String> reactiveValues;
 
     private TieredCacheManager manager;
 
     @BeforeEach
     void setUp() {
         lenient().when(redis.opsForValue()).thenReturn(values);
+        lenient().when(reactiveRedis.opsForValue()).thenReturn(reactiveValues);
         manager = new TieredCacheManager(redis, reactiveRedis, new SimpleMeterRegistry(), null);
     }
 
@@ -159,6 +175,190 @@ class TieredCacheTest {
         assertThat(result).contains(new SampleValue("reactive"));
         assertThat(second).contains(new SampleValue("reactive"));
         assertThat(loads).hasValue(1);
+    }
+
+    @Test
+    void builderRejectsInvalidConfiguration() {
+        assertThatThrownBy(() -> TieredCacheBuilder.<Integer, SampleValue>builder()
+                .name("bad")
+                .l1MaxSize(0)
+                .loader(key -> new SampleValue("unused"))
+                .valueType(SampleValue.class)
+                .build(manager))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("l1MaxSize");
+
+        assertThatThrownBy(() -> TieredCacheBuilder.<Integer, SampleValue>builder()
+                .name("bad")
+                .l2TtlJitter(1.5)
+                .loader(key -> new SampleValue("unused"))
+                .valueType(SampleValue.class)
+                .build(manager))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("l2TtlJitter");
+    }
+
+    @Test
+    void objectMapperChangePreservesTypeReferenceGenericType() {
+        when(values.get("list:v1:1")).thenReturn("[{\"value\":\"a\"}]");
+        TieredCache<Integer, java.util.List<SampleValue>> cache =
+                TieredCacheBuilder.<Integer, java.util.List<SampleValue>>builder()
+                        .name("list")
+                        .l2KeyPrefix("list:")
+                        .valueType(new com.fasterxml.jackson.core.type.TypeReference<java.util.List<SampleValue>>() {})
+                        .objectMapper(new com.fasterxml.jackson.databind.ObjectMapper())
+                        .loader(key -> java.util.List.of())
+                        .build(manager);
+
+        Optional<java.util.List<SampleValue>> result = cache.get(1);
+
+        assertThat(result).isPresent();
+        assertThat(result.get().get(0)).isEqualTo(new SampleValue("a"));
+    }
+
+    @Test
+    void getAllUsesBatchLoaderOnlyForMissingKeys() {
+        when(values.get("sample:v1:1")).thenReturn("{\"value\":\"one\"}");
+        when(values.get("sample:v1:2")).thenReturn(null);
+        when(values.get("sample:v1:3")).thenReturn(null);
+        TieredCache<Integer, SampleValue> cache = sampleCache(key -> new SampleValue("unused"));
+
+        Map<Integer, Optional<SampleValue>> result = cache.getAll(List.of(1, 2, 3),
+                missing -> Map.of(2, new SampleValue("two"), 3, new SampleValue("three")));
+
+        assertThat(result).containsEntry(1, Optional.of(new SampleValue("one")));
+        assertThat(result).containsEntry(2, Optional.of(new SampleValue("two")));
+        assertThat(result).containsEntry(3, Optional.of(new SampleValue("three")));
+        verify(values).set(eq("sample:v1:2"), contains("two"), any(Duration.class));
+        verify(values).set(eq("sample:v1:3"), contains("three"), any(Duration.class));
+    }
+
+    @Test
+    void warmupLoadsKeysAndStatsExposeCacheActivity() {
+        when(values.get("sample:v1:1")).thenReturn(null);
+        when(values.get("sample:v1:2")).thenReturn(null);
+        AtomicInteger loads = new AtomicInteger();
+        TieredCache<Integer, SampleValue> cache = sampleCache(key -> new SampleValue("value-" + loads.incrementAndGet()));
+
+        cache.warmup(List.of(1, 2));
+        cache.get(1);
+
+        assertThat(loads).hasValue(2);
+        assertThat(cache.stats().name()).isEqualTo("sample");
+        assertThat(cache.stats().l1HitCount()).isGreaterThanOrEqualTo(1);
+        assertThat(cache.stats().l1Size()).isEqualTo(2);
+    }
+
+    @Test
+    void penetrationValidatorRejectsInvalidKeyBeforeRedisAndLoader() {
+        TieredCache<Integer, SampleValue> cache = TieredCacheBuilder.<Integer, SampleValue>builder()
+                .name("sample")
+                .l2KeyPrefix("sample:")
+                .penetration(PenetrationProtectionStrategy.KEY_VALIDATOR)
+                .keyValidator(key -> key > 0)
+                .loader(key -> new SampleValue("unused"))
+                .valueType(SampleValue.class)
+                .build(manager);
+
+        assertThat(cache.get(-1)).isEmpty();
+
+        verify(values, never()).get(anyString());
+    }
+
+    @Test
+    void penetrationBloomRejectsDefinitelyMissingKeyBeforeRedisAndLoader() {
+        TieredCache<Integer, SampleValue> cache = TieredCacheBuilder.<Integer, SampleValue>builder()
+                .name("sample")
+                .l2KeyPrefix("sample:")
+                .penetration(PenetrationProtectionStrategy.BLOOM_FILTER)
+                .bloomFilter(new CacheBloomFilter<>() {
+                    @Override public boolean mightContain(Integer key) { return false; }
+                    @Override public void put(Integer key) {}
+                })
+                .loader(key -> new SampleValue("unused"))
+                .valueType(SampleValue.class)
+                .build(manager);
+
+        assertThat(cache.get(123)).isEmpty();
+
+        verify(values, never()).get(anyString());
+    }
+
+    @Test
+    void emptyCollectionUsesShortEmptyValueTtl() {
+        when(values.get("list:v1:1")).thenReturn(null);
+        TieredCache<Integer, List<SampleValue>> cache =
+                TieredCacheBuilder.<Integer, List<SampleValue>>builder()
+                        .name("list")
+                        .l2KeyPrefix("list:")
+                        .penetration(PenetrationProtectionStrategy.CACHE_EMPTY_SHORT_TTL)
+                        .emptyValueTtl(Duration.ofSeconds(20))
+                        .loader(key -> List.of())
+                        .valueType(new com.fasterxml.jackson.core.type.TypeReference<List<SampleValue>>() {})
+                        .build(manager);
+
+        assertThat(cache.get(1)).contains(List.of());
+
+        verify(values).set("list:v1:1", "[]", Duration.ofSeconds(20));
+    }
+
+    @Test
+    void localSingleFlightSharesConcurrentLoaderOverrideForSameKey() throws Exception {
+        when(values.get("sample:v1:77")).thenReturn(null);
+        CountDownLatch entered = new CountDownLatch(1);
+        CountDownLatch release = new CountDownLatch(1);
+        AtomicInteger loads = new AtomicInteger();
+        TieredCache<Integer, SampleValue> cache = TieredCacheBuilder.<Integer, SampleValue>builder()
+                .name("sample")
+                .l2KeyPrefix("sample:")
+                .breakdown(BreakdownProtectionStrategy.LOCAL_SINGLE_FLIGHT)
+                .loader(key -> new SampleValue("unused"))
+                .valueType(SampleValue.class)
+                .build(manager);
+
+        try (var executor = Executors.newFixedThreadPool(2)) {
+            var first = executor.submit(() -> cache.get(77, () -> {
+                loads.incrementAndGet();
+                entered.countDown();
+                try {
+                    release.await(2, TimeUnit.SECONDS);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                }
+                return new SampleValue("shared");
+            }));
+            assertThat(entered.await(1, TimeUnit.SECONDS)).isTrue();
+            var second = executor.submit(() -> cache.get(77, () -> {
+                loads.incrementAndGet();
+                return new SampleValue("duplicate");
+            }));
+            Thread.sleep(100);
+            release.countDown();
+
+            assertThat(first.get()).contains(new SampleValue("shared"));
+            assertThat(second.get()).contains(new SampleValue("shared"));
+        }
+        assertThat(loads).hasValue(1);
+    }
+
+    @Test
+    void staleOnErrorReturnsLastKnownValueWhenLoaderFails() {
+        when(values.get("sample:v1:88")).thenReturn(null);
+        TieredCache<Integer, SampleValue> cache = TieredCacheBuilder.<Integer, SampleValue>builder()
+                .name("sample")
+                .l2KeyPrefix("sample:")
+                .avalanche(AvalancheProtectionStrategy.STALE_ON_ERROR)
+                .loader(key -> new SampleValue("unused"))
+                .valueType(SampleValue.class)
+                .build(manager);
+        cache.put(88, new SampleValue("stale"));
+        cache.invalidate(88);
+
+        Optional<SampleValue> result = cache.get(88, () -> {
+            throw new IllegalStateException("db down");
+        });
+
+        assertThat(result).contains(new SampleValue("stale"));
     }
 
     private TieredCache<Integer, SampleValue> sampleCache(java.util.function.Function<Integer, SampleValue> loader) {

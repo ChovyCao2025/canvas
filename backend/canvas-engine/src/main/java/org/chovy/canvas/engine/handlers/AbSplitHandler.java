@@ -1,5 +1,6 @@
 package org.chovy.canvas.engine.handlers;
 
+import org.chovy.canvas.common.MapFieldKeys;
 import org.chovy.canvas.engine.context.ExecutionContext;
 import org.chovy.canvas.engine.handler.NodeHandler;
 import org.chovy.canvas.engine.handler.NodeHandlerType;
@@ -57,6 +58,6 @@ public class AbSplitHandler implements NodeHandler {
         String groupKey   = (String) matched.getOrDefault("groupKey", String.valueOf(groupIndex));
 
         // 将分组结果写入输出，供后续节点做实验分组埋点/差异化处理
-        return Mono.just(NodeResult.ok(nextNodeId, Map.of("abGroup", groupKey)));
+        return Mono.just(NodeResult.ok(nextNodeId, Map.of(MapFieldKeys.AB_GROUP, groupKey)));
     }
 }

@@ -1,5 +1,6 @@
 package org.chovy.canvas.engine.handlers;
 
+import org.chovy.canvas.common.MapFieldKeys;
 import org.chovy.canvas.domain.constant.NodeType;
 import org.chovy.canvas.domain.customer.CustomerTaskRecord;
 import org.chovy.canvas.domain.customer.CustomerTaskRecordMapper;
@@ -38,7 +39,7 @@ public class CreateTaskHandler implements NodeHandler {
         task.setCreatedAt(LocalDateTime.now());
         task.setUpdatedAt(task.getCreatedAt());
         taskMapper.insert(task);
-        return Mono.just(NodeResult.ok(string(config, "nextNodeId", null), Map.of("taskId", task.getId())));
+        return Mono.just(NodeResult.ok(string(config, "nextNodeId", null), Map.of(MapFieldKeys.TASK_ID, task.getId())));
     }
 
     private String string(Map<String, Object> config, String key, String fallback) {

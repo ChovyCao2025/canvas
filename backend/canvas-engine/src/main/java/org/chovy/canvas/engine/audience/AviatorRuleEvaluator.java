@@ -86,7 +86,7 @@ public class AviatorRuleEvaluator implements RuleEvaluator {
                 // Aviator include(list, value) 语义：value 是否在 list 中
                 yield "include(" + listKey + ", " + field + ")";
             }
-            default -> "true";
+            default -> "false";
         };
     }
 

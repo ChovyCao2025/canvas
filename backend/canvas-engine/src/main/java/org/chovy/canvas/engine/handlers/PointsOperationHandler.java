@@ -1,6 +1,7 @@
 package org.chovy.canvas.engine.handlers;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import org.chovy.canvas.common.MapFieldKeys;
 import org.chovy.canvas.domain.constant.NodeType;
 import org.chovy.canvas.domain.customer.CustomerPointsLedger;
 import org.chovy.canvas.domain.customer.CustomerPointsLedgerMapper;
@@ -32,7 +33,7 @@ public class PointsOperationHandler implements NodeHandler {
                 .last("LIMIT 1"));
         if (existing != null) {
             return Mono.just(NodeResult.ok(string(config, "nextNodeId", null),
-                    Map.of("pointsLedgerId", existing.getId(), "duplicate", true)));
+                    Map.of(MapFieldKeys.POINTS_LEDGER_ID, existing.getId(), MapFieldKeys.DUPLICATE, true)));
         }
 
         CustomerPointsLedger ledger = new CustomerPointsLedger();
@@ -48,7 +49,7 @@ public class PointsOperationHandler implements NodeHandler {
         ledger.setCreatedAt(LocalDateTime.now());
         ledgerMapper.insert(ledger);
         return Mono.just(NodeResult.ok(string(config, "nextNodeId", null),
-                Map.of("pointsLedgerId", ledger.getId(), "duplicate", false)));
+                Map.of(MapFieldKeys.POINTS_LEDGER_ID, ledger.getId(), MapFieldKeys.DUPLICATE, false)));
     }
 
     @Override

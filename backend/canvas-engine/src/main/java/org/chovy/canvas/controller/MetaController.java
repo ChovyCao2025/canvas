@@ -1,6 +1,7 @@
 package org.chovy.canvas.controller;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import org.chovy.canvas.common.MapFieldKeys;
 import org.chovy.canvas.common.R;
 import org.chovy.canvas.domain.meta.*;
 import lombok.RequiredArgsConstructor;
@@ -124,9 +125,9 @@ public class MetaController {
                                     .orderByAsc(org.chovy.canvas.domain.meta.MqMessageDefinition::getId));
             return defs.stream().map(d -> {
                 Map<String, Object> m = new java.util.LinkedHashMap<>();
-                m.put("value", d.getMessageCode());
-                m.put("label", d.getName());
-                m.put("requestSchema", d.getRequestSchema() != null ? d.getRequestSchema() : "[]");
+                m.put(MapFieldKeys.VALUE, d.getMessageCode());
+                m.put(MapFieldKeys.LABEL, d.getName());
+                m.put(MapFieldKeys.REQUEST_SCHEMA, d.getRequestSchema() != null ? d.getRequestSchema() : "[]");
                 return m;
             }).collect(Collectors.toList());
         }).subscribeOn(reactor.core.scheduler.Schedulers.boundedElastic()).map(R::ok);
@@ -213,10 +214,10 @@ public class MetaController {
             );
             return defs.stream().map(def -> {
                 Map<String, Object> m = new java.util.LinkedHashMap<>();
-                m.put("value", def.getApiKey());
-                m.put("label", def.getName());
-                m.put("requestSchema", def.getRequestSchema() != null ? def.getRequestSchema() : "[]");
-                m.put("includeContextPayload", def.getIncludeContextPayload() != null ? def.getIncludeContextPayload() : 0);
+                m.put(MapFieldKeys.VALUE, def.getApiKey());
+                m.put(MapFieldKeys.LABEL, def.getName());
+                m.put(MapFieldKeys.REQUEST_SCHEMA, def.getRequestSchema() != null ? def.getRequestSchema() : "[]");
+                m.put(MapFieldKeys.INCLUDE_CONTEXT_PAYLOAD, def.getIncludeContextPayload() != null ? def.getIncludeContextPayload() : 0);
                 return m;
             }).collect(Collectors.toList());
         }).subscribeOn(Schedulers.boundedElastic()).map(R::ok);
@@ -288,9 +289,9 @@ public class MetaController {
                                     .orderByAsc(org.chovy.canvas.domain.meta.EventDefinition::getId));
             return defs.stream().map(d -> {
                 Map<String, Object> m = new java.util.LinkedHashMap<>();
-                m.put("value", d.getEventCode());
-                m.put("label", d.getName());
-                m.put("requestSchema", d.getAttributes() != null ? d.getAttributes() : "[]");
+                m.put(MapFieldKeys.VALUE, d.getEventCode());
+                m.put(MapFieldKeys.LABEL, d.getName());
+                m.put(MapFieldKeys.REQUEST_SCHEMA, d.getAttributes() != null ? d.getAttributes() : "[]");
                 return m;
             }).collect(Collectors.toList());
         }).subscribeOn(reactor.core.scheduler.Schedulers.boundedElastic()).map(R::ok);

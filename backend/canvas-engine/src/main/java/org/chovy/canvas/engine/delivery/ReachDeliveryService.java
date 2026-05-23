@@ -3,6 +3,7 @@ package org.chovy.canvas.engine.delivery;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
+import org.chovy.canvas.common.MapFieldKeys;
 import org.chovy.canvas.domain.delivery.MessageSendRecord;
 import org.chovy.canvas.domain.delivery.MessageSendRecordMapper;
 import org.springframework.beans.factory.annotation.Value;
@@ -90,7 +91,7 @@ public class ReachDeliveryService {
     private Mono<DeliveryResult> markSent(MessageSendRecord record, Map<String, Object> response) {
         return Mono.fromCallable(() -> {
                     record.setStatus(MessageSendRecord.STATUS_SENT);
-                    Object messageId = response.getOrDefault("messageId", response.get("id"));
+                    Object messageId = response.getOrDefault(MapFieldKeys.MESSAGE_ID, response.get(MapFieldKeys.ID));
                     if (messageId != null) {
                         record.setExternalMessageId(messageId.toString());
                     }
@@ -127,12 +128,12 @@ public class ReachDeliveryService {
             String idempotencyKey
     ) {
         Map<String, Object> payload = new LinkedHashMap<>();
-        payload.put("channel", channel);
-        payload.put("templateId", templateId);
-        payload.put("userId", userId);
-        payload.put("content", content == null ? Map.of() : content);
-        payload.put("variables", variables == null ? Map.of() : variables);
-        payload.put("idempotencyKey", idempotencyKey);
+        payload.put(MapFieldKeys.CHANNEL, channel);
+        payload.put(MapFieldKeys.TEMPLATE_ID, templateId);
+        payload.put(MapFieldKeys.USER_ID, userId);
+        payload.put(MapFieldKeys.CONTENT, content == null ? Map.of() : content);
+        payload.put(MapFieldKeys.VARIABLES, variables == null ? Map.of() : variables);
+        payload.put(MapFieldKeys.IDEMPOTENCY_KEY, idempotencyKey);
         return new DeliveryRequest(executionId, canvasId, userId, nodeId, channel, templateId, payload, idempotencyKey);
     }
 

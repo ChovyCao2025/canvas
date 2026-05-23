@@ -1,5 +1,6 @@
 package org.chovy.canvas.controller;
 
+import org.chovy.canvas.common.MapFieldKeys;
 import org.chovy.canvas.common.R;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import org.chovy.canvas.domain.execution.CanvasExecutionMapper;
@@ -57,17 +58,17 @@ public class CanvasStatsController {
 
             return best.values().stream().map(t -> {
                 Map<String, Object> m = new java.util.LinkedHashMap<>();
-                m.put("nodeId", t.getNodeId());
-                m.put("nodeType", t.getNodeType());
-                m.put("nodeName", t.getNodeName());
-                m.put("status", t.getStatus());
-                m.put("errorMsg", t.getErrorMsg());
-                m.put("outputData", t.getOutputData());   // API 调用结果等
+                m.put(MapFieldKeys.NODE_ID, t.getNodeId());
+                m.put(MapFieldKeys.NODE_TYPE, t.getNodeType());
+                m.put(MapFieldKeys.NODE_NAME, t.getNodeName());
+                m.put(MapFieldKeys.STATUS, t.getStatus());
+                m.put(MapFieldKeys.ERROR_MSG, t.getErrorMsg());
+                m.put(MapFieldKeys.OUTPUT_DATA, t.getOutputData());   // API 调用结果等
                 // 优先用存储的 durationMs，无则从 startedAt/finishedAt 计算
                 if (t.getDurationMs() != null) {
-                    m.put("durationMs", t.getDurationMs());
+                    m.put(MapFieldKeys.DURATION_MS, t.getDurationMs());
                 } else if (t.getStartedAt() != null && t.getFinishedAt() != null) {
-                    m.put("durationMs",
+                    m.put(MapFieldKeys.DURATION_MS,
                             Duration.between(t.getStartedAt(), t.getFinishedAt()).toMillis());
                 }
                 return m;
@@ -96,11 +97,11 @@ public class CanvasStatsController {
                                     .last("LIMIT " + Math.min(size, 100)));
             return execs.stream().map(e -> {
                 Map<String, Object> m = new java.util.LinkedHashMap<>();
-                m.put("id", e.getId());
-                m.put("triggerType", e.getTriggerType());
-                m.put("status", e.getStatus());
-                m.put("userId", e.getUserId());
-                m.put("createdAt", e.getCreatedAt() != null ? e.getCreatedAt().toString() : null);
+                m.put(MapFieldKeys.ID, e.getId());
+                m.put(MapFieldKeys.TRIGGER_TYPE, e.getTriggerType());
+                m.put(MapFieldKeys.STATUS, e.getStatus());
+                m.put(MapFieldKeys.USER_ID, e.getUserId());
+                m.put(MapFieldKeys.CREATED_AT, e.getCreatedAt() != null ? e.getCreatedAt().toString() : null);
                 return m;
             }).collect(java.util.stream.Collectors.toList());
         }).subscribeOn(reactor.core.scheduler.Schedulers.boundedElastic()).map(R::ok);
@@ -133,12 +134,12 @@ public class CanvasStatsController {
                     .forEach(e -> uniqueUsers.add(e.getUserId()));
 
             Map<String, Object> result = new LinkedHashMap<>();
-            result.put("total", total);
-            result.put("success", success);
-            result.put("failed", failed);
-            result.put("paused", paused);
-            result.put("successRate", total > 0 ? String.format("%.1f%%", success * 100.0 / total) : "0%");
-            result.put("uniqueUsers", uniqueUsers.size());
+            result.put(MapFieldKeys.TOTAL, total);
+            result.put(MapFieldKeys.SUCCESS, success);
+            result.put(MapFieldKeys.FAILED, failed);
+            result.put(MapFieldKeys.PAUSED, paused);
+            result.put(MapFieldKeys.SUCCESS_RATE, total > 0 ? String.format("%.1f%%", success * 100.0 / total) : "0%");
+            result.put(MapFieldKeys.UNIQUE_USERS, uniqueUsers.size());
             return result;
         }).subscribeOn(Schedulers.boundedElastic()).map(R::ok);
     }
@@ -192,8 +193,8 @@ public class CanvasStatsController {
             List<Map<String, Object>> trend = new ArrayList<>();
             byDate.forEach((date, count) -> {
                 Map<String, Object> point = new LinkedHashMap<>();
-                point.put("date", date);
-                point.put("count", count);
+                point.put(MapFieldKeys.DATE, date);
+                point.put(MapFieldKeys.COUNT, count);
                 trend.add(point);
             });
             return trend;

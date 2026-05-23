@@ -3,6 +3,9 @@ package org.chovy.canvas.config;
 import org.chovy.cache.TieredCache;
 import org.chovy.cache.TieredCacheBuilder;
 import org.chovy.cache.TieredCacheManager;
+import org.chovy.cache.strategy.AvalancheProtectionStrategy;
+import org.chovy.cache.strategy.BreakdownProtectionStrategy;
+import org.chovy.cache.strategy.PenetrationProtectionStrategy;
 import org.chovy.canvas.domain.canvas.Canvas;
 import org.chovy.canvas.domain.canvas.CanvasMapper;
 import org.chovy.canvas.domain.canvas.CanvasVersionMapper;
@@ -23,7 +26,13 @@ public class CacheConfig {
                 .l2KeyPrefix("canvas:config:")
                 .l2Ttl(Duration.ofHours(24))
                 .l2TtlJitter(0.1)
-                .nullValueTtl(Duration.ofMinutes(5))
+                .nullValueTtl(Duration.ofMinutes(1))
+                .penetration(PenetrationProtectionStrategy.CACHE_NULL_SHORT_TTL)
+                .breakdown(BreakdownProtectionStrategy.LOCAL_AND_DISTRIBUTED)
+                .avalanche(AvalancheProtectionStrategy.FULL)
+                .lockTtl(Duration.ofSeconds(30))
+                .refreshAhead(Duration.ofHours(1))
+                .staleTtl(Duration.ofHours(6))
                 .loader(versionId -> {
                     var version = mapper.selectById(versionId);
                     if (version == null) {
@@ -48,7 +57,10 @@ public class CacheConfig {
                 .l2KeyPrefix("canvas:entity:")
                 .l2Ttl(Duration.ofMinutes(30))
                 .l2TtlJitter(0.1)
-                .nullValueTtl(Duration.ofMinutes(2))
+                .nullValueTtl(Duration.ofMinutes(1))
+                .penetration(PenetrationProtectionStrategy.CACHE_NULL_SHORT_TTL)
+                .breakdown(BreakdownProtectionStrategy.LOCAL_SINGLE_FLIGHT)
+                .avalanche(AvalancheProtectionStrategy.TTL_JITTER)
                 .loader(mapper::selectById)
                 .valueType(Canvas.class)
                 .build(manager);

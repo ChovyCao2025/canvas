@@ -1,6 +1,7 @@
 package org.chovy.canvas.engine.handlers;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.chovy.canvas.common.MapFieldKeys;
 import org.chovy.canvas.domain.constant.NodeType;
 import org.chovy.canvas.domain.meta.EventLog;
 import org.chovy.canvas.domain.meta.EventLogMapper;
@@ -41,7 +42,9 @@ public class TrackEventHandler implements NodeHandler {
         event.setCanvasTriggered(0);
         event.setCanvasCount(0);
         eventLogMapper.insert(event);
-        return Mono.just(NodeResult.ok(string(config, "nextNodeId", null), Map.of("eventLogId", event.getId())));
+        return Mono.just(NodeResult.ok(
+                string(config, "nextNodeId", null),
+                Map.of(MapFieldKeys.EVENT_LOG_ID, event.getId())));
     }
 
     private String toJson(Object value) {

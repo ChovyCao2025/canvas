@@ -88,7 +88,7 @@ public class QLExpressRuleEvaluator implements RuleEvaluator {
                 String listScript = list.stream().map(this::quoteIfString).collect(Collectors.joining(","));
                 yield "contains([" + listScript + "], " + field + ")";
             }
-            default -> "true";
+            default -> "false";
         };
     }
 

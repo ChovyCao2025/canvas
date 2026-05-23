@@ -1,5 +1,6 @@
 package org.chovy.canvas.engine.handlers;
 
+import org.chovy.canvas.common.MapFieldKeys;
 import org.chovy.canvas.engine.context.ExecutionContext;
 import org.chovy.canvas.engine.handler.NodeHandler;
 import org.chovy.canvas.engine.handler.NodeHandlerType;
@@ -35,7 +36,7 @@ public class TaggerOfflineHandler implements NodeHandler {
         // tagCodeKey 表示标签编码，params.tagValue 可作为期望值做二次校验
         String tagCodeKey   = (String) config.get("tagCodeKey");
         Map<String, Object> params = (Map<String, Object>) config.getOrDefault("params", Map.of());
-        String nextNodeId   = (String) config.get("nextNodeId");
+        String nextNodeId   = (String) config.get(MapFieldKeys.NEXT_NODE_ID);
         String expectedVal  = params.get("tagValue") != null ? params.get("tagValue").toString() : null;
 
         return webClient.get()
@@ -51,7 +52,7 @@ public class TaggerOfflineHandler implements NodeHandler {
                     if (expectedVal != null && !expectedVal.equals(tagValue.toString()))
                         return Mono.just(NodeResult.fail("Tagger 离线标签值不匹配"));
                     // 把命中的标签值写回上下文，供下游条件节点复用
-                    return Mono.just(NodeResult.ok(nextNodeId, Map.of("tagValue", tagValue)));
+                    return Mono.just(NodeResult.ok(nextNodeId, Map.of(MapFieldKeys.TAG_VALUE, tagValue)));
                 })
                 .onErrorResume(e -> {
                     log.warn("[TAGGER_OFFLINE] 调用失败: {}", e.getMessage());

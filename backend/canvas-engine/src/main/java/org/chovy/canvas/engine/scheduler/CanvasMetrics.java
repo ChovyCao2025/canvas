@@ -156,4 +156,29 @@ public class CanvasMetrics {
                 .register(registry)
                 .increment();
     }
+
+    /** 执行请求派发成功计数。 */
+    public void recordExecutionRequestDispatched(String canvasId) {
+        Counter.builder("canvas.execution.request.dispatched.total")
+                .tag("canvasId", canvasId != null ? canvasId : "UNKNOWN")
+                .register(registry)
+                .increment();
+    }
+
+    /** 执行请求因单画布批内限额被跳过的计数。 */
+    public void recordExecutionRequestSkipped(String canvasId, String reason) {
+        Counter.builder("canvas.execution.request.skipped.total")
+                .tag("canvasId", canvasId != null ? canvasId : "UNKNOWN")
+                .tag("reason", reason != null ? reason : "UNKNOWN")
+                .register(registry)
+                .increment();
+    }
+
+    /** 执行请求派发阶段失败计数。 */
+    public void recordExecutionRequestDispatchFailure(String canvasId) {
+        Counter.builder("canvas.execution.request.dispatch.failure.total")
+                .tag("canvasId", canvasId != null ? canvasId : "UNKNOWN")
+                .register(registry)
+                .increment();
+    }
 }

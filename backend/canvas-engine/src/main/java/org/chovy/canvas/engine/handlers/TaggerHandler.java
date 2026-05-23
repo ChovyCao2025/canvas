@@ -1,5 +1,6 @@
 package org.chovy.canvas.engine.handlers;
 
+import org.chovy.canvas.common.MapFieldKeys;
 import org.chovy.canvas.engine.audience.AudienceBitmapStore;
 import org.chovy.canvas.engine.context.ExecutionContext;
 import org.chovy.canvas.engine.handler.NodeHandler;
@@ -45,11 +46,11 @@ public class TaggerHandler implements NodeHandler {
     @Override
     public Mono<NodeResult> executeAsync(Map<String, Object> config, ExecutionContext ctx) {
         // mode 默认为 offline，保持历史节点配置兼容
-        String mode = (String) config.getOrDefault("mode", "offline");
-        if ("audience".equals(mode)) {
+        String mode = (String) config.getOrDefault(MapFieldKeys.MODE, MapFieldKeys.OFFLINE);
+        if (MapFieldKeys.AUDIENCE.equals(mode)) {
             return handleAudienceMode(config, ctx);
         }
-        if ("realtime".equals(mode)) {
+        if (MapFieldKeys.REALTIME.equals(mode)) {
             return realtimeHandler.executeAsync(config, ctx);
         }
         // 未识别模式统一按 offline 处理，避免因配置遗漏导致流程中断
@@ -58,7 +59,7 @@ public class TaggerHandler implements NodeHandler {
 
     private Mono<NodeResult> handleAudienceMode(Map<String, Object> config, ExecutionContext ctx) {
         // audience 模式要求配置 audienceId
-        Object audienceIdRaw = config.get("audienceId");
+        Object audienceIdRaw = config.get(MapFieldKeys.AUDIENCE_ID);
         if (audienceIdRaw == null) {
             return Mono.just(NodeResult.fail("TAGGER[audience]: audienceId 未配置"));
         }
@@ -66,11 +67,11 @@ public class TaggerHandler implements NodeHandler {
         // 判断当前 userId 是否在离线计算好的人群 bitmap 里
         boolean hit = audienceBitmapStore.isMember(audienceId, ctx.getUserId());
         String nextNodeId = hit
-                ? (String) config.get("hitNextNodeId")
-                : (String) config.get("missNextNodeId");
+                ? (String) config.get(MapFieldKeys.HIT_NEXT_NODE_ID)
+                : (String) config.get(MapFieldKeys.MISS_NEXT_NODE_ID);
         return Mono.just(NodeResult.ok(nextNodeId, Map.of(
-                "audienceHit", hit,
-                "audienceId", audienceId
+                MapFieldKeys.AUDIENCE_HIT, hit,
+                MapFieldKeys.AUDIENCE_ID, audienceId
         )));
     }
 }

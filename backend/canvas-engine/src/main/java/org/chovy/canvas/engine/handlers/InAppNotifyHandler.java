@@ -1,5 +1,6 @@
 package org.chovy.canvas.engine.handlers;
 
+import org.chovy.canvas.common.MapFieldKeys;
 import org.chovy.canvas.engine.context.ExecutionContext;
 import org.chovy.canvas.engine.handler.NodeHandler;
 import org.chovy.canvas.engine.handler.NodeHandlerType;
@@ -33,7 +34,7 @@ public class InAppNotifyHandler implements NodeHandler {
     public Mono<NodeResult> executeAsync(Map<String, Object> config, ExecutionContext ctx) {
         // messageCodeKey 表示通知模板编码；bizData 为模板变量
         String messageCodeKey = (String) config.get("messageCodeKey");
-        String nextNodeId     = (String) config.get("nextNodeId");
+        String nextNodeId     = (String) config.get(MapFieldKeys.NEXT_NODE_ID);
         List<Map<String, Object>> bizData = (List<Map<String, Object>>) config.getOrDefault("bizData", List.of());
 
         // 当前阶段不真正调用推送服务，仅作为流程占位节点

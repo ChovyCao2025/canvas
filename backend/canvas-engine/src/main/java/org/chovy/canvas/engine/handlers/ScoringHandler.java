@@ -1,5 +1,6 @@
 package org.chovy.canvas.engine.handlers;
 
+import org.chovy.canvas.common.MapFieldKeys;
 import org.chovy.canvas.domain.constant.NodeType;
 import org.chovy.canvas.engine.context.ExecutionContext;
 import org.chovy.canvas.engine.handler.NodeHandler;
@@ -37,11 +38,11 @@ public class ScoringHandler implements NodeHandler {
             }
         }
         if (selected == null) {
-            return Mono.just(NodeResult.ok(string(config, "nextNodeId", null), Map.of("score", score)));
+            return Mono.just(NodeResult.ok(string(config, "nextNodeId", null), Map.of(MapFieldKeys.SCORE, score)));
         }
         String bandId = string(selected, "bandId", string(selected, "id", "band"));
         return Mono.just(NodeResult.routed(bandId, string(selected, "nextNodeId", null),
-                Map.of("score", score, "scoreBand", bandId)));
+                Map.of(MapFieldKeys.SCORE, score, MapFieldKeys.SCORE_BAND, bandId)));
     }
 
     private boolean matches(Map<String, Object> rule, ExecutionContext ctx) {

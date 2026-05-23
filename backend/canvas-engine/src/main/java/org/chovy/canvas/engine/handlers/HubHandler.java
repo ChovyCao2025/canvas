@@ -1,5 +1,6 @@
 package org.chovy.canvas.engine.handlers;
 
+import org.chovy.canvas.common.MapFieldKeys;
 import org.chovy.canvas.engine.context.ExecutionContext;
 import org.chovy.canvas.engine.context.NodeStatus;
 import org.chovy.canvas.engine.handler.NodeHandler;
@@ -26,7 +27,7 @@ public class HubHandler implements NodeHandler {
     @Override
     public Mono<NodeResult> executeAsync(Map<String, Object> config, ExecutionContext ctx) {
         // HUB 的等待逻辑在调度器层，handler 只负责“通过后去哪”
-        String nextNodeId = (String) config.get("nextNodeId");
+        String nextNodeId = (String) config.get(MapFieldKeys.NEXT_NODE_ID);
         // 无额外输出，纯路由型节点
         return Mono.just(NodeResult.ok(nextNodeId, Map.of()));
     }

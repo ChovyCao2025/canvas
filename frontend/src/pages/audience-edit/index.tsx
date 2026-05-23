@@ -4,6 +4,7 @@ import { Button, Card, Form, Input, InputNumber, Select, Space, Switch, Typograp
 import { QueryBuilder, type RuleGroupType } from 'react-querybuilder'
 import { QueryBuilderAntD } from '@react-querybuilder/antd'
 import { audienceApi, type AudienceDefinition } from '../../services/audienceApi'
+import { dataSourceConfigApi, type DataSourceConfig, type DataSourceTableMeta } from '../../services/dataSourceConfigApi'
 import { tagDefinitionApi } from '../../services/api'
 import { useSystemOptions } from '../../hooks/useSystemOptions'
 import 'react-querybuilder/dist/query-builder.css'
@@ -28,24 +29,14 @@ type AudienceEditFormValues = Omit<AudienceDefinition, 'enabled'> & {
 
   /** JDBC 数据源配置。 */
   jdbcConfig?: {
-    /** JDBC 连接串。 */
-    url?: string
-
-    /** 数据库用户名。 */
-    username?: string
-
-    /** 数据库密码。 */
-    password?: string
+    /** 平台数据源配置 ID。 */
+    dataSourceId?: number
 
     /** 人群筛选的基础表名。 */
     baseTable?: string
 
     /** 用户主键列名。 */
     userIdColumn?: string
-
-    /** JDBC 驱动类。 */
-    driverClassName?: string
-
     /** 最大扫描行数，防止全表无上限扫描。 */
     maxRows?: number
   }
@@ -147,10 +138,17 @@ export default function AudienceEditPage() {
   const [query, setQuery] = useState<RuleGroupType>({ combinator: 'and', rules: [] })
 
   /** QueryBuilder 字段（来自标签定义）。 */
-  const [fields, setFields] = useState<{ name: string; label: string; value: string }[]>([])
+  const [tagFields, setTagFields] = useState<{ name: string; label: string; value: string }[]>([])
 
   /** Select 组件的标签选项。 */
   const [tagOptions, setTagOptions] = useState<{ label: string; value: string }[]>([])
+
+  /** 已启用 JDBC 数据源配置。 */
+  const [jdbcDataSources, setJdbcDataSources] = useState<DataSourceConfig[]>([])
+
+  /** 当前 JDBC 数据源下的表结构。 */
+  const [jdbcTables, setJdbcTables] = useState<DataSourceTableMeta[]>([])
+  const [tableLoading, setTableLoading] = useState(false)
 
   /** 保存按钮 loading。 */
   const [loading, setLoading] = useState(false)
@@ -162,7 +160,19 @@ export default function AudienceEditPage() {
   const { options: audienceOperatorOptions } = useSystemOptions('audience_condition_operator')
 
   const dataSourceType = Form.useWatch('dataSourceType', form) ?? 'TAGGER_API'
+  const jdbcDataSourceId = Form.useWatch(['jdbcConfig', 'dataSourceId'], form)
+  const jdbcBaseTable = Form.useWatch(['jdbcConfig', 'baseTable'], form)
   const enabled = Form.useWatch('enabled', form) ?? true
+  const selectedJdbcTable = useMemo(
+    () => jdbcTables.find(item => item.name === jdbcBaseTable),
+    [jdbcBaseTable, jdbcTables],
+  )
+  const fields = useMemo(() => {
+    if (dataSourceType === 'JDBC' && selectedJdbcTable) {
+      return selectedJdbcTable.columns.map(column => ({ name: column, label: column, value: column }))
+    }
+    return tagFields
+  }, [dataSourceType, selectedJdbcTable, tagFields])
   const queryOperators = useMemo(
     () => audienceOperatorOptions.map(option => ({ name: option.value, label: option.label })),
     [audienceOperatorOptions],
@@ -176,10 +186,57 @@ export default function AudienceEditPage() {
   useEffect(() => {
     tagDefinitionApi.list({ page: 1, size: 100, enabled: 1 }).then(res => {
       const tags = res.data.list.map((item: any) => ({ name: item.tagCode, label: item.name, value: item.tagCode }))
-      setFields(tags)
+      setTagFields(tags)
       setTagOptions(tags.map(item => ({ label: item.label, value: item.name })))
     })
   }, [])
+
+  // 加载平台级 JDBC 数据源，下拉选择后只在人群配置里保存 dataSourceId。
+  useEffect(() => {
+    dataSourceConfigApi.list({ page: 1, size: 100, type: 'JDBC', enabled: 1 }).then(res => {
+      setJdbcDataSources(res.data.list)
+    })
+  }, [])
+
+  // 选择 JDBC 数据源后读取表和列，后续表名/用户 ID 列都从元数据下拉选择。
+  useEffect(() => {
+    if (dataSourceType !== 'JDBC' || !jdbcDataSourceId) {
+      setJdbcTables([])
+      return
+    }
+    setTableLoading(true)
+    dataSourceConfigApi.listTables(Number(jdbcDataSourceId))
+      .then(res => setJdbcTables(res.data))
+      .catch(error => {
+        setJdbcTables([])
+        message.error(error?.message || '读取数据源表结构失败')
+      })
+      .finally(() => setTableLoading(false))
+  }, [dataSourceType, jdbcDataSourceId])
+
+  const handleJdbcDataSourceChange = (dataSourceId: number) => {
+    form.setFieldsValue({
+      jdbcConfig: {
+        ...form.getFieldValue('jdbcConfig'),
+        dataSourceId,
+        baseTable: undefined,
+        userIdColumn: 'user_id',
+      },
+    })
+    setJdbcTables([])
+  }
+
+  const handleBaseTableChange = (tableName: string) => {
+    const table = jdbcTables.find(item => item.name === tableName)
+    const columns = table?.columns ?? []
+    form.setFieldsValue({
+      jdbcConfig: {
+        ...form.getFieldValue('jdbcConfig'),
+        baseTable: tableName,
+        userIdColumn: columns.includes('user_id') ? 'user_id' : columns[0],
+      },
+    })
+  }
 
   // 编辑态回填：包含基本字段、数据源配置拆分以及规则 JSON 反序列化。
   useEffect(() => {
@@ -250,7 +307,7 @@ export default function AudienceEditPage() {
           evaluationStrategy: 'OFFLINE_BATCH',
           enabled: true,
           taggerConfig: { seedTagCode: undefined },
-          jdbcConfig: { userIdColumn: 'user_id', driverClassName: 'com.mysql.cj.jdbc.Driver' },
+          jdbcConfig: { userIdColumn: 'user_id' },
         }}
       >
         <Card title="基本信息" style={{ marginBottom: 16 }}>
@@ -278,23 +335,35 @@ export default function AudienceEditPage() {
 
           {dataSourceType === 'JDBC' && (
             <>
-              <Form.Item name={['jdbcConfig', 'url']} label="JDBC URL" rules={[{ required: true, message: '请输入 JDBC URL' }]}>
-                <Input placeholder="jdbc:mysql://host:3306/db" />
-              </Form.Item>
-              <Form.Item name={['jdbcConfig', 'username']} label="用户名" rules={[{ required: true, message: '请输入用户名' }]}>
-                <Input />
-              </Form.Item>
-              <Form.Item name={['jdbcConfig', 'password']} label="密码" rules={[{ required: true, message: '请输入密码' }]}>
-                <Input.Password />
+              <Form.Item name={['jdbcConfig', 'dataSourceId']} label="数据源" rules={[{ required: true, message: '请选择数据源' }]}>
+                <Select
+                  showSearch
+                  optionFilterProp="label"
+                  placeholder={jdbcDataSources.length ? '选择已配置的数据源' : '暂无可用数据源，请先到数据源配置中创建'}
+                  onChange={handleJdbcDataSourceChange}
+                  options={jdbcDataSources.map(item => ({
+                    value: item.id,
+                    label: item.name,
+                  }))}
+                />
               </Form.Item>
               <Form.Item name={['jdbcConfig', 'baseTable']} label="基础表名" rules={[{ required: true, message: '请输入基础表名' }]}>
-                <Input placeholder="user_profile" />
+                <Select
+                  showSearch
+                  loading={tableLoading}
+                  optionFilterProp="label"
+                  placeholder={jdbcDataSourceId ? '选择基础表' : '请先选择数据源'}
+                  onChange={handleBaseTableChange}
+                  options={jdbcTables.map(table => ({ value: table.name, label: table.name }))}
+                />
               </Form.Item>
               <Form.Item name={['jdbcConfig', 'userIdColumn']} label="用户 ID 列名" rules={[{ required: true, message: '请输入用户 ID 列名' }]}>
-                <Input placeholder="user_id" />
-              </Form.Item>
-              <Form.Item name={['jdbcConfig', 'driverClassName']} label="Driver Class">
-                <Input placeholder="com.mysql.cj.jdbc.Driver" />
+                <Select
+                  showSearch
+                  optionFilterProp="label"
+                  placeholder={selectedJdbcTable ? '选择用户 ID 列' : '请先选择基础表'}
+                  options={(selectedJdbcTable?.columns ?? []).map(column => ({ value: column, label: column }))}
+                />
               </Form.Item>
               <Form.Item name={['jdbcConfig', 'maxRows']} label="最大扫描行数">
                 <InputNumber style={{ width: '100%' }} min={1} placeholder="可选，如 500000" />

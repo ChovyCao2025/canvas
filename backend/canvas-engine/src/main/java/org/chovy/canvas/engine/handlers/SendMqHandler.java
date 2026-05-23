@@ -6,6 +6,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.apache.rocketmq.client.producer.SendResult;
 import org.apache.rocketmq.client.producer.SendStatus;
 import org.apache.rocketmq.spring.core.RocketMQTemplate;
+import org.chovy.canvas.common.MapFieldKeys;
 import org.chovy.canvas.domain.meta.MqMessageDefinition;
 import org.chovy.canvas.domain.meta.MqMessageDefinitionMapper;
 import org.chovy.canvas.engine.context.ExecutionContext;
@@ -42,7 +43,7 @@ public class SendMqHandler implements NodeHandler {
     public Mono<NodeResult> executeAsync(Map<String, Object> config, ExecutionContext ctx) {
         String rawMessageCodeKey = (String) config.get("messageCodeKey");
         String messageCodeKey = rawMessageCodeKey != null ? rawMessageCodeKey.trim() : null;
-        String nextNodeId = (String) config.get("nextNodeId");
+        String nextNodeId = (String) config.get(MapFieldKeys.NEXT_NODE_ID);
 
         if (messageCodeKey == null || messageCodeKey.isBlank()) {
             return Mono.just(NodeResult.fail("SEND_MQ: messageCodeKey 未配置"));
@@ -71,7 +72,7 @@ public class SendMqHandler implements NodeHandler {
                     }
 
                     log.info("[SEND_MQ] 发送成功 destination={} userId={}", destination, ctx.getUserId());
-                    return NodeResult.ok(nextNodeId, Map.of("mqSent", true));
+                    return NodeResult.ok(nextNodeId, Map.of(MapFieldKeys.MQ_SENT, true));
                 })
                 .subscribeOn(Schedulers.boundedElastic())
                 .onErrorResume(e -> {
@@ -83,8 +84,8 @@ public class SendMqHandler implements NodeHandler {
     @SuppressWarnings("unchecked")
     private Map<String, Object> buildPayload(Map<String, Object> config, ExecutionContext ctx) {
         Map<String, Object> payload = new HashMap<>();
-        copyParams(payload, config.get("params"), ctx);
-        copyParams(payload, config.get("inputParams"), ctx);
+        copyParams(payload, config.get(MapFieldKeys.PARAMS), ctx);
+        copyParams(payload, config.get(MapFieldKeys.INPUT_PARAMS), ctx);
         return payload;
     }
 

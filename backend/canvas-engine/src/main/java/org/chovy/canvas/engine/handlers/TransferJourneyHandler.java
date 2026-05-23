@@ -1,5 +1,6 @@
 package org.chovy.canvas.engine.handlers;
 
+import org.chovy.canvas.common.MapFieldKeys;
 import org.chovy.canvas.domain.constant.NodeType;
 import org.chovy.canvas.domain.constant.TriggerType;
 import org.chovy.canvas.engine.context.ExecutionContext;
@@ -35,7 +36,7 @@ public class TransferJourneyHandler implements NodeHandler {
             payload.putAll(ctx.getFlatContext());
             payload.putAll(ctx.getTriggerPayload());
         }
-        payload.put("sourceExecutionId", ctx.getExecutionId());
+        payload.put(MapFieldKeys.SOURCE_EXECUTION_ID, ctx.getExecutionId());
         executionService.trigger(
                         targetJourneyId,
                         ctx.getUserId(),
@@ -47,7 +48,7 @@ public class TransferJourneyHandler implements NodeHandler {
                         false)
                 .subscribe();
         return Mono.just(NodeResult.ok(string(config, "nextNodeId", null),
-                Map.of("transferredJourneyId", targetJourneyId)));
+                Map.of(MapFieldKeys.TRANSFERRED_JOURNEY_ID, targetJourneyId)));
     }
 
     private String string(Map<String, Object> config, String key, String fallback) {

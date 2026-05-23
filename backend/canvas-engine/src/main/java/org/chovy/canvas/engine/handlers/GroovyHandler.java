@@ -1,5 +1,6 @@
 package org.chovy.canvas.engine.handlers;
 
+import org.chovy.canvas.common.MapFieldKeys;
 import org.chovy.canvas.engine.context.ExecutionContext;
 import org.chovy.canvas.engine.handler.NodeHandler;
 import org.chovy.canvas.engine.handler.NodeHandlerType;
@@ -105,8 +106,8 @@ public class GroovyHandler implements NodeHandler {
     @SuppressWarnings("unchecked")
     public Mono<NodeResult> executeAsync(Map<String, Object> config, ExecutionContext ctx) {
         String code       = (String) config.get("code");
-        String nextNodeId = (String) config.get("nextNodeId");
-        List<Map<String, Object>> inputParams = (List<Map<String, Object>>) config.get("inputParams");
+        String nextNodeId = (String) config.get(MapFieldKeys.NEXT_NODE_ID);
+        List<Map<String, Object>> inputParams = (List<Map<String, Object>>) config.get(MapFieldKeys.INPUT_PARAMS);
 
         if (code == null || code.isBlank()) return Mono.just(NodeResult.ok(nextNodeId, Map.of()));
 
@@ -159,8 +160,12 @@ public class GroovyHandler implements NodeHandler {
 
             Boolean validateResult = (Boolean) config.get("validateResult");
             if (Boolean.TRUE.equals(validateResult)) {
-                Object res = output.get("result");
-                if (!Boolean.TRUE.equals(res) && !"true".equals(String.valueOf(res))) {
+                List<Map<String, Object>> rules =
+                        (List<Map<String, Object>>) config.get(MapFieldKeys.VALIDATE_RULES);
+                boolean valid = rules == null || rules.isEmpty()
+                        ? Boolean.TRUE.equals(output.get("result")) || "true".equals(String.valueOf(output.get("result")))
+                        : ConditionEvaluator.allMatch(rules, output);
+                if (!valid) {
                     return Mono.just(NodeResult.fail("Groovy 脚本输出校验不通过"));
                 }
             }

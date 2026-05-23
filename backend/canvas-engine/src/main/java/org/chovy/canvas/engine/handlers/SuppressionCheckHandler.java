@@ -1,5 +1,6 @@
 package org.chovy.canvas.engine.handlers;
 
+import org.chovy.canvas.common.MapFieldKeys;
 import org.chovy.canvas.domain.constant.NodeType;
 import org.chovy.canvas.engine.context.ExecutionContext;
 import org.chovy.canvas.engine.handler.NodeHandler;
@@ -40,7 +41,7 @@ public class SuppressionCheckHandler implements NodeHandler {
             return Mono.just(NodeResult.suppressed(
                     "suppressed", suppressedNodeId, suppression.reasonCode(), suppression.reasonMessage()));
         }
-        return Mono.just(NodeResult.routed("allowed", allowedNodeId, Map.of("policyAllowed", true)));
+        return Mono.just(NodeResult.routed("allowed", allowedNodeId, Map.of(MapFieldKeys.POLICY_ALLOWED, true)));
     }
 
     private boolean booleanValue(Object value) {

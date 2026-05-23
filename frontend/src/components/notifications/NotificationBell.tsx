@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, type ReactNode, useState } from 'react'
 import {
   Badge,
   Button,
@@ -12,7 +12,7 @@ import {
   Typography,
   message,
 } from 'antd'
-import { BellOutlined, CheckOutlined, InboxOutlined } from '@ant-design/icons'
+import { BellOutlined, InboxOutlined } from '@ant-design/icons'
 import { useNavigate } from 'react-router-dom'
 import { useNotifications } from '../../context/NotificationContext'
 import { notificationApi, type UserNotification } from '../../services/notificationApi'
@@ -33,7 +33,110 @@ const FILTER_OPTIONS = [
   { label: '变更', value: 'CHANGE' },
 ] as const
 
+const TOOL_BUTTON_SIZE = 40
+const TOOL_ICON_SIZE = 19
+
 type FilterValue = typeof FILTER_OPTIONS[number]['value']
+
+function ClockIcon() {
+  return (
+    <svg viewBox="0 0 20 20" width={TOOL_ICON_SIZE} height={TOOL_ICON_SIZE} aria-hidden="true">
+      <circle cx="10" cy="10" r="7" fill="none" stroke="currentColor" strokeWidth="1.8" />
+      <path
+        d="M10 6.6v3.8l2.7 1.8"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  )
+}
+
+function ArchiveIcon() {
+  return (
+    <svg viewBox="0 0 20 20" width={TOOL_ICON_SIZE} height={TOOL_ICON_SIZE} aria-hidden="true">
+      <path
+        d="M4.3 5.5h11.4l-1 9.2a1 1 0 0 1-1 .8H6.3a1 1 0 0 1-1-.8l-1-9.2Z"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinejoin="round"
+      />
+      <path d="M3.8 5.5h12.4" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+      <path d="M8 9.5h4" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+    </svg>
+  )
+}
+
+function MailOpenIcon() {
+  return (
+    <svg viewBox="0 0 20 20" width={TOOL_ICON_SIZE} height={TOOL_ICON_SIZE} aria-hidden="true">
+      <path
+        d="M3.5 8.4 10 4.8l6.5 3.6"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M4.4 8.2h11.2a1 1 0 0 1 1 1v6.1a1 1 0 0 1-1 1H4.4a1 1 0 0 1-1-1V9.2a1 1 0 0 1 1-1Z"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinejoin="round"
+      />
+      <path
+        d="m4.2 9 5.1 3.8a1.2 1.2 0 0 0 1.4 0L15.8 9"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  )
+}
+
+function ToolButton({
+  active,
+  disabled,
+  label,
+  icon,
+  onClick,
+}: {
+  active?: boolean
+  disabled?: boolean
+  label: string
+  icon: ReactNode
+  onClick: () => void
+}) {
+  return (
+    <Tooltip title={label}>
+      <Button
+        type="text"
+        size="small"
+        aria-label={label}
+        icon={icon}
+        disabled={disabled}
+        onClick={onClick}
+        style={{
+          width: TOOL_BUTTON_SIZE,
+          height: TOOL_BUTTON_SIZE,
+          borderRadius: 12,
+          display: 'inline-flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          background: active ? '#ffffff' : 'transparent',
+          color: active ? '#111827' : '#6b7280',
+          boxShadow: active ? '0 2px 6px rgba(15, 23, 42, 0.08)' : 'none',
+        }}
+      />
+    </Tooltip>
+  )
+}
 
 export default function NotificationBell() {
   const navigate = useNavigate()
@@ -118,20 +221,35 @@ export default function NotificationBell() {
         onClose={() => setOpen(false)}
         extra={(
           <Space size={8}>
-            <Segmented
-              size="small"
-              value={showArchived ? 'ARCHIVED' : 'ACTIVE'}
-              options={[
-                { label: '最新', value: 'ACTIVE' },
-                { label: '归档', value: 'ARCHIVED' },
-              ]}
-              onChange={value => setShowArchived(value === 'ARCHIVED')}
+            <div
+              style={{
+                background: '#f3f4f7',
+                padding: 4,
+                borderRadius: 14,
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 4,
+              }}
+            >
+              <ToolButton
+                label="最新"
+                icon={<ClockIcon />}
+                active={!showArchived}
+                onClick={() => setShowArchived(false)}
+              />
+              <ToolButton
+                label="归档"
+                icon={<ArchiveIcon />}
+                active={showArchived}
+                onClick={() => setShowArchived(true)}
+              />
+            </div>
+            <ToolButton
+              label={showArchived ? '归档视图无需全部已读' : '全部已读'}
+              icon={<MailOpenIcon />}
+              disabled={showArchived}
+              onClick={handleMarkAllRead}
             />
-            {!showArchived && (
-              <Button size="small" icon={<CheckOutlined />} onClick={handleMarkAllRead}>
-                全部已读
-              </Button>
-            )}
           </Space>
         )}
       >

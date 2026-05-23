@@ -2,6 +2,7 @@ package org.chovy.canvas.engine.handlers;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
+import org.chovy.canvas.common.MapFieldKeys;
 import org.chovy.canvas.domain.constant.NodeType;
 import org.chovy.canvas.domain.customer.CustomerTag;
 import org.chovy.canvas.domain.customer.CustomerTagMapper;
@@ -45,7 +46,7 @@ public class TagOperationHandler implements NodeHandler {
                 }
             }
         }
-        return Mono.just(NodeResult.ok(string(config, "nextNodeId", null), Map.of("tagsChanged", changed)));
+        return Mono.just(NodeResult.ok(string(config, "nextNodeId", null), Map.of(MapFieldKeys.TAGS_CHANGED, changed)));
     }
 
     private void upsertTag(ExecutionContext ctx, String tag, Map<String, Object> op) {

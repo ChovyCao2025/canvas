@@ -1,5 +1,7 @@
 package org.chovy.canvas.engine.handler;
 
+import org.chovy.canvas.common.MapFieldKeys;
+
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -13,7 +15,7 @@ public final class NodeRouteResolver {
         if (result.routes() != null && !result.routes().isEmpty()) {
             String elseTarget = resolveFallbackTarget(result);
             for (Map.Entry<String, String> entry : result.routes().entrySet()) {
-                if ("__else".equals(entry.getKey())) {
+                if (MapFieldKeys.ELSE.equals(entry.getKey())) {
                     continue;
                 } else {
                     addIfPresent(targets, entry.getValue());
@@ -38,7 +40,7 @@ public final class NodeRouteResolver {
         List<String> targets = new ArrayList<>();
         if (result.routes() != null && !result.routes().isEmpty()) {
             for (Map.Entry<String, String> entry : result.routes().entrySet()) {
-                if (!"__else".equals(entry.getKey())) {
+                if (!MapFieldKeys.ELSE.equals(entry.getKey())) {
                     addIfPresent(targets, entry.getValue());
                 }
             }
@@ -54,8 +56,8 @@ public final class NodeRouteResolver {
 
     public static String resolveFallbackTarget(NodeResult result) {
         String target = null;
-        if (result.routes() != null && result.routes().containsKey("__else")) {
-            target = result.routes().get("__else");
+        if (result.routes() != null && result.routes().containsKey(MapFieldKeys.ELSE)) {
+            target = result.routes().get(MapFieldKeys.ELSE);
         } else {
             target = result.elseNodeId();
         }

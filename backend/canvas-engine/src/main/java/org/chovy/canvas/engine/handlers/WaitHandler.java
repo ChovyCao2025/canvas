@@ -1,6 +1,7 @@
 package org.chovy.canvas.engine.handlers;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.chovy.canvas.common.MapFieldKeys;
 import org.chovy.canvas.domain.constant.NodeType;
 import org.chovy.canvas.engine.context.ExecutionContext;
 import org.chovy.canvas.engine.handler.NodeHandler;
@@ -44,15 +45,15 @@ public class WaitHandler implements NodeHandler {
 
     @Override
     public Mono<NodeResult> executeAsync(Map<String, Object> config, ExecutionContext ctx) {
-        String resumeStatus = string(config, "__waitResumeStatus", "");
-        if ("TIMEOUT".equalsIgnoreCase(resumeStatus) || "EXPIRED".equalsIgnoreCase(resumeStatus)) {
+        String resumeStatus = string(config, MapFieldKeys.WAIT_RESUME_STATUS, "");
+        if (MapFieldKeys.TIMEOUT.equalsIgnoreCase(resumeStatus) || MapFieldKeys.EXPIRED.equalsIgnoreCase(resumeStatus)) {
             return Mono.just(NodeResult.timeout(
-                    string(config, "timeoutNodeId", null),
+                    string(config, MapFieldKeys.TIMEOUT_NODE_ID, null),
                     "WAIT_TIMEOUT",
                     "等待节点超时"
             ));
         }
-        if ("COMPLETED".equalsIgnoreCase(resumeStatus)) {
+        if (MapFieldKeys.COMPLETED.equalsIgnoreCase(resumeStatus)) {
             return Mono.just(success(config));
         }
 
@@ -68,7 +69,7 @@ public class WaitHandler implements NodeHandler {
     }
 
     private NodeResult waitForDuration(Map<String, Object> config, ExecutionContext ctx) {
-        Duration duration = durationFrom(config.get("duration"), config);
+        Duration duration = durationFrom(config.get(MapFieldKeys.DURATION), config);
         if (duration.isZero() || duration.isNegative()) {
             return NodeResult.fail("WAIT DURATION 的等待时长必须大于 0");
         }
@@ -78,7 +79,7 @@ public class WaitHandler implements NodeHandler {
     private NodeResult waitUntilDate(Map<String, Object> config, ExecutionContext ctx) {
         LocalDateTime until;
         try {
-            until = parseDateTime(string(config, "untilDate", null));
+            until = parseDateTime(string(config, MapFieldKeys.UNTIL_DATE, null));
         } catch (DateTimeParseException e) {
             return NodeResult.fail("WAIT UNTIL_DATE 的 untilDate 格式不正确");
         }
@@ -91,7 +92,7 @@ public class WaitHandler implements NodeHandler {
     private NodeResult waitUntilRelativeTime(Map<String, Object> config, ExecutionContext ctx) {
         LocalTime targetTime;
         try {
-            targetTime = parseTime(string(config, "time", null), LocalTime.of(9, 0));
+            targetTime = parseTime(string(config, MapFieldKeys.TIME, null), LocalTime.of(9, 0));
         } catch (DateTimeParseException e) {
             return NodeResult.fail("WAIT RELATIVE_TIME 的 time 格式不正确");
         }
@@ -104,14 +105,14 @@ public class WaitHandler implements NodeHandler {
 
     @SuppressWarnings("unchecked")
     private NodeResult waitForTimeWindow(Map<String, Object> config, ExecutionContext ctx) {
-        Map<String, Object> window = config.get("timeWindow") instanceof Map<?, ?> map
+        Map<String, Object> window = config.get(MapFieldKeys.TIME_WINDOW) instanceof Map<?, ?> map
                 ? (Map<String, Object>) map
                 : Map.of();
         LocalTime start;
         LocalTime end;
         try {
-            start = parseTime(string(window, "start", string(config, "windowStart", null)), LocalTime.of(9, 0));
-            end = parseTime(string(window, "end", string(config, "windowEnd", null)), LocalTime.of(20, 0));
+            start = parseTime(string(window, MapFieldKeys.START, string(config, MapFieldKeys.WINDOW_START, null)), LocalTime.of(9, 0));
+            end = parseTime(string(window, MapFieldKeys.END, string(config, MapFieldKeys.WINDOW_END, null)), LocalTime.of(20, 0));
         } catch (DateTimeParseException e) {
             return NodeResult.fail("WAIT TIME_WINDOW 的时间窗口格式不正确");
         }
@@ -130,25 +131,25 @@ public class WaitHandler implements NodeHandler {
     }
 
     private NodeResult waitUntilEvent(Map<String, Object> config, ExecutionContext ctx) {
-        String nodeId = string(config, "__nodeId", null);
+        String nodeId = string(config, MapFieldKeys.NODE_ID_INTERNAL, null);
         if (nodeId == null || nodeId.isBlank()) {
             return NodeResult.fail("WAIT 节点未注入 __nodeId");
         }
-        String eventCode = string(config, "eventCode", null);
+        String eventCode = string(config, MapFieldKeys.EVENT_CODE, null);
         if (eventCode == null || eventCode.isBlank()) {
             return NodeResult.fail("WAIT UNTIL_EVENT 必须配置 eventCode");
         }
 
-        if (!config.containsKey("maxWait")) {
+        if (!config.containsKey(MapFieldKeys.MAX_WAIT)) {
             return NodeResult.fail("WAIT UNTIL_EVENT 必须配置 maxWait");
         }
-        Duration maxWait = durationFrom(config.get("maxWait"), Map.of());
+        Duration maxWait = durationFrom(config.get(MapFieldKeys.MAX_WAIT), Map.of());
         if (maxWait.isZero() || maxWait.isNegative()) {
             return NodeResult.fail("WAIT UNTIL_EVENT 的 maxWait 必须大于 0");
         }
 
         LocalDateTime expiresAt = now().plus(maxWait);
-        String eventFiltersJson = toJsonOrNull(config.get("eventFilters"));
+        String eventFiltersJson = toJsonOrNull(config.get(MapFieldKeys.EVENT_FILTERS));
         String resumePayload = toJson(resumePayload(nodeId, config));
 
         waitSubscriptionService.createEventWait(
@@ -166,7 +167,7 @@ public class WaitHandler implements NodeHandler {
     }
 
     private NodeResult success(Map<String, Object> config) {
-        return NodeResult.ok(string(config, "nextNodeId", null), Map.of("waitStatus", "COMPLETED"));
+        return NodeResult.ok(string(config, MapFieldKeys.NEXT_NODE_ID, null), Map.of(MapFieldKeys.WAIT_STATUS, MapFieldKeys.COMPLETED));
     }
 
     private NodeResult pendingAt(
@@ -175,7 +176,7 @@ public class WaitHandler implements NodeHandler {
             String waitType,
             LocalDateTime resumeAt
     ) {
-        String nodeId = string(config, "__nodeId", null);
+        String nodeId = string(config, MapFieldKeys.NODE_ID_INTERNAL, null);
         if (nodeId == null || nodeId.isBlank()) {
             return NodeResult.fail("WAIT 节点未注入 __nodeId");
         }
@@ -202,28 +203,28 @@ public class WaitHandler implements NodeHandler {
 
     private Map<String, Object> resumePayload(String nodeId, Map<String, Object> config) {
         Map<String, Object> payload = new LinkedHashMap<>();
-        payload.put("sourceNodeId", nodeId);
-        payload.put("successNodeId", string(config, "nextNodeId", null));
-        payload.put("timeoutNodeId", string(config, "timeoutNodeId", null));
+        payload.put(MapFieldKeys.SOURCE_NODE_ID, nodeId);
+        payload.put(MapFieldKeys.SUCCESS_NODE_ID, string(config, MapFieldKeys.NEXT_NODE_ID, null));
+        payload.put(MapFieldKeys.TIMEOUT_NODE_ID, string(config, MapFieldKeys.TIMEOUT_NODE_ID, null));
         return payload;
     }
 
     private String waitType(Map<String, Object> config) {
-        return string(config, "waitType", string(config, "wait_type", DEFAULT_WAIT_TYPE)).toUpperCase();
+        return string(config, MapFieldKeys.WAIT_TYPE, string(config, MapFieldKeys.WAIT_TYPE_SNAKE, DEFAULT_WAIT_TYPE)).toUpperCase();
     }
 
     @SuppressWarnings("unchecked")
     private Duration durationFrom(Object value, Map<String, Object> fallback) {
         if (value instanceof Number number) {
-            return duration(number.longValue(), string(fallback, "unit", "SECONDS"));
+            return duration(number.longValue(), string(fallback, MapFieldKeys.UNIT, "SECONDS"));
         }
         if (value instanceof Map<?, ?> map) {
             Map<String, Object> duration = (Map<String, Object>) map;
-            long amount = duration.get("value") instanceof Number number ? number.longValue() : 0L;
-            return duration(amount, string(duration, "unit", "SECONDS"));
+            long amount = duration.get(MapFieldKeys.VALUE) instanceof Number number ? number.longValue() : 0L;
+            return duration(amount, string(duration, MapFieldKeys.UNIT, "SECONDS"));
         }
-        long amount = fallback.get("durationValue") instanceof Number number ? number.longValue() : 0L;
-        return duration(amount, string(fallback, "durationUnit", string(fallback, "unit", "SECONDS")));
+        long amount = fallback.get(MapFieldKeys.DURATION_VALUE) instanceof Number number ? number.longValue() : 0L;
+        return duration(amount, string(fallback, MapFieldKeys.DURATION_UNIT, string(fallback, MapFieldKeys.UNIT, "SECONDS")));
     }
 
     private Duration duration(long amount, String unit) {

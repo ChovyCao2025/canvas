@@ -17,7 +17,9 @@ import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.ValueOperations;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.transaction.support.TransactionSynchronizationUtils;
+import reactor.core.publisher.Mono;
 
+import java.util.Optional;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -93,6 +95,43 @@ class TieredCacheAspectTest {
         assertThat(service.loads()).isZero();
     }
 
+    @Test
+    void tieredCachedSkipsCacheWhenConditionIsFalse() {
+        CachedService service = startContext().service();
+
+        assertThat(service.loadConditionally("item", false)).isEqualTo(new SampleValue("conditional-1"));
+        assertThat(service.loadConditionally("item", false)).isEqualTo(new SampleValue("conditional-2"));
+
+        assertThat(service.conditionalLoads()).isEqualTo(2);
+    }
+
+    @Test
+    void tieredCachedDoesNotStoreWhenUnlessMatchesResult() {
+        CachedService service = startContext().service();
+
+        assertThat(service.loadUnless("item", "skip")).isEqualTo(new SampleValue("skip"));
+        assertThat(service.loadUnless("item", "stored")).isEqualTo(new SampleValue("stored"));
+        assertThat(service.loadUnless("item", "ignored")).isEqualTo(new SampleValue("stored"));
+    }
+
+    @Test
+    void tieredCachedUnwrapsAndRewrapsOptionalReturnValues() {
+        CachedService service = startContext().service();
+
+        assertThat(service.loadOptional("item")).contains(new SampleValue("optional-1"));
+        assertThat(service.loadOptional("item")).contains(new SampleValue("optional-1"));
+        assertThat(service.optionalLoads()).isEqualTo(1);
+    }
+
+    @Test
+    void tieredCachedSupportsMonoReturnValues() {
+        CachedService service = startContext().service();
+
+        assertThat(service.loadMono("item").block()).isEqualTo(new SampleValue("mono-1"));
+        assertThat(service.loadMono("item").block()).isEqualTo(new SampleValue("mono-1"));
+        assertThat(service.monoLoads()).isEqualTo(1);
+    }
+
     private TestBeans startContext() {
         context = new AnnotationConfigApplicationContext(TestConfig.class);
         return new TestBeans(
@@ -152,6 +191,9 @@ class TieredCacheAspectTest {
 
     static class CachedService {
         private final AtomicInteger loads = new AtomicInteger();
+        private final AtomicInteger conditionalLoads = new AtomicInteger();
+        private final AtomicInteger optionalLoads = new AtomicInteger();
+        private final AtomicInteger monoLoads = new AtomicInteger();
 
         @TieredCached(
                 name = "annotation",
@@ -177,8 +219,58 @@ class TieredCacheAspectTest {
         public void evictMissing(String key) {
         }
 
+        @TieredCached(
+                name = "conditional",
+                key = "#p0",
+                valueType = SampleValue.class,
+                l2KeyPrefix = "conditional:",
+                condition = "#p1")
+        public SampleValue loadConditionally(String key, boolean cacheable) {
+            return new SampleValue("conditional-" + conditionalLoads.incrementAndGet());
+        }
+
+        @TieredCached(
+                name = "unless",
+                key = "#p0",
+                valueType = SampleValue.class,
+                l2KeyPrefix = "unless:",
+                unless = "#result.value() == 'skip'")
+        public SampleValue loadUnless(String key, String value) {
+            return new SampleValue(value);
+        }
+
+        @TieredCached(
+                name = "optional",
+                key = "#p0",
+                valueType = SampleValue.class,
+                l2KeyPrefix = "optional:")
+        public Optional<SampleValue> loadOptional(String key) {
+            return Optional.of(new SampleValue("optional-" + optionalLoads.incrementAndGet()));
+        }
+
+        @TieredCached(
+                name = "mono",
+                key = "#p0",
+                valueType = SampleValue.class,
+                l2KeyPrefix = "mono:")
+        public Mono<SampleValue> loadMono(String key) {
+            return Mono.fromSupplier(() -> new SampleValue("mono-" + monoLoads.incrementAndGet()));
+        }
+
         int loads() {
             return loads.get();
+        }
+
+        int conditionalLoads() {
+            return conditionalLoads.get();
+        }
+
+        int optionalLoads() {
+            return optionalLoads.get();
+        }
+
+        int monoLoads() {
+            return monoLoads.get();
         }
     }
 

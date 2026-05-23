@@ -2,6 +2,7 @@ package org.chovy.canvas.controller;
 
 import io.jsonwebtoken.Claims;
 import lombok.RequiredArgsConstructor;
+import org.chovy.canvas.common.MapFieldKeys;
 import org.chovy.canvas.common.R;
 import org.chovy.canvas.domain.notification.NotificationService;
 import org.chovy.canvas.domain.notification.NotificationWebSocketTicketService;
@@ -51,7 +52,7 @@ public class NotificationController {
     @GetMapping("/unread-count")
     public Mono<R<Map<String, Long>>> unreadCount() {
         return currentUser().flatMap(userId ->
-                Mono.fromCallable(() -> R.ok(Map.of("count", notificationService.unreadCount(userId))))
+                Mono.fromCallable(() -> R.ok(Map.of(MapFieldKeys.COUNT, notificationService.unreadCount(userId))))
                         .subscribeOn(Schedulers.boundedElastic()));
     }
 

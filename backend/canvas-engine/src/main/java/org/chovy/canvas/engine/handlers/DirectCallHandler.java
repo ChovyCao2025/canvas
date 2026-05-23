@@ -1,5 +1,6 @@
 package org.chovy.canvas.engine.handlers;
 
+import org.chovy.canvas.common.MapFieldKeys;
 import org.chovy.canvas.engine.context.ExecutionContext;
 import org.chovy.canvas.engine.handler.NodeHandler;
 import org.chovy.canvas.engine.handler.NodeHandlerType;
@@ -32,8 +33,8 @@ public class DirectCallHandler implements NodeHandler {
     @Override
     @SuppressWarnings("unchecked")
     public Mono<NodeResult> executeAsync(Map<String, Object> config, ExecutionContext ctx) {
-        List<Map<String, Object>> inputParams = (List<Map<String, Object>>) config.get("inputParams");
-        String nextNodeId = (String) config.get("nextNodeId");
+        List<Map<String, Object>> inputParams = (List<Map<String, Object>>) config.get(MapFieldKeys.INPUT_PARAMS);
+        String nextNodeId = (String) config.get(MapFieldKeys.NEXT_NODE_ID);
 
         // 对每个参数仅做“是否存在”校验，类型校验交由业务节点自行处理
         if (inputParams != null) {

@@ -3,14 +3,16 @@ package org.chovy.canvas.controller;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import io.jsonwebtoken.Claims;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.chovy.canvas.common.MapFieldKeys;
 import org.chovy.canvas.common.PageResult;
 import org.chovy.canvas.common.R;
 import org.chovy.canvas.domain.execution.CanvasExecutionRequest;
 import org.chovy.canvas.domain.execution.CanvasExecutionRequestMapper;
 import org.chovy.canvas.engine.disruptor.CanvasDisruptorService;
+import org.chovy.canvas.engine.request.CanvasExecutionReplayRateLimiter;
 import org.chovy.canvas.engine.request.CanvasExecutionRequestStatus;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.core.context.ReactiveSecurityContextHolder;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -29,7 +31,6 @@ import java.util.Set;
 
 @RestController
 @RequestMapping("/canvas/execution-requests")
-@RequiredArgsConstructor
 @Slf4j
 public class CanvasExecutionRequestManagementController {
 
@@ -42,6 +43,21 @@ public class CanvasExecutionRequestManagementController {
 
     private final CanvasExecutionRequestMapper mapper;
     private final CanvasDisruptorService disruptorService;
+    private final CanvasExecutionReplayRateLimiter replayRateLimiter;
+
+    public CanvasExecutionRequestManagementController(CanvasExecutionRequestMapper mapper,
+                                                      CanvasDisruptorService disruptorService) {
+        this(mapper, disruptorService, new CanvasExecutionReplayRateLimiter(0, 0));
+    }
+
+    @Autowired
+    public CanvasExecutionRequestManagementController(CanvasExecutionRequestMapper mapper,
+                                                      CanvasDisruptorService disruptorService,
+                                                      CanvasExecutionReplayRateLimiter replayRateLimiter) {
+        this.mapper = mapper;
+        this.disruptorService = disruptorService;
+        this.replayRateLimiter = replayRateLimiter;
+    }
 
     @GetMapping
     public Mono<R<PageResult<CanvasExecutionRequest>>> list(
@@ -69,6 +85,8 @@ public class CanvasExecutionRequestManagementController {
                                                @RequestParam(required = false) String reason,
                                                @RequestParam(defaultValue = "false") boolean force) {
         return currentUsername().flatMap(operator -> Mono.fromCallable(() -> {
+                    requireReplayRateLimit(replayRateLimiter.tryAcquireSingleReplay(operator),
+                            "执行请求单条重放过于频繁，请稍后再试");
                     CanvasExecutionRequest request = mapper.selectById(id);
                     if (request == null) {
                         throw new IllegalArgumentException("执行请求不存在: " + id);
@@ -85,9 +103,9 @@ public class CanvasExecutionRequestManagementController {
                     }
                     boolean immediateDispatch = publishRequestBestEffort(id);
                     return Map.<String, Object>of(
-                            "requestId", id,
-                            "status", "QUEUED",
-                            "immediateDispatch", immediateDispatch
+                            MapFieldKeys.REQUEST_ID, id,
+                            MapFieldKeys.STATUS, "QUEUED",
+                            MapFieldKeys.IMMEDIATE_DISPATCH, immediateDispatch
                     );
                 })
                 .subscribeOn(Schedulers.boundedElastic())
@@ -105,6 +123,8 @@ public class CanvasExecutionRequestManagementController {
             @RequestParam(defaultValue = "false") boolean force) {
         int normalizedLimit = normalizeLimit(limit);
         return currentUsername().flatMap(operator -> Mono.fromCallable(() -> {
+                    requireReplayRateLimit(replayRateLimiter.tryAcquireBatchReplay(operator, normalizedLimit),
+                            "执行请求批量重放过于频繁，请稍后再试");
                     LambdaQueryWrapper<CanvasExecutionRequest> wrapper = new LambdaQueryWrapper<CanvasExecutionRequest>()
                             .eq(canvasId != null, CanvasExecutionRequest::getCanvasId, canvasId)
                             .eq(userId != null && !userId.isBlank(), CanvasExecutionRequest::getUserId, userId)
@@ -129,11 +149,11 @@ public class CanvasExecutionRequestManagementController {
                         }
                     }
                     return Map.<String, Object>of(
-                            "count", replayed.size(),
-                            "limit", normalizedLimit,
-                            "requestIds", replayed,
-                            "dispatchFailureCount", dispatchFailed.size(),
-                            "dispatchFailedRequestIds", dispatchFailed
+                            MapFieldKeys.COUNT, replayed.size(),
+                            MapFieldKeys.LIMIT, normalizedLimit,
+                            MapFieldKeys.REQUEST_IDS, replayed,
+                            MapFieldKeys.DISPATCH_FAILURE_COUNT, dispatchFailed.size(),
+                            MapFieldKeys.DISPATCH_FAILED_REQUEST_IDS, dispatchFailed
                     );
                 })
                 .subscribeOn(Schedulers.boundedElastic())
@@ -148,6 +168,12 @@ public class CanvasExecutionRequestManagementController {
             log.warn("[EXEC_REQUEST] immediate replay dispatch failed requestId={} reason={}",
                     requestId, e.getMessage());
             return false;
+        }
+    }
+
+    private void requireReplayRateLimit(boolean allowed, String message) {
+        if (!allowed) {
+            throw new IllegalStateException(message);
         }
     }
 

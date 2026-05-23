@@ -5,7 +5,11 @@ import org.chovy.cache.TieredCache;
 import reactor.core.publisher.Mono;
 
 import java.util.Optional;
+import java.util.Collection;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.LongAdder;
 import java.util.function.Function;
 import java.util.function.Supplier;
 
@@ -13,6 +17,8 @@ public class InMemoryTieredCache<K, V> implements TieredCache<K, V> {
     private final String name;
     private final Function<K, V> loader;
     private final ConcurrentHashMap<K, Optional<V>> store = new ConcurrentHashMap<>();
+    private final LongAdder hits = new LongAdder();
+    private final LongAdder misses = new LongAdder();
 
     private InMemoryTieredCache(String name, Function<K, V> loader) {
         this.name = name;
@@ -34,12 +40,52 @@ public class InMemoryTieredCache<K, V> implements TieredCache<K, V> {
 
     @Override
     public Optional<V> get(K key) {
-        return store.computeIfAbsent(key, ignored -> Optional.ofNullable(loader.apply(key)));
+        Optional<V> existing = store.get(key);
+        if (existing != null) {
+            hits.increment();
+            return existing;
+        }
+        misses.increment();
+        Optional<V> loaded = Optional.ofNullable(loader.apply(key));
+        store.put(key, loaded);
+        return loaded;
+    }
+
+    @Override
+    public Optional<V> getIfPresent(K key) {
+        Optional<V> existing = store.get(key);
+        if (existing != null) {
+            hits.increment();
+            return existing;
+        }
+        misses.increment();
+        return Optional.empty();
     }
 
     @Override
     public Optional<V> get(K key, Supplier<V> loaderOverride) {
         return store.computeIfAbsent(key, ignored -> Optional.ofNullable(loaderOverride.get()));
+    }
+
+    @Override
+    public Map<K, Optional<V>> getAll(Collection<K> keys, Function<Collection<K>, Map<K, V>> batchLoader) {
+        Map<K, Optional<V>> result = new LinkedHashMap<>();
+        java.util.List<K> misses = new java.util.ArrayList<>();
+        for (K key : keys) {
+            Optional<V> existing = store.get(key);
+            if (existing == null) {
+                misses.add(key);
+            } else {
+                result.put(key, existing);
+            }
+        }
+        Map<K, V> loaded = misses.isEmpty() ? Map.of() : batchLoader.apply(misses);
+        for (K key : misses) {
+            Optional<V> value = Optional.ofNullable(loaded.get(key));
+            store.put(key, value);
+            result.put(key, value);
+        }
+        return result;
     }
 
     @Override
@@ -74,6 +120,11 @@ public class InMemoryTieredCache<K, V> implements TieredCache<K, V> {
             }
 
             @Override
+            public Mono<Optional<V>> getIfPresent(K key) {
+                return Mono.fromCallable(() -> InMemoryTieredCache.this.getIfPresent(key));
+            }
+
+            @Override
             public Mono<Void> put(K key, V value) {
                 return Mono.fromRunnable(() -> InMemoryTieredCache.this.put(key, value)).then();
             }
@@ -88,5 +139,10 @@ public class InMemoryTieredCache<K, V> implements TieredCache<K, V> {
                 return Mono.fromRunnable(() -> InMemoryTieredCache.this.refresh(key)).then();
             }
         };
+    }
+
+    @Override
+    public org.chovy.cache.TieredCacheStats stats() {
+        return new org.chovy.cache.TieredCacheStats(name, store.size(), hits.sum(), misses.sum(), 0, 0, 0, 0, 0);
     }
 }

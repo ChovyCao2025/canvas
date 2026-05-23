@@ -3,6 +3,7 @@ package org.chovy.canvas.engine.audience;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
+import org.chovy.canvas.common.MapFieldKeys;
 import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.client.WebClient;
 
@@ -40,7 +41,7 @@ public class AudienceEvaluationContextFetcher {
         }
         Map<String, Object> response = client.post()
                 .uri("/offline/user-tags/query")
-                .bodyValue(Map.of("userId", userId, "tagCodes", fields))
+                .bodyValue(Map.of(MapFieldKeys.USER_ID, userId, MapFieldKeys.TAG_CODES, fields))
                 .retrieve()
                 .bodyToMono(new org.springframework.core.ParameterizedTypeReference<Map<String, Object>>() {})
                 .block();

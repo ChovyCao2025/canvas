@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import org.chovy.canvas.domain.constant.NodeType;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.chovy.canvas.common.MapFieldKeys;
 import org.chovy.canvas.common.PageResult;
 import org.chovy.canvas.common.R;
 import org.chovy.canvas.domain.constant.TriggerType;
@@ -158,12 +159,12 @@ public class EventDefinitionController {
                     );
 
                     Map<String, Object> resp = new java.util.LinkedHashMap<>();
-                    resp.put("eventLogId", eventLog.getId());
-                    resp.put("eventCode", req.getEventCode());
-                    resp.put("userId", req.getUserId());
-                    resp.put("canvasTriggered", canvasIds.size());
-                    resp.put("waitsResumed", waitsResumed);
-                    resp.put("status", "ACCEPTED");
+                    resp.put(MapFieldKeys.EVENT_LOG_ID, eventLog.getId());
+                    resp.put(MapFieldKeys.EVENT_CODE, req.getEventCode());
+                    resp.put(MapFieldKeys.USER_ID, req.getUserId());
+                    resp.put(MapFieldKeys.CANVAS_TRIGGERED, canvasIds.size());
+                    resp.put(MapFieldKeys.WAITS_RESUMED, waitsResumed);
+                    resp.put(MapFieldKeys.STATUS, "ACCEPTED");
                     return resp;
                 }).subscribeOn(Schedulers.boundedElastic())
                 .map(R::ok);

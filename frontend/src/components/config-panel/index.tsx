@@ -421,7 +421,11 @@ function renderControl(
       )
     }
     case 'condition-rule-list':
-      return <ConditionRuleList ctxFields={ctxFields} operatorOptions={sharedOptions.conditionOps} />
+      return <ConditionRuleList
+        ctxFields={ctxFields}
+        operatorOptions={sharedOptions.conditionOps}
+        fieldKey={getConditionRuleListFieldKey(field.key)}
+      />
     case 'context-value-list':
       return <ContextValueList ctxFields={ctxFields} valueTypeOptions={sharedOptions.contextValueTypes} />
     case 'param-define-list':
@@ -467,12 +471,17 @@ interface SharedConfigOptions {
 interface ConditionRule {
   field: string; operator: string; value: string; isCustom: boolean
 }
-function ConditionRuleList({ ctxFields, operatorOptions }: {
+
+export function getConditionRuleListFieldKey(schemaFieldKey?: string) {
+  return schemaFieldKey && schemaFieldKey.trim() ? schemaFieldKey : 'rules'
+}
+
+function ConditionRuleList({ ctxFields, operatorOptions, fieldKey }: {
   ctxFields: ContextField[]
   operatorOptions: { label: string; value: string }[]
+  fieldKey: string
 }) {
   const form = Form.useFormInstance()
-  const fieldKey = 'rules'
   const rules: ConditionRule[] = Form.useWatch(fieldKey, form) ?? []
 
   const add = () => form.setFieldValue(fieldKey,

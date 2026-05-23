@@ -1,5 +1,6 @@
 package org.chovy.canvas.engine.handlers;
 
+import org.chovy.canvas.common.MapFieldKeys;
 import org.chovy.canvas.engine.context.ExecutionContext;
 import org.chovy.canvas.engine.handler.NodeHandler;
 import org.chovy.canvas.engine.handler.NodeHandlerType;
@@ -26,7 +27,7 @@ public class DelayHandler implements NodeHandler {
     public Mono<NodeResult> executeAsync(Map<String, Object> config, ExecutionContext ctx) {
         int duration    = config.get("duration") instanceof Number n ? n.intValue() : 0;
         String unit     = (String) config.getOrDefault("unit", "SECOND");
-        String nextNodeId = (String) config.get("nextNodeId");
+        String nextNodeId = (String) config.get(MapFieldKeys.NEXT_NODE_ID);
         long jitterMaxMs = config.get("jitterMaxMs") instanceof Number n
                 ? n.longValue()
                 : defaultJitterMaxMs;

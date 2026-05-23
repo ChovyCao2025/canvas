@@ -38,25 +38,31 @@ require_cmd node
 require_cmd npm
 require_cmd docker
 
-echo "[1/5] 启动 Docker 依赖..."
+echo "[1/6] 启动 Docker 依赖..."
 docker compose -f docker-compose.local.yml up -d
 
-echo "[2/5] 创建数据库..."
+echo "[2/6] 创建数据库..."
 docker exec canvas-mysql mysql -uroot -proot -e "CREATE DATABASE IF NOT EXISTS canvas_db CHARACTER SET utf8mb4;"
 
-echo "[3/5] 安装前端依赖..."
+echo "[3/6] 安装前端依赖..."
 if [ ! -d frontend/node_modules ]; then
   (cd frontend && npm install)
 fi
 
-echo "[4/5] 启动后端..."
+echo "[4/6] 安装本地 cache SDK..."
+(
+  cd backend
+  JAVA_HOME=$(/usr/libexec/java_home -v 21) mvn -q -pl canvas-cache-sdk install -DskipTests
+)
+
+echo "[5/6] 启动后端..."
 (
   cd backend
   mvn -pl canvas-engine -am spring-boot:run
 ) > "$ROOT_DIR/backend.log" 2>&1 &
 BACKEND_PID=$!
 
-echo "[5/5] 启动前端..."
+echo "[6/6] 启动前端..."
 (
   cd frontend
   npm run dev -- --host 0.0.0.0
@@ -98,25 +104,31 @@ require_cmd node
 require_cmd npm
 require_cmd docker
 
-echo "[1/5] 启动 Docker 依赖..."
+echo "[1/6] 启动 Docker 依赖..."
 docker compose -f docker-compose.local.yml up -d
 
-echo "[2/5] 创建数据库..."
+echo "[2/6] 创建数据库..."
 docker exec canvas-mysql mysql -uroot -proot -e "CREATE DATABASE IF NOT EXISTS canvas_db CHARACTER SET utf8mb4;"
 
-echo "[3/5] 安装前端依赖..."
+echo "[3/6] 安装前端依赖..."
 if [ ! -d frontend/node_modules ]; then
   (cd frontend && npm install)
 fi
 
-echo "[4/5] 启动后端..."
+echo "[4/6] 安装本地 cache SDK..."
+(
+  cd backend
+  JAVA_HOME=$(/usr/libexec/java_home -v 21) mvn -q -pl canvas-cache-sdk install -DskipTests
+)
+
+echo "[5/6] 启动后端..."
 (
   cd backend
   mvn -pl canvas-engine -am spring-boot:run
 ) > "$ROOT_DIR/backend.log" 2>&1 &
 BACKEND_PID=$!
 
-echo "[5/5] 启动前端..."
+echo "[6/6] 启动前端..."
 (
   cd frontend
   npm run dev -- --host 0.0.0.0
@@ -163,27 +175,32 @@ Require-Command node
 Require-Command npm
 Require-Command docker
 
-Write-Host "[1/5] 启动 Docker 依赖..."
+Write-Host "[1/6] 启动 Docker 依赖..."
 docker compose -f docker-compose.local.yml up -d
 
-Write-Host "[2/5] 创建数据库..."
+Write-Host "[2/6] 创建数据库..."
 docker exec canvas-mysql mysql -uroot -proot -e "CREATE DATABASE IF NOT EXISTS canvas_db CHARACTER SET utf8mb4;"
 
-Write-Host "[3/5] 安装前端依赖..."
+Write-Host "[3/6] 安装前端依赖..."
 if (-not (Test-Path "frontend\node_modules")) {
     Push-Location frontend
     npm install
     Pop-Location
 }
 
-Write-Host "[4/5] 启动后端..."
+Write-Host "[4/6] 安装本地 cache SDK..."
+Push-Location backend
+mvn -q -pl canvas-cache-sdk install -DskipTests
+Pop-Location
+
+Write-Host "[5/6] 启动后端..."
 Start-Process powershell -ArgumentList @(
     "-NoExit",
     "-Command",
     "cd `"$RootDir\backend`"; mvn -pl canvas-engine -am spring-boot:run"
 )
 
-Write-Host "[5/5] 启动前端..."
+Write-Host "[6/6] 启动前端..."
 Start-Process powershell -ArgumentList @(
     "-NoExit",
     "-Command",
@@ -220,7 +237,17 @@ docker compose -f docker-compose.local.yml ps
 docker exec canvas-mysql mysql -uroot -proot -e "CREATE DATABASE IF NOT EXISTS canvas_db CHARACTER SET utf8mb4;"
 ```
 
-## 3. 启动后端
+## 3. 安装本地 cache SDK
+
+`canvas-engine` 运行时会从本地 Maven 仓库解析 `canvas-cache-sdk` 的
+`1.0.0-SNAPSHOT`。修改 SDK 后，先安装一次，避免启动时加载到旧的 snapshot jar。
+
+```bash
+cd /Users/photonpay/project/canvas/backend
+JAVA_HOME=$(/usr/libexec/java_home -v 21) mvn -q -pl canvas-cache-sdk install -DskipTests
+```
+
+## 4. 启动后端
 
 ```bash
 cd /Users/photonpay/project/canvas/backend/canvas-engine
@@ -232,7 +259,7 @@ JAVA_HOME=/Users/photonpay/Library/Java/JavaVirtualMachines/ms-21.0.11/Contents/
 # 健康检查:   http://localhost:8080/actuator/health
 ```
 
-## 4. 启动前端
+## 5. 启动前端
 
 ```bash
 cd /Users/photonpay/project/canvas/frontend

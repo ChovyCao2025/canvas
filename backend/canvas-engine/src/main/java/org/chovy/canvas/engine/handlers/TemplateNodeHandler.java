@@ -1,5 +1,6 @@
 package org.chovy.canvas.engine.handlers;
 
+import org.chovy.canvas.common.MapFieldKeys;
 import org.chovy.canvas.domain.constant.NodeType;
 import org.chovy.canvas.engine.context.ExecutionContext;
 import org.chovy.canvas.engine.handler.NodeHandler;
@@ -15,6 +16,6 @@ import java.util.Map;
 public class TemplateNodeHandler implements NodeHandler {
     @Override
     public Mono<NodeResult> executeAsync(Map<String, Object> config, ExecutionContext ctx) {
-        return Mono.just(NodeResult.ok((String) config.get("nextNodeId"), Map.of("templateExpanded", false)));
+        return Mono.just(NodeResult.ok((String) config.get(MapFieldKeys.NEXT_NODE_ID), Map.of(MapFieldKeys.TEMPLATE_EXPANDED, false)));
     }
 }

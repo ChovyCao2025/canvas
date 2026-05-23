@@ -5,6 +5,7 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.chovy.canvas.common.MapFieldKeys;
 import org.chovy.canvas.common.PageResult;
 import org.chovy.canvas.common.R;
 import org.chovy.canvas.domain.constant.NodeType;
@@ -99,10 +100,10 @@ public class CanvasMqTriggerRejectedController {
                         }
                     });
             return R.ok(Map.<String, Object>of(
-                    "count", requestIds.size(),
-                    "requestIds", requestIds,
-                    "dispatchFailureCount", dispatchFailed.size(),
-                    "dispatchFailedRequestIds", dispatchFailed
+                    MapFieldKeys.COUNT, requestIds.size(),
+                    MapFieldKeys.REQUEST_IDS, requestIds,
+                    MapFieldKeys.DISPATCH_FAILURE_COUNT, dispatchFailed.size(),
+                    MapFieldKeys.DISPATCH_FAILED_REQUEST_IDS, dispatchFailed
             ));
         }).subscribeOn(Schedulers.boundedElastic());
     }

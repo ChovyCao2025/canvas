@@ -54,6 +54,40 @@ class SelectorHandlerTest {
     }
 
     @Test
+    @DisplayName("兼容历史 branches.rules 字段")
+    void legacy_rules_field_matches_branch_conditions() {
+        ExecutionContext ctx = new ExecutionContext();
+        ctx.getFlatContext().put("score", "50");
+
+        Map<String, Object> config = Map.of(
+                "branches", List.of(
+                        Map.of(
+                                "label", "高价值",
+                                "strategyRelation", "AND",
+                                "rules", List.of(Map.of(
+                                        "field", "score",
+                                        "operator", "GT",
+                                        "value", "80",
+                                        "isCustom", true)),
+                                "nextNodeId", "node_high"),
+                        Map.of(
+                                "label", "普通",
+                                "strategyRelation", "AND",
+                                "rules", List.of(Map.of(
+                                        "field", "score",
+                                        "operator", "GTE",
+                                        "value", "40",
+                                        "isCustom", true)),
+                                "nextNodeId", "node_normal")),
+                "elseNodeId", "node_fallback"
+        );
+
+        NodeResult r = handler.executeAsync(config, ctx).block();
+
+        assertThat(r.nextNodeId()).isEqualTo("node_normal");
+    }
+
+    @Test
     @DisplayName("全不命中走 elseNodeId")
     void all_miss_goes_else() {
         ExecutionContext ctx = new ExecutionContext();

@@ -1,5 +1,6 @@
 package org.chovy.canvas.engine.handlers;
 
+import org.chovy.canvas.common.MapFieldKeys;
 import org.chovy.canvas.engine.context.ExecutionContext;
 import org.chovy.canvas.engine.handler.NodeHandler;
 import org.chovy.canvas.engine.handler.NodeHandlerType;
@@ -33,12 +34,12 @@ public class ReachPlatformHandler implements NodeHandler {
         // scene 决定触达模板；bizData 决定模板变量
         String serviceSceneKey = (String) config.get("serviceSceneKey");
         List<Map<String, Object>> bizData = (List<Map<String, Object>>) config.getOrDefault("bizData", List.of());
-        String nextNodeId = (String) config.get("nextNodeId");
+        String nextNodeId = (String) config.get(MapFieldKeys.NEXT_NODE_ID);
 
         // 构建请求体：固定带 userId，其余字段由节点配置映射
         Map<String, Object> body = new HashMap<>();
         body.put("serviceSceneKey", serviceSceneKey);
-        body.put("userId", ctx.getUserId());
+        body.put(MapFieldKeys.USER_ID, ctx.getUserId());
         for (Map<String, Object> item : bizData) {
             String name = (String) item.get("name");
             Object val  = "CONTEXT".equals(item.get("valueType")) ? ctx.getContextValue((String) item.get("value")) : item.get("value");
