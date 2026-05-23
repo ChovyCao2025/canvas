@@ -1,6 +1,18 @@
 import type { CanvasNodeData } from '../../types/canvas'
 
-type SchemaField = { key: string; label: string; type: string }
+export interface ConfigPanelPresentationField {
+  key: string
+  label: string
+  type: string
+}
+
+export interface BuildConfigPanelPresentationInput {
+  nodeData: CanvasNodeData
+  formValues: Record<string, unknown>
+  displayValues: Record<string, string | undefined>
+  fields: ConfigPanelPresentationField[]
+  getNodeName: (id: string | undefined) => string | null
+}
 
 export interface ConfigPanelPresentation {
   header: {
@@ -15,7 +27,7 @@ export interface ConfigPanelPresentation {
   branchRoutes: Array<{ label: string; value: string; tone: 'success' | 'danger' }>
 }
 
-const TAGGER_SUMMARY_LABELS = new Set(['标签模式', '人群'])
+const TAGGER_SUMMARY_KEYS = new Set(['mode', 'audienceId'])
 
 function toDisplayValue(value: unknown): string {
   if (typeof value === 'string' && value.trim()) return value.trim()
@@ -23,27 +35,33 @@ function toDisplayValue(value: unknown): string {
   return '未设置'
 }
 
-function resolveTaggerMetaBadges(formValues: Record<string, unknown>): string[] {
-  const mode = String(formValues.mode ?? '')
-  if (mode === '人群圈选') return ['人群圈选', 'Audience Segment']
-  return mode ? [mode] : []
+function resolveDisplayValue(input: {
+  key: string
+  formValues: Record<string, unknown>
+  displayValues: Record<string, string | undefined>
+}): string {
+  const displayValue = input.displayValues[input.key]
+  if (typeof displayValue === 'string' && displayValue.trim()) return displayValue.trim()
+  return toDisplayValue(input.formValues[input.key])
 }
 
-export function buildConfigPanelPresentation(input: {
-  nodeData: CanvasNodeData
-  formValues: Record<string, unknown>
-  fields: SchemaField[]
-  getNodeName: (id: string | undefined) => string | null
-}): ConfigPanelPresentation {
-  const { nodeData, formValues, fields, getNodeName } = input
+function resolveTaggerMetaBadges(mode: unknown): string[] {
+  if (mode === 'audience') return ['人群圈选', 'Audience Segment']
+  if (typeof mode === 'string' && mode.trim()) return [mode.trim()]
+  if (typeof mode === 'number' || typeof mode === 'boolean') return [String(mode)]
+  return []
+}
+
+export function buildConfigPanelPresentation(input: BuildConfigPanelPresentationInput): ConfigPanelPresentation {
+  const { nodeData, formValues, displayValues, fields, getNodeName } = input
   const isTagger = nodeData.nodeType === 'TAGGER'
 
   const summaryRows = isTagger
     ? fields
-        .filter((field) => TAGGER_SUMMARY_LABELS.has(field.label))
+        .filter((field) => TAGGER_SUMMARY_KEYS.has(field.key))
         .map((field) => ({
           label: field.label,
-          value: toDisplayValue(formValues[field.key]),
+          value: resolveDisplayValue({ key: field.key, formValues, displayValues }),
         }))
     : []
 
@@ -67,7 +85,7 @@ export function buildConfigPanelPresentation(input: {
       tone: isTagger ? 'tagger' : 'default',
       typeBadge: isTagger ? 'Tagger' : nodeData.nodeType,
       title: nodeData.name,
-      metaBadges: isTagger ? resolveTaggerMetaBadges(formValues) : [],
+      metaBadges: isTagger ? resolveTaggerMetaBadges(formValues.mode) : [],
       description: isTagger ? '标签判断节点，根据圈选人群决定后续分支流向' : nodeData.category,
       statusLabel: '已配置',
     },

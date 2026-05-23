@@ -16,20 +16,26 @@ const taggerNode = (overrides: Partial<CanvasNodeData> = {}): CanvasNodeData => 
 })
 
 describe('buildConfigPanelPresentation', () => {
-  it('builds the approved tagger header and summary rows', () => {
-    const model = buildConfigPanelPresentation({
+  it('builds the approved tagger header and summary rows from raw values plus display lookups', () => {
+    const input = {
       nodeData: taggerNode(),
       formValues: {
+        mode: 'audience',
+        audienceId: 101,
+      },
+      displayValues: {
         mode: '人群圈选',
         audienceId: '演示：高价值近30天活跃用户',
       },
       fields: [
-        { key: 'mode', label: '标签模式', type: 'select' },
-        { key: 'audienceId', label: '人群', type: 'select' },
+        { key: 'mode', label: '模式展示', type: 'select' },
+        { key: 'tagCodeKey', label: '标签', type: 'select' },
+        { key: 'audienceId', label: '圈选对象', type: 'select' },
       ],
       getNodeName: (id) =>
         ({ 'api-node': '接口调用', 'city-node': '是否高频消费城市用户' }[id ?? ''] ?? null),
-    })
+    }
+    const model = buildConfigPanelPresentation(input)
 
     expect(model.header.tone).toBe('tagger')
     expect(model.header.typeBadge).toBe('Tagger')
@@ -37,8 +43,8 @@ describe('buildConfigPanelPresentation', () => {
     expect(model.header.metaBadges).toEqual(['人群圈选', 'Audience Segment'])
     expect(model.header.description).toBe('标签判断节点，根据圈选人群决定后续分支流向')
     expect(model.summaryRows).toEqual([
-      { label: '标签模式', value: '人群圈选' },
-      { label: '人群', value: '演示：高价值近30天活跃用户' },
+      { label: '模式展示', value: '人群圈选' },
+      { label: '圈选对象', value: '演示：高价值近30天活跃用户' },
     ])
     expect(model.branchRoutes).toEqual([
       { label: '命中分支', value: '接口调用', tone: 'success' },
@@ -51,14 +57,22 @@ describe('buildConfigPanelPresentation', () => {
       nodeData: taggerNode({
         bizConfig: { mode: 'audience', hitNextNodeId: undefined, missNextNodeId: 'city-node' },
       }),
-      formValues: {},
-      fields: [],
+      formValues: { mode: 'audience', audienceId: '101' },
+      displayValues: {},
+      fields: [
+        { key: 'mode', label: '标签模式', type: 'select' },
+        { key: 'audienceId', label: '人群', type: 'select' },
+      ],
       getNodeName: () => null,
     })
 
     expect(model.branchRoutes).toEqual([
       { label: '命中分支', value: '未连接', tone: 'success' },
       { label: '未命中分支', value: '未连接', tone: 'danger' },
+    ])
+    expect(model.summaryRows).toEqual([
+      { label: '标签模式', value: 'audience' },
+      { label: '人群', value: '101' },
     ])
   })
 
@@ -71,6 +85,7 @@ describe('buildConfigPanelPresentation', () => {
         bizConfig: {},
       },
       formValues: {},
+      displayValues: {},
       fields: [],
       getNodeName: () => null,
     })
