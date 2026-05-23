@@ -7,6 +7,8 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.util.List;
+
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.verify;
@@ -25,6 +27,7 @@ class AudienceComputeTaskRunnerTest {
     @Test
     void runNow_marksTaskSucceededAndCreatesSuccessNotification() {
         when(computeService.compute(7L)).thenReturn(AudienceComputeResult.ready(7L, "VIP 人群", 12L, 2));
+        when(asyncTaskService.subscribers("task_1")).thenReturn(List.of("operator"));
         AudienceComputeTaskRunner runner = new AudienceComputeTaskRunner(computeService, asyncTaskService, notificationService);
 
         runner.runNow("task_1", 7L, "VIP 人群", "operator");
@@ -43,6 +46,7 @@ class AudienceComputeTaskRunnerTest {
     @Test
     void runNow_marksTaskFailedAndCreatesFailureNotification() {
         when(computeService.compute(7L)).thenReturn(AudienceComputeResult.failed(7L, "VIP 人群", "JDBC timeout"));
+        when(asyncTaskService.subscribers("task_2")).thenReturn(List.of("operator"));
         AudienceComputeTaskRunner runner = new AudienceComputeTaskRunner(computeService, asyncTaskService, notificationService);
 
         runner.runNow("task_2", 7L, "VIP 人群", "operator");
@@ -61,6 +65,7 @@ class AudienceComputeTaskRunnerTest {
     @Test
     void runNow_marksFailedWhenComputeThrows() {
         when(computeService.compute(7L)).thenThrow(new RuntimeException("boom"));
+        when(asyncTaskService.subscribers("task_3")).thenReturn(List.of("operator"));
         AudienceComputeTaskRunner runner = new AudienceComputeTaskRunner(computeService, asyncTaskService, notificationService);
 
         assertDoesNotThrow(() -> runner.runNow("task_3", 7L, "VIP 人群", "operator"));
@@ -79,6 +84,7 @@ class AudienceComputeTaskRunnerTest {
     @Test
     void runNow_doesNotThrowWhenNotificationFailsAfterSuccess() {
         when(computeService.compute(7L)).thenReturn(AudienceComputeResult.ready(7L, "VIP 人群", 12L, 2));
+        when(asyncTaskService.subscribers("task_4")).thenReturn(List.of("operator"));
         doThrow(new RuntimeException("notification down")).when(notificationService).createForTask(
                 "operator",
                 "TASK_SUCCEEDED",
@@ -97,6 +103,7 @@ class AudienceComputeTaskRunnerTest {
     @Test
     void runNow_usesProvidedAudienceNameWhenResultNameIsNull() {
         when(computeService.compute(7L)).thenReturn(AudienceComputeResult.ready(7L, null, 12L, 2));
+        when(asyncTaskService.subscribers("task_5")).thenReturn(List.of("operator"));
         AudienceComputeTaskRunner runner = new AudienceComputeTaskRunner(computeService, asyncTaskService, notificationService);
 
         runner.runNow("task_5", 7L, "VIP 人群", "operator");
@@ -108,5 +115,29 @@ class AudienceComputeTaskRunnerTest {
                 "VIP 人群 · 12 人",
                 "/audiences?highlight=7&taskId=task_5",
                 "task_5");
+    }
+
+    @Test
+    void runNow_createsSuccessNotificationsForAllTaskSubscribers() {
+        when(computeService.compute(7L)).thenReturn(AudienceComputeResult.ready(7L, "VIP 人群", 12L, 2));
+        when(asyncTaskService.subscribers("task_shared")).thenReturn(List.of("alice", "bob"));
+        AudienceComputeTaskRunner runner = new AudienceComputeTaskRunner(computeService, asyncTaskService, notificationService);
+
+        runner.runNow("task_shared", 7L, "VIP 人群", "alice");
+
+        verify(notificationService).createForTask(
+                "alice",
+                "TASK_SUCCEEDED",
+                "人群计算完成",
+                "VIP 人群 · 12 人",
+                "/audiences?highlight=7&taskId=task_shared",
+                "task_shared");
+        verify(notificationService).createForTask(
+                "bob",
+                "TASK_SUCCEEDED",
+                "人群计算完成",
+                "VIP 人群 · 12 人",
+                "/audiences?highlight=7&taskId=task_shared",
+                "task_shared");
     }
 }

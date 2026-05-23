@@ -6,6 +6,9 @@ import org.chovy.canvas.domain.notification.NotificationService;
 import org.chovy.canvas.domain.task.AsyncTaskService;
 import org.springframework.stereotype.Service;
 
+import java.util.LinkedHashSet;
+import java.util.List;
+
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -30,35 +33,35 @@ public class AudienceComputeTaskRunner {
             String error = errorMessage(e);
             log.error("[AUDIENCE] compute task failed taskId={} audienceId={}: {}", taskId, audienceId, error, e);
             markFailedBestEffort(taskId, error);
-            createNotificationBestEffort(
+            createNotificationsBestEffort(
+                    taskId,
                     operator,
                     "TASK_FAILED",
                     "人群计算失败",
                     displayName(null, audienceName, audienceId) + " · " + error,
-                    targetUrl(audienceId, taskId),
-                    taskId);
+                    targetUrl(audienceId, taskId));
             return;
         }
         if (result.success()) {
             asyncTaskService.markSucceeded(taskId, successSummary(result));
-            createNotificationBestEffort(
+            createNotificationsBestEffort(
+                    taskId,
                     operator,
                     "TASK_SUCCEEDED",
                     "人群计算完成",
                     displayName(result, audienceName, audienceId) + " · " + result.estimatedSize() + " 人",
-                    targetUrl(audienceId, taskId),
-                    taskId);
+                    targetUrl(audienceId, taskId));
             return;
         }
         String error = result.errorMsg() == null ? "计算失败" : result.errorMsg();
         asyncTaskService.markFailed(taskId, error);
-        createNotificationBestEffort(
+        createNotificationsBestEffort(
+                taskId,
                 operator,
                 "TASK_FAILED",
                 "人群计算失败",
                 displayName(result, audienceName, audienceId) + " · " + error,
-                targetUrl(audienceId, taskId),
-                taskId);
+                targetUrl(audienceId, taskId));
     }
 
     private String successSummary(AudienceComputeResult result) {
@@ -89,6 +92,31 @@ public class AudienceComputeTaskRunner {
             log.error("[AUDIENCE] failed to create compute task notification taskId={}: {}",
                     taskId, notificationException.getMessage(), notificationException);
         }
+    }
+
+    private void createNotificationsBestEffort(
+            String taskId, String fallbackOperator, String type, String title, String content, String targetUrl) {
+        for (String recipient : notificationRecipients(taskId, fallbackOperator)) {
+            createNotificationBestEffort(recipient, type, title, content, targetUrl, taskId);
+        }
+    }
+
+    private List<String> notificationRecipients(String taskId, String fallbackOperator) {
+        LinkedHashSet<String> recipients = new LinkedHashSet<>();
+        try {
+            List<String> subscribers = asyncTaskService.subscribers(taskId);
+            if (subscribers != null) {
+                subscribers.stream()
+                        .filter(this::hasText)
+                        .forEach(recipients::add);
+            }
+        } catch (Exception e) {
+            log.error("[AUDIENCE] failed to load compute task subscribers taskId={}: {}", taskId, e.getMessage(), e);
+        }
+        if (recipients.isEmpty() && hasText(fallbackOperator)) {
+            recipients.add(fallbackOperator);
+        }
+        return List.copyOf(recipients);
     }
 
     private String displayName(AudienceComputeResult result, String audienceName, Long audienceId) {

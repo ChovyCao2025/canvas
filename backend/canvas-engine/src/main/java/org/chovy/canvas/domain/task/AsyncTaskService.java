@@ -18,11 +18,13 @@ public class AsyncTaskService {
     private static final int TEXT_LIMIT = 1000;
 
     private final AsyncTaskMapper mapper;
+    private final AsyncTaskSubscriptionMapper subscriptionMapper;
 
     public AsyncTaskCreateResult createOrReuseRunning(
             String taskType, String bizType, String bizId, String title, String createdBy) {
         AsyncTask existing = findActive(taskType, bizType, bizId);
         if (existing != null) {
+            subscribe(existing.getTaskId(), createdBy);
             return new AsyncTaskCreateResult(existing, false);
         }
 
@@ -40,10 +42,12 @@ public class AsyncTaskService {
         } catch (DuplicateKeyException e) {
             AsyncTask concurrent = findActive(taskType, bizType, bizId);
             if (concurrent != null) {
+                subscribe(concurrent.getTaskId(), createdBy);
                 return new AsyncTaskCreateResult(concurrent, false);
             }
             throw e;
         }
+        subscribe(task.getTaskId(), createdBy);
         return new AsyncTaskCreateResult(task, true);
     }
 
@@ -94,6 +98,7 @@ public class AsyncTaskService {
             int page,
             int size
     ) {
+        List<String> subscribedTaskIds = admin ? List.of() : subscribedTaskIds(createdBy);
         LambdaQueryWrapper<AsyncTask> query = new LambdaQueryWrapper<AsyncTask>()
                 .orderByDesc(AsyncTask::getCreatedAt);
         if (taskType != null && !taskType.isBlank()) {
@@ -109,9 +114,29 @@ public class AsyncTaskService {
             query.in(AsyncTask::getStatus, statuses);
         }
         if (!admin) {
-            query.eq(AsyncTask::getCreatedBy, createdBy);
+            if (subscribedTaskIds.isEmpty()) {
+                query.eq(AsyncTask::getCreatedBy, createdBy);
+            } else {
+                query.and(scope -> scope.eq(AsyncTask::getCreatedBy, createdBy)
+                        .or()
+                        .in(AsyncTask::getTaskId, subscribedTaskIds));
+            }
         }
         return mapper.selectPage(new Page<>(page, size), query).getRecords();
+    }
+
+    public List<String> subscribers(String taskId) {
+        if (!hasText(taskId)) {
+            return List.of();
+        }
+        return subscriptionMapper.selectList(new LambdaQueryWrapper<AsyncTaskSubscription>()
+                        .eq(AsyncTaskSubscription::getTaskId, taskId)
+                        .orderByAsc(AsyncTaskSubscription::getCreatedAt))
+                .stream()
+                .map(AsyncTaskSubscription::getUserId)
+                .filter(this::hasText)
+                .distinct()
+                .toList();
     }
 
     private AsyncTask findActive(String taskType, String bizType, String bizId) {
@@ -141,5 +166,36 @@ public class AsyncTaskService {
             return value;
         }
         return value.substring(0, TEXT_LIMIT);
+    }
+
+    private void subscribe(String taskId, String userId) {
+        if (!hasText(taskId) || !hasText(userId)) {
+            return;
+        }
+        AsyncTaskSubscription subscription = new AsyncTaskSubscription();
+        subscription.setTaskId(taskId);
+        subscription.setUserId(userId);
+        try {
+            subscriptionMapper.insert(subscription);
+        } catch (DuplicateKeyException ignored) {
+            // Multiple clicks or racing requests can subscribe the same user twice.
+        }
+    }
+
+    private List<String> subscribedTaskIds(String userId) {
+        if (!hasText(userId)) {
+            return List.of();
+        }
+        return subscriptionMapper.selectList(new LambdaQueryWrapper<AsyncTaskSubscription>()
+                        .eq(AsyncTaskSubscription::getUserId, userId))
+                .stream()
+                .map(AsyncTaskSubscription::getTaskId)
+                .filter(this::hasText)
+                .distinct()
+                .toList();
+    }
+
+    private boolean hasText(String value) {
+        return value != null && !value.isBlank();
     }
 }
