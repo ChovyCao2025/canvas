@@ -32,6 +32,16 @@ public final class NodeType {
     public static final String PRIORITY           = "PRIORITY";
     /** A/B 分流 */
     public static final String AB_SPLIT           = "AB_SPLIT";
+    /** 随机分流 */
+    public static final String RANDOM_SPLIT       = "RANDOM_SPLIT";
+    /** 实验节点 */
+    public static final String EXPERIMENT         = "EXPERIMENT";
+    /** 评分节点 */
+    public static final String SCORING            = "SCORING";
+    /** 推荐节点 */
+    public static final String RECOMMENDATION     = "RECOMMENDATION";
+    /** AI 下一步最佳动作 */
+    public static final String AI_NEXT_BEST_ACTION = "AI_NEXT_BEST_ACTION";
     /** 汇聚节点（等待多条上游汇入一条） */
     public static final String HUB                = "HUB";
     /** 聚合评估节点：等待所有上游完成，基于上游结果评估条件，路由到成功或失败分支 */

@@ -96,6 +96,18 @@ public class DagParser {
         if (groups != null) groups.forEach(g ->
                 addIfPresent(targets, ((Map<?, ?>) g).get("nextNodeId")));
 
+        List<?> paths = (List<?>) c.get("paths");
+        if (paths != null) paths.forEach(p ->
+                addIfPresent(targets, ((Map<?, ?>) p).get("nextNodeId")));
+
+        List<?> variants = (List<?>) c.get("variants");
+        if (variants != null) variants.forEach(v ->
+                addIfPresent(targets, ((Map<?, ?>) v).get("nextNodeId")));
+
+        List<?> bands = (List<?>) c.get("bands");
+        if (bands != null) bands.forEach(b ->
+                addIfPresent(targets, ((Map<?, ?>) b).get("nextNodeId")));
+
         return targets;
     }
 
