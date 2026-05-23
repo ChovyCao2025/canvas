@@ -28,7 +28,7 @@ import {
 } from '../../components/canvas/constants'
 
 import HoverEdge from '../../components/canvas/HoverEdge'
-import { getBranchHandles } from '../../components/canvas/branchHandles'
+import { getOutletHandles } from '../../components/canvas/outletSchema'
 import CronBuilder from '../../components/config-panel/CronBuilder'
 import { CanvasActionsContext } from '../../context/CanvasActionsContext'
 import { useAuth } from '../../context/AuthContext'
@@ -73,6 +73,12 @@ function deriveEdges(backendNodes: BackendNode[]): Edge[] {
     push(c.rejectNodeId,  'reject')
     push(c.hitNextNodeId, 'hit')
     push(c.missNextNodeId, 'miss')
+    push(c.timeoutNodeId, 'timeout')
+    push(c.suppressedNodeId, 'suppressed')
+    push(c.skippedNodeId, 'skipped')
+    push(c.maxExceededNodeId, 'max_exceeded')
+    push(c.goalMetNodeId, 'goal_met')
+    push(c.goalNotMetNodeId, 'goal_not_met')
     c.branches?.forEach((b, i) => push(b.nextNodeId, `branch-${i}`))
     c.priorities?.forEach((p, i) => push(p.nextNodeId, `priority-${i}`))
     c.groups?.forEach(g => push(g.nextNodeId, `group-${g.groupKey}`))
@@ -109,6 +115,12 @@ function patchBizConfig(
   else if (sourceHandle === 'reject')   next.rejectNodeId  = target
   else if (sourceHandle === 'hit')      next.hitNextNodeId = target
   else if (sourceHandle === 'miss')     next.missNextNodeId = target
+  else if (sourceHandle === 'timeout')  next.timeoutNodeId = target
+  else if (sourceHandle === 'suppressed') next.suppressedNodeId = target
+  else if (sourceHandle === 'skipped')  next.skippedNodeId = target
+  else if (sourceHandle === 'max_exceeded') next.maxExceededNodeId = target
+  else if (sourceHandle === 'goal_met') next.goalMetNodeId = target
+  else if (sourceHandle === 'goal_not_met') next.goalNotMetNodeId = target
   else if (sourceHandle.startsWith('branch-')) {
     const idx = parseInt(sourceHandle.split('-')[1], 10)
     next.branches = (next.branches ?? []).map((b, i) =>
@@ -145,6 +157,12 @@ function cleanRefs(cfg: Record<string, unknown>, deletedIds: Set<string>): BizCo
     rejectNodeId:  clean(biz.rejectNodeId)  as string | undefined,
     hitNextNodeId: clean(biz.hitNextNodeId) as string | undefined,
     missNextNodeId: clean(biz.missNextNodeId) as string | undefined,
+    timeoutNodeId: clean(biz.timeoutNodeId) as string | undefined,
+    suppressedNodeId: clean(biz.suppressedNodeId) as string | undefined,
+    skippedNodeId: clean(biz.skippedNodeId) as string | undefined,
+    maxExceededNodeId: clean(biz.maxExceededNodeId) as string | undefined,
+    goalMetNodeId: clean(biz.goalMetNodeId) as string | undefined,
+    goalNotMetNodeId: clean(biz.goalNotMetNodeId) as string | undefined,
     branches:   biz.branches?.map(b   => ({ ...b, nextNodeId: clean(b.nextNodeId) as string | undefined })),
     priorities: biz.priorities?.map(p => ({ ...p, nextNodeId: clean(p.nextNodeId) as string | undefined })),
     groups:     biz.groups?.map(g     => ({ ...g, nextNodeId: clean(g.nextNodeId) as string | undefined })),
@@ -161,6 +179,12 @@ function clearEdgeRef(cfg: Record<string, unknown>, edge: Edge): BizConfig {
   else if (sourceHandle === 'reject') next.rejectNodeId = undefined
   else if (sourceHandle === 'hit') next.hitNextNodeId = undefined
   else if (sourceHandle === 'miss') next.missNextNodeId = undefined
+  else if (sourceHandle === 'timeout') next.timeoutNodeId = undefined
+  else if (sourceHandle === 'suppressed') next.suppressedNodeId = undefined
+  else if (sourceHandle === 'skipped') next.skippedNodeId = undefined
+  else if (sourceHandle === 'max_exceeded') next.maxExceededNodeId = undefined
+  else if (sourceHandle === 'goal_met') next.goalMetNodeId = undefined
+  else if (sourceHandle === 'goal_not_met') next.goalNotMetNodeId = undefined
   else if (sourceHandle.startsWith('branch-')) {
     const idx = parseInt(sourceHandle.split('-')[1], 10)
     next.branches = (next.branches ?? []).map((branch, i) =>
@@ -406,6 +430,7 @@ function EditorInner({ detail, onStatusChange, onCanvasNameChange }: {
         nodeType: n.type, name: n.name,
         category: n.category ?? '',
         bizConfig: n.config ?? {},
+        outletSchema: n.outletSchema,
       } as CanvasNodeData,
     }))
     const rfEdges = deriveEdges(backendNodes)
@@ -476,6 +501,7 @@ function EditorInner({ detail, onStatusChange, onCanvasNameChange }: {
 
     const nodeType = e.dataTransfer.getData('application/canvas-node-type')
     const category = e.dataTransfer.getData('application/canvas-node-category')
+    const outletSchema = e.dataTransfer.getData('application/canvas-node-outlet-schema') || undefined
     if (!nodeType) return
 
     const dropPos = screenToFlowPosition({ x: e.clientX, y: e.clientY })
@@ -495,7 +521,7 @@ function EditorInner({ detail, onStatusChange, onCanvasNameChange }: {
         })()
       : null
     const defaultBizConfig = buildDefaultBizConfig(nodeType)
-    const branchHandles = getBranchHandles(nodeType, defaultBizConfig)
+    const branchHandles = getOutletHandles({ nodeType, bizConfig: defaultBizConfig, outletSchema })
     const edgeInsertActive = insertContext?.kind === 'edge'
     const edgeEligible = branchHandles.length === 0
     const resolvedContext = placeholderContext
@@ -524,6 +550,7 @@ function EditorInner({ detail, onStatusChange, onCanvasNameChange }: {
 
     const newNode = buildDetachedNode(newId, nodeType, category, newPos)
     newNode.data.bizConfig = defaultBizConfig
+    newNode.data.outletSchema = outletSchema
 
     setNodes(prev => [...prev.filter(n => !(n.data as any)?._placeholder), newNode])
 
@@ -786,6 +813,7 @@ function EditorInner({ detail, onStatusChange, onCanvasNameChange }: {
           id: n.id, type: d.nodeType, name: d.name, category: d.category,
           x: Math.round(n.position.x), y: Math.round(n.position.y),
           config: d.bizConfig,
+          outletSchema: d.outletSchema,
         }
       })
       await canvasApi.update(canvasId, {
@@ -1420,7 +1448,7 @@ function EditorInner({ detail, onStatusChange, onCanvasNameChange }: {
                   nodes: getNodes().map(n => {
                     const d = n.data as CanvasNodeData
                     return { id: n.id, type: d.nodeType, name: d.name, category: d.category,
-                             x: Math.round(n.position.x), y: Math.round(n.position.y), config: d.bizConfig, bizConfig: d.bizConfig }
+                             x: Math.round(n.position.x), y: Math.round(n.position.y), config: d.bizConfig, bizConfig: d.bizConfig, outletSchema: d.outletSchema }
                   })
                 })
                 const res = await canvasApi.dryRun(canvasId, testUserId, payload, currentGraphJson)

@@ -8,6 +8,7 @@ export interface BackendNode {
   y:         number
   config:    Record<string, unknown>
   bizConfig?: Record<string, unknown>
+  outletSchema?: string
 }
 
 // 各节点 config 中连接分支的子类型
@@ -45,6 +46,7 @@ export interface CanvasNodeData {
   name:       string
   category:   string
   bizConfig:  BizConfig
+  outletSchema?: string
   traceColor?: string
   [key: string]: unknown
 }

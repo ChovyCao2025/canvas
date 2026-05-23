@@ -62,4 +62,5 @@ export type CanvasNodeData = {
   name: string
   category: string
   bizConfig: Record<string, unknown>
+  outletSchema?: string
 }

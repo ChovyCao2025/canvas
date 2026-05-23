@@ -4,7 +4,7 @@ import { Tooltip } from 'antd'
 import { CopyOutlined, DeleteOutlined } from '@ant-design/icons'
 import type { CanvasNodeData } from './constants'
 import { CATEGORY_COLORS, TRIGGER_TYPES, TERMINAL_TYPES } from './constants'
-import { getBranchHandles } from './branchHandles'
+import { getOutletHandles } from './outletSchema'
 import { useCanvasActions } from '../../context/CanvasActionsContext'
 
 function useHover() {
@@ -62,7 +62,11 @@ const CanvasNode = memo(({ data, id, selected }: NodeProps) => {
   const isEnd       = d.nodeType === 'END'
   const isAudienceTagger = d.nodeType === 'TAGGER' && d.bizConfig?.mode === 'audience'
 
-  const branchHandles = getBranchHandles(d.nodeType, d.bizConfig ?? {})
+  const branchHandles = getOutletHandles({
+    nodeType: d.nodeType,
+    bizConfig: d.bizConfig ?? {},
+    outletSchema: d.outletSchema,
+  })
   const isBranching   = branchHandles.length > 0
 
   if (isStart || isEnd) {
