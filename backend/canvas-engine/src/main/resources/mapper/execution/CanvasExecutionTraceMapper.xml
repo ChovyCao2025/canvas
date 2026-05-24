@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="org.chovy.canvas.dal.mapper.CanvasExecutionTraceMapper">
+
+    <!-- 批量插入轨迹记录（TraceWriteBuffer 每 500ms 调用一次） -->
+    <insert id="insertBatch" parameterType="java.util.List">
+        INSERT INTO canvas_execution_trace
+            (execution_id, node_id, node_type, node_name, status,
+             input_data, output_data, error_msg, started_at, finished_at, duration_ms)
+        VALUES
+        <foreach collection="list" item="t" separator=",">
+            (#{t.executionId}, #{t.nodeId}, #{t.nodeType}, #{t.nodeName}, #{t.status},
+             #{t.inputData}, #{t.outputData}, #{t.errorMsg}, #{t.startedAt}, #{t.finishedAt}, #{t.durationMs})
+        </foreach>
+    </insert>
+
+    <!-- 节点漏斗统计：按 canvas_id 聚合每个节点的进入/成功/失败/跳过次数（设计文档 21.3节） -->
+    <select id="selectFunnelByCanvasId" parameterType="long" resultType="java.util.Map">
+        SELECT
+            t.node_id        AS nodeId,
+            t.node_type      AS nodeType,
+            t.node_name      AS nodeName,
+            COUNT(*)         AS totalEntered,
+            SUM(CASE WHEN t.status = 1 THEN 1 ELSE 0 END) AS totalSuccess,
+            SUM(CASE WHEN t.status = 2 THEN 1 ELSE 0 END) AS totalFailed,
+            SUM(CASE WHEN t.status = 3 THEN 1 ELSE 0 END) AS totalSkipped,
+            AVG(COALESCE(t.duration_ms,
+                TIMESTAMPDIFF(MICROSECOND, t.started_at, t.finished_at) / 1000
+            )) AS avgDurationMs
+        FROM canvas_execution_trace t
+        JOIN canvas_execution e ON e.id = t.execution_id
+        WHERE e.canvas_id = #{canvasId}
+          AND t.started_at IS NOT NULL
+        GROUP BY t.node_id, t.node_type, t.node_name
+        ORDER BY totalEntered DESC
+    </select>
+
+</mapper>

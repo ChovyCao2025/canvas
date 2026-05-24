@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="org.chovy.canvas.dal.mapper.CanvasMapper">
+
+    <!-- 乐观锁保存：edit_version CAS -->
+    <update id="updateEditVersion">
+        UPDATE canvas
+        SET name        = #{name},
+            description = #{description},
+            edit_version = #{newVersion},
+            updated_at  = NOW()
+        WHERE id = #{id}
+          AND edit_version = #{oldVersion}
+    </update>
+
+</mapper>

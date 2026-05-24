@@ -1,0 +1,31 @@
+package org.chovy.canvas.dal.dataobject;
+
+import com.baomidou.mybatisplus.annotation.FieldFill;
+import com.baomidou.mybatisplus.annotation.IdType;
+import com.baomidou.mybatisplus.annotation.TableField;
+import com.baomidou.mybatisplus.annotation.TableId;
+import com.baomidou.mybatisplus.annotation.TableName;
+import lombok.Data;
+
+import java.time.LocalDateTime;
+
+@Data
+@TableName("cdp_user_identity")
+public class CdpUserIdentityDO {
+
+    @TableId(type = IdType.AUTO)
+    private Long id;
+
+    private String userId;
+    private String identityType;
+    private String identityValue;
+    private String sourceType;
+    private String sourceRefId;
+    private Integer verified;
+
+    @TableField(fill = FieldFill.INSERT)
+    private LocalDateTime createdAt;
+
+    @TableField(fill = FieldFill.INSERT_UPDATE)
+    private LocalDateTime updatedAt;
+}
