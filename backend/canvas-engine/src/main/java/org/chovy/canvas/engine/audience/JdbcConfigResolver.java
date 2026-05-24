@@ -3,8 +3,8 @@ package org.chovy.canvas.engine.audience;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
-import org.chovy.canvas.domain.datasource.DataSourceConfig;
-import org.chovy.canvas.domain.datasource.DataSourceConfigMapper;
+import org.chovy.canvas.dal.dataobject.DataSourceConfigDO;
+import org.chovy.canvas.dal.mapper.DataSourceConfigMapper;
 import org.springframework.stereotype.Component;
 
 import java.util.Map;
@@ -22,7 +22,7 @@ public class JdbcConfigResolver {
         }
         Map<String, Object> config = objectMapper.readValue(configJson, new TypeReference<>() {});
         Long dataSourceId = longValue(config, "dataSourceId");
-        DataSourceConfig dataSource = dataSourceConfigMapper.selectById(dataSourceId);
+        DataSourceConfigDO dataSource = dataSourceConfigMapper.selectById(dataSourceId);
         if (dataSource == null) {
             throw new IllegalArgumentException("Data source not found: " + dataSourceId);
         }

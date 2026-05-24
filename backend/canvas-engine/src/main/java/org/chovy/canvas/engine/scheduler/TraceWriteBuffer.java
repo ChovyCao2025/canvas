@@ -1,7 +1,7 @@
 package org.chovy.canvas.engine.scheduler;
 
-import org.chovy.canvas.domain.execution.CanvasExecutionTrace;
-import org.chovy.canvas.domain.execution.CanvasExecutionTraceMapper;
+import org.chovy.canvas.dal.dataobject.CanvasExecutionTraceDO;
+import org.chovy.canvas.dal.mapper.CanvasExecutionTraceMapper;
 import jakarta.annotation.PreDestroy;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -30,13 +30,13 @@ public class TraceWriteBuffer {
     private static final int MAX_CAPACITY = 50_000;
     private static final int MAX_BATCHES_PER_FLUSH = 20;
 
-    private final ConcurrentLinkedQueue<CanvasExecutionTrace> buffer =
+    private final ConcurrentLinkedQueue<CanvasExecutionTraceDO> buffer =
             new ConcurrentLinkedQueue<>();
     private final CanvasExecutionTraceMapper traceMapper;
     private final AtomicInteger pending = new AtomicInteger(0);
 
     /** 非阻塞入队（主执行链路调用，不等待） */
-    public void offer(CanvasExecutionTrace trace) {
+    public void offer(CanvasExecutionTraceDO trace) {
         int current = pending.incrementAndGet();
         if (current > MAX_CAPACITY) {
             pending.decrementAndGet();
@@ -53,7 +53,7 @@ public class TraceWriteBuffer {
         if (pending.get() <= 0) return;
 
         for (int i = 0; i < MAX_BATCHES_PER_FLUSH; i++) {
-            List<CanvasExecutionTrace> batch = drainBatch();
+            List<CanvasExecutionTraceDO> batch = drainBatch();
             if (batch.isEmpty()) return;
             writeBatch(batch);
         }
@@ -66,8 +66,8 @@ public class TraceWriteBuffer {
         if (remaining == 0) return;
         log.info("[TRACE_BUFFER] 关闭前刷盘，剩余 {} 条", remaining);
         // 循环直到清空，不受 BATCH_SIZE 限制
-        List<CanvasExecutionTrace> batch = new ArrayList<>(BATCH_SIZE);
-        CanvasExecutionTrace item;
+        List<CanvasExecutionTraceDO> batch = new ArrayList<>(BATCH_SIZE);
+        CanvasExecutionTraceDO item;
         while ((item = buffer.poll()) != null) {
             batch.add(item);
             pending.decrementAndGet();
@@ -80,9 +80,9 @@ public class TraceWriteBuffer {
         log.info("[TRACE_BUFFER] 关闭刷盘完成");
     }
 
-    private List<CanvasExecutionTrace> drainBatch() {
-        List<CanvasExecutionTrace> batch = new ArrayList<>(BATCH_SIZE);
-        CanvasExecutionTrace item;
+    private List<CanvasExecutionTraceDO> drainBatch() {
+        List<CanvasExecutionTraceDO> batch = new ArrayList<>(BATCH_SIZE);
+        CanvasExecutionTraceDO item;
         while ((item = buffer.poll()) != null && batch.size() < BATCH_SIZE) {
             batch.add(item);
         }
@@ -92,7 +92,7 @@ public class TraceWriteBuffer {
         return batch;
     }
 
-    private void writeBatch(List<CanvasExecutionTrace> batch) {
+    private void writeBatch(List<CanvasExecutionTraceDO> batch) {
         try {
             traceMapper.insertBatch(batch);
             log.debug("[TRACE_BUFFER] 批量写入 {} 条", batch.size());

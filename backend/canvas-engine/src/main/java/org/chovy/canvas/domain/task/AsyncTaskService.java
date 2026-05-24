@@ -11,6 +11,10 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Locale;
 import java.util.UUID;
+import org.chovy.canvas.dal.dataobject.AsyncTaskDO;
+import org.chovy.canvas.dal.mapper.AsyncTaskMapper;
+import org.chovy.canvas.dal.dataobject.AsyncTaskSubscriptionDO;
+import org.chovy.canvas.dal.mapper.AsyncTaskSubscriptionMapper;
 
 @Slf4j
 @Service
@@ -24,13 +28,13 @@ public class AsyncTaskService {
 
     public AsyncTaskCreateResult createOrReuseRunning(
             String taskType, String bizType, String bizId, String title, String createdBy) {
-        AsyncTask existing = findActive(taskType, bizType, bizId);
+        AsyncTaskDO existing = findActive(taskType, bizType, bizId);
         if (existing != null) {
             subscribe(existing.getTaskId(), createdBy);
             return new AsyncTaskCreateResult(refresh(existing), false);
         }
 
-        AsyncTask task = new AsyncTask();
+        AsyncTaskDO task = new AsyncTaskDO();
         task.setTaskId(newTaskId(taskType));
         task.setTaskType(taskType);
         task.setBizType(bizType);
@@ -42,7 +46,7 @@ public class AsyncTaskService {
         try {
             mapper.insert(task);
         } catch (DuplicateKeyException e) {
-            AsyncTask concurrent = findActive(taskType, bizType, bizId);
+            AsyncTaskDO concurrent = findActive(taskType, bizType, bizId);
             if (concurrent != null) {
                 subscribe(concurrent.getTaskId(), createdBy);
                 return new AsyncTaskCreateResult(refresh(concurrent), false);
@@ -54,7 +58,7 @@ public class AsyncTaskService {
     }
 
     public void markRunning(String taskId) {
-        AsyncTask task = requireByTaskId(taskId);
+        AsyncTaskDO task = requireByTaskId(taskId);
         task.setStatus(AsyncTaskStatus.RUNNING.name());
         task.setProgress(5);
         task.setStartedAt(LocalDateTime.now());
@@ -62,7 +66,7 @@ public class AsyncTaskService {
     }
 
     public void markSucceeded(String taskId, String resultSummary) {
-        AsyncTask task = requireByTaskId(taskId);
+        AsyncTaskDO task = requireByTaskId(taskId);
         task.setStatus(AsyncTaskStatus.SUCCEEDED.name());
         task.setProgress(100);
         task.setResultSummary(trimToLimit(resultSummary));
@@ -72,7 +76,7 @@ public class AsyncTaskService {
     }
 
     public void markFailed(String taskId, String errorMsg) {
-        AsyncTask task = requireByTaskId(taskId);
+        AsyncTaskDO task = requireByTaskId(taskId);
         task.setStatus(AsyncTaskStatus.FAILED.name());
         task.setProgress(100);
         task.setErrorMsg(trimToLimit(errorMsg));
@@ -80,17 +84,17 @@ public class AsyncTaskService {
         mapper.updateById(task);
     }
 
-    public AsyncTask getByTaskId(String taskId) {
-        return mapper.selectOne(new LambdaQueryWrapper<AsyncTask>()
-                .eq(AsyncTask::getTaskId, taskId)
+    public AsyncTaskDO getByTaskId(String taskId) {
+        return mapper.selectOne(new LambdaQueryWrapper<AsyncTaskDO>()
+                .eq(AsyncTaskDO::getTaskId, taskId)
                 .last("LIMIT 1"));
     }
 
-    public List<AsyncTask> list(String taskType, String bizType, List<String> bizIds, List<String> statuses, String createdBy, boolean admin) {
+    public List<AsyncTaskDO> list(String taskType, String bizType, List<String> bizIds, List<String> statuses, String createdBy, boolean admin) {
         return list(taskType, bizType, bizIds, statuses, createdBy, admin, 1, 100);
     }
 
-    public List<AsyncTask> list(
+    public List<AsyncTaskDO> list(
             String taskType,
             String bizType,
             List<String> bizIds,
@@ -101,27 +105,27 @@ public class AsyncTaskService {
             int size
     ) {
         List<String> subscribedTaskIds = admin ? List.of() : subscribedTaskIds(createdBy);
-        LambdaQueryWrapper<AsyncTask> query = new LambdaQueryWrapper<AsyncTask>()
-                .orderByDesc(AsyncTask::getCreatedAt);
+        LambdaQueryWrapper<AsyncTaskDO> query = new LambdaQueryWrapper<AsyncTaskDO>()
+                .orderByDesc(AsyncTaskDO::getCreatedAt);
         if (taskType != null && !taskType.isBlank()) {
-            query.eq(AsyncTask::getTaskType, taskType);
+            query.eq(AsyncTaskDO::getTaskType, taskType);
         }
         if (bizType != null && !bizType.isBlank()) {
-            query.eq(AsyncTask::getBizType, bizType);
+            query.eq(AsyncTaskDO::getBizType, bizType);
         }
         if (bizIds != null && !bizIds.isEmpty()) {
-            query.in(AsyncTask::getBizId, bizIds);
+            query.in(AsyncTaskDO::getBizId, bizIds);
         }
         if (statuses != null && !statuses.isEmpty()) {
-            query.in(AsyncTask::getStatus, statuses);
+            query.in(AsyncTaskDO::getStatus, statuses);
         }
         if (!admin) {
             if (subscribedTaskIds.isEmpty()) {
-                query.eq(AsyncTask::getCreatedBy, createdBy);
+                query.eq(AsyncTaskDO::getCreatedBy, createdBy);
             } else {
-                query.and(scope -> scope.eq(AsyncTask::getCreatedBy, createdBy)
+                query.and(scope -> scope.eq(AsyncTaskDO::getCreatedBy, createdBy)
                         .or()
-                        .in(AsyncTask::getTaskId, subscribedTaskIds));
+                        .in(AsyncTaskDO::getTaskId, subscribedTaskIds));
             }
         }
         return mapper.selectPage(new Page<>(page, size), query).getRecords();
@@ -131,35 +135,35 @@ public class AsyncTaskService {
         if (!hasText(taskId)) {
             return List.of();
         }
-        return subscriptionMapper.selectList(new LambdaQueryWrapper<AsyncTaskSubscription>()
-                        .eq(AsyncTaskSubscription::getTaskId, taskId)
-                        .orderByAsc(AsyncTaskSubscription::getCreatedAt))
+        return subscriptionMapper.selectList(new LambdaQueryWrapper<AsyncTaskSubscriptionDO>()
+                        .eq(AsyncTaskSubscriptionDO::getTaskId, taskId)
+                        .orderByAsc(AsyncTaskSubscriptionDO::getCreatedAt))
                 .stream()
-                .map(AsyncTaskSubscription::getUserId)
+                .map(AsyncTaskSubscriptionDO::getUserId)
                 .filter(this::hasText)
                 .distinct()
                 .toList();
     }
 
-    private AsyncTask findActive(String taskType, String bizType, String bizId) {
-        return mapper.selectOne(new LambdaQueryWrapper<AsyncTask>()
-                .eq(AsyncTask::getTaskType, taskType)
-                .eq(AsyncTask::getBizType, bizType)
-                .eq(AsyncTask::getBizId, bizId)
-                .in(AsyncTask::getStatus, AsyncTaskStatus.QUEUED.name(), AsyncTaskStatus.RUNNING.name())
+    private AsyncTaskDO findActive(String taskType, String bizType, String bizId) {
+        return mapper.selectOne(new LambdaQueryWrapper<AsyncTaskDO>()
+                .eq(AsyncTaskDO::getTaskType, taskType)
+                .eq(AsyncTaskDO::getBizType, bizType)
+                .eq(AsyncTaskDO::getBizId, bizId)
+                .in(AsyncTaskDO::getStatus, AsyncTaskStatus.QUEUED.name(), AsyncTaskStatus.RUNNING.name())
                 .last("LIMIT 1"));
     }
 
-    private AsyncTask requireByTaskId(String taskId) {
-        AsyncTask task = getByTaskId(taskId);
+    private AsyncTaskDO requireByTaskId(String taskId) {
+        AsyncTaskDO task = getByTaskId(taskId);
         if (task == null) {
             throw new IllegalArgumentException("Async task not found: " + taskId);
         }
         return task;
     }
 
-    private AsyncTask refresh(AsyncTask task) {
-        AsyncTask latest = getByTaskId(task.getTaskId());
+    private AsyncTaskDO refresh(AsyncTaskDO task) {
+        AsyncTaskDO latest = getByTaskId(task.getTaskId());
         return latest == null ? task : latest;
     }
 
@@ -179,7 +183,7 @@ public class AsyncTaskService {
         if (!hasText(taskId) || !hasText(userId)) {
             return;
         }
-        AsyncTaskSubscription subscription = new AsyncTaskSubscription();
+        AsyncTaskSubscriptionDO subscription = new AsyncTaskSubscriptionDO();
         subscription.setTaskId(taskId);
         subscription.setUserId(userId);
         try {
@@ -194,10 +198,10 @@ public class AsyncTaskService {
         if (!hasText(userId)) {
             return List.of();
         }
-        return subscriptionMapper.selectList(new LambdaQueryWrapper<AsyncTaskSubscription>()
-                        .eq(AsyncTaskSubscription::getUserId, userId))
+        return subscriptionMapper.selectList(new LambdaQueryWrapper<AsyncTaskSubscriptionDO>()
+                        .eq(AsyncTaskSubscriptionDO::getUserId, userId))
                 .stream()
-                .map(AsyncTaskSubscription::getTaskId)
+                .map(AsyncTaskSubscriptionDO::getTaskId)
                 .filter(this::hasText)
                 .distinct()
                 .toList();

@@ -15,6 +15,9 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import org.chovy.canvas.dal.dataobject.SystemOptionDO;
+import org.chovy.canvas.dal.mapper.SystemOptionMapper;
+import org.chovy.canvas.dto.StubOption;
 
 class SystemOptionServiceTest {
 
@@ -22,13 +25,13 @@ class SystemOptionServiceTest {
     static void initMyBatisPlusTableInfo() {
         TableInfoHelper.initTableInfo(
                 new MapperBuilderAssistant(new MybatisConfiguration(), ""),
-                SystemOption.class);
+                SystemOptionDO.class);
     }
 
     @Test
     void activeOptionsReturnsStubOptionsInMapperOrder() {
         SystemOptionMapper mapper = mock(SystemOptionMapper.class);
-        SystemOption option = new SystemOption();
+        SystemOptionDO option = new SystemOptionDO();
         option.setOptionKey("EQ");
         option.setLabel("等于");
         when(mapper.selectList(any())).thenReturn(List.of(option));
@@ -47,7 +50,7 @@ class SystemOptionServiceTest {
         when(mapper.selectById(99L)).thenReturn(null);
         SystemOptionService service = new SystemOptionService(mapper);
 
-        SystemOption patch = new SystemOption();
+        SystemOptionDO patch = new SystemOptionDO();
         patch.setLabel("新标签");
 
         assertThatThrownBy(() -> service.updateEditable(99L, patch))
@@ -58,7 +61,7 @@ class SystemOptionServiceTest {
     @Test
     void updateEditableOnlyWritesEditableFields() {
         SystemOptionMapper mapper = mock(SystemOptionMapper.class);
-        SystemOption existing = new SystemOption();
+        SystemOptionDO existing = new SystemOptionDO();
         existing.setId(1L);
         existing.setCategory("condition_operator");
         existing.setOptionKey("EQ");
@@ -68,7 +71,7 @@ class SystemOptionServiceTest {
         when(mapper.selectById(1L)).thenReturn(existing);
         SystemOptionService service = new SystemOptionService(mapper);
 
-        SystemOption patch = new SystemOption();
+        SystemOptionDO patch = new SystemOptionDO();
         patch.setCategory("other");
         patch.setOptionKey("BAD");
         patch.setLabel("等于（改）");
@@ -78,7 +81,7 @@ class SystemOptionServiceTest {
 
         service.updateEditable(1L, patch);
 
-        verify(mapper).updateById(argThat((SystemOption updated) ->
+        verify(mapper).updateById(argThat((SystemOptionDO updated) ->
                 updated.getId().equals(1L)
                         && updated.getCategory().equals("condition_operator")
                         && updated.getOptionKey().equals("EQ")

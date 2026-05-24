@@ -1,7 +1,7 @@
-package org.chovy.canvas.controller;
+package org.chovy.canvas.web;
 
 import io.jsonwebtoken.Claims;
-import org.chovy.canvas.domain.notification.Notification;
+import org.chovy.canvas.dal.dataobject.NotificationDO;
 import org.chovy.canvas.domain.notification.NotificationService;
 import org.chovy.canvas.domain.notification.NotificationWebSocketTicketService;
 import org.junit.jupiter.api.Test;
@@ -79,7 +79,7 @@ class NotificationControllerTest {
     void list_capsLargeSizeAtOneHundred() {
         NotificationService service = mock(NotificationService.class);
         NotificationWebSocketTicketService ticketService = mock(NotificationWebSocketTicketService.class);
-        Notification notification = new Notification();
+        NotificationDO notification = new NotificationDO();
         notification.setNotificationId("ntf_1");
         when(service.list("system", true, null, false, 1, 100)).thenReturn(List.of(notification));
         NotificationController controller = new NotificationController(service, ticketService);

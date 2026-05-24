@@ -2,11 +2,11 @@ package org.chovy.canvas.engine.handlers;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.chovy.canvas.common.MapFieldKeys;
-import org.chovy.canvas.domain.constant.TriggerType;
-import org.chovy.canvas.domain.canvas.Canvas;
-import org.chovy.canvas.domain.canvas.CanvasMapper;
-import org.chovy.canvas.domain.canvas.CanvasVersion;
-import org.chovy.canvas.domain.canvas.CanvasVersionMapper;
+import org.chovy.canvas.common.enums.TriggerType;
+import org.chovy.canvas.dal.dataobject.CanvasDO;
+import org.chovy.canvas.dal.mapper.CanvasMapper;
+import org.chovy.canvas.dal.dataobject.CanvasVersionDO;
+import org.chovy.canvas.dal.mapper.CanvasVersionMapper;
 import org.chovy.canvas.engine.context.ExecutionContext;
 import org.chovy.canvas.engine.dag.DagGraph;
 import org.chovy.canvas.engine.handler.NodeHandler;
@@ -14,7 +14,7 @@ import org.chovy.canvas.engine.handler.NodeHandlerType;
 import org.chovy.canvas.engine.handler.NodeResult;
 import reactor.core.publisher.Mono;
 import org.chovy.canvas.engine.scheduler.DagEngine;
-import org.chovy.canvas.infra.cache.CanvasConfigCache;
+import org.chovy.canvas.infrastructure.cache.CanvasConfigCache;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Component;
@@ -72,7 +72,7 @@ public class SubFlowRefHandler implements NodeHandler {
             return Mono.just(NodeResult.fail("SUB_FLOW_REF 循环调用: " + subFlowId));
         }
 
-        Canvas canvas = canvasMapper.selectById(subFlowId);
+        CanvasDO canvas = canvasMapper.selectById(subFlowId);
         if (canvas == null || canvas.getStatus() != 1) {
             return Mono.just(NodeResult.fail("子流程画布未发布: " + subFlowId));
         }
@@ -82,7 +82,7 @@ public class SubFlowRefHandler implements NodeHandler {
         if (versionId == null) return Mono.just(NodeResult.fail("子流程版本不存在: " + subFlowVersion));
 
         // 加载子流程 graph_json
-        CanvasVersion version = canvasVersionMapper.selectById(versionId);
+        CanvasVersionDO version = canvasVersionMapper.selectById(versionId);
         if (version == null) return Mono.just(NodeResult.fail("子流程版本记录不存在"));
 
         // 解析 graph_json 顶层结构，判断子流程类型
@@ -235,9 +235,9 @@ public class SubFlowRefHandler implements NodeHandler {
 
     private Long resolveVersion(Long canvasId, int version) {
         return canvasVersionMapper.selectList(
-                        new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<CanvasVersion>()
-                                .eq(CanvasVersion::getCanvasId, canvasId)
-                                .eq(CanvasVersion::getVersion, version))
-                .stream().findFirst().map(CanvasVersion::getId).orElse(null);
+                        new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<CanvasVersionDO>()
+                                .eq(CanvasVersionDO::getCanvasId, canvasId)
+                                .eq(CanvasVersionDO::getVersion, version))
+                .stream().findFirst().map(CanvasVersionDO::getId).orElse(null);
     }
 }

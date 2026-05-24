@@ -2,13 +2,13 @@ package org.chovy.canvas.engine.handlers;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.chovy.canvas.common.MapFieldKeys;
-import org.chovy.canvas.domain.meta.ApiDefinition;
+import org.chovy.canvas.dal.dataobject.ApiDefinitionDO;
 import org.chovy.canvas.engine.context.ExecutionContext;
 import org.chovy.canvas.engine.handler.NodeHandler;
 import org.chovy.canvas.engine.handler.NodeHandlerType;
 import org.chovy.canvas.engine.handler.NodeResult;
-import org.chovy.canvas.infra.cache.ApiDefinitionCache;
-import org.chovy.canvas.infra.redis.RedisKeyUtil;
+import org.chovy.canvas.infrastructure.cache.ApiDefinitionCache;
+import org.chovy.canvas.infrastructure.redis.RedisKeyUtil;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.StringRedisTemplate;
@@ -64,7 +64,7 @@ public class ApiCallHandler implements NodeHandler {
         String outputPrefix = (String) config.getOrDefault(MapFieldKeys.OUTPUT_PREFIX, "");
         String nextNodeId   = (String) config.get(MapFieldKeys.NEXT_NODE_ID);
 
-        ApiDefinition def = apiDefinitionCache.getEnabled(apiKey);
+        ApiDefinitionDO def = apiDefinitionCache.getEnabled(apiKey);
         if (def == null) {
             return PreparedApiCall.failure(NodeResult.fail("API_CALL: 找不到接口定义 apiKey=" + apiKey));
         }
@@ -124,7 +124,7 @@ public class ApiCallHandler implements NodeHandler {
         String apiKey = prepared.apiKey();
         String outputPrefix = prepared.outputPrefix();
         String nextNodeId = prepared.nextNodeId();
-        ApiDefinition def = prepared.def();
+        ApiDefinitionDO def = prepared.def();
         List<Map<String, Object>> requestBody = prepared.requestBody();
         Map<String, Object> config = prepared.config();
 
@@ -213,7 +213,7 @@ public class ApiCallHandler implements NodeHandler {
             String apiKey,
             String outputPrefix,
             String nextNodeId,
-            ApiDefinition def,
+            ApiDefinitionDO def,
             List<Map<String, Object>> requestBody,
             Map<String, Object> config
     ) {

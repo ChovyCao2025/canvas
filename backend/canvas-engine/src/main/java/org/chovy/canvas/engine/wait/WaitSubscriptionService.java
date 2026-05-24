@@ -2,8 +2,8 @@ package org.chovy.canvas.engine.wait;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
-import org.chovy.canvas.domain.execution.CanvasWaitSubscription;
-import org.chovy.canvas.domain.execution.CanvasWaitSubscriptionMapper;
+import org.chovy.canvas.dal.dataobject.CanvasWaitSubscriptionDO;
+import org.chovy.canvas.dal.mapper.CanvasWaitSubscriptionMapper;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -35,7 +35,7 @@ public class WaitSubscriptionService {
         this.clock = clock;
     }
 
-    public CanvasWaitSubscription createEventWait(
+    public CanvasWaitSubscriptionDO createEventWait(
             String executionId,
             Long canvasId,
             Long versionId,
@@ -47,7 +47,7 @@ public class WaitSubscriptionService {
             LocalDateTime expiresAt
     ) {
         Objects.requireNonNull(eventCode, "eventCode");
-        CanvasWaitSubscription wait = newWait(
+        CanvasWaitSubscriptionDO wait = newWait(
                 executionId,
                 canvasId,
                 versionId,
@@ -63,7 +63,7 @@ public class WaitSubscriptionService {
         return wait;
     }
 
-    public CanvasWaitSubscription createTimeWait(
+    public CanvasWaitSubscriptionDO createTimeWait(
             String executionId,
             Long canvasId,
             Long versionId,
@@ -74,7 +74,7 @@ public class WaitSubscriptionService {
             LocalDateTime resumeAt
     ) {
         Objects.requireNonNull(waitType, "waitType");
-        CanvasWaitSubscription wait = newWait(
+        CanvasWaitSubscriptionDO wait = newWait(
                 executionId,
                 canvasId,
                 versionId,
@@ -90,7 +90,7 @@ public class WaitSubscriptionService {
         return wait;
     }
 
-    public CanvasWaitSubscription createGoalWait(
+    public CanvasWaitSubscriptionDO createGoalWait(
             String executionId,
             Long canvasId,
             Long versionId,
@@ -101,7 +101,7 @@ public class WaitSubscriptionService {
             LocalDateTime expiresAt
     ) {
         Objects.requireNonNull(eventCode, "eventCode");
-        CanvasWaitSubscription wait = newWait(
+        CanvasWaitSubscriptionDO wait = newWait(
                 executionId,
                 canvasId,
                 versionId,
@@ -117,29 +117,29 @@ public class WaitSubscriptionService {
         return wait;
     }
 
-    public List<CanvasWaitSubscription> findActiveEventWaits(String eventCode, String userId) {
+    public List<CanvasWaitSubscriptionDO> findActiveEventWaits(String eventCode, String userId) {
         Objects.requireNonNull(eventCode, "eventCode");
         Objects.requireNonNull(userId, "userId");
 
         LocalDateTime now = now();
-        return mapper.selectList(new LambdaQueryWrapper<CanvasWaitSubscription>()
-                .in(CanvasWaitSubscription::getWaitType, WAIT_TYPE_EVENT, WAIT_TYPE_GOAL)
-                .eq(CanvasWaitSubscription::getEventCode, eventCode)
-                .eq(CanvasWaitSubscription::getUserId, userId)
-                .eq(CanvasWaitSubscription::getStatus, STATUS_ACTIVE)
+        return mapper.selectList(new LambdaQueryWrapper<CanvasWaitSubscriptionDO>()
+                .in(CanvasWaitSubscriptionDO::getWaitType, WAIT_TYPE_EVENT, WAIT_TYPE_GOAL)
+                .eq(CanvasWaitSubscriptionDO::getEventCode, eventCode)
+                .eq(CanvasWaitSubscriptionDO::getUserId, userId)
+                .eq(CanvasWaitSubscriptionDO::getStatus, STATUS_ACTIVE)
                 .and(wrapper -> wrapper
-                        .isNull(CanvasWaitSubscription::getExpiresAt)
+                        .isNull(CanvasWaitSubscriptionDO::getExpiresAt)
                         .or()
-                        .gt(CanvasWaitSubscription::getExpiresAt, now)));
+                        .gt(CanvasWaitSubscriptionDO::getExpiresAt, now)));
     }
 
-    public List<CanvasWaitSubscription> findExpiredActiveWaits(LocalDateTime now, int limit) {
+    public List<CanvasWaitSubscriptionDO> findExpiredActiveWaits(LocalDateTime now, int limit) {
         Objects.requireNonNull(now, "now");
-        return mapper.selectList(new LambdaQueryWrapper<CanvasWaitSubscription>()
-                .eq(CanvasWaitSubscription::getStatus, STATUS_ACTIVE)
-                .isNotNull(CanvasWaitSubscription::getExpiresAt)
-                .le(CanvasWaitSubscription::getExpiresAt, now)
-                .orderByAsc(CanvasWaitSubscription::getExpiresAt)
+        return mapper.selectList(new LambdaQueryWrapper<CanvasWaitSubscriptionDO>()
+                .eq(CanvasWaitSubscriptionDO::getStatus, STATUS_ACTIVE)
+                .isNotNull(CanvasWaitSubscriptionDO::getExpiresAt)
+                .le(CanvasWaitSubscriptionDO::getExpiresAt, now)
+                .orderByAsc(CanvasWaitSubscriptionDO::getExpiresAt)
                 .last("LIMIT " + Math.max(1, limit)));
     }
 
@@ -154,21 +154,21 @@ public class WaitSubscriptionService {
     private int finishWait(Long id, String status, String resumePayload) {
         Objects.requireNonNull(id, "id");
 
-        CanvasWaitSubscription update = new CanvasWaitSubscription();
+        CanvasWaitSubscriptionDO update = new CanvasWaitSubscriptionDO();
         update.setStatus(status);
         update.setResumePayload(resumePayload);
         update.setUpdatedAt(now());
 
-        return mapper.update(update, new LambdaUpdateWrapper<CanvasWaitSubscription>()
-                .eq(CanvasWaitSubscription::getId, id)
-                .eq(CanvasWaitSubscription::getStatus, STATUS_ACTIVE));
+        return mapper.update(update, new LambdaUpdateWrapper<CanvasWaitSubscriptionDO>()
+                .eq(CanvasWaitSubscriptionDO::getId, id)
+                .eq(CanvasWaitSubscriptionDO::getStatus, STATUS_ACTIVE));
     }
 
     private LocalDateTime now() {
         return LocalDateTime.now(clock);
     }
 
-    private CanvasWaitSubscription newWait(
+    private CanvasWaitSubscriptionDO newWait(
             String executionId,
             Long canvasId,
             Long versionId,
@@ -187,7 +187,7 @@ public class WaitSubscriptionService {
         Objects.requireNonNull(nodeId, "nodeId");
 
         LocalDateTime now = now();
-        CanvasWaitSubscription wait = new CanvasWaitSubscription();
+        CanvasWaitSubscriptionDO wait = new CanvasWaitSubscriptionDO();
         wait.setExecutionId(executionId);
         wait.setCanvasId(canvasId);
         wait.setVersionId(versionId);

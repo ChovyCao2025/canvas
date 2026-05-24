@@ -1,6 +1,6 @@
 package org.chovy.canvas.dto;
 
-import org.chovy.canvas.domain.canvas.Canvas;
+import org.chovy.canvas.dal.dataobject.CanvasDO;
 import lombok.Data;
 
 /**
@@ -17,7 +17,7 @@ public class CanvasDetailDTO {
      *
      * <p>包含名称、描述、状态、配额等“业务外壳”字段。
      */
-    private Canvas canvas;
+    private CanvasDO canvas;
 
     /**
      * 当前草稿版本的 graph JSON（来自 canvas_version.graph_json）。

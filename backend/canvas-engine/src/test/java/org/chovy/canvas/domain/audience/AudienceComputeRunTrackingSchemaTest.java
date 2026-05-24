@@ -6,6 +6,7 @@ import org.springframework.core.io.ClassPathResource;
 import java.nio.charset.StandardCharsets;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import org.chovy.canvas.dal.dataobject.AudienceComputeRunDO;
 
 class AudienceComputeRunTrackingSchemaTest {
 
@@ -25,7 +26,7 @@ class AudienceComputeRunTrackingSchemaTest {
 
     @Test
     void entityExposesPerfRunFields() {
-        AudienceComputeRun run = new AudienceComputeRun();
+        AudienceComputeRunDO run = new AudienceComputeRunDO();
         run.setPerfRunId("perf_20260523_001");
         run.setPerfInputId("perf_20260523_001:audience:1");
 

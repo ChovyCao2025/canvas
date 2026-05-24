@@ -1,8 +1,8 @@
 package org.chovy.canvas.domain.canvas;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import org.chovy.canvas.domain.constant.CanvasStatusEnum;
-import org.chovy.canvas.domain.constant.VersionStatus;
+import org.chovy.canvas.common.enums.CanvasStatusEnum;
+import org.chovy.canvas.common.enums.VersionStatus;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -14,6 +14,12 @@ import java.util.List;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
+import org.chovy.canvas.dal.dataobject.CanvasDO;
+import org.chovy.canvas.dal.mapper.CanvasMapper;
+import org.chovy.canvas.dal.dataobject.CanvasTemplateDO;
+import org.chovy.canvas.dal.mapper.CanvasTemplateMapper;
+import org.chovy.canvas.dal.dataobject.CanvasVersionDO;
+import org.chovy.canvas.dal.mapper.CanvasVersionMapper;
 
 @ExtendWith(MockitoExtension.class)
 class CanvasExampleSeederTest {
@@ -37,32 +43,32 @@ class CanvasExampleSeederTest {
     @Test
     void importsMissingOfficialTemplateAsDraftCanvas() throws Exception {
         CanvasExamplesProperties properties = new CanvasExamplesProperties();
-        CanvasTemplate template = template("component_event_if_coupon", "{\"nodes\":[]}");
+        CanvasTemplateDO template = template("component_event_if_coupon", "{\"nodes\":[]}");
         when(templateMapper.selectList(any())).thenReturn(List.of(template));
         when(canvasMapper.selectOne(any())).thenReturn(null);
         doAnswer(invocation -> {
-            Canvas canvas = invocation.getArgument(0);
+            CanvasDO canvas = invocation.getArgument(0);
             canvas.setId(99L);
             return 1;
-        }).when(canvasMapper).insert(any(Canvas.class));
+        }).when(canvasMapper).insert(any(CanvasDO.class));
 
         CanvasExampleSeeder seeder = new CanvasExampleSeeder(
                 templateMapper, canvasMapper, canvasVersionMapper, new ObjectMapper(), properties);
 
         seeder.run(null);
 
-        ArgumentCaptor<Canvas> canvasCaptor = ArgumentCaptor.forClass(Canvas.class);
+        ArgumentCaptor<CanvasDO> canvasCaptor = ArgumentCaptor.forClass(CanvasDO.class);
         verify(canvasMapper).insert(canvasCaptor.capture());
-        Canvas inserted = canvasCaptor.getValue();
+        CanvasDO inserted = canvasCaptor.getValue();
         assertThat(inserted.getName()).isEqualTo("示例：事件触发新客领券");
         assertThat(inserted.getStatus()).isEqualTo(CanvasStatusEnum.DRAFT.getCode());
         assertThat(inserted.getCreatedBy()).isEqualTo("example-seed");
         assertThat(inserted.getIsExample()).isEqualTo(1);
         assertThat(inserted.getSourceTemplateKey()).isEqualTo("component_event_if_coupon");
 
-        ArgumentCaptor<CanvasVersion> versionCaptor = ArgumentCaptor.forClass(CanvasVersion.class);
+        ArgumentCaptor<CanvasVersionDO> versionCaptor = ArgumentCaptor.forClass(CanvasVersionDO.class);
         verify(canvasVersionMapper).insert(versionCaptor.capture());
-        CanvasVersion version = versionCaptor.getValue();
+        CanvasVersionDO version = versionCaptor.getValue();
         assertThat(version.getCanvasId()).isEqualTo(99L);
         assertThat(version.getVersion()).isEqualTo(1);
         assertThat(version.getStatus()).isEqualTo(VersionStatus.DRAFT.getCode());
@@ -74,14 +80,14 @@ class CanvasExampleSeederTest {
     void existingImportedCanvasIsNotDuplicated() throws Exception {
         CanvasExamplesProperties properties = new CanvasExamplesProperties();
         when(templateMapper.selectList(any())).thenReturn(List.of(template("component_event_if_coupon", "{\"nodes\":[]}")));
-        when(canvasMapper.selectOne(any())).thenReturn(new Canvas());
+        when(canvasMapper.selectOne(any())).thenReturn(new CanvasDO());
         CanvasExampleSeeder seeder = new CanvasExampleSeeder(
                 templateMapper, canvasMapper, canvasVersionMapper, new ObjectMapper(), properties);
 
         seeder.run(null);
 
-        verify(canvasMapper, never()).insert(any(Canvas.class));
-        verify(canvasVersionMapper, never()).insert(any(CanvasVersion.class));
+        verify(canvasMapper, never()).insert(any(CanvasDO.class));
+        verify(canvasVersionMapper, never()).insert(any(CanvasVersionDO.class));
     }
 
     @Test
@@ -93,12 +99,12 @@ class CanvasExampleSeederTest {
 
         seeder.run(null);
 
-        verify(canvasMapper, never()).insert(any(Canvas.class));
-        verify(canvasVersionMapper, never()).insert(any(CanvasVersion.class));
+        verify(canvasMapper, never()).insert(any(CanvasDO.class));
+        verify(canvasVersionMapper, never()).insert(any(CanvasVersionDO.class));
     }
 
-    private static CanvasTemplate template(String key, String graphJson) {
-        CanvasTemplate template = new CanvasTemplate();
+    private static CanvasTemplateDO template(String key, String graphJson) {
+        CanvasTemplateDO template = new CanvasTemplateDO();
         template.setTemplateKey(key);
         template.setName("示例：事件触发新客领券");
         template.setDescription("事件触发后判断新客并发券");

@@ -2,8 +2,8 @@ package org.chovy.canvas.engine.wait;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
-import org.chovy.canvas.domain.execution.CanvasWaitSubscription;
-import org.chovy.canvas.domain.execution.CanvasWaitSubscriptionMapper;
+import org.chovy.canvas.dal.dataobject.CanvasWaitSubscriptionDO;
+import org.chovy.canvas.dal.mapper.CanvasWaitSubscriptionMapper;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -37,7 +37,7 @@ class WaitSubscriptionServiceTest {
         WaitSubscriptionService service = new WaitSubscriptionService(mapper, CLOCK);
         LocalDateTime expiresAt = LocalDateTime.of(2026, 5, 24, 18, 0);
 
-        CanvasWaitSubscription created = service.createEventWait(
+        CanvasWaitSubscriptionDO created = service.createEventWait(
                 "exec-1",
                 10L,
                 20L,
@@ -49,9 +49,9 @@ class WaitSubscriptionServiceTest {
                 expiresAt
         );
 
-        ArgumentCaptor<CanvasWaitSubscription> captor = ArgumentCaptor.forClass(CanvasWaitSubscription.class);
+        ArgumentCaptor<CanvasWaitSubscriptionDO> captor = ArgumentCaptor.forClass(CanvasWaitSubscriptionDO.class);
         verify(mapper).insert(captor.capture());
-        CanvasWaitSubscription inserted = captor.getValue();
+        CanvasWaitSubscriptionDO inserted = captor.getValue();
 
         assertThat(created).isSameAs(inserted);
         assertThat(inserted.getExecutionId()).isEqualTo("exec-1");
@@ -74,7 +74,7 @@ class WaitSubscriptionServiceTest {
         WaitSubscriptionService service = new WaitSubscriptionService(mapper, CLOCK);
         LocalDateTime expiresAt = LocalDateTime.of(2026, 5, 24, 18, 0);
 
-        CanvasWaitSubscription created = service.createGoalWait(
+        CanvasWaitSubscriptionDO created = service.createGoalWait(
                 "exec-1",
                 10L,
                 20L,
@@ -85,9 +85,9 @@ class WaitSubscriptionServiceTest {
                 expiresAt
         );
 
-        ArgumentCaptor<CanvasWaitSubscription> captor = ArgumentCaptor.forClass(CanvasWaitSubscription.class);
+        ArgumentCaptor<CanvasWaitSubscriptionDO> captor = ArgumentCaptor.forClass(CanvasWaitSubscriptionDO.class);
         verify(mapper).insert(captor.capture());
-        CanvasWaitSubscription inserted = captor.getValue();
+        CanvasWaitSubscriptionDO inserted = captor.getValue();
 
         assertThat(created).isSameAs(inserted);
         assertThat(inserted.getExecutionId()).isEqualTo("exec-1");
@@ -108,7 +108,7 @@ class WaitSubscriptionServiceTest {
     @Test
     void findActiveEventWaits_returnsMapperResults() {
         WaitSubscriptionService service = new WaitSubscriptionService(mapper, CLOCK);
-        CanvasWaitSubscription wait = new CanvasWaitSubscription();
+        CanvasWaitSubscriptionDO wait = new CanvasWaitSubscriptionDO();
         wait.setId(1L);
         when(mapper.selectList(any(LambdaQueryWrapper.class))).thenReturn(List.of(wait));
 
@@ -123,10 +123,10 @@ class WaitSubscriptionServiceTest {
 
         service.completeWait(99L, "{\"eventId\":\"evt-1\"}");
 
-        ArgumentCaptor<CanvasWaitSubscription> entityCaptor = ArgumentCaptor.forClass(CanvasWaitSubscription.class);
+        ArgumentCaptor<CanvasWaitSubscriptionDO> entityCaptor = ArgumentCaptor.forClass(CanvasWaitSubscriptionDO.class);
         verify(mapper).update(entityCaptor.capture(), any(LambdaUpdateWrapper.class));
 
-        CanvasWaitSubscription update = entityCaptor.getValue();
+        CanvasWaitSubscriptionDO update = entityCaptor.getValue();
         assertThat(update.getStatus()).isEqualTo(WaitSubscriptionService.STATUS_COMPLETED);
         assertThat(update.getResumePayload()).isEqualTo("{\"eventId\":\"evt-1\"}");
         assertThat(update.getUpdatedAt()).isEqualTo(LocalDateTime.of(2026, 5, 23, 18, 15, 30));
@@ -138,10 +138,10 @@ class WaitSubscriptionServiceTest {
 
         service.expireWait(99L, "{\"reason\":\"timeout\"}");
 
-        ArgumentCaptor<CanvasWaitSubscription> entityCaptor = ArgumentCaptor.forClass(CanvasWaitSubscription.class);
+        ArgumentCaptor<CanvasWaitSubscriptionDO> entityCaptor = ArgumentCaptor.forClass(CanvasWaitSubscriptionDO.class);
         verify(mapper).update(entityCaptor.capture(), any(LambdaUpdateWrapper.class));
 
-        CanvasWaitSubscription update = entityCaptor.getValue();
+        CanvasWaitSubscriptionDO update = entityCaptor.getValue();
         assertThat(update.getStatus()).isEqualTo(WaitSubscriptionService.STATUS_EXPIRED);
         assertThat(update.getResumePayload()).isEqualTo("{\"reason\":\"timeout\"}");
         assertThat(update.getUpdatedAt()).isEqualTo(LocalDateTime.of(2026, 5, 23, 18, 15, 30));

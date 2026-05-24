@@ -2,9 +2,9 @@ package org.chovy.canvas.domain.cdp;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import lombok.RequiredArgsConstructor;
-import org.chovy.canvas.domain.constant.ExecutionStatus;
-import org.chovy.canvas.domain.execution.CanvasExecution;
-import org.chovy.canvas.domain.execution.CanvasExecutionMapper;
+import org.chovy.canvas.common.enums.ExecutionStatus;
+import org.chovy.canvas.dal.dataobject.CanvasExecutionDO;
+import org.chovy.canvas.dal.mapper.CanvasExecutionMapper;
 import org.chovy.canvas.dto.cdp.CanvasUserRowDTO;
 import org.springframework.stereotype.Service;
 
@@ -23,13 +23,13 @@ public class CanvasUserQueryService {
     private final CdpUserService userService;
 
     public List<CanvasUserRowDTO> listUsers(Long canvasId) {
-        List<CanvasExecution> executions = executionMapper.selectList(
-                new LambdaQueryWrapper<CanvasExecution>()
-                        .eq(CanvasExecution::getCanvasId, canvasId)
-                        .isNotNull(CanvasExecution::getUserId)
-                        .orderByDesc(CanvasExecution::getCreatedAt));
-        Map<String, List<CanvasExecution>> byUser = new LinkedHashMap<>();
-        for (CanvasExecution execution : executions) {
+        List<CanvasExecutionDO> executions = executionMapper.selectList(
+                new LambdaQueryWrapper<CanvasExecutionDO>()
+                        .eq(CanvasExecutionDO::getCanvasId, canvasId)
+                        .isNotNull(CanvasExecutionDO::getUserId)
+                        .orderByDesc(CanvasExecutionDO::getCreatedAt));
+        Map<String, List<CanvasExecutionDO>> byUser = new LinkedHashMap<>();
+        for (CanvasExecutionDO execution : executions) {
             byUser.computeIfAbsent(execution.getUserId(), ignored -> new java.util.ArrayList<>()).add(execution);
         }
         return byUser.entrySet().stream()
@@ -40,33 +40,33 @@ public class CanvasUserQueryService {
     }
 
     public CanvasUserRowDTO getUserInCanvas(Long canvasId, String userId) {
-        List<CanvasExecution> executions = executionMapper.selectList(
-                new LambdaQueryWrapper<CanvasExecution>()
-                        .eq(CanvasExecution::getCanvasId, canvasId)
-                        .eq(CanvasExecution::getUserId, userId)
-                        .orderByDesc(CanvasExecution::getCreatedAt));
+        List<CanvasExecutionDO> executions = executionMapper.selectList(
+                new LambdaQueryWrapper<CanvasExecutionDO>()
+                        .eq(CanvasExecutionDO::getCanvasId, canvasId)
+                        .eq(CanvasExecutionDO::getUserId, userId)
+                        .orderByDesc(CanvasExecutionDO::getCreatedAt));
         if (executions.isEmpty()) {
             throw new IllegalArgumentException("该用户没有进入过画布: " + userId);
         }
         return toRow(userId, executions);
     }
 
-    public List<CanvasExecution> listExecutions(Long canvasId, String userId) {
-        return executionMapper.selectList(new LambdaQueryWrapper<CanvasExecution>()
-                .eq(CanvasExecution::getCanvasId, canvasId)
-                .eq(CanvasExecution::getUserId, userId)
-                .orderByDesc(CanvasExecution::getCreatedAt)
+    public List<CanvasExecutionDO> listExecutions(Long canvasId, String userId) {
+        return executionMapper.selectList(new LambdaQueryWrapper<CanvasExecutionDO>()
+                .eq(CanvasExecutionDO::getCanvasId, canvasId)
+                .eq(CanvasExecutionDO::getUserId, userId)
+                .orderByDesc(CanvasExecutionDO::getCreatedAt)
                 .last("LIMIT 100"));
     }
 
-    private CanvasUserRowDTO toRow(String userId, List<CanvasExecution> executions) {
+    private CanvasUserRowDTO toRow(String userId, List<CanvasExecutionDO> executions) {
         executions.forEach(e -> userService.ensureUser(userId, "CANVAS_EXECUTION", e.getId()));
-        LocalDateTime first = executions.stream().map(CanvasExecution::getCreatedAt)
+        LocalDateTime first = executions.stream().map(CanvasExecutionDO::getCreatedAt)
                 .min(Comparator.naturalOrder()).orElse(null);
-        LocalDateTime last = executions.stream().map(CanvasExecution::getCreatedAt)
+        LocalDateTime last = executions.stream().map(CanvasExecutionDO::getCreatedAt)
                 .max(Comparator.naturalOrder()).orElse(null);
-        CanvasExecution latest = executions.stream()
-                .max(Comparator.comparing(CanvasExecution::getCreatedAt, Comparator.nullsLast(Comparator.naturalOrder())))
+        CanvasExecutionDO latest = executions.stream()
+                .max(Comparator.comparing(CanvasExecutionDO::getCreatedAt, Comparator.nullsLast(Comparator.naturalOrder())))
                 .orElse(null);
         long success = executions.stream().filter(e -> e.getStatus() != null && e.getStatus() == ExecutionStatus.SUCCESS.getCode()).count();
         long failed = executions.stream().filter(e -> e.getStatus() != null && e.getStatus() == ExecutionStatus.FAILED.getCode()).count();

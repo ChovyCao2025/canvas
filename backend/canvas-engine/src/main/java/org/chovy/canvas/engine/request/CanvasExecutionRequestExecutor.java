@@ -3,8 +3,8 @@ package org.chovy.canvas.engine.request;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.chovy.canvas.common.MapFieldKeys;
-import org.chovy.canvas.domain.execution.CanvasExecutionRequest;
-import org.chovy.canvas.domain.execution.CanvasExecutionRequestMapper;
+import org.chovy.canvas.dal.dataobject.CanvasExecutionRequestDO;
+import org.chovy.canvas.dal.mapper.CanvasExecutionRequestMapper;
 import org.chovy.canvas.engine.scheduler.CanvasMetrics;
 import org.chovy.canvas.engine.trigger.CanvasExecutionService;
 import org.chovy.canvas.perf.PerfRunContext;
@@ -145,7 +145,7 @@ public class CanvasExecutionRequestExecutor {
                 .subscribe();
     }
 
-    private Mono<Void> finish(CanvasExecutionRequest request, Map<String, Object> result, String runToken) {
+    private Mono<Void> finish(CanvasExecutionRequestDO request, Map<String, Object> result, String runToken) {
         if (result.containsKey(MapFieldKeys.OVERFLOW)) {
             return retryOrFail(request, String.valueOf(result.get(MapFieldKeys.OVERFLOW)), runToken);
         }
@@ -163,7 +163,7 @@ public class CanvasExecutionRequestExecutor {
                 .then();
     }
 
-    private Mono<Void> retryOrFail(CanvasExecutionRequest request, String error, String runToken) {
+    private Mono<Void> retryOrFail(CanvasExecutionRequestDO request, String error, String runToken) {
         int nextAttempt = request.getAttemptCount() == null ? 1 : request.getAttemptCount() + 1;
         LocalDateTime now = LocalDateTime.now();
         if (nextAttempt >= maxAttempts) {
@@ -180,7 +180,7 @@ public class CanvasExecutionRequestExecutor {
                 .then();
     }
 
-    private Mono<Void> fail(CanvasExecutionRequest request, String error, String runToken) {
+    private Mono<Void> fail(CanvasExecutionRequestDO request, String error, String runToken) {
         return Mono.fromCallable(() -> mapper.markFailed(request.getId(), trim(error), LocalDateTime.now(), runToken))
                 .subscribeOn(Schedulers.boundedElastic())
                 .doOnNext(updated -> {

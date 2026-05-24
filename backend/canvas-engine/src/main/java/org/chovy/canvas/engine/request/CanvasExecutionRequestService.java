@@ -3,8 +3,8 @@ package org.chovy.canvas.engine.request;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
-import org.chovy.canvas.domain.execution.CanvasExecutionRequest;
-import org.chovy.canvas.domain.execution.CanvasExecutionRequestMapper;
+import org.chovy.canvas.dal.dataobject.CanvasExecutionRequestDO;
+import org.chovy.canvas.dal.mapper.CanvasExecutionRequestMapper;
 import org.chovy.canvas.perf.PerfRunContext;
 import org.springframework.stereotype.Service;
 
@@ -29,7 +29,7 @@ public class CanvasExecutionRequestService {
                           Map<String, Object> payload,
                           String sourceMsgId) {
         String requestId = buildRequestId(canvasId, triggerType, sourceMsgId);
-        CanvasExecutionRequest request = new CanvasExecutionRequest();
+        CanvasExecutionRequestDO request = new CanvasExecutionRequestDO();
         request.setId(requestId);
         request.setCanvasId(canvasId);
         request.setUserId(userId);

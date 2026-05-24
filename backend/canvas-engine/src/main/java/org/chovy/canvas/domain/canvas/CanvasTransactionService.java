@@ -2,10 +2,12 @@ package org.chovy.canvas.domain.canvas;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.chovy.canvas.domain.constant.CanvasStatusEnum;
+import org.chovy.canvas.common.enums.CanvasStatusEnum;
 import org.chovy.canvas.engine.dag.DagGraph;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.chovy.canvas.dal.dataobject.CanvasDO;
+import org.chovy.canvas.dal.mapper.CanvasMapper;
 
 /**
  * 仅负责“数据库状态变更”的事务服务。
@@ -35,7 +37,7 @@ public class CanvasTransactionService {
     @Transactional
     Long offlineDb(Long id) {
         // 1) 读取当前画布快照（事务内）
-        Canvas canvas = canvasMapper.selectById(id);
+        CanvasDO canvas = canvasMapper.selectById(id);
         if (canvas == null) throw new IllegalArgumentException("画布不存在: " + id);
 
         // 2) 保留下线前发布版本，供事务外清缓存/清路由
@@ -63,7 +65,7 @@ public class CanvasTransactionService {
     @Transactional
     void archiveDb(Long id) {
         // 1) 读取并校验画布存在性
-        Canvas canvas = canvasMapper.selectById(id);
+        CanvasDO canvas = canvasMapper.selectById(id);
         if (canvas == null) throw new IllegalArgumentException("画布不存在: " + id);
 
         // 2) 仅变更状态，不触碰发布版本字段

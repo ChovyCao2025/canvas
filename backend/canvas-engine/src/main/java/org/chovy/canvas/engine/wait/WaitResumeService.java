@@ -5,9 +5,9 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.chovy.canvas.common.MapFieldKeys;
-import org.chovy.canvas.domain.constant.NodeType;
-import org.chovy.canvas.domain.constant.TriggerType;
-import org.chovy.canvas.domain.execution.CanvasWaitSubscription;
+import org.chovy.canvas.common.enums.NodeType;
+import org.chovy.canvas.common.enums.TriggerType;
+import org.chovy.canvas.dal.dataobject.CanvasWaitSubscriptionDO;
 import org.chovy.canvas.engine.trigger.CanvasExecutionService;
 import org.springframework.stereotype.Service;
 
@@ -26,9 +26,9 @@ public class WaitResumeService {
     private final ObjectMapper objectMapper;
 
     public int resumeEventWaits(String eventCode, String userId, Map<String, Object> eventAttributes, String eventId) {
-        List<CanvasWaitSubscription> waits = waitSubscriptionService.findActiveEventWaits(eventCode, userId);
+        List<CanvasWaitSubscriptionDO> waits = waitSubscriptionService.findActiveEventWaits(eventCode, userId);
         int resumed = 0;
-        for (CanvasWaitSubscription wait : waits) {
+        for (CanvasWaitSubscriptionDO wait : waits) {
             if (completeAndTrigger(wait, eventAttributes, eventId)) {
                 resumed++;
             }
@@ -37,9 +37,9 @@ public class WaitResumeService {
     }
 
     public int resumeDueWaits(int limit) {
-        List<CanvasWaitSubscription> waits = waitSubscriptionService.findExpiredActiveWaits(LocalDateTime.now(), limit);
+        List<CanvasWaitSubscriptionDO> waits = waitSubscriptionService.findExpiredActiveWaits(LocalDateTime.now(), limit);
         int resumed = 0;
-        for (CanvasWaitSubscription wait : waits) {
+        for (CanvasWaitSubscriptionDO wait : waits) {
             String status = timeoutDriven(wait)
                     ? WaitSubscriptionService.STATUS_EXPIRED
                     : WaitSubscriptionService.STATUS_COMPLETED;
@@ -57,7 +57,7 @@ public class WaitResumeService {
     }
 
     private boolean completeAndTrigger(
-            CanvasWaitSubscription wait,
+            CanvasWaitSubscriptionDO wait,
             Map<String, Object> eventAttributes,
             String eventId
     ) {
@@ -76,13 +76,13 @@ public class WaitResumeService {
         return true;
     }
 
-    private boolean timeoutDriven(CanvasWaitSubscription wait) {
+    private boolean timeoutDriven(CanvasWaitSubscriptionDO wait) {
         return WaitSubscriptionService.WAIT_TYPE_EVENT.equals(wait.getWaitType())
                 || WaitSubscriptionService.WAIT_TYPE_GOAL.equals(wait.getWaitType());
     }
 
     private Map<String, Object> resumePayload(
-            CanvasWaitSubscription wait,
+            CanvasWaitSubscriptionDO wait,
             String status,
             Map<String, Object> eventAttributes,
             String eventId
@@ -106,7 +106,7 @@ public class WaitResumeService {
         return payload;
     }
 
-    private Map<String, Object> storedPayload(CanvasWaitSubscription wait) {
+    private Map<String, Object> storedPayload(CanvasWaitSubscriptionDO wait) {
         if (wait.getResumePayload() == null || wait.getResumePayload().isBlank()) {
             return Map.of();
         }
@@ -118,7 +118,7 @@ public class WaitResumeService {
         }
     }
 
-    private void trigger(CanvasWaitSubscription wait, String status, Map<String, Object> payload) {
+    private void trigger(CanvasWaitSubscriptionDO wait, String status, Map<String, Object> payload) {
         boolean goal = WaitSubscriptionService.WAIT_TYPE_GOAL.equals(wait.getWaitType());
         boolean expired = WaitSubscriptionService.STATUS_EXPIRED.equals(status);
         String nodeType = goal ? NodeType.GOAL_CHECK : NodeType.WAIT;

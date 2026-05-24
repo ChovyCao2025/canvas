@@ -5,6 +5,9 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import org.chovy.canvas.dal.dataobject.SystemOptionDO;
+import org.chovy.canvas.dal.mapper.SystemOptionMapper;
+import org.chovy.canvas.dto.StubOption;
 
 @Service
 @RequiredArgsConstructor
@@ -12,19 +15,19 @@ public class SystemOptionService {
 
     private final SystemOptionMapper mapper;
 
-    public List<SystemOption> listForAdmin(String category, Integer enabled, String keyword) {
-        LambdaQueryWrapper<SystemOption> wrapper = new LambdaQueryWrapper<SystemOption>()
-                .eq(category != null && !category.isBlank(), SystemOption::getCategory, category)
-                .eq(enabled != null, SystemOption::getEnabled, enabled)
+    public List<SystemOptionDO> listForAdmin(String category, Integer enabled, String keyword) {
+        LambdaQueryWrapper<SystemOptionDO> wrapper = new LambdaQueryWrapper<SystemOptionDO>()
+                .eq(category != null && !category.isBlank(), SystemOptionDO::getCategory, category)
+                .eq(enabled != null, SystemOptionDO::getEnabled, enabled)
                 .and(keyword != null && !keyword.isBlank(), w -> w
-                        .like(SystemOption::getOptionKey, keyword)
+                        .like(SystemOptionDO::getOptionKey, keyword)
                         .or()
-                        .like(SystemOption::getLabel, keyword)
+                        .like(SystemOptionDO::getLabel, keyword)
                         .or()
-                        .like(SystemOption::getDescription, keyword))
-                .orderByAsc(SystemOption::getCategory)
-                .orderByAsc(SystemOption::getSortOrder)
-                .orderByAsc(SystemOption::getId);
+                        .like(SystemOptionDO::getDescription, keyword))
+                .orderByAsc(SystemOptionDO::getCategory)
+                .orderByAsc(SystemOptionDO::getSortOrder)
+                .orderByAsc(SystemOptionDO::getId);
         return mapper.selectList(wrapper);
     }
 
@@ -34,19 +37,19 @@ public class SystemOptionService {
                 .toList();
     }
 
-    public List<SystemOption> activeSystemOptions(String category) {
+    public List<SystemOptionDO> activeSystemOptions(String category) {
         if (category == null || category.isBlank()) {
             throw new IllegalArgumentException("category is required");
         }
-        return mapper.selectList(new LambdaQueryWrapper<SystemOption>()
-                .eq(SystemOption::getCategory, category)
-                .eq(SystemOption::getEnabled, 1)
-                .orderByAsc(SystemOption::getSortOrder)
-                .orderByAsc(SystemOption::getId));
+        return mapper.selectList(new LambdaQueryWrapper<SystemOptionDO>()
+                .eq(SystemOptionDO::getCategory, category)
+                .eq(SystemOptionDO::getEnabled, 1)
+                .orderByAsc(SystemOptionDO::getSortOrder)
+                .orderByAsc(SystemOptionDO::getId));
     }
 
-    public void updateEditable(Long id, SystemOption patch) {
-        SystemOption existing = mapper.selectById(id);
+    public void updateEditable(Long id, SystemOptionDO patch) {
+        SystemOptionDO existing = mapper.selectById(id);
         if (existing == null) {
             throw new IllegalArgumentException("系统选项不存在: " + id);
         }

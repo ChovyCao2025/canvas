@@ -7,13 +7,13 @@ import org.apache.rocketmq.client.producer.SendResult;
 import org.apache.rocketmq.client.producer.SendStatus;
 import org.apache.rocketmq.spring.core.RocketMQTemplate;
 import org.chovy.canvas.common.MapFieldKeys;
-import org.chovy.canvas.domain.meta.MqMessageDefinition;
-import org.chovy.canvas.domain.meta.MqMessageDefinitionMapper;
+import org.chovy.canvas.dal.dataobject.MqMessageDefinitionDO;
+import org.chovy.canvas.dal.mapper.MqMessageDefinitionMapper;
 import org.chovy.canvas.engine.context.ExecutionContext;
 import org.chovy.canvas.engine.handler.NodeHandler;
 import org.chovy.canvas.engine.handler.NodeHandlerType;
 import org.chovy.canvas.engine.handler.NodeResult;
-import org.chovy.canvas.infra.mq.MqTriggerMessage;
+import org.chovy.canvas.infrastructure.mq.MqTriggerMessage;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import reactor.core.publisher.Mono;
@@ -25,7 +25,7 @@ import java.util.Map;
 
 /**
  * 发送 MQ 消息节点：将业务消息发送到 RocketMQ CANVAS_MQ_TRIGGER topic。
- * Tag = MqMessageDefinition.topic，供消费端路由到对应画布。
+ * Tag = MqMessageDefinitionDO.topic，供消费端路由到对应画布。
  */
 @Slf4j
 @Component
@@ -50,10 +50,10 @@ public class SendMqHandler implements NodeHandler {
         }
 
         return Mono.fromCallable(() -> {
-                    MqMessageDefinition def = mqMapper.selectOne(
-                            new LambdaQueryWrapper<MqMessageDefinition>()
-                                    .eq(MqMessageDefinition::getMessageCode, messageCodeKey)
-                                    .eq(MqMessageDefinition::getEnabled, 1));
+                    MqMessageDefinitionDO def = mqMapper.selectOne(
+                            new LambdaQueryWrapper<MqMessageDefinitionDO>()
+                                    .eq(MqMessageDefinitionDO::getMessageCode, messageCodeKey)
+                                    .eq(MqMessageDefinitionDO::getEnabled, 1));
                     if (def == null) {
                         return NodeResult.fail("SEND_MQ: 找不到消息定义 messageCode=" + messageCodeKey);
                     }

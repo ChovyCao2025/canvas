@@ -2,8 +2,8 @@ package org.chovy.canvas.domain.notification;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.chovy.canvas.domain.approval.CanvasManualApproval;
-import org.chovy.canvas.domain.constant.ApprovalStatus;
+import org.chovy.canvas.dal.dataobject.CanvasManualApprovalDO;
+import org.chovy.canvas.common.enums.ApprovalStatus;
 import org.springframework.stereotype.Service;
 
 import java.time.format.DateTimeFormatter;
@@ -21,7 +21,7 @@ public class NotificationEventService {
     private final NotificationService notificationService;
     private final NotificationRecipientService recipientService;
 
-    public void approvalPending(CanvasManualApproval approval, List<String> approvers) {
+    public void approvalPending(CanvasManualApprovalDO approval, List<String> approvers) {
         if (approval == null || approvers == null || approvers.isEmpty()) {
             return;
         }
@@ -45,7 +45,7 @@ public class NotificationEventService {
         }
     }
 
-    public void approvalResult(CanvasManualApproval approval, String result, String approver) {
+    public void approvalResult(CanvasManualApprovalDO approval, String result, String approver) {
         if (approval == null || !hasText(approval.getUserId())) {
             return;
         }

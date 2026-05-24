@@ -1,22 +1,22 @@
 package org.chovy.canvas.engine.trigger;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import org.chovy.canvas.domain.canvas.CanvasMapper;
-import org.chovy.canvas.domain.canvas.CanvasVersionMapper;
-import org.chovy.canvas.domain.constant.NodeType;
+import org.chovy.canvas.dal.mapper.CanvasMapper;
+import org.chovy.canvas.dal.mapper.CanvasVersionMapper;
+import org.chovy.canvas.common.enums.NodeType;
 import org.chovy.canvas.domain.cdp.CdpUserService;
-import org.chovy.canvas.domain.execution.CanvasExecutionDlqMapper;
-import org.chovy.canvas.domain.execution.CanvasExecutionMapper;
-import org.chovy.canvas.domain.execution.CanvasExecutionStatsMapper;
-import org.chovy.canvas.domain.meta.MqMessageDefinition;
-import org.chovy.canvas.domain.meta.MqMessageDefinitionMapper;
+import org.chovy.canvas.dal.mapper.CanvasExecutionDlqMapper;
+import org.chovy.canvas.dal.mapper.CanvasExecutionMapper;
+import org.chovy.canvas.dal.mapper.CanvasExecutionStatsMapper;
+import org.chovy.canvas.dal.dataobject.MqMessageDefinitionDO;
+import org.chovy.canvas.dal.mapper.MqMessageDefinitionMapper;
 import org.chovy.canvas.engine.dag.DagGraph;
 import org.chovy.canvas.engine.dag.DagParser;
 import org.chovy.canvas.engine.handlers.MqTriggerHandler;
 import org.chovy.canvas.engine.scheduler.DagEngine;
-import org.chovy.canvas.infra.cache.CanvasConfigCache;
-import org.chovy.canvas.infra.cache.CanvasEntityCache;
-import org.chovy.canvas.infra.redis.ContextPersistenceService;
+import org.chovy.canvas.infrastructure.cache.CanvasConfigCache;
+import org.chovy.canvas.infrastructure.cache.CanvasEntityCache;
+import org.chovy.canvas.infrastructure.redis.ContextPersistenceService;
 import org.apache.rocketmq.spring.core.RocketMQTemplate;
 import org.junit.jupiter.api.Test;
 import org.springframework.test.util.ReflectionTestUtils;
@@ -33,7 +33,7 @@ class CanvasExecutionServiceTriggerNodeTest {
     @Test
     void findTriggerNodeMatchesMqTriggerByResolvedMessageCodeTopic() {
         MqMessageDefinitionMapper mqMapper = mock(MqMessageDefinitionMapper.class);
-        MqMessageDefinition definition = new MqMessageDefinition();
+        MqMessageDefinitionDO definition = new MqMessageDefinitionDO();
         definition.setTopic("order.paid");
         when(mqMapper.selectOne(any())).thenReturn(definition);
 

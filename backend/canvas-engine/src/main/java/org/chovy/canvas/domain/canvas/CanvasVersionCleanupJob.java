@@ -8,6 +8,10 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
+import org.chovy.canvas.dal.dataobject.CanvasDO;
+import org.chovy.canvas.dal.mapper.CanvasMapper;
+import org.chovy.canvas.dal.dataobject.CanvasVersionDO;
+import org.chovy.canvas.dal.mapper.CanvasVersionMapper;
 
 /**
  * 旧版本清理 Job（设计文档 17.2节）。
@@ -34,8 +38,8 @@ public class CanvasVersionCleanupJob {
         int totalCleaned = 0;
 
         // 全量画布逐个清理，单画布失败不影响其他画布
-        List<Canvas> canvases = canvasMapper.selectList(null);
-        for (Canvas canvas : canvases) {
+        List<CanvasDO> canvases = canvasMapper.selectList(null);
+        for (CanvasDO canvas : canvases) {
             try {
                 int cleaned = cleanupCanvas(canvas.getId());
                 totalCleaned += cleaned;
@@ -52,20 +56,20 @@ public class CanvasVersionCleanupJob {
      */
     public int cleanupCanvas(Long canvasId) {
         // 按版本号降序查出所有已发布版本
-        List<CanvasVersion> published = canvasVersionMapper.selectList(
-                new LambdaQueryWrapper<CanvasVersion>()
-                        .eq(CanvasVersion::getCanvasId, canvasId)
-                        .eq(CanvasVersion::getStatus, 1)
-                        .orderByDesc(CanvasVersion::getVersion)
+        List<CanvasVersionDO> published = canvasVersionMapper.selectList(
+                new LambdaQueryWrapper<CanvasVersionDO>()
+                        .eq(CanvasVersionDO::getCanvasId, canvasId)
+                        .eq(CanvasVersionDO::getStatus, 1)
+                        .orderByDesc(CanvasVersionDO::getVersion)
         );
 
         // 发布版本数未超过保留上限，无需清理
         if (published.size() <= maxKeepCount) return 0;
 
         // 超出 maxKeepCount 的版本：清空 graph_json（保留 id/version/status/created_at）
-        List<CanvasVersion> toClean = published.subList(maxKeepCount, published.size());
+        List<CanvasVersionDO> toClean = published.subList(maxKeepCount, published.size());
         int count = 0;
-        for (CanvasVersion v : toClean) {
+        for (CanvasVersionDO v : toClean) {
             if (v.getGraphJson() != null && !v.getGraphJson().isBlank()) {
                 // 只清空 graphJson，保留元数据用于审计与回溯
                 v.setGraphJson(null);

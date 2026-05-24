@@ -6,7 +6,7 @@ import jakarta.annotation.PreDestroy;
 import lombok.extern.slf4j.Slf4j;
 import org.chovy.canvas.dto.notification.NotificationDTO;
 import org.chovy.canvas.dto.notification.NotificationRealtimePayload;
-import org.chovy.canvas.infra.redis.RedisKeyUtil;
+import org.chovy.canvas.infrastructure.redis.RedisKeyUtil;
 import org.springframework.data.redis.connection.ReactiveRedisConnectionFactory;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.listener.ChannelTopic;
@@ -21,6 +21,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import org.chovy.canvas.dal.dataobject.NotificationDO;
 
 @Slf4j
 @Service
@@ -94,7 +95,7 @@ public class NotificationRealtimeService implements NotificationRealtimePublishe
     }
 
     @Override
-    public void publish(String eventType, String userId, Notification notification, Long unreadCount) {
+    public void publish(String eventType, String userId, NotificationDO notification, Long unreadCount) {
         if (userId == null || userId.isBlank()) {
             return;
         }

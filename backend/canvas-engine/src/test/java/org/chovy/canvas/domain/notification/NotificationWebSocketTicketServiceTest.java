@@ -1,6 +1,6 @@
 package org.chovy.canvas.domain.notification;
 
-import org.chovy.canvas.infra.redis.RedisKeyUtil;
+import org.chovy.canvas.infrastructure.redis.RedisKeyUtil;
 import org.junit.jupiter.api.Test;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.ValueOperations;

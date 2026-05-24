@@ -1,12 +1,12 @@
 package org.chovy.canvas.domain.canvas;
 
-import org.chovy.canvas.domain.constant.CanvasStatusEnum;
+import org.chovy.canvas.common.enums.CanvasStatusEnum;
 import org.chovy.canvas.engine.dag.DagGraph;
 import org.chovy.canvas.engine.dag.DagParser;
 import org.chovy.canvas.engine.trigger.CanvasExecutionService;
 import org.chovy.canvas.engine.trigger.CanvasSchedulerService;
-import org.chovy.canvas.infra.cache.CanvasConfigCache;
-import org.chovy.canvas.infra.redis.TriggerRouteService;
+import org.chovy.canvas.infrastructure.cache.CanvasConfigCache;
+import org.chovy.canvas.infrastructure.redis.TriggerRouteService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -20,6 +20,10 @@ import java.util.Set;
 
 import static org.assertj.core.api.Assertions.*;
 import static org.mockito.Mockito.*;
+import org.chovy.canvas.dal.dataobject.CanvasDO;
+import org.chovy.canvas.dal.mapper.CanvasMapper;
+import org.chovy.canvas.dal.dataobject.CanvasVersionDO;
+import org.chovy.canvas.dal.mapper.CanvasVersionMapper;
 
 @ExtendWith(MockitoExtension.class)
 class CanvasServiceArchiveTest {
@@ -52,11 +56,11 @@ class CanvasServiceArchiveTest {
     @InjectMocks
     private CanvasService canvasService;
 
-    private Canvas existingCanvas;
+    private CanvasDO existingCanvas;
 
     @BeforeEach
     void setUp() {
-        existingCanvas = new Canvas();
+        existingCanvas = new CanvasDO();
         existingCanvas.setId(1L);
         existingCanvas.setStatus(CanvasStatusEnum.DRAFT.getCode());
         existingCanvas.setName("测试画布");
@@ -101,7 +105,7 @@ class CanvasServiceArchiveTest {
         existingCanvas.setPublishedVersionId(publishedVersionId);
         when(canvasMapper.selectById(1L)).thenReturn(existingCanvas);
 
-        CanvasVersion publishedVersion = new CanvasVersion();
+        CanvasVersionDO publishedVersion = new CanvasVersionDO();
         publishedVersion.setId(publishedVersionId);
         publishedVersion.setCanvasId(1L);
         publishedVersion.setGraphJson("{\"nodes\":[]}");

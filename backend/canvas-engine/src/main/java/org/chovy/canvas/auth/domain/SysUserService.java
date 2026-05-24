@@ -9,6 +9,8 @@ import org.springframework.stereotype.Service;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Set;
+import org.chovy.canvas.dal.dataobject.SysUserDO;
+import org.chovy.canvas.dal.mapper.SysUserMapper;
 
 @Service
 @RequiredArgsConstructor
@@ -19,28 +21,28 @@ public class SysUserService {
     private final SysUserMapper sysUserMapper;
     private final BCryptPasswordEncoder encoder;
 
-    public SysUser findByUsername(String username) {
+    public SysUserDO findByUsername(String username) {
         return sysUserMapper.selectOne(
-                new LambdaQueryWrapper<SysUser>().eq(SysUser::getUsername, username));
+                new LambdaQueryWrapper<SysUserDO>().eq(SysUserDO::getUsername, username));
     }
 
     /** 仅用于登录验证，显式 SELECT password 字段（@TableField(select=false) 默认不查） */
-    public SysUser findByUsernameForAuth(String username) {
+    public SysUserDO findByUsernameForAuth(String username) {
         return sysUserMapper.selectOne(
-                new com.baomidou.mybatisplus.core.conditions.query.QueryWrapper<SysUser>()
+                new com.baomidou.mybatisplus.core.conditions.query.QueryWrapper<SysUserDO>()
                         .select("id", "username", "password", "display_name", "role", "enabled")
                         .eq("username", username));
     }
 
-    public SysUser findById(Long id) {
+    public SysUserDO findById(Long id) {
         return sysUserMapper.selectById(id);
     }
 
-    public List<SysUser> listAll() {
+    public List<SysUserDO> listAll() {
         return sysUserMapper.selectList(null);
     }
 
-    public SysUser create(String username, String rawPassword, String displayName, String role) {
+    public SysUserDO create(String username, String rawPassword, String displayName, String role) {
         String normalizedUsername = requireText(username, "用户名");
         String normalizedDisplayName = requireText(displayName, "显示名");
         String normalizedRole = requireRole(role);
@@ -50,7 +52,7 @@ public class SysUserService {
             throw new IllegalArgumentException("用户名已存在: " + normalizedUsername);
         }
 
-        SysUser user = new SysUser();
+        SysUserDO user = new SysUserDO();
         user.setUsername(normalizedUsername);
         user.setPassword(encoder.encode(rawPassword));
         user.setDisplayName(normalizedDisplayName);
@@ -65,7 +67,7 @@ public class SysUserService {
     }
 
     public void update(Long id, String displayName, String rawPassword, String role) {
-        SysUser user = sysUserMapper.selectById(id);
+        SysUserDO user = sysUserMapper.selectById(id);
         if (user == null) throw new IllegalArgumentException("用户不存在: " + id);
         if (displayName != null) user.setDisplayName(displayName);
         if (rawPassword != null && !rawPassword.isBlank()) user.setPassword(encoder.encode(rawPassword));
@@ -74,13 +76,13 @@ public class SysUserService {
     }
 
     public void disable(Long id) {
-        SysUser user = sysUserMapper.selectById(id);
+        SysUserDO user = sysUserMapper.selectById(id);
         if (user == null) throw new IllegalArgumentException("用户不存在: " + id);
         user.setEnabled(0);
         sysUserMapper.updateById(user);
     }
 
-    public boolean checkPassword(SysUser user, String rawPassword) {
+    public boolean checkPassword(SysUserDO user, String rawPassword) {
         return encoder.matches(rawPassword, user.getPassword());
     }
 

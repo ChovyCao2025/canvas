@@ -1,8 +1,8 @@
 package org.chovy.canvas.engine.trigger;
 
 import org.chovy.canvas.common.MapFieldKeys;
-import org.chovy.canvas.domain.constant.TriggerType;
-import org.chovy.canvas.domain.constant.NodeType;
+import org.chovy.canvas.common.enums.TriggerType;
+import org.chovy.canvas.common.enums.NodeType;
 import org.chovy.canvas.engine.dag.DagGraph;
 import org.chovy.canvas.engine.dag.DagParser;
 import org.chovy.canvas.engine.schedule.ScheduleKey;
@@ -25,6 +25,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicBoolean;
+import org.chovy.canvas.dal.mapper.CanvasMapper;
 
 /**
  * 画布定时调度服务（设计文档 18.1 节）。
@@ -44,8 +45,8 @@ public class CanvasSchedulerService {
 
     @Autowired
     public CanvasSchedulerService(org.springframework.scheduling.TaskScheduler taskScheduler,
-                                  org.chovy.canvas.domain.canvas.CanvasMapper canvasMapper,
-                                  org.chovy.canvas.infra.cache.CanvasConfigCache configCache,
+                                  org.chovy.canvas.dal.mapper.CanvasMapper canvasMapper,
+                                  org.chovy.canvas.infrastructure.cache.CanvasConfigCache configCache,
                                   CanvasExecutionService executionService) {
         this.executionService = executionService;
         this.scheduleRegistrar = new LegacyTaskSchedulerRegistrar(taskScheduler);

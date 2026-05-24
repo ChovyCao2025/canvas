@@ -22,6 +22,8 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import org.chovy.canvas.dal.dataobject.TagImportSourceDO;
+import org.chovy.canvas.dal.mapper.TagImportSourceMapper;
 
 @Service
 @RequiredArgsConstructor
@@ -34,13 +36,13 @@ public class TagImportSourceService {
     private final ObjectMapper objectMapper;
     private final WebClient.Builder webClientBuilder;
 
-    public List<TagImportSource> list(Integer enabled) {
-        return tagImportSourceMapper.selectList(new LambdaQueryWrapper<TagImportSource>()
-                .eq(enabled != null, TagImportSource::getEnabled, enabled)
-                .orderByDesc(TagImportSource::getId));
+    public List<TagImportSourceDO> list(Integer enabled) {
+        return tagImportSourceMapper.selectList(new LambdaQueryWrapper<TagImportSourceDO>()
+                .eq(enabled != null, TagImportSourceDO::getEnabled, enabled)
+                .orderByDesc(TagImportSourceDO::getId));
     }
 
-    public TagImportSource create(TagImportSource body) {
+    public TagImportSourceDO create(TagImportSourceDO body) {
         validateAndNormalize(body);
         applyDefaults(body);
         parseFieldMapping(body);
@@ -48,7 +50,7 @@ public class TagImportSourceService {
         return body;
     }
 
-    public void update(Long id, TagImportSource body) {
+    public void update(Long id, TagImportSourceDO body) {
         validateAndNormalize(body);
         applyDefaults(body);
         parseFieldMapping(body);
@@ -63,7 +65,7 @@ public class TagImportSourceService {
     }
 
     public TagImportResult run(Long id) {
-        TagImportSource source = requireExisting(id);
+        TagImportSourceDO source = requireExisting(id);
         if (source.getEnabled() == null || source.getEnabled() != 1) {
             throw new IllegalArgumentException("tag import source is disabled: " + id);
         }
@@ -74,7 +76,7 @@ public class TagImportSourceService {
         return tagImportService.importRows("API_PULL", null, source.getUrl(), rows);
     }
 
-    List<TagImportRow> mapRows(TagImportSource source, List<Map<String, Object>> records) {
+    List<TagImportRow> mapRows(TagImportSourceDO source, List<Map<String, Object>> records) {
         Map<String, String> fieldMapping = parseFieldMapping(source);
         List<Map<String, Object>> safeRecords = records == null ? List.of() : records;
         return java.util.stream.IntStream.range(0, safeRecords.size())
@@ -82,15 +84,15 @@ public class TagImportSourceService {
                 .toList();
     }
 
-    private TagImportSource requireExisting(Long id) {
-        TagImportSource source = tagImportSourceMapper.selectById(id);
+    private TagImportSourceDO requireExisting(Long id) {
+        TagImportSourceDO source = tagImportSourceMapper.selectById(id);
         if (source == null) {
             throw new IllegalArgumentException("tag import source not found: " + id);
         }
         return source;
     }
 
-    private JsonNode executeRequest(TagImportSource source) {
+    private JsonNode executeRequest(TagImportSourceDO source) {
         HttpMethod method = resolveMethod(source.getMethod());
         WebClient.RequestBodyUriSpec request = webClientBuilder.build().method(method);
         WebClient.RequestHeadersSpec<?> spec = request.uri(source.getUrl());
@@ -129,7 +131,7 @@ public class TagImportSourceService {
         }
     }
 
-    private List<Map<String, Object>> resolveRecords(TagImportSource source, JsonNode response) {
+    private List<Map<String, Object>> resolveRecords(TagImportSourceDO source, JsonNode response) {
         String recordsPath = normalizeRecordsPath(source.getRecordsPath());
         JsonNode recordsNode;
         if ("$".equals(recordsPath)) {
@@ -149,7 +151,7 @@ public class TagImportSourceService {
         return objectMapper.convertValue(recordsNode, new TypeReference<>() {});
     }
 
-    private Map<String, String> parseFieldMapping(TagImportSource source) {
+    private Map<String, String> parseFieldMapping(TagImportSourceDO source) {
         try {
             Map<String, String> mapping = objectMapper.readValue(source.getFieldMapping(), new TypeReference<>() {});
             if (mapping == null || mapping.isEmpty()) {
@@ -222,7 +224,7 @@ public class TagImportSourceService {
         return LocalDateTime.parse(text, TAG_TIME_FORMATTER);
     }
 
-    private static void validateAndNormalize(TagImportSource body) {
+    private static void validateAndNormalize(TagImportSourceDO body) {
         if (body == null) {
             throw new IllegalArgumentException("tag import source body is required");
         }
@@ -249,7 +251,7 @@ public class TagImportSourceService {
         body.setFieldMapping(body.getFieldMapping().trim());
     }
 
-    private static void applyDefaults(TagImportSource body) {
+    private static void applyDefaults(TagImportSourceDO body) {
         if (body.getEnabled() == null) {
             body.setEnabled(1);
         }

@@ -2,9 +2,9 @@ package org.chovy.canvas.domain.cdp;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import lombok.RequiredArgsConstructor;
-import org.chovy.canvas.domain.constant.ExecutionStatus;
-import org.chovy.canvas.domain.execution.CanvasExecution;
-import org.chovy.canvas.domain.execution.CanvasExecutionMapper;
+import org.chovy.canvas.common.enums.ExecutionStatus;
+import org.chovy.canvas.dal.dataobject.CanvasExecutionDO;
+import org.chovy.canvas.dal.mapper.CanvasExecutionMapper;
 import org.chovy.canvas.dto.cdp.CanvasUserRowDTO;
 import org.springframework.stereotype.Service;
 
@@ -15,6 +15,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
+import org.chovy.canvas.dal.dataobject.CdpUserProfileDO;
+import org.chovy.canvas.dal.mapper.CdpUserProfileMapper;
 
 @Service
 @RequiredArgsConstructor
@@ -26,23 +28,23 @@ public class CdpUserDirectoryService {
 
     public List<CanvasUserRowDTO> listUsers(String keyword) {
         String normalizedKeyword = keyword == null ? null : keyword.trim();
-        List<CdpUserProfile> profiles = profileMapper.selectList(new LambdaQueryWrapper<CdpUserProfile>()
-                .like(normalizedKeyword != null && !normalizedKeyword.isBlank(), CdpUserProfile::getUserId, normalizedKeyword)
+        List<CdpUserProfileDO> profiles = profileMapper.selectList(new LambdaQueryWrapper<CdpUserProfileDO>()
+                .like(normalizedKeyword != null && !normalizedKeyword.isBlank(), CdpUserProfileDO::getUserId, normalizedKeyword)
                 .or(normalizedKeyword != null && !normalizedKeyword.isBlank())
-                .like(normalizedKeyword != null && !normalizedKeyword.isBlank(), CdpUserProfile::getDisplayName, normalizedKeyword)
-                .orderByDesc(CdpUserProfile::getLastSeenAt)
-                .orderByDesc(CdpUserProfile::getId));
+                .like(normalizedKeyword != null && !normalizedKeyword.isBlank(), CdpUserProfileDO::getDisplayName, normalizedKeyword)
+                .orderByDesc(CdpUserProfileDO::getLastSeenAt)
+                .orderByDesc(CdpUserProfileDO::getId));
 
         if (profiles.isEmpty()) {
             return List.of();
         }
 
-        Set<String> userIds = profiles.stream().map(CdpUserProfile::getUserId).collect(Collectors.toSet());
-        List<CanvasExecution> executions = executionMapper.selectList(new LambdaQueryWrapper<CanvasExecution>()
-                .in(CanvasExecution::getUserId, userIds)
-                .orderByDesc(CanvasExecution::getCreatedAt));
-        Map<String, List<CanvasExecution>> executionsByUser = new LinkedHashMap<>();
-        for (CanvasExecution execution : executions) {
+        Set<String> userIds = profiles.stream().map(CdpUserProfileDO::getUserId).collect(Collectors.toSet());
+        List<CanvasExecutionDO> executions = executionMapper.selectList(new LambdaQueryWrapper<CanvasExecutionDO>()
+                .in(CanvasExecutionDO::getUserId, userIds)
+                .orderByDesc(CanvasExecutionDO::getCreatedAt));
+        Map<String, List<CanvasExecutionDO>> executionsByUser = new LinkedHashMap<>();
+        for (CanvasExecutionDO execution : executions) {
             executionsByUser.computeIfAbsent(execution.getUserId(), ignored -> new java.util.ArrayList<>()).add(execution);
         }
 
@@ -51,15 +53,15 @@ public class CdpUserDirectoryService {
                 .toList();
     }
 
-    private CanvasUserRowDTO toRow(CdpUserProfile profile, List<CanvasExecution> executions) {
+    private CanvasUserRowDTO toRow(CdpUserProfileDO profile, List<CanvasExecutionDO> executions) {
         long successCount = executions.stream()
                 .filter(item -> item.getStatus() != null && item.getStatus() == ExecutionStatus.SUCCESS.getCode())
                 .count();
         long failedCount = executions.stream()
                 .filter(item -> item.getStatus() != null && item.getStatus() == ExecutionStatus.FAILED.getCode())
                 .count();
-        CanvasExecution latest = executions.stream()
-                .max(Comparator.comparing(CanvasExecution::getCreatedAt, Comparator.nullsLast(Comparator.naturalOrder())))
+        CanvasExecutionDO latest = executions.stream()
+                .max(Comparator.comparing(CanvasExecutionDO::getCreatedAt, Comparator.nullsLast(Comparator.naturalOrder())))
                 .orElse(null);
         LocalDateTime firstEnteredAt = profile.getFirstSeenAt();
         LocalDateTime lastEnteredAt = profile.getLastSeenAt();

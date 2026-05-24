@@ -9,6 +9,10 @@ import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
 import java.util.Locale;
+import org.chovy.canvas.dal.dataobject.CdpUserIdentityDO;
+import org.chovy.canvas.dal.mapper.CdpUserIdentityMapper;
+import org.chovy.canvas.dal.dataobject.CdpUserProfileDO;
+import org.chovy.canvas.dal.mapper.CdpUserProfileMapper;
 
 @Service
 @RequiredArgsConstructor
@@ -17,10 +21,10 @@ public class CdpUserService {
     private final CdpUserProfileMapper profileMapper;
     private final CdpUserIdentityMapper identityMapper;
 
-    public CdpUserProfile ensureUser(String userId, String sourceType, String sourceRefId) {
+    public CdpUserProfileDO ensureUser(String userId, String sourceType, String sourceRefId) {
         String normalized = requireUserId(userId);
-        CdpUserProfile existing = profileMapper.selectOne(
-                new LambdaQueryWrapper<CdpUserProfile>().eq(CdpUserProfile::getUserId, normalized));
+        CdpUserProfileDO existing = profileMapper.selectOne(
+                new LambdaQueryWrapper<CdpUserProfileDO>().eq(CdpUserProfileDO::getUserId, normalized));
         LocalDateTime now = LocalDateTime.now();
         if (existing != null) {
             if (existing.getFirstSeenAt() == null) {
@@ -31,7 +35,7 @@ public class CdpUserService {
             return existing;
         }
 
-        CdpUserProfile created = new CdpUserProfile();
+        CdpUserProfileDO created = new CdpUserProfileDO();
         created.setUserId(normalized);
         created.setDisplayName(normalized);
         created.setStatus("ACTIVE");
@@ -39,7 +43,7 @@ public class CdpUserService {
         created.setLastSeenAt(now);
         profileMapper.insert(created);
 
-        CdpUserIdentity identity = new CdpUserIdentity();
+        CdpUserIdentityDO identity = new CdpUserIdentityDO();
         identity.setUserId(normalized);
         identity.setIdentityType("USER_ID");
         identity.setIdentityValue(normalized);
@@ -51,24 +55,24 @@ public class CdpUserService {
         return created;
     }
 
-    public CdpUserProfile ensureUserByIdentity(String identityType, String identityValue, String sourceType, String sourceRefId) {
+    public CdpUserProfileDO ensureUserByIdentity(String identityType, String identityValue, String sourceType, String sourceRefId) {
         String normalizedType = normalizeIdentityType(identityType);
         String normalizedValue = requireUserId(identityValue);
         if ("USER_ID".equals(normalizedType)) {
             return ensureUser(normalizedValue, sourceType, sourceRefId);
         }
 
-        CdpUserIdentity existingIdentity = identityMapper.selectOne(new LambdaQueryWrapper<CdpUserIdentity>()
-                .eq(CdpUserIdentity::getIdentityType, normalizedType)
-                .eq(CdpUserIdentity::getIdentityValue, normalizedValue)
+        CdpUserIdentityDO existingIdentity = identityMapper.selectOne(new LambdaQueryWrapper<CdpUserIdentityDO>()
+                .eq(CdpUserIdentityDO::getIdentityType, normalizedType)
+                .eq(CdpUserIdentityDO::getIdentityValue, normalizedValue)
                 .last("LIMIT 1"));
         if (existingIdentity != null) {
             return ensureUser(existingIdentity.getUserId(), sourceType, sourceRefId);
         }
 
         String generatedUserId = normalizedType.toLowerCase(Locale.ROOT) + ":" + normalizedValue;
-        CdpUserProfile profile = ensureUser(generatedUserId, sourceType, sourceRefId);
-        CdpUserIdentity identity = new CdpUserIdentity();
+        CdpUserProfileDO profile = ensureUser(generatedUserId, sourceType, sourceRefId);
+        CdpUserIdentityDO identity = new CdpUserIdentityDO();
         identity.setUserId(profile.getUserId());
         identity.setIdentityType(normalizedType);
         identity.setIdentityValue(normalizedValue);
@@ -78,9 +82,9 @@ public class CdpUserService {
         try {
             identityMapper.insert(identity);
         } catch (DuplicateKeyException duplicate) {
-            CdpUserIdentity raced = identityMapper.selectOne(new LambdaQueryWrapper<CdpUserIdentity>()
-                    .eq(CdpUserIdentity::getIdentityType, normalizedType)
-                    .eq(CdpUserIdentity::getIdentityValue, normalizedValue)
+            CdpUserIdentityDO raced = identityMapper.selectOne(new LambdaQueryWrapper<CdpUserIdentityDO>()
+                    .eq(CdpUserIdentityDO::getIdentityType, normalizedType)
+                    .eq(CdpUserIdentityDO::getIdentityValue, normalizedValue)
                     .last("LIMIT 1"));
             if (raced != null) {
                 return ensureUser(raced.getUserId(), sourceType, sourceRefId);
@@ -90,16 +94,16 @@ public class CdpUserService {
         return profile;
     }
 
-    public CdpUserProfile getRequiredProfile(String userId) {
-        CdpUserProfile profile = profileMapper.selectOne(
-                new LambdaQueryWrapper<CdpUserProfile>().eq(CdpUserProfile::getUserId, requireUserId(userId)));
+    public CdpUserProfileDO getRequiredProfile(String userId) {
+        CdpUserProfileDO profile = profileMapper.selectOne(
+                new LambdaQueryWrapper<CdpUserProfileDO>().eq(CdpUserProfileDO::getUserId, requireUserId(userId)));
         if (profile == null) {
             throw new IllegalArgumentException("CDP用户不存在: " + userId);
         }
         return profile;
     }
 
-    public CdpUserDetailDTO toDetail(CdpUserProfile profile) {
+    public CdpUserDetailDTO toDetail(CdpUserProfileDO profile) {
         return new CdpUserDetailDTO(
                 profile.getUserId(),
                 profile.getDisplayName(),

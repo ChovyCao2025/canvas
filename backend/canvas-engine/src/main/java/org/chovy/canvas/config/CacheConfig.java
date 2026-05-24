@@ -6,9 +6,9 @@ import org.chovy.cache.TieredCacheManager;
 import org.chovy.cache.strategy.AvalancheProtectionStrategy;
 import org.chovy.cache.strategy.BreakdownProtectionStrategy;
 import org.chovy.cache.strategy.PenetrationProtectionStrategy;
-import org.chovy.canvas.domain.canvas.Canvas;
-import org.chovy.canvas.domain.canvas.CanvasMapper;
-import org.chovy.canvas.domain.canvas.CanvasVersionMapper;
+import org.chovy.canvas.dal.dataobject.CanvasDO;
+import org.chovy.canvas.dal.mapper.CanvasMapper;
+import org.chovy.canvas.dal.mapper.CanvasVersionMapper;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
@@ -48,9 +48,9 @@ public class CacheConfig {
     }
 
     @Bean("canvasEntityTieredCache")
-    TieredCache<Long, Canvas> canvasEntityCache(TieredCacheManager manager,
+    TieredCache<Long, CanvasDO> canvasEntityCache(TieredCacheManager manager,
                                                 CanvasMapper mapper) {
-        return TieredCacheBuilder.<Long, Canvas>builder()
+        return TieredCacheBuilder.<Long, CanvasDO>builder()
                 .name("canvas-entity")
                 .l1MaxSize(500)
                 .l1RefreshAfterWrite(Duration.ofMinutes(5))
@@ -62,7 +62,7 @@ public class CacheConfig {
                 .breakdown(BreakdownProtectionStrategy.LOCAL_SINGLE_FLIGHT)
                 .avalanche(AvalancheProtectionStrategy.TTL_JITTER)
                 .loader(mapper::selectById)
-                .valueType(Canvas.class)
+                .valueType(CanvasDO.class)
                 .build(manager);
     }
 }

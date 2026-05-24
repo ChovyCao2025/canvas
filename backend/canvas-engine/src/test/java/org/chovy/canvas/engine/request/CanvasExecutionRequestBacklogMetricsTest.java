@@ -1,6 +1,6 @@
 package org.chovy.canvas.engine.request;
 
-import org.chovy.canvas.domain.execution.CanvasExecutionRequestMapper;
+import org.chovy.canvas.dal.mapper.CanvasExecutionRequestMapper;
 import org.chovy.canvas.domain.execution.CanvasExecutionRequestStatusCount;
 import org.chovy.canvas.engine.scheduler.CanvasMetrics;
 import org.junit.jupiter.api.Test;
@@ -11,6 +11,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import org.chovy.canvas.domain.execution.CanvasExecutionRequestStatusCount;
 
 class CanvasExecutionRequestBacklogMetricsTest {
 

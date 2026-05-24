@@ -3,8 +3,8 @@ package org.chovy.canvas.domain.notification;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.chovy.canvas.auth.domain.SysUser;
-import org.chovy.canvas.auth.domain.SysUserMapper;
+import org.chovy.canvas.dal.dataobject.SysUserDO;
+import org.chovy.canvas.dal.mapper.SysUserMapper;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -18,12 +18,12 @@ public class NotificationRecipientService {
 
     public List<String> activeAdmins() {
         try {
-            return userMapper.selectList(new LambdaQueryWrapper<SysUser>()
-                            .eq(SysUser::getEnabled, 1)
-                            .eq(SysUser::getRole, "ADMIN")
-                            .orderByAsc(SysUser::getUsername))
+            return userMapper.selectList(new LambdaQueryWrapper<SysUserDO>()
+                            .eq(SysUserDO::getEnabled, 1)
+                            .eq(SysUserDO::getRole, "ADMIN")
+                            .orderByAsc(SysUserDO::getUsername))
                     .stream()
-                    .map(SysUser::getUsername)
+                    .map(SysUserDO::getUsername)
                     .filter(this::hasText)
                     .distinct()
                     .toList();

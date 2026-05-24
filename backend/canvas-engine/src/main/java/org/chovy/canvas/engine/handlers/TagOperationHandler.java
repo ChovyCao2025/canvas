@@ -3,9 +3,9 @@ package org.chovy.canvas.engine.handlers;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import org.chovy.canvas.common.MapFieldKeys;
-import org.chovy.canvas.domain.constant.NodeType;
-import org.chovy.canvas.domain.customer.CustomerTag;
-import org.chovy.canvas.domain.customer.CustomerTagMapper;
+import org.chovy.canvas.common.enums.NodeType;
+import org.chovy.canvas.dal.dataobject.CustomerTagDO;
+import org.chovy.canvas.dal.mapper.CustomerTagMapper;
 import org.chovy.canvas.engine.context.ExecutionContext;
 import org.chovy.canvas.engine.handler.NodeHandler;
 import org.chovy.canvas.engine.handler.NodeHandlerType;
@@ -37,9 +37,9 @@ public class TagOperationHandler implements NodeHandler {
             for (Object tag : tags) {
                 if (tag == null || tag.toString().isBlank()) continue;
                 if ("REMOVE".equalsIgnoreCase(operation)) {
-                    changed += tagMapper.delete(new LambdaQueryWrapper<CustomerTag>()
-                            .eq(CustomerTag::getUserId, ctx.getUserId())
-                            .eq(CustomerTag::getTag, tag.toString()));
+                    changed += tagMapper.delete(new LambdaQueryWrapper<CustomerTagDO>()
+                            .eq(CustomerTagDO::getUserId, ctx.getUserId())
+                            .eq(CustomerTagDO::getTag, tag.toString()));
                 } else {
                     upsertTag(ctx, tag.toString(), op);
                     changed++;
@@ -50,7 +50,7 @@ public class TagOperationHandler implements NodeHandler {
     }
 
     private void upsertTag(ExecutionContext ctx, String tag, Map<String, Object> op) {
-        CustomerTag entity = new CustomerTag();
+        CustomerTagDO entity = new CustomerTagDO();
         entity.setUserId(ctx.getUserId());
         entity.setTag(tag);
         entity.setSource(ctx.getExecutionId());
@@ -58,9 +58,9 @@ public class TagOperationHandler implements NodeHandler {
         if (op.get("expireAfterDays") instanceof Number days) {
             entity.setExpiresAt(LocalDateTime.now().plusDays(days.longValue()));
         }
-        int updated = tagMapper.update(entity, new LambdaUpdateWrapper<CustomerTag>()
-                .eq(CustomerTag::getUserId, ctx.getUserId())
-                .eq(CustomerTag::getTag, tag));
+        int updated = tagMapper.update(entity, new LambdaUpdateWrapper<CustomerTagDO>()
+                .eq(CustomerTagDO::getUserId, ctx.getUserId())
+                .eq(CustomerTagDO::getTag, tag));
         if (updated == 0) {
             entity.setCreatedAt(LocalDateTime.now());
             tagMapper.insert(entity);

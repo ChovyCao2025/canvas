@@ -16,6 +16,9 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import org.chovy.canvas.dal.dataobject.AbExperimentGroupDO;
+import org.chovy.canvas.dal.mapper.AbExperimentGroupMapper;
+import org.chovy.canvas.dto.StubOption;
 
 class AbExperimentGroupServiceTest {
 
@@ -23,7 +26,7 @@ class AbExperimentGroupServiceTest {
     static void initMyBatisPlusTableInfo() {
         TableInfoHelper.initTableInfo(
                 new MapperBuilderAssistant(new MybatisConfiguration(), ""),
-                AbExperimentGroup.class);
+                AbExperimentGroupDO.class);
     }
 
     @Test
@@ -33,7 +36,7 @@ class AbExperimentGroupServiceTest {
 
         service.ensureDefaultGroups(12L);
 
-        verify(mapper, times(2)).insert(argThat((AbExperimentGroup group) ->
+        verify(mapper, times(2)).insert(argThat((AbExperimentGroupDO group) ->
                 group.getExperimentId().equals(12L)
                         && List.of("A", "B").contains(group.getGroupKey())
                         && group.getEnabled() == 1));
@@ -42,7 +45,7 @@ class AbExperimentGroupServiceTest {
     @Test
     void activeOptionsMapsGroupKeyToLabel() {
         AbExperimentGroupMapper mapper = mock(AbExperimentGroupMapper.class);
-        AbExperimentGroup group = new AbExperimentGroup();
+        AbExperimentGroupDO group = new AbExperimentGroupDO();
         group.setGroupKey("A");
         group.setLabel("A组");
         when(mapper.selectList(any())).thenReturn(List.of(group));
@@ -59,7 +62,7 @@ class AbExperimentGroupServiceTest {
         when(mapper.selectById(99L)).thenReturn(null);
         AbExperimentGroupService service = new AbExperimentGroupService(mapper);
 
-        assertThatThrownBy(() -> service.update(1L, 99L, new AbExperimentGroup()))
+        assertThatThrownBy(() -> service.update(1L, 99L, new AbExperimentGroupDO()))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("AB 分组不存在");
     }
@@ -67,13 +70,13 @@ class AbExperimentGroupServiceTest {
     @Test
     void updateRejectsGroupFromOtherExperiment() {
         AbExperimentGroupMapper mapper = mock(AbExperimentGroupMapper.class);
-        AbExperimentGroup existing = new AbExperimentGroup();
+        AbExperimentGroupDO existing = new AbExperimentGroupDO();
         existing.setId(99L);
         existing.setExperimentId(2L);
         when(mapper.selectById(99L)).thenReturn(existing);
         AbExperimentGroupService service = new AbExperimentGroupService(mapper);
 
-        assertThatThrownBy(() -> service.update(1L, 99L, new AbExperimentGroup()))
+        assertThatThrownBy(() -> service.update(1L, 99L, new AbExperimentGroupDO()))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("不属于当前实验");
     }

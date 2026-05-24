@@ -17,6 +17,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import org.chovy.canvas.dal.dataobject.NotificationDO;
 
 class NotificationWebSocketHandlerTest {
 
@@ -43,7 +44,7 @@ class NotificationWebSocketHandlerTest {
         NotificationWebSocketHandler handler =
                 new NotificationWebSocketHandler(ticketService, notificationService, realtimeService);
         WebSocketSession session = session("ws://localhost/canvas/ws/notifications?ticket=ntf_ws_1");
-        Notification notification = new Notification();
+        NotificationDO notification = new NotificationDO();
         notification.setNotificationId("ntf_1");
         notification.setType("TASK_SUCCEEDED");
         when(ticketService.consumeTicket("ntf_ws_1")).thenReturn("alice");

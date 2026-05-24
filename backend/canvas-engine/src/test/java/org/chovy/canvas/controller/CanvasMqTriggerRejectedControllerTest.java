@@ -1,12 +1,12 @@
-package org.chovy.canvas.controller;
+package org.chovy.canvas.web;
 
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import org.chovy.canvas.common.R;
-import org.chovy.canvas.domain.execution.CanvasMqTriggerRejected;
-import org.chovy.canvas.domain.execution.CanvasMqTriggerRejectedMapper;
+import org.chovy.canvas.dal.dataobject.CanvasMqTriggerRejectedDO;
+import org.chovy.canvas.dal.mapper.CanvasMqTriggerRejectedMapper;
 import org.chovy.canvas.engine.disruptor.CanvasDisruptorService;
 import org.chovy.canvas.engine.request.CanvasExecutionRequestService;
-import org.chovy.canvas.infra.redis.TriggerRouteService;
+import org.chovy.canvas.infrastructure.redis.TriggerRouteService;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -27,7 +27,7 @@ class CanvasMqTriggerRejectedControllerTest {
     void listReturnsRejectedMessagesPage() {
         CanvasMqTriggerRejectedMapper mapper = mock(CanvasMqTriggerRejectedMapper.class);
         CanvasMqTriggerRejectedController controller = controller(mapper);
-        Page<CanvasMqTriggerRejected> page = new Page<>(1, 20);
+        Page<CanvasMqTriggerRejectedDO> page = new Page<>(1, 20);
         page.setTotal(1);
         page.setRecords(List.of(rejected()));
         when(mapper.selectPage(any(), any())).thenReturn(page);
@@ -45,7 +45,7 @@ class CanvasMqTriggerRejectedControllerTest {
         CanvasDisruptorService disruptor = mock(CanvasDisruptorService.class);
         CanvasMqTriggerRejectedController controller =
                 new CanvasMqTriggerRejectedController(mapper, routeService, requestService, disruptor, new com.fasterxml.jackson.databind.ObjectMapper());
-        CanvasMqTriggerRejected rejected = rejected();
+        CanvasMqTriggerRejectedDO rejected = rejected();
         when(mapper.selectById(1L)).thenReturn(rejected);
         when(routeService.getCanvasByMqTopic("ORDER_PAID")).thenReturn(Set.of("101", "202"));
         when(requestService.enqueue(eq(101L), eq("user-7"), any(), any(), eq("ORDER_PAID"), any(), eq("MSG-1")))
@@ -65,7 +65,7 @@ class CanvasMqTriggerRejectedControllerTest {
     void replayRejectsInvalidStoredJson() {
         CanvasMqTriggerRejectedMapper mapper = mock(CanvasMqTriggerRejectedMapper.class);
         CanvasMqTriggerRejectedController controller = controller(mapper);
-        CanvasMqTriggerRejected rejected = rejected();
+        CanvasMqTriggerRejectedDO rejected = rejected();
         rejected.setBody("{bad-json");
         when(mapper.selectById(1L)).thenReturn(rejected);
 
@@ -84,8 +84,8 @@ class CanvasMqTriggerRejectedControllerTest {
         );
     }
 
-    private CanvasMqTriggerRejected rejected() {
-        CanvasMqTriggerRejected rejected = new CanvasMqTriggerRejected();
+    private CanvasMqTriggerRejectedDO rejected() {
+        CanvasMqTriggerRejectedDO rejected = new CanvasMqTriggerRejectedDO();
         rejected.setId(1L);
         rejected.setMsgId("MSG-1");
         rejected.setTag("ORDER_PAID");

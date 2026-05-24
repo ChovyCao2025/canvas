@@ -3,10 +3,10 @@ package org.chovy.canvas.config;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.chovy.cache.TieredCache;
 import org.chovy.cache.TieredCacheManager;
-import org.chovy.canvas.domain.canvas.Canvas;
-import org.chovy.canvas.domain.canvas.CanvasMapper;
-import org.chovy.canvas.domain.canvas.CanvasVersionMapper;
-import org.chovy.canvas.infra.cache.CanvasEntityCache;
+import org.chovy.canvas.dal.dataobject.CanvasDO;
+import org.chovy.canvas.dal.mapper.CanvasMapper;
+import org.chovy.canvas.dal.mapper.CanvasVersionMapper;
+import org.chovy.canvas.infrastructure.cache.CanvasEntityCache;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 import org.springframework.data.redis.core.ReactiveStringRedisTemplate;
@@ -37,7 +37,7 @@ class CacheConfigTest {
             assertThat(context.getBean("canvasEntityCache")).isInstanceOf(CanvasEntityCache.class);
 
             @SuppressWarnings("unchecked")
-            TieredCache<Long, Canvas> cache = context.getBean("canvasEntityTieredCache", TieredCache.class);
+            TieredCache<Long, CanvasDO> cache = context.getBean("canvasEntityTieredCache", TieredCache.class);
             assertThat(cache.name()).isEqualTo("canvas-entity");
         });
     }

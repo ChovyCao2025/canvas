@@ -1,15 +1,18 @@
 package org.chovy.canvas.domain.execution;
 
-import org.chovy.canvas.domain.meta.EventLog;
+import org.chovy.canvas.dal.dataobject.EventLogDO;
 import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import org.chovy.canvas.dal.dataobject.CanvasExecutionDO;
+import org.chovy.canvas.dal.dataobject.CanvasExecutionDlqDO;
+import org.chovy.canvas.dal.dataobject.CanvasExecutionRequestDO;
 
 class PerfRunEntityMappingTest {
 
     @Test
     void eventLogExposesPerfRunId() {
-        EventLog log = new EventLog();
+        EventLogDO log = new EventLogDO();
         log.setPerfRunId("perf_20260523_001");
 
         assertThat(log.getPerfRunId()).isEqualTo("perf_20260523_001");
@@ -17,7 +20,7 @@ class PerfRunEntityMappingTest {
 
     @Test
     void executionExposesPerfRunId() {
-        CanvasExecution execution = new CanvasExecution();
+        CanvasExecutionDO execution = new CanvasExecutionDO();
         execution.setPerfRunId("perf_20260523_001");
 
         assertThat(execution.getPerfRunId()).isEqualTo("perf_20260523_001");
@@ -25,7 +28,7 @@ class PerfRunEntityMappingTest {
 
     @Test
     void executionRequestExposesPerfRunId() {
-        CanvasExecutionRequest request = new CanvasExecutionRequest();
+        CanvasExecutionRequestDO request = new CanvasExecutionRequestDO();
         request.setPerfRunId("perf_20260523_001");
 
         assertThat(request.getPerfRunId()).isEqualTo("perf_20260523_001");
@@ -33,7 +36,7 @@ class PerfRunEntityMappingTest {
 
     @Test
     void dlqExposesPerfRunId() {
-        CanvasExecutionDlq dlq = CanvasExecutionDlq.builder()
+        CanvasExecutionDlqDO dlq = CanvasExecutionDlqDO.builder()
                 .perfRunId("perf_20260523_001")
                 .build();
 

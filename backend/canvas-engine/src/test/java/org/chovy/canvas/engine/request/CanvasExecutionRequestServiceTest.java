@@ -1,10 +1,10 @@
 package org.chovy.canvas.engine.request;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import org.chovy.canvas.domain.constant.NodeType;
-import org.chovy.canvas.domain.constant.TriggerType;
-import org.chovy.canvas.domain.execution.CanvasExecutionRequest;
-import org.chovy.canvas.domain.execution.CanvasExecutionRequestMapper;
+import org.chovy.canvas.common.enums.NodeType;
+import org.chovy.canvas.common.enums.TriggerType;
+import org.chovy.canvas.dal.dataobject.CanvasExecutionRequestDO;
+import org.chovy.canvas.dal.mapper.CanvasExecutionRequestMapper;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 
@@ -34,9 +34,9 @@ class CanvasExecutionRequestServiceTest {
         );
 
         assertThat(requestId).startsWith("mq-10-");
-        ArgumentCaptor<CanvasExecutionRequest> captor = ArgumentCaptor.forClass(CanvasExecutionRequest.class);
+        ArgumentCaptor<CanvasExecutionRequestDO> captor = ArgumentCaptor.forClass(CanvasExecutionRequestDO.class);
         verify(mapper).insertIgnore(captor.capture());
-        CanvasExecutionRequest request = captor.getValue();
+        CanvasExecutionRequestDO request = captor.getValue();
         assertThat(request.getId()).isEqualTo(requestId);
         assertThat(request.getCanvasId()).isEqualTo(10L);
         assertThat(request.getUserId()).isEqualTo("user-7");

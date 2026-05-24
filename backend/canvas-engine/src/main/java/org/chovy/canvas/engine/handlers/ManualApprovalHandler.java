@@ -2,10 +2,10 @@ package org.chovy.canvas.engine.handlers;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.chovy.canvas.common.MapFieldKeys;
-import org.chovy.canvas.domain.approval.CanvasManualApproval;
-import org.chovy.canvas.domain.approval.CanvasManualApprovalMapper;
-import org.chovy.canvas.domain.constant.ApprovalOnTimeoutAction;
-import org.chovy.canvas.domain.constant.ApprovalStatus;
+import org.chovy.canvas.dal.dataobject.CanvasManualApprovalDO;
+import org.chovy.canvas.dal.mapper.CanvasManualApprovalMapper;
+import org.chovy.canvas.common.enums.ApprovalOnTimeoutAction;
+import org.chovy.canvas.common.enums.ApprovalStatus;
 import org.chovy.canvas.domain.notification.NotificationEventService;
 import org.chovy.canvas.engine.context.ExecutionContext;
 import org.chovy.canvas.engine.context.NodeStatus;
@@ -70,7 +70,7 @@ public class ManualApprovalHandler implements NodeHandler {
         // 首次进入：创建审批记录，挂起流程
         List<String> approvers = (List<String>) config.getOrDefault("approvers", List.of());
         try {
-            CanvasManualApproval approval = CanvasManualApproval.builder()
+            CanvasManualApprovalDO approval = CanvasManualApprovalDO.builder()
                     .id(approvalId)
                     .executionId(ctx.getExecutionId())
                     .canvasId(ctx.getCanvasId())

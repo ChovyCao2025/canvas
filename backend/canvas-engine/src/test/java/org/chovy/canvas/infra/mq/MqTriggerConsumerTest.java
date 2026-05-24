@@ -1,4 +1,4 @@
-package org.chovy.canvas.infra.mq;
+package org.chovy.canvas.infrastructure.mq;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.apache.rocketmq.common.message.MessageExt;
@@ -6,15 +6,15 @@ import org.apache.rocketmq.spring.annotation.ConsumeMode;
 import org.apache.rocketmq.spring.annotation.MessageModel;
 import org.apache.rocketmq.spring.annotation.RocketMQMessageListener;
 import org.apache.rocketmq.spring.annotation.SelectorType;
-import org.chovy.canvas.domain.constant.NodeType;
-import org.chovy.canvas.domain.constant.TriggerType;
-import org.chovy.canvas.domain.execution.CanvasMqTriggerRejected;
-import org.chovy.canvas.domain.execution.CanvasMqTriggerRejectedMapper;
+import org.chovy.canvas.common.enums.NodeType;
+import org.chovy.canvas.common.enums.TriggerType;
+import org.chovy.canvas.dal.dataobject.CanvasMqTriggerRejectedDO;
+import org.chovy.canvas.dal.mapper.CanvasMqTriggerRejectedMapper;
 import org.chovy.canvas.domain.notification.NotificationEventService;
 import org.chovy.canvas.engine.disruptor.CanvasDisruptorService;
 import org.chovy.canvas.engine.request.CanvasExecutionRequestService;
 import org.chovy.canvas.engine.scheduler.CanvasMetrics;
-import org.chovy.canvas.infra.redis.TriggerRouteService;
+import org.chovy.canvas.infrastructure.redis.TriggerRouteService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -120,7 +120,7 @@ class MqTriggerConsumerTest {
         consumer.onMessage(message("ORDER_PAID", "MSG-3", "{bad-json"));
 
         verify(metrics).recordMqTriggerRejected("INVALID_BODY", "ORDER_PAID");
-        ArgumentCaptor<CanvasMqTriggerRejected> captor = ArgumentCaptor.forClass(CanvasMqTriggerRejected.class);
+        ArgumentCaptor<CanvasMqTriggerRejectedDO> captor = ArgumentCaptor.forClass(CanvasMqTriggerRejectedDO.class);
         verify(rejectedMapper).insert(captor.capture());
         assertThat(captor.getValue().getMsgId()).isEqualTo("MSG-3");
         assertThat(captor.getValue().getTag()).isEqualTo("ORDER_PAID");
@@ -143,7 +143,7 @@ class MqTriggerConsumerTest {
                 "{\"userId\":\"\",\"messageCode\":\"PAYMENT\",\"payload\":{}}"));
 
         verify(metrics).recordMqTriggerRejected("INVALID_MESSAGE", "ORDER_PAID");
-        verify(rejectedMapper).insert(any(CanvasMqTriggerRejected.class));
+        verify(rejectedMapper).insert(any(CanvasMqTriggerRejectedDO.class));
         verify(notificationEventService).systemAlert(
                 eq("MQ_TRIGGER_VALIDATE_FAILED"),
                 eq("MQ 触发消息校验失败"),

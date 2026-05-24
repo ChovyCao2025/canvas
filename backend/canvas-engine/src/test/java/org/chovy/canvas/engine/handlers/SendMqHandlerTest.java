@@ -3,11 +3,11 @@ package org.chovy.canvas.engine.handlers;
 import org.apache.rocketmq.spring.core.RocketMQTemplate;
 import org.apache.rocketmq.client.producer.SendResult;
 import org.apache.rocketmq.client.producer.SendStatus;
-import org.chovy.canvas.domain.meta.MqMessageDefinition;
-import org.chovy.canvas.domain.meta.MqMessageDefinitionMapper;
+import org.chovy.canvas.dal.dataobject.MqMessageDefinitionDO;
+import org.chovy.canvas.dal.mapper.MqMessageDefinitionMapper;
 import org.chovy.canvas.engine.context.ExecutionContext;
 import org.chovy.canvas.engine.handler.NodeResult;
-import org.chovy.canvas.infra.mq.MqTriggerMessage;
+import org.chovy.canvas.infrastructure.mq.MqTriggerMessage;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -67,7 +67,7 @@ class SendMqHandlerTest {
 
     @Test
     void executeAsyncSendsMqTriggerMessageToTopicTagDestination() {
-        MqMessageDefinition definition = new MqMessageDefinition();
+        MqMessageDefinitionDO definition = new MqMessageDefinitionDO();
         definition.setMessageCode("order_paid");
         definition.setTopic("order.paid");
         definition.setEnabled(1);
@@ -107,7 +107,7 @@ class SendMqHandlerTest {
 
     @Test
     void executeAsyncReturnsFailureWhenRocketMqSendFails() {
-        MqMessageDefinition definition = new MqMessageDefinition();
+        MqMessageDefinitionDO definition = new MqMessageDefinitionDO();
         definition.setTopic("order.paid");
         definition.setEnabled(1);
         when(mqMapper.selectOne(any())).thenReturn(definition);
@@ -122,7 +122,7 @@ class SendMqHandlerTest {
 
     @Test
     void executeAsyncBuildsPayloadFromUiInputParamsShape() {
-        MqMessageDefinition definition = enabledDefinition("order.paid");
+        MqMessageDefinitionDO definition = enabledDefinition("order.paid");
         when(mqMapper.selectOne(any())).thenReturn(definition);
         when(rocketMQTemplate.syncSendOrderly(anyString(), any(Object.class), anyString()))
                 .thenReturn(sendResult(SendStatus.SEND_OK));
@@ -153,7 +153,7 @@ class SendMqHandlerTest {
 
     @Test
     void executeAsyncBuildsPayloadFromMapShapedParams() {
-        MqMessageDefinition definition = enabledDefinition("order.paid");
+        MqMessageDefinitionDO definition = enabledDefinition("order.paid");
         when(mqMapper.selectOne(any())).thenReturn(definition);
         when(rocketMQTemplate.syncSendOrderly(anyString(), any(Object.class), anyString()))
                 .thenReturn(sendResult(SendStatus.SEND_OK));
@@ -175,7 +175,7 @@ class SendMqHandlerTest {
 
     @Test
     void executeAsyncFailsWhenRocketMqReturnsNonOkStatus() {
-        MqMessageDefinition definition = enabledDefinition("order.paid");
+        MqMessageDefinitionDO definition = enabledDefinition("order.paid");
         when(mqMapper.selectOne(any())).thenReturn(definition);
         when(rocketMQTemplate.syncSendOrderly(anyString(), any(Object.class), anyString()))
                 .thenReturn(sendResult(SendStatus.FLUSH_DISK_TIMEOUT));
@@ -188,7 +188,7 @@ class SendMqHandlerTest {
 
     @Test
     void executeAsyncFailsWhenMessageDefinitionTopicIsBlank() {
-        MqMessageDefinition definition = enabledDefinition(" ");
+        MqMessageDefinitionDO definition = enabledDefinition(" ");
         when(mqMapper.selectOne(any())).thenReturn(definition);
 
         NodeResult result = handler.executeAsync(Map.of("messageCodeKey", " order_paid "), context).block();
@@ -198,8 +198,8 @@ class SendMqHandlerTest {
         verify(rocketMQTemplate, never()).syncSendOrderly(anyString(), any(Object.class), anyString());
     }
 
-    private static MqMessageDefinition enabledDefinition(String topic) {
-        MqMessageDefinition definition = new MqMessageDefinition();
+    private static MqMessageDefinitionDO enabledDefinition(String topic) {
+        MqMessageDefinitionDO definition = new MqMessageDefinitionDO();
         definition.setMessageCode("order_paid");
         definition.setTopic(topic);
         definition.setEnabled(1);

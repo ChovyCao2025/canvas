@@ -9,6 +9,8 @@ import java.util.Arrays;
 import java.util.List;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import java.util.stream.Collectors;
+import org.chovy.canvas.dal.dataobject.CdpTagOperationDO;
+import org.chovy.canvas.dal.mapper.CdpTagOperationMapper;
 
 @Service
 @RequiredArgsConstructor
@@ -17,12 +19,12 @@ public class CdpTagOperationService {
     private final CdpTagOperationMapper operationMapper;
     private final CdpTagService tagService;
 
-    public CdpTagOperation create(CdpBatchTagReq req) {
+    public CdpTagOperationDO create(CdpBatchTagReq req) {
         List<String> userIds = req.userIds() == null ? List.of() : req.userIds();
         if (userIds.isEmpty()) {
             throw new IllegalArgumentException("批量打标用户不能为空");
         }
-        CdpTagOperation op = new CdpTagOperation();
+        CdpTagOperationDO op = new CdpTagOperationDO();
         op.setOperationType(req.operationType());
         op.setTagCode(req.tagCode());
         op.setTagValue(req.tagValue());
@@ -37,22 +39,22 @@ public class CdpTagOperationService {
         return op;
     }
 
-    public CdpTagOperation get(Long id) {
-        CdpTagOperation op = operationMapper.selectById(id);
+    public CdpTagOperationDO get(Long id) {
+        CdpTagOperationDO op = operationMapper.selectById(id);
         if (op == null) {
             throw new IllegalArgumentException("批量标签任务不存在: " + id);
         }
         return op;
     }
 
-    public List<CdpTagOperation> listRecent(int limit) {
-        return operationMapper.selectList(new LambdaQueryWrapper<CdpTagOperation>()
-                .orderByDesc(CdpTagOperation::getCreatedAt)
+    public List<CdpTagOperationDO> listRecent(int limit) {
+        return operationMapper.selectList(new LambdaQueryWrapper<CdpTagOperationDO>()
+                .orderByDesc(CdpTagOperationDO::getCreatedAt)
                 .last("LIMIT " + Math.max(1, Math.min(limit, 100))));
     }
 
-    public CdpTagOperation retryFailed(Long id, String operator) {
-        CdpTagOperation existing = get(id);
+    public CdpTagOperationDO retryFailed(Long id, String operator) {
+        CdpTagOperationDO existing = get(id);
         List<String> failedUserIds = extractFailedUserIds(existing.getErrorMsg());
         if (failedUserIds.isEmpty()) {
             throw new IllegalArgumentException("任务没有可重试的失败用户: " + id);
@@ -68,7 +70,7 @@ public class CdpTagOperationService {
         ));
     }
 
-    private void run(CdpTagOperation op, List<String> userIds, CdpBatchTagReq req) {
+    private void run(CdpTagOperationDO op, List<String> userIds, CdpBatchTagReq req) {
         int success = 0;
         int fail = 0;
         StringBuilder errors = new StringBuilder();

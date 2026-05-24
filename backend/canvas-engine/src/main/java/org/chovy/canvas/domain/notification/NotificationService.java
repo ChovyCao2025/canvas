@@ -10,6 +10,8 @@ import org.springframework.stereotype.Service;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
+import org.chovy.canvas.dal.dataobject.NotificationDO;
+import org.chovy.canvas.dal.mapper.NotificationMapper;
 
 @Service
 @RequiredArgsConstructor
@@ -26,7 +28,7 @@ public class NotificationService {
     private final NotificationMapper mapper;
     private final NotificationRealtimePublisher realtimePublisher;
 
-    public Notification createForTask(
+    public NotificationDO createForTask(
             String userId, String type, String title, String content, String targetUrl, String taskId) {
         String severity = "TASK_FAILED".equals(type) ? "ERROR" : "SUCCESS";
         return create(NotificationCreateCommand.builder()
@@ -46,8 +48,8 @@ public class NotificationService {
                 .build());
     }
 
-    public Notification create(NotificationCreateCommand command) {
-        Notification notification = new Notification();
+    public NotificationDO create(NotificationCreateCommand command) {
+        NotificationDO notification = new NotificationDO();
         notification.setNotificationId(newNotificationId());
         notification.setUserId(requireText(command.userId(), "userId"));
         notification.setType(requireText(command.type(), "type"));
@@ -67,7 +69,7 @@ public class NotificationService {
         try {
             mapper.insert(notification);
         } catch (DuplicateKeyException e) {
-            Notification existing = findExisting(notification);
+            NotificationDO existing = findExisting(notification);
             if (existing != null) {
                 return existing;
             }
@@ -81,15 +83,15 @@ public class NotificationService {
         return notification;
     }
 
-    public List<Notification> list(String userId, boolean unreadOnly, int page, int size) {
+    public List<NotificationDO> list(String userId, boolean unreadOnly, int page, int size) {
         return list(userId, unreadOnly, null, false, page, size);
     }
 
-    public List<Notification> list(
+    public List<NotificationDO> list(
             String userId, boolean unreadOnly, String category, boolean archived, int page, int size) {
         return mapper.selectPage(new Page<>(page, size), baseUserQuery(userId, unreadOnly, archived)
-                        .eq(hasText(category), Notification::getCategory, category)
-                        .orderByDesc(Notification::getCreatedAt))
+                        .eq(hasText(category), NotificationDO::getCategory, category)
+                        .orderByDesc(NotificationDO::getCreatedAt))
                 .getRecords();
     }
 
@@ -99,49 +101,49 @@ public class NotificationService {
     }
 
     public void markRead(String userId, String notificationId) {
-        Notification update = new Notification();
+        NotificationDO update = new NotificationDO();
         update.setReadAt(LocalDateTime.now());
         update.setStatus("READ");
-        mapper.update(update, new LambdaUpdateWrapper<Notification>()
-                .eq(Notification::getUserId, userId)
-                .eq(Notification::getNotificationId, notificationId)
-                .isNull(Notification::getArchivedAt)
-                .isNull(Notification::getReadAt));
+        mapper.update(update, new LambdaUpdateWrapper<NotificationDO>()
+                .eq(NotificationDO::getUserId, userId)
+                .eq(NotificationDO::getNotificationId, notificationId)
+                .isNull(NotificationDO::getArchivedAt)
+                .isNull(NotificationDO::getReadAt));
         realtimePublisher.publish("NOTIFICATION_UPDATED", userId, null, unreadCount(userId));
     }
 
     public void markAllRead(String userId) {
-        Notification update = new Notification();
+        NotificationDO update = new NotificationDO();
         update.setReadAt(LocalDateTime.now());
         update.setStatus("READ");
-        mapper.update(update, new LambdaUpdateWrapper<Notification>()
-                .eq(Notification::getUserId, userId)
-                .isNull(Notification::getArchivedAt)
-                .isNull(Notification::getReadAt));
+        mapper.update(update, new LambdaUpdateWrapper<NotificationDO>()
+                .eq(NotificationDO::getUserId, userId)
+                .isNull(NotificationDO::getArchivedAt)
+                .isNull(NotificationDO::getReadAt));
         realtimePublisher.publish("NOTIFICATION_UPDATED", userId, null, unreadCount(userId));
     }
 
     public void archive(String userId, String notificationId) {
-        Notification update = new Notification();
+        NotificationDO update = new NotificationDO();
         update.setArchivedAt(LocalDateTime.now());
         update.setStatus("ARCHIVED");
-        mapper.update(update, new LambdaUpdateWrapper<Notification>()
-                .eq(Notification::getUserId, userId)
-                .eq(Notification::getNotificationId, notificationId)
-                .isNull(Notification::getArchivedAt));
+        mapper.update(update, new LambdaUpdateWrapper<NotificationDO>()
+                .eq(NotificationDO::getUserId, userId)
+                .eq(NotificationDO::getNotificationId, notificationId)
+                .isNull(NotificationDO::getArchivedAt));
         realtimePublisher.publish("NOTIFICATION_UPDATED", userId, null, unreadCount(userId));
     }
 
-    private LambdaQueryWrapper<Notification> baseUserQuery(String userId, boolean unreadOnly, boolean archived) {
-        LambdaQueryWrapper<Notification> query = new LambdaQueryWrapper<Notification>()
-                .eq(Notification::getUserId, userId);
+    private LambdaQueryWrapper<NotificationDO> baseUserQuery(String userId, boolean unreadOnly, boolean archived) {
+        LambdaQueryWrapper<NotificationDO> query = new LambdaQueryWrapper<NotificationDO>()
+                .eq(NotificationDO::getUserId, userId);
         if (archived) {
-            query.isNotNull(Notification::getArchivedAt);
+            query.isNotNull(NotificationDO::getArchivedAt);
         } else {
-            query.isNull(Notification::getArchivedAt);
+            query.isNull(NotificationDO::getArchivedAt);
         }
         if (unreadOnly) {
-            query.isNull(Notification::getReadAt);
+            query.isNull(NotificationDO::getReadAt);
         }
         return query;
     }
@@ -150,11 +152,11 @@ public class NotificationService {
         return "ntf_" + UUID.randomUUID().toString().replace("-", "");
     }
 
-    private Notification findExisting(Notification notification) {
+    private NotificationDO findExisting(NotificationDO notification) {
         if (hasText(notification.getDedupKey())) {
-            Notification existing = mapper.selectOne(new LambdaQueryWrapper<Notification>()
-                    .eq(Notification::getUserId, notification.getUserId())
-                    .eq(Notification::getDedupKey, notification.getDedupKey())
+            NotificationDO existing = mapper.selectOne(new LambdaQueryWrapper<NotificationDO>()
+                    .eq(NotificationDO::getUserId, notification.getUserId())
+                    .eq(NotificationDO::getDedupKey, notification.getDedupKey())
                     .last("LIMIT 1"));
             if (existing != null) {
                 return existing;
@@ -163,10 +165,10 @@ public class NotificationService {
         if (!hasText(notification.getTaskId())) {
             return null;
         }
-        return mapper.selectOne(new LambdaQueryWrapper<Notification>()
-                .eq(Notification::getUserId, notification.getUserId())
-                .eq(Notification::getType, notification.getType())
-                .eq(Notification::getTaskId, notification.getTaskId())
+        return mapper.selectOne(new LambdaQueryWrapper<NotificationDO>()
+                .eq(NotificationDO::getUserId, notification.getUserId())
+                .eq(NotificationDO::getType, notification.getType())
+                .eq(NotificationDO::getTaskId, notification.getTaskId())
                 .last("LIMIT 1"));
     }
 

@@ -2,14 +2,14 @@ package org.chovy.canvas.engine.policy;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import lombok.RequiredArgsConstructor;
-import org.chovy.canvas.domain.customer.CustomerChannel;
-import org.chovy.canvas.domain.customer.CustomerChannelMapper;
-import org.chovy.canvas.domain.customer.CustomerProfile;
-import org.chovy.canvas.domain.customer.CustomerProfileMapper;
-import org.chovy.canvas.domain.customer.MarketingConsent;
-import org.chovy.canvas.domain.customer.MarketingConsentMapper;
-import org.chovy.canvas.domain.customer.MarketingSuppression;
-import org.chovy.canvas.domain.customer.MarketingSuppressionMapper;
+import org.chovy.canvas.dal.dataobject.CustomerChannelDO;
+import org.chovy.canvas.dal.mapper.CustomerChannelMapper;
+import org.chovy.canvas.dal.dataobject.CustomerProfileDO;
+import org.chovy.canvas.dal.mapper.CustomerProfileMapper;
+import org.chovy.canvas.dal.dataobject.MarketingConsentDO;
+import org.chovy.canvas.dal.mapper.MarketingConsentMapper;
+import org.chovy.canvas.dal.dataobject.MarketingSuppressionDO;
+import org.chovy.canvas.dal.mapper.MarketingSuppressionMapper;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 
@@ -36,19 +36,19 @@ public class MarketingPolicyService {
 
     public PolicyDecision consentAllowed(String userId, String channel, boolean requireExplicitConsent) {
         String normalized = normalize(channel);
-        MarketingConsent consent = consentMapper.selectOne(new LambdaQueryWrapper<MarketingConsent>()
-                .eq(MarketingConsent::getUserId, userId)
-                .eq(MarketingConsent::getChannel, normalized)
+        MarketingConsentDO consent = consentMapper.selectOne(new LambdaQueryWrapper<MarketingConsentDO>()
+                .eq(MarketingConsentDO::getUserId, userId)
+                .eq(MarketingConsentDO::getChannel, normalized)
                 .last("LIMIT 1"));
         if (consent == null) {
             return requireExplicitConsent
                     ? PolicyDecision.blocked("NO_MARKETING_CONSENT", "用户未授权该渠道营销触达")
                     : PolicyDecision.allow();
         }
-        if (MarketingConsent.OPT_OUT.equalsIgnoreCase(consent.getConsentStatus())) {
+        if (MarketingConsentDO.OPT_OUT.equalsIgnoreCase(consent.getConsentStatus())) {
             return PolicyDecision.blocked("MARKETING_OPT_OUT", "用户已退订该渠道营销触达");
         }
-        if (requireExplicitConsent && !MarketingConsent.OPT_IN.equalsIgnoreCase(consent.getConsentStatus())) {
+        if (requireExplicitConsent && !MarketingConsentDO.OPT_IN.equalsIgnoreCase(consent.getConsentStatus())) {
             return PolicyDecision.blocked("NO_MARKETING_CONSENT", "用户未授权该渠道营销触达");
         }
         return PolicyDecision.allow();
@@ -57,17 +57,17 @@ public class MarketingPolicyService {
     public PolicyDecision suppressionAllowed(String userId, String channel) {
         String normalized = normalize(channel);
         LocalDateTime now = LocalDateTime.now(clock);
-        Long count = suppressionMapper.selectCount(new LambdaQueryWrapper<MarketingSuppression>()
-                .eq(MarketingSuppression::getUserId, userId)
-                .eq(MarketingSuppression::getActive, 1)
-                .and(w -> w.isNull(MarketingSuppression::getExpiresAt)
+        Long count = suppressionMapper.selectCount(new LambdaQueryWrapper<MarketingSuppressionDO>()
+                .eq(MarketingSuppressionDO::getUserId, userId)
+                .eq(MarketingSuppressionDO::getActive, 1)
+                .and(w -> w.isNull(MarketingSuppressionDO::getExpiresAt)
                         .or()
-                        .gt(MarketingSuppression::getExpiresAt, now))
-                .and(w -> w.isNull(MarketingSuppression::getChannel)
+                        .gt(MarketingSuppressionDO::getExpiresAt, now))
+                .and(w -> w.isNull(MarketingSuppressionDO::getChannel)
                         .or()
-                        .eq(MarketingSuppression::getChannel, normalized)
+                        .eq(MarketingSuppressionDO::getChannel, normalized)
                         .or()
-                        .eq(MarketingSuppression::getChannel, "ALL")));
+                        .eq(MarketingSuppressionDO::getChannel, "ALL")));
         return count != null && count > 0
                 ? PolicyDecision.blocked("MARKETING_SUPPRESSED", "用户命中营销抑制名单")
                 : PolicyDecision.allow();
@@ -75,10 +75,10 @@ public class MarketingPolicyService {
 
     public PolicyDecision channelAvailable(String userId, String channel) {
         String normalized = normalize(channel);
-        CustomerChannel customerChannel = channelMapper.selectOne(new LambdaQueryWrapper<CustomerChannel>()
-                .eq(CustomerChannel::getUserId, userId)
-                .eq(CustomerChannel::getChannel, normalized)
-                .eq(CustomerChannel::getEnabled, 1)
+        CustomerChannelDO customerChannel = channelMapper.selectOne(new LambdaQueryWrapper<CustomerChannelDO>()
+                .eq(CustomerChannelDO::getUserId, userId)
+                .eq(CustomerChannelDO::getChannel, normalized)
+                .eq(CustomerChannelDO::getEnabled, 1)
                 .last("LIMIT 1"));
         if (customerChannel == null || customerChannel.getAddress() == null || customerChannel.getAddress().isBlank()) {
             return PolicyDecision.blocked("CHANNEL_UNAVAILABLE", "用户该渠道不可达");
@@ -87,8 +87,8 @@ public class MarketingPolicyService {
     }
 
     public ZoneId timezoneFor(String userId) {
-        CustomerProfile profile = profileMapper.selectOne(new LambdaQueryWrapper<CustomerProfile>()
-                .eq(CustomerProfile::getUserId, userId)
+        CustomerProfileDO profile = profileMapper.selectOne(new LambdaQueryWrapper<CustomerProfileDO>()
+                .eq(CustomerProfileDO::getUserId, userId)
                 .last("LIMIT 1"));
         String timezone = profile == null ? null : profile.getTimezone();
         if (timezone == null || timezone.isBlank()) {

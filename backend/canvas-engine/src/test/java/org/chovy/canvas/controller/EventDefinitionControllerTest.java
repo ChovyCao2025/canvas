@@ -1,18 +1,18 @@
-package org.chovy.canvas.controller;
+package org.chovy.canvas.web;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import org.chovy.canvas.domain.constant.CanvasStatusEnum;
-import org.chovy.canvas.domain.constant.NodeType;
-import org.chovy.canvas.domain.constant.TriggerType;
-import org.chovy.canvas.domain.meta.EventDefinition;
+import org.chovy.canvas.common.enums.CanvasStatusEnum;
+import org.chovy.canvas.common.enums.NodeType;
+import org.chovy.canvas.common.enums.TriggerType;
+import org.chovy.canvas.dal.dataobject.EventDefinitionDO;
 import org.chovy.canvas.domain.meta.EventDefinitionCacheService;
-import org.chovy.canvas.domain.meta.EventDefinitionMapper;
-import org.chovy.canvas.domain.meta.EventLog;
-import org.chovy.canvas.domain.meta.EventLogMapper;
+import org.chovy.canvas.dal.mapper.EventDefinitionMapper;
+import org.chovy.canvas.dal.dataobject.EventLogDO;
+import org.chovy.canvas.dal.mapper.EventLogMapper;
 import org.chovy.canvas.dto.EventReportReq;
 import org.chovy.canvas.engine.disruptor.CanvasDisruptorService;
 import org.chovy.canvas.engine.wait.WaitResumeService;
-import org.chovy.canvas.infra.redis.TriggerRouteService;
+import org.chovy.canvas.infrastructure.redis.TriggerRouteService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -56,7 +56,7 @@ class EventDefinitionControllerTest {
     @Test
     void reportEvent_setsCorrectCanvasCount() {
         // Arrange: valid event definition exists
-        EventDefinition def = new EventDefinition();
+        EventDefinitionDO def = new EventDefinitionDO();
         def.setEventCode("ORDER_COMPLETE");
         def.setEnabled(CanvasStatusEnum.PUBLISHED.getCode());
         when(eventDefinitionCacheService.getPublishedByCode("ORDER_COMPLETE")).thenReturn(def);
@@ -65,8 +65,8 @@ class EventDefinitionControllerTest {
         when(triggerRouteService.getCanvasByBehavior("ORDER_COMPLETE"))
                 .thenReturn(Set.of("1", "2"));
 
-        // Capture the EventLog passed to logMapper.insert()
-        ArgumentCaptor<EventLog> captor = ArgumentCaptor.forClass(EventLog.class);
+        // Capture the EventLogDO passed to logMapper.insert()
+        ArgumentCaptor<EventLogDO> captor = ArgumentCaptor.forClass(EventLogDO.class);
         doAnswer(invocation -> null).when(logMapper).insert(captor.capture());
 
         // Build request
@@ -80,8 +80,8 @@ class EventDefinitionControllerTest {
                 .block()
                 .getData();
 
-        // Assert: EventLog stored with real counts
-        EventLog insertedLog = captor.getValue();
+        // Assert: EventLogDO stored with real counts
+        EventLogDO insertedLog = captor.getValue();
         assertThat(insertedLog.getCanvasTriggered()).isEqualTo(2);
         assertThat(insertedLog.getCanvasCount()).isEqualTo(2);
 
@@ -93,7 +93,7 @@ class EventDefinitionControllerTest {
     @Test
     void reportEvent_setsZeroCanvasCount_whenNoCanvasSubscribed() {
         // Arrange: valid event definition exists but no canvas subscribed
-        EventDefinition def = new EventDefinition();
+        EventDefinitionDO def = new EventDefinitionDO();
         def.setEventCode("UNUSED_EVENT");
         def.setEnabled(CanvasStatusEnum.PUBLISHED.getCode());
         when(eventDefinitionCacheService.getPublishedByCode("UNUSED_EVENT")).thenReturn(def);
@@ -101,7 +101,7 @@ class EventDefinitionControllerTest {
         when(triggerRouteService.getCanvasByBehavior("UNUSED_EVENT"))
                 .thenReturn(Set.of());
 
-        ArgumentCaptor<EventLog> captor = ArgumentCaptor.forClass(EventLog.class);
+        ArgumentCaptor<EventLogDO> captor = ArgumentCaptor.forClass(EventLogDO.class);
         doAnswer(invocation -> null).when(logMapper).insert(captor.capture());
 
         EventReportReq req = new EventReportReq();
@@ -111,8 +111,8 @@ class EventDefinitionControllerTest {
         // Act
         controller.reportEvent(req).block();
 
-        // Assert: EventLog stored with 0 (no canvases)
-        EventLog insertedLog = captor.getValue();
+        // Assert: EventLogDO stored with 0 (no canvases)
+        EventLogDO insertedLog = captor.getValue();
         assertThat(insertedLog.getCanvasTriggered()).isEqualTo(0);
         assertThat(insertedLog.getCanvasCount()).isEqualTo(0);
     }
@@ -120,7 +120,7 @@ class EventDefinitionControllerTest {
     @Test
     void reportEvent_usesEventDefinitionCacheService_onEveryCall() {
         // Arrange: valid event definition exists
-        EventDefinition def = new EventDefinition();
+        EventDefinitionDO def = new EventDefinitionDO();
         def.setEventCode("CACHED_EVENT");
         def.setEnabled(CanvasStatusEnum.PUBLISHED.getCode());
         when(eventDefinitionCacheService.getPublishedByCode("CACHED_EVENT")).thenReturn(def);
@@ -128,7 +128,7 @@ class EventDefinitionControllerTest {
         when(triggerRouteService.getCanvasByBehavior("CACHED_EVENT"))
                 .thenReturn(Set.of());
 
-        doAnswer(invocation -> null).when(logMapper).insert(any(EventLog.class));
+        doAnswer(invocation -> null).when(logMapper).insert(any(EventLogDO.class));
 
         EventReportReq req = new EventReportReq();
         req.setEventCode("CACHED_EVENT");
@@ -144,13 +144,13 @@ class EventDefinitionControllerTest {
 
     @Test
     void reportEventPersistsPerfRunIdAndPublishesOriginalPayload() {
-        EventDefinition def = new EventDefinition();
+        EventDefinitionDO def = new EventDefinitionDO();
         def.setEventCode("PERF_EVENT");
         def.setEnabled(CanvasStatusEnum.PUBLISHED.getCode());
         when(eventDefinitionCacheService.getPublishedByCode("PERF_EVENT")).thenReturn(def);
         when(triggerRouteService.getCanvasByBehavior("PERF_EVENT")).thenReturn(Set.of("42"));
 
-        ArgumentCaptor<EventLog> logCaptor = ArgumentCaptor.forClass(EventLog.class);
+        ArgumentCaptor<EventLogDO> logCaptor = ArgumentCaptor.forClass(EventLogDO.class);
         doAnswer(invocation -> null).when(logMapper).insert(logCaptor.capture());
 
         Map<String, Object> attributes = Map.of("perfRunId", "perf_20260523_001", "amount", 88);

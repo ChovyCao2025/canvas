@@ -15,6 +15,10 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import org.chovy.canvas.dal.dataobject.AsyncTaskDO;
+import org.chovy.canvas.dal.mapper.AsyncTaskMapper;
+import org.chovy.canvas.dal.dataobject.AsyncTaskSubscriptionDO;
+import org.chovy.canvas.dal.mapper.AsyncTaskSubscriptionMapper;
 
 @ExtendWith(MockitoExtension.class)
 class AsyncTaskServiceTest {
@@ -26,7 +30,7 @@ class AsyncTaskServiceTest {
 
     @Test
     void createOrReuseRunningTask_returnsExistingRunningTask() {
-        AsyncTask existing = new AsyncTask();
+        AsyncTaskDO existing = new AsyncTaskDO();
         existing.setTaskId("task_existing");
         existing.setStatus(AsyncTaskStatus.RUNNING.name());
         when(mapper.selectOne(any())).thenReturn(existing);
@@ -48,9 +52,9 @@ class AsyncTaskServiceTest {
         AsyncTaskCreateResult result = service.createOrReuseRunning(
                 "AUDIENCE_COMPUTE", "AUDIENCE", "7", "计算人群：VIP", "operator");
 
-        ArgumentCaptor<AsyncTask> captor = ArgumentCaptor.forClass(AsyncTask.class);
+        ArgumentCaptor<AsyncTaskDO> captor = ArgumentCaptor.forClass(AsyncTaskDO.class);
         verify(mapper).insert(captor.capture());
-        AsyncTask inserted = captor.getValue();
+        AsyncTaskDO inserted = captor.getValue();
         assertThat(result.created()).isTrue();
         assertThat(result.task()).isSameAs(inserted);
         assertThat(inserted.getTaskId()).startsWith("task_audience_compute_");
@@ -62,11 +66,11 @@ class AsyncTaskServiceTest {
 
     @Test
     void createOrReuseRunningTask_returnsExistingWhenConcurrentInsertWins() {
-        AsyncTask existing = new AsyncTask();
+        AsyncTaskDO existing = new AsyncTaskDO();
         existing.setTaskId("task_existing");
         existing.setStatus(AsyncTaskStatus.RUNNING.name());
         when(mapper.selectOne(any())).thenReturn(null, existing);
-        when(mapper.insert(any(AsyncTask.class))).thenThrow(new DuplicateKeyException("duplicate active task"));
+        when(mapper.insert(any(AsyncTaskDO.class))).thenThrow(new DuplicateKeyException("duplicate active task"));
         AsyncTaskService service = service();
 
         AsyncTaskCreateResult result = service.createOrReuseRunning(
@@ -81,7 +85,7 @@ class AsyncTaskServiceTest {
     void createOrReuseRunningTask_stillReturnsCreatedTaskWhenSubscriptionInsertFails() {
         when(mapper.selectOne(any())).thenReturn(null);
         doThrow(new RuntimeException("subscription down"))
-                .when(subscriptionMapper).insert(any(AsyncTaskSubscription.class));
+                .when(subscriptionMapper).insert(any(AsyncTaskSubscriptionDO.class));
         AsyncTaskService service = service();
 
         AsyncTaskCreateResult result = service.createOrReuseRunning(
@@ -94,10 +98,10 @@ class AsyncTaskServiceTest {
 
     @Test
     void createOrReuseRunningTask_refreshesReusedTaskAfterSubscribing() {
-        AsyncTask running = new AsyncTask();
+        AsyncTaskDO running = new AsyncTaskDO();
         running.setTaskId("task_existing");
         running.setStatus(AsyncTaskStatus.RUNNING.name());
-        AsyncTask succeeded = new AsyncTask();
+        AsyncTaskDO succeeded = new AsyncTaskDO();
         succeeded.setTaskId("task_existing");
         succeeded.setStatus(AsyncTaskStatus.SUCCEEDED.name());
         when(mapper.selectOne(any())).thenReturn(running, succeeded);
@@ -113,7 +117,7 @@ class AsyncTaskServiceTest {
 
     @Test
     void createOrReuseRunningTask_subscribesRequesterToExistingTaskOwnedByAnotherUser() {
-        AsyncTask existing = new AsyncTask();
+        AsyncTaskDO existing = new AsyncTaskDO();
         existing.setTaskId("task_existing");
         existing.setStatus(AsyncTaskStatus.RUNNING.name());
         existing.setCreatedBy("alice");
@@ -130,18 +134,18 @@ class AsyncTaskServiceTest {
 
     @Test
     void list_includesSubscribedTasksForNonAdminUsers() {
-        AsyncTaskSubscription subscription = new AsyncTaskSubscription();
+        AsyncTaskSubscriptionDO subscription = new AsyncTaskSubscriptionDO();
         subscription.setTaskId("task_alice");
         subscription.setUserId("bob");
-        AsyncTask task = new AsyncTask();
+        AsyncTaskDO task = new AsyncTaskDO();
         task.setTaskId("task_alice");
-        Page<AsyncTask> page = new Page<>();
+        Page<AsyncTaskDO> page = new Page<>();
         page.setRecords(List.of(task));
         when(subscriptionMapper.selectList(any())).thenReturn(List.of(subscription));
         when(mapper.selectPage(any(Page.class), any())).thenReturn(page);
         AsyncTaskService service = service();
 
-        List<AsyncTask> result = service.list(
+        List<AsyncTaskDO> result = service.list(
                 "AUDIENCE_COMPUTE", "AUDIENCE", List.of("7"), List.of("RUNNING"), "bob", false, 1, 100);
 
         assertThat(result).containsExactly(task);
@@ -151,7 +155,7 @@ class AsyncTaskServiceTest {
 
     @Test
     void markSucceeded_setsFinishedFields() {
-        AsyncTask task = new AsyncTask();
+        AsyncTaskDO task = new AsyncTaskDO();
         task.setTaskId("task_1");
         when(mapper.selectOne(any())).thenReturn(task);
         AsyncTaskService service = service();
@@ -167,7 +171,7 @@ class AsyncTaskServiceTest {
 
     @Test
     void markSucceeded_trimsResultSummaryToColumnLimit() {
-        AsyncTask task = new AsyncTask();
+        AsyncTaskDO task = new AsyncTaskDO();
         task.setTaskId("task_1");
         when(mapper.selectOne(any())).thenReturn(task);
         AsyncTaskService service = service();
@@ -180,7 +184,7 @@ class AsyncTaskServiceTest {
 
     @Test
     void markFailed_setsErrorFields() {
-        AsyncTask task = new AsyncTask();
+        AsyncTaskDO task = new AsyncTaskDO();
         task.setTaskId("task_2");
         when(mapper.selectOne(any())).thenReturn(task);
         AsyncTaskService service = service();
@@ -199,7 +203,7 @@ class AsyncTaskServiceTest {
     }
 
     private void assertSubscriptionInserted(String taskId, String userId) {
-        ArgumentCaptor<AsyncTaskSubscription> captor = ArgumentCaptor.forClass(AsyncTaskSubscription.class);
+        ArgumentCaptor<AsyncTaskSubscriptionDO> captor = ArgumentCaptor.forClass(AsyncTaskSubscriptionDO.class);
         verify(subscriptionMapper).insert(captor.capture());
         assertThat(captor.getValue().getTaskId()).isEqualTo(taskId);
         assertThat(captor.getValue().getUserId()).isEqualTo(userId);

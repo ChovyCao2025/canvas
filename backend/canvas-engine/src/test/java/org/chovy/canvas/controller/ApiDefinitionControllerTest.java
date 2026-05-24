@@ -1,13 +1,13 @@
-package org.chovy.canvas.controller;
+package org.chovy.canvas.web;
 
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.core.MybatisConfiguration;
 import com.baomidou.mybatisplus.core.metadata.TableInfoHelper;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import org.chovy.canvas.domain.meta.ApiDefinition;
-import org.chovy.canvas.domain.meta.ApiDefinitionMapper;
-import org.chovy.canvas.infra.cache.ApiDefinitionCache;
+import org.chovy.canvas.dal.dataobject.ApiDefinitionDO;
+import org.chovy.canvas.dal.mapper.ApiDefinitionMapper;
+import org.chovy.canvas.infrastructure.cache.ApiDefinitionCache;
 import org.apache.ibatis.builder.MapperBuilderAssistant;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
@@ -30,7 +30,7 @@ class ApiDefinitionControllerTest {
     static void initMyBatisPlusTableInfo() {
         TableInfoHelper.initTableInfo(
                 new MapperBuilderAssistant(new MybatisConfiguration(), ""),
-                ApiDefinition.class);
+                ApiDefinitionDO.class);
     }
 
     @BeforeEach
@@ -43,14 +43,14 @@ class ApiDefinitionControllerTest {
 
     @Test
     void create_rejects_zero_rateLimitPerSec_and_does_not_insert() {
-        ApiDefinition body = new ApiDefinition();
+        ApiDefinitionDO body = new ApiDefinitionDO();
         body.setRateLimitPerSec(0);
 
         assertThatThrownBy(() -> controller.create(body).block())
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("rateLimitPerSec 必须大于 0");
 
-        verify(apiDefinitionMapper, never()).insert(Mockito.any(ApiDefinition.class));
+        verify(apiDefinitionMapper, never()).insert(Mockito.any(ApiDefinitionDO.class));
     }
 
     @Test
@@ -59,8 +59,8 @@ class ApiDefinitionControllerTest {
 
         controller.update(1L, bodyNode).block();
 
-        verify(apiDefinitionMapper).update(any(ApiDefinition.class), any(LambdaUpdateWrapper.class));
-        verify(apiDefinitionMapper, never()).updateById(any(ApiDefinition.class));
+        verify(apiDefinitionMapper).update(any(ApiDefinitionDO.class), any(LambdaUpdateWrapper.class));
+        verify(apiDefinitionMapper, never()).updateById(any(ApiDefinitionDO.class));
     }
 
     @Test
@@ -69,8 +69,8 @@ class ApiDefinitionControllerTest {
 
         controller.update(1L, bodyNode).block();
 
-        verify(apiDefinitionMapper).updateById(any(ApiDefinition.class));
-        verify(apiDefinitionMapper, never()).update(any(ApiDefinition.class), any(LambdaUpdateWrapper.class));
+        verify(apiDefinitionMapper).updateById(any(ApiDefinitionDO.class));
+        verify(apiDefinitionMapper, never()).update(any(ApiDefinitionDO.class), any(LambdaUpdateWrapper.class));
     }
 
     @Test
@@ -81,7 +81,7 @@ class ApiDefinitionControllerTest {
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("rateLimitPerSec 必须大于 0");
 
-        verify(apiDefinitionMapper, never()).updateById(any(ApiDefinition.class));
-        verify(apiDefinitionMapper, never()).update(any(ApiDefinition.class), any(LambdaUpdateWrapper.class));
+        verify(apiDefinitionMapper, never()).updateById(any(ApiDefinitionDO.class));
+        verify(apiDefinitionMapper, never()).update(any(ApiDefinitionDO.class), any(LambdaUpdateWrapper.class));
     }
 }

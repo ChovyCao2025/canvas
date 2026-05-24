@@ -1,6 +1,6 @@
-package org.chovy.canvas.controller;
+package org.chovy.canvas.web;
 
-import org.chovy.canvas.domain.meta.SystemOption;
+import org.chovy.canvas.dal.dataobject.SystemOptionDO;
 import org.chovy.canvas.domain.meta.SystemOptionService;
 import org.junit.jupiter.api.Test;
 import reactor.test.StepVerifier;
@@ -17,7 +17,7 @@ class SystemOptionControllerTest {
     @Test
     void listReturnsPageResultShape() {
         SystemOptionService service = mock(SystemOptionService.class);
-        SystemOption option = new SystemOption();
+        SystemOptionDO option = new SystemOptionDO();
         option.setId(1L);
         option.setCategory("http_method");
         option.setOptionKey("POST");
@@ -29,7 +29,7 @@ class SystemOptionControllerTest {
                 .assertNext(result -> {
                     assertThat(result.getData().getTotal()).isEqualTo(1);
                     assertThat(result.getData().getList())
-                            .extracting(SystemOption::getOptionKey)
+                            .extracting(SystemOptionDO::getOptionKey)
                             .containsExactly("POST");
                 })
                 .verifyComplete();
@@ -39,7 +39,7 @@ class SystemOptionControllerTest {
     void updateDelegatesToService() {
         SystemOptionService service = mock(SystemOptionService.class);
         SystemOptionController controller = new SystemOptionController(service);
-        SystemOption patch = new SystemOption();
+        SystemOptionDO patch = new SystemOptionDO();
         patch.setLabel("POST（改）");
 
         StepVerifier.create(controller.update(1L, patch))

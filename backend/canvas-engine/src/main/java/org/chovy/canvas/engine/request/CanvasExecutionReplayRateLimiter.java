@@ -1,6 +1,6 @@
 package org.chovy.canvas.engine.request;
 
-import org.chovy.canvas.infra.redis.RedisKeyUtil;
+import org.chovy.canvas.infrastructure.redis.RedisKeyUtil;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.redis.core.StringRedisTemplate;

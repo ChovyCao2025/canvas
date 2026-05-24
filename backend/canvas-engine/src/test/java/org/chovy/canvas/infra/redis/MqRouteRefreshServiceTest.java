@@ -1,11 +1,11 @@
-package org.chovy.canvas.infra.redis;
+package org.chovy.canvas.infrastructure.redis;
 
-import org.chovy.canvas.domain.canvas.Canvas;
-import org.chovy.canvas.domain.canvas.CanvasMapper;
-import org.chovy.canvas.domain.canvas.CanvasVersion;
-import org.chovy.canvas.domain.canvas.CanvasVersionMapper;
-import org.chovy.canvas.domain.constant.CanvasStatusEnum;
-import org.chovy.canvas.domain.constant.NodeType;
+import org.chovy.canvas.dal.dataobject.CanvasDO;
+import org.chovy.canvas.dal.mapper.CanvasMapper;
+import org.chovy.canvas.dal.dataobject.CanvasVersionDO;
+import org.chovy.canvas.dal.mapper.CanvasVersionMapper;
+import org.chovy.canvas.common.enums.CanvasStatusEnum;
+import org.chovy.canvas.common.enums.NodeType;
 import org.chovy.canvas.engine.dag.DagGraph;
 import org.chovy.canvas.engine.dag.DagParser;
 import org.chovy.canvas.engine.handlers.MqTriggerHandler;
@@ -31,13 +31,13 @@ class MqRouteRefreshServiceTest {
         TriggerRouteService routeService = mock(TriggerRouteService.class);
         MqTriggerHandler mqTriggerHandler = mock(MqTriggerHandler.class);
 
-        Canvas canvas = new Canvas();
+        CanvasDO canvas = new CanvasDO();
         canvas.setId(10L);
         canvas.setStatus(CanvasStatusEnum.PUBLISHED.getCode());
         canvas.setPublishedVersionId(100L);
         when(canvasMapper.selectList(any())).thenReturn(List.of(canvas));
 
-        CanvasVersion version = new CanvasVersion();
+        CanvasVersionDO version = new CanvasVersionDO();
         version.setId(100L);
         version.setGraphJson("{\"nodes\":[]}");
         when(versionMapper.selectBatchIds(List.of(100L))).thenReturn(List.of(version));

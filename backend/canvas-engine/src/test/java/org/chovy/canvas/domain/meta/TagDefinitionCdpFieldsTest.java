@@ -4,15 +4,16 @@ import com.baomidou.mybatisplus.annotation.TableName;
 import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import org.chovy.canvas.dal.dataobject.TagDefinitionDO;
 
 class TagDefinitionCdpFieldsTest {
 
     @Test
     void exposes_cdp_metadata_fields_without_changing_table_name() {
-        TableName tableName = TagDefinition.class.getAnnotation(TableName.class);
+        TableName tableName = TagDefinitionDO.class.getAnnotation(TableName.class);
         assertThat(tableName.value()).isEqualTo("tag_definition");
 
-        TagDefinition tag = new TagDefinition();
+        TagDefinitionDO tag = new TagDefinitionDO();
         tag.setValueType("BOOLEAN");
         tag.setManualEnabled(1);
         tag.setDefaultTtlDays(30);

@@ -1,7 +1,7 @@
-package org.chovy.canvas.controller;
+package org.chovy.canvas.web;
 
 import io.jsonwebtoken.Claims;
-import org.chovy.canvas.domain.task.AsyncTask;
+import org.chovy.canvas.dal.dataobject.AsyncTaskDO;
 import org.chovy.canvas.domain.task.AsyncTaskService;
 import org.junit.jupiter.api.Test;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -20,7 +20,7 @@ class AsyncTaskControllerTest {
     @Test
     void list_returnsTasksForCurrentUserWhenNoSecurityContextExists() {
         AsyncTaskService service = mock(AsyncTaskService.class);
-        AsyncTask task = new AsyncTask();
+        AsyncTaskDO task = new AsyncTaskDO();
         task.setTaskId("task_1");
         task.setTaskType("AUDIENCE_COMPUTE");
         task.setBizType("AUDIENCE");
@@ -42,7 +42,7 @@ class AsyncTaskControllerTest {
     @Test
     void list_allowsAdminToQueryAcrossUsersFromSecurityContext() {
         AsyncTaskService service = mock(AsyncTaskService.class);
-        AsyncTask task = new AsyncTask();
+        AsyncTaskDO task = new AsyncTaskDO();
         task.setTaskId("task_admin");
         task.setStatus("QUEUED");
         when(service.list(null, null, List.of("7", "8"), List.of("QUEUED"), "alice", true, 1, 100))
@@ -112,7 +112,7 @@ class AsyncTaskControllerTest {
     @Test
     void get_returnsTaskWhenCurrentUserSubscribed() {
         AsyncTaskService service = mock(AsyncTaskService.class);
-        AsyncTask task = new AsyncTask();
+        AsyncTaskDO task = new AsyncTaskDO();
         task.setTaskId("task_1");
         task.setTaskType("AUDIENCE_COMPUTE");
         task.setBizType("AUDIENCE");

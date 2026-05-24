@@ -1,7 +1,7 @@
-package org.chovy.canvas.controller;
+package org.chovy.canvas.web;
 
-import org.chovy.canvas.domain.audience.AudienceDefinitionMapper;
-import org.chovy.canvas.domain.audience.AudienceStatMapper;
+import org.chovy.canvas.dal.mapper.AudienceDefinitionMapper;
+import org.chovy.canvas.dal.mapper.AudienceStatMapper;
 import org.chovy.canvas.domain.notification.NotificationService;
 import org.chovy.canvas.domain.task.AsyncTaskService;
 import org.chovy.canvas.engine.audience.AudienceBatchComputeService;

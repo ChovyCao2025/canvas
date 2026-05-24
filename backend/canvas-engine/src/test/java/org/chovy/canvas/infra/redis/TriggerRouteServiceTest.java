@@ -1,4 +1,4 @@
-package org.chovy.canvas.infra.redis;
+package org.chovy.canvas.infrastructure.redis;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;

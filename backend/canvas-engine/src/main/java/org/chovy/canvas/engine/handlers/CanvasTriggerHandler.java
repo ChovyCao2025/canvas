@@ -1,8 +1,8 @@
 package org.chovy.canvas.engine.handlers;
 
 import org.chovy.canvas.common.MapFieldKeys;
-import org.chovy.canvas.domain.canvas.Canvas;
-import org.chovy.canvas.domain.canvas.CanvasMapper;
+import org.chovy.canvas.dal.dataobject.CanvasDO;
+import org.chovy.canvas.dal.mapper.CanvasMapper;
 import org.chovy.canvas.engine.context.ExecutionContext;
 import org.chovy.canvas.engine.dag.DagGraph;
 import org.chovy.canvas.engine.handler.NodeHandler;
@@ -10,7 +10,7 @@ import org.chovy.canvas.engine.handler.NodeHandlerType;
 import org.chovy.canvas.engine.handler.NodeResult;
 import reactor.core.publisher.Mono;
 import org.chovy.canvas.engine.scheduler.DagEngine;
-import org.chovy.canvas.infra.cache.CanvasConfigCache;
+import org.chovy.canvas.infrastructure.cache.CanvasConfigCache;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Component;
@@ -64,7 +64,7 @@ public class CanvasTriggerHandler implements NodeHandler {
         }
 
         // 4) 校验目标画布存在且已发布（只有发布版本可被调用）
-        Canvas target = canvasMapper.selectById(targetCanvasId);
+        CanvasDO target = canvasMapper.selectById(targetCanvasId);
         if (target == null || target.getStatus() != 1) {
             return Mono.just(NodeResult.fail("目标画布未发布: " + targetCanvasId));
         }

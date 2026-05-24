@@ -1,6 +1,6 @@
 package org.chovy.canvas.domain.notification;
 
-import org.chovy.canvas.domain.approval.CanvasManualApproval;
+import org.chovy.canvas.dal.dataobject.CanvasManualApprovalDO;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 
@@ -19,7 +19,7 @@ class NotificationEventServiceTest {
         NotificationService notificationService = mock(NotificationService.class);
         NotificationRecipientService recipientService = mock(NotificationRecipientService.class);
         NotificationEventService service = new NotificationEventService(notificationService, recipientService);
-        CanvasManualApproval approval = approval("approval_1");
+        CanvasManualApprovalDO approval = approval("approval_1");
 
         service.approvalPending(approval, List.of("alice", "bob"));
 
@@ -82,8 +82,8 @@ class NotificationEventServiceTest {
                         org.assertj.core.groups.Tuple.tuple("alice", "CHANGE", "CANVAS_PUBLISHED"));
     }
 
-    private CanvasManualApproval approval(String id) {
-        return CanvasManualApproval.builder()
+    private CanvasManualApprovalDO approval(String id) {
+        return CanvasManualApprovalDO.builder()
                 .id(id)
                 .executionId("exec_1")
                 .canvasId(7L)

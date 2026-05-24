@@ -1,7 +1,7 @@
 package org.chovy.canvas.engine.scheduler;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import org.chovy.canvas.domain.execution.CanvasExecutionDlqMapper;
+import org.chovy.canvas.dal.mapper.CanvasExecutionDlqMapper;
 import org.chovy.canvas.engine.context.ExecutionContext;
 import org.chovy.canvas.engine.context.NodeStatus;
 import org.chovy.canvas.engine.dag.DagGraph;
@@ -10,7 +10,7 @@ import org.chovy.canvas.engine.handler.HandlerRegistry;
 import org.chovy.canvas.engine.handler.NodeHandler;
 import org.chovy.canvas.engine.handler.NodeHandlerType;
 import org.chovy.canvas.engine.handler.NodeResult;
-import org.chovy.canvas.infra.redis.ContextPersistenceService;
+import org.chovy.canvas.infrastructure.redis.ContextPersistenceService;
 import org.junit.jupiter.api.Test;
 import org.springframework.test.util.ReflectionTestUtils;
 import reactor.core.publisher.Mono;

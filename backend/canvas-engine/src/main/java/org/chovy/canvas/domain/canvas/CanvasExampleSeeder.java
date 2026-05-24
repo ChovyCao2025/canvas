@@ -4,14 +4,20 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.chovy.canvas.domain.constant.CanvasStatusEnum;
-import org.chovy.canvas.domain.constant.VersionStatus;
+import org.chovy.canvas.common.enums.CanvasStatusEnum;
+import org.chovy.canvas.common.enums.VersionStatus;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import org.chovy.canvas.dal.dataobject.CanvasDO;
+import org.chovy.canvas.dal.mapper.CanvasMapper;
+import org.chovy.canvas.dal.dataobject.CanvasTemplateDO;
+import org.chovy.canvas.dal.mapper.CanvasTemplateMapper;
+import org.chovy.canvas.dal.dataobject.CanvasVersionDO;
+import org.chovy.canvas.dal.mapper.CanvasVersionMapper;
 
 @Slf4j
 @Component
@@ -34,36 +40,36 @@ public class CanvasExampleSeeder implements ApplicationRunner {
             return;
         }
 
-        List<CanvasTemplate> templates = templateMapper.selectList(
-                new LambdaQueryWrapper<CanvasTemplate>()
-                        .eq(CanvasTemplate::getIsOfficial, 1)
-                        .eq(CanvasTemplate::getEnabled, 1)
-                        .isNotNull(CanvasTemplate::getTemplateKey)
-                        .orderByAsc(CanvasTemplate::getSortOrder)
+        List<CanvasTemplateDO> templates = templateMapper.selectList(
+                new LambdaQueryWrapper<CanvasTemplateDO>()
+                        .eq(CanvasTemplateDO::getIsOfficial, 1)
+                        .eq(CanvasTemplateDO::getEnabled, 1)
+                        .isNotNull(CanvasTemplateDO::getTemplateKey)
+                        .orderByAsc(CanvasTemplateDO::getSortOrder)
         );
 
-        for (CanvasTemplate template : templates) {
+        for (CanvasTemplateDO template : templates) {
             importTemplate(template);
         }
     }
 
-    private void importTemplate(CanvasTemplate template) {
+    private void importTemplate(CanvasTemplateDO template) {
         if (!isValidGraph(template)) {
             log.warn("Skip official canvas example template {} because graph_json is invalid.",
                     template.getTemplateKey());
             return;
         }
 
-        Canvas existing = canvasMapper.selectOne(
-                new LambdaQueryWrapper<Canvas>()
-                        .eq(Canvas::getSourceTemplateKey, template.getTemplateKey())
+        CanvasDO existing = canvasMapper.selectOne(
+                new LambdaQueryWrapper<CanvasDO>()
+                        .eq(CanvasDO::getSourceTemplateKey, template.getTemplateKey())
                         .last("LIMIT 1")
         );
         if (existing != null) {
             return;
         }
 
-        Canvas canvas = new Canvas();
+        CanvasDO canvas = new CanvasDO();
         canvas.setName(template.getName());
         canvas.setDescription(template.getDescription());
         canvas.setStatus(CanvasStatusEnum.DRAFT.getCode());
@@ -72,7 +78,7 @@ public class CanvasExampleSeeder implements ApplicationRunner {
         canvas.setSourceTemplateKey(template.getTemplateKey());
         canvasMapper.insert(canvas);
 
-        CanvasVersion version = new CanvasVersion();
+        CanvasVersionDO version = new CanvasVersionDO();
         version.setCanvasId(canvas.getId());
         version.setVersion(1);
         version.setGraphJson(template.getGraphJson());
@@ -81,7 +87,7 @@ public class CanvasExampleSeeder implements ApplicationRunner {
         canvasVersionMapper.insert(version);
     }
 
-    private boolean isValidGraph(CanvasTemplate template) {
+    private boolean isValidGraph(CanvasTemplateDO template) {
         try {
             objectMapper.readTree(template.getGraphJson());
             return true;

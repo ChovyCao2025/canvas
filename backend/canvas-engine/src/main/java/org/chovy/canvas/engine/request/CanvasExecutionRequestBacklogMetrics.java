@@ -2,7 +2,7 @@ package org.chovy.canvas.engine.request;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.chovy.canvas.domain.execution.CanvasExecutionRequestMapper;
+import org.chovy.canvas.dal.mapper.CanvasExecutionRequestMapper;
 import org.chovy.canvas.domain.execution.CanvasExecutionRequestStatusCount;
 import org.chovy.canvas.engine.scheduler.CanvasMetrics;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -11,6 +11,7 @@ import org.springframework.stereotype.Component;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import org.chovy.canvas.domain.execution.CanvasExecutionRequestStatusCount;
 
 @Slf4j
 @Component

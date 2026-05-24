@@ -1,7 +1,7 @@
 package org.chovy.canvas.domain.cdp;
 
-import org.chovy.canvas.domain.execution.CanvasExecution;
-import org.chovy.canvas.domain.execution.CanvasExecutionMapper;
+import org.chovy.canvas.dal.dataobject.CanvasExecutionDO;
+import org.chovy.canvas.dal.mapper.CanvasExecutionMapper;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 
@@ -11,6 +11,8 @@ import java.util.List;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
+import org.chovy.canvas.dal.dataobject.CdpUserProfileDO;
+import org.chovy.canvas.dal.mapper.CdpUserProfileMapper;
 
 class CdpUserDirectoryServiceTest {
 
@@ -21,18 +23,18 @@ class CdpUserDirectoryServiceTest {
         CdpTagService tagService = Mockito.mock(CdpTagService.class);
         CdpUserDirectoryService service = new CdpUserDirectoryService(profileMapper, executionMapper, tagService);
 
-        CdpUserProfile profile = new CdpUserProfile();
+        CdpUserProfileDO profile = new CdpUserProfileDO();
         profile.setUserId("u1");
         profile.setDisplayName("Alice");
         profile.setFirstSeenAt(LocalDateTime.parse("2026-05-23T10:00:00"));
         profile.setLastSeenAt(LocalDateTime.parse("2026-05-23T11:00:00"));
         when(profileMapper.selectList(any())).thenReturn(List.of(profile));
 
-        CanvasExecution success = new CanvasExecution();
+        CanvasExecutionDO success = new CanvasExecutionDO();
         success.setUserId("u1");
         success.setStatus(2);
         success.setCreatedAt(LocalDateTime.parse("2026-05-23T10:30:00"));
-        CanvasExecution failed = new CanvasExecution();
+        CanvasExecutionDO failed = new CanvasExecutionDO();
         failed.setUserId("u1");
         failed.setStatus(3);
         failed.setCreatedAt(LocalDateTime.parse("2026-05-23T11:00:00"));

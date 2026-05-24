@@ -1,6 +1,6 @@
 package org.chovy.canvas.dto.task;
 
-import org.chovy.canvas.domain.task.AsyncTask;
+import org.chovy.canvas.dal.dataobject.AsyncTaskDO;
 
 import java.time.LocalDateTime;
 
@@ -19,7 +19,7 @@ public record AsyncTaskDTO(
         LocalDateTime createdAt,
         LocalDateTime updatedAt
 ) {
-    public static AsyncTaskDTO from(AsyncTask task) {
+    public static AsyncTaskDTO from(AsyncTaskDO task) {
         return new AsyncTaskDTO(
                 task.getTaskId(),
                 task.getTaskType(),

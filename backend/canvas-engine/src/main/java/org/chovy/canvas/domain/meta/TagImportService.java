@@ -15,6 +15,11 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Set;
+import org.chovy.canvas.dal.dataobject.IdentityTypeDO;
+import org.chovy.canvas.dal.dataobject.TagImportBatchDO;
+import org.chovy.canvas.dal.mapper.TagImportBatchMapper;
+import org.chovy.canvas.dal.dataobject.TagImportErrorDO;
+import org.chovy.canvas.dal.mapper.TagImportErrorMapper;
 
 @Service
 @RequiredArgsConstructor
@@ -32,7 +37,7 @@ public class TagImportService {
         List<TagImportRow> safeRows = rows == null ? List.of() : rows;
         LocalDateTime now = LocalDateTime.now();
 
-        TagImportBatch batch = new TagImportBatch();
+        TagImportBatchDO batch = new TagImportBatchDO();
         batch.setSourceType(sourceType);
         batch.setStatus("PROCESSING");
         batch.setFileName(fileName);
@@ -56,7 +61,7 @@ public class TagImportService {
                 continue;
             }
             try {
-                IdentityType identityType = identityTypeService.requireImportable(row.getIdType());
+                IdentityTypeDO identityType = identityTypeService.requireImportable(row.getIdType());
                 tagDefinitionService.requireEnabledTagAndValidateValue(row.getTagCode(), row.getTagValue());
                 tagDefinitionService.ensureValue(row.getTagCode(), row.getTagValue(), sourceType);
                 writeCdpTag(batch.getId(), rowNo, sourceType, identityType, row);
@@ -85,19 +90,19 @@ public class TagImportService {
         return result;
     }
 
-    public List<TagImportBatch> listBatches() {
-        return tagImportBatchMapper.selectList(new LambdaQueryWrapper<TagImportBatch>()
-                .orderByDesc(TagImportBatch::getId));
+    public List<TagImportBatchDO> listBatches() {
+        return tagImportBatchMapper.selectList(new LambdaQueryWrapper<TagImportBatchDO>()
+                .orderByDesc(TagImportBatchDO::getId));
     }
 
-    public List<TagImportError> listErrors(Long batchId) {
-        return tagImportErrorMapper.selectList(new LambdaQueryWrapper<TagImportError>()
-                .eq(TagImportError::getBatchId, batchId)
-                .orderByAsc(TagImportError::getRowNo)
-                .orderByAsc(TagImportError::getId));
+    public List<TagImportErrorDO> listErrors(Long batchId) {
+        return tagImportErrorMapper.selectList(new LambdaQueryWrapper<TagImportErrorDO>()
+                .eq(TagImportErrorDO::getBatchId, batchId)
+                .orderByAsc(TagImportErrorDO::getRowNo)
+                .orderByAsc(TagImportErrorDO::getId));
     }
 
-    private void writeCdpTag(Long batchId, int rowNo, String sourceType, IdentityType identityType, TagImportRow row) {
+    private void writeCdpTag(Long batchId, int rowNo, String sourceType, IdentityTypeDO identityType, TagImportRow row) {
         String sourceRefId = batchId == null ? null : String.valueOf(batchId);
         String userId = cdpUserService.ensureUserByIdentity(
                 identityType.getCode(),
@@ -116,7 +121,7 @@ public class TagImportService {
     }
 
     private void writeError(Long batchId, Integer rowNo, TagImportRow row, String errorCode, String errorMsg) {
-        TagImportError error = new TagImportError();
+        TagImportErrorDO error = new TagImportErrorDO();
         error.setBatchId(batchId);
         error.setRowNo(rowNo);
         error.setRawPayload(formatRawPayload(row));

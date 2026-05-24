@@ -1,7 +1,7 @@
 package org.chovy.canvas.engine.scheduler;
 
-import org.chovy.canvas.domain.execution.CanvasExecutionTrace;
-import org.chovy.canvas.domain.execution.CanvasExecutionTraceMapper;
+import org.chovy.canvas.dal.dataobject.CanvasExecutionTraceDO;
+import org.chovy.canvas.dal.mapper.CanvasExecutionTraceMapper;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 
@@ -24,14 +24,14 @@ class TraceWriteBufferTest {
 
         buffer.flush();
 
-        ArgumentCaptor<List<CanvasExecutionTrace>> captor = ArgumentCaptor.forClass(List.class);
+        ArgumentCaptor<List<CanvasExecutionTraceDO>> captor = ArgumentCaptor.forClass(List.class);
         verify(mapper).insertBatch(captor.capture());
         assertThat(captor.getValue()).hasSize(2);
         assertThat(buffer.pendingCount()).isZero();
     }
 
-    private CanvasExecutionTrace trace(String executionId, String nodeId) {
-        return CanvasExecutionTrace.builder()
+    private CanvasExecutionTraceDO trace(String executionId, String nodeId) {
+        return CanvasExecutionTraceDO.builder()
                 .executionId(executionId)
                 .nodeId(nodeId)
                 .nodeType("TEST")

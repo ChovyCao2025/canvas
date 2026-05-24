@@ -5,6 +5,9 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import org.chovy.canvas.dal.dataobject.AbExperimentGroupDO;
+import org.chovy.canvas.dal.mapper.AbExperimentGroupMapper;
+import org.chovy.canvas.dto.StubOption;
 
 @Service
 @RequiredArgsConstructor
@@ -12,12 +15,12 @@ public class AbExperimentGroupService {
 
     private final AbExperimentGroupMapper mapper;
 
-    public List<AbExperimentGroup> list(Long experimentId, boolean includeDisabled) {
-        return mapper.selectList(new LambdaQueryWrapper<AbExperimentGroup>()
-                .eq(AbExperimentGroup::getExperimentId, experimentId)
-                .eq(!includeDisabled, AbExperimentGroup::getEnabled, 1)
-                .orderByAsc(AbExperimentGroup::getSortOrder)
-                .orderByAsc(AbExperimentGroup::getId));
+    public List<AbExperimentGroupDO> list(Long experimentId, boolean includeDisabled) {
+        return mapper.selectList(new LambdaQueryWrapper<AbExperimentGroupDO>()
+                .eq(AbExperimentGroupDO::getExperimentId, experimentId)
+                .eq(!includeDisabled, AbExperimentGroupDO::getEnabled, 1)
+                .orderByAsc(AbExperimentGroupDO::getSortOrder)
+                .orderByAsc(AbExperimentGroupDO::getId));
     }
 
     public List<StubOption> activeGroupOptions(Long experimentId) {
@@ -32,13 +35,13 @@ public class AbExperimentGroupService {
     }
 
     private void insertDefaultIfMissing(Long experimentId, String groupKey, String label, int sortOrder) {
-        AbExperimentGroup existing = mapper.selectOne(new LambdaQueryWrapper<AbExperimentGroup>()
-                .eq(AbExperimentGroup::getExperimentId, experimentId)
-                .eq(AbExperimentGroup::getGroupKey, groupKey));
+        AbExperimentGroupDO existing = mapper.selectOne(new LambdaQueryWrapper<AbExperimentGroupDO>()
+                .eq(AbExperimentGroupDO::getExperimentId, experimentId)
+                .eq(AbExperimentGroupDO::getGroupKey, groupKey));
         if (existing != null) {
             return;
         }
-        AbExperimentGroup group = new AbExperimentGroup();
+        AbExperimentGroupDO group = new AbExperimentGroupDO();
         group.setExperimentId(experimentId);
         group.setGroupKey(groupKey);
         group.setLabel(label);
@@ -47,7 +50,7 @@ public class AbExperimentGroupService {
         mapper.insert(group);
     }
 
-    public AbExperimentGroup create(Long experimentId, AbExperimentGroup body) {
+    public AbExperimentGroupDO create(Long experimentId, AbExperimentGroupDO body) {
         validateGroupKey(body.getGroupKey());
         body.setExperimentId(experimentId);
         if (body.getEnabled() == null) {
@@ -60,8 +63,8 @@ public class AbExperimentGroupService {
         return body;
     }
 
-    public void update(Long experimentId, Long groupId, AbExperimentGroup body) {
-        AbExperimentGroup existing = mapper.selectById(groupId);
+    public void update(Long experimentId, Long groupId, AbExperimentGroupDO body) {
+        AbExperimentGroupDO existing = mapper.selectById(groupId);
         if (existing == null) {
             throw new IllegalArgumentException("AB 分组不存在: " + groupId);
         }
@@ -81,7 +84,7 @@ public class AbExperimentGroupService {
     }
 
     public void disable(Long experimentId, Long groupId) {
-        AbExperimentGroup existing = mapper.selectById(groupId);
+        AbExperimentGroupDO existing = mapper.selectById(groupId);
         if (existing == null) {
             throw new IllegalArgumentException("AB 分组不存在: " + groupId);
         }

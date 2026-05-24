@@ -1,7 +1,7 @@
 package org.chovy.canvas.engine.handlers;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import org.chovy.canvas.domain.execution.CanvasWaitSubscription;
+import org.chovy.canvas.dal.dataobject.CanvasWaitSubscriptionDO;
 import org.chovy.canvas.engine.context.ExecutionContext;
 import org.chovy.canvas.engine.handler.NodeOutcome;
 import org.chovy.canvas.engine.handler.NodeResult;
@@ -114,7 +114,7 @@ class WaitHandlerTest {
     @Test
     void untilEvent_creates_subscription_and_returns_pending() {
         ExecutionContext ctx = ctx();
-        CanvasWaitSubscription wait = new CanvasWaitSubscription();
+        CanvasWaitSubscriptionDO wait = new CanvasWaitSubscriptionDO();
         wait.setId(99L);
         when(waitService.createEventWait(
                 eq("exec-1"),

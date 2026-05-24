@@ -1,9 +1,9 @@
 package org.chovy.canvas.engine.handlers;
 
 import org.chovy.canvas.common.MapFieldKeys;
-import org.chovy.canvas.domain.constant.NodeType;
-import org.chovy.canvas.domain.customer.CustomerTaskRecord;
-import org.chovy.canvas.domain.customer.CustomerTaskRecordMapper;
+import org.chovy.canvas.common.enums.NodeType;
+import org.chovy.canvas.dal.dataobject.CustomerTaskRecordDO;
+import org.chovy.canvas.dal.mapper.CustomerTaskRecordMapper;
 import org.chovy.canvas.engine.context.ExecutionContext;
 import org.chovy.canvas.engine.handler.NodeHandler;
 import org.chovy.canvas.engine.handler.NodeHandlerType;
@@ -25,7 +25,7 @@ public class CreateTaskHandler implements NodeHandler {
 
     @Override
     public Mono<NodeResult> executeAsync(Map<String, Object> config, ExecutionContext ctx) {
-        CustomerTaskRecord task = new CustomerTaskRecord();
+        CustomerTaskRecordDO task = new CustomerTaskRecordDO();
         task.setUserId(ctx.getUserId());
         task.setTaskType(string(config, "taskType", "FOLLOW_UP"));
         task.setTitle(string(config, "title", "营销旅程跟进"));
@@ -35,7 +35,7 @@ public class CreateTaskHandler implements NodeHandler {
         if (config.get("dueHours") instanceof Number hours) {
             task.setDueAt(LocalDateTime.now().plusHours(hours.longValue()));
         }
-        task.setStatus(CustomerTaskRecord.STATUS_OPEN);
+        task.setStatus(CustomerTaskRecordDO.STATUS_OPEN);
         task.setCreatedAt(LocalDateTime.now());
         task.setUpdatedAt(task.getCreatedAt());
         taskMapper.insert(task);

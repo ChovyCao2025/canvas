@@ -1,4 +1,7 @@
 package org.chovy.canvas.domain.task;
 
-public record AsyncTaskCreateResult(AsyncTask task, boolean created) {
+import org.chovy.canvas.dal.dataobject.AsyncTaskDO;
+
+
+public record AsyncTaskCreateResult(AsyncTaskDO task, boolean created) {
 }

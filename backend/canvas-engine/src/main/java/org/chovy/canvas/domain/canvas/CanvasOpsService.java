@@ -2,13 +2,17 @@ package org.chovy.canvas.domain.canvas;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import org.chovy.canvas.common.MapFieldKeys;
-import org.chovy.canvas.domain.constant.CanvasStatusEnum;
-import org.chovy.canvas.domain.constant.VersionStatus;
-import org.chovy.canvas.infra.redis.TriggerRouteService;
+import org.chovy.canvas.common.enums.CanvasStatusEnum;
+import org.chovy.canvas.common.enums.VersionStatus;
+import org.chovy.canvas.infrastructure.redis.TriggerRouteService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.chovy.canvas.dal.dataobject.CanvasDO;
+import org.chovy.canvas.dal.mapper.CanvasMapper;
+import org.chovy.canvas.dal.dataobject.CanvasVersionDO;
+import org.chovy.canvas.dal.mapper.CanvasVersionMapper;
 
 /**
  * 画布运营管控服务：Kill / 灰度发布 / 版本回滚 / 克隆 / 乐观锁保存。
@@ -40,12 +44,12 @@ public class CanvasOpsService {
 
         // graphJson 为空时仅更新元数据（名称/描述）
         if (graphJson != null) {
-            CanvasVersion draft = latestDraft(id);
+            CanvasVersionDO draft = latestDraft(id);
             if (draft != null) {
                 draft.setGraphJson(graphJson);
                 canvasVersionMapper.updateById(draft);
             } else {
-                CanvasVersion v = new CanvasVersion();
+                CanvasVersionDO v = new CanvasVersionDO();
                 v.setCanvasId(id); v.setVersion(1); v.setGraphJson(graphJson);
                 v.setStatus(VersionStatus.DRAFT.getCode()); v.setCreatedBy(operator);
                 canvasVersionMapper.insert(v);
@@ -62,7 +66,7 @@ public class CanvasOpsService {
      */
     @Transactional
     public void kill(Long id, String mode) {
-        Canvas canvas = require(id);
+        CanvasDO canvas = require(id);
         canvas.setStatus(CanvasStatusEnum.KILLED.getCode());
         canvas.setPublishedVersionId(null);
         canvasMapper.updateById(canvas);
@@ -83,14 +87,14 @@ public class CanvasOpsService {
      */
     @Transactional
     public void startCanary(Long id, int percent, String operator) {
-        Canvas canvas = require(id);
+        CanvasDO canvas = require(id);
         if (canvas.getStatus() != CanvasStatusEnum.PUBLISHED.getCode()) throw new IllegalStateException("画布未在发布状态");
 
         // 生成灰度版本快照（复用当前草稿），与正式发布一样保留不可变版本
-        CanvasVersion draft = latestDraft(id);
+        CanvasVersionDO draft = latestDraft(id);
         if (draft == null) throw new IllegalStateException("无草稿可灰度");
 
-        CanvasVersion canary = new CanvasVersion();
+        CanvasVersionDO canary = new CanvasVersionDO();
         canary.setCanvasId(id);
         canary.setVersion(nextVer(id));
         canary.setGraphJson(draft.getGraphJson());
@@ -109,7 +113,7 @@ public class CanvasOpsService {
      */
     @Transactional
     public void promoteCanary(Long id) {
-        Canvas canvas = require(id);
+        CanvasDO canvas = require(id);
         if (canvas.getCanaryVersionId() == null) throw new IllegalStateException("无灰度版本");
 
         canvas.setPreviousVersionId(canvas.getPublishedVersionId());
@@ -125,7 +129,7 @@ public class CanvasOpsService {
      */
     @Transactional
     public void rollbackCanary(Long id) {
-        Canvas canvas = require(id);
+        CanvasDO canvas = require(id);
         canvas.setCanaryVersionId(null);
         canvas.setCanaryPercent(null);
         canvasMapper.updateById(canvas);
@@ -139,7 +143,7 @@ public class CanvasOpsService {
      */
     @Transactional
     public void rollback(Long id) {
-        Canvas canvas = require(id);
+        CanvasDO canvas = require(id);
         if (canvas.getPreviousVersionId() == null) throw new IllegalStateException("无上一版本可回滚");
 
         Long tmp = canvas.getPublishedVersionId();
@@ -157,11 +161,11 @@ public class CanvasOpsService {
      * @return 新的画布对象
      */
     @Transactional
-    public Canvas clone(Long id, String operator) {
-        Canvas src = require(id);
-        CanvasVersion srcDraft = latestDraft(id);
+    public CanvasDO clone(Long id, String operator) {
+        CanvasDO src = require(id);
+        CanvasVersionDO srcDraft = latestDraft(id);
 
-        Canvas copy = new Canvas();
+        CanvasDO copy = new CanvasDO();
         copy.setName(src.getName() + " (副本)");
         copy.setDescription(src.getDescription());
         copy.setStatus(CanvasStatusEnum.DRAFT.getCode());
@@ -171,7 +175,7 @@ public class CanvasOpsService {
         canvasMapper.insert(copy);
 
         if (srcDraft != null) {
-            CanvasVersion v = new CanvasVersion();
+            CanvasVersionDO v = new CanvasVersionDO();
             v.setCanvasId(copy.getId()); v.setVersion(1);
             v.setGraphJson(srcDraft.getGraphJson());
             v.setStatus(VersionStatus.DRAFT.getCode()); v.setCreatedBy(operator);
@@ -193,8 +197,8 @@ public class CanvasOpsService {
     @SuppressWarnings("unchecked")
     public java.util.Map<String, Object> diff(Long canvasId, Long v1Id, Long v2Id) {
 
-        CanvasVersion v1 = canvasVersionMapper.selectById(v1Id);
-        CanvasVersion v2 = canvasVersionMapper.selectById(v2Id);
+        CanvasVersionDO v1 = canvasVersionMapper.selectById(v1Id);
+        CanvasVersionDO v2 = canvasVersionMapper.selectById(v2Id);
         if (v1 == null || v2 == null) throw new IllegalArgumentException("版本不存在");
 
         // 解析两个版本的节点列表
@@ -271,29 +275,29 @@ public class CanvasOpsService {
 
     // ── helpers ──────────────────────────────────────────────────
 
-    private Canvas require(Long id) {
-        Canvas c = canvasMapper.selectById(id);
+    private CanvasDO require(Long id) {
+        CanvasDO c = canvasMapper.selectById(id);
         if (c == null) throw new IllegalArgumentException("画布不存在: " + id);
         return c;
     }
 
-    private CanvasVersion latestDraft(Long canvasId) {
+    private CanvasVersionDO latestDraft(Long canvasId) {
         return canvasVersionMapper.selectOne(
-                new LambdaQueryWrapper<CanvasVersion>()
-                        .eq(CanvasVersion::getCanvasId, canvasId)
-                        .eq(CanvasVersion::getStatus, 0)
-                        .orderByDesc(CanvasVersion::getVersion).last("LIMIT 1"));
+                new LambdaQueryWrapper<CanvasVersionDO>()
+                        .eq(CanvasVersionDO::getCanvasId, canvasId)
+                        .eq(CanvasVersionDO::getStatus, 0)
+                        .orderByDesc(CanvasVersionDO::getVersion).last("LIMIT 1"));
     }
 
     private int nextVer(Long canvasId) {
-        CanvasVersion max = canvasVersionMapper.selectOne(
-                new LambdaQueryWrapper<CanvasVersion>()
-                        .eq(CanvasVersion::getCanvasId, canvasId)
-                        .orderByDesc(CanvasVersion::getVersion).last("LIMIT 1"));
+        CanvasVersionDO max = canvasVersionMapper.selectOne(
+                new LambdaQueryWrapper<CanvasVersionDO>()
+                        .eq(CanvasVersionDO::getCanvasId, canvasId)
+                        .orderByDesc(CanvasVersionDO::getVersion).last("LIMIT 1"));
         return max != null ? max.getVersion() + 1 : 1;
     }
 
-    private void clearRoutes(Long id, Canvas canvas) {
+    private void clearRoutes(Long id, CanvasDO canvas) {
         // 简化：触发路由清理（完整实现在 CanvasService.clearTriggerRoutesFromGraph）
         // 当前 kill 流程主要依赖 Redis kill channel 通知执行侧快速停机。
     }

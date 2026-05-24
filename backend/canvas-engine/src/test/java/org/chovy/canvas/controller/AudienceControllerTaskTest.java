@@ -1,10 +1,10 @@
-package org.chovy.canvas.controller;
+package org.chovy.canvas.web;
 
-import org.chovy.canvas.domain.audience.AudienceDefinition;
-import org.chovy.canvas.domain.audience.AudienceDefinitionMapper;
-import org.chovy.canvas.domain.audience.AudienceStatMapper;
+import org.chovy.canvas.dal.dataobject.AudienceDefinitionDO;
+import org.chovy.canvas.dal.mapper.AudienceDefinitionMapper;
+import org.chovy.canvas.dal.mapper.AudienceStatMapper;
 import org.chovy.canvas.domain.notification.NotificationService;
-import org.chovy.canvas.domain.task.AsyncTask;
+import org.chovy.canvas.dal.dataobject.AsyncTaskDO;
 import org.chovy.canvas.domain.task.AsyncTaskCreateResult;
 import org.chovy.canvas.domain.task.AsyncTaskService;
 import org.chovy.canvas.dto.task.ComputeTaskResp;
@@ -45,7 +45,7 @@ class AudienceControllerTaskTest {
 
     @Test
     void compute_returnsTaskIdAndStartsRunnerWhenTaskCreated() {
-        AudienceDefinition definition = audience(7L, "VIP 人群");
+        AudienceDefinitionDO definition = audience(7L, "VIP 人群");
         when(definitionMapper.selectById(7L)).thenReturn(definition);
         when(taskService.createOrReuseRunning(
                 "AUDIENCE_COMPUTE",
@@ -67,7 +67,7 @@ class AudienceControllerTaskTest {
 
     @Test
     void compute_reusesExistingTaskWithoutStartingRunner() {
-        AudienceDefinition definition = audience(7L, "VIP 人群");
+        AudienceDefinitionDO definition = audience(7L, "VIP 人群");
         when(definitionMapper.selectById(7L)).thenReturn(definition);
         when(taskService.createOrReuseRunning(
                 "AUDIENCE_COMPUTE",
@@ -87,7 +87,7 @@ class AudienceControllerTaskTest {
 
     @Test
     void compute_reusedTerminalTaskCreatesCatchUpNotificationWithoutStartingRunner() {
-        AudienceDefinition definition = audience(7L, "VIP 人群");
+        AudienceDefinitionDO definition = audience(7L, "VIP 人群");
         when(definitionMapper.selectById(7L)).thenReturn(definition);
         when(taskService.createOrReuseRunning(
                 "AUDIENCE_COMPUTE",
@@ -125,7 +125,7 @@ class AudienceControllerTaskTest {
 
     @Test
     void compute_rejectsDisabledAudienceWithoutEnqueueing() {
-        AudienceDefinition definition = audience(7L, "VIP 人群");
+        AudienceDefinitionDO definition = audience(7L, "VIP 人群");
         definition.setEnabled(0);
         when(definitionMapper.selectById(7L)).thenReturn(definition);
         AudienceController controller = controller();
@@ -138,8 +138,8 @@ class AudienceControllerTaskTest {
 
     @Test
     void create_setsCreatedByAndEnqueuesCompute() {
-        AudienceDefinition body = audience(null, "新建人群");
-        AudienceDefinition created = audience(11L, "新建人群");
+        AudienceDefinitionDO body = audience(null, "新建人群");
+        AudienceDefinitionDO created = audience(11L, "新建人群");
         when(computeService.create(body)).thenReturn(created);
         when(taskService.createOrReuseRunning(
                 "AUDIENCE_COMPUTE",
@@ -154,14 +154,14 @@ class AudienceControllerTaskTest {
 
         assertThat(response.getData()).isSameAs(created);
         assertThat(body.getCreatedBy()).isEqualTo("system");
-        verify(schedulerService).refresh(any(AudienceDefinition.class), any(Runnable.class));
+        verify(schedulerService).refresh(any(AudienceDefinitionDO.class), any(Runnable.class));
         verify(runner).start("task_create", 11L, "新建人群", "system");
     }
 
     @Test
     void update_persistsAndEnqueuesSavedDefinition() {
-        AudienceDefinition body = audience(null, "请求名称");
-        AudienceDefinition saved = audience(12L, "保存后名称");
+        AudienceDefinitionDO body = audience(null, "请求名称");
+        AudienceDefinitionDO saved = audience(12L, "保存后名称");
         when(computeService.update(body)).thenReturn(true);
         when(definitionMapper.selectById(12L)).thenReturn(saved);
         when(taskService.createOrReuseRunning(
@@ -184,7 +184,7 @@ class AudienceControllerTaskTest {
 
     @Test
     void update_rejectsMissingAudienceWithoutSchedulingOrEnqueueing() {
-        AudienceDefinition body = audience(null, "请求名称");
+        AudienceDefinitionDO body = audience(null, "请求名称");
         when(computeService.update(body)).thenReturn(false);
         AudienceController controller = controller();
 
@@ -198,7 +198,7 @@ class AudienceControllerTaskTest {
 
     @Test
     void update_rejectsMissingSavedAudienceWithoutSchedulingOrEnqueueing() {
-        AudienceDefinition body = audience(null, "请求名称");
+        AudienceDefinitionDO body = audience(null, "请求名称");
         when(computeService.update(body)).thenReturn(true);
         when(definitionMapper.selectById(12L)).thenReturn(null);
         AudienceController controller = controller();
@@ -214,7 +214,7 @@ class AudienceControllerTaskTest {
 
     @Test
     void compute_usesFallbackNameWhenDefinitionNameIsBlank() {
-        AudienceDefinition definition = audience(13L, " ");
+        AudienceDefinitionDO definition = audience(13L, " ");
         when(definitionMapper.selectById(13L)).thenReturn(definition);
         when(taskService.createOrReuseRunning(
                 "AUDIENCE_COMPUTE",
@@ -242,16 +242,16 @@ class AudienceControllerTaskTest {
                 notificationService);
     }
 
-    private AudienceDefinition audience(Long id, String name) {
-        AudienceDefinition definition = new AudienceDefinition();
+    private AudienceDefinitionDO audience(Long id, String name) {
+        AudienceDefinitionDO definition = new AudienceDefinitionDO();
         definition.setId(id);
         definition.setName(name);
         definition.setEnabled(1);
         return definition;
     }
 
-    private AsyncTask task(String taskId, String status) {
-        AsyncTask task = new AsyncTask();
+    private AsyncTaskDO task(String taskId, String status) {
+        AsyncTaskDO task = new AsyncTaskDO();
         task.setTaskId(taskId);
         task.setStatus(status);
         return task;

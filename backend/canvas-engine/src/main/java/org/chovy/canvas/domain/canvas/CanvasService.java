@@ -2,20 +2,20 @@ package org.chovy.canvas.domain.canvas;
 
 import cn.hutool.core.util.StrUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import org.chovy.canvas.domain.constant.NodeType;
+import org.chovy.canvas.common.enums.NodeType;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import org.chovy.canvas.common.PageResult;
-import org.chovy.canvas.domain.constant.CanvasStatusEnum;
-import org.chovy.canvas.domain.constant.VersionStatus;
+import org.chovy.canvas.common.enums.CanvasStatusEnum;
+import org.chovy.canvas.common.enums.VersionStatus;
 import org.chovy.canvas.dto.*;
 import org.chovy.canvas.engine.dag.DagGraph;
 import org.chovy.canvas.engine.dag.DagParser;
 import org.chovy.canvas.engine.handlers.GroovyHandler;
 import org.chovy.canvas.engine.trigger.CanvasSchedulerService;
 import org.chovy.canvas.engine.trigger.CanvasExecutionService;
-import org.chovy.canvas.infra.cache.CanvasConfigCache;
-import org.chovy.canvas.infra.redis.TriggerRouteService;
+import org.chovy.canvas.infrastructure.cache.CanvasConfigCache;
+import org.chovy.canvas.infrastructure.redis.TriggerRouteService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -24,6 +24,11 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import org.chovy.canvas.dal.dataobject.CanvasDO;
+import org.chovy.canvas.dal.mapper.CanvasMapper;
+import org.chovy.canvas.dal.dataobject.CanvasVersionDO;
+import org.chovy.canvas.dal.mapper.CanvasVersionMapper;
+import org.chovy.canvas.query.CanvasListQuery;
 
 /**
  * 画布主服务：负责画布生命周期与版本管理。
@@ -60,8 +65,8 @@ public class CanvasService {
      * @return 新建的画布对象
      */
     @Transactional
-    public Canvas create(CanvasCreateReq req) {
-        Canvas canvas = new Canvas();
+    public CanvasDO create(CanvasCreateReq req) {
+        CanvasDO canvas = new CanvasDO();
         canvas.setName(req.getName());
         canvas.setDescription(req.getDescription());
         canvas.setStatus(CanvasStatusEnum.DRAFT.getCode());
@@ -69,7 +74,7 @@ public class CanvasService {
 
         // 若带初始 JSON，创建第一个草稿版本
         if (StrUtil.isNotBlank(req.getGraphJson())) {
-            CanvasVersion v = new CanvasVersion();
+            CanvasVersionDO v = new CanvasVersionDO();
             v.setCanvasId(canvas.getId());
             v.setVersion(1);
             v.setGraphJson(req.getGraphJson());
@@ -87,10 +92,10 @@ public class CanvasService {
      * @return 画布详情 DTO
      */
     public CanvasDetailDTO getById(Long id) {
-        Canvas canvas = canvasMapper.selectById(id);
+        CanvasDO canvas = canvasMapper.selectById(id);
         if (canvas == null) return null;
 
-        CanvasVersion draft = latestDraft(id);
+        CanvasVersionDO draft = latestDraft(id);
 
         CanvasDetailDTO dto = new CanvasDetailDTO();
         dto.setCanvas(canvas);
@@ -107,7 +112,7 @@ public class CanvasService {
      */
     @Transactional
     public void updateDraft(Long id, CanvasUpdateReq req) {
-        Canvas canvas = canvasMapper.selectById(id);
+        CanvasDO canvas = canvasMapper.selectById(id);
         if (canvas == null) throw new IllegalArgumentException("画布不存在: " + id);
 
         canvas.setName(req.getName());
@@ -124,13 +129,13 @@ public class CanvasService {
 
         if (req.getGraphJson() == null) return;
 
-        CanvasVersion existing = latestDraft(id);
+        CanvasVersionDO existing = latestDraft(id);
         if (existing != null) {
             existing.setGraphJson(req.getGraphJson());
             canvasVersionMapper.updateById(existing);
         } else {
             int nextVer = nextVersionNumber(id);
-            CanvasVersion v = new CanvasVersion();
+            CanvasVersionDO v = new CanvasVersionDO();
             v.setCanvasId(id);
             v.setVersion(nextVer);
             v.setGraphJson(req.getGraphJson());
@@ -146,15 +151,15 @@ public class CanvasService {
      * @param q 查询条件
      * @return 分页结果
      */
-    public PageResult<Canvas> list(CanvasListQuery q) {
-        LambdaQueryWrapper<Canvas> wrapper = new LambdaQueryWrapper<Canvas>()
-                .eq(q.getStatus() != null, Canvas::getStatus, q.getStatus())
-                .ne(q.getStatus() == null, Canvas::getStatus, CanvasStatusEnum.ARCHIVED.getCode())
-                .eq(!examplesProperties.isEnabled(), Canvas::getIsExample, 0)
-                .like(q.getName() != null && !q.getName().isBlank(), Canvas::getName, q.getName())
-                .orderByDesc(Canvas::getCreatedAt);
+    public PageResult<CanvasDO> list(CanvasListQuery q) {
+        LambdaQueryWrapper<CanvasDO> wrapper = new LambdaQueryWrapper<CanvasDO>()
+                .eq(q.getStatus() != null, CanvasDO::getStatus, q.getStatus())
+                .ne(q.getStatus() == null, CanvasDO::getStatus, CanvasStatusEnum.ARCHIVED.getCode())
+                .eq(!examplesProperties.isEnabled(), CanvasDO::getIsExample, 0)
+                .like(q.getName() != null && !q.getName().isBlank(), CanvasDO::getName, q.getName())
+                .orderByDesc(CanvasDO::getCreatedAt);
 
-        IPage<Canvas> page = canvasMapper.selectPage(new Page<>(q.getPage(), q.getSize()), wrapper);
+        IPage<CanvasDO> page = canvasMapper.selectPage(new Page<>(q.getPage(), q.getSize()), wrapper);
         return PageResult.of(page.getTotal(), page.getRecords());
     }
 
@@ -166,7 +171,7 @@ public class CanvasService {
      * @return 发布版本信息
      */
     @Transactional
-    public CanvasVersion publish(Long id, String operator) {
+    public CanvasVersionDO publish(Long id, String operator) {
 
         // 并发发布保护（设计文档 6.2节）：同一画布同时只允许一个发布操作
         String lockKey = "canvas:publish:lock:" + id;
@@ -177,10 +182,10 @@ public class CanvasService {
         if (!acquired) throw new IllegalStateException("CANVAS_011: 画布正在发布中，请稍后重试");
 
         try {
-            Canvas canvas = canvasMapper.selectById(id);
+            CanvasDO canvas = canvasMapper.selectById(id);
             if (canvas == null) throw new IllegalArgumentException("画布不存在: " + id);
 
-            CanvasVersion draft = latestDraft(id);
+            CanvasVersionDO draft = latestDraft(id);
             if (draft == null) throw new IllegalStateException("没有可发布的草稿");
 
             // DAG 校验（Kahn 算法环检测 + 触发器节点检查）
@@ -193,7 +198,7 @@ public class CanvasService {
             validateSubFlowDependencies(id, graph);
 
             // 生成发布版本快照
-            CanvasVersion published = new CanvasVersion();
+            CanvasVersionDO published = new CanvasVersionDO();
             published.setCanvasId(id);
             published.setVersion(nextVersionNumber(id));
             published.setGraphJson(draft.getGraphJson());
@@ -215,7 +220,7 @@ public class CanvasService {
             if (canvas.getPublishedVersionId() != null) {
                 configCache.invalidate(canvas.getId(), canvas.getPublishedVersionId());
             }
-            // 发布后驱逐 Canvas 实体缓存，下次 trigger() 读到最新 publishedVersionId/status
+            // 发布后驱逐 CanvasDO 实体缓存，下次 trigger() 读到最新 publishedVersionId/status
             canvasExecutionService.invalidateCanvas(id);
             // Groovy 脚本预编译（off-path，12.9节）
             precompileGroovyNodes(canvas.getId(), graph);
@@ -240,7 +245,7 @@ public class CanvasService {
             Object subFlowIdObj = cfg.get("subFlowId");
             if (subFlowIdObj == null) return;
             Long subFlowId = Long.parseLong(String.valueOf(subFlowIdObj));
-            Canvas subFlow = canvasMapper.selectById(subFlowId);
+            CanvasDO subFlow = canvasMapper.selectById(subFlowId);
             if (subFlow == null) {
                 errors.add("节点「" + node.getName() + "」引用的子流程 ID=" + subFlowId + " 不存在");
             } else if (!Objects.equals(subFlow.getStatus(), CanvasStatusEnum.PUBLISHED.getCode())) {
@@ -265,13 +270,13 @@ public class CanvasService {
     public void offline(Long id, String operator) {
         Long publishedVersionId = canvasTransactionService.offlineDb(id);   // Step 1: 事务内 DB 操作
         if (publishedVersionId != null) {
-            CanvasVersion v = canvasVersionMapper.selectById(publishedVersionId);
+            CanvasVersionDO v = canvasVersionMapper.selectById(publishedVersionId);
             if (v != null) {
                 DagGraph graph = dagParser.parse(v.getGraphJson());
                 clearTriggerRoutesFromGraph(id, graph);          // Step 2: 事务外 Redis
                 schedulerService.cancelScheduledTriggers(id, graph); // 事务外 Scheduler
                 configCache.invalidate(id, publishedVersionId);      // 事务外缓存
-                canvasExecutionService.invalidateCanvas(id);          // 驱逐 Canvas 实体缓存
+                canvasExecutionService.invalidateCanvas(id);          // 驱逐 CanvasDO 实体缓存
             }
         }
     }
@@ -284,7 +289,7 @@ public class CanvasService {
      * </ol>
      */
     public void archive(Long id, String operator) {
-        Canvas canvas = canvasMapper.selectById(id);
+        CanvasDO canvas = canvasMapper.selectById(id);
         if (canvas == null) throw new IllegalArgumentException("画布不存在: " + id);
         if (CanvasStatusEnum.ARCHIVED.getCode().equals(canvas.getStatus())) {
             throw new IllegalStateException("画布已归档: " + id);
@@ -294,13 +299,13 @@ public class CanvasService {
         // If was PUBLISHED, clean up external state exactly like offline() does
         if (CanvasStatusEnum.PUBLISHED.getCode().equals(canvas.getStatus())) {
             if (publishedVersionId != null) {
-                CanvasVersion v = canvasVersionMapper.selectById(publishedVersionId);
+                CanvasVersionDO v = canvasVersionMapper.selectById(publishedVersionId);
                 if (v != null) {
                     DagGraph graph = dagParser.parse(v.getGraphJson());
                     clearTriggerRoutesFromGraph(id, graph);          // Redis 路由清理
                     schedulerService.cancelScheduledTriggers(id, graph); // Scheduler 取消
                     configCache.invalidate(id, publishedVersionId);      // 缓存失效
-                    canvasExecutionService.invalidateCanvas(id);          // 驱逐 Canvas 实体缓存
+                    canvasExecutionService.invalidateCanvas(id);          // 驱逐 CanvasDO 实体缓存
                 }
             }
         }
@@ -309,12 +314,12 @@ public class CanvasService {
     /**
      * 分页查询画布版本历史（按版本号倒序）。
      */
-    public PageResult<CanvasVersion> getVersions(Long canvasId, int page, int size) {
-        com.baomidou.mybatisplus.extension.plugins.pagination.Page<CanvasVersion> p =
+    public PageResult<CanvasVersionDO> getVersions(Long canvasId, int page, int size) {
+        com.baomidou.mybatisplus.extension.plugins.pagination.Page<CanvasVersionDO> p =
                 new com.baomidou.mybatisplus.extension.plugins.pagination.Page<>(page, size);
-        LambdaQueryWrapper<CanvasVersion> q = new LambdaQueryWrapper<CanvasVersion>()
-                .eq(CanvasVersion::getCanvasId, canvasId)
-                .orderByDesc(CanvasVersion::getVersion);
+        LambdaQueryWrapper<CanvasVersionDO> q = new LambdaQueryWrapper<CanvasVersionDO>()
+                .eq(CanvasVersionDO::getCanvasId, canvasId)
+                .orderByDesc(CanvasVersionDO::getVersion);
         var result = canvasVersionMapper.selectPage(p, q);
         return PageResult.of(result.getTotal(), result.getRecords());
     }
@@ -323,11 +328,11 @@ public class CanvasService {
      * @deprecated 使用 getVersions(canvasId, page, size)
      */
     @Deprecated
-    public List<CanvasVersion> getVersions(Long canvasId) {
+    public List<CanvasVersionDO> getVersions(Long canvasId) {
         return canvasVersionMapper.selectList(
-                new LambdaQueryWrapper<CanvasVersion>()
-                        .eq(CanvasVersion::getCanvasId, canvasId)
-                        .orderByDesc(CanvasVersion::getVersion)
+                new LambdaQueryWrapper<CanvasVersionDO>()
+                        .eq(CanvasVersionDO::getCanvasId, canvasId)
+                        .orderByDesc(CanvasVersionDO::getVersion)
                         .last("LIMIT 20") // 防止全量返回
         );
     }
@@ -335,33 +340,33 @@ public class CanvasService {
     /**
      * 查询单个画布版本详情。
      */
-    public CanvasVersion getVersion(Long canvasId, Long versionId) {
+    public CanvasVersionDO getVersion(Long canvasId, Long versionId) {
         return canvasVersionMapper.selectOne(
-                new LambdaQueryWrapper<CanvasVersion>()
-                        .eq(CanvasVersion::getCanvasId, canvasId)
-                        .eq(CanvasVersion::getId, versionId)
+                new LambdaQueryWrapper<CanvasVersionDO>()
+                        .eq(CanvasVersionDO::getCanvasId, canvasId)
+                        .eq(CanvasVersionDO::getId, versionId)
         );
     }
 
     // ── private helpers ──────────────────────────────────────
 
     /** 查询最新草稿版本。 */
-    private CanvasVersion latestDraft(Long canvasId) {
+    private CanvasVersionDO latestDraft(Long canvasId) {
         return canvasVersionMapper.selectOne(
-                new LambdaQueryWrapper<CanvasVersion>()
-                        .eq(CanvasVersion::getCanvasId, canvasId)
-                        .eq(CanvasVersion::getStatus, 0)
-                        .orderByDesc(CanvasVersion::getVersion)
+                new LambdaQueryWrapper<CanvasVersionDO>()
+                        .eq(CanvasVersionDO::getCanvasId, canvasId)
+                        .eq(CanvasVersionDO::getStatus, 0)
+                        .orderByDesc(CanvasVersionDO::getVersion)
                         .last("LIMIT 1")
         );
     }
 
     /** 计算下一个版本号（max + 1）。 */
     private int nextVersionNumber(Long canvasId) {
-        CanvasVersion max = canvasVersionMapper.selectOne(
-                new LambdaQueryWrapper<CanvasVersion>()
-                        .eq(CanvasVersion::getCanvasId, canvasId)
-                        .orderByDesc(CanvasVersion::getVersion)
+        CanvasVersionDO max = canvasVersionMapper.selectOne(
+                new LambdaQueryWrapper<CanvasVersionDO>()
+                        .eq(CanvasVersionDO::getCanvasId, canvasId)
+                        .orderByDesc(CanvasVersionDO::getVersion)
                         .last("LIMIT 1")
         );
         return max != null ? max.getVersion() + 1 : 1;
@@ -373,16 +378,16 @@ public class CanvasService {
      */
     @Transactional
     public void revertToVersion(Long canvasId, Long versionId) {
-        CanvasVersion target = canvasVersionMapper.selectById(versionId);
+        CanvasVersionDO target = canvasVersionMapper.selectById(versionId);
         if (target == null) throw new IllegalArgumentException("版本不存在: " + versionId);
         if (!target.getCanvasId().equals(canvasId)) throw new IllegalArgumentException("版本不属于该画布");
 
-        CanvasVersion draft = latestDraft(canvasId);
+        CanvasVersionDO draft = latestDraft(canvasId);
         if (draft != null) {
             draft.setGraphJson(target.getGraphJson());
             canvasVersionMapper.updateById(draft);
         } else {
-            CanvasVersion newDraft = new CanvasVersion();
+            CanvasVersionDO newDraft = new CanvasVersionDO();
             newDraft.setCanvasId(canvasId);
             newDraft.setVersion(nextVersionNumber(canvasId));
             newDraft.setGraphJson(target.getGraphJson());
@@ -447,16 +452,16 @@ public class CanvasService {
     }
 
     private void clearTriggerRoutes(Long canvasId) {
-        Canvas canvas = canvasMapper.selectById(canvasId);
+        CanvasDO canvas = canvasMapper.selectById(canvasId);
         if (canvas == null || canvas.getPublishedVersionId() == null) return;
-        CanvasVersion v = canvasVersionMapper.selectById(canvas.getPublishedVersionId());
+        CanvasVersionDO v = canvasVersionMapper.selectById(canvas.getPublishedVersionId());
         if (v == null) return;
         clearTriggerRoutesFromGraph(canvasId, dagParser.parse(v.getGraphJson()));
     }
 
-    private void clearPublishedExternalState(Canvas canvas) {
+    private void clearPublishedExternalState(CanvasDO canvas) {
         if (canvas.getPublishedVersionId() == null) return;
-        CanvasVersion v = canvasVersionMapper.selectById(canvas.getPublishedVersionId());
+        CanvasVersionDO v = canvasVersionMapper.selectById(canvas.getPublishedVersionId());
         if (v == null) return;
         DagGraph graph = dagParser.parse(v.getGraphJson());
         clearTriggerRoutesFromGraph(canvas.getId(), graph);

@@ -2,11 +2,11 @@ package org.chovy.canvas.engine.scheduler;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.chovy.canvas.common.MapFieldKeys;
-import org.chovy.canvas.domain.constant.NodeType;
-import org.chovy.canvas.domain.constant.TriggerType;
-import org.chovy.canvas.domain.execution.CanvasExecutionDlq;
-import org.chovy.canvas.domain.execution.CanvasExecutionDlqMapper;
-import org.chovy.canvas.domain.execution.CanvasExecutionTrace;
+import org.chovy.canvas.common.enums.NodeType;
+import org.chovy.canvas.common.enums.TriggerType;
+import org.chovy.canvas.dal.dataobject.CanvasExecutionDlqDO;
+import org.chovy.canvas.dal.mapper.CanvasExecutionDlqMapper;
+import org.chovy.canvas.dal.dataobject.CanvasExecutionTraceDO;
 import org.chovy.canvas.engine.context.ExecutionContext;
 import org.chovy.canvas.engine.context.NodeGate;
 import org.chovy.canvas.engine.context.NodeStatus;
@@ -19,7 +19,7 @@ import org.chovy.canvas.engine.handler.NodeRouteResolver;
 import org.chovy.canvas.engine.handler.NodeResult;
 import org.chovy.canvas.engine.handlers.HubHandler;
 import org.chovy.canvas.engine.handlers.LogicRelationHandler;
-import org.chovy.canvas.infra.redis.ContextPersistenceService;
+import org.chovy.canvas.infrastructure.redis.ContextPersistenceService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Lazy;
@@ -458,7 +458,7 @@ public class DagEngine {
         metrics.recordDlq(nodeType);
         try {
             String msg = cause.getMessage() != null ? cause.getMessage() : "unknown";
-            CanvasExecutionDlq dlq = CanvasExecutionDlq.builder()
+            CanvasExecutionDlqDO dlq = CanvasExecutionDlqDO.builder()
                     .executionId(ctx.getExecutionId())
                     .canvasId(ctx.getCanvasId())
                     .userId(ctx.getUserId())
@@ -873,13 +873,13 @@ public class DagEngine {
     // ══════════════════════════════════════════════════════════════
 
     private void writeSkippedNodes(DagGraph graph, ExecutionContext ctx) {
-        List<CanvasExecutionTrace> skippedTraces = new ArrayList<>();
+        List<CanvasExecutionTraceDO> skippedTraces = new ArrayList<>();
         LocalDateTime now = LocalDateTime.now();
 
         graph.getNodeMap().forEach((nodeId, node) -> {
             if (!ctx.getNodeStatuses().containsKey(nodeId)) {
                 ctx.setNodeStatus(nodeId, NodeStatus.SKIPPED);
-                skippedTraces.add(CanvasExecutionTrace.builder()
+                skippedTraces.add(CanvasExecutionTraceDO.builder()
                         .executionId(ctx.getExecutionId())
                         .nodeId(nodeId)
                         .nodeType(node.getType())
@@ -915,7 +915,7 @@ public class DagEngine {
     // ══════════════════════════════════════════════════════════════
 
     private void writeTraceStart(ExecutionContext ctx, DagParser.CanvasNode node) {
-        CanvasExecutionTrace trace = CanvasExecutionTrace.builder()
+        CanvasExecutionTraceDO trace = CanvasExecutionTraceDO.builder()
                 .executionId(ctx.getExecutionId())
                 .nodeId(node.getId())
                 .nodeType(node.getType())
@@ -940,7 +940,7 @@ public class DagEngine {
         } catch (Exception ignored) {
         }
 
-        CanvasExecutionTrace trace = CanvasExecutionTrace.builder()
+        CanvasExecutionTraceDO trace = CanvasExecutionTraceDO.builder()
                 .executionId(ctx.getExecutionId())
                 .nodeId(node.getId())
                 .nodeType(node.getType())

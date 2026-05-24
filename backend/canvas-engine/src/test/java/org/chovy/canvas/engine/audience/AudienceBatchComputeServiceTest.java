@@ -1,10 +1,10 @@
 package org.chovy.canvas.engine.audience;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import org.chovy.canvas.domain.audience.AudienceComputeRun;
-import org.chovy.canvas.domain.audience.AudienceComputeRunMapper;
-import org.chovy.canvas.domain.audience.AudienceDefinitionMapper;
-import org.chovy.canvas.domain.audience.AudienceStatMapper;
+import org.chovy.canvas.dal.dataobject.AudienceComputeRunDO;
+import org.chovy.canvas.dal.mapper.AudienceComputeRunMapper;
+import org.chovy.canvas.dal.mapper.AudienceDefinitionMapper;
+import org.chovy.canvas.dal.mapper.AudienceStatMapper;
 import org.junit.jupiter.api.Test;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.ValueOperations;
@@ -30,12 +30,12 @@ class AudienceBatchComputeServiceTest {
         when(valueOps.setIfAbsent(eq("audience:compute:lock:1"), eq("1"), any(Duration.class)))
                 .thenReturn(false);
         doAnswer(invocation -> {
-            AudienceComputeRun run = invocation.getArgument(0);
+            AudienceComputeRunDO run = invocation.getArgument(0);
             assertThat(run.getStatus()).isEqualTo("COMPUTING");
             assertThat(run.getPerfRunId()).isEqualTo("perf_20260523_001");
             assertThat(run.getPerfInputId()).isEqualTo("perf_20260523_001:audience:1");
             return 1;
-        }).when(computeRunMapper).insert(any(AudienceComputeRun.class));
+        }).when(computeRunMapper).insert(any(AudienceComputeRunDO.class));
 
         AudienceBatchComputeService service = new AudienceBatchComputeService(
                 mock(AudienceDefinitionMapper.class),
@@ -57,7 +57,7 @@ class AudienceBatchComputeServiceTest {
 
         assertThat(result.success()).isFalse();
         assertThat(result.status()).isEqualTo("FAILED");
-        var runCaptor = org.mockito.ArgumentCaptor.forClass(AudienceComputeRun.class);
+        var runCaptor = org.mockito.ArgumentCaptor.forClass(AudienceComputeRunDO.class);
         verify(computeRunMapper).updateById(runCaptor.capture());
         assertThat(runCaptor.getValue().getStatus()).isEqualTo("SKIPPED_LOCK");
     }

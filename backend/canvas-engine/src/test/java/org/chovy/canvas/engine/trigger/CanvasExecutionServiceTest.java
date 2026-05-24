@@ -6,19 +6,19 @@ import org.apache.rocketmq.client.producer.SendResult;
 import org.apache.rocketmq.client.producer.SendStatus;
 import org.apache.rocketmq.common.message.Message;
 import org.apache.rocketmq.spring.core.RocketMQTemplate;
-import org.chovy.canvas.domain.canvas.Canvas;
-import org.chovy.canvas.domain.canvas.CanvasMapper;
-import org.chovy.canvas.domain.canvas.CanvasVersionMapper;
-import org.chovy.canvas.domain.constant.CanvasStatusEnum;
-import org.chovy.canvas.domain.constant.ExecutionStatus;
-import org.chovy.canvas.domain.constant.NodeType;
-import org.chovy.canvas.domain.constant.TriggerType;
+import org.chovy.canvas.dal.dataobject.CanvasDO;
+import org.chovy.canvas.dal.mapper.CanvasMapper;
+import org.chovy.canvas.dal.mapper.CanvasVersionMapper;
+import org.chovy.canvas.common.enums.CanvasStatusEnum;
+import org.chovy.canvas.common.enums.ExecutionStatus;
+import org.chovy.canvas.common.enums.NodeType;
+import org.chovy.canvas.common.enums.TriggerType;
 import org.chovy.canvas.domain.cdp.CdpUserService;
-import org.chovy.canvas.domain.execution.CanvasExecution;
-import org.chovy.canvas.domain.execution.CanvasExecutionDlq;
-import org.chovy.canvas.domain.execution.CanvasExecutionDlqMapper;
-import org.chovy.canvas.domain.execution.CanvasExecutionMapper;
-import org.chovy.canvas.domain.execution.CanvasExecutionStatsMapper;
+import org.chovy.canvas.dal.dataobject.CanvasExecutionDO;
+import org.chovy.canvas.dal.dataobject.CanvasExecutionDlqDO;
+import org.chovy.canvas.dal.mapper.CanvasExecutionDlqMapper;
+import org.chovy.canvas.dal.mapper.CanvasExecutionMapper;
+import org.chovy.canvas.dal.mapper.CanvasExecutionStatsMapper;
 import org.chovy.canvas.engine.context.ExecutionContext;
 import org.chovy.canvas.engine.context.NodeStatus;
 import org.chovy.canvas.engine.dag.DagGraph;
@@ -30,10 +30,10 @@ import org.chovy.canvas.engine.scheduler.CanvasMetrics;
 import org.chovy.canvas.engine.scheduler.CircuitBreakerRegistry;
 import org.chovy.canvas.engine.scheduler.DagEngine;
 import org.chovy.canvas.engine.scheduler.TraceWriteBuffer;
-import org.chovy.canvas.infra.cache.CanvasConfigCache;
-import org.chovy.canvas.infra.cache.CanvasEntityCache;
-import org.chovy.canvas.infra.mq.OverflowRetryMessage;
-import org.chovy.canvas.infra.redis.ContextPersistenceService;
+import org.chovy.canvas.infrastructure.cache.CanvasConfigCache;
+import org.chovy.canvas.infrastructure.cache.CanvasEntityCache;
+import org.chovy.canvas.infrastructure.mq.OverflowRetryMessage;
+import org.chovy.canvas.infrastructure.redis.ContextPersistenceService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -116,7 +116,7 @@ class CanvasExecutionServiceTest {
 
     @Test
     void triggerPropagatesExecutionInsertFailureBeforeRunningDagAndReleasesDedup() {
-        Canvas canvas = publishedCanvas(10L, 10);
+        CanvasDO canvas = publishedCanvas(10L, 10);
         when(canvasEntityCache.get(10L)).thenReturn(canvas);
         when(ctxStore.exists(10L, "user-7")).thenReturn(false);
         when(ctxStore.acquireDedup(eq(10L), eq("user-7"), eq("MSG-1"), any()))
@@ -129,7 +129,7 @@ class CanvasExecutionServiceTest {
                 .thenReturn(Optional.of(Disposables.swap()));
         when(dagEngine.execute(eq(graph), eq("trigger"), any()))
                 .thenReturn(Mono.just(Map.of("ok", true)));
-        when(executionMapper.insert(any(CanvasExecution.class))).thenThrow(new RuntimeException("db down"));
+        when(executionMapper.insert(any(CanvasExecutionDO.class))).thenThrow(new RuntimeException("db down"));
 
         assertThatThrownBy(() -> sut.trigger(
                 10L,
@@ -147,7 +147,7 @@ class CanvasExecutionServiceTest {
 
     @Test
     void normalPriorityOverflowQueuesRocketMqRetryWithIncrementedChainRetryCount() throws Exception {
-        Canvas canvas = publishedCanvas(30L, 10);
+        CanvasDO canvas = publishedCanvas(30L, 10);
         when(canvasEntityCache.get(30L)).thenReturn(canvas);
         when(ctxStore.acquireDedup(eq(30L), eq("user-1"), eq("msg-1"), any())).thenReturn(true);
         when(executionRegistry.activeCount(30L)).thenReturn(10);
@@ -192,7 +192,7 @@ class CanvasExecutionServiceTest {
 
     @Test
     void executionRequestOverflowReturnsRetrySignalWithoutRocketMqOverflowMessage() {
-        Canvas canvas = publishedCanvas(42L, 10);
+        CanvasDO canvas = publishedCanvas(42L, 10);
         when(canvasEntityCache.get(42L)).thenReturn(canvas);
         when(ctxStore.acquireDedup(eq(42L), eq("user-13"), eq("msg-13"), any())).thenReturn(true);
         when(executionRegistry.activeCount(42L)).thenReturn(10);
@@ -216,7 +216,7 @@ class CanvasExecutionServiceTest {
 
     @Test
     void overflowRetryDisruptorMetadataUsesNonMutatingCheckThenConsumesQuotaWhenAccepted() {
-        Canvas canvas = publishedCanvas(34L, 10);
+        CanvasDO canvas = publishedCanvas(34L, 10);
         when(canvasEntityCache.get(34L)).thenReturn(canvas);
         when(executionRegistry.activeCount(34L)).thenReturn(1);
         when(ctxStore.exists(34L, "user-5")).thenReturn(false);
@@ -252,7 +252,7 @@ class CanvasExecutionServiceTest {
 
     @Test
     void overflowRetryMetadataCarriesRetryBudgetWhenRequeued() throws Exception {
-        Canvas canvas = publishedCanvas(36L, 10);
+        CanvasDO canvas = publishedCanvas(36L, 10);
         when(canvasEntityCache.get(36L)).thenReturn(canvas);
         when(executionRegistry.activeCount(36L)).thenReturn(10);
         when(rocketMQTemplate.getProducer()).thenReturn(rocketProducer);
@@ -283,7 +283,7 @@ class CanvasExecutionServiceTest {
 
     @Test
     void forgedOverflowRetryPayloadDoesNotSkipPreCheck() {
-        Canvas canvas = publishedCanvas(35L, 10);
+        CanvasDO canvas = publishedCanvas(35L, 10);
         when(canvasEntityCache.get(35L)).thenReturn(canvas);
         when(executionRegistry.activeCount(35L)).thenReturn(1);
         when(ctxStore.exists(35L, "user-6")).thenReturn(false);
@@ -321,7 +321,7 @@ class CanvasExecutionServiceTest {
 
     @Test
     void duplicateMessageDoesNotConsumeQuotaOrCooldown() {
-        Canvas canvas = publishedCanvas(38L, 10);
+        CanvasDO canvas = publishedCanvas(38L, 10);
         when(canvasEntityCache.get(38L)).thenReturn(canvas);
         when(ctxStore.exists(38L, "user-9")).thenReturn(false);
         when(ctxStore.acquireDedup(eq(38L), eq("user-9"), eq("msg-9"), any())).thenReturn(false);
@@ -347,7 +347,7 @@ class CanvasExecutionServiceTest {
 
     @Test
     void resumeLockLoserDoesNotConsumeQuotaOrCooldown() {
-        Canvas canvas = publishedCanvas(39L, 10);
+        CanvasDO canvas = publishedCanvas(39L, 10);
         when(canvasEntityCache.get(39L)).thenReturn(canvas);
         when(executionRegistry.activeCount(39L)).thenReturn(1);
         when(ctxStore.exists(39L, "user-10")).thenReturn(true);
@@ -372,7 +372,7 @@ class CanvasExecutionServiceTest {
 
     @Test
     void missingTriggerNodeDoesNotConsumeQuotaOrCooldown() {
-        Canvas canvas = publishedCanvas(40L, 10);
+        CanvasDO canvas = publishedCanvas(40L, 10);
         when(canvasEntityCache.get(40L)).thenReturn(canvas);
         when(executionRegistry.activeCount(40L)).thenReturn(1);
         when(ctxStore.exists(40L, "user-11")).thenReturn(false);
@@ -400,7 +400,7 @@ class CanvasExecutionServiceTest {
 
     @Test
     void normalPriorityOverflowGeneratesReplayMsgIdWhenOriginalMsgIdMissing() throws Exception {
-        Canvas canvas = publishedCanvas(41L, 10);
+        CanvasDO canvas = publishedCanvas(41L, 10);
         when(canvasEntityCache.get(41L)).thenReturn(canvas);
         when(executionRegistry.activeCount(41L)).thenReturn(10);
         when(rocketMQTemplate.getProducer()).thenReturn(rocketProducer);
@@ -427,7 +427,7 @@ class CanvasExecutionServiceTest {
 
     @Test
     void normalPriorityOverflowReportsRetryEnqueueFailureWhenRocketMqReturnsNonOkStatus() throws Exception {
-        Canvas canvas = publishedCanvas(37L, 10);
+        CanvasDO canvas = publishedCanvas(37L, 10);
         when(canvasEntityCache.get(37L)).thenReturn(canvas);
         when(ctxStore.acquireDedup(eq(37L), eq("user-8"), eq("msg-8"), any())).thenReturn(true);
         when(executionRegistry.activeCount(37L)).thenReturn(10);
@@ -448,7 +448,7 @@ class CanvasExecutionServiceTest {
         assertThat(result).containsEntry("overflow", "retry_enqueue_failed");
         verify(preCheckService).checkWithoutQuotaAccounting(eq(canvas), eq("user-8"));
         verify(preCheckService, never()).consumeQuotaAndRecord(any(), any());
-        ArgumentCaptor<CanvasExecutionDlq> dlqCaptor = ArgumentCaptor.forClass(CanvasExecutionDlq.class);
+        ArgumentCaptor<CanvasExecutionDlqDO> dlqCaptor = ArgumentCaptor.forClass(CanvasExecutionDlqDO.class);
         verify(dlqMapper).insert(dlqCaptor.capture());
         assertThat(dlqCaptor.getValue().getExecutionId()).isEqualTo("msg-8");
         assertThat(dlqCaptor.getValue().getPerfRunId()).isEqualTo("perf_20260523_003");
@@ -459,7 +459,7 @@ class CanvasExecutionServiceTest {
 
     @Test
     void normalPriorityOverflowReportsRetryEnqueueFailureWhenRocketMqSendFails() throws Exception {
-        Canvas canvas = publishedCanvas(33L, 10);
+        CanvasDO canvas = publishedCanvas(33L, 10);
         when(canvasEntityCache.get(33L)).thenReturn(canvas);
         when(ctxStore.acquireDedup(eq(33L), eq("user-4"), eq("msg-4"), any())).thenReturn(true);
         when(executionRegistry.activeCount(33L)).thenReturn(10);
@@ -480,13 +480,13 @@ class CanvasExecutionServiceTest {
         assertThat(result).containsEntry("overflow", "retry_enqueue_failed");
         verify(preCheckService).checkWithoutQuotaAccounting(eq(canvas), eq("user-4"));
         verify(preCheckService, never()).consumeQuotaAndRecord(any(), any());
-        verify(dlqMapper).insert(any(CanvasExecutionDlq.class));
+        verify(dlqMapper).insert(any(CanvasExecutionDlqDO.class));
         verify(dagEngine, never()).execute(any(), any(), any());
     }
 
     @Test
     void lowPriorityOverflowDropsWithoutRocketMqRetry() {
-        Canvas canvas = publishedCanvas(31L, 10);
+        CanvasDO canvas = publishedCanvas(31L, 10);
         when(canvasEntityCache.get(31L)).thenReturn(canvas);
         when(ctxStore.acquireDedup(eq(31L), eq("user-2"), eq("msg-2"), any())).thenReturn(true);
         when(executionRegistry.activeCount(31L)).thenReturn(5);
@@ -511,7 +511,7 @@ class CanvasExecutionServiceTest {
 
     @Test
     void highPriorityOverThresholdStillExecutesWithoutRocketMqRetry() {
-        Canvas canvas = publishedCanvas(32L, 10);
+        CanvasDO canvas = publishedCanvas(32L, 10);
         when(canvasEntityCache.get(32L)).thenReturn(canvas);
         when(executionRegistry.activeCount(32L)).thenReturn(25);
         when(ctxStore.exists(32L, "user-3")).thenReturn(false);
@@ -542,7 +542,7 @@ class CanvasExecutionServiceTest {
 
     @Test
     void triggerPersistsExecutionPerfRunIdFromTriggerPayload() {
-        Canvas canvas = publishedCanvas(43L, 10);
+        CanvasDO canvas = publishedCanvas(43L, 10);
         when(canvasEntityCache.get(43L)).thenReturn(canvas);
         when(executionRegistry.activeCount(43L)).thenReturn(1);
         when(ctxStore.exists(43L, "user-14")).thenReturn(false);
@@ -564,14 +564,14 @@ class CanvasExecutionServiceTest {
         ).block();
 
         assertThat(result).containsEntry("ok", true);
-        ArgumentCaptor<CanvasExecution> executionCaptor = ArgumentCaptor.forClass(CanvasExecution.class);
+        ArgumentCaptor<CanvasExecutionDO> executionCaptor = ArgumentCaptor.forClass(CanvasExecutionDO.class);
         verify(executionMapper).insert(executionCaptor.capture());
         assertThat(executionCaptor.getValue().getPerfRunId()).isEqualTo("perf_20260523_001");
     }
 
     @Test
     void triggerPersistsPerfDedupKeyForDirectVerification() {
-        Canvas canvas = publishedCanvas(45L, 10);
+        CanvasDO canvas = publishedCanvas(45L, 10);
         when(canvasEntityCache.get(45L)).thenReturn(canvas);
         when(executionRegistry.activeCount(45L)).thenReturn(1);
         when(ctxStore.exists(45L, "user-16")).thenReturn(false);
@@ -597,7 +597,7 @@ class CanvasExecutionServiceTest {
         ).block();
 
         assertThat(result).containsEntry("ok", true);
-        ArgumentCaptor<CanvasExecution> executionCaptor = ArgumentCaptor.forClass(CanvasExecution.class);
+        ArgumentCaptor<CanvasExecutionDO> executionCaptor = ArgumentCaptor.forClass(CanvasExecutionDO.class);
         verify(executionMapper).insert(executionCaptor.capture());
         assertThat(executionCaptor.getValue().getPerfRunId()).isEqualTo("perf_20260523_005");
         assertThat(executionCaptor.getValue().getLastDedupKey())
@@ -606,7 +606,7 @@ class CanvasExecutionServiceTest {
 
     @Test
     void triggerDryRunPersistsExecutionPerfRunIdFromTriggerPayload() {
-        Canvas canvas = publishedCanvas(44L, 10);
+        CanvasDO canvas = publishedCanvas(44L, 10);
         when(canvasMapper.selectById(44L)).thenReturn(canvas);
         DagGraph graph = graphWithTriggerNode(NodeType.DIRECT_CALL, null);
         when(dagParser.parse("graph-json")).thenReturn(graph);
@@ -620,7 +620,7 @@ class CanvasExecutionServiceTest {
         ).block();
 
         assertThat(result).containsEntry("ok", true);
-        ArgumentCaptor<CanvasExecution> executionCaptor = ArgumentCaptor.forClass(CanvasExecution.class);
+        ArgumentCaptor<CanvasExecutionDO> executionCaptor = ArgumentCaptor.forClass(CanvasExecutionDO.class);
         verify(executionMapper).insert(executionCaptor.capture());
         assertThat(executionCaptor.getValue().getPerfRunId()).isEqualTo("perf_20260523_002");
     }
@@ -655,7 +655,7 @@ class CanvasExecutionServiceTest {
         writeDlq.setAccessible(true);
         writeDlq.invoke(engine, ctx, "node-1", NodeType.API_CALL, new RuntimeException("node failed"));
 
-        ArgumentCaptor<CanvasExecutionDlq> dlqCaptor = ArgumentCaptor.forClass(CanvasExecutionDlq.class);
+        ArgumentCaptor<CanvasExecutionDlqDO> dlqCaptor = ArgumentCaptor.forClass(CanvasExecutionDlqDO.class);
         verify(mapper, timeout(1_000)).insert(dlqCaptor.capture());
         assertThat(dlqCaptor.getValue().getPerfRunId()).isEqualTo("perf_20260523_004");
     }
@@ -666,8 +666,8 @@ class CanvasExecutionServiceTest {
         return result;
     }
 
-    private Canvas publishedCanvas(Long canvasId, Integer maxTotalExecutions) {
-        Canvas canvas = new Canvas();
+    private CanvasDO publishedCanvas(Long canvasId, Integer maxTotalExecutions) {
+        CanvasDO canvas = new CanvasDO();
         canvas.setId(canvasId);
         canvas.setStatus(CanvasStatusEnum.PUBLISHED.getCode());
         canvas.setPublishedVersionId(101L);
@@ -707,7 +707,7 @@ class CanvasExecutionServiceTest {
 
     @Test
     void triggerPersistsContextAndMarksExecutionPausedWhenDagCompletesWithWaitingNode() {
-        Canvas canvas = new Canvas();
+        CanvasDO canvas = new CanvasDO();
         canvas.setId(10L);
         canvas.setStatus(CanvasStatusEnum.PUBLISHED.getCode());
         canvas.setPublishedVersionId(100L);
@@ -746,7 +746,7 @@ class CanvasExecutionServiceTest {
         verify(ctxStore).save(any(ExecutionContext.class));
         verify(ctxStore, never()).delete(10L, "user-7");
 
-        var captor = org.mockito.ArgumentCaptor.forClass(CanvasExecution.class);
+        var captor = org.mockito.ArgumentCaptor.forClass(CanvasExecutionDO.class);
         verify(executionMapper).updateById(captor.capture());
         assertThat(captor.getValue().getStatus()).isEqualTo(ExecutionStatus.PAUSED.getCode());
     }

@@ -4,12 +4,12 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.chovy.canvas.domain.audience.AudienceDefinition;
-import org.chovy.canvas.domain.audience.AudienceDefinitionMapper;
-import org.chovy.canvas.domain.audience.AudienceComputeRun;
-import org.chovy.canvas.domain.audience.AudienceComputeRunMapper;
-import org.chovy.canvas.domain.audience.AudienceStat;
-import org.chovy.canvas.domain.audience.AudienceStatMapper;
+import org.chovy.canvas.dal.dataobject.AudienceDefinitionDO;
+import org.chovy.canvas.dal.mapper.AudienceDefinitionMapper;
+import org.chovy.canvas.dal.dataobject.AudienceComputeRunDO;
+import org.chovy.canvas.dal.mapper.AudienceComputeRunMapper;
+import org.chovy.canvas.dal.dataobject.AudienceStatDO;
+import org.chovy.canvas.dal.mapper.AudienceStatMapper;
 import org.roaringbitmap.RoaringBitmap;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.jdbc.DataSourceBuilder;
@@ -55,7 +55,7 @@ public class AudienceBatchComputeService {
     }
 
     public AudienceComputeResult compute(Long audienceId, String perfRunId, String perfInputId) {
-        AudienceComputeRun run = startRun(audienceId, perfRunId, perfInputId);
+        AudienceComputeRunDO run = startRun(audienceId, perfRunId, perfInputId);
         String lockKey = COMPUTE_LOCK_PREFIX + audienceId;
         boolean locked = Boolean.TRUE.equals(redis.opsForValue().setIfAbsent(lockKey, "1", Duration.ofHours(2)));
         if (!locked) {
@@ -70,7 +70,7 @@ public class AudienceBatchComputeService {
         String audienceName = fallbackAudienceName(audienceId);
         try {
             updateStat(audienceId, "COMPUTING", null, null, null);
-            AudienceDefinition definition = definitionMapper.selectById(audienceId);
+            AudienceDefinitionDO definition = definitionMapper.selectById(audienceId);
             if (definition == null || definition.getEnabled() == null || definition.getEnabled() == 0) {
                 throw new IllegalArgumentException("Audience not found or disabled: " + audienceId);
             }
@@ -109,12 +109,12 @@ public class AudienceBatchComputeService {
         }
     }
 
-    public AudienceDefinition create(AudienceDefinition definition) {
+    public AudienceDefinitionDO create(AudienceDefinitionDO definition) {
         definitionMapper.insert(definition);
         return definition;
     }
 
-    public boolean update(AudienceDefinition definition) {
+    public boolean update(AudienceDefinitionDO definition) {
         return definitionMapper.updateById(definition) > 0;
     }
 
@@ -124,7 +124,7 @@ public class AudienceBatchComputeService {
         bitmapStore.delete(audienceId);
     }
 
-    private RoaringBitmap computeViaJdbc(AudienceDefinition definition) throws Exception {
+    private RoaringBitmap computeViaJdbc(AudienceDefinitionDO definition) throws Exception {
         JdbcConfig jdbcConfig = jdbcConfigResolver.resolve(definition.getDataSourceConfig());
         DataSource dataSource = DataSourceBuilder.create()
                 .driverClassName(jdbcConfig.driverClassName())
@@ -149,7 +149,7 @@ public class AudienceBatchComputeService {
         return bitmap;
     }
 
-    private RoaringBitmap computeViaTaggerApi(AudienceDefinition definition) throws Exception {
+    private RoaringBitmap computeViaTaggerApi(AudienceDefinitionDO definition) throws Exception {
         Map<String, Object> config = objectMapper.readValue(
                 definition.getDataSourceConfig() == null || definition.getDataSourceConfig().isBlank()
                         ? "{}"
@@ -208,10 +208,10 @@ public class AudienceBatchComputeService {
     }
 
     private void updateStat(Long audienceId, String status, Long size, Integer sizeKb, String errorMsg) {
-        AudienceStat stat = statMapper.selectById(audienceId);
+        AudienceStatDO stat = statMapper.selectById(audienceId);
         boolean exists = stat != null;
         if (!exists) {
-            stat = new AudienceStat();
+            stat = new AudienceStatDO();
             stat.setAudienceId(audienceId);
         }
         stat.setStatus(status);
@@ -230,11 +230,11 @@ public class AudienceBatchComputeService {
         }
     }
 
-    private AudienceComputeRun startRun(Long audienceId, String perfRunId, String perfInputId) {
+    private AudienceComputeRunDO startRun(Long audienceId, String perfRunId, String perfInputId) {
         if (perfRunId == null || perfRunId.isBlank()) {
             return null;
         }
-        AudienceComputeRun run = new AudienceComputeRun();
+        AudienceComputeRunDO run = new AudienceComputeRunDO();
         run.setAudienceId(audienceId);
         run.setPerfRunId(perfRunId);
         run.setPerfInputId(perfInputId);
@@ -245,7 +245,7 @@ public class AudienceBatchComputeService {
         return run;
     }
 
-    private void finishRun(AudienceComputeRun run, String status, Long size, Integer sizeKb, String errorMsg) {
+    private void finishRun(AudienceComputeRunDO run, String status, Long size, Integer sizeKb, String errorMsg) {
         if (run == null) {
             return;
         }
@@ -266,7 +266,7 @@ public class AudienceBatchComputeService {
 
     private String safeAudienceName(Long audienceId) {
         try {
-            AudienceDefinition definition = definitionMapper.selectById(audienceId);
+            AudienceDefinitionDO definition = definitionMapper.selectById(audienceId);
             return displayName(definition == null ? null : definition.getName(), audienceId);
         } catch (Exception e) {
             log.warn("[AUDIENCE] failed to fetch audience name audienceId={}: {}", audienceId, e.getMessage(), e);
@@ -290,16 +290,16 @@ public class AudienceBatchComputeService {
         }
     }
 
-    public List<AudienceDefinition> listReadyDefinitions() {
-        List<AudienceStat> readyStats = statMapper.selectList(new LambdaQueryWrapper<AudienceStat>()
-                .eq(AudienceStat::getStatus, "READY"));
+    public List<AudienceDefinitionDO> listReadyDefinitions() {
+        List<AudienceStatDO> readyStats = statMapper.selectList(new LambdaQueryWrapper<AudienceStatDO>()
+                .eq(AudienceStatDO::getStatus, "READY"));
         if (readyStats.isEmpty()) {
             return List.of();
         }
-        List<Long> audienceIds = readyStats.stream().map(AudienceStat::getAudienceId).toList();
-        return definitionMapper.selectList(new LambdaQueryWrapper<AudienceDefinition>()
-                .in(AudienceDefinition::getId, audienceIds)
-                .eq(AudienceDefinition::getEnabled, 1)
-                .orderByAsc(AudienceDefinition::getId));
+        List<Long> audienceIds = readyStats.stream().map(AudienceStatDO::getAudienceId).toList();
+        return definitionMapper.selectList(new LambdaQueryWrapper<AudienceDefinitionDO>()
+                .in(AudienceDefinitionDO::getId, audienceIds)
+                .eq(AudienceDefinitionDO::getEnabled, 1)
+                .orderByAsc(AudienceDefinitionDO::getId));
     }
 }

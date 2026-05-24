@@ -11,6 +11,10 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import org.chovy.canvas.dal.dataobject.CdpUserIdentityDO;
+import org.chovy.canvas.dal.mapper.CdpUserIdentityMapper;
+import org.chovy.canvas.dal.dataobject.CdpUserProfileDO;
+import org.chovy.canvas.dal.mapper.CdpUserProfileMapper;
 
 class CdpUserServiceTest {
 
@@ -31,8 +35,8 @@ class CdpUserServiceTest {
 
         service.ensureUser("u1", "CANVAS_EXECUTION", "exec-1");
 
-        ArgumentCaptor<CdpUserProfile> profileCaptor = ArgumentCaptor.forClass(CdpUserProfile.class);
-        ArgumentCaptor<CdpUserIdentity> identityCaptor = ArgumentCaptor.forClass(CdpUserIdentity.class);
+        ArgumentCaptor<CdpUserProfileDO> profileCaptor = ArgumentCaptor.forClass(CdpUserProfileDO.class);
+        ArgumentCaptor<CdpUserIdentityDO> identityCaptor = ArgumentCaptor.forClass(CdpUserIdentityDO.class);
         verify(profileMapper).insert(profileCaptor.capture());
         verify(identityMapper).insert(identityCaptor.capture());
 
@@ -47,7 +51,7 @@ class CdpUserServiceTest {
 
     @Test
     void ensureUserUpdatesLastSeenWhenProfileExists() {
-        CdpUserProfile existing = new CdpUserProfile();
+        CdpUserProfileDO existing = new CdpUserProfileDO();
         existing.setId(9L);
         existing.setUserId("u1");
         when(profileMapper.selectOne(any(Wrapper.class))).thenReturn(existing);
@@ -55,12 +59,12 @@ class CdpUserServiceTest {
         service.ensureUser("u1", "MANUAL", "req-1");
 
         verify(profileMapper).updateById(existing);
-        verify(identityMapper, never()).insert(any(CdpUserIdentity.class));
+        verify(identityMapper, never()).insert(any(CdpUserIdentityDO.class));
     }
 
     @Test
     void toDetailMasksPhoneAndEmail() {
-        CdpUserProfile profile = new CdpUserProfile();
+        CdpUserProfileDO profile = new CdpUserProfileDO();
         profile.setUserId("u1");
         profile.setDisplayName("Alice");
         profile.setPhone("13812345678");

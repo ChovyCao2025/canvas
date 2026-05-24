@@ -2,9 +2,9 @@ package org.chovy.canvas.engine.handlers;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import org.chovy.canvas.common.MapFieldKeys;
-import org.chovy.canvas.domain.constant.NodeType;
-import org.chovy.canvas.domain.customer.CustomerPointsLedger;
-import org.chovy.canvas.domain.customer.CustomerPointsLedgerMapper;
+import org.chovy.canvas.common.enums.NodeType;
+import org.chovy.canvas.dal.dataobject.CustomerPointsLedgerDO;
+import org.chovy.canvas.dal.mapper.CustomerPointsLedgerMapper;
 import org.chovy.canvas.engine.context.ExecutionContext;
 import org.chovy.canvas.engine.handler.NodeHandler;
 import org.chovy.canvas.engine.handler.NodeHandlerType;
@@ -28,15 +28,15 @@ public class PointsOperationHandler implements NodeHandler {
     public Mono<NodeResult> executeAsync(Map<String, Object> config, ExecutionContext ctx) {
         String idempotencyKey = string(config, "idempotencyKey",
                 ctx.getExecutionId() + ":" + string(config, "__nodeId", "points"));
-        CustomerPointsLedger existing = ledgerMapper.selectOne(new LambdaQueryWrapper<CustomerPointsLedger>()
-                .eq(CustomerPointsLedger::getIdempotencyKey, idempotencyKey)
+        CustomerPointsLedgerDO existing = ledgerMapper.selectOne(new LambdaQueryWrapper<CustomerPointsLedgerDO>()
+                .eq(CustomerPointsLedgerDO::getIdempotencyKey, idempotencyKey)
                 .last("LIMIT 1"));
         if (existing != null) {
             return Mono.just(NodeResult.ok(string(config, "nextNodeId", null),
                     Map.of(MapFieldKeys.POINTS_LEDGER_ID, existing.getId(), MapFieldKeys.DUPLICATE, true)));
         }
 
-        CustomerPointsLedger ledger = new CustomerPointsLedger();
+        CustomerPointsLedgerDO ledger = new CustomerPointsLedgerDO();
         ledger.setUserId(ctx.getUserId());
         ledger.setOperation(string(config, "operation", "GRANT"));
         ledger.setPoints(number(config.get("points"), 0));

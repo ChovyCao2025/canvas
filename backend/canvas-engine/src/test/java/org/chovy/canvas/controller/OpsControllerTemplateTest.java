@@ -1,15 +1,15 @@
-package org.chovy.canvas.controller;
+package org.chovy.canvas.web;
 
-import org.chovy.canvas.domain.approval.CanvasManualApprovalMapper;
-import org.chovy.canvas.domain.canvas.Canvas;
-import org.chovy.canvas.domain.canvas.CanvasMapper;
-import org.chovy.canvas.domain.canvas.CanvasTemplate;
-import org.chovy.canvas.domain.canvas.CanvasTemplateMapper;
-import org.chovy.canvas.domain.canvas.CanvasVersion;
-import org.chovy.canvas.domain.canvas.CanvasVersionMapper;
-import org.chovy.canvas.domain.constant.CanvasStatusEnum;
-import org.chovy.canvas.domain.constant.VersionStatus;
-import org.chovy.canvas.infra.cache.CanvasConfigCache;
+import org.chovy.canvas.dal.mapper.CanvasManualApprovalMapper;
+import org.chovy.canvas.dal.dataobject.CanvasDO;
+import org.chovy.canvas.dal.mapper.CanvasMapper;
+import org.chovy.canvas.dal.dataobject.CanvasTemplateDO;
+import org.chovy.canvas.dal.mapper.CanvasTemplateMapper;
+import org.chovy.canvas.dal.dataobject.CanvasVersionDO;
+import org.chovy.canvas.dal.mapper.CanvasVersionMapper;
+import org.chovy.canvas.common.enums.CanvasStatusEnum;
+import org.chovy.canvas.common.enums.VersionStatus;
+import org.chovy.canvas.infrastructure.cache.CanvasConfigCache;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -33,7 +33,7 @@ class OpsControllerTemplateTest {
 
     @Test
     void createFromTemplateCreatesDraftVersionWithTemplateGraph() {
-        CanvasTemplate template = new CanvasTemplate();
+        CanvasTemplateDO template = new CanvasTemplateDO();
         template.setId(5L);
         template.setName("示例：事件触发新客领券");
         template.setDescription("事件触发后判断新客并发券");
@@ -41,17 +41,17 @@ class OpsControllerTemplateTest {
         template.setUseCount(3);
         when(templateMapper.selectById(5L)).thenReturn(template);
         doAnswer(invocation -> {
-            Canvas canvas = invocation.getArgument(0);
+            CanvasDO canvas = invocation.getArgument(0);
             canvas.setId(88L);
             return 1;
-        }).when(canvasMapper).insert(any(Canvas.class));
+        }).when(canvasMapper).insert(any(CanvasDO.class));
 
         OpsController controller = new OpsController(
                 templateMapper, canvasMapper, canvasVersionMapper, approvalMapper, configCache);
         OpsController.FromTemplateReq req = new OpsController.FromTemplateReq();
         req.setName("我的新客发券流程");
 
-        Canvas created = controller.createFromTemplate(5L, req).block().getData();
+        CanvasDO created = controller.createFromTemplate(5L, req).block().getData();
 
         assertThat(created.getId()).isEqualTo(88L);
         assertThat(created.getName()).isEqualTo("我的新客发券流程");
@@ -59,9 +59,9 @@ class OpsControllerTemplateTest {
         assertThat(created.getIsExample()).isEqualTo(0);
         assertThat(created.getSourceTemplateKey()).isNull();
 
-        ArgumentCaptor<CanvasVersion> versionCaptor = ArgumentCaptor.forClass(CanvasVersion.class);
+        ArgumentCaptor<CanvasVersionDO> versionCaptor = ArgumentCaptor.forClass(CanvasVersionDO.class);
         verify(canvasVersionMapper).insert(versionCaptor.capture());
-        CanvasVersion version = versionCaptor.getValue();
+        CanvasVersionDO version = versionCaptor.getValue();
         assertThat(version.getCanvasId()).isEqualTo(88L);
         assertThat(version.getVersion()).isEqualTo(1);
         assertThat(version.getGraphJson()).isEqualTo("{\"nodes\":[]}");

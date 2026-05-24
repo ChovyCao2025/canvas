@@ -1,9 +1,9 @@
-package org.chovy.canvas.controller;
+package org.chovy.canvas.web;
 
 import org.chovy.canvas.domain.cdp.CdpTagService;
 import org.chovy.canvas.domain.cdp.CdpUserDirectoryService;
 import org.chovy.canvas.domain.cdp.CdpUserInsightService;
-import org.chovy.canvas.domain.cdp.CdpUserProfile;
+import org.chovy.canvas.dal.dataobject.CdpUserProfileDO;
 import org.chovy.canvas.domain.cdp.CdpUserService;
 import org.chovy.canvas.dto.cdp.CdpTagWriteReq;
 import org.chovy.canvas.dto.cdp.CdpUserDetailDTO;
@@ -36,7 +36,7 @@ class CdpUserControllerTest {
 
     @Test
     void getReturnsUserDetail() {
-        CdpUserProfile profile = new CdpUserProfile();
+        CdpUserProfileDO profile = new CdpUserProfileDO();
         profile.setUserId("u1");
         when(userService.getRequiredProfile("u1")).thenReturn(profile);
         when(userService.toDetail(profile)).thenReturn(new CdpUserDetailDTO("u1", "u1", null, null,

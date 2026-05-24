@@ -1,18 +1,18 @@
 package org.chovy.canvas.engine.trigger;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import org.chovy.canvas.domain.constant.NodeType;
-import org.chovy.canvas.domain.approval.CanvasManualApproval;
-import org.chovy.canvas.domain.approval.CanvasManualApprovalMapper;
-import org.chovy.canvas.domain.constant.ApprovalOnTimeoutAction;
-import org.chovy.canvas.domain.constant.ApprovalStatus;
-import org.chovy.canvas.domain.constant.ExecutionStatus;
-import org.chovy.canvas.domain.constant.TriggerType;
-import org.chovy.canvas.domain.execution.CanvasExecution;
-import org.chovy.canvas.domain.execution.CanvasExecutionMapper;
+import org.chovy.canvas.common.enums.NodeType;
+import org.chovy.canvas.dal.dataobject.CanvasManualApprovalDO;
+import org.chovy.canvas.dal.mapper.CanvasManualApprovalMapper;
+import org.chovy.canvas.common.enums.ApprovalOnTimeoutAction;
+import org.chovy.canvas.common.enums.ApprovalStatus;
+import org.chovy.canvas.common.enums.ExecutionStatus;
+import org.chovy.canvas.common.enums.TriggerType;
+import org.chovy.canvas.dal.dataobject.CanvasExecutionDO;
+import org.chovy.canvas.dal.mapper.CanvasExecutionMapper;
 import org.chovy.canvas.engine.handlers.ManualApprovalHandler;
 import org.chovy.canvas.engine.wait.WaitResumeService;
-import org.chovy.canvas.infra.redis.ContextPersistenceService;
+import org.chovy.canvas.infrastructure.redis.ContextPersistenceService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -67,14 +67,14 @@ public class ExecutionWatchdog {
     private void scanZombieCtx() {
         LocalDateTime threshold = LocalDateTime.now().minusMinutes(zombieThresholdMin);
 
-        List<CanvasExecution> zombies = executionMapper.selectList(
-                new LambdaQueryWrapper<CanvasExecution>()
-                        .eq(CanvasExecution::getStatus, ExecutionStatus.PAUSED.getCode())
-                        .isNotNull(CanvasExecution::getLastDedupKey)
-                        .lt(CanvasExecution::getUpdatedAt, threshold)
+        List<CanvasExecutionDO> zombies = executionMapper.selectList(
+                new LambdaQueryWrapper<CanvasExecutionDO>()
+                        .eq(CanvasExecutionDO::getStatus, ExecutionStatus.PAUSED.getCode())
+                        .isNotNull(CanvasExecutionDO::getLastDedupKey)
+                        .lt(CanvasExecutionDO::getUpdatedAt, threshold)
         );
 
-        for (CanvasExecution exec : zombies) {
+        for (CanvasExecutionDO exec : zombies) {
             log.warn("[WATCHDOG] 僵尸 ctx executionId={} dedupKey={}",
                     exec.getId(), exec.getLastDedupKey());
             // 释放 dedup 后，相同消息可再次触发，避免永久卡死
@@ -95,13 +95,13 @@ public class ExecutionWatchdog {
     // ── ManualApproval 超时处理（Section 18.2）─────────────────────
 
     private void scanApprovalTimeout() {
-        List<CanvasManualApproval> timedOut = approvalMapper.selectList(
-                new LambdaQueryWrapper<CanvasManualApproval>()
-                        .eq(CanvasManualApproval::getStatus, ApprovalStatus.PENDING)
-                        .lt(CanvasManualApproval::getTimeoutAt, LocalDateTime.now())
+        List<CanvasManualApprovalDO> timedOut = approvalMapper.selectList(
+                new LambdaQueryWrapper<CanvasManualApprovalDO>()
+                        .eq(CanvasManualApprovalDO::getStatus, ApprovalStatus.PENDING)
+                        .lt(CanvasManualApprovalDO::getTimeoutAt, LocalDateTime.now())
         );
 
-        for (CanvasManualApproval approval : timedOut) {
+        for (CanvasManualApprovalDO approval : timedOut) {
             log.warn("[WATCHDOG] ManualApproval 超时 approvalId={} onTimeout={}",
                     approval.getId(), approval.getOnTimeout());
 
@@ -119,7 +119,7 @@ public class ExecutionWatchdog {
         }
     }
 
-    private void processApprovalTimeout(CanvasManualApproval approval, String result) {
+    private void processApprovalTimeout(CanvasManualApprovalDO approval, String result) {
         // 1) 审批实例落 TIMEOUT，审计可追踪
         approval.setStatus(ApprovalStatus.TIMEOUT);
         approval.setResultBy("watchdog");

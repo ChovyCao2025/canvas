@@ -1,7 +1,7 @@
 package org.chovy.canvas.config;
 
-import org.chovy.canvas.auth.controller.AuthController;
-import org.chovy.canvas.auth.domain.JwtUtil;
+import org.chovy.canvas.web.AuthController;
+import org.chovy.canvas.auth.util.JwtUtil;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.JwtException;
 import lombok.RequiredArgsConstructor;

@@ -1,9 +1,9 @@
 package org.chovy.canvas.engine.trigger;
 
-import org.chovy.canvas.domain.canvas.Canvas;
-import org.chovy.canvas.domain.canvas.CanvasMapper;
-import org.chovy.canvas.domain.execution.CanvasUserQuota;
-import org.chovy.canvas.domain.execution.CanvasUserQuotaMapper;
+import org.chovy.canvas.dal.dataobject.CanvasDO;
+import org.chovy.canvas.dal.mapper.CanvasMapper;
+import org.chovy.canvas.dal.dataobject.CanvasUserQuotaDO;
+import org.chovy.canvas.dal.mapper.CanvasUserQuotaMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -50,16 +50,16 @@ class TriggerPreCheckServiceTest {
         lenient().when(redis.opsForValue()).thenReturn(valueOps);
     }
 
-    private Canvas canvasWithTotalLimit(int limit) {
-        Canvas c = new Canvas();
+    private CanvasDO canvasWithTotalLimit(int limit) {
+        CanvasDO c = new CanvasDO();
         c.setId(CANVAS_ID);
         c.setStatus(1);
         c.setPerUserTotalLimit(limit);
         return c;
     }
 
-    private Canvas canvasWithAllQuotaLimits() {
-        Canvas c = new Canvas();
+    private CanvasDO canvasWithAllQuotaLimits() {
+        CanvasDO c = new CanvasDO();
         c.setId(CANVAS_ID);
         c.setStatus(1);
         c.setMaxTotalExecutions(10);
@@ -70,20 +70,20 @@ class TriggerPreCheckServiceTest {
 
     @Test
     void checkWithoutQuotaAccounting_doesNotConsumeRedisOrPersistQuotaCounters() {
-        Canvas canvas = canvasWithAllQuotaLimits();
+        CanvasDO canvas = canvasWithAllQuotaLimits();
 
         assertThatCode(() -> service.checkWithoutQuotaAccounting(canvas, USER_ID))
                 .doesNotThrowAnyException();
 
         verify(redis, never()).opsForValue();
         verifyNoInteractions(valueOps);
-        verify(quotaMapper, never()).insert(any(CanvasUserQuota.class));
-        verify(quotaMapper, never()).update(any(CanvasUserQuota.class), any());
+        verify(quotaMapper, never()).insert(any(CanvasUserQuotaDO.class));
+        verify(quotaMapper, never()).update(any(CanvasUserQuotaDO.class), any());
     }
 
     @Test
     void checkWithoutQuotaAccounting_rejectsUnpublishedCanvas() {
-        Canvas canvas = canvasWithAllQuotaLimits();
+        CanvasDO canvas = canvasWithAllQuotaLimits();
         canvas.setStatus(0);
 
         assertThatThrownBy(() -> service.checkWithoutQuotaAccounting(canvas, USER_ID))
@@ -98,7 +98,7 @@ class TriggerPreCheckServiceTest {
 
     @Test
     void checkWithoutQuotaAccounting_rejectsFutureValidStart() {
-        Canvas canvas = canvasWithAllQuotaLimits();
+        CanvasDO canvas = canvasWithAllQuotaLimits();
         canvas.setValidStart(LocalDateTime.now().plusMinutes(1));
 
         assertThatThrownBy(() -> service.checkWithoutQuotaAccounting(canvas, USER_ID))
@@ -113,9 +113,9 @@ class TriggerPreCheckServiceTest {
 
     @Test
     void checkWithoutQuotaAccounting_rejectsExistingCooldownWithoutConsumingQuota() {
-        Canvas canvas = canvasWithAllQuotaLimits();
+        CanvasDO canvas = canvasWithAllQuotaLimits();
         canvas.setCooldownSeconds(60);
-        CanvasUserQuota quota = new CanvasUserQuota();
+        CanvasUserQuotaDO quota = new CanvasUserQuotaDO();
         quota.setLastTriggerAt(LocalDateTime.now().minusSeconds(5));
         when(quotaMapper.selectOne(any())).thenReturn(quota);
 
@@ -127,14 +127,14 @@ class TriggerPreCheckServiceTest {
 
         verify(redis, never()).opsForValue();
         verifyNoInteractions(valueOps);
-        verify(quotaMapper, never()).insert(any(CanvasUserQuota.class));
-        verify(quotaMapper, never()).update(any(CanvasUserQuota.class), any());
+        verify(quotaMapper, never()).insert(any(CanvasUserQuotaDO.class));
+        verify(quotaMapper, never()).update(any(CanvasUserQuotaDO.class), any());
     }
 
     @Test
     void perUserTotalLimit_rejectsWhenAtLimit() {
         int limit = 3;
-        Canvas canvas = canvasWithTotalLimit(limit);
+        CanvasDO canvas = canvasWithTotalLimit(limit);
 
         String key = QUOTA_KEY + "total:" + CANVAS_ID + ":" + USER_ID;
         when(valueOps.increment(key)).thenReturn((long) limit + 1);
@@ -151,7 +151,7 @@ class TriggerPreCheckServiceTest {
     @Test
     void perUserTotalLimit_allowsWhenUnderLimit() {
         int limit = 3;
-        Canvas canvas = canvasWithTotalLimit(limit);
+        CanvasDO canvas = canvasWithTotalLimit(limit);
 
         String key = QUOTA_KEY + "total:" + CANVAS_ID + ":" + USER_ID;
         when(valueOps.increment(key)).thenReturn(2L);
@@ -164,7 +164,7 @@ class TriggerPreCheckServiceTest {
 
     @Test
     void cooldownRejectsWithRedisSetNxBeforeQuotaCounters() {
-        Canvas canvas = new Canvas();
+        CanvasDO canvas = new CanvasDO();
         canvas.setId(CANVAS_ID);
         canvas.setStatus(1);
         canvas.setCooldownSeconds(60);

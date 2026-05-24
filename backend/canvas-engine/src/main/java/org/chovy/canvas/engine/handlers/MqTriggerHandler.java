@@ -2,8 +2,8 @@ package org.chovy.canvas.engine.handlers;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import org.chovy.canvas.common.MapFieldKeys;
-import org.chovy.canvas.domain.meta.MqMessageDefinition;
-import org.chovy.canvas.domain.meta.MqMessageDefinitionMapper;
+import org.chovy.canvas.dal.dataobject.MqMessageDefinitionDO;
+import org.chovy.canvas.dal.mapper.MqMessageDefinitionMapper;
 import org.chovy.canvas.engine.context.ExecutionContext;
 import org.chovy.canvas.engine.handler.NodeHandler;
 import org.chovy.canvas.engine.handler.NodeHandlerType;
@@ -56,10 +56,10 @@ public class MqTriggerHandler implements NodeHandler {
     public String resolveTopic(Map<String, Object> config) {
         String messageCode = (String) config.get(MapFieldKeys.MESSAGE_CODE_KEY);
         if (messageCode != null && mqMessageDefinitionMapper != null) {
-            MqMessageDefinition def = mqMessageDefinitionMapper.selectOne(
-                new LambdaQueryWrapper<MqMessageDefinition>()
-                    .eq(MqMessageDefinition::getMessageCode, messageCode)
-                    .eq(MqMessageDefinition::getEnabled, 1));
+            MqMessageDefinitionDO def = mqMessageDefinitionMapper.selectOne(
+                new LambdaQueryWrapper<MqMessageDefinitionDO>()
+                    .eq(MqMessageDefinitionDO::getMessageCode, messageCode)
+                    .eq(MqMessageDefinitionDO::getEnabled, 1));
             if (def != null) return def.getTopic();
         }
         // Backward-compat: old canvases store topicKey directly

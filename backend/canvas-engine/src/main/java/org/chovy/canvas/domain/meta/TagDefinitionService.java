@@ -4,14 +4,18 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import lombok.RequiredArgsConstructor;
 import org.chovy.canvas.common.PageResult;
-import org.chovy.canvas.domain.cdp.CdpUserTag;
-import org.chovy.canvas.domain.cdp.CdpUserTagMapper;
+import org.chovy.canvas.dal.dataobject.CdpUserTagDO;
+import org.chovy.canvas.dal.mapper.CdpUserTagMapper;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Locale;
 import java.util.regex.Pattern;
+import org.chovy.canvas.dal.dataobject.TagDefinitionDO;
+import org.chovy.canvas.dal.mapper.TagDefinitionMapper;
+import org.chovy.canvas.dal.dataobject.TagValueDefinitionDO;
+import org.chovy.canvas.dal.mapper.TagValueDefinitionMapper;
 
 @Service
 @RequiredArgsConstructor
@@ -23,25 +27,25 @@ public class TagDefinitionService {
     private final TagValueDefinitionMapper tagValueDefinitionMapper;
     private final CdpUserTagMapper cdpUserTagMapper;
 
-    public PageResult<TagDefinition> page(int page, int size, String tagType, Integer enabled) {
-        Page<TagDefinition> result = tagDefinitionMapper.selectPage(
+    public PageResult<TagDefinitionDO> page(int page, int size, String tagType, Integer enabled) {
+        Page<TagDefinitionDO> result = tagDefinitionMapper.selectPage(
                 new Page<>(Math.max(1, page), Math.max(1, size)),
                 query(tagType, enabled));
         return PageResult.of(result.getTotal(), result.getRecords());
     }
 
-    public List<TagDefinition> list(String tagType, Integer enabled) {
+    public List<TagDefinitionDO> list(String tagType, Integer enabled) {
         return tagDefinitionMapper.selectList(query(tagType, enabled));
     }
 
-    public TagDefinition create(TagDefinition body) {
+    public TagDefinitionDO create(TagDefinitionDO body) {
         validateAndNormalize(body);
         applyDefaults(body);
         tagDefinitionMapper.insert(body);
         return body;
     }
 
-    public void update(Long id, TagDefinition body) {
+    public void update(Long id, TagDefinitionDO body) {
         validateAndNormalize(body);
         applyDefaults(body);
         body.setId(id);
@@ -49,47 +53,47 @@ public class TagDefinitionService {
     }
 
     public void delete(Long id) {
-        TagDefinition existing = tagDefinitionMapper.selectById(id);
+        TagDefinitionDO existing = tagDefinitionMapper.selectById(id);
         if (existing == null) {
             throw new IllegalArgumentException("tag definition not found: " + id);
         }
-        Long count = cdpUserTagMapper.selectCount(new LambdaQueryWrapper<CdpUserTag>()
-                .eq(CdpUserTag::getTagCode, existing.getTagCode()));
+        Long count = cdpUserTagMapper.selectCount(new LambdaQueryWrapper<CdpUserTagDO>()
+                .eq(CdpUserTagDO::getTagCode, existing.getTagCode()));
         if (count != null && count > 0) {
             throw new IllegalArgumentException("tag definition is in use: " + existing.getTagCode());
         }
         tagDefinitionMapper.deleteById(id);
     }
 
-    public List<TagValueDefinition> listValues(String tagCode, Integer enabled) {
+    public List<TagValueDefinitionDO> listValues(String tagCode, Integer enabled) {
         String normalizedTagCode = normalizeTagCode(tagCode);
-        return tagValueDefinitionMapper.selectList(new LambdaQueryWrapper<TagValueDefinition>()
-                .eq(TagValueDefinition::getTagCode, normalizedTagCode)
-                .eq(enabled != null, TagValueDefinition::getEnabled, enabled)
-                .orderByAsc(TagValueDefinition::getSortOrder)
-                .orderByAsc(TagValueDefinition::getId));
+        return tagValueDefinitionMapper.selectList(new LambdaQueryWrapper<TagValueDefinitionDO>()
+                .eq(TagValueDefinitionDO::getTagCode, normalizedTagCode)
+                .eq(enabled != null, TagValueDefinitionDO::getEnabled, enabled)
+                .orderByAsc(TagValueDefinitionDO::getSortOrder)
+                .orderByAsc(TagValueDefinitionDO::getId));
     }
 
-    public TagValueDefinition createValue(String tagCode, TagValueDefinition body) {
+    public TagValueDefinitionDO createValue(String tagCode, TagValueDefinitionDO body) {
         if (body == null) {
             throw new IllegalArgumentException("tag value body is required");
         }
-        TagDefinition definition = requireTag(tagCode);
+        TagDefinitionDO definition = requireTag(tagCode);
         validateAndNormalizeValueBody(body, definition, normalizeTagCode(tagCode), false);
         applyValueDefaults(body);
         tagValueDefinitionMapper.insert(body);
         return body;
     }
 
-    public void updateValue(Long id, TagValueDefinition body) {
+    public void updateValue(Long id, TagValueDefinitionDO body) {
         if (body == null) {
             throw new IllegalArgumentException("tag value body is required");
         }
-        TagValueDefinition existingValue = tagValueDefinitionMapper.selectById(id);
+        TagValueDefinitionDO existingValue = tagValueDefinitionMapper.selectById(id);
         if (existingValue == null) {
             throw new IllegalArgumentException("tag value definition not found: " + id);
         }
-        TagDefinition definition = requireTag(existingValue.getTagCode());
+        TagDefinitionDO definition = requireTag(existingValue.getTagCode());
         if (body.getTagCode() == null || body.getTagCode().isBlank()) {
             body.setTagCode(existingValue.getTagCode());
         }
@@ -106,23 +110,23 @@ public class TagDefinitionService {
     }
 
     public void deleteValue(Long id) {
-        TagValueDefinition existing = tagValueDefinitionMapper.selectById(id);
+        TagValueDefinitionDO existing = tagValueDefinitionMapper.selectById(id);
         if (existing == null) {
             throw new IllegalArgumentException("tag value definition not found: " + id);
         }
-        Long count = cdpUserTagMapper.selectCount(new LambdaQueryWrapper<CdpUserTag>()
-                .eq(CdpUserTag::getTagCode, existing.getTagCode())
-                .eq(CdpUserTag::getTagValue, existing.getValue()));
+        Long count = cdpUserTagMapper.selectCount(new LambdaQueryWrapper<CdpUserTagDO>()
+                .eq(CdpUserTagDO::getTagCode, existing.getTagCode())
+                .eq(CdpUserTagDO::getTagValue, existing.getValue()));
         if (count != null && count > 0) {
             throw new IllegalArgumentException("tag value definition is in use: " + existing.getTagCode() + "=" + existing.getValue());
         }
         tagValueDefinitionMapper.deleteById(id);
     }
 
-    public TagDefinition requireEnabledTagAndValidateValue(String tagCode, String tagValue) {
+    public TagDefinitionDO requireEnabledTagAndValidateValue(String tagCode, String tagValue) {
         String normalizedTagCode = normalizeTagCode(tagCode);
-        TagDefinition definition = tagDefinitionMapper.selectOne(new LambdaQueryWrapper<TagDefinition>()
-                .eq(TagDefinition::getTagCode, normalizedTagCode));
+        TagDefinitionDO definition = tagDefinitionMapper.selectOne(new LambdaQueryWrapper<TagDefinitionDO>()
+                .eq(TagDefinitionDO::getTagCode, normalizedTagCode));
         if (definition == null || definition.getEnabled() == null || definition.getEnabled() != 1) {
             throw new IllegalArgumentException("tag definition is not enabled: " + normalizedTagCode);
         }
@@ -131,16 +135,16 @@ public class TagDefinitionService {
     }
 
     public void ensureValue(String tagCode, String tagValue, String source) {
-        TagDefinition definition = requireEnabledTagAndValidateValue(tagCode, tagValue);
+        TagDefinitionDO definition = requireEnabledTagAndValidateValue(tagCode, tagValue);
         String normalizedTagCode = definition.getTagCode();
         String normalizedValue = normalizeValue(tagValue);
-        TagValueDefinition existing = tagValueDefinitionMapper.selectOne(new LambdaQueryWrapper<TagValueDefinition>()
-                .eq(TagValueDefinition::getTagCode, normalizedTagCode)
-                .eq(TagValueDefinition::getValue, normalizedValue));
+        TagValueDefinitionDO existing = tagValueDefinitionMapper.selectOne(new LambdaQueryWrapper<TagValueDefinitionDO>()
+                .eq(TagValueDefinitionDO::getTagCode, normalizedTagCode)
+                .eq(TagValueDefinitionDO::getValue, normalizedValue));
         if (existing != null) {
             return;
         }
-        TagValueDefinition value = new TagValueDefinition();
+        TagValueDefinitionDO value = new TagValueDefinitionDO();
         value.setTagCode(normalizedTagCode);
         value.setValue(normalizedValue);
         value.setLabel(normalizedValue);
@@ -150,24 +154,24 @@ public class TagDefinitionService {
         tagValueDefinitionMapper.insert(value);
     }
 
-    private TagDefinition requireTag(String tagCode) {
+    private TagDefinitionDO requireTag(String tagCode) {
         String normalizedTagCode = normalizeTagCode(tagCode);
-        TagDefinition definition = tagDefinitionMapper.selectOne(new LambdaQueryWrapper<TagDefinition>()
-                .eq(TagDefinition::getTagCode, normalizedTagCode));
+        TagDefinitionDO definition = tagDefinitionMapper.selectOne(new LambdaQueryWrapper<TagDefinitionDO>()
+                .eq(TagDefinitionDO::getTagCode, normalizedTagCode));
         if (definition == null) {
             throw new IllegalArgumentException("tag definition not found: " + normalizedTagCode);
         }
         return definition;
     }
 
-    private LambdaQueryWrapper<TagDefinition> query(String tagType, Integer enabled) {
-        return new LambdaQueryWrapper<TagDefinition>()
-                .eq(tagType != null && !tagType.isBlank(), TagDefinition::getTagType, normalizeTagType(tagType))
-                .eq(enabled != null, TagDefinition::getEnabled, enabled)
-                .orderByAsc(TagDefinition::getId);
+    private LambdaQueryWrapper<TagDefinitionDO> query(String tagType, Integer enabled) {
+        return new LambdaQueryWrapper<TagDefinitionDO>()
+                .eq(tagType != null && !tagType.isBlank(), TagDefinitionDO::getTagType, normalizeTagType(tagType))
+                .eq(enabled != null, TagDefinitionDO::getEnabled, enabled)
+                .orderByAsc(TagDefinitionDO::getId);
     }
 
-    private static void validateAndNormalize(TagDefinition body) {
+    private static void validateAndNormalize(TagDefinitionDO body) {
         if (body == null) {
             throw new IllegalArgumentException("tag definition body is required");
         }
@@ -183,7 +187,7 @@ public class TagDefinitionService {
         body.setValueType(normalizedValueType);
     }
 
-    private static void applyDefaults(TagDefinition body) {
+    private static void applyDefaults(TagDefinitionDO body) {
         if (body.getEnabled() == null) {
             body.setEnabled(1);
         }
@@ -208,7 +212,7 @@ public class TagDefinitionService {
     }
 
     private static void validateAndNormalizeValueBody(
-            TagValueDefinition body, TagDefinition definition, String expectedTagCode, boolean allowMissingValue) {
+            TagValueDefinitionDO body, TagDefinitionDO definition, String expectedTagCode, boolean allowMissingValue) {
         String normalizedTagCode = normalizeTagCode(body.getTagCode());
         if (!expectedTagCode.equals(normalizedTagCode)) {
             throw new IllegalArgumentException("tagCode does not match existing definition");
@@ -231,7 +235,7 @@ public class TagDefinitionService {
         }
     }
 
-    private static void applyValueDefaults(TagValueDefinition body) {
+    private static void applyValueDefaults(TagValueDefinitionDO body) {
         if (body.getSortOrder() == null) {
             body.setSortOrder(0);
         }

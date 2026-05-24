@@ -1,10 +1,10 @@
 package org.chovy.canvas.engine.request;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import org.chovy.canvas.domain.constant.NodeType;
-import org.chovy.canvas.domain.constant.TriggerType;
-import org.chovy.canvas.domain.execution.CanvasExecutionRequest;
-import org.chovy.canvas.domain.execution.CanvasExecutionRequestMapper;
+import org.chovy.canvas.common.enums.NodeType;
+import org.chovy.canvas.common.enums.TriggerType;
+import org.chovy.canvas.dal.dataobject.CanvasExecutionRequestDO;
+import org.chovy.canvas.dal.mapper.CanvasExecutionRequestMapper;
 import org.chovy.canvas.engine.scheduler.CanvasMetrics;
 import org.chovy.canvas.engine.trigger.CanvasExecutionService;
 import org.junit.jupiter.api.Test;
@@ -34,7 +34,7 @@ class CanvasExecutionRequestExecutorTest {
         CanvasExecutionRequestExecutor executor = new CanvasExecutionRequestExecutor(
                 mapper, executionService, new ObjectMapper());
 
-        CanvasExecutionRequest request = request();
+        CanvasExecutionRequestDO request = request();
         when(mapper.selectById("req-1")).thenReturn(request);
         when(mapper.markRunning(eq("req-1"), any(), any(), anyString())).thenReturn(1);
         when(executionService.triggerFromExecutionRequest(eq(10L), eq("user-7"), eq(TriggerType.MQ),
@@ -57,7 +57,7 @@ class CanvasExecutionRequestExecutorTest {
         CanvasExecutionRequestExecutor executor = new CanvasExecutionRequestExecutor(
                 mapper, executionService, new ObjectMapper());
 
-        CanvasExecutionRequest request = request();
+        CanvasExecutionRequestDO request = request();
         request.setPerfRunId("perf_20260523_001");
         when(mapper.selectById("req-1")).thenReturn(request);
         when(mapper.markRunning(eq("req-1"), any(), any(), anyString())).thenReturn(1);
@@ -88,7 +88,7 @@ class CanvasExecutionRequestExecutorTest {
         CanvasExecutionRequestExecutor executor = new CanvasExecutionRequestExecutor(
                 mapper, executionService, new ObjectMapper(), metrics, 1_000L, 5, 300L, 60_000L);
 
-        CanvasExecutionRequest request = request();
+        CanvasExecutionRequestDO request = request();
         request.setAttemptCount(2);
         when(mapper.selectById("req-1")).thenReturn(request);
         when(mapper.markRunning(eq("req-1"), any(), any(), anyString())).thenReturn(1);
@@ -134,7 +134,7 @@ class CanvasExecutionRequestExecutorTest {
         CanvasExecutionRequestExecutor executor = new CanvasExecutionRequestExecutor(
                 mapper, executionService, new ObjectMapper());
 
-        CanvasExecutionRequest request = request();
+        CanvasExecutionRequestDO request = request();
         request.setPayloadJson("{");
         when(mapper.selectById("req-1")).thenReturn(request);
         when(mapper.markRunning(eq("req-1"), any(), any(), anyString())).thenReturn(1);
@@ -154,7 +154,7 @@ class CanvasExecutionRequestExecutorTest {
         CanvasExecutionRequestExecutor executor = new CanvasExecutionRequestExecutor(
                 mapper, executionService, new ObjectMapper(), null, 1_000L, 5, 300L, 60_000L, 10L);
 
-        CanvasExecutionRequest request = request();
+        CanvasExecutionRequestDO request = request();
         when(mapper.selectById("req-1")).thenReturn(request);
         when(mapper.markRunning(eq("req-1"), any(), any(), anyString())).thenReturn(1);
         when(mapper.touchRunning(eq("req-1"), any(), anyString())).thenReturn(1);
@@ -179,7 +179,7 @@ class CanvasExecutionRequestExecutorTest {
         CanvasExecutionRequestExecutor executor = new CanvasExecutionRequestExecutor(
                 mapper, executionService, new ObjectMapper(), metrics, 1_000L, 5, 300L, 60_000L);
 
-        CanvasExecutionRequest request = request();
+        CanvasExecutionRequestDO request = request();
         when(mapper.selectById("req-1")).thenReturn(request);
         when(mapper.markRunning(eq("req-1"), any(), any(), anyString())).thenReturn(1);
         when(mapper.markSucceeded(eq("req-1"), anyString(), any(), anyString())).thenReturn(1);
@@ -201,7 +201,7 @@ class CanvasExecutionRequestExecutorTest {
         CanvasExecutionRequestExecutor executor = new CanvasExecutionRequestExecutor(
                 mapper, executionService, new ObjectMapper(), metrics, 1_000L, 5, 300L, 60_000L);
 
-        CanvasExecutionRequest request = request();
+        CanvasExecutionRequestDO request = request();
         when(mapper.selectById("req-1")).thenReturn(request);
         when(mapper.markRunning(eq("req-1"), any(), any(), anyString())).thenReturn(1);
         when(mapper.markSucceeded(eq("req-1"), anyString(), any(), anyString())).thenReturn(0);
@@ -222,7 +222,7 @@ class CanvasExecutionRequestExecutorTest {
         CanvasExecutionRequestExecutor executor = new CanvasExecutionRequestExecutor(
                 mapper, executionService, new ObjectMapper(), 1_000L, 3, 300L);
 
-        CanvasExecutionRequest request = request();
+        CanvasExecutionRequestDO request = request();
         request.setAttemptCount(2);
         when(mapper.selectById("req-1")).thenReturn(request);
         when(mapper.markRunning(eq("req-1"), any(), any(), anyString())).thenReturn(1);
@@ -236,8 +236,8 @@ class CanvasExecutionRequestExecutorTest {
         verify(mapper).markFailed(eq("req-1"), eq("downstream down"), any(), eq(token.getValue()));
     }
 
-    private CanvasExecutionRequest request() {
-        CanvasExecutionRequest request = new CanvasExecutionRequest();
+    private CanvasExecutionRequestDO request() {
+        CanvasExecutionRequestDO request = new CanvasExecutionRequestDO();
         request.setId("req-1");
         request.setCanvasId(10L);
         request.setUserId("user-7");

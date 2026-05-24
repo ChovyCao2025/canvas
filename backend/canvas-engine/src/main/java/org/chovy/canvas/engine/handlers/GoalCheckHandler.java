@@ -3,9 +3,9 @@ package org.chovy.canvas.engine.handlers;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.chovy.canvas.common.MapFieldKeys;
-import org.chovy.canvas.domain.constant.NodeType;
-import org.chovy.canvas.domain.meta.EventLog;
-import org.chovy.canvas.domain.meta.EventLogMapper;
+import org.chovy.canvas.common.enums.NodeType;
+import org.chovy.canvas.dal.dataobject.EventLogDO;
+import org.chovy.canvas.dal.mapper.EventLogMapper;
 import org.chovy.canvas.engine.context.ExecutionContext;
 import org.chovy.canvas.engine.handler.NodeHandler;
 import org.chovy.canvas.engine.handler.NodeHandlerType;
@@ -79,9 +79,9 @@ public class GoalCheckHandler implements NodeHandler {
             return NodeResult.fail("GOAL_CHECK 必须配置 eventCode");
         }
 
-        Long count = eventLogMapper.selectCount(new LambdaQueryWrapper<EventLog>()
-                .eq(EventLog::getEventCode, eventCode)
-                .eq(EventLog::getUserId, ctx.getUserId()));
+        Long count = eventLogMapper.selectCount(new LambdaQueryWrapper<EventLogDO>()
+                .eq(EventLogDO::getEventCode, eventCode)
+                .eq(EventLogDO::getUserId, ctx.getUserId()));
         boolean met = count != null && count > 0;
         return met ? goalMet(config) : goalNotMet(config);
     }

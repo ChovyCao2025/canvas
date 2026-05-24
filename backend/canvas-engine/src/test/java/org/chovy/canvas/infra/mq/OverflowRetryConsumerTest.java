@@ -1,9 +1,9 @@
-package org.chovy.canvas.infra.mq;
+package org.chovy.canvas.infrastructure.mq;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.apache.rocketmq.common.message.MessageExt;
-import org.chovy.canvas.domain.execution.CanvasExecutionDlq;
-import org.chovy.canvas.domain.execution.CanvasExecutionDlqMapper;
+import org.chovy.canvas.dal.dataobject.CanvasExecutionDlqDO;
+import org.chovy.canvas.dal.mapper.CanvasExecutionDlqMapper;
 import org.chovy.canvas.engine.disruptor.CanvasDisruptorService;
 import org.chovy.canvas.engine.trigger.TriggerPriorityConfig;
 import org.junit.jupiter.api.BeforeEach;
@@ -75,7 +75,7 @@ class OverflowRetryConsumerTest {
         assertThat(payloadCaptor.getValue())
                 .containsEntry("orderId", "o-1")
                 .doesNotContainKey(OverflowRetryMessage.CHAIN_RETRY_PAYLOAD_KEY);
-        verify(dlqMapper, never()).insert(org.mockito.ArgumentMatchers.any(CanvasExecutionDlq.class));
+        verify(dlqMapper, never()).insert(org.mockito.ArgumentMatchers.any(CanvasExecutionDlqDO.class));
     }
 
     @Test
@@ -104,9 +104,9 @@ class OverflowRetryConsumerTest {
                 org.mockito.ArgumentMatchers.any(),
                 anyInt()
         );
-        ArgumentCaptor<CanvasExecutionDlq> dlqCaptor = ArgumentCaptor.forClass(CanvasExecutionDlq.class);
+        ArgumentCaptor<CanvasExecutionDlqDO> dlqCaptor = ArgumentCaptor.forClass(CanvasExecutionDlqDO.class);
         verify(dlqMapper).insert(dlqCaptor.capture());
-        CanvasExecutionDlq dlq = dlqCaptor.getValue();
+        CanvasExecutionDlqDO dlq = dlqCaptor.getValue();
         assertThat(dlq.getExecutionId()).isEqualTo("business-msg-2");
         assertThat(dlq.getCanvasId()).isEqualTo(200L);
         assertThat(dlq.getUserId()).isEqualTo("user-2");
@@ -139,7 +139,7 @@ class OverflowRetryConsumerTest {
 
         consumer.onMessage(message);
 
-        ArgumentCaptor<CanvasExecutionDlq> dlqCaptor = ArgumentCaptor.forClass(CanvasExecutionDlq.class);
+        ArgumentCaptor<CanvasExecutionDlqDO> dlqCaptor = ArgumentCaptor.forClass(CanvasExecutionDlqDO.class);
         verify(dlqMapper).insert(dlqCaptor.capture());
         assertThat(dlqCaptor.getValue().getExecutionId()).isEqualTo("rocket-msg-without-business-id");
     }
@@ -164,7 +164,7 @@ class OverflowRetryConsumerTest {
                 org.mockito.ArgumentMatchers.any(),
                 anyInt()
         );
-        verify(dlqMapper, never()).insert(org.mockito.ArgumentMatchers.any(CanvasExecutionDlq.class));
+        verify(dlqMapper, never()).insert(org.mockito.ArgumentMatchers.any(CanvasExecutionDlqDO.class));
     }
 
     @Test
@@ -180,7 +180,7 @@ class OverflowRetryConsumerTest {
                 3
         );
         MessageExt message = messageExt(retryMessage, 0);
-        when(dlqMapper.insert(any(CanvasExecutionDlq.class))).thenThrow(new RuntimeException("db down"));
+        when(dlqMapper.insert(any(CanvasExecutionDlqDO.class))).thenThrow(new RuntimeException("db down"));
 
         assertThatThrownBy(() -> consumer.onMessage(message))
                 .isInstanceOf(IllegalStateException.class)

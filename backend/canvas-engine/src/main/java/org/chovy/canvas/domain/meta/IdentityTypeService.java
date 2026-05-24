@@ -2,13 +2,15 @@ package org.chovy.canvas.domain.meta;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import lombok.RequiredArgsConstructor;
-import org.chovy.canvas.domain.cdp.CdpUserIdentity;
-import org.chovy.canvas.domain.cdp.CdpUserIdentityMapper;
+import org.chovy.canvas.dal.dataobject.CdpUserIdentityDO;
+import org.chovy.canvas.dal.mapper.CdpUserIdentityMapper;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
 import java.util.Locale;
 import java.util.regex.Pattern;
+import org.chovy.canvas.dal.dataobject.IdentityTypeDO;
+import org.chovy.canvas.dal.mapper.IdentityTypeMapper;
 
 @Service
 @RequiredArgsConstructor
@@ -19,25 +21,25 @@ public class IdentityTypeService {
     private final IdentityTypeMapper identityTypeMapper;
     private final CdpUserIdentityMapper cdpUserIdentityMapper;
 
-    public List<IdentityType> list(Integer enabled, Integer allowImport) {
-        return identityTypeMapper.selectList(new LambdaQueryWrapper<IdentityType>()
-                .eq(enabled != null, IdentityType::getEnabled, enabled)
-                .eq(allowImport != null, IdentityType::getAllowImport, allowImport)
-                .orderByAsc(IdentityType::getId));
+    public List<IdentityTypeDO> list(Integer enabled, Integer allowImport) {
+        return identityTypeMapper.selectList(new LambdaQueryWrapper<IdentityTypeDO>()
+                .eq(enabled != null, IdentityTypeDO::getEnabled, enabled)
+                .eq(allowImport != null, IdentityTypeDO::getAllowImport, allowImport)
+                .orderByAsc(IdentityTypeDO::getId));
     }
 
-    public List<IdentityType> listImportable() {
+    public List<IdentityTypeDO> listImportable() {
         return list(1, 1);
     }
 
-    public IdentityType create(IdentityType body) {
+    public IdentityTypeDO create(IdentityTypeDO body) {
         validateAndNormalize(body);
         applyDefaults(body);
         identityTypeMapper.insert(body);
         return body;
     }
 
-    public void update(Long id, IdentityType body) {
+    public void update(Long id, IdentityTypeDO body) {
         validateAndNormalize(body);
         applyDefaults(body);
         body.setId(id);
@@ -45,22 +47,22 @@ public class IdentityTypeService {
     }
 
     public void delete(Long id) {
-        IdentityType existing = identityTypeMapper.selectById(id);
+        IdentityTypeDO existing = identityTypeMapper.selectById(id);
         if (existing == null) {
             throw new IllegalArgumentException("identity type not found: " + id);
         }
-        Long count = cdpUserIdentityMapper.selectCount(new LambdaQueryWrapper<CdpUserIdentity>()
-                .eq(CdpUserIdentity::getIdentityType, toCdpIdentityType(existing.getCode())));
+        Long count = cdpUserIdentityMapper.selectCount(new LambdaQueryWrapper<CdpUserIdentityDO>()
+                .eq(CdpUserIdentityDO::getIdentityType, toCdpIdentityType(existing.getCode())));
         if (count != null && count > 0) {
             throw new IllegalArgumentException("identity type is in use: " + existing.getCode());
         }
         identityTypeMapper.deleteById(id);
     }
 
-    public IdentityType requireImportable(String code) {
+    public IdentityTypeDO requireImportable(String code) {
         String normalizedCode = normalizeCode(code);
-        IdentityType identityType = identityTypeMapper.selectOne(new LambdaQueryWrapper<IdentityType>()
-                .eq(IdentityType::getCode, normalizedCode));
+        IdentityTypeDO identityType = identityTypeMapper.selectOne(new LambdaQueryWrapper<IdentityTypeDO>()
+                .eq(IdentityTypeDO::getCode, normalizedCode));
         if (identityType == null || identityType.getEnabled() == null || identityType.getEnabled() != 1
                 || identityType.getAllowImport() == null || identityType.getAllowImport() != 1) {
             throw new IllegalArgumentException("identity type is not importable: " + normalizedCode);
@@ -68,7 +70,7 @@ public class IdentityTypeService {
         return identityType;
     }
 
-    private static void validateAndNormalize(IdentityType body) {
+    private static void validateAndNormalize(IdentityTypeDO body) {
         if (body == null) {
             throw new IllegalArgumentException("identity type body is required");
         }
@@ -86,7 +88,7 @@ public class IdentityTypeService {
         body.setName(body.getName().trim());
     }
 
-    private static void applyDefaults(IdentityType body) {
+    private static void applyDefaults(IdentityTypeDO body) {
         if (body.getEnabled() == null) {
             body.setEnabled(1);
         }

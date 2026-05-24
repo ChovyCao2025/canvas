@@ -1,8 +1,8 @@
 package org.chovy.canvas.domain.cdp;
 
 import com.baomidou.mybatisplus.core.conditions.Wrapper;
-import org.chovy.canvas.domain.execution.CanvasExecution;
-import org.chovy.canvas.domain.execution.CanvasExecutionMapper;
+import org.chovy.canvas.dal.dataobject.CanvasExecutionDO;
+import org.chovy.canvas.dal.mapper.CanvasExecutionMapper;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 
@@ -22,8 +22,8 @@ class CanvasUserQueryServiceTest {
         CdpUserService userService = Mockito.mock(CdpUserService.class);
         CanvasUserQueryService service = new CanvasUserQueryService(executionMapper, tagService, userService);
 
-        CanvasExecution success = exec("e1", "u1", 2, LocalDateTime.parse("2026-05-23T10:00:00"));
-        CanvasExecution failed = exec("e2", "u1", 3, LocalDateTime.parse("2026-05-23T11:00:00"));
+        CanvasExecutionDO success = exec("e1", "u1", 2, LocalDateTime.parse("2026-05-23T10:00:00"));
+        CanvasExecutionDO failed = exec("e2", "u1", 3, LocalDateTime.parse("2026-05-23T11:00:00"));
         when(executionMapper.selectList(any(Wrapper.class))).thenReturn(List.of(success, failed));
         when(tagService.listCurrentTags("u1")).thenReturn(List.of());
 
@@ -37,8 +37,8 @@ class CanvasUserQueryServiceTest {
         assertThat(rows.get(0).latestStatus()).isEqualTo("FAILED");
     }
 
-    private CanvasExecution exec(String id, String userId, int status, LocalDateTime createdAt) {
-        CanvasExecution exec = new CanvasExecution();
+    private CanvasExecutionDO exec(String id, String userId, int status, LocalDateTime createdAt) {
+        CanvasExecutionDO exec = new CanvasExecutionDO();
         exec.setId(id);
         exec.setCanvasId(7L);
         exec.setUserId(userId);

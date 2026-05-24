@@ -1,8 +1,8 @@
 package org.chovy.canvas.engine.handlers;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import org.chovy.canvas.domain.meta.MqMessageDefinition;
-import org.chovy.canvas.domain.meta.MqMessageDefinitionMapper;
+import org.chovy.canvas.dal.dataobject.MqMessageDefinitionDO;
+import org.chovy.canvas.dal.mapper.MqMessageDefinitionMapper;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -26,7 +26,7 @@ class MqTriggerHandlerTest {
 
     @Test
     void resolveTopic_from_messageCodeKey() {
-        MqMessageDefinition def = new MqMessageDefinition();
+        MqMessageDefinitionDO def = new MqMessageDefinitionDO();
         def.setTopic("flight_order_status_change");
         when(mqMapper.selectOne(any(LambdaQueryWrapper.class))).thenReturn(def);
 

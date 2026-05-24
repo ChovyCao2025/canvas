@@ -7,29 +7,29 @@ import org.apache.rocketmq.client.producer.SendStatus;
 import org.apache.rocketmq.common.message.Message;
 import org.apache.rocketmq.spring.core.RocketMQTemplate;
 import org.chovy.canvas.common.MapFieldKeys;
-import org.chovy.canvas.domain.canvas.Canvas;
-import org.chovy.canvas.domain.canvas.CanvasMapper;
-import org.chovy.canvas.domain.canvas.CanvasVersion;
-import org.chovy.canvas.domain.canvas.CanvasVersionMapper;
-import org.chovy.canvas.domain.constant.CanvasStatusEnum;
-import org.chovy.canvas.domain.constant.ExecutionStatus;
-import org.chovy.canvas.domain.constant.NodeType;
-import org.chovy.canvas.domain.constant.TriggerType;
+import org.chovy.canvas.dal.dataobject.CanvasDO;
+import org.chovy.canvas.dal.mapper.CanvasMapper;
+import org.chovy.canvas.dal.dataobject.CanvasVersionDO;
+import org.chovy.canvas.dal.mapper.CanvasVersionMapper;
+import org.chovy.canvas.common.enums.CanvasStatusEnum;
+import org.chovy.canvas.common.enums.ExecutionStatus;
+import org.chovy.canvas.common.enums.NodeType;
+import org.chovy.canvas.common.enums.TriggerType;
 import org.chovy.canvas.domain.cdp.CdpUserService;
-import org.chovy.canvas.domain.execution.CanvasExecution;
-import org.chovy.canvas.domain.execution.CanvasExecutionDlq;
-import org.chovy.canvas.domain.execution.CanvasExecutionDlqMapper;
-import org.chovy.canvas.domain.execution.CanvasExecutionMapper;
+import org.chovy.canvas.dal.dataobject.CanvasExecutionDO;
+import org.chovy.canvas.dal.dataobject.CanvasExecutionDlqDO;
+import org.chovy.canvas.dal.mapper.CanvasExecutionDlqMapper;
+import org.chovy.canvas.dal.mapper.CanvasExecutionMapper;
 import org.chovy.canvas.engine.context.ExecutionContext;
 import org.chovy.canvas.engine.dag.DagGraph;
 import org.chovy.canvas.engine.dag.DagParser;
 import org.chovy.canvas.engine.disruptor.CanvasDisruptorService;
 import org.chovy.canvas.engine.handlers.MqTriggerHandler;
 import org.chovy.canvas.engine.scheduler.DagEngine;
-import org.chovy.canvas.infra.cache.CanvasConfigCache;
-import org.chovy.canvas.infra.cache.CanvasEntityCache;
-import org.chovy.canvas.infra.mq.OverflowRetryMessage;
-import org.chovy.canvas.infra.redis.ContextPersistenceService;
+import org.chovy.canvas.infrastructure.cache.CanvasConfigCache;
+import org.chovy.canvas.infrastructure.cache.CanvasEntityCache;
+import org.chovy.canvas.infrastructure.mq.OverflowRetryMessage;
+import org.chovy.canvas.infrastructure.redis.ContextPersistenceService;
 import org.chovy.canvas.perf.PerfRunContext;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -45,6 +45,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
+import org.chovy.canvas.dal.mapper.CanvasExecutionStatsMapper;
 
 /**
  * 画布执行编排器：dedup → ctx 加载/初始化 → DAG 执行 → 结果写入 DB。
@@ -64,7 +65,7 @@ public class CanvasExecutionService {
     private final DagEngine dagEngine;
     private final TriggerPreCheckService preCheckService;
     private final InFlightExecutionRegistry executionRegistry;
-    private final org.chovy.canvas.domain.execution.CanvasExecutionStatsMapper statsMapper;
+    private final org.chovy.canvas.dal.mapper.CanvasExecutionStatsMapper statsMapper;
     private final CanvasEntityCache canvasEntityCache;
     private final MqTriggerHandler mqTriggerHandler;
     private final CanvasExecutionDlqMapper dlqMapper;
@@ -92,7 +93,7 @@ public class CanvasExecutionService {
             Long canvasId, String userId,
             Map<String, Object> payload, String graphJson) {
         return Mono.fromCallable(() -> {
-                    Canvas canvas = canvasMapper.selectById(canvasId);
+                    CanvasDO canvas = canvasMapper.selectById(canvasId);
                     if (canvas == null) throw new IllegalStateException("画布不存在: " + canvasId);
 
                     ExecutionContext ctx = newContext(canvasId, -1L, userId, TriggerType.DRY_RUN);
@@ -130,7 +131,7 @@ public class CanvasExecutionService {
                     String triggerNodeId = (String) prep.get(MapFieldKeys.TRIGGER_NODE_ID);
 
                     ensureCdpUser(ctx);
-                    CanvasExecution exec = createExecution(ctx);
+                    CanvasExecutionDO exec = createExecution(ctx);
 
                     return insertExecution(exec)
                             .then(dagEngine.execute(graph, triggerNodeId, ctx)
@@ -203,7 +204,7 @@ public class CanvasExecutionService {
             boolean persistentRequest) {
         return Mono.fromCallable(() -> {
 
-                    Canvas canvas = canvasEntityCache.get(canvasId);
+                    CanvasDO canvas = canvasEntityCache.get(canvasId);
                     if (canvas == null) {
                         throw new IllegalStateException("画布不存在: " + canvasId);
                     }
@@ -327,7 +328,7 @@ public class CanvasExecutionService {
                     DagGraph graph = (DagGraph) prep.get(MapFieldKeys.GRAPH);
                     String triggerNodeId = (String) prep.get(MapFieldKeys.TRIGGER_NODE_ID);
                     boolean isResume = (Boolean) prep.get(MapFieldKeys.IS_RESUME);
-                    Canvas canvas = (Canvas) prep.get(MapFieldKeys.CANVAS);
+                    CanvasDO canvas = (CanvasDO) prep.get(MapFieldKeys.CANVAS);
                     String acquiredDedupKey = (String) prep.get(MapFieldKeys.DEDUP_KEY);
                     int admissionLimit = (Integer) prep.get(MapFieldKeys.ADMISSION_LIMIT);
 
@@ -363,7 +364,7 @@ public class CanvasExecutionService {
                     }
 
                     ensureCdpUser(ctx);
-                    final CanvasExecution finalExec = createExecution(ctx);
+                    final CanvasExecutionDO finalExec = createExecution(ctx);
                     if (ctx.getPerfRunId() != null && acquiredDedupKey != null) {
                         finalExec.setLastDedupKey(acquiredDedupKey);
                     }
@@ -438,7 +439,7 @@ public class CanvasExecutionService {
     // ── 缓存失效 ──────────────────────────────────────────────────
 
     /**
-     * 画布发布/下线时主动驱逐 Canvas 实体缓存，
+     * 画布发布/下线时主动驱逐 CanvasDO 实体缓存，
      * 确保下次 trigger() 读到最新状态（已发布/已下线）。
      */
     public void invalidateCanvas(Long canvasId) {
@@ -464,20 +465,20 @@ public class CanvasExecutionService {
         }
     }
 
-    private Long resolveVersionId(Canvas canvas, String userId, boolean dryRun) {
+    private Long resolveVersionId(CanvasDO canvas, String userId, boolean dryRun) {
         if (dryRun) {
-            CanvasVersion draft = canvasVersionMapper.selectOne(
-                    new LambdaQueryWrapper<CanvasVersion>()
-                            .eq(CanvasVersion::getCanvasId, canvas.getId())
-                            .eq(CanvasVersion::getStatus, 0)
-                            .orderByDesc(CanvasVersion::getId)
+            CanvasVersionDO draft = canvasVersionMapper.selectOne(
+                    new LambdaQueryWrapper<CanvasVersionDO>()
+                            .eq(CanvasVersionDO::getCanvasId, canvas.getId())
+                            .eq(CanvasVersionDO::getStatus, 0)
+                            .orderByDesc(CanvasVersionDO::getId)
                             .last("LIMIT 1")
             );
             if (draft != null) return draft.getId();
-            CanvasVersion latest = canvasVersionMapper.selectOne(
-                    new LambdaQueryWrapper<CanvasVersion>()
-                            .eq(CanvasVersion::getCanvasId, canvas.getId())
-                            .orderByDesc(CanvasVersion::getId)
+            CanvasVersionDO latest = canvasVersionMapper.selectOne(
+                    new LambdaQueryWrapper<CanvasVersionDO>()
+                            .eq(CanvasVersionDO::getCanvasId, canvas.getId())
+                            .orderByDesc(CanvasVersionDO::getId)
                             .last("LIMIT 1")
             );
             if (latest != null) return latest.getId();
@@ -573,7 +574,7 @@ public class CanvasExecutionService {
 
     private void writeOverflowEnqueueDlq(OverflowRetryMessage msg, String errorMsg) {
         try {
-            CanvasExecutionDlq dlq = CanvasExecutionDlq.builder()
+            CanvasExecutionDlqDO dlq = CanvasExecutionDlqDO.builder()
                     .executionId(msg.getMsgId())
                     .canvasId(msg.getCanvasId())
                     .userId(msg.getUserId())
@@ -606,8 +607,8 @@ public class CanvasExecutionService {
         return value.substring(0, Math.min(value.length(), maxLength));
     }
 
-    private CanvasExecution createExecution(ExecutionContext ctx) {
-        CanvasExecution exec = new CanvasExecution();
+    private CanvasExecutionDO createExecution(ExecutionContext ctx) {
+        CanvasExecutionDO exec = new CanvasExecutionDO();
         exec.setId(ctx.getExecutionId());
         exec.setCanvasId(ctx.getCanvasId());
         exec.setVersionId(ctx.getVersionId());
@@ -618,13 +619,13 @@ public class CanvasExecutionService {
         return exec;
     }
 
-    private Mono<Void> insertExecution(CanvasExecution exec) {
+    private Mono<Void> insertExecution(CanvasExecutionDO exec) {
         return Mono.fromRunnable(() -> executionMapper.insert(exec))
                 .subscribeOn(Schedulers.boundedElastic())
                 .then();
     }
 
-    private Mono<Void> updateExecution(CanvasExecution exec, int status, Map<String, Object> result) {
+    private Mono<Void> updateExecution(CanvasExecutionDO exec, int status, Map<String, Object> result) {
         if (exec == null) return Mono.empty();
         exec.setStatus(status);
         try {

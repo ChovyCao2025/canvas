@@ -1,6 +1,6 @@
-package org.chovy.canvas.controller;
+package org.chovy.canvas.web;
 
-import org.chovy.canvas.domain.cdp.CdpTagOperation;
+import org.chovy.canvas.dal.dataobject.CdpTagOperationDO;
 import org.chovy.canvas.domain.cdp.CdpTagOperationService;
 import org.chovy.canvas.dto.cdp.CdpBatchTagReq;
 import org.junit.jupiter.api.Test;
@@ -17,7 +17,7 @@ class CdpTagOperationControllerTest {
     void createReturnsCreatedOperation() {
         CdpTagOperationService service = Mockito.mock(CdpTagOperationService.class);
         CdpTagOperationController controller = new CdpTagOperationController(service);
-        CdpTagOperation op = new CdpTagOperation();
+        CdpTagOperationDO op = new CdpTagOperationDO();
         op.setId(7L);
         when(service.create(new CdpBatchTagReq("BATCH_SET", "vip", "true", List.of("u1"), "reason", "admin")))
                 .thenReturn(op);
@@ -39,7 +39,7 @@ class CdpTagOperationControllerTest {
     void retryFailedReturnsNewOperation() {
         CdpTagOperationService service = Mockito.mock(CdpTagOperationService.class);
         CdpTagOperationController controller = new CdpTagOperationController(service);
-        CdpTagOperation op = new CdpTagOperation();
+        CdpTagOperationDO op = new CdpTagOperationDO();
         op.setId(9L);
         when(service.retryFailed(7L, null)).thenReturn(op);
 

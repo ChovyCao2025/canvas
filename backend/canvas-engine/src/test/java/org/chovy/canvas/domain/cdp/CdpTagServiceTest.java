@@ -1,8 +1,8 @@
 package org.chovy.canvas.domain.cdp;
 
 import com.baomidou.mybatisplus.core.conditions.Wrapper;
-import org.chovy.canvas.domain.meta.TagDefinition;
-import org.chovy.canvas.domain.meta.TagDefinitionMapper;
+import org.chovy.canvas.dal.dataobject.TagDefinitionDO;
+import org.chovy.canvas.dal.mapper.TagDefinitionMapper;
 import org.chovy.canvas.dto.cdp.CdpTagWriteReq;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -14,6 +14,10 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import org.chovy.canvas.dal.dataobject.CdpUserTagDO;
+import org.chovy.canvas.dal.dataobject.CdpUserTagHistoryDO;
+import org.chovy.canvas.dal.mapper.CdpUserTagHistoryMapper;
+import org.chovy.canvas.dal.mapper.CdpUserTagMapper;
 
 class CdpTagServiceTest {
 
@@ -41,8 +45,8 @@ class CdpTagServiceTest {
                 null, "MANUAL", "req-1", "admin", null);
         service.setTag("u1", req);
 
-        ArgumentCaptor<CdpUserTag> tagCaptor = ArgumentCaptor.forClass(CdpUserTag.class);
-        ArgumentCaptor<CdpUserTagHistory> historyCaptor = ArgumentCaptor.forClass(CdpUserTagHistory.class);
+        ArgumentCaptor<CdpUserTagDO> tagCaptor = ArgumentCaptor.forClass(CdpUserTagDO.class);
+        ArgumentCaptor<CdpUserTagHistoryDO> historyCaptor = ArgumentCaptor.forClass(CdpUserTagHistoryDO.class);
         verify(userTagMapper).insert(tagCaptor.capture());
         verify(historyMapper).insert(historyCaptor.capture());
 
@@ -67,7 +71,7 @@ class CdpTagServiceTest {
 
     @Test
     void removeTagMarksCurrentTagRemovedAndWritesHistory() {
-        CdpUserTag existing = new CdpUserTag();
+        CdpUserTagDO existing = new CdpUserTagDO();
         existing.setUserId("u1");
         existing.setTagCode("vip");
         existing.setTagValue("true");
@@ -78,11 +82,11 @@ class CdpTagServiceTest {
 
         assertThat(existing.getStatus()).isEqualTo("REMOVED");
         verify(userTagMapper).updateById(existing);
-        verify(historyMapper).insert(any(CdpUserTagHistory.class));
+        verify(historyMapper).insert(any(CdpUserTagHistoryDO.class));
     }
 
-    private TagDefinition tag(String code, String valueType, int enabled, int manualEnabled) {
-        TagDefinition def = new TagDefinition();
+    private TagDefinitionDO tag(String code, String valueType, int enabled, int manualEnabled) {
+        TagDefinitionDO def = new TagDefinitionDO();
         def.setTagCode(code);
         def.setName(code);
         def.setEnabled(enabled);

@@ -4,9 +4,9 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.chovy.canvas.common.MapFieldKeys;
-import org.chovy.canvas.domain.constant.NodeType;
-import org.chovy.canvas.domain.customer.CustomerProfile;
-import org.chovy.canvas.domain.customer.CustomerProfileMapper;
+import org.chovy.canvas.common.enums.NodeType;
+import org.chovy.canvas.dal.dataobject.CustomerProfileDO;
+import org.chovy.canvas.dal.mapper.CustomerProfileMapper;
 import org.chovy.canvas.engine.context.ExecutionContext;
 import org.chovy.canvas.engine.handler.NodeHandler;
 import org.chovy.canvas.engine.handler.NodeHandlerType;
@@ -33,12 +33,12 @@ public class UpdateProfileHandler implements NodeHandler {
     @Override
     @SuppressWarnings("unchecked")
     public Mono<NodeResult> executeAsync(Map<String, Object> config, ExecutionContext ctx) {
-        CustomerProfile profile = profileMapper.selectOne(new LambdaQueryWrapper<CustomerProfile>()
-                .eq(CustomerProfile::getUserId, ctx.getUserId())
+        CustomerProfileDO profile = profileMapper.selectOne(new LambdaQueryWrapper<CustomerProfileDO>()
+                .eq(CustomerProfileDO::getUserId, ctx.getUserId())
                 .last("LIMIT 1"));
         boolean created = false;
         if (profile == null) {
-            profile = new CustomerProfile();
+            profile = new CustomerProfileDO();
             profile.setUserId(ctx.getUserId());
             profile.setAttributes("{}");
             profile.setCreatedAt(LocalDateTime.now());
@@ -60,7 +60,7 @@ public class UpdateProfileHandler implements NodeHandler {
         return Mono.just(NodeResult.ok(string(config, "nextNodeId", null), Map.of(MapFieldKeys.PROFILE_UPDATED, true)));
     }
 
-    private void apply(CustomerProfile profile, Map<String, Object> attributes, Map<String, Object> op, ExecutionContext ctx) {
+    private void apply(CustomerProfileDO profile, Map<String, Object> attributes, Map<String, Object> op, ExecutionContext ctx) {
         String field = string(op, "field", null);
         if (field == null || field.isBlank()) return;
         Object value = resolve(op.get("value"), ctx);

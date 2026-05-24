@@ -1,4 +1,4 @@
-package org.chovy.canvas.controller;
+package org.chovy.canvas.web;
 
 import org.chovy.canvas.domain.cdp.CanvasUserQueryService;
 import org.junit.jupiter.api.Test;

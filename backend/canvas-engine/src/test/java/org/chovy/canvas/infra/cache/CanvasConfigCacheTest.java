@@ -1,4 +1,4 @@
-package org.chovy.canvas.infra.cache;
+package org.chovy.canvas.infrastructure.cache;
 
 import org.chovy.cache.TieredCache;
 import org.chovy.canvas.engine.dag.DagGraph;

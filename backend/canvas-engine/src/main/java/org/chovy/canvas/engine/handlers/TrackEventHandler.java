@@ -2,9 +2,9 @@ package org.chovy.canvas.engine.handlers;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.chovy.canvas.common.MapFieldKeys;
-import org.chovy.canvas.domain.constant.NodeType;
-import org.chovy.canvas.domain.meta.EventLog;
-import org.chovy.canvas.domain.meta.EventLogMapper;
+import org.chovy.canvas.common.enums.NodeType;
+import org.chovy.canvas.dal.dataobject.EventLogDO;
+import org.chovy.canvas.dal.mapper.EventLogMapper;
 import org.chovy.canvas.engine.context.ExecutionContext;
 import org.chovy.canvas.engine.handler.NodeHandler;
 import org.chovy.canvas.engine.handler.NodeHandlerType;
@@ -35,7 +35,7 @@ public class TrackEventHandler implements NodeHandler {
         Map<String, Object> attributes = config.get("attributes") instanceof Map<?, ?> map
                 ? (Map<String, Object>) map
                 : Map.of();
-        EventLog event = new EventLog();
+        EventLogDO event = new EventLogDO();
         event.setEventCode(eventCode);
         event.setUserId(ctx.getUserId());
         event.setAttributes(toJson(attributes));

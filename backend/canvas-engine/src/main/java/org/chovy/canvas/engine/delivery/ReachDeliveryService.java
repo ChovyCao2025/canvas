@@ -4,8 +4,8 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
 import org.chovy.canvas.common.MapFieldKeys;
-import org.chovy.canvas.domain.delivery.MessageSendRecord;
-import org.chovy.canvas.domain.delivery.MessageSendRecordMapper;
+import org.chovy.canvas.dal.dataobject.MessageSendRecordDO;
+import org.chovy.canvas.dal.mapper.MessageSendRecordMapper;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
@@ -39,7 +39,7 @@ public class ReachDeliveryService {
                 .subscribeOn(Schedulers.boundedElastic())
                 .flatMap(prepared -> {
                     if (prepared.duplicate()) {
-                        boolean sent = !MessageSendRecord.STATUS_FAILED.equals(prepared.record().getStatus());
+                        boolean sent = !MessageSendRecordDO.STATUS_FAILED.equals(prepared.record().getStatus());
                         return Mono.just(new DeliveryResult(
                                 sent,
                                 true,
@@ -55,14 +55,14 @@ public class ReachDeliveryService {
     }
 
     private PreparedRecord prepareRecord(DeliveryRequest request) {
-        MessageSendRecord existing = recordMapper.selectOne(new LambdaQueryWrapper<MessageSendRecord>()
-                .eq(MessageSendRecord::getIdempotencyKey, request.idempotencyKey())
+        MessageSendRecordDO existing = recordMapper.selectOne(new LambdaQueryWrapper<MessageSendRecordDO>()
+                .eq(MessageSendRecordDO::getIdempotencyKey, request.idempotencyKey())
                 .last("LIMIT 1"));
         if (existing != null) {
             return new PreparedRecord(existing, true);
         }
 
-        MessageSendRecord record = new MessageSendRecord();
+        MessageSendRecordDO record = new MessageSendRecordDO();
         record.setExecutionId(request.executionId());
         record.setCanvasId(request.canvasId());
         record.setUserId(request.userId());
@@ -71,7 +71,7 @@ public class ReachDeliveryService {
         record.setTemplateId(request.templateId());
         record.setIdempotencyKey(request.idempotencyKey());
         record.setRequestPayload(toJson(request.payload()));
-        record.setStatus(MessageSendRecord.STATUS_PENDING);
+        record.setStatus(MessageSendRecordDO.STATUS_PENDING);
         record.setCreatedAt(LocalDateTime.now());
         record.setUpdatedAt(record.getCreatedAt());
         recordMapper.insert(record);
@@ -88,9 +88,9 @@ public class ReachDeliveryService {
                 .map(map -> (Map<String, Object>) map);
     }
 
-    private Mono<DeliveryResult> markSent(MessageSendRecord record, Map<String, Object> response) {
+    private Mono<DeliveryResult> markSent(MessageSendRecordDO record, Map<String, Object> response) {
         return Mono.fromCallable(() -> {
-                    record.setStatus(MessageSendRecord.STATUS_SENT);
+                    record.setStatus(MessageSendRecordDO.STATUS_SENT);
                     Object messageId = response.getOrDefault(MapFieldKeys.MESSAGE_ID, response.get(MapFieldKeys.ID));
                     if (messageId != null) {
                         record.setExternalMessageId(messageId.toString());
@@ -102,10 +102,10 @@ public class ReachDeliveryService {
                 .subscribeOn(Schedulers.boundedElastic());
     }
 
-    private Mono<DeliveryResult> markFailed(MessageSendRecord record, Throwable error) {
+    private Mono<DeliveryResult> markFailed(MessageSendRecordDO record, Throwable error) {
         return Mono.fromCallable(() -> {
                     String message = error.getMessage() == null ? "delivery failed" : error.getMessage();
-                    record.setStatus(MessageSendRecord.STATUS_FAILED);
+                    record.setStatus(MessageSendRecordDO.STATUS_FAILED);
                     record.setErrorMessage(message.substring(0, Math.min(500, message.length())));
                     record.setUpdatedAt(LocalDateTime.now());
                     recordMapper.updateById(record);
@@ -145,7 +145,7 @@ public class ReachDeliveryService {
         }
     }
 
-    private record PreparedRecord(MessageSendRecord record, boolean duplicate) {
+    private record PreparedRecord(MessageSendRecordDO record, boolean duplicate) {
     }
 
     public record DeliveryRequest(

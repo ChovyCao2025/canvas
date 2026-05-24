@@ -2,8 +2,8 @@ package org.chovy.canvas.domain.cdp;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import lombok.RequiredArgsConstructor;
-import org.chovy.canvas.domain.meta.TagDefinition;
-import org.chovy.canvas.domain.meta.TagDefinitionMapper;
+import org.chovy.canvas.dal.dataobject.TagDefinitionDO;
+import org.chovy.canvas.dal.mapper.TagDefinitionMapper;
 import org.chovy.canvas.dto.cdp.CdpTagWriteReq;
 import org.chovy.canvas.dto.cdp.CdpUserTagDTO;
 import org.chovy.canvas.dto.cdp.CdpUserTagHistoryDTO;
@@ -12,6 +12,10 @@ import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import org.chovy.canvas.dal.dataobject.CdpUserTagDO;
+import org.chovy.canvas.dal.dataobject.CdpUserTagHistoryDO;
+import org.chovy.canvas.dal.mapper.CdpUserTagHistoryMapper;
+import org.chovy.canvas.dal.mapper.CdpUserTagMapper;
 
 @Service
 @RequiredArgsConstructor
@@ -22,10 +26,10 @@ public class CdpTagService {
     private final CdpUserTagHistoryMapper historyMapper;
     private final CdpUserService userService;
 
-    public CdpUserTag setTag(String userId, CdpTagWriteReq req) {
+    public CdpUserTagDO setTag(String userId, CdpTagWriteReq req) {
         String normalizedUserId = requireText(userId, "userId");
         String tagCode = requireText(req.tagCode(), "tagCode");
-        TagDefinition def = getEnabledTag(tagCode);
+        TagDefinitionDO def = getEnabledTag(tagCode);
         String sourceType = req.sourceType() == null || req.sourceType().isBlank() ? "MANUAL" : req.sourceType();
         if ("MANUAL".equals(sourceType) && Integer.valueOf(0).equals(def.getManualEnabled())) {
             throw new IllegalArgumentException("标签不允许人工打标: " + tagCode);
@@ -33,9 +37,9 @@ public class CdpTagService {
         String value = normalizeValue(def.getValueType(), req.tagValue());
         userService.ensureUser(normalizedUserId, sourceType, req.sourceRefId());
 
-        CdpUserTag existing = userTagMapper.selectOne(new LambdaQueryWrapper<CdpUserTag>()
-                .eq(CdpUserTag::getUserId, normalizedUserId)
-                .eq(CdpUserTag::getTagCode, tagCode));
+        CdpUserTagDO existing = userTagMapper.selectOne(new LambdaQueryWrapper<CdpUserTagDO>()
+                .eq(CdpUserTagDO::getUserId, normalizedUserId)
+                .eq(CdpUserTagDO::getTagCode, tagCode));
         String oldValue = existing != null ? existing.getTagValue() : null;
         LocalDateTime now = LocalDateTime.now();
         LocalDateTime expiresAt = req.expiresAt();
@@ -43,7 +47,7 @@ public class CdpTagService {
             expiresAt = now.plusDays(def.getDefaultTtlDays());
         }
 
-        CdpUserTag tag = existing != null ? existing : new CdpUserTag();
+        CdpUserTagDO tag = existing != null ? existing : new CdpUserTagDO();
         tag.setUserId(normalizedUserId);
         tag.setTagCode(tagCode);
         tag.setTagValue(value);
@@ -68,9 +72,9 @@ public class CdpTagService {
     public void removeTag(String userId, String tagCode, String reason, String operator) {
         String normalizedUserId = requireText(userId, "userId");
         String normalizedTagCode = requireText(tagCode, "tagCode");
-        CdpUserTag existing = userTagMapper.selectOne(new LambdaQueryWrapper<CdpUserTag>()
-                .eq(CdpUserTag::getUserId, normalizedUserId)
-                .eq(CdpUserTag::getTagCode, normalizedTagCode));
+        CdpUserTagDO existing = userTagMapper.selectOne(new LambdaQueryWrapper<CdpUserTagDO>()
+                .eq(CdpUserTagDO::getUserId, normalizedUserId)
+                .eq(CdpUserTagDO::getTagCode, normalizedTagCode));
         if (existing == null) {
             return;
         }
@@ -82,10 +86,10 @@ public class CdpTagService {
     }
 
     public List<CdpUserTagDTO> listCurrentTags(String userId) {
-        return userTagMapper.selectList(new LambdaQueryWrapper<CdpUserTag>()
-                        .eq(CdpUserTag::getUserId, requireText(userId, "userId"))
-                        .eq(CdpUserTag::getStatus, "ACTIVE")
-                        .orderByDesc(CdpUserTag::getUpdatedAt))
+        return userTagMapper.selectList(new LambdaQueryWrapper<CdpUserTagDO>()
+                        .eq(CdpUserTagDO::getUserId, requireText(userId, "userId"))
+                        .eq(CdpUserTagDO::getStatus, "ACTIVE")
+                        .orderByDesc(CdpUserTagDO::getUpdatedAt))
                 .stream()
                 .map(tag -> new CdpUserTagDTO(tag.getTagCode(), tag.getTagCode(), tag.getTagValue(),
                         tag.getValueType(), tag.getSourceType(), tag.getStatus(),
@@ -94,9 +98,9 @@ public class CdpTagService {
     }
 
     public List<CdpUserTagHistoryDTO> listHistory(String userId) {
-        return historyMapper.selectList(new LambdaQueryWrapper<CdpUserTagHistory>()
-                        .eq(CdpUserTagHistory::getUserId, requireText(userId, "userId"))
-                        .orderByDesc(CdpUserTagHistory::getOperatedAt))
+        return historyMapper.selectList(new LambdaQueryWrapper<CdpUserTagHistoryDO>()
+                        .eq(CdpUserTagHistoryDO::getUserId, requireText(userId, "userId"))
+                        .orderByDesc(CdpUserTagHistoryDO::getOperatedAt))
                 .stream()
                 .map(item -> new CdpUserTagHistoryDTO(item.getTagCode(), item.getOldValue(), item.getNewValue(),
                         item.getOperation(), item.getSourceType(), item.getSourceRefId(),
@@ -104,10 +108,10 @@ public class CdpTagService {
                 .toList();
     }
 
-    private TagDefinition getEnabledTag(String tagCode) {
-        TagDefinition def = tagDefinitionMapper.selectOne(new LambdaQueryWrapper<TagDefinition>()
-                .eq(TagDefinition::getTagCode, tagCode)
-                .eq(TagDefinition::getEnabled, 1)
+    private TagDefinitionDO getEnabledTag(String tagCode) {
+        TagDefinitionDO def = tagDefinitionMapper.selectOne(new LambdaQueryWrapper<TagDefinitionDO>()
+                .eq(TagDefinitionDO::getTagCode, tagCode)
+                .eq(TagDefinitionDO::getEnabled, 1)
                 .last("LIMIT 1"));
         if (def == null) {
             throw new IllegalArgumentException("标签不存在或已禁用: " + tagCode);
@@ -118,7 +122,7 @@ public class CdpTagService {
     private void writeHistory(String userId, String tagCode, String oldValue, String newValue,
                               String operation, String sourceType, String sourceRefId,
                               String idempotencyKey, String reason, String operator) {
-        CdpUserTagHistory history = new CdpUserTagHistory();
+        CdpUserTagHistoryDO history = new CdpUserTagHistoryDO();
         history.setUserId(userId);
         history.setTagCode(tagCode);
         history.setOldValue(oldValue);

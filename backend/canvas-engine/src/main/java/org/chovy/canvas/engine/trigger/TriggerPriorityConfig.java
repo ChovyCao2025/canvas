@@ -1,7 +1,7 @@
 package org.chovy.canvas.engine.trigger;
 
 import lombok.Data;
-import org.chovy.canvas.domain.constant.TriggerType;
+import org.chovy.canvas.common.enums.TriggerType;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.stereotype.Component;
 

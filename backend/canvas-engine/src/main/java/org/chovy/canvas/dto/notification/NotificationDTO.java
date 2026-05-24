@@ -1,6 +1,6 @@
 package org.chovy.canvas.dto.notification;
 
-import org.chovy.canvas.domain.notification.Notification;
+import org.chovy.canvas.dal.dataobject.NotificationDO;
 
 import java.time.LocalDateTime;
 
@@ -25,7 +25,7 @@ public record NotificationDTO(
         LocalDateTime deliveredAt,
         LocalDateTime createdAt
 ) {
-    public static NotificationDTO from(Notification notification) {
+    public static NotificationDTO from(NotificationDO notification) {
         return new NotificationDTO(
                 notification.getNotificationId(),
                 notification.getType(),

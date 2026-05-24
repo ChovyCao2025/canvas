@@ -13,6 +13,8 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import org.chovy.canvas.dal.dataobject.SysUserDO;
+import org.chovy.canvas.dal.mapper.SysUserMapper;
 
 @ExtendWith(MockitoExtension.class)
 class SysUserServiceTest {
@@ -29,11 +31,11 @@ class SysUserServiceTest {
         when(encoder.encode("Secret1")).thenReturn("$2a$encoded-password");
         SysUserService service = new SysUserService(sysUserMapper, encoder);
 
-        SysUser created = service.create("operator", "Secret1", "运营人员", "OPERATOR");
+        SysUserDO created = service.create("operator", "Secret1", "运营人员", "OPERATOR");
 
-        ArgumentCaptor<SysUser> captor = ArgumentCaptor.forClass(SysUser.class);
+        ArgumentCaptor<SysUserDO> captor = ArgumentCaptor.forClass(SysUserDO.class);
         verify(sysUserMapper).insert(captor.capture());
-        SysUser inserted = captor.getValue();
+        SysUserDO inserted = captor.getValue();
         assertThat(inserted.getUsername()).isEqualTo("operator");
         assertThat(inserted.getPassword()).isEqualTo("$2a$encoded-password");
         assertThat(inserted.getDisplayName()).isEqualTo("运营人员");
@@ -47,7 +49,7 @@ class SysUserServiceTest {
 
     @Test
     void createRejectsDuplicateUsername() {
-        SysUser existing = new SysUser();
+        SysUserDO existing = new SysUserDO();
         existing.setUsername("operator");
         when(sysUserMapper.selectOne(any())).thenReturn(existing);
         SysUserService service = new SysUserService(sysUserMapper, encoder);

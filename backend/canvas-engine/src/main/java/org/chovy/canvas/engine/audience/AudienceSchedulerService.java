@@ -4,8 +4,8 @@ import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.chovy.canvas.domain.audience.AudienceDefinition;
-import org.chovy.canvas.domain.audience.AudienceDefinitionMapper;
+import org.chovy.canvas.dal.dataobject.AudienceDefinitionDO;
+import org.chovy.canvas.dal.mapper.AudienceDefinitionMapper;
 import org.springframework.scheduling.TaskScheduler;
 import org.springframework.scheduling.support.CronTrigger;
 import org.springframework.stereotype.Service;
@@ -50,8 +50,8 @@ public class AudienceSchedulerService {
 
     /** 全量刷新所有人群定时任务。 */
     public void refreshAll() {
-        List<AudienceDefinition> definitions = definitionMapper.selectList(null);
-        for (AudienceDefinition definition : definitions) {
+        List<AudienceDefinitionDO> definitions = definitionMapper.selectList(null);
+        for (AudienceDefinitionDO definition : definitions) {
             // 全量刷新阶段先挂空任务，真实执行任务由业务层 refresh(...) 注入
             schedule(definition, () -> {
             });
@@ -59,12 +59,12 @@ public class AudienceSchedulerService {
     }
 
     /** 刷新单个人群任务（外部传入实际执行 job）。 */
-    public void refresh(AudienceDefinition definition, Runnable job) {
+    public void refresh(AudienceDefinitionDO definition, Runnable job) {
         schedule(definition, job);
     }
 
     /** 注册单个人群定时任务（会先取消旧任务）。 */
-    private void schedule(AudienceDefinition definition, Runnable job) {
+    private void schedule(AudienceDefinitionDO definition, Runnable job) {
         // 覆盖更新前先清理旧任务，避免同一 audience 出现重复触发
         cancel(definition.getId());
         if (definition.getEnabled() == null || definition.getEnabled() == 0) {

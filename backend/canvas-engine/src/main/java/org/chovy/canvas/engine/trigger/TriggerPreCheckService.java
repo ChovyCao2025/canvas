@@ -3,10 +3,10 @@ package org.chovy.canvas.engine.trigger;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.chovy.canvas.domain.canvas.Canvas;
-import org.chovy.canvas.domain.canvas.CanvasMapper;
-import org.chovy.canvas.domain.execution.CanvasUserQuota;
-import org.chovy.canvas.domain.execution.CanvasUserQuotaMapper;
+import org.chovy.canvas.dal.dataobject.CanvasDO;
+import org.chovy.canvas.dal.mapper.CanvasMapper;
+import org.chovy.canvas.dal.dataobject.CanvasUserQuotaDO;
+import org.chovy.canvas.dal.mapper.CanvasUserQuotaMapper;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 
@@ -37,7 +37,7 @@ public class TriggerPreCheckService {
      *
      * @throws TriggerRejectedException 任意检查不通过时抛出（含错误码）
      */
-    public void check(Canvas canvas, String userId) {
+    public void check(CanvasDO canvas, String userId) {
         checkWithoutQuotaAccounting(canvas, userId);
         consumeQuotaAndRecord(canvas, userId);
     }
@@ -46,7 +46,7 @@ public class TriggerPreCheckService {
      * 只校验不会扣减配额的触发资格。
      * 用于溢出重试，避免同一个事件在排队期间重复消耗配额。
      */
-    public void checkWithoutQuotaAccounting(Canvas canvas, String userId) {
+    public void checkWithoutQuotaAccounting(CanvasDO canvas, String userId) {
         Long canvasId = canvas.getId();
 
         if (canvas.getStatus() != 1) {
@@ -62,11 +62,11 @@ public class TriggerPreCheckService {
         }
 
         if (canvas.getCooldownSeconds() != null) {
-            CanvasUserQuota quota = quotaMapper.selectOne(
-                    new LambdaQueryWrapper<CanvasUserQuota>()
-                            .eq(CanvasUserQuota::getCanvasId, canvasId)
-                            .eq(CanvasUserQuota::getUserId, userId)
-                            .orderByDesc(CanvasUserQuota::getTriggerDate)
+            CanvasUserQuotaDO quota = quotaMapper.selectOne(
+                    new LambdaQueryWrapper<CanvasUserQuotaDO>()
+                            .eq(CanvasUserQuotaDO::getCanvasId, canvasId)
+                            .eq(CanvasUserQuotaDO::getUserId, userId)
+                            .orderByDesc(CanvasUserQuotaDO::getTriggerDate)
                             .last("LIMIT 1")
             );
             if (quota != null && quota.getLastTriggerAt() != null) {
@@ -84,7 +84,7 @@ public class TriggerPreCheckService {
      * 扣减配额并记录用量。
      * CanvasExecutionService 在确认本次触发会被执行后调用，避免溢出排队事件提前刷新冷却期。
      */
-    public void consumeQuotaAndRecord(Canvas canvas, String userId) {
+    public void consumeQuotaAndRecord(CanvasDO canvas, String userId) {
         Long canvasId = canvas.getId();
         List<String> acquiredCounterKeys = new ArrayList<>();
         String acquiredCooldownKey = null;

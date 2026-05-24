@@ -2,7 +2,7 @@ package org.chovy.canvas.engine.handlers;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import org.chovy.canvas.domain.meta.EventLogMapper;
+import org.chovy.canvas.dal.mapper.EventLogMapper;
 import org.chovy.canvas.engine.context.ExecutionContext;
 import org.chovy.canvas.engine.handler.NodeOutcome;
 import org.chovy.canvas.engine.handler.NodeResult;

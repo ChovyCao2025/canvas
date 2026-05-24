@@ -17,6 +17,8 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import org.chovy.canvas.dal.dataobject.NotificationDO;
+import org.chovy.canvas.dal.mapper.NotificationMapper;
 
 @ExtendWith(MockitoExtension.class)
 class NotificationServiceTest {
@@ -31,7 +33,7 @@ class NotificationServiceTest {
         when(mapper.selectCount(any())).thenReturn(1L);
         NotificationService service = new NotificationService(mapper, realtimePublisher);
 
-        Notification notification = service.createForTask(
+        NotificationDO notification = service.createForTask(
                 "operator",
                 "TASK_SUCCEEDED",
                 "人群计算完成",
@@ -39,9 +41,9 @@ class NotificationServiceTest {
                 "/audiences?highlight=7&taskId=task_1",
                 "task_1");
 
-        ArgumentCaptor<Notification> captor = ArgumentCaptor.forClass(Notification.class);
+        ArgumentCaptor<NotificationDO> captor = ArgumentCaptor.forClass(NotificationDO.class);
         verify(mapper).insert(captor.capture());
-        Notification inserted = captor.getValue();
+        NotificationDO inserted = captor.getValue();
         assertThat(notification).isSameAs(inserted);
         assertThat(inserted.getNotificationId()).startsWith("ntf_");
         assertThat(inserted.getUserId()).isEqualTo("operator");
@@ -66,20 +68,20 @@ class NotificationServiceTest {
                 "/audiences?highlight=7&taskId=task_1",
                 "task_1");
 
-        ArgumentCaptor<Notification> captor = ArgumentCaptor.forClass(Notification.class);
+        ArgumentCaptor<NotificationDO> captor = ArgumentCaptor.forClass(NotificationDO.class);
         verify(mapper).insert(captor.capture());
         assertThat(captor.getValue().getTitle()).hasSize(200);
     }
 
     @Test
     void createForTask_returnsExistingNotificationWhenTaskUserTypeAlreadyExists() {
-        Notification existing = new Notification();
+        NotificationDO existing = new NotificationDO();
         existing.setNotificationId("ntf_existing");
-        when(mapper.insert(any(Notification.class))).thenThrow(new DuplicateKeyException("duplicate notification"));
+        when(mapper.insert(any(NotificationDO.class))).thenThrow(new DuplicateKeyException("duplicate notification"));
         when(mapper.selectOne(any())).thenReturn(existing);
         NotificationService service = new NotificationService(mapper, realtimePublisher);
 
-        Notification notification = service.createForTask(
+        NotificationDO notification = service.createForTask(
                 "operator",
                 "TASK_SUCCEEDED",
                 "人群计算完成",
@@ -93,13 +95,13 @@ class NotificationServiceTest {
 
     @Test
     void createAlert_deduplicatesByUserAndDedupKey() {
-        Notification existing = new Notification();
+        NotificationDO existing = new NotificationDO();
         existing.setNotificationId("ntf_existing");
-        when(mapper.insert(any(Notification.class))).thenThrow(new DuplicateKeyException("duplicate alert"));
+        when(mapper.insert(any(NotificationDO.class))).thenThrow(new DuplicateKeyException("duplicate alert"));
         when(mapper.selectOne(any())).thenReturn(existing);
         NotificationService service = new NotificationService(mapper, realtimePublisher);
 
-        Notification notification = service.create(NotificationCreateCommand.builder()
+        NotificationDO notification = service.create(NotificationCreateCommand.builder()
                 .userId("admin")
                 .category("ALERT")
                 .severity("ERROR")
@@ -114,16 +116,16 @@ class NotificationServiceTest {
 
     @Test
     void list_returnsPagedRecordsForUser() {
-        Notification first = new Notification();
+        NotificationDO first = new NotificationDO();
         first.setNotificationId("ntf_1");
-        Notification second = new Notification();
+        NotificationDO second = new NotificationDO();
         second.setNotificationId("ntf_2");
-        Page<Notification> pageResult = new Page<>();
+        Page<NotificationDO> pageResult = new Page<>();
         pageResult.setRecords(List.of(first, second));
         when(mapper.selectPage(any(Page.class), any())).thenReturn(pageResult);
         NotificationService service = new NotificationService(mapper, realtimePublisher);
 
-        List<Notification> notifications = service.list("operator", true, 1, 20);
+        List<NotificationDO> notifications = service.list("operator", true, 1, 20);
 
         assertThat(notifications).containsExactly(first, second);
     }
@@ -143,16 +145,16 @@ class NotificationServiceTest {
 
         service.markRead("operator", "ntf_1");
 
-        ArgumentCaptor<Notification> captor = ArgumentCaptor.forClass(Notification.class);
+        ArgumentCaptor<NotificationDO> captor = ArgumentCaptor.forClass(NotificationDO.class);
         verify(mapper).update(captor.capture(), any(Wrapper.class));
-        Notification updateEntity = captor.getValue();
+        NotificationDO updateEntity = captor.getValue();
         assertThat(updateEntity.getReadAt()).isNotNull();
         assertThat(updateEntity.getStatus()).isEqualTo("READ");
         assertThat(updateEntity.getNotificationId()).isNull();
         assertThat(updateEntity.getUserId()).isNull();
         verify(realtimePublisher).publish(eq("NOTIFICATION_UPDATED"), eq("operator"), eq(null), eq(0L));
         verify(mapper, never()).selectOne(any());
-        verify(mapper, never()).updateById(any(Notification.class));
+        verify(mapper, never()).updateById(any(NotificationDO.class));
     }
 
     @Test
@@ -162,13 +164,13 @@ class NotificationServiceTest {
 
         service.markAllRead("operator");
 
-        ArgumentCaptor<Notification> captor = ArgumentCaptor.forClass(Notification.class);
+        ArgumentCaptor<NotificationDO> captor = ArgumentCaptor.forClass(NotificationDO.class);
         verify(mapper).update(captor.capture(), any(Wrapper.class));
         assertThat(captor.getValue().getReadAt()).isNotNull();
         assertThat(captor.getValue().getStatus()).isEqualTo("READ");
         verify(realtimePublisher).publish(eq("NOTIFICATION_UPDATED"), eq("operator"), eq(null), eq(0L));
         verify(mapper, never()).selectList(any());
-        verify(mapper, never()).updateById(any(Notification.class));
+        verify(mapper, never()).updateById(any(NotificationDO.class));
     }
 
     @Test
@@ -178,7 +180,7 @@ class NotificationServiceTest {
 
         service.archive("operator", "ntf_1");
 
-        ArgumentCaptor<Notification> captor = ArgumentCaptor.forClass(Notification.class);
+        ArgumentCaptor<NotificationDO> captor = ArgumentCaptor.forClass(NotificationDO.class);
         verify(mapper).update(captor.capture(), any(Wrapper.class));
         assertThat(captor.getValue().getArchivedAt()).isNotNull();
         assertThat(captor.getValue().getStatus()).isEqualTo("ARCHIVED");

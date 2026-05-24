@@ -1,10 +1,10 @@
 package org.chovy.canvas.engine.handlers;
 
-import org.chovy.canvas.domain.meta.ApiDefinition;
+import org.chovy.canvas.dal.dataobject.ApiDefinitionDO;
 import org.chovy.canvas.engine.context.ExecutionContext;
 import org.chovy.canvas.engine.handler.NodeResult;
-import org.chovy.canvas.infra.cache.ApiDefinitionCache;
-import org.chovy.canvas.infra.redis.RedisKeyUtil;
+import org.chovy.canvas.infrastructure.cache.ApiDefinitionCache;
+import org.chovy.canvas.infrastructure.redis.RedisKeyUtil;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -147,7 +147,7 @@ class ApiCallHandlerRateLimitTest {
     @Test
     @DisplayName("Redis 限流检查异常时返回失败结果且不调用下游 HTTP")
     void executeAsync_returns_failure_when_redis_rate_limit_check_throws() {
-        ApiDefinition def = enabledDefinition(10);
+        ApiDefinitionDO def = enabledDefinition(10);
         when(apiDefinitionCache.getEnabled("test_api")).thenReturn(def);
         when(valueOps.increment(anyString())).thenThrow(new RuntimeException("redis down"));
         ApiCallHandler handler = new ApiCallHandler(
@@ -164,7 +164,7 @@ class ApiCallHandlerRateLimitTest {
     @Test
     @DisplayName("请求准备异常不应被误报为 Redis 限流检查失败")
     void executeAsync_propagates_request_preparation_errors_after_rate_limit_passes() {
-        ApiDefinition def = enabledDefinition(10);
+        ApiDefinitionDO def = enabledDefinition(10);
         when(apiDefinitionCache.getEnabled("test_api")).thenReturn(def);
         when(valueOps.increment(anyString())).thenReturn(2L);
         ApiCallHandler handler = new ApiCallHandler(
@@ -180,7 +180,7 @@ class ApiCallHandlerRateLimitTest {
     @Test
     @DisplayName("持久化非法限制值时返回失败结果且不调用 Redis 或下游 HTTP")
     void executeAsync_returns_failure_when_persisted_rate_limit_is_invalid() {
-        ApiDefinition def = enabledDefinition(0);
+        ApiDefinitionDO def = enabledDefinition(0);
         when(apiDefinitionCache.getEnabled("test_api")).thenReturn(def);
         ApiCallHandler handler = new ApiCallHandler(
                 apiDefinitionCache, webClientBuilder, new com.fasterxml.jackson.databind.ObjectMapper(),
@@ -197,7 +197,7 @@ class ApiCallHandlerRateLimitTest {
     @Test
     @DisplayName("未超限时执行下游 HTTP 并解析 JSON 输出")
     void executeAsync_calls_downstream_and_parses_json_when_under_limit() {
-        ApiDefinition def = enabledDefinition(10);
+        ApiDefinitionDO def = enabledDefinition(10);
         when(apiDefinitionCache.getEnabled("test_api")).thenReturn(def);
         when(valueOps.increment(anyString())).thenReturn(1L);
         when(redis.expire(anyString(), any())).thenReturn(true);
@@ -224,7 +224,7 @@ class ApiCallHandlerRateLimitTest {
     @Test
     @DisplayName("开启 validateRules 时接口响应不满足规则则失败")
     void executeAsync_returns_failure_when_response_validation_rules_do_not_match() {
-        ApiDefinition def = enabledDefinition(null);
+        ApiDefinitionDO def = enabledDefinition(null);
         when(apiDefinitionCache.getEnabled("test_api")).thenReturn(def);
         ExchangeFunction exchangeFunction = request -> Mono.just(ClientResponse.create(HttpStatus.OK)
                 .header("Content-Type", MediaType.APPLICATION_JSON_VALUE)
@@ -249,7 +249,7 @@ class ApiCallHandlerRateLimitTest {
     @Test
     @DisplayName("Redis 计数为空时生产路径返回限流检查失败且不调用下游 HTTP")
     void executeAsync_returns_check_failed_when_redis_increment_returns_null() {
-        ApiDefinition def = enabledDefinition(10);
+        ApiDefinitionDO def = enabledDefinition(10);
         when(apiDefinitionCache.getEnabled("test_api")).thenReturn(def);
         when(valueOps.increment(anyString())).thenReturn(null);
         ApiCallHandler handler = new ApiCallHandler(
@@ -266,7 +266,7 @@ class ApiCallHandlerRateLimitTest {
     @Test
     @DisplayName("第一次请求 TTL 设置失败时生产路径返回限流检查失败且不调用下游 HTTP")
     void executeAsync_returns_check_failed_when_first_expire_returns_false() {
-        ApiDefinition def = enabledDefinition(10);
+        ApiDefinitionDO def = enabledDefinition(10);
         when(apiDefinitionCache.getEnabled("test_api")).thenReturn(def);
         when(valueOps.increment(anyString())).thenReturn(1L);
         when(redis.expire(anyString(), any())).thenReturn(false);
@@ -284,7 +284,7 @@ class ApiCallHandlerRateLimitTest {
     @Test
     @DisplayName("第一次请求 TTL 设置结果为空时生产路径返回限流检查失败且不调用下游 HTTP")
     void executeAsync_returns_check_failed_when_first_expire_returns_null() {
-        ApiDefinition def = enabledDefinition(10);
+        ApiDefinitionDO def = enabledDefinition(10);
         when(apiDefinitionCache.getEnabled("test_api")).thenReturn(def);
         when(valueOps.increment(anyString())).thenReturn(1L);
         when(redis.expire(anyString(), any())).thenReturn(null);
@@ -302,7 +302,7 @@ class ApiCallHandlerRateLimitTest {
     @Test
     @DisplayName("生产路径使用配置的 Redis key 前缀")
     void executeAsync_uses_configured_redis_key_prefix_when_under_limit() {
-        ApiDefinition def = enabledDefinition(10);
+        ApiDefinitionDO def = enabledDefinition(10);
         when(apiDefinitionCache.getEnabled("test_api")).thenReturn(def);
         when(valueOps.increment(anyString())).thenReturn(2L);
         ExchangeFunction exchangeFunction = request -> Mono.just(ClientResponse.create(HttpStatus.OK)
@@ -325,8 +325,8 @@ class ApiCallHandlerRateLimitTest {
         return Instant.ofEpochSecond(1_700_000_000L);
     }
 
-    private static ApiDefinition enabledDefinition(Integer rateLimitPerSec) {
-        ApiDefinition def = new ApiDefinition();
+    private static ApiDefinitionDO enabledDefinition(Integer rateLimitPerSec) {
+        ApiDefinitionDO def = new ApiDefinitionDO();
         def.setApiKey("test_api");
         def.setEnabled(1);
         def.setUrl("https://example.test/api");

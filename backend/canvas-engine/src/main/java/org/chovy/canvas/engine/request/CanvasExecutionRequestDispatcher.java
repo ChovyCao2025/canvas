@@ -1,8 +1,8 @@
 package org.chovy.canvas.engine.request;
 
 import lombok.extern.slf4j.Slf4j;
-import org.chovy.canvas.domain.execution.CanvasExecutionRequest;
-import org.chovy.canvas.domain.execution.CanvasExecutionRequestMapper;
+import org.chovy.canvas.dal.dataobject.CanvasExecutionRequestDO;
+import org.chovy.canvas.dal.mapper.CanvasExecutionRequestMapper;
 import org.chovy.canvas.engine.disruptor.CanvasDisruptorService;
 import org.chovy.canvas.engine.scheduler.CanvasMetrics;
 import org.chovy.canvas.engine.trigger.TriggerPriorityConfig;
@@ -65,10 +65,10 @@ public class CanvasExecutionRequestDispatcher {
     public void dispatchDueRequests() {
         LocalDateTime now = LocalDateTime.now();
         LocalDateTime staleBefore = now.minusSeconds(runningStaleSeconds);
-        List<CanvasExecutionRequest> requests = mapper.selectDueRequests(batchSize, now, staleBefore);
+        List<CanvasExecutionRequestDO> requests = mapper.selectDueRequests(batchSize, now, staleBefore);
         Map<Long, Integer> canvasCounts = new HashMap<>();
         Map<Long, CanvasDispatchProfile> profiles = buildDispatchProfiles(requests);
-        for (CanvasExecutionRequest request : requests) {
+        for (CanvasExecutionRequestDO request : requests) {
             if (request == null || request.getId() == null) {
                 continue;
             }
@@ -86,7 +86,7 @@ public class CanvasExecutionRequestDispatcher {
         }
     }
 
-    private boolean exceedsPerCanvasLimit(CanvasExecutionRequest request,
+    private boolean exceedsPerCanvasLimit(CanvasExecutionRequestDO request,
                                           Map<Long, Integer> canvasCounts,
                                           Map<Long, CanvasDispatchProfile> profiles) {
         Long canvasId = request.getCanvasId();
@@ -104,9 +104,9 @@ public class CanvasExecutionRequestDispatcher {
         return false;
     }
 
-    private Map<Long, CanvasDispatchProfile> buildDispatchProfiles(List<CanvasExecutionRequest> requests) {
+    private Map<Long, CanvasDispatchProfile> buildDispatchProfiles(List<CanvasExecutionRequestDO> requests) {
         Map<Long, CanvasDispatchProfile> profiles = new HashMap<>();
-        for (CanvasExecutionRequest request : requests) {
+        for (CanvasExecutionRequestDO request : requests) {
             if (request == null || request.getCanvasId() == null) {
                 continue;
             }
