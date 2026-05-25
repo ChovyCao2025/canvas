@@ -141,11 +141,13 @@ public class DagEngine {
                                              ExecutionContext ctx) {
         // 从起始节点开始执行画布相关节点
         return executeNode(graph, triggerNodeId, ctx, 0)
-                .doFinally(__ -> writeSkippedNodesIfComplete(graph, ctx))
+                .doOnTerminate(() -> writeSkippedNodesIfComplete(graph, ctx))
                 .onErrorResume(e -> {
                     log.error("[ENGINE] 执行出错 executionId={}: {}",
                             ctx.getExecutionId(), e.getMessage(), e);
-                    return Mono.just(Map.of(MapFieldKeys.ERROR, e.getMessage()));
+                    ctxStore.save(ctx);
+                    String errMsg = e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName();
+                    return Mono.just(Map.of(MapFieldKeys.ERROR, errMsg));
                 });
     }
 
@@ -230,7 +232,8 @@ public class DagEngine {
                 return Mono.just(Map.of());
             }
 
-            // FIXME: 此处CAS锁其实没有覆盖之前特殊类型的节点, 但是是否真正有竞争的是上面的特殊节点？相反如果是普通节点的话, 发生并发的概率其实不大
+            // special 节点会先经过阶段 2 的等待/条件判断；一旦满足条件，会统一进入
+            // executeNodeAfterStage2(...) 复用同一套幂等、CAS 与 repeat 机制。
             // ──────────────────────────────────────────────────────
             // 阶段 4：CAS 抢占 nodeGate 门控锁
             // ──────────────────────────────────────────────────────
@@ -257,10 +260,9 @@ public class DagEngine {
                     .<Map<String, Object>>flatMap(result -> {
 
                         if (!result.success()) {
-                            // Handler 返回失败
-                            nodeGate.executing.set(false); // 释放锁
+                            // 锁已由 executeHandlerWithRepeat 释放，此处只处理状态和 trace。
                             ctx.setNodeStatus(nodeId, NodeStatus.FAILED);
-                            writeTraceEnd(ctx, node, result);
+                            writeTraceEnd(ctx, node, result, System.currentTimeMillis() - nodeStartMs);
                             // 防资损：已发券/已触达则整体 SUCCESS
                             if (ctx.isBenefitGranted() || ctx.isUserReached()) {
                                 log.warn("[ENGINE] 防资损：节点失败但整体判定成功 nodeId={}", nodeId);
@@ -340,6 +342,24 @@ public class DagEngine {
      * handler 执行时 ctx 已完整，repeat 是防御性兜底，不改变路由结果。
      * </pre>
      *
+     * <h3>设计假设：普通节点在同一 execution 内只有一条活跃的上游 trigger</h3>
+     * <pre>
+     * repeat 机制的保护对象是"最后到达的信号不被漏掉"，它保证下游只触发一次、状态只写一次。
+     * 但 handler 本身（executeAsync）在发生 CAS 竞争时会被调用两次：
+     *   第一次：CAS 胜者持锁执行
+     *   第二次：胜者释放锁后，因 repeatPending=true 重入执行
+     *
+     * 对于 HUB/LOGIC_RELATION/AGGREGATE：handler 是纯路由逻辑，无副作用，两次调用无害。
+     * 对于 THRESHOLD：两次调用是语义必要的（第二次才能看到全部上游状态）。
+     * 对于普通节点（发消息、发券、调 API 等）：若两条并发 trigger 同时到达且 handler
+     *   执行期间存在竞争，handler 的副作用会执行两次。
+     *
+     * 因此，Canvas DAG 的设计约束是：
+     *   多分支收敛必须经由显式的收敛节点（HUB / LOGIC_RELATION / AGGREGATE / THRESHOLD）。
+     *   普通节点的直接上游在同一 execution 内只应有一条活跃路径，不应出现无收敛节点的菱形拓扑。
+     *   若违反此约束，普通节点的副作用（发消息、扣库存等）可能被执行两次。
+     * </pre>
+     *
      * <h3>三种到达场景（Case 1/2/3）</h3>
      * <pre>
      * Case 1 — 无并发：
@@ -417,7 +437,9 @@ public class DagEngine {
         // 注意：doFinally 本身不触发订阅，触发订阅的是 flatMap 对返回值的处理。
         return withRetry.flatMap(result -> {
             if (!result.success()) {
-                // 失败时调用方（executeNodeAfterStage2）会释放 nodeGate
+                // 失败时由此处统一释放锁，调用方 flatMap 不再重复释放，
+                // 消除 repeat+failure 路径中 doFinally 与调用方双重释放的竞态窗口。
+                nodeGate.executing.set(false);
                 return Mono.just(result);
             }
 
@@ -426,6 +448,10 @@ public class DagEngine {
             // （详见 executeHandlerWithRepeat JavaDoc 中的 Case 3 分析）
             boolean needsRepeat = nodeGate.repeatPending.getAndSet(false); // ← 读信号
             nodeGate.executing.set(false); // 释放锁
+            // 二次补检：捕获在 getAndSet→set(false) 窗口期内到达并设置 repeatPending 的信号。
+            // 窗口期内 CAS 必然失败（锁仍被持有），对方已写入 repeatPending=true；
+            // 释放锁后立即再读一次可以收住该信号，将窗口从"单次读→释放"缩小到"释放→二次读"。
+            needsRepeat |= nodeGate.repeatPending.getAndSet(false);
 
             if (needsRepeat && nodeGate.executing.compareAndSet(false, true)) {
                 // 重新持锁后返回 withRetry.doFinally(__)：
@@ -496,19 +522,51 @@ public class DagEngine {
         String relation = (String) config.getOrDefault("relation", "AND");
 
         // AND 模式：上游有 FAILED/SKIPPED → 立即失败（7.7节）
+        //
+        // handleLogicRelation 在 executeNode 第2阶段提前返回，绕过了第3阶段（isNodeDone）和
+        // 第4阶段（CAS），多条上游并发完成时多线程会同时进入此分支。
+        // 用 CAS 保证 writeTrace 和 setStatus 只由一个线程执行；
+        // 其他线程 CAS 失败后幂等返回，由赢家负责向外传播 Mono.error。
         if (LogicRelationHandler.shouldFailImmediately(relation, upstreamIds, ctx)) {
-            ctx.setNodeStatus(nodeId, NodeStatus.FAILED);
-            log.warn("[ENGINE] LOGIC_RELATION AND 上游失败，立即 FAILED nodeId={}", nodeId);
-            if (ctx.isBenefitGranted() || ctx.isUserReached()) return Mono.just(Map.of());
-            return Mono.error(new RuntimeException("LOGIC_RELATION AND 条件因上游失败不可满足"));
+            NodeGate gate = ctx.getGate(nodeId);
+            if (gate.executing.compareAndSet(false, true)) {
+                writeTraceStart(ctx, node);
+                ctx.setNodeStatus(nodeId, NodeStatus.FAILED);
+                writeTraceEnd(ctx, node, NodeResult.fail("AND 上游失败，条件不可满足"), 0);
+                gate.executing.set(false);
+                log.warn("[ENGINE] LOGIC_RELATION AND 上游失败，立即 FAILED nodeId={}", nodeId);
+                if (ctx.isBenefitGranted() || ctx.isUserReached()) return Mono.just(Map.of());
+                return Mono.error(new RuntimeException("LOGIC_RELATION AND 条件因上游失败不可满足"));
+            }
+            // CAS 失败：另一线程已在处理，当前线程幂等返回
+            return Mono.just(Map.of());
         }
 
         // 条件未满足：进入等待态，设置 WAITING 状态（供 isPaused 检测）
+        //
+        // ── 并发安全性说明 ──────────────────────────────────────────
+        // 此处没有加锁，多个上游并发完成时多条线程可能同时走到这里：
+        //
+        //   场景A（至少一条线程看到"条件已满足"）：
+        //     该线程进入 executeNodeAfterStage2，由 stage 4 的 CAS 保证只执行一次。
+        //
+        //   场景B（所有线程都读到"条件未满足"，全部返回 WAITING）：
+        //     这是真实可能发生的竞态——A、B 两个上游几乎同时完成，
+        //     Thread-A 触发本节点时读到 B=PENDING，Thread-B 触发时读到 A=PENDING，
+        //     两条线程都走了 WAITING 分支，没有人进入 executeNodeAfterStage2。
+        //     此时节点会卡死，直到下方的超时定时器介入。
+        //
+        //   因此超时不是可选的"安全网"，而是并发正确性的必要兜底：
+        //   超时触发新的 execution，最终驱动节点从 WAITING 状态恢复。
+        //
+        //   setNodeStatus(WAITING) 多线程同时写相同值，幂等，没有问题。
+        // ──────────────────────────────────────────────────────────
         if (!LogicRelationHandler.checkCondition(relation, upstreamIds, ctx)) {
             ctx.setNodeStatus(nodeId, NodeStatus.WAITING);
 
             // LOGIC_RELATION 等待超时（与 Hub 类似，防止第二触发永不到来）
             // config 中可选配置 timeout 字段（秒），默认等于全局执行超时
+            // ConcurrentHashSet.add() 保证定时器只被调度一次（多线程同时进入时）
             if (ctx.getScheduledHubTimeouts().add("lr:" + nodeId)) {
                 ctx.getHubStartTimes().putIfAbsent("lr:" + nodeId, System.currentTimeMillis());
                 int timeoutSec = config.get("timeout") instanceof Number n
@@ -589,6 +647,20 @@ public class DagEngine {
         List<String> upstreamIds = graph.upstream(nodeId);
 
         // 所有上游未完成：进入等待态
+        //
+        // ── 并发安全性说明（与 LOGIC_RELATION 相同） ───────────────
+        // 此处无锁：多条上游并发完成时，多条线程可能同时执行以下检查。
+        //
+        //   正常路径：最后一条线程必然看到 allUpstreamDone=true，
+        //     进入 executeNodeAfterStage2，stage 4 CAS 保证只执行一次。
+        //
+        //   竞态路径（全部线程均读到"未全完成"）：
+        //     节点卡在 WAITING，依赖下方超时定时器恢复。
+        //     超时是并发正确性的必要兜底，不是可选项。
+        //
+        //   setNodeStatus(WAITING) 多线程写相同值，幂等。
+        //   scheduledHubTimeouts.add() 是 ConcurrentHashSet，保证定时器只调度一次。
+        // ──────────────────────────────────────────────────────────
         if (!HubHandler.allUpstreamDone(upstreamIds, ctx)) {
             ctx.setNodeStatus(nodeId, NodeStatus.WAITING);  // 设 WAITING 供 isPaused 检测
             if (ctx.getScheduledHubTimeouts().add(nodeId)) {
@@ -649,6 +721,7 @@ public class DagEngine {
         List<String> upstreamIds = graph.upstream(nodeId);
 
         if (!HubHandler.allUpstreamDone(upstreamIds, ctx)) {
+            // 并发安全性同 handleHub：无锁，竞态下超时定时器是必要兜底。
             ctx.setNodeStatus(nodeId, NodeStatus.WAITING);
             String timerKey = "ag:" + nodeId;
             if (ctx.getScheduledHubTimeouts().add(timerKey)) {
@@ -733,10 +806,8 @@ public class DagEngine {
                 nodeId, node.getType())
                 .<Map<String, Object>>flatMap(result -> {
                     // ── 路径A：FAILED ─────────────────────────────────────────
-                    // executeHandlerWithRepeat 对 FAILED 结果直接返回（跳过 repeat 检查），
-                    // 锁由此处调用方释放。
+                    // 锁已由 executeHandlerWithRepeat 统一释放，此处只处理状态和 trace。
                     if (!result.success()) {
-                        nodeGate.executing.set(false); // 释放锁（FAILED 路径）
                         ctx.setNodeStatus(nodeId, NodeStatus.FAILED);
                         long durationMs = System.currentTimeMillis() - nodeStartMs;
                         writeTraceEnd(ctx, node, result, durationMs);
@@ -811,8 +882,7 @@ public class DagEngine {
 
         return Flux.fromIterable(nextIds)
                 .flatMap(nextId -> executeNode(graph, nextId, ctx, depth + 1))
-                .last(Map.of())
-                .defaultIfEmpty(Map.of());
+                .last(Map.of());
     }
 
     /**

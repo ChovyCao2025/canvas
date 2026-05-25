@@ -1,5 +1,6 @@
 package org.chovy.canvas.engine.trigger;
 
+import jakarta.annotation.PostConstruct;
 import org.chovy.canvas.common.MapFieldKeys;
 import org.chovy.canvas.common.enums.TriggerType;
 import org.chovy.canvas.common.enums.NodeType;
@@ -12,6 +13,7 @@ import jakarta.annotation.PreDestroy;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.EnableScheduling;
 import org.springframework.stereotype.Service;
 import reactor.core.Disposable;
@@ -53,18 +55,18 @@ public class CanvasSchedulerService {
     }
 
 
-    @org.springframework.beans.factory.annotation.Value("${canvas.integration.tagger-service-url}")
+    @Value("${canvas.integration.tagger-service-url}")
     private String taggerUrl;
-    @org.springframework.beans.factory.annotation.Value("${canvas.integration.api-call-base-url}")
+    @Value("${canvas.integration.api-call-base-url}")
     private String apiCallUrl;
-    @org.springframework.beans.factory.annotation.Value("${canvas.scheduler.jitter-max-ms:300000}")
+    @Value("${canvas.scheduler.jitter-max-ms:300000}")
     private long jitterMaxMs;
 
     // WebClient 懒建，避免循环依赖
     private org.springframework.web.reactive.function.client.WebClient taggerClient;
     private org.springframework.web.reactive.function.client.WebClient apiCallClient;
 
-    @jakarta.annotation.PostConstruct
+    @PostConstruct
     void initClients() {
         taggerClient  = org.springframework.web.reactive.function.client.WebClient.builder().baseUrl(taggerUrl).build();
         apiCallClient = org.springframework.web.reactive.function.client.WebClient.builder().baseUrl(apiCallUrl).build();

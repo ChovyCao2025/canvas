@@ -1,6 +1,6 @@
-package org.chovy.canvas.web;
+package org.chovy.canvas.controller;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+
 import org.chovy.canvas.common.enums.CanvasStatusEnum;
 import org.chovy.canvas.common.enums.NodeType;
 import org.chovy.canvas.common.enums.TriggerType;
@@ -13,12 +13,15 @@ import org.chovy.canvas.dto.EventReportReq;
 import org.chovy.canvas.engine.disruptor.CanvasDisruptorService;
 import org.chovy.canvas.engine.wait.WaitResumeService;
 import org.chovy.canvas.infrastructure.redis.TriggerRouteService;
+import org.chovy.canvas.service.EventDefinitionService;
+import org.chovy.canvas.web.EventDefinitionController;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mockito;
 
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -32,25 +35,23 @@ import static org.mockito.Mockito.when;
 
 class EventDefinitionControllerTest {
 
-    private EventDefinitionMapper eventMapper;
     private EventLogMapper logMapper;
     private CanvasDisruptorService disruptorService;
     private TriggerRouteService triggerRouteService;
     private EventDefinitionCacheService eventDefinitionCacheService;
-    private WaitResumeService waitResumeService;
     private EventDefinitionController controller;
+    private EventDefinitionService eventDefinitionService;
 
     @BeforeEach
     void setUp() {
-        eventMapper = Mockito.mock(EventDefinitionMapper.class);
+        EventDefinitionMapper eventMapper = Mockito.mock(EventDefinitionMapper.class);
         logMapper = Mockito.mock(EventLogMapper.class);
         disruptorService = Mockito.mock(CanvasDisruptorService.class);
         triggerRouteService = Mockito.mock(TriggerRouteService.class);
         eventDefinitionCacheService = Mockito.mock(EventDefinitionCacheService.class);
-        waitResumeService = Mockito.mock(WaitResumeService.class);
+        WaitResumeService waitResumeService = Mockito.mock(WaitResumeService.class);
         controller = new EventDefinitionController(
-                eventMapper, logMapper, disruptorService, triggerRouteService, new ObjectMapper(),
-                eventDefinitionCacheService, waitResumeService);
+                eventMapper, eventDefinitionCacheService,eventDefinitionService);
     }
 
     @Test
@@ -76,8 +77,8 @@ class EventDefinitionControllerTest {
         req.setAttributes(Map.of("orderId", "ORD-001"));
 
         // Act
-        Map<String, Object> result = controller.reportEvent(req)
-                .block()
+        Map<String, Object> result = Objects.requireNonNull(controller.reportEvent(req)
+                        .block())
                 .getData();
 
         // Assert: EventLogDO stored with real counts
