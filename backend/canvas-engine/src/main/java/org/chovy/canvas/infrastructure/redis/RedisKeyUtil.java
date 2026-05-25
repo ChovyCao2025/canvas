@@ -52,6 +52,11 @@ public class RedisKeyUtil {
     public String inflightCanvas(Long canvasId) { return prefix + ":inflight:canvas:" + canvasId; }
     /** 全局正在执行的任务集合（ZSET，score=过期时间戳ms）。 */
     public String inflightGlobal()              { return prefix + ":inflight:global"; }
+    /**
+     * 集群 globalMaxConcurrency 基准值（String），用于启动时一致性校验。
+     * 首台实例 SETNX 写入，后续实例读取并与本地配置比对；不一致则 fail-fast。
+     */
+    public String globalMaxConcurrencyConfig()  { return prefix + ":config:max-concurrency"; }
 
     // ── 事件上报幂等 ──────────────────────────────────────────────
     /** 事件级幂等 key，按 idempotencyKey 去重，TTL 24h。 */

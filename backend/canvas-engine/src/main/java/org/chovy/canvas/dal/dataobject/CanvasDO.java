@@ -63,7 +63,15 @@ public class CanvasDO {
     @TableField(updateStrategy = FieldStrategy.ALWAYS)
     private Integer cooldownSeconds;
 
-    /** 画布全局最大并发执行数，null 时使用全局默认值 */
+    /**
+     * 画布全局最大触发总次数（所有用户合计，生命周期内），null 表示不限制。
+     *
+     * <p>语义：总量配额，由 {@link org.chovy.canvas.engine.trigger.TriggerPreCheckService}
+     * 通过 Redis INCR 原子扣减，画布下线/Kill/归档时由 {@code cleanupCanvasQuotas} 清理。
+     *
+     * <p>并发执行上限通过全局配置 {@code canvas.execution.max-concurrency} 控制，
+     * 与本字段无关。
+     */
     @TableField(updateStrategy = FieldStrategy.ALWAYS)
     private Integer maxTotalExecutions;
 

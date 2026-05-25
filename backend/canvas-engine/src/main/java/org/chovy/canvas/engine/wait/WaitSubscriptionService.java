@@ -117,6 +117,12 @@ public class WaitSubscriptionService {
         return wait;
     }
 
+    /**
+     * 查找指定用户在该 eventCode 下所有 ACTIVE 的等待订阅（含 GOAL_CHECK）。
+     *
+     * <p>上限 100 条：正常场景下一个 (eventCode, userId) 组合最多几条，
+     * 若因 bug 积累过多也不会拉垮 HTTP 线程。超出部分不处理（已有 CAS 保护，不会漏恢复正常数量）。
+     */
     public List<CanvasWaitSubscriptionDO> findActiveEventWaits(String eventCode, String userId) {
         Objects.requireNonNull(eventCode, "eventCode");
         Objects.requireNonNull(userId, "userId");
@@ -130,7 +136,8 @@ public class WaitSubscriptionService {
                 .and(wrapper -> wrapper
                         .isNull(CanvasWaitSubscriptionDO::getExpiresAt)
                         .or()
-                        .gt(CanvasWaitSubscriptionDO::getExpiresAt, now)));
+                        .gt(CanvasWaitSubscriptionDO::getExpiresAt, now))
+                .last("LIMIT 100"));
     }
 
     public List<CanvasWaitSubscriptionDO> findExpiredActiveWaits(LocalDateTime now, int limit) {

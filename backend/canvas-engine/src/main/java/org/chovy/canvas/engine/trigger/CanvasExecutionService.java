@@ -30,6 +30,8 @@ import org.chovy.canvas.infrastructure.cache.CanvasConfigCache;
 import org.chovy.canvas.infrastructure.cache.CanvasEntityCache;
 import org.chovy.canvas.infrastructure.mq.OverflowRetryMessage;
 import org.chovy.canvas.infrastructure.redis.ContextPersistenceService;
+import org.chovy.canvas.infrastructure.redis.RedisKeyUtil;
+import jakarta.annotation.PostConstruct;
 import org.chovy.canvas.perf.PerfRunContext;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -75,6 +77,8 @@ public class CanvasExecutionService {
     private final ObjectMapper objectMapper;
     private final CdpUserService cdpUserService;
     private final CanvasDisruptorService disruptorService;
+    private final org.springframework.data.redis.core.StringRedisTemplate redis;
+    private final RedisKeyUtil redisKeys;
 
     @Value("${canvas.execution.context-ttl-sec:86400}")
     private long ctxTtlSec;
@@ -84,6 +88,38 @@ public class CanvasExecutionService {
 
     @org.springframework.beans.factory.annotation.Value("${canvas.execution.max-concurrency:1000}")
     private int globalMaxConcurrency;
+
+    // ── 启动校验 ──────────────────────────────────────────────────
+
+    /**
+     * 启动时校验 globalMaxConcurrency 在集群内的一致性。
+     *
+     * <p>用 Redis SETNX 抢占写入本机配置值：
+     * <ul>
+     *   <li>首台启动的实例：写入成功，该值成为集群基准；</li>
+     *   <li>后续实例：读取已有值，若与本机配置不符则抛出 {@link IllegalStateException}（fail-fast），
+     *       避免不同实例用不同的并发上限悄无声息地破坏全局限流语义。</li>
+     * </ul>
+     *
+     * <p>注意：若需变更 globalMaxConcurrency，需先停止所有实例、删除 Redis key，
+     * 再以新配置重新部署。
+     */
+    @PostConstruct
+    void validateGlobalMaxConcurrencyConsistency() {
+        String key = redisKeys.globalMaxConcurrencyConfig();
+        String localVal = String.valueOf(globalMaxConcurrency);
+        Boolean isNew = redis.opsForValue().setIfAbsent(key, localVal);
+        if (!Boolean.TRUE.equals(isNew)) {
+            String stored = redis.opsForValue().get(key);
+            if (!localVal.equals(stored)) {
+                throw new IllegalStateException(
+                        "[STARTUP] canvas.execution.max-concurrency 集群内配置不一致！" +
+                        " 本机=" + localVal + "，Redis存储值=" + stored +
+                        "。请统一配置后重新部署，或手动删除 Redis key: " + key);
+            }
+        }
+        log.info("[STARTUP] globalMaxConcurrency={} 集群一致性校验通过", globalMaxConcurrency);
+    }
 
     // ── 触发入口 ──────────────────────────────────────────────────
 
@@ -277,10 +313,11 @@ public class CanvasExecutionService {
             DagGraph graph, String triggerNodeId) {
         if (!dryRun) {
             try {
-                // 强扣减配额（Redis 原子操作，跨机安全）
-                // 此处是 consumeQuotaAndRecord 的唯一调用点（dryRun=false 时）
-                // 溢出重试场景同样会扣减配额（非幂等！原始事件已扣过一次，重试再扣一次）
-                preCheckService.consumeQuotaAndRecord(canvas, userId);
+                // Fix 2: WAIT/GOAL 恢复触发跳过配额扣减：恢复不是新触发，不应重复消耗配额
+                // 冷却期和总触发量均在原始触发时已扣减，恢复路径重复扣减会导致配额虚耗
+                if (!isWaitResumeTrigger(ctx.getTriggerType())) {
+                    preCheckService.consumeQuotaAndRecord(canvas, userId);
+                }
             } catch (RuntimeException e) {
                 if (finalExecutionSlot != null) {
                     executionRegistry.deregister(canvasId, ctx.getExecutionId());
@@ -409,9 +446,8 @@ public class CanvasExecutionService {
         String acquiredDedupKey = dedup.dedupKey();
 
         // C. 前置资格校验（不扣减配额）
-        //    溢出重试场景：跳过的是配额扣减，资格校验（有效期、状态）仍然执行
-        //    ⚠️ 已知问题：WAIT 恢复场景（isResume=true）也会进此分支，冷却期检查可能误拒
-        if (!dryRun) {
+        //    WAIT/GOAL 恢复触发跳过此检查：恢复不是新触发，冷却期不应拦截恢复路径
+        if (!dryRun && !isWaitResumeTrigger(triggerType)) {
             preCheckService.checkWithoutQuotaAccounting(canvas, userId);
             if (overflowRetry) {
                 log.debug("[ENGINE] 溢出重试跳过配额扣减（扣减在 doExecute 中进行）canvasId={} userId={}", canvasId, userId);
@@ -651,10 +687,9 @@ public class CanvasExecutionService {
         TriggerPriorityConfig.Priority priority = priorityConfig.of(triggerType);
         // ⚠️ 分布式注意：activeCount 仅统计本 JVM 内的活跃执行
         int active = executionRegistry.activeCount(canvasId);
-        // maxConc 取画布配置与全局配置的较小值（null 时用全局默认）
-        int maxConc = canvas.getMaxTotalExecutions() != null
-                ? Math.min(canvas.getMaxTotalExecutions(), globalMaxConcurrency)
-                : globalMaxConcurrency;
+        // Fix 5: maxTotalExecutions 仅用于总触发量配额，不再作为并发上限
+        // 并发上限统一由 canvas.execution.max-concurrency（globalMaxConcurrency）控制
+        int maxConc = globalMaxConcurrency;
 
         // HIGH 优先级：超限仅告警，不拒绝（不能让高优先级任务被低优先级挤死）
         if (priority == TriggerPriorityConfig.Priority.HIGH) {
@@ -865,6 +900,17 @@ public class CanvasExecutionService {
     private boolean isPaused(ExecutionContext ctx, DagGraph graph) {
         return ctx.getNodeStatuses().values().stream()
                 .anyMatch(s -> s == org.chovy.canvas.engine.context.NodeStatus.WAITING);
+    }
+
+    /**
+     * 判断是否为 WAIT/GOAL 节点恢复触发（Fix 2）。
+     * 这类触发是对已暂停执行的"继续"，不是新触发，不应扣减冷却期和配额。
+     */
+    private static boolean isWaitResumeTrigger(String triggerType) {
+        return org.chovy.canvas.common.enums.TriggerType.WAIT_RESUME.equals(triggerType)
+                || org.chovy.canvas.common.enums.TriggerType.WAIT_TIMEOUT.equals(triggerType)
+                || org.chovy.canvas.common.enums.TriggerType.GOAL_CHECK_RESUME.equals(triggerType)
+                || org.chovy.canvas.common.enums.TriggerType.GOAL_CHECK_TIMEOUT.equals(triggerType);
     }
 
     private boolean sendOverflowRetry(Long canvasId, String userId, String triggerType,

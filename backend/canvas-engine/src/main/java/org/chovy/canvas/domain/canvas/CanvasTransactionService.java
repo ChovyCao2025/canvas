@@ -1,72 +1,98 @@
 package org.chovy.canvas.domain.canvas;
 
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.chovy.canvas.common.enums.CanvasStatusEnum;
-import org.chovy.canvas.engine.dag.DagGraph;
+import org.chovy.canvas.common.enums.VersionStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.chovy.canvas.dal.dataobject.CanvasDO;
+import org.chovy.canvas.dal.dataobject.CanvasVersionDO;
 import org.chovy.canvas.dal.mapper.CanvasMapper;
+import org.chovy.canvas.dal.mapper.CanvasVersionMapper;
 
 /**
- * 仅负责“数据库状态变更”的事务服务。
+ * 仅负责"数据库状态变更"的事务服务。
  *
  * <p>目的：把 Redis / Scheduler / Cache 这类外部副作用放在事务外执行，
- * 避免出现“外部调用失败导致 DB 事务回滚”的级联问题。
+ * 避免出现"外部调用失败导致 DB 事务回滚"或"DB 回滚但 Redis 已变更"的不一致问题。
  */
 @Slf4j
 @Service
 @RequiredArgsConstructor
 public class CanvasTransactionService {
-    /** 画布主表访问层，仅做事务内数据更新。 */
-    private final CanvasMapper  canvasMapper;
+
+    private final CanvasMapper canvasMapper;
+    private final CanvasVersionMapper canvasVersionMapper;
+
+    // ── 发布事务 ──────────────────────────────────────────────────
 
     /**
-     * 下线事务。
+     * 发布事务（DB-only）。
      *
-     * <p>步骤：
-     * 1) 校验画布存在；
-     * 2) 记录当前 publishedVersionId（供事务外清缓存/清路由）；
-     * 3) 置状态为 OFFLINE，并清空 publishedVersionId。
+     * <p>只负责创建发布版本快照、更新画布状态字段，不涉及任何 Redis/Scheduler/Cache 操作。
+     * 调用方（{@link CanvasService#publish}）在事务外完成验证和 DAG 解析后调用此方法，
+     * 事务提交后再执行路由注册、调度更新、缓存失效等外部副作用。
      *
-     * <p>返回值：
-     * - 返回下线前的发布版本 ID，供事务外清理路由/缓存使用；
-     * - 可能为 null（画布从未发布过）。
+     * <p>Fix 1：原 CanvasService.publish 将 clearPublishedExternalState 和 registerTriggerRoutes
+     * 混在 @Transactional 内，DB 回滚时 Redis 路由状态已改变，造成不可逆不一致。
+     * 现拆分为两阶段，本方法仅做 DB 写入。
+     *
+     * @return {@link PublishResult} 包含新发布版本和旧 publishedVersionId（供清旧路由使用）
+     */
+    @Transactional
+    public PublishResult publishDb(Long canvasId, String graphJson, String operator) {
+        CanvasDO canvas = canvasMapper.selectById(canvasId);
+        if (canvas == null) throw new IllegalArgumentException("画布不存在: " + canvasId);
+
+        Long oldPublishedVersionId = canvas.getPublishedVersionId();
+
+        CanvasVersionDO published = new CanvasVersionDO();
+        published.setCanvasId(canvasId);
+        published.setVersion(nextVersionNumber(canvasId));
+        published.setGraphJson(graphJson);
+        published.setStatus(VersionStatus.PUBLISHED.getCode());
+        published.setCreatedBy(operator);
+        canvasVersionMapper.insert(published);
+
+        canvas.setStatus(CanvasStatusEnum.PUBLISHED.getCode());
+        canvas.setPublishedVersionId(published.getId());
+        canvasMapper.updateById(canvas);
+
+        return new PublishResult(published, oldPublishedVersionId);
+    }
+
+    /** 发布操作的结果载体，供事务外清理旧路由和注册新路由使用。 */
+    public record PublishResult(CanvasVersionDO publishedVersion, Long oldPublishedVersionId) {}
+
+    // ── 下线事务 ──────────────────────────────────────────────────
+
+    /**
+     * 下线事务（DB-only）。
+     * 返回下线前的 publishedVersionId，供事务外清理路由/缓存。
      */
     @Transactional
     Long offlineDb(Long id) {
-        // 1) 读取当前画布快照（事务内）
         CanvasDO canvas = canvasMapper.selectById(id);
         if (canvas == null) throw new IllegalArgumentException("画布不存在: " + id);
-
-        // 2) 保留下线前发布版本，供事务外清缓存/清路由
         Long publishedVersionId = canvas.getPublishedVersionId();
-
-        // 3) 更新主表状态
         canvas.setStatus(CanvasStatusEnum.OFFLINE.getCode());
         canvas.setPublishedVersionId(null);
         canvasMapper.updateById(canvas);
-
-        // 4) 返回给上层做后置清理
         return publishedVersionId;
     }
 
+    // ── Kill 事务 ─────────────────────────────────────────────────
+
     /**
-     * Kill 事务。
-     *
-     * <p>步骤：
-     * 1) 校验画布存在；
-     * 2) 记录当前 publishedVersionId（供事务外清路由/缓存）；
-     * 3) 置状态为 KILLED，清空 publishedVersionId。
-     *
-     * <p>为何与 offlineDb 分开：KILLED 是不可恢复的紧急停止，语义与 OFFLINE 不同；
-     * 此处仅做 DB 变更，外部副作用（路由/调度/缓存清理）由 {@link CanvasService#applyKillExternalCleanup} 完成。
+     * Kill 事务（DB-only）。
+     * 返回 kill 前的 publishedVersionId，供事务外清理路由/缓存。
      */
     @Transactional
     public Long killDb(Long id) {
         CanvasDO canvas = canvasMapper.selectById(id);
-        if (canvas == null) throw new IllegalArgumentException("Canvas not found: " + id);
+        if (canvas == null) throw new IllegalArgumentException("画布不存在: " + id);
         Long publishedVersionId = canvas.getPublishedVersionId();
         canvas.setStatus(CanvasStatusEnum.KILLED.getCode());
         canvas.setPublishedVersionId(null);
@@ -74,14 +100,25 @@ public class CanvasTransactionService {
         return publishedVersionId;
     }
 
+    // ── 归档事务 ──────────────────────────────────────────────────
+
+    /** 归档事务（DB-only）：仅修改状态为 ARCHIVED，不清 publishedVersionId。 */
     @Transactional
     void archiveDb(Long id) {
-        // 1) 读取并校验画布存在性
         CanvasDO canvas = canvasMapper.selectById(id);
         if (canvas == null) throw new IllegalArgumentException("画布不存在: " + id);
-
-        // 2) 仅变更状态，不触碰发布版本字段
         canvas.setStatus(CanvasStatusEnum.ARCHIVED.getCode());
         canvasMapper.updateById(canvas);
+    }
+
+    // ── 私有辅助 ──────────────────────────────────────────────────
+
+    private int nextVersionNumber(Long canvasId) {
+        CanvasVersionDO max = canvasVersionMapper.selectOne(
+                new LambdaQueryWrapper<CanvasVersionDO>()
+                        .eq(CanvasVersionDO::getCanvasId, canvasId)
+                        .orderByDesc(CanvasVersionDO::getVersion)
+                        .last("LIMIT 1"));
+        return max != null ? max.getVersion() + 1 : 1;
     }
 }

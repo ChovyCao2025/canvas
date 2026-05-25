@@ -167,16 +167,22 @@ public class CanvasService {
     }
 
     /**
-     * 发布画布
+     * 发布画布（两阶段，Fix 1）。
      *
-     * @param id       画布 ID
-     * @param operator 操作人
-     * @return 发布版本信息
+     * <p>原实现将 Redis 路由操作（clearPublishedExternalState / registerTriggerRoutes）
+     * 混在 @Transactional 内：若 DB 事务回滚，Redis 路由已变更，导致不可逆不一致。
+     *
+     * <p>现拆分为两阶段：
+     * <ol>
+     *   <li>验证阶段（事务外）：读操作 + DAG 解析 + 依赖校验；</li>
+     *   <li>{@link CanvasTransactionService#publishDb}（事务内）：仅做 DB 写入；</li>
+     *   <li>外部副作用（事务外）：清旧路由 → 注册新路由 → 调度 → 缓存失效。</li>
+     * </ol>
+     * 发布锁（Redis SETNX，TTL 30s）贯穿全流程，防并发发布。
      */
-    @Transactional
     public CanvasVersionDO publish(Long id, String operator) {
 
-        // 并发发布保护（设计文档 6.2节）：同一画布同时只允许一个发布操作
+        // 并发发布保护：同一画布同时只允许一个发布操作
         String lockKey = "canvas:publish:lock:" + id;
         String lockVal = java.util.UUID.randomUUID().toString();
         boolean acquired = Boolean.TRUE.equals(
@@ -185,50 +191,35 @@ public class CanvasService {
         if (!acquired) throw new IllegalStateException("CANVAS_011: 画布正在发布中，请稍后重试");
 
         try {
+            // 阶段1：验证（事务外，全部读操作）
             CanvasDO canvas = canvasMapper.selectById(id);
             if (canvas == null) throw new IllegalArgumentException("画布不存在: " + id);
 
             CanvasVersionDO draft = latestDraft(id);
             if (draft == null) throw new IllegalStateException("没有可发布的草稿");
 
-            // DAG 校验（Kahn 算法环检测 + 触发器节点检查）
             DagGraph graph = dagParser.parse(draft.getGraphJson());
             if (graph.entryNodes().isEmpty()) {
                 throw new IllegalStateException("画布缺少有效触发器节点");
             }
-
-            // SUB_FLOW_REF 依赖校验（设计文档 6.2节补充）
             validateSubFlowDependencies(id, graph);
 
-            // 生成发布版本快照
-            CanvasVersionDO published = new CanvasVersionDO();
-            published.setCanvasId(id);
-            published.setVersion(nextVersionNumber(id));
-            published.setGraphJson(draft.getGraphJson());
-            published.setStatus(VersionStatus.PUBLISHED.getCode());
-            published.setCreatedBy(operator);
-            canvasVersionMapper.insert(published);
+            // 阶段2：DB 事务（只写 DB，不碰 Redis/Scheduler/Cache）
+            CanvasTransactionService.PublishResult result =
+                    canvasTransactionService.publishDb(id, draft.getGraphJson(), operator);
 
-            clearPublishedExternalState(canvas);
-
-            canvas.setStatus(CanvasStatusEnum.PUBLISHED.getCode());
-            canvas.setPublishedVersionId(published.getId());
-            canvasMapper.updateById(canvas);
-
-            // 注册触发路由到 Redis
-            registerTriggerRoutes(canvas.getId(), graph);
-            // 注册定时调度任务
-            schedulerService.registerScheduledTriggers(canvas.getId(), graph);
-            // 使旧版本缓存失效（含 L1 Caffeine 广播）
-            if (canvas.getPublishedVersionId() != null) {
-                configCache.invalidate(canvas.getId(), canvas.getPublishedVersionId());
-            }
-            // 发布后驱逐 CanvasDO 实体缓存，下次 trigger() 读到最新 publishedVersionId/status
+            // 阶段3：事务外副作用（任一步骤失败不回滚 DB，路由/缓存最终通过 TTL 或再次发布自愈）
+            // 3a. 清理旧版本路由和调度
+            clearPreviousPublishedState(id, result.oldPublishedVersionId());
+            // 3b. 注册新版本路由和调度
+            registerTriggerRoutes(id, graph);
+            schedulerService.registerScheduledTriggers(id, graph);
+            // 3c. 缓存失效
             canvasExecutionService.invalidateCanvas(id);
-            // Groovy 脚本预编译（off-path，12.9节）
-            precompileGroovyNodes(canvas.getId(), graph);
+            // 3d. Groovy 脚本预编译（off-path，12.9节）
+            precompileGroovyNodes(id, graph);
 
-            return published;
+            return result.publishedVersion();
         } finally {
             // 原子释放发布锁（Lua check-then-del，防止锁超时后误删其他实例的锁）
             redis.execute(PUBLISH_LOCK_RELEASE_SCRIPT, List.of(lockKey), lockVal);
@@ -240,6 +231,20 @@ public class CanvasService {
             "if redis.call('GET', KEYS[1]) == ARGV[1] then return redis.call('DEL', KEYS[1]) else return 0 end",
             Long.class
     );
+
+    /**
+     * 清理旧发布版本的触发路由、调度任务和配置缓存（阶段3a，事务外）。
+     * 取代原 clearPublishedExternalState，语义更明确。
+     */
+    private void clearPreviousPublishedState(Long canvasId, Long oldPublishedVersionId) {
+        if (oldPublishedVersionId == null) return;
+        CanvasVersionDO oldV = canvasVersionMapper.selectById(oldPublishedVersionId);
+        if (oldV == null) return;
+        DagGraph oldGraph = dagParser.parse(oldV.getGraphJson());
+        clearTriggerRoutesFromGraph(canvasId, oldGraph);
+        schedulerService.cancelScheduledTriggers(canvasId, oldGraph);
+        configCache.invalidate(canvasId, oldPublishedVersionId);
+    }
 
     /**
      * SUB_FLOW_REF 依赖校验（设计文档 6.2节）：
@@ -487,16 +492,6 @@ public class CanvasService {
         CanvasVersionDO v = canvasVersionMapper.selectById(canvas.getPublishedVersionId());
         if (v == null) return;
         clearTriggerRoutesFromGraph(canvasId, dagParser.parse(v.getGraphJson()));
-    }
-
-    private void clearPublishedExternalState(CanvasDO canvas) {
-        if (canvas.getPublishedVersionId() == null) return;
-        CanvasVersionDO v = canvasVersionMapper.selectById(canvas.getPublishedVersionId());
-        if (v == null) return;
-        DagGraph graph = dagParser.parse(v.getGraphJson());
-        clearTriggerRoutesFromGraph(canvas.getId(), graph);
-        schedulerService.cancelScheduledTriggers(canvas.getId(), graph);
-        configCache.invalidate(canvas.getId(), canvas.getPublishedVersionId());
     }
 
     /**
