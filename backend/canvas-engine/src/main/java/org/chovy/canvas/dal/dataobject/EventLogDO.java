@@ -8,7 +8,8 @@ import java.time.LocalDateTime;
  * 事件上报日志（event_log）。
  *
  * <p>每次业务方调用 {@code POST /canvas/events/report} 时写入一条记录，
- * 用于事件追踪和触发统计。
+ * 用于事件追踪和触发量统计。写入时间点：triggerAllCanvas 之后、resumeWaits 之前，
+ * 因此 canvasTriggered 反映新触发的画布数量（不含本次 WAIT 恢复数量）。
  */
 @Data
 @TableName("event_log")
@@ -33,10 +34,15 @@ public class EventLogDO {
      */
     private String attributes;
 
-    /** 本次事件触发的画布数量（0 表示无匹配画布） */
+    /**
+     * 本次事件新触发的画布数量（写入 Disruptor 的画布数，不含 WAIT 恢复）。
+     * 0 表示无匹配画布（路由表为空或所有画布触发均失败）。
+     */
     private Integer canvasTriggered;
 
-    /** 触发的画布总数（含并发触发的多个画布） */
+    /**
+     * 触发的画布总数（当前与 canvasTriggered 相同，预留字段以区分未来的触发方式）。
+     */
     private Integer canvasCount;
 
     @TableField(fill = FieldFill.INSERT)

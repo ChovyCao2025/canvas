@@ -74,6 +74,7 @@ public class CanvasExecutionService {
     private final RocketMQTemplate rocketMQTemplate;
     private final ObjectMapper objectMapper;
     private final CdpUserService cdpUserService;
+    private final CanvasDisruptorService disruptorService;
 
     @Value("${canvas.execution.context-ttl-sec:86400}")
     private long ctxTtlSec;
@@ -228,12 +229,20 @@ public class CanvasExecutionService {
         if (!prep.containsKey(MapFieldKeys.CTX)) {
             return Mono.just(new HashMap<String, Object>(prep));
         }
+        // ============== 准备执行画布相关信息 ==============
+        // 单次画布执行的上下文
         ExecutionContext ctx = (ExecutionContext) prep.get(MapFieldKeys.CTX);
+        // 画布 DAG 图
         DagGraph graph = (DagGraph) prep.get(MapFieldKeys.GRAPH);
+        // 触发器节点 ID
         String triggerNodeId = (String) prep.get(MapFieldKeys.TRIGGER_NODE_ID);
+        // 是否是恢复执行
         boolean isResume = (Boolean) prep.get(MapFieldKeys.IS_RESUME);
+        // 画布实例
         CanvasDO canvas = (CanvasDO) prep.get(MapFieldKeys.CANVAS);
+        // 幂等键
         String acquiredDedupKey = (String) prep.get(MapFieldKeys.DEDUP_KEY);
+        // 准入上限
         int admissionLimit = (Integer) prep.get(MapFieldKeys.ADMISSION_LIMIT);
 
         SlotAcquisitionResult slotResult = tryAcquireSlot(
@@ -246,6 +255,21 @@ public class CanvasExecutionService {
                 graph, triggerNodeId);
     }
 
+    /**
+     * 执行阶段：扣减配额 → CDP 用户确保 → 创建执行记录 → 运行 DAG → 处理结果。
+     *
+     * <p>资源释放责任链（异常时）：
+     * <ul>
+     *   <li>consumeQuotaAndRecord 失败 → 释放 slot + resumeLock + dedupKey，返回 error；</li>
+     *   <li>DAG 执行失败（onErrorResume）→ 更新执行状态为 FAILED，
+     *       释放 resumeLock + dedupKey（doOnError）；</li>
+     *   <li>finally（doFinally）→ 注销 registry slot（无论成功失败）。</li>
+     * </ul>
+     *
+     * <p>PAUSED 状态处理：
+     * DAG 执行后若 ctx 中存在 WAITING 状态节点，视为挂起：
+     * 保存上下文到 Redis（供下次恢复），释放 resumeLock，更新执行状态为 PAUSED。
+     */
     private Mono<Map<String, Object>> doExecute(
             Long canvasId, String userId, boolean dryRun,
             CanvasDO canvas, Disposable.Swap finalExecutionSlot,
@@ -253,12 +277,15 @@ public class CanvasExecutionService {
             DagGraph graph, String triggerNodeId) {
         if (!dryRun) {
             try {
+                // 强扣减配额（Redis 原子操作，跨机安全）
+                // 此处是 consumeQuotaAndRecord 的唯一调用点（dryRun=false 时）
+                // 溢出重试场景同样会扣减配额（非幂等！原始事件已扣过一次，重试再扣一次）
                 preCheckService.consumeQuotaAndRecord(canvas, userId);
             } catch (RuntimeException e) {
                 if (finalExecutionSlot != null) {
                     executionRegistry.deregister(canvasId, ctx.getExecutionId());
                 }
-                if (isResume) ctxStore.releaseResumeLock(ctx.getCanvasId(), ctx.getUserId());
+                if (isResume) ctxStore.releaseResumeLock(ctx.getCanvasId(), ctx.getUserId(), ctx.getResumeLockToken());
                 if (acquiredDedupKey != null) ctxStore.releaseDedup(acquiredDedupKey);
                 return Mono.error(e);
             }
@@ -278,76 +305,102 @@ public class CanvasExecutionService {
                         finalExecutionSlot.update(sub::cancel);
                     }
                 })
-                .flatMap(result -> {
-                    // 9. 执行完成或挂起，更新执行记录
-                    boolean paused = isPaused(ctx, graph);
-                    if (paused) {
-                        if (!dryRun) {
-                            ctxStore.save(ctx);
-                            if (isResume) ctxStore.releaseResumeLock(ctx.getCanvasId(), ctx.getUserId());
-                            incrementStats(ctx.getCanvasId(), ExecutionStatus.PAUSED.getCode(), ctx.getUserId());
-                        }
-                        Map<String, Object> resp = new HashMap<>(result);
-                        resp.put(MapFieldKeys.EXECUTION_ID, ctx.getExecutionId());
-                        return updateExecution(finalExec, ExecutionStatus.PAUSED.getCode(), result)
-                                .thenReturn(resp);
-                    }
-                    if (!dryRun) {
-                        ctxStore.delete(ctx.getCanvasId(), ctx.getUserId());
-                        if (isResume) ctxStore.releaseResumeLock(ctx.getCanvasId(), ctx.getUserId());
-                        incrementStats(ctx.getCanvasId(), ExecutionStatus.SUCCESS.getCode(), ctx.getUserId());
-                    }
-                    Map<String, Object> resp = new HashMap<>(result);
-                    resp.put(MapFieldKeys.EXECUTION_ID, ctx.getExecutionId());
-                    return updateExecution(finalExec, ExecutionStatus.SUCCESS.getCode(), result)
-                            .thenReturn(resp);
-                })
-                .onErrorResume(e -> {
-                    log.error("[ENGINE] 执行失败 executionId={}: {}", ctx.getExecutionId(), e.getMessage());
-                    boolean paused = isPaused(ctx, graph);
-                    Mono<Void> updateMono;
-                    if (paused) {
-                        if (!dryRun) {
-                            ctxStore.save(ctx);
-                            if (isResume) ctxStore.releaseResumeLock(ctx.getCanvasId(), ctx.getUserId());
-                        }
-                        updateMono = updateExecution(finalExec, ExecutionStatus.PAUSED.getCode(), Map.of());
-                        if (!dryRun)
-                            incrementStats(ctx.getCanvasId(), ExecutionStatus.PAUSED.getCode(), ctx.getUserId());
-                    } else {
-                        if (!dryRun) {
-                            ctxStore.delete(ctx.getCanvasId(), ctx.getUserId());
-                            if (isResume) ctxStore.releaseResumeLock(ctx.getCanvasId(), ctx.getUserId());
-                        }
-                        updateMono = updateExecution(finalExec, ExecutionStatus.FAILED.getCode(),
-                                Map.of(MapFieldKeys.ERROR, e.getMessage()));
-                        if (!dryRun)
-                            incrementStats(ctx.getCanvasId(), ExecutionStatus.FAILED.getCode(), ctx.getUserId());
-                    }
-                    Map<String, Object> resp = Map.of(
-                            MapFieldKeys.ERROR, e.getMessage(),
-                            MapFieldKeys.EXECUTION_ID, ctx.getExecutionId()
-                    );
-                    return updateMono.thenReturn(resp);
-                }));
+                .flatMap(result -> handleSuccess(result, finalExec, ctx, graph, dryRun, isResume))
+                .onErrorResume(e -> handleError(e, finalExec, ctx, graph, dryRun, isResume)));
         return runMono.doOnError(e -> {
-            if (isResume) ctxStore.releaseResumeLock(ctx.getCanvasId(), ctx.getUserId());
+            if (isResume) ctxStore.releaseResumeLock(ctx.getCanvasId(), ctx.getUserId(), ctx.getResumeLockToken());
             if (acquiredDedupKey != null) ctxStore.releaseDedup(acquiredDedupKey);
         }).doFinally(signal -> {
             if (!dryRun) executionRegistry.deregister(canvasId, ctx.getExecutionId());
         });
     }
 
+    private Mono<Map<String, Object>> handleSuccess(
+            Map<String, Object> result, CanvasExecutionDO finalExec,
+            ExecutionContext ctx, DagGraph graph, boolean dryRun, boolean isResume) {
+        boolean paused = isPaused(ctx, graph);
+        if (paused) {
+            if (!dryRun) {
+                ctxStore.save(ctx);
+                if (isResume) ctxStore.releaseResumeLock(ctx.getCanvasId(), ctx.getUserId(), ctx.getResumeLockToken());
+                incrementStats(ctx.getCanvasId(), ExecutionStatus.PAUSED.getCode(), ctx.getUserId());
+            }
+            Map<String, Object> resp = new HashMap<>(result);
+            resp.put(MapFieldKeys.EXECUTION_ID, ctx.getExecutionId());
+            return updateExecution(finalExec, ExecutionStatus.PAUSED.getCode(), result)
+                    .thenReturn(resp);
+        }
+        if (!dryRun) {
+            ctxStore.delete(ctx.getCanvasId(), ctx.getUserId());
+            if (isResume) ctxStore.releaseResumeLock(ctx.getCanvasId(), ctx.getUserId(), ctx.getResumeLockToken());
+            incrementStats(ctx.getCanvasId(), ExecutionStatus.SUCCESS.getCode(), ctx.getUserId());
+        }
+        Map<String, Object> resp = new HashMap<>(result);
+        resp.put(MapFieldKeys.EXECUTION_ID, ctx.getExecutionId());
+        return updateExecution(finalExec, ExecutionStatus.SUCCESS.getCode(), result)
+                .thenReturn(resp);
+    }
+
+    private Mono<Map<String, Object>> handleError(
+            Throwable e, CanvasExecutionDO finalExec,
+            ExecutionContext ctx, DagGraph graph, boolean dryRun, boolean isResume) {
+        log.error("[ENGINE] 执行失败 executionId={}: {}", ctx.getExecutionId(), e.getMessage());
+        boolean paused = isPaused(ctx, graph);
+        Mono<Void> updateMono;
+        if (paused) {
+            if (!dryRun) {
+                ctxStore.save(ctx);
+                if (isResume) ctxStore.releaseResumeLock(ctx.getCanvasId(), ctx.getUserId(), ctx.getResumeLockToken());
+            }
+            updateMono = updateExecution(finalExec, ExecutionStatus.PAUSED.getCode(), Map.of());
+            if (!dryRun)
+                incrementStats(ctx.getCanvasId(), ExecutionStatus.PAUSED.getCode(), ctx.getUserId());
+        } else {
+            if (!dryRun) {
+                ctxStore.delete(ctx.getCanvasId(), ctx.getUserId());
+                if (isResume) ctxStore.releaseResumeLock(ctx.getCanvasId(), ctx.getUserId(), ctx.getResumeLockToken());
+            }
+            updateMono = updateExecution(finalExec, ExecutionStatus.FAILED.getCode(),
+                    Map.of(MapFieldKeys.ERROR, e.getMessage()));
+            if (!dryRun)
+                incrementStats(ctx.getCanvasId(), ExecutionStatus.FAILED.getCode(), ctx.getUserId());
+        }
+        Map<String, Object> resp = Map.of(
+                MapFieldKeys.ERROR, e.getMessage(),
+                MapFieldKeys.EXECUTION_ID, ctx.getExecutionId()
+        );
+        return updateMono.thenReturn(resp);
+    }
+
     /**
-     * 准备阶段：校验画布、去重、前置检查、并发控制、创建执行上下文
-     * 返回包含执行所需信息的 prep Map，或短路结果（去重/溢出/跳过）
+     * 准备阶段：校验画布、去重、前置检查、并发配额、创建执行上下文。
+     *
+     * <p>返回值约定：
+     * <ul>
+     *   <li>含 {@code CTX} key → 正常流程，继续执行 DAG；</li>
+     *   <li>含 {@code DEDUPLICATED=true} → 幂等拦截，不执行；</li>
+     *   <li>含 {@code SKIPPED} → resume-lock 竞争失败，放弃本次；</li>
+     *   <li>含 {@code OVERFLOW} → 并发超限，已入队重试或已丢弃。</li>
+     * </ul>
+     *
+     * <p>分布式行为说明：
+     * <ul>
+     *   <li>步骤A：{@code canvasEntityCache}——Caffeine L1（JVM 本地），画布状态变更有缓存延迟；</li>
+     *   <li>步骤B：dedup——Redis SETNX，跨机原子，安全；</li>
+     *   <li>步骤C：{@code checkWithoutQuotaAccounting} 冷却期读 DB，有异步延迟，见该方法注释；</li>
+     *   <li>步骤D：{@code resolveAdmission} 用 {@link InFlightExecutionRegistry}——Redis ZSET，
+     *       跨机原子，已修复分布式并发控制问题；</li>
+     *   <li>步骤E：resumeLock——Redis SETNX，跨机原子，安全。</li>
+     * </ul>
      */
     private Map<String, ?> prepareExecution(Long canvasId, String userId, String triggerType, String triggerNodeType, String matchKey, Map<String, Object> payload, String msgId, boolean dryRun, boolean overflowRetry, int overflowChainRetryCount, boolean persistentRequest) {
 
-        // 1. 校验画布
+        // A. 从 Caffeine L1 缓存加载画布实体，验证存在且已发布
+        //    ⚠️ 分布式：L1 是 JVM 本地，画布下线后最多延迟一个缓存 TTL 才感知
         CanvasDO canvas = validateAndLoadCanvas(canvasId, dryRun);
 
-        // 2. 去重检查
+        // B. 幂等去重（Redis SETNX，跨机安全）
+        //    isResume=true 表示 Redis 中存有该用户的上下文快照（画布已暂停等待中）
         boolean isResume = !dryRun && ctxStore.exists(canvasId, userId);
         DedupResult dedup = performDedupCheck(canvasId, userId, msgId, isResume, dryRun, overflowRetry);
         if (dedup.deduplicated()){
@@ -355,18 +408,20 @@ public class CanvasExecutionService {
         }
         String acquiredDedupKey = dedup.dedupKey();
 
-        // 3. 前置检查: 分别检查画布状态、有效期、冷却期
+        // C. 前置资格校验（不扣减配额）
+        //    溢出重试场景：跳过的是配额扣减，资格校验（有效期、状态）仍然执行
+        //    ⚠️ 已知问题：WAIT 恢复场景（isResume=true）也会进此分支，冷却期检查可能误拒
         if (!dryRun) {
             preCheckService.checkWithoutQuotaAccounting(canvas, userId);
             if (overflowRetry) {
-                log.debug("[ENGINE] 溢出重试先跳过配额扣减 canvasId={} userId={}", canvasId, userId);
+                log.debug("[ENGINE] 溢出重试跳过配额扣减（扣减在 doExecute 中进行）canvasId={} userId={}", canvasId, userId);
             }
         }
 
-        // 4. 并发配额检查
+        // D. 并发配额检查（JVM 本地计数，不跨机）
+        //    多机部署时实际并发上限 = effectiveMax × 机器数
         int admissionLimit = globalMaxConcurrency;
         if (!dryRun) {
-            // 针对不同的优先级任务有不同的并发控制策略
             AdmissionResult admission = resolveAdmission(
                     canvasId, userId, triggerType, triggerNodeType,
                     matchKey, payload, msgId, canvas,
@@ -375,7 +430,7 @@ public class CanvasExecutionService {
             admissionLimit = admission.admissionLimit();
         }
 
-        // 5. 创建或恢复执行上下文，并构建 prep Map
+        // E. 创建/恢复执行上下文，resumeLock 跨机安全（Redis SETNX）
         return buildPrepMap(
                 canvasId, userId, triggerType,
                 triggerNodeType, matchKey, payload,
@@ -384,17 +439,32 @@ public class CanvasExecutionService {
     }
 
     /**
-     * 创建或恢复执行上下文，并构建 prep Map
+     * 创建或恢复执行上下文，并构建 prep Map。
+     *
+     * <p>两条路径：
+     * <ul>
+     *   <li>isResume=true（Redis 中有上下文快照）：
+     *       先抢 resumeLock（Redis SETNX，防止多个触发并发恢复同一份上下文），
+     *       再从 Redis 反序列化上下文；若 Redis 快照丢失则创建新上下文；</li>
+     *   <li>isResume=false：直接创建新的 {@link ExecutionContext}。</li>
+     * </ul>
+     *
+     * <p>resumeLock 分布式语义（跨机安全）：
+     * 同一时刻只有一个机器实例能持有 (canvasId, userId) 的 resumeLock，
+     * 其他机器抢锁失败时直接放弃本次触发（SKIPPED）。
+     * 锁的 TTL = globalTimeoutSec，保证执行超时后锁自动释放。
      */
     private Map<String, Object> buildPrepMap(Long canvasId, String userId, String triggerType, String triggerNodeType, String matchKey, Map<String, Object> payload, boolean dryRun, boolean isResume, CanvasDO canvas, int admissionLimit, String acquiredDedupKey) {
         boolean resumeLockAcquired = false;
+        // 提升到 try 外层，使 catch 块可以用于原子释放锁
+        String resumeLockInstanceId = null;
         ExecutionContext ctx;
 
         try {
 
             if (isResume && !dryRun) {
-                String instanceId = UUID.randomUUID().toString();
-                if (!ctxStore.acquireResumeLock(canvasId, userId, instanceId, globalTimeoutSec)) {
+                resumeLockInstanceId = UUID.randomUUID().toString();
+                if (!ctxStore.acquireResumeLock(canvasId, userId, resumeLockInstanceId, globalTimeoutSec)) {
                     log.warn("[ENGINE] resume-lock 竞争失败，放弃本次触发 canvasId={}", canvasId);
                     return Map.<String, Object>of(MapFieldKeys.SKIPPED, "resume-lock");
                 }
@@ -403,6 +473,8 @@ public class CanvasExecutionService {
                 if (ctx == null) {
                     ctx = newContext(canvasId, resolveVersionId(canvas, userId, false), userId, triggerType);
                 }
+                // 存入 ctx，后续 doExecute / handleSuccess / handleError 用于原子释放锁
+                ctx.setResumeLockToken(resumeLockInstanceId);
             } else {
                 ctx = newContext(canvasId, resolveVersionId(canvas, userId, dryRun), userId, triggerType);
             }
@@ -430,7 +502,8 @@ public class CanvasExecutionService {
             );
         } catch (RuntimeException e) {
             if (resumeLockAcquired) {
-                ctxStore.releaseResumeLock(canvasId, userId);
+                // 使用 instanceId 原子释放（Lua check-then-del，防误删他机的锁）
+                ctxStore.releaseResumeLock(canvasId, userId, resumeLockInstanceId);
             }
             if (acquiredDedupKey != null) {
                 ctxStore.releaseDedup(acquiredDedupKey);
@@ -524,6 +597,22 @@ public class CanvasExecutionService {
         }
     }
 
+    /**
+     * 幂等去重检查（Redis SETNX，跨机安全）。
+     *
+     * <p>跳过去重的条件（返回 skipped）：
+     * <ul>
+     *   <li>dryRun=true；</li>
+     *   <li>overflowRetry=true（溢出重试不参与去重，否则重试 msg 永远被首次触发拦截）；</li>
+     *   <li>msgId=null（无幂等 key，如 WAIT 恢复等内部触发）。</li>
+     * </ul>
+     *
+     * <p>TTL 设计：
+     * isResume 时 TTL 更长（超时 + 600s 容忍），防止上下文恢复过程中 dedupKey 过期导致重复消费。
+     *
+     * <p>FIXME：isResume 时 dedupTtl = globalTimeoutSec + 600，
+     * 但 globalTimeoutSec 可能在运行期被修改（通过配置刷新），导致部分已在途的 dedup 与新值不匹配。
+     */
     private DedupResult performDedupCheck(Long canvasId, String userId, String msgId,
                                           boolean isResume, boolean dryRun, boolean overflowRetry) {
         if (dryRun || overflowRetry || msgId == null) {
@@ -540,28 +629,45 @@ public class CanvasExecutionService {
         return DedupResult.acquired(ctxStore.buildDedupKey(canvasId, userId, msgId));
     }
 
+    /**
+     * 并发准入决策：按优先级分级处理超限行为。
+     *
+     * <p>计数来源 {@link InFlightExecutionRegistry}（JVM 本地），多机部署时不跨机同步。
+     *
+     * <p>三级优先级处理策略：
+     * <ul>
+     *   <li>HIGH：超 highMax（= maxConc × highRatio）仅打 ERROR 告警，不拒绝，
+     *       返回 globalMaxConcurrency 作为 admissionLimit（后续 slot 阶段再卡）；</li>
+     *   <li>NORMAL：超 effectiveMax 时发送至 RocketMQ 延迟重试队列，
+     *       重试次数通过 {@code overflowChainRetryCount} 累积防止无限重试；</li>
+     *   <li>LOW：超 effectiveMax（= maxConc × lowRatio）直接丢弃。</li>
+     * </ul>
+     */
     private AdmissionResult resolveAdmission(
             Long canvasId, String userId, String triggerType,
             String triggerNodeType, String matchKey,
             Map<String, Object> payload, String msgId,
             CanvasDO canvas, int overflowChainRetryCount, boolean persistentRequest) {
         TriggerPriorityConfig.Priority priority = priorityConfig.of(triggerType);
+        // ⚠️ 分布式注意：activeCount 仅统计本 JVM 内的活跃执行
         int active = executionRegistry.activeCount(canvasId);
+        // maxConc 取画布配置与全局配置的较小值（null 时用全局默认）
         int maxConc = canvas.getMaxTotalExecutions() != null
                 ? Math.min(canvas.getMaxTotalExecutions(), globalMaxConcurrency)
                 : globalMaxConcurrency;
 
-        // 检查高优先级任务并发数
+        // HIGH 优先级：超限仅告警，不拒绝（不能让高优先级任务被低优先级挤死）
         if (priority == TriggerPriorityConfig.Priority.HIGH) {
             int highMax = Math.max(1, (int) (maxConc * priorityConfig.getHighMaxConcurrencyRatio()));
-            // 高优先级任务仅打告警, 不拒绝执行
             if (active >= highMax) {
                 log.error("[ENGINE] HIGH优先级超并发告警 canvasId={} active={}/{}",
                         canvasId, active, highMax);
             }
+            // 返回全局上限，后续 tryAcquireSlot 仍会做最终卡口
             return AdmissionResult.granted(globalMaxConcurrency);
         }
 
+        // LOW 优先级生效上限（= maxConc × lowRatio），NORMAL 使用 maxConc
         int effectiveMax = priority == TriggerPriorityConfig.Priority.LOW
                 ? Math.max(1, (int) (maxConc * priorityConfig.getLowRatio()))
                 : maxConc;
@@ -571,20 +677,66 @@ public class CanvasExecutionService {
                     canvasId, active, effectiveMax, priority);
             if (priority == TriggerPriorityConfig.Priority.NORMAL) {
                 if (persistentRequest) {
+                    // 来自持久请求表的触发：交由请求表重试策略处理，不再写 MQ
                     return AdmissionResult.overflow("request_retry");
                 }
-                // 中优先级任务超过并发上限, 发送至 RocketMQ 重试队列
+                // Fix 6: 溢出重试次数达到上限，写 DLQ 放弃
+                if (overflowChainRetryCount >= priorityConfig.getOverflowMaxRetry()) {
+                    log.error("[ENGINE] 溢出重试次数达上限 canvasId={} userId={} retryCount={}/{}，写 DLQ",
+                            canvasId, userId, overflowChainRetryCount, priorityConfig.getOverflowMaxRetry());
+                    String effectiveMsgId = nonBlank(msgId) ? msgId : "overflow-max-" + UUID.randomUUID();
+                    writeOverflowEnqueueDlq(
+                            new org.chovy.canvas.infrastructure.mq.OverflowRetryMessage(
+                                    canvasId, userId, triggerType, triggerNodeType,
+                                    matchKey, sanitizePayload(payload), effectiveMsgId,
+                                    overflowChainRetryCount),
+                            "max_retry_exceeded:" + overflowChainRetryCount);
+                    return AdmissionResult.overflow("max_retry_exceeded");
+                }
+                // 写入 RocketMQ 延迟队列，稍后重试（携带 chainRetryCount 防循环）
                 boolean queued = sendOverflowRetry(canvasId, userId, triggerType, triggerNodeType,
                         matchKey, payload, msgId, overflowChainRetryCount);
                 return AdmissionResult.overflow(queued ? "queued_for_retry" : "retry_enqueue_failed");
             }
-            // 低优先级任务并发数超过上限, 拒绝执行
+            // LOW 优先级直接丢弃
             return AdmissionResult.overflow("dropped_low_priority");
         }
 
         return AdmissionResult.granted(effectiveMax);
     }
 
+    /**
+     * 事件触发的 Disruptor 发布，RingBuffer 满时降级为 RocketMQ 溢出重试队列（Fix 2）。
+     *
+     * <p>补齐不对称：MQ 触发溢出有 RocketMQ 兜底，Event 触发之前直接丢弃。
+     * 现统一：先入 RocketMQ 溢出队列，超最大重试次数后写 DLQ。
+     */
+    public void publishEventWithOverflowFallback(Long canvasId, String userId,
+            String eventCode, Map<String, Object> payload, String msgId) {
+        try {
+            disruptorService.publish(canvasId, userId, TriggerType.EVENT,
+                    NodeType.EVENT_TRIGGER, eventCode, payload, msgId);
+        } catch (IllegalStateException e) {
+            log.warn("[EVENT] Disruptor 溢出，降级 MQ 重试 canvasId={} eventCode={}: {}",
+                    canvasId, eventCode, e.getMessage());
+            boolean queued = sendOverflowRetry(canvasId, userId, TriggerType.EVENT,
+                    NodeType.EVENT_TRIGGER, eventCode, payload, msgId, 0);
+            if (!queued) {
+                log.error("[EVENT] 溢出事件入队失败，触发丢失 canvasId={} eventCode={}", canvasId, eventCode);
+            }
+        }
+    }
+
+    /**
+     * slot 阶段的最终并发卡口（双重保险，resolveAdmission 之后再卡一次）。
+     *
+     * <p>resolveAdmission 用本地 activeCount 决策，tryAcquireSlot 用 registry.compute 原子写入——
+     * 两者合力：前者在轻量路径快速判断，后者保证同 JVM 内原子性。
+     *
+     * <p>获取失败时释放 resumeLock 和 dedupKey，避免资源泄漏。
+     *
+     * <p>⚠️ 分布式注意：slot 也是 JVM 本地，与 resolveAdmission 共享"不跨机"的限制。
+     */
     private SlotAcquisitionResult tryAcquireSlot(Long canvasId, ExecutionContext ctx,
                                                  int admissionLimit, boolean dryRun,
                                                  boolean isResume, String acquiredDedupKey) {
@@ -596,7 +748,8 @@ public class CanvasExecutionService {
             log.warn("[ENGINE] 画布并发上限已达 canvasId={} active={}/{} global={}/{}",
                     canvasId, active, admissionLimit,
                     executionRegistry.totalActiveCount(), globalMaxConcurrency);
-            if (isResume) ctxStore.releaseResumeLock(ctx.getCanvasId(), ctx.getUserId());
+            // 清理已持有的分布式锁和幂等 key，防泄漏
+            if (isResume) ctxStore.releaseResumeLock(ctx.getCanvasId(), ctx.getUserId(), ctx.getResumeLockToken());
             if (acquiredDedupKey != null) ctxStore.releaseDedup(acquiredDedupKey);
             return SlotAcquisitionResult.overflow(
                     Mono.just(Map.of(MapFieldKeys.OVERFLOW, "concurrency_limit_reached",
@@ -634,6 +787,16 @@ public class CanvasExecutionService {
         }
     }
 
+    /**
+     * 灰度版本解析：根据 userId hash 决定使用灰度版本还是正式版本。
+     *
+     * <p>dryRun 时优先返回最新草稿版本（draft），无草稿则取最新版本，用于实时预览。
+     * 正式执行时：若画布开启灰度（canaryVersionId + canaryPercent > 0），
+     * 则对 "{userId}:{canvasId}" 做 hashCode 取模，命中则用灰度版本。
+     *
+     * <p>注意：hashCode 取模不保证均匀分布（Java String.hashCode 非密码学强散列），
+     * 但对于运营画布的灰度场景，均匀性要求不高，可接受。
+     */
     private Long resolveVersionId(CanvasDO canvas, String userId, boolean dryRun) {
         if (dryRun) {
             CanvasVersionDO draft = canvasVersionMapper.selectOne(
@@ -664,6 +827,18 @@ public class CanvasExecutionService {
         return canvas.getPublishedVersionId();
     }
 
+    /**
+     * 在 DAG 图中查找与 (triggerNodeType, matchKey) 匹配的触发器节点 ID。
+     *
+     * <p>匹配规则（按 triggerNodeType 分支）：
+     * <ul>
+     *   <li>WAIT / GOAL_CHECK：nodeId 直接等于 matchKey（matchKey 即 nodeId）；</li>
+     *   <li>MQ_TRIGGER：用 MqTriggerHandler 解析节点 config 中的 topic，与 matchKey 比对；</li>
+     *   <li>其他（EVENT_TRIGGER 等）：从 bizConfig 或 config 中取 eventCode / topicKey 与 matchKey 比对。</li>
+     * </ul>
+     *
+     * <p>遍历所有节点（allNodeIds），无法通过 index 加速，但 DAG 节点数通常 < 100，可接受。
+     */
     private String findTriggerNode(DagGraph graph, String triggerNodeType, String matchKey) {
         log.debug("[FIND_TRIGGER] triggerNodeType={} matchKey={}", triggerNodeType, matchKey);
 

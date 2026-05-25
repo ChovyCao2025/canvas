@@ -9,6 +9,7 @@ import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 
 import java.time.Duration;
+import java.util.List;
 
 /**
  * ExecutionContext 在 Redis 中的持久化（多阶段执行挂起/恢复）。
@@ -90,6 +91,16 @@ public class ContextPersistenceService {
 
     // ── 恢复锁 ─────────────────────────────────────────────────────
 
+    /**
+     * 尝试获取 resumeLock（分布式互斥锁，跨机安全）。
+     *
+     * <p>使用 Redis SETNX + EX，原子操作，保证同一时刻只有一个 JVM 实例
+     * 可以持有 (canvasId, userId) 的恢复锁。
+     * 锁 TTL = globalTimeoutSec，等于画布最大执行超时，保证机器崩溃后锁自动释放。
+     *
+     * @param instanceId 当前实例标识（UUID），记录锁的持有者，供原子释放时验证
+     * @return true=获锁成功，false=已有其他实例持有锁（放弃本次触发）
+     */
     public boolean acquireResumeLock(Long canvasId, String userId, String instanceId,
                                       long timeoutSec) {
         // SETNX + EX：锁自动过期，避免实例崩溃后死锁
@@ -98,9 +109,42 @@ public class ContextPersistenceService {
                         instanceId, Duration.ofSeconds(timeoutSec)));
     }
 
-    public void releaseResumeLock(Long canvasId, String userId) {
-        redis.delete(resumeLockKey(canvasId, userId));
+    /**
+     * 原子释放 resumeLock（Lua check-then-del，跨机安全）。
+     *
+     * <p>只有当锁的 value 等于 {@code token} 时才执行 DEL，防止锁过期后被其他机器重新获取，
+     * 而本机因执行延迟才来释放，错误删除他机的锁。
+     *
+     * @param token 获锁时传入的 instanceId，null 时降级为无校验 DEL（兜底）
+     */
+    public void releaseResumeLock(Long canvasId, String userId, String token) {
+        String key = resumeLockKey(canvasId, userId);
+        if (token == null) {
+            // token 为空（ctx 未设置，极罕见降级路径），直接 DEL
+            redis.delete(key);
+            return;
+        }
+        try {
+            redis.execute(RESUME_LOCK_RELEASE_SCRIPT, List.of(key), token);
+        } catch (Exception e) {
+            log.warn("[CTX] resumeLock Lua 释放失败，降级 DEL key={}: {}", key, e.getMessage());
+            redis.delete(key);
+        }
     }
+
+    /**
+     * Lua 原子 check-then-del：
+     * GET key == token → DEL；否则 return 0（不操作，防误删他机的锁）。
+     */
+    private static final org.springframework.data.redis.core.script.RedisScript<Long> RESUME_LOCK_RELEASE_SCRIPT =
+            org.springframework.data.redis.core.script.RedisScript.of(
+                    "if redis.call('GET', KEYS[1]) == ARGV[1] then\n" +
+                    "    return redis.call('DEL', KEYS[1])\n" +
+                    "else\n" +
+                    "    return 0\n" +
+                    "end",
+                    Long.class
+            );
 
     // ── dedup key ────────────────────────────────────────────────
 

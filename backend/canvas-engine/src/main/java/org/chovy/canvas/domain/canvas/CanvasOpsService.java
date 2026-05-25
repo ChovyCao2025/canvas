@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import org.chovy.canvas.common.MapFieldKeys;
 import org.chovy.canvas.common.enums.CanvasStatusEnum;
 import org.chovy.canvas.common.enums.VersionStatus;
+import org.chovy.canvas.engine.trigger.TriggerPreCheckService;
 import org.chovy.canvas.infrastructure.redis.TriggerRouteService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.redis.core.StringRedisTemplate;
@@ -24,6 +25,9 @@ public class CanvasOpsService {
     private final CanvasMapper        canvasMapper;
     private final CanvasVersionMapper canvasVersionMapper;
     private final TriggerRouteService triggerRouteService;
+    private final TriggerPreCheckService preCheckService;
+    private final CanvasTransactionService canvasTransactionService;
+    private final CanvasService canvasService;
     private final StringRedisTemplate redis;
 
     /**
@@ -60,21 +64,24 @@ public class CanvasOpsService {
     // ── Kill Switch ────────────────────────────────────────────────
 
     /**
-     * 终止正在运行的画布实例
-     * @param id 画布 ID
-     * @param mode 终止模式
+     * 紧急终止画布。
+     *
+     * <p>两阶段执行（与 offline 同模式）：
+     * <ol>
+     *   <li>{@link CanvasTransactionService#killDb} — 事务内 DB 操作：置 KILLED、清 publishedVersionId；</li>
+     *   <li>事务外：广播 Kill 信号 → 路由/调度/缓存清理 → 配额清理。</li>
+     * </ol>
+     * 外部副作用失败不会回滚 DB，路由/缓存最终会通过 TTL 或下次操作自愈。
      */
-    @Transactional
     public void kill(Long id, String mode) {
-        CanvasDO canvas = require(id);
-        canvas.setStatus(CanvasStatusEnum.KILLED.getCode());
-        canvas.setPublishedVersionId(null);
-        canvasMapper.updateById(canvas);
+        // Step 1: 事务内 DB 操作，返回下线前的 publishedVersionId 供外部清理使用
+        Long publishedVersionId = canvasTransactionService.killDb(id);
 
-        // 广播 Kill 信号（Phase 11 接入 Redis Pub/Sub）
+        // Step 2: 事务外副作用
+        // 广播 Kill 信号（Phase 11 Redis Pub/Sub），各机器收到后立即取消正在进行的执行
         redis.convertAndSend("canvas:kill:" + id, mode);
-
-        clearRoutes(id, canvas);
+        // 清理触发路由、调度任务、缓存、配额
+        canvasService.applyKillExternalCleanup(id, publishedVersionId);
     }
 
     // ── 灰度发布 ────────────────────────────────────────────────
@@ -298,7 +305,6 @@ public class CanvasOpsService {
     }
 
     private void clearRoutes(Long id, CanvasDO canvas) {
-        // 简化：触发路由清理（完整实现在 CanvasService.clearTriggerRoutesFromGraph）
-        // 当前 kill 流程主要依赖 Redis kill channel 通知执行侧快速停机。
+        // 已由 canvasService.applyKillExternalCleanup 统一实现，保留签名兼容旧调用
     }
 }

@@ -47,6 +47,16 @@ public class RedisKeyUtil {
     // ── 并发锁 ─────────────────────────────────────────────────────
     public String publishLock(Long canvasId) { return prefix + ":publish:lock:" + canvasId; }
 
+    // ── 分布式并发注册表（InFlightExecutionRegistry）────────────────
+    /** 每个画布当前正在执行的任务集合（ZSET，score=过期时间戳ms）。 */
+    public String inflightCanvas(Long canvasId) { return prefix + ":inflight:canvas:" + canvasId; }
+    /** 全局正在执行的任务集合（ZSET，score=过期时间戳ms）。 */
+    public String inflightGlobal()              { return prefix + ":inflight:global"; }
+
+    // ── 事件上报幂等 ──────────────────────────────────────────────
+    /** 事件级幂等 key，按 idempotencyKey 去重，TTL 24h。 */
+    public String eventDedup(String idempotencyKey) { return prefix + ":event:dedup:" + idempotencyKey; }
+
     // ── 认证安全 ───────────────────────────────────────────────────
     public String loginFail(String username)   { return prefix + ":login:fail:" + username; }
     public String loginLocked(String username) { return prefix + ":login:locked:" + username; }

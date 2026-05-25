@@ -14,6 +14,7 @@ import org.chovy.canvas.engine.dag.DagParser;
 import org.chovy.canvas.engine.handlers.GroovyHandler;
 import org.chovy.canvas.engine.trigger.CanvasSchedulerService;
 import org.chovy.canvas.engine.trigger.CanvasExecutionService;
+import org.chovy.canvas.engine.trigger.TriggerPreCheckService;
 import org.chovy.canvas.infrastructure.cache.CanvasConfigCache;
 import org.chovy.canvas.infrastructure.redis.TriggerRouteService;
 import lombok.RequiredArgsConstructor;
@@ -24,6 +25,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import org.springframework.data.redis.core.script.RedisScript;
 import org.chovy.canvas.dal.dataobject.CanvasDO;
 import org.chovy.canvas.dal.mapper.CanvasMapper;
 import org.chovy.canvas.dal.dataobject.CanvasVersionDO;
@@ -52,6 +54,7 @@ public class CanvasService {
     private final CanvasSchedulerService schedulerService;
     private final CanvasConfigCache configCache;
     private final CanvasExecutionService canvasExecutionService;
+    private final TriggerPreCheckService preCheckService;
     private final GroovyHandler groovyHandler;
     private final org.chovy.canvas.engine.handlers.MqTriggerHandler mqTriggerHandler;
     private final org.springframework.data.redis.core.StringRedisTemplate redis;
@@ -227,9 +230,16 @@ public class CanvasService {
 
             return published;
         } finally {
-            redis.delete(lockKey); // 发布结束无论成功失败都释放锁
+            // 原子释放发布锁（Lua check-then-del，防止锁超时后误删其他实例的锁）
+            redis.execute(PUBLISH_LOCK_RELEASE_SCRIPT, List.of(lockKey), lockVal);
         }
     }
+
+    /** Lua 原子 check-then-del：值匹配才 DEL，防止锁超时被他机重新获取后被本机误删。 */
+    private static final RedisScript<Long> PUBLISH_LOCK_RELEASE_SCRIPT = RedisScript.of(
+            "if redis.call('GET', KEYS[1]) == ARGV[1] then return redis.call('DEL', KEYS[1]) else return 0 end",
+            Long.class
+    );
 
     /**
      * SUB_FLOW_REF 依赖校验（设计文档 6.2节）：
@@ -277,6 +287,7 @@ public class CanvasService {
                 schedulerService.cancelScheduledTriggers(id, graph); // 事务外 Scheduler
                 configCache.invalidate(id, publishedVersionId);      // 事务外缓存
                 canvasExecutionService.invalidateCanvas(id);          // 驱逐 CanvasDO 实体缓存
+                preCheckService.cleanupCanvasQuotas(id);              // 清理永不过期配额 key
             }
         }
     }
@@ -306,6 +317,7 @@ public class CanvasService {
                     schedulerService.cancelScheduledTriggers(id, graph); // Scheduler 取消
                     configCache.invalidate(id, publishedVersionId);      // 缓存失效
                     canvasExecutionService.invalidateCanvas(id);          // 驱逐 CanvasDO 实体缓存
+                    preCheckService.cleanupCanvasQuotas(id);              // 清理永不过期配额 key
                 }
             }
         }
@@ -346,6 +358,24 @@ public class CanvasService {
                         .eq(CanvasVersionDO::getCanvasId, canvasId)
                         .eq(CanvasVersionDO::getId, versionId)
         );
+    }
+
+    /**
+     * Kill 操作的外部状态清理，供 {@link CanvasOpsService#kill} 在事务外调用。
+     * 复用与 offline/archive 相同的清理逻辑：路由 → 调度 → 缓存 → 配额。
+     */
+    public void applyKillExternalCleanup(Long canvasId, Long publishedVersionId) {
+        if (publishedVersionId != null) {
+            CanvasVersionDO v = canvasVersionMapper.selectById(publishedVersionId);
+            if (v != null) {
+                DagGraph graph = dagParser.parse(v.getGraphJson());
+                clearTriggerRoutesFromGraph(canvasId, graph);
+                schedulerService.cancelScheduledTriggers(canvasId, graph);
+                configCache.invalidate(canvasId, publishedVersionId);
+            }
+        }
+        canvasExecutionService.invalidateCanvas(canvasId);
+        preCheckService.cleanupCanvasQuotas(canvasId);
     }
 
     // ── private helpers ──────────────────────────────────────

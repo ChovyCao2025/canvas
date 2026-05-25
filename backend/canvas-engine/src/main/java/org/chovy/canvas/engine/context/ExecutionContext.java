@@ -6,18 +6,16 @@ import lombok.Setter;
 import lombok.ToString;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * 单次画布执行的上下文。
- *
  * 注意：使用 @Getter/@Setter 而非 @Data，避免对含可变 Map/AtomicBoolean 的对象
  * 生成基于所有字段的 equals()/hashCode()，那会导致并发场景下行为不可预测。
  */
 @Getter
 @Setter
-@ToString(exclude = {"nodeLocks", "scheduledHubTimeouts"})
+@ToString(exclude = {"scheduledHubTimeouts"})
 public class ExecutionContext {
 
     /** 执行实例 ID（UUID）。 */
@@ -83,6 +81,14 @@ public class ExecutionContext {
      */
     @JsonIgnore
     private final Map<String, NodeGate> nodeGates = new ConcurrentHashMap<>();
+
+    /**
+     * resume-lock 的持有令牌（acquireResumeLock 时生成的 UUID）。
+     * 用于 releaseResumeLock 的原子 check-then-del（防止错误释放其他实例持有的锁）。
+     * 不序列化：每次 resume 重新获取新锁，token 不需要跨 WAIT 持久化。
+     */
+    @JsonIgnore
+    private String resumeLockToken;
 
     /**
      * 已为 Hub 节点调度过超时任务的节点 ID 集合（防重复调度）。
