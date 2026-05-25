@@ -574,9 +574,8 @@ public class DagEngine {
 
                 Mono.delay(Duration.ofSeconds(timeoutSec), VIRTUAL)
                         .subscribe(__ -> {
-                            if (ctx.getNodeStatus(nodeId) == NodeStatus.WAITING) {
+                            if (ctx.setNodeStatusIfNotDone(nodeId, NodeStatus.FAILED)) {
                                 log.warn("[ENGINE] LOGIC_RELATION 等待超时 timeout={}s nodeId={}", timeoutSec, nodeId);
-                                ctx.setNodeStatus(nodeId, NodeStatus.FAILED);
                                 ctxStore.save(ctx);
                                 executionService.trigger(
                                                 ctx.getCanvasId(), ctx.getUserId(),
@@ -670,9 +669,8 @@ public class DagEngine {
                 // 延迟任务：超时后若 Hub 仍未完成则标记 FAILED，持久化 ctx，触发执行恢复
                 Mono.delay(Duration.ofSeconds(timeoutSec), VIRTUAL)
                         .subscribe(__ -> {
-                            if (!ctx.isNodeDone(nodeId)) {
+                            if (ctx.setNodeStatusIfNotDone(nodeId, NodeStatus.FAILED)) {
                                 log.warn("[HUB] 等待超时 timeout={}s nodeId={}", timeoutSec, nodeId);
-                                ctx.setNodeStatus(nodeId, NodeStatus.FAILED);
                                 ctxStore.save(ctx);   // 同步回写 Redis，避免内存与持久化状态不一致
                                 // 触发执行恢复：让执行引擎感知 FAILED 状态并继续后续处理
                                 executionService.trigger(
@@ -691,7 +689,7 @@ public class DagEngine {
                 long start = ctx.getHubStartTimes().getOrDefault(nodeId, System.currentTimeMillis());
                 int timeout = HubHandler.getTimeoutSeconds(config);
                 if (System.currentTimeMillis() - start > (long) timeout * 1000) {
-                    ctx.setNodeStatus(nodeId, NodeStatus.FAILED);
+                    ctx.setNodeStatusIfNotDone(nodeId, NodeStatus.FAILED);
                     return Mono.error(new RuntimeException("HUB 等待超时 nodeId=" + nodeId));
                 }
             }
@@ -730,9 +728,8 @@ public class DagEngine {
 
                 Mono.delay(Duration.ofSeconds(timeoutSec), VIRTUAL)
                         .subscribe(__ -> {
-                            if (!ctx.isNodeDone(nodeId)) {
+                            if (ctx.setNodeStatusIfNotDone(nodeId, NodeStatus.FAILED)) {
                                 log.warn("[AGGREGATE] 等待超时 timeout={}s nodeId={}", timeoutSec, nodeId);
-                                ctx.setNodeStatus(nodeId, NodeStatus.FAILED);
                                 ctxStore.save(ctx);
                                 executionService.trigger(
                                                 ctx.getCanvasId(), ctx.getUserId(),
@@ -768,9 +765,8 @@ public class DagEngine {
         int timeoutSec = config.get("timeout") instanceof Number n ? n.intValue() : (int) globalTimeout;
         Mono.delay(Duration.ofSeconds(timeoutSec), VIRTUAL)
                 .subscribe(__ -> {
-                    if (!ctx.isNodeDone(nodeId)) {
+                    if (ctx.setNodeStatusIfNotDone(nodeId, NodeStatus.FAILED)) {
                         log.warn("[THRESHOLD] 等待超时 timeout={}s nodeId={}", timeoutSec, nodeId);
-                        ctx.setNodeStatus(nodeId, NodeStatus.FAILED);
                         ctxStore.save(ctx);
                         executionService.trigger(
                                         ctx.getCanvasId(), ctx.getUserId(),
@@ -947,8 +943,7 @@ public class DagEngine {
         LocalDateTime now = LocalDateTime.now();
 
         graph.getNodeMap().forEach((nodeId, node) -> {
-            if (!ctx.getNodeStatuses().containsKey(nodeId)) {
-                ctx.setNodeStatus(nodeId, NodeStatus.SKIPPED);
+            if (ctx.setNodeStatusIfAbsent(nodeId, NodeStatus.SKIPPED)) {
                 skippedTraces.add(CanvasExecutionTraceDO.builder()
                         .executionId(ctx.getExecutionId())
                         .nodeId(nodeId)
@@ -1207,8 +1202,7 @@ public class DagEngine {
     }
 
     private void markSkipped(String nodeId, ExecutionContext ctx) {
-        if (nodeId != null && !ctx.isNodeDone(nodeId)) {
-            ctx.setNodeStatus(nodeId, NodeStatus.SKIPPED);
+        if (nodeId != null && ctx.setNodeStatusIfNotDone(nodeId, NodeStatus.SKIPPED)) {
             log.debug("[ENGINE] 立即标记 SKIPPED nodeId={}", nodeId);
         }
     }

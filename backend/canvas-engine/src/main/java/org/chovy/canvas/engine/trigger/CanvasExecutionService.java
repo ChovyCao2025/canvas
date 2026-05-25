@@ -45,6 +45,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
+
 import org.chovy.canvas.dal.mapper.CanvasExecutionStatsMapper;
 
 /**
@@ -184,10 +185,15 @@ public class CanvasExecutionService {
      * constructible, so business payloads cannot forge overflow-retry status.
      */
     public Mono<Map<String, Object>> triggerFromDisruptor(
-            Long canvasId, String userId, String triggerType,
-            String triggerNodeType, String matchKey,
-            Map<String, Object> payload, String msgId,
-            CanvasDisruptorService.DispatchOptions dispatchOptions) {
+            Long canvasId,
+            String userId,
+            String triggerType,
+            String triggerNodeType,
+            String matchKey,
+            Map<String, Object> payload,
+            String msgId,
+            CanvasDisruptorService.DispatchOptions dispatchOptions
+    ) {
         boolean overflowRetry = dispatchOptions != null && dispatchOptions.isOverflowRetry();
         int overflowChainRetryCount = dispatchOptions != null
                 ? dispatchOptions.getOverflowChainRetryCount()
@@ -202,238 +208,401 @@ public class CanvasExecutionService {
             Map<String, Object> payload, String msgId, boolean dryRun,
             boolean overflowRetry, int overflowChainRetryCount,
             boolean persistentRequest) {
-        return Mono.fromCallable(() -> {
+        return Mono.fromCallable(() ->
+                        // 校验与准备
+                        prepareExecution(
+                                canvasId, userId, triggerType,
+                                triggerNodeType, matchKey, payload,
+                                msgId, dryRun, overflowRetry,
+                                overflowChainRetryCount, persistentRequest))
+                .subscribeOn(Schedulers.boundedElastic())
+                .flatMap(
+                        // 执行阶段
+                        prep -> executeFromPrep(canvasId, userId, dryRun, prep));
+    }
 
-                    CanvasDO canvas = canvasEntityCache.get(canvasId);
-                    if (canvas == null) {
-                        throw new IllegalStateException("画布不存在: " + canvasId);
-                    }
-                    if (!dryRun && !Objects.equals(canvas.getStatus(), CanvasStatusEnum.PUBLISHED.getCode())) {
-                        throw new IllegalStateException("画布未发布，请先发布后再触发: " + canvasId);
-                    }
+    /**
+     * 执行阶段：获取执行槽位、消费配额、执行 DAG、处理结果
+     */
+    private Mono<? extends Map<String, Object>> executeFromPrep(Long canvasId, String userId, boolean dryRun, Map<String, ?> prep) {
+        if (!prep.containsKey(MapFieldKeys.CTX)) {
+            return Mono.just(new HashMap<String, Object>(prep));
+        }
+        ExecutionContext ctx = (ExecutionContext) prep.get(MapFieldKeys.CTX);
+        DagGraph graph = (DagGraph) prep.get(MapFieldKeys.GRAPH);
+        String triggerNodeId = (String) prep.get(MapFieldKeys.TRIGGER_NODE_ID);
+        boolean isResume = (Boolean) prep.get(MapFieldKeys.IS_RESUME);
+        CanvasDO canvas = (CanvasDO) prep.get(MapFieldKeys.CANVAS);
+        String acquiredDedupKey = (String) prep.get(MapFieldKeys.DEDUP_KEY);
+        int admissionLimit = (Integer) prep.get(MapFieldKeys.ADMISSION_LIMIT);
 
-                    boolean isResume = !dryRun && ctxStore.exists(canvasId, userId);
-                    String acquiredDedupKey = null;
-                    if (!dryRun && !overflowRetry && msgId != null) {
-                        Duration dedupTtl = isResume
-                                ? Duration.ofSeconds(globalTimeoutSec + 600)
-                                : Duration.ofHours(24);
-                        if (!ctxStore.acquireDedup(canvasId, userId, msgId, dedupTtl)) {
-                            log.debug("[ENGINE] dedup 拦截 canvasId={} userId={} msgId={}", canvasId, userId, msgId);
-                            return Map.<String, Object>of(MapFieldKeys.DEDUPLICATED, true);
-                        }
-                        acquiredDedupKey = ctxStore.buildDedupKey(canvasId, userId, msgId);
-                    }
+        SlotAcquisitionResult slotResult = tryAcquireSlot(
+                canvasId, ctx, admissionLimit, dryRun, isResume, acquiredDedupKey);
+        if (slotResult.isOverflow()) return slotResult.overflowMono();
 
-                    if (!dryRun) {
-                        preCheckService.checkWithoutQuotaAccounting(canvas, userId);
-                        if (overflowRetry) {
-                            log.debug("[ENGINE] 溢出重试先跳过配额扣减 canvasId={} userId={}", canvasId, userId);
-                        }
-                    }
+        return doExecute(canvasId, userId, dryRun,
+                canvas, slotResult.slot(), ctx,
+                isResume, acquiredDedupKey,
+                graph, triggerNodeId);
+    }
 
-                    int admissionLimit = globalMaxConcurrency;
-                    if (!dryRun) {
-                        TriggerPriorityConfig.Priority priority = priorityConfig.of(triggerType);
-                        int active = executionRegistry.activeCount(canvasId);
-                        int maxConc = canvas.getMaxTotalExecutions() != null
-                                ? Math.min(canvas.getMaxTotalExecutions(), globalMaxConcurrency)
-                                : globalMaxConcurrency;
-                        admissionLimit = maxConc;
-                        if (priority == TriggerPriorityConfig.Priority.HIGH) {
-                            int highMax = Math.max(1, (int) (maxConc * priorityConfig.getHighMaxConcurrencyRatio()));
-                            admissionLimit = globalMaxConcurrency;
-                            if (active >= highMax) {
-                                log.error("[ENGINE] HIGH优先级超并发告警 canvasId={} active={}/{}",
-                                        canvasId, active, highMax);
-                            }
-                        } else {
-                            int effectiveMax = priority == TriggerPriorityConfig.Priority.LOW
-                                    ? Math.max(1, (int) (maxConc * priorityConfig.getLowRatio()))
-                                    : maxConc;
-                            admissionLimit = effectiveMax;
+    private Mono<Map<String, Object>> doExecute(
+            Long canvasId, String userId, boolean dryRun,
+            CanvasDO canvas, Disposable.Swap finalExecutionSlot,
+            ExecutionContext ctx, boolean isResume, String acquiredDedupKey,
+            DagGraph graph, String triggerNodeId) {
+        if (!dryRun) {
+            try {
+                preCheckService.consumeQuotaAndRecord(canvas, userId);
+            } catch (RuntimeException e) {
+                if (finalExecutionSlot != null) {
+                    executionRegistry.deregister(canvasId, ctx.getExecutionId());
+                }
+                if (isResume) ctxStore.releaseResumeLock(ctx.getCanvasId(), ctx.getUserId());
+                if (acquiredDedupKey != null) ctxStore.releaseDedup(acquiredDedupKey);
+                return Mono.error(e);
+            }
+        }
 
-                            if (active >= effectiveMax) {
-                                log.warn("[ENGINE] 并发上限 canvasId={} active={}/{} priority={}",
-                                        canvasId, active, effectiveMax, priority);
-                                if (priority == TriggerPriorityConfig.Priority.NORMAL) {
-                                    if (persistentRequest) {
-                                        return Map.of(MapFieldKeys.OVERFLOW, "request_retry");
-                                    }
-                                    boolean queued = sendOverflowRetry(canvasId, userId, triggerType, triggerNodeType,
-                                            matchKey, payload, msgId, overflowChainRetryCount);
-                                    return Map.of(MapFieldKeys.OVERFLOW, queued ? "queued_for_retry" : "retry_enqueue_failed");
-                                }
-                                return Map.of(MapFieldKeys.OVERFLOW, "dropped_low_priority");
-                            }
-                        }
-                    }
+        ensureCdpUser(ctx);
+        final CanvasExecutionDO finalExec = createExecution(ctx);
+        if (ctx.getPerfRunId() != null && acquiredDedupKey != null) {
+            finalExec.setLastDedupKey(acquiredDedupKey);
+        }
+        Mono<Map<String, Object>> executionMono = dagEngine.execute(graph, triggerNodeId, ctx)
+                .timeout(Duration.ofSeconds(globalTimeoutSec));
 
-                    ExecutionContext ctx;
-                    boolean resumeLockAcquired = false;
-                    try {
-                        if (isResume && !dryRun) {
-                            String instanceId = UUID.randomUUID().toString();
-                            if (!ctxStore.acquireResumeLock(canvasId, userId, instanceId, globalTimeoutSec)) {
-                                log.warn("[ENGINE] resume-lock 竞争失败，放弃本次触发 canvasId={}", canvasId);
-                                return Map.<String, Object>of(MapFieldKeys.SKIPPED, "resume-lock");
-                            }
-                            resumeLockAcquired = true;
-                            ctx = ctxStore.load(canvasId, userId);
-                            if (ctx == null) {
-                                ctx = newContext(canvasId, resolveVersionId(canvas, userId, false), userId, triggerType);
-                            }
-                        } else {
-                            ctx = newContext(canvasId, resolveVersionId(canvas, userId, dryRun), userId, triggerType);
-                        }
-
-                        ctx.setTriggerType(triggerType);
-                        ctx.setTriggerNodeType(triggerNodeType);
-                        ctx.setMatchKey(matchKey);
-                        ctx.getTriggerPayload().putAll(sanitizePayload(payload));
-                        ctx.setPerfRunId(PerfRunContext.extract(ctx.getTriggerPayload()));
-
-                        DagGraph graph = configCache.get(canvasId, ctx.getVersionId());
-                        String triggerNodeId = findTriggerNode(graph, triggerNodeType, matchKey);
-                        if (triggerNodeId == null) {
-                            throw new IllegalStateException(
-                                    "找不到触发器节点 type=" + triggerNodeType + " key=" + matchKey);
-                        }
-
-                        Map<String, Object> prep = new HashMap<>();
-                        prep.put(MapFieldKeys.CTX, ctx);
-                        prep.put(MapFieldKeys.GRAPH, graph);
-                        prep.put(MapFieldKeys.TRIGGER_NODE_ID, triggerNodeId);
-                        prep.put(MapFieldKeys.IS_RESUME, isResume);
-                        prep.put(MapFieldKeys.CANVAS, canvas);
-                        prep.put(MapFieldKeys.ADMISSION_LIMIT, admissionLimit);
-                        if (acquiredDedupKey != null) prep.put(MapFieldKeys.DEDUP_KEY, acquiredDedupKey);
-                        return prep;
-                    } catch (RuntimeException e) {
-                        if (resumeLockAcquired) {
-                            ctxStore.releaseResumeLock(canvasId, userId);
-                        }
-                        if (acquiredDedupKey != null) {
-                            ctxStore.releaseDedup(acquiredDedupKey);
-                        }
-                        throw e;
+        Mono<Map<String, Object>> runMono = insertExecution(finalExec).then(executionMono
+                .doOnSubscribe(sub -> {
+                    if (finalExecutionSlot != null) {
+                        finalExecutionSlot.update(sub::cancel);
                     }
                 })
-                .subscribeOn(Schedulers.boundedElastic())
-                .flatMap(prep -> {
-                    if (!prep.containsKey(MapFieldKeys.CTX)) {
-                        return Mono.just(new HashMap<String, Object>(prep));
-                    }
-                    ExecutionContext ctx = (ExecutionContext) prep.get(MapFieldKeys.CTX);
-                    DagGraph graph = (DagGraph) prep.get(MapFieldKeys.GRAPH);
-                    String triggerNodeId = (String) prep.get(MapFieldKeys.TRIGGER_NODE_ID);
-                    boolean isResume = (Boolean) prep.get(MapFieldKeys.IS_RESUME);
-                    CanvasDO canvas = (CanvasDO) prep.get(MapFieldKeys.CANVAS);
-                    String acquiredDedupKey = (String) prep.get(MapFieldKeys.DEDUP_KEY);
-                    int admissionLimit = (Integer) prep.get(MapFieldKeys.ADMISSION_LIMIT);
-
-                    Disposable.Swap executionSlot = null;
-                    if (!dryRun) {
-                        var acquired = executionRegistry.tryAcquire(
-                                canvasId, ctx.getExecutionId(), admissionLimit, globalMaxConcurrency);
-                        if (acquired.isEmpty()) {
-                            int active = executionRegistry.activeCount(canvasId);
-                            log.warn("[ENGINE] 画布并发上限已达 canvasId={} active={}/{} global={}/{}",
-                                    canvasId, active, admissionLimit,
-                                    executionRegistry.totalActiveCount(), globalMaxConcurrency);
+                .flatMap(result -> {
+                    // 9. 执行完成或挂起，更新执行记录
+                    boolean paused = isPaused(ctx, graph);
+                    if (paused) {
+                        if (!dryRun) {
+                            ctxStore.save(ctx);
                             if (isResume) ctxStore.releaseResumeLock(ctx.getCanvasId(), ctx.getUserId());
-                            if (acquiredDedupKey != null) ctxStore.releaseDedup(acquiredDedupKey);
-                            return Mono.just(Map.of(MapFieldKeys.OVERFLOW, "concurrency_limit_reached",
-                                    MapFieldKeys.ACTIVE, active, MapFieldKeys.LIMIT, admissionLimit));
+                            incrementStats(ctx.getCanvasId(), ExecutionStatus.PAUSED.getCode(), ctx.getUserId());
                         }
-                        executionSlot = acquired.get();
+                        Map<String, Object> resp = new HashMap<>(result);
+                        resp.put(MapFieldKeys.EXECUTION_ID, ctx.getExecutionId());
+                        return updateExecution(finalExec, ExecutionStatus.PAUSED.getCode(), result)
+                                .thenReturn(resp);
                     }
-                    final Disposable.Swap finalExecutionSlot = executionSlot;
-
                     if (!dryRun) {
-                        try {
-                            preCheckService.consumeQuotaAndRecord(canvas, userId);
-                        } catch (RuntimeException e) {
-                            if (finalExecutionSlot != null) {
-                                executionRegistry.deregister(canvasId, ctx.getExecutionId());
-                            }
-                            if (isResume) ctxStore.releaseResumeLock(ctx.getCanvasId(), ctx.getUserId());
-                            if (acquiredDedupKey != null) ctxStore.releaseDedup(acquiredDedupKey);
-                            return Mono.error(e);
-                        }
-                    }
-
-                    ensureCdpUser(ctx);
-                    final CanvasExecutionDO finalExec = createExecution(ctx);
-                    if (ctx.getPerfRunId() != null && acquiredDedupKey != null) {
-                        finalExec.setLastDedupKey(acquiredDedupKey);
-                    }
-                    Mono<Map<String, Object>> executionMono = dagEngine.execute(graph, triggerNodeId, ctx)
-                            .timeout(Duration.ofSeconds(globalTimeoutSec));
-
-                    Mono<Map<String, Object>> runMono = insertExecution(finalExec).then(executionMono
-                            .doOnSubscribe(sub -> {
-                                if (finalExecutionSlot != null) {
-                                    finalExecutionSlot.update(sub::cancel);
-                                }
-                            })
-                            .flatMap(result -> {
-                                // 9. 执行完成或挂起，更新执行记录
-                                boolean paused = isPaused(ctx, graph);
-                                if (paused) {
-                                    if (!dryRun) {
-                                        ctxStore.save(ctx);
-                                        if (isResume) ctxStore.releaseResumeLock(ctx.getCanvasId(), ctx.getUserId());
-                                        incrementStats(ctx.getCanvasId(), ExecutionStatus.PAUSED.getCode(), ctx.getUserId());
-                                    }
-                                    Map<String, Object> resp = new HashMap<>(result);
-                                    resp.put(MapFieldKeys.EXECUTION_ID, ctx.getExecutionId());
-                                    return updateExecution(finalExec, ExecutionStatus.PAUSED.getCode(), result)
-                                            .thenReturn(resp);
-                                }
-                                if (!dryRun) {
-                                    ctxStore.delete(ctx.getCanvasId(), ctx.getUserId());
-                                    if (isResume) ctxStore.releaseResumeLock(ctx.getCanvasId(), ctx.getUserId());
-                                    incrementStats(ctx.getCanvasId(), ExecutionStatus.SUCCESS.getCode(), ctx.getUserId());
-                                }
-                                Map<String, Object> resp = new HashMap<>(result);
-                                resp.put(MapFieldKeys.EXECUTION_ID, ctx.getExecutionId());
-                                return updateExecution(finalExec, ExecutionStatus.SUCCESS.getCode(), result)
-                                        .thenReturn(resp);
-                            })
-                            .onErrorResume(e -> {
-                                log.error("[ENGINE] 执行失败 executionId={}: {}", ctx.getExecutionId(), e.getMessage());
-                                boolean paused = isPaused(ctx, graph);
-                                Mono<Void> updateMono;
-                                if (paused) {
-                                    if (!dryRun) {
-                                        ctxStore.save(ctx);
-                                        if (isResume) ctxStore.releaseResumeLock(ctx.getCanvasId(), ctx.getUserId());
-                                    }
-                                    updateMono = updateExecution(finalExec, ExecutionStatus.PAUSED.getCode(), Map.of());
-                                    if (!dryRun) incrementStats(ctx.getCanvasId(), ExecutionStatus.PAUSED.getCode(), ctx.getUserId());
-                                } else {
-                                    if (!dryRun) {
-                                        ctxStore.delete(ctx.getCanvasId(), ctx.getUserId());
-                                        if (isResume) ctxStore.releaseResumeLock(ctx.getCanvasId(), ctx.getUserId());
-                                    }
-                                    updateMono = updateExecution(finalExec, ExecutionStatus.FAILED.getCode(),
-                                            Map.of(MapFieldKeys.ERROR, e.getMessage()));
-                                    if (!dryRun) incrementStats(ctx.getCanvasId(), ExecutionStatus.FAILED.getCode(), ctx.getUserId());
-                                }
-                                Map<String, Object> resp = Map.of(
-                                        MapFieldKeys.ERROR, e.getMessage(),
-                                        MapFieldKeys.EXECUTION_ID, ctx.getExecutionId()
-                                );
-                                return updateMono.thenReturn(resp);
-                            }));
-                    return runMono.doOnError(e -> {
+                        ctxStore.delete(ctx.getCanvasId(), ctx.getUserId());
                         if (isResume) ctxStore.releaseResumeLock(ctx.getCanvasId(), ctx.getUserId());
-                        if (acquiredDedupKey != null) ctxStore.releaseDedup(acquiredDedupKey);
-                    }).doFinally(signal -> {
-                        if (!dryRun) executionRegistry.deregister(canvasId, ctx.getExecutionId());
-                    });
-                });
+                        incrementStats(ctx.getCanvasId(), ExecutionStatus.SUCCESS.getCode(), ctx.getUserId());
+                    }
+                    Map<String, Object> resp = new HashMap<>(result);
+                    resp.put(MapFieldKeys.EXECUTION_ID, ctx.getExecutionId());
+                    return updateExecution(finalExec, ExecutionStatus.SUCCESS.getCode(), result)
+                            .thenReturn(resp);
+                })
+                .onErrorResume(e -> {
+                    log.error("[ENGINE] 执行失败 executionId={}: {}", ctx.getExecutionId(), e.getMessage());
+                    boolean paused = isPaused(ctx, graph);
+                    Mono<Void> updateMono;
+                    if (paused) {
+                        if (!dryRun) {
+                            ctxStore.save(ctx);
+                            if (isResume) ctxStore.releaseResumeLock(ctx.getCanvasId(), ctx.getUserId());
+                        }
+                        updateMono = updateExecution(finalExec, ExecutionStatus.PAUSED.getCode(), Map.of());
+                        if (!dryRun)
+                            incrementStats(ctx.getCanvasId(), ExecutionStatus.PAUSED.getCode(), ctx.getUserId());
+                    } else {
+                        if (!dryRun) {
+                            ctxStore.delete(ctx.getCanvasId(), ctx.getUserId());
+                            if (isResume) ctxStore.releaseResumeLock(ctx.getCanvasId(), ctx.getUserId());
+                        }
+                        updateMono = updateExecution(finalExec, ExecutionStatus.FAILED.getCode(),
+                                Map.of(MapFieldKeys.ERROR, e.getMessage()));
+                        if (!dryRun)
+                            incrementStats(ctx.getCanvasId(), ExecutionStatus.FAILED.getCode(), ctx.getUserId());
+                    }
+                    Map<String, Object> resp = Map.of(
+                            MapFieldKeys.ERROR, e.getMessage(),
+                            MapFieldKeys.EXECUTION_ID, ctx.getExecutionId()
+                    );
+                    return updateMono.thenReturn(resp);
+                }));
+        return runMono.doOnError(e -> {
+            if (isResume) ctxStore.releaseResumeLock(ctx.getCanvasId(), ctx.getUserId());
+            if (acquiredDedupKey != null) ctxStore.releaseDedup(acquiredDedupKey);
+        }).doFinally(signal -> {
+            if (!dryRun) executionRegistry.deregister(canvasId, ctx.getExecutionId());
+        });
+    }
+
+    /**
+     * 准备阶段：校验画布、去重、前置检查、并发控制、创建执行上下文
+     * 返回包含执行所需信息的 prep Map，或短路结果（去重/溢出/跳过）
+     */
+    private Map<String, ?> prepareExecution(Long canvasId, String userId, String triggerType, String triggerNodeType, String matchKey, Map<String, Object> payload, String msgId, boolean dryRun, boolean overflowRetry, int overflowChainRetryCount, boolean persistentRequest) {
+
+        // 1. 校验画布
+        CanvasDO canvas = validateAndLoadCanvas(canvasId, dryRun);
+
+        // 2. 去重检查
+        boolean isResume = !dryRun && ctxStore.exists(canvasId, userId);
+        DedupResult dedup = performDedupCheck(canvasId, userId, msgId, isResume, dryRun, overflowRetry);
+        if (dedup.deduplicated()){
+            return Map.of(MapFieldKeys.DEDUPLICATED, true);
+        }
+        String acquiredDedupKey = dedup.dedupKey();
+
+        // 3. 前置检查: 分别检查画布状态、有效期、冷却期
+        if (!dryRun) {
+            preCheckService.checkWithoutQuotaAccounting(canvas, userId);
+            if (overflowRetry) {
+                log.debug("[ENGINE] 溢出重试先跳过配额扣减 canvasId={} userId={}", canvasId, userId);
+            }
+        }
+
+        // 4. 并发配额检查
+        int admissionLimit = globalMaxConcurrency;
+        if (!dryRun) {
+            // 针对不同的优先级任务有不同的并发控制策略
+            AdmissionResult admission = resolveAdmission(
+                    canvasId, userId, triggerType, triggerNodeType,
+                    matchKey, payload, msgId, canvas,
+                    overflowChainRetryCount, persistentRequest);
+            if (admission.isOverflow()) return admission.overflowResponse();
+            admissionLimit = admission.admissionLimit();
+        }
+
+        // 5. 创建或恢复执行上下文，并构建 prep Map
+        return buildPrepMap(
+                canvasId, userId, triggerType,
+                triggerNodeType, matchKey, payload,
+                dryRun, isResume, canvas,
+                admissionLimit, acquiredDedupKey);
+    }
+
+    /**
+     * 创建或恢复执行上下文，并构建 prep Map
+     */
+    private Map<String, Object> buildPrepMap(Long canvasId, String userId, String triggerType, String triggerNodeType, String matchKey, Map<String, Object> payload, boolean dryRun, boolean isResume, CanvasDO canvas, int admissionLimit, String acquiredDedupKey) {
+        boolean resumeLockAcquired = false;
+        ExecutionContext ctx;
+
+        try {
+
+            if (isResume && !dryRun) {
+                String instanceId = UUID.randomUUID().toString();
+                if (!ctxStore.acquireResumeLock(canvasId, userId, instanceId, globalTimeoutSec)) {
+                    log.warn("[ENGINE] resume-lock 竞争失败，放弃本次触发 canvasId={}", canvasId);
+                    return Map.<String, Object>of(MapFieldKeys.SKIPPED, "resume-lock");
+                }
+                resumeLockAcquired = true;
+                ctx = ctxStore.load(canvasId, userId);
+                if (ctx == null) {
+                    ctx = newContext(canvasId, resolveVersionId(canvas, userId, false), userId, triggerType);
+                }
+            } else {
+                ctx = newContext(canvasId, resolveVersionId(canvas, userId, dryRun), userId, triggerType);
+            }
+
+
+            // 补充上下文信息
+            populateContext(triggerType, triggerNodeType, matchKey, payload, ctx);
+
+
+            // 查找画布内容
+            DagGraph graph = configCache.get(canvasId, ctx.getVersionId());
+
+            // 查找触发器节点
+            String triggerNodeId = findTriggerNode(graph, triggerNodeType, matchKey);
+            if (triggerNodeId == null) {
+                throw new IllegalStateException(
+                        "找不到触发器节点 type=" + triggerNodeType + " key=" + matchKey);
+            }
+
+            // 构建返回结果
+            return buildPrepareResultMap(
+                    isResume, canvas,
+                    admissionLimit, acquiredDedupKey,
+                    ctx, graph, triggerNodeId
+            );
+        } catch (RuntimeException e) {
+            if (resumeLockAcquired) {
+                ctxStore.releaseResumeLock(canvasId, userId);
+            }
+            if (acquiredDedupKey != null) {
+                ctxStore.releaseDedup(acquiredDedupKey);
+            }
+            throw e;
+        }
+    }
+
+    private static Map<String, Object> buildPrepareResultMap(boolean isResume, CanvasDO canvas, int admissionLimit, String acquiredDedupKey, ExecutionContext ctx, DagGraph graph, String triggerNodeId) {
+        Map<String, Object> prep = new HashMap<>();
+        prep.put(MapFieldKeys.CTX, ctx);
+        prep.put(MapFieldKeys.GRAPH, graph);
+        prep.put(MapFieldKeys.TRIGGER_NODE_ID, triggerNodeId);
+        prep.put(MapFieldKeys.IS_RESUME, isResume);
+        prep.put(MapFieldKeys.CANVAS, canvas);
+        prep.put(MapFieldKeys.ADMISSION_LIMIT, admissionLimit);
+        if (acquiredDedupKey != null) prep.put(MapFieldKeys.DEDUP_KEY, acquiredDedupKey);
+        return prep;
+    }
+
+    /**
+     * 填充执行上下文触发信息
+     */
+    private void populateContext(String triggerType, String triggerNodeType, String matchKey, Map<String, Object> payload, ExecutionContext ctx) {
+        ctx.setTriggerType(triggerType);
+        ctx.setTriggerNodeType(triggerNodeType);
+        ctx.setMatchKey(matchKey);
+        ctx.getTriggerPayload().putAll(sanitizePayload(payload));
+        ctx.setPerfRunId(PerfRunContext.extract(ctx.getTriggerPayload()));
+    }
+
+    /**
+     * 校验画布存在且已发布
+     */
+    private CanvasDO validateAndLoadCanvas(Long canvasId, boolean dryRun) {
+        CanvasDO canvas = canvasEntityCache.get(canvasId);
+        if (canvas == null) {
+            throw new IllegalStateException("画布不存在: " + canvasId);
+        }
+        if (!dryRun && !Objects.equals(canvas.getStatus(), CanvasStatusEnum.PUBLISHED.getCode())) {
+            throw new IllegalStateException("画布未发布，请先发布后再触发: " + canvasId);
+        }
+        return canvas;
+    }
+
+    // ── 方法提取辅助记录 ──────────────────────────────────────────
+
+    private record DedupResult(boolean deduplicated, String dedupKey) {
+        static DedupResult duplicate() {
+            return new DedupResult(true, null);
+        }
+
+        static DedupResult acquired(String key) {
+            return new DedupResult(false, key);
+        }
+
+        static DedupResult skipped() {
+            return new DedupResult(false, null);
+        }
+    }
+
+    private record AdmissionResult(int admissionLimit, Map<String, Object> overflowResponse) {
+        static AdmissionResult granted(int limit) {
+            return new AdmissionResult(limit, null);
+        }
+
+        static AdmissionResult overflow(String code) {
+            return new AdmissionResult(0, Map.of(MapFieldKeys.OVERFLOW, code));
+        }
+
+        boolean isOverflow() {
+            return overflowResponse != null;
+        }
+    }
+
+    private record SlotAcquisitionResult(Disposable.Swap slot, Mono<Map<String, Object>> overflowMono) {
+        static SlotAcquisitionResult acquired(Disposable.Swap slot) {
+            return new SlotAcquisitionResult(slot, null);
+        }
+
+        static SlotAcquisitionResult overflow(Mono<Map<String, Object>> mono) {
+            return new SlotAcquisitionResult(null, mono);
+        }
+
+        static SlotAcquisitionResult skipped() {
+            return new SlotAcquisitionResult(null, null);
+        }
+
+        boolean isOverflow() {
+            return overflowMono != null;
+        }
+    }
+
+    private DedupResult performDedupCheck(Long canvasId, String userId, String msgId,
+                                          boolean isResume, boolean dryRun, boolean overflowRetry) {
+        if (dryRun || overflowRetry || msgId == null) {
+            return DedupResult.skipped();
+        }
+        // FIXME: 过期时间会发生变化, 判断是否需要调整
+        Duration dedupTtl = isResume
+                ? Duration.ofSeconds(globalTimeoutSec + 600)
+                : Duration.ofHours(24);
+        if (!ctxStore.acquireDedup(canvasId, userId, msgId, dedupTtl)) {
+            log.debug("[ENGINE] dedup 拦截 canvasId={} userId={} msgId={}", canvasId, userId, msgId);
+            return DedupResult.duplicate();
+        }
+        return DedupResult.acquired(ctxStore.buildDedupKey(canvasId, userId, msgId));
+    }
+
+    private AdmissionResult resolveAdmission(
+            Long canvasId, String userId, String triggerType,
+            String triggerNodeType, String matchKey,
+            Map<String, Object> payload, String msgId,
+            CanvasDO canvas, int overflowChainRetryCount, boolean persistentRequest) {
+        TriggerPriorityConfig.Priority priority = priorityConfig.of(triggerType);
+        int active = executionRegistry.activeCount(canvasId);
+        int maxConc = canvas.getMaxTotalExecutions() != null
+                ? Math.min(canvas.getMaxTotalExecutions(), globalMaxConcurrency)
+                : globalMaxConcurrency;
+
+        // 检查高优先级任务并发数
+        if (priority == TriggerPriorityConfig.Priority.HIGH) {
+            int highMax = Math.max(1, (int) (maxConc * priorityConfig.getHighMaxConcurrencyRatio()));
+            // 高优先级任务仅打告警, 不拒绝执行
+            if (active >= highMax) {
+                log.error("[ENGINE] HIGH优先级超并发告警 canvasId={} active={}/{}",
+                        canvasId, active, highMax);
+            }
+            return AdmissionResult.granted(globalMaxConcurrency);
+        }
+
+        int effectiveMax = priority == TriggerPriorityConfig.Priority.LOW
+                ? Math.max(1, (int) (maxConc * priorityConfig.getLowRatio()))
+                : maxConc;
+
+        if (active >= effectiveMax) {
+            log.warn("[ENGINE] 并发上限 canvasId={} active={}/{} priority={}",
+                    canvasId, active, effectiveMax, priority);
+            if (priority == TriggerPriorityConfig.Priority.NORMAL) {
+                if (persistentRequest) {
+                    return AdmissionResult.overflow("request_retry");
+                }
+                // 中优先级任务超过并发上限, 发送至 RocketMQ 重试队列
+                boolean queued = sendOverflowRetry(canvasId, userId, triggerType, triggerNodeType,
+                        matchKey, payload, msgId, overflowChainRetryCount);
+                return AdmissionResult.overflow(queued ? "queued_for_retry" : "retry_enqueue_failed");
+            }
+            // 低优先级任务并发数超过上限, 拒绝执行
+            return AdmissionResult.overflow("dropped_low_priority");
+        }
+
+        return AdmissionResult.granted(effectiveMax);
+    }
+
+    private SlotAcquisitionResult tryAcquireSlot(Long canvasId, ExecutionContext ctx,
+                                                 int admissionLimit, boolean dryRun,
+                                                 boolean isResume, String acquiredDedupKey) {
+        if (dryRun) return SlotAcquisitionResult.skipped();
+        var acquired = executionRegistry.tryAcquire(
+                canvasId, ctx.getExecutionId(), admissionLimit, globalMaxConcurrency);
+        if (acquired.isEmpty()) {
+            int active = executionRegistry.activeCount(canvasId);
+            log.warn("[ENGINE] 画布并发上限已达 canvasId={} active={}/{} global={}/{}",
+                    canvasId, active, admissionLimit,
+                    executionRegistry.totalActiveCount(), globalMaxConcurrency);
+            if (isResume) ctxStore.releaseResumeLock(ctx.getCanvasId(), ctx.getUserId());
+            if (acquiredDedupKey != null) ctxStore.releaseDedup(acquiredDedupKey);
+            return SlotAcquisitionResult.overflow(
+                    Mono.just(Map.of(MapFieldKeys.OVERFLOW, "concurrency_limit_reached",
+                            MapFieldKeys.ACTIVE, active, MapFieldKeys.LIMIT, admissionLimit)));
+        }
+        return SlotAcquisitionResult.acquired(acquired.get());
     }
 
     // ── 缓存失效 ──────────────────────────────────────────────────

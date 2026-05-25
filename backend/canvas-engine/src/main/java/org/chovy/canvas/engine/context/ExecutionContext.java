@@ -141,6 +141,36 @@ public class ExecutionContext {
         nodeStatuses.put(nodeId, status);
     }
 
+    /**
+     * 原子 putIfAbsent：仅在 key 不存在时写入，返回是否实际写入。
+     * 供 writeSkippedNodes 使用，防止覆盖并发执行路径已写入的状态。
+     */
+    public boolean setNodeStatusIfAbsent(String nodeId, NodeStatus status) {
+        return nodeStatuses.putIfAbsent(nodeId, status) == null;
+    }
+
+    /**
+     * 原子 compute：仅在节点未到达终态时写入，返回是否实际写入。
+     * 终态定义与 isNodeDone 一致。供 markSkipped 使用，防止覆盖已完成节点的状态。
+     */
+    public boolean setNodeStatusIfNotDone(String nodeId, NodeStatus status) {
+        boolean[] updated = {false};
+        nodeStatuses.compute(nodeId, (k, current) -> {
+            if (!isTerminalStatus(current)) {
+                updated[0] = true;
+                return status;
+            }
+            return current;
+        });
+        return updated[0];
+    }
+
+    private static boolean isTerminalStatus(NodeStatus s) {
+        return s == NodeStatus.SUCCESS || s == NodeStatus.FAILED
+                || s == NodeStatus.TIMEOUT || s == NodeStatus.SUPPRESSED
+                || s == NodeStatus.SKIPPED || s == NodeStatus.PARTIAL_FAIL;
+    }
+
     public NodeStatus getNodeStatus(String nodeId) {
         return nodeStatuses.getOrDefault(nodeId, NodeStatus.PENDING);
     }

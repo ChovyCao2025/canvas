@@ -84,48 +84,93 @@ public class CanvasExecutionRequestExecutor {
     }
 
     public Mono<Void> execute(String requestId) {
+        return loadRequest(requestId)
+                .flatMap(this::tryMarkAsRunning)
+                .flatMap(this::executeCanvas)
+                .then();
+    }
+
+    /**
+     * 加载执行请求
+     */
+    private Mono<CanvasExecutionRequestDO> loadRequest(String requestId) {
         return Mono.fromCallable(() -> mapper.selectById(requestId))
                 .subscribeOn(Schedulers.boundedElastic())
-                .flatMap(request -> {
-                    if (request == null || isTerminal(request.getStatus())) {
-                        return Mono.empty();
-                    }
-                    LocalDateTime now = LocalDateTime.now();
-                    LocalDateTime staleBefore = now.minusSeconds(runningStaleSeconds);
-                    String runToken = UUID.randomUUID().toString();
-                    return Mono.fromCallable(() -> mapper.markRunning(requestId, now, staleBefore, runToken))
-                            .subscribeOn(Schedulers.boundedElastic())
-                            .flatMap(updated -> {
-                                if (updated <= 0) {
-                                    return Mono.empty();
-                                }
-                                return Mono.defer(() -> {
-                                            Map<String, Object> payload = parsePayload(request.getPayloadJson());
-                                            if (request.getPerfRunId() != null
-                                                    && PerfRunContext.extract(payload) == null) {
-                                                payload.put("perfRunId", request.getPerfRunId());
-                                            }
-                                            return withRunningHeartbeat(request.getId(), runToken,
-                                                    executionService.triggerFromExecutionRequest(
-                                                request.getCanvasId(),
-                                                request.getUserId(),
-                                                request.getTriggerType(),
-                                                request.getTriggerNodeType(),
-                                                request.getMatchKey(),
-                                                payload,
-                                                request.getSourceMsgId()
-                                            ));
-                                        })
-                                        .flatMap(result -> finish(request, result, runToken))
-                                        .onErrorResume(e -> {
-                                            if (isNonRecoverable(e)) {
-                                                return fail(request, e.getMessage(), runToken);
-                                            }
-                                            return retryOrFail(request, e.getMessage(), runToken);
-                                        });
-                            });
-                })
-                .then();
+                .filter(request -> request != null && !isTerminal(request.getStatus()));
+    }
+
+    /**
+     * 尝试标记为运行中（基于乐观锁）
+     */
+    private Mono<RunningContext> tryMarkAsRunning(CanvasExecutionRequestDO request) {
+        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime staleBefore = now.minusSeconds(runningStaleSeconds);
+        String runToken = UUID.randomUUID().toString();
+
+        return Mono.fromCallable(() -> mapper.markRunning(
+                        request.getId(), now, staleBefore, runToken))
+                .subscribeOn(Schedulers.boundedElastic())
+                .filter(updated -> updated > 0)
+                .map(updated -> new RunningContext(request, runToken));
+    }
+
+    /**
+     * 执行画布逻辑
+     */
+    private Mono<Void> executeCanvas(RunningContext ctx) {
+        Map<String, Object> payload = preparePayload(ctx.request);
+
+        return withRunningHeartbeat(
+                ctx.request.getId(),
+                ctx.runToken,
+                executionService.triggerFromExecutionRequest(
+                        ctx.request.getCanvasId(),
+                        ctx.request.getUserId(),
+                        ctx.request.getTriggerType(),
+                        ctx.request.getTriggerNodeType(),
+                        ctx.request.getMatchKey(),
+                        payload,
+                        ctx.request.getSourceMsgId()
+                ))
+                .flatMap(result -> finish(ctx.request, result, ctx.runToken))
+                .onErrorResume(e -> handleExecutionError(ctx, e));
+    }
+
+    /**
+     * 准备执行载荷
+     */
+    private Map<String, Object> preparePayload(CanvasExecutionRequestDO request) {
+        Map<String, Object> payload = parsePayload(request.getPayloadJson());
+
+        // 回填 perfRunId（如果 payload 中没有）
+        if (request.getPerfRunId() != null && PerfRunContext.extract(payload) == null) {
+            payload.put("perfRunId", request.getPerfRunId());
+        }
+
+        return payload;
+    }
+
+    /**
+     * 处理执行异常
+     */
+    private Mono<Void> handleExecutionError(RunningContext ctx, Throwable e) {
+        if (isNonRecoverable(e)) {
+            return fail(ctx.request, e.getMessage(), ctx.runToken);
+        }
+        return retryOrFail(ctx.request, e.getMessage(), ctx.runToken);
+    }
+
+    /**
+     * 运行中的上下文
+     */
+    private static class RunningContext {
+        final CanvasExecutionRequestDO request;
+        final String runToken;
+
+        RunningContext(CanvasExecutionRequestDO request, String runToken) {
+            this.request = request;
+            this.runToken = runToken;
+        }
     }
 
     private <T> Mono<T> withRunningHeartbeat(String requestId, String runToken, Mono<T> source) {

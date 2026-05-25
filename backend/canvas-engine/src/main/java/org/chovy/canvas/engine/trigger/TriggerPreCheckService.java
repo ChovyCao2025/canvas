@@ -49,10 +49,12 @@ public class TriggerPreCheckService {
     public void checkWithoutQuotaAccounting(CanvasDO canvas, String userId) {
         Long canvasId = canvas.getId();
 
+        // 1. 检查画布是否已发布
         if (canvas.getStatus() != 1) {
             throw new TriggerRejectedException("QUOTA_006", "画布未发布");
         }
 
+        // 2. 检查有效期
         LocalDateTime now = LocalDateTime.now();
         if (canvas.getValidStart() != null && now.isBefore(canvas.getValidStart())) {
             throw new TriggerRejectedException("QUOTA_005", "活动尚未开始");
@@ -61,6 +63,7 @@ public class TriggerPreCheckService {
             throw new TriggerRejectedException("QUOTA_006", "活动已结束");
         }
 
+        // 3. 检查冷却期
         if (canvas.getCooldownSeconds() != null) {
             CanvasUserQuotaDO quota = quotaMapper.selectOne(
                     new LambdaQueryWrapper<CanvasUserQuotaDO>()

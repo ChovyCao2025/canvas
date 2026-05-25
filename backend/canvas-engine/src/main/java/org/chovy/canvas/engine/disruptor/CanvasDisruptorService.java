@@ -3,6 +3,7 @@ package org.chovy.canvas.engine.disruptor;
 import com.lmax.disruptor.*;
 import com.lmax.disruptor.dsl.*;
 import com.lmax.disruptor.util.DaemonThreadFactory;
+import lombok.Getter;
 import org.chovy.canvas.engine.scheduler.CanvasMetrics;
 import org.chovy.canvas.engine.request.CanvasExecutionRequestExecutor;
 import org.chovy.canvas.engine.trigger.CanvasExecutionService;
@@ -28,10 +29,14 @@ import java.util.Map;
 @Service
 public class CanvasDisruptorService {
 
-    /** Disruptor 主实例，负责 worker 生命周期管理。 */
+    /**
+     * Disruptor 主实例，负责 worker 生命周期管理。
+     */
     private final Disruptor<CanvasExecutionEvent> disruptor;
 
-    /** RingBuffer 发布端，供外部触发源写入执行事件。 */
+    /**
+     * RingBuffer 发布端，供外部触发源写入执行事件。
+     */
     private final RingBuffer<CanvasExecutionEvent> ringBuffer;
     private final CanvasMetrics metrics;
 
@@ -41,52 +46,35 @@ public class CanvasDisruptorService {
             CanvasExecutionRequestExecutor requestExecutor,
             CanvasMetrics metrics,
             @Value("${canvas.disruptor.ring-buffer-size:65536}") int ringBufferSize,
-            @Value("${canvas.disruptor.consumers:0}") int configuredConsumers) {
+            @Value("${canvas.disruptor.consumers:0}") int configuredConsumers
+    ) {
         this.metrics = metrics;
 
         // consumers=0 时自动使用 CPU 核数
-        int consumers = configuredConsumers > 0
-                ? configuredConsumers
-                : Runtime.getRuntime().availableProcessors();
+        int consumers = determineConsumerCount(configuredConsumers);
 
-        disruptor = new Disruptor<>(
-                CanvasExecutionEvent::new,
-                ringBufferSize,
-                DaemonThreadFactory.INSTANCE,
-                ProducerType.MULTI,         // 多触发源
-                new YieldingWaitStrategy()   // 低延迟（设计文档推荐）
-        );
+        // 创建 Disruptor 实例
+        disruptor = createDisruptor(ringBufferSize);
 
         // WorkerPool：每个 event 只由一个 worker 处理
-        @SuppressWarnings("unchecked")
-        WorkHandler<CanvasExecutionEvent>[] workers = new WorkHandler[consumers];
-        Arrays.fill(workers, (WorkHandler<CanvasExecutionEvent>) event -> {
-            try {
-                if (event.requestId != null) {
-                    String requestId = event.requestId;
-                    requestExecutor.execute(requestId)
-                            .subscribe(
-                                    null,
-                                    e -> log.error("[DISRUPTOR] request 执行失败 requestId={}: {}",
-                                            requestId, e.getMessage())
-                            );
-                } else {
-                    executionService.triggerFromDisruptor(
-                                    event.canvasId, event.userId, event.triggerType,
-                                    event.triggerNodeType, event.matchKey,
-                                    event.payload, event.msgId, event.dispatchOptions)
-                            .subscribe(
-                                    null,
-                                    e -> log.error("[DISRUPTOR] 执行失败 canvasId={} userId={}: {}",
-                                            event.canvasId, event.userId, e.getMessage())
-                            );
-                }
-            } finally {
-                event.reset(); // 归还事件对象（Ring Buffer 复用）
-            }
-        });
-        disruptor.handleEventsWithWorkerPool(workers);
+        // >>> 配置具体的 worker 处理逻辑
+        configureWorkerPool(executionService, requestExecutor, consumers);
 
+        // 配置异常处理器
+        configureExceptionHandler();
+
+        // 启动 Disruptor 并返回 RingBuffer
+        ringBuffer = startDisruptor(ringBufferSize, consumers);
+    }
+
+    private RingBuffer<CanvasExecutionEvent> startDisruptor(int ringBufferSize, int consumers) {
+        final RingBuffer<CanvasExecutionEvent> ringBuffer;
+        ringBuffer = disruptor.start();
+        log.info("[DISRUPTOR] 启动 ringBufferSize={} consumers={}", ringBufferSize, consumers);
+        return ringBuffer;
+    }
+
+    private void configureExceptionHandler() {
         // 异常处理：记录错误但不中断 Ring Buffer
         disruptor.setDefaultExceptionHandler(new ExceptionHandler<>() {
             @Override
@@ -105,9 +93,74 @@ public class CanvasDisruptorService {
                 log.error("[DISRUPTOR] 关闭异常: {}", ex.getMessage());
             }
         });
+    }
 
-        ringBuffer = disruptor.start();
-        log.info("[DISRUPTOR] 启动 ringBufferSize={} consumers={}", ringBufferSize, consumers);
+    private void configureWorkerPool(CanvasExecutionService executionService, CanvasExecutionRequestExecutor requestExecutor, int consumers) {
+        @SuppressWarnings("unchecked")
+        WorkHandler<CanvasExecutionEvent>[] workers = new WorkHandler[consumers];
+        // >>> 配置具体的 worker 处理逻辑
+        Arrays.fill(workers, createWorkerHandler(executionService, requestExecutor));
+        disruptor.handleEventsWithWorkerPool(workers);
+    }
+
+    private static WorkHandler<CanvasExecutionEvent> createWorkerHandler(CanvasExecutionService executionService, CanvasExecutionRequestExecutor requestExecutor) {
+        return event -> {
+            try {
+                if (event.requestId != null) {
+                    // 处理请求类型事件
+                    handleRequestEvent(requestExecutor, event);
+                } else {
+                    // 处理画布执行类型事件
+                    handleCanvasEvent(executionService, event);
+                }
+            } finally {
+                event.reset(); // 归还事件对象（Ring Buffer 复用）
+            }
+        };
+    }
+
+    private static void handleCanvasEvent(CanvasExecutionService executionService, CanvasExecutionEvent event) {
+        executionService.triggerFromDisruptor(
+                        event.canvasId, event.userId, event.triggerType,
+                        event.triggerNodeType, event.matchKey,
+                        event.payload, event.msgId, event.dispatchOptions)
+                .subscribe(
+                        null,
+                        e -> log.error("[DISRUPTOR] 执行失败 canvasId={} userId={}: {}",
+                                event.canvasId, event.userId, e.getMessage())
+                );
+    }
+
+    private static void handleRequestEvent(CanvasExecutionRequestExecutor requestExecutor, CanvasExecutionEvent event) {
+        String requestId = event.requestId;
+        requestExecutor.execute(requestId)
+                .subscribe(
+                        null,
+                        e -> log.error("[DISRUPTOR] request 执行失败 requestId={}: {}",
+                                requestId, e.getMessage())
+                );
+    }
+
+    /**
+     * 创建 Disruptor 实例
+     */
+    private static Disruptor<CanvasExecutionEvent> createDisruptor(int ringBufferSize) {
+        return new Disruptor<>(
+                CanvasExecutionEvent::new,
+                ringBufferSize,
+                DaemonThreadFactory.INSTANCE,
+                ProducerType.MULTI,         // 多触发源
+                new YieldingWaitStrategy()   // 低延迟（设计文档推荐）
+        );
+    }
+
+    /**
+     * 确定消费者数量：0 时自动使用 CPU 核数
+     */
+    private static int determineConsumerCount(int configuredConsumers) {
+        return configuredConsumers > 0
+                ? configuredConsumers
+                : Runtime.getRuntime().availableProcessors();
     }
 
     /**
@@ -197,6 +250,7 @@ public class CanvasDisruptorService {
      * Disruptor-only dispatch metadata. Instances are not publicly constructible,
      * so external trigger payloads cannot opt into internal replay behavior.
      */
+    @Getter
     public static final class DispatchOptions {
         private static final DispatchOptions NORMAL = new DispatchOptions(false);
 
@@ -216,12 +270,5 @@ public class CanvasDisruptorService {
             return new DispatchOptions(true, overflowChainRetryCount);
         }
 
-        public boolean isOverflowRetry() {
-            return overflowRetry;
-        }
-
-        public int getOverflowChainRetryCount() {
-            return overflowChainRetryCount;
-        }
     }
 }
