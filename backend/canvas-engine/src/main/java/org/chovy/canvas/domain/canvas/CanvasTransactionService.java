@@ -53,15 +53,27 @@ public class CanvasTransactionService {
     }
 
     /**
-     * 归档事务。
+     * Kill 事务。
      *
-     * <p>仅修改状态为 ARCHIVED，不处理发布版本和缓存路由，
-     * 由上层服务按业务策略决定后续清理动作。
+     * <p>步骤：
+     * 1) 校验画布存在；
+     * 2) 记录当前 publishedVersionId（供事务外清路由/缓存）；
+     * 3) 置状态为 KILLED，清空 publishedVersionId。
      *
-     * <p>为什么与 offlineDb 分开：
-     * - OFFLINE 是“可再发布”的运营状态；
-     * - ARCHIVED 是“长期隐藏”的治理状态，语义不同。
+     * <p>为何与 offlineDb 分开：KILLED 是不可恢复的紧急停止，语义与 OFFLINE 不同；
+     * 此处仅做 DB 变更，外部副作用（路由/调度/缓存清理）由 {@link CanvasService#applyKillExternalCleanup} 完成。
      */
+    @Transactional
+    public Long killDb(Long id) {
+        CanvasDO canvas = canvasMapper.selectById(id);
+        if (canvas == null) throw new IllegalArgumentException("Canvas not found: " + id);
+        Long publishedVersionId = canvas.getPublishedVersionId();
+        canvas.setStatus(CanvasStatusEnum.KILLED.getCode());
+        canvas.setPublishedVersionId(null);
+        canvasMapper.updateById(canvas);
+        return publishedVersionId;
+    }
+
     @Transactional
     void archiveDb(Long id) {
         // 1) 读取并校验画布存在性
