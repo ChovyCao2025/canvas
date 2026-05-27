@@ -317,7 +317,7 @@ class CanvasExecutionServiceTest {
     void normalPriorityOverflowGeneratesReplayMsgIdWhenOriginalMsgIdMissing() throws Exception {
         CanvasDO canvas = publishedCanvas(41L, 10);
         when(canvasEntityCache.get(41L)).thenReturn(canvas);
-        when(executionRegistry.activeCount(41L)).thenReturn(10);
+        when(executionRegistry.activeCount(41L)).thenReturn(1000);
         when(rocketMQTemplate.getProducer()).thenReturn(rocketProducer);
         when(rocketProducer.send(any(Message.class))).thenReturn(sendResult(SendStatus.SEND_OK));
 
@@ -345,7 +345,7 @@ class CanvasExecutionServiceTest {
         CanvasDO canvas = publishedCanvas(37L, 10);
         when(canvasEntityCache.get(37L)).thenReturn(canvas);
         when(ctxStore.acquireDedup(eq(37L), eq("user-8"), eq("msg-8"), any())).thenReturn(true);
-        when(executionRegistry.activeCount(37L)).thenReturn(10);
+        when(executionRegistry.activeCount(37L)).thenReturn(1000);
         when(rocketMQTemplate.getProducer()).thenReturn(rocketProducer);
         when(rocketProducer.send(any(Message.class))).thenReturn(sendResult(SendStatus.FLUSH_DISK_TIMEOUT));
 
@@ -377,7 +377,7 @@ class CanvasExecutionServiceTest {
         CanvasDO canvas = publishedCanvas(33L, 10);
         when(canvasEntityCache.get(33L)).thenReturn(canvas);
         when(ctxStore.acquireDedup(eq(33L), eq("user-4"), eq("msg-4"), any())).thenReturn(true);
-        when(executionRegistry.activeCount(33L)).thenReturn(10);
+        when(executionRegistry.activeCount(33L)).thenReturn(1000);
         when(rocketMQTemplate.getProducer()).thenReturn(rocketProducer);
         when(rocketProducer.send(any(Message.class))).thenThrow(new RuntimeException("mq down"));
 
@@ -404,7 +404,7 @@ class CanvasExecutionServiceTest {
         CanvasDO canvas = publishedCanvas(31L, 10);
         when(canvasEntityCache.get(31L)).thenReturn(canvas);
         when(ctxStore.acquireDedup(eq(31L), eq("user-2"), eq("msg-2"), any())).thenReturn(true);
-        when(executionRegistry.activeCount(31L)).thenReturn(5);
+        when(executionRegistry.activeCount(31L)).thenReturn(500);
 
         Map<String, Object> result = sut.trigger(
                 31L,
