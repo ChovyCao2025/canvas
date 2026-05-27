@@ -40,12 +40,17 @@ http.interceptors.response.use(
 
 // ── 认证 ─────────────────────────────────────────────────────
 
+export type UserRole = 'ADMIN' | 'SUPER_ADMIN' | 'TENANT_ADMIN' | 'OPERATOR'
+
 export interface LoginResp {
   /** JWT 令牌。 */
   token: string
 
   /** 用户 ID。 */
   userId: number
+
+  /** 租户 ID；legacy ADMIN rollout 期间可能为空。 */
+  tenantId: number | null
 
   /** 用户名。 */
   username: string
@@ -54,7 +59,7 @@ export interface LoginResp {
   displayName: string
 
   /** 角色。 */
-  role: 'ADMIN' | 'OPERATOR'
+  role: UserRole
 }
 
 export interface SysUser {
@@ -68,7 +73,7 @@ export interface SysUser {
   displayName: string
 
   /** 角色。 */
-  role: 'ADMIN' | 'OPERATOR'
+  role: UserRole
 
   /** 启用状态：1 启用，0 禁用。 */
   enabled: 0 | 1
