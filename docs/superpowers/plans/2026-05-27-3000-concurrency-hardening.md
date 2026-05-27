@@ -82,7 +82,7 @@ JAVA_HOME=$(/usr/libexec/java_home -v 21) mvn -f backend/pom.xml -pl canvas-engi
 Expected:
 
 ```text
-Tests run: 22, Failures: 0, Errors: 0, Skipped: 0
+Tests run: 26, Failures: 0, Errors: 0, Skipped: 0
 BUILD SUCCESS
 ```
 
@@ -108,7 +108,7 @@ JAVA_HOME=$(/usr/libexec/java_home -v 21) mvn -f backend/pom.xml -pl canvas-engi
 Pass condition:
 
 ```text
-Tests run: 22, Failures: 0, Errors: 0, Skipped: 0
+Tests run: 26, Failures: 0, Errors: 0, Skipped: 0
 BUILD SUCCESS
 ```
 
@@ -881,7 +881,7 @@ JAVA_HOME=$(/usr/libexec/java_home -v 21) mvn -f backend/pom.xml -pl canvas-engi
 Expected:
 
 ```text
-Tests run: 22, Failures: 0, Errors: 0, Skipped: 0
+Tests run: 26, Failures: 0, Errors: 0, Skipped: 0
 BUILD SUCCESS
 ```
 

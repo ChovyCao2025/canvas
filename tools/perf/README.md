@@ -106,6 +106,40 @@ Stage failure reasons:
 - `P95_EXCEEDED`: runner p95 exceeded `--max-p95-ms`.
 - `VERIFIER_FAIL`: correctness reconciliation failed. This result is not valid capacity data.
 
+## 3000 Hardening Profiles
+
+The 3000 production gate is driven by `tools/perf/3000-hardening-profiles.json`.
+
+Validate the profile file:
+
+```bash
+node -e "const p=require('./tools/perf/3000-hardening-profiles.json'); const total=Object.values(p.lanes).reduce((sum,l)=>sum+l.concurrency,0); if (total !== p.targetConcurrency) throw new Error(String(total)); console.log(total)"
+```
+
+Render the default mixed 3000 command:
+
+```bash
+node tools/perf/hardening-profile.mjs \
+  --profile default-mixed-3000 \
+  --run-id-prefix "perf_3000_gate_$(date +%Y%m%d_%H%M%S)"
+```
+
+Run the rendered command only after:
+
+- the small-flow smoke passes
+- impacted backend tests pass on Java 21
+- the 3000 code foundation is present in the branch
+- rollback and degrade actions from `docs/optimization/3000-concurrency-hardening-checklist.md` are ready
+
+Profiles required for 3000 completion:
+
+- `default-mixed-3000`
+- `retry-surge-300`
+- `heavy-surge-300`
+- `slow-downstream-standard`
+- `redis-registry-latency`
+- `rocketmq-backlog-recovery`
+
 ## Direct Call Test
 
 ```bash
