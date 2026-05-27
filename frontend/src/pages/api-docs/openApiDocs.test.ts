@@ -51,11 +51,11 @@ describe('OpenAPI docs adapter', () => {
 
     expect(endpoints.map(endpoint => `${endpoint.method} ${endpoint.path}`)).toEqual([
       'GET /admin/users',
+      'GET /canvas/{id}/versions/{versionId}',
       'PUT /canvas/data-sources',
       'DELETE /canvas/data-sources',
       'POST /canvas/events/report',
       'GET /canvas/mq-trigger-rejected/{id}',
-      'GET /canvas/{id}/versions/{versionId}',
     ])
   })
 

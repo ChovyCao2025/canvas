@@ -33,7 +33,6 @@ export interface ParseOpenApiResult {
 }
 
 const SUPPORTED_METHODS: ApiDocMethod[] = ['GET', 'POST', 'PUT', 'DELETE']
-const METHOD_ORDER = new Map(SUPPORTED_METHODS.map((method, index) => [method, index]))
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value)
@@ -205,18 +204,10 @@ export const parseOpenApiEndpoints = (spec: OpenApiDocument): ParseOpenApiResult
     }
   }
 
-  endpoints.sort((first, second) => {
-    const firstIsParameterized = first.path.includes('{')
-    const secondIsParameterized = second.path.includes('{')
-    if (firstIsParameterized !== secondIsParameterized) return firstIsParameterized ? 1 : -1
-    if (firstIsParameterized && secondIsParameterized && first.path.indexOf('{') !== second.path.indexOf('{')) {
-      return second.path.indexOf('{') - first.path.indexOf('{')
-    }
-
-    const pathComparison = first.path.localeCompare(second.path, undefined, { ignorePunctuation: true })
-    if (pathComparison !== 0) return pathComparison
-
-    return (METHOD_ORDER.get(first.method) ?? 0) - (METHOD_ORDER.get(second.method) ?? 0)
+  endpoints.sort((left, right) => {
+    const pathCompare = left.path.localeCompare(right.path)
+    if (pathCompare !== 0) return pathCompare
+    return SUPPORTED_METHODS.indexOf(left.method) - SUPPORTED_METHODS.indexOf(right.method)
   })
 
   return { endpoints, warnings }
