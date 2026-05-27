@@ -58,4 +58,20 @@ class SqlWhereGeneratorTest {
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("Illegal field name");
     }
+
+    @Test
+    void supports_lowercase_in_operator_from_ui_options() throws Exception {
+        String ruleJson = """
+                {
+                  "logic":"AND",
+                  "conditions":[
+                    {"field":"city","op":"in","value":["Beijing","Shanghai"]}
+                  ]
+                }
+                """;
+
+        SqlWhereGenerator.SqlWhere where = generator.generate(ruleJson);
+
+        assertThat(where.sql()).isEqualTo("city IN (:p1)");
+    }
 }

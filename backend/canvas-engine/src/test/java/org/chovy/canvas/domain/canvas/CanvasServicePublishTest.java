@@ -7,8 +7,10 @@ import org.chovy.canvas.engine.dag.DagGraph;
 import org.chovy.canvas.engine.dag.DagParser;
 import org.chovy.canvas.engine.handlers.GroovyHandler;
 import org.chovy.canvas.engine.handlers.MqTriggerHandler;
+import org.chovy.canvas.engine.rule.CanvasRuleGraphValidator;
 import org.chovy.canvas.engine.trigger.CanvasExecutionService;
 import org.chovy.canvas.engine.trigger.CanvasSchedulerService;
+import org.chovy.canvas.engine.trigger.TriggerPreCheckService;
 import org.chovy.canvas.infrastructure.cache.CanvasConfigCache;
 import org.chovy.canvas.infrastructure.redis.TriggerRouteService;
 import org.junit.jupiter.api.BeforeEach;
@@ -41,8 +43,10 @@ class CanvasServicePublishTest {
     @Mock CanvasSchedulerService schedulerService;
     @Mock CanvasConfigCache configCache;
     @Mock CanvasExecutionService canvasExecutionService;
+    @Mock TriggerPreCheckService preCheckService;
     @Mock GroovyHandler groovyHandler;
     @Mock MqTriggerHandler mqTriggerHandler;
+    @Mock CanvasRuleGraphValidator canvasRuleGraphValidator;
     @Mock StringRedisTemplate redis;
     @Mock ValueOperations<String, String> valueOperations;
     @Mock CanvasTransactionService canvasTransactionService;
@@ -59,8 +63,10 @@ class CanvasServicePublishTest {
                 schedulerService,
                 configCache,
                 canvasExecutionService,
+                preCheckService,
                 groovyHandler,
                 mqTriggerHandler,
+                canvasRuleGraphValidator,
                 redis,
                 canvasTransactionService,
                 new CanvasExamplesProperties()
@@ -81,16 +87,12 @@ class CanvasServicePublishTest {
         CanvasVersionDO draft = version(200L, 2, "draft");
         when(canvasVersionMapper.selectOne(any())).thenReturn(draft);
         when(canvasVersionMapper.selectById(100L)).thenReturn(oldVersion);
-        doAnswer(invocation -> {
-            CanvasVersionDO inserted = invocation.getArgument(0);
-            inserted.setId(300L);
-            return 1;
-        }).when(canvasVersionMapper).insert(any(CanvasVersionDO.class));
-
         DagGraph oldGraph = graph("old-mq");
         DagGraph newGraph = graph("new-mq");
         when(dagParser.parse("old")).thenReturn(oldGraph);
         when(dagParser.parse("draft")).thenReturn(newGraph);
+        when(canvasTransactionService.publishDb(10L, "draft", "operator"))
+                .thenReturn(new CanvasTransactionService.PublishResult(version(300L, 3, "draft"), 100L));
         when(mqTriggerHandler.resolveTopic(Map.of("messageCodeKey", "old"))).thenReturn("old.topic");
         when(mqTriggerHandler.resolveTopic(Map.of("messageCodeKey", "new"))).thenReturn("new.topic");
 
@@ -98,6 +100,7 @@ class CanvasServicePublishTest {
 
         verify(triggerRouteService).removeMq(10L, "old.topic");
         verify(triggerRouteService).registerMq(10L, "new.topic");
+        verify(canvasRuleGraphValidator).validateOrThrow(newGraph);
         var order = inOrder(triggerRouteService);
         order.verify(triggerRouteService).removeMq(10L, "old.topic");
         order.verify(triggerRouteService).registerMq(10L, "new.topic");

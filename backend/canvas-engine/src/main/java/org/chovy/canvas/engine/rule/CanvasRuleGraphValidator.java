@@ -1,0 +1,118 @@
+package org.chovy.canvas.engine.rule;
+
+import org.chovy.canvas.common.MapFieldKeys;
+import org.chovy.canvas.common.enums.NodeType;
+import org.chovy.canvas.engine.dag.DagGraph;
+import org.chovy.canvas.engine.dag.DagParser;
+import org.springframework.stereotype.Component;
+
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+
+@Component
+public class CanvasRuleGraphValidator {
+
+    private static final Set<String> SAFE_MULTI_UPSTREAM_TYPES = Set.of(
+            NodeType.HUB,
+            NodeType.LOGIC_RELATION,
+            NodeType.AGGREGATE,
+            NodeType.THRESHOLD,
+            NodeType.MERGE,
+            NodeType.END
+    );
+
+    private final RuleParser ruleParser;
+    private final RuleValidator ruleValidator;
+
+    public CanvasRuleGraphValidator(RuleParser ruleParser, RuleValidator ruleValidator) {
+        this.ruleParser = ruleParser;
+        this.ruleValidator = ruleValidator;
+    }
+
+    public void validateOrThrow(DagGraph graph) {
+        List<String> errors = new ArrayList<>();
+        for (Map.Entry<String, DagParser.CanvasNode> entry : graph.getNodeMap().entrySet()) {
+            String nodeId = entry.getKey();
+            DagParser.CanvasNode node = entry.getValue();
+            Map<String, Object> config = mergedConfig(node);
+            validateNodeRules(nodeId, node, config, errors);
+            validateTopology(nodeId, node, graph, errors);
+        }
+        if (!errors.isEmpty()) {
+            throw new RuleValidationException("发布校验失败：\n" + String.join("\n", errors));
+        }
+    }
+
+    @SuppressWarnings("unchecked")
+    private void validateNodeRules(String nodeId,
+                                   DagParser.CanvasNode node,
+                                   Map<String, Object> config,
+                                   List<String> errors) {
+        String type = node.getType();
+        try {
+            if (NodeType.IF_CONDITION.equals(type)) {
+                RuleGroup rule = ruleParser.parseCanvasRules((List<Map<String, Object>>) config.get("rules"));
+                RuleValidationOptions options = options(nodeId, "rules", Boolean.TRUE.equals(config.get("matchAll")));
+                errors.addAll(ruleValidator.validate(rule, options));
+            }
+            if (NodeType.MQ_TRIGGER.equals(type)
+                    || NodeType.API_CALL.equals(type)
+                    || NodeType.GROOVY.equals(type)) {
+                if (Boolean.TRUE.equals(config.get(MapFieldKeys.VALIDATE_RESULT))) {
+                    RuleGroup rule = ruleParser.parseCanvasRules((List<Map<String, Object>>) config.get(MapFieldKeys.VALIDATE_RULES));
+                    errors.addAll(ruleValidator.validate(rule, options(nodeId, MapFieldKeys.VALIDATE_RULES, false)));
+                }
+            }
+            if (NodeType.SELECTOR.equals(type)) {
+                List<Map<String, Object>> branches = (List<Map<String, Object>>) config.getOrDefault(MapFieldKeys.BRANCHES, List.of());
+                for (int i = 0; i < branches.size(); i++) {
+                    Map<String, Object> branch = branches.get(i);
+                    List<Map<String, Object>> conditions = (List<Map<String, Object>>) branch.get(MapFieldKeys.CONDITIONS);
+                    if (conditions == null) {
+                        conditions = (List<Map<String, Object>>) branch.get("rules");
+                    }
+                    boolean isLastBranch = i == branches.size() - 1;
+                    boolean explicitMatchAll = Boolean.TRUE.equals(branch.get("matchAll"));
+                    RuleGroup rule = ruleParser.parseCanvasRules(conditions);
+                    errors.addAll(ruleValidator.validate(
+                            new RuleGroup(rule.logic(), rule.children(), explicitMatchAll),
+                            options(nodeId, "branches[" + i + "]", isLastBranch || explicitMatchAll)));
+                }
+            }
+        } catch (RuleValidationException e) {
+            errors.add(nodeId + ": " + e.getMessage());
+        }
+    }
+
+    private void validateTopology(String nodeId,
+                                  DagParser.CanvasNode node,
+                                  DagGraph graph,
+                                  List<String> errors) {
+        if (graph.upstream(nodeId).size() <= 1) {
+            return;
+        }
+        if (SAFE_MULTI_UPSTREAM_TYPES.contains(node.getType())) {
+            return;
+        }
+        errors.add(nodeId + ": 多分支汇入副作用/普通节点必须先经过汇聚节点");
+    }
+
+    private RuleValidationOptions options(String nodeId, String field, boolean allowEmpty) {
+        RuleValidationOptions options = RuleValidationOptions.strict(nodeId + "." + field);
+        return allowEmpty ? options.withAllowEmpty() : options;
+    }
+
+    private Map<String, Object> mergedConfig(DagParser.CanvasNode node) {
+        Map<String, Object> config = new HashMap<>();
+        if (node.getBizConfig() != null) {
+            config.putAll(node.getBizConfig());
+        }
+        if (node.getConfig() != null) {
+            config.putAll(node.getConfig());
+        }
+        return config;
+    }
+}

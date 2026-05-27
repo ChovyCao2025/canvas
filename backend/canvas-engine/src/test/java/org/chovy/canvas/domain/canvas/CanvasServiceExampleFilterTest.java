@@ -32,8 +32,10 @@ class CanvasServiceExampleFilterTest {
     @Mock org.chovy.canvas.engine.trigger.CanvasSchedulerService schedulerService;
     @Mock org.chovy.canvas.infrastructure.cache.CanvasConfigCache configCache;
     @Mock org.chovy.canvas.engine.trigger.CanvasExecutionService canvasExecutionService;
+    @Mock org.chovy.canvas.engine.trigger.TriggerPreCheckService preCheckService;
     @Mock org.chovy.canvas.engine.handlers.GroovyHandler groovyHandler;
     @Mock org.chovy.canvas.engine.handlers.MqTriggerHandler mqTriggerHandler;
+    @Mock org.chovy.canvas.engine.rule.CanvasRuleGraphValidator canvasRuleGraphValidator;
     @Mock org.springframework.data.redis.core.StringRedisTemplate redis;
     @Mock CanvasTransactionService canvasTransactionService;
 
@@ -52,8 +54,8 @@ class CanvasServiceExampleFilterTest {
         properties = new CanvasExamplesProperties();
         service = new CanvasService(
                 canvasMapper, canvasVersionMapper, dagParser, triggerRouteService,
-                schedulerService, configCache, canvasExecutionService, groovyHandler,
-                mqTriggerHandler, redis, canvasTransactionService, properties);
+                schedulerService, configCache, canvasExecutionService, preCheckService, groovyHandler,
+                mqTriggerHandler, canvasRuleGraphValidator, redis, canvasTransactionService, properties);
         when(canvasMapper.selectPage(any(Page.class), any())).thenReturn(new Page<>());
     }
 

@@ -24,6 +24,9 @@ class CanvasOpsServiceExampleCloneTest {
     @Mock CanvasMapper canvasMapper;
     @Mock CanvasVersionMapper canvasVersionMapper;
     @Mock org.chovy.canvas.infrastructure.redis.TriggerRouteService triggerRouteService;
+    @Mock org.chovy.canvas.engine.trigger.TriggerPreCheckService preCheckService;
+    @Mock CanvasTransactionService canvasTransactionService;
+    @Mock CanvasService canvasService;
     @Mock org.springframework.data.redis.core.StringRedisTemplate redis;
 
     @Test
@@ -43,7 +46,14 @@ class CanvasOpsServiceExampleCloneTest {
             return 1;
         }).when(canvasMapper).insert(any(CanvasDO.class));
 
-        CanvasOpsService service = new CanvasOpsService(canvasMapper, canvasVersionMapper, triggerRouteService, redis);
+        CanvasOpsService service = new CanvasOpsService(
+                canvasMapper,
+                canvasVersionMapper,
+                triggerRouteService,
+                preCheckService,
+                canvasTransactionService,
+                canvasService,
+                redis);
 
         service.clone(7L, "alice");
 

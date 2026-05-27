@@ -10,6 +10,7 @@ import org.chovy.canvas.dal.dataobject.AudienceComputeRunDO;
 import org.chovy.canvas.dal.mapper.AudienceComputeRunMapper;
 import org.chovy.canvas.dal.dataobject.AudienceStatDO;
 import org.chovy.canvas.dal.mapper.AudienceStatMapper;
+import org.chovy.canvas.engine.rule.AudienceDefinitionRuleValidator;
 import org.roaringbitmap.RoaringBitmap;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.jdbc.DataSourceBuilder;
@@ -46,6 +47,7 @@ public class AudienceBatchComputeService {
     private final SqlWhereGenerator sqlWhereGenerator;
     private final AudienceEvaluationContextFetcher contextFetcher;
     private final JdbcConfigResolver jdbcConfigResolver;
+    private final AudienceDefinitionRuleValidator audienceRuleValidator;
 
     @Value("${canvas.integration.tagger-service-url}")
     private String taggerUrl;
@@ -110,11 +112,13 @@ public class AudienceBatchComputeService {
     }
 
     public AudienceDefinitionDO create(AudienceDefinitionDO definition) {
+        audienceRuleValidator.validateForSave(definition);
         definitionMapper.insert(definition);
         return definition;
     }
 
     public boolean update(AudienceDefinitionDO definition) {
+        audienceRuleValidator.validateForSave(definition);
         return definitionMapper.updateById(definition) > 0;
     }
 
@@ -132,21 +136,38 @@ public class AudienceBatchComputeService {
                 .username(jdbcConfig.username())
                 .password(jdbcConfig.password())
                 .build();
-        NamedParameterJdbcTemplate jdbcTemplate = new NamedParameterJdbcTemplate(dataSource);
-        SqlWhereGenerator.SqlWhere where = sqlWhereGenerator.generate(definition.getRuleJson());
-        String sql = "SELECT " + jdbcConfig.userIdColumn() + " FROM " + jdbcConfig.baseTable() +
-                " WHERE " + where.sql();
-        if (jdbcConfig.maxRows() != null) {
-            sql += " LIMIT " + jdbcConfig.maxRows();
+        try {
+            NamedParameterJdbcTemplate jdbcTemplate = new NamedParameterJdbcTemplate(dataSource);
+            jdbcTemplate.getJdbcTemplate().setFetchSize(PAGE_SIZE);
+            SqlWhereGenerator.SqlWhere where = sqlWhereGenerator.generate(definition.getRuleJson());
+            String sql = "SELECT " + jdbcConfig.userIdColumn() + " FROM " + jdbcConfig.baseTable() +
+                    " WHERE " + where.sql();
+            org.springframework.jdbc.core.namedparam.MapSqlParameterSource params = where.params();
+            if (jdbcConfig.maxRows() != null) {
+                sql += " LIMIT :__maxRows";
+                params.addValue("__maxRows", jdbcConfig.maxRows());
+            }
+            RoaringBitmap bitmap = new RoaringBitmap();
+            jdbcTemplate.query(sql, params, rs -> {
+                String userId = rs.getString(1);
+                if (userId != null && !userId.isBlank()) {
+                    bitmap.add(AudienceBitmapStore.toUid(userId));
+                }
+            });
+            return bitmap;
+        } finally {
+            closeDataSource(dataSource);
         }
-        List<String> userIds = jdbcTemplate.query(sql, where.params(), (rs, rowNum) -> rs.getString(1));
-        RoaringBitmap bitmap = new RoaringBitmap();
-        for (String userId : userIds) {
-            if (userId != null && !userId.isBlank()) {
-                bitmap.add(AudienceBitmapStore.toUid(userId));
+    }
+
+    private void closeDataSource(DataSource dataSource) {
+        if (dataSource instanceof AutoCloseable closeable) {
+            try {
+                closeable.close();
+            } catch (Exception e) {
+                log.warn("[AUDIENCE] failed to close JDBC DataSource: {}", e.getMessage(), e);
             }
         }
-        return bitmap;
     }
 
     private RoaringBitmap computeViaTaggerApi(AudienceDefinitionDO definition) throws Exception {

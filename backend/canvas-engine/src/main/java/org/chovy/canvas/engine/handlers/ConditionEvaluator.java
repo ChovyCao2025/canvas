@@ -1,15 +1,17 @@
 package org.chovy.canvas.engine.handlers;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.chovy.canvas.engine.context.ExecutionContext;
+import org.chovy.canvas.engine.rule.RuleAstEvaluator;
+import org.chovy.canvas.engine.rule.RuleParser;
 
-import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.function.Function;
-import java.util.function.IntPredicate;
 
 final class ConditionEvaluator {
+    private static final RuleParser RULE_PARSER = new RuleParser(new ObjectMapper());
+
     private ConditionEvaluator() {
     }
 
@@ -31,57 +33,10 @@ final class ConditionEvaluator {
 
     private static boolean evaluate(Map<String, Object> rule, Function<String, Object> resolver) {
         if (rule == null) return false;
-        String field = string(rule.get("field"));
-        String operator = string(rule.get("operator"));
-        if (field.isBlank() || operator.isBlank()) return false;
-
-        String actual = stringify(resolver.apply(field));
-        String expected = resolveExpected(rule.get("value"), resolver);
-
-        return switch (operator) {
-            case "EQ" -> Objects.equals(actual, expected);
-            case "NEQ" -> !Objects.equals(actual, expected);
-            case "CONTAINS" -> containsCheck(actual, expected);
-            case "GT" -> compareNumbers(actual, expected, comparison -> comparison > 0);
-            case "LT" -> compareNumbers(actual, expected, comparison -> comparison < 0);
-            case "GTE" -> compareNumbers(actual, expected, comparison -> comparison >= 0);
-            case "LTE" -> compareNumbers(actual, expected, comparison -> comparison <= 0);
-            default -> false;
-        };
-    }
-
-    private static String resolveExpected(Object rawValue, Function<String, Object> resolver) {
-        String raw = stringify(rawValue);
-        if (raw.startsWith("${") && raw.endsWith("}")) {
-            String fieldKey = raw.substring(2, raw.length() - 1);
-            return stringify(resolver.apply(fieldKey));
-        }
-        return raw;
-    }
-
-    private static boolean containsCheck(String actual, String expected) {
-        if (expected.contains(",")) {
-            for (String candidate : expected.split(",")) {
-                if (actual.equals(candidate.trim())) return true;
-            }
-            return false;
-        }
-        return actual.contains(expected);
-    }
-
-    private static boolean compareNumbers(String actual, String expected, IntPredicate matcher) {
         try {
-            return matcher.test(new BigDecimal(actual).compareTo(new BigDecimal(expected)));
+            return RuleAstEvaluator.matches(RULE_PARSER.parseCanvasCondition(rule), resolver);
         } catch (RuntimeException e) {
             return false;
         }
-    }
-
-    private static String stringify(Object value) {
-        return value == null ? "null" : String.valueOf(value);
-    }
-
-    private static String string(Object value) {
-        return value == null ? "" : String.valueOf(value);
     }
 }

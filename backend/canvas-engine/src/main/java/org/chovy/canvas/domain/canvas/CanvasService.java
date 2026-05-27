@@ -12,6 +12,7 @@ import org.chovy.canvas.dto.*;
 import org.chovy.canvas.engine.dag.DagGraph;
 import org.chovy.canvas.engine.dag.DagParser;
 import org.chovy.canvas.engine.handlers.GroovyHandler;
+import org.chovy.canvas.engine.rule.CanvasRuleGraphValidator;
 import org.chovy.canvas.engine.trigger.CanvasSchedulerService;
 import org.chovy.canvas.engine.trigger.CanvasExecutionService;
 import org.chovy.canvas.engine.trigger.TriggerPreCheckService;
@@ -57,6 +58,7 @@ public class CanvasService {
     private final TriggerPreCheckService preCheckService;
     private final GroovyHandler groovyHandler;
     private final org.chovy.canvas.engine.handlers.MqTriggerHandler mqTriggerHandler;
+    private final CanvasRuleGraphValidator canvasRuleGraphValidator;
     private final org.springframework.data.redis.core.StringRedisTemplate redis;
     private final CanvasTransactionService canvasTransactionService;
     private final CanvasExamplesProperties examplesProperties;
@@ -203,6 +205,7 @@ public class CanvasService {
                 throw new IllegalStateException("画布缺少有效触发器节点");
             }
             validateSubFlowDependencies(id, graph);
+            canvasRuleGraphValidator.validateOrThrow(graph);
 
             // 阶段2：DB 事务（只写 DB，不碰 Redis/Scheduler/Cache）
             CanvasTransactionService.PublishResult result =

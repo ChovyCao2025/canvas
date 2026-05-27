@@ -17,6 +17,7 @@ import org.chovy.canvas.engine.scheduler.DagEngine;
 import org.chovy.canvas.infrastructure.cache.CanvasConfigCache;
 import org.chovy.canvas.infrastructure.cache.CanvasEntityCache;
 import org.chovy.canvas.infrastructure.redis.ContextPersistenceService;
+import org.chovy.canvas.infrastructure.redis.RedisKeyUtil;
 import org.apache.rocketmq.spring.core.RocketMQTemplate;
 import org.junit.jupiter.api.Test;
 import org.springframework.test.util.ReflectionTestUtils;
@@ -106,7 +107,10 @@ class CanvasExecutionServiceTriggerNodeTest {
                 new TriggerPriorityConfig(),
                 mock(RocketMQTemplate.class),
                 new ObjectMapper(),
-                mock(CdpUserService.class)
+                mock(CdpUserService.class),
+                mock(org.chovy.canvas.engine.disruptor.CanvasDisruptorService.class),
+                mock(org.springframework.data.redis.core.StringRedisTemplate.class),
+                mock(RedisKeyUtil.class)
         );
     }
 }

@@ -77,6 +77,13 @@ class IfConditionHandlerTest {
             Map<String, Object> rule = rule("desc", "CONTAINS", "已支付");
             assertThat(IfConditionHandler.evaluate(rule, ctx)).isTrue();
         }
+
+        @Test
+        void in_operator_matches_comma_separated_values() {
+            Map<String, Object> rule = rule("tripPhase", "IN", "待出行,到达目的地");
+
+            assertThat(IfConditionHandler.evaluate(rule, ctx)).isTrue();
+        }
     }
 
     @Nested
@@ -113,6 +120,22 @@ class IfConditionHandlerTest {
         void invalid_numeric_values_do_not_match_order_comparisons() {
             ctx.getFlatContext().put("amount", "unknown");
             Map<String, Object> rule = rule("amount", "GT", "50");
+
+            assertThat(IfConditionHandler.evaluate(rule, ctx)).isFalse();
+        }
+
+        @Test
+        void invalid_actual_numeric_values_do_not_match_lt_comparison() {
+            ctx.getFlatContext().put("amount", "unknown");
+            Map<String, Object> rule = rule("amount", "LT", "50");
+
+            assertThat(IfConditionHandler.evaluate(rule, ctx)).isFalse();
+        }
+
+        @Test
+        void invalid_actual_numeric_values_do_not_match_lte_comparison() {
+            ctx.getFlatContext().put("amount", "unknown");
+            Map<String, Object> rule = rule("amount", "LTE", "50");
 
             assertThat(IfConditionHandler.evaluate(rule, ctx)).isFalse();
         }

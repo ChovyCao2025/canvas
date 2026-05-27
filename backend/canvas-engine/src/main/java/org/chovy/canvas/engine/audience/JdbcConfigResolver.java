@@ -36,6 +36,9 @@ public class JdbcConfigResolver {
         String baseTable = stringValue(config, "baseTable");
         String userIdColumn = stringValue(config, "userIdColumn", "user_id");
         Integer maxRows = config.get("maxRows") instanceof Number number ? number.intValue() : null;
+        if (maxRows != null && maxRows <= 0) {
+            throw new IllegalArgumentException("maxRows must be positive");
+        }
         if (!baseTable.matches("[A-Za-z_][A-Za-z0-9_]*") || !userIdColumn.matches("[A-Za-z_][A-Za-z0-9_]*")) {
             throw new IllegalArgumentException("Illegal table or column name in JDBC config");
         }

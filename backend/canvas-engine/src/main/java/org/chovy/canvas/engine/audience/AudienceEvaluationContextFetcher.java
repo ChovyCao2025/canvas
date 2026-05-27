@@ -11,6 +11,8 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 
 /**
  * 人群规则评估上下文拉取器。
@@ -24,6 +26,7 @@ public class AudienceEvaluationContextFetcher {
 
     /** 规则 JSON 解析器。 */
     private final ObjectMapper objectMapper;
+    private final ConcurrentMap<String, List<String>> fieldCache = new ConcurrentHashMap<>();
 
     /**
      * 拉取某用户的人群评估上下文。
@@ -57,10 +60,17 @@ public class AudienceEvaluationContextFetcher {
 
     /** 从规则 JSON 提取所有字段名（去重后返回）。 */
     private List<String> extractFields(String ruleJson) throws Exception {
-        Map<String, Object> rule = objectMapper.readValue(ruleJson, new TypeReference<>() {});
+        String cacheKey = ruleJson == null ? "" : ruleJson;
+        List<String> cached = fieldCache.get(cacheKey);
+        if (cached != null) {
+            return cached;
+        }
+        Map<String, Object> rule = objectMapper.readValue(cacheKey, new TypeReference<>() {});
         List<String> fields = new ArrayList<>();
         collectFields(rule, fields);
-        return fields.stream().distinct().toList();
+        List<String> extracted = fields.stream().distinct().toList();
+        fieldCache.put(cacheKey, extracted);
+        return extracted;
     }
 
     @SuppressWarnings("unchecked")
