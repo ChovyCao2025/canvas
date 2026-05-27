@@ -50,7 +50,7 @@ class ApiDefinitionControllerTest {
     @Test
     void create_rejects_zero_rateLimitPerSec_and_does_not_insert() {
         ApiDefinitionDO body = new ApiDefinitionDO();
-        body.setUrl("https://api.example.com/orders");
+        body.setUrl("http://93.184.216.34/orders");
         body.setRateLimitPerSec(0);
 
         assertThatThrownBy(() -> controller.create(body).block())
@@ -94,7 +94,7 @@ class ApiDefinitionControllerTest {
 
     @Test
     void update_rejects_negative_rateLimitPerSec_and_does_not_update() throws Exception {
-        JsonNode bodyNode = objectMapper.readTree("{\"url\":\"https://api.example.com/orders\",\"rateLimitPerSec\":-1}");
+        JsonNode bodyNode = objectMapper.readTree("{\"url\":\"http://93.184.216.34/orders\",\"rateLimitPerSec\":-1}");
 
         assertThatThrownBy(() -> controller.update(1L, bodyNode).block())
                 .isInstanceOf(IllegalArgumentException.class)

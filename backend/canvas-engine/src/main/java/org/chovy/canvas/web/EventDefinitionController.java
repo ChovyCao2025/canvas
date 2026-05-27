@@ -2,6 +2,7 @@ package org.chovy.canvas.web;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.chovy.canvas.common.PageResult;
 import org.chovy.canvas.common.R;
 import org.chovy.canvas.dal.dataobject.EventDefinitionDO;
@@ -11,6 +12,7 @@ import org.chovy.canvas.dto.EventReportReq;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.chovy.canvas.service.EventDefinitionService;
+import org.springframework.http.server.reactive.ServerHttpRequest;
 import org.springframework.web.bind.annotation.*;
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
@@ -37,6 +39,10 @@ public class EventDefinitionController {
     private final EventDefinitionCacheService eventDefinitionCacheService;
     /** 事件定义服务，用于处理事件定义业务校验。 */
     private final EventDefinitionService eventDefinitionService;
+    /** JSON 转换器，用于从原始请求体解析事件上报内容。 */
+    private final ObjectMapper objectMapper;
+    /** 事件上报签名校验服务。 */
+    private final EventReportAuthService eventReportAuthService;
 
 
     // ── 事件定义 CRUD ────────────────────────────────────────────
@@ -67,6 +73,7 @@ public class EventDefinitionController {
     public Mono<R<EventDefinitionDO>> create(@RequestBody EventDefinitionDO body) {
         return Mono.fromCallable(() -> {
                     eventMapper.insert(body);
+                    invalidateEventCode(body.getEventCode());
                     return R.ok(body);
                 })
                 .subscribeOn(Schedulers.boundedElastic());
@@ -85,10 +92,10 @@ public class EventDefinitionController {
     public Mono<R<Void>> update(@PathVariable Long id, @RequestBody EventDefinitionDO body) {
         body.setId(id);
         return Mono.fromCallable(() -> {
+                    EventDefinitionDO existing = eventMapper.selectById(id);
                     eventMapper.updateById(body);
-                    if (body.getEventCode() != null) {
-                        eventDefinitionCacheService.invalidatePublishedByCode(body.getEventCode());
-                    }
+                    if (existing != null) invalidateEventCode(existing.getEventCode());
+                    invalidateEventCode(body.getEventCode());
                     return R.ok();
                 })
                 .subscribeOn(Schedulers.boundedElastic());
@@ -104,7 +111,11 @@ public class EventDefinitionController {
      */
     @DeleteMapping("/event-definitions/{id}")
     public Mono<R<Void>> delete(@PathVariable Long id) {
-        return Mono.<R<Void>>fromRunnable(() -> eventMapper.deleteById(id))
+        return Mono.<R<Void>>fromRunnable(() -> {
+                    EventDefinitionDO existing = eventMapper.selectById(id);
+                    eventMapper.deleteById(id);
+                    if (existing != null) invalidateEventCode(existing.getEventCode());
+                })
                 .subscribeOn(Schedulers.boundedElastic())
                 .then(Mono.just(R.ok()));
     }
@@ -124,11 +135,23 @@ public class EventDefinitionController {
      * 不直接耦合到具体画布 ID，由引擎根据 eventCode 路由。
      */
     @PostMapping("/events/report")
-    public Mono<R<Map<String, Object>>> reportEvent(@RequestBody EventReportReq req) {
-        return Mono.fromCallable(() -> eventDefinitionService.doReportEvent(req))
-                .subscribeOn(Schedulers.boundedElastic())
+    public Mono<R<Map<String, Object>>> reportEvent(
+            ServerHttpRequest request,
+            @RequestBody Mono<String> rawBody) {
+        return rawBody.defaultIfEmpty("")
+                .flatMap(body -> Mono.fromCallable(() -> {
+                            eventReportAuthService.verify(request.getHeaders(), body);
+                            EventReportReq req = objectMapper.readValue(body, EventReportReq.class);
+                            return eventDefinitionService.doReportEvent(req);
+                        })
+                        .subscribeOn(Schedulers.boundedElastic()))
                 .map(R::ok);
     }
 
+    private void invalidateEventCode(String eventCode) {
+        if (eventCode != null && !eventCode.isBlank()) {
+            eventDefinitionCacheService.invalidatePublishedByCode(eventCode);
+        }
+    }
 
 }

@@ -77,15 +77,16 @@ public class ManualApprovalHandler implements NodeHandler {
         if (ApprovalStatus.REJECTED.equals(result)) {
             // 拒绝时优先走配置的 reject 分支；未配置则按业务失败处理。
             log.info("[MANUAL_APPROVAL] 审批拒绝 approvalId={}", approvalId);
-            return approveNodeId != null
+            return rejectNodeId != null && !rejectNodeId.isBlank()
                     ? Mono.just(NodeResult.ok(rejectNodeId, Map.of()))
                     : Mono.just(NodeResult.fail("人工审批被拒绝"));
         }
 
         // 首次进入：创建审批记录，挂起流程
         List<String> approvers = (List<String>) config.getOrDefault("approvers", List.of());
+        CanvasManualApprovalDO approval;
         try {
-            CanvasManualApprovalDO approval = CanvasManualApprovalDO.builder()
+            approval = CanvasManualApprovalDO.builder()
                     .id(approvalId)
                     .executionId(ctx.getExecutionId())
                     .canvasId(ctx.getCanvasId())
@@ -100,10 +101,23 @@ public class ManualApprovalHandler implements NodeHandler {
             approvalMapper.insert(approval);
             log.info("[MANUAL_APPROVAL] 创建审批 approvalId={} approvers={} timeout={}h",
                     approvalId, approvers, timeoutHours);
-            // 审批记录落库后再发送待办通知，通知失败不会改变已挂起的审批状态。
-            notificationEventService.approvalPending(approval, approvers);
         } catch (Exception e) {
             log.error("[MANUAL_APPROVAL] 创建审批记录失败: {}", e.getMessage());
+            return Mono.just(NodeResult.fail("创建审批记录失败: " + e.getMessage()));
+        }
+
+        try {
+            // 审批记录落库后再发送待办通知；通知失败需要补偿，不能让流程静默挂起。
+            notificationEventService.approvalPending(approval, approvers);
+        } catch (Exception e) {
+            log.error("[MANUAL_APPROVAL] 审批通知发送失败 approvalId={}: {}", approvalId, e.getMessage());
+            try {
+                approvalMapper.deleteById(approvalId);
+            } catch (Exception cleanupError) {
+                log.error("[MANUAL_APPROVAL] 审批通知失败后的补偿删除也失败 approvalId={}: {}",
+                        approvalId, cleanupError.getMessage());
+            }
+            return Mono.just(NodeResult.fail("审批通知发送失败: " + e.getMessage()));
         }
 
         // 返回 PENDING，由 DagEngine 统一写 WAITING 并停止下游调度。

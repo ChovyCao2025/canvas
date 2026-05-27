@@ -5,6 +5,7 @@ import lombok.Data;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.chovy.canvas.common.MapFieldKeys;
+import org.chovy.canvas.common.enums.NodeType;
 import org.springframework.stereotype.Component;
 
 import java.util.*;
@@ -68,6 +69,7 @@ public class DagParser {
 
         // Kahn 算法环检测
         validateNoCycle(nodeMap, forward, inDegree);
+        validateMultiInputConvergence(nodeMap, reverse);
 
         return new DagGraph(nodeMap, forward, reverse, inDegree);
     }
@@ -182,6 +184,30 @@ public class DagParser {
             degree.forEach((id, d) -> { if (d == 0) cycleNodes.remove(id); });
             throw new IllegalArgumentException("画布存在循环连接，涉及节点: " + cycleNodes);
         }
+    }
+
+    private void validateMultiInputConvergence(Map<String, CanvasNode> nodeMap,
+                                               Map<String, List<String>> reverse) {
+        for (Map.Entry<String, List<String>> entry : reverse.entrySet()) {
+            List<String> upstream = entry.getValue();
+            if (upstream == null || upstream.size() <= 1) {
+                continue;
+            }
+            CanvasNode node = nodeMap.get(entry.getKey());
+            String type = node != null ? node.getType() : null;
+            if (!isConvergenceNode(type)) {
+                throw new IllegalArgumentException(
+                        "多分支收敛必须使用 HUB/LOGIC_RELATION/AGGREGATE/THRESHOLD 节点: nodeId="
+                                + entry.getKey() + " type=" + type + " upstream=" + upstream);
+            }
+        }
+    }
+
+    private boolean isConvergenceNode(String type) {
+        return NodeType.HUB.equals(type)
+                || NodeType.LOGIC_RELATION.equals(type)
+                || NodeType.AGGREGATE.equals(type)
+                || NodeType.THRESHOLD.equals(type);
     }
 
     // ── 内部 DTO ─────────────────────────────────────────────────

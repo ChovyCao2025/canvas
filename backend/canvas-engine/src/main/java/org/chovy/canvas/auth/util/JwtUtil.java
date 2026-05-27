@@ -6,6 +6,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 import javax.crypto.SecretKey;
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.Date;
 import org.chovy.canvas.dal.dataobject.SysUserDO;
@@ -20,6 +21,8 @@ import org.chovy.canvas.dal.dataobject.SysUserDO;
 @Component
 public class JwtUtil {
 
+    private static final String LEGACY_DEFAULT_SECRET_PREFIX = "canvas-engine-jwt-secret-key";
+
     /** HMAC 签名密钥。 */
     private final SecretKey key;
 
@@ -28,11 +31,27 @@ public class JwtUtil {
 
     /** 基于配置初始化签名密钥与过期时间。 */
     public JwtUtil(
-            @Value("${canvas.jwt.secret:canvas-engine-jwt-secret-key-must-be-at-least-256-bits}") String secret,
+            @Value("${canvas.jwt.secret:}") String secret,
             @Value("${canvas.jwt.expiry-hours:24}") long expiryHours) {
-        // HS256 要求足够长度的密钥；默认值仅用于本地开发。
-        this.key = Keys.hmacShaKeyFor(secret.getBytes());
+        validateSecret(secret);
+        if (expiryHours <= 0) {
+            throw new IllegalStateException("canvas.jwt.expiry-hours 必须大于 0");
+        }
+        // HS256 要求至少 256-bit 密钥，启动时 fail-fast，避免默认密钥进入环境。
+        this.key = Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8));
         this.expiry = Duration.ofHours(expiryHours);
+    }
+
+    private static void validateSecret(String secret) {
+        if (secret == null || secret.isBlank()) {
+            throw new IllegalStateException("canvas.jwt.secret 未配置，请设置 CANVAS_JWT_SECRET");
+        }
+        if (secret.startsWith(LEGACY_DEFAULT_SECRET_PREFIX)) {
+            throw new IllegalStateException("canvas.jwt.secret 不能使用默认示例密钥");
+        }
+        if (secret.getBytes(StandardCharsets.UTF_8).length < 32) {
+            throw new IllegalStateException("canvas.jwt.secret 长度不能少于 32 字节");
+        }
     }
 
     /** 生成访问令牌。 */

@@ -1,8 +1,6 @@
 package org.chovy.canvas.infrastructure.redis;
 
 import lombok.RequiredArgsConstructor;
-import com.github.benmanes.caffeine.cache.Cache;
-import com.github.benmanes.caffeine.cache.Caffeine;
 import org.springframework.data.redis.connection.ReactiveRedisConnectionFactory;
 import org.springframework.data.redis.core.Cursor;
 import org.springframework.data.redis.core.RedisOperations;
@@ -43,11 +41,6 @@ public class TriggerRouteService {
 
     /** 响应式 Redis 连接工厂。 */
     private final ReactiveRedisConnectionFactory reactiveFactory;
-    /** MQ 触发路由本地缓存。 */
-    private final Cache<String, Set<String>> mqRouteCache = Caffeine.newBuilder()
-            .maximumSize(10_000)
-            .expireAfterWrite(Duration.ofSeconds(30))
-            .build();
     /** 路由变更锁 TTL。 */
     private static final Duration ROUTE_MUTATION_LOCK_TTL = Duration.ofSeconds(30);
     /** 等待路由变更锁的最大毫秒数。 */
@@ -58,7 +51,6 @@ public class TriggerRouteService {
         withRouteMutationLock(() -> {
             // MQ 路由用 Set 存储 topic 到画布集合；单点增量写也需要与全量替换互斥。
             redis.opsForSet().add(keys.triggerMq(topicKey), String.valueOf(canvasId));
-            mqRouteCache.invalidate(topicKey);
         });
     }
     /** 注册行为事件触发路由：eventCode -> canvasId。 */
@@ -74,7 +66,6 @@ public class TriggerRouteService {
         withRouteMutationLock(() -> {
             // 变更 Redis 后同步失效本地 Caffeine，避免消费线程继续读到旧 topic 路由。
             redis.opsForSet().remove(keys.triggerMq(topicKey), String.valueOf(canvasId));
-            mqRouteCache.invalidate(topicKey);
         });
     }
     /** 移除行为事件触发路由。 */
@@ -87,8 +78,8 @@ public class TriggerRouteService {
     }
     /** 按 MQ topicKey 查询订阅画布 ID 集合。 */
     public Set<String> getCanvasByMqTopic(String topicKey) {
-        // MQ 消费高频读路由，先走短 TTL 本地缓存；未命中时再读 Redis Set。
-        return mqRouteCache.get(topicKey, this::loadMqRoute);
+        // MQ 路由必须跨实例实时一致，直接读取 Redis，避免本地缓存导致其他实例读到旧路由。
+        return loadMqRoute(topicKey);
     }
     /** 按事件编码查询订阅画布 ID 集合。 */
     public Set<String> getCanvasByBehavior(String eventCode) {
@@ -119,7 +110,6 @@ public class TriggerRouteService {
             markRouteRebuilding();
             List<String> oldKeys = scanMqRouteKeys();
 
-            mqRouteCache.invalidateAll();
             redis.execute(new SessionCallback<List<Object>>() {
                 @Override
                 @SuppressWarnings("unchecked")
@@ -136,8 +126,6 @@ public class TriggerRouteService {
                     return operations.exec();
                 }
             });
-            // 事务提交后再次清空本地缓存，覆盖并发读在重建期间可能填入的空值或旧值。
-            mqRouteCache.invalidateAll();
             markRouteReady();
         });
     }
@@ -155,7 +143,6 @@ public class TriggerRouteService {
     /** 标记触发路由表正在重建。 */
     public void markRouteRebuilding() {
         redis.delete(keys.triggerRouteReady());
-        mqRouteCache.invalidateAll();
     }
 
     /**

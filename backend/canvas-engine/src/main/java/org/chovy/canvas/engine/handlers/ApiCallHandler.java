@@ -17,6 +17,8 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
+import java.net.URI;
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.*;
@@ -177,7 +179,7 @@ public class ApiCallHandler implements NodeHandler {
         } catch (IllegalArgumentException e) {
             return Mono.just(NodeResult.fail("API_CALL: " + e.getMessage()));
         }
-        log.info("[API_CALL] → {} {} body={}", method, url, requestBody);
+        log.info("[API_CALL] → apiKey={} method={} url={}", apiKey, method, safeUrlForLog(url));
 
         // 先读 String，避免因响应 Content-Type 非 JSON 导致解码失败
         Mono<String> rawCall = "GET".equals(method)
@@ -192,7 +194,8 @@ public class ApiCallHandler implements NodeHandler {
         return rawCall
             .defaultIfEmpty("")
             .flatMap(body -> {
-                log.info("[API_CALL] ← apiKey={} body={}", apiKey, body.length() > 200 ? body.substring(0, 200) + "..." : body);
+                int responseBytes = body == null ? 0 : body.getBytes(StandardCharsets.UTF_8).length;
+                log.info("[API_CALL] ← apiKey={} status=200 bytes={}", apiKey, responseBytes);
                 Map<String, Object> out = new HashMap<>();
                 // 尝试解 JSON，失败就把原始 body 存入 output
                 try {
@@ -280,6 +283,16 @@ public class ApiCallHandler implements NodeHandler {
                     : RateLimitCheck.CHECK_FAILED;
         }
         return count > limitPerSec ? RateLimitCheck.EXCEEDED : RateLimitCheck.ALLOWED;
+    }
+
+    private static String safeUrlForLog(String url) {
+        try {
+            URI uri = URI.create(url);
+            return new URI(uri.getScheme(), null, uri.getHost(), uri.getPort(),
+                    uri.getPath(), null, null).toString();
+        } catch (Exception e) {
+            return "<invalid-url>";
+        }
     }
 
     private enum RateLimitCheck {

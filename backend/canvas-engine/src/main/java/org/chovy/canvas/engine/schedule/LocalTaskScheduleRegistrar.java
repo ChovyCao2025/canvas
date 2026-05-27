@@ -123,13 +123,13 @@ public class LocalTaskScheduleRegistrar implements ScheduleRegistrar {
         );
     }
 
-        /**
-     * 执行 guarded Callback 对应的业务逻辑。
+    /**
+     * 包装调度回调，隔离任务异常并清理一次性任务句柄。
      *
-     * <p>实现会处理 MQ 消息、路由或发送记录，影响异步触发链路。
+     * <p>调度线程不能因业务回调异常退出，一次性任务结束后也不能继续占用注册表。
      *
-     * @param registration registration 方法执行所需的业务参数
-     * @return 方法执行后的业务结果
+     * @param registration 调度注册信息
+     * @return 可交给 Spring TaskScheduler 执行的安全回调
      */
     private Runnable guardedCallback(ScheduleRegistration registration) {
         return () -> {

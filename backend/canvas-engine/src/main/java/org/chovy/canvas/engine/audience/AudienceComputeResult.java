@@ -49,15 +49,15 @@ public record AudienceComputeResult(
         return new AudienceComputeResult(audienceId, audienceName, "FAILED", null, null, errorMsg);
     }
 
-        /**
-     * 执行 in Progress 对应的业务逻辑。
+    /**
+     * 构造“已有计算进行中”的结果。
      *
-     * <p>实现会处理 MQ 消息、路由或发送记录，影响异步触发链路。
+     * <p>调用方据此等待或重试，不会重复启动同一人群的离线计算。
      *
-     * @param audienceId audienceId 对应的业务主键或标识
-     * @param audienceName audienceName 方法执行所需的业务参数
-     * @param message message 方法执行所需的业务参数
-     * @return 当前对象实例，便于继续链式配置或后续处理
+     * @param audienceId 人群定义 ID
+     * @param audienceName 人群展示名
+     * @param message 进行中原因或锁占用提示
+     * @return IN_PROGRESS 状态的人群计算结果
      */
     public static AudienceComputeResult inProgress(Long audienceId, String audienceName, String message) {
         return new AudienceComputeResult(audienceId, audienceName, "IN_PROGRESS", null, null, message);

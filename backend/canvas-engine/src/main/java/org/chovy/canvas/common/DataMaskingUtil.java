@@ -1,5 +1,9 @@
 package org.chovy.canvas.common;
 
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.regex.Pattern;
 
@@ -41,6 +45,10 @@ public final class DataMaskingUtil {
         if (json == null || json.isBlank()) return json;
         String result = json;
         for (String key : sensitiveKeys) {
+            result = result.replaceAll(
+                    "(?i)\"" + key + "\"\\s*:\\s*\"[^\"]*\"",
+                    "\"" + key + "\":\"******\""
+            );
             // 替换 "phone":"13812345678" → "phone":"138****5678"
             result = result.replaceAll(
                     "\"" + key + "\"\\s*:\\s*\"(\\d{3})\\d{4}(\\d{4})\"",
@@ -55,10 +63,62 @@ public final class DataMaskingUtil {
         return result;
     }
 
+    /** 递归脱敏 Map/List/String，可在写 trace 或日志前使用。 */
+    @SuppressWarnings("unchecked")
+    public static Object maskObject(Object value) {
+        return maskObject(value, DEFAULT_SENSITIVE_KEYS);
+    }
+
+    @SuppressWarnings("unchecked")
+    public static Object maskObject(Object value, Set<String> sensitiveKeys) {
+        if (value instanceof Map<?, ?> map) {
+            Map<String, Object> masked = new LinkedHashMap<>();
+            for (Map.Entry<?, ?> entry : map.entrySet()) {
+                String key = String.valueOf(entry.getKey());
+                if (isSensitiveKey(key, sensitiveKeys)) {
+                    masked.put(key, "******");
+                } else {
+                    masked.put(key, maskObject(entry.getValue(), sensitiveKeys));
+                }
+            }
+            return masked;
+        }
+        if (value instanceof List<?> list) {
+            List<Object> masked = new ArrayList<>(list.size());
+            for (Object item : list) {
+                masked.add(maskObject(item, sensitiveKeys));
+            }
+            return masked;
+        }
+        if (value instanceof String text) {
+            return maskIdCard(maskPhone(maskJson(text, sensitiveKeys)));
+        }
+        return value;
+    }
+
+    public static String maskText(String text) {
+        Object masked = maskObject(text);
+        return masked == null ? null : String.valueOf(masked);
+    }
+
+    private static boolean isSensitiveKey(String key, Set<String> sensitiveKeys) {
+        if (key == null) {
+            return false;
+        }
+        String normalized = key.toLowerCase();
+        return sensitiveKeys.stream()
+                .map(String::toLowerCase)
+                .anyMatch(normalized::contains);
+    }
+
     /** 默认敏感字段集合 */
     public static final Set<String> DEFAULT_SENSITIVE_KEYS = Set.of(
             "phone", "mobile", "phoneNumber", "mobileNumber",
             "idCard", "idNumber", "identityCard",
-            "bankCard", "cardNumber"
+            "bankCard", "cardNumber",
+            "password", "passwd", "pwd",
+            "token", "accessToken", "refreshToken",
+            "secret", "apiKey", "authorization",
+            "cookie", "session", "credential", "body"
     );
 }

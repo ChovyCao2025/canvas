@@ -1,7 +1,9 @@
 package org.chovy.canvas.config;
 
 import org.chovy.canvas.web.AuthController;
+import org.chovy.canvas.auth.domain.SysUserService;
 import org.chovy.canvas.auth.util.JwtUtil;
+import org.chovy.canvas.dal.dataobject.SysUserDO;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.JwtException;
 import lombok.RequiredArgsConstructor;
@@ -34,6 +36,8 @@ public class JwtAuthFilter implements WebFilter {
     private final JwtUtil             jwtUtil;
     /** Redis 模板，用于查询令牌黑名单。 */
     private final StringRedisTemplate redis;
+    /** 用户服务，用于按 JWT subject 反查当前用户状态和角色。 */
+    private final SysUserService      userService;
 
     /**
      * 执行 filter 对应的业务逻辑。
@@ -63,22 +67,44 @@ public class JwtAuthFilter implements WebFilter {
                     .subscribeOn(Schedulers.boundedElastic())
                     .flatMap(revoked -> {
                         if (revoked) {
-                            exchange.getResponse().setStatusCode(HttpStatus.UNAUTHORIZED);
-                            return exchange.getResponse().setComplete();
+                            return unauthorized(exchange);
                         }
 
-                        String role = claims.get("role", String.class);
-                        // 将 JWT claims 作为 principal 写入 Reactor Context，后续控制器通过 ReactiveSecurityContextHolder 读取。
-                        UsernamePasswordAuthenticationToken auth = new UsernamePasswordAuthenticationToken(
-                                claims, null,
-                                List.of(new SimpleGrantedAuthority("ROLE_" + role))
-                        );
-                        return chain.filter(exchange)
-                                .contextWrite(ReactiveSecurityContextHolder.withAuthentication(auth));
+                        return Mono.fromCallable(() -> loadCurrentUser(claims))
+                                .subscribeOn(Schedulers.boundedElastic())
+                                .flatMap(user -> {
+                                    if (user == null || user.getEnabled() == null || user.getEnabled() != 1
+                                            || user.getRole() == null || user.getRole().isBlank()) {
+                                        return unauthorized(exchange);
+                                    }
+                                    // principal 仍保持 Claims 类型，兼容现有控制器；权限以 DB 当前角色为准。
+                                    claims.put("username", user.getUsername());
+                                    claims.put("role", user.getRole());
+                                    claims.put("displayName", user.getDisplayName());
+                                    UsernamePasswordAuthenticationToken auth =
+                                            new UsernamePasswordAuthenticationToken(
+                                                    claims, null,
+                                                    List.of(new SimpleGrantedAuthority("ROLE_" + user.getRole()))
+                                            );
+                                    return chain.filter(exchange)
+                                            .contextWrite(ReactiveSecurityContextHolder.withAuthentication(auth));
+                                });
                     });
-        } catch (JwtException e) {
-            exchange.getResponse().setStatusCode(HttpStatus.UNAUTHORIZED);
-            return exchange.getResponse().setComplete();
+        } catch (JwtException | IllegalArgumentException e) {
+            return unauthorized(exchange);
         }
+    }
+
+    private SysUserDO loadCurrentUser(Claims claims) {
+        String subject = claims.getSubject();
+        if (subject == null || subject.isBlank()) {
+            return null;
+        }
+        return userService.findById(Long.parseLong(subject));
+    }
+
+    private Mono<Void> unauthorized(ServerWebExchange exchange) {
+        exchange.getResponse().setStatusCode(HttpStatus.UNAUTHORIZED);
+        return exchange.getResponse().setComplete();
     }
 }

@@ -47,19 +47,19 @@ class TriggerRouteServiceTest {
     }
 
     @Test
-    void getCanvasByMqTopicCachesRedisSetUntilRouteChanges() {
+    void getCanvasByMqTopicReadsRedisEachTimeToAvoidCrossInstanceStaleRoutes() {
         when(setOps.members("test:trigger:mq:order.paid")).thenReturn(Set.of("101"));
 
         assertThat(service.getCanvasByMqTopic("order.paid")).containsExactly("101");
         assertThat(service.getCanvasByMqTopic("order.paid")).containsExactly("101");
 
-        verify(setOps, times(1)).members("test:trigger:mq:order.paid");
+        verify(setOps, times(2)).members("test:trigger:mq:order.paid");
 
         when(setOps.members("test:trigger:mq:order.paid")).thenReturn(Set.of("101", "202"));
         service.registerMq(202L, "order.paid");
 
         assertThat(service.getCanvasByMqTopic("order.paid")).containsExactlyInAnyOrder("101", "202");
-        verify(setOps, times(2)).members("test:trigger:mq:order.paid");
+        verify(setOps, times(3)).members("test:trigger:mq:order.paid");
     }
 
     @Test

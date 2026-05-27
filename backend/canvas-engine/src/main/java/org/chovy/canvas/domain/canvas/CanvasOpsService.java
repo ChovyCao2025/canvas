@@ -7,6 +7,7 @@ import org.chovy.canvas.common.enums.ExecutionStatus;
 import org.chovy.canvas.common.enums.VersionStatus;
 import org.chovy.canvas.dal.dataobject.CanvasExecutionDO;
 import org.chovy.canvas.dal.mapper.CanvasExecutionMapper;
+import org.chovy.canvas.dal.mapper.CanvasExecutionRequestMapper;
 import org.chovy.canvas.engine.trigger.TriggerPreCheckService;
 import org.chovy.canvas.infrastructure.redis.TriggerRouteService;
 import lombok.RequiredArgsConstructor;
@@ -31,6 +32,8 @@ public class CanvasOpsService {
     private final CanvasVersionMapper canvasVersionMapper;
     /** 执行记录 Mapper，用于 FORCE kill 时终止运行中记录。 */
     private final CanvasExecutionMapper executionMapper;
+    /** 执行请求 Mapper，用于 FORCE kill 时终止持久请求队列状态。 */
+    private final CanvasExecutionRequestMapper executionRequestMapper;
     /** 触发路由服务，负责 Redis 路由注册、清理和查询。 */
     private final TriggerRouteService triggerRouteService;
     /** 触发预检服务，负责有效期、配额、冷却期和并发保护校验。 */
@@ -95,6 +98,7 @@ public class CanvasOpsService {
         if ("FORCE".equalsIgnoreCase(mode)) {
             // FORCE 模式需要同步落库终止存量 RUNNING 记录，避免执行态长期悬挂。
             markRunningExecutionsFailed(id);
+            executionRequestMapper.markForceCancelledByCanvas(id, java.time.LocalDateTime.now());
         }
         // 清理触发路由、调度任务、缓存、配额
         canvasService.applyKillExternalCleanup(id, publishedVersionId);

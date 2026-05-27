@@ -1,7 +1,9 @@
 package org.chovy.canvas.engine.scheduler;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.chovy.canvas.common.DataMaskingUtil;
 import org.chovy.canvas.common.MapFieldKeys;
+import org.chovy.canvas.common.enums.ExecutionStatus;
 import org.chovy.canvas.common.enums.NodeType;
 import org.chovy.canvas.common.enums.TriggerType;
 import org.chovy.canvas.dal.dataobject.CanvasExecutionDlqDO;
@@ -247,7 +249,7 @@ public class DagEngine {
                 Map<String, Object> enrichedConfig = new HashMap<>(config);
                 enrichedConfig.put(MapFieldKeys.UPSTREAM_IDS, graph.upstream(nodeId));
                 enrichedConfig.put(MapFieldKeys.NODE_ID_INTERNAL, nodeId);
-                scheduleThresholdTimeoutIfNeeded(nodeId, config, ctx);
+                scheduleThresholdTimeoutIfNeeded(graph, nodeId, node, config, ctx, depth);
                 return executeNodeAfterStage2(graph, nodeId, node, enrichedConfig, ctx, depth);
             }
 
@@ -627,19 +629,8 @@ public class DagEngine {
                         ? n.intValue() : (int) globalTimeout;
 
                 Mono.delay(Duration.ofSeconds(timeoutSec), VIRTUAL)
-                        .subscribe(__ -> {
-                            if (ctx.setNodeStatusIfNotDone(nodeId, NodeStatus.FAILED)) {
-                                log.warn("[ENGINE] LOGIC_RELATION 等待超时 timeout={}s nodeId={}", timeoutSec, nodeId);
-                                ctxStore.save(ctx);
-                                executionService.trigger(
-                                                ctx.getCanvasId(), ctx.getUserId(),
-                                                TriggerType.LOGIC_RELATION_TIMEOUT, NodeType.LOGIC_RELATION,
-                                                nodeId, Map.of(),
-                                                ctx.getExecutionId() + ":lr-timeout:" + nodeId, false)
-                                        .subscribe(null,
-                                                (Throwable e) -> log.error("[LOGIC_RELATION] 超时恢复失败 nodeId={}: {}", nodeId, e.getMessage()));
-                            }
-                        });
+                        .subscribe(__ -> handleSpecialNodeTimeout(graph, nodeId, node, config, ctx, depth,
+                                "LOGIC_RELATION", timeoutSec));
                 log.debug("[LOGIC_RELATION] 启动等待超时定时器 {}s nodeId={}", timeoutSec, nodeId);
             }
             log.debug("[ENGINE] LOGIC_RELATION 条件未满足，进入 WAITING nodeId={}", nodeId);
@@ -727,20 +718,8 @@ public class DagEngine {
 
                 // 延迟任务：超时后若 Hub 仍未完成则标记 FAILED，持久化 ctx，触发执行恢复
                 Mono.delay(Duration.ofSeconds(timeoutSec), VIRTUAL)
-                        .subscribe(__ -> {
-                            if (ctx.setNodeStatusIfNotDone(nodeId, NodeStatus.FAILED)) {
-                                log.warn("[HUB] 等待超时 timeout={}s nodeId={}", timeoutSec, nodeId);
-                                ctxStore.save(ctx);   // 同步回写 Redis，避免内存与持久化状态不一致
-                                // 触发执行恢复：让执行引擎感知 FAILED 状态并继续后续处理
-                                executionService.trigger(
-                                                ctx.getCanvasId(), ctx.getUserId(),
-                                                TriggerType.HUB_TIMEOUT, NodeType.HUB,
-                                                nodeId, Map.of(),
-                                                ctx.getExecutionId() + ":hub-timeout:" + nodeId, false)
-                                        .subscribe(null,
-                                                (Throwable e) -> log.error("[HUB] 超时恢复失败 nodeId={}: {}", nodeId, e.getMessage()));
-                            }
-                        });
+                        .subscribe(__ -> handleSpecialNodeTimeout(graph, nodeId, node, config, ctx, depth,
+                                "HUB", timeoutSec));
 
                 log.debug("[HUB] 启动超时定时器 {}s nodeId={}", timeoutSec, nodeId);
             } else {
@@ -790,19 +769,8 @@ public class DagEngine {
                 int timeoutSec = config.get("timeout") instanceof Number n ? n.intValue() : (int) globalTimeout;
 
                 Mono.delay(Duration.ofSeconds(timeoutSec), VIRTUAL)
-                        .subscribe(__ -> {
-                            if (ctx.setNodeStatusIfNotDone(nodeId, NodeStatus.FAILED)) {
-                                log.warn("[AGGREGATE] 等待超时 timeout={}s nodeId={}", timeoutSec, nodeId);
-                                ctxStore.save(ctx);
-                                executionService.trigger(
-                                                ctx.getCanvasId(), ctx.getUserId(),
-                                                TriggerType.AGGREGATE_TIMEOUT, NodeType.AGGREGATE,
-                                                nodeId, Map.of(),
-                                                ctx.getExecutionId() + ":ag-timeout:" + nodeId, false)
-                                        .subscribe(null,
-                                                (Throwable e) -> log.error("[AGGREGATE] 超时恢复失败 nodeId={}: {}", nodeId, e.getMessage()));
-                            }
-                        });
+                        .subscribe(__ -> handleSpecialNodeTimeout(graph, nodeId, node, config, ctx, depth,
+                                "AGGREGATE", timeoutSec));
                 log.debug("[AGGREGATE] 启动超时定时器 {}s nodeId={}", timeoutSec, nodeId);
             }
             return Mono.just(Map.of());
@@ -821,25 +789,89 @@ public class DagEngine {
     /**
      * THRESHOLD 超时调度（首次触发时启动，防止所有上游都不完成导致永久 WAITING）
      */
-    private void scheduleThresholdTimeoutIfNeeded(String nodeId, Map<String, Object> config,
-                                                  ExecutionContext ctx) {
+    private void scheduleThresholdTimeoutIfNeeded(DagGraph graph,
+                                                  String nodeId,
+                                                  DagParser.CanvasNode node,
+                                                  Map<String, Object> config,
+                                                  ExecutionContext ctx,
+                                                  int depth) {
         String timerKey = "th:" + nodeId;
         if (!ctx.getScheduledHubTimeouts().add(timerKey)) return;
         int timeoutSec = config.get("timeout") instanceof Number n ? n.intValue() : (int) globalTimeout;
         Mono.delay(Duration.ofSeconds(timeoutSec), VIRTUAL)
-                .subscribe(__ -> {
-                    if (ctx.setNodeStatusIfNotDone(nodeId, NodeStatus.FAILED)) {
-                        log.warn("[THRESHOLD] 等待超时 timeout={}s nodeId={}", timeoutSec, nodeId);
-                        ctxStore.save(ctx);
-                        executionService.trigger(
-                                        ctx.getCanvasId(), ctx.getUserId(),
-                                        TriggerType.THRESHOLD_TIMEOUT, NodeType.THRESHOLD,
-                                        nodeId, Map.of(),
-                                        ctx.getExecutionId() + ":th-timeout:" + nodeId, false)
-                                .subscribe(null,
-                                        (Throwable e) -> log.error("[THRESHOLD] 超时恢复失败 nodeId={}: {}", nodeId, e.getMessage()));
-                    }
-                });
+                .subscribe(__ -> handleSpecialNodeTimeout(graph, nodeId, node, config, ctx, depth,
+                        "THRESHOLD", timeoutSec));
+    }
+
+    private void handleSpecialNodeTimeout(DagGraph graph,
+                                          String nodeId,
+                                          DagParser.CanvasNode node,
+                                          Map<String, Object> config,
+                                          ExecutionContext ctx,
+                                          int depth,
+                                          String label,
+                                          int timeoutSec) {
+        if (!ctx.setNodeStatusIfNotDone(nodeId, NodeStatus.TIMEOUT)) {
+            return;
+        }
+        log.warn("[{}] 等待超时 timeout={}s nodeId={}", label, timeoutSec, nodeId);
+        String targetNodeId = resolveSpecialTimeoutTarget(config);
+        Map<String, Object> timeoutOutput = new LinkedHashMap<>();
+        timeoutOutput.put(MapFieldKeys.NODE_ID, nodeId);
+        timeoutOutput.put(MapFieldKeys.NODE_TYPE, node.getType());
+        timeoutOutput.put(MapFieldKeys.OUTCOME, NodeOutcome.TIMEOUT.name());
+        timeoutOutput.put(MapFieldKeys.REASON_CODE, "SPECIAL_NODE_TIMEOUT");
+        timeoutOutput.put(MapFieldKeys.REASON_MESSAGE, label + " 等待超时");
+        ctx.putNodeOutput(nodeId, timeoutOutput);
+        writeTraceEnd(ctx, node, NodeResult.timeout(targetNodeId,
+                "SPECIAL_NODE_TIMEOUT", label + " 等待超时"), 0);
+
+        if (targetNodeId == null || targetNodeId.isBlank()) {
+            ctxStore.delete(ctx.getCanvasId(), ctx.getUserId());
+            executionService.completePausedExecution(ctx, ExecutionStatus.FAILED.getCode(), timeoutOutput)
+                    .subscribe(null,
+                            e -> log.error("[{}] 超时终态落库失败 nodeId={}: {}", label, nodeId, e.getMessage()));
+            return;
+        }
+
+        ctxStore.save(ctx);
+        executeNode(graph, targetNodeId, ctx, depth + 1)
+                .defaultIfEmpty(Map.of())
+                .flatMap(result -> completeSpecialTimeoutContinuation(graph, ctx, result))
+                .onErrorResume(e -> {
+                    Map<String, Object> error = Map.of(
+                            MapFieldKeys.ERROR, e.getMessage(),
+                            MapFieldKeys.NODE_ID, nodeId,
+                            MapFieldKeys.OUTCOME, NodeOutcome.TIMEOUT.name());
+                    ctxStore.delete(ctx.getCanvasId(), ctx.getUserId());
+                    return executionService.completePausedExecution(ctx,
+                            ExecutionStatus.FAILED.getCode(), error);
+                })
+                .subscribe(null,
+                        e -> log.error("[{}] 超时分支执行失败 nodeId={}: {}", label, nodeId, e.getMessage()));
+    }
+
+    private Mono<Void> completeSpecialTimeoutContinuation(
+            DagGraph graph, ExecutionContext ctx, Map<String, Object> result) {
+        Map<String, Object> safeResult = result == null ? Map.of() : result;
+        if (hasWaitingNodes(ctx)) {
+            ctxStore.save(ctx);
+            return executionService.completePausedExecution(ctx,
+                    ExecutionStatus.PAUSED.getCode(), safeResult);
+        }
+        writeSkippedNodesIfComplete(graph, ctx);
+        ctxStore.delete(ctx.getCanvasId(), ctx.getUserId());
+        return executionService.completePausedExecution(ctx,
+                ExecutionStatus.SUCCESS.getCode(), safeResult);
+    }
+
+    private String resolveSpecialTimeoutTarget(Map<String, Object> config) {
+        Object timeoutTarget = config.get(MapFieldKeys.TIMEOUT_NODE_ID);
+        if (timeoutTarget instanceof String s && !s.isBlank()) {
+            return s;
+        }
+        Object failTarget = config.get(MapFieldKeys.FAIL_NODE_ID);
+        return failTarget instanceof String s && !s.isBlank() ? s : null;
     }
 
     /**
@@ -1154,7 +1186,7 @@ public class DagEngine {
         try {
             if (result.output() != null && !result.output().isEmpty()) {
                 // trace 只保存节点输出快照，序列化失败不阻断业务结果返回。
-                outputJson = objectMapper.writeValueAsString(result.output());
+                outputJson = objectMapper.writeValueAsString(DataMaskingUtil.maskObject(result.output()));
             }
         } catch (Exception ignored) {
         }
@@ -1166,7 +1198,7 @@ public class DagEngine {
                 .nodeName(node.getName())
                 .status(status)
                 .outputData(outputJson)
-                .errorMsg(result.errorMessage())
+                .errorMsg(DataMaskingUtil.maskText(result.errorMessage()))
                 .finishedAt(LocalDateTime.now())
                 .durationMs(durationMs > 0 ? durationMs : null)
                 .build();
@@ -1237,6 +1269,9 @@ public class DagEngine {
      */
     private int traceStatus(NodeResult result) {
         if (!result.success()) {
+            return 2;
+        }
+        if (result.outcome() == NodeOutcome.TIMEOUT || result.outcome() == NodeOutcome.FAIL) {
             return 2;
         }
         if (result.outcome() == NodeOutcome.PENDING) {

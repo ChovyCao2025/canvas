@@ -91,13 +91,13 @@ public class OverflowRetryConsumer implements RocketMQListener<MessageExt> {
         );
     }
 
-        /**
-     * 执行 copy Payload 对应的业务逻辑。
+    /**
+     * 复制溢出重试载荷并清理内部控制字段。
      *
-     * <p>实现会处理 MQ 消息、路由或发送记录，影响异步触发链路。
+     * <p>业务节点只能看到原始触发参数，不能依赖重试链路的内部计数字段。
      *
-     * @param payload payload 请求体、消息体或事件载荷
-     * @return 按业务键组织的映射结果
+     * @param payload 原始触发载荷
+     * @return 可重新投递到 Disruptor 的载荷副本
      */
     private Map<String, Object> copyPayload(Map<String, Object> payload) {
         Map<String, Object> copy = new HashMap<>();

@@ -194,13 +194,13 @@ public class CanvasExecutionRequestManagementController {
                 .map(R::ok));
     }
 
-        /**
-     * 发布或发送 publish Request Best Effort 相关的业务数据。
+    /**
+     * 尝试立即投递重放后的执行请求。
      *
-     * <p>实现会处理 MQ 消息、路由或发送记录，影响异步触发链路。
+     * <p>状态已恢复为 PENDING 后再投递；即时投递失败时保留记录给后台补偿。
      *
-     * @param requestId requestId 对应的业务主键或标识
-     * @return 判断结果，true 表示校验通过或条件成立
+     * @param requestId 执行请求 ID
+     * @return {@code true} 表示即时投递成功
      */
     private boolean publishRequestBestEffort(String requestId) {
         try {
@@ -213,13 +213,13 @@ public class CanvasExecutionRequestManagementController {
         }
     }
 
-        /**
-     * 执行 require Replay Rate Limit 对应的业务逻辑。
+    /**
+     * 校验重放限流结果，失败时直接阻断本次管理操作。
      *
-     * <p>实现会处理 MQ 消息、路由或发送记录，影响异步触发链路。
+     * <p>限流按操作人维度控制，避免批量重放瞬时压垮执行队列。
      *
-     * @param allowed allowed 方法执行所需的业务参数
-     * @param message message 方法执行所需的业务参数
+     * @param allowed 是否已获得重放令牌
+     * @param message 限流失败时返回给调用方的错误信息
      */
     private void requireReplayRateLimit(boolean allowed, String message) {
         if (!allowed) {

@@ -3,6 +3,7 @@ package org.chovy.canvas.engine.trigger;
 import cn.hutool.core.lang.Snowflake;
 import cn.hutool.core.util.StrUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.apache.rocketmq.client.producer.SendResult;
 import org.apache.rocketmq.client.producer.SendStatus;
@@ -555,10 +556,8 @@ public class CanvasExecutionService {
         // A. 从 Caffeine L1 缓存加载画布实体，验证存在且已发布
         //    ⚠️ 分布式：L1 是 JVM 本地，画布下线后最多延迟一个缓存 TTL 才感知
         CanvasDO canvas = validateAndLoadCanvas(canvasId, dryRun);
-        boolean persistentRetry = persistentRequest && priorAttemptCount > 0;
-        boolean persistentRetryAfterOverflow = persistentRetry && "request_retry".equals(lastError);
         boolean internalContinuation = isInternalContinuationTrigger(triggerType);
-        boolean quotaBypass = internalContinuation || (persistentRetry && !persistentRetryAfterOverflow);
+        boolean quotaBypass = internalContinuation;
         ExecutionLane executionLane = executionLaneOverride != null
                 ? executionLaneOverride
                 : executionLaneResolver.resolve(
@@ -578,7 +577,7 @@ public class CanvasExecutionService {
 
         // C. 前置资格校验（不扣减配额）
         //    WAIT/GOAL 恢复触发跳过此检查：恢复不是新触发，冷却期不应拦截恢复路径
-        if (!dryRun && !isInternalContinuationTrigger(triggerType) && !persistentRetry) {
+        if (!dryRun && !internalContinuation) {
             preCheckService.checkWithoutQuotaAccounting(canvas, userId);
             if (overflowRetry) {
                 log.debug("[ENGINE] 溢出重试跳过配额扣减（扣减在 doExecute 中进行）canvasId={} userId={}", canvasId, userId);
@@ -593,7 +592,10 @@ public class CanvasExecutionService {
                     canvasId, userId, triggerType, triggerNodeType,
                     matchKey, payload, msgId, canvas,
                     overflowChainRetryCount, persistentRequest);
-            if (admission.isOverflow()) return admission.overflowResponse();
+            if (admission.isOverflow()) {
+                releaseDedupIfPresent(acquiredDedupKey);
+                return admission.overflowResponse();
+            }
             admissionLimit = admission.admissionLimit();
         }
 
@@ -635,6 +637,7 @@ public class CanvasExecutionService {
                 if (!ctxStore.acquireResumeLock(canvasId, userId, resumeLockInstanceId, globalTimeoutSec)) {
                     // 同一用户同一画布只允许一个恢复执行持有上下文，避免并发恢复写乱 ctx。
                     log.warn("[ENGINE] resume-lock 竞争失败，放弃本次触发 canvasId={}", canvasId);
+                    releaseDedupIfPresent(acquiredDedupKey);
                     return Map.<String, Object>of(MapFieldKeys.SKIPPED, "resume-lock");
                 }
                 resumeLockAcquired = true;
@@ -676,11 +679,14 @@ public class CanvasExecutionService {
                 // 使用 instanceId 原子释放（Lua check-then-del，防误删他机的锁）
                 ctxStore.releaseResumeLock(canvasId, userId, resumeLockInstanceId);
             }
-            if (acquiredDedupKey != null) {
-                // 准备阶段失败时释放 dedup，否则同一消息会被错误拦截到 TTL 结束。
-                ctxStore.releaseDedup(acquiredDedupKey);
-            }
+            releaseDedupIfPresent(acquiredDedupKey);
             throw e;
+        }
+    }
+
+    private void releaseDedupIfPresent(String acquiredDedupKey) {
+        if (acquiredDedupKey != null) {
+            ctxStore.releaseDedup(acquiredDedupKey);
         }
     }
 
@@ -1312,12 +1318,36 @@ public class CanvasExecutionService {
     /** 更新执行状态和结果 JSON，序列化失败时保留状态更新。 */
     private Mono<Void> updateExecution(CanvasExecutionDO exec, int status, Map<String, Object> result) {
         if (exec == null) return Mono.empty();
-        exec.setStatus(status);
+        return updateExecutionById(exec.getId(), status, result);
+    }
+
+    /** 供特殊节点超时兜底等内部恢复路径更新已暂停的原 execution。 */
+    public Mono<Void> completePausedExecution(ExecutionContext ctx, int status, Map<String, Object> result) {
+        if (ctx == null || ctx.getExecutionId() == null) {
+            return Mono.empty();
+        }
+        return updateExecutionById(ctx.getExecutionId(), status, result);
+    }
+
+    private Mono<Void> updateExecutionById(String executionId, int status, Map<String, Object> result) {
+        CanvasExecutionDO update = new CanvasExecutionDO();
+        update.setStatus(status);
         try {
-            exec.setResult(objectMapper.writeValueAsString(result));
+            update.setResult(objectMapper.writeValueAsString(result));
         } catch (Exception ignored) {
         }
-        return Mono.fromRunnable(() -> executionMapper.updateById(exec))
+        return Mono.fromRunnable(() -> {
+                    int updated = executionMapper.update(update,
+                            new LambdaUpdateWrapper<CanvasExecutionDO>()
+                                    .eq(CanvasExecutionDO::getId, executionId)
+                                    .in(CanvasExecutionDO::getStatus,
+                                            ExecutionStatus.RUNNING.getCode(),
+                                            ExecutionStatus.PAUSED.getCode()));
+                    if (updated == 0) {
+                        log.warn("[ENGINE] execution 状态未更新，可能已被终止 executionId={} targetStatus={}",
+                                executionId, status);
+                    }
+                })
                 .subscribeOn(Schedulers.boundedElastic())
                 .then();
     }

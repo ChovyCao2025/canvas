@@ -66,9 +66,9 @@ public class ApiDefinitionController {
     @PostMapping
     public Mono<R<ApiDefinitionDO>> create(@RequestBody ApiDefinitionDO body) {
         return Mono.fromCallable(() -> {
+            validateRateLimit(body);
             // API_CALL 节点会按该 URL 发起出站请求，入库前先做协议和内网地址校验。
             validateOutboundUrl(body, true);
-            validateRateLimit(body);
             // 兼容前端未传的开关字段，避免数据库默认值和更新语义不一致。
             if (body.getEnabled() == null) body.setEnabled(1);
             if (body.getIncludeContextPayload() == null) body.setIncludeContextPayload(0);
@@ -91,9 +91,9 @@ public class ApiDefinitionController {
     public Mono<R<Void>> update(@PathVariable Long id, @RequestBody JsonNode bodyNode) {
         return Mono.<Void>fromRunnable(() -> {
             ApiDefinitionDO body = objectMapper.convertValue(bodyNode, ApiDefinitionDO.class);
+            validateRateLimit(body);
             // 更新时只有显式传 url 才校验，支持局部更新其他字段。
             validateOutboundUrl(body, false);
-            validateRateLimit(body);
             if (hasExplicitNullRateLimit(bodyNode)) {
                 // MyBatis-Plus updateById 默认不会把 null 写入数据库，需单独构造 set null。
                 body.setId(null);

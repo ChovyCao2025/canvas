@@ -151,6 +151,7 @@ class TieredCacheTest {
         cache.invalidate(42);
 
         verify(redis).delete("sample:v1:42");
+        verify(redis).expire("sample:v1:__invalidate__:42", Duration.ofHours(2));
         verify(redis).convertAndSend("tiered-cache:sample:invalidate", "42");
     }
 

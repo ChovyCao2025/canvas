@@ -120,6 +120,20 @@ public interface CanvasExecutionRequestMapper extends BaseMapper<CanvasExecution
 
     @Update("""
             UPDATE canvas_execution_request
+            SET status = 'FAILED',
+                last_error = 'FORCE_CANCELLED',
+                result_json = '{"error":"FORCE_CANCELLED"}',
+                next_retry_at = NULL,
+                run_token = NULL,
+                updated_at = #{now}
+            WHERE canvas_id = #{canvasId}
+              AND status IN ('PENDING', 'RETRY', 'RUNNING')
+            """)
+    int markForceCancelledByCanvas(@Param("canvasId") Long canvasId,
+                                   @Param("now") LocalDateTime now);
+
+    @Update("""
+            UPDATE canvas_execution_request
             SET status = 'PENDING',
                 attempt_count = 0,
                 next_retry_at = NULL,

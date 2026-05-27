@@ -7,6 +7,8 @@ package org.chovy.cache.strategy;
  * <p>该枚举帮助缓存实例在性能和一致性之间选择明确取舍。
  */
 public enum ConsistencyStrategy {
+    /** 写入后允许缓存最终一致。 */
     EVENTUAL,
+    /** 写入后执行延迟双删降低脏读概率。 */
     DOUBLE_DELETE
 }

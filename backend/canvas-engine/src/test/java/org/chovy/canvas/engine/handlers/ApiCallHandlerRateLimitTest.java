@@ -335,7 +335,7 @@ class ApiCallHandlerRateLimitTest {
         ApiDefinitionDO def = new ApiDefinitionDO();
         def.setApiKey("test_api");
         def.setEnabled(1);
-        def.setUrl("https://example.test/api");
+        def.setUrl("http://93.184.216.34/api");
         def.setMethod("POST");
         def.setRateLimitPerSec(rateLimitPerSec);
         return def;

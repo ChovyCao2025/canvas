@@ -88,15 +88,15 @@ public class AudienceComputeTaskRunner {
         Thread.ofVirtual().start(() -> runNow(taskId, audienceId, audienceName, operator));
     }
 
-        /**
-     * 执行 run Now 对应的业务逻辑。
+    /**
+     * 同步执行一次人群计算任务并落地任务状态。
      *
-     * <p>实现会处理 MQ 消息、路由或发送记录，影响异步触发链路。
+     * <p>成功、失败和计算锁等待都会写回异步任务，并按订阅关系发送结果通知。
      *
-     * @param taskId taskId 对应的业务主键或标识
-     * @param audienceId audienceId 对应的业务主键或标识
-     * @param audienceName audienceName 方法执行所需的业务参数
-     * @param operator operator 操作人标识
+     * @param taskId 异步任务 ID
+     * @param audienceId 人群定义 ID
+     * @param audienceName 人群展示名
+     * @param operator 发起计算的操作人
      */
     public void runNow(String taskId, Long audienceId, String audienceName, String operator) {
         asyncTaskService.markRunning(taskId);
@@ -166,13 +166,13 @@ public class AudienceComputeTaskRunner {
         return "/audiences?highlight=" + audienceId + "&taskId=" + taskId;
     }
 
-        /**
-     * 写入或记录 mark Failed Best Effort 相关的业务数据。
+    /**
+     * 尝试把任务标记为失败。
      *
-     * <p>实现会处理 MQ 消息、路由或发送记录，影响异步触发链路。
+     * <p>异常处理链路中不能再次抛出状态写入错误，否则会掩盖原始计算异常。
      *
-     * @param taskId taskId 对应的业务主键或标识
-     * @param error error 方法执行所需的业务参数
+     * @param taskId 异步任务 ID
+     * @param error 已截断的失败原因
      */
     private void markFailedBestEffort(String taskId, String error) {
         try {
@@ -216,17 +216,17 @@ public class AudienceComputeTaskRunner {
         Thread.sleep(lockRetryDelay.toMillis());
     }
 
-        /**
-     * 创建或新增 create Notification Best Effort 相关的业务数据。
+    /**
+     * 尝试创建单个任务结果通知。
      *
-     * <p>实现会处理 MQ 消息、路由或发送记录，影响异步触发链路。
+     * <p>通知失败只记录日志，不影响任务最终状态。
      *
-     * @param operator operator 操作人标识
-     * @param type type 类型标识或分类条件
-     * @param title title 方法执行所需的业务参数
-     * @param content content 方法执行所需的业务参数
-     * @param targetUrl targetUrl 方法执行所需的业务参数
-     * @param taskId taskId 对应的业务主键或标识
+     * @param operator 通知接收人
+     * @param type 通知类型
+     * @param title 通知标题
+     * @param content 通知内容
+     * @param targetUrl 前端跳转地址
+     * @param taskId 关联异步任务 ID
      */
     private void createNotificationBestEffort(
             String operator, String type, String title, String content, String targetUrl, String taskId) {
@@ -257,14 +257,14 @@ public class AudienceComputeTaskRunner {
         }
     }
 
-        /**
-     * 执行 notification Recipients 对应的业务逻辑。
+    /**
+     * 汇总人群计算任务的通知接收人。
      *
-     * <p>实现会处理 MQ 消息、路由或发送记录，影响异步触发链路。
+     * <p>优先使用任务订阅者；订阅读取失败或为空时回退到本次操作人。
      *
-     * @param taskId taskId 对应的业务主键或标识
-     * @param fallbackOperator fallbackOperator 操作人标识
-     * @return 查询、转换或计算得到的结果集合
+     * @param taskId 异步任务 ID
+     * @param fallbackOperator 订阅为空时使用的操作人
+     * @return 去重后的通知接收人列表
      */
     private List<String> notificationRecipients(String taskId, String fallbackOperator) {
         LinkedHashSet<String> recipients = new LinkedHashSet<>();
@@ -304,13 +304,13 @@ public class AudienceComputeTaskRunner {
         return "人群 " + audienceId;
     }
 
-        /**
-     * 执行 error Message 对应的业务逻辑。
+    /**
+     * 提取并截断任务失败原因。
      *
-     * <p>实现会处理 MQ 消息、路由或发送记录，影响异步触发链路。
+     * <p>异步任务表只保存摘要，完整异常仍通过日志定位。
      *
-     * @param e e 方法执行所需的业务参数
-     * @return 转换或查询得到的字符串结果
+     * @param e 人群计算抛出的异常
+     * @return 可写入任务结果的失败摘要
      */
     private String errorMessage(Exception e) {
         String message = e.getMessage();

@@ -97,4 +97,39 @@ class DagParserTest {
         assertThat(g.getNode("n1").getOutletSchema()).contains("success");
         assertThat(g.downstream("n1")).containsExactlyInAnyOrder("n2", "n3", "n4", "n5", "n6", "n7");
     }
+
+    @Test
+    @DisplayName("普通副作用节点不允许直接多入边收敛")
+    void normal_node_multi_input_convergence_rejected() {
+        String json = """
+            {"nodes":[
+              {"id":"start","type":"MQ_TRIGGER","config":{"successNodeId":"a","failNodeId":"b"}},
+              {"id":"a","type":"DELAY","config":{"nextNodeId":"send"}},
+              {"id":"b","type":"DELAY","config":{"nextNodeId":"send"}},
+              {"id":"send","type":"SEND_SMS","config":{}}
+            ]}
+            """;
+
+        assertThatThrownBy(() -> parser.parse(json))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("多分支收敛")
+                .hasMessageContaining("send");
+    }
+
+    @Test
+    @DisplayName("显式收敛节点允许多入边")
+    void convergence_nodes_allow_multi_input() {
+        for (String type : java.util.List.of("HUB", "LOGIC_RELATION", "AGGREGATE", "THRESHOLD")) {
+            String json = """
+                {"nodes":[
+                  {"id":"start","type":"MQ_TRIGGER","config":{"successNodeId":"a","failNodeId":"b"}},
+                  {"id":"a","type":"DELAY","config":{"nextNodeId":"merge"}},
+                  {"id":"b","type":"DELAY","config":{"nextNodeId":"merge"}},
+                  {"id":"merge","type":"%s","config":{}}
+                ]}
+                """.formatted(type);
+
+            assertThat(parser.parse(json).upstream("merge")).containsExactlyInAnyOrder("a", "b");
+        }
+    }
 }

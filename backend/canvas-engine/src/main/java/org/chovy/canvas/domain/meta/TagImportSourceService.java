@@ -5,6 +5,7 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
+import org.chovy.canvas.common.OutboundUrlValidator;
 import org.chovy.canvas.dto.TagImportResult;
 import org.chovy.canvas.dto.TagImportRow;
 import org.springframework.http.HttpMethod;
@@ -22,6 +23,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 import org.chovy.canvas.dal.dataobject.TagImportSourceDO;
 import org.chovy.canvas.dal.mapper.TagImportSourceMapper;
 
@@ -37,6 +39,11 @@ public class TagImportSourceService {
 
     /** API 来源中标签时间字段的默认解析格式。 */
     private static final DateTimeFormatter TAG_TIME_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
+    /** 禁止由配置覆盖的 HTTP 请求头，避免 SSRF 绕过和请求走私风险。 */
+    private static final Set<String> BLOCKED_HEADER_NAMES = Set.of(
+            "host", "cookie", "set-cookie", "content-length", "transfer-encoding",
+            "connection", "proxy-authorization", "proxy-authenticate", "forwarded",
+            "x-forwarded-for", "x-forwarded-host", "x-forwarded-proto");
 
     /** 标签导入来源 Mapper。 */
     private final TagImportSourceMapper tagImportSourceMapper;
@@ -122,6 +129,7 @@ public class TagImportSourceService {
 
     /** 按来源配置发起 HTTP 请求并返回 JSON 响应体。 */
     private JsonNode executeRequest(TagImportSourceDO source) {
+        OutboundUrlValidator.validateHttpUrl(source.getUrl());
         HttpMethod method = resolveMethod(source.getMethod());
         WebClient.RequestBodyUriSpec request = webClientBuilder.build().method(method);
         WebClient.RequestHeadersSpec<?> spec = request.uri(source.getUrl());
@@ -145,7 +153,12 @@ public class TagImportSourceService {
             WebClient.RequestHeadersSpec<?> current = spec;
             for (Map.Entry<String, Object> entry : headers.entrySet()) {
                 if (entry.getValue() != null) {
-                    current = current.header(entry.getKey(), String.valueOf(entry.getValue()));
+                    String headerName = normalizeHeaderName(entry.getKey());
+                    if (BLOCKED_HEADER_NAMES.contains(headerName)
+                            || headerName.startsWith("proxy-")) {
+                        throw new IllegalArgumentException("headersJson 包含不允许的请求头: " + entry.getKey());
+                    }
+                    current = current.header(entry.getKey().trim(), String.valueOf(entry.getValue()));
                 }
             }
             return current;
@@ -273,6 +286,7 @@ public class TagImportSourceService {
         if (!hasText(body.getUrl())) {
             throw new IllegalArgumentException("url is required");
         }
+        OutboundUrlValidator.validateHttpUrl(body.getUrl().trim());
         if (!hasText(body.getFieldMapping())) {
             throw new IllegalArgumentException("fieldMapping is required");
         }
@@ -340,5 +354,12 @@ public class TagImportSourceService {
     /** 判断字符串是否包含非空白字符。 */
     private static boolean hasText(String value) {
         return value != null && !value.trim().isEmpty();
+    }
+
+    private static String normalizeHeaderName(String value) {
+        if (!hasText(value)) {
+            throw new IllegalArgumentException("headersJson 包含空请求头名");
+        }
+        return value.trim().toLowerCase(Locale.ROOT);
     }
 }

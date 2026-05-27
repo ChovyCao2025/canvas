@@ -156,14 +156,14 @@ public class MqTriggerConsumer implements RocketMQListener<MessageExt> {
         }
     }
 
-        /**
-     * 构建、解析或转换 parse Canvas Id 相关的业务数据。
+    /**
+     * 解析路由表中的画布 ID，非法路由只记录指标并跳过当前画布。
      *
-     * <p>实现会处理 MQ 消息、路由或发送记录，影响异步触发链路。
+     * <p>路由表异常不应阻断同一 MQ tag 下其他画布继续消费。
      *
-     * @param canvasIdStr canvasIdStr 画布相关对象或标识
-     * @param tag tag 方法执行所需的业务参数
-     * @return 计算得到的数值结果
+     * @param canvasIdStr 路由表保存的画布 ID 字符串
+     * @param tag 当前 MQ 消息 tag，用于日志和拒绝指标
+     * @return 合法画布 ID；非法时返回 {@code null}
      */
     private Long parseCanvasId(String canvasIdStr, String tag) {
         try {
@@ -180,12 +180,12 @@ public class MqTriggerConsumer implements RocketMQListener<MessageExt> {
         }
     }
 
-        /**
-     * 校验 validate Message 相关的业务数据。
+    /**
+     * 校验 MQ 触发消息的必填业务字段。
      *
-     * <p>实现会处理 MQ 消息、路由或发送记录，影响异步触发链路。
+     * <p>字段缺失会进入 rejected 表和系统告警，而不是交给执行引擎兜底。
      *
-     * @param message message 方法执行所需的业务参数
+     * @param message 已反序列化的 MQ 触发消息
      */
     private void validateMessage(MqTriggerMessage message) {
         if (message.getUserId() == null || message.getUserId().isBlank()) {
@@ -199,13 +199,13 @@ public class MqTriggerConsumer implements RocketMQListener<MessageExt> {
         }
     }
 
-        /**
-     * 写入或记录 record Rejected 相关的业务数据。
+    /**
+     * 记录 MQ 消费维度的拒绝指标。
      *
-     * <p>实现会处理 MQ 消息、路由或发送记录，影响异步触发链路。
+     * <p>指标采集失败不能影响消息消费结果，因此这里按 best-effort 处理。
      *
-     * @param reason reason 方法执行所需的业务参数
-     * @param tag tag 方法执行所需的业务参数
+     * @param reason 拒绝原因编码
+     * @param tag 当前 MQ 消息 tag
      */
     private void recordRejected(String reason, String tag) {
         try {
@@ -214,13 +214,13 @@ public class MqTriggerConsumer implements RocketMQListener<MessageExt> {
         }
     }
 
-        /**
-     * 写入或记录 record Route Rejected 相关的业务数据。
+    /**
+     * 记录 MQ 路由维度的拒绝指标。
      *
-     * <p>实现会处理 MQ 消息、路由或发送记录，影响异步触发链路。
+     * <p>用于区分消息体问题和路由表脏数据，便于后续排查。
      *
-     * @param reason reason 方法执行所需的业务参数
-     * @param tag tag 方法执行所需的业务参数
+     * @param reason 路由拒绝原因编码
+     * @param tag 当前 MQ 消息 tag
      */
     private void recordRouteRejected(String reason, String tag) {
         try {
@@ -257,14 +257,14 @@ public class MqTriggerConsumer implements RocketMQListener<MessageExt> {
         }
     }
 
-        /**
-     * 执行 trim 对应的业务逻辑。
+    /**
+     * 按数据库字段长度截断文本。
      *
-     * <p>实现会处理 MQ 消息、路由或发送记录，影响异步触发链路。
+     * <p>rejected 表保存的是诊断信息，截断优先于写入失败。
      *
-     * @param value value 待写入、比较或转换的业务值
-     * @param maxLength maxLength 方法执行所需的业务参数
-     * @return 转换或查询得到的字符串结果
+     * @param value 原始文本
+     * @param maxLength 最大保留长度
+     * @return 截断后的文本，输入为 {@code null} 时返回 {@code null}
      */
     private String trim(String value, int maxLength) {
         if (value == null) {
@@ -273,13 +273,13 @@ public class MqTriggerConsumer implements RocketMQListener<MessageExt> {
         return value.length() <= maxLength ? value : value.substring(0, maxLength);
     }
 
-        /**
-     * 执行 trim Alert 对应的业务逻辑。
+    /**
+     * 截断系统告警内容，避免异常载荷过长影响通知展示。
      *
-     * <p>实现会处理 MQ 消息、路由或发送记录，影响异步触发链路。
+     * <p>告警只承载定位摘要，完整原文以 rejected 表为准。
      *
-     * @param value value 待写入、比较或转换的业务值
-     * @return 转换或查询得到的字符串结果
+     * @param value 原始告警内容
+     * @return 不超过告警长度上限的内容
      */
     private String trimAlert(String value) {
         if (value == null || value.length() <= ALERT_CONTENT_LIMIT) {

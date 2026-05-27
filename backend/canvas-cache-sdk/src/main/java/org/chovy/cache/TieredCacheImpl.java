@@ -867,7 +867,9 @@ public class TieredCacheImpl<K, V> implements TieredCache<K, V> {
      */
     private long bumpInvalidationVersion(K key) {
         try {
-            Long version = redis.opsForValue().increment(invalidationVersionKey(key));
+            String versionKey = invalidationVersionKey(key);
+            Long version = redis.opsForValue().increment(versionKey);
+            redis.expire(versionKey, invalidationVersionTtl());
             return version != null ? version : System.currentTimeMillis();
         } catch (Exception e) {
             if (redisWriteFailure == RedisFailureStrategy.FAIL_FAST) {
@@ -876,6 +878,20 @@ public class TieredCacheImpl<K, V> implements TieredCache<K, V> {
             log.warn("[TIERED_CACHE][{}] invalidation version bump failed key={}: {}", name, key, e.getMessage());
             return System.currentTimeMillis();
         }
+    }
+
+    private Duration invalidationVersionTtl() {
+        Duration max = maxDuration(l2Ttl, staleTtl);
+        max = maxDuration(max, nullValueTtl);
+        max = maxDuration(max, emptyValueTtl);
+        max = maxDuration(max, refreshAhead);
+        return max.plus(Duration.ofHours(1));
+    }
+
+    private static Duration maxDuration(Duration first, Duration second) {
+        if (first == null) return second == null ? Duration.ZERO : second;
+        if (second == null) return first;
+        return first.compareTo(second) >= 0 ? first : second;
     }
 
     /**
@@ -1372,12 +1388,12 @@ public class TieredCacheImpl<K, V> implements TieredCache<K, V> {
         return Optional.of(stale.value());
     }
 
-        /**
-     * 执行 maybe Refresh Ahead 对应的业务逻辑。
+    /**
+     * 在缓存接近二级过期前触发异步刷新。
      *
-     * <p>实现会处理 MQ 消息、路由或发送记录，影响异步触发链路。
+     * <p>刷新使用 inFlightLoads 去重，避免热点 key 同时触发多次回源加载。
      *
-     * @param key key 对应的缓存键、配置键或业务键
+     * @param key 待检查的缓存 key
      */
     private void maybeRefreshAhead(K key) {
         if (refreshAhead.isZero() || refreshAhead.compareTo(l2Ttl) >= 0) {

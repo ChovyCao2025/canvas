@@ -138,13 +138,13 @@ public class CanvasMqTriggerRejectedController {
         }).subscribeOn(Schedulers.boundedElastic());
     }
 
-        /**
-     * 构建、解析或转换 parse Message 相关的业务数据。
+    /**
+     * 从 rejected 记录中恢复原始 MQ 触发消息。
      *
-     * <p>实现会处理 MQ 消息、路由或发送记录，影响异步触发链路。
+     * <p>只有原始消息体仍可解析时才允许重放，避免制造新的脏执行请求。
      *
-     * @param rejected rejected 方法执行所需的业务参数
-     * @return 方法执行后的业务结果
+     * @param rejected 待重放的拒绝记录
+     * @return 反序列化后的 MQ 触发消息
      */
     private MqTriggerMessage parseMessage(CanvasMqTriggerRejectedDO rejected) {
         try {
@@ -155,12 +155,12 @@ public class CanvasMqTriggerRejectedController {
         }
     }
 
-        /**
-     * 校验 validate Message 相关的业务数据。
+    /**
+     * 校验 rejected 消息重放所需的最小字段。
      *
-     * <p>实现会处理 MQ 消息、路由或发送记录，影响异步触发链路。
+     * <p>重放入口复用 MQ 消费入口的字段约束，缺字段时立即拒绝。
      *
-     * @param message message 方法执行所需的业务参数
+     * @param message 从 rejected body 恢复出的消息
      */
     private void validateMessage(MqTriggerMessage message) {
         if (message.getUserId() == null || message.getUserId().isBlank()
@@ -170,13 +170,13 @@ public class CanvasMqTriggerRejectedController {
         }
     }
 
-        /**
-     * 构建、解析或转换 parse Canvas Id 相关的业务数据。
+    /**
+     * 解析当前路由表中的画布 ID。
      *
-     * <p>实现会处理 MQ 消息、路由或发送记录，影响异步触发链路。
+     * <p>重放按最新路由表执行，路由脏数据只跳过并记录日志。
      *
-     * @param raw raw 方法执行所需的业务参数
-     * @return 可能存在的查询结果，未命中或无数据时为空
+     * @param raw 路由表保存的画布 ID 字符串
+     * @return 合法画布 ID；非法或非正数时为空
      */
     private java.util.Optional<Long> parseCanvasId(String raw) {
         try {
@@ -189,13 +189,13 @@ public class CanvasMqTriggerRejectedController {
         }
     }
 
-        /**
-     * 发布或发送 publish Best Effort 相关的业务数据。
+    /**
+     * 尝试立即投递重放请求到 Disruptor。
      *
-     * <p>实现会处理 MQ 消息、路由或发送记录，影响异步触发链路。
+     * <p>投递失败不回滚已入库的执行请求，后台补偿仍可继续扫描处理。
      *
-     * @param requestId requestId 对应的业务主键或标识
-     * @return 判断结果，true 表示校验通过或条件成立
+     * @param requestId 已创建的执行请求 ID
+     * @return {@code true} 表示即时投递成功
      */
     private boolean publishBestEffort(String requestId) {
         try {

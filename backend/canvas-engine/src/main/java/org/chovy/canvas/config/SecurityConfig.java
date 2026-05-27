@@ -62,9 +62,13 @@ public class SecurityConfig {
                                 "/canvas/*/kill", "/canvas/*/canary",
                                 "/canvas/*/promote-canary", "/canvas/*/rollback-canary",
                                 "/canvas/*/rollback", "/canvas/*/approve", "/canvas/*/reject",
-                                "/canvas/import").hasRole("ADMIN")
+                                "/canvas/*/archive", "/canvas/*/revert/*", "/canvas/*/clone",
+                                "/canvas/*/save-as-template", "/canvas/from-template/*",
+                                "/canvas/import", "/canvas").hasRole("ADMIN")
+                        .pathMatchers(HttpMethod.PUT, "/canvas/*", "/canvas/*/safe").hasRole("ADMIN")
                         .pathMatchers("/canvas/data-sources/**").hasRole("ADMIN")
                         .pathMatchers("/canvas/api-definitions/**").hasRole("ADMIN")
+                        .pathMatchers("/canvas/tag-import-sources/**").hasRole("ADMIN")
                         // 管理员接口
                         .pathMatchers("/admin/**").hasRole("ADMIN")
                         // 其余接口需要登录

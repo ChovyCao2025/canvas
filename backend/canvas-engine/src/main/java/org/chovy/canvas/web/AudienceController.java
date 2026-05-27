@@ -236,15 +236,15 @@ public class AudienceController {
         return new ComputeTaskResp(taskId, result.task().getStatus());
     }
 
-        /**
-     * 创建或新增 create Catch Up Notification If Terminal 相关的业务数据。
+    /**
+     * 复用已有终态任务时补发一次任务结果通知。
      *
-     * <p>实现会处理 MQ 消息、路由或发送记录，影响异步触发链路。
+     * <p>创建或更新人群时如果计算任务已结束，不重新计算，只让当前操作者看到结果入口。
      *
-     * @param task task 方法执行所需的业务参数
-     * @param audienceId audienceId 对应的业务主键或标识
-     * @param displayName displayName 方法执行所需的业务参数
-     * @param operator operator 操作人标识
+     * @param task 已存在的异步任务
+     * @param audienceId 人群定义 ID
+     * @param displayName 人群展示名
+     * @param operator 当前操作人
      */
     private void createCatchUpNotificationIfTerminal(AsyncTaskDO task, Long audienceId, String displayName, String operator) {
         if (task == null || !isTerminal(task.getStatus())) {
