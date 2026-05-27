@@ -1,8 +1,9 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 
 import { overrideKey } from './apiDocOverrides'
 import {
   classifyOpenApiPath,
+  fetchOpenApiSpec,
   inferOpenApiInternalFlag,
   parseOpenApiEndpoints,
 } from './openApiDocs'
@@ -34,6 +35,10 @@ const spec = {
       get: { responses: { '200': { description: 'OK' } } },
     },
     '/canvas/data-sources': {
+      parameters: [
+        { name: 'tenantId', in: 'query', required: true, description: '租户 ID' },
+        { name: 'keyword', in: 'query', required: false, description: '旧关键字' },
+      ],
       put: {
         parameters: [{ name: 'keyword', in: 'query', required: false, description: '关键字' }],
         requestBody: { required: true, content: { 'application/json': { schema: { type: 'object' } } } },
@@ -65,8 +70,12 @@ describe('OpenAPI docs adapter', () => {
     const versions = endpoints.find(endpoint => endpoint.method === 'GET' && endpoint.path === '/canvas/{id}/versions/{versionId}')
 
     expect(dataSources?.params).toEqual([
+      { name: 'tenantId', in: 'query', required: true, desc: '租户 ID' },
       { name: 'keyword', in: 'query', required: false, desc: '关键字' },
       { name: 'body', in: 'body', required: true, desc: 'Request body' },
+    ])
+    expect(dataSources?.params?.filter(param => param.in === 'query' && param.name === 'keyword')).toEqual([
+      { name: 'keyword', in: 'query', required: false, desc: '关键字' },
     ])
     expect(versions?.params).toEqual([
       { name: 'id', in: 'path', required: true, desc: '画布 ID' },
@@ -118,5 +127,19 @@ describe('OpenAPI docs adapter', () => {
       endpoints: [],
       warnings: ['OpenAPI document does not contain a paths object.'],
     })
+  })
+
+  it('fetches the OpenAPI spec with an injected fetcher', async () => {
+    const fetcher = vi.fn(async () => new Response(JSON.stringify(spec), {
+      headers: { 'Content-Type': 'application/json' },
+      status: 200,
+    })) as unknown as typeof fetch
+
+    await expect(fetchOpenApiSpec(fetcher)).resolves.toEqual(spec)
+    expect(fetcher).toHaveBeenCalledWith('/v3/api-docs', { headers: { Accept: 'application/json' } })
+  })
+
+  it('requires an injected fetcher outside the browser', async () => {
+    await expect(fetchOpenApiSpec()).rejects.toThrow('fetchOpenApiSpec requires an injected fetcher outside the browser.')
   })
 })

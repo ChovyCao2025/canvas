@@ -21,9 +21,13 @@ interface OpenApiOperation {
   requestBody?: unknown
 }
 
-type OpenApiPathItem = Partial<Record<OpenApiMethod, OpenApiOperation>> & Record<string, unknown>
+interface OpenApiPathItem extends Partial<Record<OpenApiMethod, OpenApiOperation>> {
+  parameters?: unknown
+  [key: string]: unknown
+}
 
-interface OpenApiDocument {
+export interface OpenApiDocument {
+  openapi?: string
   paths?: unknown
 }
 
@@ -46,8 +50,13 @@ const humanizePath = (path: string) =>
 
 const pathParamNames = (path: string) => Array.from(path.matchAll(/\{([^}]+)\}/g), match => match[1])
 
-export const fetchOpenApiSpec = async (fetcher: typeof fetch = fetch) => {
-  const response = await fetcher('/v3/api-docs', { headers: { Accept: 'application/json' } })
+export async function fetchOpenApiSpec(fetcher?: typeof fetch): Promise<OpenApiDocument> {
+  if (!fetcher && typeof window === 'undefined') {
+    throw new Error('fetchOpenApiSpec requires an injected fetcher outside the browser.')
+  }
+
+  const effectiveFetcher = fetcher ?? fetch
+  const response = await effectiveFetcher('/v3/api-docs', { headers: { Accept: 'application/json' } })
 
   if (!response.ok) {
     throw new Error(`GET /v3/api-docs failed with HTTP ${response.status}`)
@@ -128,13 +137,26 @@ const openApiParamToApiDocParam = (parameter: OpenApiParameter): ApiDocParam | n
   }
 }
 
-const extractParams = (path: string, operation: OpenApiOperation): ApiDocParam[] => {
-  const params = Array.isArray(operation.parameters)
-    ? operation.parameters
+const convertParams = (parameters: unknown): ApiDocParam[] =>
+  Array.isArray(parameters)
+    ? parameters
       .filter(isRecord)
       .map(openApiParamToApiDocParam)
       .filter((param): param is ApiDocParam => param !== null)
     : []
+
+const extractParams = (path: string, pathItem: OpenApiPathItem, operation: OpenApiOperation): ApiDocParam[] => {
+  const paramsByKey = new Map<string, ApiDocParam>()
+
+  for (const param of convertParams(pathItem.parameters)) {
+    paramsByKey.set(`${param.in}-${param.name}`, param)
+  }
+
+  for (const param of convertParams(operation.parameters)) {
+    paramsByKey.set(`${param.in}-${param.name}`, param)
+  }
+
+  const params = Array.from(paramsByKey.values())
 
   for (const name of pathParamNames(path)) {
     if (!params.some(param => param.in === 'path' && param.name === name)) {
@@ -154,7 +176,12 @@ const extractParams = (path: string, operation: OpenApiOperation): ApiDocParam[]
   return params
 }
 
-const parseOperation = (path: string, method: ApiDocMethod, operation: OpenApiOperation): ApiDocEndpoint => {
+const parseOperation = (
+  path: string,
+  method: ApiDocMethod,
+  pathItem: OpenApiPathItem,
+  operation: OpenApiOperation,
+): ApiDocEndpoint => {
   const override = API_DOC_OVERRIDES[overrideKey(method, path)]
   const summary = typeof operation.summary === 'string'
     ? operation.summary
@@ -171,7 +198,7 @@ const parseOperation = (path: string, method: ApiDocMethod, operation: OpenApiOp
     summary: override?.summary ?? summary,
     auth: override?.auth ?? (path === '/auth/login' ? 'none' : 'bearer'),
     internal: override?.internal ?? inferOpenApiInternalFlag(method, path),
-    params: override?.params ?? extractParams(path, operation),
+    params: override?.params ?? extractParams(path, pathItem, operation),
     requestExample: override?.requestExample,
     responseExample: override?.responseExample ?? success({ id: 'demo_id', status: 'ok' }),
   }
@@ -200,7 +227,7 @@ export const parseOpenApiEndpoints = (spec: OpenApiDocument): ParseOpenApiResult
         continue
       }
 
-      endpoints.push(parseOperation(path, method, operation))
+      endpoints.push(parseOperation(path, method, pathItem, operation))
     }
   }
 
