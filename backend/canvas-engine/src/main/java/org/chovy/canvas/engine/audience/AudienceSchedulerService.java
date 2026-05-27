@@ -76,6 +76,7 @@ public class AudienceSchedulerService {
         String cronExpression = normalizeCron(definition.getCronExpression());
         ScheduledFuture<?> future = taskScheduler.schedule(
                 job,
+                // 离线人群任务固定按业务默认时区注册，避免部署机时区差异造成错峰触发。
                 new CronTrigger(cronExpression, TimeZone.getTimeZone("Asia/Shanghai"))
         );
         tasks.put(definition.getId(), future);
@@ -87,6 +88,7 @@ public class AudienceSchedulerService {
         String normalized = cronExpression.trim().replaceAll("\\s+", " ");
         String[] fields = normalized.split(" ");
         if (fields.length == 5) {
+            // Spring CronTrigger 需要秒字段；传统 5 段 cron 默认补 0 秒。
             return "0 " + normalized;
         }
         return normalized;

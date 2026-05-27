@@ -78,6 +78,7 @@ public class AudienceBatchComputeService {
     public AudienceComputeResult compute(Long audienceId, String perfRunId, String perfInputId) {
         AudienceComputeRunDO run = startRun(audienceId, perfRunId, perfInputId);
         String lockKey = COMPUTE_LOCK_PREFIX + audienceId;
+        // 同一人群只允许一个计算任务持锁，避免多个批任务同时覆盖 Bitmap 和统计口径。
         boolean locked = Boolean.TRUE.equals(redis.opsForValue().setIfAbsent(lockKey, "1", Duration.ofHours(2)));
         if (!locked) {
             log.warn("[AUDIENCE] compute skipped because lock exists audienceId={}", audienceId);
@@ -97,12 +98,14 @@ public class AudienceBatchComputeService {
             }
             audienceName = displayName(definition.getName(), audienceId);
 
+            // 根据数据源类型选择计算路径：JDBC 直接下推 SQL，TAGGER_API 先取种子人群再二次规则过滤。
             RoaringBitmap bitmap = switch (definition.getDataSourceType()) {
                 case "JDBC" -> computeViaJdbc(definition);
                 case "TAGGER_API" -> computeViaTaggerApi(definition);
                 default -> throw new IllegalStateException("Unsupported data source: " + definition.getDataSourceType());
             };
 
+            // Bitmap 是后续在线 membership 判断的唯一结果载体，统计数据只用于展示和任务回执。
             bitmapStore.save(audienceId, bitmap);
             ByteArrayOutputStream bos = new ByteArrayOutputStream();
             try (DataOutputStream dos = new DataOutputStream(bos)) {
@@ -151,6 +154,7 @@ public class AudienceBatchComputeService {
     /** 通过 JDBC 数据源执行规则 SQL 并转换为用户 Bitmap。 */
     private RoaringBitmap computeViaJdbc(AudienceDefinitionDO definition) throws Exception {
         JdbcConfig jdbcConfig = jdbcConfigResolver.resolve(definition.getDataSourceConfig());
+        // 数据源来自人群配置引用，运行期临时构造连接，避免把业务库连接固化在主应用数据源里。
         DataSource dataSource = DataSourceBuilder.create()
                 .driverClassName(jdbcConfig.driverClassName())
                 .url(jdbcConfig.url())
@@ -159,15 +163,18 @@ public class AudienceBatchComputeService {
                 .build();
         NamedParameterJdbcTemplate jdbcTemplate = new NamedParameterJdbcTemplate(dataSource);
         SqlWhereGenerator.SqlWhere where = sqlWhereGenerator.generate(definition.getRuleJson());
+        // 表名和用户列已在 JdbcConfigResolver 做标识符校验，规则值通过命名参数绑定。
         String sql = "SELECT " + jdbcConfig.userIdColumn() + " FROM " + jdbcConfig.baseTable() +
                 " WHERE " + where.sql();
         if (jdbcConfig.maxRows() != null) {
+            // maxRows 用于限制离线计算的读取上界，防止错误规则扫出超大结果集。
             sql += " LIMIT " + jdbcConfig.maxRows();
         }
         List<String> userIds = jdbcTemplate.query(sql, where.params(), (rs, rowNum) -> rs.getString(1));
         RoaringBitmap bitmap = new RoaringBitmap();
         for (String userId : userIds) {
             if (userId != null && !userId.isBlank()) {
+                // 业务 userId 映射为稳定整数，后续在线判断只需要检查 bitmap 是否包含该整数。
                 bitmap.add(AudienceBitmapStore.toUid(userId));
             }
         }
@@ -192,6 +199,7 @@ public class AudienceBatchComputeService {
         int page = 1;
         while (true) {
             int currentPage = page;
+            // 先按种子标签分页取候选用户，避免对全量用户逐个拉取上下文。
             Map<String, Object> response = client.get()
                     .uri(uriBuilder -> uriBuilder.path("/offline/users")
                             .queryParam("tagCode", seedTagCode)
@@ -206,12 +214,14 @@ public class AudienceBatchComputeService {
                 break;
             }
             for (String userId : userIds) {
+                // 只拉取规则依赖字段后再交给表达式引擎，减少 Tagger API 的无关字段负载。
                 Map<String, Object> context = contextFetcher.fetch(client, userId, definition.getRuleJson());
                 if (ruleEvaluatorRouter.evaluate(definition.getEngineType(), definition.getRuleJson(), context)) {
                     bitmap.add(AudienceBitmapStore.toUid(userId));
                 }
             }
             if (userIds.size() < PAGE_SIZE) {
+                // 最后一页不足 PAGE_SIZE，说明候选人群已经遍历完。
                 break;
             }
             page++;

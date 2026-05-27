@@ -55,6 +55,7 @@ public class MarketingPolicyService {
                 .eq(MarketingConsentDO::getChannel, normalized)
                 .last("LIMIT 1"));
         if (consent == null) {
+            // 未找到授权记录时是否放行取决于节点是否要求显式授权。
             return requireExplicitConsent
                     ? PolicyDecision.blocked("NO_MARKETING_CONSENT", "用户未授权该渠道营销触达")
                     : PolicyDecision.allow();
@@ -75,9 +76,11 @@ public class MarketingPolicyService {
         Long count = suppressionMapper.selectCount(new LambdaQueryWrapper<MarketingSuppressionDO>()
                 .eq(MarketingSuppressionDO::getUserId, userId)
                 .eq(MarketingSuppressionDO::getActive, 1)
+                // 未设置过期时间表示长期抑制，设置过期时间则只在未来仍生效。
                 .and(w -> w.isNull(MarketingSuppressionDO::getExpiresAt)
                         .or()
                         .gt(MarketingSuppressionDO::getExpiresAt, now))
+                // channel 为空或 ALL 表示跨渠道抑制，否则只拦截当前渠道。
                 .and(w -> w.isNull(MarketingSuppressionDO::getChannel)
                         .or()
                         .eq(MarketingSuppressionDO::getChannel, normalized)
@@ -133,6 +136,7 @@ public class MarketingPolicyService {
                 ? timezoneFor(userId)
                 : ZoneId.of(timezone);
         LocalTime now = LocalTime.now(clock.withZone(zone));
+        // insideWindow 为 true 表示当前在静默窗口内，因此策略返回 blocked。
         return insideWindow(now, quietStart, quietEnd)
                 ? PolicyDecision.blocked("QUIET_HOURS", "当前处于用户静默时段")
                 : PolicyDecision.allow();
@@ -154,9 +158,11 @@ public class MarketingPolicyService {
         String key = frequencyKey(userId, canvasId, nodeId, scope, channel, window);
         Long count = redisTemplate.opsForValue().increment(key);
         if (count != null && count == 1L) {
+            // 首次创建计数桶时设置过期时间，后续自增沿用同一窗口。
             redisTemplate.expire(key, window);
         }
         if (count != null && count > maxCount) {
+            // 超限的这一次不应占用额度，回滚自增后再返回拦截。
             redisTemplate.opsForValue().decrement(key);
             return PolicyDecision.blocked("FREQUENCY_CAP_EXCEEDED", "用户触达频率超过限制");
         }
@@ -174,6 +180,7 @@ public class MarketingPolicyService {
     ) {
         long bucket = clock.millis() / Math.max(1L, window.toMillis());
         String normalizedScope = scope == null || scope.isBlank() ? "JOURNEY" : scope.toUpperCase(Locale.ROOT);
+        // 不同 scope 决定频控维度：全局、渠道、节点或当前画布旅程。
         String dimension = switch (normalizedScope) {
             case "GLOBAL" -> "global";
             case "CHANNEL" -> "channel:" + normalize(channel);
@@ -187,8 +194,10 @@ public class MarketingPolicyService {
     private boolean insideWindow(LocalTime current, LocalTime start, LocalTime end) {
         if (start.equals(end)) return true;
         if (start.isBefore(end)) {
+            // 普通窗口：例如 09:00-18:00。
             return !current.isBefore(start) && current.isBefore(end);
         }
+        // 跨午夜窗口：例如 22:00-08:00，命中晚间或次日凌晨任一段即可。
         return !current.isBefore(start) || current.isBefore(end);
     }
 

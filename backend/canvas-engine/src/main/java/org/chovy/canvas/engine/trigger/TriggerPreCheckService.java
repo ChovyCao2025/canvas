@@ -219,10 +219,12 @@ public class TriggerPreCheckService {
         Long count = redis.execute(INCR_WITH_TTL_SCRIPT, List.of(key), String.valueOf(ttlMs));
         if (count == null || count > limit) {
             if (count != null) {
+                // 超限时回滚本次 INCR，保持计数器与真实准入次数一致。
                 redis.opsForValue().decrement(key);
             }
             throw new TriggerRejectedException(rejectCode, rejectMessage);
         }
+        // 记录已成功递增的 key，后续任一步失败时统一回滚。
         acquiredCounterKeys.add(key);
     }
 
@@ -298,6 +300,7 @@ public class TriggerPreCheckService {
                 while (cursor.hasNext()) {
                     batch.add(cursor.next());
                     if (batch.size() >= 500) {
+                        // 分批 DEL，避免一次性删除海量 key 阻塞 Redis。
                         redis.delete(batch);
                         deleted += batch.size();
                         batch.clear();

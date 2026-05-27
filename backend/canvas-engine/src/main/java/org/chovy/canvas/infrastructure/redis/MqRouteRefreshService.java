@@ -46,6 +46,7 @@ public class MqRouteRefreshService {
 
     /** 扫描已发布画布并重建 MQ 触发路由表。 */
     public void rebuildMqRoutes() {
+        // 路由重建只以“已发布画布 + 已发布版本”为数据源，草稿版本不进入运行时 MQ 路由。
         List<CanvasDO> published = canvasMapper.selectList(
                 new LambdaQueryWrapper<CanvasDO>().eq(CanvasDO::getStatus, CanvasStatusEnum.PUBLISHED.getCode()));
         List<Long> versionIds = published.stream()
@@ -64,6 +65,7 @@ public class MqRouteRefreshService {
         for (CanvasDO canvas : published) {
             CanvasVersionDO version = versionMap.get(canvas.getPublishedVersionId());
             if (version == null || version.getGraphJson() == null) {
+                // 发布记录缺少可解析版本时跳过，避免单个脏数据阻断整批路由重建。
                 continue;
             }
             try {
@@ -95,6 +97,7 @@ public class MqRouteRefreshService {
             }
             String topic = mqTriggerHandler.resolveTopic(config);
             if (topic != null && !topic.isBlank()) {
+                // Redis 路由的写入单位是 topic -> canvasId 集合，同一 topic 可命中多个已发布画布。
                 routes.computeIfAbsent(topic, ignored -> new HashSet<>()).add(String.valueOf(canvasId));
                 count++;
             }

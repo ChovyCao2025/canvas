@@ -44,6 +44,7 @@ public class CdpTagOperationService {
         op.setCreatedBy(req.operator());
         operationMapper.insert(op);
 
+        // 批量打标可能耗时较长，创建操作记录后交给虚拟线程逐用户执行并回写统计。
         Thread.ofVirtual().start(() -> run(op, userIds, req));
         return op;
     }
@@ -92,6 +93,7 @@ public class CdpTagOperationService {
                 if ("BATCH_REMOVE".equals(req.operationType())) {
                     tagService.removeTag(userId, req.tagCode(), req.reason(), req.operator());
                 } else {
+                    // 幂等键绑定 operationId + userId + tagCode，重试同一任务不会重复写历史。
                     tagService.setTag(userId, new CdpTagWriteReq(req.tagCode(), req.tagValue(),
                             req.reason(), null, "BATCH", String.valueOf(op.getId()),
                             req.operator(), op.getId() + ":" + userId + ":" + req.tagCode()));
@@ -100,6 +102,7 @@ public class CdpTagOperationService {
             } catch (RuntimeException e) {
                 fail++;
                 if (errors.length() < 900) {
+                    // 错误摘要控制长度，完整失败用户可通过重试解析前缀 userId。
                     errors.append(userId).append(": ").append(e.getMessage()).append("; ");
                 }
             }

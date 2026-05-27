@@ -25,6 +25,7 @@ public class MqDefinitionController {
 
     /** MQ 消息定义 Mapper。 */
     private final MqMessageDefinitionMapper mapper;
+    /** MQ 路由刷新服务，用于同步消息定义路由缓存。 */
     private final MqRouteRefreshService routeRefreshService;
 
     /** 分页查询 MQ 消息定义。 */

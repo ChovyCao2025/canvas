@@ -20,6 +20,7 @@ public class R<T> {
     /** 成功响应（含数据）。 */
     public static <T> R<T> ok(T data) {
         R<T> r = new R<>();
+        // code/message/data 三元组保持稳定，所有控制器都通过这里收敛成功响应格式。
         r.code = 0;
         r.message = "success";
         r.data = data;
@@ -34,6 +35,7 @@ public class R<T> {
     /** 失败响应。 */
     public static <T> R<T> fail(String message) {
         R<T> r = new R<>();
+        // 失败统一使用非 0 code；更细粒度错误码目前嵌入 message 前缀中透传。
         r.code = -1;
         r.message = message;
         return r;

@@ -86,12 +86,14 @@ public class NotificationService {
         try {
             mapper.insert(notification);
         } catch (DuplicateKeyException e) {
+            // 通知去重命中时返回已存在消息，不再重复推送相同业务通知。
             NotificationDO existing = findExisting(notification);
             if (existing != null) {
                 return existing;
             }
             throw e;
         }
+        // 持久化成功后再推送实时消息，确保前端收到通知时列表接口也能查到。
         realtimePublisher.publish(
                 "NOTIFICATION_CREATED",
                 notification.getUserId(),
@@ -130,6 +132,7 @@ public class NotificationService {
                 .eq(NotificationDO::getNotificationId, notificationId)
                 .isNull(NotificationDO::getArchivedAt)
                 .isNull(NotificationDO::getReadAt));
+        // 更新类通知只广播未读数，具体列表由前端按需重新拉取。
         realtimePublisher.publish("NOTIFICATION_UPDATED", userId, null, unreadCount(userId));
     }
 
@@ -142,6 +145,7 @@ public class NotificationService {
                 .eq(NotificationDO::getUserId, userId)
                 .isNull(NotificationDO::getArchivedAt)
                 .isNull(NotificationDO::getReadAt));
+        // 批量已读后推送最新未读数，避免多条单独消息刷屏。
         realtimePublisher.publish("NOTIFICATION_UPDATED", userId, null, unreadCount(userId));
     }
 
@@ -154,6 +158,7 @@ public class NotificationService {
                 .eq(NotificationDO::getUserId, userId)
                 .eq(NotificationDO::getNotificationId, notificationId)
                 .isNull(NotificationDO::getArchivedAt));
+        // 归档会改变未读口径，实时事件用于刷新角标和列表。
         realtimePublisher.publish("NOTIFICATION_UPDATED", userId, null, unreadCount(userId));
     }
 

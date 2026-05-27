@@ -77,6 +77,7 @@ public class EventDefinitionServiceImpl implements EventDefinitionService {
 
         // 校验是否是重复上报
         if (isDuplicateEvent(req)) {
+            // 幂等命中时不写 event_log，也不触发画布或 WAIT 恢复，保持事件处理一次性。
             return duplicateResponse(req);
         }
         String eventId = resolveEventId(req);
@@ -175,6 +176,7 @@ public class EventDefinitionServiceImpl implements EventDefinitionService {
             eventLog.setAttributes(req.getAttributes() != null
                     ? objectMapper.writeValueAsString(req.getAttributes()) : null);
         } catch (Exception ignored) {
+            // 属性序列化失败不阻断事件触发，日志保留主体字段即可。
         }
         eventLog.setCanvasTriggered(canvasIds.size());
         eventLog.setCanvasCount(canvasIds.size());

@@ -40,6 +40,7 @@ public class AsyncTaskService {
             String taskType, String bizType, String bizId, String title, String createdBy) {
         AsyncTaskDO existing = findActive(taskType, bizType, bizId);
         if (existing != null) {
+            // 同一业务对象已有排队/运行任务时复用，避免后台重复启动长耗时任务。
             subscribe(existing.getTaskId(), createdBy);
             return new AsyncTaskCreateResult(refresh(existing), false);
         }
@@ -56,6 +57,7 @@ public class AsyncTaskService {
         try {
             mapper.insert(task);
         } catch (DuplicateKeyException e) {
+            // 并发创建撞唯一键时重新读取运行中任务，保证调用方拿到同一个任务 ID。
             AsyncTaskDO concurrent = findActive(taskType, bizType, bizId);
             if (concurrent != null) {
                 subscribe(concurrent.getTaskId(), createdBy);
@@ -139,6 +141,7 @@ public class AsyncTaskService {
             if (subscribedTaskIds.isEmpty()) {
                 query.eq(AsyncTaskDO::getCreatedBy, createdBy);
             } else {
+                // 普通用户可见自己创建或已订阅的任务，避免后台任务进度只对创建者可见。
                 query.and(scope -> scope.eq(AsyncTaskDO::getCreatedBy, createdBy)
                         .or()
                         .in(AsyncTaskDO::getTaskId, subscribedTaskIds));
@@ -212,6 +215,7 @@ public class AsyncTaskService {
         try {
             subscriptionMapper.insert(subscription);
         } catch (DuplicateKeyException ignored) {
+            // 重复订阅视为成功，避免同一用户刷新或并发请求产生噪音。
         } catch (Exception e) {
             log.error("[ASYNC_TASK] failed to subscribe user={} to task={}: {}", userId, taskId, e.getMessage(), e);
         }

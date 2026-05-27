@@ -19,12 +19,19 @@ public class OverflowRetryMessage {
     @Deprecated
     public static final String CHAIN_RETRY_PAYLOAD_KEY = "__overflowChainRetry";
 
+    /** 被重试触发请求所属的画布 ID。 */
     private Long canvasId;
+    /** 触发请求的用户 ID。 */
     private String userId;
+    /** 原始触发类型。 */
     private String triggerType;
+    /** 原始触发节点类型。 */
     private String triggerNodeType;
+    /** 命中的触发路由键。 */
     private String matchKey;
+    /** 原始触发载荷。 */
     private Map<String, Object> payload;
+    /** 原始执行或 MQ 消息标识。 */
     private String msgId;
     /** 跨越 sendOverflowRetry 调用的累计重试次数。 */
     private int chainRetryCount;

@@ -9,7 +9,9 @@ import java.util.List;
  * <p>record 天然不可变，适合作为只读元数据在服务之间传递，避免调用方直接操作裸 Map。
  */
 public record DataSourceTableMeta(
+        /** 外部数据源中的表名。 */
         String name,
+        /** 表内可用于规则配置和 SQL 生成的列名列表。 */
         List<String> columns
 ) {
 }

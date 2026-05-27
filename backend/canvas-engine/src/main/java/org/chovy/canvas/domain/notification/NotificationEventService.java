@@ -37,6 +37,7 @@ public class NotificationEventService {
         }
         String actionUrl = canvasUrl(approval.getCanvasId());
         for (String approver : distinctNonBlank(approvers)) {
+            // 每个审批人使用独立 dedupKey，避免多人审批任务只生成一条通知。
             createBestEffort(NotificationCreateCommand.builder()
                     .userId(approver)
                     .category("APPROVAL")
@@ -90,6 +91,7 @@ public class NotificationEventService {
             String operator) {
         String actionUrl = canvasUrl(canvasId);
         for (String recipient : adminsPlusOperator(operator)) {
+            // 画布变更通知面向管理员和操作者，通知失败不影响主业务状态切换。
             createBestEffort(NotificationCreateCommand.builder()
                     .userId(recipient)
                     .category("CHANGE")
@@ -140,6 +142,7 @@ public class NotificationEventService {
         try {
             notificationService.create(command);
         } catch (Exception e) {
+            // 通知是旁路能力，异常只记录日志，不能反向中断审批或画布生命周期主流程。
             log.error("[NOTIFICATION] 创建通知失败 userId={} type={}: {}",
                     command.userId(), command.type(), e.getMessage(), e);
         }

@@ -50,6 +50,7 @@ public class ReachDeliveryService {
                 .subscribeOn(Schedulers.boundedElastic())
                 .flatMap(prepared -> {
                     if (prepared.duplicate()) {
+                        // 命中幂等键时直接返回已有流水状态，避免重复调用外部渠道造成二次触达。
                         boolean sent = !MessageSendRecordDO.STATUS_FAILED.equals(prepared.record().getStatus());
                         return Mono.just(new DeliveryResult(
                                 sent,
@@ -74,6 +75,7 @@ public class ReachDeliveryService {
             return new PreparedRecord(existing, true);
         }
 
+        // 先落 PENDING 流水再调用外部平台，失败时仍能回写错误并保留审计轨迹。
         MessageSendRecordDO record = new MessageSendRecordDO();
         record.setExecutionId(request.executionId());
         record.setCanvasId(request.canvasId());
@@ -95,6 +97,7 @@ public class ReachDeliveryService {
     private Mono<Map<String, Object>> callReachPlatform(DeliveryRequest request) {
         return webClient.post()
                 .uri("/send")
+                // 渠道、模板、变量和幂等键统一放入 payload，具体渠道差异由触达平台适配。
                 .bodyValue(request.payload())
                 .retrieve()
                 .bodyToMono(Map.class)
@@ -107,6 +110,7 @@ public class ReachDeliveryService {
                     record.setStatus(MessageSendRecordDO.STATUS_SENT);
                     Object messageId = response.getOrDefault(MapFieldKeys.MESSAGE_ID, response.get(MapFieldKeys.ID));
                     if (messageId != null) {
+                        // 记录外部消息 ID，便于后续回执、排障和人工核对渠道侧状态。
                         record.setExternalMessageId(messageId.toString());
                     }
                     record.setUpdatedAt(LocalDateTime.now());
@@ -144,6 +148,7 @@ public class ReachDeliveryService {
             String idempotencyKey
     ) {
         Map<String, Object> payload = new LinkedHashMap<>();
+        // LinkedHashMap 让序列化后的请求字段顺序稳定，便于日志比对和问题排查。
         payload.put(MapFieldKeys.CHANNEL, channel);
         payload.put(MapFieldKeys.TEMPLATE_ID, templateId);
         payload.put(MapFieldKeys.USER_ID, userId);
@@ -163,28 +168,46 @@ public class ReachDeliveryService {
     }
 
     /** 发送前记录准备结果，标识本次是否命中幂等重复请求。 */
-    private record PreparedRecord(MessageSendRecordDO record, boolean duplicate) {
+    private record PreparedRecord(
+            /** 已落库或已命中的发送记录。 */
+            MessageSendRecordDO record,
+            /** 是否命中幂等重复请求。 */
+            boolean duplicate
+    ) {
     }
 
     /** 标准化触达投递请求，封装节点执行产生的渠道、模板、变量和幂等键。 */
     public record DeliveryRequest(
+            /** 画布执行实例 ID。 */
             String executionId,
+            /** 画布 ID。 */
             Long canvasId,
+            /** 接收触达的用户 ID。 */
             String userId,
+            /** 发起触达的节点 ID。 */
             String nodeId,
+            /** 触达渠道。 */
             String channel,
+            /** 渠道模板 ID。 */
             String templateId,
+            /** 发送给触达平台的标准化载荷。 */
             Map<String, Object> payload,
+            /** 幂等键，用于避免重复触达。 */
             String idempotencyKey
     ) {
     }
 
     /** 触达投递结果，返回是否发送、是否命中幂等、记录 ID 和外部渠道回执。 */
     public record DeliveryResult(
+            /** 是否已成功提交触达。 */
             boolean sent,
+            /** 是否命中幂等重复请求。 */
             boolean duplicate,
+            /** 对应的发送记录 ID。 */
             Long recordId,
+            /** 外部渠道返回的消息 ID。 */
             String externalMessageId,
+            /** 失败原因，成功时为空。 */
             String errorMessage
     ) {
     }

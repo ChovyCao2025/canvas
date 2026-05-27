@@ -56,6 +56,7 @@ public class TriggerRouteService {
     /** 注册 MQ 触发路由：topicKey -> canvasId。 */
     public void registerMq(Long canvasId, String topicKey) {
         withRouteMutationLock(() -> {
+            // MQ 路由用 Set 存储 topic 到画布集合；单点增量写也需要与全量替换互斥。
             redis.opsForSet().add(keys.triggerMq(topicKey), String.valueOf(canvasId));
             mqRouteCache.invalidate(topicKey);
         });
@@ -71,6 +72,7 @@ public class TriggerRouteService {
     /** 移除 MQ 触发路由。 */
     public void removeMq(Long canvasId, String topicKey) {
         withRouteMutationLock(() -> {
+            // 变更 Redis 后同步失效本地 Caffeine，避免消费线程继续读到旧 topic 路由。
             redis.opsForSet().remove(keys.triggerMq(topicKey), String.valueOf(canvasId));
             mqRouteCache.invalidate(topicKey);
         });
@@ -85,6 +87,7 @@ public class TriggerRouteService {
     }
     /** 按 MQ topicKey 查询订阅画布 ID 集合。 */
     public Set<String> getCanvasByMqTopic(String topicKey) {
+        // MQ 消费高频读路由，先走短 TTL 本地缓存；未命中时再读 Redis Set。
         return mqRouteCache.get(topicKey, this::loadMqRoute);
     }
     /** 按事件编码查询订阅画布 ID 集合。 */
@@ -105,12 +108,14 @@ public class TriggerRouteService {
 
     /** 批量替换 MQ 触发路由表。 */
     public void replaceMqRoutes(Map<String, Set<String>> routes) {
+        // 先在内存中清洗快照，保证持锁期间只做 Redis IO，降低锁占用时间。
         Map<String, Set<String>> snapshot = routes.entrySet().stream()
                 .filter(entry -> entry.getKey() != null && !entry.getKey().isBlank())
                 .map(entry -> Map.entry(entry.getKey(), sanitizeCanvasIds(entry.getValue())))
                 .filter(entry -> !entry.getValue().isEmpty())
                 .collect(Collectors.toUnmodifiableMap(Map.Entry::getKey, Map.Entry::getValue));
         withRouteMutationLock(() -> {
+            // ready 标记先删除，消费者会把“路由未就绪”视为可重试异常，避免读到半重建状态。
             markRouteRebuilding();
             List<String> oldKeys = scanMqRouteKeys();
 
@@ -119,6 +124,7 @@ public class TriggerRouteService {
                 @Override
                 @SuppressWarnings("unchecked")
                 public <K, V> List<Object> execute(RedisOperations<K, V> operations) {
+                    // 删除旧 key 和写入新 Set 放在同一个 Redis 事务中，减少路由表短暂混杂的窗口。
                     operations.multi();
                     if (!oldKeys.isEmpty()) {
                         operations.delete((Collection<K>) oldKeys);
@@ -130,6 +136,7 @@ public class TriggerRouteService {
                     return operations.exec();
                 }
             });
+            // 事务提交后再次清空本地缓存，覆盖并发读在重建期间可能填入的空值或旧值。
             mqRouteCache.invalidateAll();
             markRouteReady();
         });
@@ -175,6 +182,7 @@ public class TriggerRouteService {
         if (ids == null || ids.isEmpty()) {
             return Set.of();
         }
+        // Redis 中的路由可能来自历史数据或人工修复，读出时再做一次 ID 清洗保证消费侧稳态。
         return sanitizeCanvasIds(ids);
     }
 
@@ -185,11 +193,13 @@ public class TriggerRouteService {
         long deadline = System.currentTimeMillis() + ROUTE_MUTATION_LOCK_WAIT_MS;
         boolean acquired = false;
         while (System.currentTimeMillis() <= deadline) {
+            // SETNX + TTL 防止多实例同时替换路由；TTL 兜底释放异常退出的持锁者。
             acquired = Boolean.TRUE.equals(redis.opsForValue().setIfAbsent(lockKey, token, ROUTE_MUTATION_LOCK_TTL));
             if (acquired) {
                 break;
             }
             try {
+                // 短暂轮询等待发布/初始化中的路由变更完成，避免直接放大并发冲突。
                 Thread.sleep(50);
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
@@ -226,6 +236,7 @@ public class TriggerRouteService {
         List<String> result = new ArrayList<>(1000);
         try (Cursor<String> cursor = redis.scan(options)) {
             while (cursor.hasNext()) {
+                // 使用 SCAN 渐进遍历当前命名空间 MQ 路由 key，避免 KEYS 阻塞 Redis。
                 result.add(cursor.next());
             }
         }

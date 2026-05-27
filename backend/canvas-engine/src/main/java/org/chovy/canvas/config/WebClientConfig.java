@@ -32,12 +32,14 @@ public class WebClientConfig {
             @Value("${canvas.http-client.response-timeout-ms:3000}") long responseTimeoutMs,
             @Value("${canvas.http-client.write-timeout-ms:3000}") long writeTimeoutMs) {
 
+        // 连接池参数集中在配置项，避免出站 API 节点高并发时无界建连。
         ConnectionProvider provider = ConnectionProvider.builder("canvas-http")
                 .maxConnections(maxConnections)
                 .pendingAcquireMaxCount(pendingAcquireMaxCount)
                 .pendingAcquireTimeout(Duration.ofMillis(pendingAcquireTimeoutMs))
                 .build();
 
+        // 同时设置连接、响应读取和写入超时，防止下游卡死拖住执行链路。
         HttpClient httpClient = HttpClient.create(provider)
                 .option(ChannelOption.CONNECT_TIMEOUT_MILLIS, connectTimeoutMs)
                 .responseTimeout(Duration.ofMillis(responseTimeoutMs))

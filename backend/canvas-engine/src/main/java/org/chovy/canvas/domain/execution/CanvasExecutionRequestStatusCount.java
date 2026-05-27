@@ -15,6 +15,8 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 public class CanvasExecutionRequestStatusCount {
 
+    /** 执行请求状态编码。 */
     private String status;
+    /** 该状态下的执行请求数量。 */
     private Long count;
 }

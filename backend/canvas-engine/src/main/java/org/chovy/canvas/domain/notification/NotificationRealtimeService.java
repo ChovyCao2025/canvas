@@ -97,6 +97,7 @@ public class NotificationRealtimeService implements NotificationRealtimePublishe
     public Mono<Void> register(String userId, WebSocketSession session, NotificationRealtimePayload initialPayload) {
         String sessionId = session.getId();
         Sinks.Many<String> sink = Sinks.many().unicast().onBackpressureBuffer();
+        // 一个用户可同时存在多个浏览器会话，按 sessionId 独立维护推送通道。
         sessionsByUser.computeIfAbsent(userId, ignored -> new ConcurrentHashMap<>()).put(sessionId, sink);
         emit(sink, initialPayload);
         Mono<Void> output = session.send(sink.asFlux().map(session::textMessage));
@@ -125,6 +126,7 @@ public class NotificationRealtimeService implements NotificationRealtimePublishe
         NotificationRealtimeEnvelope envelope = new NotificationRealtimeEnvelope(originId, userId, payload);
         deliverLocal(envelope);
         try {
+            // 先本机投递再广播 Redis，当前实例即使 Redis 短暂不可用也能收到实时通知。
             redis.convertAndSend(keys.notificationChannel(), objectMapper.writeValueAsString(envelope));
         } catch (Exception e) {
             log.warn("[NOTIFICATION_WS] Redis 广播失败，已完成本实例推送 userId={}: {}", userId, e.getMessage());
@@ -142,6 +144,7 @@ public class NotificationRealtimeService implements NotificationRealtimePublishe
         try {
             NotificationRealtimeEnvelope envelope = objectMapper.readValue(raw, NotificationRealtimeEnvelope.class);
             if (originId.equals(envelope.originId())) {
+                // 忽略自己通过 Redis 广播回来的消息，避免同实例重复推送。
                 return;
             }
             deliverLocal(envelope);
@@ -158,6 +161,7 @@ public class NotificationRealtimeService implements NotificationRealtimePublishe
         }
         Set<Map.Entry<String, Sinks.Many<String>>> entries = Set.copyOf(sessions.entrySet());
         for (Map.Entry<String, Sinks.Many<String>> entry : entries) {
+            // 对快照遍历，避免推送过程中连接关闭导致并发修改影响其他会话。
             emit(entry.getValue(), envelope.payload());
         }
     }

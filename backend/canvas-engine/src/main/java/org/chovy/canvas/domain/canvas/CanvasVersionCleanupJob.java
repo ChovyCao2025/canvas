@@ -26,9 +26,12 @@ import org.chovy.canvas.dal.mapper.CanvasVersionMapper;
 @RequiredArgsConstructor
 public class CanvasVersionCleanupJob {
 
+    /** 画布版本 Mapper，用于查询发布版本并清空旧版本 graphJson。 */
     private final CanvasVersionMapper canvasVersionMapper;
+    /** 画布 Mapper，用于全量遍历需要清理的画布。 */
     private final CanvasMapper        canvasMapper;
 
+    /** 每个画布保留的最近已发布版本数量。 */
     @Value("${canvas.version.max-keep-count:10}")
     private int maxKeepCount;
 

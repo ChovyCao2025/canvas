@@ -28,8 +28,10 @@ import java.util.Base64;
 @RequiredArgsConstructor
 public class AudienceBitmapStore {
 
+    /** Redis 中保存人群位图的 key 前缀。 */
     private static final String KEY_PREFIX = "audience:bitmap:";
 
+    /** Redis 字符串模板，用于读写 Base64 编码后的位图数据。 */
     private final StringRedisTemplate redis;
 
     /**
@@ -41,17 +43,20 @@ public class AudienceBitmapStore {
         int hash = Hashing.murmur3_32_fixed()
                 .hashString(userId, StandardCharsets.UTF_8)
                 .asInt();
+        // RoaringBitmap 需要非负 int 下标；MIN_VALUE 取绝对值仍溢出，因此单独归零。
         return hash == Integer.MIN_VALUE ? 0 : Math.abs(hash);
     }
 
     /** 保存人群 bitmap 到 Redis。 */
     public void save(Long audienceId, RoaringBitmap bitmap) throws IOException {
+        // runOptimize 会把连续区间压缩成 run container，适合大批量人群结果的 Redis 存储。
         bitmap.runOptimize();
         ByteArrayOutputStream bos = new ByteArrayOutputStream();
         try (DataOutputStream dos = new DataOutputStream(bos)) {
             bitmap.serialize(dos);
             dos.flush();
         }
+        // Redis 使用 String 存储，二进制序列化结果先 Base64 化，避免字符集和协议层转义问题。
         redis.opsForValue().set(KEY_PREFIX + audienceId, Base64.getEncoder().encodeToString(bos.toByteArray()));
         log.info("[AUDIENCE] bitmap saved audienceId={} sizeKB={}", audienceId, bos.size() / 1024);
     }
@@ -64,6 +69,7 @@ public class AudienceBitmapStore {
         }
         byte[] bytes = Base64.getDecoder().decode(encoded);
         RoaringBitmap bitmap = new RoaringBitmap();
+        // 反序列化格式需与 save() 中 RoaringBitmap.serialize 保持一致。
         bitmap.deserialize(new DataInputStream(new ByteArrayInputStream(bytes)));
         return bitmap;
     }
@@ -71,6 +77,7 @@ public class AudienceBitmapStore {
     /** 判断用户是否命中指定人群。 */
     public boolean isMember(Long audienceId, String userId) {
         try {
+            // 在线判断不回查原始人群规则，只用持久化 Bitmap 做 O(1) membership 检查。
             return load(audienceId).contains(toUid(userId));
         } catch (IOException e) {
             log.error("[AUDIENCE] bitmap load failed audienceId={}: {}", audienceId, e.getMessage());

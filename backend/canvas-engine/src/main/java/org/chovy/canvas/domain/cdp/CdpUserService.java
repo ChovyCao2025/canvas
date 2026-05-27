@@ -39,6 +39,7 @@ public class CdpUserService {
             if (existing.getFirstSeenAt() == null) {
                 existing.setFirstSeenAt(now);
             }
+            // 已存在用户只刷新最近出现时间，避免覆盖管理端维护的画像字段。
             existing.setLastSeenAt(now);
             profileMapper.updateById(existing);
             return existing;
@@ -77,9 +78,11 @@ public class CdpUserService {
                 .eq(CdpUserIdentityDO::getIdentityValue, normalizedValue)
                 .last("LIMIT 1"));
         if (existingIdentity != null) {
+            // 外部身份已绑定时统一落到既有 userId，避免同一客户被拆成多个 CDP 用户。
             return ensureUser(existingIdentity.getUserId(), sourceType, sourceRefId);
         }
 
+        // 未绑定外部身份时生成稳定 userId，后续唯一身份记录会把相同身份收敛到同一用户。
         String generatedUserId = normalizedType.toLowerCase(Locale.ROOT) + ":" + normalizedValue;
         CdpUserProfileDO profile = ensureUser(generatedUserId, sourceType, sourceRefId);
         CdpUserIdentityDO identity = new CdpUserIdentityDO();
@@ -92,6 +95,7 @@ public class CdpUserService {
         try {
             identityMapper.insert(identity);
         } catch (DuplicateKeyException duplicate) {
+            // 并发导入同一外部身份时，以已成功插入的身份映射为准重新归并用户。
             CdpUserIdentityDO raced = identityMapper.selectOne(new LambdaQueryWrapper<CdpUserIdentityDO>()
                     .eq(CdpUserIdentityDO::getIdentityType, normalizedType)
                     .eq(CdpUserIdentityDO::getIdentityValue, normalizedValue)

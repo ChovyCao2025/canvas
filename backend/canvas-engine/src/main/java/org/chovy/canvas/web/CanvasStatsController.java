@@ -28,7 +28,9 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class CanvasStatsController {
 
+    /** 执行记录 Mapper，用于查询画布执行统计。 */
     private final CanvasExecutionMapper executionMapper;
+    /** 执行轨迹 Mapper，用于查询节点轨迹和漏斗。 */
     private final CanvasExecutionTraceMapper traceMapper;
 
     /**

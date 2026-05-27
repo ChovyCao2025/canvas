@@ -28,7 +28,9 @@ public class CanvasExecutionEvent {
 
     /** 消息 ID（用于 MQ 幂等/追踪）。 */
     public String msgId;
+    /** 请求模式下对应的执行请求 ID。 */
     public String requestId;
+    /** Disruptor 内部派发选项，如溢出重试元数据。 */
     public CanvasDisruptorService.DispatchOptions dispatchOptions;
 
     /** 归还对象前清空字段，防止复用污染下一条事件。 */

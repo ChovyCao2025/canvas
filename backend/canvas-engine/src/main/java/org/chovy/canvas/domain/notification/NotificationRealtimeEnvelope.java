@@ -9,8 +9,11 @@ import org.chovy.canvas.dto.notification.NotificationRealtimePayload;
  * <p>该类型应保持轻量，只表达字段语义和序列化边界，不放入复杂业务流程。
  */
 public record NotificationRealtimeEnvelope(
+        /** 发布通知的服务实例标识，用于避免本实例重复消费。 */
         String originId,
+        /** 实时通知目标用户 ID。 */
         String userId,
+        /** WebSocket 推送的实时通知载荷。 */
         NotificationRealtimePayload payload
 ) {
 }

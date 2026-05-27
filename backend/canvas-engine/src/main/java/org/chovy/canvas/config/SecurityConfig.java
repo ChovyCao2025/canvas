@@ -32,6 +32,7 @@ public class SecurityConfig {
             ServerHttpSecurity http, JwtAuthFilter jwtAuthFilter) {
 
         return http
+                // API 服务不依赖浏览器表单态，关闭有状态防护入口后统一走 JWT。
                 .csrf(ServerHttpSecurity.CsrfSpec::disable)
                 .httpBasic(ServerHttpSecurity.HttpBasicSpec::disable)
                 .formLogin(ServerHttpSecurity.FormLoginSpec::disable)
@@ -69,6 +70,7 @@ public class SecurityConfig {
                         // 其余接口需要登录
                         .anyExchange().authenticated()
                 )
+                // JWT 过滤器必须位于认证阶段，先解析身份再进入后续授权判断。
                 .addFilterAt(jwtAuthFilter, SecurityWebFiltersOrder.AUTHENTICATION)
                 .build();
     }

@@ -33,6 +33,7 @@ public class EventTriggerHandler implements NodeHandler {
         String expectedEvent = (String) config.get("eventCode");
         Object actualEvent = ctx.getContextValue("eventCode");
         if (expectedEvent != null && actualEvent != null && !expectedEvent.equals(actualEvent.toString())) {
+            // 事件编码不匹配时终止当前触发，避免一个事件误启动多个旅程分支。
             return Mono.just(NodeResult.terminal(Map.of(MapFieldKeys.EVENT_MATCHED, false)));
         }
         String nextNodeId = (String) config.get(MapFieldKeys.NEXT_NODE_ID);

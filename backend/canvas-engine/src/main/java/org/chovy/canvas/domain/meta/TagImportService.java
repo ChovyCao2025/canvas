@@ -59,6 +59,7 @@ public class TagImportService {
         batch.setSuccessRows(0);
         batch.setFailedRows(0);
         batch.setStartedAt(now);
+        // 先落批次主记录，后续每行错误和 CDP 标签历史都用 batchId 串联审计。
         tagImportBatchMapper.insert(batch);
 
         int successRows = 0;
@@ -70,12 +71,14 @@ public class TagImportService {
             String duplicateKey = buildDuplicateKey(row);
             if (!seenKeys.add(duplicateKey)) {
                 failedRows++;
+                // 批次内同一身份 + 标签只处理一次，避免文件重复行造成多次打标。
                 writeError(batch.getId(), rowNo, row, "DUPLICATE_ROW", "duplicate row in same batch");
                 continue;
             }
             try {
                 IdentityTypeDO identityType = identityTypeService.requireImportable(row.getIdType());
                 tagDefinitionService.requireEnabledTagAndValidateValue(row.getTagCode(), row.getTagValue());
+                // 导入来源的新枚举值先同步到元数据，保证后续管理端可见。
                 tagDefinitionService.ensureValue(row.getTagCode(), row.getTagValue(), sourceType);
                 writeCdpTag(batch.getId(), rowNo, sourceType, identityType, row);
                 successRows++;
@@ -92,6 +95,7 @@ public class TagImportService {
         batch.setFailedRows(failedRows);
         batch.setFinishedAt(LocalDateTime.now());
         batch.setErrorMessage(null);
+        // 同一事务内最终回写批次状态，确保批次统计和错误明细一起提交或回滚。
         tagImportBatchMapper.updateById(batch);
 
         TagImportResult result = new TagImportResult();
@@ -125,6 +129,7 @@ public class TagImportService {
                 row.getIdValue(),
                 sourceType,
                 sourceRefId).getUserId();
+        // 幂等键精确到 batchId + rowNo，接口重放同一批次行不会重复写入标签历史。
         cdpTagService.setTag(userId, new CdpTagWriteReq(
                 row.getTagCode(),
                 row.getTagValue(),
