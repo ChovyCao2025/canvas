@@ -34,7 +34,7 @@ public class AudienceDefinitionDO {
     /** 规则引擎类型：AVIATOR | QL。 */
     private String engineType;
 
-    /** 数据源类型：TAGGER_API | JDBC。 */
+    /** 数据源类型：TAGGER_API | JDBC | CDP_TAG | CDP_PROFILE | CDP_IDENTITY。 */
     private String dataSourceType;
 
     /** 数据源配置（JSON 字符串，可选）。 */

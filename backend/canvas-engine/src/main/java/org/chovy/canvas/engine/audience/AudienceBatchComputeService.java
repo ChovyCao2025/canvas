@@ -67,6 +67,8 @@ public class AudienceBatchComputeService {
     private final JdbcConfigResolver jdbcConfigResolver;
     /** 人群规则校验器，用于保存前拦截非法规则配置。 */
     private final AudienceDefinitionRuleValidator audienceRuleValidator;
+    /** CDP 标签、画像和身份数据源解析器。 */
+    private final CdpAudienceSourceService cdpAudienceSourceService;
 
     /** Tagger 服务地址。 */
     @Value("${canvas.integration.tagger-service-url}")
@@ -105,6 +107,7 @@ public class AudienceBatchComputeService {
             RoaringBitmap bitmap = switch (definition.getDataSourceType()) {
                 case "JDBC" -> computeViaJdbc(definition);
                 case "TAGGER_API" -> computeViaTaggerApi(definition);
+                case "CDP_TAG", "CDP_PROFILE", "CDP_IDENTITY" -> computeViaCdp(definition);
                 default -> throw new IllegalStateException("Unsupported data source: " + definition.getDataSourceType());
             };
 
@@ -201,6 +204,20 @@ public class AudienceBatchComputeService {
                 log.warn("[AUDIENCE] failed to close JDBC DataSource: {}", e.getMessage(), e);
             }
         }
+    }
+
+    /** 通过 CDP 当前标签、画像或身份数据直接圈选用户并转换为 Bitmap。 */
+    private RoaringBitmap computeViaCdp(AudienceDefinitionDO definition) {
+        List<String> userIds = cdpAudienceSourceService.resolveUserIds(
+                definition.getDataSourceType(),
+                definition.getRuleJson());
+        RoaringBitmap bitmap = new RoaringBitmap();
+        for (String userId : userIds) {
+            if (userId != null && !userId.isBlank()) {
+                bitmap.add(AudienceBitmapStore.toUid(userId));
+            }
+        }
+        return bitmap;
     }
 
     /** 通过 Tagger API 分页拉取种子用户并按规则二次过滤生成 Bitmap。 */

@@ -5,13 +5,14 @@
  */
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { Button, Card, Form, Input, InputNumber, Select, Space, Switch, Typography, message } from 'antd'
+import { Alert, Button, Card, Form, Input, InputNumber, Select, Space, Switch, Typography, message } from 'antd'
 import { QueryBuilder, type RuleGroupType } from 'react-querybuilder'
 import { QueryBuilderAntD } from '@react-querybuilder/antd'
-import { audienceApi, type AudienceDefinition } from '../../services/audienceApi'
+import { audienceApi, type AudienceDataSourceType, type AudienceDefinition, type AudiencePreviewResp, type AudienceSourceField } from '../../services/audienceApi'
 import { dataSourceConfigApi, type DataSourceConfig, type DataSourceTableMeta } from '../../services/dataSourceConfigApi'
 import { tagDefinitionApi } from '../../services/api'
 import { useSystemOptions } from '../../hooks/useSystemOptions'
+import { isCdpAudienceSource, toQueryBuilderFields } from './cdpAudienceFields'
 import 'react-querybuilder/dist/query-builder.css'
 
 /** 页面标题组件别名。 */
@@ -146,6 +147,9 @@ export default function AudienceEditPage() {
 
   /** QueryBuilder 字段（来自标签定义）。 */
   const [tagFields, setTagFields] = useState<{ name: string; label: string; value: string }[]>([])
+  const [cdpFields, setCdpFields] = useState<AudienceSourceField[]>([])
+  const [previewResult, setPreviewResult] = useState<AudiencePreviewResp | null>(null)
+  const [previewLoading, setPreviewLoading] = useState(false)
 
   /** Select 组件的标签选项。 */
   const [tagOptions, setTagOptions] = useState<{ label: string; value: string }[]>([])
@@ -180,8 +184,11 @@ export default function AudienceEditPage() {
     if (dataSourceType === 'JDBC' && selectedJdbcTable) {
       return selectedJdbcTable.columns.map(column => ({ name: column, label: column, value: column }))
     }
+    if (isCdpAudienceSource(dataSourceType)) {
+      return toQueryBuilderFields(cdpFields)
+    }
     return tagFields
-  }, [dataSourceType, selectedJdbcTable, tagFields])
+  }, [cdpFields, dataSourceType, selectedJdbcTable, tagFields])
   /** QueryBuilder 操作符选项，由系统字典转换成库需要的 name/label。 */
   const queryOperators = useMemo(
     () => audienceOperatorOptions.map(option => ({ name: option.value, label: option.label })),
@@ -224,6 +231,21 @@ export default function AudienceEditPage() {
       })
       .finally(() => setTableLoading(false))
   }, [dataSourceType, jdbcDataSourceId])
+
+  // CDP 数据源按类型加载当前可圈选字段。
+  useEffect(() => {
+    if (!isCdpAudienceSource(dataSourceType)) {
+      setCdpFields([])
+      setPreviewResult(null)
+      return
+    }
+    audienceApi.sourceFields(dataSourceType as AudienceDataSourceType)
+      .then(res => setCdpFields(res.data ?? []))
+      .catch(error => {
+        setCdpFields([])
+        message.error(error?.message || '读取 CDP 字段失败')
+      })
+  }, [dataSourceType])
 
   /** 切换 JDBC 数据源后清空表选择，避免沿用上一个数据源的表名。 */
   const handleJdbcDataSourceChange = (dataSourceId: number) => {
@@ -280,7 +302,9 @@ export default function AudienceEditPage() {
       // dataSourceConfig 在后端为 JSON 字符串，按当前数据源类型序列化。
       const config = values.dataSourceType === 'JDBC'
         ? values.jdbcConfig
-        : values.taggerConfig
+        : values.dataSourceType === 'TAGGER_API'
+          ? values.taggerConfig
+          : { sourceType: values.dataSourceType }
 
       const body: AudienceDefinition = {
         name: values.name,
@@ -305,6 +329,26 @@ export default function AudienceEditPage() {
       }
     } finally {
       setLoading(false)
+    }
+  }
+
+  const handlePreview = async () => {
+    if (!isCdpAudienceSource(dataSourceType)) {
+      return
+    }
+    setPreviewLoading(true)
+    try {
+      const res = await audienceApi.preview({
+        dataSourceType: dataSourceType as AudienceDataSourceType,
+        ruleJson: JSON.stringify(serializeGroup(query)),
+        sampleLimit: 10,
+      })
+      setPreviewResult(res.data)
+    } catch (error: any) {
+      setPreviewResult(null)
+      message.error(error?.message || '预览命中失败')
+    } finally {
+      setPreviewLoading(false)
     }
   }
 
@@ -383,6 +427,14 @@ export default function AudienceEditPage() {
               </Form.Item>
             </>
           )}
+
+          {isCdpAudienceSource(dataSourceType) && (
+            <Alert
+              type="info"
+              showIcon
+              message="CDP 数据源将按当前规则圈选用户，并保存为现有人群 bitmap。"
+            />
+          )}
         </Card>
 
         <Card title="圈选规则" style={{ marginBottom: 16 }}>
@@ -395,6 +447,20 @@ export default function AudienceEditPage() {
               combinators={queryCombinators}
             />
           </QueryBuilderAntD>
+          {isCdpAudienceSource(dataSourceType) && (
+            <div style={{ marginTop: 12 }}>
+              <Space>
+                <Button loading={previewLoading} onClick={handlePreview}>
+                  预览命中
+                </Button>
+                {previewResult && (
+                  <Typography.Text type="secondary">
+                    命中 {previewResult.estimatedSize.toLocaleString()} 人，样例：{previewResult.sampleUserIds.join(', ') || '-'}
+                  </Typography.Text>
+                )}
+              </Space>
+            </div>
+          )}
           <div style={{ marginTop: 12 }}>
             <div style={{ fontSize: 12, color: '#666', marginBottom: 6 }}>规则 JSON 预览</div>
             <Input.TextArea value={querySummary} rows={8} readOnly />
