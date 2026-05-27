@@ -64,7 +64,7 @@ const bodyParam = (name: string, desc: string): ApiDocParam => ({ name, in: 'bod
 const pathParams = (path: string): ApiDocParam[] =>
   Array.from(path.matchAll(/\{([^}]+)\}/g), match => idParam(match[1], `${match[1]} 路径参数`))
 
-const endpointId = (method: ApiDocMethod, path: string) =>
+export const endpointId = (method: ApiDocMethod, path: string) =>
   `${method.toLowerCase()}-${path.replace(/[{}]/g, '').replace(/[^a-zA-Z0-9]+/g, '-').replace(/^-|-$/g, '')}`
 
 const endpoint = ({
@@ -382,10 +382,22 @@ export const API_DOCS: ApiDocEndpoint[] = [
 
 const categoriesByKey = new Map(API_DOC_CATEGORIES.map(category => [category.key, category]))
 
-export function filterApiDocEndpoints(filter: ApiDocFilter): ApiDocEndpoint[] {
+export function filterApiDocEndpoints(endpoints: ApiDocEndpoint[], filter: ApiDocFilter): ApiDocEndpoint[]
+export function filterApiDocEndpoints(filter: ApiDocFilter): ApiDocEndpoint[]
+export function filterApiDocEndpoints(
+  endpointsOrFilter: ApiDocEndpoint[] | ApiDocFilter,
+  maybeFilter?: ApiDocFilter,
+): ApiDocEndpoint[] {
+  const endpoints = Array.isArray(endpointsOrFilter) ? endpointsOrFilter : API_DOCS
+  const filter = Array.isArray(endpointsOrFilter) ? maybeFilter : endpointsOrFilter
+
+  if (!filter) {
+    return endpoints
+  }
+
   const keyword = filter.keyword?.trim().toLowerCase()
 
-  return API_DOCS.filter(endpoint => {
+  return endpoints.filter(endpoint => {
     if (!filter.showInternal && endpoint.internal) {
       return false
     }

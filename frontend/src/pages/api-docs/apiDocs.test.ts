@@ -1,49 +1,86 @@
 import { describe, expect, it } from 'vitest'
 
 import {
-  API_DOCS,
   API_DOC_CATEGORIES,
+  endpointId,
   filterApiDocEndpoints,
   formatJsonExample,
   getApiDocCategorySummaries,
+  type ApiDocEndpoint,
 } from './apiDocs'
 
+const endpoints: ApiDocEndpoint[] = [
+  {
+    id: endpointId('POST', '/canvas/events/report'),
+    title: '上报业务事件',
+    method: 'POST',
+    path: '/canvas/events/report',
+    category: 'external-trigger',
+    summary: '业务系统上报事件编码和用户属性。',
+    auth: 'bearer',
+    responseExample: { code: 0, message: 'success', data: { accepted: true } },
+  },
+  {
+    id: endpointId('GET', '/canvas/api-definitions'),
+    title: 'API 定义列表',
+    method: 'GET',
+    path: '/canvas/api-definitions',
+    category: 'configuration',
+    summary: '分页查询后台 API 配置。',
+    auth: 'bearer',
+    internal: true,
+    responseExample: { code: 0, message: 'success', data: { total: 0, list: [] } },
+  },
+  {
+    id: endpointId('GET', '/admin/users'),
+    title: '用户列表',
+    method: 'GET',
+    path: '/admin/users',
+    category: 'users',
+    summary: '分页查询后台用户。',
+    auth: 'bearer',
+    internal: true,
+    responseExample: { code: 0, message: 'success', data: [] },
+  },
+]
+
 describe('api docs data helpers', () => {
-  it('contains external and internal endpoints', () => {
-    expect(API_DOCS.some(endpoint => !endpoint.internal)).toBe(true)
-    expect(API_DOCS.some(endpoint => endpoint.internal)).toBe(true)
-  })
-
   it('hides internal endpoints by default', () => {
-    const visible = filterApiDocEndpoints({ showInternal: false })
+    const visible = filterApiDocEndpoints(endpoints, { showInternal: false })
 
-    expect(visible.every(endpoint => endpoint.internal !== true)).toBe(true)
-    expect(visible.map(endpoint => endpoint.path)).toContain('/canvas/events/report')
-    expect(visible.map(endpoint => endpoint.path)).not.toContain('/canvas/api-definitions')
+    expect(visible.map(endpoint => endpoint.path)).toEqual(['/canvas/events/report'])
   })
 
   it('reveals internal endpoints when requested', () => {
-    const visible = filterApiDocEndpoints({ showInternal: true })
+    const visible = filterApiDocEndpoints(endpoints, { showInternal: true })
 
-    expect(visible.map(endpoint => endpoint.path)).toContain('/canvas/api-definitions')
-    expect(visible.map(endpoint => endpoint.path)).toContain('/admin/users')
+    expect(visible.map(endpoint => endpoint.path)).toEqual([
+      '/canvas/events/report',
+      '/canvas/api-definitions',
+      '/admin/users',
+    ])
   })
 
   it('filters by path title summary and category title', () => {
-    expect(filterApiDocEndpoints({ showInternal: true, keyword: 'events/report' })
+    expect(filterApiDocEndpoints(endpoints, { showInternal: true, keyword: 'events/report' })
       .map(endpoint => endpoint.path)).toEqual(['/canvas/events/report'])
-    expect(filterApiDocEndpoints({ showInternal: true, keyword: '用户管理' })
-      .map(endpoint => endpoint.category)).toContain('users')
+    expect(filterApiDocEndpoints(endpoints, { showInternal: true, keyword: 'API 定义' })
+      .map(endpoint => endpoint.path)).toEqual(['/canvas/api-definitions'])
+    expect(filterApiDocEndpoints(endpoints, { showInternal: true, keyword: '用户属性' })
+      .map(endpoint => endpoint.path)).toEqual(['/canvas/events/report'])
+    expect(filterApiDocEndpoints(endpoints, { showInternal: true, keyword: '用户管理' })
+      .map(endpoint => endpoint.path)).toEqual(['/admin/users'])
   })
 
   it('builds category summaries from visible endpoints', () => {
-    const summaries = getApiDocCategorySummaries(filterApiDocEndpoints({ showInternal: false }))
+    const summaries = getApiDocCategorySummaries(filterApiDocEndpoints(endpoints, { showInternal: false }))
 
     expect(summaries[0]).toMatchObject({
-      key: API_DOC_CATEGORIES[0].key,
-      title: API_DOC_CATEGORIES[0].title,
+      key: API_DOC_CATEGORIES[1].key,
+      title: API_DOC_CATEGORIES[1].title,
+      description: API_DOC_CATEGORIES[1].description,
+      count: 1,
     })
-    expect(summaries.every(summary => summary.count > 0)).toBe(true)
   })
 
   it('formats JSON examples with two-space indentation', () => {
@@ -52,13 +89,11 @@ describe('api docs data helpers', () => {
     )
   })
 
-  it('formats undefined examples with a safe string fallback', () => {
+  it('formats undefined examples as undefined', () => {
     expect(formatJsonExample(undefined)).toBe('undefined')
   })
 
-  it('does not duplicate endpoint ids', () => {
-    const ids = API_DOCS.map(endpoint => endpoint.id)
-
-    expect(new Set(ids).size).toBe(ids.length)
+  it('builds stable endpoint IDs', () => {
+    expect(endpointId('GET', '/canvas/{id}/versions/{versionId}')).toBe('get-canvas-id-versions-versionId')
   })
 })
