@@ -9,13 +9,13 @@ This checklist is the production-readiness gate for the 3000 Canvas execution co
 Run before any 3000 hardening code change:
 
 ```bash
-JAVA_HOME=$(/usr/libexec/java_home -v 21) mvn -f backend/pom.xml -pl canvas-engine -Dtest=CanvasExecutionServiceTest,CanvasExecutionServiceTriggerNodeTest,InFlightExecutionRegistryTest,CanvasServicePublishTest,CanvasServiceExampleFilterTest,CanvasOpsServiceExampleCloneTest test
+JAVA_HOME=$(/usr/libexec/java_home -v 21) mvn -f backend/pom.xml -pl canvas-engine -Dtest=CanvasExecutionServiceTest,CanvasExecutionServiceTriggerNodeTest,InFlightExecutionRegistryTest,ExecutionLaneResolverTest,InFlightExecutionRegistryLaneTest,CanvasServicePublishTest,CanvasServiceExampleFilterTest,CanvasOpsServiceExampleCloneTest test
 ```
 
 Pass condition:
 
 ```text
-Tests run: 26, Failures: 0, Errors: 0, Skipped: 0
+Tests run: 31, Failures: 0, Errors: 0, Skipped: 0
 BUILD SUCCESS
 ```
 
@@ -29,6 +29,12 @@ Stop condition:
 
 3000 is complete only when:
 
+- runtime config is `canvas.execution.max-concurrency=3000`
+- runtime lane budgets are `LIGHT=600`, `STANDARD=1800`, `HEAVY=300`, `RETRY=300`
+- `InFlightExecutionRegistry` uses canvas + lane + global Redis ZSET admission
+- overflow retry and persistent request retry resolve to `RETRY`
+- heavy scheduled, replay, Groovy, tagger, audience, and subflow work resolves to `HEAVY`
+- direct and internal continuation work resolves to `LIGHT`
 - affected backend tests pass on Java 21
 - the default mixed profile passes the full observation window
 - retry surge passes after downstream recovery

@@ -9,6 +9,7 @@ import org.apache.rocketmq.client.producer.SendStatus;
 import org.apache.rocketmq.common.message.Message;
 import org.apache.rocketmq.spring.core.RocketMQTemplate;
 import org.chovy.canvas.common.MapFieldKeys;
+import org.chovy.canvas.config.ExecutionLaneProperties;
 import org.chovy.canvas.dal.dataobject.CanvasDO;
 import org.chovy.canvas.dal.mapper.CanvasMapper;
 import org.chovy.canvas.dal.dataobject.CanvasVersionDO;
@@ -27,6 +28,9 @@ import org.chovy.canvas.engine.dag.DagGraph;
 import org.chovy.canvas.engine.dag.DagParser;
 import org.chovy.canvas.engine.disruptor.CanvasDisruptorService;
 import org.chovy.canvas.engine.handlers.MqTriggerHandler;
+import org.chovy.canvas.engine.lane.ExecutionLane;
+import org.chovy.canvas.engine.lane.ExecutionLaneAdmissionResult;
+import org.chovy.canvas.engine.lane.ExecutionLaneResolver;
 import org.chovy.canvas.engine.scheduler.DagEngine;
 import org.chovy.canvas.infrastructure.cache.CanvasConfigCache;
 import org.chovy.canvas.infrastructure.cache.CanvasEntityCache;
@@ -90,6 +94,10 @@ public class CanvasExecutionService {
     private final CanvasExecutionDlqMapper dlqMapper;
     /** 触发优先级配置。 */
     private final TriggerPriorityConfig priorityConfig;
+    /** 执行 lane 解析器。 */
+    private final ExecutionLaneResolver executionLaneResolver;
+    /** 执行 lane 预算配置。 */
+    private final ExecutionLaneProperties executionLaneProperties;
     /** RocketMQ 模板，用于溢出重试和降级消息投递。 */
     private final RocketMQTemplate rocketMQTemplate;
     /** Jackson ObjectMapper，用于 JSON 序列化和反序列化。 */
@@ -114,7 +122,7 @@ public class CanvasExecutionService {
     private long globalTimeoutSec;
 
     /** 全局最大并发执行数。 */
-    @org.springframework.beans.factory.annotation.Value("${canvas.execution.max-concurrency:1000}")
+    @org.springframework.beans.factory.annotation.Value("${canvas.execution.max-concurrency:3000}")
     private int globalMaxConcurrency;
 
 // ── 启动校验 ──────────────────────────────────────────────────
@@ -240,7 +248,7 @@ public class CanvasExecutionService {
             String triggerNodeType, String matchKey,
             Map<String, Object> payload, String msgId, boolean dryRun) {
         return triggerInternal(canvasId, userId, triggerType, triggerNodeType, matchKey,
-                payload, msgId, dryRun, false, 0, false, 0, null);
+                payload, msgId, dryRun, false, 0, false, 0, null, null);
     }
 
     /**
@@ -263,7 +271,7 @@ public class CanvasExecutionService {
             Map<String, Object> payload, String msgId,
             int priorAttemptCount, String lastError) {
         return triggerInternal(canvasId, userId, triggerType, triggerNodeType, matchKey,
-                payload, msgId, false, false, 0, true, priorAttemptCount, lastError);
+                payload, msgId, false, false, 0, true, priorAttemptCount, lastError, null);
     }
 
     /**
@@ -280,12 +288,30 @@ public class CanvasExecutionService {
             String msgId,
             CanvasDisruptorService.DispatchOptions dispatchOptions
     ) {
+        return triggerFromDisruptor(canvasId, userId, triggerType, triggerNodeType,
+                matchKey, payload, msgId, null, dispatchOptions);
+    }
+
+    /**
+     * Internal Disruptor entrypoint with pre-resolved lane metadata.
+     */
+    public Mono<Map<String, Object>> triggerFromDisruptor(
+            Long canvasId,
+            String userId,
+            String triggerType,
+            String triggerNodeType,
+            String matchKey,
+            Map<String, Object> payload,
+            String msgId,
+            ExecutionLane executionLane,
+            CanvasDisruptorService.DispatchOptions dispatchOptions
+    ) {
         boolean overflowRetry = dispatchOptions != null && dispatchOptions.isOverflowRetry();
         int overflowChainRetryCount = dispatchOptions != null
                 ? dispatchOptions.getOverflowChainRetryCount()
                 : 0;
         return triggerInternal(canvasId, userId, triggerType, triggerNodeType, matchKey,
-                payload, msgId, false, overflowRetry, overflowChainRetryCount, false, 0, null);
+                payload, msgId, false, overflowRetry, overflowChainRetryCount, false, 0, null, executionLane);
     }
 
     /** 统一触发入口，串联准备阶段和执行阶段的响应式流程。 */
@@ -294,7 +320,8 @@ public class CanvasExecutionService {
             String triggerNodeType, String matchKey,
             Map<String, Object> payload, String msgId, boolean dryRun,
             boolean overflowRetry, int overflowChainRetryCount,
-            boolean persistentRequest, int priorAttemptCount, String lastError) {
+            boolean persistentRequest, int priorAttemptCount, String lastError,
+            ExecutionLane executionLaneOverride) {
         return Mono.fromCallable(() ->
                         // 校验与准备
                         prepareExecution(
@@ -302,7 +329,8 @@ public class CanvasExecutionService {
                                 triggerNodeType, matchKey, payload,
                                 msgId, dryRun, overflowRetry,
                                 overflowChainRetryCount, persistentRequest,
-                                priorAttemptCount, lastError))
+                                priorAttemptCount, lastError,
+                                executionLaneOverride))
                 .subscribeOn(Schedulers.boundedElastic())
                 .flatMap(
                         // 执行阶段
@@ -331,10 +359,13 @@ public class CanvasExecutionService {
         String acquiredDedupKey = (String) prep.get(MapFieldKeys.DEDUP_KEY);
         // 准入上限
         int admissionLimit = (Integer) prep.get(MapFieldKeys.ADMISSION_LIMIT);
+        Object laneValue = prep.get(MapFieldKeys.EXECUTION_LANE);
+        ExecutionLane executionLane = laneValue instanceof ExecutionLane lane ? lane : ExecutionLane.STANDARD;
+        int laneLimit = executionLaneProperties.limitFor(executionLane);
 
         // 执行槽位是最终并发卡口，失败时会释放已获取的 resumeLock/dedupKey。
         SlotAcquisitionResult slotResult = tryAcquireSlot(
-                canvasId, ctx, admissionLimit, dryRun, isResume, acquiredDedupKey);
+                canvasId, ctx, executionLane, admissionLimit, laneLimit, dryRun, isResume, acquiredDedupKey);
         if (slotResult.isOverflow()) return slotResult.overflowMono();
 
         return doExecute(canvasId, userId, dryRun,
@@ -519,7 +550,7 @@ public class CanvasExecutionService {
      *   <li>步骤E：resumeLock——Redis SETNX，跨机原子，安全。</li>
      * </ul>
      */
-    private Map<String, ?> prepareExecution(Long canvasId, String userId, String triggerType, String triggerNodeType, String matchKey, Map<String, Object> payload, String msgId, boolean dryRun, boolean overflowRetry, int overflowChainRetryCount, boolean persistentRequest, int priorAttemptCount, String lastError) {
+    private Map<String, ?> prepareExecution(Long canvasId, String userId, String triggerType, String triggerNodeType, String matchKey, Map<String, Object> payload, String msgId, boolean dryRun, boolean overflowRetry, int overflowChainRetryCount, boolean persistentRequest, int priorAttemptCount, String lastError, ExecutionLane executionLaneOverride) {
 
         // A. 从 Caffeine L1 缓存加载画布实体，验证存在且已发布
         //    ⚠️ 分布式：L1 是 JVM 本地，画布下线后最多延迟一个缓存 TTL 才感知
@@ -528,6 +559,11 @@ public class CanvasExecutionService {
         boolean persistentRetryAfterOverflow = persistentRetry && "request_retry".equals(lastError);
         boolean internalContinuation = isInternalContinuationTrigger(triggerType);
         boolean quotaBypass = internalContinuation || (persistentRetry && !persistentRetryAfterOverflow);
+        ExecutionLane executionLane = executionLaneOverride != null
+                ? executionLaneOverride
+                : executionLaneResolver.resolve(
+                        triggerType, triggerNodeType, payload,
+                        overflowRetry, persistentRequest, priorAttemptCount);
 
         // B. 幂等去重（Redis SETNX，跨机安全）
         //    isResume=true 表示 Redis 中存有该用户的上下文快照（画布已暂停等待中）
@@ -566,7 +602,8 @@ public class CanvasExecutionService {
                 canvasId, userId, triggerType,
                 triggerNodeType, matchKey, payload,
                 dryRun, isResume, canvas,
-                admissionLimit, acquiredDedupKey, quotaBypass);
+                admissionLimit, acquiredDedupKey, quotaBypass,
+                executionLane);
     }
 
     /**
@@ -585,7 +622,7 @@ public class CanvasExecutionService {
      * 其他机器抢锁失败时直接放弃本次触发（SKIPPED）。
      * 锁的 TTL = globalTimeoutSec，保证执行超时后锁自动释放。
      */
-    private Map<String, Object> buildPrepMap(Long canvasId, String userId, String triggerType, String triggerNodeType, String matchKey, Map<String, Object> payload, boolean dryRun, boolean isResume, CanvasDO canvas, int admissionLimit, String acquiredDedupKey, boolean quotaBypass) {
+    private Map<String, Object> buildPrepMap(Long canvasId, String userId, String triggerType, String triggerNodeType, String matchKey, Map<String, Object> payload, boolean dryRun, boolean isResume, CanvasDO canvas, int admissionLimit, String acquiredDedupKey, boolean quotaBypass, ExecutionLane executionLane) {
         boolean resumeLockAcquired = false;
         // 提升到 try 外层，使 catch 块可以用于原子释放锁
         String resumeLockInstanceId = null;
@@ -615,6 +652,7 @@ public class CanvasExecutionService {
             // 补充上下文信息
             populateContext(triggerType, triggerNodeType, matchKey, payload, ctx);
             ctx.setQuotaBypass(quotaBypass);
+            ctx.getTriggerPayload().put(MapFieldKeys.EXECUTION_LANE, executionLane.name());
 
 
             // 查找画布内容
@@ -631,7 +669,7 @@ public class CanvasExecutionService {
             return buildPrepareResultMap(
                     isResume, canvas,
                     admissionLimit, acquiredDedupKey,
-                    ctx, graph, triggerNodeId
+                    executionLane, ctx, graph, triggerNodeId
             );
         } catch (RuntimeException e) {
             if (resumeLockAcquired) {
@@ -647,7 +685,7 @@ public class CanvasExecutionService {
     }
 
     /** 构建准备阶段输出 Map，供执行阶段解包上下文、图和准入信息。 */
-    private static Map<String, Object> buildPrepareResultMap(boolean isResume, CanvasDO canvas, int admissionLimit, String acquiredDedupKey, ExecutionContext ctx, DagGraph graph, String triggerNodeId) {
+    private static Map<String, Object> buildPrepareResultMap(boolean isResume, CanvasDO canvas, int admissionLimit, String acquiredDedupKey, ExecutionLane executionLane, ExecutionContext ctx, DagGraph graph, String triggerNodeId) {
         Map<String, Object> prep = new HashMap<>();
         prep.put(MapFieldKeys.CTX, ctx);
         prep.put(MapFieldKeys.GRAPH, graph);
@@ -655,6 +693,7 @@ public class CanvasExecutionService {
         prep.put(MapFieldKeys.IS_RESUME, isResume);
         prep.put(MapFieldKeys.CANVAS, canvas);
         prep.put(MapFieldKeys.ADMISSION_LIMIT, admissionLimit);
+        prep.put(MapFieldKeys.EXECUTION_LANE, executionLane);
         if (acquiredDedupKey != null) prep.put(MapFieldKeys.DEDUP_KEY, acquiredDedupKey);
         return prep;
     }
@@ -965,25 +1004,38 @@ public class CanvasExecutionService {
      * <p>⚠️ 分布式注意：slot 也是 JVM 本地，与 resolveAdmission 共享"不跨机"的限制。
      */
     private SlotAcquisitionResult tryAcquireSlot(Long canvasId, ExecutionContext ctx,
-                                                 int admissionLimit, boolean dryRun,
-                                                 boolean isResume, String acquiredDedupKey) {
+                                                 ExecutionLane executionLane,
+                                                 int admissionLimit, int laneLimit,
+                                                 boolean dryRun, boolean isResume,
+                                                 String acquiredDedupKey) {
         if (dryRun) return SlotAcquisitionResult.skipped();
-        var acquired = executionRegistry.tryAcquire(
-                canvasId, ctx.getExecutionId(), admissionLimit, globalMaxConcurrency);
-        if (acquired.isEmpty()) {
-            int active = executionRegistry.activeCount(canvasId);
-            log.warn("[ENGINE] 画布并发上限已达 canvasId={} active={}/{} global={}/{}",
-                    canvasId, active, admissionLimit,
-                    executionRegistry.totalActiveCount(), globalMaxConcurrency);
+        ExecutionLaneAdmissionResult acquired = executionRegistry.tryAcquire(
+                canvasId, ctx.getExecutionId(), executionLane,
+                admissionLimit, laneLimit, globalMaxConcurrency);
+        if (acquired == null || !acquired.allowed()) {
+            ExecutionLaneAdmissionResult result = acquired != null
+                    ? acquired
+                    : ExecutionLaneAdmissionResult.rejected(
+                            ExecutionLaneAdmissionResult.Reason.REGISTRY_UNAVAILABLE, 0, 0, 0);
+            log.warn("[ENGINE] 执行并发上限已达 canvasId={} lane={} reason={} canvas={}/{} lane={}/{} global={}/{}",
+                    canvasId, executionLane, result.reason(),
+                    result.canvasActive(), admissionLimit,
+                    result.laneActive(), laneLimit,
+                    result.globalActive(), globalMaxConcurrency);
             // 清理已持有的分布式锁和幂等 key，防泄漏
             if (isResume) ctxStore.releaseResumeLock(ctx.getCanvasId(), ctx.getUserId(), ctx.getResumeLockToken());
             if (acquiredDedupKey != null) ctxStore.releaseDedup(acquiredDedupKey);
             // 没拿到 slot 就不进入 DAG，调用方只收到 overflow 响应。
             return SlotAcquisitionResult.overflow(
                     Mono.just(Map.of(MapFieldKeys.OVERFLOW, "concurrency_limit_reached",
-                            MapFieldKeys.ACTIVE, active, MapFieldKeys.LIMIT, admissionLimit)));
+                            MapFieldKeys.EXECUTION_LANE, executionLane.name(),
+                            MapFieldKeys.ADMISSION_REASON, result.reason().name(),
+                            MapFieldKeys.ACTIVE, result.canvasActive(),
+                            MapFieldKeys.LANE_ACTIVE, result.laneActive(),
+                            MapFieldKeys.GLOBAL_ACTIVE, result.globalActive(),
+                            MapFieldKeys.LIMIT, admissionLimit)));
         }
-        return SlotAcquisitionResult.acquired(acquired.get());
+        return SlotAcquisitionResult.acquired(acquired.slot());
     }
 
     /**

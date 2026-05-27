@@ -38,6 +38,22 @@ test('validateHardeningProfiles accepts a 3000 lane total', () => {
   assert.equal(validateHardeningProfiles(validConfig).targetConcurrency, 3000)
 })
 
+test('validateHardeningProfiles accepts a 4000 readiness lane total', () => {
+  const readiness4000 = structuredClone(validConfig)
+  readiness4000.targetConcurrency = 4000
+  readiness4000.lanes.LIGHT.concurrency = 800
+  readiness4000.lanes.STANDARD.concurrency = 2400
+  readiness4000.lanes.HEAVY.concurrency = 400
+  readiness4000.lanes.RETRY.concurrency = 400
+  readiness4000.profiles[0].name = 'readiness-mixed-4000'
+  readiness4000.profiles[0].stages = [
+    { count: 12000, concurrency: 800 },
+    { count: 70000, concurrency: 4000 },
+  ]
+
+  assert.equal(validateHardeningProfiles(readiness4000).targetConcurrency, 4000)
+})
+
 test('validateHardeningProfiles rejects lane totals above target', () => {
   const invalid = structuredClone(validConfig)
   invalid.lanes.RETRY.concurrency = 301

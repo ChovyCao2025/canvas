@@ -140,6 +140,26 @@ Profiles required for 3000 completion:
 - `redis-registry-latency`
 - `rocketmq-backlog-recovery`
 
+## 4000 Readiness Profiles
+
+4000 is a readiness target after the 3000 gate passes. The starting profile lives in `tools/perf/4000-readiness-profiles.json`; it is not a production default.
+
+Validate the lane total:
+
+```bash
+node -e "const p=require('./tools/perf/4000-readiness-profiles.json'); const total=Object.values(p.lanes).reduce((sum,l)=>sum+l.concurrency,0); if (total !== p.targetConcurrency) throw new Error(String(total)); console.log(total)"
+```
+
+Render the mixed 4000 readiness command:
+
+```bash
+node tools/perf/hardening-profile.mjs \
+  --profile-file tools/perf/4000-readiness-profiles.json \
+  --profile readiness-mixed-4000 \
+  --out-dir tmp/perf-4000-readiness \
+  --run-id-prefix "perf_4000_readiness_$(date +%Y%m%d_%H%M%S)"
+```
+
 ## Direct Call Test
 
 ```bash

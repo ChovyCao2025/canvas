@@ -181,6 +181,18 @@ public final class MapFieldKeys {
     /** 准入上限。 */
     public static final String ADMISSION_LIMIT = "admissionLimit";
 
+    /** 执行 lane。 */
+    public static final String EXECUTION_LANE = "executionLane";
+
+    /** 准入拒绝原因。 */
+    public static final String ADMISSION_REASON = "admissionReason";
+
+    /** lane 活跃执行数。 */
+    public static final String LANE_ACTIVE = "laneActive";
+
+    /** 全局活跃执行数。 */
+    public static final String GLOBAL_ACTIVE = "globalActive";
+
     /** 去重键。 */
     public static final String DEDUP_KEY = "dedupKey";
 
