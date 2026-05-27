@@ -1,0 +1,103 @@
+{
+  "targetConcurrency": 3000,
+  "observationWindowSeconds": 1800,
+  "lanes": {
+    "LIGHT": { "concurrency": 600, "share": 0.2 },
+    "STANDARD": { "concurrency": 1800, "share": 0.6 },
+    "HEAVY": { "concurrency": 300, "share": 0.1 },
+    "RETRY": { "concurrency": 300, "share": 0.1 }
+  },
+  "stopGates": [
+    "RUNNER_FAILED",
+    "VERIFIER_FAIL",
+    "P95_EXCEEDED",
+    "REDIS_REGISTRY_LATENCY_SUSTAINED",
+    "REGISTRY_UNAVAILABLE_OVER_ADMIT",
+    "MYSQL_POOL_SATURATION",
+    "NORMAL_MQ_BACKLOG_STARVED_BY_RETRY",
+    "DISRUPTOR_OVERFLOW_GROWING",
+    "RETRY_BACKLOG_GROWING_AFTER_RECOVERY",
+    "DLQ_GROWING_AFTER_RECOVERY"
+  ],
+  "profiles": [
+    {
+      "name": "default-mixed-3000",
+      "description": "Default 3000 mixed profile: LIGHT 600, STANDARD 1800, HEAVY 300, RETRY 300.",
+      "mode": "event",
+      "eventCode": "PERF_ORDER_PAID",
+      "stages": [
+        { "count": 10000, "concurrency": 600 },
+        { "count": 30000, "concurrency": 1800 },
+        { "count": 50000, "concurrency": 3000 }
+      ],
+      "maxFailed": 0,
+      "maxP95Ms": 1000,
+      "waitAfterRunMs": 10000
+    },
+    {
+      "name": "retry-surge-300",
+      "description": "Retry lane reaches 300 while LIGHT and STANDARD stay protected.",
+      "mode": "event",
+      "eventCode": "PERF_ORDER_PAID",
+      "stages": [
+        { "count": 5000, "concurrency": 100 },
+        { "count": 15000, "concurrency": 300 }
+      ],
+      "maxFailed": 0,
+      "maxP95Ms": 1500,
+      "waitAfterRunMs": 30000
+    },
+    {
+      "name": "heavy-surge-300",
+      "description": "Heavy lane reaches 300 and must not borrow LIGHT or STANDARD budget.",
+      "mode": "event",
+      "eventCode": "PERF_HEAVY_FLOW",
+      "stages": [
+        { "count": 3000, "concurrency": 100 },
+        { "count": 10000, "concurrency": 300 }
+      ],
+      "maxFailed": 0,
+      "maxP95Ms": 3000,
+      "waitAfterRunMs": 30000
+    },
+    {
+      "name": "slow-downstream-standard",
+      "description": "One downstream is slow; timeout, circuit breaker, and bulkhead must contain impact.",
+      "mode": "event",
+      "eventCode": "PERF_SLOW_DOWNSTREAM",
+      "stages": [
+        { "count": 5000, "concurrency": 300 },
+        { "count": 20000, "concurrency": 1200 }
+      ],
+      "maxFailed": 100,
+      "maxP95Ms": 5000,
+      "waitAfterRunMs": 30000
+    },
+    {
+      "name": "redis-registry-latency",
+      "description": "Redis registry latency spike must fail conservatively and never over-admit.",
+      "mode": "event",
+      "eventCode": "PERF_ORDER_PAID",
+      "stages": [
+        { "count": 5000, "concurrency": 300 },
+        { "count": 15000, "concurrency": 1000 }
+      ],
+      "maxFailed": 500,
+      "maxP95Ms": 5000,
+      "waitAfterRunMs": 30000
+    },
+    {
+      "name": "rocketmq-backlog-recovery",
+      "description": "Normal, retry, and heavy backlog are observed separately; retry recovery must not starve normal traffic.",
+      "mode": "event",
+      "eventCode": "PERF_MQ",
+      "stages": [
+        { "count": 10000, "concurrency": 500 },
+        { "count": 30000, "concurrency": 1500 }
+      ],
+      "maxFailed": 0,
+      "maxP95Ms": 2000,
+      "waitAfterRunMs": 30000
+    }
+  ]
+}
