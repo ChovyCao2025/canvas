@@ -50,4 +50,38 @@ class RuleEvaluatorFailClosedTest {
 
         assertThat(matched).isFalse();
     }
+
+    @Test
+    void aviator_lowercase_in_operator_matches() {
+        AviatorRuleEvaluator evaluator = new AviatorRuleEvaluator(objectMapper);
+        String ruleJson = """
+                {
+                  "logic":"AND",
+                  "conditions":[
+                    {"field":"city","op":"in","value":["Beijing","Shanghai"]}
+                  ]
+                }
+                """;
+
+        boolean matched = evaluator.evaluate(ruleJson, Map.of("city", "Beijing"));
+
+        assertThat(matched).isTrue();
+    }
+
+    @Test
+    void ql_lowercase_in_operator_matches() {
+        QLExpressRuleEvaluator evaluator = new QLExpressRuleEvaluator(objectMapper);
+        String ruleJson = """
+                {
+                  "logic":"AND",
+                  "conditions":[
+                    {"field":"city","op":"in","value":["Beijing","Shanghai"]}
+                  ]
+                }
+                """;
+
+        boolean matched = evaluator.evaluate(ruleJson, Map.of("city", "Beijing"));
+
+        assertThat(matched).isTrue();
+    }
 }

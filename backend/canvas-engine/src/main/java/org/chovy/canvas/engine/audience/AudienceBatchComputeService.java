@@ -10,6 +10,7 @@ import org.chovy.canvas.dal.dataobject.AudienceComputeRunDO;
 import org.chovy.canvas.dal.mapper.AudienceComputeRunMapper;
 import org.chovy.canvas.dal.dataobject.AudienceStatDO;
 import org.chovy.canvas.dal.mapper.AudienceStatMapper;
+import org.chovy.canvas.engine.rule.AudienceDefinitionRuleValidator;
 import org.roaringbitmap.RoaringBitmap;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.jdbc.DataSourceBuilder;
@@ -64,6 +65,8 @@ public class AudienceBatchComputeService {
     private final AudienceEvaluationContextFetcher contextFetcher;
     /** JDBC 数据源配置解析器。 */
     private final JdbcConfigResolver jdbcConfigResolver;
+    /** 人群规则校验器，用于保存前拦截非法规则配置。 */
+    private final AudienceDefinitionRuleValidator audienceRuleValidator;
 
     /** Tagger 服务地址。 */
     @Value("${canvas.integration.tagger-service-url}")
@@ -135,12 +138,14 @@ public class AudienceBatchComputeService {
 
     /** 创建新记录，并执行必要的唯一性、格式和默认值处理。 */
     public AudienceDefinitionDO create(AudienceDefinitionDO definition) {
+        audienceRuleValidator.validateForSave(definition);
         definitionMapper.insert(definition);
         return definition;
     }
 
     /** 更新已有记录，仅修改允许变更的字段。 */
     public boolean update(AudienceDefinitionDO definition) {
+        audienceRuleValidator.validateForSave(definition);
         return definitionMapper.updateById(definition) > 0;
     }
 
@@ -161,24 +166,41 @@ public class AudienceBatchComputeService {
                 .username(jdbcConfig.username())
                 .password(jdbcConfig.password())
                 .build();
-        NamedParameterJdbcTemplate jdbcTemplate = new NamedParameterJdbcTemplate(dataSource);
-        SqlWhereGenerator.SqlWhere where = sqlWhereGenerator.generate(definition.getRuleJson());
-        // 表名和用户列已在 JdbcConfigResolver 做标识符校验，规则值通过命名参数绑定。
-        String sql = "SELECT " + jdbcConfig.userIdColumn() + " FROM " + jdbcConfig.baseTable() +
-                " WHERE " + where.sql();
-        if (jdbcConfig.maxRows() != null) {
-            // maxRows 用于限制离线计算的读取上界，防止错误规则扫出超大结果集。
-            sql += " LIMIT " + jdbcConfig.maxRows();
+        try {
+            NamedParameterJdbcTemplate jdbcTemplate = new NamedParameterJdbcTemplate(dataSource);
+            jdbcTemplate.getJdbcTemplate().setFetchSize(PAGE_SIZE);
+            SqlWhereGenerator.SqlWhere where = sqlWhereGenerator.generate(definition.getRuleJson());
+            // 表名和用户列已在 JdbcConfigResolver 做标识符校验，规则值通过命名参数绑定。
+            String sql = "SELECT " + jdbcConfig.userIdColumn() + " FROM " + jdbcConfig.baseTable() +
+                    " WHERE " + where.sql();
+            org.springframework.jdbc.core.namedparam.MapSqlParameterSource params = where.params();
+            if (jdbcConfig.maxRows() != null) {
+                // maxRows 作为命名参数绑定，限制离线计算读取上界且避免拼接数值。
+                sql += " LIMIT :__maxRows";
+                params.addValue("__maxRows", jdbcConfig.maxRows());
+            }
+            RoaringBitmap bitmap = new RoaringBitmap();
+            jdbcTemplate.query(sql, params, rs -> {
+                String userId = rs.getString(1);
+                if (userId != null && !userId.isBlank()) {
+                    // 业务 userId 映射为稳定整数，后续在线判断只需要检查 bitmap 是否包含该整数。
+                    bitmap.add(AudienceBitmapStore.toUid(userId));
+                }
+            });
+            return bitmap;
+        } finally {
+            closeDataSource(dataSource);
         }
-        List<String> userIds = jdbcTemplate.query(sql, where.params(), (rs, rowNum) -> rs.getString(1));
-        RoaringBitmap bitmap = new RoaringBitmap();
-        for (String userId : userIds) {
-            if (userId != null && !userId.isBlank()) {
-                // 业务 userId 映射为稳定整数，后续在线判断只需要检查 bitmap 是否包含该整数。
-                bitmap.add(AudienceBitmapStore.toUid(userId));
+    }
+
+    private void closeDataSource(DataSource dataSource) {
+        if (dataSource instanceof AutoCloseable closeable) {
+            try {
+                closeable.close();
+            } catch (Exception e) {
+                log.warn("[AUDIENCE] failed to close JDBC DataSource: {}", e.getMessage(), e);
             }
         }
-        return bitmap;
     }
 
     /** 通过 Tagger API 分页拉取种子用户并按规则二次过滤生成 Bitmap。 */

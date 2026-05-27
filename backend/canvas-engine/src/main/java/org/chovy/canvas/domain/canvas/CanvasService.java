@@ -12,6 +12,7 @@ import org.chovy.canvas.dto.*;
 import org.chovy.canvas.engine.dag.DagGraph;
 import org.chovy.canvas.engine.dag.DagParser;
 import org.chovy.canvas.engine.handlers.GroovyHandler;
+import org.chovy.canvas.engine.rule.CanvasRuleGraphValidator;
 import org.chovy.canvas.engine.trigger.CanvasSchedulerService;
 import org.chovy.canvas.engine.trigger.CanvasExecutionService;
 import org.chovy.canvas.engine.trigger.TriggerPreCheckService;
@@ -67,6 +68,8 @@ public class CanvasService {
     private final GroovyHandler groovyHandler;
     /** MQ 触发节点处理器，用于解析和匹配 MQ 触发入口。 */
     private final org.chovy.canvas.engine.handlers.MqTriggerHandler mqTriggerHandler;
+    /** 画布规则图校验器，用于发布前验证条件/人群规则结构。 */
+    private final CanvasRuleGraphValidator canvasRuleGraphValidator;
     /** 阻塞式 Redis 模板，用于锁、去重、票据或跨实例通知。 */
     private final org.springframework.data.redis.core.StringRedisTemplate redis;
     /** 画布事务服务，封装只涉及数据库写入的事务边界。 */
@@ -217,6 +220,7 @@ public class CanvasService {
             }
             // 子流程依赖必须在发布事务前完成校验，避免 DB 已切发布态后运行时才发现断链。
             validateSubFlowDependencies(id, graph);
+            canvasRuleGraphValidator.validateOrThrow(graph);
 
             // 阶段2：DB 事务（只写 DB，不碰 Redis/Scheduler/Cache）
             CanvasTransactionService.PublishResult result =

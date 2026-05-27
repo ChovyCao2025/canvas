@@ -53,6 +53,9 @@ public class JdbcConfigResolver {
         String baseTable = stringValue(config, "baseTable");
         String userIdColumn = stringValue(config, "userIdColumn", "user_id");
         Integer maxRows = config.get("maxRows") instanceof Number number ? number.intValue() : null;
+        if (maxRows != null && maxRows <= 0) {
+            throw new IllegalArgumentException("maxRows must be positive");
+        }
         // 表名/列名无法用 JDBC 参数绑定，只允许简单标识符，阻断通过配置注入 SQL 片段。
         if (!baseTable.matches("[A-Za-z_][A-Za-z0-9_]*") || !userIdColumn.matches("[A-Za-z_][A-Za-z0-9_]*")) {
             throw new IllegalArgumentException("Illegal table or column name in JDBC config");
