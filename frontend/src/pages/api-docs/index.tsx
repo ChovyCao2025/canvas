@@ -1,5 +1,5 @@
 // Runtime API docs page backed by the OpenAPI spec exposed at /v3/api-docs.
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Alert, Button, Card, Empty, Input, Space, Spin, Switch, Table, Tag, Tooltip, Typography, message } from 'antd'
 import { CopyOutlined, ReloadOutlined, SearchOutlined } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
@@ -148,27 +148,40 @@ export default function ApiDocsPage() {
   const [warnings, setWarnings] = useState<string[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | undefined>()
+  const requestSeqRef = useRef(0)
 
   const loadOpenApiDocs = useCallback(async () => {
+    const requestSeq = requestSeqRef.current + 1
+    requestSeqRef.current = requestSeq
+
     setLoading(true)
     setError(undefined)
 
     try {
       const spec = await fetchOpenApiSpec()
       const result = parseOpenApiEndpoints(spec)
+      if (requestSeq !== requestSeqRef.current) return
+
       setApiEndpoints(result.endpoints)
       setWarnings(result.warnings)
     } catch (nextError) {
+      if (requestSeq !== requestSeqRef.current) return
+
       setApiEndpoints([])
       setWarnings([])
       setError(nextError instanceof Error ? nextError.message : '加载 /v3/api-docs 失败')
     } finally {
+      if (requestSeq !== requestSeqRef.current) return
+
       setLoading(false)
     }
   }, [])
 
   useEffect(() => {
     void loadOpenApiDocs()
+    return () => {
+      requestSeqRef.current += 1
+    }
   }, [loadOpenApiDocs])
 
   const disabled = loading || Boolean(error)
