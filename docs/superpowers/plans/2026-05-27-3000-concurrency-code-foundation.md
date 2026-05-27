@@ -4,7 +4,7 @@
 
 **Goal:** Implement the code-controlled foundation needed for 3000 cluster-level Canvas execution concurrency: lane budgets, lane resolution, lane-aware Redis ZSET admission, service wiring, flow routing, and metrics.
 
-**Architecture:** Keep the existing WebFlux + RocketMQ + Disruptor + DAG execution model. Extend the current `InFlightExecutionRegistry` from canvas/global admission to canvas/lane/global admission, then wire `CanvasExecutionService` to resolve `LIGHT`, `STANDARD`, `HEAVY`, and `RETRY` lanes before acquiring execution slots. This plan does not physically split Redis clusters or rewrite the execution engine into multiple services.
+**Architecture:** Keep the existing WebFlux + RocketMQ + Disruptor + DAG execution model. Extend the current `InFlightExecutionRegistry` from canvas/global admission to canvas/lane/global admission, then wire `CanvasExecutionService` to resolve `LIGHT`, `STANDARD`, `HEAVY`, and `RETRY` lanes before acquiring execution slots. This plan does not physically split Redis clusters or rewrite the execution engine into multiple services; it preserves the extension points needed for a later 4000 readiness phase.
 
 **Tech Stack:** Java 21, Spring Boot WebFlux, Spring Boot configuration properties, Redis `StringRedisTemplate`, Redis Lua scripts, RocketMQ, Disruptor, Micrometer, JUnit 5, AssertJ, Mockito.
 
@@ -28,8 +28,15 @@ This plan intentionally does not implement:
 - application instance sizing
 - downstream service capacity expansion
 - full production load test execution
+- 4000-only upgrades such as per-lane ring buffers, async audit writers, adaptive retry controllers, or DAG cost profiling
 
 Those remain rollout and infrastructure tasks in `docs/superpowers/plans/2026-05-25-2000-concurrency.md`.
+
+The code introduced here must not block those later 4000 upgrades. In particular:
+- `ExecutionLaneResolver` must accept explicit heavy / light / retry inputs so DAG cost profile can become another input later.
+- `CanvasExecutionEvent` must carry lane metadata so per-lane worker pools can be added without changing trigger contracts.
+- `InFlightExecutionRegistry` must keep lane and global counts separate so the global target can move from 3000 to 4000 by configuration after readiness gates pass.
+- metrics must tag lane and reason so adaptive retry and worker-starvation controllers have usable signals later.
 
 ---
 
@@ -1463,6 +1470,7 @@ This plan implements the code-controlled foundation from the 3000 design:
 - `CanvasExecutionService` resolves lane and acquires lane-aware slots
 - Disruptor events can carry lane metadata
 - metrics expose lane rejection and active counts
+- 4000 readiness is supported by extension points, not implemented as a production target
 
 ### Placeholder scan
 
@@ -1481,7 +1489,7 @@ Core names are consistent across tasks:
 
 ### Scope check
 
-The plan is intentionally narrower than the full 3000 rollout. It produces a testable code foundation without bundling infrastructure provisioning, physical Redis separation, or production load testing into the same implementation slice.
+The plan is intentionally narrower than the full 3000 rollout. It produces a testable code foundation without bundling infrastructure provisioning, physical Redis separation, production load testing, or 4000-only architectural upgrades into the same implementation slice.
 
 ---
 
