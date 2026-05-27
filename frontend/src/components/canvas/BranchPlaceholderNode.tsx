@@ -1,5 +1,11 @@
+/**
+ * 组件职责：分支占位节点组件，显示“拖节点到这里连接”的虚拟落点。
+ *
+ * 维护说明：它只参与编辑器交互反馈，不代表真实可执行节点。
+ */
 import { Handle, Position, type NodeProps } from '@xyflow/react'
 
+/** 分支占位节点 data，记录它代表哪个源节点和出口 handle。 */
 export type PlaceholderData = {
   /** 标记该节点是占位节点而非真实业务节点。 */
   _placeholder: true
@@ -20,6 +26,8 @@ export type PlaceholderData = {
 // 与真实节点尺寸一致，碰撞检测才准确。
 // 否则拖拽投放时会出现“看起来落在框里，但判定没命中”的错位。
 export const PLACEHOLDER_W = 200
+
+/** 分支占位节点高度，与真实画布节点的命中区域保持接近。 */
 export const PLACEHOLDER_H = 76
 
 /**

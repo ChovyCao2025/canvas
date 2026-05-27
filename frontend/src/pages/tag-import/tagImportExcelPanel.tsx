@@ -1,3 +1,8 @@
+/**
+ * 页面职责：标签导入 Excel 面板，说明离线文件导入字段和模板格式。
+ *
+ * 维护说明：当前组件只呈现说明和入口，真实上传流程可在后续扩展。
+ */
 import { useState } from 'react'
 import { Alert, Button, Card, Space, Typography, Upload, message } from 'antd'
 import { DownloadOutlined, UploadOutlined } from '@ant-design/icons'
@@ -5,12 +10,15 @@ import type { UploadProps } from 'antd'
 import { tagImportApi } from '../../services/api'
 import type { TagImportResult } from './tagImportTypes'
 
+/** Excel 面板常用文本组件别名。 */
 const { Paragraph, Text } = Typography
 
+/** 标签导入 Excel 模板说明面板。 */
 export default function TagImportExcelPanel() {
   const [uploading, setUploading] = useState(false)
   const [result, setResult] = useState<TagImportResult>()
 
+  /** 上传 Excel 文件并展示后端返回的导入批次统计。 */
   const handleUpload = async (file: File) => {
     setUploading(true)
     try {
@@ -24,6 +32,7 @@ export default function TagImportExcelPanel() {
     }
   }
 
+  /** 拦截 Upload 默认提交流程，改为调用项目封装的导入接口。 */
   const beforeUpload: UploadProps['beforeUpload'] = (file) => {
     void handleUpload(file as File)
     return false

@@ -34,12 +34,14 @@ import org.chovy.canvas.infrastructure.cache.CanvasConfigCache;
 import org.chovy.canvas.infrastructure.cache.CanvasEntityCache;
 import org.chovy.canvas.infrastructure.mq.OverflowRetryMessage;
 import org.chovy.canvas.infrastructure.redis.ContextPersistenceService;
+import org.chovy.canvas.infrastructure.redis.RedisKeyUtil;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.test.util.ReflectionTestUtils;
 import reactor.core.Disposables;
 import reactor.core.publisher.Mono;
@@ -55,6 +57,12 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
+/**
+ * 画布执行 测试类。
+ *
+ * <p>覆盖该后端组件在典型输入、边界条件和异常场景下的行为，确保重构或性能优化不会改变既有契约。
+ * <p>测试代码只构造必要的依赖与数据，断言重点放在可观察结果、状态变更和关键副作用上。
+ */
 @ExtendWith(MockitoExtension.class)
 class CanvasExecutionServiceTest {
 
@@ -74,6 +82,10 @@ class CanvasExecutionServiceTest {
     @Mock RocketMQTemplate rocketMQTemplate;
     @Mock DefaultMQProducer rocketProducer;
     @Mock CdpUserService cdpUserService;
+    @Mock CanvasDisruptorService disruptorService;
+    @Mock StringRedisTemplate redis;
+    @Mock RedisKeyUtil redisKeys;
+    @Mock cn.hutool.core.lang.Snowflake snowflake;
 
     TriggerPriorityConfig priorityConfig;
     ObjectMapper objectMapper;
@@ -100,7 +112,11 @@ class CanvasExecutionServiceTest {
                 priorityConfig,
                 rocketMQTemplate,
                 objectMapper,
-                cdpUserService
+                cdpUserService,
+                disruptorService,
+                redis,
+                redisKeys,
+                snowflake
         );
         ReflectionTestUtils.setField(sut, "ctxTtlSec", 86400L);
         ReflectionTestUtils.setField(sut, "globalTimeoutSec", 600L);
@@ -146,177 +162,76 @@ class CanvasExecutionServiceTest {
     }
 
     @Test
-    void normalPriorityOverflowQueuesRocketMqRetryWithIncrementedChainRetryCount() throws Exception {
-        CanvasDO canvas = publishedCanvas(30L, 10);
-        when(canvasEntityCache.get(30L)).thenReturn(canvas);
-        when(ctxStore.acquireDedup(eq(30L), eq("user-1"), eq("msg-1"), any())).thenReturn(true);
-        when(executionRegistry.activeCount(30L)).thenReturn(10);
-        when(rocketMQTemplate.getProducer()).thenReturn(rocketProducer);
-        when(rocketProducer.send(any(Message.class))).thenReturn(sendResult(SendStatus.SEND_OK));
-
-        long enqueueStart = System.currentTimeMillis();
-        Map<String, Object> result = sut.trigger(
-                30L,
-                "user-1",
-                TriggerType.MQ,
-                NodeType.MQ_TRIGGER,
-                "topic-a",
-                Map.of("orderId", "o-1", OverflowRetryMessage.CHAIN_RETRY_PAYLOAD_KEY, 2),
-                "msg-1",
-                false
-        ).block();
-
-        assertThat(result).containsEntry("overflow", "queued_for_retry");
-        ArgumentCaptor<Message> messageCaptor = ArgumentCaptor.forClass(Message.class);
-        verify(rocketProducer).send(messageCaptor.capture());
-        Message message = messageCaptor.getValue();
-        assertThat(message.getTopic()).isEqualTo("CANVAS_TRIGGER_OVERFLOW");
-        assertThat(message.getTags()).isEqualTo(TriggerType.MQ);
-        assertThat(message.getDeliverTimeMs())
-                .isGreaterThanOrEqualTo(enqueueStart + priorityConfig.getOverflowRetryDelayMs())
-                .isLessThanOrEqualTo(System.currentTimeMillis() + priorityConfig.getOverflowRetryDelayMs() + 1_000);
-        OverflowRetryMessage retryMessage = objectMapper.readValue(message.getBody(), OverflowRetryMessage.class);
-        assertThat(retryMessage.getCanvasId()).isEqualTo(30L);
-        assertThat(retryMessage.getUserId()).isEqualTo("user-1");
-        assertThat(retryMessage.getTriggerType()).isEqualTo(TriggerType.MQ);
-        assertThat(retryMessage.getTriggerNodeType()).isEqualTo(NodeType.MQ_TRIGGER);
-        assertThat(retryMessage.getMatchKey()).isEqualTo("topic-a");
-        assertThat(retryMessage.getPayload())
-                .containsEntry("orderId", "o-1")
-                .doesNotContainKey(OverflowRetryMessage.CHAIN_RETRY_PAYLOAD_KEY);
-        assertThat(retryMessage.getChainRetryCount()).isEqualTo(1);
-        verify(preCheckService).checkWithoutQuotaAccounting(eq(canvas), eq("user-1"));
-        verify(preCheckService, never()).consumeQuotaAndRecord(any(), any());
-        verify(dagEngine, never()).execute(any(), any(), any());
-    }
-
-    @Test
-    void executionRequestOverflowReturnsRetrySignalWithoutRocketMqOverflowMessage() {
-        CanvasDO canvas = publishedCanvas(42L, 10);
-        when(canvasEntityCache.get(42L)).thenReturn(canvas);
-        when(ctxStore.acquireDedup(eq(42L), eq("user-13"), eq("msg-13"), any())).thenReturn(true);
-        when(executionRegistry.activeCount(42L)).thenReturn(10);
+    void executionRequestRetryAfterExecutionFailureSkipsCooldownQuotaAndRedisDedup() {
+        CanvasDO canvas = publishedCanvas(46L, 10);
+        when(canvasEntityCache.get(46L)).thenReturn(canvas);
+        when(ctxStore.exists(46L, "user-17")).thenReturn(false);
+        when(executionRegistry.activeCount(46L)).thenReturn(1);
+        DagGraph graph = graphWithTriggerNode(NodeType.MQ_TRIGGER, "topic-request-retry");
+        when(configCache.get(46L, 101L)).thenReturn(graph);
+        when(mqTriggerHandler.resolveTopic(any())).thenReturn("topic-request-retry");
+        when(executionRegistry.tryAcquire(eq(46L), any(), eq(1000), eq(1000)))
+                .thenReturn(Optional.of(Disposables.swap()));
+        when(dagEngine.execute(eq(graph), eq("trigger"), any())).thenReturn(Mono.just(Map.of("ok", true)));
 
         Map<String, Object> result = sut.triggerFromExecutionRequest(
-                42L,
-                "user-13",
+                46L,
+                "user-17",
                 TriggerType.MQ,
                 NodeType.MQ_TRIGGER,
-                "topic-request",
-                Map.of("orderId", "o-13"),
-                "msg-13"
-        ).block();
-
-        assertThat(result).containsEntry("overflow", "request_retry");
-        verify(preCheckService).checkWithoutQuotaAccounting(eq(canvas), eq("user-13"));
-        verify(preCheckService, never()).consumeQuotaAndRecord(any(), any());
-        verify(rocketMQTemplate, never()).getProducer();
-        verify(dagEngine, never()).execute(any(), any(), any());
-    }
-
-    @Test
-    void overflowRetryDisruptorMetadataUsesNonMutatingCheckThenConsumesQuotaWhenAccepted() {
-        CanvasDO canvas = publishedCanvas(34L, 10);
-        when(canvasEntityCache.get(34L)).thenReturn(canvas);
-        when(executionRegistry.activeCount(34L)).thenReturn(1);
-        when(ctxStore.exists(34L, "user-5")).thenReturn(false);
-        DagGraph graph = graphWithTriggerNode(NodeType.MQ_TRIGGER, "topic-b");
-        when(configCache.get(34L, 101L)).thenReturn(graph);
-        when(mqTriggerHandler.resolveTopic(any())).thenReturn("topic-b");
-        when(executionRegistry.tryAcquire(eq(34L), any(), eq(10), eq(1000)))
-                .thenReturn(Optional.of(Disposables.swap()));
-        when(dagEngine.execute(eq(graph), eq("trigger"), any())).thenReturn(Mono.just(Map.of("ok", true)));
-
-        Map<String, Object> result = sut.triggerFromDisruptor(
-                34L,
-                "user-5",
-                TriggerType.MQ,
-                NodeType.MQ_TRIGGER,
-                "topic-b",
-                Map.of(OverflowRetryMessage.CHAIN_RETRY_PAYLOAD_KEY, 1, "orderId", "o-5"),
-                "msg-5",
-                overflowRetryDispatchOptions()
+                "topic-request-retry",
+                Map.of("orderId", "o-17"),
+                "msg-17",
+                1,
+                "node failed"
         ).block();
 
         assertThat(result).containsEntry("ok", true);
-        verify(preCheckService, never()).check(any(), any());
-        verify(preCheckService).checkWithoutQuotaAccounting(eq(canvas), eq("user-5"));
-        verify(preCheckService).consumeQuotaAndRecord(eq(canvas), eq("user-5"));
         verify(ctxStore, never()).acquireDedup(any(), any(), any(), any());
-        ArgumentCaptor<ExecutionContext> ctxCaptor = ArgumentCaptor.forClass(ExecutionContext.class);
-        verify(dagEngine).execute(eq(graph), eq("trigger"), ctxCaptor.capture());
-        assertThat(ctxCaptor.getValue().getTriggerType()).isEqualTo(TriggerType.MQ);
-        assertThat(ctxCaptor.getValue().getTriggerNodeType()).isEqualTo(NodeType.MQ_TRIGGER);
-        assertThat(ctxCaptor.getValue().getMatchKey()).isEqualTo("topic-b");
-    }
-
-    @Test
-    void overflowRetryMetadataCarriesRetryBudgetWhenRequeued() throws Exception {
-        CanvasDO canvas = publishedCanvas(36L, 10);
-        when(canvasEntityCache.get(36L)).thenReturn(canvas);
-        when(executionRegistry.activeCount(36L)).thenReturn(10);
-        when(rocketMQTemplate.getProducer()).thenReturn(rocketProducer);
-        when(rocketProducer.send(any(Message.class))).thenReturn(sendResult(SendStatus.SEND_OK));
-
-        Map<String, Object> result = sut.triggerFromDisruptor(
-                36L,
-                "user-7",
-                TriggerType.MQ,
-                NodeType.MQ_TRIGGER,
-                "topic-d",
-                Map.of(OverflowRetryMessage.CHAIN_RETRY_PAYLOAD_KEY, 99, "orderId", "o-7"),
-                "msg-7",
-                overflowRetryDispatchOptions(2)
-        ).block();
-
-        assertThat(result).containsEntry("overflow", "queued_for_retry");
-        verify(preCheckService, never()).check(any(), any());
-        verify(preCheckService).checkWithoutQuotaAccounting(eq(canvas), eq("user-7"));
+        verify(preCheckService, never()).checkWithoutQuotaAccounting(any(), any());
         verify(preCheckService, never()).consumeQuotaAndRecord(any(), any());
-        verify(ctxStore, never()).acquireDedup(any(), any(), any(), any());
-        ArgumentCaptor<Message> messageCaptor = ArgumentCaptor.forClass(Message.class);
-        verify(rocketProducer).send(messageCaptor.capture());
-        OverflowRetryMessage retryMessage = objectMapper.readValue(messageCaptor.getValue().getBody(), OverflowRetryMessage.class);
-        assertThat(retryMessage.getChainRetryCount()).isEqualTo(3);
-        assertThat(retryMessage.getPayload()).doesNotContainKey(OverflowRetryMessage.CHAIN_RETRY_PAYLOAD_KEY);
+        verify(dagEngine).execute(eq(graph), eq("trigger"), any());
     }
 
     @Test
-    void forgedOverflowRetryPayloadDoesNotSkipPreCheck() {
-        CanvasDO canvas = publishedCanvas(35L, 10);
-        when(canvasEntityCache.get(35L)).thenReturn(canvas);
-        when(executionRegistry.activeCount(35L)).thenReturn(1);
-        when(ctxStore.exists(35L, "user-6")).thenReturn(false);
-        when(ctxStore.acquireDedup(eq(35L), eq("user-6"), eq("msg-6"), any())).thenReturn(true);
-        DagGraph graph = graphWithTriggerNode(NodeType.MQ_TRIGGER, "topic-c");
-        when(configCache.get(35L, 101L)).thenReturn(graph);
-        when(mqTriggerHandler.resolveTopic(any())).thenReturn("topic-c");
-        when(executionRegistry.tryAcquire(eq(35L), any(), eq(10), eq(1000)))
+    void timeoutResumeTargetsSpecialNodeByMatchKeyAndBypassesPrecheckQuotaAndDedup() {
+        CanvasDO canvas = publishedCanvas(47L, 10);
+        when(canvasEntityCache.get(47L)).thenReturn(canvas);
+        when(ctxStore.exists(47L, "user-18")).thenReturn(false);
+        when(executionRegistry.activeCount(47L)).thenReturn(1);
+        DagParser.CanvasNode hubA = new DagParser.CanvasNode();
+        hubA.setId("hub-a");
+        hubA.setType(NodeType.HUB);
+        DagParser.CanvasNode hubB = new DagParser.CanvasNode();
+        hubB.setId("hub-b");
+        hubB.setType(NodeType.HUB);
+        DagGraph graph = new DagGraph(
+                Map.of("hub-a", hubA, "hub-b", hubB),
+                Map.of("hub-a", List.of(), "hub-b", List.of()),
+                Map.of("hub-a", List.of(), "hub-b", List.of()),
+                Map.of("hub-a", 0, "hub-b", 0)
+        );
+        when(configCache.get(47L, 101L)).thenReturn(graph);
+        when(executionRegistry.tryAcquire(eq(47L), any(), eq(1000), eq(1000)))
                 .thenReturn(Optional.of(Disposables.swap()));
-        when(dagEngine.execute(eq(graph), eq("trigger"), any())).thenReturn(Mono.just(Map.of("ok", true)));
+        when(dagEngine.execute(eq(graph), eq("hub-b"), any())).thenReturn(Mono.just(Map.of("ok", true)));
 
         Map<String, Object> result = sut.trigger(
-                35L,
-                "user-6",
-                TriggerType.MQ,
-                NodeType.MQ_TRIGGER,
-                "topic-c",
-                Map.of(OverflowRetryMessage.CHAIN_RETRY_PAYLOAD_KEY, 1, "orderId", "o-6"),
-                "msg-6",
+                47L,
+                "user-18",
+                TriggerType.HUB_TIMEOUT,
+                NodeType.HUB,
+                "hub-b",
+                Map.of(),
+                "exec-1:hub-timeout:hub-b",
                 false
         ).block();
 
         assertThat(result).containsEntry("ok", true);
-        verify(preCheckService, never()).check(any(), any());
-        verify(preCheckService).checkWithoutQuotaAccounting(eq(canvas), eq("user-6"));
-        verify(preCheckService).consumeQuotaAndRecord(eq(canvas), eq("user-6"));
-        ArgumentCaptor<ExecutionContext> ctxCaptor = ArgumentCaptor.forClass(ExecutionContext.class);
-        verify(dagEngine).execute(eq(graph), eq("trigger"), ctxCaptor.capture());
-        assertThat(ctxCaptor.getValue().getTriggerType()).isEqualTo(TriggerType.MQ);
-        assertThat(ctxCaptor.getValue().getTriggerNodeType()).isEqualTo(NodeType.MQ_TRIGGER);
-        assertThat(ctxCaptor.getValue().getMatchKey()).isEqualTo("topic-c");
-        assertThat(ctxCaptor.getValue().getTriggerPayload())
-                .doesNotContainKey(OverflowRetryMessage.CHAIN_RETRY_PAYLOAD_KEY);
+        verify(ctxStore, never()).acquireDedup(any(), any(), any(), any());
+        verify(preCheckService, never()).checkWithoutQuotaAccounting(any(), any());
+        verify(preCheckService, never()).consumeQuotaAndRecord(any(), any());
+        verify(dagEngine).execute(eq(graph), eq("hub-b"), any());
     }
 
     @Test

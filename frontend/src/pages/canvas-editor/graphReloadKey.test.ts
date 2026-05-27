@@ -1,7 +1,13 @@
+/**
+ * 测试职责：验证画布图重载 key 只响应图内容/草稿版本变化。
+ *
+ * 维护说明：发布状态变化不应导致编辑器误重载并丢失本地交互状态。
+ */
 import { describe, expect, it } from 'vitest'
 import type { CanvasDetail } from '../../types'
 import { getCanvasGraphReloadKey } from './graphReloadKey'
 
+/** 构造画布详情样本，测试只覆盖影响 reload key 的字段。 */
 const detail = (overrides: Partial<CanvasDetail> = {}): CanvasDetail => ({
   canvas: {
     id: 1,

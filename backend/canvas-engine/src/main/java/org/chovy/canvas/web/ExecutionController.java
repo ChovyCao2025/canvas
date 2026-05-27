@@ -6,9 +6,11 @@ import org.chovy.canvas.engine.disruptor.CanvasDisruptorService;
 import org.chovy.canvas.engine.trigger.CanvasExecutionService;
 import lombok.Data;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.core.context.ReactiveSecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 import reactor.core.publisher.Mono;
 
+import io.jsonwebtoken.Claims;
 import java.util.Map;
 import java.util.UUID;
 
@@ -41,11 +43,12 @@ public class ExecutionController {
         String dedupKey = (req.getIdempotencyKey() != null && !req.getIdempotencyKey().isBlank())
                 ? req.getIdempotencyKey()
                 : UUID.randomUUID().toString();
-        return executionService.trigger(
-                        canvasId, req.getUserId(), NodeType.DIRECT_CALL,
-                        NodeType.DIRECT_CALL, null,
-                        req.getInputParams(), dedupKey, false)
-                .map(R::ok);
+        return currentUserId().flatMap(userId ->
+                executionService.trigger(
+                                canvasId, userId, NodeType.DIRECT_CALL,
+                                NodeType.DIRECT_CALL, null,
+                                req.getInputParams(), dedupKey, false)
+                        .map(R::ok));
     }
 
     /**
@@ -75,10 +78,26 @@ public class ExecutionController {
     public Mono<R<Map<String, Object>>> dryRun(
             @PathVariable Long canvasId,
             @RequestBody DirectCallReq req) {
-        return executionService.triggerDryRun(
-                        canvasId, req.getUserId(),
-                        req.getInputParams(), req.getGraphJson())
-                .map(R::ok);
+        return currentUserId().flatMap(userId ->
+                executionService.triggerDryRun(
+                                canvasId, userId,
+                                req.getInputParams(), req.getGraphJson())
+                        .map(R::ok));
+    }
+
+    private Mono<String> currentUserId() {
+        return ReactiveSecurityContextHolder.getContext()
+                .map(ctx -> ctx.getAuthentication().getPrincipal())
+                .cast(Claims.class)
+                .map(claims -> {
+                    String subject = claims.getSubject();
+                    if (subject != null && !subject.isBlank()) {
+                        return subject;
+                    }
+                    String username = claims.get("username", String.class);
+                    return username != null && !username.isBlank() ? username : "system";
+                })
+                .defaultIfEmpty("system");
     }
 
 

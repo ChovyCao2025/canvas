@@ -1,3 +1,8 @@
+/**
+ * 页面职责：API 定义管理页，维护画布 API_CALL 节点可选择的外部接口配置。
+ *
+ * 维护说明：请求/响应参数在子表格中编辑，提交前合并为后端 DTO。
+ */
 import { useEffect, useState } from 'react'
 import {
   Button, Table, Tag, Space, Modal, Form, Input, InputNumber,
@@ -16,10 +21,16 @@ import {
 } from './requestPreview'
 import type { ApiReceiptStatus } from './requestPreview'
 
+/** 页面标题组件别名。 */
 const { Title } = Typography
+
+/** API 回执默认过期时间：1 天，避免未配置时回执状态长期挂起。 */
 const DEFAULT_RECEIPT_EXPIRE_MINUTES = 1440
+
+/** 默认把 HTTP 200 视为成功回执，用户可在表单里继续追加业务状态。 */
 const DEFAULT_RECEIPT_STATUSES: ApiReceiptStatus[] = [{ code: '200', label: '成功' }]
 
+/** API_CALL 节点请求参数 schema 的单个字段。 */
 export interface ApiParam {
   name:        string
   displayName: string
@@ -27,6 +38,7 @@ export interface ApiParam {
   required:    boolean
 }
 
+/** API 定义列表行，与后端 API 定义 DTO 对齐。 */
 interface ApiDefinition {
   id: number
   name: string
@@ -43,6 +55,7 @@ interface ApiDefinition {
   enabled: number
 }
 
+/** 安全解析 JSON 数组字段，解析失败或空数组时使用兜底值。 */
 function parseArrayField<T>(raw: string | undefined, fallback: T[]): T[] {
   try {
     const parsed = JSON.parse(raw || '[]')
@@ -53,15 +66,20 @@ function parseArrayField<T>(raw: string | undefined, fallback: T[]): T[] {
 }
 
 // ── 参数定义子表格 ───────────────────────────────────────────────
+/** 请求参数 schema 编辑器，作为 Form.Item 的受控子组件使用。 */
 function ParamSchemaEditor({ value, onChange, paramTypeOptions }: {
   value?: ApiParam[]; onChange?: (v: ApiParam[]) => void
   paramTypeOptions: { value: string; label: string }[]
 }) {
   const params: ApiParam[] = value ?? []
 
+  // Form.Item 自定义控件通过 onChange 回传完整数组，父表单负责保存。
   const set = (next: ApiParam[]) => onChange?.(next)
+  /** 追加一个默认字符串请求参数。 */
   const add = () => set([...params, { name: '', displayName: '', type: 'STRING', required: false }])
+  /** 删除指定下标的请求参数。 */
   const remove = (i: number) => set(params.filter((_, idx) => idx !== i))
+  /** 更新指定请求参数的局部字段。 */
   const update = (i: number, patch: Partial<ApiParam>) =>
     set(params.map((p, idx) => idx === i ? { ...p, ...patch } : p))
 
@@ -120,14 +138,19 @@ function ParamSchemaEditor({ value, onChange, paramTypeOptions }: {
   )
 }
 
+/** API 回执状态编辑器，维护 code -> label 的状态映射。 */
 function ReceiptStatusEditor({ value, onChange }: {
   value?: ApiReceiptStatus[]; onChange?: (v: ApiReceiptStatus[]) => void
 }) {
   const statuses: ApiReceiptStatus[] = value ?? []
 
+  /** 将回执状态数组回传给 Form.Item。 */
   const set = (next: ApiReceiptStatus[]) => onChange?.(next)
+  /** 追加一个空回执状态映射。 */
   const add = () => set([...statuses, { code: '', label: '' }])
+  /** 删除指定下标的回执状态映射。 */
   const remove = (i: number) => set(statuses.filter((_, idx) => idx !== i))
+  /** 更新指定回执状态的 code 或 label。 */
   const update = (i: number, patch: Partial<ApiReceiptStatus>) =>
     set(statuses.map((item, idx) => idx === i ? { ...item, ...patch } : item))
 
@@ -173,6 +196,7 @@ function ReceiptStatusEditor({ value, onChange }: {
 }
 
 // ── 主页面 ────────────────────────────────────────────────────────
+/** API 定义管理页面主组件。 */
 export default function ApiConfigPage() {
   const [data,          setData]          = useState<ApiDefinition[]>([])
   const [total,         setTotal]         = useState(0)
@@ -188,6 +212,8 @@ export default function ApiConfigPage() {
   const includeContextPayloadPreview = Form.useWatch('includeContextPayload', form) as boolean | undefined
   const receiptEnabledPreview = Form.useWatch('receiptEnabled', form) as boolean | undefined
   const receiptStatusesPreview = Form.useWatch('receiptStatuses', form) as ApiReceiptStatus[] | undefined
+
+  // 预览使用当前表单值实时生成，帮助配置者确认 API_CALL 节点实际会发送的结构。
   const requestPreviewJson = formatApiRequestPreview(buildApiRequestPreview({
     requestSchema: requestSchemaPreview,
     includeContextPayload: !!includeContextPayloadPreview,
@@ -197,6 +223,7 @@ export default function ApiConfigPage() {
     receiptStatuses: receiptStatusesPreview,
   }))
 
+  /** 分页加载 API 定义列表。 */
   const fetchList = async (p = page) => {
     setLoading(true)
     try {
@@ -210,6 +237,7 @@ export default function ApiConfigPage() {
 
   useEffect(() => { fetchList(1) }, [])
 
+  /** 新建时写入安全默认值，减少用户必填项输入成本。 */
   const openCreate = () => {
     setEditingRecord(null)
     form.resetFields()
@@ -225,6 +253,7 @@ export default function ApiConfigPage() {
     setModalVisible(true)
   }
 
+  /** 打开编辑弹窗，并把 JSON 字符串字段解析成表单数组。 */
   const openEdit = (record: ApiDefinition) => {
     setEditingRecord(record)
     const schema = parseArrayField<ApiParam>(record.requestSchema, [])
@@ -244,6 +273,7 @@ export default function ApiConfigPage() {
     setModalVisible(true)
   }
 
+  /** 保存 API 定义；提交前统一归一化布尔值、schema 和回执配置。 */
   const handleOk = async () => {
     const values = await form.validateFields()
     setSubmitting(true)
@@ -263,6 +293,7 @@ export default function ApiConfigPage() {
     }
   }
 
+  /** 删除 API 定义并刷新当前页。 */
   const handleDelete = async (id: number) => {
     await apiDefinitionApi.delete(id)
     message.success('已删除')

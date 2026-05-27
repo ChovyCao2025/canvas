@@ -1,5 +1,11 @@
+/**
+ * 组件职责：配置面板控件的统一视觉样式定义。
+ *
+ * 维护说明：集中维护输入框、下拉框和标签样式，避免各字段重复写内联样式。
+ */
 import type { CSSProperties } from 'react'
 
+/** 标准大尺寸控件外观，用于右侧配置面板的主要输入项。 */
 export function getControlChrome(): CSSProperties {
   return {
     height: 60,
@@ -11,6 +17,7 @@ export function getControlChrome(): CSSProperties {
   }
 }
 
+/** 行内小控件外观，用于动态列表、表格内字段等紧凑场景。 */
 export function getInlineControlChrome(): CSSProperties {
   return {
     height: 30,
@@ -21,6 +28,7 @@ export function getInlineControlChrome(): CSSProperties {
   }
 }
 
+/** 表单标签统一样式，保持复杂 schema 字段的标题层级一致。 */
 export function getControlLabelStyle(): CSSProperties {
   return {
     fontSize: 14,
@@ -29,10 +37,17 @@ export function getControlLabelStyle(): CSSProperties {
   }
 }
 
+/** Ant Design Select v5 的 popup className 配置，集中引用避免调用处写错结构。 */
 export const CONTROL_SELECT_CLASS_NAMES = {
   popup: { root: 'config-panel-ios-dropdown' },
 } as const
 
+/**
+ * 配置面板控件覆盖样式。
+ *
+ * 这里使用 class 选择器覆盖 antd 内部结构，适合全局注入一次；
+ * 若调整控件高度或圆角，要同步检查 ConfigPanel 内的布局间距。
+ */
 export const CONTROL_CHROME_SELECTOR_CSS = `
   .config-panel-form .ant-form-item {
     margin-bottom: 16px;

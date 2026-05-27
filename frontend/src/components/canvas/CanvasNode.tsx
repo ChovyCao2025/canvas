@@ -1,3 +1,8 @@
+/**
+ * 组件职责：React Flow 自定义节点组件，负责节点卡片、分支 handles、悬浮工具条和复制/删除动作入口。
+ *
+ * 维护说明：组件只渲染节点 data，不直接修改图结构，编辑动作通过 CanvasActionsContext 回传给编辑器。
+ */
 import { memo, useEffect, useRef, useState } from 'react'
 import { Handle, Position, NodeToolbar, type NodeProps } from '@xyflow/react'
 import { Tooltip } from 'antd'
@@ -14,7 +19,9 @@ import { useCanvasActions } from '../../context/CanvasActionsContext'
 function useHover() {
   const [hovered, setHovered] = useState(false)
   const timer = useRef<ReturnType<typeof setTimeout>>()
+  /** 鼠标进入节点时立即展示悬浮操作条。 */
   const enter = () => { clearTimeout(timer.current); setHovered(true) }
+  /** 鼠标离开节点后延迟隐藏，给用户移动到操作条留出时间。 */
   const leave = () => { timer.current = setTimeout(() => setHovered(false), 300) }
   useEffect(() => () => clearTimeout(timer.current), [])
   return { hovered, enter, leave }

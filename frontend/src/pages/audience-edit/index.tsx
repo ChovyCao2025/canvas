@@ -1,3 +1,8 @@
+/**
+ * 页面职责：人群新建/编辑页，维护规则树、数据源配置、种子标签和计算策略。
+ *
+ * 维护说明：保存时会把前端表单拆分的配置重新序列化为后端 DTO。
+ */
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { Button, Card, Form, Input, InputNumber, Select, Space, Switch, Typography, message } from 'antd'
@@ -9,6 +14,7 @@ import { tagDefinitionApi } from '../../services/api'
 import { useSystemOptions } from '../../hooks/useSystemOptions'
 import 'react-querybuilder/dist/query-builder.css'
 
+/** 页面标题组件别名。 */
 const { Title } = Typography
 
 /**
@@ -129,6 +135,7 @@ function parseDataSourceConfig(value?: string) {
   }
 }
 
+/** 人群新建/编辑页面主组件。 */
 export default function AudienceEditPage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
@@ -163,20 +170,24 @@ export default function AudienceEditPage() {
   const jdbcDataSourceId = Form.useWatch(['jdbcConfig', 'dataSourceId'], form)
   const jdbcBaseTable = Form.useWatch(['jdbcConfig', 'baseTable'], form)
   const enabled = Form.useWatch('enabled', form) ?? true
+  /** 当前选中的 JDBC 基表元数据，用于派生规则字段和用户 ID 列候选。 */
   const selectedJdbcTable = useMemo(
     () => jdbcTables.find(item => item.name === jdbcBaseTable),
     [jdbcBaseTable, jdbcTables],
   )
+  /** QueryBuilder 字段来源：JDBC 模式取表字段，标签模式取标签定义。 */
   const fields = useMemo(() => {
     if (dataSourceType === 'JDBC' && selectedJdbcTable) {
       return selectedJdbcTable.columns.map(column => ({ name: column, label: column, value: column }))
     }
     return tagFields
   }, [dataSourceType, selectedJdbcTable, tagFields])
+  /** QueryBuilder 操作符选项，由系统字典转换成库需要的 name/label。 */
   const queryOperators = useMemo(
     () => audienceOperatorOptions.map(option => ({ name: option.value, label: option.label })),
     [audienceOperatorOptions],
   )
+  /** QueryBuilder 逻辑关系选项，由系统字典转换成库需要的 name/label。 */
   const queryCombinators = useMemo(
     () => combinatorOptions.map(option => ({ name: option.value, label: option.label })),
     [combinatorOptions],
@@ -214,6 +225,7 @@ export default function AudienceEditPage() {
       .finally(() => setTableLoading(false))
   }, [dataSourceType, jdbcDataSourceId])
 
+  /** 切换 JDBC 数据源后清空表选择，避免沿用上一个数据源的表名。 */
   const handleJdbcDataSourceChange = (dataSourceId: number) => {
     form.setFieldsValue({
       jdbcConfig: {
@@ -226,6 +238,7 @@ export default function AudienceEditPage() {
     setJdbcTables([])
   }
 
+  /** 切换基表后根据字段自动选择 user_id 或第一列作为用户 ID 列。 */
   const handleBaseTableChange = (tableName: string) => {
     const table = jdbcTables.find(item => item.name === tableName)
     const columns = table?.columns ?? []

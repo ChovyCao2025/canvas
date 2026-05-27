@@ -90,6 +90,10 @@ public class ExecutionContext {
     @JsonIgnore
     private String resumeLockToken;
 
+    /** 当前执行是否跳过配额扣减；仅运行期使用，不随 WAIT 上下文持久化。 */
+    @JsonIgnore
+    private boolean quotaBypass;
+
     /**
      * 已为 Hub 节点调度过超时任务的节点 ID 集合（防重复调度）。
      * 不序列化：多阶段恢复后首次触发时重新调度。
@@ -179,6 +183,13 @@ public class ExecutionContext {
 
     public NodeStatus getNodeStatus(String nodeId) {
         return nodeStatuses.getOrDefault(nodeId, NodeStatus.PENDING);
+    }
+
+    public void resetNodeStatusForReentry(String nodeId) {
+        nodeStatuses.computeIfPresent(nodeId, (key, status) ->
+                status == NodeStatus.FAILED || status == NodeStatus.TIMEOUT || status == NodeStatus.PARTIAL_FAIL
+                        ? status
+                        : null);
     }
 
     public boolean isNodeDone(String nodeId) {

@@ -15,6 +15,7 @@ import java.time.LocalDateTime;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 
 /**
  * 等待节点恢复服务。
@@ -51,8 +52,11 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class WaitResumeService {
 
+    /** 等待订阅服务，用于查询和 CAS 完成等待记录。 */
     private final WaitSubscriptionService waitSubscriptionService;
+    /** 画布执行服务。 */
     private final CanvasExecutionService executionService;
+    /** Jackson ObjectMapper，用于 JSON 序列化和反序列化。 */
     private final ObjectMapper objectMapper;
 
     /**
@@ -67,6 +71,9 @@ public class WaitResumeService {
         List<CanvasWaitSubscriptionDO> waits = waitSubscriptionService.findActiveEventWaits(eventCode, userId);
         int resumed = 0;
         for (CanvasWaitSubscriptionDO wait : waits) {
+            if (!matchesEventFilters(wait, eventAttributes == null ? Map.of() : eventAttributes)) {
+                continue;
+            }
             if (completeAndTrigger(wait, eventAttributes, eventId)) {
                 resumed++;
             }
@@ -74,6 +81,7 @@ public class WaitResumeService {
         return resumed;
     }
 
+    /** 恢复或过期到期的时间等待订阅。 */
     public int resumeDueWaits(int limit) {
         List<CanvasWaitSubscriptionDO> waits = waitSubscriptionService.findExpiredActiveWaits(LocalDateTime.now(), limit);
         int resumed = 0;
@@ -127,11 +135,84 @@ public class WaitResumeService {
         return true;
     }
 
+    /** 判断等待订阅到期后是否应走超时分支而非普通完成分支。 */
     private boolean timeoutDriven(CanvasWaitSubscriptionDO wait) {
         return WaitSubscriptionService.WAIT_TYPE_EVENT.equals(wait.getWaitType())
                 || WaitSubscriptionService.WAIT_TYPE_GOAL.equals(wait.getWaitType());
     }
 
+    /** 按订阅中保存的过滤条件判断事件属性是否满足恢复条件。 */
+    @SuppressWarnings("unchecked")
+    private boolean matchesEventFilters(CanvasWaitSubscriptionDO wait, Map<String, Object> eventAttributes) {
+        String filtersJson = wait.getEventFilters();
+        if (filtersJson == null || filtersJson.isBlank()) {
+            return true;
+        }
+        try {
+            Map<String, Object> filters = objectMapper.readValue(filtersJson, new TypeReference<>() {});
+            for (Map.Entry<String, Object> entry : filters.entrySet()) {
+                Object actual = eventAttributes.get(entry.getKey());
+                Object expected = entry.getValue();
+                if (expected instanceof Map<?, ?> operators) {
+                    if (!matchesOperators(actual, (Map<String, Object>) operators)) {
+                        return false;
+                    }
+                } else if (!Objects.equals(String.valueOf(actual), String.valueOf(expected))) {
+                    return false;
+                }
+            }
+            return true;
+        } catch (Exception e) {
+            log.warn("[WAIT] eventFilters 解析失败 waitId={} reason={}", wait.getId(), e.getMessage());
+            return false;
+        }
+    }
+
+    /** 逐个计算过滤条件操作符，支持等值、比较和集合包含。 */
+    private boolean matchesOperators(Object actual, Map<String, Object> operators) {
+        for (Map.Entry<String, Object> operator : operators.entrySet()) {
+            String op = operator.getKey();
+            Object expected = operator.getValue();
+            boolean matched = switch (op) {
+                case "eq" -> Objects.equals(String.valueOf(actual), String.valueOf(expected));
+                case "ne" -> !Objects.equals(String.valueOf(actual), String.valueOf(expected));
+                case "gt" -> compareNumbers(actual, expected) > 0;
+                case "gte" -> compareNumbers(actual, expected) >= 0;
+                case "lt" -> compareNumbers(actual, expected) < 0;
+                case "lte" -> compareNumbers(actual, expected) <= 0;
+                case "in" -> expected instanceof List<?> values
+                        && values.stream().anyMatch(value -> Objects.equals(String.valueOf(actual), String.valueOf(value)));
+                default -> false;
+            };
+            if (!matched) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /** 将两个值转为数字后比较，无法转换时返回不匹配。 */
+    private int compareNumbers(Object actual, Object expected) {
+        Number actualNumber = toNumber(actual);
+        Number expectedNumber = toNumber(expected);
+        if (actualNumber == null || expectedNumber == null) {
+            return -1;
+        }
+        return Double.compare(actualNumber.doubleValue(), expectedNumber.doubleValue());
+    }
+
+    /** 将 Number 或数字字符串转换为数值对象。 */
+    private Number toNumber(Object value) {
+        if (value instanceof Number number) {
+            return number;
+        }
+        if (value == null) {
+            return null;
+        }
+        return Double.parseDouble(value.toString());
+    }
+
+    /** 合并原始恢复载荷、等待订阅信息和事件属性，生成恢复触发 payload。 */
     private Map<String, Object> resumePayload(
             CanvasWaitSubscriptionDO wait,
             String status,
@@ -157,6 +238,7 @@ public class WaitResumeService {
         return payload;
     }
 
+    /** 读取等待订阅中保存的恢复载荷，解析失败时返回空载荷。 */
     private Map<String, Object> storedPayload(CanvasWaitSubscriptionDO wait) {
         if (wait.getResumePayload() == null || wait.getResumePayload().isBlank()) {
             return Map.of();
@@ -209,6 +291,7 @@ public class WaitResumeService {
                 );
     }
 
+    /** 将恢复载荷序列化为等待订阅表中的 JSON 文本。 */
     private String toJson(Map<String, Object> payload) {
         try {
             return objectMapper.writeValueAsString(payload);

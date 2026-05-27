@@ -21,19 +21,33 @@ import java.time.ZoneId;
 import java.time.format.DateTimeParseException;
 import java.util.Locale;
 
+/**
+ * Marketing Policy 营销策略服务。
+ *
+ * <p>集中处理频控、静默时段、授权和抑制名单等营销合规判断，避免各节点重复实现策略。
+ * <p>执行节点通过该服务获得是否允许触达的结果，并据此选择继续、跳过或失败。
+ */
 @Service
 @RequiredArgsConstructor
 public class MarketingPolicyService {
 
+    /** 用户未配置时使用的默认时区。 */
     public static final String DEFAULT_TIMEZONE = "Asia/Shanghai";
 
+    /** 用户画像 Mapper。 */
     private final CustomerProfileMapper profileMapper;
+    /** 客户渠道 Mapper。 */
     private final CustomerChannelMapper channelMapper;
+    /** 营销授权 Mapper。 */
     private final MarketingConsentMapper consentMapper;
+    /** 营销抑制 Mapper。 */
     private final MarketingSuppressionMapper suppressionMapper;
+    /** Redis 模板，用于频控计数。 */
     private final StringRedisTemplate redisTemplate;
+    /** 可注入时钟，便于测试时间相关策略。 */
     private final Clock clock = Clock.systemDefaultZone();
 
+    /** 判断用户在指定渠道是否满足营销授权要求。 */
     public PolicyDecision consentAllowed(String userId, String channel, boolean requireExplicitConsent) {
         String normalized = normalize(channel);
         MarketingConsentDO consent = consentMapper.selectOne(new LambdaQueryWrapper<MarketingConsentDO>()
@@ -54,6 +68,7 @@ public class MarketingPolicyService {
         return PolicyDecision.allow();
     }
 
+    /** 判断用户是否被营销抑制名单拦截。 */
     public PolicyDecision suppressionAllowed(String userId, String channel) {
         String normalized = normalize(channel);
         LocalDateTime now = LocalDateTime.now(clock);
@@ -73,6 +88,7 @@ public class MarketingPolicyService {
                 : PolicyDecision.allow();
     }
 
+    /** 判断用户指定触达渠道是否可用。 */
     public PolicyDecision channelAvailable(String userId, String channel) {
         String normalized = normalize(channel);
         CustomerChannelDO customerChannel = channelMapper.selectOne(new LambdaQueryWrapper<CustomerChannelDO>()
@@ -86,6 +102,7 @@ public class MarketingPolicyService {
         return PolicyDecision.allow();
     }
 
+    /** 解析用户时区，缺失时返回默认时区。 */
     public ZoneId timezoneFor(String userId) {
         CustomerProfileDO profile = profileMapper.selectOne(new LambdaQueryWrapper<CustomerProfileDO>()
                 .eq(CustomerProfileDO::getUserId, userId)
@@ -101,6 +118,7 @@ public class MarketingPolicyService {
         }
     }
 
+    /** 判断当前时间是否落在用户静默时段之外。 */
     public PolicyDecision quietHoursAllowed(String userId, String start, String end, String timezone) {
         LocalTime quietStart;
         LocalTime quietEnd;
@@ -120,6 +138,7 @@ public class MarketingPolicyService {
                 : PolicyDecision.allow();
     }
 
+    /** 消费一次频控额度并返回是否允许触达。 */
     public PolicyDecision consumeFrequency(
             String userId,
             Long canvasId,
@@ -144,6 +163,7 @@ public class MarketingPolicyService {
         return PolicyDecision.allow();
     }
 
+    /** 根据频控作用域、渠道、节点和时间窗口生成 Redis 计数 key。 */
     private String frequencyKey(
             String userId,
             Long canvasId,
@@ -163,6 +183,7 @@ public class MarketingPolicyService {
         return "canvas:marketing:freq:" + normalizedScope + ":" + dimension + ":" + userId + ":" + bucket;
     }
 
+    /** 判断当前本地时间是否位于静默窗口内，支持跨午夜窗口。 */
     private boolean insideWindow(LocalTime current, LocalTime start, LocalTime end) {
         if (start.equals(end)) return true;
         if (start.isBefore(end)) {
@@ -171,15 +192,19 @@ public class MarketingPolicyService {
         return !current.isBefore(start) || current.isBefore(end);
     }
 
+    /** 将渠道统一为大写编码，缺省表示全部渠道。 */
     private String normalize(String channel) {
         return channel == null || channel.isBlank() ? "ALL" : channel.toUpperCase(Locale.ROOT);
     }
 
+    /** 策略判断结果，包含是否允许通过以及被拦截时的原因码和提示文案。 */
     public record PolicyDecision(boolean allowed, String reasonCode, String reasonMessage) {
+        /** 构造允许通过的策略结果。 */
         public static PolicyDecision allow() {
             return new PolicyDecision(true, null, null);
         }
 
+        /** 构造被策略拦截的结果。 */
         public static PolicyDecision blocked(String reasonCode, String reasonMessage) {
             return new PolicyDecision(false, reasonCode, reasonMessage);
         }

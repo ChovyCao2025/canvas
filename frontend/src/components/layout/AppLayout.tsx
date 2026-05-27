@@ -1,3 +1,8 @@
+/**
+ * 组件职责：登录后的主应用布局，包含侧边导航、折叠菜单、用户信息和通知入口。
+ *
+ * 维护说明：菜单 key 与路由路径强绑定，新增页面时需要同步这里的导航配置。
+ */
 import { useEffect, useState } from 'react'
 import { Layout, Menu, Avatar, Dropdown, Tooltip, type MenuProps } from 'antd'
 import {
@@ -14,6 +19,7 @@ import { useAuth } from '../../context/AuthContext'
 import { authApi } from '../../services/api'
 import NotificationBell from '../notifications/NotificationBell'
 
+/** 主布局的侧栏和内容区组件别名。 */
 const { Sider, Content } = Layout
 
 /**
@@ -30,8 +36,11 @@ const siderChildrenStyle = `
   }
 `
 
+/** 侧栏主背景色。 */
 const SIDER_DARK  = '#0d1117'
+/** 侧栏菜单悬浮背景色。 */
 const SIDER_HOVER = '#1f2d45'
+/** 侧栏高亮强调色。 */
 const ACCENT      = '#4f8ef7'
 
 /**
@@ -64,6 +73,7 @@ export default function AppLayout() {
     return 'canvas'
   })()
 
+  /** 根据当前菜单高亮项计算需要展开的父级菜单。 */
   const getDesiredOpenKeys = () => {
     // 保证进入子页面时，父菜单分组同步展开，减少额外点击
     if (selectedKey === 'api-docs') return ['developer']
@@ -205,6 +215,7 @@ export default function AppLayout() {
     },
   ]
 
+  /** 后端登出失败也继续清理本地会话，保证用户能退出当前浏览器。 */
   const handleLogout = async () => {
     // 先尝试通知后端登出，再清本地认证态，接口失败也不阻断退出
     try { await authApi.logout() } catch { /* ignore */ }

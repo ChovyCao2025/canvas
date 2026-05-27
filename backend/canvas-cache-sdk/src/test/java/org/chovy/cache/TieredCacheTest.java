@@ -33,6 +33,12 @@ import org.chovy.cache.strategy.AvalancheProtectionStrategy;
 import org.chovy.cache.strategy.BreakdownProtectionStrategy;
 import org.chovy.cache.strategy.PenetrationProtectionStrategy;
 
+/**
+ * Tiered Cache 测试类。
+ *
+ * <p>覆盖该后端组件在典型输入、边界条件和异常场景下的行为，确保重构或性能优化不会改变既有契约。
+ * <p>测试代码只构造必要的依赖与数据，断言重点放在可观察结果、状态变更和关键副作用上。
+ */
 @ExtendWith(MockitoExtension.class)
 class TieredCacheTest {
 
@@ -47,6 +53,7 @@ class TieredCacheTest {
     void setUp() {
         lenient().when(redis.opsForValue()).thenReturn(values);
         lenient().when(reactiveRedis.opsForValue()).thenReturn(reactiveValues);
+        lenient().when(values.get(contains(":__invalidate__:"))).thenReturn(null);
         manager = new TieredCacheManager(redis, reactiveRedis, new SimpleMeterRegistry(), null);
     }
 
@@ -67,6 +74,29 @@ class TieredCacheTest {
         assertThat(loads).hasValue(1);
         verify(values, times(1)).get("sample:v1:42");
         verify(values).set(eq("sample:v1:42"), contains("value-42"), any(Duration.class));
+    }
+
+    @Test
+    void l1EntryExpiresWithConfiguredL2Ttl() throws Exception {
+        when(values.get("short:v1:1")).thenReturn(null, null);
+        AtomicInteger loads = new AtomicInteger();
+        TieredCache<Integer, SampleValue> cache = TieredCacheBuilder.<Integer, SampleValue>builder()
+                .name("short")
+                .l2KeyPrefix("short:")
+                .l2Ttl(Duration.ofMillis(50))
+                .l1RefreshAfterWrite(Duration.ofSeconds(10))
+                .loader(key -> new SampleValue("value-" + loads.incrementAndGet()))
+                .valueType(SampleValue.class)
+                .build(manager);
+
+        Optional<SampleValue> first = cache.get(1);
+        Thread.sleep(90);
+        Optional<SampleValue> second = cache.get(1);
+
+        assertThat(first).contains(new SampleValue("value-1"));
+        assertThat(second).contains(new SampleValue("value-2"));
+        assertThat(loads).hasValue(2);
+        verify(values, times(2)).get("short:v1:1");
     }
 
     @Test
@@ -116,11 +146,41 @@ class TieredCacheTest {
     @Test
     void invalidate_deletesL2AndPublishesInvalidation() {
         TieredCache<Integer, SampleValue> cache = sampleCache(key -> new SampleValue("unused"));
+        when(values.increment("sample:v1:__invalidate__:42")).thenReturn(1L);
 
         cache.invalidate(42);
 
         verify(redis).delete("sample:v1:42");
         verify(redis).convertAndSend("tiered-cache:sample:invalidate", "42");
+    }
+
+    @Test
+    void invalidatePublishesExternalInvalidationTransport() {
+        CacheInvalidationPublisher publisher = mock(CacheInvalidationPublisher.class);
+        manager = new TieredCacheManager(redis, reactiveRedis, new SimpleMeterRegistry(), null, List.of(publisher));
+        TieredCache<Integer, SampleValue> cache = sampleCache(key -> new SampleValue("unused"));
+        when(values.increment("sample:v1:__invalidate__:42")).thenReturn(3L);
+
+        cache.invalidate(42);
+
+        verify(publisher).publish(new CacheInvalidationEvent("sample", "42", 3L));
+    }
+
+    @Test
+    void getInvalidatesLocalEntryWhenInvalidationVersionAdvanced() {
+        when(values.get("sample:v1:42")).thenReturn(null, null);
+        when(values.get("sample:v1:__invalidate__:42")).thenReturn(null, "1", "1");
+        AtomicInteger loads = new AtomicInteger();
+        TieredCache<Integer, SampleValue> cache = sampleCache(key ->
+                new SampleValue("value-" + loads.incrementAndGet()));
+
+        Optional<SampleValue> first = cache.get(42);
+        Optional<SampleValue> second = cache.get(42);
+
+        assertThat(first).contains(new SampleValue("value-1"));
+        assertThat(second).contains(new SampleValue("value-2"));
+        assertThat(loads).hasValue(2);
+        verify(values, times(2)).get("sample:v1:42");
     }
 
     @Test

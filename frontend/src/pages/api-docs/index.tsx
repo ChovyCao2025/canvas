@@ -1,3 +1,8 @@
+/**
+ * 页面职责：API 文档页面，提供分类筛选、搜索、内部接口开关和示例复制。
+ *
+ * 维护说明：页面读取本地文档常量，不依赖后端接口。
+ */
 import { useEffect, useMemo, useState } from 'react'
 import { Button, Card, Empty, Input, Space, Switch, Table, Tag, Tooltip, Typography, message } from 'antd'
 import { CopyOutlined, SearchOutlined } from '@ant-design/icons'
@@ -10,8 +15,10 @@ import {
 } from './apiDocs'
 import type { ApiDocEndpoint, ApiDocParam } from './apiDocs'
 
+/** 文档页常用排版组件别名，减少 JSX 中的命名噪音。 */
 const { Paragraph, Text, Title } = Typography
 
+/** HTTP 方法颜色映射，保持文档列表和详情卡片中的方法标签一致。 */
 const methodColors: Record<ApiDocEndpoint['method'], string> = {
   GET: 'blue',
   POST: 'green',
@@ -19,6 +26,7 @@ const methodColors: Record<ApiDocEndpoint['method'], string> = {
   DELETE: 'red',
 }
 
+/** 参数表列定义，独立出来避免每个接口卡片重复创建渲染规则。 */
 const paramColumns: ColumnsType<ApiDocParam> = [
   {
     title: '参数',
@@ -44,9 +52,11 @@ const paramColumns: ColumnsType<ApiDocParam> = [
   },
 ]
 
+/** 请求/响应示例代码块，内置复制按钮和 JSON 格式化。 */
 function CodeExample({ title, value }: { title: string; value: unknown }) {
   const code = formatJsonExample(value)
 
+  /** 复制示例代码；Clipboard API 不可用时给出明确失败提示。 */
   const copyCode = async () => {
     try {
       if (!navigator.clipboard?.writeText) {
@@ -87,6 +97,7 @@ function CodeExample({ title, value }: { title: string; value: unknown }) {
   )
 }
 
+/** 单个接口文档卡片，展示方法、路径、鉴权、参数和示例。 */
 function EndpointCard({ endpoint }: { endpoint: ApiDocEndpoint }) {
   return (
     <Card
@@ -139,16 +150,19 @@ function EndpointCard({ endpoint }: { endpoint: ApiDocEndpoint }) {
   )
 }
 
+/** API 文档页主组件：筛选条件在顶部维护，接口卡片由过滤后的文档数据驱动。 */
 export default function ApiDocsPage() {
   const [keyword, setKeyword] = useState('')
   const [showInternal, setShowInternal] = useState(false)
   const [category, setCategory] = useState<string | undefined>()
 
+  // 分类侧栏的计数不受“当前分类”影响，只受搜索和内部接口开关影响。
   const categorySourceEndpoints = useMemo(() => filterApiDocEndpoints({
     showInternal,
     keyword,
   }), [keyword, showInternal])
 
+  /** 分类摘要列表，包含每个分类在当前搜索条件下的接口数量。 */
   const categorySummaries = useMemo(
     () => getApiDocCategorySummaries(categorySourceEndpoints),
     [categorySourceEndpoints],
@@ -156,12 +170,14 @@ export default function ApiDocsPage() {
 
   const selectedCategory = categorySummaries.some(summary => summary.key === category) ? category : undefined
 
+  // 当搜索词或内部接口开关导致当前分类没有结果时，自动清空分类筛选。
   useEffect(() => {
     if (category && !selectedCategory) {
       setCategory(undefined)
     }
   }, [category, selectedCategory])
 
+  // 主列表筛选结果，同时应用搜索、内部接口开关和有效分类。
   const endpoints = useMemo(() => filterApiDocEndpoints({
     showInternal,
     keyword,

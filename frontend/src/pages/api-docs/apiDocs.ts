@@ -1,48 +1,100 @@
+/**
+ * 页面职责：前端内置 API 文档数据源和过滤工具。
+ *
+ * 维护说明：文档面向控制台使用者，示例响应保持与后端 R<T>/分页结构一致。
+ */
 export type ApiDocMethod = 'GET' | 'POST' | 'PUT' | 'DELETE'
+
+/** API 文档鉴权方式枚举。 */
 export type ApiDocAuth = 'none' | 'bearer'
 
+/** 文档中的单个参数描述。 */
 export interface ApiDocParam {
+  /** 参数名。 */
   name: string
+
+  /** 参数位置：路径、查询串或请求体。 */
   in: 'path' | 'query' | 'body'
+
+  /** 是否必填。 */
   required?: boolean
+
+  /** 参数说明。 */
   desc: string
 }
 
+/** 单个 API 文档条目，供文档页列表和详情面板渲染。 */
 export interface ApiDocEndpoint {
+  /** 前端生成的稳定 ID，用作锚点、复制和列表 key。 */
   id: string
+
+  /** 接口标题。 */
   title: string
+
+  /** HTTP 方法。 */
   method: ApiDocMethod
+
+  /** 接口路径，路径参数用 {id} 这类形式标记。 */
   path: string
+
+  /** 所属分类 key。 */
   category: string
+
+  /** 一句话摘要。 */
   summary: string
+
+  /** 鉴权方式。 */
   auth: ApiDocAuth
+
+  /** 是否仅面向内部后台使用。 */
   internal?: boolean
+
+  /** 参数列表。 */
   params?: ApiDocParam[]
+
+  /** 请求示例。 */
   requestExample?: unknown
+
+  /** 响应示例。 */
   responseExample?: unknown
 }
 
+/** API 文档分类定义。 */
 export interface ApiDocCategory {
+  /** 分类 key。 */
   key: string
+
+  /** 分类标题。 */
   title: string
+
+  /** 分类说明。 */
   description: string
 }
 
+/** 分类摘要，额外包含当前筛选结果下的接口数量。 */
 export interface ApiDocCategorySummary extends ApiDocCategory {
   count: number
 }
 
+/** 文档页筛选条件。 */
 export interface ApiDocFilter {
+  /** 是否展示内部接口。 */
   showInternal: boolean
+
+  /** 搜索关键词，匹配标题、摘要、路径和方法。 */
   keyword?: string
+
+  /** 分类 key。 */
   category?: string
 }
 
+/** 内部声明文档条目时使用的输入结构，允许省略可自动补齐的字段。 */
 type EndpointInput = Omit<ApiDocEndpoint, 'id' | 'auth' | 'responseExample'> & {
   auth?: ApiDocAuth
   responseExample?: unknown
 }
 
+/** 文档分类顺序和文案，页面侧按此顺序展示筛选导航。 */
 export const API_DOC_CATEGORIES: ApiDocCategory[] = [
   { key: 'auth', title: '认证', description: '登录、登出和当前用户信息' },
   { key: 'external-trigger', title: '外部触发', description: '业务系统触发画布执行的主要入口' },
@@ -55,18 +107,30 @@ export const API_DOC_CATEGORIES: ApiDocCategory[] = [
   { key: 'users', title: '用户管理', description: '后台用户管理接口' },
 ]
 
+/** 构造标准 R<T> 成功响应示例。 */
 const success = (data: unknown) => ({ code: 0, message: 'success', data })
+
+/** 构造标准分页响应示例。 */
 const page = (list: unknown[]) => success({ total: list.length, list })
+
+/** 快速声明路径参数。 */
 const idParam = (name: string, desc: string): ApiDocParam => ({ name, in: 'path', required: true, desc })
+
+/** 快速声明 query 参数。 */
 const queryParam = (name: string, desc: string): ApiDocParam => ({ name, in: 'query', desc })
+
+/** 快速声明 body 参数。 */
 const bodyParam = (name: string, desc: string): ApiDocParam => ({ name, in: 'body', required: true, desc })
 
+/** 从 /foo/{id} 这类路径自动补齐路径参数文档。 */
 const pathParams = (path: string): ApiDocParam[] =>
   Array.from(path.matchAll(/\{([^}]+)\}/g), match => idParam(match[1], `${match[1]} 路径参数`))
 
+/** 根据方法和路径生成稳定文档 ID，避免人工维护重复 key。 */
 const endpointId = (method: ApiDocMethod, path: string) =>
   `${method.toLowerCase()}-${path.replace(/[{}]/g, '').replace(/[^a-zA-Z0-9]+/g, '-').replace(/^-|-$/g, '')}`
 
+/** 创建文档条目，同时补默认鉴权、路径参数和默认响应示例。 */
 const endpoint = ({
   method,
   path,
@@ -88,6 +152,7 @@ const endpoint = ({
   ...rest,
 })
 
+/** API 文档完整数据集；页面侧只做筛选和展示，不再拼装接口元数据。 */
 export const API_DOCS: ApiDocEndpoint[] = [
   endpoint({
     title: '账号登录',
@@ -380,8 +445,10 @@ export const API_DOCS: ApiDocEndpoint[] = [
   }),
 ]
 
+/** 分类 key 到分类定义的索引，供摘要聚合时快速读取分类文案。 */
 const categoriesByKey = new Map(API_DOC_CATEGORIES.map(category => [category.key, category]))
 
+/** 根据关键词、分类和内部接口开关过滤文档条目。 */
 export function filterApiDocEndpoints(filter: ApiDocFilter): ApiDocEndpoint[] {
   const keyword = filter.keyword?.trim().toLowerCase()
 
@@ -410,6 +477,7 @@ export function filterApiDocEndpoints(filter: ApiDocFilter): ApiDocEndpoint[] {
   })
 }
 
+/** 统计每个分类在当前筛选结果中的接口数量。 */
 export function getApiDocCategorySummaries(endpoints: ApiDocEndpoint[]): ApiDocCategorySummary[] {
   const counts = endpoints.reduce<Map<string, number>>((nextCounts, endpoint) => {
     nextCounts.set(endpoint.category, (nextCounts.get(endpoint.category) ?? 0) + 1)
@@ -422,6 +490,7 @@ export function getApiDocCategorySummaries(endpoints: ApiDocEndpoint[]): ApiDocC
   })).filter(summary => summary.count > 0)
 }
 
+/** 格式化请求/响应示例，失败时安全回退为字符串。 */
 export function formatJsonExample(value: unknown): string {
   return JSON.stringify(value, null, 2) ?? String(value)
 }

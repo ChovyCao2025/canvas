@@ -8,6 +8,12 @@ import java.util.Optional;
 import java.util.function.Function;
 import java.util.function.Supplier;
 
+/**
+ * 分层缓存核心接口，统一封装 L1 本地缓存、L2 Redis 缓存与 L3 数据加载器的访问语义。
+ *
+ * <p>调用方通过 get/put/invalidate 等方法使用缓存，不需要感知各层命中、回填、预热和延迟双删的内部细节。
+ * <p>默认方法提供批量读取、强制命中、批量写入和预热的便捷实现，具体一致性策略由实现类处理。
+ */
 public interface TieredCache<K, V> {
     String name();
 

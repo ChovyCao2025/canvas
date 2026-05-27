@@ -18,14 +18,24 @@ import java.util.stream.Collectors;
 import org.chovy.canvas.dal.dataobject.CdpUserProfileDO;
 import org.chovy.canvas.dal.mapper.CdpUserProfileMapper;
 
+/**
+ * CDP 用户 Directory CDP 领域服务。
+ *
+ * <p>负责用户画像、身份、标签和画布参与记录等客户数据能力，为画布执行和管理端查询提供统一入口。
+ * <p>该层隔离 CDP 数据结构与上层业务，集中处理状态、历史和幂等语义。
+ */
 @Service
 @RequiredArgsConstructor
 public class CdpUserDirectoryService {
 
+    /** CDP 用户画像 Mapper，用于用户目录检索和展示排序。 */
     private final CdpUserProfileMapper profileMapper;
+    /** 画布执行记录 Mapper。 */
     private final CanvasExecutionMapper executionMapper;
+    /** CDP 标签服务。 */
     private final CdpTagService tagService;
 
+    /** 查询用户列表或指定画布下的用户聚合视图。 */
     public List<CanvasUserRowDTO> listUsers(String keyword) {
         String normalizedKeyword = keyword == null ? null : keyword.trim();
         List<CdpUserProfileDO> profiles = profileMapper.selectList(new LambdaQueryWrapper<CdpUserProfileDO>()
@@ -53,6 +63,7 @@ public class CdpUserDirectoryService {
                 .toList();
     }
 
+    /** 将用户画像与执行统计合并为用户目录列表行。 */
     private CanvasUserRowDTO toRow(CdpUserProfileDO profile, List<CanvasExecutionDO> executions) {
         long successCount = executions.stream()
                 .filter(item -> item.getStatus() != null && item.getStatus() == ExecutionStatus.SUCCESS.getCode())
@@ -78,6 +89,7 @@ public class CdpUserDirectoryService {
         );
     }
 
+    /** 将最近一次执行状态码转换为目录展示文案。 */
     private String statusLabel(Integer status) {
         if (status != null && status == ExecutionStatus.SUCCESS.getCode()) {
             return "SUCCESS";

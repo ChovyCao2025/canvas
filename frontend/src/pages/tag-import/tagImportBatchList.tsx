@@ -1,3 +1,8 @@
+/**
+ * 页面职责：标签导入批次列表，展示最近导入任务的状态、成功数和失败数。
+ *
+ * 维护说明：用于快速定位导入失败批次并查看错误明细。
+ */
 import { useEffect, useState } from 'react'
 import { Alert, Button, Space, Table, Tag, Typography, message } from 'antd'
 import { ReloadOutlined } from '@ant-design/icons'
@@ -5,8 +10,10 @@ import type { ColumnsType } from 'antd/es/table'
 import { tagImportApi } from '../../services/api'
 import type { BatchErrorLoadingState, BatchErrorState, TagImportBatch, TagImportError } from './tagImportTypes'
 
+/** 批次列表中的文本组件别名。 */
 const { Text } = Typography
 
+/** 将批次状态转换为颜色明确的 Tag。 */
 function renderBatchStatus(status: string) {
   const normalized = status.toUpperCase()
   if (normalized === 'SUCCESS') return <Tag color="green">SUCCESS</Tag>
@@ -15,12 +22,14 @@ function renderBatchStatus(status: string) {
   return <Tag color="blue">{status}</Tag>
 }
 
+/** 标签导入批次列表组件，支持展开失败明细。 */
 export default function TagImportBatchList() {
   const [data, setData] = useState<TagImportBatch[]>([])
   const [loading, setLoading] = useState(false)
   const [errorMap, setErrorMap] = useState<BatchErrorState>({})
   const [errorLoading, setErrorLoading] = useState<BatchErrorLoadingState>({})
 
+  /** 加载最近导入批次。 */
   const fetchBatches = async () => {
     setLoading(true)
     try {
@@ -35,6 +44,7 @@ export default function TagImportBatchList() {
     void fetchBatches()
   }, [])
 
+  /** 按需加载某个批次的失败明细；已加载或加载中时直接复用。 */
   const loadErrors = async (batchId: number) => {
     if (errorMap[batchId] || errorLoading[batchId]) return
     setErrorLoading(current => ({ ...current, [batchId]: true }))
@@ -48,6 +58,7 @@ export default function TagImportBatchList() {
     }
   }
 
+  /** 批次主表列。 */
   const columns: ColumnsType<TagImportBatch> = [
     { title: '批次 ID', dataIndex: 'id', width: 96 },
     { title: '来源', dataIndex: 'sourceType', width: 120 },
@@ -63,6 +74,7 @@ export default function TagImportBatchList() {
     { title: '创建时间', dataIndex: 'createdAt', width: 180 },
   ]
 
+  /** 展开行中的失败明细列。 */
   const errorColumns: ColumnsType<TagImportError> = [
     { title: '行号', dataIndex: 'rowNo', width: 90 },
     { title: '错误码', dataIndex: 'errorCode', width: 140 },

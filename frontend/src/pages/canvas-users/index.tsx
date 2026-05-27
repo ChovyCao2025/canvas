@@ -1,3 +1,8 @@
+/**
+ * 页面职责：单个画布的命中用户页，展示进入该画布的用户、标签和执行统计。
+ *
+ * 维护说明：用户 ID 链接到 CDP 详情页，便于从画布结果追溯用户画像。
+ */
 import { useEffect, useState } from 'react'
 import { Button, Drawer, Space, Table, Tag, Typography } from 'antd'
 import { ArrowLeftOutlined } from '@ant-design/icons'
@@ -6,8 +11,10 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { cdpApi, type CanvasUserRow } from '../../services/cdpApi'
 import { formatDateTime, formatExecutionStatus, tagColor } from '../cdp-users/cdpPresentation'
 
+/** 画布用户页标题和文本组件别名。 */
 const { Title, Text } = Typography
 
+/** 单画布命中用户页面，展示用户、标签和该画布下的执行统计。 */
 export default function CanvasUsersPage() {
   const { id = '' } = useParams()
   const canvasId = Number(id)
@@ -17,6 +24,7 @@ export default function CanvasUsersPage() {
   const [executions, setExecutions] = useState<any[]>([])
   const [loading, setLoading] = useState(false)
 
+  /** 加载当前画布命中过的用户列表。 */
   const load = async () => {
     setLoading(true)
     try {
@@ -29,6 +37,7 @@ export default function CanvasUsersPage() {
 
   useEffect(() => { if (canvasId) load() }, [canvasId])
 
+  /** 打开用户执行明细抽屉，并加载该用户在当前画布下的执行记录。 */
   const openUser = async (row: CanvasUserRow) => {
     setSelected(row)
     const res = await cdpApi.listCanvasUserExecutions(canvasId, row.userId)

@@ -51,6 +51,7 @@ public class CanvasRouteInitializer {
     @PostConstruct
     public void initTriggerRoutes() {
         if (!triggerRouteService.isRouteTableEmpty()) {
+            triggerRouteService.markRouteReady();
             log.info("[ROUTE_INIT] 路由表已存在，跳过重建");
             return;
         }
@@ -68,6 +69,7 @@ public class CanvasRouteInitializer {
         }
 
         try {
+            triggerRouteService.markRouteRebuilding();
             log.warn("[ROUTE_INIT] 触发路由表为空，从 MySQL 全量重建...");
             List<CanvasDO> published = canvasMapper.selectList(
                     new LambdaQueryWrapper<CanvasDO>().eq(CanvasDO::getStatus, CanvasStatusEnum.PUBLISHED.getCode()));
@@ -97,6 +99,7 @@ public class CanvasRouteInitializer {
                     log.error("[ROUTE_INIT] 重建失败 canvasId={}: {}", canvas.getId(), e.getMessage());
                 }
             }
+            triggerRouteService.markRouteReady();
             log.info("[ROUTE_INIT] 路由表重建完成，共处理 {} 个已发布画布", count);
         } finally {
             // 释放锁

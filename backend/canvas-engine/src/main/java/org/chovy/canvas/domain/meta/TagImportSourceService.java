@@ -25,23 +25,36 @@ import java.util.Map;
 import org.chovy.canvas.dal.dataobject.TagImportSourceDO;
 import org.chovy.canvas.dal.mapper.TagImportSourceMapper;
 
+/**
+ * 标签导入来源 元数据领域服务。
+ *
+ * <p>负责事件、接口、标签、系统选项或实验分组等配置型数据的维护和查询。
+ * <p>元数据会影响画布运行时行为，因此该层需要兼顾管理端易用性与执行链路缓存一致性。
+ */
 @Service
 @RequiredArgsConstructor
 public class TagImportSourceService {
 
+    /** API 来源中标签时间字段的默认解析格式。 */
     private static final DateTimeFormatter TAG_TIME_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
+    /** 标签导入来源 Mapper。 */
     private final TagImportSourceMapper tagImportSourceMapper;
+    /** 标签导入服务，用于复用行级导入逻辑。 */
     private final TagImportService tagImportService;
+    /** Jackson ObjectMapper，用于 JSON 序列化和反序列化。 */
     private final ObjectMapper objectMapper;
+    /** WebClient 构建器，用于创建远程 HTTP 调用客户端。 */
     private final WebClient.Builder webClientBuilder;
 
+    /** 按条件查询列表数据。 */
     public List<TagImportSourceDO> list(Integer enabled) {
         return tagImportSourceMapper.selectList(new LambdaQueryWrapper<TagImportSourceDO>()
                 .eq(enabled != null, TagImportSourceDO::getEnabled, enabled)
                 .orderByDesc(TagImportSourceDO::getId));
     }
 
+    /** 创建新记录，并执行必要的唯一性、格式和默认值处理。 */
     public TagImportSourceDO create(TagImportSourceDO body) {
         validateAndNormalize(body);
         applyDefaults(body);
@@ -50,6 +63,7 @@ public class TagImportSourceService {
         return body;
     }
 
+    /** 更新已有记录，仅修改允许变更的字段。 */
     public void update(Long id, TagImportSourceDO body) {
         validateAndNormalize(body);
         applyDefaults(body);
@@ -59,11 +73,13 @@ public class TagImportSourceService {
         tagImportSourceMapper.updateById(body);
     }
 
+    /** 删除标签导入来源配置，删除前确认配置存在。 */
     public void delete(Long id) {
         requireExisting(id);
         tagImportSourceMapper.deleteById(id);
     }
 
+    /** 执行一次远程标签来源拉取并导入结果。 */
     public TagImportResult run(Long id) {
         TagImportSourceDO source = requireExisting(id);
         if (source.getEnabled() == null || source.getEnabled() != 1) {
@@ -84,6 +100,7 @@ public class TagImportSourceService {
                 .toList();
     }
 
+    /** 查询标签导入来源配置，不存在时抛出异常。 */
     private TagImportSourceDO requireExisting(Long id) {
         TagImportSourceDO source = tagImportSourceMapper.selectById(id);
         if (source == null) {
@@ -92,6 +109,7 @@ public class TagImportSourceService {
         return source;
     }
 
+    /** 按来源配置发起 HTTP 请求并返回 JSON 响应体。 */
     private JsonNode executeRequest(TagImportSourceDO source) {
         HttpMethod method = resolveMethod(source.getMethod());
         WebClient.RequestBodyUriSpec request = webClientBuilder.build().method(method);
@@ -105,6 +123,7 @@ public class TagImportSourceService {
         return spec.retrieve().bodyToMono(JsonNode.class).block();
     }
 
+    /** 将配置中的 JSON 头信息追加到 WebClient 请求。 */
     private WebClient.RequestHeadersSpec<?> applyHeaders(WebClient.RequestHeadersSpec<?> spec, String headersJson) {
         if (!hasText(headersJson)) {
             return spec;
@@ -123,6 +142,7 @@ public class TagImportSourceService {
         }
     }
 
+    /** 将 POST 请求体模板解析为可直接发送的 JSON 对象。 */
     private Object parseBodyTemplate(String bodyTemplate) {
         try {
             return objectMapper.readValue(bodyTemplate, Object.class);
@@ -131,6 +151,7 @@ public class TagImportSourceService {
         }
     }
 
+    /** 根据 recordsPath 从远程响应中定位记录数组。 */
     private List<Map<String, Object>> resolveRecords(TagImportSourceDO source, JsonNode response) {
         String recordsPath = normalizeRecordsPath(source.getRecordsPath());
         JsonNode recordsNode;
@@ -151,6 +172,7 @@ public class TagImportSourceService {
         return objectMapper.convertValue(recordsNode, new TypeReference<>() {});
     }
 
+    /** 解析并规范化字段映射配置，保证必需映射不为空。 */
     private Map<String, String> parseFieldMapping(TagImportSourceDO source) {
         try {
             Map<String, String> mapping = objectMapper.readValue(source.getFieldMapping(), new TypeReference<>() {});
@@ -174,6 +196,7 @@ public class TagImportSourceService {
         }
     }
 
+    /** 将远程记录按字段映射转换为统一的标签导入行。 */
     private TagImportRow toImportRow(int rowNo, Map<String, Object> record, Map<String, String> fieldMapping) {
         TagImportRow row = new TagImportRow();
         row.setRowNo(rowNo);
@@ -185,6 +208,7 @@ public class TagImportSourceService {
         return row;
     }
 
+    /** 从远程记录读取字段原值，字段名缺失时返回 null。 */
     private static Object readValue(Map<String, Object> record, String fieldName) {
         if (record == null || !hasText(fieldName)) {
             return null;
@@ -192,6 +216,7 @@ public class TagImportSourceService {
         return record.get(fieldName);
     }
 
+    /** 从远程记录读取字符串字段，空白值统一视为 null。 */
     private static String readString(Map<String, Object> record, String fieldName) {
         Object value = readValue(record, fieldName);
         if (value == null) {
@@ -201,6 +226,7 @@ public class TagImportSourceService {
         return text.isEmpty() ? null : text;
     }
 
+    /** 兼容多种时间对象和默认字符串格式，解析标签发生时间。 */
     private static LocalDateTime parseTagTime(Object value) {
         if (value == null) {
             return null;
@@ -224,6 +250,7 @@ public class TagImportSourceService {
         return LocalDateTime.parse(text, TAG_TIME_FORMATTER);
     }
 
+    /** 校验来源配置必填字段并规范化请求、路径和模板字段。 */
     private static void validateAndNormalize(TagImportSourceDO body) {
         if (body == null) {
             throw new IllegalArgumentException("tag import source body is required");
@@ -251,6 +278,7 @@ public class TagImportSourceService {
         body.setFieldMapping(body.getFieldMapping().trim());
     }
 
+    /** 为来源配置写入启用、请求方法、分页大小和记录路径默认值。 */
     private static void applyDefaults(TagImportSourceDO body) {
         if (body.getEnabled() == null) {
             body.setEnabled(1);
@@ -266,6 +294,7 @@ public class TagImportSourceService {
         }
     }
 
+    /** 将配置的 HTTP 方法文本转换为 Spring HttpMethod。 */
     private static HttpMethod resolveMethod(String method) {
         String normalized = normalizeMethod(method);
         if ("GET".equals(normalized)) {
@@ -277,14 +306,17 @@ public class TagImportSourceService {
         throw new IllegalArgumentException("unsupported method: " + normalized);
     }
 
+    /** 将 HTTP 方法统一为大写，缺省使用 GET。 */
     private static String normalizeMethod(String method) {
         return hasText(method) ? method.trim().toUpperCase(Locale.ROOT) : "GET";
     }
 
+    /** 规范化记录数组路径，缺省读取根节点数组。 */
     private static String normalizeRecordsPath(String recordsPath) {
         return hasText(recordsPath) ? recordsPath.trim() : "$";
     }
 
+    /** 将可选配置文本去除首尾空白，空串统一保存为 null。 */
     private static String trimToNull(String value) {
         if (value == null) {
             return null;
@@ -293,6 +325,7 @@ public class TagImportSourceService {
         return trimmed.isEmpty() ? null : trimmed;
     }
 
+    /** 判断字符串是否包含非空白字符。 */
     private static boolean hasText(String value) {
         return value != null && !value.trim().isEmpty();
     }

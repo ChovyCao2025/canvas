@@ -12,6 +12,12 @@ import org.springframework.web.util.UriComponentsBuilder;
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
 
+/**
+ * 通知消息 Web Socket节点处理器。
+ *
+ * <p>由 DAG 执行器在运行画布节点时调用，读取节点 config 与执行上下文，产出 NodeResult 决定后续路由。
+ * <p>处理器应保持单节点职责，跨节点编排、重试和状态持久化由执行引擎统一管理。
+ */
 @Slf4j
 @Component
 @RequiredArgsConstructor

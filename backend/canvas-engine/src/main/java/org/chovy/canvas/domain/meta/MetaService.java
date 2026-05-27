@@ -25,7 +25,7 @@ public class MetaService {
     /** 节点类型注册表 Mapper。 */
     private final NodeTypeRegistryMapper nodeTypeRegistryMapper;
 
-    /** 上下文字段定义 Mapper。 */
+    /** 执行上下文字段 Mapper。 */
     private final ContextFieldMapper contextFieldMapper;
 
     /** 查询全部启用节点类型（按分类排序）。 */

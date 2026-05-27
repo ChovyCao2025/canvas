@@ -20,6 +20,7 @@ import java.time.LocalDateTime;
 public class CanvasExecutionTraceDO {
 
     @TableId(type = IdType.AUTO)
+    /** 节点轨迹主键 ID */
     private Long id;
 
     /** 所属执行记录 ID */

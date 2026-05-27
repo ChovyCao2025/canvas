@@ -28,32 +28,53 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * Audience Batch Compute 人群计算组件。
+ *
+ * <p>负责把人群规则、数据源配置和计算任务转换为可执行查询或后台任务结果。
+ * <p>该组件处于画布触发与 CDP 数据之间，需关注大数据量查询的边界和失败兜底。
+ */
 @Slf4j
 @Service
 @RequiredArgsConstructor
 public class AudienceBatchComputeService {
 
+    /** 人群计算分布式锁前缀，防止同一人群并发重复计算。 */
     private static final String COMPUTE_LOCK_PREFIX = "audience:compute:lock:";
+    /** 批量读取或计算时的默认分页大小。 */
     private static final int PAGE_SIZE = 1000;
 
+    /** 人群定义 Mapper。 */
     private final AudienceDefinitionMapper definitionMapper;
+    /** 人群统计 Mapper。 */
     private final AudienceStatMapper statMapper;
+    /** 人群计算运行记录 Mapper。 */
     private final AudienceComputeRunMapper computeRunMapper;
+    /** 规则求值路由器，根据引擎类型选择具体求值器。 */
     private final RuleEvaluatorRouter ruleEvaluatorRouter;
+    /** 人群 Bitmap 存储组件，用于保存计算结果。 */
     private final AudienceBitmapStore bitmapStore;
+    /** 阻塞式 Redis 模板，用于锁、去重、票据或跨实例通知。 */
     private final StringRedisTemplate redis;
+    /** Jackson ObjectMapper，用于 JSON 序列化和反序列化。 */
     private final ObjectMapper objectMapper;
+    /** SQL 条件生成器，用于 JDBC 人群计算。 */
     private final SqlWhereGenerator sqlWhereGenerator;
+    /** 人群计算上下文拉取器，用于按用户批量读取字段。 */
     private final AudienceEvaluationContextFetcher contextFetcher;
+    /** JDBC 数据源配置解析器。 */
     private final JdbcConfigResolver jdbcConfigResolver;
 
+    /** Tagger 服务地址。 */
     @Value("${canvas.integration.tagger-service-url}")
     private String taggerUrl;
 
+    /** 执行人群计算并返回计算结果。 */
     public AudienceComputeResult compute(Long audienceId) {
         return compute(audienceId, null, null);
     }
 
+    /** 执行人群计算并返回计算结果。 */
     public AudienceComputeResult compute(Long audienceId, String perfRunId, String perfInputId) {
         AudienceComputeRunDO run = startRun(audienceId, perfRunId, perfInputId);
         String lockKey = COMPUTE_LOCK_PREFIX + audienceId;
@@ -109,21 +130,25 @@ public class AudienceBatchComputeService {
         }
     }
 
+    /** 创建新记录，并执行必要的唯一性、格式和默认值处理。 */
     public AudienceDefinitionDO create(AudienceDefinitionDO definition) {
         definitionMapper.insert(definition);
         return definition;
     }
 
+    /** 更新已有记录，仅修改允许变更的字段。 */
     public boolean update(AudienceDefinitionDO definition) {
         return definitionMapper.updateById(definition) > 0;
     }
 
+    /** 删除人群定义、统计和已持久化的 Bitmap 结果。 */
     public void delete(Long audienceId) {
         definitionMapper.deleteById(audienceId);
         statMapper.deleteById(audienceId);
         bitmapStore.delete(audienceId);
     }
 
+    /** 通过 JDBC 数据源执行规则 SQL 并转换为用户 Bitmap。 */
     private RoaringBitmap computeViaJdbc(AudienceDefinitionDO definition) throws Exception {
         JdbcConfig jdbcConfig = jdbcConfigResolver.resolve(definition.getDataSourceConfig());
         DataSource dataSource = DataSourceBuilder.create()
@@ -149,6 +174,7 @@ public class AudienceBatchComputeService {
         return bitmap;
     }
 
+    /** 通过 Tagger API 分页拉取种子用户并按规则二次过滤生成 Bitmap。 */
     private RoaringBitmap computeViaTaggerApi(AudienceDefinitionDO definition) throws Exception {
         Map<String, Object> config = objectMapper.readValue(
                 definition.getDataSourceConfig() == null || definition.getDataSourceConfig().isBlank()
@@ -193,6 +219,7 @@ public class AudienceBatchComputeService {
         return bitmap;
     }
 
+    /** 从 Tagger API 响应中安全提取用户 ID 列表。 */
     private List<String> extractUserIds(Map<String, Object> response) {
         Object raw = response == null ? null : response.get("userIds");
         if (!(raw instanceof List<?> list)) {
@@ -207,6 +234,7 @@ public class AudienceBatchComputeService {
         return userIds;
     }
 
+    /** 更新或创建人群计算状态统计记录。 */
     private void updateStat(Long audienceId, String status, Long size, Integer sizeKb, String errorMsg) {
         AudienceStatDO stat = statMapper.selectById(audienceId);
         boolean exists = stat != null;
@@ -230,6 +258,7 @@ public class AudienceBatchComputeService {
         }
     }
 
+    /** 记录性能压测场景下的人群计算开始信息。 */
     private AudienceComputeRunDO startRun(Long audienceId, String perfRunId, String perfInputId) {
         if (perfRunId == null || perfRunId.isBlank()) {
             return null;
@@ -245,6 +274,7 @@ public class AudienceBatchComputeService {
         return run;
     }
 
+    /** 回写性能压测计算运行记录的最终状态和结果指标。 */
     private void finishRun(AudienceComputeRunDO run, String status, Long size, Integer sizeKb, String errorMsg) {
         if (run == null) {
             return;
@@ -257,6 +287,7 @@ public class AudienceBatchComputeService {
         computeRunMapper.updateById(run);
     }
 
+    /** 截断计算错误信息，避免统计字段过长。 */
     private String trimError(String message) {
         if (message == null) {
             return null;
@@ -264,6 +295,7 @@ public class AudienceBatchComputeService {
         return message.length() <= 500 ? message : message.substring(0, 500);
     }
 
+    /** 容错读取人群名称，读取失败时返回兜底名称。 */
     private String safeAudienceName(Long audienceId) {
         try {
             AudienceDefinitionDO definition = definitionMapper.selectById(audienceId);
@@ -274,14 +306,17 @@ public class AudienceBatchComputeService {
         }
     }
 
+    /** 返回人群展示名称，空名称时使用兜底文案。 */
     private String displayName(String audienceName, Long audienceId) {
         return audienceName == null || audienceName.isBlank() ? fallbackAudienceName(audienceId) : audienceName;
     }
 
+    /** 构造人群名称兜底文案。 */
     private String fallbackAudienceName(Long audienceId) {
         return "人群 " + audienceId;
     }
 
+    /** 释放人群计算锁，释放失败仅记录日志不影响计算结果返回。 */
     private void releaseLock(String lockKey, Long audienceId) {
         try {
             redis.delete(lockKey);
@@ -290,6 +325,7 @@ public class AudienceBatchComputeService {
         }
     }
 
+    /** 查询可调度或可计算的人群定义。 */
     public List<AudienceDefinitionDO> listReadyDefinitions() {
         List<AudienceStatDO> readyStats = statMapper.selectList(new LambdaQueryWrapper<AudienceStatDO>()
                 .eq(AudienceStatDO::getStatus, "READY"));

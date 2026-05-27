@@ -1,3 +1,8 @@
+/**
+ * 页面职责：画布设置展示工具，生成触发方式和执行限制摘要。
+ *
+ * 维护说明：纯函数供编辑器页面和测试复用。
+ */
 export type CanvasTriggerType = 'REALTIME' | 'SCHEDULED'
 
 /**

@@ -11,6 +11,12 @@ import reactor.core.publisher.Mono;
 
 import java.util.Map;
 
+/**
+ * CDP 标签写入节点处理器（节点类型 {@code CDP_TAG_WRITE}）。
+ *
+ * <p>由 DAG 执行器在运行画布节点时调用，读取节点 config 与执行上下文，产出 NodeResult 决定后续路由。
+ * <p>处理器应保持单节点职责，跨节点编排、重试和状态持久化由执行引擎统一管理。
+ */
 @Component
 @NodeHandlerType("CDP_TAG_WRITE")
 public class CdpTagWriteHandler implements NodeHandler {

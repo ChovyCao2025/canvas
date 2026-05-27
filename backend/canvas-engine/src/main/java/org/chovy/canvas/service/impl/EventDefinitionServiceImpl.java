@@ -19,6 +19,7 @@ import org.chovy.canvas.perf.PerfRunContext;
 import org.chovy.canvas.service.EventDefinitionService;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
+import org.springframework.util.StringUtils;
 
 import java.time.Duration;
 import java.util.LinkedHashMap;
@@ -26,19 +27,34 @@ import java.util.Map;
 import java.util.Set;
 
 
+/**
+ * 事件定义与事件上报服务实现。
+ *
+ * <p>负责校验事件、执行幂等去重、写入事件日志，并把行为事件路由到已发布画布和等待恢复流程。
+ * <p>该类连接事件中心、Redis 路由、执行引擎和 WAIT 恢复服务，是行为触发链路的核心编排点。
+ */
 @Slf4j
 @RequiredArgsConstructor
 @Service
 public class EventDefinitionServiceImpl implements EventDefinitionService {
 
+    /** 事件日志 Mapper，用于记录事件上报和画布触发数量。 */
     private final EventLogMapper logMapper;
+    /** 画布执行服务，负责触发和恢复 DAG 执行。 */
     private final CanvasExecutionService canvasExecutionService;  // 取代 CanvasDisruptorService，内含溢出降级能力
+    /** 触发路由服务，负责 Redis 路由注册、清理和查询。 */
     private final TriggerRouteService triggerRouteService;
+    /** Jackson ObjectMapper，用于 JSON 序列化和反序列化。 */
     private final ObjectMapper objectMapper;
+    /** 等待恢复服务，用于唤醒因事件挂起的 WAIT/GOAL_CHECK 节点。 */
     private final WaitResumeService waitResumeService;
+    /** 事件定义缓存服务。 */
     private final EventDefinitionCacheService eventDefinitionCacheService;
+    /** 雪花 ID 生成器。 */
     private final Snowflake snowflake;
+    /** 阻塞式 Redis 模板，用于锁、去重、票据或跨实例通知。 */
     private final StringRedisTemplate redis;
+    /** Redis key 工具，集中生成执行相关 key。 */
     private final RedisKeyUtil redisKeys;
 
     /**
@@ -59,28 +75,11 @@ public class EventDefinitionServiceImpl implements EventDefinitionService {
         // 步骤1：校验参数非空 + 事件定义存在且已启用（走二级缓存，穿透时查 DB）
         validateReportReq(req);
 
-        // Fix 1: idempotencyKey 接入——事件级 Redis SETNX 去重（TTL 24h）
-        // 若调用方带幂等 key 重试，Redis SETNX 失败则直接返回 DUPLICATED，不重复写日志也不重复触发
-        String eventId;
-        if (req.getIdempotencyKey() != null && !req.getIdempotencyKey().isBlank()) {
-            String dedupKey = redisKeys.eventDedup(req.getIdempotencyKey());
-            Boolean isNew = redis.opsForValue().setIfAbsent(dedupKey, "1", Duration.ofHours(24));
-            if (!Boolean.TRUE.equals(isNew)) {
-                log.debug("[EVENT] idempotencyKey 重复上报，忽略 eventCode={} key={}",
-                        req.getEventCode(), req.getIdempotencyKey());
-                Map<String, Object> dup = new LinkedHashMap<>();
-                dup.put(MapFieldKeys.EVENT_CODE, req.getEventCode());
-                dup.put(MapFieldKeys.USER_ID, req.getUserId());
-                dup.put(MapFieldKeys.STATUS, "DUPLICATED");
-                return dup;
-            }
-            // 同一 idempotencyKey 的后续重试（若 SETNX 成功后处理失败，key 已存在），
-            // eventId 保持一致，使 canvas 层 dedup（msgId=eventId+canvasId）也能正确去重
-            eventId = "evt-idem-" + req.getIdempotencyKey();
-        } else {
-            // 无幂等 key：每次生成新 ID（单次触发语义）
-            eventId = "evt-" + snowflake.nextIdStr();
+        // 校验是否是重复上报
+        if (isDuplicateEvent(req)) {
+            return duplicateResponse(req);
         }
+        String eventId = resolveEventId(req);
 
         Map<String, Object> payload = req.getAttributes() != null ? req.getAttributes() : Map.of();
 
@@ -181,6 +180,35 @@ public class EventDefinitionServiceImpl implements EventDefinitionService {
         eventLog.setCanvasCount(canvasIds.size());
         logMapper.insert(eventLog);
         return eventLog;
+    }
+
+    /** 基于 idempotencyKey 做 Redis 24 小时去重，重复上报直接短路。 */
+    private boolean isDuplicateEvent(EventReportReq req) {
+        if (!StringUtils.hasText(req.getIdempotencyKey())) return false;
+        String dedupKey = redisKeys.eventDedup(req.getIdempotencyKey());
+        boolean isFirstSeen = Boolean.TRUE.equals(
+                redis.opsForValue().setIfAbsent(dedupKey, "1", Duration.ofHours(24)));
+        if (!isFirstSeen) {
+            log.debug("[EVENT] idempotencyKey 重复上报，忽略 eventCode={} key={}",
+                    req.getEventCode(), req.getIdempotencyKey());
+        }
+        return !isFirstSeen;
+    }
+
+    /** 构造重复上报时的轻量响应，不再写事件日志或触发画布。 */
+    private Map<String, Object> duplicateResponse(EventReportReq req) {
+        Map<String, Object> dup = new LinkedHashMap<>();
+        dup.put(MapFieldKeys.EVENT_CODE, req.getEventCode());
+        dup.put(MapFieldKeys.USER_ID, req.getUserId());
+        dup.put(MapFieldKeys.STATUS, "DUPLICATED");
+        return dup;
+    }
+
+    /** 优先使用幂等键生成稳定事件 ID，否则使用雪花 ID。 */
+    private String resolveEventId(EventReportReq req) {
+        return StringUtils.hasText(req.getIdempotencyKey())
+                ? "evt-idem-" + req.getIdempotencyKey()
+                : "evt-" + snowflake.nextIdStr();
     }
 
     /**

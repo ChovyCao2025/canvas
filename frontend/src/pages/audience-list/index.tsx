@@ -1,3 +1,8 @@
+/**
+ * 页面职责：人群列表页，展示人群定义、最新统计和手动重算入口。
+ *
+ * 维护说明：人群统计是异步补充数据，表格渲染必须兼容统计未返回的状态。
+ */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Button, message, Popconfirm, Space, Table, Tag, Tooltip, Typography } from 'antd'
 import { PlusOutlined, ThunderboltOutlined } from '@ant-design/icons'
@@ -11,8 +16,10 @@ import {
   hasRunningAudienceTasks,
 } from './audienceTaskPresentation'
 
+/** 页面标题组件别名。 */
 const { Title } = Typography
 
+/** 人群统计/异步任务状态到表格 Tag 展示的映射。 */
 const STATUS_MAP: Record<string, { label: string; color: string }> = {
   PENDING: { label: '待计算', color: 'default' },
   COMPUTING: { label: '计算中', color: 'processing' },
@@ -41,12 +48,14 @@ export default function AudienceListPage() {
   const [pollFailureCount, setPollFailureCount] = useState(0)
   const pollTimerRef = useRef<number | null>(null)
   const tasksRef = useRef<Record<number, AsyncTask>>({})
+  /** URL 中指定的高亮人群 ID，用于从任务回跳时补齐当前页展示。 */
   const highlightedAudienceId = useMemo(() => {
     const value = new URLSearchParams(location.search).get('highlight')
     if (!value) return undefined
     const id = Number(value)
     return Number.isFinite(id) ? id : undefined
   }, [location.search])
+  /** URL 中关联的异步任务 ID，用于进入列表后立即展示任务状态。 */
   const linkedTaskId = useMemo(() => {
     return new URLSearchParams(location.search).get('taskId') ?? undefined
   }, [location.search])
@@ -55,6 +64,7 @@ export default function AudienceListPage() {
     tasksRef.current = tasks
   }, [tasks])
 
+  /** 加载人群定义列表，并并行补充每个人群的最新统计。 */
   const fetchList = useCallback(async () => {
     setLoading(true)
     try {
@@ -93,6 +103,7 @@ export default function AudienceListPage() {
     fetchList()
   }, [fetchList])
 
+  /** 轮询人群计算任务，任务结束或列表无运行任务时回补统计数据。 */
   const pollAudienceTasks = useCallback(async (refreshWhenIdle = true) => {
     const ids = data.map(item => item.id).filter((id): id is number => id != null)
     if (ids.length === 0) {
@@ -175,6 +186,7 @@ export default function AudienceListPage() {
   }, [pollAudienceTasks, pollFailureCount, tasks])
 
   useEffect(() => {
+    /** 页面从隐藏回到可见时立即刷新运行中的任务，避免等待下一轮定时器。 */
     const handleVisibilityChange = () => {
       if (document.hidden || !hasRunningAudienceTasks(Object.values(tasks))) return
       pollAudienceTasks().catch(() => setPollFailureCount(count => count + 1))
@@ -201,6 +213,7 @@ export default function AudienceListPage() {
     message.success('已开始计算，完成后会自动更新结果')
   }
 
+  /** 删除人群定义并刷新列表。 */
   const handleDelete = async (id: number) => {
     await audienceApi.delete(id)
     message.success('已删除')

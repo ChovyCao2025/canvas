@@ -1,3 +1,8 @@
+/**
+ * 测试职责：验证 CDP 用户页打标 payload、执行状态和时间格式化规则。
+ *
+ * 维护说明：批量打标表单字段变化时，应先更新 payload 归一化测试。
+ */
 import { describe, expect, it } from 'vitest'
 import { buildBatchTagPayload, buildTagWritePayload, formatDateTime, formatExecutionStatus } from './cdpPresentation'
 

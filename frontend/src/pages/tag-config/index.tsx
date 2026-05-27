@@ -1,3 +1,8 @@
+/**
+ * 页面职责：标签定义管理页，维护标签基本信息和枚举值。
+ *
+ * 维护说明：标签定义供 CDP、打标节点和人群规则共用。
+ */
 import { useEffect, useState } from 'react'
 import { Button, Divider, Form, Input, InputNumber, Modal, Popconfirm, Select, Space, Switch, Table, Tag, Typography, message } from 'antd'
 import { DeleteOutlined, EditOutlined, PlusOutlined } from '@ant-design/icons'
@@ -8,8 +13,10 @@ import { normalizeTagDefinitionPayload } from './tagConfigPayload'
 import type { TagConfigRecord, TagFormValues } from './tagTypes'
 import TagValueEditor from './tagValueEditor'
 
+/** 页面标题组件别名。 */
 const { Title } = Typography
 
+/** 标签定义管理页面主组件。 */
 export default function TagConfigPage() {
   const [data, setData] = useState<TagConfigRecord[]>([])
   const [total, setTotal] = useState(0)
@@ -21,6 +28,7 @@ export default function TagConfigPage() {
   const [saving, setSaving] = useState(false)
   const { options: tagTypeOptions } = useSystemOptions('tag_type')
 
+  /** 分页拉取标签定义列表。 */
   const fetchList = async (p = page) => {
     setLoading(true)
     try {
@@ -34,6 +42,7 @@ export default function TagConfigPage() {
 
   useEffect(() => { fetchList(1) }, [])
 
+  /** 新建标签时设置常用默认值，和后端默认写入策略保持一致。 */
   const openCreate = () => {
     setEditing(null)
     form.resetFields()
@@ -47,6 +56,7 @@ export default function TagConfigPage() {
     setVisible(true)
   }
 
+  /** 编辑标签时把后端 1/0 状态转换为表单 Switch 所需的 boolean。 */
   const openEdit = (record: TagConfigRecord) => {
     setEditing(record)
     form.setFieldsValue({
@@ -57,6 +67,7 @@ export default function TagConfigPage() {
     setVisible(true)
   }
 
+  /** 保存标签定义；新建后回到第一页，编辑后保留当前页。 */
   const handleOk = async () => {
     const values = await form.validateFields()
     setSaving(true)
@@ -76,6 +87,7 @@ export default function TagConfigPage() {
     }
   }
 
+  /** 标签表格列；删除后重新加载当前页。 */
   const columns: ColumnsType<TagConfigRecord> = [
     { title: 'ID', dataIndex: 'id', width: 60 },
     { title: '名称', dataIndex: 'name' },

@@ -6,6 +6,7 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.chovy.canvas.common.PageResult;
+import org.chovy.canvas.common.OutboundUrlValidator;
 import org.chovy.canvas.common.R;
 import org.chovy.canvas.dal.dataobject.ApiDefinitionDO;
 import org.chovy.canvas.dal.mapper.ApiDefinitionMapper;
@@ -16,6 +17,12 @@ import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
 
 
+/**
+ * 接口定义 HTTP 控制器，根路由为 {@code /canvas/api-definitions}。
+ *
+ * <p>负责接收前端或外部系统请求，完成参数绑定、基础校验和统一响应包装。
+ * <p>具体业务规则委托给领域服务处理，控制器层保持薄封装以减少重复逻辑。
+ */
 @RestController
 @RequestMapping("/canvas/api-definitions")
 @RequiredArgsConstructor
@@ -56,6 +63,7 @@ public class ApiDefinitionController {
     @PostMapping
     public Mono<R<ApiDefinitionDO>> create(@RequestBody ApiDefinitionDO body) {
         return Mono.fromCallable(() -> {
+            validateOutboundUrl(body, true);
             validateRateLimit(body);
             if (body.getEnabled() == null) body.setEnabled(1);
             if (body.getIncludeContextPayload() == null) body.setIncludeContextPayload(0);
@@ -78,6 +86,7 @@ public class ApiDefinitionController {
     public Mono<R<Void>> update(@PathVariable Long id, @RequestBody JsonNode bodyNode) {
         return Mono.<Void>fromRunnable(() -> {
             ApiDefinitionDO body = objectMapper.convertValue(bodyNode, ApiDefinitionDO.class);
+            validateOutboundUrl(body, false);
             validateRateLimit(body);
             if (hasExplicitNullRateLimit(bodyNode)) {
                 body.setId(null);
@@ -111,6 +120,12 @@ public class ApiDefinitionController {
     private static void validateRateLimit(ApiDefinitionDO body) {
         if (body.getRateLimitPerSec() != null && body.getRateLimitPerSec() <= 0) {
             throw new IllegalArgumentException("rateLimitPerSec 必须大于 0");
+        }
+    }
+
+    private static void validateOutboundUrl(ApiDefinitionDO body, boolean required) {
+        if (required || body.getUrl() != null) {
+            OutboundUrlValidator.validateHttpUrl(body.getUrl());
         }
     }
 

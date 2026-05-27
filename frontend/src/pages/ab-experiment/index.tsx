@@ -1,3 +1,8 @@
+/**
+ * 页面职责：AB 实验管理页，提供实验定义的列表、新建、编辑和启停入口。
+ *
+ * 维护说明：实验 key 是运行时分桶依据，页面仅负责维护配置元数据。
+ */
 import { useEffect, useState } from 'react'
 import {
   Button, Table, Tag, Space, Modal, Form, Input, InputNumber, Drawer,
@@ -8,6 +13,7 @@ import type { ColumnsType } from 'antd/es/table'
 import { abExperimentApi } from '../../services/api'
 import type { AbExperimentGroup } from '../../types'
 
+/** 页面标题组件别名。 */
 const { Title } = Typography
 
 /**
@@ -102,12 +108,14 @@ export default function AbExperimentPage() {
     }
   }
 
+  /** 删除实验定义并刷新当前分页。 */
   const handleDelete = async (id: number) => {
     await abExperimentApi.delete(id)
     message.success('已删除')
     fetchList(page)
   }
 
+  /** 加载指定实验的分组列表，包含已禁用分组以便查看历史配置。 */
   const loadGroups = async (experiment: AbExperiment) => {
     setGroupsLoading(true)
     try {
@@ -118,6 +126,7 @@ export default function AbExperimentPage() {
     }
   }
 
+  /** 打开实验分组抽屉，并初始化分组编辑表单。 */
   const openGroups = (record: AbExperiment) => {
     setSelectedExperiment(record)
     setGroupDrawerOpen(true)
@@ -127,6 +136,7 @@ export default function AbExperimentPage() {
     loadGroups(record)
   }
 
+  /** 进入单个实验分组的编辑态。 */
   const startEditGroup = (group: AbExperimentGroup) => {
     setEditingGroup(group)
     groupForm.setFieldsValue({
@@ -137,12 +147,14 @@ export default function AbExperimentPage() {
     })
   }
 
+  /** 重置分组表单到新建默认值。 */
   const resetGroupForm = () => {
     setEditingGroup(null)
     groupForm.resetFields()
     groupForm.setFieldsValue({ enabled: true, sortOrder: 0 })
   }
 
+  /** 保存实验分组；根据 editingGroup 判断创建或更新。 */
   const saveGroup = async () => {
     if (!selectedExperiment) return
     const values = await groupForm.validateFields()
@@ -163,6 +175,7 @@ export default function AbExperimentPage() {
     loadGroups(selectedExperiment)
   }
 
+  /** 禁用指定实验分组，保留历史数据用于运行记录追溯。 */
   const disableGroup = async (group: AbExperimentGroup) => {
     if (!selectedExperiment) return
     await abExperimentApi.deleteGroup(selectedExperiment.id, group.id)

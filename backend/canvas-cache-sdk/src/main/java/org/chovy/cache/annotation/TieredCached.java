@@ -13,6 +13,12 @@ import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
+/**
+ * 声明式分层缓存读取注解。
+ *
+ * <p>标注在方法上后由 AOP 根据 SpEL key 计算缓存键，命中缓存则跳过原方法，未命中时执行方法并回填缓存。
+ * <p>该注解用于把缓存策略从业务方法中剥离，保持业务代码只表达数据获取逻辑。
+ */
 @Target(ElementType.METHOD)
 @Retention(RetentionPolicy.RUNTIME)
 @Documented

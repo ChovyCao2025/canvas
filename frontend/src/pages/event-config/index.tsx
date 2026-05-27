@@ -1,3 +1,8 @@
+/**
+ * 页面职责：事件定义管理页，维护事件编码、属性 schema 和启用状态。
+ *
+ * 维护说明：事件编码会被触发器节点引用，因此编辑时要保留与运行时上报格式的一致性。
+ */
 import { useEffect, useState } from 'react'
 import { Button, Table, Tag, Space, Modal, Form, Input, Select, Switch, message, Typography, Popconfirm, Divider, Alert } from 'antd'
 import { PlusOutlined, EditOutlined, DeleteOutlined, CodeOutlined } from '@ant-design/icons'
@@ -6,6 +11,7 @@ import http from '../../services/api'
 import type { ApiParam } from '../api-config'
 import { useSystemOptions } from '../../hooks/useSystemOptions'
 
+/** 页面标题和辅助文本组件别名，保持 JSX 可读。 */
 const { Title, Text } = Typography
 
 /**
@@ -48,11 +54,16 @@ interface AttrSchemaEditorProps {
   attrTypeOptions: { value: string; label: string }[]
 }
 
+/** 表单内联属性编辑器，负责维护事件 attributes schema 的字段数组。 */
 function AttrSchemaEditor({ value, onChange, attrTypeOptions }: AttrSchemaEditorProps) {
   const attrs: ApiParam[] = value ?? []
+  /** 将属性数组回传给 Form.Item，保持受控字段同步。 */
   const set = (next: ApiParam[]) => onChange?.(next)
+  /** 追加一个默认字符串属性。 */
   const add = () => set([...attrs, { name: '', displayName: '', type: 'STRING', required: false }])
+  /** 删除指定下标的属性。 */
   const remove = (i: number) => set(attrs.filter((_, idx) => idx !== i))
+  /** 更新指定属性的局部字段。 */
   const update = (i: number, patch: Partial<ApiParam>) =>
     set(attrs.map((p, idx) => idx === i ? { ...p, ...patch } : p))
 
@@ -97,6 +108,7 @@ export default function EventConfigPage() {
   const [saving, setSaving] = useState(false)
   const { options: attrTypeOptions } = useSystemOptions('event_attr_type')
 
+  /** 分页加载事件定义列表。 */
   const fetchList = async (p = page) => {
     setLoading(true)
     try {
@@ -107,10 +119,12 @@ export default function EventConfigPage() {
 
   useEffect(() => { fetchList(1) }, [])
 
+  /** 打开新建弹窗，并初始化启用状态和空属性 schema。 */
   const openCreate = () => {
     setEditing(null); form.resetFields()
     form.setFieldsValue({ enabled: true, attributes: [] }); setVisible(true)
   }
+  /** 打开编辑弹窗，将后端 attributes 字符串转换为表单数组。 */
   const openEdit = (r: EventDef) => {
     // 后端存储为 JSON 字符串，编辑时反序列化为数组
     setEditing(r)
@@ -119,6 +133,7 @@ export default function EventConfigPage() {
     form.setFieldsValue({ ...r, enabled: r.enabled === 1, attributes: attrs })
     setVisible(true)
   }
+  /** 保存事件定义；提交前把属性数组序列化为后端字段。 */
   const handleOk = async () => {
     const values = await form.validateFields()
     setSaving(true)

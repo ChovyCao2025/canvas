@@ -20,6 +20,12 @@ import reactor.core.scheduler.Schedulers;
 
 import java.util.List;
 
+/**
+ * JWT 认证过滤器。
+ *
+ * <p>在 WebFlux 请求进入控制器前解析 Authorization 头，校验 token 并把用户身份写入安全上下文。
+ * <p>该过滤器是接口鉴权的第一道边界，匿名白名单和异常响应需要在这里保持一致。
+ */
 @Component
 @RequiredArgsConstructor
 public class JwtAuthFilter implements WebFilter {

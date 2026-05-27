@@ -24,6 +24,12 @@ import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
 import java.util.Set;
 
+/**
+ * Mq Trigger Consumer RocketMQ 消息组件。
+ *
+ * <p>负责消费或重试画布触发消息，将外部 MQ 流量转换为内部执行请求。
+ * <p>该层需要处理反序列化、幂等、异常降级和日志观测，避免消息异常扩散到执行引擎。
+ */
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -89,6 +95,10 @@ public class MqTriggerConsumer implements RocketMQListener<MessageExt> {
                     "mq:validate:" + msgId,
                     null);
             return;
+        }
+
+        if (!routeService.isRouteReady()) {
+            throw new IllegalStateException("MQ trigger route table is not ready");
         }
 
         Set<String> canvasIds = routeService.getCanvasByMqTopic(tag);

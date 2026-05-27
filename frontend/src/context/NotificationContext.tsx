@@ -1,3 +1,8 @@
+/**
+ * 上下文职责：通知中心上下文，封装通知列表、未读数、轮询和 WebSocket 实时同步。
+ *
+ * 维护说明：页面组件只消费统一状态和动作，避免各处重复维护通知刷新逻辑。
+ */
 import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from 'react'
 import { useAuth } from './AuthContext'
 import {
@@ -11,6 +16,7 @@ import {
   nextNotificationReconnectDelay,
 } from '../components/notifications/notificationRealtime'
 
+/** 通知上下文对外暴露的状态和动作集合。 */
 interface NotificationState {
   items: UserNotification[]
   unreadCount: number
@@ -21,6 +27,7 @@ interface NotificationState {
   archive: (notificationId: string) => Promise<void>
 }
 
+/** 通知上下文默认值；真实实现由 NotificationProvider 注入。 */
 const NotificationContext = createContext<NotificationState>({
   items: [],
   unreadCount: 0,
@@ -31,8 +38,10 @@ const NotificationContext = createContext<NotificationState>({
   archive: async () => {},
 })
 
+/** WebSocket 不可用时的兜底轮询间隔。 */
 const FALLBACK_POLL_MS = 30000
 
+/** 通知状态 Provider，负责在 HTTP 轮询和 WebSocket 实时通道之间切换。 */
 export function NotificationProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth()
   const [items, setItems] = useState<UserNotification[]>([])
@@ -46,6 +55,7 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
   const activeUserRef = useRef<string | null>(null)
   const stoppedRef = useRef(false)
 
+  /** 同时刷新通知列表和未读数，作为 WebSocket 不可用时的兜底同步入口。 */
   async function refresh() {
     const [listRes, countRes] = await Promise.all([
       notificationApi.list({ page: 1, size: 20 }),
@@ -56,6 +66,7 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
     setUnreadCount(countRes.data.count)
   }
 
+  /** 乐观标记单条通知已读；后端成功后本地列表和未读数同步更新。 */
   async function markRead(notificationId: string) {
     const target = itemsRef.current.find(item => item.notificationId === notificationId)
     await notificationApi.markRead(notificationId)
@@ -71,6 +82,7 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
     }
   }
 
+  /** 将当前用户所有未读通知置为已读。 */
   async function markAllRead() {
     await notificationApi.markAllRead()
     setItems(current => {
@@ -85,6 +97,7 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
     setUnreadCount(0)
   }
 
+  /** 归档通知并从当前列表移除；未读归档同时递减未读数。 */
   async function archive(notificationId: string) {
     const target = itemsRef.current.find(item => item.notificationId === notificationId)
     await notificationApi.archive(notificationId)
@@ -98,6 +111,7 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
     }
   }
 
+  /** 清理待执行的 WebSocket 重连计时器。 */
   function clearReconnectTimer() {
     if (reconnectTimerRef.current != null) {
       window.clearTimeout(reconnectTimerRef.current)
@@ -105,6 +119,7 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
     }
   }
 
+  /** 清理 HTTP 轮询兜底计时器。 */
   function clearFallbackTimer() {
     if (fallbackTimerRef.current != null) {
       window.clearInterval(fallbackTimerRef.current)
@@ -112,6 +127,7 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
     }
   }
 
+  /** 主动关闭当前 WebSocket，切换用户或卸载时调用。 */
   function closeSocket() {
     if (wsRef.current) {
       wsRef.current.close()
@@ -119,6 +135,7 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
     }
   }
 
+  /** 开启兜底轮询；WebSocket 断开或创建失败时使用。 */
   function scheduleFallbackPolling() {
     clearFallbackTimer()
     fallbackTimerRef.current = window.setInterval(() => {
@@ -126,6 +143,7 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
     }, FALLBACK_POLL_MS)
   }
 
+  /** 按指数退避安排下一次 WebSocket 重连。 */
   function scheduleReconnect() {
     if (stoppedRef.current || !activeUserRef.current) {
       return
@@ -138,6 +156,7 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
     reconnectAttemptRef.current += 1
   }
 
+  /** 处理服务端实时推送，合并通知列表并覆盖未读数。 */
   function handleRealtimePayload(payload: NotificationRealtimePayload) {
     setItems(current => {
       const next = mergeRealtimeNotifications(current, payload)
@@ -149,6 +168,7 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
     }
   }
 
+  /** 建立实时通知 WebSocket；失败时自动切到轮询并安排重连。 */
   async function connectRealtime() {
     if (!activeUserRef.current || stoppedRef.current) {
       return
@@ -187,6 +207,7 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
     }
   }
 
+  // 登录用户变化时重建连接；退出登录时清空通知并停止所有后台同步。
   useEffect(() => {
     activeUserRef.current = user?.username ?? null
     stoppedRef.current = !user
@@ -228,6 +249,7 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
   )
 }
 
+/** 读取通知上下文，页面和通知铃铛都通过这个 Hook 访问统一状态。 */
 export function useNotifications() {
   return useContext(NotificationContext)
 }

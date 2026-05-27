@@ -58,6 +58,54 @@ node tools/perf/perf-runner.mjs \
 
 The runner prints `sent`, `success`, `failed`, `p95Ms`, timestamps, run settings, and machine metadata. A nonzero `failed` count exits with code `2`.
 
+## Threshold Runner
+
+Use this wrapper after smoke passes. It runs staged pressure, verifies each run, and stops at the first unstable stage.
+
+Event example:
+
+```bash
+node tools/perf/threshold-runner.mjs \
+  --mode event \
+  --base-url http://localhost:8080 \
+  --event-code PERF_ORDER_PAID \
+  --stages 1000:10,5000:50,10000:100,30000:200,50000:400 \
+  --matched-canvas-count 1 \
+  --max-failed 0 \
+  --max-p95-ms 1000 \
+  --wait-after-run-ms 10000 \
+  --out-dir tmp/perf-threshold \
+  --run-id-prefix "perf_$(date +%Y%m%d_%H%M%S)"
+```
+
+Direct example:
+
+```bash
+node tools/perf/threshold-runner.mjs \
+  --mode direct \
+  --base-url http://localhost:8080 \
+  --canvas-id "$DIRECT_CANVAS_ID" \
+  --stages 1000:10,5000:50,10000:100,30000:200,50000:400 \
+  --matched-canvas-count 1 \
+  --max-failed 0 \
+  --max-p95-ms 1000 \
+  --wait-after-run-ms 0 \
+  --out-dir tmp/perf-threshold \
+  --run-id-prefix "perf_$(date +%Y%m%d_%H%M%S)"
+```
+
+Verdicts:
+
+- `MAX_STAGE_STABLE`: all configured stages passed. Add a higher stage if you still need the limit.
+- `THRESHOLD_FOUND`: the first unstable stage was found. Use `stableStage` as the current maximum stable point.
+- `NO_STABLE_STAGE`: even the first stage failed. Fix correctness or environment before capacity testing.
+
+Stage failure reasons:
+
+- `RUNNER_FAILED`: HTTP request failures exceeded `--max-failed`.
+- `P95_EXCEEDED`: runner p95 exceeded `--max-p95-ms`.
+- `VERIFIER_FAIL`: correctness reconciliation failed. This result is not valid capacity data.
+
 ## Direct Call Test
 
 ```bash

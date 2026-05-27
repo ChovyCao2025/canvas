@@ -9,6 +9,12 @@ import java.util.Objects;
 import java.util.function.Function;
 import java.util.function.IntPredicate;
 
+/**
+ * 条件规则求值工具。
+ *
+ * <p>统一处理节点配置中的字段比较、包含判断、数值比较和多条件组合，供条件分支、接口响应校验等节点复用。
+ * <p>工具类保持无状态，输入仅来自规则列表和上下文 Map，便于单元测试覆盖边界判断。
+ */
 final class ConditionEvaluator {
     private ConditionEvaluator() {
     }

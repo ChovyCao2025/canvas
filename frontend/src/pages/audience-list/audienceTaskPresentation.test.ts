@@ -1,3 +1,8 @@
+/**
+ * 测试职责：验证人群异步任务状态展示、轮询退避和运行中状态优先级。
+ *
+ * 维护说明：后端任务状态机扩展时，应同步终态判断和显示状态合并规则。
+ */
 import { describe, expect, it } from 'vitest'
 import {
   getAudienceDisplayStatus,

@@ -1,3 +1,8 @@
+/**
+ * 页面职责：管理员用户管理页，支持查询用户、创建用户和禁用用户。
+ *
+ * 维护说明：权限入口由路由守卫控制，页面内只处理管理表单和列表刷新。
+ */
 import { useEffect, useState } from 'react'
 import { Button, Form, Input, Modal, Select, Table, Tag, Tooltip, message, Typography } from 'antd'
 import { PlusOutlined, StopOutlined } from '@ant-design/icons'
@@ -6,6 +11,7 @@ import { adminApi } from '../../services/api'
 import type { SysUser } from '../../services/api'
 import { useSystemOptions } from '../../hooks/useSystemOptions'
 
+/** 页面标题组件别名。 */
 const { Title } = Typography
 
 /**

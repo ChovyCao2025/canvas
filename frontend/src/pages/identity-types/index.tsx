@@ -1,3 +1,8 @@
+/**
+ * 页面职责：身份类型管理页，维护手机号、邮箱、unionId 等用户标识定义。
+ *
+ * 维护说明：这些标识用于 CDP 和人群规则识别用户，配置变更需谨慎。
+ */
 import { useEffect, useState } from 'react'
 import { Button, Form, Input, InputNumber, Modal, Popconfirm, Space, Switch, Table, Tag, Typography, message } from 'antd'
 import { DeleteOutlined, EditOutlined, PlusOutlined } from '@ant-design/icons'
@@ -5,8 +10,10 @@ import type { ColumnsType } from 'antd/es/table'
 import { identityTypeApi } from '../../services/api'
 import type { IdentityType } from '../../types'
 
+/** 页面标题组件别名。 */
 const { Title } = Typography
 
+/** 身份类型表单值；布尔字段面向 Switch，提交前再转为后端 1/0。 */
 type IdentityTypeFormValues = {
   code: string
   name: string
@@ -18,6 +25,7 @@ type IdentityTypeFormValues = {
   participateMapping: boolean
 }
 
+/** 身份类型配置页面主组件。 */
 export default function IdentityTypesPage() {
   const [data, setData] = useState<IdentityType[]>([])
   const [loading, setLoading] = useState(false)
@@ -26,6 +34,7 @@ export default function IdentityTypesPage() {
   const [saving, setSaving] = useState(false)
   const [form] = Form.useForm<IdentityTypeFormValues>()
 
+  /** 拉取身份类型列表；用于首次加载和保存/删除后的刷新。 */
   const fetchList = async () => {
     setLoading(true)
     try {
@@ -40,6 +49,7 @@ export default function IdentityTypesPage() {
     fetchList()
   }, [])
 
+  /** 新建身份类型时设置推荐默认值，默认参与用户映射。 */
   const openCreate = () => {
     setEditing(null)
     form.resetFields()
@@ -53,6 +63,7 @@ export default function IdentityTypesPage() {
     setVisible(true)
   }
 
+  /** 编辑时把后端 1/0 字段转换为 Switch 使用的 boolean。 */
   const openEdit = (record: IdentityType) => {
     setEditing(record)
     form.setFieldsValue({
@@ -68,6 +79,7 @@ export default function IdentityTypesPage() {
     setVisible(true)
   }
 
+  /** 保存身份类型；code 在编辑态禁用，避免破坏已有映射关系。 */
   const handleOk = async () => {
     const values = await form.validateFields()
     const body: Partial<IdentityType> = {
@@ -94,6 +106,7 @@ export default function IdentityTypesPage() {
     }
   }
 
+  /** 身份类型表格列，操作列提供编辑和删除入口。 */
   const columns: ColumnsType<IdentityType> = [
     { title: '编码', dataIndex: 'code', render: (value: string) => <Typography.Text code>{value}</Typography.Text> },
     { title: '名称', dataIndex: 'name' },

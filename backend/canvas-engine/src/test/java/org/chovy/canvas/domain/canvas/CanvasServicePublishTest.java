@@ -9,6 +9,7 @@ import org.chovy.canvas.engine.handlers.GroovyHandler;
 import org.chovy.canvas.engine.handlers.MqTriggerHandler;
 import org.chovy.canvas.engine.trigger.CanvasExecutionService;
 import org.chovy.canvas.engine.trigger.CanvasSchedulerService;
+import org.chovy.canvas.engine.trigger.TriggerPreCheckService;
 import org.chovy.canvas.infrastructure.cache.CanvasConfigCache;
 import org.chovy.canvas.infrastructure.redis.TriggerRouteService;
 import org.junit.jupiter.api.BeforeEach;
@@ -31,6 +32,12 @@ import org.chovy.canvas.dal.mapper.CanvasMapper;
 import org.chovy.canvas.dal.dataobject.CanvasVersionDO;
 import org.chovy.canvas.dal.mapper.CanvasVersionMapper;
 
+/**
+ * Canvas Service Publish 测试类。
+ *
+ * <p>覆盖该后端组件在典型输入、边界条件和异常场景下的行为，确保重构或性能优化不会改变既有契约。
+ * <p>测试代码只构造必要的依赖与数据，断言重点放在可观察结果、状态变更和关键副作用上。
+ */
 @ExtendWith(MockitoExtension.class)
 class CanvasServicePublishTest {
 
@@ -41,6 +48,7 @@ class CanvasServicePublishTest {
     @Mock CanvasSchedulerService schedulerService;
     @Mock CanvasConfigCache configCache;
     @Mock CanvasExecutionService canvasExecutionService;
+    @Mock TriggerPreCheckService preCheckService;
     @Mock GroovyHandler groovyHandler;
     @Mock MqTriggerHandler mqTriggerHandler;
     @Mock StringRedisTemplate redis;
@@ -59,6 +67,7 @@ class CanvasServicePublishTest {
                 schedulerService,
                 configCache,
                 canvasExecutionService,
+                preCheckService,
                 groovyHandler,
                 mqTriggerHandler,
                 redis,
@@ -81,11 +90,9 @@ class CanvasServicePublishTest {
         CanvasVersionDO draft = version(200L, 2, "draft");
         when(canvasVersionMapper.selectOne(any())).thenReturn(draft);
         when(canvasVersionMapper.selectById(100L)).thenReturn(oldVersion);
-        doAnswer(invocation -> {
-            CanvasVersionDO inserted = invocation.getArgument(0);
-            inserted.setId(300L);
-            return 1;
-        }).when(canvasVersionMapper).insert(any(CanvasVersionDO.class));
+        CanvasVersionDO published = version(300L, 3, "draft");
+        when(canvasTransactionService.publishDb(eq(10L), eq("draft"), eq("operator")))
+                .thenReturn(new CanvasTransactionService.PublishResult(published, 100L));
 
         DagGraph oldGraph = graph("old-mq");
         DagGraph newGraph = graph("new-mq");

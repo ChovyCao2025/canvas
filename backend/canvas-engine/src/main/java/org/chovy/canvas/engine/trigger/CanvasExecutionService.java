@@ -1,5 +1,7 @@
 package org.chovy.canvas.engine.trigger;
 
+import cn.hutool.core.lang.Snowflake;
+import cn.hutool.core.util.StrUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.apache.rocketmq.client.producer.SendResult;
@@ -36,6 +38,7 @@ import org.chovy.canvas.perf.PerfRunContext;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import reactor.core.Disposable;
 import reactor.core.publisher.Mono;
@@ -59,33 +62,58 @@ import org.chovy.canvas.dal.mapper.CanvasExecutionStatsMapper;
 @RequiredArgsConstructor
 public class CanvasExecutionService {
 
+    /** 画布 Mapper，用于 dry-run 和版本解析场景读取画布主表。 */
     private final CanvasMapper canvasMapper;
+    /** 画布版本 Mapper。 */
     private final CanvasVersionMapper canvasVersionMapper;
+    /** 画布执行记录 Mapper。 */
     private final CanvasExecutionMapper executionMapper;
+    /** 画布配置缓存，用于执行链路快速读取发布态配置。 */
     private final CanvasConfigCache configCache;
+    /** DAG 解析器，将 graphJson 转换为可执行图结构。 */
     private final DagParser dagParser;
+    /** 执行上下文 Redis 持久化服务。 */
     private final ContextPersistenceService ctxStore;
+    /** DAG 执行引擎。 */
     private final DagEngine dagEngine;
+    /** 触发预检服务，负责有效期、配额、冷却期和并发保护校验。 */
     private final TriggerPreCheckService preCheckService;
+    /** 运行中执行注册表，控制并发和取消。 */
     private final InFlightExecutionRegistry executionRegistry;
-    private final org.chovy.canvas.dal.mapper.CanvasExecutionStatsMapper statsMapper;
+    /** 画布执行统计 Mapper。 */
+    private final CanvasExecutionStatsMapper statsMapper;
+    /** 画布实体缓存。 */
     private final CanvasEntityCache canvasEntityCache;
+    /** MQ 触发节点处理器，用于解析和匹配 MQ 触发入口。 */
     private final MqTriggerHandler mqTriggerHandler;
+    /** 画布执行死信 Mapper。 */
     private final CanvasExecutionDlqMapper dlqMapper;
+    /** 触发优先级配置。 */
     private final TriggerPriorityConfig priorityConfig;
+    /** RocketMQ 模板，用于溢出重试和降级消息投递。 */
     private final RocketMQTemplate rocketMQTemplate;
+    /** Jackson ObjectMapper，用于 JSON 序列化和反序列化。 */
     private final ObjectMapper objectMapper;
+    /** CDP 用户服务，用于导入或执行时创建用户画像。 */
     private final CdpUserService cdpUserService;
+    /** Disruptor 派发服务。 */
     private final CanvasDisruptorService disruptorService;
-    private final org.springframework.data.redis.core.StringRedisTemplate redis;
+    /** 阻塞式 Redis 模板，用于锁、去重、票据或跨实例通知。 */
+    private final StringRedisTemplate redis;
+    /** Redis key 工具，集中生成执行相关 key。 */
     private final RedisKeyUtil redisKeys;
+    /** 雪花 ID 生成器。 */
+    private final Snowflake snowflake;
 
+    /** 执行上下文在 Redis 中的保留秒数。 */
     @Value("${canvas.execution.context-ttl-sec:86400}")
     private long ctxTtlSec;
 
+    /** 单次画布执行全局超时时间。 */
     @Value("${canvas.execution.global-timeout-sec:600}")
     private long globalTimeoutSec;
 
+    /** 全局最大并发执行数。 */
     @org.springframework.beans.factory.annotation.Value("${canvas.execution.max-concurrency:1000}")
     private int globalMaxConcurrency;
 
@@ -201,7 +229,7 @@ public class CanvasExecutionService {
             String triggerNodeType, String matchKey,
             Map<String, Object> payload, String msgId, boolean dryRun) {
         return triggerInternal(canvasId, userId, triggerType, triggerNodeType, matchKey,
-                payload, msgId, dryRun, false, 0, false);
+                payload, msgId, dryRun, false, 0, false, 0, null);
     }
 
     /**
@@ -213,8 +241,18 @@ public class CanvasExecutionService {
             Long canvasId, String userId, String triggerType,
             String triggerNodeType, String matchKey,
             Map<String, Object> payload, String msgId) {
+        return triggerFromExecutionRequest(canvasId, userId, triggerType, triggerNodeType,
+                matchKey, payload, msgId, 0, null);
+    }
+
+    /** 从执行请求队列触发画布执行。 */
+    public Mono<Map<String, Object>> triggerFromExecutionRequest(
+            Long canvasId, String userId, String triggerType,
+            String triggerNodeType, String matchKey,
+            Map<String, Object> payload, String msgId,
+            int priorAttemptCount, String lastError) {
         return triggerInternal(canvasId, userId, triggerType, triggerNodeType, matchKey,
-                payload, msgId, false, false, 0, true);
+                payload, msgId, false, false, 0, true, priorAttemptCount, lastError);
     }
 
     /**
@@ -236,22 +274,24 @@ public class CanvasExecutionService {
                 ? dispatchOptions.getOverflowChainRetryCount()
                 : 0;
         return triggerInternal(canvasId, userId, triggerType, triggerNodeType, matchKey,
-                payload, msgId, false, overflowRetry, overflowChainRetryCount, false);
+                payload, msgId, false, overflowRetry, overflowChainRetryCount, false, 0, null);
     }
 
+    /** 统一触发入口，串联准备阶段和执行阶段的响应式流程。 */
     private Mono<Map<String, Object>> triggerInternal(
             Long canvasId, String userId, String triggerType,
             String triggerNodeType, String matchKey,
             Map<String, Object> payload, String msgId, boolean dryRun,
             boolean overflowRetry, int overflowChainRetryCount,
-            boolean persistentRequest) {
+            boolean persistentRequest, int priorAttemptCount, String lastError) {
         return Mono.fromCallable(() ->
                         // 校验与准备
                         prepareExecution(
                                 canvasId, userId, triggerType,
                                 triggerNodeType, matchKey, payload,
                                 msgId, dryRun, overflowRetry,
-                                overflowChainRetryCount, persistentRequest))
+                                overflowChainRetryCount, persistentRequest,
+                                priorAttemptCount, lastError))
                 .subscribeOn(Schedulers.boundedElastic())
                 .flatMap(
                         // 执行阶段
@@ -292,9 +332,9 @@ public class CanvasExecutionService {
     }
 
     /**
-     * 执行阶段：扣减配额 → CDP 用户确保 → 创建执行记录 → 运行 DAG → 处理结果。
+     * 执行阶段：扣减配额 → CDP 用户相关信息落库 → 创建执行记录 → 运行 DAG → 处理结果。
      *
-     * <p>资源释放责任链（异常时）：
+     * <p> 资源释放责任链（异常时）：
      * <ul>
      *   <li>consumeQuotaAndRecord 失败 → 释放 slot + resumeLock + dedupKey，返回 error；</li>
      *   <li>DAG 执行失败（onErrorResume）→ 更新执行状态为 FAILED，
@@ -302,56 +342,86 @@ public class CanvasExecutionService {
      *   <li>finally（doFinally）→ 注销 registry slot（无论成功失败）。</li>
      * </ul>
      *
-     * <p>PAUSED 状态处理：
+     * <p> PAUSED 状态处理：
      * DAG 执行后若 ctx 中存在 WAITING 状态节点，视为挂起：
      * 保存上下文到 Redis（供下次恢复），释放 resumeLock，更新执行状态为 PAUSED。
+     *
+     * <p>
+     * 执行 DAG 主流程，分三步：
+     * <ol>
+     *   <li>配额扣减 — 非 dryRun 且非 WAIT/GOAL 恢复触发时扣减，失败立即释放锁并返回错误</li>
+     *   <li>准备执行记录 — 初始化 CDP 用户、创建 CanvasExecutionDO、构建 executionMono</li>
+     *   <li>响应式链组装 — 持久化记录 → 绑定取消句柄 → 成功/失败回调 → 释放分布式锁</li>
+     * </ol>
      */
     private Mono<Map<String, Object>> doExecute(
             Long canvasId, String userId, boolean dryRun,
             CanvasDO canvas, Disposable.Swap finalExecutionSlot,
             ExecutionContext ctx, boolean isResume, String acquiredDedupKey,
             DagGraph graph, String triggerNodeId) {
+
+        // 1. 配额扣减（WAIT/GOAL 恢复触发跳过，防止配额虚耗）
         if (!dryRun) {
             try {
-                // Fix 2: WAIT/GOAL 恢复触发跳过配额扣减：恢复不是新触发，不应重复消耗配额
-                // 冷却期和总触发量均在原始触发时已扣减，恢复路径重复扣减会导致配额虚耗
-                if (!isWaitResumeTrigger(ctx.getTriggerType())) {
-                    preCheckService.consumeQuotaAndRecord(canvas, userId);
-                }
+                consumeQuotaIfNeeded(canvas, userId, ctx);
             } catch (RuntimeException e) {
-                if (finalExecutionSlot != null) {
-                    executionRegistry.deregister(canvasId, ctx.getExecutionId());
-                }
-                if (isResume) ctxStore.releaseResumeLock(ctx.getCanvasId(), ctx.getUserId(), ctx.getResumeLockToken());
-                if (acquiredDedupKey != null) ctxStore.releaseDedup(acquiredDedupKey);
+                releaseResources(canvasId, finalExecutionSlot, ctx, isResume, acquiredDedupKey);
                 return Mono.error(e);
             }
         }
 
+        // 2. 保存 CDP 用户相关信息
         ensureCdpUser(ctx);
-        final CanvasExecutionDO finalExec = createExecution(ctx);
-        if (ctx.getPerfRunId() != null && acquiredDedupKey != null) {
-            finalExec.setLastDedupKey(acquiredDedupKey);
-        }
+        final CanvasExecutionDO finalExec = buildExecutionRecord(ctx, acquiredDedupKey);
+
+        // 3. 运行 DAG
         Mono<Map<String, Object>> executionMono = dagEngine.execute(graph, triggerNodeId, ctx)
                 .timeout(Duration.ofSeconds(globalTimeoutSec));
 
-        Mono<Map<String, Object>> runMono = insertExecution(finalExec).then(executionMono
-                .doOnSubscribe(sub -> {
-                    if (finalExecutionSlot != null) {
-                        finalExecutionSlot.update(sub::cancel);
-                    }
-                })
-                .flatMap(result -> handleSuccess(result, finalExec, ctx, graph, dryRun, isResume))
-                .onErrorResume(e -> handleError(e, finalExec, ctx, graph, dryRun, isResume)));
-        return runMono.doOnError(e -> {
-            if (isResume) ctxStore.releaseResumeLock(ctx.getCanvasId(), ctx.getUserId(), ctx.getResumeLockToken());
-            if (acquiredDedupKey != null) ctxStore.releaseDedup(acquiredDedupKey);
-        }).doFinally(signal -> {
-            if (!dryRun) executionRegistry.deregister(canvasId, ctx.getExecutionId());
-        });
+        // 4. 组装响应式链：持久化记录 → 绑定取消句柄 → 处理结果/错误 → 释放分布式锁
+        return insertExecution(finalExec)
+                .then(executionMono
+                        .doOnSubscribe(sub -> {
+                            if (finalExecutionSlot != null) finalExecutionSlot.update(sub::cancel);
+                        })
+                        .flatMap(result -> handleSuccess(result, finalExec, ctx, graph, dryRun, isResume))
+                        .onErrorResume(e -> handleError(e, finalExec, ctx, graph, dryRun, isResume)))
+                .doOnError(e -> releaseLocks(ctx, isResume, acquiredDedupKey))
+                .doFinally(signal -> {
+                    if (!dryRun) executionRegistry.deregister(canvasId, ctx.getExecutionId());
+                });
     }
 
+    /** 非 WAIT/GOAL 恢复触发时扣减配额，恢复路径跳过以防虚耗。 */
+    private void consumeQuotaIfNeeded(CanvasDO canvas, String userId, ExecutionContext ctx) {
+        if (!ctx.isQuotaBypass() && !isInternalContinuationTrigger(ctx.getTriggerType())) {
+            preCheckService.consumeQuotaAndRecord(canvas, userId);
+        }
+    }
+
+    /** 基于执行上下文创建执行记录，并在压测链路保存实际获取的幂等键。 */
+    private CanvasExecutionDO buildExecutionRecord(ExecutionContext ctx, String acquiredDedupKey) {
+        CanvasExecutionDO exec = createExecution(ctx);
+        if (ctx.getPerfRunId() != null && acquiredDedupKey != null) {
+            exec.setLastDedupKey(acquiredDedupKey);
+        }
+        return exec;
+    }
+
+    /** 释放 resumeLock 和 dedupKey，用于响应式链 doOnError 回调。 */
+    private void releaseLocks(ExecutionContext ctx, boolean isResume, String acquiredDedupKey) {
+        if (isResume) ctxStore.releaseResumeLock(ctx.getCanvasId(), ctx.getUserId(), ctx.getResumeLockToken());
+        if (acquiredDedupKey != null) ctxStore.releaseDedup(acquiredDedupKey);
+    }
+
+    /** 释放执行槽 + 分布式锁，用于配额扣减失败时的同步清理。 */
+    private void releaseResources(Long canvasId, Disposable.Swap finalExecutionSlot,
+            ExecutionContext ctx, boolean isResume, String acquiredDedupKey) {
+        if (finalExecutionSlot != null) executionRegistry.deregister(canvasId, ctx.getExecutionId());
+        releaseLocks(ctx, isResume, acquiredDedupKey);
+    }
+
+    /** 处理 DAG 成功返回后的执行状态、上下文快照和统计更新。 */
     private Mono<Map<String, Object>> handleSuccess(
             Map<String, Object> result, CanvasExecutionDO finalExec,
             ExecutionContext ctx, DagGraph graph, boolean dryRun, boolean isResume) {
@@ -378,6 +448,7 @@ public class CanvasExecutionService {
                 .thenReturn(resp);
     }
 
+    /** 处理 DAG 执行异常，区分暂停状态和失败状态并持久化结果。 */
     private Mono<Map<String, Object>> handleError(
             Throwable e, CanvasExecutionDO finalExec,
             ExecutionContext ctx, DagGraph graph, boolean dryRun, boolean isResume) {
@@ -430,16 +501,21 @@ public class CanvasExecutionService {
      *   <li>步骤E：resumeLock——Redis SETNX，跨机原子，安全。</li>
      * </ul>
      */
-    private Map<String, ?> prepareExecution(Long canvasId, String userId, String triggerType, String triggerNodeType, String matchKey, Map<String, Object> payload, String msgId, boolean dryRun, boolean overflowRetry, int overflowChainRetryCount, boolean persistentRequest) {
+    private Map<String, ?> prepareExecution(Long canvasId, String userId, String triggerType, String triggerNodeType, String matchKey, Map<String, Object> payload, String msgId, boolean dryRun, boolean overflowRetry, int overflowChainRetryCount, boolean persistentRequest, int priorAttemptCount, String lastError) {
 
         // A. 从 Caffeine L1 缓存加载画布实体，验证存在且已发布
         //    ⚠️ 分布式：L1 是 JVM 本地，画布下线后最多延迟一个缓存 TTL 才感知
         CanvasDO canvas = validateAndLoadCanvas(canvasId, dryRun);
+        boolean persistentRetry = persistentRequest && priorAttemptCount > 0;
+        boolean persistentRetryAfterOverflow = persistentRetry && "request_retry".equals(lastError);
+        boolean internalContinuation = isInternalContinuationTrigger(triggerType);
+        boolean quotaBypass = internalContinuation || (persistentRetry && !persistentRetryAfterOverflow);
 
         // B. 幂等去重（Redis SETNX，跨机安全）
         //    isResume=true 表示 Redis 中存有该用户的上下文快照（画布已暂停等待中）
         boolean isResume = !dryRun && ctxStore.exists(canvasId, userId);
-        DedupResult dedup = performDedupCheck(canvasId, userId, msgId, isResume, dryRun, overflowRetry);
+        DedupResult dedup = performDedupCheck(canvasId, userId, msgId, isResume, dryRun, overflowRetry,
+                persistentRequest, internalContinuation);
         if (dedup.deduplicated()){
             return Map.of(MapFieldKeys.DEDUPLICATED, true);
         }
@@ -447,7 +523,7 @@ public class CanvasExecutionService {
 
         // C. 前置资格校验（不扣减配额）
         //    WAIT/GOAL 恢复触发跳过此检查：恢复不是新触发，冷却期不应拦截恢复路径
-        if (!dryRun && !isWaitResumeTrigger(triggerType)) {
+        if (!dryRun && !isInternalContinuationTrigger(triggerType) && !persistentRetry) {
             preCheckService.checkWithoutQuotaAccounting(canvas, userId);
             if (overflowRetry) {
                 log.debug("[ENGINE] 溢出重试跳过配额扣减（扣减在 doExecute 中进行）canvasId={} userId={}", canvasId, userId);
@@ -471,7 +547,7 @@ public class CanvasExecutionService {
                 canvasId, userId, triggerType,
                 triggerNodeType, matchKey, payload,
                 dryRun, isResume, canvas,
-                admissionLimit, acquiredDedupKey);
+                admissionLimit, acquiredDedupKey, quotaBypass);
     }
 
     /**
@@ -490,7 +566,7 @@ public class CanvasExecutionService {
      * 其他机器抢锁失败时直接放弃本次触发（SKIPPED）。
      * 锁的 TTL = globalTimeoutSec，保证执行超时后锁自动释放。
      */
-    private Map<String, Object> buildPrepMap(Long canvasId, String userId, String triggerType, String triggerNodeType, String matchKey, Map<String, Object> payload, boolean dryRun, boolean isResume, CanvasDO canvas, int admissionLimit, String acquiredDedupKey) {
+    private Map<String, Object> buildPrepMap(Long canvasId, String userId, String triggerType, String triggerNodeType, String matchKey, Map<String, Object> payload, boolean dryRun, boolean isResume, CanvasDO canvas, int admissionLimit, String acquiredDedupKey, boolean quotaBypass) {
         boolean resumeLockAcquired = false;
         // 提升到 try 外层，使 catch 块可以用于原子释放锁
         String resumeLockInstanceId = null;
@@ -518,6 +594,7 @@ public class CanvasExecutionService {
 
             // 补充上下文信息
             populateContext(triggerType, triggerNodeType, matchKey, payload, ctx);
+            ctx.setQuotaBypass(quotaBypass);
 
 
             // 查找画布内容
@@ -548,6 +625,7 @@ public class CanvasExecutionService {
         }
     }
 
+    /** 构建准备阶段输出 Map，供执行阶段解包上下文、图和准入信息。 */
     private static Map<String, Object> buildPrepareResultMap(boolean isResume, CanvasDO canvas, int admissionLimit, String acquiredDedupKey, ExecutionContext ctx, DagGraph graph, String triggerNodeId) {
         Map<String, Object> prep = new HashMap<>();
         prep.put(MapFieldKeys.CTX, ctx);
@@ -587,6 +665,7 @@ public class CanvasExecutionService {
 
     // ── 方法提取辅助记录 ──────────────────────────────────────────
 
+    /** 幂等检查结果，标识是否被拦截以及本次持有的 Redis 幂等 key。 */
     private record DedupResult(boolean deduplicated, String dedupKey) {
         static DedupResult duplicate() {
             return new DedupResult(true, null);
@@ -601,6 +680,7 @@ public class CanvasExecutionService {
         }
     }
 
+    /** 并发准入结果，正常时返回准入上限，超限时返回溢出响应。 */
     private record AdmissionResult(int admissionLimit, Map<String, Object> overflowResponse) {
         static AdmissionResult granted(int limit) {
             return new AdmissionResult(limit, null);
@@ -615,6 +695,7 @@ public class CanvasExecutionService {
         }
     }
 
+    /** 执行槽位获取结果，包含取消句柄或并发超限响应。 */
     private record SlotAcquisitionResult(Disposable.Swap slot, Mono<Map<String, Object>> overflowMono) {
         static SlotAcquisitionResult acquired(Disposable.Swap slot) {
             return new SlotAcquisitionResult(slot, null);
@@ -650,8 +731,9 @@ public class CanvasExecutionService {
      * 但 globalTimeoutSec 可能在运行期被修改（通过配置刷新），导致部分已在途的 dedup 与新值不匹配。
      */
     private DedupResult performDedupCheck(Long canvasId, String userId, String msgId,
-                                          boolean isResume, boolean dryRun, boolean overflowRetry) {
-        if (dryRun || overflowRetry || msgId == null) {
+                                          boolean isResume, boolean dryRun, boolean overflowRetry,
+                                          boolean persistentRequest, boolean internalContinuation) {
+        if (dryRun || overflowRetry || persistentRequest || internalContinuation || msgId == null) {
             return DedupResult.skipped();
         }
         // FIXME: 过期时间会发生变化, 判断是否需要调整
@@ -805,6 +887,7 @@ public class CanvasExecutionService {
 
     // ── 私有帮助方法 ──────────────────────────────────────────────
 
+    /** 创建新的执行上下文并写入基础画布、版本、用户和触发信息。 */
     private ExecutionContext newContext(Long canvasId, Long versionId, String userId, String triggerType) {
         ExecutionContext ctx = new ExecutionContext();
         ctx.setExecutionId(UUID.randomUUID().toString());
@@ -816,8 +899,9 @@ public class CanvasExecutionService {
         return ctx;
     }
 
+    /** 确保执行上下文中的用户已写入 CDP 用户画像。 */
     private void ensureCdpUser(ExecutionContext ctx) {
-        if (ctx.getUserId() != null && !ctx.getUserId().isBlank()) {
+        if (StrUtil.isNotBlank(ctx.getUserId())) {
             cdpUserService.ensureUser(ctx.getUserId(), "CANVAS_EXECUTION", ctx.getExecutionId());
         }
     }
@@ -880,7 +964,7 @@ public class CanvasExecutionService {
         for (String nodeId : graph.allNodeIds()) {
             DagParser.CanvasNode node = graph.getNode(nodeId);
             if (node == null || !triggerNodeType.equals(node.getType())) continue;
-            if (NodeType.WAIT.equals(triggerNodeType) || NodeType.GOAL_CHECK.equals(triggerNodeType)) {
+            if (matchesByNodeId(triggerNodeType)) {
                 if (matchKey == null || nodeId.equals(matchKey)) return nodeId;
                 continue;
             }
@@ -897,6 +981,18 @@ public class CanvasExecutionService {
         return null;
     }
 
+    /** 判断触发类型是否应直接按节点 ID 与 matchKey 匹配。 */
+    private boolean matchesByNodeId(String triggerNodeType) {
+        return NodeType.WAIT.equals(triggerNodeType)
+                || NodeType.GOAL_CHECK.equals(triggerNodeType)
+                || NodeType.HUB.equals(triggerNodeType)
+                || NodeType.AGGREGATE.equals(triggerNodeType)
+                || NodeType.LOGIC_RELATION.equals(triggerNodeType)
+                || NodeType.THRESHOLD.equals(triggerNodeType)
+                || NodeType.MANUAL_APPROVAL.equals(triggerNodeType);
+    }
+
+    /** 判断执行上下文中是否存在 WAITING 节点状态。 */
     private boolean isPaused(ExecutionContext ctx, DagGraph graph) {
         return ctx.getNodeStatuses().values().stream()
                 .anyMatch(s -> s == org.chovy.canvas.engine.context.NodeStatus.WAITING);
@@ -906,13 +1002,20 @@ public class CanvasExecutionService {
      * 判断是否为 WAIT/GOAL 节点恢复触发（Fix 2）。
      * 这类触发是对已暂停执行的"继续"，不是新触发，不应扣减冷却期和配额。
      */
-    private static boolean isWaitResumeTrigger(String triggerType) {
+    private static boolean isInternalContinuationTrigger(String triggerType) {
         return org.chovy.canvas.common.enums.TriggerType.WAIT_RESUME.equals(triggerType)
                 || org.chovy.canvas.common.enums.TriggerType.WAIT_TIMEOUT.equals(triggerType)
                 || org.chovy.canvas.common.enums.TriggerType.GOAL_CHECK_RESUME.equals(triggerType)
-                || org.chovy.canvas.common.enums.TriggerType.GOAL_CHECK_TIMEOUT.equals(triggerType);
+                || org.chovy.canvas.common.enums.TriggerType.GOAL_CHECK_TIMEOUT.equals(triggerType)
+                || org.chovy.canvas.common.enums.TriggerType.HUB_TIMEOUT.equals(triggerType)
+                || org.chovy.canvas.common.enums.TriggerType.LOGIC_RELATION_TIMEOUT.equals(triggerType)
+                || org.chovy.canvas.common.enums.TriggerType.AGGREGATE_TIMEOUT.equals(triggerType)
+                || org.chovy.canvas.common.enums.TriggerType.THRESHOLD_TIMEOUT.equals(triggerType)
+                || org.chovy.canvas.common.enums.TriggerType.MANUAL_APPROVAL_TIMEOUT.equals(triggerType)
+                || "MANUAL_APPROVAL_RESUME".equals(triggerType);
     }
 
+    /** 将并发溢出的触发请求发送到 RocketMQ 延迟重试队列。 */
     private boolean sendOverflowRetry(Long canvasId, String userId, String triggerType,
                                       String triggerNodeType, String matchKey,
                                       Map<String, Object> payload, String msgId, int chainRetryCount) {
@@ -920,10 +1023,12 @@ public class CanvasExecutionService {
         try {
             String effectiveMsgId = nonBlank(msgId)
                     ? msgId
-                    : "overflow-" + UUID.randomUUID();
+                    : "overflow-" + snowflake.nextIdStr();
             OverflowRetryMessage msg = new OverflowRetryMessage(
-                    canvasId, userId, triggerType, triggerNodeType,
-                    matchKey, retryPayload, effectiveMsgId, chainRetryCount + 1);
+                    canvasId, userId,
+                    triggerType, triggerNodeType,
+                    matchKey, retryPayload,
+                    effectiveMsgId, chainRetryCount + 1);
             String tag = triggerType != null ? triggerType : TriggerPriorityConfig.Priority.NORMAL.name();
             Message rocketMsg = new Message(
                     "CANVAS_TRIGGER_OVERFLOW",
@@ -953,6 +1058,7 @@ public class CanvasExecutionService {
         }
     }
 
+    /** 清理内部重试控制字段，避免业务 payload 伪造溢出重试状态。 */
     private Map<String, Object> sanitizePayload(Map<String, Object> payload) {
         if (payload == null || payload.isEmpty()) {
             return Map.of();
@@ -962,6 +1068,7 @@ public class CanvasExecutionService {
         return sanitized;
     }
 
+    /** 在溢出重试入队失败或达到上限时写入执行死信记录。 */
     private void writeOverflowEnqueueDlq(OverflowRetryMessage msg, String errorMsg) {
         try {
             CanvasExecutionDlqDO dlq = CanvasExecutionDlqDO.builder()
@@ -986,10 +1093,12 @@ public class CanvasExecutionService {
         }
     }
 
+    /** 判断字符串是否包含非空白字符。 */
     private boolean nonBlank(String value) {
         return value != null && !value.isBlank();
     }
 
+    /** 截断字符串到指定最大长度，null 保持不变。 */
     private String truncate(String value, int maxLength) {
         if (value == null) {
             return null;
@@ -997,6 +1106,7 @@ public class CanvasExecutionService {
         return value.substring(0, Math.min(value.length(), maxLength));
     }
 
+    /** 根据执行上下文创建 RUNNING 状态的画布执行记录。 */
     private CanvasExecutionDO createExecution(ExecutionContext ctx) {
         CanvasExecutionDO exec = new CanvasExecutionDO();
         exec.setId(ctx.getExecutionId());
@@ -1009,12 +1119,14 @@ public class CanvasExecutionService {
         return exec;
     }
 
+    /** 在线程池中插入执行记录，避免阻塞响应式执行链。 */
     private Mono<Void> insertExecution(CanvasExecutionDO exec) {
         return Mono.fromRunnable(() -> executionMapper.insert(exec))
                 .subscribeOn(Schedulers.boundedElastic())
                 .then();
     }
 
+    /** 更新执行状态和结果 JSON，序列化失败时保留状态更新。 */
     private Mono<Void> updateExecution(CanvasExecutionDO exec, int status, Map<String, Object> result) {
         if (exec == null) return Mono.empty();
         exec.setStatus(status);
@@ -1027,6 +1139,7 @@ public class CanvasExecutionService {
                 .then();
     }
 
+    /** 异步累加画布每日执行统计，失败不影响主执行链路。 */
     private void incrementStats(Long canvasId, int finalStatus, String userId) {
         Thread.ofVirtual().start(() -> {
             try {

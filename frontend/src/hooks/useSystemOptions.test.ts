@@ -1,3 +1,8 @@
+/**
+ * 测试职责：验证系统字典 Hook 的 option 转换和历史值补回规则。
+ *
+ * 维护说明：字典 DTO 字段命名或已禁用值展示规则变化时，要同步这些用例。
+ */
 import { describe, expect, it } from 'vitest'
 import { mergeCurrentValueOption, toSelectOptions } from './useSystemOptions'
 

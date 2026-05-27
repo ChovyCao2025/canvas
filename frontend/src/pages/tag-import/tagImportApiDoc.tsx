@@ -1,7 +1,14 @@
+/**
+ * 页面职责：标签导入 OpenAPI 说明面板，展示三方系统推送数据的请求示例。
+ *
+ * 维护说明：内容是静态说明，不发起请求。
+ */
 import { Card, Descriptions, Typography } from 'antd'
 
+/** API 说明页常用文本组件别名。 */
 const { Paragraph, Text } = Typography
 
+/** 单条标签推送的示例请求体，用于文档面板展示。 */
 const SAMPLE_PAYLOAD = `{
   "idType": "mobile",
   "idValue": "13800138000",
@@ -10,6 +17,7 @@ const SAMPLE_PAYLOAD = `{
   "tagTime": "2026-05-23 10:00:00"
 }`
 
+/** 标签导入 API 静态说明组件。 */
 export default function TagImportApiDoc() {
   return (
     <Card size="small" bordered={false} style={{ padding: 0 }}>

@@ -15,6 +15,7 @@ import java.time.LocalDateTime;
 public class CanvasDO {
 
     @TableId(type = IdType.AUTO)
+    /** 画布主键 ID */
     private Long id;
 
     /** 画布名称 */
@@ -101,8 +102,10 @@ public class CanvasDO {
     private String cronExpression;
 
     @TableField(fill = FieldFill.INSERT)
+    /** 记录创建时间，由 MyBatis-Plus 自动填充 */
     private LocalDateTime createdAt;
 
     @TableField(fill = FieldFill.INSERT_UPDATE)
+    /** 记录最后更新时间，由 MyBatis-Plus 自动填充 */
     private LocalDateTime updatedAt;
 }

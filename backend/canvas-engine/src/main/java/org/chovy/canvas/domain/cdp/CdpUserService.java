@@ -14,13 +14,22 @@ import org.chovy.canvas.dal.mapper.CdpUserIdentityMapper;
 import org.chovy.canvas.dal.dataobject.CdpUserProfileDO;
 import org.chovy.canvas.dal.mapper.CdpUserProfileMapper;
 
+/**
+ * CDP 用户 CDP 领域服务。
+ *
+ * <p>负责用户画像、身份、标签和画布参与记录等客户数据能力，为画布执行和管理端查询提供统一入口。
+ * <p>该层隔离 CDP 数据结构与上层业务，集中处理状态、历史和幂等语义。
+ */
 @Service
 @RequiredArgsConstructor
 public class CdpUserService {
 
+    /** CDP 用户画像 Mapper，用于维护用户主档和最近出现时间。 */
     private final CdpUserProfileMapper profileMapper;
+    /** 用户身份 Mapper。 */
     private final CdpUserIdentityMapper identityMapper;
 
+    /** 确保 CDP 用户画像存在，不存在时按来源创建。 */
     public CdpUserProfileDO ensureUser(String userId, String sourceType, String sourceRefId) {
         String normalized = requireUserId(userId);
         CdpUserProfileDO existing = profileMapper.selectOne(
@@ -55,6 +64,7 @@ public class CdpUserService {
         return created;
     }
 
+    /** 按身份类型和值确保用户存在，并补齐身份映射。 */
     public CdpUserProfileDO ensureUserByIdentity(String identityType, String identityValue, String sourceType, String sourceRefId) {
         String normalizedType = normalizeIdentityType(identityType);
         String normalizedValue = requireUserId(identityValue);
@@ -94,6 +104,7 @@ public class CdpUserService {
         return profile;
     }
 
+    /** 查询用户画像，不存在时抛出业务异常。 */
     public CdpUserProfileDO getRequiredProfile(String userId) {
         CdpUserProfileDO profile = profileMapper.selectOne(
                 new LambdaQueryWrapper<CdpUserProfileDO>().eq(CdpUserProfileDO::getUserId, requireUserId(userId)));
@@ -103,6 +114,7 @@ public class CdpUserService {
         return profile;
     }
 
+    /** 将用户画像实体转换为前端详情 DTO。 */
     public CdpUserDetailDTO toDetail(CdpUserProfileDO profile) {
         return new CdpUserDetailDTO(
                 profile.getUserId(),
@@ -116,6 +128,7 @@ public class CdpUserService {
         );
     }
 
+    /** 校验用户标识并返回去除首尾空白后的值。 */
     private String requireUserId(String userId) {
         if (userId == null || userId.isBlank()) {
             throw new IllegalArgumentException("userId不能为空");
@@ -123,6 +136,7 @@ public class CdpUserService {
         return userId.trim();
     }
 
+    /** 规范化外部身份类型，统一使用大写编码。 */
     private String normalizeIdentityType(String identityType) {
         if (identityType == null || identityType.isBlank()) {
             throw new IllegalArgumentException("identityType不能为空");
@@ -130,6 +144,7 @@ public class CdpUserService {
         return identityType.trim().toUpperCase(Locale.ROOT);
     }
 
+    /** 对邮箱用户名部分做脱敏，保留首尾字符和域名。 */
     private String maskEmail(String email) {
         if (email == null || email.isBlank()) {
             return email;

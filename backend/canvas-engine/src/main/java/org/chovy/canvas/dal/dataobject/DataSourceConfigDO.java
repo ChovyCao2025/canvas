@@ -1,5 +1,6 @@
 package org.chovy.canvas.dal.dataobject;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import com.baomidou.mybatisplus.annotation.FieldFill;
 import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableField;
@@ -15,6 +16,7 @@ import java.time.LocalDateTime;
 public class DataSourceConfigDO {
 
     @TableId(type = IdType.AUTO)
+    /** 数据源配置主键 ID */
     private Long id;
 
     /** 配置名称，供业务配置页下拉选择。 */
@@ -30,6 +32,7 @@ public class DataSourceConfigDO {
     private String username;
 
     /** JDBC 密码。 */
+    @JsonProperty(access = JsonProperty.Access.WRITE_ONLY)
     private String password;
 
     /** JDBC 驱动类。 */
@@ -45,8 +48,10 @@ public class DataSourceConfigDO {
     private String createdBy;
 
     @TableField(fill = FieldFill.INSERT)
+    /** 记录创建时间，由 MyBatis-Plus 自动填充 */
     private LocalDateTime createdAt;
 
     @TableField(fill = FieldFill.INSERT_UPDATE)
+    /** 记录最后更新时间，由 MyBatis-Plus 自动填充 */
     private LocalDateTime updatedAt;
 }

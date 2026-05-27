@@ -2,6 +2,7 @@ package org.chovy.canvas.engine.handlers;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.chovy.canvas.common.MapFieldKeys;
+import org.chovy.canvas.common.OutboundUrlValidator;
 import org.chovy.canvas.dal.dataobject.ApiDefinitionDO;
 import org.chovy.canvas.engine.context.ExecutionContext;
 import org.chovy.canvas.engine.handler.NodeHandler;
@@ -130,6 +131,11 @@ public class ApiCallHandler implements NodeHandler {
 
         String method = def.getMethod() == null ? "POST" : def.getMethod().toUpperCase();
         String url    = def.getUrl();
+        try {
+            OutboundUrlValidator.validateHttpUrl(url);
+        } catch (IllegalArgumentException e) {
+            return Mono.just(NodeResult.fail("API_CALL: " + e.getMessage()));
+        }
         log.info("[API_CALL] → {} {} body={}", method, url, requestBody);
 
         // 先读 String，避免因响应 Content-Type 非 JSON 导致解码失败

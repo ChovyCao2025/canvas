@@ -1,3 +1,8 @@
+/**
+ * 页面职责：标签导入源管理面板，维护第三方推送标签数据的鉴权和启用状态。
+ *
+ * 维护说明：导入源 key/secret 与外部系统集成相关，页面只展示 secret 的脱敏信息。
+ */
 import { useEffect, useState } from 'react'
 import { Button, Form, Input, Modal, Popconfirm, Select, Space, Switch, Table, Tag, Typography, message } from 'antd'
 import { DeleteOutlined, EditOutlined, PlayCircleOutlined, PlusOutlined, ReloadOutlined } from '@ant-design/icons'
@@ -6,8 +11,10 @@ import { tagImportApi } from '../../services/api'
 import { DEFAULT_SOURCE_FIELD_MAPPING } from './tagImportTypes'
 import type { TagImportResult, TagImportSource, TagImportSourceFormValues } from './tagImportTypes'
 
+/** 导入源表格中的文本组件别名。 */
 const { Text } = Typography
 
+/** 标签导入源配置面板，负责远程拉取来源的 CRUD 和手动运行。 */
 export default function TagImportSourcePanel() {
   const [data, setData] = useState<TagImportSource[]>([])
   const [loading, setLoading] = useState(false)
@@ -17,6 +24,7 @@ export default function TagImportSourcePanel() {
   const [runningId, setRunningId] = useState<number>()
   const [form] = Form.useForm<TagImportSourceFormValues>()
 
+  /** 查询所有导入源；来源数量较少，当前页不做分页。 */
   const fetchSources = async () => {
     setLoading(true)
     try {
@@ -31,6 +39,7 @@ export default function TagImportSourcePanel() {
     void fetchSources()
   }, [])
 
+  /** 新建来源默认使用 GET 和标准字段映射模板。 */
   const openCreate = () => {
     setEditing(null)
     form.resetFields()
@@ -42,6 +51,7 @@ export default function TagImportSourcePanel() {
     setVisible(true)
   }
 
+  /** 编辑来源时回填脱敏后的配置；secret 等敏感字段不在前端明文展示。 */
   const openEdit = (record: TagImportSource) => {
     setEditing(record)
     form.setFieldsValue({
@@ -55,6 +65,7 @@ export default function TagImportSourcePanel() {
     setVisible(true)
   }
 
+  /** 校验字段映射 JSON 后提交来源配置。 */
   const handleSubmit = async () => {
     const values = await form.validateFields()
     setSaving(true)
@@ -88,6 +99,7 @@ export default function TagImportSourcePanel() {
     }
   }
 
+  /** 手动触发一次来源拉取，结果以成功/失败行数提示。 */
   const handleRun = async (record: TagImportSource) => {
     setRunningId(record.id)
     try {
@@ -101,6 +113,7 @@ export default function TagImportSourcePanel() {
     }
   }
 
+  /** 导入源列表列定义，URL 和映射 JSON 以 code/ellipsis 展示避免撑宽表格。 */
   const columns: ColumnsType<TagImportSource> = [
     { title: '名称', dataIndex: 'name', width: 160 },
     {

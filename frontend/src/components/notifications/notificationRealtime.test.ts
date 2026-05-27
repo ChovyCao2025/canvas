@@ -1,3 +1,8 @@
+/**
+ * 测试职责：验证通知 WebSocket 地址、重连退避和实时消息合并策略。
+ *
+ * 维护说明：实时同步协议变化时，应先更新这些纯函数测试再改 Provider 生命周期。
+ */
 import { describe, expect, it } from 'vitest'
 import { buildNotificationWebSocketUrl, mergeRealtimeNotifications, nextNotificationReconnectDelay } from './notificationRealtime'
 

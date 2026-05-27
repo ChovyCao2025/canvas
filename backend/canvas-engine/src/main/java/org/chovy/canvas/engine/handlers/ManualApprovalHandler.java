@@ -8,7 +8,6 @@ import org.chovy.canvas.common.enums.ApprovalOnTimeoutAction;
 import org.chovy.canvas.common.enums.ApprovalStatus;
 import org.chovy.canvas.domain.notification.NotificationEventService;
 import org.chovy.canvas.engine.context.ExecutionContext;
-import org.chovy.canvas.engine.context.NodeStatus;
 import org.chovy.canvas.engine.handler.NodeHandler;
 import org.chovy.canvas.engine.handler.NodeHandlerType;
 import org.chovy.canvas.engine.handler.NodeResult;
@@ -90,10 +89,8 @@ public class ManualApprovalHandler implements NodeHandler {
             log.error("[MANUAL_APPROVAL] 创建审批记录失败: {}", e.getMessage());
         }
 
-        // 返回 WAITING（设计文档 18.2 节：流程挂起，等待审批）
-        // DagEngine 的调用方（CanvasExecutionService）检测 WAITING 状态后持久化 ctx
-        ctx.setNodeStatus(nodeId, NodeStatus.WAITING);
-        return Mono.just(NodeResult.ok(null, Map.of())); // nextNodeId=null 表示挂起
+        // 返回 PENDING，由 DagEngine 统一写 WAITING 并停止下游调度。
+        return Mono.just(NodeResult.pending(null, "MANUAL_APPROVAL_PENDING", "等待人工审批"));
     }
 
     private String extractNodeId(Map<String, Object> config) {

@@ -1,3 +1,8 @@
+/**
+ * Hook 职责：根据真实节点、边和分支出口推导“可连接占位节点”。
+ *
+ * 维护说明：占位节点是纯派生状态，不能写回后端图结构，否则会污染真实业务节点。
+ */
 import { useMemo } from 'react'
 import type { Node, Edge } from '@xyflow/react'
 import type { CanvasNodeData }  from '../components/canvas/constants'
@@ -6,9 +11,12 @@ import { PLACEHOLDER_W, PLACEHOLDER_H } from '../components/canvas/BranchPlaceho
 import { getOutletHandles }    from '../components/canvas/outletSchema'
 import { TERMINAL_TYPES }      from '../components/canvas/constants'
 
+/** 占位节点相对真实出口的垂直间距。 */
 const V_GAP       = 80
+/** 同一节点多个占位分支的最小横向间距。 */
 const MIN_SPACING = PLACEHOLDER_W + 12
 
+/** 分支占位 Hook 的返回结果。 */
 export type PlaceholderResult = {
   /** 需要渲染的占位节点集合。 */
   nodes: Node<PlaceholderData>[]
@@ -41,6 +49,7 @@ function overlapsAnyNode(
   })
 }
 
+/** 根据当前图结构推导未连线分支的占位节点和虚线边。 */
 export function useBranchPlaceholders(
   nodes: Node<CanvasNodeData>[],
   edges: Edge[],

@@ -1,7 +1,13 @@
+/**
+ * 组件职责：Cron 可视化编辑器，将常见频率选择转换为后端可保存的 cron 表达式。
+ *
+ * 维护说明：组件同时支持从已有 cron 回填 UI 状态，避免用户编辑时丢失当前配置。
+ */
 import { useEffect, useMemo, useState } from 'react'
 import { Select } from 'antd'
 import { ClockCircleOutlined } from '@ant-design/icons'
 
+/** 可视化 Cron 编辑器支持的简单频率类型。 */
 type Freq = 'daily' | 'weekly' | 'monthly' | 'hourly'
 
 /**
@@ -13,14 +19,18 @@ const FREQ_OPTIONS = [
   { value: 'monthly', label: 'monthly' },
   { value: 'hourly',  label: 'hourly' },
 ]
+/** Cron 星期选择项，0 表示周日，1-6 表示周一到周六。 */
 const WEEKDAY_OPTIONS = [
   { value: 1, label: '1' }, { value: 2, label: '2' },
   { value: 3, label: '3' }, { value: 4, label: '4' },
   { value: 5, label: '5' }, { value: 6, label: '6' },
   { value: 0, label: '0' },
 ]
+/** 小时下拉选项，覆盖 00-23。 */
 const HOUR_OPTIONS   = Array.from({ length: 24 }, (_, h) => ({ value: h, label: String(h).padStart(2, '0') }))
+/** 分钟下拉选项，覆盖 00-59。 */
 const MINUTE_OPTIONS = Array.from({ length: 60 }, (_, m) => ({ value: m, label: String(m).padStart(2, '0') }))
+/** 月内日期下拉选项，仅覆盖 1-28 以避开不同月份天数差异。 */
 const DAY_OPTIONS    = Array.from({ length: 28 }, (_, i) => ({ value: i + 1, label: `${i + 1} 日` }))
 
 /** 尝试将 cron 字符串解析为简单模式；返回 null 表示超出简单模式范围 */
@@ -50,6 +60,7 @@ function buildCron(freq: Freq, hour: number, minute: number, weekday: number, da
   }
 }
 
+/** CronBuilder 组件入参，支持受控值和可选的系统字典选项。 */
 interface Props {
   /** 当前 cron 值。 */
   value?: string
@@ -96,6 +107,7 @@ function TimeSelect({ hour, minute, onHourChange, onMinuteChange }: {
   )
 }
 
+/** Cron 可视化编辑器组件。 */
 export default function CronBuilder({ value, onChange, frequencyOptions, weekdayOptions }: Props) {
   // 初始值优先尝试解析为“简单模式”状态
   const init   = value ? parseCron(value) : null
@@ -130,6 +142,7 @@ export default function CronBuilder({ value, onChange, frequencyOptions, weekday
     setParseError(false)
   }, [value])
 
+  /** 当前简单模式状态实时生成的 cron 表达式。 */
   const computed = useMemo(
     () => buildCron(freq, hour, minute, weekday, dayOfMonth),
     [freq, hour, minute, weekday, dayOfMonth]
@@ -140,12 +153,18 @@ export default function CronBuilder({ value, onChange, frequencyOptions, weekday
     if (!advanced) onChange?.(buildCron(f, h, m, wd, dom))
   }
 
+  /** 切换执行频率并同步输出 cron。 */
   const handleFreq = (v: Freq)   => { setFreq(v);       emitComputed(v) }
+  /** 修改小时并同步输出 cron。 */
   const handleHour = (v: number) => { setHour(v);       emitComputed(freq, v) }
+  /** 修改分钟并同步输出 cron。 */
   const handleMin  = (v: number) => { setMinute(v);     emitComputed(freq, hour, v) }
+  /** 修改周几并同步输出 cron。 */
   const handleWd   = (v: number) => { setWeekday(v);    emitComputed(freq, hour, minute, v) }
+  /** 修改月内日期并同步输出 cron。 */
   const handleDom  = (v: number) => { setDayOfMonth(v); emitComputed(freq, hour, minute, weekday, v) }
 
+  /** 进入高级模式，允许用户直接编辑 cron 字符串。 */
   const openAdvanced = () => {
     // 进入高级模式时带入当前简单模式生成值，便于继续手改
     setManualCron(computed)
@@ -153,6 +172,7 @@ export default function CronBuilder({ value, onChange, frequencyOptions, weekday
     setParseError(false)
   }
 
+  /** 尝试从高级模式回到简单模式，无法解析时保留高级编辑。 */
   const closeAdvanced = () => {
     const p = parseCron(manualCron)
     if (p) {

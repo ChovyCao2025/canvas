@@ -1,3 +1,8 @@
+/**
+ * 页面职责：画布统计页，展示执行 KPI、趋势图和节点漏斗。
+ *
+ * 维护说明：统计数据从多个接口并行加载，页面负责聚合展示和空态降级。
+ */
 import { useEffect, useState, useCallback } from 'react'
 import { Card, Col, Row, Table, Typography, Spin, Button, DatePicker, Space, Tag } from 'antd'
 import { ArrowLeftOutlined, DownOutlined, UpOutlined, CalendarOutlined, TeamOutlined, CheckCircleOutlined, CloseCircleOutlined, ThunderboltOutlined, PauseCircleOutlined } from '@ant-design/icons'
@@ -10,7 +15,9 @@ import dayjs, { type Dayjs } from 'dayjs'
 import http from '../../services/api'
 import type { R } from '../../types'
 
+/** 统计页标题和辅助文本组件别名。 */
 const { Title, Text } = Typography
+/** 日期范围选择器别名，用于切换统计窗口。 */
 const { RangePicker } = DatePicker
 
 /** 统计总览数据。 */
@@ -88,6 +95,7 @@ function CompBadge({ curr, prev }: { curr: number; prev: number | null }) {
   return <span style={up ? BS.up : BS.down}>{up ? '↑' : '↓'} {pct}% vs 上期</span>
 }
 
+/** 环比徽章样式集合，按上升、下降和持平分别着色。 */
 const BS = {
   up:      { display:'inline-flex', gap:3, background:'#dcfce7', borderRadius:20, padding:'2px 10px', fontSize:11, color:'#16a34a', fontWeight:600 },
   down:    { display:'inline-flex', gap:3, background:'#fee2e2', borderRadius:20, padding:'2px 10px', fontSize:11, color:'#dc2626', fontWeight:600 },
@@ -109,6 +117,7 @@ const KPI_DEFS = [
 // 默认展示的关键节点类型（去掉 END）
 const KEY_NODE_TYPES = new Set(['TRIGGER','CRON_TRIGGER','MQ_TRIGGER','SEND_MQ','API_CALL'])
 
+/** 常用统计时间范围快捷项。 */
 const PRESETS: { label: string; value: [Dayjs, Dayjs] }[] = [
   { label:'最近7天',   value:[dayjs().subtract(6,'day'), dayjs()] },
   { label:'最近30天',  value:[dayjs().subtract(29,'day'), dayjs()] },

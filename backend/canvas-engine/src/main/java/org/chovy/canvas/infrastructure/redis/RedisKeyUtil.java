@@ -25,6 +25,8 @@ public class RedisKeyUtil {
     public String triggerTagger(String tagCodeKey) { return prefix + ":trigger:tagger:" + tagCodeKey; }
     public String triggerMqPattern()               { return prefix + ":trigger:mq:*"; }
     public String triggerPattern()                 { return prefix + ":trigger:*"; }
+    public String triggerRouteReady()              { return prefix + ":trigger:routes:ready"; }
+    public String triggerRouteMutationLock()       { return prefix + ":trigger:routes:mutation-lock"; }
 
     // ── 执行上下文 ─────────────────────────────────────────────────
     public String context(Long canvasId, String userId)  { return prefix + ":" + canvasId + ":user:" + userId; }

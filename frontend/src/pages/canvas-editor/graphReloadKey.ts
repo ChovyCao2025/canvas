@@ -1,3 +1,8 @@
+/**
+ * 页面职责：画布图重载 key 生成工具。
+ *
+ * 维护说明：编辑器用它判断服务端版本或 graphJson 内容是否变化。
+ */
 import type { CanvasDetail } from '../../types'
 
 /**

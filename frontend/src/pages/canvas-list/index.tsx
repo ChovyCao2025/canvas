@@ -1,3 +1,8 @@
+/**
+ * 页面职责：画布列表页，提供创建、发布、下线、克隆、灰度、回滚和归档等操作入口。
+ *
+ * 维护说明：列表页是运营控制台的主要入口，所有状态变更后都通过统一刷新保持表格一致。
+ */
 import { useEffect, useState } from 'react'
 import {
   Button, Table, Tag, Space, Modal, Form, Input,
@@ -14,8 +19,10 @@ import { canvasApi } from '../../services/api'
 import { useAuth } from '../../context/AuthContext'
 import type { Canvas } from '../../types'
 
+/** 页面标题组件别名。 */
 const { Title } = Typography
 
+/** 画布状态到表格 Tag 展示的映射，和后端状态码保持一致。 */
 const STATUS_MAP: Record<number, { label: string; color: string }> = {
   0: { label: '草稿',   color: 'default' },
   1: { label: '已发布', color: 'green' },
@@ -115,6 +122,7 @@ export default function CanvasListPage() {
     fetchList()
   }
 
+  /** 归档画布前展示影响范围确认，归档后刷新当前列表。 */
   const handleArchive = (id: number, name: string) => {
     Modal.confirm({
       title: '归档画布',

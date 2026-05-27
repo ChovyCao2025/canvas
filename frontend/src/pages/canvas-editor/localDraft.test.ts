@@ -1,3 +1,8 @@
+/**
+ * 测试职责：验证画布本地草稿的读写、清理和与服务端详情的差异比较。
+ *
+ * 维护说明：localStorage 结构升级时，应保留坏数据安全降级和版本比较场景。
+ */
 import { beforeEach, describe, expect, it } from 'vitest'
 import type { CanvasDetail } from '../../types'
 import type { CanvasSettingsLike } from './settingsPresentation'
@@ -8,6 +13,7 @@ import {
   writeCanvasLocalDraft,
 } from './localDraft'
 
+/** 测试用内存版 Storage，避免直接依赖真实浏览器 localStorage。 */
 class MemoryStorage implements Storage {
   private readonly data = new Map<string, string>()
 
@@ -36,6 +42,7 @@ class MemoryStorage implements Storage {
   }
 }
 
+/** 构造画布详情样本，供本地草稿差异比较测试复用。 */
 function detail(overrides: Partial<CanvasDetail> = {}): CanvasDetail {
   return {
     canvas: {

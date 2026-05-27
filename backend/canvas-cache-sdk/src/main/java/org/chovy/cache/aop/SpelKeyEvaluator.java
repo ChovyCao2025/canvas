@@ -7,6 +7,12 @@ import org.springframework.expression.spel.support.StandardEvaluationContext;
 
 import java.lang.reflect.Method;
 
+/**
+ * SpEL 缓存 key 计算器。
+ *
+ * <p>根据方法签名、参数名和注解表达式生成稳定缓存键，支持以业务参数组合缓存维度。
+ * <p>该类集中封装 Spring Expression 解析细节，避免各个切面重复处理参数上下文。
+ */
 public class SpelKeyEvaluator {
     private final ExpressionParser parser = new SpelExpressionParser();
     private final DefaultParameterNameDiscoverer nameDiscoverer = new DefaultParameterNameDiscoverer();

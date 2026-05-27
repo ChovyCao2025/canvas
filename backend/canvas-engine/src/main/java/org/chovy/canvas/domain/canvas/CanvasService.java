@@ -47,18 +47,31 @@ import org.chovy.canvas.query.CanvasListQuery;
 @RequiredArgsConstructor
 public class CanvasService {
 
+    /** 画布 Mapper，用于画布主表的生命周期状态读写。 */
     private final CanvasMapper canvasMapper;
+    /** 画布版本 Mapper。 */
     private final CanvasVersionMapper canvasVersionMapper;
+    /** DAG 解析器，将 graphJson 转换为可执行图结构。 */
     private final DagParser dagParser;
+    /** 触发路由服务，负责 Redis 路由注册、清理和查询。 */
     private final TriggerRouteService triggerRouteService;
+    /** 画布调度服务，负责定时触发器注册和取消。 */
     private final CanvasSchedulerService schedulerService;
+    /** 画布配置缓存，用于执行链路快速读取发布态配置。 */
     private final CanvasConfigCache configCache;
+    /** 画布执行服务，负责触发和恢复 DAG 执行。 */
     private final CanvasExecutionService canvasExecutionService;
+    /** 触发预检服务，负责有效期、配额、冷却期和并发保护校验。 */
     private final TriggerPreCheckService preCheckService;
+    /** Groovy 节点处理器，用于发布前脚本预编译和校验。 */
     private final GroovyHandler groovyHandler;
+    /** MQ 触发节点处理器，用于解析和匹配 MQ 触发入口。 */
     private final org.chovy.canvas.engine.handlers.MqTriggerHandler mqTriggerHandler;
+    /** 阻塞式 Redis 模板，用于锁、去重、票据或跨实例通知。 */
     private final org.springframework.data.redis.core.StringRedisTemplate redis;
+    /** 画布事务服务，封装只涉及数据库写入的事务边界。 */
     private final CanvasTransactionService canvasTransactionService;
+    /** 示例画布配置属性，控制示例数据展示和过滤。 */
     private final CanvasExamplesProperties examplesProperties;
 
     /**
@@ -226,7 +239,7 @@ public class CanvasService {
         }
     }
 
-    /** Lua 原子 check-then-del：值匹配才 DEL，防止锁超时被他机重新获取后被本机误删。 */
+    /** 释放画布发布锁的 Lua 脚本，保证只释放当前发布流程持有的锁。 */
     private static final RedisScript<Long> PUBLISH_LOCK_RELEASE_SCRIPT = RedisScript.of(
             "if redis.call('GET', KEYS[1]) == ARGV[1] then return redis.call('DEL', KEYS[1]) else return 0 end",
             Long.class
@@ -431,6 +444,7 @@ public class CanvasService {
         }
     }
 
+    /** 根据发布态 DAG 中的触发节点注册行为事件、MQ 和 Tagger 实时路由。 */
     private void registerTriggerRoutes(Long canvasId, DagGraph graph) {
         for (String nodeId : graph.allNodeIds()) {
             DagParser.CanvasNode node = graph.getNode(nodeId);
@@ -486,6 +500,7 @@ public class CanvasService {
         }
     }
 
+    /** 从当前发布版本反解析 DAG 并清理全部触发路由。 */
     private void clearTriggerRoutes(Long canvasId) {
         CanvasDO canvas = canvasMapper.selectById(canvasId);
         if (canvas == null || canvas.getPublishedVersionId() == null) return;

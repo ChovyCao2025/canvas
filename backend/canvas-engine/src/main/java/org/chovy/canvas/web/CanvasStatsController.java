@@ -38,8 +38,13 @@ public class CanvasStatsController {
      * @return 节点轨迹列表
      */
     @GetMapping("/execution/{executionId}/trace")
-    public Mono<R<List<Map<String, Object>>>> getTrace(@PathVariable String executionId) {
+    public Mono<R<List<Map<String, Object>>>> getTrace(@PathVariable Long id,
+                                                       @PathVariable String executionId) {
         return Mono.fromCallable(() -> {
+            CanvasExecutionDO execution = executionMapper.selectById(executionId);
+            if (execution == null || !Objects.equals(execution.getCanvasId(), id)) {
+                return List.<Map<String, Object>>of();
+            }
             List<CanvasExecutionTraceDO> all =
                     traceMapper.selectList(
                             new LambdaQueryWrapper<

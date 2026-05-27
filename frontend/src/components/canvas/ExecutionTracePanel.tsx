@@ -1,3 +1,8 @@
+/**
+ * 组件职责：执行轨迹面板，展示单次调试/运行的节点执行结果和上下文信息。
+ *
+ * 维护说明：面板数据来自后端 dry-run 或执行记录，前端只做状态归类和可读化展示。
+ */
 import { useState, useCallback } from 'react'
 import {
   Modal, Select, Table, Tag, Tooltip, Typography,
@@ -7,6 +12,7 @@ import { EyeOutlined } from '@ant-design/icons'
 import http from '../../services/api'
 import type { R } from '../../types'
 
+/** 轨迹面板内使用的文本组件别名。 */
 const { Text } = Typography
 
 /**
@@ -60,6 +66,7 @@ const STATUS_LABEL: Record<TraceStatus, [string, string]> = {
   3: ['default',    '跳过'],
 }
 
+/** 执行轨迹面板组件入参。 */
 interface Props {
   /** 当前画布 ID。 */
   canvasId: number

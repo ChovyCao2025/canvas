@@ -1,3 +1,8 @@
+/**
+ * 组件职责：节点配置面板主组件，根据节点 schema 渲染表单、远程选项和特定节点的复杂控件。
+ *
+ * 维护说明：这里是画布编辑器右侧属性面板的核心，负责把表单变更归一化后回传节点 data。
+ */
 import { useEffect, useState, useCallback, useRef } from 'react'
 import type { Node } from '@xyflow/react'
 import {
@@ -29,15 +34,27 @@ import {
 import { normalizeFieldOptions, resolveDisplayValue } from './displayValues'
 import { buildConfigPanelPresentation } from './presentation'
 
+/** API 参数定义的最小形态，用于事件属性预览等只读控件。 */
 interface ApiParamDef { name: string; displayName: string; type: string; required: boolean }
 
+/** 配置面板内常用文本组件别名。 */
 const { Text } = Typography
 
+/** 配置面板组件入参，承接编辑器选中节点和回写回调。 */
 interface Props {
+  /** 当前选中的节点 ID。 */
   nodeId:    string | null
+
+  /** 当前选中节点的数据。 */
   nodeData:  CanvasNodeData | null
+
+  /** 配置变更回调，主编辑器负责把 patch 写回节点。 */
   onChange:  (nodeId: string, patch: Partial<CanvasNodeData>) => void
+
+  /** 画布全部节点，用于解析后继节点名称和动态上下文字段。 */
   nodes?:    Node<CanvasNodeData>[]
+
+  /** 只读态禁用表单编辑。 */
   readonly?: boolean
 }
 
@@ -45,19 +62,25 @@ interface Props {
 // rawCache: URL → 原始响应数组（包含 value/label/requestSchema 等全量字段）
 // 统一缓存，彻底替代 apiDefsCache + optionsCache + dataSourceFetcher 分散逻辑
 const schemaCache   = new Map<string, NodeTypeRegistry>()
+/** 远程 dataSource 原始响应缓存，key 为最终请求 URL。 */
 const rawCache      = new Map<string, any[]>()         // key = dataSource URL
+/** 系统字典分类缓存，避免同一页面重复请求相同分类。 */
 const systemOptionCache = new Map<string, StubOption[]>()
+/** 上下文字段缓存，供配置项引用运行时字段。 */
 let contextFieldsCache: ContextField[] | null = null
 
+/** 从 dataSource 模板中提取依赖字段，例如 /meta/foo/{apiKey} 依赖 apiKey。 */
 export function getDataSourceDependencies(src?: string): string[] {
   if (!src) return []
   return [...src.matchAll(/\{(\w+)\}/g)].map((match) => match[1])
 }
 
+/** 判断 dataSource 依赖值是否缺失；缺失时不发起远程请求。 */
 function isBlankDependencyValue(value: unknown): boolean {
   return value == null || (typeof value === 'string' && value.trim() === '')
 }
 
+/** 用当前表单值填充 dataSource URL 模板；有依赖缺失时返回 null。 */
 export function resolveDataSourceTemplate(src: string, values: Record<string, unknown>): string | null {
   let unresolved = false
   const resolved = src.replace(/\{(\w+)\}/g, (_match, key: string) => {
@@ -72,6 +95,7 @@ export function resolveDataSourceTemplate(src: string, values: Record<string, un
   return unresolved ? null : resolved
 }
 
+/** 统一渲染配置项标题，避免每个 Form.Item 重复写样式。 */
 function renderControlLabel(label: string): React.ReactNode {
   return <div style={{ ...getControlLabelStyle(), margin: '0 6px 6px' }}>{label}</div>
 }
@@ -95,6 +119,7 @@ function toSelectOptions(data: any[]): StubOption[] {
   }))
 }
 
+/** 加载系统字典分类并缓存，减少同一页面内重复请求。 */
 async function loadSystemOptionCategory(category: string): Promise<StubOption[]> {
   if (systemOptionCache.has(category)) return systemOptionCache.get(category)!
   const res = await systemOptionsApi.meta(category)
@@ -102,10 +127,12 @@ async function loadSystemOptionCategory(category: string): Promise<StubOption[]>
   return res.data
 }
 
+/** 把 StubOption 转为 antd Select 的 options。 */
 function selectOptionsFromStubs(options: StubOption[]) {
   return options.map(option => ({ label: option.label, value: option.key }))
 }
 
+/** 节点配置面板主组件。 */
 export default function ConfigPanel({ nodeId, nodeData, onChange, nodes, readonly }: Props) {
   const [schema,   setSchema]   = useState<NodeTypeRegistry | null>(null)
   const [options,  setOptions]  = useState<Record<string, StubOption[]>>({})
@@ -122,6 +149,7 @@ export default function ConfigPanel({ nodeId, nodeData, onChange, nodes, readonl
   const { raw: cronFrequencies } = useSystemOptions('cron_frequency')
   const { raw: weekdays } = useSystemOptions('weekday')
 
+  // 复杂控件共用的字典选项在这里集中转换，避免子控件各自请求。
   const sharedOptions = {
     conditionOps: selectOptionsFromStubs(conditionOps),
     logicRelations: selectOptionsFromStubs(logicRelations),
@@ -132,6 +160,7 @@ export default function ConfigPanel({ nodeId, nodeData, onChange, nodes, readonl
     weekdays: weekdays.map(option => ({ label: option.label, value: Number(option.key) })),
   }
 
+  /** 根据节点 ID 反查画布中的节点名称，用于分支/连线摘要。 */
   const getNodeName = (id: string | undefined): string | null => {
     if (!id || !nodes) return null
     return nodes.find(n => n.id === id)?.data.name ?? null
@@ -196,6 +225,7 @@ export default function ConfigPanel({ nodeId, nodeData, onChange, nodes, readonl
     fields.filter(f => f.type === 'select' && f.dataSource).forEach(f => {
       const src = resolveDataSourceTemplate(f.dataSource!, formValues)
       if (!src) {
+        // 依赖字段还没填完时清空该下拉，避免展示上一组依赖下的旧选项。
         setOptions(prev => ({ ...prev, [f.key]: [] }))
         return
       }
@@ -231,6 +261,7 @@ export default function ConfigPanel({ nodeId, nodeData, onChange, nodes, readonl
     }
   }, [nodeId, nodeData, form])
 
+  /** 表单变化后把 name 和 bizConfig 拆开回传给画布编辑器。 */
   const handleValuesChange = useCallback((changed: Record<string, unknown>, all: Record<string, unknown>) => {
     if (!nodeId || !nodeData) return
     const schemaFields = parseSchema(schema?.configSchema)
@@ -260,6 +291,7 @@ export default function ConfigPanel({ nodeId, nodeData, onChange, nodes, readonl
     })
   }, [form, nodeData, nodeId, onChange, schema])
 
+  /** 子控件需要一次性写多个字段时使用，比如延迟预设同时写 duration 和 unit。 */
   const applyFormPatch = useCallback((patch: Record<string, unknown>) => {
     if (!nodeId || !nodeData) return
     const all = { ...form.getFieldsValue(true), ...patch }
@@ -280,6 +312,7 @@ export default function ConfigPanel({ nodeId, nodeData, onChange, nodes, readonl
   }
 
   const fields = parseSchema(schema?.configSchema)
+  // visible/showWhen 都由 schema 控制，前端只实现轻量表达式判断。
   const visibleFields = fields.filter((f) =>
     evaluateVisible(f.visible, formValues) &&
     evaluateVisible(f.showWhen, formValues)
@@ -290,6 +323,7 @@ export default function ConfigPanel({ nodeId, nodeData, onChange, nodes, readonl
       resolveDisplayValue(field, formValues[field.key], options),
     ]),
   )
+  // Header/摘要/分支卡片先计算成 presentation model，再交给 InspectorCards 渲染。
   const presentation = buildConfigPanelPresentation({
     nodeData,
     formValues,
@@ -396,6 +430,7 @@ function evaluateVisible(visible: string | undefined, values: Record<string, unk
 }
 
 // ── 控件映射（含自定义复杂控件）─────────────────────────────────
+/** 根据 schema field.type 渲染对应控件；新增控件类型优先在这里扩展。 */
 function renderControl(
   field: SchemaField,
   options: Record<string, StubOption[]>,
@@ -515,14 +550,17 @@ interface SharedConfigOptions {
   weekdays: { label: string; value: number }[]
 }
 
+/** 条件规则配置项，表示单条字段比较表达式。 */
 interface ConditionRule {
   field: string; operator: string; value: string; isCustom: boolean
 }
 
+/** 条件规则列表字段名兜底，兼容旧 schema 未显式指定 key 的情况。 */
 export function getConditionRuleListFieldKey(schemaFieldKey?: string) {
   return schemaFieldKey && schemaFieldKey.trim() ? schemaFieldKey : 'rules'
 }
 
+/** 条件规则列表控件，用于 IF、SELECTOR、MQ_TRIGGER 等节点。 */
 function ConditionRuleList({ ctxFields, operatorOptions, fieldKey }: {
   ctxFields: ContextField[]
   operatorOptions: { label: string; value: string }[]
@@ -531,11 +569,14 @@ function ConditionRuleList({ ctxFields, operatorOptions, fieldKey }: {
   const form = Form.useFormInstance()
   const rules: ConditionRule[] = Form.useWatch(fieldKey, form) ?? []
 
+  // 每条规则由字段、操作符、比较值组成，写回同一个数组字段。
   const add = () => form.setFieldValue(fieldKey,
     [...rules, { field: '', operator: 'EQ', value: '', isCustom: true }])
+  /** 删除指定下标的条件规则。 */
   const remove = (i: number) => {
     const next = [...rules]; next.splice(i, 1); form.setFieldValue(fieldKey, next)
   }
+  /** 更新指定规则的单个字段，避免重置整组条件。 */
   const update = (i: number, k: keyof ConditionRule, v: string | boolean) => {
     const next = [...rules]; (next[i] as any)[k] = v; form.setFieldValue(fieldKey, next)
   }
@@ -570,6 +611,8 @@ function ConditionRuleList({ ctxFields, operatorOptions, fieldKey }: {
 
 // ── 上下文引用值列表控件（IN_APP_NOTIFY / GROOVY inputParams 等）─
 interface ContextValueItem { name: string; valueType: 'CUSTOM' | 'CONTEXT'; value: string }
+
+/** 上下文引用值列表，支持固定值和 ${contextKey} 两种来源。 */
 function ContextValueList({ ctxFields, valueTypeOptions }: {
   ctxFields: ContextField[]
   valueTypeOptions: { label: string; value: string }[]
@@ -579,11 +622,14 @@ function ContextValueList({ ctxFields, valueTypeOptions }: {
   const items: ContextValueItem[] = Form.useWatch(fieldKey, form) ?? []
   const inlineChrome = getInlineControlChrome()
 
+  /** 新增一个固定值类型的上下文字段映射。 */
   const add = () => form.setFieldValue(fieldKey,
     [...items, { name: '', valueType: 'CUSTOM', value: '' }])
+  /** 删除指定下标的上下文字段映射。 */
   const remove = (i: number) => {
     const next = [...items]; next.splice(i, 1); form.setFieldValue(fieldKey, next)
   }
+  /** 更新上下文字段映射的名称、取值类型或取值。 */
   const update = (i: number, k: keyof ContextValueItem, v: string) => {
     const next = [...items]; (next[i] as any)[k] = v; form.setFieldValue(fieldKey, next)
   }
@@ -617,17 +663,22 @@ function ContextValueList({ ctxFields, valueTypeOptions }: {
 
 // ── 参数定义列表控件（DIRECT_CALL inputParams / GROOVY outputParams）
 interface ParamDef { name: string; description?: string; dataType: string; required?: boolean }
+
+/** 参数定义列表控件，用于直调和脚本类节点声明输入/输出参数。 */
 function ParamDefineList({ paramTypeOptions }: { paramTypeOptions: { label: string; value: string }[] }) {
   const form = Form.useFormInstance()
   const fieldKey = 'inputParams'
   const items: ParamDef[] = Form.useWatch(fieldKey, form) ?? []
   const inlineChrome = getInlineControlChrome()
 
+  /** 追加一个默认字符串参数定义。 */
   const add = () => form.setFieldValue(fieldKey,
     [...items, { name: '', dataType: 'STRING', required: false }])
+  /** 删除指定参数定义。 */
   const remove = (i: number) => {
     const next = [...items]; next.splice(i, 1); form.setFieldValue(fieldKey, next)
   }
+  /** 更新参数名、类型或必填状态。 */
   const update = (i: number, k: keyof ParamDef, v: string | boolean) => {
     const next = [...items]; (next[i] as any)[k] = v; form.setFieldValue(fieldKey, next)
   }
@@ -654,6 +705,8 @@ function ParamDefineList({ paramTypeOptions }: { paramTypeOptions: { label: stri
 
 // ── SELECTOR 分支列表控件（branch-list）────────────────────────────
 interface BranchItem { label: string; strategyRelation: string; conditions: ConditionRule[]; nextNodeId?: string }
+
+/** SELECTOR 分支配置控件；实际后继节点由画布连线写回 nextNodeId。 */
 function BranchList({ ctxFields, operatorOptions, relationOptions }: {
   ctxFields: ContextField[]
   operatorOptions: { label: string; value: string }[]
@@ -663,24 +716,30 @@ function BranchList({ ctxFields, operatorOptions, relationOptions }: {
   const branches: BranchItem[] = Form.useWatch('branches', form) ?? []
 
   const LABELS = ['如果', '否则如果', '否则如果', '否则如果', '否则如果']
+  /** 追加一个 SELECTOR 分支，默认使用 AND 关系。 */
   const addBranch = () => form.setFieldValue('branches', [
     ...branches,
     { label: LABELS[Math.min(branches.length, LABELS.length - 1)], strategyRelation: 'AND', conditions: [], nextNodeId: undefined }
   ])
+  /** 删除指定分支，同时保留其他分支顺序。 */
   const removeBranch = (i: number) => {
     const next = [...branches]; next.splice(i, 1); form.setFieldValue('branches', next)
   }
+  /** 更新指定分支的标题、关系或后继节点字段。 */
   const updateBranch = (i: number, k: keyof BranchItem, v: unknown) => {
     const next = [...branches]; (next[i] as any)[k] = v; form.setFieldValue('branches', next)
   }
+  /** 在指定分支下追加一条条件。 */
   const addCondition = (branchIdx: number) => {
     const next = [...branches]
     next[branchIdx] = { ...next[branchIdx], conditions: [...(next[branchIdx].conditions ?? []), { field: '', operator: 'EQ', value: '', isCustom: true }] }
     form.setFieldValue('branches', next)
   }
+  /** 删除指定分支下的指定条件。 */
   const removeCondition = (bi: number, ci: number) => {
     const next = [...branches]; next[bi].conditions.splice(ci, 1); form.setFieldValue('branches', next)
   }
+  /** 更新指定分支条件中的字段、操作符或比较值。 */
   const updateCondition = (bi: number, ci: number, k: string, v: string) => {
     const next = [...branches]; (next[bi].conditions[ci] as any)[k] = v; form.setFieldValue('branches', next)
   }
@@ -745,6 +804,8 @@ function BranchList({ ctxFields, operatorOptions, relationOptions }: {
 
 // ── AB 分流分组路由控件（ab-group-list）────────────────────────────
 interface AbGroup { groupKey: string; label?: string; nextNodeId?: string }
+
+/** AB 分流分组展示控件，分组来自实验配置，后继节点来自画布连线。 */
 function AbGroupList({ nodeId, getNodeName, onGroupsChange }: {
   nodeId?: string | null
   getNodeName: (id: string | undefined) => string | null
@@ -757,6 +818,7 @@ function AbGroupList({ nodeId, getNodeName, onGroupsChange }: {
   const [loadError, setLoadError] = useState(false)
   const previousExperimentKeyRef = useRef<string>()
 
+  // 切换节点时重置实验 key 记忆，避免把上一个节点的禁用分组带到当前节点。
   useEffect(() => {
     previousExperimentKeyRef.current = undefined
   }, [nodeId])
@@ -778,6 +840,7 @@ function AbGroupList({ nodeId, getNodeName, onGroupsChange }: {
           nextNodeId: existingByKey.get(option.key)?.nextNodeId,
         }))
         const loadedKeys = new Set(loaded.map(group => group.groupKey))
+        // 同一实验下保留历史禁用分组，切换实验时丢弃旧分组防止误连线。
         const disabledHistory = experimentChanged
           ? []
           : existing
@@ -847,12 +910,17 @@ function AbGroupList({ nodeId, getNodeName, onGroupsChange }: {
 
 // ── 优先级列表控件（priority-list）────────────────────────────────
 interface PriorityItem { order: number; nextNodeId?: string }
+
+/** 优先级路由列表，按 order 从小到大尝试。 */
 function PriorityList() {
   const form = Form.useFormInstance()
   const priorities: PriorityItem[] = Form.useWatch('priorities', form) ?? []
   const inlineChrome = getInlineControlChrome()
+  /** 追加一个优先级路由项，默认排在当前列表末尾。 */
   const add = () => form.setFieldValue('priorities', [...priorities, { order: priorities.length + 1, nextNodeId: undefined }])
+  /** 删除指定优先级路由项。 */
   const remove = (i: number) => { const n = [...priorities]; n.splice(i, 1); form.setFieldValue('priorities', n) }
+  /** 更新优先级顺序或后继节点 ID。 */
   const update = (i: number, k: keyof PriorityItem, v: string | number) => {
     const n = [...priorities]; (n[i] as any)[k] = v; form.setFieldValue('priorities', n)
   }
@@ -877,21 +945,26 @@ function PriorityList() {
 }
 
 // ── 键值映射控件（CANVAS_TRIGGER paramMapping / SUB_FLOW_REF inputMapping）
+/** 子流程/画布调用参数映射控件，左侧是目标字段，右侧是上下文或固定值。 */
 function KeyValueMapping({ fieldKey, ctxFields }: { fieldKey: string; ctxFields: ContextField[] }) {
   const form = Form.useFormInstance()
   const mapping: Record<string, string> = Form.useWatch(fieldKey, form) ?? {}
   const entries = Object.entries(mapping)
   const inlineChrome = getInlineControlChrome()
 
+  /** 新增一个空键值映射行。 */
   const add = () => form.setFieldValue(fieldKey, { ...mapping, '': '' })
+  /** 删除指定目标字段的映射。 */
   const remove = (k: string) => {
     const n = { ...mapping }; delete n[k]; form.setFieldValue(fieldKey, n)
   }
+  /** 修改目标字段名时保留原值并重建映射对象。 */
   const updateKey = (oldKey: string, newKey: string) => {
     const n: Record<string, string> = {}
     Object.entries(mapping).forEach(([k, v]) => n[k === oldKey ? newKey : k] = v)
     form.setFieldValue(fieldKey, n)
   }
+  /** 修改目标字段对应的来源值。 */
   const updateVal = (k: string, v: string) => form.setFieldValue(fieldKey, { ...mapping, [k]: v })
 
   return (
@@ -918,6 +991,7 @@ function KeyValueMapping({ fieldKey, ctxFields }: { fieldKey: string; ctxFields:
 // ── 画布选择控件（CANVAS_TRIGGER / SUB_FLOW_REF）─────────────────
 let canvasListCache: Canvas[] | null = null
 
+/** 已发布画布选择器，用于配置调用其他画布的节点。 */
 function CanvasSelector() {
   const [canvases, setCanvases] = useState<Canvas[]>(canvasListCache ?? [])
   const [loading, setLoading] = useState(!canvasListCache)
@@ -946,6 +1020,7 @@ function CanvasSelector() {
   )
 }
 
+/** 后端 configSchema 中单个表单字段的前端可用子集。 */
 interface SchemaField {
   key: string; label: string; type: string
   required?: boolean; options?: any[]; dataSource?: string; optionCategory?: string
@@ -955,6 +1030,7 @@ interface SchemaField {
   defsSource?: string                    // api-input-params 使用，默认 /meta/api-definitions
 }
 
+/** 安全解析后端 configSchema，解析失败时按空 schema 处理。 */
 function parseSchema(raw: string | undefined): SchemaField[] {
   try { return raw ? JSON.parse(raw) : [] } catch { return [] }
 }
@@ -970,10 +1046,12 @@ function EventAttrPreview() {
   useEffect(() => {
     if (!evCode) { setAttrs([]); return }
     const src = '/meta/event-definitions'
+    /** 从事件定义列表中选中当前事件并解析属性 schema。 */
     const pick = (list: any[]) => {
       const def = list.find(d => d.value === evCode)
       try { setAttrs(def ? JSON.parse(def.requestSchema || '[]') : []) } catch { setAttrs([]) }
     }
+    // 复用全局 dataSource 缓存，避免事件选择后重复加载事件定义列表。
     if (rawCache.has(src)) { pick(rawCache.get(src)!); return }
     loadDataSource(src).then(pick)
   }, [evCode])
@@ -981,6 +1059,7 @@ function EventAttrPreview() {
   if (!evCode) return <Text type="secondary" style={{ fontSize: 12 }}>请先选择触发事件</Text>
   if (!attrs.length) return <Text type="secondary" style={{ fontSize: 12 }}>该事件未定义属性</Text>
 
+  /** 把事件属性类型编码转换成系统字典展示名。 */
   const typeLabel = (type: string) => eventAttrTypes.find(option => option.value === type)?.label ?? type
 
   return (
@@ -1031,6 +1110,7 @@ function DelayInput({
 }) {
   const form = Form.useFormInstance()
 
+  // 单位默认值写回表单和节点配置，保证只填时长时也能保存完整结构。
   useEffect(() => {
     if (form.getFieldValue(unitFieldKey) == null) {
       form.setFieldValue(unitFieldKey, 'MINUTE')
@@ -1102,8 +1182,10 @@ function ApiCallInputParams({ label, apiKeyField = 'apiKey', defsSource = '/meta
   const controlChrome = getControlChrome()
   const { options: paramTypeOptions } = useSystemOptions('param_type')
 
+  // 根据当前 apiKey 找到 API 定义中的 requestSchema，并同步清理旧接口遗留入参。
   useEffect(() => {
     if (!apiKey) { setParams([]); return }
+    /** 从 API 定义列表中选中当前接口并同步请求参数 schema。 */
     const pick = (list: any[]) => {
       const def = list.find(d => d.value === apiKey)
       let schema: ApiParamDef[] = []
@@ -1122,6 +1204,7 @@ function ApiCallInputParams({ label, apiKeyField = 'apiKey', defsSource = '/meta
     loadDataSource(defsSource).then(pick)
   }, [apiKey, defsSource]) // eslint-disable-line react-hooks/exhaustive-deps
 
+  /** 把 API 参数类型编码转换成系统字典展示名。 */
   const typeLabel = (t: string) => paramTypeOptions.find(p => p.value === t)?.label ?? t
 
   return (

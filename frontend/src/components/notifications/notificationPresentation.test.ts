@@ -1,3 +1,8 @@
+/**
+ * 测试职责：验证通知中心展示文案、颜色和未读角标规则。
+ *
+ * 维护说明：新增通知分类、严重等级或归档状态时，应补充对应展示断言。
+ */
 import { describe, expect, it } from 'vitest'
 import {
   getNotificationActionLabel,

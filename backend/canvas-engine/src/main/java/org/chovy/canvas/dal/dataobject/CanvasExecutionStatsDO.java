@@ -15,6 +15,7 @@ import java.time.LocalDate;
 public class CanvasExecutionStatsDO {
 
     @TableId(type = IdType.AUTO)
+    /** 统计记录主键 ID */
     private Long id;
 
     /** 画布 ID */

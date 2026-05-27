@@ -8,10 +8,13 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mockito;
+import org.springframework.dao.DuplicateKeyException;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import org.chovy.canvas.dal.dataobject.CdpUserTagDO;
@@ -19,6 +22,12 @@ import org.chovy.canvas.dal.dataobject.CdpUserTagHistoryDO;
 import org.chovy.canvas.dal.mapper.CdpUserTagHistoryMapper;
 import org.chovy.canvas.dal.mapper.CdpUserTagMapper;
 
+/**
+ * Cdp Tag 测试类。
+ *
+ * <p>覆盖该后端组件在典型输入、边界条件和异常场景下的行为，确保重构或性能优化不会改变既有契约。
+ * <p>测试代码只构造必要的依赖与数据，断言重点放在可观察结果、状态变更和关键副作用上。
+ */
 class CdpTagServiceTest {
 
     private TagDefinitionMapper tagDefinitionMapper;
@@ -68,6 +77,23 @@ class CdpTagServiceTest {
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("BOOLEAN");
     }
+
+    @Test
+    void setTagDoesNotMutateCurrentTagWhenIdempotencyKeyAlreadyExists() {
+        when(tagDefinitionMapper.selectOne(any(Wrapper.class))).thenReturn(tag("vip", "BOOLEAN", 1, 1));
+        when(userTagMapper.selectOne(any(Wrapper.class))).thenReturn(null);
+        doThrow(new DuplicateKeyException("duplicate idempotency"))
+                .when(historyMapper).insert(any(CdpUserTagHistoryDO.class));
+        CdpTagWriteReq req = new CdpTagWriteReq("vip", "true", "manual mark",
+                null, "MANUAL", "req-1", "admin", "idem-1");
+
+        service.setTag("u1", req);
+
+        verify(userTagMapper, never()).insert(any(CdpUserTagDO.class));
+        verify(userTagMapper, never()).updateById(any(CdpUserTagDO.class));
+        verify(userService, never()).ensureUser(any(), any(), any());
+    }
+
 
     @Test
     void removeTagMarksCurrentTagRemovedAndWritesHistory() {

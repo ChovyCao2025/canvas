@@ -1,15 +1,23 @@
+/**
+ * 页面职责：数据源配置页，维护人群规则可使用的 JDBC 数据源。
+ *
+ * 维护说明：页面负责 CRUD 配置，表和列元数据由数据源 API 按需加载。
+ */
 import { useEffect, useState } from 'react'
 import { Button, Form, Input, Modal, Popconfirm, Select, Space, Switch, Table, Tag, Typography, message } from 'antd'
 import { DeleteOutlined, EditOutlined, PlusOutlined } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
 import { dataSourceConfigApi, type DataSourceConfig } from '../../services/dataSourceConfigApi'
 
+/** 页面标题组件别名。 */
 const { Title } = Typography
 
+/** 数据源表单值；enabled 在表单中是 boolean，提交时转换为 1/0。 */
 type DataSourceFormValues = Omit<DataSourceConfig, 'enabled'> & {
   enabled?: boolean
 }
 
+/** 数据源配置页面主组件。 */
 export default function DataSourceConfigPage() {
   const [data, setData] = useState<DataSourceConfig[]>([])
   const [total, setTotal] = useState(0)
@@ -20,6 +28,7 @@ export default function DataSourceConfigPage() {
   const [editing, setEditing] = useState<DataSourceConfig | null>(null)
   const [form] = Form.useForm<DataSourceFormValues>()
 
+  /** 分页加载数据源配置。 */
   const fetchList = async (p = page) => {
     setLoading(true)
     try {
@@ -33,6 +42,7 @@ export default function DataSourceConfigPage() {
 
   useEffect(() => { fetchList(1) }, [])
 
+  /** 新建数据源时默认使用 JDBC 和 MySQL Driver。 */
   const openCreate = () => {
     setEditing(null)
     form.resetFields()
@@ -44,6 +54,7 @@ export default function DataSourceConfigPage() {
     setVisible(true)
   }
 
+  /** 编辑时把后端 enabled 1/0 转为 Switch 使用的 boolean。 */
   const openEdit = (record: DataSourceConfig) => {
     setEditing(record)
     form.setFieldsValue({
@@ -53,6 +64,7 @@ export default function DataSourceConfigPage() {
     setVisible(true)
   }
 
+  /** 保存数据源配置；密码字段按表单值提交，由后端决定脱敏/覆盖策略。 */
   const handleOk = async () => {
     const values = await form.validateFields()
     setSaving(true)
@@ -76,6 +88,7 @@ export default function DataSourceConfigPage() {
     }
   }
 
+  /** 数据源表格列，删除后刷新当前页。 */
   const columns: ColumnsType<DataSourceConfig> = [
     { title: 'ID', dataIndex: 'id', width: 70 },
     { title: '名称', dataIndex: 'name', width: 180 },

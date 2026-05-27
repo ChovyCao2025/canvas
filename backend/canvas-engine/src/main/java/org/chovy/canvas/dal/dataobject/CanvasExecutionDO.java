@@ -52,8 +52,10 @@ public class CanvasExecutionDO {
     private String lastDedupKey;
 
     @TableField(fill = FieldFill.INSERT)
+    /** 执行记录创建时间，由 MyBatis-Plus 自动填充 */
     private LocalDateTime createdAt;
 
     @TableField(fill = FieldFill.INSERT_UPDATE)
+    /** 执行记录最后更新时间，由 MyBatis-Plus 自动填充 */
     private LocalDateTime updatedAt;
 }

@@ -4,6 +4,12 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ThreadLocalRandom;
 
+/**
+ * 权重选择工具。
+ *
+ * <p>根据候选项中的 weight 字段完成随机或稳定分桶选择，用于随机分流、实验分组等需要按比例路由的节点。
+ * <p>stable 模式下使用 seed 做确定性分桶，保证同一用户或同一上下文在多次执行中落到相同分支。
+ */
 final class WeightedChoice {
     private WeightedChoice() {
     }

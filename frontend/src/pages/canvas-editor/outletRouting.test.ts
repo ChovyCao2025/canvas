@@ -1,3 +1,8 @@
+/**
+ * 测试职责：验证 React Flow 边与后端 bizConfig 后继引用之间的双向转换。
+ *
+ * 维护说明：新增动态出口或集合型分支时，要补充 patch/clear/derive 三类用例。
+ */
 import type { Edge } from '@xyflow/react'
 import { describe, expect, it } from 'vitest'
 import {

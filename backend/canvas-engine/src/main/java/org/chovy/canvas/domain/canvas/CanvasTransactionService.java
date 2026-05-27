@@ -23,7 +23,9 @@ import org.chovy.canvas.dal.mapper.CanvasVersionMapper;
 @RequiredArgsConstructor
 public class CanvasTransactionService {
 
+    /** 画布 Mapper，仅在事务内修改画布主表状态。 */
     private final CanvasMapper canvasMapper;
+    /** 画布版本 Mapper。 */
     private final CanvasVersionMapper canvasVersionMapper;
 
     // ── 发布事务 ──────────────────────────────────────────────────
@@ -113,6 +115,7 @@ public class CanvasTransactionService {
 
     // ── 私有辅助 ──────────────────────────────────────────────────
 
+    /** 查询当前最大版本号并生成下一次发布快照版本号。 */
     private int nextVersionNumber(Long canvasId) {
         CanvasVersionDO max = canvasVersionMapper.selectOne(
                 new LambdaQueryWrapper<CanvasVersionDO>()

@@ -33,6 +33,12 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+/**
+ * Mq Trigger Consumer 测试类。
+ *
+ * <p>覆盖该后端组件在典型输入、边界条件和异常场景下的行为，确保重构或性能优化不会改变既有契约。
+ * <p>测试代码只构造必要的依赖与数据，断言重点放在可观察结果、状态变更和关键副作用上。
+ */
 class MqTriggerConsumerTest {
 
     private TriggerRouteService routeService;
@@ -59,6 +65,7 @@ class MqTriggerConsumerTest {
                 rejectedMapper,
                 metrics,
                 notificationEventService);
+        org.mockito.Mockito.lenient().when(routeService.isRouteReady()).thenReturn(true);
     }
 
     @Test
@@ -113,6 +120,19 @@ class MqTriggerConsumerTest {
                 eq("UNUSED"),
                 eq("mq:no-route:UNUSED"),
                 eq(null));
+    }
+
+    @Test
+    void onMessagePropagatesWhenRouteTableIsNotReadySoRocketMqCanRetry() {
+        when(routeService.isRouteReady()).thenReturn(false);
+
+        assertThatThrownBy(() -> consumer.onMessage(message("ORDER_PAID", "MSG-NOT-READY",
+                "{\"userId\":\"user-8\",\"messageCode\":\"PAYMENT\",\"payload\":{\"k\":\"v\"}}")))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("route table is not ready");
+
+        verify(routeService, never()).getCanvasByMqTopic(any());
+        verify(disruptorService, never()).publishRequest(any());
     }
 
     @Test

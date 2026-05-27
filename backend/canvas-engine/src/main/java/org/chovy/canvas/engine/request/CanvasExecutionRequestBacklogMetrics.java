@@ -13,6 +13,12 @@ import java.util.List;
 import java.util.Map;
 import org.chovy.canvas.domain.execution.CanvasExecutionRequestStatusCount;
 
+/**
+ * 画布执行请求 Backlog Metrics 执行请求治理组件。
+ *
+ * <p>负责画布执行请求的排队、派发、限流、重放或积压度量，削峰高并发触发流量。
+ * <p>该层位于触发入口和 DAG 执行之间，核心目标是保护执行引擎稳定性。
+ */
 @Slf4j
 @Component
 @RequiredArgsConstructor

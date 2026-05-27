@@ -9,6 +9,7 @@ import org.chovy.canvas.dto.cdp.CdpUserTagDTO;
 import org.chovy.canvas.dto.cdp.CdpUserTagHistoryDTO;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -17,15 +18,27 @@ import org.chovy.canvas.dal.dataobject.CdpUserTagHistoryDO;
 import org.chovy.canvas.dal.mapper.CdpUserTagHistoryMapper;
 import org.chovy.canvas.dal.mapper.CdpUserTagMapper;
 
+/**
+ * Cdp Tag CDP 领域服务。
+ *
+ * <p>负责用户画像、身份、标签和画布参与记录等客户数据能力，为画布执行和管理端查询提供统一入口。
+ * <p>该层隔离 CDP 数据结构与上层业务，集中处理状态、历史和幂等语义。
+ */
 @Service
 @RequiredArgsConstructor
 public class CdpTagService {
 
+    /** 标签定义 Mapper，用于读取标签元数据、值类型和人工打标开关。 */
     private final TagDefinitionMapper tagDefinitionMapper;
+    /** CDP 用户标签 Mapper。 */
     private final CdpUserTagMapper userTagMapper;
+    /** CDP 用户标签历史 Mapper。 */
     private final CdpUserTagHistoryMapper historyMapper;
+    /** CDP 用户服务。 */
     private final CdpUserService userService;
 
+    /** 为用户写入或更新 CDP 标签，并记录变更历史。 */
+    @Transactional
     public CdpUserTagDO setTag(String userId, CdpTagWriteReq req) {
         String normalizedUserId = requireText(userId, "userId");
         String tagCode = requireText(req.tagCode(), "tagCode");
@@ -35,7 +48,6 @@ public class CdpTagService {
             throw new IllegalArgumentException("标签不允许人工打标: " + tagCode);
         }
         String value = normalizeValue(def.getValueType(), req.tagValue());
-        userService.ensureUser(normalizedUserId, sourceType, req.sourceRefId());
 
         CdpUserTagDO existing = userTagMapper.selectOne(new LambdaQueryWrapper<CdpUserTagDO>()
                 .eq(CdpUserTagDO::getUserId, normalizedUserId)
@@ -46,6 +58,15 @@ public class CdpTagService {
         if (expiresAt == null && def.getDefaultTtlDays() != null) {
             expiresAt = now.plusDays(def.getDefaultTtlDays());
         }
+        boolean reserved = writeHistory(normalizedUserId, tagCode, oldValue, value, "SET", sourceType,
+                req.sourceRefId(), req.idempotencyKey(), req.reason(), req.operator());
+        if (!reserved) {
+            return existing != null ? existing : userTagMapper.selectOne(new LambdaQueryWrapper<CdpUserTagDO>()
+                    .eq(CdpUserTagDO::getUserId, normalizedUserId)
+                    .eq(CdpUserTagDO::getTagCode, tagCode));
+        }
+
+        userService.ensureUser(normalizedUserId, sourceType, req.sourceRefId());
 
         CdpUserTagDO tag = existing != null ? existing : new CdpUserTagDO();
         tag.setUserId(normalizedUserId);
@@ -64,11 +85,10 @@ public class CdpTagService {
             userTagMapper.updateById(tag);
         }
 
-        writeHistory(normalizedUserId, tagCode, oldValue, value, "SET", sourceType,
-                req.sourceRefId(), req.idempotencyKey(), req.reason(), req.operator());
         return tag;
     }
 
+    /** 移除用户标签，并写入标签变更历史。 */
     public void removeTag(String userId, String tagCode, String reason, String operator) {
         String normalizedUserId = requireText(userId, "userId");
         String normalizedTagCode = requireText(tagCode, "tagCode");
@@ -85,6 +105,7 @@ public class CdpTagService {
                 null, null, reason, operator);
     }
 
+    /** 查询用户当前生效标签。 */
     public List<CdpUserTagDTO> listCurrentTags(String userId) {
         return userTagMapper.selectList(new LambdaQueryWrapper<CdpUserTagDO>()
                         .eq(CdpUserTagDO::getUserId, requireText(userId, "userId"))
@@ -97,6 +118,7 @@ public class CdpTagService {
                 .toList();
     }
 
+    /** 查询用户标签变更历史。 */
     public List<CdpUserTagHistoryDTO> listHistory(String userId) {
         return historyMapper.selectList(new LambdaQueryWrapper<CdpUserTagHistoryDO>()
                         .eq(CdpUserTagHistoryDO::getUserId, requireText(userId, "userId"))
@@ -108,6 +130,7 @@ public class CdpTagService {
                 .toList();
     }
 
+    /** 查询已启用的标签定义，不存在或禁用时阻止写入。 */
     private TagDefinitionDO getEnabledTag(String tagCode) {
         TagDefinitionDO def = tagDefinitionMapper.selectOne(new LambdaQueryWrapper<TagDefinitionDO>()
                 .eq(TagDefinitionDO::getTagCode, tagCode)
@@ -119,9 +142,10 @@ public class CdpTagService {
         return def;
     }
 
-    private void writeHistory(String userId, String tagCode, String oldValue, String newValue,
-                              String operation, String sourceType, String sourceRefId,
-                              String idempotencyKey, String reason, String operator) {
+    /** 写入标签变更历史，并通过幂等键拦截重复写入。 */
+    private boolean writeHistory(String userId, String tagCode, String oldValue, String newValue,
+                                 String operation, String sourceType, String sourceRefId,
+                                 String idempotencyKey, String reason, String operator) {
         CdpUserTagHistoryDO history = new CdpUserTagHistoryDO();
         history.setUserId(userId);
         history.setTagCode(tagCode);
@@ -136,13 +160,16 @@ public class CdpTagService {
         history.setOperatedAt(LocalDateTime.now());
         try {
             historyMapper.insert(history);
+            return true;
         } catch (DuplicateKeyException duplicate) {
             if (idempotencyKey == null || idempotencyKey.isBlank()) {
                 throw duplicate;
             }
+            return false;
         }
     }
 
+    /** 按标签定义的值类型校验并规范化标签值。 */
     private String normalizeValue(String valueType, String value) {
         String type = valueType == null || valueType.isBlank() ? "STRING" : valueType;
         if (value == null) {
@@ -168,6 +195,7 @@ public class CdpTagService {
         };
     }
 
+    /** 校验必填文本字段并返回去除首尾空白后的值。 */
     private String requireText(String value, String fieldName) {
         if (value == null || value.isBlank()) {
             throw new IllegalArgumentException(fieldName + "不能为空");

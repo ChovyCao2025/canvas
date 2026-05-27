@@ -1,3 +1,8 @@
+/**
+ * 组件职责：通知铃铛组件，展示未读数、通知列表、过滤、全部已读和归档操作。
+ *
+ * 维护说明：组件消费 NotificationContext，不直接维护 WebSocket 或轮询。
+ */
 import { useEffect, type ReactNode, useState } from 'react'
 import {
   Badge,
@@ -23,8 +28,10 @@ import {
   shouldShowUnreadBadge,
 } from './notificationPresentation'
 
+/** 通知铃铛列表中的文本组件别名。 */
 const { Text } = Typography
 
+/** 抽屉内分类筛选项；value 与后端通知 category 保持一致。 */
 const FILTER_OPTIONS = [
   { label: '全部', value: 'ALL' },
   { label: '任务', value: 'TASK' },
@@ -33,11 +40,15 @@ const FILTER_OPTIONS = [
   { label: '变更', value: 'CHANGE' },
 ] as const
 
+/** 通知抽屉顶部工具按钮的固定尺寸。 */
 const TOOL_BUTTON_SIZE = 40
+/** 自定义工具图标的固定尺寸。 */
 const TOOL_ICON_SIZE = 19
 
+/** 通知分类筛选项的 value 类型，来源于 FILTER_OPTIONS。 */
 type FilterValue = typeof FILTER_OPTIONS[number]['value']
 
+/** 时钟图标：表示查看最新通知。 */
 function ClockIcon() {
   return (
     <svg viewBox="0 0 20 20" width={TOOL_ICON_SIZE} height={TOOL_ICON_SIZE} aria-hidden="true">
@@ -54,6 +65,7 @@ function ClockIcon() {
   )
 }
 
+/** 归档箱图标：表示查看已归档通知。 */
 function ArchiveIcon() {
   return (
     <svg viewBox="0 0 20 20" width={TOOL_ICON_SIZE} height={TOOL_ICON_SIZE} aria-hidden="true">
@@ -70,6 +82,7 @@ function ArchiveIcon() {
   )
 }
 
+/** 已读图标：表示全部标记为已读。 */
 function MailOpenIcon() {
   return (
     <svg viewBox="0 0 20 20" width={TOOL_ICON_SIZE} height={TOOL_ICON_SIZE} aria-hidden="true">
@@ -100,6 +113,7 @@ function MailOpenIcon() {
   )
 }
 
+/** 工具栏图标按钮，统一尺寸、激活态和 tooltip。 */
 function ToolButton({
   active,
   disabled,
@@ -138,6 +152,7 @@ function ToolButton({
   )
 }
 
+/** 通知铃铛入口和右侧消息抽屉。 */
 export default function NotificationBell() {
   const navigate = useNavigate()
   const { items, unreadCount, connected, refresh, markRead, markAllRead, archive } = useNotifications()
@@ -147,6 +162,7 @@ export default function NotificationBell() {
   const [archivedItems, setArchivedItems] = useState<UserNotification[]>([])
   const [loadingArchived, setLoadingArchived] = useState(false)
 
+  // 归档列表只在用户切到归档视图并打开抽屉时加载，避免主界面常驻请求。
   useEffect(() => {
     if (!open || !showArchived) {
       return
@@ -158,6 +174,7 @@ export default function NotificationBell() {
       .finally(() => setLoadingArchived(false))
   }, [open, showArchived])
 
+  /** 打开抽屉时主动刷新一次，弥补 WebSocket/轮询间隔带来的短暂延迟。 */
   async function handleOpen() {
     setOpen(true)
     try {
@@ -167,6 +184,7 @@ export default function NotificationBell() {
     }
   }
 
+  /** 点击通知：未读先标记为已读，再跳到 actionUrl/targetUrl。 */
   async function handleClick(item: UserNotification) {
     try {
       if (!item.readAt && !showArchived) {
@@ -179,6 +197,7 @@ export default function NotificationBell() {
     }
   }
 
+  /** 批量已读只作用于当前用户的未归档通知。 */
   async function handleMarkAllRead() {
     try {
       await markAllRead()
@@ -187,6 +206,7 @@ export default function NotificationBell() {
     }
   }
 
+  /** 归档单条通知，归档后从主列表移除。 */
   async function handleArchive(item: UserNotification) {
     try {
       await archive(item.notificationId)
@@ -195,6 +215,7 @@ export default function NotificationBell() {
     }
   }
 
+  // 主列表使用实时上下文，归档列表单独维护；两者再套同一分类筛选。
   const activeItems = items.filter(item => filter === 'ALL' || item.category === filter)
   const displayedItems = showArchived
     ? archivedItems.filter(item => filter === 'ALL' || item.category === filter)

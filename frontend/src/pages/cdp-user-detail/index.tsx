@@ -1,3 +1,8 @@
+/**
+ * 页面职责：CDP 用户详情页，展示用户基础属性、标签、标签历史和参与画布。
+ *
+ * 维护说明：页面也支持手动给用户增删标签，用于运营侧临时修正。
+ */
 import { useEffect, useState } from 'react'
 import { Button, Card, Drawer, Form, Input, Modal, Popconfirm, Space, Table, Tag, Typography, message } from 'antd'
 import { ArrowLeftOutlined, PlusOutlined } from '@ant-design/icons'
@@ -5,8 +10,10 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { cdpApi, type CdpUserCanvasSummary, type CdpUserDetail, type CdpUserTag, type CdpUserTagHistory } from '../../services/cdpApi'
 import { buildTagWritePayload, formatDateTime, formatExecutionStatus, tagColor } from '../cdp-users/cdpPresentation'
 
+/** 详情页标题和辅助文本组件别名。 */
 const { Title, Text } = Typography
 
+/** CDP 用户详情主页面，按 userId 聚合画像、标签和画布参与记录。 */
 export default function CdpUserDetailPage() {
   const { userId = '' } = useParams()
   const navigate = useNavigate()
@@ -19,6 +26,7 @@ export default function CdpUserDetailPage() {
   const [modalOpen, setModalOpen] = useState(false)
   const [form] = Form.useForm()
 
+  /** 并行加载用户洞察和标签历史；两者来自不同接口但同属详情页首屏数据。 */
   const load = async () => {
     const [insight, h] = await Promise.all([
       cdpApi.getUserInsight(userId),
@@ -32,6 +40,7 @@ export default function CdpUserDetailPage() {
 
   useEffect(() => { if (userId) load() }, [userId])
 
+  /** 手动写入单个标签，成功后刷新画像和历史。 */
   const saveTag = async () => {
     const values = await form.validateFields()
     await cdpApi.addUserTag(userId, buildTagWritePayload(values))
@@ -41,12 +50,14 @@ export default function CdpUserDetailPage() {
     load()
   }
 
+  /** 移除当前用户的指定标签。 */
   const removeTag = async (tagCode: string) => {
     await cdpApi.removeUserTag(userId, tagCode)
     message.success('标签已移除')
     load()
   }
 
+  /** 打开某个画布下该用户的执行明细抽屉。 */
   const openCanvasExecutions = async (row: CdpUserCanvasSummary) => {
     setSelectedCanvas(row)
     const res = await cdpApi.listCanvasUserExecutions(row.canvasId, userId)
@@ -55,11 +66,13 @@ export default function CdpUserDetailPage() {
 
   return (
     <div>
+      {/* 返回导航和页面标题。 */}
       <Space style={{ marginBottom: 16 }}>
         <Button type="text" icon={<ArrowLeftOutlined />} onClick={() => navigate(-1)} />
         <Title level={4} style={{ margin: 0 }}>用户详情</Title>
       </Space>
 
+      {/* 用户基础信息卡片，字段缺失时用 '-' 保持布局稳定。 */}
       <Card style={{ marginBottom: 16 }}>
         <Space direction="vertical" size={4}>
           <Text strong>{detail?.displayName || userId}</Text>
@@ -70,6 +83,7 @@ export default function CdpUserDetailPage() {
         </Space>
       </Card>
 
+      {/* 当前标签支持点击删除，适合运营临时修正用户画像。 */}
       <Card title="当前标签" extra={<Button size="small" icon={<PlusOutlined />} onClick={() => setModalOpen(true)}>打标签</Button>} style={{ marginBottom: 16 }}>
         <Space wrap>
           {tags.map(tag => (
@@ -81,6 +95,7 @@ export default function CdpUserDetailPage() {
         </Space>
       </Card>
 
+      {/* 标签历史用于审计，记录来源、旧值、新值和操作时间。 */}
       <Card title="标签历史">
         <Table rowKey={(_, index) => String(index)} dataSource={history} pagination={false} size="small"
           columns={[
@@ -93,6 +108,7 @@ export default function CdpUserDetailPage() {
           ]} />
       </Card>
 
+      {/* 触达画布列表用于从用户视角反查其参与过的营销旅程。 */}
       <Card title="触达画布" style={{ marginTop: 16 }}>
         <Table
           rowKey="canvasId"

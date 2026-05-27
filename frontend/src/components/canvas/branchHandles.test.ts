@@ -1,3 +1,8 @@
+/**
+ * 测试职责：验证节点业务配置到画布分支 handle 的推导规则。
+ *
+ * 维护说明：新增分支型节点或修改 handle ID 时，需要同步更新这些契约测试。
+ */
 import { describe, it, expect } from 'vitest'
 import { getBranchHandles } from './branchHandles'
 

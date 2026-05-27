@@ -17,14 +17,22 @@ import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+/**
+ * 画布执行请求 Executor 测试类。
+ *
+ * <p>覆盖该后端组件在典型输入、边界条件和异常场景下的行为，确保重构或性能优化不会改变既有契约。
+ * <p>测试代码只构造必要的依赖与数据，断言重点放在可观察结果、状态变更和关键副作用上。
+ */
 class CanvasExecutionRequestExecutorTest {
 
     @Test
@@ -39,7 +47,7 @@ class CanvasExecutionRequestExecutorTest {
         when(mapper.markRunning(eq("req-1"), any(), any(), anyString())).thenReturn(1);
         when(executionService.triggerFromExecutionRequest(eq(10L), eq("user-7"), eq(TriggerType.MQ),
                 eq(NodeType.MQ_TRIGGER), eq("order.paid"), eq(Map.of("orderId", "O-1")),
-                eq("MSG-1")))
+                eq("MSG-1"), eq(0), isNull()))
                 .thenReturn(Mono.just(Map.of("executionId", "exec-1")));
 
         executor.execute("req-1").block();
@@ -61,7 +69,7 @@ class CanvasExecutionRequestExecutorTest {
         request.setPerfRunId("perf_20260523_001");
         when(mapper.selectById("req-1")).thenReturn(request);
         when(mapper.markRunning(eq("req-1"), any(), any(), anyString())).thenReturn(1);
-        when(executionService.triggerFromExecutionRequest(any(), any(), any(), any(), any(), any(), any()))
+        when(executionService.triggerFromExecutionRequest(any(), any(), any(), any(), any(), any(), any(), anyInt(), any()))
                 .thenReturn(Mono.just(Map.of("executionId", "exec-1")));
 
         executor.execute("req-1").block();
@@ -74,7 +82,9 @@ class CanvasExecutionRequestExecutorTest {
                 eq(NodeType.MQ_TRIGGER),
                 eq("order.paid"),
                 payloadCaptor.capture(),
-                eq("MSG-1"));
+                eq("MSG-1"),
+                eq(0),
+                isNull());
         assertThat(payloadCaptor.getValue())
                 .containsEntry("orderId", "O-1")
                 .containsEntry("perfRunId", "perf_20260523_001");
@@ -95,7 +105,7 @@ class CanvasExecutionRequestExecutorTest {
         when(mapper.markRetry(eq("req-1"), anyString(), any(), any(), anyString())).thenReturn(1);
         when(executionService.triggerFromExecutionRequest(eq(10L), eq("user-7"), eq(TriggerType.MQ),
                 eq(NodeType.MQ_TRIGGER), eq("order.paid"), eq(Map.of("orderId", "O-1")),
-                eq("MSG-1")))
+                eq("MSG-1"), eq(2), isNull()))
                 .thenReturn(Mono.just(Map.of("overflow", "concurrency_limit_reached")));
 
         LocalDateTime before = LocalDateTime.now();
@@ -113,6 +123,33 @@ class CanvasExecutionRequestExecutorTest {
     }
 
     @Test
+    void executeRetriesWhenCanvasTriggerReturnsErrorMap() {
+        CanvasExecutionRequestMapper mapper = mock(CanvasExecutionRequestMapper.class);
+        CanvasExecutionService executionService = mock(CanvasExecutionService.class);
+        CanvasMetrics metrics = mock(CanvasMetrics.class);
+        CanvasExecutionRequestExecutor executor = new CanvasExecutionRequestExecutor(
+                mapper, executionService, new ObjectMapper(), metrics, 1_000L, 5, 300L, 60_000L);
+
+        CanvasExecutionRequestDO request = request();
+        request.setAttemptCount(2);
+        when(mapper.selectById("req-1")).thenReturn(request);
+        when(mapper.markRunning(eq("req-1"), any(), any(), anyString())).thenReturn(1);
+        when(mapper.markRetry(eq("req-1"), anyString(), any(), any(), anyString())).thenReturn(1);
+        when(executionService.triggerFromExecutionRequest(eq(10L), eq("user-7"), eq(TriggerType.MQ),
+                eq(NodeType.MQ_TRIGGER), eq("order.paid"), eq(Map.of("orderId", "O-1")),
+                eq("MSG-1"), eq(2), isNull()))
+                .thenReturn(Mono.just(Map.of("error", "node failed")));
+
+        executor.execute("req-1").block();
+
+        ArgumentCaptor<String> token = ArgumentCaptor.forClass(String.class);
+        verify(mapper).markRunning(eq("req-1"), any(), any(), token.capture());
+        verify(mapper).markRetry(eq("req-1"), eq("node failed"), any(), any(), eq(token.getValue()));
+        verify(mapper, never()).markSucceeded(anyString(), anyString(), any(), anyString());
+        verify(metrics).recordExecutionRequestTransition(CanvasExecutionRequestStatus.RETRY, TriggerType.MQ);
+    }
+
+    @Test
     void executeDoesNotTriggerCanvasWhenAnotherWorkerAlreadyClaimedRequest() {
         CanvasExecutionRequestMapper mapper = mock(CanvasExecutionRequestMapper.class);
         CanvasExecutionService executionService = mock(CanvasExecutionService.class);
@@ -124,7 +161,7 @@ class CanvasExecutionRequestExecutorTest {
 
         executor.execute("req-1").block();
 
-        verify(executionService, never()).triggerFromExecutionRequest(any(), any(), any(), any(), any(), any(), any());
+        verify(executionService, never()).triggerFromExecutionRequest(any(), any(), any(), any(), any(), any(), any(), anyInt(), any());
     }
 
     @Test
@@ -144,7 +181,7 @@ class CanvasExecutionRequestExecutorTest {
         verify(mapper).markFailed(eq("req-1"), org.mockito.ArgumentMatchers.contains("payload parse failed"),
                 any(), anyString());
         verify(mapper, never()).markRetry(anyString(), anyString(), any(), any(), anyString());
-        verify(executionService, never()).triggerFromExecutionRequest(any(), any(), any(), any(), any(), any(), any());
+        verify(executionService, never()).triggerFromExecutionRequest(any(), any(), any(), any(), any(), any(), any(), anyInt(), any());
     }
 
     @Test
@@ -161,7 +198,7 @@ class CanvasExecutionRequestExecutorTest {
         when(mapper.markSucceeded(eq("req-1"), anyString(), any(), anyString())).thenReturn(1);
         when(executionService.triggerFromExecutionRequest(eq(10L), eq("user-7"), eq(TriggerType.MQ),
                 eq(NodeType.MQ_TRIGGER), eq("order.paid"), eq(Map.of("orderId", "O-1")),
-                eq("MSG-1")))
+                eq("MSG-1"), eq(0), isNull()))
                 .thenReturn(Mono.delay(Duration.ofMillis(50)).thenReturn(Map.of("executionId", "exec-1")));
 
         executor.execute("req-1").block();
@@ -185,7 +222,7 @@ class CanvasExecutionRequestExecutorTest {
         when(mapper.markSucceeded(eq("req-1"), anyString(), any(), anyString())).thenReturn(1);
         when(executionService.triggerFromExecutionRequest(eq(10L), eq("user-7"), eq(TriggerType.MQ),
                 eq(NodeType.MQ_TRIGGER), eq("order.paid"), eq(Map.of("orderId", "O-1")),
-                eq("MSG-1")))
+                eq("MSG-1"), eq(0), isNull()))
                 .thenReturn(Mono.just(Map.of("executionId", "exec-1")));
 
         executor.execute("req-1").block();
@@ -207,7 +244,7 @@ class CanvasExecutionRequestExecutorTest {
         when(mapper.markSucceeded(eq("req-1"), anyString(), any(), anyString())).thenReturn(0);
         when(executionService.triggerFromExecutionRequest(eq(10L), eq("user-7"), eq(TriggerType.MQ),
                 eq(NodeType.MQ_TRIGGER), eq("order.paid"), eq(Map.of("orderId", "O-1")),
-                eq("MSG-1")))
+                eq("MSG-1"), eq(0), isNull()))
                 .thenReturn(Mono.just(Map.of("executionId", "exec-1")));
 
         executor.execute("req-1").block();
@@ -226,7 +263,7 @@ class CanvasExecutionRequestExecutorTest {
         request.setAttemptCount(2);
         when(mapper.selectById("req-1")).thenReturn(request);
         when(mapper.markRunning(eq("req-1"), any(), any(), anyString())).thenReturn(1);
-        when(executionService.triggerFromExecutionRequest(any(), any(), any(), any(), any(), any(), any()))
+        when(executionService.triggerFromExecutionRequest(any(), any(), any(), any(), any(), any(), any(), anyInt(), any()))
                 .thenReturn(Mono.error(new IllegalStateException("downstream down")));
 
         executor.execute("req-1").block();

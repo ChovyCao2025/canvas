@@ -17,6 +17,7 @@ import lombok.Data;
 public class ContextFieldDO {
 
     @TableId(type = IdType.AUTO)
+    /** 上下文字段定义主键 ID */
     private Long id;
 
     /** 字段在上下文中的 key，对应 {@code ${fieldKey}} 表达式 */

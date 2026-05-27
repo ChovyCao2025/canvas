@@ -1,3 +1,8 @@
+/**
+ * 类型职责：画布编辑器专用类型，描述后端 graph_json 与 React Flow 节点 data 的转换边界。
+ *
+ * 维护说明：连接关系以节点 bizConfig 为主存，React Flow 的 edges 只是编辑器展示和交互模型。
+ */
 // 画布后端节点数据格式（graph_json 中每个 node 的结构）
 export interface BackendNode {
   /** 节点唯一 ID。 */
@@ -38,6 +43,7 @@ export interface Branch {
   [k: string]: unknown
 }
 
+/** 优先级节点中的单条优先级路由。 */
 export interface Priority {
   /** 优先级顺序，数字越小越先执行。 */
   order?: number
@@ -49,6 +55,7 @@ export interface Priority {
   [k: string]: unknown
 }
 
+/** AB 分流节点中的单个分组路由。 */
 export interface AbGroup {
   /** 分组 key（用于 hash 分桶）。 */
   groupKey?: string

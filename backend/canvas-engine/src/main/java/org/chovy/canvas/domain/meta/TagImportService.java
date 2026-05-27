@@ -21,17 +21,30 @@ import org.chovy.canvas.dal.mapper.TagImportBatchMapper;
 import org.chovy.canvas.dal.dataobject.TagImportErrorDO;
 import org.chovy.canvas.dal.mapper.TagImportErrorMapper;
 
+/**
+ * 标签导入 元数据领域服务。
+ *
+ * <p>负责事件、接口、标签、系统选项或实验分组等配置型数据的维护和查询。
+ * <p>元数据会影响画布运行时行为，因此该层需要兼顾管理端易用性与执行链路缓存一致性。
+ */
 @Service
 @RequiredArgsConstructor
 public class TagImportService {
 
+    /** 身份类型服务，用于校验导入行中的用户识别方式是否允许导入。 */
     private final IdentityTypeService identityTypeService;
+    /** 标签定义服务，用于校验导入标签和标签值。 */
     private final TagDefinitionService tagDefinitionService;
+    /** CDP 用户服务，用于导入或执行时创建用户画像。 */
     private final CdpUserService cdpUserService;
+    /** CDP 标签服务，用于写入用户标签。 */
     private final CdpTagService cdpTagService;
+    /** 标签导入批次 Mapper。 */
     private final TagImportBatchMapper tagImportBatchMapper;
+    /** 标签导入错误 Mapper。 */
     private final TagImportErrorMapper tagImportErrorMapper;
 
+    /** 导入标签行数据，写入批次、错误明细、用户和标签。 */
     @Transactional(rollbackFor = Exception.class)
     public TagImportResult importRows(String sourceType, String fileName, String externalUrl, List<TagImportRow> rows) {
         List<TagImportRow> safeRows = rows == null ? List.of() : rows;
@@ -90,11 +103,13 @@ public class TagImportService {
         return result;
     }
 
+    /** 查询标签导入批次列表。 */
     public List<TagImportBatchDO> listBatches() {
         return tagImportBatchMapper.selectList(new LambdaQueryWrapper<TagImportBatchDO>()
                 .orderByDesc(TagImportBatchDO::getId));
     }
 
+    /** 查询指定导入批次的错误明细。 */
     public List<TagImportErrorDO> listErrors(Long batchId) {
         return tagImportErrorMapper.selectList(new LambdaQueryWrapper<TagImportErrorDO>()
                 .eq(TagImportErrorDO::getBatchId, batchId)
@@ -102,6 +117,7 @@ public class TagImportService {
                 .orderByAsc(TagImportErrorDO::getId));
     }
 
+    /** 将单行导入数据解析成 CDP 用户并写入用户标签。 */
     private void writeCdpTag(Long batchId, int rowNo, String sourceType, IdentityTypeDO identityType, TagImportRow row) {
         String sourceRefId = batchId == null ? null : String.valueOf(batchId);
         String userId = cdpUserService.ensureUserByIdentity(
@@ -120,6 +136,7 @@ public class TagImportService {
                 "TAG_IMPORT:" + batchId + ":" + rowNo));
     }
 
+    /** 记录单行导入失败明细，保留原始载荷便于后台排查。 */
     private void writeError(Long batchId, Integer rowNo, TagImportRow row, String errorCode, String errorMsg) {
         TagImportErrorDO error = new TagImportErrorDO();
         error.setBatchId(batchId);
@@ -130,6 +147,7 @@ public class TagImportService {
         tagImportErrorMapper.insert(error);
     }
 
+    /** 解析原始行号，缺失时使用当前列表下标生成行号。 */
     private static Integer resolveRowNo(TagImportRow row, int index) {
         if (row != null && row.getRowNo() != null) {
             return row.getRowNo();
@@ -137,6 +155,7 @@ public class TagImportService {
         return index + 1;
     }
 
+    /** 构造批次内去重键，避免同一身份和标签重复导入。 */
     private static String buildDuplicateKey(TagImportRow row) {
         return String.join("|",
                 normalizeIdType(row == null ? null : row.getIdType()),
@@ -144,6 +163,7 @@ public class TagImportService {
                 normalizeText(row == null ? null : row.getTagCode()));
     }
 
+    /** 将导入行格式化为错误表中的原始载荷文本。 */
     private static String formatRawPayload(TagImportRow row) {
         if (row == null) {
             return "rowNo=null,idType=null,idValue=null,tagCode=null,tagValue=null,tagTime=null";
@@ -156,6 +176,7 @@ public class TagImportService {
                 + ",tagTime=" + row.getTagTime();
     }
 
+    /** 根据成功和失败行数计算批次最终状态。 */
     private static String resolveStatus(int successRows, int failedRows) {
         if (failedRows == 0) {
             return "SUCCESS";
@@ -166,6 +187,7 @@ public class TagImportService {
         return "PARTIAL_SUCCESS";
     }
 
+    /** 规范化身份类型文本，用于批次内重复判断。 */
     private static String normalizeIdType(String value) {
         if (value == null) {
             return "";
@@ -173,6 +195,7 @@ public class TagImportService {
         return value.trim().toLowerCase(Locale.ROOT);
     }
 
+    /** 规范化普通文本字段，null 按空串参与去重。 */
     private static String normalizeText(String value) {
         return value == null ? "" : value.trim();
     }

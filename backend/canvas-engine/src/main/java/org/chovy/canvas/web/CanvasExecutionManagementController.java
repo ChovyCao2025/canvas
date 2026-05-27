@@ -115,7 +115,14 @@ public class CanvasExecutionManagementController {
         approval.setStatus(result);
         approval.setResultBy(approver);
         approval.setResultAt(LocalDateTime.now());
-        approvalMapper.updateById(approval);
+        int updated = approvalMapper.update(approval,
+                new com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper<CanvasManualApprovalDO>()
+                        .eq(CanvasManualApprovalDO::getId, approval.getId())
+                        .eq(CanvasManualApprovalDO::getStatus, ApprovalStatus.PENDING));
+        if (updated <= 0) {
+            log.info("[APPROVAL] 审批已被其他请求处理 approvalId={}", approval.getId());
+            return;
+        }
         notificationEventService.approvalResult(approval, result, approver);
 
         // 3. 从 Redis 恢复 ctx，写入审批结果
@@ -138,7 +145,7 @@ public class CanvasExecutionManagementController {
                         approval.getUserId(),
                         "MANUAL_APPROVAL_RESUME",
                         NodeType.MANUAL_APPROVAL,
-                        null,
+                        approval.getNodeId(),
                         Map.of(MapFieldKeys.APPROVAL_RESULT, result),
                         executionId + ":resume:" + result,
                         false)

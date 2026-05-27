@@ -19,6 +19,12 @@ import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
+/**
+ * 接口定义 测试类。
+ *
+ * <p>覆盖该后端组件在典型输入、边界条件和异常场景下的行为，确保重构或性能优化不会改变既有契约。
+ * <p>测试代码只构造必要的依赖与数据，断言重点放在可观察结果、状态变更和关键副作用上。
+ */
 class ApiDefinitionControllerTest {
 
     private ApiDefinitionMapper apiDefinitionMapper;
@@ -44,11 +50,24 @@ class ApiDefinitionControllerTest {
     @Test
     void create_rejects_zero_rateLimitPerSec_and_does_not_insert() {
         ApiDefinitionDO body = new ApiDefinitionDO();
+        body.setUrl("https://api.example.com/orders");
         body.setRateLimitPerSec(0);
 
         assertThatThrownBy(() -> controller.create(body).block())
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("rateLimitPerSec 必须大于 0");
+
+        verify(apiDefinitionMapper, never()).insert(Mockito.any(ApiDefinitionDO.class));
+    }
+
+    @Test
+    void create_rejects_localhost_url_and_does_not_insert() {
+        ApiDefinitionDO body = new ApiDefinitionDO();
+        body.setUrl("http://localhost:8080/internal");
+
+        assertThatThrownBy(() -> controller.create(body).block())
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("不允许访问内网或本机地址");
 
         verify(apiDefinitionMapper, never()).insert(Mockito.any(ApiDefinitionDO.class));
     }
@@ -75,11 +94,23 @@ class ApiDefinitionControllerTest {
 
     @Test
     void update_rejects_negative_rateLimitPerSec_and_does_not_update() throws Exception {
-        JsonNode bodyNode = objectMapper.readTree("{\"rateLimitPerSec\":-1}");
+        JsonNode bodyNode = objectMapper.readTree("{\"url\":\"https://api.example.com/orders\",\"rateLimitPerSec\":-1}");
 
         assertThatThrownBy(() -> controller.update(1L, bodyNode).block())
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("rateLimitPerSec 必须大于 0");
+
+        verify(apiDefinitionMapper, never()).updateById(any(ApiDefinitionDO.class));
+        verify(apiDefinitionMapper, never()).update(any(ApiDefinitionDO.class), any(LambdaUpdateWrapper.class));
+    }
+
+    @Test
+    void update_rejects_private_network_url_and_does_not_update() throws Exception {
+        JsonNode bodyNode = objectMapper.readTree("{\"url\":\"http://10.0.0.5/admin\"}");
+
+        assertThatThrownBy(() -> controller.update(1L, bodyNode).block())
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("不允许访问内网或本机地址");
 
         verify(apiDefinitionMapper, never()).updateById(any(ApiDefinitionDO.class));
         verify(apiDefinitionMapper, never()).update(any(ApiDefinitionDO.class), any(LambdaUpdateWrapper.class));

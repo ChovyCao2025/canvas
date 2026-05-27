@@ -1,8 +1,16 @@
+/**
+ * 组件职责：节点配置面板的说明卡片，展示节点摘要、风险提示和运行策略。
+ *
+ * 维护说明：该组件只负责 presentation，不发起网络请求。
+ */
 import type { CSSProperties, ReactNode } from 'react'
 import { Typography } from 'antd'
 
+/** 配置面板外层浅灰背景色。 */
 const PANEL_SURFACE = '#f5f5f7'
+/** 配置卡片背景色。 */
 const PANEL_CARD = '#ffffff'
+/** 配置卡片边框色。 */
 const PANEL_BORDER = '#c7c7cc'
 
 /**
@@ -66,6 +74,7 @@ export interface NodeHeaderCardProps {
   categoryColor?: string
 }
 
+/** 根据分类色生成头卡内徽章、状态和元信息的半透明样式。 */
 function getHeaderPillStyles(color: string) {
   return {
     badge: {
@@ -86,6 +95,7 @@ function getHeaderPillStyles(color: string) {
   }
 }
 
+/** 节点配置面板顶部标题卡片。 */
 export function NodeHeaderCard({
   tone,
   title,
@@ -186,6 +196,7 @@ export interface ConfigSectionCardProps {
   children: ReactNode
 }
 
+/** 配置面板内部分区卡片。 */
 export function ConfigSectionCard({ title, children }: ConfigSectionCardProps) {
   return (
     <section style={{ ...CARD_STYLE, padding: '20px 20px 22px', marginBottom: 16 }}>
@@ -219,11 +230,13 @@ export interface FieldSummaryRowProps {
   value: string
 }
 
+/** 配置摘要列表 props。 */
 export interface ConfigSummaryListProps {
   /** 摘要行列表。 */
   rows: FieldSummaryRowProps[]
 }
 
+/** 配置摘要列表组件。 */
 export function ConfigSummaryList({ rows }: ConfigSummaryListProps) {
   return (
     <section style={{ ...CARD_STYLE, padding: 18, marginBottom: 16 }}>
@@ -236,6 +249,7 @@ export function ConfigSummaryList({ rows }: ConfigSummaryListProps) {
   )
 }
 
+/** 配置摘要单行组件。 */
 export function FieldSummaryRow({ label, value }: FieldSummaryRowProps) {
   return (
     <div
@@ -270,6 +284,7 @@ export interface BranchRouteCardProps {
   tone: 'success' | 'danger'
 }
 
+/** 分支流向摘要卡片。 */
 export function BranchRouteCard({ label, value, tone }: BranchRouteCardProps) {
   const styles = ROUTE_STYLES[tone]
 

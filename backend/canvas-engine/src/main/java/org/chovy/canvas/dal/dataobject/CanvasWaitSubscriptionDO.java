@@ -26,6 +26,7 @@ import java.time.LocalDateTime;
 public class CanvasWaitSubscriptionDO {
 
     @TableId(type = IdType.AUTO)
+    /** 等待订阅主键 ID */
     private Long id;
 
     /** 所属执行实例 ID（对应 canvas_execution.id），用于恢复时关联执行上下文。 */
@@ -88,6 +89,7 @@ public class CanvasWaitSubscriptionDO {
      */
     private String status;
 
+    /** 订阅创建时间，表示执行进入等待节点的时间。 */
     private LocalDateTime createdAt;
 
     /** 状态更新时间，CAS 成功后由 {@code finishWait()} 写入。 */

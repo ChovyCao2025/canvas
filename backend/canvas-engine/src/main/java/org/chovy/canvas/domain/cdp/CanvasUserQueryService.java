@@ -14,14 +14,24 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * 画布用户 Query CDP 领域服务。
+ *
+ * <p>负责用户画像、身份、标签和画布参与记录等客户数据能力，为画布执行和管理端查询提供统一入口。
+ * <p>该层隔离 CDP 数据结构与上层业务，集中处理状态、历史和幂等语义。
+ */
 @Service
 @RequiredArgsConstructor
 public class CanvasUserQueryService {
 
+    /** 画布执行 Mapper，用于聚合用户在画布中的执行历史。 */
     private final CanvasExecutionMapper executionMapper;
+    /** CDP 标签服务。 */
     private final CdpTagService tagService;
+    /** CDP 用户服务。 */
     private final CdpUserService userService;
 
+    /** 查询用户列表或指定画布下的用户聚合视图。 */
     public List<CanvasUserRowDTO> listUsers(Long canvasId) {
         List<CanvasExecutionDO> executions = executionMapper.selectList(
                 new LambdaQueryWrapper<CanvasExecutionDO>()
@@ -39,6 +49,7 @@ public class CanvasUserQueryService {
                 .toList();
     }
 
+    /** 查询指定用户在指定画布中的执行聚合信息。 */
     public CanvasUserRowDTO getUserInCanvas(Long canvasId, String userId) {
         List<CanvasExecutionDO> executions = executionMapper.selectList(
                 new LambdaQueryWrapper<CanvasExecutionDO>()
@@ -51,6 +62,7 @@ public class CanvasUserQueryService {
         return toRow(userId, executions);
     }
 
+    /** 查询指定用户在指定画布下的执行记录。 */
     public List<CanvasExecutionDO> listExecutions(Long canvasId, String userId) {
         return executionMapper.selectList(new LambdaQueryWrapper<CanvasExecutionDO>()
                 .eq(CanvasExecutionDO::getCanvasId, canvasId)
@@ -59,6 +71,7 @@ public class CanvasUserQueryService {
                 .last("LIMIT 100"));
     }
 
+    /** 将同一用户的执行记录汇总为管理端列表行数据。 */
     private CanvasUserRowDTO toRow(String userId, List<CanvasExecutionDO> executions) {
         executions.forEach(e -> userService.ensureUser(userId, "CANVAS_EXECUTION", e.getId()));
         LocalDateTime first = executions.stream().map(CanvasExecutionDO::getCreatedAt)
@@ -83,6 +96,7 @@ public class CanvasUserQueryService {
         );
     }
 
+    /** 将执行状态码转换为前端展示使用的状态文本。 */
     private String statusLabel(Integer status) {
         if (status != null && status == ExecutionStatus.SUCCESS.getCode()) {
             return "SUCCESS";

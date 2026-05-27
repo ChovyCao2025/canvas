@@ -9,6 +9,7 @@ import org.springframework.data.redis.core.RedisOperations;
 import org.springframework.data.redis.core.ScanOptions;
 import org.springframework.data.redis.core.SessionCallback;
 import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.data.redis.core.script.RedisScript;
 import org.springframework.stereotype.Service;
 
 import java.time.Duration;
@@ -18,6 +19,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.UUID;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -36,20 +38,27 @@ public class TriggerRouteService {
     /** 阻塞式 Redis 模板，用于 Set 增删查。 */
     private final StringRedisTemplate redis;
 
-    /** 统一 key 构造器（含命名空间前缀）。 */
+    /** Redis key 工具，集中生成业务 key。 */
     private final RedisKeyUtil keys;
 
-    /** reactive 连接，仅用于 SCAN 探测路由表是否为空。 */
+    /** 响应式 Redis 连接工厂。 */
     private final ReactiveRedisConnectionFactory reactiveFactory;
+    /** MQ 触发路由本地缓存。 */
     private final Cache<String, Set<String>> mqRouteCache = Caffeine.newBuilder()
             .maximumSize(10_000)
             .expireAfterWrite(Duration.ofSeconds(30))
             .build();
+    /** 路由变更锁 TTL。 */
+    private static final Duration ROUTE_MUTATION_LOCK_TTL = Duration.ofSeconds(30);
+    /** 等待路由变更锁的最大毫秒数。 */
+    private static final long ROUTE_MUTATION_LOCK_WAIT_MS = 5_000L;
 
     /** 注册 MQ 触发路由：topicKey -> canvasId。 */
     public void registerMq(Long canvasId, String topicKey) {
-        redis.opsForSet().add(keys.triggerMq(topicKey), String.valueOf(canvasId));
-        mqRouteCache.invalidate(topicKey);
+        withRouteMutationLock(() -> {
+            redis.opsForSet().add(keys.triggerMq(topicKey), String.valueOf(canvasId));
+            mqRouteCache.invalidate(topicKey);
+        });
     }
     /** 注册行为事件触发路由：eventCode -> canvasId。 */
     public void registerBehavior(Long canvasId, String eventCode) {
@@ -59,62 +68,86 @@ public class TriggerRouteService {
     public void registerTagger(Long canvasId, String tagCodeKey) {
         redis.opsForSet().add(keys.triggerTagger(tagCodeKey), String.valueOf(canvasId));
     }
-    /** 移除 MQ 路由。 */
+    /** 移除 MQ 触发路由。 */
     public void removeMq(Long canvasId, String topicKey) {
-        redis.opsForSet().remove(keys.triggerMq(topicKey), String.valueOf(canvasId));
-        mqRouteCache.invalidate(topicKey);
+        withRouteMutationLock(() -> {
+            redis.opsForSet().remove(keys.triggerMq(topicKey), String.valueOf(canvasId));
+            mqRouteCache.invalidate(topicKey);
+        });
     }
-    /** 移除行为事件路由。 */
+    /** 移除行为事件触发路由。 */
     public void removeBehavior(Long canvasId, String eventCode) {
         redis.opsForSet().remove(keys.triggerBehavior(eventCode), String.valueOf(canvasId));
     }
-    /** 移除 tagger 路由。 */
+    /** 移除 tagger 实时触发路由。 */
     public void removeTagger(Long canvasId, String tagCodeKey) {
         redis.opsForSet().remove(keys.triggerTagger(tagCodeKey), String.valueOf(canvasId));
     }
-    /** 查询某 MQ topic 对应的画布集合。 */
+    /** 按 MQ topicKey 查询订阅画布 ID 集合。 */
     public Set<String> getCanvasByMqTopic(String topicKey) {
         return mqRouteCache.get(topicKey, this::loadMqRoute);
     }
-    /** 查询某行为事件对应的画布集合。 */
+    /** 按事件编码查询订阅画布 ID 集合。 */
     public Set<String> getCanvasByBehavior(String eventCode) {
         Set<String> ids = redis.opsForSet().members(keys.triggerBehavior(eventCode));
         return ids != null ? ids : Set.of();
     }
-    /** 查询某 tagger code 对应的画布集合。 */
+    /** 按标签 key 查询订阅画布 ID 集合。 */
     public Set<String> getCanvasByTagger(String tagCodeKey) {
         Set<String> ids = redis.opsForSet().members(keys.triggerTagger(tagCodeKey));
         return ids != null ? ids : Set.of();
     }
 
+    /** 清空 MQ 触发路由表。 */
     public void clearMqRoutes() {
         replaceMqRoutes(Map.of());
     }
 
+    /** 批量替换 MQ 触发路由表。 */
     public void replaceMqRoutes(Map<String, Set<String>> routes) {
         Map<String, Set<String>> snapshot = routes.entrySet().stream()
                 .filter(entry -> entry.getKey() != null && !entry.getKey().isBlank())
                 .map(entry -> Map.entry(entry.getKey(), sanitizeCanvasIds(entry.getValue())))
                 .filter(entry -> !entry.getValue().isEmpty())
                 .collect(Collectors.toUnmodifiableMap(Map.Entry::getKey, Map.Entry::getValue));
-        List<String> oldKeys = scanMqRouteKeys();
+        withRouteMutationLock(() -> {
+            markRouteRebuilding();
+            List<String> oldKeys = scanMqRouteKeys();
 
-        mqRouteCache.invalidateAll();
-        redis.execute(new SessionCallback<List<Object>>() {
-            @Override
-            @SuppressWarnings("unchecked")
-            public <K, V> List<Object> execute(RedisOperations<K, V> operations) {
-                operations.multi();
-                if (!oldKeys.isEmpty()) {
-                    operations.delete((Collection<K>) oldKeys);
+            mqRouteCache.invalidateAll();
+            redis.execute(new SessionCallback<List<Object>>() {
+                @Override
+                @SuppressWarnings("unchecked")
+                public <K, V> List<Object> execute(RedisOperations<K, V> operations) {
+                    operations.multi();
+                    if (!oldKeys.isEmpty()) {
+                        operations.delete((Collection<K>) oldKeys);
+                    }
+                    snapshot.forEach((topicKey, canvasIds) ->
+                            operations.opsForSet().add(
+                                    (K) keys.triggerMq(topicKey),
+                                    (V[]) canvasIds.toArray(String[]::new)));
+                    return operations.exec();
                 }
-                snapshot.forEach((topicKey, canvasIds) ->
-                        operations.opsForSet().add(
-                                (K) keys.triggerMq(topicKey),
-                                (V[]) canvasIds.toArray(String[]::new)));
-                return operations.exec();
-            }
+            });
+            mqRouteCache.invalidateAll();
+            markRouteReady();
         });
+    }
+
+    /** 判断触发路由表是否处于可用状态。 */
+    public boolean isRouteReady() {
+        return Boolean.TRUE.equals(redis.hasKey(keys.triggerRouteReady()));
+    }
+
+    /** 标记触发路由表已就绪。 */
+    public void markRouteReady() {
+        redis.opsForValue().set(keys.triggerRouteReady(), "1");
+    }
+
+    /** 标记触发路由表正在重建。 */
+    public void markRouteRebuilding() {
+        redis.delete(keys.triggerRouteReady());
         mqRouteCache.invalidateAll();
     }
 
@@ -136,6 +169,7 @@ public class TriggerRouteService {
         }
     }
 
+    /** 从 Redis 加载 MQ topic 路由并清洗无效画布 ID。 */
     private Set<String> loadMqRoute(String topicKey) {
         Set<String> ids = redis.opsForSet().members(keys.triggerMq(topicKey));
         if (ids == null || ids.isEmpty()) {
@@ -144,6 +178,46 @@ public class TriggerRouteService {
         return sanitizeCanvasIds(ids);
     }
 
+    /** 使用 Redis 分布式锁串行化 MQ 路由重建和单点增删操作。 */
+    private void withRouteMutationLock(Runnable action) {
+        String lockKey = keys.triggerRouteMutationLock();
+        String token = UUID.randomUUID().toString();
+        long deadline = System.currentTimeMillis() + ROUTE_MUTATION_LOCK_WAIT_MS;
+        boolean acquired = false;
+        while (System.currentTimeMillis() <= deadline) {
+            acquired = Boolean.TRUE.equals(redis.opsForValue().setIfAbsent(lockKey, token, ROUTE_MUTATION_LOCK_TTL));
+            if (acquired) {
+                break;
+            }
+            try {
+                Thread.sleep(50);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                throw new IllegalStateException("Interrupted while waiting for route mutation lock", e);
+            }
+        }
+        if (!acquired) {
+            throw new IllegalStateException("MQ route mutation lock busy");
+        }
+        try {
+            action.run();
+        } finally {
+            releaseRouteMutationLock(lockKey, token);
+        }
+    }
+
+    /** 使用 Lua 校验 token 后释放路由变更锁，避免误删其他实例持有的锁。 */
+    private void releaseRouteMutationLock(String lockKey, String token) {
+        String script = """
+                if redis.call('get', KEYS[1]) == ARGV[1] then
+                    return redis.call('del', KEYS[1])
+                end
+                return 0
+                """;
+        redis.execute(RedisScript.of(script, Long.class), List.of(lockKey), token);
+    }
+
+    /** 使用 SCAN 查找当前命名空间下全部 MQ 路由 key。 */
     private List<String> scanMqRouteKeys() {
         ScanOptions options = ScanOptions.scanOptions()
                 .match(keys.triggerMqPattern())
@@ -158,6 +232,7 @@ public class TriggerRouteService {
         return result;
     }
 
+    /** 过滤空值、空白值和非正整数，得到可写入 Redis 的画布 ID 集合。 */
     private Set<String> sanitizeCanvasIds(Set<String> canvasIds) {
         if (canvasIds == null || canvasIds.isEmpty()) {
             return Set.of();
@@ -170,6 +245,7 @@ public class TriggerRouteService {
                 .collect(Collectors.toUnmodifiableSet());
     }
 
+    /** 判断字符串是否为正整数 ID。 */
     private boolean isPositiveLong(String value) {
         try {
             return Long.parseLong(value) > 0;

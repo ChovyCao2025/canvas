@@ -20,15 +20,26 @@ import java.util.Set;
 import java.util.stream.Collectors;
 import org.chovy.canvas.dal.dataobject.CdpUserProfileDO;
 
+/**
+ * CDP 用户 Insight CDP 领域服务。
+ *
+ * <p>负责用户画像、身份、标签和画布参与记录等客户数据能力，为画布执行和管理端查询提供统一入口。
+ * <p>该层隔离 CDP 数据结构与上层业务，集中处理状态、历史和幂等语义。
+ */
 @Service
 @RequiredArgsConstructor
 public class CdpUserInsightService {
 
+    /** CDP 用户服务，用于读取画像详情并补齐用户基础信息。 */
     private final CdpUserService userService;
+    /** CDP 标签服务。 */
     private final CdpTagService tagService;
+    /** 画布执行记录 Mapper。 */
     private final CanvasExecutionMapper executionMapper;
+    /** 画布主表 Mapper。 */
     private final CanvasMapper canvasMapper;
 
+    /** 聚合用户画像、标签和画布参与记录，形成用户洞察详情。 */
     public CanvasUserDetailDTO getUserInsight(String userId) {
         CdpUserProfileDO profile = userService.getRequiredProfile(userId);
         List<CanvasExecutionDO> executions = executionMapper.selectList(new LambdaQueryWrapper<CanvasExecutionDO>()
@@ -60,6 +71,7 @@ public class CdpUserInsightService {
         );
     }
 
+    /** 汇总用户在单个画布中的进入次数、成功失败数和最近状态。 */
     private CdpUserCanvasSummaryDTO toCanvasSummary(Long canvasId, CanvasDO canvas, List<CanvasExecutionDO> executions) {
         long successCount = executions.stream()
                 .filter(item -> item.getStatus() != null && item.getStatus() == ExecutionStatus.SUCCESS.getCode())
@@ -88,6 +100,7 @@ public class CdpUserInsightService {
         );
     }
 
+    /** 将执行状态码转换为用户洞察页展示文案。 */
     private String statusLabel(Integer status) {
         if (status != null && status == ExecutionStatus.SUCCESS.getCode()) {
             return "SUCCESS";

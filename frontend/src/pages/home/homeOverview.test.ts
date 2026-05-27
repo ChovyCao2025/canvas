@@ -1,3 +1,8 @@
+/**
+ * 测试职责：验证首页概览 KPI、统计范围和关注项展示模型。
+ *
+ * 维护说明：首页后端概览字段变化时，应同步 HomeOverview 类型和这些展示模型测试。
+ */
 import { describe, expect, it } from 'vitest'
 import { buildKpiCards, getAttentionPresentation, HOME_RANGE_OPTIONS, type HomeOverview } from './homeOverview'
 
@@ -44,6 +49,7 @@ describe('homeOverview helpers', () => {
   })
 })
 
+/** 首页概览测试样本，默认给出一组有量级的运营数据。 */
 function overview(): HomeOverview {
   return {
     range: { days: 7, since: '2026-05-17', until: '2026-05-23' },

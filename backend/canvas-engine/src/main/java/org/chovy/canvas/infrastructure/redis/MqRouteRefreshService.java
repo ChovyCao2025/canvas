@@ -22,17 +22,29 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
 
+/**
+ * Mq Route Refresh Redis 基础设施组件。
+ *
+ * <p>封装触发路由、分布式状态或缓存 key 的 Redis 访问逻辑，减少业务层直接拼接 key。
+ * <p>该组件是运行时路由和高并发治理的重要边界，需要保持 key 语义稳定。
+ */
 @Slf4j
 @Service
 @RequiredArgsConstructor
 public class MqRouteRefreshService {
 
+    /** 画布 Mapper，用于扫描所有已发布画布。 */
     private final CanvasMapper canvasMapper;
+    /** 画布版本 Mapper。 */
     private final CanvasVersionMapper canvasVersionMapper;
+    /** DAG 解析器，将 graphJson 转换为可执行图结构。 */
     private final DagParser dagParser;
+    /** 触发路由服务，负责 Redis 路由注册、清理和查询。 */
     private final TriggerRouteService triggerRouteService;
+    /** MQ 触发节点处理器，用于解析和匹配 MQ 触发入口。 */
     private final MqTriggerHandler mqTriggerHandler;
 
+    /** 扫描已发布画布并重建 MQ 触发路由表。 */
     public void rebuildMqRoutes() {
         List<CanvasDO> published = canvasMapper.selectList(
                 new LambdaQueryWrapper<CanvasDO>().eq(CanvasDO::getStatus, CanvasStatusEnum.PUBLISHED.getCode()));
@@ -66,6 +78,7 @@ public class MqRouteRefreshService {
         log.info("[MQ_ROUTE] rebuild completed canvases={} routes={}", canvasCount, routeCount);
     }
 
+    /** 从单个画布 DAG 中收集 MQ 触发 topic 到画布 ID 的路由关系。 */
     private int collectMqRoutes(Long canvasId, DagGraph graph, Map<String, Set<String>> routes) {
         int count = 0;
         for (String nodeId : graph.allNodeIds()) {

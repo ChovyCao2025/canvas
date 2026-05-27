@@ -16,6 +16,7 @@ import java.time.LocalDateTime;
 public class AbExperimentDO {
 
     @TableId(type = IdType.AUTO)
+    /** 实验主键 ID */
     private Long id;
 
     /** 实验显示名称 */
@@ -34,8 +35,10 @@ public class AbExperimentDO {
     private String createdBy;
 
     @TableField(fill = FieldFill.INSERT)
+    /** 记录创建时间，由 MyBatis-Plus 自动填充 */
     private LocalDateTime createdAt;
 
     @TableField(fill = FieldFill.INSERT_UPDATE)
+    /** 记录最后更新时间，由 MyBatis-Plus 自动填充 */
     private LocalDateTime updatedAt;
 }

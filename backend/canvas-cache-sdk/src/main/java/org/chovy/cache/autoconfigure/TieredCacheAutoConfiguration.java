@@ -2,6 +2,7 @@ package org.chovy.cache.autoconfigure;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.micrometer.core.instrument.MeterRegistry;
+import org.chovy.cache.CacheInvalidationPublisher;
 import org.chovy.cache.TieredCacheManager;
 import org.chovy.cache.aop.AnnotationCacheResolver;
 import org.chovy.cache.aop.SpelKeyEvaluator;
@@ -17,6 +18,12 @@ import org.springframework.data.redis.connection.ReactiveRedisConnectionFactory;
 import org.springframework.data.redis.core.ReactiveStringRedisTemplate;
 import org.springframework.data.redis.core.StringRedisTemplate;
 
+/**
+ * 分层缓存 Spring Boot 自动配置。
+ *
+ * <p>负责在应用启动时注册 TieredCacheManager、AOP 切面和辅助组件，使业务模块引入 SDK 后即可使用注解缓存。
+ * <p>自动配置只提供基础 Bean，具体缓存实例仍由业务配置或构建器创建。
+ */
 @AutoConfiguration(after = {RedisAutoConfiguration.class, RedisReactiveAutoConfiguration.class})
 public class TieredCacheAutoConfiguration {
     @Bean
@@ -25,9 +32,11 @@ public class TieredCacheAutoConfiguration {
     public TieredCacheManager tieredCacheManager(StringRedisTemplate redis,
                                                  ObjectProvider<ReactiveStringRedisTemplate> reactiveRedis,
                                                  ObjectProvider<ReactiveRedisConnectionFactory> reactiveFactory,
-                                                 ObjectProvider<MeterRegistry> meterRegistry) {
+                                                 ObjectProvider<MeterRegistry> meterRegistry,
+                                                 ObjectProvider<CacheInvalidationPublisher> invalidationPublishers) {
         return new TieredCacheManager(redis, reactiveRedis.getIfAvailable(),
-                meterRegistry.getIfAvailable(), reactiveFactory.getIfAvailable());
+                meterRegistry.getIfAvailable(), reactiveFactory.getIfAvailable(),
+                invalidationPublishers.orderedStream().toList());
     }
 
     @Bean

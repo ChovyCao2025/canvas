@@ -1,3 +1,8 @@
+/**
+ * 测试职责：验证画布名称编辑的 trim、空值校验和编辑态 UI 辅助规则。
+ *
+ * 维护说明：标题栏交互变化时，先确认这些纯函数契约是否仍成立。
+ */
 import { describe, expect, it } from 'vitest'
 import { buildCanvasNameUpdate, getCanvasNameStatusGap, shouldShowCanvasNameActions } from './canvasNameUpdate'
 

@@ -14,13 +14,22 @@ import java.util.HexFormat;
 import java.util.Map;
 import java.util.UUID;
 
+/**
+ * 画布执行请求 执行请求治理组件。
+ *
+ * <p>负责画布执行请求的排队、派发、限流、重放或积压度量，削峰高并发触发流量。
+ * <p>该层位于触发入口和 DAG 执行之间，核心目标是保护执行引擎稳定性。
+ */
 @Service
 @RequiredArgsConstructor
 public class CanvasExecutionRequestService {
 
+    /** 执行请求 Mapper，用于落库排队请求并支持幂等插入。 */
     private final CanvasExecutionRequestMapper mapper;
+    /** Jackson ObjectMapper，用于 JSON 序列化和反序列化。 */
     private final ObjectMapper objectMapper;
 
+    /** 将触发请求写入执行请求表，供异步派发。 */
     public String enqueue(Long canvasId,
                           String userId,
                           String triggerType,
@@ -45,6 +54,7 @@ public class CanvasExecutionRequestService {
         return requestId;
     }
 
+    /** 根据来源消息 ID 生成幂等请求 ID；无来源 ID 时生成随机请求 ID。 */
     private String buildRequestId(Long canvasId, String triggerType, String sourceMsgId) {
         String prefix = triggerType == null ? "request" : triggerType.toLowerCase();
         if (sourceMsgId == null || sourceMsgId.isBlank()) {
@@ -56,6 +66,7 @@ public class CanvasExecutionRequestService {
         return prefix + "-" + canvasId + "-" + sha256(raw).substring(0, 24);
     }
 
+    /** 计算 SHA-256 十六进制摘要，用于稳定生成幂等请求后缀。 */
     private String sha256(String raw) {
         try {
             MessageDigest digest = MessageDigest.getInstance("SHA-256");
@@ -65,6 +76,7 @@ public class CanvasExecutionRequestService {
         }
     }
 
+    /** 将执行请求载荷序列化为数据库中的 JSON 文本。 */
     private String toJson(Map<String, Object> payload) {
         try {
             return objectMapper.writeValueAsString(payload);

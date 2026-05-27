@@ -1,3 +1,8 @@
+/**
+ * 组件职责：左侧节点库面板，负责加载节点类型、分类筛选、搜索、折叠和拖拽。
+ *
+ * 维护说明：分类顺序和折叠状态会写入 localStorage，便于用户保留常用布局。
+ */
 import type { DragEvent } from 'react'
 import { useEffect, useMemo, useState } from 'react'
 import { Empty, Input, Spin, Tooltip } from 'antd'
@@ -13,14 +18,20 @@ import {
   getNodeSummary,
 } from './nodeLibrary'
 
+/** 节点库面板入参。 */
 interface Props {
+  /** 拖拽开始时通知编辑器当前节点类型，编辑器可据此准备落点状态。 */
   onDragStart: (nodeType: string, category: string) => void
 }
 
+/** 默认展开的高频分类；其他分类默认折叠以降低初次进入时的信息密度。 */
 const DEFAULT_EXPANDED_CATEGORIES = new Set(['其他', '逻辑分支'])
+/** 分类折叠状态的 localStorage key。 */
 const COLLAPSE_STATE_KEY = 'canvas_node_panel_collapsed_groups_v1'
+/** 用户自定义分类排序的 localStorage key。 */
 const CATEGORY_ORDER_KEY = 'canvas_node_panel_category_order_v1'
 
+/** 左侧节点库主组件。 */
 export default function NodePanel({ onDragStart }: Props) {
   const [nodes, setNodes] = useState<NodeTypeRegistry[]>([])
   const [loading, setLoading] = useState(true)
@@ -32,6 +43,7 @@ export default function NodePanel({ onDragStart }: Props) {
   const [draggingCategory, setDraggingCategory] = useState<string | null>(null)
   const [dropTargetCategory, setDropTargetCategory] = useState<string | null>(null)
 
+  // 节点类型来自后端注册表，新增节点后不需要改前端列表渲染。
   useEffect(() => {
     metaApi.getNodeTypes()
       .then((res) => {
@@ -40,6 +52,7 @@ export default function NodePanel({ onDragStart }: Props) {
       .finally(() => setLoading(false))
   }, [])
 
+  // 恢复用户上次保存的分类折叠状态；坏数据直接忽略。
   useEffect(() => {
     try {
       const saved = window.localStorage.getItem(COLLAPSE_STATE_KEY)
@@ -51,6 +64,7 @@ export default function NodePanel({ onDragStart }: Props) {
     }
   }, [])
 
+  // 恢复用户自定义分类排序；只接受数组，避免 localStorage 污染导致崩溃。
   useEffect(() => {
     try {
       const saved = window.localStorage.getItem(CATEGORY_ORDER_KEY)
@@ -62,6 +76,7 @@ export default function NodePanel({ onDragStart }: Props) {
     }
   }, [])
 
+  // 分类顺序 = 全部 + 用户排序中的有效分类 + 后端新出现但用户尚未排序的分类。
   const categories = useMemo(() => {
     const built = buildCategoryOptions(nodes)
     const base = built.filter(category => category !== '全部')
@@ -69,6 +84,8 @@ export default function NodePanel({ onDragStart }: Props) {
     const missing = base.filter(category => !ordered.includes(category))
     return ['全部', ...ordered, ...missing]
   }, [categoryOrder, nodes])
+
+  // 根据分类和关键词生成当前可见节点集合。
   const view = useMemo(
     () =>
       buildNodeLibraryView(nodes, {
@@ -78,6 +95,8 @@ export default function NodePanel({ onDragStart }: Props) {
       }),
     [activeCategory, keyword, nodes],
   )
+
+  // 按后端 category 字段分组，渲染时每组可独立折叠。
   const groupedNodes = useMemo(() => {
     const groups: Record<string, NodeTypeRegistry[]> = {}
     for (const node of view.filteredNodes) {
@@ -86,15 +105,18 @@ export default function NodePanel({ onDragStart }: Props) {
     }
     return groups
   }, [view.filteredNodes])
+  /** 当前筛选条件下真正有节点可展示的分类。 */
   const visibleCategories = useMemo(
     () => categories.filter(category => category !== '全部' && groupedNodes[category]?.length),
     [categories, groupedNodes],
   )
+  /** 可参与用户排序的分类列表，不包含“全部”虚拟分类。 */
   const sortableCategories = useMemo(
     () => categories.filter(category => category !== '全部'),
     [categories],
   )
 
+  // 搜索或切换分类时强制展开命中的分组，确保用户能直接看到过滤结果。
   useEffect(() => {
     if (!visibleCategories.length) return
     setCollapsedGroups((current) => {
@@ -107,6 +129,7 @@ export default function NodePanel({ onDragStart }: Props) {
     })
   }, [activeCategory, keyword, visibleCategories])
 
+  /** 写入拖拽 payload，画布编辑器的 onDrop 会读取这些字段创建节点。 */
   const handleNodeDragStart = (event: DragEvent<HTMLDivElement>, node: NodeTypeRegistry) => {
     event.dataTransfer.setData('application/canvas-node-type', node.typeKey)
     event.dataTransfer.setData('application/canvas-node-category', node.category)
@@ -120,6 +143,7 @@ export default function NodePanel({ onDragStart }: Props) {
     onDragStart(node.typeKey, node.category)
   }
 
+  /** 切换单个分类的折叠状态。 */
   const toggleGroup = (category: string) => {
     setCollapsedGroups((current) => ({
       ...current,
@@ -127,11 +151,13 @@ export default function NodePanel({ onDragStart }: Props) {
     }))
   }
 
+  /** 生成分类标题背景色，和画布节点分类颜色保持弱关联。 */
   const getCategoryTint = (category: string) => {
     const color = CATEGORY_SOLID[category] ?? '#6d5efc'
     return `${color}12`
   }
 
+  /** 拖拽排序分类；只调整分类顺序，不改变节点本身顺序。 */
   const moveCategory = (source: string, target: string) => {
     if (source === target) return
     setCategoryOrder((current) => {
@@ -144,11 +170,13 @@ export default function NodePanel({ onDragStart }: Props) {
     })
   }
 
+  // 持久化折叠状态。
   useEffect(() => {
     if (!Object.keys(collapsedGroups).length) return
     window.localStorage.setItem(COLLAPSE_STATE_KEY, JSON.stringify(collapsedGroups))
   }, [collapsedGroups])
 
+  // 持久化分类排序。
   useEffect(() => {
     if (!categoryOrder.length) return
     window.localStorage.setItem(CATEGORY_ORDER_KEY, JSON.stringify(categoryOrder))

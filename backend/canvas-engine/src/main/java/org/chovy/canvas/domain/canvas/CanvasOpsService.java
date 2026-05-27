@@ -3,7 +3,10 @@ package org.chovy.canvas.domain.canvas;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import org.chovy.canvas.common.MapFieldKeys;
 import org.chovy.canvas.common.enums.CanvasStatusEnum;
+import org.chovy.canvas.common.enums.ExecutionStatus;
 import org.chovy.canvas.common.enums.VersionStatus;
+import org.chovy.canvas.dal.dataobject.CanvasExecutionDO;
+import org.chovy.canvas.dal.mapper.CanvasExecutionMapper;
 import org.chovy.canvas.engine.trigger.TriggerPreCheckService;
 import org.chovy.canvas.infrastructure.redis.TriggerRouteService;
 import lombok.RequiredArgsConstructor;
@@ -22,12 +25,21 @@ import org.chovy.canvas.dal.mapper.CanvasVersionMapper;
 @RequiredArgsConstructor
 public class CanvasOpsService {
 
+    /** 画布 Mapper，用于读取和更新画布主表状态。 */
     private final CanvasMapper        canvasMapper;
+    /** 画布版本 Mapper。 */
     private final CanvasVersionMapper canvasVersionMapper;
+    /** 执行记录 Mapper，用于 FORCE kill 时终止运行中记录。 */
+    private final CanvasExecutionMapper executionMapper;
+    /** 触发路由服务，负责 Redis 路由注册、清理和查询。 */
     private final TriggerRouteService triggerRouteService;
+    /** 触发预检服务，负责有效期、配额、冷却期和并发保护校验。 */
     private final TriggerPreCheckService preCheckService;
+    /** 画布事务服务，封装只涉及数据库写入的事务边界。 */
     private final CanvasTransactionService canvasTransactionService;
+    /** 画布主服务，用于复用发布、回滚和外部状态清理能力。 */
     private final CanvasService canvasService;
+    /** 阻塞式 Redis 模板，用于锁、去重、票据或跨实例通知。 */
     private final StringRedisTemplate redis;
 
     /**
@@ -80,8 +92,22 @@ public class CanvasOpsService {
         // Step 2: 事务外副作用
         // 广播 Kill 信号（Phase 11 Redis Pub/Sub），各机器收到后立即取消正在进行的执行
         redis.convertAndSend("canvas:kill:" + id, mode);
+        if ("FORCE".equalsIgnoreCase(mode)) {
+            markRunningExecutionsFailed(id);
+        }
         // 清理触发路由、调度任务、缓存、配额
         canvasService.applyKillExternalCleanup(id, publishedVersionId);
+    }
+
+    /** FORCE Kill 时将该画布仍处于 RUNNING 的执行记录统一标记为失败。 */
+    private void markRunningExecutionsFailed(Long canvasId) {
+        CanvasExecutionDO update = new CanvasExecutionDO();
+        update.setStatus(ExecutionStatus.FAILED.getCode());
+        update.setResult("{\"error\":\"FORCE_CANCELLED\"}");
+        executionMapper.update(update,
+                new com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper<CanvasExecutionDO>()
+                        .eq(CanvasExecutionDO::getCanvasId, canvasId)
+                        .eq(CanvasExecutionDO::getStatus, ExecutionStatus.RUNNING.getCode()));
     }
 
     // ── 灰度发布 ────────────────────────────────────────────────
@@ -266,6 +292,7 @@ public class CanvasOpsService {
         );
     }
 
+    /** 将版本图 JSON 解析为节点列表，解析失败时按空图处理，避免差异接口中断。 */
     @SuppressWarnings("unchecked")
     private java.util.List<java.util.Map<String, Object>> parseNodes(String graphJson) {
         if (graphJson == null || graphJson.isBlank()) return java.util.List.of();
@@ -282,12 +309,14 @@ public class CanvasOpsService {
 
     // ── helpers ──────────────────────────────────────────────────
 
+    /** 按 ID 查询画布，不存在时抛出业务异常。 */
     private CanvasDO require(Long id) {
         CanvasDO c = canvasMapper.selectById(id);
         if (c == null) throw new IllegalArgumentException("画布不存在: " + id);
         return c;
     }
 
+    /** 查询指定画布当前版本号最大的草稿版本。 */
     private CanvasVersionDO latestDraft(Long canvasId) {
         return canvasVersionMapper.selectOne(
                 new LambdaQueryWrapper<CanvasVersionDO>()
@@ -296,6 +325,7 @@ public class CanvasOpsService {
                         .orderByDesc(CanvasVersionDO::getVersion).last("LIMIT 1"));
     }
 
+    /** 根据现有最大版本号计算下一次快照版本号。 */
     private int nextVer(Long canvasId) {
         CanvasVersionDO max = canvasVersionMapper.selectOne(
                 new LambdaQueryWrapper<CanvasVersionDO>()
@@ -304,6 +334,7 @@ public class CanvasOpsService {
         return max != null ? max.getVersion() + 1 : 1;
     }
 
+    /** 保留旧版本路由清理签名，实际清理由 CanvasService 统一处理。 */
     private void clearRoutes(Long id, CanvasDO canvas) {
         // 已由 canvasService.applyKillExternalCleanup 统一实现，保留签名兼容旧调用
     }

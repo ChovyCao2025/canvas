@@ -17,6 +17,7 @@ import org.chovy.canvas.engine.handlers.GroovyHandler;
 import org.chovy.canvas.engine.handlers.AggregateHandler;
 import org.chovy.canvas.engine.handlers.HubHandler;
 import org.chovy.canvas.engine.handlers.LogicRelationHandler;
+import org.chovy.canvas.engine.handlers.MergeHandler;
 import org.chovy.canvas.engine.handlers.ThresholdHandler;
 import org.chovy.canvas.infrastructure.redis.ContextPersistenceService;
 import org.junit.jupiter.api.Test;
@@ -31,10 +32,17 @@ import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+/**
+ * Special Node Stage 2 Execution 测试类。
+ *
+ * <p>覆盖该后端组件在典型输入、边界条件和异常场景下的行为，确保重构或性能优化不会改变既有契约。
+ * <p>测试代码只构造必要的依赖与数据，断言重点放在可观察结果、状态变更和关键副作用上。
+ */
 class SpecialNodeStage2ExecutionTest {
 
     @Test
@@ -120,12 +128,79 @@ class SpecialNodeStage2ExecutionTest {
         assertThat(ctx.getNodeStatus("done")).isEqualTo(NodeStatus.SUCCESS);
     }
 
+    @Test
+    void nodeFailurePropagatesToCallerInsteadOfReturningErrorMap() {
+        DagEngine engine = engineWithHandlers(new FailingHandler());
+        DagGraph graph = graph(List.of(
+                node("fail", "TEST_FAIL")
+        ), Map.of());
+        ExecutionContext ctx = context();
+
+        assertThatThrownBy(() -> engine.execute(graph, "fail", ctx).block())
+                .hasMessageContaining("节点 fail 失败");
+
+        assertThat(ctx.getNodeStatus("fail")).isEqualTo(NodeStatus.FAILED);
+    }
+
+    @Test
+    void failedHubReentryPropagatesTerminalFailureInsteadOfReturningToWaiting() {
+        DagEngine engine = engineWithHandlers();
+        DagGraph graph = graph(List.of(
+                node("upA", "TEST_SOURCE"),
+                node("hub", NodeType.HUB)
+        ), Map.of(
+                "upA", List.of("hub")
+        ));
+        ExecutionContext ctx = context();
+        ctx.setNodeStatus("hub", NodeStatus.FAILED);
+
+        assertThatThrownBy(() -> engine.execute(graph, "hub", ctx).block())
+                .hasMessageContaining("节点 hub 已处于终态: FAILED");
+
+        assertThat(ctx.getNodeStatus("hub")).isEqualTo(NodeStatus.FAILED);
+    }
+
+    @Test
+    void skippedBranchPropagatesUntilMergeCanRun() {
+        DagEngine engine = engineWithHandlers(new BranchHandler());
+        DagParser.CanvasNode branch = node("branch", NodeType.IF_CONDITION);
+        branch.setConfig(Map.of(
+                MapFieldKeys.SUCCESS_NODE_ID, "active",
+                MapFieldKeys.FAIL_NODE_ID, "skip1"
+        ));
+        DagParser.CanvasNode merge = node("merge", NodeType.MERGE);
+        merge.setConfig(Map.of(MapFieldKeys.NEXT_NODE_ID, "done"));
+        DagGraph graph = graph(List.of(
+                branch,
+                node("active", "TEST_SOURCE"),
+                node("skip1", "TEST_SOURCE"),
+                node("skip2", "TEST_SOURCE"),
+                merge,
+                node("done", "TEST_SOURCE")
+        ), Map.of(
+                "branch", List.of("active", "skip1"),
+                "active", List.of("merge"),
+                "skip1", List.of("skip2"),
+                "skip2", List.of("merge"),
+                "merge", List.of("done")
+        ));
+        ExecutionContext ctx = context();
+
+        engine.execute(graph, "branch", ctx).block();
+
+        assertThat(ctx.getNodeStatus("skip1")).isEqualTo(NodeStatus.SKIPPED);
+        assertThat(ctx.getNodeStatus("skip2")).isEqualTo(NodeStatus.SKIPPED);
+        assertThat(ctx.getNodeStatus("merge")).isEqualTo(NodeStatus.SUCCESS);
+        assertThat(ctx.getNodeStatus("done")).isEqualTo(NodeStatus.SUCCESS);
+    }
+
     private DagEngine engineWithHandlers(NodeHandler... extraHandlers) {
         List<NodeHandler> handlers = new ArrayList<>();
         handlers.add(new HubHandler());
         handlers.add(new AggregateHandler(new GroovyHandler(mock(GroovyScriptCache.class))));
         handlers.add(new LogicRelationHandler());
         handlers.add(new ThresholdHandler());
+        handlers.add(new MergeHandler());
         handlers.add(new TestSourceHandler());
         handlers.addAll(List.of(extraHandlers));
 
@@ -236,6 +311,24 @@ class SpecialNodeStage2ExecutionTest {
         @Override
         public Mono<NodeResult> executeAsync(Map<String, Object> config, ExecutionContext ctx) {
             return Mono.just(NodeResult.terminal(Map.of()));
+        }
+    }
+
+    @NodeHandlerType("TEST_FAIL")
+    static class FailingHandler implements NodeHandler {
+        @Override
+        public Mono<NodeResult> executeAsync(Map<String, Object> config, ExecutionContext ctx) {
+            return Mono.just(NodeResult.fail("boom"));
+        }
+    }
+
+    @NodeHandlerType(NodeType.IF_CONDITION)
+    static class BranchHandler implements NodeHandler {
+        @Override
+        public Mono<NodeResult> executeAsync(Map<String, Object> config, ExecutionContext ctx) {
+            return Mono.just(NodeResult.ifResult(true,
+                    (String) config.get(MapFieldKeys.SUCCESS_NODE_ID),
+                    (String) config.get(MapFieldKeys.FAIL_NODE_ID)));
         }
     }
 }

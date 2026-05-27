@@ -142,12 +142,10 @@ public class DagEngine {
         // 从起始节点开始执行画布相关节点
         return executeNode(graph, triggerNodeId, ctx, 0)
                 .doOnTerminate(() -> writeSkippedNodesIfComplete(graph, ctx))
-                .onErrorResume(e -> {
+                .doOnError(e -> {
                     log.error("[ENGINE] 执行出错 executionId={}: {}",
                             ctx.getExecutionId(), e.getMessage(), e);
                     ctxStore.save(ctx);
-                    String errMsg = e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName();
-                    return Mono.just(Map.of(MapFieldKeys.ERROR, errMsg));
                 });
     }
 
@@ -213,6 +211,10 @@ public class DagEngine {
                 return handleAggregate(graph, nodeId, node, config, ctx, depth);
             }
             if (NodeType.THRESHOLD.equals(node.getType())) {
+                Mono<Map<String, Object>> terminal = terminalSpecialNodeResult(nodeId, ctx);
+                if (terminal != null) {
+                    return terminal;
+                }
                 // THRESHOLD 不等所有上游完成——每个上游完成都触发一次 handler。
                 // 与 HUB/AGGREGATE 的关键区别：此处只注入 upstreamIds，不加 allUpstreamDone 门控，
                 // handler 在执行时才读 ctx 计数，这是 repeat 机制真正有用的场景：
@@ -477,6 +479,17 @@ public class DagEngine {
         return msg != null && (msg.contains("5xx") || msg.contains("timeout") || msg.contains("Timeout"));
     }
 
+    private Mono<Map<String, Object>> terminalSpecialNodeResult(String nodeId, ExecutionContext ctx) {
+        NodeStatus status = ctx.getNodeStatus(nodeId);
+        if (status == NodeStatus.FAILED || status == NodeStatus.TIMEOUT || status == NodeStatus.PARTIAL_FAIL) {
+            return Mono.error(new RuntimeException("节点 " + nodeId + " 已处于终态: " + status));
+        }
+        if (ctx.isNodeDone(nodeId)) {
+            return Mono.just(Map.of());
+        }
+        return null;
+    }
+
     /**
      * 写入死信队列（13.3节）
      */
@@ -518,6 +531,10 @@ public class DagEngine {
                                                           Map<String, Object> config,
                                                           ExecutionContext ctx,
                                                           int depth) {
+        Mono<Map<String, Object>> terminal = terminalSpecialNodeResult(nodeId, ctx);
+        if (terminal != null) {
+            return terminal;
+        }
         List<String> upstreamIds = graph.upstream(nodeId);
         String relation = (String) config.getOrDefault("relation", "AND");
 
@@ -562,7 +579,7 @@ public class DagEngine {
         //   setNodeStatus(WAITING) 多线程同时写相同值，幂等，没有问题。
         // ──────────────────────────────────────────────────────────
         if (!LogicRelationHandler.checkCondition(relation, upstreamIds, ctx)) {
-            ctx.setNodeStatus(nodeId, NodeStatus.WAITING);
+            ctx.setNodeStatusIfNotDone(nodeId, NodeStatus.WAITING);
 
             // LOGIC_RELATION 等待超时（与 Hub 类似，防止第二触发永不到来）
             // config 中可选配置 timeout 字段（秒），默认等于全局执行超时
@@ -580,7 +597,7 @@ public class DagEngine {
                                 executionService.trigger(
                                                 ctx.getCanvasId(), ctx.getUserId(),
                                                 TriggerType.LOGIC_RELATION_TIMEOUT, NodeType.LOGIC_RELATION,
-                                                null, Map.of(),
+                                                nodeId, Map.of(),
                                                 ctx.getExecutionId() + ":lr-timeout:" + nodeId, false)
                                         .subscribe(null,
                                                 (Throwable e) -> log.error("[LOGIC_RELATION] 超时恢复失败 nodeId={}: {}", nodeId, e.getMessage()));
@@ -643,6 +660,10 @@ public class DagEngine {
                                                 Map<String, Object> config,
                                                 ExecutionContext ctx,
                                                 int depth) {
+        Mono<Map<String, Object>> terminal = terminalSpecialNodeResult(nodeId, ctx);
+        if (terminal != null) {
+            return terminal;
+        }
         List<String> upstreamIds = graph.upstream(nodeId);
 
         // 所有上游未完成：进入等待态
@@ -661,7 +682,7 @@ public class DagEngine {
         //   scheduledHubTimeouts.add() 是 ConcurrentHashSet，保证定时器只调度一次。
         // ──────────────────────────────────────────────────────────
         if (!HubHandler.allUpstreamDone(upstreamIds, ctx)) {
-            ctx.setNodeStatus(nodeId, NodeStatus.WAITING);  // 设 WAITING 供 isPaused 检测
+            ctx.setNodeStatusIfNotDone(nodeId, NodeStatus.WAITING);  // 设 WAITING 供 isPaused 检测
             if (ctx.getScheduledHubTimeouts().add(nodeId)) {
                 ctx.getHubStartTimes().putIfAbsent(nodeId, System.currentTimeMillis());
                 int timeoutSec = HubHandler.getTimeoutSeconds(config);
@@ -676,7 +697,7 @@ public class DagEngine {
                                 executionService.trigger(
                                                 ctx.getCanvasId(), ctx.getUserId(),
                                                 TriggerType.HUB_TIMEOUT, NodeType.HUB,
-                                                null, Map.of(),
+                                                nodeId, Map.of(),
                                                 ctx.getExecutionId() + ":hub-timeout:" + nodeId, false)
                                         .subscribe(null,
                                                 (Throwable e) -> log.error("[HUB] 超时恢复失败 nodeId={}: {}", nodeId, e.getMessage()));
@@ -716,11 +737,15 @@ public class DagEngine {
                                                       Map<String, Object> config,
                                                       ExecutionContext ctx,
                                                       int depth) {
+        Mono<Map<String, Object>> terminal = terminalSpecialNodeResult(nodeId, ctx);
+        if (terminal != null) {
+            return terminal;
+        }
         List<String> upstreamIds = graph.upstream(nodeId);
 
         if (!HubHandler.allUpstreamDone(upstreamIds, ctx)) {
             // 并发安全性同 handleHub：无锁，竞态下超时定时器是必要兜底。
-            ctx.setNodeStatus(nodeId, NodeStatus.WAITING);
+            ctx.setNodeStatusIfNotDone(nodeId, NodeStatus.WAITING);
             String timerKey = "ag:" + nodeId;
             if (ctx.getScheduledHubTimeouts().add(timerKey)) {
                 ctx.getHubStartTimes().putIfAbsent(timerKey, System.currentTimeMillis());
@@ -734,7 +759,7 @@ public class DagEngine {
                                 executionService.trigger(
                                                 ctx.getCanvasId(), ctx.getUserId(),
                                                 TriggerType.AGGREGATE_TIMEOUT, NodeType.AGGREGATE,
-                                                null, Map.of(),
+                                                nodeId, Map.of(),
                                                 ctx.getExecutionId() + ":ag-timeout:" + nodeId, false)
                                         .subscribe(null,
                                                 (Throwable e) -> log.error("[AGGREGATE] 超时恢复失败 nodeId={}: {}", nodeId, e.getMessage()));
@@ -771,7 +796,7 @@ public class DagEngine {
                         executionService.trigger(
                                         ctx.getCanvasId(), ctx.getUserId(),
                                         TriggerType.THRESHOLD_TIMEOUT, NodeType.THRESHOLD,
-                                        null, Map.of(),
+                                        nodeId, Map.of(),
                                         ctx.getExecutionId() + ":th-timeout:" + nodeId, false)
                                 .subscribe(null,
                                         (Throwable e) -> log.error("[THRESHOLD] 超时恢复失败 nodeId={}: {}", nodeId, e.getMessage()));
@@ -875,10 +900,45 @@ public class DagEngine {
         if (nextIds.isEmpty()) {
             return Mono.just(result.output() != null ? result.output() : Map.of());
         }
+        prepareControlFlowReentry(graph, result, sourceNodeId, sourceType, nextIds, ctx);
 
         return Flux.fromIterable(nextIds)
                 .flatMap(nextId -> executeNode(graph, nextId, ctx, depth + 1))
                 .last(Map.of());
+    }
+
+    private void prepareControlFlowReentry(DagGraph graph, NodeResult result, String sourceNodeId,
+                                           String sourceType, List<String> nextIds, ExecutionContext ctx) {
+        boolean looping = NodeType.LOOP.equals(sourceType)
+                && result.routes() != null
+                && result.routes().containsKey("loop");
+        boolean jumping = NodeType.GOTO.equals(sourceType)
+                && result.routes() != null
+                && result.routes().containsKey("goto");
+        if (!looping && !jumping) {
+            return;
+        }
+        for (String nextId : nextIds) {
+            resetReachableUntilSource(graph, nextId, sourceNodeId, ctx);
+        }
+    }
+
+    private void resetReachableUntilSource(DagGraph graph, String startNodeId, String sourceNodeId,
+                                           ExecutionContext ctx) {
+        Deque<String> queue = new ArrayDeque<>();
+        Set<String> visited = new HashSet<>();
+        queue.add(startNodeId);
+        while (!queue.isEmpty()) {
+            String current = queue.removeFirst();
+            if (!visited.add(current)) {
+                continue;
+            }
+            ctx.resetNodeStatusForReentry(current);
+            if (current.equals(sourceNodeId)) {
+                continue;
+            }
+            graph.downstream(current).forEach(queue::addLast);
+        }
     }
 
     /**
@@ -1180,7 +1240,7 @@ public class DagEngine {
             String takenId = result.successNodeId() != null ? result.successNodeId()
                     : result.failNodeId();
             String skippedId = takenId != null && takenId.equals(successId) ? failId : successId;
-            markSkipped(skippedId, ctx);
+            markSkippedPath(graph, skippedId, ctx);
 
         } else if ("SELECTOR".equals(sourceType)) {
             // 标记所有未走的 branch 入口
@@ -1192,18 +1252,41 @@ public class DagEngine {
             branches.forEach(b -> {
                 String branchNext = (String) b.get(MapFieldKeys.NEXT_NODE_ID);
                 if (branchNext != null && !branchNext.equals(takenId)) {
-                    markSkipped(branchNext, ctx);
+                    markSkippedPath(graph, branchNext, ctx);
                 }
             });
             if (elseId != null && !elseId.equals(takenId)) {
-                markSkipped(elseId, ctx);
+                markSkippedPath(graph, elseId, ctx);
             }
         }
     }
 
-    private void markSkipped(String nodeId, ExecutionContext ctx) {
-        if (nodeId != null && ctx.setNodeStatusIfNotDone(nodeId, NodeStatus.SKIPPED)) {
-            log.debug("[ENGINE] 立即标记 SKIPPED nodeId={}", nodeId);
+    private void markSkippedPath(DagGraph graph, String nodeId, ExecutionContext ctx) {
+        if (nodeId == null || nodeId.isBlank()) {
+            return;
         }
+        Deque<String> queue = new ArrayDeque<>();
+        Set<String> visited = new HashSet<>();
+        queue.add(nodeId);
+        while (!queue.isEmpty()) {
+            String current = queue.removeFirst();
+            if (!visited.add(current)) {
+                continue;
+            }
+            if (ctx.setNodeStatusIfNotDone(current, NodeStatus.SKIPPED)) {
+                log.debug("[ENGINE] 立即标记 SKIPPED nodeId={}", current);
+            }
+            for (String downstream : graph.downstream(current)) {
+                if (allUpstreamSkipped(graph, downstream, ctx)) {
+                    queue.addLast(downstream);
+                }
+            }
+        }
+    }
+
+    private boolean allUpstreamSkipped(DagGraph graph, String nodeId, ExecutionContext ctx) {
+        List<String> upstreamIds = graph.upstream(nodeId);
+        return !upstreamIds.isEmpty()
+                && upstreamIds.stream().allMatch(upstream -> ctx.getNodeStatus(upstream) == NodeStatus.SKIPPED);
     }
 }

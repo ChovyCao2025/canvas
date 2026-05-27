@@ -50,11 +50,16 @@ import java.util.List;
 @RequiredArgsConstructor
 public class TriggerPreCheckService {
 
+    /** 画布 Mapper，保留给配额检查扩展场景读取画布配置。 */
     private final CanvasMapper canvasMapper;
+    /** 用户配额 Mapper。 */
     private final CanvasUserQuotaMapper quotaMapper;
+    /** 阻塞式 Redis 模板，用于锁、去重、票据或跨实例通知。 */
     private final StringRedisTemplate redis;
 
+    /** 画布全局触发次数 Redis key 模板。 */
     private static final String GLOBAL_COUNT_KEY = "canvas:global_count:";
+    /** 用户配额 Redis key 模板。 */
     private static final String QUOTA_KEY = "canvas:quota:";
 
     /**
@@ -310,15 +315,18 @@ public class TriggerPreCheckService {
         });
     }
 
-    /** 触发拒绝异常（含错误码，供 Controller 映射 HTTP 状态） */
+    /** 触发拒绝异常，携带错误码供 Controller 映射 HTTP 状态。 */
     public static class TriggerRejectedException extends RuntimeException {
+        /** 触发拒绝错误码。 */
         private final String code;
 
+        /** 创建带业务错误码和提示信息的触发拒绝异常。 */
         public TriggerRejectedException(String code, String msg) {
             super(msg);
             this.code = code;
         }
 
+        /** 返回触发拒绝错误码。 */
         public String getCode() {
             return code;
         }

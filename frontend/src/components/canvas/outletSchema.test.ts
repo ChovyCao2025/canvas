@@ -1,3 +1,8 @@
+/**
+ * 测试职责：验证动态出口 schema 的解析、回退和目标字段映射规则。
+ *
+ * 维护说明：后端新增 outletSchema 字段或变更 handle 兼容策略时，应先补这里的用例。
+ */
 import { describe, expect, it } from 'vitest'
 import { getOutletHandles, getOutletTargetField, hasOutletSchema, parseOutletSchema } from './outletSchema'
 

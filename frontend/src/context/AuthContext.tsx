@@ -1,3 +1,8 @@
+/**
+ * 上下文职责：认证上下文，维护当前用户、管理员判断和本地持久化登录态。
+ *
+ * 维护说明：Provider 负责 localStorage 与 React 状态的同步，调用方通过 useAuth 读取和更新。
+ */
 import { createContext, useContext, useState, type ReactNode } from 'react'
 import type { LoginResp } from '../services/api'
 
@@ -22,6 +27,7 @@ interface AuthState {
   logout: () => void
 }
 
+/** 认证上下文默认值；真实登录态由 AuthProvider 在运行时注入。 */
 const AuthContext = createContext<AuthState>({
   user: null,
   isAdmin: false,
@@ -30,6 +36,7 @@ const AuthContext = createContext<AuthState>({
   logout: () => {},
 })
 
+/** 认证状态 Provider，负责 localStorage 恢复和登录态写入。 */
 export function AuthProvider({ children }: { children: ReactNode }) {
   // 首次渲染从 localStorage 恢复，保证刷新后不丢失会话
   const [user, setUser] = useState<LoginResp | null>(() => {
@@ -43,6 +50,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   })
 
+  /** 登录成功后写入 token、用户快照和 React 状态。 */
   const login = (resp: LoginResp) => {
     // token 与用户快照同时写入，避免页面切换期间状态不一致
     localStorage.setItem('canvas_token', resp.token)
@@ -50,6 +58,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(resp)
   }
 
+  /** 退出登录时清理本地会话并重置认证态。 */
   const logout = () => {
     localStorage.removeItem('canvas_token')
     localStorage.removeItem('canvas_user')

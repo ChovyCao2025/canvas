@@ -58,7 +58,7 @@ echo "[4/6] 安装本地 cache SDK..."
 echo "[5/6] 启动后端..."
 (
   cd backend
-  mvn -pl canvas-engine -am spring-boot:run
+  mvn -pl canvas-engine -am -Dmaven.test.skip=true spring-boot:run
 ) > "$ROOT_DIR/backend.log" 2>&1 &
 BACKEND_PID=$!
 
@@ -124,7 +124,7 @@ echo "[4/6] 安装本地 cache SDK..."
 echo "[5/6] 启动后端..."
 (
   cd backend
-  mvn -pl canvas-engine -am spring-boot:run
+  mvn -pl canvas-engine -am -Dmaven.test.skip=true spring-boot:run
 ) > "$ROOT_DIR/backend.log" 2>&1 &
 BACKEND_PID=$!
 
@@ -197,7 +197,7 @@ Write-Host "[5/6] 启动后端..."
 Start-Process powershell -ArgumentList @(
     "-NoExit",
     "-Command",
-    "cd `"$RootDir\backend`"; mvn -pl canvas-engine -am spring-boot:run"
+    "cd `"$RootDir\backend`"; mvn -pl canvas-engine -am -Dmaven.test.skip=true spring-boot:run"
 )
 
 Write-Host "[6/6] 启动前端..."
@@ -253,6 +253,7 @@ JAVA_HOME=$(/usr/libexec/java_home -v 21) mvn -q -pl canvas-cache-sdk install -D
 cd /Users/photonpay/project/canvas/backend/canvas-engine
 JAVA_HOME=/Users/photonpay/Library/Java/JavaVirtualMachines/ms-21.0.11/Contents/Home \
     /opt/homebrew/bin/mvn spring-boot:run \
+    -Dmaven.test.skip=true \
     -f /Users/photonpay/project/canvas/backend/canvas-engine/pom.xml
 # 启动完成标志：Started CanvasEngineApplication
 # Swagger UI: http://localhost:8080/swagger-ui.html
@@ -289,5 +290,5 @@ SPRING_DATASOURCE_URL="jdbc:mysql://host:3306/canvas_db?..." \
 SPRING_DATA_REDIS_HOST=host \
 ROCKETMQ_NAME_SERVER=host:9876 \
 CANVAS_JWT_SECRET=your-secret \
-mvn spring-boot:run
+mvn -Dmaven.test.skip=true spring-boot:run
 ```

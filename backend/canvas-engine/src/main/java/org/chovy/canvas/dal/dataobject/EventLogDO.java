@@ -16,6 +16,7 @@ import java.time.LocalDateTime;
 public class EventLogDO {
 
     @TableId(type = IdType.AUTO)
+    /** 事件日志主键 ID */
     private Long id;
 
     /** 上报的事件标识，对应 EventDefinitionDO.eventCode */
@@ -46,5 +47,6 @@ public class EventLogDO {
     private Integer canvasCount;
 
     @TableField(fill = FieldFill.INSERT)
+    /** 事件日志创建时间，即事件上报落库时间 */
     private LocalDateTime createdAt;
 }

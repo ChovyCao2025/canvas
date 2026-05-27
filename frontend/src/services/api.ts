@@ -1,3 +1,8 @@
+/**
+ * 服务职责：统一后端 API 客户端和核心业务 API 聚合层。
+ *
+ * 维护说明：axios 拦截器在这里注入 token、解包 R<T> 响应，并在 401 时清理登录态。
+ */
 import axios from 'axios'
 import type {
   R, PageResult,
@@ -57,6 +62,7 @@ export interface LoginResp {
   role: 'ADMIN' | 'OPERATOR'
 }
 
+/** 后台系统用户列表项。 */
 export interface SysUser {
   /** 用户 ID。 */
   id: number
@@ -101,6 +107,7 @@ interface AdminUpdateUserReq {
   role?: string
 }
 
+/** 登录、登出和当前用户接口集合。 */
 export const authApi = {
   login: (username: string, password: string) =>
     http.post<R<LoginResp>, R<LoginResp>>('/auth/login', { username, password }),
@@ -108,6 +115,7 @@ export const authApi = {
   me: () => http.get<R<LoginResp>, R<LoginResp>>('/auth/me'),
 }
 
+/** 管理员用户管理接口集合。 */
 export const adminApi = {
   listUsers: () => http.get<R<SysUser[]>, R<SysUser[]>>('/admin/users'),
   createUser: (body: AdminCreateUserReq) =>
@@ -186,6 +194,7 @@ interface CanvasListQuery {
   name?: string
 }
 
+/** 画布草稿、发布、版本、灰度和执行调试接口集合。 */
 export const canvasApi = {
   create: (body: CanvasCreateReq) =>
     http.post<R<Canvas>, R<Canvas>>('/canvas', body),
@@ -246,6 +255,7 @@ export const canvasApi = {
     ),
 }
 
+/** 首页运营概览接口。 */
 export const homeApi = {
   overview: (days = 7) =>
     http.get<R<HomeOverview>, R<HomeOverview>>('/canvas/home/overview', { params: { days } }),
@@ -335,6 +345,7 @@ export const abExperimentApi = {
     http.delete<R<void>, R<void>>(`/canvas/ab-experiments/${id}/groups/${groupId}`),
 }
 
+/** 标签定义管理接口集合。 */
 export const tagDefinitionApi = {
   list: (params?: { page?: number; size?: number; tagType?: string; enabled?: number }) =>
     http.get<R<PageResult<any>>, R<PageResult<any>>>('/canvas/tag-definitions', { params }),
@@ -346,6 +357,7 @@ export const tagDefinitionApi = {
     http.delete<R<void>, R<void>>(`/canvas/tag-definitions/${id}`),
 }
 
+/** 身份类型管理接口集合。 */
 export const identityTypeApi = {
   list: (params?: { enabled?: number; allowImport?: number }) =>
     http.get<R<PageResult<IdentityType>>, R<PageResult<IdentityType>>>('/canvas/identity-types', { params }),
@@ -357,6 +369,7 @@ export const identityTypeApi = {
     http.delete<R<void>, R<void>>(`/canvas/identity-types/${id}`),
 }
 
+/** 标签值管理接口集合。 */
 export const tagValueApi = {
   list: (tagCode: string, params?: { enabled?: number }) =>
     http.get<R<TagValueDefinition[]>, R<TagValueDefinition[]>>(`/canvas/tag-definitions/${tagCode}/values`, { params }),
@@ -368,6 +381,7 @@ export const tagValueApi = {
     http.delete<R<void>, R<void>>(`/canvas/tag-definitions/values/${id}`),
 }
 
+/** 标签导入批次、来源和错误明细接口集合。 */
 export const tagImportApi = {
   apiPush: (rows: TagImportRow[]) =>
     http.post<R<TagImportResult>, R<TagImportResult>>('/canvas/tag-imports/api-push', { rows }),

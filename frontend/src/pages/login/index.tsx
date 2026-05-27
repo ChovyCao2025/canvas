@@ -1,9 +1,15 @@
+/**
+ * 页面职责：登录页，负责账号密码提交、认证态写入和登录后跳转。
+ *
+ * 维护说明：认证状态的持久化由 AuthContext 统一处理，页面只处理表单交互。
+ */
 import { useState } from 'react'
 import { Form, Input, Button, Card, Typography, message } from 'antd'
 import { useNavigate } from 'react-router-dom'
 import { authApi } from '../../services/api'
 import { useAuth } from '../../context/AuthContext'
 
+/** 页面标题组件别名，避免 JSX 中重复书写 Typography.Title。 */
 const { Title } = Typography
 
 /**

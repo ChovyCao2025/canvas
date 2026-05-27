@@ -1,3 +1,8 @@
+/**
+ * 测试职责：验证画布设置摘要、执行限制计数和高级区默认展开规则。
+ *
+ * 维护说明：画布级限制字段新增时，应同步 countExecutionLimitFields 和摘要断言。
+ */
 import { describe, expect, it } from 'vitest'
 import {
   countExecutionLimitFields,

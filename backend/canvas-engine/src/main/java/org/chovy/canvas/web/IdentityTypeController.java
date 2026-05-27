@@ -9,6 +9,12 @@ import org.springframework.web.bind.annotation.*;
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
 
+/**
+ * 身份类型 HTTP 控制器，根路由为 {@code /canvas/identity-types}。
+ *
+ * <p>负责接收前端或外部系统请求，完成参数绑定、基础校验和统一响应包装。
+ * <p>具体业务规则委托给领域服务处理，控制器层保持薄封装以减少重复逻辑。
+ */
 @RestController
 @RequestMapping("/canvas/identity-types")
 @RequiredArgsConstructor

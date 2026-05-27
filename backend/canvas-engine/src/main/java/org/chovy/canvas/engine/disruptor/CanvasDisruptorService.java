@@ -38,9 +38,10 @@ public class CanvasDisruptorService {
      * RingBuffer 发布端，供外部触发源写入执行事件。
      */
     private final RingBuffer<CanvasExecutionEvent> ringBuffer;
+    /** 画布执行指标组件。 */
     private final CanvasMetrics metrics;
 
-    // 初始化配置
+    /** 初始化 Disruptor、worker pool 和异常处理器。 */
     public CanvasDisruptorService(
             CanvasExecutionService executionService,
             CanvasExecutionRequestExecutor requestExecutor,
@@ -67,6 +68,7 @@ public class CanvasDisruptorService {
         ringBuffer = startDisruptor(ringBufferSize, consumers);
     }
 
+    /** 启动 Disruptor 并返回对外发布事件的 RingBuffer。 */
     private RingBuffer<CanvasExecutionEvent> startDisruptor(int ringBufferSize, int consumers) {
         final RingBuffer<CanvasExecutionEvent> ringBuffer;
         ringBuffer = disruptor.start();
@@ -74,6 +76,7 @@ public class CanvasDisruptorService {
         return ringBuffer;
     }
 
+    /** 配置默认异常处理器，确保单个事件异常不会中断消费线程。 */
     private void configureExceptionHandler() {
         // 异常处理：记录错误但不中断 Ring Buffer
         disruptor.setDefaultExceptionHandler(new ExceptionHandler<>() {
@@ -95,6 +98,7 @@ public class CanvasDisruptorService {
         });
     }
 
+    /** 按消费者数量创建 WorkerPool，使每个事件只被一个 worker 处理。 */
     private void configureWorkerPool(CanvasExecutionService executionService, CanvasExecutionRequestExecutor requestExecutor, int consumers) {
         @SuppressWarnings("unchecked")
         WorkHandler<CanvasExecutionEvent>[] workers = new WorkHandler[consumers];
@@ -103,6 +107,7 @@ public class CanvasDisruptorService {
         disruptor.handleEventsWithWorkerPool(workers);
     }
 
+    /** 创建根据事件类型分派到画布执行或请求执行器的 worker。 */
     private static WorkHandler<CanvasExecutionEvent> createWorkerHandler(CanvasExecutionService executionService, CanvasExecutionRequestExecutor requestExecutor) {
         return event -> {
             try {
@@ -119,6 +124,7 @@ public class CanvasDisruptorService {
         };
     }
 
+    /** 处理直接触发画布执行的 Disruptor 事件。 */
     private static void handleCanvasEvent(CanvasExecutionService executionService, CanvasExecutionEvent event) {
         executionService.triggerFromDisruptor(
                         event.canvasId, event.userId, event.triggerType,
@@ -131,6 +137,7 @@ public class CanvasDisruptorService {
                 );
     }
 
+    /** 处理已入库执行请求的 Disruptor 事件。 */
     private static void handleRequestEvent(CanvasExecutionRequestExecutor requestExecutor, CanvasExecutionEvent event) {
         String requestId = event.requestId;
         requestExecutor.execute(requestId)
@@ -188,6 +195,7 @@ public class CanvasDisruptorService {
         publishOverflowRetry(canvasId, userId, triggerType, triggerNodeType, matchKey, payload, msgId, 0);
     }
 
+    /** 发布来自溢出重试链路的执行事件。 */
     public void publishOverflowRetry(Long canvasId, String userId, String triggerType,
                                      String triggerNodeType, String matchKey,
                                      Map<String, Object> payload, String msgId,
@@ -196,6 +204,7 @@ public class CanvasDisruptorService {
                 DispatchOptions.overflowRetry(overflowChainRetryCount));
     }
 
+    /** 写入 RingBuffer 事件槽位并发布到 worker pool。 */
     private void publish(Long canvasId, String userId, String triggerType,
                          String triggerNodeType, String matchKey,
                          Map<String, Object> payload, String msgId,
@@ -218,11 +227,13 @@ public class CanvasDisruptorService {
             event.msgId = msgId;
             event.dispatchOptions = dispatchOptions;
         } finally {
+            // >>> 事件处理逻辑见: org.chovy.canvas.engine.disruptor.CanvasDisruptorService.CanvasDisruptorService
             ringBuffer.publish(sequence);
         }
         metrics.recordDisruptorPublished(triggerType);
     }
 
+    /** 发布已入库的执行请求 ID 事件。 */
     public void publishRequest(String requestId) {
         long sequence;
         try {
@@ -240,6 +251,7 @@ public class CanvasDisruptorService {
         metrics.recordDisruptorPublished("REQUEST");
     }
 
+    /** 关闭服务时释放订阅和连接资源。 */
     @PreDestroy
     public void shutdown() {
         disruptor.shutdown();
@@ -252,9 +264,12 @@ public class CanvasDisruptorService {
      */
     @Getter
     public static final class DispatchOptions {
+        /** 普通触发事件的默认派发选项，不携带溢出重试标记。 */
         private static final DispatchOptions NORMAL = new DispatchOptions(false);
 
+        /** 是否来自 Disruptor 溢出重试队列。 */
         private final boolean overflowRetry;
+        /** 溢出重试链路已经重试的次数。 */
         private final int overflowChainRetryCount;
 
         private DispatchOptions(boolean overflowRetry) {

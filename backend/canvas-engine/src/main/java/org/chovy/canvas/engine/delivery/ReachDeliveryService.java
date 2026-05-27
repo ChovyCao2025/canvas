@@ -16,14 +16,24 @@ import java.time.LocalDateTime;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
+/**
+ * Reach Delivery 触达投递组件。
+ *
+ * <p>封装营销消息发送后的记录写入和投递状态维护，供短信、邮件、Push 等节点复用。
+ * <p>外部渠道差异应在调用方或适配层处理，本类聚焦统一的投递流水语义。
+ */
 @Slf4j
 @Service
 public class ReachDeliveryService {
 
+    /** 消息发送记录 Mapper，用于落库触达请求、状态和外部消息 ID。 */
     private final MessageSendRecordMapper recordMapper;
+    /** Jackson ObjectMapper，用于 JSON 序列化和反序列化。 */
     private final ObjectMapper objectMapper;
+    /** WebClient 客户端。 */
     private final WebClient webClient;
 
+    /** 初始化触达投递依赖，并按配置创建外部触达平台客户端。 */
     public ReachDeliveryService(
             MessageSendRecordMapper recordMapper,
             ObjectMapper objectMapper,
@@ -34,6 +44,7 @@ public class ReachDeliveryService {
         this.webClient = WebClient.builder().baseUrl(reachPlatformUrl).build();
     }
 
+    /** 执行触达投递并写入发送记录。 */
     public Mono<DeliveryResult> send(DeliveryRequest request) {
         return Mono.fromCallable(() -> prepareRecord(request))
                 .subscribeOn(Schedulers.boundedElastic())
@@ -54,6 +65,7 @@ public class ReachDeliveryService {
                 });
     }
 
+    /** 准备发送记录；命中幂等键时返回已有记录而不重复投递。 */
     private PreparedRecord prepareRecord(DeliveryRequest request) {
         MessageSendRecordDO existing = recordMapper.selectOne(new LambdaQueryWrapper<MessageSendRecordDO>()
                 .eq(MessageSendRecordDO::getIdempotencyKey, request.idempotencyKey())
@@ -78,6 +90,7 @@ public class ReachDeliveryService {
         return new PreparedRecord(record, false);
     }
 
+    /** 调用外部触达平台发送消息并返回渠道响应。 */
     @SuppressWarnings("unchecked")
     private Mono<Map<String, Object>> callReachPlatform(DeliveryRequest request) {
         return webClient.post()
@@ -88,6 +101,7 @@ public class ReachDeliveryService {
                 .map(map -> (Map<String, Object>) map);
     }
 
+    /** 将发送记录标记为成功并保存外部渠道消息 ID。 */
     private Mono<DeliveryResult> markSent(MessageSendRecordDO record, Map<String, Object> response) {
         return Mono.fromCallable(() -> {
                     record.setStatus(MessageSendRecordDO.STATUS_SENT);
@@ -102,6 +116,7 @@ public class ReachDeliveryService {
                 .subscribeOn(Schedulers.boundedElastic());
     }
 
+    /** 将发送记录标记为失败并保存截断后的错误信息。 */
     private Mono<DeliveryResult> markFailed(MessageSendRecordDO record, Throwable error) {
         return Mono.fromCallable(() -> {
                     String message = error.getMessage() == null ? "delivery failed" : error.getMessage();
@@ -116,6 +131,7 @@ public class ReachDeliveryService {
                 .subscribeOn(Schedulers.boundedElastic());
     }
 
+    /** 构造标准化触达投递请求。 */
     public DeliveryRequest request(
             String executionId,
             Long canvasId,
@@ -137,6 +153,7 @@ public class ReachDeliveryService {
         return new DeliveryRequest(executionId, canvasId, userId, nodeId, channel, templateId, payload, idempotencyKey);
     }
 
+    /** 将触达请求载荷序列化为发送记录中的 JSON 文本。 */
     private String toJson(Object value) {
         try {
             return objectMapper.writeValueAsString(value);
@@ -145,9 +162,11 @@ public class ReachDeliveryService {
         }
     }
 
+    /** 发送前记录准备结果，标识本次是否命中幂等重复请求。 */
     private record PreparedRecord(MessageSendRecordDO record, boolean duplicate) {
     }
 
+    /** 标准化触达投递请求，封装节点执行产生的渠道、模板、变量和幂等键。 */
     public record DeliveryRequest(
             String executionId,
             Long canvasId,
@@ -160,6 +179,7 @@ public class ReachDeliveryService {
     ) {
     }
 
+    /** 触达投递结果，返回是否发送、是否命中幂等、记录 ID 和外部渠道回执。 */
     public record DeliveryResult(
             boolean sent,
             boolean duplicate,

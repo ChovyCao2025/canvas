@@ -12,13 +12,22 @@ import java.util.stream.Collectors;
 import org.chovy.canvas.dal.dataobject.CdpTagOperationDO;
 import org.chovy.canvas.dal.mapper.CdpTagOperationMapper;
 
+/**
+ * CDP 标签操作 CDP 领域服务。
+ *
+ * <p>负责用户画像、身份、标签和画布参与记录等客户数据能力，为画布执行和管理端查询提供统一入口。
+ * <p>该层隔离 CDP 数据结构与上层业务，集中处理状态、历史和幂等语义。
+ */
 @Service
 @RequiredArgsConstructor
 public class CdpTagOperationService {
 
+    /** 标签操作 Mapper，用于记录批量打标任务进度和结果。 */
     private final CdpTagOperationMapper operationMapper;
+    /** CDP 标签服务。 */
     private final CdpTagService tagService;
 
+    /** 创建新记录，并执行必要的唯一性、格式和默认值处理。 */
     public CdpTagOperationDO create(CdpBatchTagReq req) {
         List<String> userIds = req.userIds() == null ? List.of() : req.userIds();
         if (userIds.isEmpty()) {
@@ -39,6 +48,7 @@ public class CdpTagOperationService {
         return op;
     }
 
+    /** 按主键或业务键查询记录。 */
     public CdpTagOperationDO get(Long id) {
         CdpTagOperationDO op = operationMapper.selectById(id);
         if (op == null) {
@@ -47,12 +57,14 @@ public class CdpTagOperationService {
         return op;
     }
 
+    /** 查询最近的操作记录。 */
     public List<CdpTagOperationDO> listRecent(int limit) {
         return operationMapper.selectList(new LambdaQueryWrapper<CdpTagOperationDO>()
                 .orderByDesc(CdpTagOperationDO::getCreatedAt)
                 .last("LIMIT " + Math.max(1, Math.min(limit, 100))));
     }
 
+    /** 重试失败的批量标签操作。 */
     public CdpTagOperationDO retryFailed(Long id, String operator) {
         CdpTagOperationDO existing = get(id);
         List<String> failedUserIds = extractFailedUserIds(existing.getErrorMsg());
@@ -70,6 +82,7 @@ public class CdpTagOperationService {
         ));
     }
 
+    /** 在线程中逐个执行批量打标/删标，并回写成功失败统计。 */
     private void run(CdpTagOperationDO op, List<String> userIds, CdpBatchTagReq req) {
         int success = 0;
         int fail = 0;
@@ -98,6 +111,7 @@ public class CdpTagOperationService {
         operationMapper.updateById(op);
     }
 
+    /** 从任务错误摘要中提取失败用户 ID，供失败重试复用。 */
     private List<String> extractFailedUserIds(String errorMsg) {
         if (errorMsg == null || errorMsg.isBlank()) {
             return List.of();

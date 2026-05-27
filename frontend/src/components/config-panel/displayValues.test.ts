@@ -1,3 +1,8 @@
+/**
+ * 测试职责：验证配置展示值从远程字典、schema 选项和原始值中的解析顺序。
+ *
+ * 维护说明：新增选项字段命名兼容时，应在 normalizeFieldOptions 用例中补覆盖。
+ */
 import { describe, expect, it } from 'vitest'
 import type { StubOption } from '../../types'
 import { normalizeFieldOptions, resolveDisplayValue } from './displayValues'

@@ -42,9 +42,12 @@ import org.chovy.canvas.dal.mapper.CanvasMapper;
 @RequiredArgsConstructor
 public class CanvasSchedulerService {
 
+    /** 画布执行服务，用于定时任务到期后触发画布执行。 */
     private final CanvasExecutionService executionService;
+    /** 调度注册器。 */
     private final ScheduleRegistrar      scheduleRegistrar;
 
+    /** 兼容旧测试和默认本地调度器的构造器，生产可替换 ScheduleRegistrar 实现。 */
     @Autowired
     public CanvasSchedulerService(org.springframework.scheduling.TaskScheduler taskScheduler,
                                   org.chovy.canvas.dal.mapper.CanvasMapper canvasMapper,
@@ -55,30 +58,38 @@ public class CanvasSchedulerService {
     }
 
 
+    /** Tagger 服务地址。 */
     @Value("${canvas.integration.tagger-service-url}")
     private String taggerUrl;
+    /** API_CALL 健康检查或预热地址。 */
     @Value("${canvas.integration.api-call-base-url}")
     private String apiCallUrl;
+    /** 定时触发抖动最大毫秒数。 */
     @Value("${canvas.scheduler.jitter-max-ms:300000}")
     private long jitterMaxMs;
 
-    // WebClient 懒建，避免循环依赖
+    /** Tagger WebClient 懒加载实例，避免构造阶段产生循环依赖。 */
     private org.springframework.web.reactive.function.client.WebClient taggerClient;
+    /** API_CALL WebClient 客户端。 */
     private org.springframework.web.reactive.function.client.WebClient apiCallClient;
 
+    /** 在 Bean 初始化完成后创建外部用户来源查询客户端。 */
     @PostConstruct
     void initClients() {
         taggerClient  = org.springframework.web.reactive.function.client.WebClient.builder().baseUrl(taggerUrl).build();
         apiCallClient = org.springframework.web.reactive.function.client.WebClient.builder().baseUrl(apiCallUrl).build();
     }
 
-    /** 等待 jitter 后触发的回调（canvasId:nodeId → pending subscriptions） */
+    /** 带抖动的延迟调度任务分组，避免大量定时触发同时打入执行链路。 */
     private final Map<String, PendingJitterGroup> pendingJitterTasks = new ConcurrentHashMap<>();
+    /** 调度生命周期锁，保护注册、取消和关闭过程的并发状态。 */
     private final Object lifecycleLock = new Object();
+    /** 调度服务是否已关闭。 */
     private boolean closed;
 
     // ── 注册 ─────────────────────────────────────────────────────
 
+    /** 扫描发布态 DAG 中的定时触发节点并注册对应调度任务。 */
     public void registerScheduledTriggers(Long canvasId, DagGraph graph) {
         for (String nodeId : graph.allNodeIds()) {
             DagParser.CanvasNode node = graph.getNode(nodeId);
@@ -122,6 +133,7 @@ public class CanvasSchedulerService {
 
     // ── 注销 ─────────────────────────────────────────────────────
 
+    /** 按画布 DAG 注销全部定时触发节点对应的调度任务。 */
     public void cancelScheduledTriggers(Long canvasId, DagGraph graph) {
         for (String nodeId : graph.allNodeIds()) {
             DagParser.CanvasNode node = graph.getNode(nodeId);
@@ -130,6 +142,7 @@ public class CanvasSchedulerService {
         }
     }
 
+    /** 取消全部已注册调度任务。 */
     @PreDestroy
     public void cancelAll() {
         List<PendingJitterGroup> groups;
@@ -150,6 +163,7 @@ public class CanvasSchedulerService {
 
     // ── 内部 ─────────────────────────────────────────────────────
 
+    /** 注销单个调度任务，并清理其尚未执行的 jitter 延迟任务。 */
     void cancelScheduledTrigger(ScheduleKey key) {
         PendingJitterGroup pending = null;
         synchronized (lifecycleLock) {
@@ -163,10 +177,12 @@ public class CanvasSchedulerService {
     /**
      * Backward-compatible test hook for legacy callers.
      */
+    /** 兼容旧单测的取消入口，将历史 taskKey 转换为 ScheduleKey。 */
     void cancelTask(String taskKey) {
         cancelScheduledTrigger(new ScheduleKey("canvas", taskKey));
     }
 
+    /** 解析定时节点用户来源，并为每个用户安排带随机抖动的触发。 */
     @SuppressWarnings("unchecked")
     private void triggerForAllUsers(Long canvasId, String nodeId, Map<String, Object> cfg, PendingJitterGroup group) {
         Map<String, Object> src = (Map<String, Object>) cfg.getOrDefault("userSource", Map.of());
@@ -180,6 +196,7 @@ public class CanvasSchedulerService {
         }
     }
 
+    /** 创建并登记 jitter 分组，服务关闭后不再接受新分组。 */
     PendingJitterGroup createPendingJitterGroup(String taskKey) {
         synchronized (lifecycleLock) {
             if (closed) {
@@ -191,12 +208,14 @@ public class CanvasSchedulerService {
         }
     }
 
+    /** 判断指定任务 key 是否仍存在待执行 jitter 分组。 */
     boolean hasPendingJitterGroup(String taskKey) {
         synchronized (lifecycleLock) {
             return pendingJitterTasks.containsKey(taskKey);
         }
     }
 
+    /** 判断指定任务 key 是否在调度器和 jitter 分组中仍处于活跃状态。 */
     boolean hasActiveTask(String taskKey) {
         if (scheduleRegistrar instanceof TaskAwareScheduleRegistrar aware) {
             return hasPendingJitterGroup(taskKey) && aware.hasTask(new ScheduleKey("canvas", taskKey));
@@ -204,12 +223,14 @@ public class CanvasSchedulerService {
         return hasPendingJitterGroup(taskKey);
     }
 
+    /** 判断传入分组是否仍是当前任务 key 对应的活跃分组。 */
     boolean isCurrentPendingJitterGroup(String taskKey, PendingJitterGroup group) {
         synchronized (lifecycleLock) {
             return pendingJitterTasks.get(taskKey) == group;
         }
     }
 
+    /** 在注册失败或取消时移除指定 jitter 分组，并释放未执行任务。 */
     void removePendingJitterGroup(String taskKey, PendingJitterGroup group) {
         boolean removed = false;
         synchronized (lifecycleLock) {
@@ -221,6 +242,7 @@ public class CanvasSchedulerService {
         if (removed) group.dispose();
     }
 
+    /** 一次性任务触发完成且 jitter 队列清空后，注销调度并清理分组。 */
     void cleanupOneShotTask(ScheduleKey scheduleKey, PendingJitterGroup group) {
         boolean removed = false;
         synchronized (lifecycleLock) {
@@ -233,6 +255,7 @@ public class CanvasSchedulerService {
         if (removed) group.dispose();
     }
 
+    /** 根据 cron 或单次触发时间构建调度注册对象。 */
     private ScheduleRegistration buildRegistration(ScheduleKey scheduleKey,
                                                    Long canvasId,
                                                    String nodeId,
@@ -275,10 +298,12 @@ public class CanvasSchedulerService {
         );
     }
 
+    /** 生成画布定时节点的稳定调度 key。 */
     private ScheduleKey scheduleKey(Long canvasId, String nodeId) {
         return new ScheduleKey("canvas", canvasId + ":" + nodeId);
     }
 
+    /** 按 jitter 延迟安排单个用户触发，取消时通过 Disposable 释放。 */
     Disposable scheduleTriggerWithJitter(PendingJitterGroup group, Long canvasId, String userId, Duration jitter) {
         if (jitter.isZero() || jitter.isNegative()) {
             if (!group.canScheduleImmediate()) {
@@ -302,6 +327,7 @@ public class CanvasSchedulerService {
         return pending;
     }
 
+    /** 将单个用户的定时触发提交到画布执行服务。 */
     void dispatchScheduledTrigger(PendingJitterGroup group, Long canvasId, String userId) {
         if (group.isTerminated()) {
             return;
@@ -316,6 +342,7 @@ public class CanvasSchedulerService {
                 );
     }
 
+    /** 根据用户来源类型解析定时触发目标用户列表。 */
     @SuppressWarnings("unchecked")
     private List<String> resolveUserIds(String sourceType, Map<String, Object> src) {
         return switch (sourceType) {
@@ -331,11 +358,12 @@ public class CanvasSchedulerService {
                     List<String> result = new java.util.ArrayList<>();
                     int page = 1;
                     while (result.size() < limit) {
+                        int currentPage = page;
                         @SuppressWarnings("unchecked")
                         java.util.Map<String, Object> resp = taggerClient.get()
                                 .uri(u -> u.path("/offline/users")
                                         .queryParam("tagCode", tagCode)
-                                        .queryParam("page", page)
+                                        .queryParam("page", currentPage)
                                         .queryParam("size", pageSize).build())
                                 .retrieve()
                                 .bodyToMono(java.util.Map.class)
@@ -343,6 +371,7 @@ public class CanvasSchedulerService {
                         List<String> batch = resp != null ? (List<String>) resp.getOrDefault("userIds", List.of()) : List.of();
                         result.addAll(batch);
                         if (batch.size() < pageSize) break; // 最后一页
+                        page++;
                     }
                     log.info("[SCHEDULER] TAGGER_GROUP tagCode={} 拉取 {} 个用户", tagCode, result.size());
                     yield result.subList(0, Math.min(result.size(), limit));
@@ -388,19 +417,29 @@ public class CanvasSchedulerService {
         return Duration.ofMillis(java.util.concurrent.ThreadLocalRandom.current().nextLong(0, jitterMaxMs));
     }
 
+    /** 单个调度任务下的 jitter 延迟任务集合，负责取消、关闭和空闲清理。 */
     static final class PendingJitterGroup {
+        /** 抖动任务分组 key，用于日志和清理。 */
         private final String taskKey;
+        /** 当前分组尚未完成的响应式任务集合。 */
         private final Set<Disposable> pending = ConcurrentHashMap.newKeySet();
+        /** 当前分组待执行任务数量。 */
         private final AtomicInteger size = new AtomicInteger();
+        /** 是否在任务清空后关闭分组。 */
         private final AtomicBoolean closeWhenIdle = new AtomicBoolean(false);
+        /** 分组是否已终止。 */
         private final AtomicBoolean terminated = new AtomicBoolean(false);
+        /** 分组清理是否已触发，防止重复清理。 */
         private final AtomicBoolean cleanupTriggered = new AtomicBoolean(false);
+        /** 分组空闲回调，用于从 pendingJitterTasks 中移除自身。 */
         private volatile Runnable onIdle;
 
+        /** 创建与指定调度 taskKey 绑定的 jitter 分组。 */
         private PendingJitterGroup(String taskKey) {
             this.taskKey = taskKey;
         }
 
+        /** 添加一个待执行延迟任务，分组终止或关闭时拒绝添加。 */
         boolean add(Disposable disposable) {
             if (terminated.get() || closeWhenIdle.get()) {
                 return false;
@@ -419,6 +458,7 @@ public class CanvasSchedulerService {
             return true;
         }
 
+        /** 移除已完成或已取消的延迟任务，并在空闲时触发清理。 */
         void remove(Disposable disposable) {
             if (pending.remove(disposable)) {
                 size.decrementAndGet();
@@ -426,12 +466,14 @@ public class CanvasSchedulerService {
             }
         }
 
+        /** 标记分组在所有延迟任务完成后执行空闲清理回调。 */
         void closeWhenIdle(Runnable onIdle) {
             this.onIdle = onIdle;
             closeWhenIdle.set(true);
             cleanupIfIdle();
         }
 
+        /** 在分组关闭且无待执行任务时只触发一次清理回调。 */
         private void cleanupIfIdle() {
             Runnable cleanup = onIdle;
             if (closeWhenIdle.get() && size.get() == 0 && cleanup != null
@@ -440,18 +482,22 @@ public class CanvasSchedulerService {
             }
         }
 
+        /** 标记分组终止，阻止后续新增或执行任务。 */
         void terminate() {
             terminated.set(true);
         }
 
+        /** 返回分组是否已终止。 */
         boolean isTerminated() {
             return terminated.get();
         }
 
+        /** 判断当前分组是否允许立即执行零 jitter 任务。 */
         boolean canScheduleImmediate() {
             return !terminated.get() && !closeWhenIdle.get();
         }
 
+        /** 取消并清空所有待执行延迟任务。 */
         void dispose() {
             terminated.set(true);
             for (Disposable disposable : pending) {
@@ -462,19 +508,26 @@ public class CanvasSchedulerService {
         }
     }
 
+    /** 可查询任务是否存在的调度注册器扩展接口，供测试和状态判断使用。 */
     private interface TaskAwareScheduleRegistrar {
         boolean hasTask(ScheduleKey key);
     }
 
+    /** Spring 任务调度器适配实现，用本地 TaskScheduler 承载 cron 和一次性任务。 */
     private static final class LegacyTaskSchedulerRegistrar implements ScheduleRegistrar, TaskAwareScheduleRegistrar {
+        /** Spring TaskScheduler 实例，负责实际注册本机调度任务。 */
         private final org.springframework.scheduling.TaskScheduler taskScheduler;
+        /** 已注册的定时任务映射。 */
         private final Map<ScheduleKey, ScheduledFuture<?>> tasks = new ConcurrentHashMap<>();
+        /** 注册过程中被取消的任务 key 集合，用于处理并发取消。 */
         private final Set<ScheduleKey> cancelledDuringRegistration = ConcurrentHashMap.newKeySet();
 
+        /** 注入 Spring TaskScheduler，作为默认本地调度注册器。 */
         private LegacyTaskSchedulerRegistrar(org.springframework.scheduling.TaskScheduler taskScheduler) {
             this.taskScheduler = taskScheduler;
         }
 
+        /** 注册 cron 或一次性调度任务，并处理注册期间并发取消的竞态。 */
         @Override
         public void register(ScheduleRegistration registration) {
             unregister(registration.key());
@@ -495,6 +548,7 @@ public class CanvasSchedulerService {
             tasks.put(registration.key(), future);
         }
 
+        /** 注销调度任务。 */
         @Override
         public void unregister(ScheduleKey key) {
             ScheduledFuture<?> future = tasks.remove(key);
@@ -505,6 +559,7 @@ public class CanvasSchedulerService {
             }
         }
 
+        /** 判断指定调度任务是否已注册。 */
         @Override
         public boolean hasTask(ScheduleKey key) {
             return tasks.containsKey(key);

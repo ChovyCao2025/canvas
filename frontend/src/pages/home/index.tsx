@@ -1,3 +1,8 @@
+/**
+ * 页面职责：首页运营仪表盘，展示画布、任务、通知、导入和人群计算等关键指标。
+ *
+ * 维护说明：页面聚合多个业务域的概览信息，用于登录后的快速巡检。
+ */
 import { useCallback, useEffect, useMemo, useState, type CSSProperties, type ReactNode } from 'react'
 import {
   Alert,
@@ -47,15 +52,19 @@ import {
   type HomeTopCanvas,
 } from './homeOverview'
 
+/** 首页常用文本组件别名。 */
 const { Text, Title } = Typography
 
+/** 首页仪表盘主组件，按时间范围聚合展示运营健康度。 */
 export default function HomePage() {
   const navigate = useNavigate()
+  // days 控制所有概览指标的统计窗口，切换后统一重新拉取后端聚合数据。
   const [days, setDays] = useState<number>(7)
   const [overview, setOverview] = useState<HomeOverview | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
+  /** 拉取首页聚合数据；失败时保留旧 overview，仅展示错误提示。 */
   const load = useCallback(async () => {
     setLoading(true)
     setError(null)
@@ -71,8 +80,10 @@ export default function HomePage() {
 
   useEffect(() => { load() }, [load])
 
+  // KPI 卡片展示模型由纯函数生成，避免 JSX 中混入单位、图标和颜色规则。
   const kpiCards = useMemo(() => overview ? buildKpiCards(overview) : [], [overview])
 
+  /** TOP 旅程表格列；点击旅程名进入对应画布统计页。 */
   const topColumns: ColumnsType<HomeTopCanvas> = [
     {
       title: '旅程',
@@ -94,6 +105,7 @@ export default function HomePage() {
 
   return (
     <div style={{ minHeight: '100vh', background: '#f6f8fb', padding: '24px 28px 32px' }}>
+      {/* 页头：时间范围和刷新动作影响下方全部模块。 */}
       <div style={{
         display: 'flex',
         alignItems: 'flex-start',
@@ -133,6 +145,7 @@ export default function HomePage() {
         </Space>
       </div>
 
+      {/* 错误提示不替代已有数据，便于用户在短暂失败时仍可查看上一次结果。 */}
       {error && (
         <Alert
           type="error"
@@ -148,6 +161,7 @@ export default function HomePage() {
         <Spin size="large" style={{ display: 'block', margin: '96px auto' }} />
       ) : overview ? (
         <>
+          {/* KPI 区：快速展示画布、任务、人群、导入等核心指标。 */}
           <Row gutter={[14, 14]} style={{ marginBottom: 18 }}>
             {kpiCards.map(card => (
               <Col key={card.key} flex={1} style={{ minWidth: 0, display: 'flex' }}>
@@ -194,6 +208,7 @@ export default function HomePage() {
             ))}
           </Row>
 
+          {/* 趋势 + 待关注事项：左侧看整体变化，右侧提示需要处理的问题。 */}
           <Row gutter={[16, 16]} style={{ marginBottom: 18 }}>
             <Col xs={24} xl={16}>
               <Card title="每日触发趋势" bordered={false} style={cardStyle} styles={{ body: { paddingTop: 6 } }}>
@@ -281,6 +296,7 @@ export default function HomePage() {
   )
 }
 
+/** 快捷入口按钮，封装图标、文字和主题色，保持首页操作区布局一致。 */
 function QuickAction({ icon, label, color, onClick }: {
   icon: ReactNode
   label: string
@@ -309,6 +325,7 @@ function QuickAction({ icon, label, color, onClick }: {
   )
 }
 
+/** 需要关注列表项，按严重程度展示标签并提供跳转入口。 */
 function AttentionItem({ item, onOpen }: { item: HomeAttentionItem; onOpen: () => void }) {
   const presentation = getAttentionPresentation(item.severity)
   return (
@@ -324,11 +341,13 @@ function AttentionItem({ item, onOpen }: { item: HomeAttentionItem; onOpen: () =
   )
 }
 
+/** 根据关注项类型返回目标页：无执行记录去编辑页，其余去统计页。 */
 function attentionUrl(item: HomeAttentionItem) {
   if (item.type === 'NO_RECENT_EXECUTIONS') return `/canvas/${item.canvasId}/edit`
   return `/canvas/${item.canvasId}/stats`
 }
 
+/** 首页业务卡片通用样式，保持各模块边框和阴影一致。 */
 const cardStyle: CSSProperties = {
   height: '100%',
   borderRadius: 8,

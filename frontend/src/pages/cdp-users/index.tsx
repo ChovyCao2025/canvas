@@ -1,3 +1,8 @@
+/**
+ * 页面职责：CDP 用户列表页，支持关键词搜索、用户画像入口和批量打标签操作。
+ *
+ * 维护说明：批量操作创建后端异步任务，前端通过操作列表展示进度。
+ */
 import { useEffect, useState } from 'react'
 import { Button, Input, Space, Table, Tag, Typography, Modal, Form, message, Card, Drawer, Descriptions, List, Progress } from 'antd'
 import { TagsOutlined } from '@ant-design/icons'
@@ -6,10 +11,13 @@ import { useNavigate } from 'react-router-dom'
 import { cdpApi, type CanvasUserRow, type CdpTagOperation } from '../../services/cdpApi'
 import { buildBatchTagPayload, formatDateTime, formatExecutionStatus, tagColor } from './cdpPresentation'
 
+/** 页面标题组件别名。 */
 const { Title } = Typography
 
+/** CDP 用户中心主页面，包含用户检索和批量打标任务跟踪。 */
 export default function CdpUsersPage() {
   const navigate = useNavigate()
+  // 用户列表与批量任务列表相互独立：搜索用户不会影响批量任务查询。
   const [keyword, setKeyword] = useState('')
   const [rows, setRows] = useState<CanvasUserRow[]>([])
   const [loading, setLoading] = useState(false)
@@ -19,6 +27,7 @@ export default function CdpUsersPage() {
   const [selectedOperation, setSelectedOperation] = useState<CdpTagOperation | null>(null)
   const [form] = Form.useForm()
 
+  /** 加载用户列表；空关键字表示查询最近/默认用户集合。 */
   const load = async (searchKeyword = '') => {
     setLoading(true)
     try {
@@ -29,17 +38,20 @@ export default function CdpUsersPage() {
     }
   }
 
+  /** 加载最近批量打标任务，用于列表展示和详情抽屉同步。 */
   const loadOperations = async () => {
     const res = await cdpApi.listTagOperations(20)
     setOperations(res.data ?? [])
     return res.data ?? []
   }
 
+  // 首次进入同时加载用户列表和最近任务。
   useEffect(() => {
     load()
     loadOperations()
   }, [])
 
+  // 只要有运行中的任务或正在关注的任务，就按 2 秒轮询任务列表。
   useEffect(() => {
     const shouldPoll = watchOperationId != null || operations.some(item => item.status === 'RUNNING')
     if (!shouldPoll) return
@@ -60,6 +72,7 @@ export default function CdpUsersPage() {
     return () => window.clearInterval(timer)
   }, [operations, selectedOperation, watchOperationId])
 
+  /** 创建批量打标任务，并立即进入详情抽屉观察进度。 */
   const submitBatch = async () => {
     const values = await form.validateFields()
     const res = await cdpApi.createBatchTagOperation(buildBatchTagPayload(values))
@@ -71,11 +84,13 @@ export default function CdpUsersPage() {
     loadOperations()
   }
 
+  /** 打开某个批量任务详情。 */
   const openOperation = async (id: number) => {
     const res = await cdpApi.getBatchTagOperation(id)
     setSelectedOperation(res.data)
   }
 
+  /** 对当前任务中失败的用户创建一次重试任务。 */
   const retryFailedUsers = async () => {
     if (!selectedOperation) return
     const res = await cdpApi.retryFailedTagOperation(selectedOperation.id)
@@ -85,6 +100,7 @@ export default function CdpUsersPage() {
     loadOperations()
   }
 
+  /** 用户列表列定义，用户 ID 链接到用户画像详情页。 */
   const columns: ColumnsType<CanvasUserRow> = [
     { title: '用户 ID', dataIndex: 'userId', render: v => <Button type="link" onClick={() => navigate(`/cdp/users/${encodeURIComponent(v)}`)}>{v}</Button> },
     { title: '执行次数', dataIndex: 'executionCount', width: 100, align: 'right' },
@@ -93,6 +109,7 @@ export default function CdpUsersPage() {
     { title: '最近进入', dataIndex: 'lastEnteredAt', width: 180, render: formatDateTime },
   ]
 
+  /** 批量打标任务列定义，状态使用 CDP 展示工具统一转换。 */
   const operationColumns: ColumnsType<CdpTagOperation> = [
     {
       title: '任务 ID',
@@ -117,6 +134,7 @@ export default function CdpUsersPage() {
     { title: '错误摘要', dataIndex: 'errorMsg', ellipsis: true },
   ]
 
+  // 详情抽屉进度：成功 + 失败都算作已处理。
   const selectedProgress = selectedOperation && selectedOperation.totalCount > 0
     ? Math.round(((selectedOperation.successCount + selectedOperation.failCount) / selectedOperation.totalCount) * 100)
     : 0

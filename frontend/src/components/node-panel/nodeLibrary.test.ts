@@ -1,3 +1,8 @@
+/**
+ * 测试职责：验证节点库分类排序、搜索过滤、常用节点和摘要兜底规则。
+ *
+ * 维护说明：节点库体验依赖稳定排序和搜索范围，新增分类排序规则时先补这里。
+ */
 import { describe, expect, it } from 'vitest'
 
 import type { NodeTypeRegistry } from '../../types'
@@ -8,6 +13,7 @@ import {
   getNodeSummary,
 } from './nodeLibrary'
 
+/** 节点库测试样本，覆盖有描述、无描述、不同分类和触发节点。 */
 const nodes: NodeTypeRegistry[] = [
   {
     typeKey: 'API_CALL',

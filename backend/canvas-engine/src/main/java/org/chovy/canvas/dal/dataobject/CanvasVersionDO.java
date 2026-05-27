@@ -15,6 +15,7 @@ import java.time.LocalDateTime;
 public class CanvasVersionDO {
 
     @TableId(type = IdType.AUTO)
+    /** 画布版本主键 ID */
     private Long id;
 
     /** 所属画布 ID */
@@ -39,5 +40,6 @@ public class CanvasVersionDO {
     private String createdBy;
 
     @TableField(fill = FieldFill.INSERT)
+    /** 版本创建时间，由 MyBatis-Plus 自动填充 */
     private LocalDateTime createdAt;
 }

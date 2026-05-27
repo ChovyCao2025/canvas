@@ -1,3 +1,8 @@
+/**
+ * 组件职责：React Flow 自定义边组件，提供悬浮高亮、删除按钮和分支标签展示。
+ *
+ * 维护说明：边的真实含义由 sourceHandle 与节点配置共同决定，组件本身不改写关系。
+ */
 import { useState } from 'react'
 import { BaseEdge, EdgeLabelRenderer, getBezierPath, type EdgeProps } from '@xyflow/react'
 import { DeleteOutlined, PlusOutlined } from '@ant-design/icons'

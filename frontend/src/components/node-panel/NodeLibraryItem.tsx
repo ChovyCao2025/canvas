@@ -1,18 +1,33 @@
+/**
+ * 组件职责：节点库单个条目组件，负责拖拽数据、节点名称和摘要展示。
+ *
+ * 维护说明：拖拽 payload 与画布编辑器 onDrop 协议保持一致。
+ */
 import type { DragEvent } from 'react'
 import { Popover, Typography } from 'antd'
 import { RightOutlined } from '@ant-design/icons'
 
 import type { NodeTypeRegistry } from '../../types'
 
+/** 节点条目中的文本组件别名。 */
 const { Text } = Typography
 
+/** 节点库条目组件入参。 */
 interface Props {
+  /** 当前节点分类的主题色，用于左侧色条和 hover 描边。 */
   categoryColor: string
+
+  /** 后端节点类型注册信息。 */
   node: NodeTypeRegistry
+
+  /** 节点摘要说明。 */
   detail: string
+
+  /** 拖拽开始回调，由父组件写入 dataTransfer。 */
   onDragStart: (event: DragEvent<HTMLDivElement>, node: NodeTypeRegistry) => void
 }
 
+/** 节点库条目，点击右侧箭头查看说明，拖拽整行可放到画布。 */
 export default function NodeLibraryItem({
   categoryColor,
   node,
@@ -36,6 +51,7 @@ export default function NodeLibraryItem({
         transition: 'border-color 0.2s ease, box-shadow 0.2s ease',
       }}
       onMouseEnter={(event) => {
+        // 轻量 hover 反馈直接改当前元素样式，避免为每个条目维护 hover state。
         event.currentTarget.style.borderColor = categoryColor
         event.currentTarget.style.boxShadow = `0 0 0 1px ${categoryColor}1f`
       }}

@@ -23,19 +23,34 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import org.chovy.canvas.dal.dataobject.NotificationDO;
 
+/**
+ * 通知实时推送 通知领域组件。
+ *
+ * <p>负责站内通知的创建、收件人解析、未读状态和实时推送封装。
+ * <p>该组件连接异步任务、WebSocket 和通知持久化模型，保证消息中心口径一致。
+ */
 @Slf4j
 @Service
 public class NotificationRealtimeService implements NotificationRealtimePublisher {
 
+    /** 当前服务实例标识，用于避免 Redis 实时通知回环处理。 */
     private final String originId = UUID.randomUUID().toString();
+    /** Jackson ObjectMapper，用于 JSON 序列化和反序列化。 */
     private final ObjectMapper objectMapper;
+    /** 阻塞式 Redis 模板，用于锁、去重、票据或跨实例通知。 */
     private final StringRedisTemplate redis;
+    /** 响应式 Redis 连接工厂，用于 WebSocket 跨实例通知订阅。 */
     private final ReactiveRedisConnectionFactory reactiveRedisConnectionFactory;
+    /** Redis key 工具，集中生成业务 key。 */
     private final RedisKeyUtil keys;
+    /** 本机维护的用户到 WebSocket 会话 sink 的映射。 */
     private final Map<String, Map<String, Sinks.Many<String>>> sessionsByUser = new ConcurrentHashMap<>();
+    /** 响应式 Redis 监听容器，用于订阅跨实例实时通知频道。 */
     private ReactiveRedisMessageListenerContainer listenerContainer;
+    /** Redis 通知频道订阅句柄，应用关闭时释放。 */
     private Disposable subscription;
 
+    /** 注入序列化、Redis 发布订阅和业务 key 依赖。 */
     public NotificationRealtimeService(
             ObjectMapper objectMapper,
             StringRedisTemplate redis,
@@ -47,6 +62,7 @@ public class NotificationRealtimeService implements NotificationRealtimePublishe
         this.keys = keys;
     }
 
+    /** 订阅 Redis 实时通知频道，接收其他实例发布的通知。 */
     @PostConstruct
     public void subscribeRedisChannel() {
         try {
@@ -59,6 +75,7 @@ public class NotificationRealtimeService implements NotificationRealtimePublishe
         }
     }
 
+    /** 关闭服务时释放订阅和连接资源。 */
     @PreDestroy
     public void shutdown() {
         if (subscription != null && !subscription.isDisposed()) {
@@ -76,6 +93,7 @@ public class NotificationRealtimeService implements NotificationRealtimePublishe
         sessionsByUser.clear();
     }
 
+    /** 注册用户 WebSocket 会话，并把初始通知快照推送到该连接。 */
     public Mono<Void> register(String userId, WebSocketSession session, NotificationRealtimePayload initialPayload) {
         String sessionId = session.getId();
         Sinks.Many<String> sink = Sinks.many().unicast().onBackpressureBuffer();
@@ -94,6 +112,7 @@ public class NotificationRealtimeService implements NotificationRealtimePublishe
                 .doFinally(signal -> unregister(userId, sessionId));
     }
 
+    /** 发布实时通知到本机会话和跨实例 Redis 通道。 */
     @Override
     public void publish(String eventType, String userId, NotificationDO notification, Long unreadCount) {
         if (userId == null || userId.isBlank()) {
@@ -112,11 +131,13 @@ public class NotificationRealtimeService implements NotificationRealtimePublishe
         }
     }
 
+    /** 返回指定用户当前活跃 WebSocket 会话数。 */
     public int activeSessionCount(String userId) {
         Map<String, Sinks.Many<String>> sessions = sessionsByUser.get(userId);
         return sessions == null ? 0 : sessions.size();
     }
 
+    /** 处理其他实例通过 Redis 广播过来的实时通知。 */
     private void handleRemote(String raw) {
         try {
             NotificationRealtimeEnvelope envelope = objectMapper.readValue(raw, NotificationRealtimeEnvelope.class);
@@ -129,6 +150,7 @@ public class NotificationRealtimeService implements NotificationRealtimePublishe
         }
     }
 
+    /** 将通知投递到本机当前用户的全部活跃 WebSocket 会话。 */
     private void deliverLocal(NotificationRealtimeEnvelope envelope) {
         Map<String, Sinks.Many<String>> sessions = sessionsByUser.get(envelope.userId());
         if (sessions == null || sessions.isEmpty()) {
@@ -140,6 +162,7 @@ public class NotificationRealtimeService implements NotificationRealtimePublishe
         }
     }
 
+    /** 将实时通知载荷序列化后写入单个 WebSocket sink。 */
     private void emit(Sinks.Many<String> sink, NotificationRealtimePayload payload) {
         try {
             sink.tryEmitNext(objectMapper.writeValueAsString(payload));
@@ -148,6 +171,7 @@ public class NotificationRealtimeService implements NotificationRealtimePublishe
         }
     }
 
+    /** 注销 WebSocket 会话并在用户无会话时清理本地映射。 */
     private void unregister(String userId, String sessionId) {
         Map<String, Sinks.Many<String>> sessions = sessionsByUser.get(userId);
         if (sessions == null) {

@@ -1,3 +1,8 @@
+/**
+ * 页面职责：MQ 触发器配置页，维护 topic、tag、消费组和消息参数 schema。
+ *
+ * 维护说明：这些定义会被 MQ 触发节点引用，参数 schema 影响配置面板的上下文字段。
+ */
 import { useEffect, useState } from 'react'
 import { Button, Table, Tag, Space, Modal, Form, Input, Select, Switch, message, Typography, Popconfirm, Divider } from 'antd'
 import { PlusOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons'
@@ -6,6 +11,7 @@ import http from '../../services/api'
 import type { ApiParam } from '../api-config'
 import { useSystemOptions } from '../../hooks/useSystemOptions'
 
+/** 页面标题组件别名，统一主标题渲染。 */
 const { Title } = Typography
 
 /**
@@ -51,11 +57,16 @@ interface ParamSchemaEditorProps {
   paramTypeOptions: { value: string; label: string }[]
 }
 
+/** 表单内联参数编辑器，负责增删改 requestSchema 的单行参数。 */
 function ParamSchemaEditor({ value, onChange, paramTypeOptions }: ParamSchemaEditorProps) {
   const params: ApiParam[] = value ?? []
+  /** 将参数数组回传给 Form.Item，保持受控字段同步。 */
   const set = (next: ApiParam[]) => onChange?.(next)
+  /** 追加一个默认字符串参数。 */
   const add = () => set([...params, { name: '', displayName: '', type: 'STRING', required: false }])
+  /** 删除指定下标的参数。 */
   const remove = (i: number) => set(params.filter((_, idx) => idx !== i))
+  /** 更新指定参数的局部字段。 */
   const update = (i: number, patch: Partial<ApiParam>) =>
     set(params.map((p, idx) => idx === i ? { ...p, ...patch } : p))
 
@@ -96,6 +107,7 @@ export default function MqConfigPage() {
   const [saving, setSaving] = useState(false)
   const { options: paramTypeOptions } = useSystemOptions('param_type')
 
+  /** 分页加载 MQ 定义列表。 */
   const fetchList = async (p = page) => {
     setLoading(true)
     try {
@@ -106,10 +118,12 @@ export default function MqConfigPage() {
 
   useEffect(() => { fetchList(1) }, [])
 
+  /** 打开新建弹窗，并初始化启用状态和空参数 schema。 */
   const openCreate = () => {
     setEditing(null); form.resetFields()
     form.setFieldsValue({ enabled: true, requestSchema: [] }); setVisible(true)
   }
+  /** 打开编辑弹窗，将后端 JSON schema 字符串转换为表单数组。 */
   const openEdit = (r: MqDef) => {
     // 字符串 schema -> 数组，供 Form 内部编辑器渲染
     setEditing(r)
@@ -118,6 +132,7 @@ export default function MqConfigPage() {
     form.setFieldsValue({ ...r, enabled: r.enabled === 1, requestSchema: schema })
     setVisible(true)
   }
+  /** 保存 MQ 定义；提交前把参数数组序列化为后端字段。 */
   const handleOk = async () => {
     const values = await form.validateFields()
     setSaving(true)

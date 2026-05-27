@@ -1,4 +1,9 @@
 /**
+ * 组件职责：从节点业务配置推导可渲染的分支出口 handle 列表。
+ *
+ * 维护说明：这里集中处理 IF、审批、AB、优先级等不同节点的出口命名和颜色。
+ */
+/**
  * 画布分支出口定义：
  * 负责把节点类型 + bizConfig 映射为可渲染的 source handles。
  */
@@ -15,16 +20,15 @@ export type BranchHandle = {
   color: string
 }
 
+/** 动态分支颜色池，按分支下标循环分配，保证相邻分支易区分。 */
 const GROUP_COLORS = ['#1677ff', '#52c41a', '#fa8c16', '#722ed1', '#eb2f96', '#13c2c2']
 
-/**
- * 计算节点出口 handles。
- * 返回结果与后端 bizConfig 字段一一对应，用于连线渲染与回写。
- */
+/** 把配置值转换为可展示字符串；空值使用业务兜底文案。 */
 function stringValue(value: unknown, fallback: string): string {
   return value == null || value === '' ? fallback : String(value)
 }
 
+/** 根据节点类型和 bizConfig 推导需要渲染的分支出口 handle。 */
 export function getBranchHandles(
   nodeType: string,
   bizConfig: Record<string, unknown>,

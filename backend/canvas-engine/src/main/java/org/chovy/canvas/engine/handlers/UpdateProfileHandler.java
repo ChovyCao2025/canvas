@@ -19,6 +19,12 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * 画像更新节点处理器。
+ *
+ * <p>由 DAG 执行器在运行画布节点时调用，读取节点 config 与执行上下文，产出 NodeResult 决定后续路由。
+ * <p>处理器应保持单节点职责，跨节点编排、重试和状态持久化由执行引擎统一管理。
+ */
 @Component
 @NodeHandlerType(NodeType.UPDATE_PROFILE)
 public class UpdateProfileHandler implements NodeHandler {

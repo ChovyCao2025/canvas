@@ -18,12 +18,22 @@ import org.chovy.canvas.dal.mapper.CanvasMapper;
 import org.chovy.canvas.dal.dataobject.CanvasVersionDO;
 import org.chovy.canvas.dal.mapper.CanvasVersionMapper;
 
+/**
+ * Canvas Ops Service Example Clone 测试类。
+ *
+ * <p>覆盖该后端组件在典型输入、边界条件和异常场景下的行为，确保重构或性能优化不会改变既有契约。
+ * <p>测试代码只构造必要的依赖与数据，断言重点放在可观察结果、状态变更和关键副作用上。
+ */
 @ExtendWith(MockitoExtension.class)
 class CanvasOpsServiceExampleCloneTest {
 
     @Mock CanvasMapper canvasMapper;
     @Mock CanvasVersionMapper canvasVersionMapper;
+    @Mock org.chovy.canvas.dal.mapper.CanvasExecutionMapper executionMapper;
     @Mock org.chovy.canvas.infrastructure.redis.TriggerRouteService triggerRouteService;
+    @Mock org.chovy.canvas.engine.trigger.TriggerPreCheckService preCheckService;
+    @Mock CanvasTransactionService canvasTransactionService;
+    @Mock CanvasService canvasService;
     @Mock org.springframework.data.redis.core.StringRedisTemplate redis;
 
     @Test
@@ -43,7 +53,15 @@ class CanvasOpsServiceExampleCloneTest {
             return 1;
         }).when(canvasMapper).insert(any(CanvasDO.class));
 
-        CanvasOpsService service = new CanvasOpsService(canvasMapper, canvasVersionMapper, triggerRouteService, redis);
+        CanvasOpsService service = new CanvasOpsService(
+                canvasMapper,
+                canvasVersionMapper,
+                executionMapper,
+                triggerRouteService,
+                preCheckService,
+                canvasTransactionService,
+                canvasService,
+                redis);
 
         service.clone(7L, "alice");
 

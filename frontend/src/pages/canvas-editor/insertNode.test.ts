@@ -1,3 +1,8 @@
+/**
+ * 测试职责：验证拖拽插入节点时的边拆分、空白节点和占位边构造规则。
+ *
+ * 维护说明：画布拖拽/插入交互变化时，应保持默认边插入与分支插入语义分离。
+ */
 import type { Edge } from '@xyflow/react'
 import { describe, expect, it } from 'vitest'
 import { applyInsertIntoEdge, buildDetachedNode, buildPlaceholderEdge } from './insertNode'

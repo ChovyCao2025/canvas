@@ -1,3 +1,8 @@
+/**
+ * 模块职责：React 应用挂载入口，负责注入全局 UI 语言包和最外层运行时配置。
+ *
+ * 维护说明：入口保持轻量，业务 Provider 和路由组合由 App.tsx 管理。
+ */
 import React from 'react'
 import ReactDOM from 'react-dom/client'
 import { ConfigProvider } from 'antd'

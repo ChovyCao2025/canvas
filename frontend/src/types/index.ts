@@ -1,3 +1,8 @@
+/**
+ * 类型职责：前端共享业务类型集合，覆盖后端响应、画布、元数据、标签和导入模型。
+ *
+ * 维护说明：这些类型是页面和服务层之间的契约，字段名应尽量与后端 DTO 保持一致。
+ */
 // ============================================================
 // 后端 API 响应类型
 // ============================================================
@@ -13,6 +18,7 @@ export interface R<T> {
   data: T
 }
 
+/** 后端统一分页结果。 */
 export interface PageResult<T> {
   /** 总记录数。 */
   total: number
@@ -28,6 +34,7 @@ export interface PageResult<T> {
 /** 画布状态：0草稿 1已发布 2已下线 */
 export type CanvasStatus = 0 | 1 | 2
 
+/** 画布列表和详情中的基础元信息。 */
 export interface Canvas {
   /** 画布主键。 */
   id: number
@@ -93,6 +100,7 @@ export interface Canvas {
   cooldownSeconds?: number
 }
 
+/** 画布详情，包含画布元信息和草稿图结构。 */
 export interface CanvasDetail {
   /** 画布元信息。 */
   canvas: Canvas
@@ -104,6 +112,7 @@ export interface CanvasDetail {
   draftVersionId?: number
 }
 
+/** 画布版本记录。 */
 export interface CanvasVersion {
   /** 版本记录 ID。 */
   id: number
@@ -139,6 +148,7 @@ export interface ValueRef {
   value: string
 }
 
+/** 条件判断规则。 */
 export interface ConditionRule {
   /** 字段 key。 */
   field: string
@@ -153,6 +163,7 @@ export interface ConditionRule {
   isCustom: boolean
 }
 
+/** graph_json 中的单个后端节点。 */
 export interface CanvasNode {
   /** 节点 ID。 */
   id: string
@@ -175,6 +186,7 @@ export interface CanvasNode {
   y?: number
 }
 
+/** graph_json 根结构。 */
 export interface CanvasGraph {
   /** 节点数组（边关系放在节点 config 中）。 */
   nodes: CanvasNode[]
@@ -225,6 +237,7 @@ export interface NodeTypeRegistry {
   enabled: 0 | 1
 }
 
+/** 可在节点配置中引用的上下文字段。 */
 export interface ContextField {
   /** 字段主键。 */
   id: number
@@ -245,6 +258,7 @@ export interface ContextField {
   description?: string
 }
 
+/** 后端元数据接口返回的轻量下拉选项。 */
 export interface StubOption {
   /** 实际 value。 */
   key: string
@@ -253,6 +267,7 @@ export interface StubOption {
   label: string
 }
 
+/** 系统字典项完整模型。 */
 export interface SystemOption {
   id: number
   category: string
@@ -266,6 +281,7 @@ export interface SystemOption {
   updatedAt?: string
 }
 
+/** AB 实验分组元数据。 */
 export interface AbExperimentGroup {
   id: number
   experimentId: number
@@ -277,6 +293,7 @@ export interface AbExperimentGroup {
   updatedAt?: string
 }
 
+/** antd Select 通用选项类型。 */
 export type SelectOption = { label: string; value: string }
 
 /** 表单 Schema 字段（config_schema 解析结果） */
@@ -309,6 +326,7 @@ export interface SchemaField {
   visible?: string
 }
 
+/** 用户身份类型定义。 */
 export interface IdentityType {
   id: number
   code: string
@@ -324,6 +342,7 @@ export interface IdentityType {
   updatedAt?: string
 }
 
+/** 标签定义。 */
 export interface TagDefinition {
   id: number
   name: string
@@ -342,6 +361,7 @@ export interface TagDefinition {
   updatedAt?: string
 }
 
+/** 标签枚举值定义。 */
 export interface TagValueDefinition {
   id: number
   tagCode: string
@@ -355,6 +375,7 @@ export interface TagValueDefinition {
   updatedAt?: string
 }
 
+/** 标签导入单行数据。 */
 export interface TagImportRow {
   rowNo?: number
   idType: string
@@ -364,6 +385,7 @@ export interface TagImportRow {
   tagTime?: string
 }
 
+/** 标签导入执行结果。 */
 export interface TagImportResult {
   batchId: number
   status: string
@@ -372,6 +394,7 @@ export interface TagImportResult {
   failedRows: number
 }
 
+/** 标签导入批次。 */
 export interface TagImportBatch {
   id: number
   sourceType: string
@@ -389,6 +412,7 @@ export interface TagImportBatch {
   updatedAt?: string
 }
 
+/** 标签导入失败明细。 */
 export interface TagImportError {
   id: number
   batchId: number
@@ -399,6 +423,7 @@ export interface TagImportError {
   createdAt?: string
 }
 
+/** 标签导入来源配置。 */
 export interface TagImportSource {
   id: number
   name: string

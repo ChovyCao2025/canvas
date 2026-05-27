@@ -16,6 +16,12 @@ import java.lang.reflect.Type;
 import java.util.function.Predicate;
 import java.util.function.Function;
 
+/**
+ * 分层缓存构建器，集中收集缓存名称、TTL、加载器、序列化和保护策略等配置。
+ *
+ * <p>使用构建器可以避免调用方直接依赖 TieredCacheImpl 构造细节，并保证默认策略统一。
+ * <p>build 后得到可直接注册到 TieredCacheManager 的缓存实例。
+ */
 public class TieredCacheBuilder<K, V> {
     private String name;
     private int l1MaxSize = 1000;
@@ -144,7 +150,7 @@ public class TieredCacheBuilder<K, V> {
                 keySchemaVersion, nullValueTtl, emptyValueTtl, lockTtl, refreshAhead, staleTtl,
                 hotspotProtection, penetration, breakdown, avalanche, keyValidator, bloomFilter, loaderFailure,
                 redisReadFailure, redisWriteFailure, deserializeFailure, loader,
-                valueJavaType, objectMapper, manager.getRedis(), manager.getReactiveRedis(), registry);
+                valueJavaType, objectMapper, manager.getRedis(), manager.getReactiveRedis(), manager::publish, registry);
         manager.register(cache);
         return cache;
     }

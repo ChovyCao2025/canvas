@@ -1,3 +1,8 @@
+/**
+ * 服务职责：人群定义与人群计算 API 类型和请求封装。
+ *
+ * 维护说明：该文件只描述前端 DTO 和 HTTP 调用，复杂表单组装在页面层完成。
+ */
 import type { R, PageResult } from '../types'
 import http from './api'
 
@@ -45,6 +50,7 @@ export interface AudienceDefinition {
   updatedAt?: string
 }
 
+/** 人群计算状态摘要。 */
 export interface AudienceStat {
   /** 人群 ID。 */
   audienceId: number
@@ -65,11 +71,13 @@ export interface AudienceStat {
   errorMsg?: string
 }
 
+/** 创建人群计算任务后的响应。 */
 export interface ComputeTaskResp {
   taskId: string
   status: 'QUEUED' | 'RUNNING' | 'SUCCEEDED' | 'FAILED' | 'CANCELED'
 }
 
+/** 人群定义、统计和计算任务接口集合。 */
 export const audienceApi = {
   list: (page = 1, size = 20) =>
     http.get<R<PageResult<AudienceDefinition>>, R<PageResult<AudienceDefinition>>>('/canvas/audiences', { params: { page, size } }),

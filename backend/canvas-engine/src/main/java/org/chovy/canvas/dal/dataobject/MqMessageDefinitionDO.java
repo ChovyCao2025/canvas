@@ -16,6 +16,7 @@ import java.time.LocalDateTime;
 public class MqMessageDefinitionDO {
 
     @TableId(type = IdType.AUTO)
+    /** MQ 消息定义主键 ID */
     private Long id;
 
     /** 消息显示名称 */
@@ -44,8 +45,10 @@ public class MqMessageDefinitionDO {
     private String createdBy;
 
     @TableField(fill = FieldFill.INSERT)
+    /** 记录创建时间，由 MyBatis-Plus 自动填充 */
     private LocalDateTime createdAt;
 
     @TableField(fill = FieldFill.INSERT_UPDATE)
+    /** 记录最后更新时间，由 MyBatis-Plus 自动填充 */
     private LocalDateTime updatedAt;
 }

@@ -1,3 +1,8 @@
+/**
+ * 测试职责：验证配置面板展示模型和 Inspector 卡片样式契约。
+ *
+ * 维护说明：TAGGER 节点的头部、摘要和分支展示是重点视觉路径，样式调整需同步这些断言。
+ */
 import { describe, expect, it } from 'vitest'
 import type { ReactElement, ReactNode } from 'react'
 import type { CanvasNodeData } from '../../types/canvas'
@@ -5,6 +10,7 @@ import { CATEGORY_SOLID } from '../canvas/constants'
 import { NodeHeaderCard } from './InspectorCards'
 import { buildConfigPanelPresentation } from './presentation'
 
+/** 构造 TAGGER 节点默认样本，测试用例按需覆盖字段。 */
 const taggerNode = (overrides: Partial<CanvasNodeData> = {}): CanvasNodeData => ({
   nodeType: 'TAGGER',
   name: '是否高价值近30天活跃用户',
@@ -18,16 +24,19 @@ const taggerNode = (overrides: Partial<CanvasNodeData> = {}): CanvasNodeData => 
   ...overrides,
 })
 
+/** 测试用节点 ID 到展示名的映射，用于校验分支摘要文案。 */
 const taggerRouteNames: Record<string, string> = {
   'api-node': '接口调用',
   'city-node': '是否高频消费城市用户',
 }
 
+/** 将 ReactNode 收窄为 ReactElement，方便读取组件 props 做样式断言。 */
 function asElement(node: ReactNode): ReactElement {
   expect(node).toBeTruthy()
   return node as ReactElement
 }
 
+/** 提取 NodeHeaderCard 关键区域样式，避免测试直接依赖完整 JSX 结构。 */
 function getHeaderStyles(props: Parameters<typeof NodeHeaderCard>[0]) {
   const card = asElement(NodeHeaderCard(props))
   const topRow = asElement(card.props.children[0])

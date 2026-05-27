@@ -13,6 +13,12 @@ import java.util.concurrent.atomic.LongAdder;
 import java.util.function.Function;
 import java.util.function.Supplier;
 
+/**
+ * InMemoryTieredCache 是分层缓存 SDK 的测试支撑组件。
+ *
+ * <p>用于在业务或单元测试中替代真实 Redis/多级缓存依赖，使缓存调用可以在内存中稳定验证。
+ * <p>该组件只服务测试场景，不应承载生产缓存策略。
+ */
 public class InMemoryTieredCache<K, V> implements TieredCache<K, V> {
     private final String name;
     private final Function<K, V> loader;

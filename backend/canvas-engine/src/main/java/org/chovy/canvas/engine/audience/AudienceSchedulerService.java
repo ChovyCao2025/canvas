@@ -35,10 +35,10 @@ public class AudienceSchedulerService {
     /** 统一调度器（线程池在 SchedulerConfig 中配置）。 */
     private final TaskScheduler taskScheduler;
 
-    /** 人群定义表访问层。 */
+    /** 人群定义 Mapper，用于启动时读取全部可调度的人群定义。 */
     private final AudienceDefinitionMapper definitionMapper;
 
-    /** audienceId -> 定时任务句柄。 */
+    /** audienceId 到定时任务句柄的映射，用于刷新或取消已有任务。 */
     private final Map<Long, ScheduledFuture<?>> tasks = new ConcurrentHashMap<>();
 
     /** 启动后加载全部人群定义并尝试注册调度。 */
@@ -48,7 +48,7 @@ public class AudienceSchedulerService {
         refreshAll();
     }
 
-    /** 全量刷新所有人群定时任务。 */
+    /** 全量读取人群定义并刷新离线人群计算调度任务。 */
     public void refreshAll() {
         List<AudienceDefinitionDO> definitions = definitionMapper.selectList(null);
         for (AudienceDefinitionDO definition : definitions) {
@@ -58,7 +58,7 @@ public class AudienceSchedulerService {
         }
     }
 
-    /** 刷新单个人群任务（外部传入实际执行 job）。 */
+    /** 刷新单个人群定义对应的调度任务，实际计算逻辑由调用方传入。 */
     public void refresh(AudienceDefinitionDO definition, Runnable job) {
         schedule(definition, job);
     }
@@ -92,7 +92,7 @@ public class AudienceSchedulerService {
         return normalized;
     }
 
-    /** 取消指定人群任务。 */
+    /** 取消指定人群的后续调度任务，不中断正在执行的计算。 */
     public void cancel(Long audienceId) {
         ScheduledFuture<?> future = tasks.remove(audienceId);
         if (future != null) {

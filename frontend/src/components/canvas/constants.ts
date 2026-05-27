@@ -1,4 +1,9 @@
 /**
+ * 组件职责：画布节点样式、尺寸、分支 handle ID 和节点类型常量。
+ *
+ * 维护说明：布局、占位符和节点组件依赖这些值保持视觉与命中区域一致。
+ */
+/**
  * 节点类别 -> 头部背景色（可渐变）。
  *
  * 用途：
@@ -22,6 +27,7 @@ export const CATEGORY_COLORS: Record<string, string> = {
   '其他':     '#6d5efc',
 }
 
+/** 节点分类实色，用于分类色条和节点库 hover 态。 */
 export const CATEGORY_SOLID: Record<string, string> = {
   '入口节点': '#0f766e',
   '行为策略': '#14b8a6',
@@ -116,6 +122,7 @@ export const DEFAULT_NAMES: Record<string, string> = {
   TEMPLATE_NODE:     '模板节点',
 }
 
+/** 画布节点 data 类型，供 React Flow Node<T> 使用。 */
 export type CanvasNodeData = {
   /** 节点类型编码（与后端 node_type_registry.type_key 对齐）。 */
   nodeType: string

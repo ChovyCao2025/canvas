@@ -1,7 +1,13 @@
+/**
+ * 测试职责：验证节点切换时配置表单的值同步和旧字段清理策略。
+ *
+ * 维护说明：ConfigPanel 表单同步逻辑调整时，要确保不会把上一个节点字段误保存到当前节点。
+ */
 import { describe, expect, it } from 'vitest'
 import type { CanvasNodeData } from '../../types/canvas'
 import { buildNodeConfigFormSyncPlan } from './formValues'
 
+/** 构造最小可用节点 data，便于测试只关注变化字段。 */
 const node = (overrides: Partial<CanvasNodeData>): CanvasNodeData => ({
   nodeType: 'API_CALL',
   name: '接口节点',

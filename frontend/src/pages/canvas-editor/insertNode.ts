@@ -1,8 +1,18 @@
+/**
+ * 页面职责：画布插入节点工具，处理拖拽节点、插入边、占位分支和默认配置生成。
+ *
+ * 维护说明：这些纯函数让主编辑器在拖拽场景下只负责组织状态变更。
+ */
 import type { Edge, Node, XYPosition } from '@xyflow/react'
 import { DEFAULT_NAMES } from '../../components/canvas/constants'
 import type { BizConfig, CanvasNodeData } from '../../types/canvas'
 
-// Task 3 only covers splitting a linear/default edge; branch-specific routing is handled later in editor integration.
+/**
+ * 把一个新节点插入到已有默认边中间。
+ *
+ * 只支持 default 出口边；分支出口的插入逻辑需要保留 handle 语义，
+ * 由编辑器主流程在占位分支场景中单独处理。
+ */
 export function applyInsertIntoEdge(edge: Edge, nodeId: string) {
   const sourceHandle = edge.sourceHandle ?? 'default'
   if (sourceHandle !== 'default') {
@@ -31,6 +41,7 @@ export function applyInsertIntoEdge(edge: Edge, nodeId: string) {
   }
 }
 
+/** 构造从指定出口到新节点的占位连线。 */
 export function buildPlaceholderEdge(sourceId: string, handleId: string, nodeId: string): Edge {
   return {
     id: `${sourceId}->${nodeId}::${handleId}`,
@@ -41,6 +52,7 @@ export function buildPlaceholderEdge(sourceId: string, handleId: string, nodeId:
   }
 }
 
+/** 构造一个尚未接入任何边的 React Flow 节点。 */
 export function buildDetachedNode(
   nodeId: string,
   nodeType: string,
@@ -60,11 +72,16 @@ export function buildDetachedNode(
   }
 }
 
+/** 节点 schema 中与默认配置提取相关的最小字段集合。 */
 type SchemaField = {
+  /** schema 字段 key。 */
   key?: string
+
+  /** 新建节点时要写入 bizConfig 的默认值。 */
   defaultValue?: unknown
 }
 
+/** 从节点 configSchema 中提取 defaultValue，作为新节点初始配置。 */
 export function buildConfigDefaultsFromSchema(rawSchema: string | undefined): BizConfig {
   if (!rawSchema) return {}
   try {
@@ -83,14 +100,25 @@ export function buildConfigDefaultsFromSchema(rawSchema: string | undefined): Bi
   }
 }
 
+/** 拖入一个节点后可能展开成的节点/边集合。 */
 export type NodeExpansion = {
+  /** 上游连线应连接到的入口节点。 */
   entryNodeId: string
+
+  /** 下游连线应从哪个节点继续连出。 */
   exitNodeId: string
+
+  /** 下游连线使用的出口 handle。 */
   exitHandleId: string
+
+  /** 本次新增的节点集合。 */
   nodes: Node<CanvasNodeData>[]
+
+  /** 模板节点内部预连好的边集合。 */
   edges: Edge[]
 }
 
+/** 构造带默认配置和 outletSchema 的画布节点。 */
 function buildNode(
   nodeId: string,
   nodeType: string,
@@ -105,6 +133,11 @@ function buildNode(
   return node
 }
 
+/**
+ * 根据拖入的节点类型生成实际要落到画布上的节点集合。
+ *
+ * 普通节点是一进一出；TEMPLATE_NODE 会展开为合规检查、渠道可达、邮件发送三段模板。
+ */
 export function buildNodeExpansion(input: {
   nodeId: string
   nodeType: string
@@ -124,6 +157,7 @@ export function buildNodeExpansion(input: {
     }
   }
 
+  // 模板节点用于一键插入常见触达链路，节点 ID 以主节点 ID 为前缀保证可追踪。
   const suppressionId = `${input.nodeId}_sup`
   const channelId = `${input.nodeId}_ch`
   const emailId = `${input.nodeId}_mail`

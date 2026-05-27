@@ -1,3 +1,8 @@
+/**
+ * 测试职责：验证内置 API 文档数据的过滤、分类统计、格式化和 ID 唯一性。
+ *
+ * 维护说明：新增 API 文档条目时，这些测试能防止分类遗漏和 endpoint id 冲突。
+ */
 import { describe, expect, it } from 'vitest'
 
 import {

@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.JavaType;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.github.benmanes.caffeine.cache.CacheLoader;
 import com.github.benmanes.caffeine.cache.Caffeine;
+import com.github.benmanes.caffeine.cache.Expiry;
 import com.github.benmanes.caffeine.cache.LoadingCache;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
@@ -40,11 +41,18 @@ import java.util.function.Predicate;
 import java.util.function.Supplier;
 import java.util.concurrent.atomic.LongAdder;
 
+/**
+ * 分层缓存默认实现，串联本地缓存、Redis 缓存、数据加载器和保护策略。
+ *
+ * <p>核心读取链路按 L1 → L2 → L3 顺序命中，命中下层后会回填上层以提升后续访问性能。
+ * <p>该实现还负责统计缓存指标、处理穿透/击穿/雪崩保护，以及在写路径上执行一致性策略。
+ */
 @Slf4j
 public class TieredCacheImpl<K, V> implements TieredCache<K, V> {
     static final String NULL_SENTINEL = "__NULL__";
 
     @Getter private final String name;
+    private final int l1MaxSize;
     private final String l2KeyPrefix;
     private final Duration l2Ttl;
     private final double l2TtlJitter;
@@ -70,9 +78,11 @@ public class TieredCacheImpl<K, V> implements TieredCache<K, V> {
     private final StringRedisTemplate redis;
     @SuppressWarnings("unused")
     private final ReactiveStringRedisTemplate reactiveRedis;
+    private final CacheInvalidationPublisher invalidationPublisher;
     final LoadingCache<K, Optional<V>> l1;
     private final ReactiveTieredCache<K, V> reactiveView;
     private final Map<K, CompletableFuture<Optional<V>>> inFlightLoads = new ConcurrentHashMap<>();
+    private final Map<K, Long> l1Versions = new ConcurrentHashMap<>();
     private final Map<K, StaleValue<V>> staleValues = new ConcurrentHashMap<>();
     private final LongAdder localL1Hits = new LongAdder();
     private final LongAdder localL1Misses = new LongAdder();
@@ -119,8 +129,10 @@ public class TieredCacheImpl<K, V> implements TieredCache<K, V> {
                     ObjectMapper objectMapper,
                     StringRedisTemplate redis,
                     ReactiveStringRedisTemplate reactiveRedis,
+                    CacheInvalidationPublisher invalidationPublisher,
                     MeterRegistry meterRegistry) {
         this.name = name;
+        this.l1MaxSize = l1MaxSize;
         this.l2KeyPrefix = l2KeyPrefix;
         this.l2Ttl = l2Ttl;
         this.l2TtlJitter = l2TtlJitter;
@@ -145,8 +157,26 @@ public class TieredCacheImpl<K, V> implements TieredCache<K, V> {
         this.objectMapper = objectMapper;
         this.redis = redis;
         this.reactiveRedis = reactiveRedis;
+        this.invalidationPublisher = invalidationPublisher;
         this.l1 = Caffeine.newBuilder()
                 .maximumSize(l1MaxSize)
+                .expireAfter(new Expiry<K, Optional<V>>() {
+                    @Override
+                    public long expireAfterCreate(K key, Optional<V> value, long currentTime) {
+                        return l1TtlNanos(value);
+                    }
+
+                    @Override
+                    public long expireAfterUpdate(K key, Optional<V> value, long currentTime, long currentDuration) {
+                        return l1TtlNanos(value);
+                    }
+
+                    @Override
+                    public long expireAfterRead(K key, Optional<V> value, long currentTime, long currentDuration) {
+                        return currentDuration;
+                    }
+                })
+                .refreshAfterWrite(l1RefreshAfterWrite)
                 .executor(Executors.newVirtualThreadPerTaskExecutor())
                 .build(buildCacheLoader());
         this.reactiveView = new ReactiveTieredCacheView<>(this);
@@ -165,7 +195,7 @@ public class TieredCacheImpl<K, V> implements TieredCache<K, V> {
         if (isRejectedByPenetrationProtection(key)) {
             return Optional.empty();
         }
-        Optional<V> cached = l1.getIfPresent(key);
+        Optional<V> cached = freshL1IfPresent(key);
         if (cached != null) {
             countHit("L1");
             maybeRefreshAhead(key);
@@ -181,7 +211,7 @@ public class TieredCacheImpl<K, V> implements TieredCache<K, V> {
         if (isRejectedByPenetrationProtection(key)) {
             return Optional.empty();
         }
-        Optional<V> cached = l1.getIfPresent(key);
+        Optional<V> cached = freshL1IfPresent(key);
         if (cached != null) {
             countHit("L1");
             maybeRefreshAhead(key);
@@ -196,7 +226,7 @@ public class TieredCacheImpl<K, V> implements TieredCache<K, V> {
         if (isRejectedByPenetrationProtection(key)) {
             return Optional.empty();
         }
-        Optional<V> cached = l1.getIfPresent(key);
+        Optional<V> cached = freshL1IfPresent(key);
         if (cached != null) {
             countHit("L1");
             maybeRefreshAhead(key);
@@ -204,15 +234,17 @@ public class TieredCacheImpl<K, V> implements TieredCache<K, V> {
         }
         countMiss("L1");
         Optional<V> loaded = loadFromL2ThenL3(key, loaderOverride);
-        l1.put(key, loaded);
+        putL1WithCurrentVersion(key, loaded);
         return loaded;
     }
 
     @Override
     public void put(K key, V value) {
         if (writeL2(key, value)) {
-            l1.put(key, Optional.ofNullable(value));
+            long version = bumpInvalidationVersion(key);
+            putL1(key, Optional.ofNullable(value), version);
             rememberStale(key, value);
+            publishInvalidate(keyToString(key), version);
         }
     }
 
@@ -225,7 +257,7 @@ public class TieredCacheImpl<K, V> implements TieredCache<K, V> {
                 result.put(key, Optional.empty());
                 continue;
             }
-            Optional<V> cached = l1.getIfPresent(key);
+            Optional<V> cached = freshL1IfPresent(key);
             if (cached != null) {
                 countHit("L1");
                 result.put(key, cached);
@@ -245,7 +277,7 @@ public class TieredCacheImpl<K, V> implements TieredCache<K, V> {
                 V value = loaded.get(key);
                 writeL2(key, value);
                 Optional<V> optional = Optional.ofNullable(value);
-                l1.put(key, optional);
+                putL1WithCurrentVersion(key, optional);
                 rememberStale(key, value);
                 result.put(key, optional);
             }
@@ -255,17 +287,18 @@ public class TieredCacheImpl<K, V> implements TieredCache<K, V> {
 
     @Override
     public void invalidate(K key) {
-        l1.invalidate(key);
+        invalidateLocal(key);
         deleteL2(key);
-        publishInvalidate(keyToString(key));
+        long version = bumpInvalidationVersion(key);
+        publishInvalidate(keyToString(key), version);
         log.debug("[TIERED_CACHE][{}] invalidate key={}", name, key);
     }
 
     @Override
     public void safeWrite(K key, Runnable writeAction, long delayMs) {
-        l1.invalidate(key);
+        invalidateLocal(key);
         deleteL2(key);
-        publishInvalidate(keyToString(key));
+        publishInvalidate(keyToString(key), bumpInvalidationVersion(key));
         try {
             writeAction.run();
             if (delayMs > 0) {
@@ -274,17 +307,19 @@ public class TieredCacheImpl<K, V> implements TieredCache<K, V> {
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
         }
-        l1.invalidate(key);
+        invalidateLocal(key);
         deleteL2(key);
-        publishInvalidate(keyToString(key));
+        publishInvalidate(keyToString(key), bumpInvalidationVersion(key));
     }
 
     @Override
     public void refresh(K key) {
-        l1.invalidate(key);
+        invalidateLocal(key);
         deleteL2(key);
         Optional<V> loaded = loadFromL2ThenL3(key, () -> loader.apply(key));
-        l1.put(key, loaded);
+        long version = bumpInvalidationVersion(key);
+        putL1(key, loaded, version);
+        publishInvalidate(keyToString(key), version);
     }
 
     @Override
@@ -307,7 +342,13 @@ public class TieredCacheImpl<K, V> implements TieredCache<K, V> {
     }
 
     void onInvalidateBroadcast(String rawKey) {
-        l1.asMap().keySet().removeIf(key -> keyToString(key).equals(rawKey));
+        l1.asMap().keySet().removeIf(key -> {
+            boolean matches = keyToString(key).equals(rawKey);
+            if (matches) {
+                l1Versions.remove(key);
+            }
+            return matches;
+        });
         log.debug("[TIERED_CACHE][{}] L1 evicted from pub/sub rawKey={}", name, rawKey);
     }
 
@@ -324,9 +365,12 @@ public class TieredCacheImpl<K, V> implements TieredCache<K, V> {
                     String json = redis.opsForValue().get(l2Key(key));
                     if (json != null) {
                         if (NULL_SENTINEL.equals(json)) {
+                            rememberLocalVersion(key);
                             return Optional.empty();
                         }
-                        return Optional.ofNullable(deserialize(json));
+                        Optional<V> value = Optional.ofNullable(deserialize(json));
+                        rememberLocalVersion(key);
+                        return value;
                     }
                 } catch (Exception e) {
                     if (redisReadFailure == RedisFailureStrategy.FAIL_FAST) {
@@ -334,20 +378,26 @@ public class TieredCacheImpl<K, V> implements TieredCache<K, V> {
                     }
                     log.warn("[TIERED_CACHE][{}] Redis read failed on refresh: {}", name, e.getMessage());
                 }
-                return loadFromL3(key, oldValue, () -> loader.apply(key));
+                Optional<V> value = loadFromL3(key, oldValue, () -> loader.apply(key));
+                rememberLocalVersion(key);
+                return value;
             }
         };
     }
 
     private Optional<V> loadFromL2ThenL3(K key, Supplier<V> effectiveLoader) {
+        Optional<V> loaded;
         L2Lookup<V> l2Lookup = readL2(key, false);
         if (l2Lookup.found()) {
-            return l2Lookup.value();
+            loaded = l2Lookup.value();
+        } else {
+            Supplier<Optional<V>> l3Call = () -> useDistributedLock()
+                    ? loadFromL3WithLock(key, null, effectiveLoader)
+                    : loadFromL3(key, null, effectiveLoader);
+            loaded = useLocalSingleFlight() ? loadWithSingleFlight(key, l3Call) : l3Call.get();
         }
-        Supplier<Optional<V>> l3Call = () -> useDistributedLock()
-                ? loadFromL3WithLock(key, null, effectiveLoader)
-                : loadFromL3(key, null, effectiveLoader);
-        return useLocalSingleFlight() ? loadWithSingleFlight(key, l3Call) : l3Call.get();
+        rememberLocalVersion(key);
+        return loaded;
     }
 
     private Optional<V> loadWithSingleFlight(K key, Supplier<Optional<V>> loaderCall) {
@@ -387,7 +437,7 @@ public class TieredCacheImpl<K, V> implements TieredCache<K, V> {
                 countHit("L2");
                 increment(penetrationHits);
                 if (cacheInL1) {
-                    l1.put(key, Optional.empty());
+                    putL1WithCurrentVersion(key, Optional.empty());
                 }
                 return new L2Lookup<>(true, Optional.empty());
             }
@@ -396,7 +446,7 @@ public class TieredCacheImpl<K, V> implements TieredCache<K, V> {
                 countHit("L2");
                 Optional<V> result = Optional.of(value);
                 if (cacheInL1) {
-                    l1.put(key, result);
+                    putL1WithCurrentVersion(key, result);
                 }
                 return new L2Lookup<>(true, result);
             }
@@ -511,11 +561,101 @@ public class TieredCacheImpl<K, V> implements TieredCache<K, V> {
         }
     }
 
-    private void publishInvalidate(String rawKey) {
+    private long bumpInvalidationVersion(K key) {
         try {
-            redis.convertAndSend(invalidateChannel(), rawKey);
+            Long version = redis.opsForValue().increment(invalidationVersionKey(key));
+            return version != null ? version : System.currentTimeMillis();
         } catch (Exception e) {
-            log.warn("[TIERED_CACHE][{}] Pub/Sub publish failed: {}", name, e.getMessage());
+            if (redisWriteFailure == RedisFailureStrategy.FAIL_FAST) {
+                throw asRuntime(e);
+            }
+            log.warn("[TIERED_CACHE][{}] invalidation version bump failed key={}: {}", name, key, e.getMessage());
+            return System.currentTimeMillis();
+        }
+    }
+
+    private Long currentInvalidationVersion(K key) {
+        try {
+            String version = redis.opsForValue().get(invalidationVersionKey(key));
+            return version == null || version.isBlank() ? 0L : Long.parseLong(version);
+        } catch (NumberFormatException e) {
+            log.warn("[TIERED_CACHE][{}] invalidation version is invalid key={}: {}", name, key, e.getMessage());
+            return null;
+        } catch (Exception e) {
+            if (redisReadFailure == RedisFailureStrategy.FAIL_FAST) {
+                throw asRuntime(e);
+            }
+            log.warn("[TIERED_CACHE][{}] invalidation version read failed key={}: {}", name, key, e.getMessage());
+            return null;
+        }
+    }
+
+    private Optional<V> freshL1IfPresent(K key) {
+        Optional<V> cached = l1.getIfPresent(key);
+        if (cached == null) {
+            return null;
+        }
+        Long localVersion = l1Versions.get(key);
+        Long currentVersion = currentInvalidationVersion(key);
+        if (localVersion != null && currentVersion != null && localVersion >= currentVersion) {
+            return cached;
+        }
+        invalidateLocal(key);
+        return null;
+    }
+
+    private void putL1WithCurrentVersion(K key, Optional<V> value) {
+        Long version = currentInvalidationVersion(key);
+        if (version != null) {
+            putL1(key, value, version);
+        } else {
+            l1.put(key, value);
+            l1Versions.remove(key);
+        }
+    }
+
+    private void putL1(K key, Optional<V> value, long version) {
+        l1.put(key, value);
+        l1Versions.put(key, version);
+        cleanupDetachedLocalVersions();
+    }
+
+    private long l1TtlNanos(Optional<V> value) {
+        Duration ttl;
+        if (value == null || value.isEmpty()) {
+            ttl = nullValueTtl;
+        } else if (isEmptyValue(value.get())) {
+            ttl = emptyValueTtl;
+        } else {
+            ttl = l2Ttl;
+        }
+        return Math.max(1L, ttl.toNanos());
+    }
+
+    private void rememberLocalVersion(K key) {
+        Long version = currentInvalidationVersion(key);
+        if (version != null) {
+            l1Versions.put(key, version);
+        } else {
+            l1Versions.remove(key);
+        }
+    }
+
+    private void invalidateLocal(K key) {
+        l1.invalidate(key);
+        l1Versions.remove(key);
+    }
+
+    private void cleanupDetachedLocalVersions() {
+        if (l1Versions.size() <= l1MaxSize * 2L) {
+            return;
+        }
+        l1Versions.keySet().removeIf(key -> !l1.asMap().containsKey(key));
+    }
+
+    private void publishInvalidate(String rawKey, long version) {
+        if (invalidationPublisher != null) {
+            invalidationPublisher.publish(new CacheInvalidationEvent(name, rawKey, version));
         }
     }
 
@@ -525,6 +665,10 @@ public class TieredCacheImpl<K, V> implements TieredCache<K, V> {
 
     String l2Key(K key) {
         return l2KeyPrefix + "v" + keySchemaVersion + ":" + keyToString(key);
+    }
+
+    String invalidationVersionKey(K key) {
+        return l2KeyPrefix + "v" + keySchemaVersion + ":__invalidate__:" + keyToString(key);
     }
 
     private String keyToString(K key) {
@@ -707,7 +851,7 @@ public class TieredCacheImpl<K, V> implements TieredCache<K, V> {
                         : (useDistributedLock()
                         ? loadFromL3WithLock(key, staleFor(key), () -> loader.apply(key))
                         : loadFromL3(key, staleFor(key), () -> loader.apply(key)));
-                l1.put(key, refreshed);
+                putL1WithCurrentVersion(key, refreshed);
                 marker.complete(refreshed);
             } catch (RuntimeException e) {
                 marker.completeExceptionally(e);
@@ -729,7 +873,7 @@ public class TieredCacheImpl<K, V> implements TieredCache<K, V> {
 
         @Override
         public Mono<Optional<V>> get(K key) {
-            Optional<V> cached = delegate.l1.getIfPresent(key);
+            Optional<V> cached = delegate.freshL1IfPresent(key);
             if (cached != null) {
                 delegate.countHit("L1");
                 return Mono.just(cached);
@@ -755,7 +899,7 @@ public class TieredCacheImpl<K, V> implements TieredCache<K, V> {
 
         @Override
         public Mono<Optional<V>> getIfPresent(K key) {
-            Optional<V> cached = delegate.l1.getIfPresent(key);
+            Optional<V> cached = delegate.freshL1IfPresent(key);
             if (cached != null) {
                 delegate.countHit("L1");
                 return Mono.just(cached);
@@ -775,29 +919,12 @@ public class TieredCacheImpl<K, V> implements TieredCache<K, V> {
 
         @Override
         public Mono<Void> put(K key, V value) {
-            if (delegate.reactiveRedis == null) {
-                return Mono.fromRunnable(() -> delegate.put(key, value)).subscribeOn(Schedulers.boundedElastic()).then();
-            }
-            String redisValue = value == null ? NULL_SENTINEL : delegate.serialize(value);
-            Duration ttl = value == null ? delegate.nullValueTtl : delegate.actualL2Ttl();
-            return delegate.reactiveRedis.opsForValue().set(delegate.l2Key(key), redisValue, ttl)
-                    .doOnNext(ok -> {
-                        if (Boolean.TRUE.equals(ok)) {
-                            delegate.l1.put(key, Optional.ofNullable(value));
-                        }
-                    })
-                    .then();
+            return Mono.fromRunnable(() -> delegate.put(key, value)).subscribeOn(Schedulers.boundedElastic()).then();
         }
 
         @Override
         public Mono<Void> invalidate(K key) {
-            if (delegate.reactiveRedis == null) {
-                return Mono.fromRunnable(() -> delegate.invalidate(key)).subscribeOn(Schedulers.boundedElastic()).then();
-            }
-            delegate.l1.invalidate(key);
-            return delegate.reactiveRedis.delete(delegate.l2Key(key))
-                    .then(delegate.reactiveRedis.convertAndSend(delegate.invalidateChannel(), delegate.keyToString(key)))
-                    .then();
+            return Mono.fromRunnable(() -> delegate.invalidate(key)).subscribeOn(Schedulers.boundedElastic()).then();
         }
 
         @Override

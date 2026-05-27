@@ -31,7 +31,7 @@ public class ContextPersistenceService {
     /** 阻塞式 Redis 模板（执行链路中以轻量 KV 操作为主）。 */
     private final StringRedisTemplate redis;
 
-    /** JSON 序列化器（ExecutionContext <-> String）。 */
+    /** Jackson ObjectMapper，用于 JSON 序列化和反序列化。 */
     private final ObjectMapper objectMapper;
 
     /**
@@ -50,12 +50,9 @@ public class ContextPersistenceService {
     public void save(ExecutionContext ctx) {
         try {
             String json = objectMapper.writeValueAsString(ctx);
-            // 敏感字段脱敏后再存 Redis（设计文档 13.8节）
-            String masked = org.chovy.canvas.common.DataMaskingUtil.maskJson(
-                    json, org.chovy.canvas.common.DataMaskingUtil.DEFAULT_SENSITIVE_KEYS);
             // 覆盖写 + TTL 续期：每次挂起/恢复都会刷新上下文生命周期
             redis.opsForValue().set(keys.context(ctx.getCanvasId(), ctx.getUserId()),
-                    masked, Duration.ofSeconds(ttlSec));
+                    json, Duration.ofSeconds(ttlSec));
         } catch (Exception e) {
             log.error("保存 ExecutionContext 失败: {}", e.getMessage());
         }
@@ -124,7 +121,7 @@ public class ContextPersistenceService {
         }
     }
 
-    /** Lua 原子 check-then-del：值匹配才 DEL，防止误删他机持有的锁。 */
+    /** 释放 WAIT 恢复锁的 Lua 脚本，保证只释放当前持有者的锁。 */
     private static final RedisScript<Long> RESUME_LOCK_RELEASE_SCRIPT = RedisScript.of(
             "if redis.call('GET', KEYS[1]) == ARGV[1] then return redis.call('DEL', KEYS[1]) else return 0 end",
             Long.class
@@ -132,6 +129,7 @@ public class ContextPersistenceService {
 
     // ── dedup key ────────────────────────────────────────────────
 
+    /** 尝试写入消息级幂等 key，成功表示本次消息可继续执行。 */
     public boolean acquireDedup(Long canvasId, String userId, String msgId, Duration ttl) {
         return Boolean.TRUE.equals(
                 redis.opsForValue().setIfAbsent(keys.dedup(canvasId, userId, msgId), "1", ttl));

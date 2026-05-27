@@ -10,17 +10,27 @@ import java.time.format.DateTimeFormatter;
 import java.util.LinkedHashSet;
 import java.util.List;
 
+/**
+ * 通知消息 Event 通知领域组件。
+ *
+ * <p>负责站内通知的创建、收件人解析、未读状态和实时推送封装。
+ * <p>该组件连接异步任务、WebSocket 和通知持久化模型，保证消息中心口径一致。
+ */
 @Slf4j
 @Service
 @RequiredArgsConstructor
 public class NotificationEventService {
 
+    /** 通知内容中展示审批截止时间的格式。 */
     private static final DateTimeFormatter TIME_FORMATTER =
             DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
 
+    /** 通知服务，用于创建消息中心通知。 */
     private final NotificationService notificationService;
+    /** 通知收件人服务，用于解析管理员或目标用户。 */
     private final NotificationRecipientService recipientService;
 
+    /** 创建人工审批待处理通知。 */
     public void approvalPending(CanvasManualApprovalDO approval, List<String> approvers) {
         if (approval == null || approvers == null || approvers.isEmpty()) {
             return;
@@ -45,6 +55,7 @@ public class NotificationEventService {
         }
     }
 
+    /** 创建人工审批结果通知。 */
     public void approvalResult(CanvasManualApprovalDO approval, String result, String approver) {
         if (approval == null || !hasText(approval.getUserId())) {
             return;
@@ -69,6 +80,7 @@ public class NotificationEventService {
                 .build());
     }
 
+    /** 创建画布变更类通知。 */
     public void canvasChanged(
             String type,
             Long canvasId,
@@ -94,6 +106,7 @@ public class NotificationEventService {
         }
     }
 
+    /** 创建系统告警通知。 */
     public void systemAlert(
             String type,
             String title,
@@ -122,6 +135,7 @@ public class NotificationEventService {
         }
     }
 
+    /** 封装通知创建的容错逻辑，避免通知失败影响主业务流程。 */
     private void createBestEffort(NotificationCreateCommand command) {
         try {
             notificationService.create(command);
@@ -131,6 +145,7 @@ public class NotificationEventService {
         }
     }
 
+    /** 组合管理员和操作人作为画布变更类通知收件人，并保持去重顺序。 */
     private List<String> adminsPlusOperator(String operator) {
         LinkedHashSet<String> recipients = new LinkedHashSet<>(adminsOrDefault());
         if (hasText(operator)) {
@@ -139,6 +154,7 @@ public class NotificationEventService {
         return List.copyOf(recipients);
     }
 
+    /** 查询管理员收件人，系统未配置管理员时使用默认 admin。 */
     private List<String> adminsOrDefault() {
         List<String> admins = recipientService.activeAdmins();
         if (admins == null || admins.isEmpty()) {
@@ -147,6 +163,7 @@ public class NotificationEventService {
         return admins;
     }
 
+    /** 过滤空白收件人并去重，避免同一审批人收到重复通知。 */
     private List<String> distinctNonBlank(List<String> values) {
         return values.stream()
                 .filter(this::hasText)
@@ -154,18 +171,22 @@ public class NotificationEventService {
                 .toList();
     }
 
+    /** 生成通知跳转的画布统计页地址。 */
     private String canvasUrl(Long canvasId) {
         return canvasId == null ? "/home" : "/canvas/" + canvasId + "/stats";
     }
 
+    /** 格式化通知中的时间字段，空值显示为未设置。 */
     private String formatTime(java.time.LocalDateTime value) {
         return value == null ? "未设置" : TIME_FORMATTER.format(value);
     }
 
+    /** 返回非空白文本，否则使用默认值。 */
     private String defaultIfBlank(String value, String fallback) {
         return hasText(value) ? value : fallback;
     }
 
+    /** 判断字符串是否包含非空白字符。 */
     private boolean hasText(String value) {
         return value != null && !value.isBlank();
     }

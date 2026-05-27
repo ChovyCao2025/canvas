@@ -11,6 +11,12 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
+/**
+ * 注解缓存解析器，负责把声明式缓存注解中的 cacheName 解析为具体 TieredCache 实例。
+ *
+ * <p>切面通过该组件隔离缓存查找逻辑，避免在 AOP 主流程中散落缓存注册中心访问代码。
+ * <p>当缓存不存在或类型不匹配时，该类负责给出统一的错误边界。
+ */
 public class AnnotationCacheResolver {
     private final TieredCacheManager manager;
     private final ObjectMapper objectMapper;

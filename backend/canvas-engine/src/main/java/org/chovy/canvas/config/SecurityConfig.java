@@ -51,7 +51,6 @@ public class SecurityConfig {
                                 "/v3/api-docs/**", "/webjars/**").permitAll()
                         // OpenAPI：事件上报无需登录（业务系统直接调用）
                         .pathMatchers(HttpMethod.POST, "/canvas/events/report").permitAll()
-                        .pathMatchers(HttpMethod.POST, "/canvas/execute/direct/**").permitAll()
                         // WebSocket 使用一次性票据鉴权；票据接口本身仍要求登录。
                         .pathMatchers("/canvas/ws/notifications").permitAll()
                         // 运维接口：无需登录（内网调用，不对外暴露）
@@ -63,6 +62,8 @@ public class SecurityConfig {
                                 "/canvas/*/promote-canary", "/canvas/*/rollback-canary",
                                 "/canvas/*/rollback", "/canvas/*/approve", "/canvas/*/reject",
                                 "/canvas/import").hasRole("ADMIN")
+                        .pathMatchers("/canvas/data-sources/**").hasRole("ADMIN")
+                        .pathMatchers("/canvas/api-definitions/**").hasRole("ADMIN")
                         // 管理员接口
                         .pathMatchers("/admin/**").hasRole("ADMIN")
                         // 其余接口需要登录

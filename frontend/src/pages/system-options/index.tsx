@@ -1,3 +1,8 @@
+/**
+ * 页面职责：系统字典管理页，提供分类筛选、关键字搜索和字典项编辑。
+ *
+ * 维护说明：前台多个配置控件依赖这些字典项，禁用或改值会影响下拉选项。
+ */
 import { useEffect, useState } from 'react'
 import {
   Button, Form, Input, InputNumber, Modal, Select,
@@ -7,8 +12,10 @@ import type { ColumnsType } from 'antd/es/table'
 import type { SystemOption } from '../../types'
 import { SYSTEM_OPTION_CATEGORIES, systemOptionsApi } from '../../services/systemOptions'
 
+/** 页面标题和说明文本组件别名。 */
 const { Title, Text } = Typography
 
+/** 系统字典管理页主组件，维护表格筛选、编辑弹窗和保存动作。 */
 export default function SystemOptionsPage() {
   const [data, setData] = useState<SystemOption[]>([])
   const [loading, setLoading] = useState(false)
@@ -18,6 +25,7 @@ export default function SystemOptionsPage() {
   const [editing, setEditing] = useState<SystemOption | null>(null)
   const [form] = Form.useForm()
 
+  /** 统一列表加载入口；筛选条件直接来自页面状态。 */
   const fetchList = async () => {
     setLoading(true)
     try {
@@ -34,6 +42,7 @@ export default function SystemOptionsPage() {
 
   useEffect(() => { fetchList() }, [category, enabled])
 
+  /** 打开编辑弹窗并把只允许修改的字段回填到表单。 */
   const openEdit = (record: SystemOption) => {
     setEditing(record)
     form.setFieldsValue({
@@ -44,6 +53,7 @@ export default function SystemOptionsPage() {
     })
   }
 
+  /** 保存字典项；布尔开关在提交时转换为后端使用的 1/0。 */
   const save = async () => {
     if (!editing) return
     const values = await form.validateFields()
@@ -58,6 +68,7 @@ export default function SystemOptionsPage() {
     fetchList()
   }
 
+  /** 字典项表格列，内置项只做展示提示，是否允许修改由后端最终校验。 */
   const columns: ColumnsType<SystemOption> = [
     { title: '分类', dataIndex: 'category', width: 220 },
     { title: 'Key', dataIndex: 'optionKey', width: 180 },

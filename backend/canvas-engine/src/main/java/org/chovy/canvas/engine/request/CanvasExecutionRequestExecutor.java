@@ -22,6 +22,12 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
 
+/**
+ * 画布执行请求 Executor 执行请求治理组件。
+ *
+ * <p>负责画布执行请求的排队、派发、限流、重放或积压度量，削峰高并发触发流量。
+ * <p>该层位于触发入口和 DAG 执行之间，核心目标是保护执行引擎稳定性。
+ */
 @Service
 public class CanvasExecutionRequestExecutor {
 
@@ -130,7 +136,9 @@ public class CanvasExecutionRequestExecutor {
                         ctx.request.getTriggerNodeType(),
                         ctx.request.getMatchKey(),
                         payload,
-                        ctx.request.getSourceMsgId()
+                        ctx.request.getSourceMsgId(),
+                        ctx.request.getAttemptCount() == null ? 0 : ctx.request.getAttemptCount(),
+                        ctx.request.getLastError()
                 ))
                 .flatMap(result -> finish(ctx.request, result, ctx.runToken))
                 .onErrorResume(e -> handleExecutionError(ctx, e));
@@ -193,6 +201,9 @@ public class CanvasExecutionRequestExecutor {
     private Mono<Void> finish(CanvasExecutionRequestDO request, Map<String, Object> result, String runToken) {
         if (result.containsKey(MapFieldKeys.OVERFLOW)) {
             return retryOrFail(request, String.valueOf(result.get(MapFieldKeys.OVERFLOW)), runToken);
+        }
+        if (result.containsKey(MapFieldKeys.ERROR)) {
+            return retryOrFail(request, String.valueOf(result.get(MapFieldKeys.ERROR)), runToken);
         }
         return Mono.fromCallable(() -> mapper.markSucceeded(
                         request.getId(),

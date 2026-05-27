@@ -6,6 +6,12 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * Node Route Resolver 执行引擎基础类型。
+ *
+ * <p>定义节点执行结果、路由判断或处理器契约，是 DAG 调度与具体节点实现之间的稳定接口。
+ * <p>该层不依赖具体业务节点，保持通用语义以便新增节点复用。
+ */
 public final class NodeRouteResolver {
     private NodeRouteResolver() {
     }

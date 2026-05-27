@@ -1,3 +1,8 @@
+/**
+ * 模块职责：路由权限守卫，统一处理未登录、加载中和管理员权限不足的跳转/提示。
+ *
+ * 维护说明：这里的判断顺序会影响页面闪烁和浏览器历史栈，调整时要同时验证登录态恢复流程。
+ */
 import { Navigate, Outlet } from 'react-router-dom'
 import { Spin } from 'antd'
 import { useAuth } from '../context/AuthContext'

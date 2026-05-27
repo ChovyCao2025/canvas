@@ -13,6 +13,12 @@ import java.time.LocalDateTime;
 import java.util.List;
 import org.chovy.canvas.domain.execution.CanvasExecutionRequestStatusCount;
 
+/**
+ * 画布执行请求 MyBatis-Plus Mapper。
+ *
+ * <p>继承 BaseMapper 为 {@code CanvasExecutionRequestDO} 提供基础 CRUD 能力，复杂查询可在同名 XML 中扩展。
+ * <p>该接口只定义数据访问边界，不承载业务编排或跨表事务逻辑。
+ */
 @Mapper
 public interface CanvasExecutionRequestMapper extends BaseMapper<CanvasExecutionRequestDO> {
 

@@ -17,6 +17,7 @@ import java.time.LocalDateTime;
 public class CanvasExecutionDlqDO {
 
     @TableId(type = IdType.AUTO)
+    /** 死信记录主键 ID */
     private Long id;
 
     /** 原始执行记录 ID */

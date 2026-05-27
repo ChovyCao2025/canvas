@@ -12,6 +12,7 @@ import java.time.LocalDateTime;
 public class CanvasTemplateDO {
 
     @TableId(type = IdType.AUTO)
+    /** 模板主键 ID。 */
     private Long id;
 
     /** 模板名称。 */
@@ -60,5 +61,6 @@ public class CanvasTemplateDO {
     private String createdBy;
 
     @TableField(fill = FieldFill.INSERT)
+    /** 模板创建时间，由 MyBatis-Plus 自动填充。 */
     private LocalDateTime createdAt;
 }

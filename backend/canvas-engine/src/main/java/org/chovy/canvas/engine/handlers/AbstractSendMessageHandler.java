@@ -9,6 +9,12 @@ import reactor.core.publisher.Mono;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
+/**
+ * 发送类节点处理器抽象基类。
+ *
+ * <p>封装短信、邮件、Push、站内信、微信等触达节点共同的参数解析、策略校验和发送记录写入流程。
+ * <p>子类只需要声明具体渠道类型和渠道特有字段，跨节点路由、重试和状态持久化仍由执行引擎统一管理。
+ */
 abstract class AbstractSendMessageHandler implements NodeHandler {
 
     private final ReachDeliveryService deliveryService;

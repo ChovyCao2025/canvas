@@ -1,3 +1,8 @@
+/**
+ * 测试职责：验证配置面板控件统一视觉样式的关键尺寸和颜色。
+ *
+ * 维护说明：这些断言保护输入框/下拉框的布局契约，调整设计时需要同步更新。
+ */
 import { describe, expect, it } from 'vitest'
 import { getControlChrome, getControlLabelStyle } from './controlChrome'
 

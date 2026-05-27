@@ -19,6 +19,12 @@ import java.util.stream.Stream;
 
 import reactor.core.publisher.Mono;
 
+/**
+ * 分层缓存注解切面。
+ *
+ * <p>拦截 TieredCached、TieredCachePut 和 TieredCacheEvict 注解方法，串联 key 计算、缓存读取、方法调用和缓存写入/失效。
+ * <p>该切面是声明式缓存能力进入业务代码的入口，必须保持幂等和异常边界清晰。
+ */
 @Aspect
 @RequiredArgsConstructor
 public class TieredCacheAspect {
