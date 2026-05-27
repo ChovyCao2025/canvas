@@ -72,6 +72,11 @@ describe('api docs data helpers', () => {
       .map(endpoint => endpoint.path)).toEqual(['/admin/users'])
   })
 
+  it('filters by category', () => {
+    expect(filterApiDocEndpoints(endpoints, { showInternal: true, category: 'configuration' })
+      .map(endpoint => endpoint.path)).toEqual(['/canvas/api-definitions'])
+  })
+
   it('builds category summaries from visible endpoints', () => {
     const summaries = getApiDocCategorySummaries(filterApiDocEndpoints(endpoints, { showInternal: false }))
 
