@@ -30,7 +30,7 @@ public class SysUserService {
     public SysUserDO findByUsernameForAuth(String username) {
         return sysUserMapper.selectOne(
                 new com.baomidou.mybatisplus.core.conditions.query.QueryWrapper<SysUserDO>()
-                        .select("id", "username", "password", "display_name", "role", "enabled")
+                        .select("id", "tenant_id", "username", "password", "display_name", "role", "enabled")
                         .eq("username", username));
     }
 
