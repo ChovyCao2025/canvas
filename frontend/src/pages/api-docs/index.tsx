@@ -1,19 +1,19 @@
 /**
  * 页面职责：API 文档页面，提供分类筛选、搜索、内部接口开关和示例复制。
  *
- * 维护说明：页面读取本地文档常量，不依赖后端接口。
+ * 维护说明：页面读取后端 /v3/api-docs，并转换为前端展示结构。
  */
-import { useEffect, useMemo, useState } from 'react'
-import { Button, Card, Empty, Input, Space, Switch, Table, Tag, Tooltip, Typography, message } from 'antd'
-import { CopyOutlined, SearchOutlined } from '@ant-design/icons'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { Alert, Button, Card, Empty, Input, Space, Spin, Switch, Table, Tag, Tooltip, Typography, message } from 'antd'
+import { CopyOutlined, ReloadOutlined, SearchOutlined } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
 import {
-  API_DOCS,
   filterApiDocEndpoints,
   formatJsonExample,
   getApiDocCategorySummaries,
 } from './apiDocs'
 import type { ApiDocEndpoint, ApiDocParam } from './apiDocs'
+import { fetchOpenApiSpec, parseOpenApiEndpoints } from './openApiDocs'
 
 /** 文档页常用排版组件别名，减少 JSX 中的命名噪音。 */
 const { Paragraph, Text, Title } = Typography
@@ -150,17 +150,59 @@ function EndpointCard({ endpoint }: { endpoint: ApiDocEndpoint }) {
   )
 }
 
-/** API 文档页主组件：筛选条件在顶部维护，接口卡片由过滤后的文档数据驱动。 */
+/** API 文档页主组件：从 OpenAPI 加载接口，再由顶部筛选条件驱动卡片列表。 */
 export default function ApiDocsPage() {
   const [keyword, setKeyword] = useState('')
   const [showInternal, setShowInternal] = useState(false)
   const [category, setCategory] = useState<string | undefined>()
+  const [apiEndpoints, setApiEndpoints] = useState<ApiDocEndpoint[]>([])
+  const [warnings, setWarnings] = useState<string[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | undefined>()
+  const requestSeqRef = useRef(0)
+
+  /** 加载运行时 OpenAPI 文档；请求序号用于避免过期请求覆盖较新的结果。 */
+  const loadOpenApiDocs = useCallback(async () => {
+    const requestSeq = requestSeqRef.current + 1
+    requestSeqRef.current = requestSeq
+
+    setLoading(true)
+    setError(undefined)
+
+    try {
+      const spec = await fetchOpenApiSpec()
+      const result = parseOpenApiEndpoints(spec)
+      if (requestSeq !== requestSeqRef.current) return
+
+      setApiEndpoints(result.endpoints)
+      setWarnings(result.warnings)
+    } catch (nextError) {
+      if (requestSeq !== requestSeqRef.current) return
+
+      setApiEndpoints([])
+      setWarnings([])
+      setError(nextError instanceof Error ? nextError.message : '加载 /v3/api-docs 失败')
+    } finally {
+      if (requestSeq !== requestSeqRef.current) return
+
+      setLoading(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    void loadOpenApiDocs()
+    return () => {
+      requestSeqRef.current += 1
+    }
+  }, [loadOpenApiDocs])
+
+  const disabled = loading || Boolean(error)
 
   // 分类侧栏的计数不受“当前分类”影响，只受搜索和内部接口开关影响。
-  const categorySourceEndpoints = useMemo(() => filterApiDocEndpoints({
+  const categorySourceEndpoints = useMemo(() => filterApiDocEndpoints(apiEndpoints, {
     showInternal,
     keyword,
-  }), [keyword, showInternal])
+  }), [apiEndpoints, keyword, showInternal])
 
   /** 分类摘要列表，包含每个分类在当前搜索条件下的接口数量。 */
   const categorySummaries = useMemo(
@@ -178,15 +220,15 @@ export default function ApiDocsPage() {
   }, [category, selectedCategory])
 
   // 主列表筛选结果，同时应用搜索、内部接口开关和有效分类。
-  const endpoints = useMemo(() => filterApiDocEndpoints({
+  const endpoints = useMemo(() => filterApiDocEndpoints(apiEndpoints, {
     showInternal,
     keyword,
     category: selectedCategory,
-  }), [keyword, selectedCategory, showInternal])
+  }), [apiEndpoints, keyword, selectedCategory, showInternal])
 
   const totalVisibleCount = categorySourceEndpoints.length
-  const publicCount = API_DOCS.filter(endpoint => !endpoint.internal).length
-  const internalCount = API_DOCS.length - publicCount
+  const publicCount = apiEndpoints.filter(endpoint => !endpoint.internal).length
+  const internalCount = apiEndpoints.length - publicCount
 
   return (
     <div style={{ padding: 24, minWidth: 0 }}>
@@ -198,6 +240,38 @@ export default function ApiDocsPage() {
             打开“显示内部管理 API”后，可查看画布、配置、观测、运维和用户管理等后台接口。
           </Paragraph>
         </div>
+
+        {loading ? (
+          <Card size="small" style={{ borderRadius: 8 }}>
+            <Space>
+              <Spin size="small" />
+              <Text type="secondary">正在加载 /v3/api-docs...</Text>
+            </Space>
+          </Card>
+        ) : null}
+
+        {error ? (
+          <Alert
+            type="error"
+            showIcon
+            message="OpenAPI 文档加载失败"
+            description={`请求 /v3/api-docs 未成功：${error}`}
+            action={(
+              <Button size="small" icon={<ReloadOutlined />} onClick={loadOpenApiDocs}>
+                重试
+              </Button>
+            )}
+          />
+        ) : null}
+
+        {!error && warnings.length > 0 ? (
+          <Alert
+            type="warning"
+            showIcon
+            message={`OpenAPI 解析跳过 ${warnings.length} 项`}
+            description={warnings.slice(0, 3).join('；')}
+          />
+        ) : null}
 
         <div style={{
           display: 'flex',
@@ -217,6 +291,7 @@ export default function ApiDocsPage() {
                 placeholder="搜索标题、路径、方法或分类"
                 value={keyword}
                 onChange={event => setKeyword(event.target.value)}
+                disabled={disabled}
               />
 
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
@@ -228,7 +303,7 @@ export default function ApiDocsPage() {
                     </Text>
                   </div>
                 </div>
-                <Switch checked={showInternal} onChange={setShowInternal} />
+                <Switch checked={showInternal} onChange={setShowInternal} disabled={disabled} />
               </div>
 
               <div>
@@ -238,6 +313,7 @@ export default function ApiDocsPage() {
                     block
                     type={!selectedCategory ? 'primary' : 'default'}
                     onClick={() => setCategory(undefined)}
+                    disabled={disabled}
                     style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
                   >
                     <span>全部 API</span>
@@ -249,6 +325,7 @@ export default function ApiDocsPage() {
                       block
                       type={selectedCategory === summary.key ? 'primary' : 'default'}
                       onClick={() => setCategory(summary.key)}
+                      disabled={disabled}
                       style={{
                         height: 'auto',
                         minHeight: 42,
@@ -282,17 +359,20 @@ export default function ApiDocsPage() {
                   当前展示 <Text strong>{endpoints.length}</Text> 个接口
                 </Text>
                 {selectedCategory ? (
-                  <Button size="small" onClick={() => setCategory(undefined)}>清除分类</Button>
+                  <Button size="small" onClick={() => setCategory(undefined)} disabled={disabled}>
+                    清除分类
+                  </Button>
                 ) : null}
               </div>
 
-              {endpoints.length > 0 ? (
-                endpoints.map(endpoint => <EndpointCard key={endpoint.id} endpoint={endpoint} />)
-              ) : (
+              {!loading && !error && endpoints.length > 0
+                ? endpoints.map(endpoint => <EndpointCard key={endpoint.id} endpoint={endpoint} />)
+                : null}
+              {!loading && !error && endpoints.length === 0 ? (
                 <Card size="small" style={{ borderRadius: 8 }}>
                   <Empty description="没有匹配的 API" />
                 </Card>
-              )}
+              ) : null}
             </Space>
           </div>
         </div>
