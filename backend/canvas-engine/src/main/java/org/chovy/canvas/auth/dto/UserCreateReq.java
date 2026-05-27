@@ -20,6 +20,9 @@ public class UserCreateReq {
     /** 展示名（用于后台列表和操作审计展示）。 */
     private String displayName;
 
-    /** 角色：`ADMIN` / `OPERATOR`。 */
+    /** 角色：`SUPER_ADMIN` / `TENANT_ADMIN` / `OPERATOR`。 */
     private String role;
+
+    /** 所属租户 ID。 */
+    private Long tenantId;
 }

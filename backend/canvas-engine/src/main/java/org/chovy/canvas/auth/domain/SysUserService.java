@@ -2,12 +2,15 @@ package org.chovy.canvas.auth.domain;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import lombok.RequiredArgsConstructor;
+import org.chovy.canvas.common.tenant.RoleNames;
+import org.chovy.canvas.common.tenant.TenantContext;
 import org.springframework.dao.DuplicateKeyException;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
 
-import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Locale;
 import java.util.Set;
 import org.chovy.canvas.dal.dataobject.SysUserDO;
 import org.chovy.canvas.dal.mapper.SysUserMapper;
@@ -23,7 +26,10 @@ import org.chovy.canvas.dal.mapper.SysUserMapper;
 public class SysUserService {
 
     /** 后台用户允许使用的角色集合。 */
-    private static final Set<String> ALLOWED_ROLES = Set.of("ADMIN", "OPERATOR");
+    private static final Set<String> ALLOWED_ROLES = Set.of(
+            RoleNames.SUPER_ADMIN,
+            RoleNames.TENANT_ADMIN,
+            RoleNames.OPERATOR);
 
     /** 系统用户 Mapper，用于认证和后台用户管理。 */
     private final SysUserMapper sysUserMapper;
@@ -40,7 +46,7 @@ public class SysUserService {
     public SysUserDO findByUsernameForAuth(String username) {
         return sysUserMapper.selectOne(
                 new com.baomidou.mybatisplus.core.conditions.query.QueryWrapper<SysUserDO>()
-                        .select("id", "username", "password", "display_name", "role", "enabled")
+                        .select("id", "tenant_id", "username", "password", "display_name", "role", "enabled")
                         .eq("username", username));
     }
 
@@ -54,11 +60,24 @@ public class SysUserService {
         return sysUserMapper.selectList(null);
     }
 
+    public List<SysUserDO> listVisible(TenantContext operator) {
+        requireUserAdmin(operator);
+        if (operator.isSuperAdmin()) {
+            return listAll();
+        }
+        Long tenantId = requireContextTenantId(operator);
+        return sysUserMapper.selectList(
+                new LambdaQueryWrapper<SysUserDO>().eq(SysUserDO::getTenantId, tenantId));
+    }
+
     /** 创建新记录，并执行必要的唯一性、格式和默认值处理。 */
-    public SysUserDO create(String username, String rawPassword, String displayName, String role) {
+    public SysUserDO create(String username, String rawPassword, String displayName,
+                            String role, Long tenantId, TenantContext operator) {
         String normalizedUsername = requireText(username, "用户名");
         String normalizedDisplayName = requireText(displayName, "显示名");
         String normalizedRole = requireRole(role);
+        Long targetTenantId = requireTenantId(tenantId);
+        requireCreatePermission(operator, targetTenantId, normalizedRole);
         requirePassword(rawPassword);
 
         if (findByUsername(normalizedUsername) != null) {
@@ -66,6 +85,7 @@ public class SysUserService {
         }
 
         SysUserDO user = new SysUserDO();
+        user.setTenantId(targetTenantId);
         user.setUsername(normalizedUsername);
         user.setPassword(encoder.encode(rawPassword));
         user.setDisplayName(normalizedDisplayName);
@@ -80,19 +100,21 @@ public class SysUserService {
     }
 
     /** 更新已有记录，仅修改允许变更的字段。 */
-    public void update(Long id, String displayName, String rawPassword, String role) {
+    public void update(Long id, String displayName, String rawPassword, String role, TenantContext operator) {
         SysUserDO user = sysUserMapper.selectById(id);
         if (user == null) throw new IllegalArgumentException("用户不存在: " + id);
+        requireManagePermission(operator, user.getTenantId(), role);
         if (displayName != null) user.setDisplayName(displayName);
         if (rawPassword != null && !rawPassword.isBlank()) user.setPassword(encoder.encode(rawPassword));
-        if (role != null) user.setRole(role);
+        if (role != null) user.setRole(requireRole(role));
         sysUserMapper.updateById(user);
     }
 
     /** 禁用记录，使其不再参与后续业务流程。 */
-    public void disable(Long id) {
+    public void disable(Long id, TenantContext operator) {
         SysUserDO user = sysUserMapper.selectById(id);
         if (user == null) throw new IllegalArgumentException("用户不存在: " + id);
+        requireManagePermission(operator, user.getTenantId(), null);
         user.setEnabled(0);
         sysUserMapper.updateById(user);
     }
@@ -119,10 +141,58 @@ public class SysUserService {
 
     /** 校验并规范化后台用户角色，限制为系统允许的角色集合。 */
     private String requireRole(String role) {
-        String normalizedRole = requireText(role, "角色");
+        String normalizedRole = requireText(role, "角色").toUpperCase(Locale.ROOT);
         if (!ALLOWED_ROLES.contains(normalizedRole)) {
-            throw new IllegalArgumentException("角色只能是 ADMIN 或 OPERATOR");
+            throw new IllegalArgumentException("角色只能是 SUPER_ADMIN、TENANT_ADMIN 或 OPERATOR");
         }
         return normalizedRole;
+    }
+
+    private Long requireTenantId(Long tenantId) {
+        if (tenantId == null) {
+            throw new IllegalArgumentException("租户 ID 不能为空");
+        }
+        return tenantId;
+    }
+
+    private Long requireContextTenantId(TenantContext operator) {
+        if (operator.tenantId() == null) {
+            throw new AccessDeniedException("当前用户缺少租户 ID");
+        }
+        return operator.tenantId();
+    }
+
+    private void requireUserAdmin(TenantContext operator) {
+        if (operator == null || (!operator.isSuperAdmin() && !operator.isTenantAdmin())) {
+            throw new AccessDeniedException("无权限管理用户");
+        }
+    }
+
+    private void requireCreatePermission(TenantContext operator, Long targetTenantId, String targetRole) {
+        requireUserAdmin(operator);
+        if (operator.isSuperAdmin()) {
+            return;
+        }
+        if (RoleNames.SUPER_ADMIN.equals(targetRole)) {
+            throw new AccessDeniedException("TENANT_ADMIN 不能创建 SUPER_ADMIN 用户");
+        }
+        Long operatorTenantId = requireContextTenantId(operator);
+        if (!operatorTenantId.equals(targetTenantId)) {
+            throw new AccessDeniedException("TENANT_ADMIN 只能创建当前租户用户");
+        }
+    }
+
+    private void requireManagePermission(TenantContext operator, Long targetTenantId, String targetRole) {
+        requireUserAdmin(operator);
+        if (operator.isSuperAdmin()) {
+            return;
+        }
+        if (targetRole != null && RoleNames.SUPER_ADMIN.equals(requireRole(targetRole))) {
+            throw new AccessDeniedException("TENANT_ADMIN 不能授予 SUPER_ADMIN 角色");
+        }
+        Long operatorTenantId = requireContextTenantId(operator);
+        if (!operatorTenantId.equals(targetTenantId)) {
+            throw new AccessDeniedException("TENANT_ADMIN 只能管理当前租户用户");
+        }
     }
 }

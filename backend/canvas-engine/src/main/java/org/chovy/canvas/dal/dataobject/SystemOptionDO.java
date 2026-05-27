@@ -23,6 +23,9 @@ public class SystemOptionDO {
     /** 系统选项主键 ID */
     private Long id;
 
+    @TableField("tenant_id")
+    private Long tenantId;
+
     /** 选项分类，用于前端按业务域分组展示 */
     private String category;
 

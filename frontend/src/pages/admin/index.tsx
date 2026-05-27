@@ -7,9 +7,11 @@ import { useEffect, useState } from 'react'
 import { Button, Form, Input, Modal, Select, Table, Tag, Tooltip, message, Typography } from 'antd'
 import { PlusOutlined, StopOutlined } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
-import { adminApi } from '../../services/api'
-import type { SysUser } from '../../services/api'
+import { adminApi, tenantApi } from '../../services/api'
+import type { SysUser, Tenant } from '../../services/api'
 import { useSystemOptions } from '../../hooks/useSystemOptions'
+import { useAuth } from '../../context/AuthContext'
+import { roleLabel } from '../../auth/roles'
 
 /** 页面标题组件别名。 */
 const { Title } = Typography
@@ -25,10 +27,16 @@ const { Title } = Typography
 export default function AdminUsersPage() {
   // 列表与弹窗状态
   const [users, setUsers] = useState<SysUser[]>([])
+  const [tenants, setTenants] = useState<Tenant[]>([])
   const [loading, setLoading] = useState(false)
   const [createVisible, setCreateVisible] = useState(false)
   const [form] = Form.useForm()
   const { options: roleOptions } = useSystemOptions('user_role')
+  const { user, isSuperAdmin } = useAuth()
+
+  const availableRoleOptions = roleOptions
+    .filter(option => ['SUPER_ADMIN', 'TENANT_ADMIN', 'OPERATOR'].includes(String(option.value)))
+    .filter(option => isSuperAdmin || option.value !== 'SUPER_ADMIN')
 
   // 拉取全部用户：作为列表唯一数据源，创建/禁用后都回调它刷新
   const fetchUsers = async () => {
@@ -43,10 +51,23 @@ export default function AdminUsersPage() {
 
   useEffect(() => { fetchUsers() }, [])
 
+  useEffect(() => {
+    if (!isSuperAdmin) return
+    tenantApi.list().then(res => setTenants(res.data.filter(tenant => tenant.status === 'ACTIVE')))
+  }, [isSuperAdmin])
+
   // 创建用户：先做表单校验，再调用后端接口
   const handleCreate = async () => {
     const values = await form.validateFields()
-    await adminApi.createUser(values)
+    const targetTenantId = isSuperAdmin ? values.tenantId : user?.tenantId
+    if (!targetTenantId) {
+      message.error('缺少租户 ID，无法创建用户')
+      return
+    }
+    await adminApi.createUser({
+      ...values,
+      tenantId: targetTenantId,
+    })
     message.success('创建成功')
     setCreateVisible(false)
     form.resetFields()
@@ -72,10 +93,11 @@ export default function AdminUsersPage() {
     { title: 'ID', dataIndex: 'id', width: 80 },
     { title: '用户名', dataIndex: 'username' },
     { title: '显示名', dataIndex: 'displayName' },
+    { title: '租户 ID', dataIndex: 'tenantId', width: 96 },
     {
       title: '角色',
       dataIndex: 'role',
-      render: (r) => <Tag color={r === 'ADMIN' ? 'blue' : 'default'}>{r}</Tag>,
+      render: (r) => <Tag color={r === 'SUPER_ADMIN' || r === 'ADMIN' ? 'blue' : r === 'TENANT_ADMIN' ? 'purple' : 'default'}>{roleLabel(r)}</Tag>,
     },
     {
       title: '状态',
@@ -117,8 +139,20 @@ export default function AdminUsersPage() {
           <Form.Item name="displayName" label="显示名" rules={[{ required: true }]}>
             <Input />
           </Form.Item>
+          {isSuperAdmin ? (
+            <Form.Item name="tenantId" label="所属租户" rules={[{ required: true, message: '请选择租户' }]}>
+              <Select
+                showSearch
+                options={tenants.map(tenant => ({
+                  value: tenant.id,
+                  label: `${tenant.name} (${tenant.tenantKey})`,
+                }))}
+                optionFilterProp="label"
+              />
+            </Form.Item>
+          ) : null}
           <Form.Item name="role" label="角色" rules={[{ required: true }]} initialValue="OPERATOR">
-            <Select options={roleOptions} />
+            <Select options={availableRoleOptions} />
           </Form.Item>
         </Form>
       </Modal>

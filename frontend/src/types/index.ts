@@ -270,6 +270,7 @@ export interface StubOption {
 /** 系统字典项完整模型。 */
 export interface SystemOption {
   id: number
+  tenantId?: number | null
   category: string
   optionKey: string
   label: string

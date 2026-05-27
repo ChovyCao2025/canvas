@@ -71,8 +71,8 @@ export const systemOptionsApi = {
         .join('&'),
     }),
 
-  /** 管理端分页查询字典项，支持分类、启用状态和关键字筛选。 */
-  adminList: (params?: { category?: string; enabled?: number; keyword?: string }) =>
+  /** 管理端分页查询字典项，支持分类、启用状态、租户和关键字筛选。 */
+  adminList: (params?: { category?: string; enabled?: number; keyword?: string; tenantId?: number }) =>
     http.get<R<PageResult<SystemOption>>, R<PageResult<SystemOption>>>('/admin/system-options', { params }),
 
   /** 更新字典项；前端以 Partial 传递仅修改的字段。 */

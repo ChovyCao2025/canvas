@@ -81,6 +81,7 @@ public class AuthController {
             LoginResp resp = new LoginResp();
             resp.setToken(token);
             resp.setUserId(user.getId());
+            resp.setTenantId(user.getTenantId());
             resp.setUsername(user.getUsername());
             resp.setDisplayName(user.getDisplayName());
             resp.setRole(user.getRole());
@@ -156,6 +157,7 @@ public class AuthController {
                     if (user == null) throw new IllegalArgumentException("用户不存在");
                     LoginResp resp = new LoginResp();
                     resp.setUserId(user.getId());
+                    resp.setTenantId(user.getTenantId());
                     resp.setUsername(user.getUsername());
                     resp.setDisplayName(user.getDisplayName());
                     resp.setRole(user.getRole());

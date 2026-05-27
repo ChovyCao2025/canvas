@@ -5,6 +5,13 @@
  */
 import { createContext, useContext, useState, type ReactNode } from 'react'
 import type { LoginResp } from '../services/api'
+import {
+  canManageSystemOptions,
+  canManageTenants,
+  canManageUsers,
+  isSuperAdminRole,
+  isTenantAdminRole,
+} from '../auth/roles'
 
 /**
  * 全局认证态：负责 token/user 持久化及登录态切换。
@@ -16,6 +23,21 @@ interface AuthState {
 
   /** 是否管理员。 */
   isAdmin: boolean
+
+  /** 是否平台超级管理员；legacy ADMIN rollout 期间也按超级管理员处理。 */
+  isSuperAdmin: boolean
+
+  /** 是否租户管理员。 */
+  isTenantAdmin: boolean
+
+  /** 是否可管理用户。 */
+  canManageUsers: boolean
+
+  /** 是否可管理租户。 */
+  canManageTenants: boolean
+
+  /** 是否可管理系统选项。 */
+  canManageSystemOptions: boolean
 
   /** 初始化/校验登录态时的加载标记。 */
   loading: boolean
@@ -31,6 +53,11 @@ interface AuthState {
 const AuthContext = createContext<AuthState>({
   user: null,
   isAdmin: false,
+  isSuperAdmin: false,
+  isTenantAdmin: false,
+  canManageUsers: false,
+  canManageTenants: false,
+  canManageSystemOptions: false,
   loading: false,
   login: () => {},
   logout: () => {},
@@ -66,7 +93,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   return (
-    <AuthContext.Provider value={{ user, isAdmin: user?.role === 'ADMIN', loading: false, login, logout }}>
+    <AuthContext.Provider value={{
+      user,
+      isAdmin: canManageUsers(user?.role),
+      isSuperAdmin: isSuperAdminRole(user?.role),
+      isTenantAdmin: isTenantAdminRole(user?.role),
+      canManageUsers: canManageUsers(user?.role),
+      canManageTenants: canManageTenants(user?.role),
+      canManageSystemOptions: canManageSystemOptions(user?.role),
+      loading: false,
+      login,
+      logout,
+    }}>
       {children}
     </AuthContext.Provider>
   )

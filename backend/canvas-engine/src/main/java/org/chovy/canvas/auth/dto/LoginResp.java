@@ -18,12 +18,15 @@ public class LoginResp {
     /** 用户 ID。 */
     private Long userId;
 
+    /** Tenant ID. */
+    private Long tenantId;
+
     /** 用户名（唯一标识）。 */
     private String username;
 
     /** 展示名（用于侧边栏头像区和用户菜单显示）。 */
     private String displayName;
 
-    /** 用户角色（ADMIN / OPERATOR）。 */
+    /** 用户角色（ADMIN / SUPER_ADMIN / TENANT_ADMIN / OPERATOR）。 */
     private String role;
 }

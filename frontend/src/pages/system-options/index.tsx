@@ -11,6 +11,8 @@ import {
 import type { ColumnsType } from 'antd/es/table'
 import type { SystemOption } from '../../types'
 import { SYSTEM_OPTION_CATEGORIES, systemOptionsApi } from '../../services/systemOptions'
+import { tenantApi, type Tenant } from '../../services/api'
+import { useAuth } from '../../context/AuthContext'
 
 /** 页面标题和说明文本组件别名。 */
 const { Title, Text } = Typography
@@ -21,9 +23,12 @@ export default function SystemOptionsPage() {
   const [loading, setLoading] = useState(false)
   const [category, setCategory] = useState<string>()
   const [enabled, setEnabled] = useState<number>()
+  const [tenantId, setTenantId] = useState<number>()
+  const [tenants, setTenants] = useState<Tenant[]>([])
   const [keyword, setKeyword] = useState('')
   const [editing, setEditing] = useState<SystemOption | null>(null)
   const [form] = Form.useForm()
+  const { isSuperAdmin } = useAuth()
 
   /** 统一列表加载入口；筛选条件直接来自页面状态。 */
   const fetchList = async () => {
@@ -32,6 +37,7 @@ export default function SystemOptionsPage() {
       const res = await systemOptionsApi.adminList({
         category,
         enabled,
+        tenantId,
         keyword: keyword.trim() || undefined,
       })
       setData(res.data.list)
@@ -40,7 +46,12 @@ export default function SystemOptionsPage() {
     }
   }
 
-  useEffect(() => { fetchList() }, [category, enabled])
+  useEffect(() => { fetchList() }, [category, enabled, tenantId])
+
+  useEffect(() => {
+    if (!isSuperAdmin) return
+    tenantApi.list().then(res => setTenants(res.data))
+  }, [isSuperAdmin])
 
   /** 打开编辑弹窗并把只允许修改的字段回填到表单。 */
   const openEdit = (record: SystemOption) => {
@@ -71,6 +82,12 @@ export default function SystemOptionsPage() {
   /** 字典项表格列，内置项只做展示提示，是否允许修改由后端最终校验。 */
   const columns: ColumnsType<SystemOption> = [
     { title: '分类', dataIndex: 'category', width: 220 },
+    {
+      title: '作用域',
+      dataIndex: 'tenantId',
+      width: 120,
+      render: value => value ? <Tag color="purple">租户 {value}</Tag> : <Tag color="blue">全局</Tag>,
+    },
     { title: 'Key', dataIndex: 'optionKey', width: 180 },
     { title: '显示名', dataIndex: 'label', width: 220 },
     { title: '描述', dataIndex: 'description', ellipsis: true },
@@ -114,6 +131,21 @@ export default function SystemOptionsPage() {
             onChange={setCategory}
             optionFilterProp="label"
           />
+          {isSuperAdmin ? (
+            <Select
+              allowClear
+              showSearch
+              placeholder="筛选租户"
+              style={{ width: 220 }}
+              value={tenantId}
+              onChange={setTenantId}
+              options={tenants.map(tenant => ({
+                value: tenant.id,
+                label: `${tenant.name} (${tenant.tenantKey})`,
+              }))}
+              optionFilterProp="label"
+            />
+          ) : null}
           <Select
             allowClear
             placeholder="状态"

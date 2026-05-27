@@ -60,6 +60,7 @@ public class JwtUtil {
         return Jwts.builder()
                 // sub 统一存用户 ID，便于后续扩展通用身份解析
                 .subject(String.valueOf(user.getId()))
+                .claim("tenantId", user.getTenantId())
                 .claim("username", user.getUsername())
                 .claim("role", user.getRole())
                 .claim("displayName", user.getDisplayName())

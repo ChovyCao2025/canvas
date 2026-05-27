@@ -13,11 +13,13 @@ import {
   BookOutlined,
   DatabaseOutlined,
   IdcardOutlined,
+  BankOutlined,
 } from '@ant-design/icons'
 import { Outlet, useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
 import { authApi } from '../../services/api'
 import NotificationBell from '../notifications/NotificationBell'
+import { roleLabel } from '../../auth/roles'
 
 /** 主布局的侧栏和内容区组件别名。 */
 const { Sider, Content } = Layout
@@ -51,7 +53,7 @@ const ACCENT      = '#4f8ef7'
 export default function AppLayout() {
   const navigate = useNavigate()
   const location = useLocation()
-  const { user, isAdmin, logout } = useAuth()
+  const { user, isAdmin, canManageTenants, logout } = useAuth()
   const [collapsed, setCollapsed] = useState(false)
 
   // 根据当前 URL 计算菜单高亮 key
@@ -68,6 +70,7 @@ export default function AppLayout() {
     if (location.pathname.startsWith('/event-config'))   return 'event-config'
     if (location.pathname.startsWith('/api-docs'))       return 'api-docs'
     if (location.pathname.startsWith('/system-options')) return 'system-options'
+    if (location.pathname.startsWith('/admin/tenants'))  return 'admin-tenants'
     if (location.pathname.startsWith('/admin/users'))    return 'admin-users'
     if (location.pathname.startsWith('/cdp/users'))      return 'cdp-users'
     return 'canvas'
@@ -88,6 +91,7 @@ export default function AppLayout() {
       'mq-config',
       'event-config',
       'system-options',
+      'admin-tenants',
       'admin-users',
     ].includes(selectedKey)) return ['settings']
     if (selectedKey === 'home') return []
@@ -139,7 +143,7 @@ export default function AppLayout() {
         },
       ],
     }] : []),
-    {
+    ...(isAdmin ? [{
       key: 'settings',
       icon: <SettingOutlined />,
       label: '系统设置',
@@ -204,6 +208,12 @@ export default function AppLayout() {
           label: '系统选项配置',
           onClick: () => navigate('/system-options'),
         },
+        ...(canManageTenants ? [{
+          key: 'admin-tenants',
+          icon: <BankOutlined />,
+          label: '租户管理',
+          onClick: () => navigate('/admin/tenants'),
+        }] : []),
         ...(isAdmin ? [{
           // 管理员才显示用户管理入口
           key: 'admin-users',
@@ -212,7 +222,7 @@ export default function AppLayout() {
           onClick: () => navigate('/admin/users'),
         }] : []),
       ],
-    },
+    }] : []),
   ]
 
   /** 后端登出失败也继续清理本地会话，保证用户能退出当前浏览器。 */
@@ -343,7 +353,7 @@ export default function AppLayout() {
                       {user?.displayName}
                     </div>
                     <div style={{ color: 'rgba(255,255,255,.38)', fontSize: 11, marginTop: 1 }}>
-                      {user?.role === 'ADMIN' ? '管理员' : '操作员'}
+                      {roleLabel(user?.role)}
                     </div>
                   </div>
                 )}

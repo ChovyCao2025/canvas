@@ -18,6 +18,10 @@ public class SysUserDO {
     @TableId(type = IdType.AUTO)
     private Long id;
 
+    /** Tenant ID. */
+    @TableField("tenant_id")
+    private Long tenantId;
+
     /** 登录用户名（唯一）。 */
     private String username;
 
@@ -29,7 +33,7 @@ public class SysUserDO {
     /** 展示名。 */
     private String displayName;
 
-    /** ADMIN / OPERATOR */
+    /** ADMIN / SUPER_ADMIN / TENANT_ADMIN / OPERATOR */
     private String role;
 
     /** 启用状态：1=启用，0=禁用。 */

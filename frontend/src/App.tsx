@@ -8,7 +8,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { Spin } from 'antd'
 import { AuthProvider } from './context/AuthContext'
 import { NotificationProvider } from './context/NotificationContext'
-import { RequireAuth, RequireAdmin } from './auth/guards'
+import { RequireAuth, RequireAdmin, RequireSuperAdmin } from './auth/guards'
 
 // 页面组件统一 lazy，首屏只加载登录态、路由和当前访问页面所需的代码块。
 const AppLayout = lazy(() => import('./components/layout/AppLayout'))
@@ -24,6 +24,8 @@ const CanvasEditorPage = lazy(() => import('./pages/canvas-editor'))
 const CanvasStatsPage = lazy(() => import('./pages/canvas-stats'))
 /** 管理员用户页懒加载组件，仅管理员路由会访问。 */
 const AdminUsersPage = lazy(() => import('./pages/admin'))
+/** 租户管理页懒加载组件，仅超级管理员路由会访问。 */
+const TenantAdminPage = lazy(() => import('./pages/tenant-admin'))
 /** API 配置页懒加载组件，维护外部接口定义。 */
 const ApiConfigPage = lazy(() => import('./pages/api-config'))
 /** 数据源配置页懒加载组件，维护下拉和远程选项来源。 */
@@ -103,6 +105,12 @@ export default function App() {
                   <Route path="/event-config" element={<EventConfigPage />} />
                   <Route path="/api-docs" element={<ApiDocsPage />} />
                   <Route path="/system-options" element={<SystemOptionsPage />} />
+                </Route>
+              </Route>
+
+              <Route element={<RequireSuperAdmin />}>
+                <Route element={<AppLayout />}>
+                  <Route path="/admin/tenants" element={<TenantAdminPage />} />
                 </Route>
               </Route>
             </Routes>
