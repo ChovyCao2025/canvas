@@ -9,13 +9,18 @@ import java.util.regex.Pattern;
  */
 public final class DataMaskingUtil {
 
+    /**
+     * 构造 DataMaskingUtil 实例。
+     *
+     * <p>方法会结合入参、当前对象状态和依赖组件完成处理，调用方需关注返回值以及可能产生的状态变更。
+     */
     private DataMaskingUtil() {}
 
-    // 手机号：保留前3后4，中间用 **** 替换
+    /** 手机号：保留前3后4，中间用 **** 替换。 */
     private static final Pattern PHONE_PATTERN =
             Pattern.compile("(\\d{3})\\d{4}(\\d{4})");
 
-    // 身份证：保留前3后4
+    /** 身份证：保留前3后4。 */
     private static final Pattern ID_CARD_PATTERN =
             Pattern.compile("(\\d{3})\\d{11}(\\w{4})");
 

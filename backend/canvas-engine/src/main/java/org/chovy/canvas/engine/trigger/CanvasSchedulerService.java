@@ -87,7 +87,15 @@ public class CanvasSchedulerService {
     /** 调度服务是否已关闭。 */
     private boolean closed;
 
-    // ── 注册 ─────────────────────────────────────────────────────
+    /**
+     * 注册、调度或初始化 register Scheduled Triggers 相关的业务数据。
+     *
+     * <p>方法会结合入参、当前对象状态和依赖组件完成处理，调用方需关注返回值以及可能产生的状态变更。
+     *
+     * @param canvasId canvasId 对应的业务主键或标识
+     * @param graph graph 方法执行所需的业务参数
+     */
+// ── 注册 ─────────────────────────────────────────────────────
 
     /** 扫描发布态 DAG 中的定时触发节点并注册对应调度任务。 */
     public void registerScheduledTriggers(Long canvasId, DagGraph graph) {
@@ -112,6 +120,7 @@ public class CanvasSchedulerService {
 
             PendingJitterGroup group = createPendingJitterGroup(scheduleKey.id());
             if (group == null) {
+                // 服务正在关闭时拒绝新调度分组，避免注册后无人清理。
                 continue;
             }
 
@@ -131,7 +140,15 @@ public class CanvasSchedulerService {
         }
     }
 
-    // ── 注销 ─────────────────────────────────────────────────────
+    /**
+     * 判断 cancel Scheduled Triggers 相关的业务数据。
+     *
+     * <p>方法会结合入参、当前对象状态和依赖组件完成处理，调用方需关注返回值以及可能产生的状态变更。
+     *
+     * @param canvasId canvasId 对应的业务主键或标识
+     * @param graph graph 方法执行所需的业务参数
+     */
+// ── 注销 ─────────────────────────────────────────────────────
 
     /** 按画布 DAG 注销全部定时触发节点对应的调度任务。 */
     public void cancelScheduledTriggers(Long canvasId, DagGraph graph) {
@@ -153,6 +170,7 @@ public class CanvasSchedulerService {
             scheduleKeys = pendingJitterTasks.keySet().stream()
                     .map(taskKey -> new ScheduleKey("canvas", taskKey))
                     .toList();
+            // 先标记终止，阻止并发线程继续追加 jitter 延迟任务。
             groups.forEach(PendingJitterGroup::terminate);
             pendingJitterTasks.clear();
         }
@@ -161,7 +179,14 @@ public class CanvasSchedulerService {
         log.info("[SCHEDULER] 所有定时任务已取消");
     }
 
-    // ── 内部 ─────────────────────────────────────────────────────
+    /**
+     * 判断 cancel Scheduled Trigger 相关的业务数据。
+     *
+     * <p>方法会结合入参、当前对象状态和依赖组件完成处理，调用方需关注返回值以及可能产生的状态变更。
+     *
+     * @param key key 对应的缓存键、配置键或业务键
+     */
+// ── 内部 ─────────────────────────────────────────────────────
 
     /** 注销单个调度任务，并清理其尚未执行的 jitter 延迟任务。 */
     void cancelScheduledTrigger(ScheduleKey key) {
@@ -319,6 +344,7 @@ public class CanvasSchedulerService {
         }
 
         pending.update(Mono.delay(jitter)
+                // 延迟任务无论执行、取消还是失败，都必须从分组中移除以触发空闲清理。
                 .doFinally(signalType -> group.remove(pending))
                 .subscribe(
                         ignored -> dispatchScheduledTrigger(group, canvasId, userId),
@@ -330,6 +356,7 @@ public class CanvasSchedulerService {
     /** 将单个用户的定时触发提交到画布执行服务。 */
     void dispatchScheduledTrigger(PendingJitterGroup group, Long canvasId, String userId) {
         if (group.isTerminated()) {
+            // 任务已被下线/关闭，延迟到期的 jitter 触发直接丢弃。
             return;
         }
         executionService.trigger(
@@ -449,6 +476,7 @@ public class CanvasSchedulerService {
             }
             size.incrementAndGet();
             if (terminated.get() || closeWhenIdle.get()) {
+                // add 与 terminate/closeWhenIdle 竞态时回滚计数并取消刚加入的任务。
                 if (pending.remove(disposable)) {
                     size.decrementAndGet();
                 }
@@ -478,6 +506,7 @@ public class CanvasSchedulerService {
             Runnable cleanup = onIdle;
             if (closeWhenIdle.get() && size.get() == 0 && cleanup != null
                     && cleanupTriggered.compareAndSet(false, true)) {
+                // 一次性任务所有 jitter 都结束后，只触发一次注册表清理。
                 cleanup.run();
             }
         }
@@ -510,6 +539,14 @@ public class CanvasSchedulerService {
 
     /** 可查询任务是否存在的调度注册器扩展接口，供测试和状态判断使用。 */
     private interface TaskAwareScheduleRegistrar {
+        /**
+         * 判断 has Task 相关的业务数据。
+         *
+         * <p>方法会结合入参、当前对象状态和依赖组件完成处理，调用方需关注返回值以及可能产生的状态变更。
+         *
+         * @param key key 对应的缓存键、配置键或业务键
+         * @return 判断结果，true 表示校验通过或条件成立
+         */
         boolean hasTask(ScheduleKey key);
     }
 

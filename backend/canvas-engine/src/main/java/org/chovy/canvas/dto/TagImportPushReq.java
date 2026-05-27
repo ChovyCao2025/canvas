@@ -14,5 +14,6 @@ import java.util.List;
 @Data
 public class TagImportPushReq {
 
+    /** 外部 API 推送的标签导入行列表。 */
     private List<TagImportRow> rows = new ArrayList<>();
 }

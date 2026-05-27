@@ -21,12 +21,22 @@ import java.util.Map;
 @Component
 @NodeHandlerType(NodeType.RANDOM_SPLIT)
 public class RandomSplitHandler implements NodeHandler {
+    /**
+     * 执行当前节点或服务的核心处理流程。
+     *
+     * <p>执行过程中会根据节点配置和上下文决定成功、失败或下一跳路由。
+     *
+     * @param config 节点配置或业务配置，方法会从中读取执行参数
+     * @param ctx 执行上下文，提供当前画布、用户和节点运行态数据
+     * @return 异步执行结果，订阅后产生节点结果或业务响应
+     */
     @Override
     @SuppressWarnings("unchecked")
     public Mono<NodeResult> executeAsync(Map<String, Object> config, ExecutionContext ctx) {
         List<Map<String, Object>> paths = (List<Map<String, Object>>) config.get(MapFieldKeys.PATHS);
         boolean stable = !MapFieldKeys.RANDOM.equalsIgnoreCase(String.valueOf(
                 config.getOrDefault(MapFieldKeys.ALLOCATION_STRATEGY, MapFieldKeys.CONSISTENT)));
+        // stable=true 时同一用户同一画布固定落入同一路径，random 则每次重新抽样。
         Map<String, Object> chosen = WeightedChoice.choose(paths, ctx.getUserId() + ":" + ctx.getCanvasId(), stable);
         if (chosen == null) return Mono.just(NodeResult.terminal(Map.of()));
         String pathId = String.valueOf(chosen.getOrDefault(MapFieldKeys.PATH_ID, chosen.getOrDefault(MapFieldKeys.ID, "path")));

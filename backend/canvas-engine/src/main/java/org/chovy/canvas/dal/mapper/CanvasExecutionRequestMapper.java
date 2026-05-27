@@ -22,6 +22,14 @@ import org.chovy.canvas.domain.execution.CanvasExecutionRequestStatusCount;
 @Mapper
 public interface CanvasExecutionRequestMapper extends BaseMapper<CanvasExecutionRequestDO> {
 
+    /**
+     * 创建或新增 insert Ignore 相关的业务数据。
+     *
+     * <p>方法会结合入参、当前对象状态和依赖组件完成处理，调用方需关注返回值以及可能产生的状态变更。
+     *
+     * @param request 请求对象，承载调用方提交的业务参数
+     * @return 计算得到的数值结果
+     */
     @Insert("""
             INSERT IGNORE INTO canvas_execution_request
             (id, canvas_id, user_id, perf_run_id, trigger_type, trigger_node_type, match_key,
@@ -130,8 +138,15 @@ public interface CanvasExecutionRequestMapper extends BaseMapper<CanvasExecution
                              @Param("replayBy") String replayBy,
                              @Param("reason") String reason);
 
+    /**
+     * 计算或统计 count By Status 相关的业务数据。
+     *
+     * <p>方法会结合入参、当前对象状态和依赖组件完成处理，调用方需关注返回值以及可能产生的状态变更。
+     *
+     * @return 查询、转换或计算得到的结果集合
+     */
     @Select("""
-            SELECT status, COUNT(*) AS count
+    SELECT status, COUNT(*) AS count
             FROM canvas_execution_request
             WHERE status IN ('PENDING', 'RETRY', 'RUNNING')
             GROUP BY status

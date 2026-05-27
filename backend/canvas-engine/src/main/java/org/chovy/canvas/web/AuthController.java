@@ -31,13 +31,20 @@ import org.chovy.canvas.auth.util.JwtUtil;
 @RequiredArgsConstructor
 public class AuthController {
 
+    /** 用户服务，用于校验登录账号与查询当前用户。 */
     private final SysUserService      userService;
+    /** Redis 客户端，用于记录登录失败次数和锁定状态。 */
     private final StringRedisTemplate redis;
 
+    /** 登录失败达到锁定的阈值。 */
     private static final int    MAX_FAIL_COUNT  = 5;
+    /** 登录锁定时长。 */
     private static final Duration LOCK_TTL      = Duration.ofMinutes(15);
+    /** 登录失败计数 Redis Key 前缀。 */
     private static final String FAIL_KEY_PREFIX = "canvas:login:fail:";
+    /** 登录锁定 Redis Key 前缀。 */
     private static final String LOCK_KEY_PREFIX = "canvas:login:locked:";
+    /** JWT 工具，用于生成和解析登录令牌。 */
     private final JwtUtil jwtUtil;
 
     /**
@@ -55,6 +62,7 @@ public class AuthController {
                         ErrorCode.AUTH_004 + ": 账号已锁定，请 15 分钟后重试");
             }
 
+            // 用户表和密码哈希校验都是阻塞操作，外层 subscribeOn 已切到 boundedElastic。
             SysUserDO user = userService.findByUsernameForAuth(username);
             if (user == null || user.getEnabled() == 0) {
                 recordFailedAttempt(username);
@@ -68,6 +76,7 @@ public class AuthController {
             // 2. 登录成功：清除失败计数
             redis.delete(FAIL_KEY_PREFIX + username);
 
+            // JWT 只写入最小身份 claims，权限细节由后续过滤器转成 Spring Security Authority。
             String token = jwtUtil.generate(user);
             LoginResp resp = new LoginResp();
             resp.setToken(token);
@@ -82,6 +91,7 @@ public class AuthController {
     /** 记录一次失败尝试；超过阈值则锁定账号 */
     private void recordFailedAttempt(String username) {
         String failKey = FAIL_KEY_PREFIX + username;
+        // 失败计数和锁定 key 使用相同 TTL，避免长期保存无效登录噪声。
         Long count = redis.opsForValue().increment(failKey);
         redis.expire(failKey, LOCK_TTL);
         if (count != null && count >= MAX_FAIL_COUNT) {
@@ -103,6 +113,7 @@ public class AuthController {
                 String token = header.substring(7);
                 try {
                     io.jsonwebtoken.Claims claims = jwtUtil.parse(token);
+                    // 黑名单 TTL 只保留 token 剩余有效期，过期后 Redis 自动清理。
                     long remaining = claims.getExpiration().getTime() - System.currentTimeMillis();
                     if (remaining > 0) {
                         // key = 前32位 SHA-256 hash，固定长度，不泄露 token 内容
@@ -139,6 +150,7 @@ public class AuthController {
                 .map(Authentication::getPrincipal)
                 .cast(Claims.class)
                 .flatMap(claims -> Mono.fromCallable(() -> {
+                    // JWT subject 统一存用户 ID，这里反查数据库拿最新展示名和角色。
                     Long userId = Long.parseLong(claims.getSubject());
                     SysUserDO user = userService.findById(userId);
                     if (user == null) throw new IllegalArgumentException("用户不存在");

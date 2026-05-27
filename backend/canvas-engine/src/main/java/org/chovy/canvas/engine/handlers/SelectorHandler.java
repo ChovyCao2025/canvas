@@ -50,6 +50,15 @@ public class SelectorHandler implements NodeHandler {
         return Mono.just(NodeResult.terminal(Map.of()));
     }
 
+    /**
+     * 执行 branch Matches 对应的业务逻辑。
+     *
+     * <p>执行过程中会根据节点配置和上下文决定成功、失败或下一跳路由。
+     *
+     * @param branch branch 方法执行所需的业务参数
+     * @param ctx 执行上下文，提供当前画布、用户和节点运行态数据
+     * @return 判断结果，true 表示校验通过或条件成立
+     */
     @SuppressWarnings("unchecked")
     private boolean branchMatches(Map<String, Object> branch, ExecutionContext ctx) {
         String relation = (String) branch.getOrDefault(MapFieldKeys.STRATEGY_RELATION, MapFieldKeys.AND);

@@ -117,7 +117,7 @@ public class CanvasExecutionService {
     @org.springframework.beans.factory.annotation.Value("${canvas.execution.max-concurrency:1000}")
     private int globalMaxConcurrency;
 
-    // ── 启动校验 ──────────────────────────────────────────────────
+// ── 启动校验 ──────────────────────────────────────────────────
 
     /**
      * 启动时校验 globalMaxConcurrency 在集群内的一致性。
@@ -149,7 +149,18 @@ public class CanvasExecutionService {
         log.info("[STARTUP] globalMaxConcurrency={} 集群一致性校验通过", globalMaxConcurrency);
     }
 
-    // ── 触发入口 ──────────────────────────────────────────────────
+    /**
+     * 执行 trigger Dry Run 对应的业务逻辑。
+     *
+     * <p>实现会通过持久化层读取或写入数据库记录。
+     *
+     * @param canvasId canvasId 对应的业务主键或标识
+     * @param userId userId 对应的业务主键或标识
+     * @param payload payload 请求体、消息体或事件载荷
+     * @param graphJson graphJson 方法执行所需的业务参数
+     * @return 异步执行结果，订阅后产生节点结果或业务响应
+     */
+// ── 触发入口 ──────────────────────────────────────────────────
 
     /**
      * dry-run 专用入口：直接传入 graphJson，跳过 DB draft 读取。
@@ -321,6 +332,7 @@ public class CanvasExecutionService {
         // 准入上限
         int admissionLimit = (Integer) prep.get(MapFieldKeys.ADMISSION_LIMIT);
 
+        // 执行槽位是最终并发卡口，失败时会释放已获取的 resumeLock/dedupKey。
         SlotAcquisitionResult slotResult = tryAcquireSlot(
                 canvasId, ctx, admissionLimit, dryRun, isResume, acquiredDedupKey);
         if (slotResult.isOverflow()) return slotResult.overflowMono();
@@ -363,6 +375,7 @@ public class CanvasExecutionService {
         // 1. 配额扣减（WAIT/GOAL 恢复触发跳过，防止配额虚耗）
         if (!dryRun) {
             try {
+                // 配额扣减发生在 DAG 前；失败必须同步释放 slot 和分布式锁。
                 consumeQuotaIfNeeded(canvas, userId, ctx);
             } catch (RuntimeException e) {
                 releaseResources(canvasId, finalExecutionSlot, ctx, isResume, acquiredDedupKey);
@@ -382,6 +395,7 @@ public class CanvasExecutionService {
         return insertExecution(finalExec)
                 .then(executionMono
                         .doOnSubscribe(sub -> {
+                            // 绑定取消句柄，Kill Switch 可通过 registry 取消当前 Reactor 订阅。
                             if (finalExecutionSlot != null) finalExecutionSlot.update(sub::cancel);
                         })
                         .flatMap(result -> handleSuccess(result, finalExec, ctx, graph, dryRun, isResume))
@@ -428,6 +442,7 @@ public class CanvasExecutionService {
         boolean paused = isPaused(ctx, graph);
         if (paused) {
             if (!dryRun) {
+                // WAITING 表示执行挂起，保留 ctx 快照供后续恢复触发继续推进。
                 ctxStore.save(ctx);
                 if (isResume) ctxStore.releaseResumeLock(ctx.getCanvasId(), ctx.getUserId(), ctx.getResumeLockToken());
                 incrementStats(ctx.getCanvasId(), ExecutionStatus.PAUSED.getCode(), ctx.getUserId());
@@ -438,6 +453,7 @@ public class CanvasExecutionService {
                     .thenReturn(resp);
         }
         if (!dryRun) {
+            // 无挂起节点时清理 ctx，避免下一次正常触发被误判为恢复执行。
             ctxStore.delete(ctx.getCanvasId(), ctx.getUserId());
             if (isResume) ctxStore.releaseResumeLock(ctx.getCanvasId(), ctx.getUserId(), ctx.getResumeLockToken());
             incrementStats(ctx.getCanvasId(), ExecutionStatus.SUCCESS.getCode(), ctx.getUserId());
@@ -457,6 +473,7 @@ public class CanvasExecutionService {
         Mono<Void> updateMono;
         if (paused) {
             if (!dryRun) {
+                // 异常后仍存在 WAITING 节点时按 PAUSED 落库，保留恢复机会。
                 ctxStore.save(ctx);
                 if (isResume) ctxStore.releaseResumeLock(ctx.getCanvasId(), ctx.getUserId(), ctx.getResumeLockToken());
             }
@@ -465,6 +482,7 @@ public class CanvasExecutionService {
                 incrementStats(ctx.getCanvasId(), ExecutionStatus.PAUSED.getCode(), ctx.getUserId());
         } else {
             if (!dryRun) {
+                // 非挂起失败是终态，删除 ctx 防止旧上下文污染后续触发。
                 ctxStore.delete(ctx.getCanvasId(), ctx.getUserId());
                 if (isResume) ctxStore.releaseResumeLock(ctx.getCanvasId(), ctx.getUserId(), ctx.getResumeLockToken());
             }
@@ -517,6 +535,7 @@ public class CanvasExecutionService {
         DedupResult dedup = performDedupCheck(canvasId, userId, msgId, isResume, dryRun, overflowRetry,
                 persistentRequest, internalContinuation);
         if (dedup.deduplicated()){
+            // 同一业务消息已被处理或正在处理，直接短路，不创建新的 execution。
             return Map.of(MapFieldKeys.DEDUPLICATED, true);
         }
         String acquiredDedupKey = dedup.dedupKey();
@@ -577,6 +596,7 @@ public class CanvasExecutionService {
             if (isResume && !dryRun) {
                 resumeLockInstanceId = UUID.randomUUID().toString();
                 if (!ctxStore.acquireResumeLock(canvasId, userId, resumeLockInstanceId, globalTimeoutSec)) {
+                    // 同一用户同一画布只允许一个恢复执行持有上下文，避免并发恢复写乱 ctx。
                     log.warn("[ENGINE] resume-lock 竞争失败，放弃本次触发 canvasId={}", canvasId);
                     return Map.<String, Object>of(MapFieldKeys.SKIPPED, "resume-lock");
                 }
@@ -619,6 +639,7 @@ public class CanvasExecutionService {
                 ctxStore.releaseResumeLock(canvasId, userId, resumeLockInstanceId);
             }
             if (acquiredDedupKey != null) {
+                // 准备阶段失败时释放 dedup，否则同一消息会被错误拦截到 TTL 结束。
                 ctxStore.releaseDedup(acquiredDedupKey);
             }
             throw e;
@@ -666,49 +687,136 @@ public class CanvasExecutionService {
     // ── 方法提取辅助记录 ──────────────────────────────────────────
 
     /** 幂等检查结果，标识是否被拦截以及本次持有的 Redis 幂等 key。 */
-    private record DedupResult(boolean deduplicated, String dedupKey) {
+    private record DedupResult(
+            /** 是否已被 Redis 幂等键拦截。 */
+            boolean deduplicated,
+            /** 本次成功持有的 Redis 幂等 key。 */
+            String dedupKey) {
+        /**
+         * 执行 duplicate 对应的业务逻辑。
+         *
+         * <p>方法会结合入参、当前对象状态和依赖组件完成处理，调用方需关注返回值以及可能产生的状态变更。
+         *
+         * @return 当前对象实例，便于继续链式配置或后续处理
+         */
         static DedupResult duplicate() {
             return new DedupResult(true, null);
         }
 
+        /**
+         * 执行 acquired 对应的业务逻辑。
+         *
+         * <p>方法会结合入参、当前对象状态和依赖组件完成处理，调用方需关注返回值以及可能产生的状态变更。
+         *
+         * @param key key 对应的缓存键、配置键或业务键
+         * @return 当前对象实例，便于继续链式配置或后续处理
+         */
         static DedupResult acquired(String key) {
             return new DedupResult(false, key);
         }
 
+        /**
+         * 执行 skipped 对应的业务逻辑。
+         *
+         * <p>方法会结合入参、当前对象状态和依赖组件完成处理，调用方需关注返回值以及可能产生的状态变更。
+         *
+         * @return 当前对象实例，便于继续链式配置或后续处理
+         */
         static DedupResult skipped() {
             return new DedupResult(false, null);
         }
     }
 
     /** 并发准入结果，正常时返回准入上限，超限时返回溢出响应。 */
-    private record AdmissionResult(int admissionLimit, Map<String, Object> overflowResponse) {
+    private record AdmissionResult(
+            /** 本次执行允许使用的并发准入上限。 */
+            int admissionLimit,
+            /** 并发超限时返回给调用方的溢出响应。 */
+            Map<String, Object> overflowResponse) {
+        /**
+         * 执行 granted 对应的业务逻辑。
+         *
+         * <p>方法会结合入参、当前对象状态和依赖组件完成处理，调用方需关注返回值以及可能产生的状态变更。
+         *
+         * @param limit limit 数量、阈值或分页参数
+         * @return 当前对象实例，便于继续链式配置或后续处理
+         */
         static AdmissionResult granted(int limit) {
             return new AdmissionResult(limit, null);
         }
 
+        /**
+         * 执行 overflow 对应的业务逻辑。
+         *
+         * <p>方法会结合入参、当前对象状态和依赖组件完成处理，调用方需关注返回值以及可能产生的状态变更。
+         *
+         * @param code code 方法执行所需的业务参数
+         * @return 当前对象实例，便于继续链式配置或后续处理
+         */
         static AdmissionResult overflow(String code) {
             return new AdmissionResult(0, Map.of(MapFieldKeys.OVERFLOW, code));
         }
 
+        /**
+         * 判断 is Overflow 相关的业务数据。
+         *
+         * <p>方法会结合入参、当前对象状态和依赖组件完成处理，调用方需关注返回值以及可能产生的状态变更。
+         *
+         * @return 判断结果，true 表示校验通过或条件成立
+         */
         boolean isOverflow() {
             return overflowResponse != null;
         }
     }
 
     /** 执行槽位获取结果，包含取消句柄或并发超限响应。 */
-    private record SlotAcquisitionResult(Disposable.Swap slot, Mono<Map<String, Object>> overflowMono) {
+    private record SlotAcquisitionResult(
+            /** 当前执行持有的本地取消槽位。 */
+            Disposable.Swap slot,
+            /** 获取槽位失败时返回的溢出响应流。 */
+            Mono<Map<String, Object>> overflowMono) {
+        /**
+         * 执行 acquired 对应的业务逻辑。
+         *
+         * <p>方法会结合入参、当前对象状态和依赖组件完成处理，调用方需关注返回值以及可能产生的状态变更。
+         *
+         * @param slot slot 方法执行所需的业务参数
+         * @return 当前对象实例，便于继续链式配置或后续处理
+         */
         static SlotAcquisitionResult acquired(Disposable.Swap slot) {
             return new SlotAcquisitionResult(slot, null);
         }
 
+        /**
+         * 执行 overflow 对应的业务逻辑。
+         *
+         * <p>方法会结合入参、当前对象状态和依赖组件完成处理，调用方需关注返回值以及可能产生的状态变更。
+         *
+         * @param mono mono 方法执行所需的业务参数
+         * @return 当前对象实例，便于继续链式配置或后续处理
+         */
         static SlotAcquisitionResult overflow(Mono<Map<String, Object>> mono) {
             return new SlotAcquisitionResult(null, mono);
         }
 
+        /**
+         * 执行 skipped 对应的业务逻辑。
+         *
+         * <p>方法会结合入参、当前对象状态和依赖组件完成处理，调用方需关注返回值以及可能产生的状态变更。
+         *
+         * @return 当前对象实例，便于继续链式配置或后续处理
+         */
         static SlotAcquisitionResult skipped() {
             return new SlotAcquisitionResult(null, null);
         }
 
+        /**
+         * 判断 is Overflow 相关的业务数据。
+         *
+         * <p>方法会结合入参、当前对象状态和依赖组件完成处理，调用方需关注返回值以及可能产生的状态变更。
+         *
+         * @return 判断结果，true 表示校验通过或条件成立
+         */
         boolean isOverflow() {
             return overflowMono != null;
         }
@@ -734,6 +842,7 @@ public class CanvasExecutionService {
                                           boolean isResume, boolean dryRun, boolean overflowRetry,
                                           boolean persistentRequest, boolean internalContinuation) {
         if (dryRun || overflowRetry || persistentRequest || internalContinuation || msgId == null) {
+            // 内部恢复、持久请求和溢出重试不走普通消息幂等，避免重试/恢复被首次 key 拦住。
             return DedupResult.skipped();
         }
         // FIXME: 过期时间会发生变化, 判断是否需要调整
@@ -794,6 +903,7 @@ public class CanvasExecutionService {
                     canvasId, active, effectiveMax, priority);
             if (priority == TriggerPriorityConfig.Priority.NORMAL) {
                 if (persistentRequest) {
+                    // 持久请求已有表级重试状态机，避免再写 MQ 形成双重重试。
                     // 来自持久请求表的触发：交由请求表重试策略处理，不再写 MQ
                     return AdmissionResult.overflow("request_retry");
                 }
@@ -868,6 +978,7 @@ public class CanvasExecutionService {
             // 清理已持有的分布式锁和幂等 key，防泄漏
             if (isResume) ctxStore.releaseResumeLock(ctx.getCanvasId(), ctx.getUserId(), ctx.getResumeLockToken());
             if (acquiredDedupKey != null) ctxStore.releaseDedup(acquiredDedupKey);
+            // 没拿到 slot 就不进入 DAG，调用方只收到 overflow 响应。
             return SlotAcquisitionResult.overflow(
                     Mono.just(Map.of(MapFieldKeys.OVERFLOW, "concurrency_limit_reached",
                             MapFieldKeys.ACTIVE, active, MapFieldKeys.LIMIT, admissionLimit)));
@@ -875,7 +986,14 @@ public class CanvasExecutionService {
         return SlotAcquisitionResult.acquired(acquired.get());
     }
 
-    // ── 缓存失效 ──────────────────────────────────────────────────
+    /**
+     * 删除、清理或失效 invalidate Canvas 相关的业务数据。
+     *
+     * <p>方法会结合入参、当前对象状态和依赖组件完成处理，调用方需关注返回值以及可能产生的状态变更。
+     *
+     * @param canvasId canvasId 对应的业务主键或标识
+     */
+// ── 缓存失效 ──────────────────────────────────────────────────
 
     /**
      * 画布发布/下线时主动驱逐 CanvasDO 实体缓存，
@@ -885,7 +1003,18 @@ public class CanvasExecutionService {
         canvasEntityCache.invalidate(canvasId);
     }
 
-    // ── 私有帮助方法 ──────────────────────────────────────────────
+    /**
+     * 执行 new Context 对应的业务逻辑。
+     *
+     * <p>方法会结合入参、当前对象状态和依赖组件完成处理，调用方需关注返回值以及可能产生的状态变更。
+     *
+     * @param canvasId canvasId 对应的业务主键或标识
+     * @param versionId versionId 对应的业务主键或标识
+     * @param userId userId 对应的业务主键或标识
+     * @param triggerType triggerType 类型标识或分类条件
+     * @return 方法执行后的业务结果
+     */
+// ── 私有帮助方法 ──────────────────────────────────────────────
 
     /** 创建新的执行上下文并写入基础画布、版本、用户和触发信息。 */
     private ExecutionContext newContext(Long canvasId, Long versionId, String userId, String triggerType) {
@@ -1035,6 +1164,7 @@ public class CanvasExecutionService {
                     tag,
                     objectMapper.writeValueAsBytes(msg)
             );
+            // RocketMQ 延迟投递是并发溢出的恢复入口，chainRetryCount 防止无限循环。
             rocketMsg.setDeliverTimeMs(System.currentTimeMillis() + priorityConfig.getOverflowRetryDelayMs());
             SendResult sendResult = rocketMQTemplate.getProducer().send(rocketMsg);
             if (sendResult == null || sendResult.getSendStatus() != SendStatus.SEND_OK) {
@@ -1064,6 +1194,7 @@ public class CanvasExecutionService {
             return Map.of();
         }
         Map<String, Object> sanitized = new HashMap<>(payload);
+        // 内部重试次数只能由服务端维护，避免外部 payload 伪造 chainRetryCount。
         sanitized.remove(OverflowRetryMessage.CHAIN_RETRY_PAYLOAD_KEY);
         return sanitized;
     }

@@ -37,12 +37,32 @@ import java.util.*;
 @NodeHandlerType("SUB_FLOW_REF")
 public class SubFlowRefHandler implements NodeHandler {
 
+    /** 画布数据访问器，用于校验子流程画布发布状态。 */
     private final CanvasMapper        canvasMapper;
+
+    /** 画布版本访问器，用于读取指定子流程版本内容。 */
     private final CanvasVersionMapper canvasVersionMapper;
+
+    /** 画布配置缓存，用于加载 WORKFLOW 子流程 DAG。 */
     private final CanvasConfigCache   configCache;
+
+    /** DAG 执行引擎，用于运行 WORKFLOW 类型子流程。 */
     private final DagEngine           dagEngine;
+
+    /** JSON 序列化器，用于解析子流程 graph_json。 */
     private final ObjectMapper        objectMapper;
 
+    /**
+     * 构造 SubFlowRefHandler 实例，并根据入参初始化依赖、配置或内部状态。
+     *
+     * <p>执行过程中会根据节点配置和上下文决定成功、失败或下一跳路由。
+     *
+     * @param canvasMapper canvasMapper 画布相关对象或标识
+     * @param canvasVersionMapper canvasVersionMapper 画布相关对象或标识
+     * @param configCache configCache 方法执行所需的业务参数
+     * @param dagEngine dagEngine 方法执行所需的业务参数
+     * @param objectMapper objectMapper 方法执行所需的业务参数
+     */
     public SubFlowRefHandler(CanvasMapper canvasMapper,
                              CanvasVersionMapper canvasVersionMapper,
                              CanvasConfigCache configCache,
@@ -55,6 +75,15 @@ public class SubFlowRefHandler implements NodeHandler {
         this.objectMapper        = objectMapper;
     }
 
+    /**
+     * 执行当前节点或服务的核心处理流程。
+     *
+     * <p>执行过程中会根据节点配置和上下文决定成功、失败或下一跳路由。
+     *
+     * @param config 节点配置或业务配置，方法会从中读取执行参数
+     * @param ctx 执行上下文，提供当前画布、用户和节点运行态数据
+     * @return 异步执行结果，订阅后产生节点结果或业务响应
+     */
     @Override
     @SuppressWarnings("unchecked")
     public Mono<NodeResult> executeAsync(Map<String, Object> config, ExecutionContext ctx) {
@@ -69,6 +98,7 @@ public class SubFlowRefHandler implements NodeHandler {
 
         // 防循环
         if (ctx.getCallStack().contains(subFlowId)) {
+            // 调用栈中已存在目标子流程，说明会形成递归调用。
             return Mono.just(NodeResult.fail("SUB_FLOW_REF 循环调用: " + subFlowId));
         }
 
@@ -79,6 +109,7 @@ public class SubFlowRefHandler implements NodeHandler {
         Long versionId = subFlowVersion == -1
                 ? canvas.getPublishedVersionId()
                 : resolveVersion(subFlowId, subFlowVersion);
+        // subFlowVersion=-1 使用当前发布版本；指定版本则按版本号解析。
         if (versionId == null) return Mono.just(NodeResult.fail("子流程版本不存在: " + subFlowVersion));
 
         // 加载子流程 graph_json
@@ -105,11 +136,13 @@ public class SubFlowRefHandler implements NodeHandler {
 
         return switch (subFlowType) {
             case "STRATEGY_TABLE" -> {
+                // 策略表子流程在当前线程内做多因子匹配，不启动完整 DAG。
                 Map<String, Object> r = executeStrategyTable(graphRoot, inputData, ctx);
                 yield r != null ? Mono.just(NodeResult.ok(nextNodeId, r))
                                 : Mono.just(NodeResult.fail("STRATEGY_TABLE 无匹配策略"));
             }
             case "DATA_TABLE" -> {
+                // 数据表子流程按 lookupKey 查列值，未命中视为业务失败。
                 Map<String, Object> r = executeDataTable(graphRoot, inputData, ctx);
                 yield r != null ? Mono.just(NodeResult.ok(nextNodeId, r))
                                 : Mono.just(NodeResult.fail("DATA_TABLE 未找到 key"));
@@ -119,7 +152,7 @@ public class SubFlowRefHandler implements NodeHandler {
         };
     }
 
-    // ══ STRATEGY_TABLE（设计文档 20.3节）════════════════════════
+// ══ STRATEGY_TABLE（设计文档 20.3节）════════════════════════
 
     /**
      * 多因子精确匹配算法（设计文档 20.5节）：
@@ -162,7 +195,7 @@ public class SubFlowRefHandler implements NodeHandler {
         return null; // 无匹配
     }
 
-    // ══ DATA_TABLE（设计文档 20.4节）════════════════════════════
+// ══ DATA_TABLE（设计文档 20.4节）════════════════════════════
 
     /**
      * 按 lookupKey 查列值（精确匹配 column.key）。
@@ -197,7 +230,7 @@ public class SubFlowRefHandler implements NodeHandler {
                 .orElse(null); // 未找到 → null → 父流程失败
     }
 
-    // ══ WORKFLOW（设计文档 20.5节）══════════════════════════════
+// ══ WORKFLOW（设计文档 20.5节）══════════════════════════════
 
     /** WORKFLOW 子流程执行，返回 Mono（彻底消除 block()） */
     private Mono<NodeResult> executeWorkflow(Long subFlowId, Long versionId,
@@ -215,6 +248,7 @@ public class SubFlowRefHandler implements NodeHandler {
         childCtx.getCallStack().add(ctx.getCanvasId());
         childCtx.getTriggerPayload().putAll(inputData);
 
+        // WORKFLOW 子流程复用 DagEngine 执行，使用独立 childCtx 隔离节点状态。
         DagGraph graph = configCache.get(subFlowId, versionId);
         if (graph.entryNodes().isEmpty()) return Mono.just(NodeResult.fail("子流程无触发器节点"));
 
@@ -231,7 +265,16 @@ public class SubFlowRefHandler implements NodeHandler {
                 });
     }
 
-    // ── helper ───────────────────────────────────────────────────
+    /**
+     * 构建、解析或转换 resolve Version 相关的业务数据。
+     *
+     * <p>执行过程中会根据节点配置和上下文决定成功、失败或下一跳路由。
+     *
+     * @param canvasId canvasId 对应的业务主键或标识
+     * @param version version 方法执行所需的业务参数
+     * @return 计算得到的数值结果
+     */
+// ── helper ───────────────────────────────────────────────────
 
     private Long resolveVersion(Long canvasId, int version) {
         return canvasVersionMapper.selectList(

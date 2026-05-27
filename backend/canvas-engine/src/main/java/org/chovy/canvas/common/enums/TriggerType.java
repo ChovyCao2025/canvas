@@ -54,5 +54,10 @@ public final class TriggerType {
     /** 子流程引用节点触发。 */
     public static final String SUB_FLOW_REF            = "SUB_FLOW_REF";
 
+    /**
+     * 构造 TriggerType 实例。
+     *
+     * <p>方法会结合入参、当前对象状态和依赖组件完成处理，调用方需关注返回值以及可能产生的状态变更。
+     */
     private TriggerType() {}
 }

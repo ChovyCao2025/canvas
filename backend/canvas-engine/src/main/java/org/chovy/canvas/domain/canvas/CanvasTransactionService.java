@@ -28,7 +28,7 @@ public class CanvasTransactionService {
     /** 画布版本 Mapper。 */
     private final CanvasVersionMapper canvasVersionMapper;
 
-    // ── 发布事务 ──────────────────────────────────────────────────
+// ── 发布事务 ──────────────────────────────────────────────────
 
     /**
      * 发布事务（DB-only）。
@@ -48,6 +48,7 @@ public class CanvasTransactionService {
         CanvasDO canvas = canvasMapper.selectById(canvasId);
         if (canvas == null) throw new IllegalArgumentException("画布不存在: " + canvasId);
 
+        // 先保留旧发布版本 ID，事务提交后由调用方据此清理旧 Redis 路由和调度。
         Long oldPublishedVersionId = canvas.getPublishedVersionId();
 
         CanvasVersionDO published = new CanvasVersionDO();
@@ -60,15 +61,29 @@ public class CanvasTransactionService {
 
         canvas.setStatus(CanvasStatusEnum.PUBLISHED.getCode());
         canvas.setPublishedVersionId(published.getId());
+        // 主表只指向刚创建的不可变快照，外部副作用不进入本事务。
         canvasMapper.updateById(canvas);
 
         return new PublishResult(published, oldPublishedVersionId);
     }
 
     /** 发布操作的结果载体，供事务外清理旧路由和注册新路由使用。 */
-    public record PublishResult(CanvasVersionDO publishedVersion, Long oldPublishedVersionId) {}
+    public record PublishResult(
+            /** 本次发布创建的版本快照。 */
+            CanvasVersionDO publishedVersion,
+            /** 发布前旧版本 ID，用于事务外清理旧路由和调度。 */
+            Long oldPublishedVersionId
+    ) {}
 
-    // ── 下线事务 ──────────────────────────────────────────────────
+    /**
+     * 执行 offline Db 对应的业务逻辑。
+     *
+     * <p>该方法在事务边界内执行，确保相关数据库写入保持一致。
+     *
+     * @param id id 对应的业务主键或标识
+     * @return 计算得到的数值结果
+     */
+// ── 下线事务 ──────────────────────────────────────────────────
 
     /**
      * 下线事务（DB-only）。
@@ -78,6 +93,7 @@ public class CanvasTransactionService {
     Long offlineDb(Long id) {
         CanvasDO canvas = canvasMapper.selectById(id);
         if (canvas == null) throw new IllegalArgumentException("画布不存在: " + id);
+        // publishedVersionId 在清空前返回，供事务外清理该版本的路由、调度和缓存。
         Long publishedVersionId = canvas.getPublishedVersionId();
         canvas.setStatus(CanvasStatusEnum.OFFLINE.getCode());
         canvas.setPublishedVersionId(null);
@@ -85,7 +101,15 @@ public class CanvasTransactionService {
         return publishedVersionId;
     }
 
-    // ── Kill 事务 ─────────────────────────────────────────────────
+    /**
+     * 执行 kill Db 对应的业务逻辑。
+     *
+     * <p>该方法在事务边界内执行，确保相关数据库写入保持一致。
+     *
+     * @param id id 对应的业务主键或标识
+     * @return 计算得到的数值结果
+     */
+// ── Kill 事务 ─────────────────────────────────────────────────
 
     /**
      * Kill 事务（DB-only）。
@@ -95,6 +119,7 @@ public class CanvasTransactionService {
     public Long killDb(Long id) {
         CanvasDO canvas = canvasMapper.selectById(id);
         if (canvas == null) throw new IllegalArgumentException("画布不存在: " + id);
+        // Kill 与下线同样先切 DB 状态，再由事务外广播和清理运行时状态。
         Long publishedVersionId = canvas.getPublishedVersionId();
         canvas.setStatus(CanvasStatusEnum.KILLED.getCode());
         canvas.setPublishedVersionId(null);
@@ -102,18 +127,34 @@ public class CanvasTransactionService {
         return publishedVersionId;
     }
 
-    // ── 归档事务 ──────────────────────────────────────────────────
+    /**
+     * 执行 archive Db 对应的业务逻辑。
+     *
+     * <p>该方法在事务边界内执行，确保相关数据库写入保持一致。
+     *
+     * @param id id 对应的业务主键或标识
+     */
+// ── 归档事务 ──────────────────────────────────────────────────
 
     /** 归档事务（DB-only）：仅修改状态为 ARCHIVED，不清 publishedVersionId。 */
     @Transactional
     void archiveDb(Long id) {
         CanvasDO canvas = canvasMapper.selectById(id);
         if (canvas == null) throw new IllegalArgumentException("画布不存在: " + id);
+        // 归档保留 publishedVersionId 审计线索，外部状态是否清理由调用方按归档前状态判断。
         canvas.setStatus(CanvasStatusEnum.ARCHIVED.getCode());
         canvasMapper.updateById(canvas);
     }
 
-    // ── 私有辅助 ──────────────────────────────────────────────────
+    /**
+     * 执行 next Version Number 对应的业务逻辑。
+     *
+     * <p>实现会通过持久化层读取或写入数据库记录。
+     *
+     * @param canvasId canvasId 对应的业务主键或标识
+     * @return 计算得到的数值结果
+     */
+// ── 私有辅助 ──────────────────────────────────────────────────
 
     /** 查询当前最大版本号并生成下一次发布快照版本号。 */
     private int nextVersionNumber(Long canvasId) {

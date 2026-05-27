@@ -18,7 +18,7 @@ public class PageResult<T> {
     /** 当前页数据列表（长度通常 <= pageSize）。 */
     private List<T> list;
 
-    // 结构保持扁平，便于前端列表组件直接消费。
+// 结构保持扁平，便于前端列表组件直接消费。
 
     /**
      * 工厂方法。

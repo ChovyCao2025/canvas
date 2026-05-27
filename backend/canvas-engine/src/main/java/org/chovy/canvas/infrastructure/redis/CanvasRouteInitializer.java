@@ -35,13 +35,20 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class CanvasRouteInitializer {
 
+    /** 画布数据访问组件，用于扫描已发布画布。 */
     private final CanvasMapper          canvasMapper;
+    /** 画布版本数据访问组件，用于批量读取发布版本。 */
     private final CanvasVersionMapper   canvasVersionMapper;
+    /** DAG 解析器，用于从 graphJson 恢复触发节点配置。 */
     private final DagParser             dagParser;
+    /** 触发路由服务，用于注册启动重建得到的路由。 */
     private final TriggerRouteService   triggerRouteService;
+    /** MQ 触发处理器，用于复用 topic 解析语义。 */
     private final MqTriggerHandler      mqTriggerHandler;
+    /** Redis 模板，用于启动重建锁和路由状态标记。 */
     private final StringRedisTemplate   redis;
 
+    /** 启动路由重建的分布式锁 key。 */
     private static final String REBUILD_LOCK = "canvas:route-init:lock";
 
     /**
@@ -51,6 +58,7 @@ public class CanvasRouteInitializer {
     @PostConstruct
     public void initTriggerRoutes() {
         if (!triggerRouteService.isRouteTableEmpty()) {
+            // Redis 中已有任意触发路由时只补 ready 标记，避免重启时重复扫描 MySQL 和改写路由表。
             triggerRouteService.markRouteReady();
             log.info("[ROUTE_INIT] 路由表已存在，跳过重建");
             return;
@@ -64,11 +72,13 @@ public class CanvasRouteInitializer {
         if (!acquired) {
             // 另一实例正在重建，等待 2s 后不再重建（它会完成）
             log.info("[ROUTE_INIT] 另一实例正在重建路由表，本实例跳过");
+            // 等待窗口给持锁实例完成 ready 标记；本实例不抢重建，减少启动风暴下的重复写。
             try { Thread.sleep(2000); } catch (InterruptedException ignored) {}
             return;
         }
 
         try {
+            // 重建期间先标记不可用，MQ 消费端会抛异常交给 RocketMQ 重试而不是丢消息。
             triggerRouteService.markRouteRebuilding();
             log.warn("[ROUTE_INIT] 触发路由表为空，从 MySQL 全量重建...");
             List<CanvasDO> published = canvasMapper.selectList(
@@ -99,6 +109,7 @@ public class CanvasRouteInitializer {
                     log.error("[ROUTE_INIT] 重建失败 canvasId={}: {}", canvas.getId(), e.getMessage());
                 }
             }
+            // 所有可解析画布处理完后再发布 ready 标记，消费端从这里开始读取新路由。
             triggerRouteService.markRouteReady();
             log.info("[ROUTE_INIT] 路由表重建完成，共处理 {} 个已发布画布", count);
         } finally {
@@ -107,6 +118,14 @@ public class CanvasRouteInitializer {
         }
     }
 
+    /**
+     * 注册、调度或初始化 register Routes 相关的业务数据。
+     *
+     * <p>方法会结合入参、当前对象状态和依赖组件完成处理，调用方需关注返回值以及可能产生的状态变更。
+     *
+     * @param canvasId canvasId 对应的业务主键或标识
+     * @param graph graph 方法执行所需的业务参数
+     */
     @SuppressWarnings("unchecked")
     private void registerRoutes(Long canvasId, DagGraph graph) {
         // 与 CanvasService.publish 的注册逻辑保持同构，保证“启动重建”和“发布增量”行为一致

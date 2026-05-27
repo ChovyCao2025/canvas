@@ -39,6 +39,7 @@ import java.util.List;
 @RequiredArgsConstructor
 public class DataSourceConfigController {
 
+    /** 数据源配置 Mapper，用于读写数据源配置。 */
     private final DataSourceConfigMapper dataSourceConfigMapper;
 
     @GetMapping
@@ -62,12 +63,29 @@ public class DataSourceConfigController {
         }).subscribeOn(Schedulers.boundedElastic());
     }
 
+    /**
+     * 处理 list Tables 对应的 HTTP 接口请求。
+     *
+     * <p>方法负责接收控制层参数、调用领域服务并封装统一响应。
+     *
+     * @param id id 对应的业务主键或标识
+     * @return 异步执行结果，订阅后产生节点结果或业务响应
+     */
     @GetMapping("/{id}/tables")
     public Mono<R<List<DataSourceTableMeta>>> listTables(@PathVariable Long id) {
+        // JDBC 元数据读取会建立真实数据库连接，必须放在线程池中执行。
         return Mono.fromCallable(() -> R.ok(readJdbcTables(id)))
                 .subscribeOn(Schedulers.boundedElastic());
     }
 
+    /**
+     * 处理 create 对应的 HTTP 接口请求。
+     *
+     * <p>方法负责接收控制层参数、调用领域服务并封装统一响应。
+     *
+     * @param body body 请求体、消息体或事件载荷
+     * @return 异步执行结果，订阅后产生节点结果或业务响应
+     */
     @PostMapping
     public Mono<R<DataSourceConfigDO>> create(@RequestBody DataSourceConfigDO body) {
         return Mono.fromCallable(() -> {
@@ -77,6 +95,15 @@ public class DataSourceConfigController {
         }).subscribeOn(Schedulers.boundedElastic());
     }
 
+    /**
+     * 处理 update 对应的 HTTP 接口请求。
+     *
+     * <p>方法负责接收控制层参数、调用领域服务并封装统一响应。
+     *
+     * @param id id 对应的业务主键或标识
+     * @param body body 请求体、消息体或事件载荷
+     * @return 异步执行结果，订阅后产生节点结果或业务响应
+     */
     @PutMapping("/{id}")
     public Mono<R<Void>> update(@PathVariable Long id, @RequestBody DataSourceConfigDO body) {
         return Mono.fromCallable(() -> {
@@ -87,6 +114,14 @@ public class DataSourceConfigController {
         }).subscribeOn(Schedulers.boundedElastic());
     }
 
+    /**
+     * 处理 delete 对应的 HTTP 接口请求。
+     *
+     * <p>方法负责接收控制层参数、调用领域服务并封装统一响应。
+     *
+     * @param id id 对应的业务主键或标识
+     * @return 异步执行结果，订阅后产生节点结果或业务响应
+     */
     @DeleteMapping("/{id}")
     public Mono<R<Void>> delete(@PathVariable Long id) {
         return Mono.fromCallable(() -> {
@@ -95,10 +130,18 @@ public class DataSourceConfigController {
         }).subscribeOn(Schedulers.boundedElastic());
     }
 
+    /**
+     * 执行 normalize 对应的业务逻辑。
+     *
+     * <p>方法会结合入参、当前对象状态和依赖组件完成处理，调用方需关注返回值以及可能产生的状态变更。
+     *
+     * @param body body 请求体、消息体或事件载荷
+     */
     private static void normalize(DataSourceConfigDO body) {
         if (body.getType() == null || body.getType().isBlank()) {
             body.setType("JDBC");
         }
+        // 当前只支持 JDBC 数据源，先阻断未知类型避免后续按错误驱动建连。
         if (!"JDBC".equals(body.getType())) {
             throw new IllegalArgumentException("Unsupported data source type: " + body.getType());
         }
@@ -107,6 +150,7 @@ public class DataSourceConfigController {
         requireText(body.getUsername(), "username");
         requireText(body.getPassword(), "password");
         if (body.getDriverClassName() == null || body.getDriverClassName().isBlank()) {
+            // 管理端未传驱动时按 MySQL 默认值补齐，保持旧配置兼容。
             body.setDriverClassName("com.mysql.cj.jdbc.Driver");
         }
         if (body.getEnabled() == null) {
@@ -114,12 +158,28 @@ public class DataSourceConfigController {
         }
     }
 
+    /**
+     * 执行 require Text 对应的业务逻辑。
+     *
+     * <p>方法会结合入参、当前对象状态和依赖组件完成处理，调用方需关注返回值以及可能产生的状态变更。
+     *
+     * @param value value 待写入、比较或转换的业务值
+     * @param field field 方法执行所需的业务参数
+     */
     private static void requireText(String value, String field) {
         if (value == null || value.isBlank()) {
             throw new IllegalArgumentException("Missing data source field: " + field);
         }
     }
 
+    /**
+     * 查询或读取 read Jdbc Tables 相关的业务数据。
+     *
+     * <p>实现会通过持久化层读取或写入数据库记录。
+     *
+     * @param id id 对应的业务主键或标识
+     * @return 查询、转换或计算得到的结果集合
+     */
     private List<DataSourceTableMeta> readJdbcTables(Long id) throws Exception {
         DataSourceConfigDO config = dataSourceConfigMapper.selectById(id);
         if (config == null) {
@@ -138,6 +198,7 @@ public class DataSourceConfigController {
                 .password(config.getPassword())
                 .build();
         try (Connection connection = dataSource.getConnection()) {
+            // 通过 JDBC DatabaseMetaData 读取表和视图，不执行用户表数据查询。
             DatabaseMetaData metaData = connection.getMetaData();
             String catalog = connection.getCatalog();
             List<DataSourceTableMeta> tables = new ArrayList<>();
@@ -152,8 +213,19 @@ public class DataSourceConfigController {
         }
     }
 
+    /**
+     * 查询或读取 read Columns 相关的业务数据。
+     *
+     * <p>方法会结合入参、当前对象状态和依赖组件完成处理，调用方需关注返回值以及可能产生的状态变更。
+     *
+     * @param metaData metaData 方法执行所需的业务参数
+     * @param catalog catalog 方法执行所需的业务参数
+     * @param tableName tableName 方法执行所需的业务参数
+     * @return 查询、转换或计算得到的结果集合
+     */
     private static List<String> readColumns(DatabaseMetaData metaData, String catalog, String tableName) throws Exception {
         List<String> columns = new ArrayList<>();
+        // 只取列名供前端配置选择，不暴露字段样本值。
         try (ResultSet rs = metaData.getColumns(catalog, null, tableName, "%")) {
             while (rs.next()) {
                 columns.add(rs.getString("COLUMN_NAME"));

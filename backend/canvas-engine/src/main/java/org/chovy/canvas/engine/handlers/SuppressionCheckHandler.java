@@ -22,12 +22,29 @@ import java.util.Map;
 @NodeHandlerType(NodeType.SUPPRESSION_CHECK)
 public class SuppressionCheckHandler implements NodeHandler {
 
+    /** 营销策略服务，用于校验用户授权和抑制名单。 */
     private final MarketingPolicyService policyService;
 
+    /**
+     * 构造 SuppressionCheckHandler 实例，并根据入参初始化依赖、配置或内部状态。
+     *
+     * <p>执行过程中会根据节点配置和上下文决定成功、失败或下一跳路由。
+     *
+     * @param policyService policyService 方法执行所需的业务参数
+     */
     public SuppressionCheckHandler(MarketingPolicyService policyService) {
         this.policyService = policyService;
     }
 
+    /**
+     * 执行当前节点或服务的核心处理流程。
+     *
+     * <p>执行过程中会根据节点配置和上下文决定成功、失败或下一跳路由。
+     *
+     * @param config 节点配置或业务配置，方法会从中读取执行参数
+     * @param ctx 执行上下文，提供当前画布、用户和节点运行态数据
+     * @return 异步执行结果，订阅后产生节点结果或业务响应
+     */
     @Override
     public Mono<NodeResult> executeAsync(Map<String, Object> config, ExecutionContext ctx) {
         String channel = string(config, "channel", "ALL");
@@ -35,6 +52,7 @@ public class SuppressionCheckHandler implements NodeHandler {
         String suppressedNodeId = string(config, "suppressedNodeId", null);
         boolean requireConsent = booleanValue(config.getOrDefault("requireConsent", true));
 
+        // 先校验用户授权，未授权时不再做抑制名单检查。
         MarketingPolicyService.PolicyDecision consent = policyService.consentAllowed(
                 ctx.getUserId(), channel, requireConsent);
         if (!consent.allowed()) {
@@ -44,16 +62,35 @@ public class SuppressionCheckHandler implements NodeHandler {
 
         MarketingPolicyService.PolicyDecision suppression = policyService.suppressionAllowed(ctx.getUserId(), channel);
         if (!suppression.allowed()) {
+            // 命中退订、黑名单等抑制策略时走 suppressed 分支。
             return Mono.just(NodeResult.suppressed(
                     "suppressed", suppressedNodeId, suppression.reasonCode(), suppression.reasonMessage()));
         }
         return Mono.just(NodeResult.routed("allowed", allowedNodeId, Map.of(MapFieldKeys.POLICY_ALLOWED, true)));
     }
 
+    /**
+     * 执行 boolean Value 对应的业务逻辑。
+     *
+     * <p>执行过程中会根据节点配置和上下文决定成功、失败或下一跳路由。
+     *
+     * @param value value 待写入、比较或转换的业务值
+     * @return 判断结果，true 表示校验通过或条件成立
+     */
     private boolean booleanValue(Object value) {
         return value instanceof Boolean b ? b : Boolean.parseBoolean(String.valueOf(value));
     }
 
+    /**
+     * 执行 string 对应的业务逻辑。
+     *
+     * <p>执行过程中会根据节点配置和上下文决定成功、失败或下一跳路由。
+     *
+     * @param config 节点配置或业务配置，方法会从中读取执行参数
+     * @param key key 对应的缓存键、配置键或业务键
+     * @param fallback fallback 方法执行所需的业务参数
+     * @return 转换或查询得到的字符串结果
+     */
     private String string(Map<String, Object> config, String key, String fallback) {
         Object value = config.get(key);
         return value == null ? fallback : value.toString();

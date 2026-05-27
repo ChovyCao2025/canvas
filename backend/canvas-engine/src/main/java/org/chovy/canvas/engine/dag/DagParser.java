@@ -18,6 +18,7 @@ import java.util.*;
 @RequiredArgsConstructor
 public class DagParser {
 
+    /** JSON 解析器，用于反序列化前端保存的 graph_json。 */
     private final ObjectMapper objectMapper;
 
     /**
@@ -48,6 +49,7 @@ public class DagParser {
 
         for (CanvasNode n : nodes) {
             nodeMap.put(n.getId(), n);
+            // 先为每个节点初始化三份索引，后续即使没有边也能直接查询到空列表/0 入度。
             forward.put(n.getId(), new ArrayList<>());
             reverse.put(n.getId(), new ArrayList<>());
             inDegree.put(n.getId(), 0);
@@ -57,6 +59,7 @@ public class DagParser {
         for (CanvasNode n : nodes) {
             for (String target : extractTargets(n)) {
                 if (!nodeMap.containsKey(target)) continue;
+                // 同时维护正向、反向和入度索引，运行期路由和入口节点判断都依赖这些结构。
                 forward.get(n.getId()).add(target);
                 reverse.get(target).add(n.getId());
                 inDegree.merge(target, 1, Integer::sum);
@@ -69,6 +72,14 @@ public class DagParser {
         return new DagGraph(nodeMap, forward, reverse, inDegree);
     }
 
+    /**
+     * 执行 extract Targets 对应的业务逻辑。
+     *
+     * <p>方法会结合入参、当前对象状态和依赖组件完成处理，调用方需关注返回值以及可能产生的状态变更。
+     *
+     * @param node node 节点相关对象、标识或配置
+     * @return 查询、转换或计算得到的结果集合
+     */
     @SuppressWarnings("unchecked")
     private List<String> extractTargets(CanvasNode node) {
         List<String> targets = new ArrayList<>();
@@ -98,6 +109,7 @@ public class DagParser {
 
         List<?> branches = (List<?>) c.get(MapFieldKeys.BRANCHES);
         if (branches != null) branches.forEach(b ->
+                // 分支类节点的出口保存在数组项里，需要逐项展开为图边。
                 addIfPresent(targets, ((Map<?, ?>) b).get(MapFieldKeys.NEXT_NODE_ID)));
 
         List<?> priorities = (List<?>) c.get(MapFieldKeys.PRIORITIES);
@@ -114,6 +126,7 @@ public class DagParser {
 
         List<?> variants = (List<?>) c.get(MapFieldKeys.VARIANTS);
         if (variants != null) variants.forEach(v ->
+                // 实验组/变体的 nextNodeId 也参与 DAG 校验，避免隐藏出口绕过环检测。
                 addIfPresent(targets, ((Map<?, ?>) v).get(MapFieldKeys.NEXT_NODE_ID)));
 
         List<?> bands = (List<?>) c.get(MapFieldKeys.BANDS);
@@ -124,10 +137,27 @@ public class DagParser {
         return targets;
     }
 
+    /**
+     * 创建或新增 add If Present 相关的业务数据。
+     *
+     * <p>方法会结合入参、当前对象状态和依赖组件完成处理，调用方需关注返回值以及可能产生的状态变更。
+     *
+     * @param list list 待处理的数据集合
+     * @param val val 方法执行所需的业务参数
+     */
     private void addIfPresent(List<String> list, Object val) {
         if (val instanceof String s && !s.isBlank()) list.add(s);
     }
 
+    /**
+     * 校验 validate No Cycle 相关的业务数据。
+     *
+     * <p>方法会结合入参、当前对象状态和依赖组件完成处理，调用方需关注返回值以及可能产生的状态变更。
+     *
+     * @param nodeMap nodeMap 节点相关对象、标识或配置
+     * @param forward forward 方法执行所需的业务参数
+     * @param inDegree inDegree 方法执行所需的业务参数
+     */
     private void validateNoCycle(Map<String, CanvasNode> nodeMap,
                                   Map<String, List<String>> forward,
                                   Map<String, Integer> inDegree) {

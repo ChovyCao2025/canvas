@@ -41,6 +41,7 @@ public class AudienceEvaluationContextFetcher {
         }
         Map<String, Object> response = client.post()
                 .uri("/offline/user-tags/query")
+                // 只把规则里出现过的字段传给 Tagger，降低单用户上下文拉取成本。
                 .bodyValue(Map.of(MapFieldKeys.USER_ID, userId, MapFieldKeys.TAG_CODES, fields))
                 .retrieve()
                 .bodyToMono(new org.springframework.core.ParameterizedTypeReference<Map<String, Object>>() {})
@@ -60,9 +61,18 @@ public class AudienceEvaluationContextFetcher {
         Map<String, Object> rule = objectMapper.readValue(ruleJson, new TypeReference<>() {});
         List<String> fields = new ArrayList<>();
         collectFields(rule, fields);
+        // 同一字段可能出现在多个条件或分组里，发起查询前去重。
         return fields.stream().distinct().toList();
     }
 
+    /**
+     * 执行 collect Fields 对应的业务逻辑。
+     *
+     * <p>方法会结合入参、当前对象状态和依赖组件完成处理，调用方需关注返回值以及可能产生的状态变更。
+     *
+     * @param group group 方法执行所需的业务参数
+     * @param fields fields 方法执行所需的业务参数
+     */
     @SuppressWarnings("unchecked")
     private void collectFields(Map<String, Object> group, List<String> fields) {
         // 当前层条件字段

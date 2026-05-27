@@ -73,7 +73,7 @@ public class CanvasOpsService {
         }
     }
 
-    // ── Kill Switch ────────────────────────────────────────────────
+// ── Kill Switch ────────────────────────────────────────────────
 
     /**
      * 紧急终止画布。
@@ -93,6 +93,7 @@ public class CanvasOpsService {
         // 广播 Kill 信号（Phase 11 Redis Pub/Sub），各机器收到后立即取消正在进行的执行
         redis.convertAndSend("canvas:kill:" + id, mode);
         if ("FORCE".equalsIgnoreCase(mode)) {
+            // FORCE 模式需要同步落库终止存量 RUNNING 记录，避免执行态长期悬挂。
             markRunningExecutionsFailed(id);
         }
         // 清理触发路由、调度任务、缓存、配额
@@ -110,7 +111,7 @@ public class CanvasOpsService {
                         .eq(CanvasExecutionDO::getStatus, ExecutionStatus.RUNNING.getCode()));
     }
 
-    // ── 灰度发布 ────────────────────────────────────────────────
+// ── 灰度发布 ────────────────────────────────────────────────
 
     /**
      * 启动画布灰度发布
@@ -168,7 +169,14 @@ public class CanvasOpsService {
         canvasMapper.updateById(canvas);
     }
 
-    // ── 版本回滚 ────────────────────────────────────────────────
+    /**
+     * 执行 rollback 对应的业务逻辑。
+     *
+     * <p>该方法在事务边界内执行，确保相关数据库写入保持一致。
+     *
+     * @param id id 对应的业务主键或标识
+     */
+// ── 版本回滚 ────────────────────────────────────────────────
 
     /**
      * 回滚画布到上一个版本
@@ -185,7 +193,7 @@ public class CanvasOpsService {
         canvasMapper.updateById(canvas);
     }
 
-    // ── 克隆 ────────────────────────────────────────────────────
+// ── 克隆 ────────────────────────────────────────────────────
 
     /**
      * 克隆画布
@@ -204,10 +212,12 @@ public class CanvasOpsService {
         copy.setStatus(CanvasStatusEnum.DRAFT.getCode());
         copy.setCreatedBy(operator);
         copy.setIsExample(0);
+        // 克隆结果必须脱离示例模板来源，避免后续示例同步把用户副本识别为官方示例。
         copy.setSourceTemplateKey(null);
         canvasMapper.insert(copy);
 
         if (srcDraft != null) {
+            // 只克隆最新草稿为新画布的草稿版本，不继承发布态、灰度和外部路由状态。
             CanvasVersionDO v = new CanvasVersionDO();
             v.setCanvasId(copy.getId()); v.setVersion(1);
             v.setGraphJson(srcDraft.getGraphJson());
@@ -218,7 +228,7 @@ public class CanvasOpsService {
         return copy;
     }
 
-    // ── 版本对比（设计文档 23.3节）─────────────────────────────────
+// ── 版本对比（设计文档 23.3节）─────────────────────────────────
 
     /**
      * 比较两个画布版本之间的配置差异
@@ -307,7 +317,15 @@ public class CanvasOpsService {
         return java.util.List.of();
     }
 
-    // ── helpers ──────────────────────────────────────────────────
+    /**
+     * 执行 require 对应的业务逻辑。
+     *
+     * <p>实现会通过持久化层读取或写入数据库记录。
+     *
+     * @param id id 对应的业务主键或标识
+     * @return 方法执行后的业务结果
+     */
+// ── helpers ──────────────────────────────────────────────────
 
     /** 按 ID 查询画布，不存在时抛出业务异常。 */
     private CanvasDO require(Long id) {

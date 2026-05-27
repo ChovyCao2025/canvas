@@ -37,10 +37,15 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class CanvasExecutionManagementController {
 
+    /** 人工审批 Mapper，用于查询和更新审批单。 */
     private final CanvasManualApprovalMapper approvalMapper;
+    /** 上下文持久化服务，用于读取执行上下文快照。 */
     private final ContextPersistenceService ctxStore;
+    /** 执行服务，用于审批后继续推进画布执行。 */
     private final CanvasExecutionService executionService;
+    /** JSON 转换器，用于解析审批上下文。 */
     private final ObjectMapper objectMapper;
+    /** 通知事件服务，用于发送审批结果通知。 */
     private final NotificationEventService notificationEventService;
 
     /**
@@ -79,10 +84,21 @@ public class CanvasExecutionManagementController {
     }
 
 
-    // ── private ──────────────────────────────────────────────────
+    /**
+     * 执行 resume With Result 对应的业务逻辑。
+     *
+     * <p>实现会读写 Redis 中的缓存、锁、路由或运行态数据。
+     *
+     * @param executionId executionId 对应的业务主键或标识
+     * @param result result 方法执行所需的业务参数
+     * @param approver approver 方法执行所需的业务参数
+     * @param isWatchdog isWatchdog 方法执行所需的业务参数
+     */
+// ── private ──────────────────────────────────────────────────
 
     private void resumeWithResult(String executionId, String result, String approver,
                                   boolean isWatchdog) {
+        // 只查 PENDING 记录，审批结果一旦落库后重复请求会自然变成幂等 no-op。
         CanvasManualApprovalDO approval = approvalMapper.selectList(
                         new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<CanvasManualApprovalDO>()
                                 .eq(CanvasManualApprovalDO::getExecutionId, executionId)
@@ -115,6 +131,7 @@ public class CanvasExecutionManagementController {
         approval.setStatus(result);
         approval.setResultBy(approver);
         approval.setResultAt(LocalDateTime.now());
+        // 条件更新再次限定 PENDING，防止两个审批人并发通过/拒绝造成双写。
         int updated = approvalMapper.update(approval,
                 new com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper<CanvasManualApprovalDO>()
                         .eq(CanvasManualApprovalDO::getId, approval.getId())
@@ -126,6 +143,7 @@ public class CanvasExecutionManagementController {
         notificationEventService.approvalResult(approval, result, approver);
 
         // 3. 从 Redis 恢复 ctx，写入审批结果
+        // 人工审批挂起时上下文保存在 Redis，恢复前必须重新加载最新执行上下文。
         var ctx = ctxStore.load(approval.getCanvasId(), approval.getUserId());
         if (ctx == null) {
             log.warn("[APPROVAL] ctx 已不存在（可能已过期）executionId={}", executionId);
@@ -140,6 +158,7 @@ public class CanvasExecutionManagementController {
         ctxStore.save(ctx);
 
         // 5. 重新触发画布执行（从 MANUAL_APPROVAL 节点的触发器入口重新进入）
+        // 这里显式订阅是为了在同步管理请求返回后继续恢复执行链路。
         executionService.trigger(
                         approval.getCanvasId(),
                         approval.getUserId(),

@@ -23,8 +23,11 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class ExecutionController {
 
+    /** 执行服务，用于直调和 dry-run 画布执行。 */
     private final CanvasExecutionService executionService;
-    private final CanvasDisruptorService disruptorService;  // 12.8节 Disruptor 分发
+    // 12.8节 Disruptor 分发
+    /** Disruptor 投递服务，用于异步发布行为触发任务。 */
+    private final CanvasDisruptorService disruptorService;
 
     /**
      * 业务直调接口：同步执行并等待结果
@@ -43,6 +46,7 @@ public class ExecutionController {
         String dedupKey = (req.getIdempotencyKey() != null && !req.getIdempotencyKey().isBlank())
                 ? req.getIdempotencyKey()
                 : UUID.randomUUID().toString();
+        // 从 Reactor 安全上下文取当前登录用户，避免信任请求体里的 userId。
         return currentUserId().flatMap(userId ->
                 executionService.trigger(
                                 canvasId, userId, NodeType.DIRECT_CALL,
@@ -60,6 +64,7 @@ public class ExecutionController {
      */
     @PostMapping("/trigger/behavior")
     public Mono<R<Void>> behaviorTrigger(@RequestBody BehaviorTriggerReq req) {
+        // 控制器只负责投递 Ring Buffer，实际画布执行由 Disruptor 消费线程异步完成。
         disruptorService.publish(
                 req.getCanvasId(), req.getUserId(), "BEHAVIOR",
                 NodeType.EVENT_TRIGGER, req.getEventCode(),
@@ -78,6 +83,7 @@ public class ExecutionController {
     public Mono<R<Map<String, Object>>> dryRun(
             @PathVariable Long canvasId,
             @RequestBody DirectCallReq req) {
+        // dry-run 使用请求中的 graphJson，不读取线上发布版本，也不产生真实副作用。
         return currentUserId().flatMap(userId ->
                 executionService.triggerDryRun(
                                 canvasId, userId,
@@ -85,11 +91,19 @@ public class ExecutionController {
                         .map(R::ok));
     }
 
+    /**
+     * 执行 current User Id 对应的业务逻辑。
+     *
+     * <p>返回值采用 Reactor 异步模型，调用方可继续组合后续处理。
+     *
+     * @return 异步执行结果，订阅后产生节点结果或业务响应
+     */
     private Mono<String> currentUserId() {
         return ReactiveSecurityContextHolder.getContext()
                 .map(ctx -> ctx.getAuthentication().getPrincipal())
                 .cast(Claims.class)
                 .map(claims -> {
+                    // 优先使用 subject 中的用户 ID；旧 token 缺失 subject 时兼容 username。
                     String subject = claims.getSubject();
                     if (subject != null && !subject.isBlank()) {
                         return subject;

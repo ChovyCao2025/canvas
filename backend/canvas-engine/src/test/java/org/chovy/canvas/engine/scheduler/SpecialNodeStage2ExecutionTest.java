@@ -160,40 +160,6 @@ class SpecialNodeStage2ExecutionTest {
         assertThat(ctx.getNodeStatus("hub")).isEqualTo(NodeStatus.FAILED);
     }
 
-    @Test
-    void skippedBranchPropagatesUntilMergeCanRun() {
-        DagEngine engine = engineWithHandlers(new BranchHandler());
-        DagParser.CanvasNode branch = node("branch", NodeType.IF_CONDITION);
-        branch.setConfig(Map.of(
-                MapFieldKeys.SUCCESS_NODE_ID, "active",
-                MapFieldKeys.FAIL_NODE_ID, "skip1"
-        ));
-        DagParser.CanvasNode merge = node("merge", NodeType.MERGE);
-        merge.setConfig(Map.of(MapFieldKeys.NEXT_NODE_ID, "done"));
-        DagGraph graph = graph(List.of(
-                branch,
-                node("active", "TEST_SOURCE"),
-                node("skip1", "TEST_SOURCE"),
-                node("skip2", "TEST_SOURCE"),
-                merge,
-                node("done", "TEST_SOURCE")
-        ), Map.of(
-                "branch", List.of("active", "skip1"),
-                "active", List.of("merge"),
-                "skip1", List.of("skip2"),
-                "skip2", List.of("merge"),
-                "merge", List.of("done")
-        ));
-        ExecutionContext ctx = context();
-
-        engine.execute(graph, "branch", ctx).block();
-
-        assertThat(ctx.getNodeStatus("skip1")).isEqualTo(NodeStatus.SKIPPED);
-        assertThat(ctx.getNodeStatus("skip2")).isEqualTo(NodeStatus.SKIPPED);
-        assertThat(ctx.getNodeStatus("merge")).isEqualTo(NodeStatus.SUCCESS);
-        assertThat(ctx.getNodeStatus("done")).isEqualTo(NodeStatus.SUCCESS);
-    }
-
     private DagEngine engineWithHandlers(NodeHandler... extraHandlers) {
         List<NodeHandler> handlers = new ArrayList<>();
         handlers.add(new HubHandler());

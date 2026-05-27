@@ -134,5 +134,10 @@ public final class NodeType {
     /** 记录事件 */
     public static final String TRACK_EVENT        = "TRACK_EVENT";
 
+    /**
+     * 构造 NodeType 实例。
+     *
+     * <p>方法会结合入参、当前对象状态和依赖组件完成处理，调用方需关注返回值以及可能产生的状态变更。
+     */
     private NodeType() {}
 }

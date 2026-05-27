@@ -86,15 +86,26 @@ public class TagImportSourceService {
             throw new IllegalArgumentException("tag import source is disabled: " + id);
         }
 
+        // 来源拉取只负责取数和字段映射，行级校验、批次统计和 CDP 写入统一交给 TagImportService。
         JsonNode response = executeRequest(source);
         List<Map<String, Object>> records = resolveRecords(source, response);
         List<TagImportRow> rows = mapRows(source, records);
         return tagImportService.importRows("API_PULL", null, source.getUrl(), rows);
     }
 
+    /**
+     * 构建、解析或转换 map Rows 相关的业务数据。
+     *
+     * <p>方法会结合入参、当前对象状态和依赖组件完成处理，调用方需关注返回值以及可能产生的状态变更。
+     *
+     * @param source source 方法执行所需的业务参数
+     * @param records records 待处理的数据集合
+     * @return 查询、转换或计算得到的结果集合
+     */
     List<TagImportRow> mapRows(TagImportSourceDO source, List<Map<String, Object>> records) {
         Map<String, String> fieldMapping = parseFieldMapping(source);
         List<Map<String, Object>> safeRecords = records == null ? List.of() : records;
+        // 保留远程数组顺序生成 rowNo，方便错误明细回溯到原始响应位置。
         return java.util.stream.IntStream.range(0, safeRecords.size())
                 .mapToObj(index -> toImportRow(index + 1, safeRecords.get(index), fieldMapping))
                 .toList();
@@ -116,6 +127,7 @@ public class TagImportSourceService {
         WebClient.RequestHeadersSpec<?> spec = request.uri(source.getUrl());
         spec = applyHeaders(spec, source.getHeadersJson());
         if (method == HttpMethod.POST && hasText(source.getBodyTemplate())) {
+            // bodyTemplate 已按 JSON 解析后发送，避免把模板字符串当普通文本提交给远端。
             spec = ((WebClient.RequestBodySpec) spec)
                     .contentType(MediaType.APPLICATION_JSON)
                     .bodyValue(parseBodyTemplate(source.getBodyTemplate()));

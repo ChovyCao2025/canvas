@@ -36,7 +36,9 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class HomeOverviewController {
 
+    /** 画布 Mapper，用于统计已发布画布。 */
     private final CanvasMapper canvasMapper;
+    /** 执行记录 Mapper，用于统计首页执行数据。 */
     private final CanvasExecutionMapper executionMapper;
 
     @GetMapping("/overview")
@@ -46,6 +48,14 @@ public class HomeOverviewController {
                 .subscribeOn(Schedulers.boundedElastic());
     }
 
+    /**
+     * 构建、解析或转换 build Overview 相关的业务数据。
+     *
+     * <p>实现会通过持久化层读取或写入数据库记录。
+     *
+     * @param days days 方法执行所需的业务参数
+     * @return 方法执行后的业务结果
+     */
     private HomeOverviewDTO buildOverview(int days) {
         LocalDate today = LocalDate.now();
         LocalDate since = today.minusDays(days - 1L);
@@ -104,6 +114,15 @@ public class HomeOverviewController {
         );
     }
 
+    /**
+     * 构建、解析或转换 build Trend 相关的业务数据。
+     *
+     * <p>方法会结合入参、当前对象状态和依赖组件完成处理，调用方需关注返回值以及可能产生的状态变更。
+     *
+     * @param executions executions 方法执行所需的业务参数
+     * @param days days 方法执行所需的业务参数
+     * @return 查询、转换或计算得到的结果集合
+     */
     private List<TrendPointDTO> buildTrend(List<CanvasExecutionDO> executions, int days) {
         LocalDate today = LocalDate.now();
         Map<LocalDate, List<CanvasExecutionDO>> byDate = executions.stream()
@@ -122,6 +141,15 @@ public class HomeOverviewController {
         return trend;
     }
 
+    /**
+     * 构建、解析或转换 build Top Canvases 相关的业务数据。
+     *
+     * <p>方法会结合入参、当前对象状态和依赖组件完成处理，调用方需关注返回值以及可能产生的状态变更。
+     *
+     * @param executions executions 方法执行所需的业务参数
+     * @param canvasById canvasById 对应的业务主键或标识
+     * @return 查询、转换或计算得到的结果集合
+     */
     private List<TopCanvasDTO> buildTopCanvases(List<CanvasExecutionDO> executions, Map<Long, CanvasDO> canvasById) {
         return executions.stream()
                 .collect(Collectors.groupingBy(CanvasExecutionDO::getCanvasId))
@@ -157,6 +185,17 @@ public class HomeOverviewController {
                 .toList();
     }
 
+    /**
+     * 构建、解析或转换 build Attention Items 相关的业务数据。
+     *
+     * <p>方法会结合入参、当前对象状态和依赖组件完成处理，调用方需关注返回值以及可能产生的状态变更。
+     *
+     * @param totalExecutions totalExecutions 方法执行所需的业务参数
+     * @param failedExecutions failedExecutions 方法执行所需的业务参数
+     * @param executions executions 方法执行所需的业务参数
+     * @param canvasById canvasById 对应的业务主键或标识
+     * @return 查询、转换或计算得到的结果集合
+     */
     private List<AttentionItemDTO> buildAttentionItems(
             long totalExecutions,
             long failedExecutions,
@@ -195,10 +234,28 @@ public class HomeOverviewController {
         return items;
     }
 
+    /**
+     * 判断 has Status 相关的业务数据。
+     *
+     * <p>方法会结合入参、当前对象状态和依赖组件完成处理，调用方需关注返回值以及可能产生的状态变更。
+     *
+     * @param execution execution 方法执行所需的业务参数
+     * @param status status 状态值或状态筛选条件
+     * @return 判断结果，true 表示校验通过或条件成立
+     */
     private boolean hasStatus(CanvasExecutionDO execution, ExecutionStatus status) {
         return execution.getStatus() != null && execution.getStatus() == status.getCode();
     }
 
+    /**
+     * 执行 format Rate 对应的业务逻辑。
+     *
+     * <p>方法会结合入参、当前对象状态和依赖组件完成处理，调用方需关注返回值以及可能产生的状态变更。
+     *
+     * @param successExecutions successExecutions 方法执行所需的业务参数
+     * @param totalExecutions totalExecutions 方法执行所需的业务参数
+     * @return 转换或查询得到的字符串结果
+     */
     private String formatRate(long successExecutions, long totalExecutions) {
         if (totalExecutions <= 0) {
             return "0%";
@@ -208,32 +265,80 @@ public class HomeOverviewController {
     }
 
     public record HomeOverviewDTO(
+            /** 统计时间范围。 */
             RangeDTO range,
+            /** 汇总指标。 */
             SummaryDTO summary,
+            /** 每日执行趋势。 */
             List<TrendPointDTO> trend,
+            /** 执行量靠前的画布。 */
             List<TopCanvasDTO> topCanvases,
+            /** 首页关注项。 */
             List<AttentionItemDTO> attentionItems
     ) {
     }
 
-    public record RangeDTO(int days, String since, String until) {
+    public record RangeDTO(
+            /** 统计天数。 */
+            int days,
+            /** 起始日期（含）。 */
+            String since,
+            /** 截止日期（含）。 */
+            String until
+    ) {
     }
 
     public record SummaryDTO(
+            /** 已发布画布数量。 */
             long publishedCanvasCount,
+            /** 执行总次数。 */
             long totalExecutions,
+            /** 去重用户数。 */
             long uniqueUsers,
+            /** 失败执行次数。 */
             long failedExecutions,
+            /** 成功率展示值。 */
             String successRate
     ) {
     }
 
-    public record TrendPointDTO(String date, long total, long failed) {
+    public record TrendPointDTO(
+            /** 日期。 */
+            String date,
+            /** 当日执行次数。 */
+            long total,
+            /** 当日失败次数。 */
+            long failed
+    ) {
     }
 
-    public record TopCanvasDTO(Long canvasId, String name, long total, long uniqueUsers, String successRate, long failed) {
+    public record TopCanvasDTO(
+            /** 画布 ID。 */
+            Long canvasId,
+            /** 画布名称。 */
+            String name,
+            /** 执行总次数。 */
+            long total,
+            /** 去重用户数。 */
+            long uniqueUsers,
+            /** 成功率展示值。 */
+            String successRate,
+            /** 失败执行次数。 */
+            long failed
+    ) {
     }
 
-    public record AttentionItemDTO(Long canvasId, String name, String type, String message, String severity) {
+    public record AttentionItemDTO(
+            /** 关联画布 ID。 */
+            Long canvasId,
+            /** 关联名称。 */
+            String name,
+            /** 提醒类型。 */
+            String type,
+            /** 提醒文案。 */
+            String message,
+            /** 严重级别。 */
+            String severity
+    ) {
     }
 }

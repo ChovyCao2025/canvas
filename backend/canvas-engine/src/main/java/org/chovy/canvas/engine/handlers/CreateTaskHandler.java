@@ -23,12 +23,29 @@ import java.util.Map;
 @Component
 @NodeHandlerType(NodeType.CREATE_TASK)
 public class CreateTaskHandler implements NodeHandler {
+    /** 客户任务记录访问器，用于创建 CRM 跟进任务。 */
     private final CustomerTaskRecordMapper taskMapper;
 
+    /**
+     * 构造 CreateTaskHandler 实例，并根据入参初始化依赖、配置或内部状态。
+     *
+     * <p>执行过程中会根据节点配置和上下文决定成功、失败或下一跳路由。
+     *
+     * @param taskMapper taskMapper 方法执行所需的业务参数
+     */
     public CreateTaskHandler(CustomerTaskRecordMapper taskMapper) {
         this.taskMapper = taskMapper;
     }
 
+    /**
+     * 执行当前节点或服务的核心处理流程。
+     *
+     * <p>执行过程中会根据节点配置和上下文决定成功、失败或下一跳路由。
+     *
+     * @param config 节点配置或业务配置，方法会从中读取执行参数
+     * @param ctx 执行上下文，提供当前画布、用户和节点运行态数据
+     * @return 异步执行结果，订阅后产生节点结果或业务响应
+     */
     @Override
     public Mono<NodeResult> executeAsync(Map<String, Object> config, ExecutionContext ctx) {
         CustomerTaskRecordDO task = new CustomerTaskRecordDO();
@@ -39,15 +56,27 @@ public class CreateTaskHandler implements NodeHandler {
         task.setPriority(string(config, "priority", "NORMAL"));
         task.setAssignee(string(config, "assignee", null));
         if (config.get("dueHours") instanceof Number hours) {
+            // dueHours 是相对当前时间的 SLA，用于后续任务提醒或逾期统计。
             task.setDueAt(LocalDateTime.now().plusHours(hours.longValue()));
         }
         task.setStatus(CustomerTaskRecordDO.STATUS_OPEN);
         task.setCreatedAt(LocalDateTime.now());
         task.setUpdatedAt(task.getCreatedAt());
+        // 创建任务是 CRM 侧副作用，插入成功后把 taskId 写回上下文。
         taskMapper.insert(task);
         return Mono.just(NodeResult.ok(string(config, "nextNodeId", null), Map.of(MapFieldKeys.TASK_ID, task.getId())));
     }
 
+    /**
+     * 执行 string 对应的业务逻辑。
+     *
+     * <p>执行过程中会根据节点配置和上下文决定成功、失败或下一跳路由。
+     *
+     * @param config 节点配置或业务配置，方法会从中读取执行参数
+     * @param key key 对应的缓存键、配置键或业务键
+     * @param fallback fallback 方法执行所需的业务参数
+     * @return 转换或查询得到的字符串结果
+     */
     private String string(Map<String, Object> config, String key, String fallback) {
         Object value = config.get(key);
         return value == null ? fallback : value.toString();

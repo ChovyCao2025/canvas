@@ -17,6 +17,11 @@ public final class ApprovalStatus {
     /** 审批超时。 */
     public static final String TIMEOUT  = "TIMEOUT";
 
-    // 状态值用字符串而非数字，便于审计日志直接阅读。
+    /**
+     * 构造 ApprovalStatus 实例。
+     *
+     * <p>方法会结合入参、当前对象状态和依赖组件完成处理，调用方需关注返回值以及可能产生的状态变更。
+     */
+// 状态值用字符串而非数字，便于审计日志直接阅读。
     private ApprovalStatus() {}
 }

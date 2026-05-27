@@ -215,6 +215,7 @@ public class CanvasService {
             if (graph.entryNodes().isEmpty()) {
                 throw new IllegalStateException("画布缺少有效触发器节点");
             }
+            // 子流程依赖必须在发布事务前完成校验，避免 DB 已切发布态后运行时才发现断链。
             validateSubFlowDependencies(id, graph);
 
             // 阶段2：DB 事务（只写 DB，不碰 Redis/Scheduler/Cache）
@@ -222,6 +223,7 @@ public class CanvasService {
                     canvasTransactionService.publishDb(id, draft.getGraphJson(), operator);
 
             // 阶段3：事务外副作用（任一步骤失败不回滚 DB，路由/缓存最终通过 TTL 或再次发布自愈）
+            // 使用 publishDb 返回的旧版本 ID 精准清理旧路由，避免误删本次刚注册的新发布路由。
             // 3a. 清理旧版本路由和调度
             clearPreviousPublishedState(id, result.oldPublishedVersionId());
             // 3b. 注册新版本路由和调度
@@ -253,6 +255,7 @@ public class CanvasService {
         if (oldPublishedVersionId == null) return;
         CanvasVersionDO oldV = canvasVersionMapper.selectById(oldPublishedVersionId);
         if (oldV == null) return;
+        // 旧发布快照是清理外部状态的唯一依据，不能依赖画布主表当前 publishedVersionId。
         DagGraph oldGraph = dagParser.parse(oldV.getGraphJson());
         clearTriggerRoutesFromGraph(canvasId, oldGraph);
         schedulerService.cancelScheduledTriggers(canvasId, oldGraph);
@@ -300,6 +303,7 @@ public class CanvasService {
         if (publishedVersionId != null) {
             CanvasVersionDO v = canvasVersionMapper.selectById(publishedVersionId);
             if (v != null) {
+                // 下线后的 Redis/Scheduler/Cache 清理放在事务外，DB 状态不因外部系统异常回滚。
                 DagGraph graph = dagParser.parse(v.getGraphJson());
                 clearTriggerRoutesFromGraph(id, graph);          // Step 2: 事务外 Redis
                 schedulerService.cancelScheduledTriggers(id, graph); // 事务外 Scheduler
@@ -324,8 +328,9 @@ public class CanvasService {
             throw new IllegalStateException("画布已归档: " + id);
         }
         Long publishedVersionId = canvas.getPublishedVersionId();
+        // 归档事务内只改主表状态，是否需要清外部状态由归档前状态决定。
         canvasTransactionService.archiveDb(id);
-        // If was PUBLISHED, clean up external state exactly like offline() does
+        // 若归档前仍是发布态，事务提交后按下线同口径清理外部状态。
         if (CanvasStatusEnum.PUBLISHED.getCode().equals(canvas.getStatus())) {
             if (publishedVersionId != null) {
                 CanvasVersionDO v = canvasVersionMapper.selectById(publishedVersionId);
@@ -386,6 +391,7 @@ public class CanvasService {
         if (publishedVersionId != null) {
             CanvasVersionDO v = canvasVersionMapper.selectById(publishedVersionId);
             if (v != null) {
+                // Kill 只接收事务前发布版本 ID，确保清理的是被终止版本的触发入口。
                 DagGraph graph = dagParser.parse(v.getGraphJson());
                 clearTriggerRoutesFromGraph(canvasId, graph);
                 schedulerService.cancelScheduledTriggers(canvasId, graph);
@@ -396,7 +402,15 @@ public class CanvasService {
         preCheckService.cleanupCanvasQuotas(canvasId);
     }
 
-    // ── private helpers ──────────────────────────────────────
+    /**
+     * 执行 latest Draft 对应的业务逻辑。
+     *
+     * <p>实现会通过持久化层读取或写入数据库记录。
+     *
+     * @param canvasId canvasId 对应的业务主键或标识
+     * @return 方法执行后的业务结果
+     */
+// ── private helpers ──────────────────────────────────────
 
     /** 查询最新草稿版本。 */
     private CanvasVersionDO latestDraft(Long canvasId) {
@@ -449,6 +463,7 @@ public class CanvasService {
         for (String nodeId : graph.allNodeIds()) {
             DagParser.CanvasNode node = graph.getNode(nodeId);
             if (node == null) continue;
+            // bizConfig 与 config 合并后再取触发参数，兼容前端不同节点配置落点。
             Map<String, Object> cfg = new java.util.HashMap<>();
             if (node.getBizConfig() != null) cfg.putAll(node.getBizConfig());
             if (node.getConfig() != null) cfg.putAll(node.getConfig());
@@ -478,6 +493,7 @@ public class CanvasService {
         for (String nodeId : graph.allNodeIds()) {
             DagParser.CanvasNode node = graph.getNode(nodeId);
             if (node == null) continue;
+            // 按发布快照反向删除路由，避免下线后行为事件、MQ 或 Tagger 继续命中画布。
             Map<String, Object> cfg = new java.util.HashMap<>();
             if (node.getBizConfig() != null) cfg.putAll(node.getBizConfig());
             if (node.getConfig() != null) cfg.putAll(node.getConfig());
@@ -515,6 +531,7 @@ public class CanvasService {
      */
     private void precompileGroovyNodes(Long canvasId, DagGraph graph) {
         Thread.ofVirtual().start(() -> {
+            // 脚本预编译是发布后的旁路优化，失败不应阻塞发布主链路。
             graph.getNodeMap().forEach((nodeId, node) -> {
                 if (!NodeType.GROOVY.equals(node.getType())) return;
                 Map<String, Object> config = node.getConfig();

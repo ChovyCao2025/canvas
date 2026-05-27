@@ -20,12 +20,29 @@ import java.util.Map;
 @Component
 @NodeHandlerType(NodeType.SUBFLOW)
 public class SubflowHandler implements NodeHandler {
+    /** 子流程引用处理器，复用 SUB_FLOW_REF 的执行逻辑。 */
     private final SubFlowRefHandler delegate;
 
+    /**
+     * 构造 SubflowHandler 实例，并根据入参初始化依赖、配置或内部状态。
+     *
+     * <p>执行过程中会根据节点配置和上下文决定成功、失败或下一跳路由。
+     *
+     * @param delegate delegate 方法执行所需的业务参数
+     */
     public SubflowHandler(SubFlowRefHandler delegate) {
         this.delegate = delegate;
     }
 
+    /**
+     * 执行当前节点或服务的核心处理流程。
+     *
+     * <p>执行过程中会根据节点配置和上下文决定成功、失败或下一跳路由。
+     *
+     * @param config 节点配置或业务配置，方法会从中读取执行参数
+     * @param ctx 执行上下文，提供当前画布、用户和节点运行态数据
+     * @return 异步执行结果，订阅后产生节点结果或业务响应
+     */
     @Override
     public Mono<NodeResult> executeAsync(Map<String, Object> config, ExecutionContext ctx) {
         Map<String, Object> mapped = new HashMap<>(config);

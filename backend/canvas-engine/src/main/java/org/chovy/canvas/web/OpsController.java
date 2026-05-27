@@ -30,13 +30,26 @@ import org.chovy.canvas.dal.mapper.CanvasVersionMapper;
 @RequiredArgsConstructor
 public class OpsController {
 
+    /** 画布模板 Mapper，用于管理模板记录。 */
     private final CanvasTemplateMapper templateMapper;
+    /** 画布 Mapper，用于读取和创建画布记录。 */
     private final CanvasMapper canvasMapper;
+    /** 画布版本 Mapper，用于读取模板对应版本。 */
     private final CanvasVersionMapper canvasVersionMapper;
+    /** 人工审批 Mapper，用于查询审批记录。 */
     private final CanvasManualApprovalMapper approvalMapper;
+    /** 画布配置缓存，用于刷新画布配置缓存。 */
     private final CanvasConfigCache configCache;
 
-    // ── 缓存管理 ─────────────────────────────────────────────────────
+    /**
+     * 处理 invalidate Cache 对应的 HTTP 接口请求。
+     *
+     * <p>方法负责接收控制层参数、调用领域服务并封装统一响应。
+     *
+     * @param id id 对应的业务主键或标识
+     * @return 异步执行结果，订阅后产生节点结果或业务响应
+     */
+// ── 缓存管理 ─────────────────────────────────────────────────────
 
     /**
      * 强制失效指定画布的配置缓存（L1 Caffeine + L2 Redis）。
@@ -150,7 +163,7 @@ public class OpsController {
         }).subscribeOn(Schedulers.boundedElastic()).map(R::ok);
     }
 
-    // ── 发布审批（23.2节） ─────────────────────────────────────────
+// ── 发布审批（23.2节） ─────────────────────────────────────────
 
     /**
      * 获取待审批的发布请求列表

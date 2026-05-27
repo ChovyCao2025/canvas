@@ -24,11 +24,19 @@ import org.springframework.stereotype.Component;
 @RequiredArgsConstructor
 public class KillSwitchSubscriber {
 
+    /** 响应式 Redis 连接工厂，用于创建 Pub/Sub 监听容器。 */
     private final ReactiveRedisConnectionFactory factory;
+    /** 本机执行注册表，用于取消正在运行的画布执行。 */
     private final InFlightExecutionRegistry      registry;
 
+    /** Kill Switch 的 Redis 模式订阅频道。 */
     private static final String KILL_PATTERN = "canvas:kill:*";
 
+    /**
+     * 执行 subscribe 对应的业务逻辑。
+     *
+     * <p>实现会读写 Redis 中的缓存、锁、路由或运行态数据。
+     */
     @PostConstruct
     void subscribe() {
         try {
@@ -41,10 +49,12 @@ public class KillSwitchSubscriber {
                         String channel = msg.getChannel();   // "canvas:kill:{canvasId}"
                         String mode    = msg.getMessage();   // "GRACEFUL" or "FORCE"
                         try {
+                            // 频道名承载 canvasId，消息体只表达处理模式，便于按画布做模式订阅。
                             Long canvasId = Long.parseLong(
                                     channel.replace("canvas:kill:", ""));
 
                             if ("FORCE".equals(mode)) {
+                                // FORCE 需要跨 JVM 取消本机正在执行的订阅，其他实例收到同一 Pub/Sub 消息各自处理。
                                 int cancelled = registry.cancelAll(canvasId);
                                 log.warn("[KILL] FORCE 模式，取消 {} 个执行 canvasId={}",
                                         cancelled, canvasId);
@@ -57,7 +67,8 @@ public class KillSwitchSubscriber {
                         } catch (NumberFormatException e) {
                             log.error("[KILL] 解析 canvasId 失败 channel={}", channel);
                         }
-                    })
+                    }
+            )
                     .doOnError(e -> log.error("[KILL] Kill Switch 订阅异常: {}", e.getMessage()))
                     .subscribe();
 

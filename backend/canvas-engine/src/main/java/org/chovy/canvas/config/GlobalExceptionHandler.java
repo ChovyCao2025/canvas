@@ -24,6 +24,7 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(IllegalArgumentException.class)
     @ResponseStatus(HttpStatus.BAD_REQUEST)
     public R<Void> handleIllegalArgument(IllegalArgumentException e) {
+        // 参数和业务前置校验均归一为统一响应体，HTTP 语义由状态码表达。
         return R.fail(e.getMessage());
     }
 
@@ -35,6 +36,14 @@ public class GlobalExceptionHandler {
         return R.fail(e.getMessage());
     }
 
+    /**
+     * 执行 handle Trigger Rejected 对应的业务逻辑。
+     *
+     * <p>执行过程中会根据节点配置和上下文决定成功、失败或下一跳路由。
+     *
+     * @param e e 方法执行所需的业务参数
+     * @return 接口响应包装结果
+     */
     @ExceptionHandler(TriggerRejectedException.class)
     @ResponseStatus(HttpStatus.TOO_MANY_REQUESTS)
     public R<Void> handleTriggerRejected(TriggerRejectedException e) {
@@ -46,11 +55,20 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(ResponseStatusException.class)
     public org.springframework.http.ResponseEntity<R<Void>> handleResponseStatus(
             ResponseStatusException e) {
+        // 保留上游显式指定的 HTTP 状态码，只把响应体包装成前端统一格式。
         return org.springframework.http.ResponseEntity
                 .status(e.getStatusCode())
                 .body(R.fail(e.getReason() != null ? e.getReason() : e.getMessage()));
     }
 
+    /**
+     * 执行 handle Forbidden 对应的业务逻辑。
+     *
+     * <p>执行过程中会根据节点配置和上下文决定成功、失败或下一跳路由。
+     *
+     * @param e e 方法执行所需的业务参数
+     * @return 接口响应包装结果
+     */
     @ExceptionHandler(SecurityException.class)
     @ResponseStatus(HttpStatus.FORBIDDEN)
     public R<Void> handleForbidden(SecurityException e) {
@@ -62,6 +80,7 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(Exception.class)
     @ResponseStatus(HttpStatus.INTERNAL_SERVER_ERROR)
     public R<Void> handleGeneral(Exception e) {
+        // 兜底只返回业务化错误信息，避免 WebFlux 默认错误页或堆栈结构透出。
         return R.fail("系统错误: " + e.getMessage());
     }
 }

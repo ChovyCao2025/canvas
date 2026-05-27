@@ -25,6 +25,15 @@ public class AviatorRuleEvaluator implements RuleEvaluator {
     /** 规则 JSON 解析器。 */
     private final ObjectMapper objectMapper;
 
+        /**
+     * 执行 evaluate 对应的业务逻辑。
+     *
+     * <p>实现会处理 MQ 消息、路由或发送记录，影响异步触发链路。
+     *
+     * @param ruleJson ruleJson 方法执行所需的业务参数
+     * @param context 执行上下文，提供当前画布、用户和节点运行态数据
+     * @return 判断结果，true 表示校验通过或条件成立
+     */
     @Override
     public boolean evaluate(String ruleJson, Map<String, Object> context) {
         try {
@@ -43,6 +52,15 @@ public class AviatorRuleEvaluator implements RuleEvaluator {
         }
     }
 
+    /**
+     * 构建、解析或转换 to Expression 相关的业务数据。
+     *
+     * <p>方法会结合入参、当前对象状态和依赖组件完成处理，调用方需关注返回值以及可能产生的状态变更。
+     *
+     * @param rule rule 方法执行所需的业务参数
+     * @param context 执行上下文，提供当前画布、用户和节点运行态数据
+     * @return 转换或查询得到的字符串结果
+     */
     @SuppressWarnings("unchecked")
     private String toExpression(Map<String, Object> rule, Map<String, Object> context) {
         // 每个分组通过 logic 决定条件拼接关系（AND/OR）
@@ -53,6 +71,7 @@ public class AviatorRuleEvaluator implements RuleEvaluator {
         List<Map<String, Object>> conditions = (List<Map<String, Object>>) rule.get("conditions");
         if (conditions != null) {
             for (Map<String, Object> condition : conditions) {
+                // 叶子条件转成表达式片段，字段值仍从 runtimeContext 动态读取。
                 parts.add(toConditionExpr(condition, context));
             }
         }
@@ -60,6 +79,7 @@ public class AviatorRuleEvaluator implements RuleEvaluator {
         List<Map<String, Object>> groups = (List<Map<String, Object>>) rule.get("groups");
         if (groups != null) {
             for (Map<String, Object> group : groups) {
+                // 子分组递归生成并加括号，避免 AND/OR 混用时改变规则语义。
                 parts.add("(" + toExpression(group, context) + ")");
             }
         }
@@ -67,6 +87,15 @@ public class AviatorRuleEvaluator implements RuleEvaluator {
         return parts.isEmpty() ? "true" : String.join(joinOp, parts);
     }
 
+    /**
+     * 构建、解析或转换 to Condition Expr 相关的业务数据。
+     *
+     * <p>方法会结合入参、当前对象状态和依赖组件完成处理，调用方需关注返回值以及可能产生的状态变更。
+     *
+     * @param condition condition 方法执行所需的业务参数
+     * @param context 执行上下文，提供当前画布、用户和节点运行态数据
+     * @return 转换或查询得到的字符串结果
+     */
     @SuppressWarnings("unchecked")
     private String toConditionExpr(Map<String, Object> condition, Map<String, Object> context) {
         String field = String.valueOf(condition.get("field"));
@@ -82,6 +111,7 @@ public class AviatorRuleEvaluator implements RuleEvaluator {
             case "<=" -> field + " <= " + value;
             case "IN" -> {
                 String listKey = field + "_list";
+                // Aviator 的 include 需要列表变量，不能直接把 Java List 字面量拼进表达式。
                 context.put(listKey, value instanceof List<?> list ? list : List.of());
                 // Aviator include(list, value) 语义：value 是否在 list 中
                 yield "include(" + listKey + ", " + field + ")";
@@ -90,6 +120,14 @@ public class AviatorRuleEvaluator implements RuleEvaluator {
         };
     }
 
+    /**
+     * 执行 quote If String 对应的业务逻辑。
+     *
+     * <p>方法会结合入参、当前对象状态和依赖组件完成处理，调用方需关注返回值以及可能产生的状态变更。
+     *
+     * @param value value 待写入、比较或转换的业务值
+     * @return 转换或查询得到的字符串结果
+     */
     private String quoteIfString(Object value) {
         if (value instanceof String text) {
             return '"' + text.replace("\\", "\\\\").replace("\"", "\\\"") + '"';

@@ -25,8 +25,11 @@ import org.chovy.canvas.query.CanvasListQuery;
 @RequiredArgsConstructor
 public class CanvasController {
 
+    /** 画布服务，用于处理画布 CRUD 和草稿版本。 */
     private final CanvasService canvasService;
+    /** 画布运维服务，用于发布、下线和审批操作。 */
     private final CanvasOpsService opsService;
+    /** 通知事件服务，用于发送画布运营通知。 */
     private final NotificationEventService notificationEventService;
 
     /**
@@ -94,6 +97,7 @@ public class CanvasController {
             @PathVariable Long id,
             @RequestParam(defaultValue = "system") String operator) {
         return Mono.fromCallable(() -> {
+                    // 发布会修改版本状态并刷新运行配置，属于阻塞事务操作。
                     CanvasVersionDO version = canvasService.publish(id, operator);
                     notifyCanvasChange("CANVAS_PUBLISHED", id, "画布已发布",
                             "operator=" + operator + " versionId=" + version.getId(),
@@ -324,6 +328,7 @@ public class CanvasController {
 
         return currentUser().flatMap(operator ->
                 Mono.<Void>fromRunnable(() -> opsService.saveWithOptimisticLock(
+                                // editVersion 用于乐观锁，前端版本落后时返回可识别的冲突文案。
                                 id, req.getName(), req.getDescription(),
                                 req.getGraphJson(), req.getEditVersion(), operator))
                         .subscribeOn(Schedulers.boundedElastic())
@@ -335,17 +340,37 @@ public class CanvasController {
                         }));
     }
 
-    // ── helpers ───────────────────────────────────────────────────
+    /**
+     * 执行 current User 对应的业务逻辑。
+     *
+     * <p>返回值采用 Reactor 异步模型，调用方可继续组合后续处理。
+     *
+     * @return 异步执行结果，订阅后产生节点结果或业务响应
+     */
+// ── helpers ───────────────────────────────────────────────────
 
     /** 从安全上下文读取当前用户名，缺失时回退 system。 */
     private Mono<String> currentUser() {
         return ReactiveSecurityContextHolder.getContext()
                 .map(ctx -> ctx.getAuthentication().getPrincipal())
                 .cast(io.jsonwebtoken.Claims.class)
+                // 管控类操作统一记录 JWT 中的 username 作为审计操作人。
                 .map(c -> c.get("username", String.class))
                 .defaultIfEmpty("system");
     }
 
+    /**
+     * 发布或发送 notify Canvas Change 相关的业务数据。
+     *
+     * <p>方法会结合入参、当前对象状态和依赖组件完成处理，调用方需关注返回值以及可能产生的状态变更。
+     *
+     * @param type type 类型标识或分类条件
+     * @param canvasId canvasId 对应的业务主键或标识
+     * @param title title 方法执行所需的业务参数
+     * @param content content 方法执行所需的业务参数
+     * @param severity severity 方法执行所需的业务参数
+     * @param operator operator 操作人标识
+     */
     private void notifyCanvasChange(
             String type,
             Long canvasId,
@@ -353,6 +378,7 @@ public class CanvasController {
             String content,
             String severity,
             String operator) {
+        // 控制器内只发领域事件，实际通知落库/推送由通知服务处理。
         notificationEventService.canvasChanged(type, canvasId, title, content, severity, operator);
     }
 

@@ -31,10 +31,20 @@ import java.util.Set;
 @RequiredArgsConstructor
 public class MigrationCacheSync implements ApplicationRunner {
 
+    /** Flyway 迁移元数据读取器，用于判断最新迁移描述。 */
     private final Flyway           flyway;
+    /** 画布配置缓存，用于失效已发布版本的 DAG 配置。 */
     private final CanvasConfigCache configCache;
+    /** 画布数据访问组件，用于定位已发布版本。 */
     private final CanvasMapper      canvasMapper;
 
+    /**
+     * 执行 run 对应的业务逻辑。
+     *
+     * <p>方法会结合入参、当前对象状态和依赖组件完成处理，调用方需关注返回值以及可能产生的状态变更。
+     *
+     * @param args args 方法执行所需的业务参数
+     */
     @Override
     public void run(ApplicationArguments args) {
         // 仅检查“已应用迁移列表”中的最新一条，避免每次启动重复全量失效
@@ -53,6 +63,7 @@ public class MigrationCacheSync implements ApplicationRunner {
             String idStr = (end > start ? desc.substring(start, end) : desc.substring(start)).trim();
             try {
                 Long canvasId = Long.parseLong(idStr);
+                // 精确失效用于小范围数据修复，避免启动时广播清理所有已发布画布缓存。
                 invalidateSingleCanvas(canvasId);
             } catch (NumberFormatException e) {
                 log.warn("[MIGRATION_CACHE_SYNC] 无法解析 canvas id: {}", idStr);
@@ -63,6 +74,13 @@ public class MigrationCacheSync implements ApplicationRunner {
         }
     }
 
+    /**
+     * 删除、清理或失效 invalidate Single Canvas 相关的业务数据。
+     *
+     * <p>实现会通过持久化层读取或写入数据库记录。
+     *
+     * @param canvasId canvasId 对应的业务主键或标识
+     */
     private void invalidateSingleCanvas(Long canvasId) {
         CanvasDO canvas = canvasMapper.selectById(canvasId);
         if (canvas == null) return;
@@ -74,6 +92,11 @@ public class MigrationCacheSync implements ApplicationRunner {
         }
     }
 
+    /**
+     * 删除、清理或失效 invalidate All Published Canvases 相关的业务数据。
+     *
+     * <p>实现会通过持久化层读取或写入数据库记录。
+     */
     private void invalidateAllPublishedCanvases() {
         // 仅处理已发布版本：草稿不参与执行链路，无需失效
         canvasMapper.selectList(

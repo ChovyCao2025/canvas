@@ -28,10 +28,21 @@ public class SqlWhereGenerator {
         Map<String, Object> rule = objectMapper.readValue(ruleJson, new TypeReference<>() {});
         AtomicInteger counter = new AtomicInteger();
         MapSqlParameterSource params = new MapSqlParameterSource();
+        // 规则树只生成 WHERE 片段，外层 SELECT/FROM 由数据源配置决定。
         String sql = buildGroup(rule, params, counter);
         return new SqlWhere(sql.isBlank() ? "1=1" : sql, params);
     }
 
+    /**
+     * 构建、解析或转换 build Group 相关的业务数据。
+     *
+     * <p>方法会结合入参、当前对象状态和依赖组件完成处理，调用方需关注返回值以及可能产生的状态变更。
+     *
+     * @param group group 方法执行所需的业务参数
+     * @param params params 方法执行所需的业务参数
+     * @param counter counter 数量、阈值或分页参数
+     * @return 转换或查询得到的字符串结果
+     */
     @SuppressWarnings("unchecked")
     private String buildGroup(Map<String, Object> group,
                               MapSqlParameterSource params,
@@ -45,6 +56,7 @@ public class SqlWhereGenerator {
         if (conditionsObj instanceof List<?> conditions) {
             for (Object item : conditions) {
                 if (item instanceof Map<?, ?> condition) {
+                    // 每个叶子条件都会绑定独立命名参数，避免不同字段/分支参数名冲突。
                     parts.add(buildCondition((Map<String, Object>) condition, params, counter));
                 }
             }
@@ -56,6 +68,7 @@ public class SqlWhereGenerator {
                 if (item instanceof Map<?, ?> nested) {
                     String nestedSql = buildGroup((Map<String, Object>) nested, params, counter);
                     if (!nestedSql.isBlank()) {
+                        // 子分组加括号保留前端规则树里的逻辑优先级。
                         parts.add("(" + nestedSql + ")");
                     }
                 }
@@ -65,6 +78,16 @@ public class SqlWhereGenerator {
         return String.join(joiner, parts);
     }
 
+    /**
+     * 构建、解析或转换 build Condition 相关的业务数据。
+     *
+     * <p>方法会结合入参、当前对象状态和依赖组件完成处理，调用方需关注返回值以及可能产生的状态变更。
+     *
+     * @param condition condition 方法执行所需的业务参数
+     * @param params params 方法执行所需的业务参数
+     * @param counter counter 数量、阈值或分页参数
+     * @return 转换或查询得到的字符串结果
+     */
     private String buildCondition(Map<String, Object> condition,
                                   MapSqlParameterSource params,
                                   AtomicInteger counter) {
@@ -74,6 +97,7 @@ public class SqlWhereGenerator {
         Object value = condition.get("value");
         String paramName = "p" + counter.incrementAndGet();
 
+        // 运算符白名单决定可生成的 SQL 形态，不允许规则 JSON 直接拼接任意 SQL。
         return switch (op) {
             case "=" -> bindSimple(field, "=", paramName, value, params);
             case "!=" -> bindSimple(field, "<>", paramName, value, params);
@@ -86,6 +110,18 @@ public class SqlWhereGenerator {
         };
     }
 
+    /**
+     * 执行 bind Simple 对应的业务逻辑。
+     *
+     * <p>方法会结合入参、当前对象状态和依赖组件完成处理，调用方需关注返回值以及可能产生的状态变更。
+     *
+     * @param field field 方法执行所需的业务参数
+     * @param sqlOp sqlOp 方法执行所需的业务参数
+     * @param paramName paramName 方法执行所需的业务参数
+     * @param value value 待写入、比较或转换的业务值
+     * @param params params 方法执行所需的业务参数
+     * @return 转换或查询得到的字符串结果
+     */
     private String bindSimple(String field,
                               String sqlOp,
                               String paramName,
@@ -95,6 +131,17 @@ public class SqlWhereGenerator {
         return field + ' ' + sqlOp + " :" + paramName;
     }
 
+    /**
+     * 执行 bind In 对应的业务逻辑。
+     *
+     * <p>方法会结合入参、当前对象状态和依赖组件完成处理，调用方需关注返回值以及可能产生的状态变更。
+     *
+     * @param field field 方法执行所需的业务参数
+     * @param paramName paramName 方法执行所需的业务参数
+     * @param value value 待写入、比较或转换的业务值
+     * @param params params 方法执行所需的业务参数
+     * @return 转换或查询得到的字符串结果
+     */
     private String bindIn(String field,
                           String paramName,
                           Object value,
@@ -107,6 +154,14 @@ public class SqlWhereGenerator {
         return field + " IN (:" + paramName + ')';
     }
 
+    /**
+     * 执行 sanitize Identifier 对应的业务逻辑。
+     *
+     * <p>方法会结合入参、当前对象状态和依赖组件完成处理，调用方需关注返回值以及可能产生的状态变更。
+     *
+     * @param field field 方法执行所需的业务参数
+     * @return 转换或查询得到的字符串结果
+     */
     private String sanitizeIdentifier(String field) {
         if (!field.matches("[A-Za-z_][A-Za-z0-9_]*")) {
             throw new IllegalArgumentException("Illegal field name: " + field);
@@ -114,7 +169,12 @@ public class SqlWhereGenerator {
         return field;
     }
 
-    public record SqlWhere(String sql, MapSqlParameterSource params) {
+    public record SqlWhere(
+            /** WHERE 片段，不包含 WHERE 关键字。 */
+            String sql,
+            /** 与命名参数占位符对应的参数集合。 */
+            MapSqlParameterSource params
+    ) {
         // sql: 仅 WHERE 片段（不含 "WHERE" 关键字）
         // params: 与命名参数占位符一一对应
     }

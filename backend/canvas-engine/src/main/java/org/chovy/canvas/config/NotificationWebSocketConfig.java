@@ -18,6 +18,14 @@ import java.util.Map;
 @Configuration
 public class NotificationWebSocketConfig {
 
+    /**
+     * 创建并注册 notification Web Socket Mapping 相关的 Spring Bean。
+     *
+     * <p>该方法在应用启动时由 Spring 容器调用，用于装配运行依赖。
+     *
+     * @param handler handler 方法执行所需的业务参数
+     * @return 方法执行后的业务结果
+     */
     @Bean
     public HandlerMapping notificationWebSocketMapping(NotificationWebSocketHandler handler) {
         SimpleUrlHandlerMapping mapping = new SimpleUrlHandlerMapping();
@@ -26,6 +34,13 @@ public class NotificationWebSocketConfig {
         return mapping;
     }
 
+    /**
+     * 创建并注册 web Socket Handler Adapter 相关的 Spring Bean。
+     *
+     * <p>该方法在应用启动时由 Spring 容器调用，用于装配运行依赖。
+     *
+     * @return 方法执行后的业务结果
+     */
     @Bean
     public WebSocketHandlerAdapter webSocketHandlerAdapter() {
         return new WebSocketHandlerAdapter();

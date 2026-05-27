@@ -44,16 +44,31 @@ import java.util.Set;
 )
 public class MqTriggerConsumer implements RocketMQListener<MessageExt> {
 
+    /** 系统告警内容最大长度，避免异常消息体过长。 */
     private static final int ALERT_CONTENT_LIMIT = 900;
 
+    /** MQ 触发消息反序列化组件。 */
     private final ObjectMapper objectMapper;
+    /** 触发路由服务，用于按 topic 查询命中画布。 */
     private final TriggerRouteService routeService;
+    /** Disruptor 投递服务，用于进入内部执行队列。 */
     private final CanvasDisruptorService disruptorService;
+    /** 执行请求服务，用于生成画布执行请求。 */
     private final CanvasExecutionRequestService requestService;
+    /** MQ 触发拒绝记录 Mapper。 */
     private final CanvasMqTriggerRejectedMapper rejectedMapper;
+    /** MQ 触发链路指标采集器。 */
     private final CanvasMetrics metrics;
+    /** 通知事件服务，用于发送 MQ 触发异常告警。 */
     private final NotificationEventService notificationEventService;
 
+    /**
+     * 消费或监听 on Message 相关的业务数据。
+     *
+     * <p>实现会处理 MQ 消息、路由或发送记录，影响异步触发链路。
+     *
+     * @param message message 方法执行所需的业务参数
+     */
     @Override
     public void onMessage(MessageExt message) {
         String tag = message.getTags();
@@ -64,6 +79,7 @@ public class MqTriggerConsumer implements RocketMQListener<MessageExt> {
 
         MqTriggerMessage triggerMessage;
         try {
+            // 解析失败属于不可执行消息：记录拒绝原因和告警后 ACK，避免毒消息无限重试。
             triggerMessage = objectMapper.readValue(body, MqTriggerMessage.class);
         } catch (Exception e) {
             log.error("[MQ_CONSUMER] 消息体解析失败 msgId={} body={}: {}", msgId, body, e.getMessage());
@@ -83,6 +99,7 @@ public class MqTriggerConsumer implements RocketMQListener<MessageExt> {
         try {
             validateMessage(triggerMessage);
         } catch (IllegalArgumentException e) {
+            // 结构合法但业务字段缺失，同样落 rejected 表供后续排查或人工补偿。
             recordRejected("INVALID_MESSAGE", tag);
             storeRejected(msgId, tag, "INVALID_MESSAGE", e.getMessage(), body);
             notificationEventService.systemAlert(
@@ -98,11 +115,13 @@ public class MqTriggerConsumer implements RocketMQListener<MessageExt> {
         }
 
         if (!routeService.isRouteReady()) {
+            // 路由重建窗口内不消费消息，抛异常交给 RocketMQ 重投，避免按空路由误丢弃。
             throw new IllegalStateException("MQ trigger route table is not ready");
         }
 
         Set<String> canvasIds = routeService.getCanvasByMqTopic(tag);
         if (canvasIds.isEmpty()) {
+            // 路由就绪但无匹配画布说明配置缺失或 tag 未订阅，按业务丢弃并发出告警。
             log.warn("[MQ_CONSUMER] tag={} 无匹配画布，丢弃消息 msgId={}", tag, msgId);
             notificationEventService.systemAlert(
                     "MQ_TRIGGER_NO_ROUTE",
@@ -121,6 +140,7 @@ public class MqTriggerConsumer implements RocketMQListener<MessageExt> {
             if (canvasId == null) {
                 continue;
             }
+            // 每个命中的画布生成独立执行请求，共用 RocketMQ msgId 做后续幂等和链路追踪。
             String requestId = requestService.enqueue(
                     canvasId,
                     triggerMessage.getUserId(),
@@ -136,6 +156,15 @@ public class MqTriggerConsumer implements RocketMQListener<MessageExt> {
         }
     }
 
+        /**
+     * 构建、解析或转换 parse Canvas Id 相关的业务数据。
+     *
+     * <p>实现会处理 MQ 消息、路由或发送记录，影响异步触发链路。
+     *
+     * @param canvasIdStr canvasIdStr 画布相关对象或标识
+     * @param tag tag 方法执行所需的业务参数
+     * @return 计算得到的数值结果
+     */
     private Long parseCanvasId(String canvasIdStr, String tag) {
         try {
             long canvasId = Long.parseLong(canvasIdStr);
@@ -144,12 +173,20 @@ public class MqTriggerConsumer implements RocketMQListener<MessageExt> {
             }
             return canvasId;
         } catch (RuntimeException e) {
+            // 非法路由成员只影响当前画布 ID，不阻断同 topic 下其他画布继续触发。
             log.warn("[MQ_CONSUMER] 跳过非法路由 canvasId={} tag={}", canvasIdStr, tag);
             recordRouteRejected("INVALID_CANVAS_ID", tag);
             return null;
         }
     }
 
+        /**
+     * 校验 validate Message 相关的业务数据。
+     *
+     * <p>实现会处理 MQ 消息、路由或发送记录，影响异步触发链路。
+     *
+     * @param message message 方法执行所需的业务参数
+     */
     private void validateMessage(MqTriggerMessage message) {
         if (message.getUserId() == null || message.getUserId().isBlank()) {
             throw new IllegalArgumentException("Invalid MQ trigger message body: userId is required");
@@ -162,6 +199,14 @@ public class MqTriggerConsumer implements RocketMQListener<MessageExt> {
         }
     }
 
+        /**
+     * 写入或记录 record Rejected 相关的业务数据。
+     *
+     * <p>实现会处理 MQ 消息、路由或发送记录，影响异步触发链路。
+     *
+     * @param reason reason 方法执行所需的业务参数
+     * @param tag tag 方法执行所需的业务参数
+     */
     private void recordRejected(String reason, String tag) {
         try {
             metrics.recordMqTriggerRejected(reason, tag);
@@ -169,6 +214,14 @@ public class MqTriggerConsumer implements RocketMQListener<MessageExt> {
         }
     }
 
+        /**
+     * 写入或记录 record Route Rejected 相关的业务数据。
+     *
+     * <p>实现会处理 MQ 消息、路由或发送记录，影响异步触发链路。
+     *
+     * @param reason reason 方法执行所需的业务参数
+     * @param tag tag 方法执行所需的业务参数
+     */
     private void recordRouteRejected(String reason, String tag) {
         try {
             metrics.recordMqRouteRejected(reason, tag);
@@ -176,8 +229,20 @@ public class MqTriggerConsumer implements RocketMQListener<MessageExt> {
         }
     }
 
+    /**
+     * 执行 store Rejected 对应的业务逻辑。
+     *
+     * <p>实现会通过持久化层读取或写入数据库记录。
+     *
+     * @param msgId msgId 对应的业务主键或标识
+     * @param tag tag 方法执行所需的业务参数
+     * @param reason reason 方法执行所需的业务参数
+     * @param errorMsg errorMsg 方法执行所需的业务参数
+     * @param body body 请求体、消息体或事件载荷
+     */
     private void storeRejected(String msgId, String tag, String reason, String errorMsg, String body) {
         try {
+            // rejected 表保存原始消息和截断后的错误信息，作为 MQ 消费降级后的可观测出口。
             CanvasMqTriggerRejectedDO rejected = new CanvasMqTriggerRejectedDO();
             rejected.setMsgId(trim(msgId, 255));
             rejected.setTag(trim(tag, 128));
@@ -192,6 +257,15 @@ public class MqTriggerConsumer implements RocketMQListener<MessageExt> {
         }
     }
 
+        /**
+     * 执行 trim 对应的业务逻辑。
+     *
+     * <p>实现会处理 MQ 消息、路由或发送记录，影响异步触发链路。
+     *
+     * @param value value 待写入、比较或转换的业务值
+     * @param maxLength maxLength 方法执行所需的业务参数
+     * @return 转换或查询得到的字符串结果
+     */
     private String trim(String value, int maxLength) {
         if (value == null) {
             return null;
@@ -199,6 +273,14 @@ public class MqTriggerConsumer implements RocketMQListener<MessageExt> {
         return value.length() <= maxLength ? value : value.substring(0, maxLength);
     }
 
+        /**
+     * 执行 trim Alert 对应的业务逻辑。
+     *
+     * <p>实现会处理 MQ 消息、路由或发送记录，影响异步触发链路。
+     *
+     * @param value value 待写入、比较或转换的业务值
+     * @return 转换或查询得到的字符串结果
+     */
     private String trimAlert(String value) {
         if (value == null || value.length() <= ALERT_CONTENT_LIMIT) {
             return value;

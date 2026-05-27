@@ -24,6 +24,7 @@ import java.util.List;
 @RequiredArgsConstructor
 public class TagDefinitionController {
 
+    /** 标签定义服务，用于管理标签元数据。 */
     private final TagDefinitionService tagDefinitionService;
 
     /** 分页查询标签定义。 */
@@ -72,6 +73,15 @@ public class TagDefinitionController {
                 .map(R::ok);
     }
 
+    /**
+     * 处理 create Value 对应的 HTTP 接口请求。
+     *
+     * <p>方法负责接收控制层参数、调用领域服务并封装统一响应。
+     *
+     * @param tagCode tagCode 方法执行所需的业务参数
+     * @param body body 请求体、消息体或事件载荷
+     * @return 异步执行结果，订阅后产生节点结果或业务响应
+     */
     @PostMapping("/{tagCode}/values")
     public Mono<R<TagValueDefinitionDO>> createValue(@PathVariable String tagCode, @RequestBody TagValueDefinitionDO body) {
         return Mono.fromCallable(() -> tagDefinitionService.createValue(tagCode, body))
@@ -79,6 +89,15 @@ public class TagDefinitionController {
                 .map(R::ok);
     }
 
+    /**
+     * 处理 update Value 对应的 HTTP 接口请求。
+     *
+     * <p>方法负责接收控制层参数、调用领域服务并封装统一响应。
+     *
+     * @param id id 对应的业务主键或标识
+     * @param body body 请求体、消息体或事件载荷
+     * @return 异步执行结果，订阅后产生节点结果或业务响应
+     */
     @PutMapping("/values/{id}")
     public Mono<R<Void>> updateValue(@PathVariable Long id, @RequestBody TagValueDefinitionDO body) {
         return Mono.<Void>fromRunnable(() -> tagDefinitionService.updateValue(id, body))
@@ -86,6 +105,14 @@ public class TagDefinitionController {
                 .thenReturn(R.ok());
     }
 
+    /**
+     * 处理 delete Value 对应的 HTTP 接口请求。
+     *
+     * <p>方法负责接收控制层参数、调用领域服务并封装统一响应。
+     *
+     * @param id id 对应的业务主键或标识
+     * @return 异步执行结果，订阅后产生节点结果或业务响应
+     */
     @DeleteMapping("/values/{id}")
     public Mono<R<Void>> deleteValue(@PathVariable Long id) {
         return Mono.<Void>fromRunnable(() -> tagDefinitionService.deleteValue(id))

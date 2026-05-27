@@ -105,8 +105,10 @@ public class ExecutionContext {
     @JsonIgnore
     private final AtomicInteger approxSizeBytes = new AtomicInteger(0);
 
+    /** 上下文估算大小上限，超过后由调用方判断是否中止。 */
     private static final int MAX_SIZE_BYTES  = 1024 * 1024; // 1MB（设计文档 13.7节）
-    private static final int WARN_SIZE_BYTES = 512 * 1024;  // 512KB 预警
+    /** 上下文估算大小预警阈值。 */
+    private static final int WARN_SIZE_BYTES = 512 * 1024; // 512KB 预警
 
     // ── 写入节点输出 ────────────────────────────────────────────
 
@@ -115,7 +117,16 @@ public class ExecutionContext {
         return java.util.Collections.unmodifiableMap(nodeOutputs);
     }
 
+    /**
+     * 写入或记录 put Node Output 相关的业务数据。
+     *
+     * <p>方法会结合入参、当前对象状态和依赖组件完成处理，调用方需关注返回值以及可能产生的状态变更。
+     *
+     * @param nodeId nodeId 对应的业务主键或标识
+     * @param output output 方法执行所需的业务参数
+     */
     public void putNodeOutput(String nodeId, Map<String, Object> output) {
+        // nodeOutputs 保留按节点分组的完整快照，flatContext 提供跨节点字段的快速读取。
         nodeOutputs.put(nodeId, output);
         flatContext.putAll(output);
 
@@ -138,14 +149,31 @@ public class ExecutionContext {
     /** 获取估算大小（字节） */
     public int getApproxSizeBytes() { return approxSizeBytes.get(); }
 
-    // ── 读取上下文字段，O(1) ─────────────────────────────────────
+    /**
+     * 查询或读取 get Context Value 相关的业务数据。
+     *
+     * <p>方法会结合入参、当前对象状态和依赖组件完成处理，调用方需关注返回值以及可能产生的状态变更。
+     *
+     * @param fieldKey fieldKey 对应的缓存键、配置键或业务键
+     * @return 方法执行后的业务结果
+     */
+// ── 读取上下文字段，O(1) ─────────────────────────────────────
 
     public Object getContextValue(String fieldKey) {
         Object val = flatContext.get(fieldKey);
+        // 节点输出优先于触发载荷，允许下游节点读取上游加工后的同名字段。
         return val != null ? val : triggerPayload.get(fieldKey);
     }
 
-    // ── 节点状态 ────────────────────────────────────────────────
+    /**
+     * 执行 set Node Status 对应的业务逻辑。
+     *
+     * <p>方法会结合入参、当前对象状态和依赖组件完成处理，调用方需关注返回值以及可能产生的状态变更。
+     *
+     * @param nodeId nodeId 对应的业务主键或标识
+     * @param status status 状态值或状态筛选条件
+     */
+// ── 节点状态 ────────────────────────────────────────────────
 
     public void setNodeStatus(String nodeId, NodeStatus status) {
         nodeStatuses.put(nodeId, status);
@@ -166,6 +194,7 @@ public class ExecutionContext {
     public boolean setNodeStatusIfNotDone(String nodeId, NodeStatus status) {
         boolean[] updated = {false};
         nodeStatuses.compute(nodeId, (k, current) -> {
+            // 已进入终态的节点不再被 SKIPPED 等状态覆盖，避免并发分支破坏真实执行结果。
             if (!isTerminalStatus(current)) {
                 updated[0] = true;
                 return status;
@@ -175,23 +204,55 @@ public class ExecutionContext {
         return updated[0];
     }
 
+    /**
+     * 判断 is Terminal Status 相关的业务数据。
+     *
+     * <p>方法会结合入参、当前对象状态和依赖组件完成处理，调用方需关注返回值以及可能产生的状态变更。
+     *
+     * @param s s 方法执行所需的业务参数
+     * @return 判断结果，true 表示校验通过或条件成立
+     */
     private static boolean isTerminalStatus(NodeStatus s) {
         return s == NodeStatus.SUCCESS || s == NodeStatus.FAILED
                 || s == NodeStatus.TIMEOUT || s == NodeStatus.SUPPRESSED
                 || s == NodeStatus.SKIPPED || s == NodeStatus.PARTIAL_FAIL;
     }
 
+    /**
+     * 查询或读取 get Node Status 相关的业务数据。
+     *
+     * <p>方法会结合入参、当前对象状态和依赖组件完成处理，调用方需关注返回值以及可能产生的状态变更。
+     *
+     * @param nodeId nodeId 对应的业务主键或标识
+     * @return 方法执行后的业务结果
+     */
     public NodeStatus getNodeStatus(String nodeId) {
         return nodeStatuses.getOrDefault(nodeId, NodeStatus.PENDING);
     }
 
+    /**
+     * 执行 reset Node Status For Reentry 对应的业务逻辑。
+     *
+     * <p>方法会结合入参、当前对象状态和依赖组件完成处理，调用方需关注返回值以及可能产生的状态变更。
+     *
+     * @param nodeId nodeId 对应的业务主键或标识
+     */
     public void resetNodeStatusForReentry(String nodeId) {
         nodeStatuses.computeIfPresent(nodeId, (key, status) ->
+                // 重入只清理可重新执行的非终态/成功态，失败类终态保留给恢复和告警判断。
                 status == NodeStatus.FAILED || status == NodeStatus.TIMEOUT || status == NodeStatus.PARTIAL_FAIL
                         ? status
                         : null);
     }
 
+    /**
+     * 判断 is Node Done 相关的业务数据。
+     *
+     * <p>方法会结合入参、当前对象状态和依赖组件完成处理，调用方需关注返回值以及可能产生的状态变更。
+     *
+     * @param nodeId nodeId 对应的业务主键或标识
+     * @return 判断结果，true 表示校验通过或条件成立
+     */
     public boolean isNodeDone(String nodeId) {
         NodeStatus s = getNodeStatus(nodeId);
         return s == NodeStatus.SUCCESS || s == NodeStatus.FAILED
@@ -199,7 +260,15 @@ public class ExecutionContext {
                 || s == NodeStatus.SKIPPED || s == NodeStatus.PARTIAL_FAIL;
     }
 
-    // ── 每节点并发锁（懒建，不序列化） ─────────────────────────────
+    /**
+     * 查询或读取 get Gate 相关的业务数据。
+     *
+     * <p>方法会结合入参、当前对象状态和依赖组件完成处理，调用方需关注返回值以及可能产生的状态变更。
+     *
+     * @param nodeId nodeId 对应的业务主键或标识
+     * @return 方法执行后的业务结果
+     */
+// ── 每节点并发锁（懒建，不序列化） ─────────────────────────────
 
     /** 获取节点执行门控，不存在时懒建（恢复执行后首次访问时自动创建）。 */
     public NodeGate getGate(String nodeId) {

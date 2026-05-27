@@ -51,12 +51,19 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class AudienceController {
 
+    /** 人群定义 Mapper，用于读写人群定义。 */
     private final AudienceDefinitionMapper definitionMapper;
+    /** 人群统计 Mapper，用于读取人群统计。 */
     private final AudienceStatMapper statMapper;
+    /** 人群批量计算服务，用于触发人群计算。 */
     private final AudienceBatchComputeService computeService;
+    /** 人群调度服务，用于维护定时计算计划。 */
     private final AudienceSchedulerService schedulerService;
+    /** 异步任务服务，用于登记和查询人群计算任务。 */
     private final AsyncTaskService taskService;
+    /** 人群计算任务执行器，用于运行后台计算。 */
     private final AudienceComputeTaskRunner computeTaskRunner;
+    /** 通知服务，用于发送人群任务通知。 */
     private final NotificationService notificationService;
 
     /** 分页查询人群定义。 */
@@ -158,6 +165,14 @@ public class AudienceController {
                 }).subscribeOn(Schedulers.boundedElastic()));
     }
 
+    /**
+     * 计算或统计 compute 相关的业务数据。
+     *
+     * <p>返回值采用 Reactor 异步模型，调用方可继续组合后续处理。
+     *
+     * @param id id 对应的业务主键或标识
+     * @return 异步执行结果，订阅后产生节点结果或业务响应
+     */
     public Mono<R<ComputeTaskResp>> compute(Long id) {
         return compute(id, null);
     }
@@ -169,6 +184,15 @@ public class AudienceController {
                 .subscribeOn(Schedulers.boundedElastic());
     }
 
+    /**
+     * 执行 enqueue Compute 对应的业务逻辑。
+     *
+     * <p>方法会结合入参、当前对象状态和依赖组件完成处理，调用方需关注返回值以及可能产生的状态变更。
+     *
+     * @param definition definition 方法执行所需的业务参数
+     * @param operator operator 操作人标识
+     * @return 方法执行后的业务结果
+     */
     private ComputeTaskResp enqueueCompute(AudienceDefinitionDO definition, String operator) {
         String audienceId = String.valueOf(definition.getId());
         String displayName = displayName(definition);
@@ -187,6 +211,16 @@ public class AudienceController {
         return new ComputeTaskResp(taskId, result.task().getStatus());
     }
 
+        /**
+     * 创建或新增 create Catch Up Notification If Terminal 相关的业务数据。
+     *
+     * <p>实现会处理 MQ 消息、路由或发送记录，影响异步触发链路。
+     *
+     * @param task task 方法执行所需的业务参数
+     * @param audienceId audienceId 对应的业务主键或标识
+     * @param displayName displayName 方法执行所需的业务参数
+     * @param operator operator 操作人标识
+     */
     private void createCatchUpNotificationIfTerminal(AsyncTaskDO task, Long audienceId, String displayName, String operator) {
         if (task == null || !isTerminal(task.getStatus())) {
             return;
@@ -210,12 +244,27 @@ public class AudienceController {
         }
     }
 
+    /**
+     * 判断 is Terminal 相关的业务数据。
+     *
+     * <p>方法会结合入参、当前对象状态和依赖组件完成处理，调用方需关注返回值以及可能产生的状态变更。
+     *
+     * @param status status 状态值或状态筛选条件
+     * @return 判断结果，true 表示校验通过或条件成立
+     */
     private boolean isTerminal(String status) {
         return AsyncTaskStatus.SUCCEEDED.name().equals(status)
                 || AsyncTaskStatus.FAILED.name().equals(status)
                 || AsyncTaskStatus.CANCELED.name().equals(status);
     }
 
+    /**
+     * 执行 current User 对应的业务逻辑。
+     *
+     * <p>返回值采用 Reactor 异步模型，调用方可继续组合后续处理。
+     *
+     * @return 异步执行结果，订阅后产生节点结果或业务响应
+     */
     private Mono<String> currentUser() {
         return ReactiveSecurityContextHolder.getContext()
                 .map(ctx -> {
@@ -228,18 +277,52 @@ public class AudienceController {
                 .defaultIfEmpty("system");
     }
 
+    /**
+     * 执行 display Name 对应的业务逻辑。
+     *
+     * <p>方法会结合入参、当前对象状态和依赖组件完成处理，调用方需关注返回值以及可能产生的状态变更。
+     *
+     * @param definition definition 方法执行所需的业务参数
+     * @return 转换或查询得到的字符串结果
+     */
     private String displayName(AudienceDefinitionDO definition) {
         return defaultIfBlank(definition.getName(), "人群 " + definition.getId());
     }
 
+    /**
+     * 执行 default If Blank 对应的业务逻辑。
+     *
+     * <p>方法会结合入参、当前对象状态和依赖组件完成处理，调用方需关注返回值以及可能产生的状态变更。
+     *
+     * @param value value 待写入、比较或转换的业务值
+     * @param fallback fallback 方法执行所需的业务参数
+     * @return 转换或查询得到的字符串结果
+     */
     private String defaultIfBlank(String value, String fallback) {
         return value == null || value.isBlank() ? fallback : value;
     }
 
+    /**
+     * 执行 perf Task Id 对应的业务逻辑。
+     *
+     * <p>方法会结合入参、当前对象状态和依赖组件完成处理，调用方需关注返回值以及可能产生的状态变更。
+     *
+     * @param perfRunId perfRunId 对应的业务主键或标识
+     * @param perfInputId perfInputId 对应的业务主键或标识
+     * @return 转换或查询得到的字符串结果
+     */
     private String perfTaskId(String perfRunId, String perfInputId) {
         return "perf:" + defaultIfBlank(perfInputId, perfRunId);
     }
 
+    /**
+     * 执行 extract Perf Run Id 对应的业务逻辑。
+     *
+     * <p>方法会结合入参、当前对象状态和依赖组件完成处理，调用方需关注返回值以及可能产生的状态变更。
+     *
+     * @param req 请求对象，承载调用方提交的业务参数
+     * @return 转换或查询得到的字符串结果
+     */
     private String extractPerfRunId(ComputeReq req) {
         if (req == null) {
             return null;
@@ -251,7 +334,9 @@ public class AudienceController {
 
     @Data
     static class ComputeReq {
+        /** 压测运行 ID。 */
         private String perfRunId;
+        /** 压测输入 ID。 */
         private String perfInputId;
     }
 }

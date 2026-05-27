@@ -7,7 +7,9 @@ package org.chovy.canvas.dto.notification;
  * <p>该类型应保持轻量，只表达字段语义和序列化边界，不放入复杂业务流程。
  */
 public record NotificationWebSocketTicketDTO(
+        /** WebSocket 连接票据。 */
         String ticket,
+        /** 票据有效期，单位秒。 */
         int expiresInSeconds
 ) {
 }

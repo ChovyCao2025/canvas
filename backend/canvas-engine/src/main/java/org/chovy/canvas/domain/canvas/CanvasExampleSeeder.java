@@ -30,14 +30,27 @@ import org.chovy.canvas.dal.mapper.CanvasVersionMapper;
 @RequiredArgsConstructor
 public class CanvasExampleSeeder implements ApplicationRunner {
 
+    /** 官方示例导入时写入的创建人标识。 */
     static final String CREATED_BY = "example-seed";
 
+    /** 画布模板 Mapper，用于读取启用的官方模板。 */
     private final CanvasTemplateMapper templateMapper;
+    /** 画布 Mapper，用于幂等创建示例画布。 */
     private final CanvasMapper canvasMapper;
+    /** 画布版本 Mapper，用于写入示例的初始草稿版本。 */
     private final CanvasVersionMapper canvasVersionMapper;
+    /** Jackson ObjectMapper，用于校验模板 graphJson 是否可解析。 */
     private final ObjectMapper objectMapper;
+    /** 示例画布配置属性，控制启动导入开关。 */
     private final CanvasExamplesProperties properties;
 
+    /**
+     * 执行 run 对应的业务逻辑。
+     *
+     * <p>该方法在事务边界内执行，确保相关数据库写入保持一致。
+     *
+     * @param args args 方法执行所需的业务参数
+     */
     @Override
     @Transactional
     public void run(ApplicationArguments args) {
@@ -46,6 +59,7 @@ public class CanvasExampleSeeder implements ApplicationRunner {
             return;
         }
 
+        // 启动时只导入启用的官方模板，后续按 sourceTemplateKey 做幂等保护。
         List<CanvasTemplateDO> templates = templateMapper.selectList(
                 new LambdaQueryWrapper<CanvasTemplateDO>()
                         .eq(CanvasTemplateDO::getIsOfficial, 1)
@@ -59,6 +73,13 @@ public class CanvasExampleSeeder implements ApplicationRunner {
         }
     }
 
+    /**
+     * 执行 import Template 对应的业务逻辑。
+     *
+     * <p>实现会通过持久化层读取或写入数据库记录。
+     *
+     * @param template template 方法执行所需的业务参数
+     */
     private void importTemplate(CanvasTemplateDO template) {
         if (!isValidGraph(template)) {
             log.warn("Skip official canvas example template {} because graph_json is invalid.",
@@ -72,6 +93,7 @@ public class CanvasExampleSeeder implements ApplicationRunner {
                         .last("LIMIT 1")
         );
         if (existing != null) {
+            // 已导入过的官方模板不再覆盖，避免启动任务改写用户可能已查看或复制的示例数据。
             return;
         }
 
@@ -84,6 +106,7 @@ public class CanvasExampleSeeder implements ApplicationRunner {
         canvas.setSourceTemplateKey(template.getTemplateKey());
         canvasMapper.insert(canvas);
 
+        // 示例仅创建草稿版本，不注册触发路由，也不进入发布态执行链路。
         CanvasVersionDO version = new CanvasVersionDO();
         version.setCanvasId(canvas.getId());
         version.setVersion(1);
@@ -93,6 +116,14 @@ public class CanvasExampleSeeder implements ApplicationRunner {
         canvasVersionMapper.insert(version);
     }
 
+    /**
+     * 判断 is Valid Graph 相关的业务数据。
+     *
+     * <p>方法会结合入参、当前对象状态和依赖组件完成处理，调用方需关注返回值以及可能产生的状态变更。
+     *
+     * @param template template 方法执行所需的业务参数
+     * @return 判断结果，true 表示校验通过或条件成立
+     */
     private boolean isValidGraph(CanvasTemplateDO template) {
         try {
             objectMapper.readTree(template.getGraphJson());

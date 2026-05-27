@@ -34,6 +34,15 @@ public class TaggerHandler implements NodeHandler {
     /** 人群 bitmap 查询能力（audience 模式）。 */
     private final AudienceBitmapStore   audienceBitmapStore;
 
+    /**
+     * 构造 TaggerHandler 实例，并根据入参初始化依赖、配置或内部状态。
+     *
+     * <p>执行过程中会根据节点配置和上下文决定成功、失败或下一跳路由。
+     *
+     * @param offlineHandler offlineHandler 方法执行所需的业务参数
+     * @param realtimeHandler realtimeHandler 时间、过期时间或持续时长参数
+     * @param audienceBitmapStore audienceBitmapStore 方法执行所需的业务参数
+     */
     @Autowired
     public TaggerHandler(TaggerOfflineHandler offlineHandler,
                          TaggerRealtimeHandler realtimeHandler,
@@ -43,6 +52,15 @@ public class TaggerHandler implements NodeHandler {
         this.audienceBitmapStore = audienceBitmapStore;
     }
 
+    /**
+     * 执行当前节点或服务的核心处理流程。
+     *
+     * <p>执行过程中会根据节点配置和上下文决定成功、失败或下一跳路由。
+     *
+     * @param config 节点配置或业务配置，方法会从中读取执行参数
+     * @param ctx 执行上下文，提供当前画布、用户和节点运行态数据
+     * @return 异步执行结果，订阅后产生节点结果或业务响应
+     */
     @Override
     public Mono<NodeResult> executeAsync(Map<String, Object> config, ExecutionContext ctx) {
         // mode 默认为 offline，保持历史节点配置兼容
@@ -57,6 +75,15 @@ public class TaggerHandler implements NodeHandler {
         return offlineHandler.executeAsync(config, ctx);
     }
 
+    /**
+     * 执行 handle Audience Mode 对应的业务逻辑。
+     *
+     * <p>执行过程中会根据节点配置和上下文决定成功、失败或下一跳路由。
+     *
+     * @param config 节点配置或业务配置，方法会从中读取执行参数
+     * @param ctx 执行上下文，提供当前画布、用户和节点运行态数据
+     * @return 异步执行结果，订阅后产生节点结果或业务响应
+     */
     private Mono<NodeResult> handleAudienceMode(Map<String, Object> config, ExecutionContext ctx) {
         // audience 模式要求配置 audienceId
         Object audienceIdRaw = config.get(MapFieldKeys.AUDIENCE_ID);

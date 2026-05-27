@@ -22,6 +22,15 @@ import java.time.Duration;
  */
 @Configuration
 public class CacheConfig {
+    /**
+     * 创建并注册 canvas Config Graph Json Cache 相关的 Spring Bean。
+     *
+     * <p>实现会通过持久化层读取或写入数据库记录。
+     *
+     * @param manager manager 方法执行所需的业务参数
+     * @param mapper mapper 方法执行所需的业务参数
+     * @return 方法执行后的业务结果
+     */
     @Bean("canvasConfigGraphJsonCache")
     TieredCache<Long, String> canvasConfigGraphJsonCache(TieredCacheManager manager,
                                                          CanvasVersionMapper mapper) {
@@ -40,6 +49,7 @@ public class CacheConfig {
                 .refreshAhead(Duration.ofHours(1))
                 .staleTtl(Duration.ofHours(6))
                 .loader(versionId -> {
+                    // 缓存回源时必须读取完整 graphJson，归档清空后的版本不能再参与执行。
                     var version = mapper.selectById(versionId);
                     if (version == null) {
                         throw new IllegalArgumentException("版本不存在: " + versionId);
@@ -53,6 +63,15 @@ public class CacheConfig {
                 .build(manager);
     }
 
+    /**
+     * 创建并注册 canvas Entity Cache 相关的 Spring Bean。
+     *
+     * <p>实现会通过持久化层读取或写入数据库记录。
+     *
+     * @param manager manager 方法执行所需的业务参数
+     * @param mapper mapper 方法执行所需的业务参数
+     * @return 方法执行后的业务结果
+     */
     @Bean("canvasEntityTieredCache")
     TieredCache<Long, CanvasDO> canvasEntityCache(TieredCacheManager manager,
                                                 CanvasMapper mapper) {

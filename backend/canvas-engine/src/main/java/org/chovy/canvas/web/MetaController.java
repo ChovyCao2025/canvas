@@ -41,17 +41,28 @@ import org.chovy.canvas.dto.StubOption;
 @RequiredArgsConstructor
 public class MetaController {
 
+    /** 元数据服务，用于查询节点类型和数据源元信息。 */
     private final MetaService metaService;
+    /** API 定义 Mapper，用于提供 API 节点配置选项。 */
     private final ApiDefinitionMapper apiDefinitionMapper;
+    /** AB 实验 Mapper，用于提供 AB 节点配置选项。 */
     private final AbExperimentMapper abExperimentMapper;
+    /** 标签定义服务，用于提供标签节点配置选项。 */
     private final TagDefinitionService tagDefinitionService;
+    /** MQ 消息定义 Mapper，用于提供 MQ 节点配置选项。 */
     private final MqMessageDefinitionMapper mqMapper;
+    /** 事件定义 Mapper，用于提供事件触发配置选项。 */
     private final EventDefinitionMapper eventDefinitionMapper;
+    /** 身份类型服务，用于提供身份字段配置选项。 */
     private final IdentityTypeService identityTypeService;
+    /** JSON 转换器，用于解析节点参数 schema。 */
     private final ObjectMapper objectMapper;
+    /** 系统选项服务，用于读取枚举类配置。 */
     private final SystemOptionService systemOptionService;
+    /** AB 实验分组服务，用于查询实验分组选项。 */
     private final AbExperimentGroupService abExperimentGroupService;
 
+    /** 标签服务地址，用于生成外部标签查询配置。 */
     @Value("${canvas.integration.tagger-service-url}")
     private String taggerUrl;
 
@@ -92,6 +103,14 @@ public class MetaController {
                 .map(R::ok);
     }
 
+    /**
+     * 处理 get Options 对应的 HTTP 接口请求。
+     *
+     * <p>方法负责接收控制层参数、调用领域服务并封装统一响应。
+     *
+     * @param category category 方法执行所需的业务参数
+     * @return 异步执行结果，订阅后产生节点结果或业务响应
+     */
     @GetMapping("/options")
     public Mono<R<List<StubOption>>> getOptions(@RequestParam String category) {
         return Mono.fromCallable(() -> systemOptionService.activeOptions(category))
@@ -99,10 +118,19 @@ public class MetaController {
                 .map(R::ok);
     }
 
+    /**
+     * 处理 get Options Batch 对应的 HTTP 接口请求。
+     *
+     * <p>方法负责接收控制层参数、调用领域服务并封装统一响应。
+     *
+     * @param categories categories 方法执行所需的业务参数
+     * @return 异步执行结果，订阅后产生节点结果或业务响应
+     */
     @GetMapping("/options/batch")
     public Mono<R<Map<String, List<StubOption>>>> getOptionsBatch(@RequestParam List<String> categories) {
         return Mono.fromCallable(() -> categories.stream()
                         .distinct()
+                        // 去重后按传入顺序返回，前端可一次加载多个下拉配置。
                         .collect(Collectors.toMap(
                                 category -> category,
                                 systemOptionService::activeOptions,
@@ -246,6 +274,7 @@ public class MetaController {
             @RequestParam(defaultValue = "offline") String type) {
         // 优先从 tag_definition 表读取（管理员自定义标签）
         return Mono.fromCallable(() -> {
+                    // 本地标签表有数据时直接返回，避免每次打开配置面板都依赖外部 Tagger 服务。
                     List<org.chovy.canvas.dal.dataobject.TagDefinitionDO> defs =
                             tagDefinitionService.list(type, 1);
                     if (!defs.isEmpty()) {
@@ -258,6 +287,7 @@ public class MetaController {
                 .flatMap(dbList -> {
                     if (dbList != null) return Mono.just(R.ok(dbList));
                     // fallback: 调 Tagger 服务
+                    // 外部服务失败时降级为空列表，保持元数据页面可用。
                     return WebClient.builder().baseUrl(taggerUrl).build()
                             .get()
                             .uri(u -> u.path("/tags").queryParam("type", type).build())
@@ -275,6 +305,14 @@ public class MetaController {
                 });
     }
 
+    /**
+     * 处理 get Tagger Tag Values 对应的 HTTP 接口请求。
+     *
+     * <p>方法负责接收控制层参数、调用领域服务并封装统一响应。
+     *
+     * @param tagCode tagCode 方法执行所需的业务参数
+     * @return 异步执行结果，订阅后产生节点结果或业务响应
+     */
     @GetMapping("/tagger-tag-values")
     public Mono<R<List<StubOption>>> getTaggerTagValues(@RequestParam String tagCode) {
         return Mono.fromCallable(() -> tagDefinitionService.listValues(tagCode, 1).stream()
@@ -378,6 +416,7 @@ public class MetaController {
                 for (EventDefinitionDO evt : events) {
                     if (evt.getAttributes() == null) continue;
                     try {
+                        // 事件属性 schema 是 JSON 数组，解析失败时跳过该事件，不影响其他字段推导。
                         List<Map<String, Object>> attrs =
                                 objectMapper.readValue(evt.getAttributes(), List.class);
                         for (Map<String, Object> a : attrs) {
@@ -407,6 +446,7 @@ public class MetaController {
                             && !outputPrefixes.get(i).isBlank())
                             ? outputPrefixes.get(i) + "." : "";
                     try {
+                        // API response_schema 结合 outputPrefix 生成可在后续节点引用的扁平字段名。
                         List<Map<String, Object>> schema =
                                 objectMapper.readValue(def.getResponseSchema(), List.class);
                         for (Map<String, Object> f : schema) {
@@ -424,6 +464,17 @@ public class MetaController {
         }).subscribeOn(Schedulers.boundedElastic()).map(R::ok);
     }
 
+    /**
+     * 执行 field 对应的业务逻辑。
+     *
+     * <p>方法会结合入参、当前对象状态和依赖组件完成处理，调用方需关注返回值以及可能产生的状态变更。
+     *
+     * @param key key 对应的缓存键、配置键或业务键
+     * @param name name 方法执行所需的业务参数
+     * @param type type 类型标识或分类条件
+     * @param source source 方法执行所需的业务参数
+     * @return 方法执行后的业务结果
+     */
     private static ContextFieldDO field(String key, String name, String type, String source) {
         ContextFieldDO f = new ContextFieldDO();
         f.setFieldKey(key);
@@ -433,6 +484,14 @@ public class MetaController {
         return f;
     }
 
+    /**
+     * 执行 str 对应的业务逻辑。
+     *
+     * <p>方法会结合入参、当前对象状态和依赖组件完成处理，调用方需关注返回值以及可能产生的状态变更。
+     *
+     * @param o o 方法执行所需的业务参数
+     * @return 转换或查询得到的字符串结果
+     */
     private static String str(Object o) {
         return o == null ? "" : String.valueOf(o);
     }

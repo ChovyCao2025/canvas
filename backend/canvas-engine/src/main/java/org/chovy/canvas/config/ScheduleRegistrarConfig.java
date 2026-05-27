@@ -15,6 +15,13 @@ import org.springframework.scheduling.concurrent.ThreadPoolTaskScheduler;
 @Configuration
 public class ScheduleRegistrarConfig {
 
+    /**
+     * 创建并注册 task Scheduler 相关的 Spring Bean。
+     *
+     * <p>该方法在应用启动时由 Spring 容器调用，用于装配运行依赖。
+     *
+     * @return 方法执行后的业务结果
+     */
     @Bean
     @ConditionalOnMissingBean(TaskScheduler.class)
     public TaskScheduler taskScheduler() {

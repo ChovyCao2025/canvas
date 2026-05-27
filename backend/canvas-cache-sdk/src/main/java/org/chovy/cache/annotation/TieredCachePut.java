@@ -16,9 +16,30 @@ import java.lang.annotation.Target;
 @Retention(RetentionPolicy.RUNTIME)
 @Documented
 public @interface TieredCachePut {
+    /**
+     * 返回 TieredCachePut 的 name 配置值。
+     *
+     * <p>方法会结合入参、当前对象状态和依赖组件完成处理，调用方需关注返回值以及可能产生的状态变更。
+     *
+     * @return 转换或查询得到的字符串结果
+     */
     String name();
 
+    /**
+     * 返回 TieredCachePut 的 key 配置值。
+     *
+     * <p>方法会结合入参、当前对象状态和依赖组件完成处理，调用方需关注返回值以及可能产生的状态变更。
+     *
+     * @return 转换或查询得到的字符串结果
+     */
     String key();
 
+    /**
+     * 执行 after Commit 对应的业务逻辑。
+     *
+     * <p>方法会结合入参、当前对象状态和依赖组件完成处理，调用方需关注返回值以及可能产生的状态变更。
+     *
+     * @return 判断结果，true 表示校验通过或条件成立
+     */
     boolean afterCommit() default true;
 }

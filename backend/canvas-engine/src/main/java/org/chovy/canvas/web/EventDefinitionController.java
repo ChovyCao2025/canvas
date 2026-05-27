@@ -31,8 +31,11 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class EventDefinitionController {
 
+    /** 事件定义 Mapper，用于读写事件定义。 */
     private final EventDefinitionMapper eventMapper;
+    /** 事件定义缓存服务，用于刷新事件路由缓存。 */
     private final EventDefinitionCacheService eventDefinitionCacheService;
+    /** 事件定义服务，用于处理事件定义业务校验。 */
     private final EventDefinitionService eventDefinitionService;
 
 
@@ -52,6 +55,14 @@ public class EventDefinitionController {
         }).subscribeOn(Schedulers.boundedElastic());
     }
 
+    /**
+     * 处理 create 对应的 HTTP 接口请求。
+     *
+     * <p>方法负责接收控制层参数、调用领域服务并封装统一响应。
+     *
+     * @param body body 请求体、消息体或事件载荷
+     * @return 异步执行结果，订阅后产生节点结果或业务响应
+     */
     @PostMapping("/event-definitions")
     public Mono<R<EventDefinitionDO>> create(@RequestBody EventDefinitionDO body) {
         return Mono.fromCallable(() -> {
@@ -61,6 +72,15 @@ public class EventDefinitionController {
                 .subscribeOn(Schedulers.boundedElastic());
     }
 
+    /**
+     * 处理 update 对应的 HTTP 接口请求。
+     *
+     * <p>方法负责接收控制层参数、调用领域服务并封装统一响应。
+     *
+     * @param id id 对应的业务主键或标识
+     * @param body body 请求体、消息体或事件载荷
+     * @return 异步执行结果，订阅后产生节点结果或业务响应
+     */
     @PutMapping("/event-definitions/{id}")
     public Mono<R<Void>> update(@PathVariable Long id, @RequestBody EventDefinitionDO body) {
         body.setId(id);
@@ -74,6 +94,14 @@ public class EventDefinitionController {
                 .subscribeOn(Schedulers.boundedElastic());
     }
 
+    /**
+     * 处理 delete 对应的 HTTP 接口请求。
+     *
+     * <p>方法负责接收控制层参数、调用领域服务并封装统一响应。
+     *
+     * @param id id 对应的业务主键或标识
+     * @return 异步执行结果，订阅后产生节点结果或业务响应
+     */
     @DeleteMapping("/event-definitions/{id}")
     public Mono<R<Void>> delete(@PathVariable Long id) {
         return Mono.<R<Void>>fromRunnable(() -> eventMapper.deleteById(id))
@@ -81,7 +109,15 @@ public class EventDefinitionController {
                 .then(Mono.just(R.ok()));
     }
 
-    // ── 事件上报 ─────────────────────────────────────────────────
+    /**
+     * 处理 report Event 对应的 HTTP 接口请求。
+     *
+     * <p>方法负责接收控制层参数、调用领域服务并封装统一响应。
+     *
+     * @param req 请求对象，承载调用方提交的业务参数
+     * @return 异步执行结果，订阅后产生节点结果或业务响应
+     */
+// ── 事件上报 ─────────────────────────────────────────────────
 
     /**
      * 事件上报接口。业务方调用此接口，系统存储事件并异步触发对应画布。

@@ -9,8 +9,12 @@ import java.util.List;
  * <p>该类型应保持轻量，只表达字段语义和序列化边界，不放入复杂业务流程。
  */
 public record CanvasUserDetailDTO(
+        /** CDP 内部统一用户 ID。 */
         String userId,
+        /** 用户基础画像信息。 */
         CdpUserDetailDTO profile,
+        /** 用户当前生效标签列表。 */
         List<CdpUserTagDTO> tags,
+        /** 用户参与过的画布汇总列表。 */
         List<CdpUserCanvasSummaryDTO> canvasRows
 ) {}

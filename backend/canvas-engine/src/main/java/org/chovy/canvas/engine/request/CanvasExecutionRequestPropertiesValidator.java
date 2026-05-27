@@ -13,15 +13,25 @@ import org.springframework.stereotype.Component;
 @Component
 public class CanvasExecutionRequestPropertiesValidator {
 
+    /** 每轮执行请求派发批量。 */
     private final int dispatchBatchSize;
+    /** 执行请求派发定时任务间隔毫秒数。 */
     private final long dispatchFixedDelayMs;
+    /** 执行请求初始重试延迟毫秒数。 */
     private final long retryDelayMs;
+    /** 执行请求最大尝试次数。 */
     private final int maxAttempts;
+    /** RUNNING 请求陈旧判定秒数。 */
     private final long runningStaleSeconds;
+    /** 指数退避重试最大延迟毫秒数。 */
     private final long maxRetryDelayMs;
+    /** RUNNING 请求心跳刷新间隔毫秒数。 */
     private final long heartbeatIntervalMs;
+    /** 单画布单轮派发上限，0 表示不限制。 */
     private final int perCanvasBatchLimit;
+    /** 单条重放每分钟限额，0 表示不限制。 */
     private final int replaySinglePerMinute;
+    /** 批量重放请求每分钟限额，0 表示不限制。 */
     private final int replayBatchRequestsPerMinute;
 
     public CanvasExecutionRequestPropertiesValidator(
@@ -47,6 +57,11 @@ public class CanvasExecutionRequestPropertiesValidator {
         this.replayBatchRequestsPerMinute = replayBatchRequestsPerMinute;
     }
 
+    /**
+     * 校验 validate 相关的业务数据。
+     *
+     * <p>方法会结合入参、当前对象状态和依赖组件完成处理，调用方需关注返回值以及可能产生的状态变更。
+     */
     @PostConstruct
     public void validate() {
         requirePositive("dispatch-batch-size", dispatchBatchSize);
@@ -63,6 +78,7 @@ public class CanvasExecutionRequestPropertiesValidator {
                             + "canvas.execution-request.retry-delay-ms");
         }
         long runningStaleMs = runningStaleSeconds * 1000L;
+        // 心跳刷新必须快于 stale 判定窗口，否则 RUNNING 请求会被误判为超时。
         if (heartbeatIntervalMs >= runningStaleMs) {
             throw new IllegalStateException(
                     "canvas.execution-request.heartbeat-interval-ms must be smaller than "
@@ -82,6 +98,14 @@ public class CanvasExecutionRequestPropertiesValidator {
         }
     }
 
+    /**
+     * 执行 require Positive 对应的业务逻辑。
+     *
+     * <p>方法会结合入参、当前对象状态和依赖组件完成处理，调用方需关注返回值以及可能产生的状态变更。
+     *
+     * @param property property 方法执行所需的业务参数
+     * @param value value 待写入、比较或转换的业务值
+     */
     private void requirePositive(String property, long value) {
         if (value <= 0) {
             throw new IllegalStateException("canvas.execution-request." + property + " must be greater than 0");

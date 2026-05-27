@@ -58,6 +58,7 @@ public class CdpTagService {
         if (expiresAt == null && def.getDefaultTtlDays() != null) {
             expiresAt = now.plusDays(def.getDefaultTtlDays());
         }
+        // 先写历史表占用幂等键，重复请求直接短路，避免当前标签被重复覆盖。
         boolean reserved = writeHistory(normalizedUserId, tagCode, oldValue, value, "SET", sourceType,
                 req.sourceRefId(), req.idempotencyKey(), req.reason(), req.operator());
         if (!reserved) {
@@ -66,6 +67,7 @@ public class CdpTagService {
                     .eq(CdpUserTagDO::getTagCode, tagCode));
         }
 
+        // 标签写入前补齐用户主档，保证用户标签表不会出现孤立 userId。
         userService.ensureUser(normalizedUserId, sourceType, req.sourceRefId());
 
         CdpUserTagDO tag = existing != null ? existing : new CdpUserTagDO();
@@ -82,6 +84,7 @@ public class CdpTagService {
         if (existing == null) {
             userTagMapper.insert(tag);
         } else {
+            // 当前标签表只保留最新生效值，完整变更轨迹已经由历史表承载。
             userTagMapper.updateById(tag);
         }
 
@@ -165,6 +168,7 @@ public class CdpTagService {
             if (idempotencyKey == null || idempotencyKey.isBlank()) {
                 throw duplicate;
             }
+            // 唯一键冲突且存在幂等键时表示同一来源请求已处理过，调用方复用当前标签状态。
             return false;
         }
     }

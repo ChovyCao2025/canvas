@@ -34,13 +34,27 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class ManualApprovalHandler implements NodeHandler {
 
+    /** 人工审批记录访问器，用于创建和查询审批挂起记录。 */
     private final CanvasManualApprovalMapper approvalMapper;
+
+    /** JSON 序列化器，用于保存审批人等结构化配置。 */
     private final ObjectMapper objectMapper;
+
+    /** 通知事件服务，用于发送待审批提醒。 */
     private final NotificationEventService notificationEventService;
 
     /** ctx 中审批结果的 key */
     public static final String APPROVAL_RESULT_KEY = "__approval_result_";
 
+    /**
+     * 执行当前节点或服务的核心处理流程。
+     *
+     * <p>执行过程中会根据节点配置和上下文决定成功、失败或下一跳路由。
+     *
+     * @param config 节点配置或业务配置，方法会从中读取执行参数
+     * @param ctx 执行上下文，提供当前画布、用户和节点运行态数据
+     * @return 异步执行结果，订阅后产生节点结果或业务响应
+     */
     @Override
     @SuppressWarnings("unchecked")
     public Mono<NodeResult> executeAsync(Map<String, Object> config, ExecutionContext ctx) {
@@ -56,10 +70,12 @@ public class ManualApprovalHandler implements NodeHandler {
         // 检查是否已经有审批结果（审批/拒绝 API 写入 ctx 后再次触发）
         Object result = ctx.getContextValue(resultKey);
         if (ApprovalStatus.APPROVED.equals(result)) {
+            // 审批 API 写入通过结果后再次进入节点，直接路由到 approve 分支。
             log.info("[MANUAL_APPROVAL] 审批通过 approvalId={}", approvalId);
             return Mono.just(NodeResult.ok(approveNodeId, Map.of()));
         }
         if (ApprovalStatus.REJECTED.equals(result)) {
+            // 拒绝时优先走配置的 reject 分支；未配置则按业务失败处理。
             log.info("[MANUAL_APPROVAL] 审批拒绝 approvalId={}", approvalId);
             return approveNodeId != null
                     ? Mono.just(NodeResult.ok(rejectNodeId, Map.of()))
@@ -84,6 +100,7 @@ public class ManualApprovalHandler implements NodeHandler {
             approvalMapper.insert(approval);
             log.info("[MANUAL_APPROVAL] 创建审批 approvalId={} approvers={} timeout={}h",
                     approvalId, approvers, timeoutHours);
+            // 审批记录落库后再发送待办通知，通知失败不会改变已挂起的审批状态。
             notificationEventService.approvalPending(approval, approvers);
         } catch (Exception e) {
             log.error("[MANUAL_APPROVAL] 创建审批记录失败: {}", e.getMessage());
@@ -93,6 +110,14 @@ public class ManualApprovalHandler implements NodeHandler {
         return Mono.just(NodeResult.pending(null, "MANUAL_APPROVAL_PENDING", "等待人工审批"));
     }
 
+    /**
+     * 执行 extract Node Id 对应的业务逻辑。
+     *
+     * <p>执行过程中会根据节点配置和上下文决定成功、失败或下一跳路由。
+     *
+     * @param config 节点配置或业务配置，方法会从中读取执行参数
+     * @return 转换或查询得到的字符串结果
+     */
     private String extractNodeId(Map<String, Object> config) {
         Object id = config.get(MapFieldKeys.NODE_ID_INTERNAL);
         if (id == null) {

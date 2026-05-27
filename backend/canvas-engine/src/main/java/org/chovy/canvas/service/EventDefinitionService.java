@@ -12,5 +12,13 @@ import java.util.Map;
  */
 public interface EventDefinitionService {
 
+    /**
+     * 执行 do Report Event 对应的业务逻辑。
+     *
+     * <p>方法会结合入参、当前对象状态和依赖组件完成处理，调用方需关注返回值以及可能产生的状态变更。
+     *
+     * @param req 请求对象，承载调用方提交的业务参数
+     * @return 按业务键组织的映射结果
+     */
     Map<String, Object> doReportEvent(EventReportReq req);
 }

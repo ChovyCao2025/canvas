@@ -11,9 +11,18 @@ import lombok.Data;
 @Data
 public class TagImportResult {
 
+    /** 标签导入批次 ID，对应 tag_import_batch.id。 */
     private Long batchId;
+
+    /** 批次最终状态：SUCCESS、FAILED 或 PARTIAL_SUCCESS。 */
     private String status;
+
+    /** 本次导入提交的总行数。 */
     private Integer totalRows;
+
+    /** 校验通过并成功写入的行数。 */
     private Integer successRows;
+
+    /** 校验失败或写入失败的行数。 */
     private Integer failedRows;
 }

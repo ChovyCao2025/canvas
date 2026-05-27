@@ -33,12 +33,25 @@ import java.util.Map;
 @NodeHandlerType("SEND_MQ")
 public class SendMqHandler implements NodeHandler {
 
+    /** RocketMQ 发送模板，用于投递画布触发消息。 */
     private final RocketMQTemplate rocketMQTemplate;
+
+    /** MQ 消息定义访问器，用于按消息编码查找启用定义。 */
     private final MqMessageDefinitionMapper mqMapper;
 
+    /** RocketMQ 画布触发消息 Topic。 */
     @Value("${canvas.mq.topic:CANVAS_MQ_TRIGGER}")
     private String mqTopic;
 
+    /**
+     * 执行当前节点或服务的核心处理流程。
+     *
+     * <p>执行过程中会根据节点配置和上下文决定成功、失败或下一跳路由。
+     *
+     * @param config 节点配置或业务配置，方法会从中读取执行参数
+     * @param ctx 执行上下文，提供当前画布、用户和节点运行态数据
+     * @return 异步执行结果，订阅后产生节点结果或业务响应
+     */
     @Override
     public Mono<NodeResult> executeAsync(Map<String, Object> config, ExecutionContext ctx) {
         String rawMessageCodeKey = (String) config.get("messageCodeKey");
@@ -50,6 +63,7 @@ public class SendMqHandler implements NodeHandler {
         }
 
         return Mono.fromCallable(() -> {
+                    // 消息编码先解析为启用的消息定义，再用定义中的 topic 作为 RocketMQ tag。
                     MqMessageDefinitionDO def = mqMapper.selectOne(
                             new LambdaQueryWrapper<MqMessageDefinitionDO>()
                                     .eq(MqMessageDefinitionDO::getMessageCode, messageCodeKey)
@@ -65,6 +79,7 @@ public class SendMqHandler implements NodeHandler {
                     MqTriggerMessage message = new MqTriggerMessage(ctx.getUserId(), messageCodeKey, payload);
                     String destination = mqTopic + ":" + def.getTopic().trim();
 
+                    // 使用 userId 做 orderly sharding key，保证同一用户消息顺序。
                     SendResult sendResult = rocketMQTemplate.syncSendOrderly(destination, message, ctx.getUserId());
                     if (sendResult == null || sendResult.getSendStatus() != SendStatus.SEND_OK) {
                         SendStatus status = sendResult != null ? sendResult.getSendStatus() : null;
@@ -81,6 +96,15 @@ public class SendMqHandler implements NodeHandler {
                 });
     }
 
+    /**
+     * 构建、解析或转换 build Payload 相关的业务数据。
+     *
+     * <p>执行过程中会根据节点配置和上下文决定成功、失败或下一跳路由。
+     *
+     * @param config 节点配置或业务配置，方法会从中读取执行参数
+     * @param ctx 执行上下文，提供当前画布、用户和节点运行态数据
+     * @return 按业务键组织的映射结果
+     */
     @SuppressWarnings("unchecked")
     private Map<String, Object> buildPayload(Map<String, Object> config, ExecutionContext ctx) {
         Map<String, Object> payload = new HashMap<>();
@@ -89,6 +113,15 @@ public class SendMqHandler implements NodeHandler {
         return payload;
     }
 
+    /**
+     * 执行 copy Params 对应的业务逻辑。
+     *
+     * <p>执行过程中会根据节点配置和上下文决定成功、失败或下一跳路由。
+     *
+     * @param payload payload 请求体、消息体或事件载荷
+     * @param rawParams rawParams 方法执行所需的业务参数
+     * @param ctx 执行上下文，提供当前画布、用户和节点运行态数据
+     */
     private void copyParams(Map<String, Object> payload, Object rawParams, ExecutionContext ctx) {
         if (rawParams == null) {
             return;
@@ -96,6 +129,7 @@ public class SendMqHandler implements NodeHandler {
         if (rawParams instanceof Map<?, ?> paramsMap) {
             paramsMap.forEach((key, value) -> {
                 if (key != null) {
+                    // Map 形态直接按 key 写入 payload，value 仍支持上下文表达式。
                     payload.put(String.valueOf(key), resolveValue(value, ctx));
                 }
             });
@@ -108,6 +142,7 @@ public class SendMqHandler implements NodeHandler {
                 }
                 Object key = param.get("key");
                 if (key != null) {
+                    // 列表形态兼容前端参数配置器的 key/value 结构。
                     payload.put(String.valueOf(key), resolveValue(param.get("value"), ctx));
                 }
             }
@@ -116,10 +151,20 @@ public class SendMqHandler implements NodeHandler {
         throw new IllegalArgumentException("SEND_MQ: params 必须是对象或列表");
     }
 
+    /**
+     * 构建、解析或转换 resolve Value 相关的业务数据。
+     *
+     * <p>执行过程中会根据节点配置和上下文决定成功、失败或下一跳路由。
+     *
+     * @param value value 待写入、比较或转换的业务值
+     * @param ctx 执行上下文，提供当前画布、用户和节点运行态数据
+     * @return 方法执行后的业务结果
+     */
     private Object resolveValue(Object value, ExecutionContext ctx) {
         if (value instanceof String stringValue) {
             String normalized = stringValue.startsWith("$${") ? stringValue.substring(1) : stringValue;
             if (normalized.startsWith("${") && normalized.endsWith("}")) {
+                // 兼容 Flyway 转义后的 $${field} 和运行时标准 ${field}。
                 return ctx.getContextValue(normalized.substring(2, normalized.length() - 1));
             }
         }

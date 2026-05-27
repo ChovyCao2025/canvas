@@ -104,6 +104,7 @@ public class CanvasDisruptorService {
         WorkHandler<CanvasExecutionEvent>[] workers = new WorkHandler[consumers];
         // >>> 配置具体的 worker 处理逻辑
         Arrays.fill(workers, createWorkerHandler(executionService, requestExecutor));
+        // WorkerPool 只会让一个 worker 拿到同一个 event，适合执行请求这种单消费语义。
         disruptor.handleEventsWithWorkerPool(workers);
     }
 
@@ -119,6 +120,7 @@ public class CanvasDisruptorService {
                     handleCanvasEvent(executionService, event);
                 }
             } finally {
+                // 复用前必须清空字段，否则下一次 ring buffer 取到的内容会串链路。
                 event.reset(); // 归还事件对象（Ring Buffer 复用）
             }
         };
@@ -126,6 +128,7 @@ public class CanvasDisruptorService {
 
     /** 处理直接触发画布执行的 Disruptor 事件。 */
     private static void handleCanvasEvent(CanvasExecutionService executionService, CanvasExecutionEvent event) {
+        // 直接触发链路不落库，事件消费后立刻进入 DAG 执行。
         executionService.triggerFromDisruptor(
                         event.canvasId, event.userId, event.triggerType,
                         event.triggerNodeType, event.matchKey,
@@ -140,6 +143,7 @@ public class CanvasDisruptorService {
     /** 处理已入库执行请求的 Disruptor 事件。 */
     private static void handleRequestEvent(CanvasExecutionRequestExecutor requestExecutor, CanvasExecutionEvent event) {
         String requestId = event.requestId;
+        // 已入库请求由 executor 接管状态迁移和失败重试，不在这里重复实现。
         requestExecutor.execute(requestId)
                 .subscribe(
                         null,
@@ -211,6 +215,7 @@ public class CanvasDisruptorService {
                          DispatchOptions dispatchOptions) {
         long sequence;
         try {
+            // tryNext 失败说明 ring buffer 已满，属于上游回压信号。
             sequence = ringBuffer.tryNext();
         } catch (InsufficientCapacityException e) {
             metrics.recordDisruptorOverflow(triggerType);
@@ -230,6 +235,7 @@ public class CanvasDisruptorService {
             // >>> 事件处理逻辑见: org.chovy.canvas.engine.disruptor.CanvasDisruptorService.CanvasDisruptorService
             ringBuffer.publish(sequence);
         }
+        // 成功发布后再记一次指标，便于区分吞吐和溢出。
         metrics.recordDisruptorPublished(triggerType);
     }
 
@@ -237,6 +243,7 @@ public class CanvasDisruptorService {
     public void publishRequest(String requestId) {
         long sequence;
         try {
+            // 请求事件和普通触发事件共享同一个 ring buffer，满时同样需要快速失败。
             sequence = ringBuffer.tryNext();
         } catch (InsufficientCapacityException e) {
             metrics.recordDisruptorOverflow("REQUEST");
@@ -272,15 +279,38 @@ public class CanvasDisruptorService {
         /** 溢出重试链路已经重试的次数。 */
         private final int overflowChainRetryCount;
 
+        /**
+         * 构造 DispatchOptions 实例，并根据入参初始化依赖、配置或内部状态。
+         *
+         * <p>方法会结合入参、当前对象状态和依赖组件完成处理，调用方需关注返回值以及可能产生的状态变更。
+         *
+         * @param overflowRetry overflowRetry 方法执行所需的业务参数
+         */
         private DispatchOptions(boolean overflowRetry) {
             this(overflowRetry, 0);
         }
 
+        /**
+         * 构造 DispatchOptions 实例，并根据入参初始化依赖、配置或内部状态。
+         *
+         * <p>方法会结合入参、当前对象状态和依赖组件完成处理，调用方需关注返回值以及可能产生的状态变更。
+         *
+         * @param overflowRetry overflowRetry 方法执行所需的业务参数
+         * @param overflowChainRetryCount overflowChainRetryCount 数量、阈值或分页参数
+         */
         private DispatchOptions(boolean overflowRetry, int overflowChainRetryCount) {
             this.overflowRetry = overflowRetry;
             this.overflowChainRetryCount = Math.max(0, overflowChainRetryCount);
         }
 
+        /**
+         * 执行 overflow Retry 对应的业务逻辑。
+         *
+         * <p>方法会结合入参、当前对象状态和依赖组件完成处理，调用方需关注返回值以及可能产生的状态变更。
+         *
+         * @param overflowChainRetryCount overflowChainRetryCount 数量、阈值或分页参数
+         * @return 当前对象实例，便于继续链式配置或后续处理
+         */
         static DispatchOptions overflowRetry(int overflowChainRetryCount) {
             return new DispatchOptions(true, overflowChainRetryCount);
         }

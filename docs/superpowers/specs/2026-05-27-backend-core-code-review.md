@@ -38,4 +38,12 @@ Scope: backend core execution logic, scheduler/resume behavior, MQ trigger routi
 
 ## Verification Notes
 
-Each remediation should add or update targeted regression tests first, then run the affected module tests. Final verification should include the core engine request/scheduler tests and cache SDK tests.
+Status: remediations BE-001 through BE-022 have been implemented in the backend/cache SDK code paths covered by this review. During verification, additional stale unit tests were removed per request where they encoded obsolete constructor or concurrency-threshold assumptions instead of current behavior.
+
+Additional fixes found during verification:
+- Execution request payload parse failures are now handled inside the request executor error path, so claimed requests are marked `FAILED` instead of escaping and remaining `RUNNING`.
+- DAG special-node timeout timers now use a Reactor scheduler that supports delayed scheduling; the previous virtual-thread executor-backed scheduler rejected `Mono.delay`.
+
+Fresh verification:
+- `JAVA_HOME=$(/usr/libexec/java_home -v 21) mvn test` from `backend/`
+- Result: backend reactor `BUILD SUCCESS`; `canvas-cache-sdk` 30 tests passed, `canvas-engine` 362 tests passed.

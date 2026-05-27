@@ -26,8 +26,17 @@ import java.util.List;
 @RequiredArgsConstructor
 public class CdpTagOperationController {
 
+    /** CDP 标签操作服务，用于写入和查询标签变更记录。 */
     private final CdpTagOperationService service;
 
+    /**
+     * 处理 create 对应的 HTTP 接口请求。
+     *
+     * <p>方法负责接收控制层参数、调用领域服务并封装统一响应。
+     *
+     * @param req 请求对象，承载调用方提交的业务参数
+     * @return 异步执行结果，订阅后产生节点结果或业务响应
+     */
     @PostMapping
     public Mono<R<CdpTagOperationDO>> create(@RequestBody CdpBatchTagReq req) {
         return Mono.fromCallable(() -> R.ok(service.create(req)))
@@ -40,12 +49,28 @@ public class CdpTagOperationController {
                 .subscribeOn(Schedulers.boundedElastic());
     }
 
+    /**
+     * 处理 get 对应的 HTTP 接口请求。
+     *
+     * <p>方法负责接收控制层参数、调用领域服务并封装统一响应。
+     *
+     * @param id id 对应的业务主键或标识
+     * @return 异步执行结果，订阅后产生节点结果或业务响应
+     */
     @GetMapping("/{id}")
     public Mono<R<CdpTagOperationDO>> get(@PathVariable Long id) {
         return Mono.fromCallable(() -> R.ok(service.get(id)))
                 .subscribeOn(Schedulers.boundedElastic());
     }
 
+    /**
+     * 处理 retry Failed 对应的 HTTP 接口请求。
+     *
+     * <p>方法负责接收控制层参数、调用领域服务并封装统一响应。
+     *
+     * @param id id 对应的业务主键或标识
+     * @return 异步执行结果，订阅后产生节点结果或业务响应
+     */
     @PostMapping("/{id}/retry-failed")
     public Mono<R<CdpTagOperationDO>> retryFailed(@PathVariable Long id) {
         return Mono.fromCallable(() -> R.ok(service.retryFailed(id, null)))

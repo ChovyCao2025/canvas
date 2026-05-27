@@ -25,20 +25,47 @@ import java.util.List;
 @RequiredArgsConstructor
 public class CanvasUserController {
 
+    /** 画布用户查询服务，用于查询用户明细和画像字段。 */
     private final CanvasUserQueryService service;
 
+    /**
+     * 处理 list 对应的 HTTP 接口请求。
+     *
+     * <p>方法负责接收控制层参数、调用领域服务并封装统一响应。
+     *
+     * @param id id 对应的业务主键或标识
+     * @return 异步执行结果，订阅后产生节点结果或业务响应
+     */
     @GetMapping
     public Mono<R<List<CanvasUserRowDTO>>> list(@PathVariable Long id) {
         return Mono.fromCallable(() -> R.ok(service.listUsers(id)))
                 .subscribeOn(Schedulers.boundedElastic());
     }
 
+    /**
+     * 处理 get 对应的 HTTP 接口请求。
+     *
+     * <p>方法负责接收控制层参数、调用领域服务并封装统一响应。
+     *
+     * @param id id 对应的业务主键或标识
+     * @param userId userId 对应的业务主键或标识
+     * @return 异步执行结果，订阅后产生节点结果或业务响应
+     */
     @GetMapping("/{userId}")
     public Mono<R<CanvasUserRowDTO>> get(@PathVariable Long id, @PathVariable String userId) {
         return Mono.fromCallable(() -> R.ok(service.getUserInCanvas(id, userId)))
                 .subscribeOn(Schedulers.boundedElastic());
     }
 
+    /**
+     * 处理 executions 对应的 HTTP 接口请求。
+     *
+     * <p>方法负责接收控制层参数、调用领域服务并封装统一响应。
+     *
+     * @param id id 对应的业务主键或标识
+     * @param userId userId 对应的业务主键或标识
+     * @return 异步执行结果，订阅后产生节点结果或业务响应
+     */
     @GetMapping("/{userId}/executions")
     public Mono<R<List<CanvasExecutionDO>>> executions(@PathVariable Long id, @PathVariable String userId) {
         return Mono.fromCallable(() -> R.ok(service.listExecutions(id, userId)))

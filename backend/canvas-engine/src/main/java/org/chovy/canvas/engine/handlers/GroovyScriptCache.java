@@ -85,5 +85,12 @@ public class GroovyScriptCache {
         }
     }
 
+    /**
+     * 执行 size 对应的业务逻辑。
+     *
+     * <p>方法会结合入参、当前对象状态和依赖组件完成处理，调用方需关注返回值以及可能产生的状态变更。
+     *
+     * @return 计算得到的数值结果
+     */
     public long size() { return compiledClasses.estimatedSize(); }
 }

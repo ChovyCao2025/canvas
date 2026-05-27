@@ -44,7 +44,14 @@ public class ContextPersistenceService {
     @Value("${canvas.execution.context-ttl-sec:86400}")
     private long ttlSec;
 
-    // ── 上下文持久化 ──────────────────────────────────────────────
+    /**
+     * 创建或新增 save 相关的业务数据。
+     *
+     * <p>实现会读写 Redis 中的缓存、锁、路由或运行态数据。
+     *
+     * @param ctx 执行上下文，提供当前画布、用户和节点运行态数据
+     */
+// ── 上下文持久化 ──────────────────────────────────────────────
 
     /** 保存或覆盖上下文快照，并刷新 TTL。 */
     public void save(ExecutionContext ctx) {
@@ -63,6 +70,7 @@ public class ContextPersistenceService {
         String json = redis.opsForValue().get(keys.context(canvasId, userId));
         if (json == null) return null;
         try {
+            // 恢复执行直接反序列化完整上下文，保持挂起前的节点状态和用户变量。
             return objectMapper.readValue(json, ExecutionContext.class);
         } catch (Exception e) {
             log.error("反序列化 ExecutionContext 失败: {}", e.getMessage());
@@ -80,7 +88,18 @@ public class ContextPersistenceService {
         return redis.hasKey(keys.context(canvasId, userId));
     }
 
-    // ── 恢复锁 ─────────────────────────────────────────────────────
+    /**
+     * 执行 acquire Resume Lock 对应的业务逻辑。
+     *
+     * <p>实现会读写 Redis 中的缓存、锁、路由或运行态数据。
+     *
+     * @param canvasId canvasId 对应的业务主键或标识
+     * @param userId userId 对应的业务主键或标识
+     * @param instanceId instanceId 对应的业务主键或标识
+     * @param timeoutSec timeoutSec 时间、过期时间或持续时长参数
+     * @return 判断结果，true 表示校验通过或条件成立
+     */
+// ── 恢复锁 ─────────────────────────────────────────────────────
 
     /**
      * 尝试获取 resumeLock（分布式互斥锁，跨机安全）。
@@ -110,6 +129,7 @@ public class ContextPersistenceService {
     public void releaseResumeLock(Long canvasId, String userId, String token) {
         String key = keys.resumeLock(canvasId, userId);
         if (token == null) {
+            // 历史调用未传 token 时只能降级直接删除；新路径应优先走 Lua 校验释放。
             redis.delete(key);
             return;
         }
@@ -127,7 +147,18 @@ public class ContextPersistenceService {
             Long.class
     );
 
-    // ── dedup key ────────────────────────────────────────────────
+    /**
+     * 执行 acquire Dedup 对应的业务逻辑。
+     *
+     * <p>实现会读写 Redis 中的缓存、锁、路由或运行态数据。
+     *
+     * @param canvasId canvasId 对应的业务主键或标识
+     * @param userId userId 对应的业务主键或标识
+     * @param msgId msgId 对应的业务主键或标识
+     * @param ttl ttl 时间、过期时间或持续时长参数
+     * @return 判断结果，true 表示校验通过或条件成立
+     */
+// ── dedup key ────────────────────────────────────────────────
 
     /** 尝试写入消息级幂等 key，成功表示本次消息可继续执行。 */
     public boolean acquireDedup(Long canvasId, String userId, String msgId, Duration ttl) {

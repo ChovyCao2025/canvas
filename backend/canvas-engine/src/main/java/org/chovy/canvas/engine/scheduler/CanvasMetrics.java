@@ -22,10 +22,21 @@ import java.util.concurrent.atomic.AtomicLong;
 @RequiredArgsConstructor
 public class CanvasMetrics {
 
+    /** Micrometer 指标注册中心。 */
     private final MeterRegistry registry;
+    /** 执行请求积压 Gauge 的状态值缓存。 */
     private final ConcurrentMap<String, AtomicLong> executionRequestBacklog = new ConcurrentHashMap<>();
 
-    // ── 执行层指标 ────────────────────────────────────────────────
+    /**
+     * 写入或记录 record Execution 相关的业务数据。
+     *
+     * <p>方法会结合入参、当前对象状态和依赖组件完成处理，调用方需关注返回值以及可能产生的状态变更。
+     *
+     * @param canvasId canvasId 对应的业务主键或标识
+     * @param status status 状态值或状态筛选条件
+     * @param durationMs durationMs 时间、过期时间或持续时长参数
+     */
+// ── 执行层指标 ────────────────────────────────────────────────
 
     /** 记录一次画布执行完成（含 canvasId、status 标签） */
     public void recordExecution(String canvasId, String status, long durationMs) {
@@ -49,7 +60,16 @@ public class CanvasMetrics {
                 .register(registry);
     }
 
-    // ── 节点层指标 ────────────────────────────────────────────────
+    /**
+     * 写入或记录 record Node Execution 相关的业务数据。
+     *
+     * <p>方法会结合入参、当前对象状态和依赖组件完成处理，调用方需关注返回值以及可能产生的状态变更。
+     *
+     * @param nodeType nodeType 节点相关对象、标识或配置
+     * @param status status 状态值或状态筛选条件
+     * @param durationMs durationMs 时间、过期时间或持续时长参数
+     */
+// ── 节点层指标 ────────────────────────────────────────────────
 
     /** 记录一次节点执行 */
     public void recordNodeExecution(String nodeType, String status, long durationMs) {
@@ -82,7 +102,14 @@ public class CanvasMetrics {
                 .increment();
     }
 
-    // ── 触发层指标 ────────────────────────────────────────────────
+    /**
+     * 写入或记录 record Dedup 相关的业务数据。
+     *
+     * <p>方法会结合入参、当前对象状态和依赖组件完成处理，调用方需关注返回值以及可能产生的状态变更。
+     *
+     * @param canvasId canvasId 对应的业务主键或标识
+     */
+// ── 触发层指标 ────────────────────────────────────────────────
 
     /** 幂等拦截计数 */
     public void recordDedup(String canvasId) {
@@ -131,11 +158,13 @@ public class CanvasMetrics {
         String normalizedStatus = status != null ? status : "UNKNOWN";
         AtomicLong gauge = executionRequestBacklog.computeIfAbsent(normalizedStatus, key -> {
             AtomicLong value = new AtomicLong();
+            // 每个状态只注册一次 Gauge，后续只更新 AtomicLong，避免重复注册同名指标。
             Gauge.builder("canvas.execution.request.backlog", value, AtomicLong::get)
                     .tag("status", key)
                     .register(registry);
             return value;
         });
+        // backlog 不能为负，异常统计值在指标入口归零。
         gauge.set(Math.max(0L, count));
     }
 

@@ -20,6 +20,15 @@ import java.util.Map;
 @Component
 @NodeHandlerType(NodeType.LOOP)
 public class LoopHandler implements NodeHandler {
+    /**
+     * 执行当前节点或服务的核心处理流程。
+     *
+     * <p>执行过程中会根据节点配置和上下文决定成功、失败或下一跳路由。
+     *
+     * @param config 节点配置或业务配置，方法会从中读取执行参数
+     * @param ctx 执行上下文，提供当前画布、用户和节点运行态数据
+     * @return 异步执行结果，订阅后产生节点结果或业务响应
+     */
     @Override
     public Mono<NodeResult> executeAsync(Map<String, Object> config, ExecutionContext ctx) {
         String nodeId = string(config, "__nodeId", "loop");
@@ -28,6 +37,7 @@ public class LoopHandler implements NodeHandler {
             return Mono.just(NodeResult.fail("LOOP 必须配置 maxIterations > 0"));
         }
         int nextCount = ctx.getLoopIterations().merge(nodeId, 1, Integer::sum);
+        // 先累加当前节点迭代次数，再判断退出条件和最大次数保护。
         boolean exit = exitConditionMet(config, ctx);
         if (exit) {
             return Mono.just(NodeResult.routed("exit", string(config, "exitNodeId", string(config, "nextNodeId", null)),
@@ -41,18 +51,47 @@ public class LoopHandler implements NodeHandler {
                 Map.of(MapFieldKeys.LOOP_ITERATIONS, nextCount)));
     }
 
+    /**
+     * 执行 exit Condition Met 对应的业务逻辑。
+     *
+     * <p>执行过程中会根据节点配置和上下文决定成功、失败或下一跳路由。
+     *
+     * @param config 节点配置或业务配置，方法会从中读取执行参数
+     * @param ctx 执行上下文，提供当前画布、用户和节点运行态数据
+     * @return 判断结果，true 表示校验通过或条件成立
+     */
     private boolean exitConditionMet(Map<String, Object> config, ExecutionContext ctx) {
         String field = string(config, "exitField", null);
         if (field == null) return false;
         Object actual = ctx.getContextValue(field);
         Object expected = config.get("exitValue");
+        // 未配置 exitValue 时，只要上下文字段存在即认为满足退出条件。
         return expected == null ? actual != null : expected.toString().equals(String.valueOf(actual));
     }
 
+    /**
+     * 执行 number 对应的业务逻辑。
+     *
+     * <p>执行过程中会根据节点配置和上下文决定成功、失败或下一跳路由。
+     *
+     * @param value value 待写入、比较或转换的业务值
+     * @param fallback fallback 方法执行所需的业务参数
+     * @return 计算得到的数值结果
+     */
     private int number(Object value, int fallback) {
         return value instanceof Number number ? number.intValue() : fallback;
     }
 
+    /**
+     * 执行 string 对应的业务逻辑。
+     *
+     * <p>执行过程中会根据节点配置和上下文决定成功、失败或下一跳路由。
+     *
+     * @param config 节点配置或业务配置，方法会从中读取执行参数
+     * @param key key 对应的缓存键、配置键或业务键
+     * @param fallback fallback 方法执行所需的业务参数
+     * @return 转换或查询得到的字符串结果
+     */
     private String string(Map<String, Object> config, String key, String fallback) {
         Object value = config.get(key);
         return value == null ? fallback : value.toString();

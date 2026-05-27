@@ -20,14 +20,29 @@ import java.util.List;
 @Service
 public class AudienceComputeTaskRunner {
 
+    /** 任务失败错误信息最大保留长度。 */
     private static final int ERROR_LIMIT = 1000;
+    /** 人群计算锁被占用时的默认重试间隔。 */
     private static final Duration DEFAULT_LOCK_RETRY_DELAY = Duration.ofSeconds(3);
 
+    /** 人群批量计算服务。 */
     private final AudienceBatchComputeService computeService;
+    /** 异步任务状态服务，用于更新任务运行结果。 */
     private final AsyncTaskService asyncTaskService;
+    /** 通知服务，用于向任务订阅者发送计算结果。 */
     private final NotificationService notificationService;
+    /** 人群计算锁被占用时的实际重试间隔。 */
     private final Duration lockRetryDelay;
 
+    /**
+     * 构造 AudienceComputeTaskRunner 实例，并根据入参初始化依赖、配置或内部状态。
+     *
+     * <p>方法会结合入参、当前对象状态和依赖组件完成处理，调用方需关注返回值以及可能产生的状态变更。
+     *
+     * @param computeService computeService 方法执行所需的业务参数
+     * @param asyncTaskService asyncTaskService 方法执行所需的业务参数
+     * @param notificationService notificationService 方法执行所需的业务参数
+     */
     @Autowired
     public AudienceComputeTaskRunner(
             AudienceBatchComputeService computeService,
@@ -37,6 +52,16 @@ public class AudienceComputeTaskRunner {
         this(computeService, asyncTaskService, notificationService, DEFAULT_LOCK_RETRY_DELAY);
     }
 
+    /**
+     * 构造 AudienceComputeTaskRunner 实例，并根据入参初始化依赖、配置或内部状态。
+     *
+     * <p>方法会结合入参、当前对象状态和依赖组件完成处理，调用方需关注返回值以及可能产生的状态变更。
+     *
+     * @param computeService computeService 方法执行所需的业务参数
+     * @param asyncTaskService asyncTaskService 方法执行所需的业务参数
+     * @param notificationService notificationService 方法执行所需的业务参数
+     * @param lockRetryDelay lockRetryDelay 方法执行所需的业务参数
+     */
     AudienceComputeTaskRunner(
             AudienceBatchComputeService computeService,
             AsyncTaskService asyncTaskService,
@@ -49,10 +74,30 @@ public class AudienceComputeTaskRunner {
         this.lockRetryDelay = lockRetryDelay;
     }
 
+    /**
+     * 注册、调度或初始化 start 相关的业务数据。
+     *
+     * <p>方法会结合入参、当前对象状态和依赖组件完成处理，调用方需关注返回值以及可能产生的状态变更。
+     *
+     * @param taskId taskId 对应的业务主键或标识
+     * @param audienceId audienceId 对应的业务主键或标识
+     * @param audienceName audienceName 方法执行所需的业务参数
+     * @param operator operator 操作人标识
+     */
     public void start(String taskId, Long audienceId, String audienceName, String operator) {
         Thread.ofVirtual().start(() -> runNow(taskId, audienceId, audienceName, operator));
     }
 
+        /**
+     * 执行 run Now 对应的业务逻辑。
+     *
+     * <p>实现会处理 MQ 消息、路由或发送记录，影响异步触发链路。
+     *
+     * @param taskId taskId 对应的业务主键或标识
+     * @param audienceId audienceId 对应的业务主键或标识
+     * @param audienceName audienceName 方法执行所需的业务参数
+     * @param operator operator 操作人标识
+     */
     public void runNow(String taskId, Long audienceId, String audienceName, String operator) {
         asyncTaskService.markRunning(taskId);
         AudienceComputeResult result;
@@ -93,6 +138,14 @@ public class AudienceComputeTaskRunner {
                 targetUrl(audienceId, taskId));
     }
 
+    /**
+     * 执行 success Summary 对应的业务逻辑。
+     *
+     * <p>方法会结合入参、当前对象状态和依赖组件完成处理，调用方需关注返回值以及可能产生的状态变更。
+     *
+     * @param result result 方法执行所需的业务参数
+     * @return 转换或查询得到的字符串结果
+     */
     private String successSummary(AudienceComputeResult result) {
         return "{\"audienceId\":" + result.audienceId()
                 + ",\"estimatedSize\":" + result.estimatedSize()
@@ -100,10 +153,27 @@ public class AudienceComputeTaskRunner {
                 + "}";
     }
 
+    /**
+     * 执行 target Url 对应的业务逻辑。
+     *
+     * <p>方法会结合入参、当前对象状态和依赖组件完成处理，调用方需关注返回值以及可能产生的状态变更。
+     *
+     * @param audienceId audienceId 对应的业务主键或标识
+     * @param taskId taskId 对应的业务主键或标识
+     * @return 转换或查询得到的字符串结果
+     */
     private String targetUrl(Long audienceId, String taskId) {
         return "/audiences?highlight=" + audienceId + "&taskId=" + taskId;
     }
 
+        /**
+     * 写入或记录 mark Failed Best Effort 相关的业务数据。
+     *
+     * <p>实现会处理 MQ 消息、路由或发送记录，影响异步触发链路。
+     *
+     * @param taskId taskId 对应的业务主键或标识
+     * @param error error 方法执行所需的业务参数
+     */
     private void markFailedBestEffort(String taskId, String error) {
         try {
             asyncTaskService.markFailed(taskId, error);
@@ -113,6 +183,15 @@ public class AudienceComputeTaskRunner {
         }
     }
 
+    /**
+     * 计算或统计 compute With Lock Retry 相关的业务数据。
+     *
+     * <p>方法会结合入参、当前对象状态和依赖组件完成处理，调用方需关注返回值以及可能产生的状态变更。
+     *
+     * @param audienceId audienceId 对应的业务主键或标识
+     * @param taskId taskId 对应的业务主键或标识
+     * @return 方法执行后的业务结果
+     */
     private AudienceComputeResult computeWithLockRetry(Long audienceId, String taskId) throws InterruptedException {
         while (true) {
             AudienceComputeResult result = computeService.compute(audienceId);
@@ -125,6 +204,11 @@ public class AudienceComputeTaskRunner {
         }
     }
 
+    /**
+     * 执行 sleep Before Lock Retry 对应的业务逻辑。
+     *
+     * <p>方法会结合入参、当前对象状态和依赖组件完成处理，调用方需关注返回值以及可能产生的状态变更。
+     */
     private void sleepBeforeLockRetry() throws InterruptedException {
         if (lockRetryDelay.isZero() || lockRetryDelay.isNegative()) {
             return;
@@ -132,6 +216,18 @@ public class AudienceComputeTaskRunner {
         Thread.sleep(lockRetryDelay.toMillis());
     }
 
+        /**
+     * 创建或新增 create Notification Best Effort 相关的业务数据。
+     *
+     * <p>实现会处理 MQ 消息、路由或发送记录，影响异步触发链路。
+     *
+     * @param operator operator 操作人标识
+     * @param type type 类型标识或分类条件
+     * @param title title 方法执行所需的业务参数
+     * @param content content 方法执行所需的业务参数
+     * @param targetUrl targetUrl 方法执行所需的业务参数
+     * @param taskId taskId 对应的业务主键或标识
+     */
     private void createNotificationBestEffort(
             String operator, String type, String title, String content, String targetUrl, String taskId) {
         try {
@@ -142,6 +238,18 @@ public class AudienceComputeTaskRunner {
         }
     }
 
+    /**
+     * 创建或新增 create Notifications Best Effort 相关的业务数据。
+     *
+     * <p>方法会结合入参、当前对象状态和依赖组件完成处理，调用方需关注返回值以及可能产生的状态变更。
+     *
+     * @param taskId taskId 对应的业务主键或标识
+     * @param fallbackOperator fallbackOperator 操作人标识
+     * @param type type 类型标识或分类条件
+     * @param title title 方法执行所需的业务参数
+     * @param content content 方法执行所需的业务参数
+     * @param targetUrl targetUrl 方法执行所需的业务参数
+     */
     private void createNotificationsBestEffort(
             String taskId, String fallbackOperator, String type, String title, String content, String targetUrl) {
         for (String recipient : notificationRecipients(taskId, fallbackOperator)) {
@@ -149,6 +257,15 @@ public class AudienceComputeTaskRunner {
         }
     }
 
+        /**
+     * 执行 notification Recipients 对应的业务逻辑。
+     *
+     * <p>实现会处理 MQ 消息、路由或发送记录，影响异步触发链路。
+     *
+     * @param taskId taskId 对应的业务主键或标识
+     * @param fallbackOperator fallbackOperator 操作人标识
+     * @return 查询、转换或计算得到的结果集合
+     */
     private List<String> notificationRecipients(String taskId, String fallbackOperator) {
         LinkedHashSet<String> recipients = new LinkedHashSet<>();
         try {
@@ -167,6 +284,16 @@ public class AudienceComputeTaskRunner {
         return List.copyOf(recipients);
     }
 
+    /**
+     * 执行 display Name 对应的业务逻辑。
+     *
+     * <p>方法会结合入参、当前对象状态和依赖组件完成处理，调用方需关注返回值以及可能产生的状态变更。
+     *
+     * @param result result 方法执行所需的业务参数
+     * @param audienceName audienceName 方法执行所需的业务参数
+     * @param audienceId audienceId 对应的业务主键或标识
+     * @return 转换或查询得到的字符串结果
+     */
     private String displayName(AudienceComputeResult result, String audienceName, Long audienceId) {
         if (result != null && hasText(result.audienceName())) {
             return result.audienceName();
@@ -177,6 +304,14 @@ public class AudienceComputeTaskRunner {
         return "人群 " + audienceId;
     }
 
+        /**
+     * 执行 error Message 对应的业务逻辑。
+     *
+     * <p>实现会处理 MQ 消息、路由或发送记录，影响异步触发链路。
+     *
+     * @param e e 方法执行所需的业务参数
+     * @return 转换或查询得到的字符串结果
+     */
     private String errorMessage(Exception e) {
         String message = e.getMessage();
         if (!hasText(message)) {
@@ -185,6 +320,14 @@ public class AudienceComputeTaskRunner {
         return message.length() <= ERROR_LIMIT ? message : message.substring(0, ERROR_LIMIT);
     }
 
+    /**
+     * 判断 has Text 相关的业务数据。
+     *
+     * <p>方法会结合入参、当前对象状态和依赖组件完成处理，调用方需关注返回值以及可能产生的状态变更。
+     *
+     * @param value value 待写入、比较或转换的业务值
+     * @return 判断结果，true 表示校验通过或条件成立
+     */
     private boolean hasText(String value) {
         return value != null && !value.isBlank();
     }

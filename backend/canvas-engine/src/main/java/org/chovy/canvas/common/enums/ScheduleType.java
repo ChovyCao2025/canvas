@@ -14,7 +14,12 @@ public final class ScheduleType {
     /** 单次触发（指定一个确定触发时刻）。 */
     public static final String ONCE = "ONCE";
 
-    // 未来若扩展固定间隔触发，可在此新增常量并同步前端选项。
+    /**
+     * 构造 ScheduleType 实例。
+     *
+     * <p>方法会结合入参、当前对象状态和依赖组件完成处理，调用方需关注返回值以及可能产生的状态变更。
+     */
+// 未来若扩展固定间隔触发，可在此新增常量并同步前端选项。
     // 常量值需与前端配置面板枚举保持一致。
     private ScheduleType() {}
 }

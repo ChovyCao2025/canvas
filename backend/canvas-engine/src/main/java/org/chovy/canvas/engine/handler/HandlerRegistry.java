@@ -51,6 +51,14 @@ public class HandlerRegistry {
         return h;
     }
 
+    /**
+     * 判断 has 相关的业务数据。
+     *
+     * <p>方法会结合入参、当前对象状态和依赖组件完成处理，调用方需关注返回值以及可能产生的状态变更。
+     *
+     * @param typeKey typeKey 对应的缓存键、配置键或业务键
+     * @return 判断结果，true 表示校验通过或条件成立
+     */
     public boolean has(String typeKey) {
         // 常用于启动检查或兼容分支判断
         return registry.containsKey(typeKey);

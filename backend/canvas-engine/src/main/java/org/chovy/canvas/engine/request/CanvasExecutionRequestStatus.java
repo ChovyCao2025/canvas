@@ -8,12 +8,22 @@ package org.chovy.canvas.engine.request;
  */
 public final class CanvasExecutionRequestStatus {
 
+    /** 待派发执行请求状态。 */
     public static final String PENDING = "PENDING";
+    /** 已抢占并正在执行的请求状态。 */
     public static final String RUNNING = "RUNNING";
+    /** 等待下一次重试的请求状态。 */
     public static final String RETRY = "RETRY";
+    /** 已成功完成的请求状态。 */
     public static final String SUCCEEDED = "SUCCEEDED";
+    /** 已最终失败的请求状态。 */
     public static final String FAILED = "FAILED";
 
+    /**
+     * 构造 CanvasExecutionRequestStatus 实例。
+     *
+     * <p>方法会结合入参、当前对象状态和依赖组件完成处理，调用方需关注返回值以及可能产生的状态变更。
+     */
     private CanvasExecutionRequestStatus() {
     }
 }

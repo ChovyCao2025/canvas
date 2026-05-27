@@ -15,6 +15,13 @@ import org.springframework.context.annotation.Configuration;
 @Configuration
 public class SnowflakeConfig {
 
+    /**
+     * 创建并注册 snowflake 相关的 Spring Bean。
+     *
+     * <p>该方法在应用启动时由 Spring 容器调用，用于装配运行依赖。
+     *
+     * @return 方法执行后的业务结果
+     */
     @Bean
     public Snowflake snowflake() {
         // 通过IP后两段自动计算workerId，确保每台机器唯一（范围0-31）

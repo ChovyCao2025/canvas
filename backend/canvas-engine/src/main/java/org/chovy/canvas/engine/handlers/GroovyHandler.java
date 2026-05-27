@@ -37,18 +37,31 @@ import java.util.concurrent.*;
 @RequiredArgsConstructor
 public class GroovyHandler implements NodeHandler {
 
+    /** Groovy 脚本编译缓存，避免运行时重复编译脚本。 */
     private final GroovyScriptCache scriptCache;
 
+    /** Groovy 脚本单次执行超时时间，单位毫秒。 */
     @Value("${canvas.groovy.timeout-ms:5000}")
     private long timeoutMs;
 
+    /** Groovy 脚本输出结果最大大小，单位 KB。 */
     @Value("${canvas.groovy.max-output-kb:64}")
     private int maxOutputKb;
 
+    /** GroovyShell 对象池容量。 */
     private static final int POOL_SIZE = Runtime.getRuntime().availableProcessors() * 2;
+
+    /** GroovyShell 对象池，用于复用安全沙箱配置。 */
     private BlockingQueue<groovy.lang.GroovyShell> shellPool;
+
+    /** 虚拟线程执行器，用于隔离脚本运行和超时控制。 */
     private final ExecutorService vte = Executors.newVirtualThreadPerTaskExecutor();
 
+    /**
+     * 注册、调度或初始化 init 相关的业务数据。
+     *
+     * <p>执行过程中会根据节点配置和上下文决定成功、失败或下一跳路由。
+     */
     @PostConstruct
     void init() {
         CompilerConfiguration cfg = buildConfig();
@@ -75,8 +88,16 @@ public class GroovyHandler implements NodeHandler {
         scriptCache.evictCanvas(canvasId);
     }
 
+    /**
+     * 构建、解析或转换 build Config 相关的业务数据。
+     *
+     * <p>执行过程中会根据节点配置和上下文决定成功、失败或下一跳路由。
+     *
+     * @return 方法执行后的业务结果
+     */
     private CompilerConfiguration buildConfig() {
         SecureASTCustomizer security = new SecureASTCustomizer();
+        // 仅开放基础类型和常用集合/时间/数学类，脚本不能随意导入系统类。
         security.setAllowedImports(List.of(
                 "java.lang.Math", "java.lang.String", "java.lang.StringBuilder",
                 "java.lang.Integer", "java.lang.Long", "java.lang.Double",
@@ -95,6 +116,7 @@ public class GroovyHandler implements NodeHandler {
                 "java.lang.Runtime", "java.lang.Process", "java.lang.ProcessBuilder",
                 "java.lang.Thread", "java.lang.ClassLoader", "java.lang.Class",
                 "java.lang.reflect.Method", "java.lang.reflect.Field"));
+        // 开启间接导入检查，避免脚本通过全限定名绕过导入白名单。
         security.setIndirectImportCheckEnabled(true);
 
         CompilerConfiguration config = new CompilerConfiguration();
@@ -102,6 +124,15 @@ public class GroovyHandler implements NodeHandler {
         return config;
     }
 
+    /**
+     * 执行当前节点或服务的核心处理流程。
+     *
+     * <p>执行过程中会根据节点配置和上下文决定成功、失败或下一跳路由。
+     *
+     * @param config 节点配置或业务配置，方法会从中读取执行参数
+     * @param ctx 执行上下文，提供当前画布、用户和节点运行态数据
+     * @return 异步执行结果，订阅后产生节点结果或业务响应
+     */
     @Override
     @SuppressWarnings("unchecked")
     public Mono<NodeResult> executeAsync(Map<String, Object> config, ExecutionContext ctx) {
@@ -137,6 +168,7 @@ public class GroovyHandler implements NodeHandler {
             // 缓存 key（发布时可预编译，运行时命中则无编译开销）
             String cacheKey = ctx.getCanvasId() + ":__groovy__:" + GroovyScriptCache.hash(code);
 
+            // 脚本放到虚拟线程里执行，主响应式链路只等待 Future 结果和超时。
             Future<Object> future = vte.submit(() -> {
                 Script script = scriptCache.getOrCompile(cacheKey, code, finalShell);
                 script.setBinding(binding);
@@ -162,6 +194,7 @@ public class GroovyHandler implements NodeHandler {
             if (Boolean.TRUE.equals(validateResult)) {
                 List<Map<String, Object>> rules =
                         (List<Map<String, Object>>) config.get(MapFieldKeys.VALIDATE_RULES);
+                // 未配置 validateRules 时，约定脚本输出 result=true 才算通过。
                 boolean valid = rules == null || rules.isEmpty()
                         ? Boolean.TRUE.equals(output.get("result")) || "true".equals(String.valueOf(output.get("result")))
                         : ConditionEvaluator.allMatch(rules, output);

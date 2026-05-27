@@ -26,24 +26,32 @@ import java.util.concurrent.atomic.AtomicInteger;
 @RequiredArgsConstructor
 public class TraceWriteBuffer {
 
+    /** 单批轨迹刷盘条数。 */
     private static final int BATCH_SIZE   = 200;
+    /** 内存缓冲区最大容量。 */
     private static final int MAX_CAPACITY = 50_000;
+    /** 单次定时 flush 最多处理的批次数。 */
     private static final int MAX_BATCHES_PER_FLUSH = 20;
 
+    /** 待批量写入的执行轨迹内存队列。 */
     private final ConcurrentLinkedQueue<CanvasExecutionTraceDO> buffer =
             new ConcurrentLinkedQueue<>();
+    /** 执行轨迹 Mapper。 */
     private final CanvasExecutionTraceMapper traceMapper;
+    /** 当前待刷盘轨迹数量。 */
     private final AtomicInteger pending = new AtomicInteger(0);
 
     /** 非阻塞入队（主执行链路调用，不等待） */
     public void offer(CanvasExecutionTraceDO trace) {
         int current = pending.incrementAndGet();
         if (current > MAX_CAPACITY) {
+            // 背压保护：宁可丢 trace，也不能让主执行链路被轨迹写入拖垮。
             pending.decrementAndGet();
             log.warn("[TRACE_BUFFER] 缓冲区已满（{}），丢弃轨迹 executionId={}",
                     MAX_CAPACITY, trace.getExecutionId());
             return;
         }
+        // 只入内存队列，真正 DB 写入由定时 flush 批量完成。
         buffer.offer(trace);
     }
 
@@ -55,6 +63,7 @@ public class TraceWriteBuffer {
         for (int i = 0; i < MAX_BATCHES_PER_FLUSH; i++) {
             List<CanvasExecutionTraceDO> batch = drainBatch();
             if (batch.isEmpty()) return;
+            // 单次调度最多刷 MAX_BATCHES_PER_FLUSH 批，避免 flush 长时间占用调度线程。
             writeBatch(batch);
         }
     }
@@ -80,6 +89,13 @@ public class TraceWriteBuffer {
         log.info("[TRACE_BUFFER] 关闭刷盘完成");
     }
 
+    /**
+     * 执行 drain Batch 对应的业务逻辑。
+     *
+     * <p>方法会结合入参、当前对象状态和依赖组件完成处理，调用方需关注返回值以及可能产生的状态变更。
+     *
+     * @return 查询、转换或计算得到的结果集合
+     */
     private List<CanvasExecutionTraceDO> drainBatch() {
         List<CanvasExecutionTraceDO> batch = new ArrayList<>(BATCH_SIZE);
         CanvasExecutionTraceDO item;
@@ -87,19 +103,35 @@ public class TraceWriteBuffer {
             batch.add(item);
         }
         if (!batch.isEmpty()) {
+            // pending 与队列 poll 成功数量保持一致，作为 backlog gauge 的数据源。
             pending.addAndGet(-batch.size());
         }
         return batch;
     }
 
+    /**
+     * 写入或记录 write Batch 相关的业务数据。
+     *
+     * <p>实现会通过持久化层读取或写入数据库记录。
+     *
+     * @param batch batch 方法执行所需的业务参数
+     */
     private void writeBatch(List<CanvasExecutionTraceDO> batch) {
         try {
             traceMapper.insertBatch(batch);
             log.debug("[TRACE_BUFFER] 批量写入 {} 条", batch.size());
         } catch (Exception e) {
+            // trace 是旁路审计数据，写失败只记录日志，不反向影响节点执行结果。
             log.error("[TRACE_BUFFER] 批量写入失败: {}", e.getMessage());
         }
     }
 
+    /**
+     * 执行 pending Count 对应的业务逻辑。
+     *
+     * <p>方法会结合入参、当前对象状态和依赖组件完成处理，调用方需关注返回值以及可能产生的状态变更。
+     *
+     * @return 计算得到的数值结果
+     */
     public int pendingCount() { return pending.get(); }
 }

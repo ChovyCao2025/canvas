@@ -14,10 +14,24 @@ import org.springframework.stereotype.Component;
 @Component
 @NodeHandlerType(NodeType.SEND_IN_APP)
 public class SendInAppHandler extends AbstractSendMessageHandler {
+    /**
+     * 构造 SendInAppHandler 实例，并根据入参初始化依赖、配置或内部状态。
+     *
+     * <p>执行过程中会根据节点配置和上下文决定成功、失败或下一跳路由。
+     *
+     * @param deliveryService deliveryService 方法执行所需的业务参数
+     */
     public SendInAppHandler(ReachDeliveryService deliveryService) {
         super(deliveryService);
     }
 
+    /**
+     * 执行 channel 对应的业务逻辑。
+     *
+     * <p>执行过程中会根据节点配置和上下文决定成功、失败或下一跳路由。
+     *
+     * @return 转换或查询得到的字符串结果
+     */
     @Override
     protected String channel() {
         return "IN_APP";

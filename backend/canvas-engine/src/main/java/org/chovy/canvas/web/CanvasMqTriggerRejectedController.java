@@ -41,10 +41,15 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class CanvasMqTriggerRejectedController {
 
+    /** 拒绝消息 Mapper，用于查询和更新拒绝记录。 */
     private final CanvasMqTriggerRejectedMapper mapper;
+    /** 触发路由服务，用于解析 MQ 触发路由。 */
     private final TriggerRouteService routeService;
+    /** 执行请求服务，用于创建重放请求。 */
     private final CanvasExecutionRequestService requestService;
+    /** Disruptor 投递服务，用于重放触发消息。 */
     private final CanvasDisruptorService disruptorService;
+    /** JSON 转换器，用于解析拒绝消息 payload。 */
     private final ObjectMapper objectMapper;
 
     @GetMapping
@@ -63,6 +68,14 @@ public class CanvasMqTriggerRejectedController {
         }).subscribeOn(Schedulers.boundedElastic());
     }
 
+    /**
+     * 处理 detail 对应的 HTTP 接口请求。
+     *
+     * <p>方法负责接收控制层参数、调用领域服务并封装统一响应。
+     *
+     * @param id id 对应的业务主键或标识
+     * @return 异步执行结果，订阅后产生节点结果或业务响应
+     */
     @GetMapping("/{id}")
     public Mono<R<CanvasMqTriggerRejectedDO>> detail(@PathVariable Long id) {
         return Mono.fromCallable(() -> {
@@ -74,6 +87,14 @@ public class CanvasMqTriggerRejectedController {
         }).subscribeOn(Schedulers.boundedElastic());
     }
 
+    /**
+     * 处理 replay 对应的 HTTP 接口请求。
+     *
+     * <p>方法负责接收控制层参数、调用领域服务并封装统一响应。
+     *
+     * @param id id 对应的业务主键或标识
+     * @return 异步执行结果，订阅后产生节点结果或业务响应
+     */
     @PostMapping("/{id}/replay")
     public Mono<R<Map<String, Object>>> replay(@PathVariable Long id) {
         return Mono.fromCallable(() -> {
@@ -81,6 +102,7 @@ public class CanvasMqTriggerRejectedController {
             if (rejected == null) {
                 throw new IllegalArgumentException("rejected 消息不存在: " + id);
             }
+            // 先恢复原始 MQ 触发消息，再基于当前路由表重新生成执行请求。
             MqTriggerMessage message = parseMessage(rejected);
             validateMessage(message);
 
@@ -91,6 +113,7 @@ public class CanvasMqTriggerRejectedController {
                     .flatMap(java.util.Optional::stream)
                     .sorted()
                     .forEach(canvasId -> {
+                        // 重放只入执行请求队列，不直接执行节点，保持与正常 MQ 入口相同边界。
                         String requestId = requestService.enqueue(
                                 canvasId,
                                 message.getUserId(),
@@ -102,6 +125,7 @@ public class CanvasMqTriggerRejectedController {
                         );
                         requestIds.add(requestId);
                         if (!publishBestEffort(requestId)) {
+                            // 即时投递失败会返回给调用方，后台补偿仍可根据队列表继续处理。
                             dispatchFailed.add(requestId);
                         }
                     });
@@ -114,14 +138,30 @@ public class CanvasMqTriggerRejectedController {
         }).subscribeOn(Schedulers.boundedElastic());
     }
 
+        /**
+     * 构建、解析或转换 parse Message 相关的业务数据。
+     *
+     * <p>实现会处理 MQ 消息、路由或发送记录，影响异步触发链路。
+     *
+     * @param rejected rejected 方法执行所需的业务参数
+     * @return 方法执行后的业务结果
+     */
     private MqTriggerMessage parseMessage(CanvasMqTriggerRejectedDO rejected) {
         try {
+            // rejected.body 存的是消费失败时的原始消息体，必须可反序列化后才允许重放。
             return objectMapper.readValue(rejected.getBody(), MqTriggerMessage.class);
         } catch (Exception e) {
             throw new IllegalArgumentException("无法重放 rejected 消息，消息体不是合法 MQ 触发 JSON", e);
         }
     }
 
+        /**
+     * 校验 validate Message 相关的业务数据。
+     *
+     * <p>实现会处理 MQ 消息、路由或发送记录，影响异步触发链路。
+     *
+     * @param message message 方法执行所需的业务参数
+     */
     private void validateMessage(MqTriggerMessage message) {
         if (message.getUserId() == null || message.getUserId().isBlank()
                 || message.getMessageCode() == null || message.getMessageCode().isBlank()
@@ -130,9 +170,18 @@ public class CanvasMqTriggerRejectedController {
         }
     }
 
+        /**
+     * 构建、解析或转换 parse Canvas Id 相关的业务数据。
+     *
+     * <p>实现会处理 MQ 消息、路由或发送记录，影响异步触发链路。
+     *
+     * @param raw raw 方法执行所需的业务参数
+     * @return 可能存在的查询结果，未命中或无数据时为空
+     */
     private java.util.Optional<Long> parseCanvasId(String raw) {
         try {
             long canvasId = Long.parseLong(raw);
+            // 路由表里可能存在脏数据，非正数 ID 直接跳过。
             return canvasId > 0 ? java.util.Optional.of(canvasId) : java.util.Optional.empty();
         } catch (RuntimeException e) {
             log.warn("[MQ_REJECTED] replay skip invalid route canvasId={}", raw);
@@ -140,6 +189,14 @@ public class CanvasMqTriggerRejectedController {
         }
     }
 
+        /**
+     * 发布或发送 publish Best Effort 相关的业务数据。
+     *
+     * <p>实现会处理 MQ 消息、路由或发送记录，影响异步触发链路。
+     *
+     * @param requestId requestId 对应的业务主键或标识
+     * @return 判断结果，true 表示校验通过或条件成立
+     */
     private boolean publishBestEffort(String requestId) {
         try {
             disruptorService.publishRequest(requestId);

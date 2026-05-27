@@ -17,10 +17,24 @@ public class CanvasExamplesProperties {
      */
     private boolean enabled = true;
 
+    /**
+     * 判断 is Enabled 相关的业务数据。
+     *
+     * <p>方法会结合入参、当前对象状态和依赖组件完成处理，调用方需关注返回值以及可能产生的状态变更。
+     *
+     * @return 判断结果，true 表示校验通过或条件成立
+     */
     public boolean isEnabled() {
         return enabled;
     }
 
+    /**
+     * 执行 set Enabled 对应的业务逻辑。
+     *
+     * <p>方法会结合入参、当前对象状态和依赖组件完成处理，调用方需关注返回值以及可能产生的状态变更。
+     *
+     * @param enabled enabled 方法执行所需的业务参数
+     */
     public void setEnabled(boolean enabled) {
         this.enabled = enabled;
     }

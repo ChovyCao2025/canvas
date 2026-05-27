@@ -34,6 +34,13 @@ public class EndHandler implements NodeHandler {
         return Mono.just(NodeResult.terminal(Map.of()));
     }
 
+    /**
+     * 判断 is Benefit Node 相关的业务数据。
+     *
+     * <p>执行过程中会根据节点配置和上下文决定成功、失败或下一跳路由。
+     *
+     * @return 判断结果，true 表示校验通过或条件成立
+     */
     @Override public boolean isBenefitNode() { return false; }
     @Override public boolean isReachNode()   { return false; }
-}
+    }

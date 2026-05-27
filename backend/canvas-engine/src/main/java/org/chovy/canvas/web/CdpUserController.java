@@ -35,9 +35,13 @@ import java.util.List;
 @RequiredArgsConstructor
 public class CdpUserController {
 
+    /** CDP 用户目录服务，用于查询用户列表。 */
     private final CdpUserDirectoryService directoryService;
+    /** CDP 用户洞察服务，用于查询用户洞察数据。 */
     private final CdpUserInsightService insightService;
+    /** CDP 用户服务，用于维护用户基础资料。 */
     private final CdpUserService userService;
+    /** CDP 标签服务，用于查询用户标签。 */
     private final CdpTagService tagService;
 
     @GetMapping
@@ -46,30 +50,71 @@ public class CdpUserController {
                 .subscribeOn(Schedulers.boundedElastic());
     }
 
+    /**
+     * 处理 get 对应的 HTTP 接口请求。
+     *
+     * <p>方法负责接收控制层参数、调用领域服务并封装统一响应。
+     *
+     * @param userId userId 对应的业务主键或标识
+     * @return 异步执行结果，订阅后产生节点结果或业务响应
+     */
     @GetMapping("/{userId}")
     public Mono<R<CdpUserDetailDTO>> get(@PathVariable String userId) {
         return Mono.fromCallable(() -> R.ok(userService.toDetail(userService.getRequiredProfile(userId))))
                 .subscribeOn(Schedulers.boundedElastic());
     }
 
+    /**
+     * 处理 get Insight 对应的 HTTP 接口请求。
+     *
+     * <p>方法负责接收控制层参数、调用领域服务并封装统一响应。
+     *
+     * @param userId userId 对应的业务主键或标识
+     * @return 异步执行结果，订阅后产生节点结果或业务响应
+     */
     @GetMapping("/{userId}/insight")
     public Mono<R<CanvasUserDetailDTO>> getInsight(@PathVariable String userId) {
         return Mono.fromCallable(() -> R.ok(insightService.getUserInsight(userId)))
                 .subscribeOn(Schedulers.boundedElastic());
     }
 
+    /**
+     * 处理 list Tags 对应的 HTTP 接口请求。
+     *
+     * <p>方法负责接收控制层参数、调用领域服务并封装统一响应。
+     *
+     * @param userId userId 对应的业务主键或标识
+     * @return 异步执行结果，订阅后产生节点结果或业务响应
+     */
     @GetMapping("/{userId}/tags")
     public Mono<R<List<CdpUserTagDTO>>> listTags(@PathVariable String userId) {
         return Mono.fromCallable(() -> R.ok(tagService.listCurrentTags(userId)))
                 .subscribeOn(Schedulers.boundedElastic());
     }
 
+    /**
+     * 处理 list Tag History 对应的 HTTP 接口请求。
+     *
+     * <p>方法负责接收控制层参数、调用领域服务并封装统一响应。
+     *
+     * @param userId userId 对应的业务主键或标识
+     * @return 异步执行结果，订阅后产生节点结果或业务响应
+     */
     @GetMapping("/{userId}/tag-history")
     public Mono<R<List<CdpUserTagHistoryDTO>>> listTagHistory(@PathVariable String userId) {
         return Mono.fromCallable(() -> R.ok(tagService.listHistory(userId)))
                 .subscribeOn(Schedulers.boundedElastic());
     }
 
+    /**
+     * 处理 add Tag 对应的 HTTP 接口请求。
+     *
+     * <p>方法负责接收控制层参数、调用领域服务并封装统一响应。
+     *
+     * @param userId userId 对应的业务主键或标识
+     * @param req 请求对象，承载调用方提交的业务参数
+     * @return 异步执行结果，订阅后产生节点结果或业务响应
+     */
     @PostMapping("/{userId}/tags")
     public Mono<R<Void>> addTag(@PathVariable String userId, @RequestBody CdpTagWriteReq req) {
         return Mono.fromCallable(() -> {
@@ -78,6 +123,15 @@ public class CdpUserController {
         }).subscribeOn(Schedulers.boundedElastic());
     }
 
+    /**
+     * 处理 remove Tag 对应的 HTTP 接口请求。
+     *
+     * <p>方法负责接收控制层参数、调用领域服务并封装统一响应。
+     *
+     * @param userId userId 对应的业务主键或标识
+     * @param tagCode tagCode 方法执行所需的业务参数
+     * @return 异步执行结果，订阅后产生节点结果或业务响应
+     */
     @DeleteMapping("/{userId}/tags/{tagCode}")
     public Mono<R<Void>> removeTag(@PathVariable String userId, @PathVariable String tagCode) {
         return Mono.fromCallable(() -> {

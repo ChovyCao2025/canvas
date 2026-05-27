@@ -31,6 +31,7 @@ import java.util.List;
 @RequiredArgsConstructor
 public class TagImportSourceController {
 
+    /** 标签导入来源服务，用于管理来源配置。 */
     private final TagImportSourceService tagImportSourceService;
 
     @GetMapping
@@ -43,6 +44,14 @@ public class TagImportSourceController {
                 .map(R::ok);
     }
 
+    /**
+     * 处理 create 对应的 HTTP 接口请求。
+     *
+     * <p>方法负责接收控制层参数、调用领域服务并封装统一响应。
+     *
+     * @param body body 请求体、消息体或事件载荷
+     * @return 异步执行结果，订阅后产生节点结果或业务响应
+     */
     @PostMapping
     public Mono<R<TagImportSourceDO>> create(@RequestBody TagImportSourceDO body) {
         return Mono.fromCallable(() -> tagImportSourceService.create(body))
@@ -50,6 +59,15 @@ public class TagImportSourceController {
                 .map(R::ok);
     }
 
+    /**
+     * 处理 update 对应的 HTTP 接口请求。
+     *
+     * <p>方法负责接收控制层参数、调用领域服务并封装统一响应。
+     *
+     * @param id id 对应的业务主键或标识
+     * @param body body 请求体、消息体或事件载荷
+     * @return 异步执行结果，订阅后产生节点结果或业务响应
+     */
     @PutMapping("/{id}")
     public Mono<R<Void>> update(@PathVariable Long id, @RequestBody TagImportSourceDO body) {
         return Mono.<Void>fromRunnable(() -> tagImportSourceService.update(id, body))
@@ -57,6 +75,14 @@ public class TagImportSourceController {
                 .thenReturn(R.ok());
     }
 
+    /**
+     * 处理 delete 对应的 HTTP 接口请求。
+     *
+     * <p>方法负责接收控制层参数、调用领域服务并封装统一响应。
+     *
+     * @param id id 对应的业务主键或标识
+     * @return 异步执行结果，订阅后产生节点结果或业务响应
+     */
     @DeleteMapping("/{id}")
     public Mono<R<Void>> delete(@PathVariable Long id) {
         return Mono.<Void>fromRunnable(() -> tagImportSourceService.delete(id))
@@ -64,6 +90,14 @@ public class TagImportSourceController {
                 .thenReturn(R.ok());
     }
 
+    /**
+     * 处理 run 对应的 HTTP 接口请求。
+     *
+     * <p>方法负责接收控制层参数、调用领域服务并封装统一响应。
+     *
+     * @param id id 对应的业务主键或标识
+     * @return 异步执行结果，订阅后产生节点结果或业务响应
+     */
     @PostMapping("/{id}/run")
     public Mono<R<TagImportResult>> run(@PathVariable Long id) {
         return Mono.fromCallable(() -> tagImportSourceService.run(id))

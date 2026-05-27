@@ -30,18 +30,31 @@ import java.util.List;
 @RequiredArgsConstructor
 public class JwtAuthFilter implements WebFilter {
 
+    /** JWT 工具，用于解析并校验令牌。 */
     private final JwtUtil             jwtUtil;
+    /** Redis 模板，用于查询令牌黑名单。 */
     private final StringRedisTemplate redis;
 
+    /**
+     * 执行 filter 对应的业务逻辑。
+     *
+     * <p>实现会读写 Redis 中的缓存、锁、路由或运行态数据。
+     *
+     * @param exchange exchange 方法执行所需的业务参数
+     * @param chain chain 方法执行所需的业务参数
+     * @return 异步执行结果，订阅后产生节点结果或业务响应
+     */
     @Override
     public Mono<Void> filter(ServerWebExchange exchange, WebFilterChain chain) {
         String header = exchange.getRequest().getHeaders().getFirst(HttpHeaders.AUTHORIZATION);
         if (header == null || !header.startsWith("Bearer ")) {
+            // 未携带 Bearer token 时不在这里拦截，交给 Security 的授权规则决定是否允许匿名访问。
             return chain.filter(exchange);
         }
 
         String token = header.substring(7);
         try {
+            // parse 会同时校验签名和过期时间，失败会进入统一 401 分支。
             Claims claims = jwtUtil.parse(token);
 
             // 检查 JWT 黑名单（服务端登出，设计文档 19.6.1节）
@@ -55,6 +68,7 @@ public class JwtAuthFilter implements WebFilter {
                         }
 
                         String role = claims.get("role", String.class);
+                        // 将 JWT claims 作为 principal 写入 Reactor Context，后续控制器通过 ReactiveSecurityContextHolder 读取。
                         UsernamePasswordAuthenticationToken auth = new UsernamePasswordAuthenticationToken(
                                 claims, null,
                                 List.of(new SimpleGrantedAuthority("ROLE_" + role))

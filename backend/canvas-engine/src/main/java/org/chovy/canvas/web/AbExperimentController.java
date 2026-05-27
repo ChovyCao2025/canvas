@@ -29,6 +29,7 @@ public class AbExperimentController {
 
     /** AB 实验表访问层。 */
     private final AbExperimentMapper abExperimentMapper;
+    /** AB 实验分组服务，用于维护实验默认分组。 */
     private final AbExperimentGroupService abExperimentGroupService;
 
     /**
@@ -107,6 +108,15 @@ public class AbExperimentController {
                 .map(R::ok);
     }
 
+    /**
+     * 处理 create Group 对应的 HTTP 接口请求。
+     *
+     * <p>方法负责接收控制层参数、调用领域服务并封装统一响应。
+     *
+     * @param id id 对应的业务主键或标识
+     * @param body body 请求体、消息体或事件载荷
+     * @return 异步执行结果，订阅后产生节点结果或业务响应
+     */
     @PostMapping("/{id}/groups")
     public Mono<R<AbExperimentGroupDO>> createGroup(
             @PathVariable Long id,
@@ -116,6 +126,16 @@ public class AbExperimentController {
                 .map(R::ok);
     }
 
+    /**
+     * 处理 update Group 对应的 HTTP 接口请求。
+     *
+     * <p>方法负责接收控制层参数、调用领域服务并封装统一响应。
+     *
+     * @param id id 对应的业务主键或标识
+     * @param groupId groupId 对应的业务主键或标识
+     * @param body body 请求体、消息体或事件载荷
+     * @return 异步执行结果，订阅后产生节点结果或业务响应
+     */
     @PutMapping("/{id}/groups/{groupId}")
     public Mono<R<Void>> updateGroup(
             @PathVariable Long id,
@@ -126,6 +146,15 @@ public class AbExperimentController {
                 .thenReturn(R.ok());
     }
 
+    /**
+     * 处理 delete Group 对应的 HTTP 接口请求。
+     *
+     * <p>方法负责接收控制层参数、调用领域服务并封装统一响应。
+     *
+     * @param id id 对应的业务主键或标识
+     * @param groupId groupId 对应的业务主键或标识
+     * @return 异步执行结果，订阅后产生节点结果或业务响应
+     */
     @DeleteMapping("/{id}/groups/{groupId}")
     public Mono<R<Void>> deleteGroup(@PathVariable Long id, @PathVariable Long groupId) {
         return Mono.<Void>fromRunnable(() -> abExperimentGroupService.disable(id, groupId))

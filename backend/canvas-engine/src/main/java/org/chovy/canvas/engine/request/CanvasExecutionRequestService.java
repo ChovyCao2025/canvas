@@ -42,12 +42,15 @@ public class CanvasExecutionRequestService {
         request.setId(requestId);
         request.setCanvasId(canvasId);
         request.setUserId(userId);
+        // 压测批次标识直接写入请求记录，后续执行和指标可沿着同一条链路关联。
         request.setPerfRunId(PerfRunContext.extract(payload));
         request.setTriggerType(triggerType);
         request.setTriggerNodeType(triggerNodeType);
         request.setMatchKey(matchKey);
+        // 先序列化入库，再交给派发器异步消费，避免触发入口同步阻塞。
         request.setPayloadJson(toJson(payload != null ? payload : Map.of()));
         request.setSourceMsgId(sourceMsgId);
+        // 初始态统一落为 PENDING，等待 dispatcher 抢占并推进到 RUNNING。
         request.setStatus(CanvasExecutionRequestStatus.PENDING);
         request.setAttemptCount(0);
         mapper.insertIgnore(request);

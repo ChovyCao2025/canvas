@@ -28,6 +28,15 @@ public class QLExpressRuleEvaluator implements RuleEvaluator {
     /** QL 执行器实例（线程安全，可复用）。 */
     private final ExpressRunner runner = new ExpressRunner();
 
+        /**
+     * 执行 evaluate 对应的业务逻辑。
+     *
+     * <p>实现会处理 MQ 消息、路由或发送记录，影响异步触发链路。
+     *
+     * @param ruleJson ruleJson 方法执行所需的业务参数
+     * @param context 执行上下文，提供当前画布、用户和节点运行态数据
+     * @return 判断结果，true 表示校验通过或条件成立
+     */
     @Override
     public boolean evaluate(String ruleJson, Map<String, Object> context) {
         try {
@@ -47,6 +56,14 @@ public class QLExpressRuleEvaluator implements RuleEvaluator {
         }
     }
 
+    /**
+     * 构建、解析或转换 to Script 相关的业务数据。
+     *
+     * <p>方法会结合入参、当前对象状态和依赖组件完成处理，调用方需关注返回值以及可能产生的状态变更。
+     *
+     * @param rule rule 方法执行所需的业务参数
+     * @return 转换或查询得到的字符串结果
+     */
     @SuppressWarnings("unchecked")
     private String toScript(Map<String, Object> rule) {
         String logic = String.valueOf(rule.getOrDefault("logic", "AND"));
@@ -56,6 +73,7 @@ public class QLExpressRuleEvaluator implements RuleEvaluator {
         List<Map<String, Object>> conditions = (List<Map<String, Object>>) rule.get("conditions");
         if (conditions != null) {
             for (Map<String, Object> condition : conditions) {
+                // 与 Aviator 保持同一套规则 JSON 语义，只替换为 QLExpress 脚本片段。
                 parts.add(toConditionScript(condition));
             }
         }
@@ -63,6 +81,7 @@ public class QLExpressRuleEvaluator implements RuleEvaluator {
         List<Map<String, Object>> groups = (List<Map<String, Object>>) rule.get("groups");
         if (groups != null) {
             for (Map<String, Object> group : groups) {
+                // 子分组递归包裹，保证嵌套规则的逻辑优先级不被扁平化。
                 parts.add("(" + toScript(group) + ")");
             }
         }
@@ -70,6 +89,14 @@ public class QLExpressRuleEvaluator implements RuleEvaluator {
         return parts.isEmpty() ? "true" : String.join(joinOp, parts);
     }
 
+    /**
+     * 构建、解析或转换 to Condition Script 相关的业务数据。
+     *
+     * <p>方法会结合入参、当前对象状态和依赖组件完成处理，调用方需关注返回值以及可能产生的状态变更。
+     *
+     * @param condition condition 方法执行所需的业务参数
+     * @return 转换或查询得到的字符串结果
+     */
     private String toConditionScript(Map<String, Object> condition) {
         String field = String.valueOf(condition.get("field"));
         String op = String.valueOf(condition.get("op"));
@@ -85,6 +112,7 @@ public class QLExpressRuleEvaluator implements RuleEvaluator {
             case "IN" -> {
                 // IN 操作转为 contains(list, field) 脚本表达式
                 List<?> list = value instanceof List<?> values ? values : List.of();
+                // QLExpress 需要脚本文本里的数组字面量，因此列表元素在这里逐个转义。
                 String listScript = list.stream().map(this::quoteIfString).collect(Collectors.joining(","));
                 yield "contains([" + listScript + "], " + field + ")";
             }
@@ -92,6 +120,14 @@ public class QLExpressRuleEvaluator implements RuleEvaluator {
         };
     }
 
+    /**
+     * 执行 quote If String 对应的业务逻辑。
+     *
+     * <p>方法会结合入参、当前对象状态和依赖组件完成处理，调用方需关注返回值以及可能产生的状态变更。
+     *
+     * @param value value 待写入、比较或转换的业务值
+     * @return 转换或查询得到的字符串结果
+     */
     private String quoteIfString(Object value) {
         if (value instanceof String text) {
             return '"' + text.replace("\\", "\\\\").replace("\"", "\\\"") + '"';

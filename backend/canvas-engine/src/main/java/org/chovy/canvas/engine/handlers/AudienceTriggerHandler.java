@@ -20,6 +20,15 @@ import java.util.Map;
 @Component
 @NodeHandlerType(NodeType.AUDIENCE_TRIGGER)
 public class AudienceTriggerHandler implements NodeHandler {
+    /**
+     * 执行当前节点或服务的核心处理流程。
+     *
+     * <p>执行过程中会根据节点配置和上下文决定成功、失败或下一跳路由。
+     *
+     * @param config 节点配置或业务配置，方法会从中读取执行参数
+     * @param ctx 执行上下文，提供当前画布、用户和节点运行态数据
+     * @return 异步执行结果，订阅后产生节点结果或业务响应
+     */
     @Override
     public Mono<NodeResult> executeAsync(Map<String, Object> config, ExecutionContext ctx) {
         String expectedSegment = string(config, "segmentId", null);
@@ -27,14 +36,26 @@ public class AudienceTriggerHandler implements NodeHandler {
         Object actualSegment = ctx.getContextValue("segmentId");
         Object actualAction = ctx.getContextValue("audienceAction");
         if (expectedSegment != null && actualSegment != null && !expectedSegment.equals(actualSegment.toString())) {
+            // 分群不匹配时以 terminal 结束本次触发，不进入后续营销节点。
             return Mono.just(NodeResult.terminal(Map.of(MapFieldKeys.AUDIENCE_MATCHED, false)));
         }
         if (actualAction != null && !triggerOn.equalsIgnoreCase(actualAction.toString())) {
+            // ENTER/LEAVE 动作不匹配时同样终止，避免反向人群事件误触发。
             return Mono.just(NodeResult.terminal(Map.of(MapFieldKeys.AUDIENCE_MATCHED, false)));
         }
         return Mono.just(NodeResult.ok(string(config, "nextNodeId", null), Map.of(MapFieldKeys.AUDIENCE_MATCHED, true)));
     }
 
+    /**
+     * 执行 string 对应的业务逻辑。
+     *
+     * <p>执行过程中会根据节点配置和上下文决定成功、失败或下一跳路由。
+     *
+     * @param config 节点配置或业务配置，方法会从中读取执行参数
+     * @param key key 对应的缓存键、配置键或业务键
+     * @param fallback fallback 方法执行所需的业务参数
+     * @return 转换或查询得到的字符串结果
+     */
     private String string(Map<String, Object> config, String key, String fallback) {
         Object value = config.get(key);
         return value == null ? fallback : value.toString();

@@ -85,16 +85,38 @@ import java.util.stream.Collectors;
 @Component
 public class DagEngine {
 
+    /** 节点处理器注册表。 */
     private final HandlerRegistry handlerRegistry;
+    /** 执行轨迹异步写入缓冲区。 */
     private final TraceWriteBuffer traceBuffer;
+    /** 画布执行死信 Mapper。 */
     private final CanvasExecutionDlqMapper dlqMapper;
+    /** 节点熔断器注册表。 */
     private final CircuitBreakerRegistry cbRegistry;
+    /** 画布执行指标埋点器。 */
     private final CanvasMetrics metrics;
+    /** Jackson ObjectMapper，用于节点输入输出序列化。 */
     private final ObjectMapper objectMapper;
+    /** 执行上下文 Redis 持久化服务。 */
     private final ContextPersistenceService ctxStore;
     // @Lazy 避免与 CanvasExecutionService → DagEngine 的循环依赖
+    /** 画布执行服务，用于超时恢复等内部触发。 */
     private final org.chovy.canvas.engine.trigger.CanvasExecutionService executionService;
 
+    /**
+     * 构造 DagEngine 实例，并根据入参初始化依赖、配置或内部状态。
+     *
+     * <p>方法会结合入参、当前对象状态和依赖组件完成处理，调用方需关注返回值以及可能产生的状态变更。
+     *
+     * @param handlerRegistry handlerRegistry 方法执行所需的业务参数
+     * @param traceBuffer traceBuffer 方法执行所需的业务参数
+     * @param dlqMapper dlqMapper 方法执行所需的业务参数
+     * @param cbRegistry cbRegistry 方法执行所需的业务参数
+     * @param metrics metrics 方法执行所需的业务参数
+     * @param objectMapper objectMapper 方法执行所需的业务参数
+     * @param ctxStore ctxStore 方法执行所需的业务参数
+     * @param executionService executionService 方法执行所需的业务参数
+     */
     public DagEngine(HandlerRegistry handlerRegistry,
                      TraceWriteBuffer traceBuffer,
                      CanvasExecutionDlqMapper dlqMapper,
@@ -114,17 +136,20 @@ public class DagEngine {
         this.executionService = executionService;
     }
 
+    /** 节点执行最大重试次数。 */
     @Value("${canvas.execution.max-retry:3}")
     private int maxRetry;
 
+    /** 节点重试基础退避毫秒数。 */
     @Value("${canvas.execution.retry-base-delay-ms:1000}")
     private long retryBaseDelayMs;
 
+    /** 节点重试最大退避毫秒数。 */
     @Value("${canvas.execution.retry-max-delay-ms:30000}")
     private long retryMaxDelayMs;
 
     /**
-     * 虚拟线程调度器，供阻塞型 Handler 使用
+     * 虚拟线程调度器，供阻塞型 Handler 和延迟兜底任务使用。
      */
     private static final Scheduler VIRTUAL =
             Schedulers.fromExecutorService(Executors.newVirtualThreadPerTaskExecutor());
@@ -479,12 +504,23 @@ public class DagEngine {
         return msg != null && (msg.contains("5xx") || msg.contains("timeout") || msg.contains("Timeout"));
     }
 
+    /**
+     * 执行 terminal Special Node Result 对应的业务逻辑。
+     *
+     * <p>返回值采用 Reactor 异步模型，调用方可继续组合后续处理。
+     *
+     * @param nodeId nodeId 对应的业务主键或标识
+     * @param ctx 执行上下文，提供当前画布、用户和节点运行态数据
+     * @return 异步执行结果，订阅后产生节点结果或业务响应
+     */
     private Mono<Map<String, Object>> terminalSpecialNodeResult(String nodeId, ExecutionContext ctx) {
         NodeStatus status = ctx.getNodeStatus(nodeId);
         if (status == NodeStatus.FAILED || status == NodeStatus.TIMEOUT || status == NodeStatus.PARTIAL_FAIL) {
+            // 特殊汇聚节点进入失败类终态后不再恢复执行，防止超时恢复重复改写路由结果。
             return Mono.error(new RuntimeException("节点 " + nodeId + " 已处于终态: " + status));
         }
         if (ctx.isNodeDone(nodeId)) {
+            // 已完成的 special 节点按幂等返回，避免恢复触发重复写 trace 或重复下游路由。
             return Mono.just(Map.of());
         }
         return null;
@@ -513,6 +549,7 @@ public class DagEngine {
                     .matchKey(ctx.getMatchKey())
                     .failedAt(LocalDateTime.now())
                     .build();
+            // DLQ 写入放到 boundedElastic，避免阻塞 Reactor 主执行链路。
             Mono.fromRunnable(() -> dlqMapper.insert(dlq))
                     .subscribeOn(Schedulers.boundedElastic())
                     .subscribe(null, (Throwable e) -> log.error("[DLQ] 写入失败: {}", e.getMessage()));
@@ -613,6 +650,7 @@ public class DagEngine {
         return executeNodeAfterStage2(graph, nodeId, node, config, ctx, depth);
     }
 
+    /** 特殊等待节点的全局超时秒数兜底。 */
     @org.springframework.beans.factory.annotation.Value("${canvas.execution.global-timeout-sec:600}")
     private long globalTimeout;
 
@@ -804,6 +842,19 @@ public class DagEngine {
                 });
     }
 
+    /**
+     * 执行 execute Node After Stage2 对应的业务逻辑。
+     *
+     * <p>实现会处理 MQ 消息、路由或发送记录，影响异步触发链路。
+     *
+     * @param graph graph 方法执行所需的业务参数
+     * @param nodeId nodeId 对应的业务主键或标识
+     * @param node node 节点相关对象、标识或配置
+     * @param config 节点配置或业务配置，方法会从中读取执行参数
+     * @param ctx 执行上下文，提供当前画布、用户和节点运行态数据
+     * @param depth depth 方法执行所需的业务参数
+     * @return 异步执行结果，订阅后产生节点结果或业务响应
+     */
     private Mono<Map<String, Object>> executeNodeAfterStage2(DagGraph graph, String nodeId,
                                                              DagParser.CanvasNode node,
                                                              Map<String, Object> config,
@@ -898,15 +949,29 @@ public class DagEngine {
         // 普通节点：收集所有下游并行触发
         List<String> nextIds = collectNextIds(result);
         if (nextIds.isEmpty()) {
+            // 叶子节点直接返回自身输出，作为本次 DAG 执行响应的一部分。
             return Mono.just(result.output() != null ? result.output() : Map.of());
         }
         prepareControlFlowReentry(graph, result, sourceNodeId, sourceType, nextIds, ctx);
 
         return Flux.fromIterable(nextIds)
+                // 下游分支并行推进；汇聚节点依赖 NodeGate/repeat 保证单 execution 内不漏信号。
                 .flatMap(nextId -> executeNode(graph, nextId, ctx, depth + 1))
                 .last(Map.of());
     }
 
+    /**
+     * 执行 prepare Control Flow Reentry 对应的业务逻辑。
+     *
+     * <p>方法会结合入参、当前对象状态和依赖组件完成处理，调用方需关注返回值以及可能产生的状态变更。
+     *
+     * @param graph graph 方法执行所需的业务参数
+     * @param result result 方法执行所需的业务参数
+     * @param sourceNodeId sourceNodeId 对应的业务主键或标识
+     * @param sourceType sourceType 类型标识或分类条件
+     * @param nextIds nextIds 方法执行所需的业务参数
+     * @param ctx 执行上下文，提供当前画布、用户和节点运行态数据
+     */
     private void prepareControlFlowReentry(DagGraph graph, NodeResult result, String sourceNodeId,
                                            String sourceType, List<String> nextIds, ExecutionContext ctx) {
         boolean looping = NodeType.LOOP.equals(sourceType)
@@ -919,10 +984,21 @@ public class DagEngine {
             return;
         }
         for (String nextId : nextIds) {
+            // LOOP/GOTO 回流到旧路径前清理可达节点状态，使下一轮能重新通过幂等检查。
             resetReachableUntilSource(graph, nextId, sourceNodeId, ctx);
         }
     }
 
+    /**
+     * 执行 reset Reachable Until Source 对应的业务逻辑。
+     *
+     * <p>方法会结合入参、当前对象状态和依赖组件完成处理，调用方需关注返回值以及可能产生的状态变更。
+     *
+     * @param graph graph 方法执行所需的业务参数
+     * @param startNodeId startNodeId 对应的业务主键或标识
+     * @param sourceNodeId sourceNodeId 对应的业务主键或标识
+     * @param ctx 执行上下文，提供当前画布、用户和节点运行态数据
+     */
     private void resetReachableUntilSource(DagGraph graph, String startNodeId, String sourceNodeId,
                                            ExecutionContext ctx) {
         Deque<String> queue = new ArrayDeque<>();
@@ -1004,6 +1080,7 @@ public class DagEngine {
 
         graph.getNodeMap().forEach((nodeId, node) -> {
             if (ctx.setNodeStatusIfAbsent(nodeId, NodeStatus.SKIPPED)) {
+                // 只为从未进入状态机的节点补 SKIPPED，避免覆盖已执行/等待/失败节点。
                 skippedTraces.add(CanvasExecutionTraceDO.builder()
                         .executionId(ctx.getExecutionId())
                         .nodeId(nodeId)
@@ -1022,6 +1099,14 @@ public class DagEngine {
         }
     }
 
+    /**
+     * 写入或记录 write Skipped Nodes If Complete 相关的业务数据。
+     *
+     * <p>方法会结合入参、当前对象状态和依赖组件完成处理，调用方需关注返回值以及可能产生的状态变更。
+     *
+     * @param graph graph 方法执行所需的业务参数
+     * @param ctx 执行上下文，提供当前画布、用户和节点运行态数据
+     */
     private void writeSkippedNodesIfComplete(DagGraph graph, ExecutionContext ctx) {
         if (hasWaitingNodes(ctx)) {
             log.debug("[ENGINE] 执行已挂起，暂不批量写入 SKIPPED executionId={}", ctx.getExecutionId());
@@ -1030,6 +1115,14 @@ public class DagEngine {
         writeSkippedNodes(graph, ctx);
     }
 
+    /**
+     * 判断 has Waiting Nodes 相关的业务数据。
+     *
+     * <p>方法会结合入参、当前对象状态和依赖组件完成处理，调用方需关注返回值以及可能产生的状态变更。
+     *
+     * @param ctx 执行上下文，提供当前画布、用户和节点运行态数据
+     * @return 判断结果，true 表示校验通过或条件成立
+     */
     private boolean hasWaitingNodes(ExecutionContext ctx) {
         return ctx.getNodeStatuses().values().stream().anyMatch(status -> status == NodeStatus.WAITING);
     }
@@ -1060,6 +1153,7 @@ public class DagEngine {
         String outputJson = null;
         try {
             if (result.output() != null && !result.output().isEmpty()) {
+                // trace 只保存节点输出快照，序列化失败不阻断业务结果返回。
                 outputJson = objectMapper.writeValueAsString(result.output());
             }
         } catch (Exception ignored) {
@@ -1079,10 +1173,27 @@ public class DagEngine {
         traceBuffer.offer(trace);
     }
 
+    /**
+     * 写入或记录 write Trace End 相关的业务数据。
+     *
+     * <p>方法会结合入参、当前对象状态和依赖组件完成处理，调用方需关注返回值以及可能产生的状态变更。
+     *
+     * @param ctx 执行上下文，提供当前画布、用户和节点运行态数据
+     * @param node node 节点相关对象、标识或配置
+     * @param result result 方法执行所需的业务参数
+     */
     private void writeTraceEnd(ExecutionContext ctx, DagParser.CanvasNode node, NodeResult result) {
         writeTraceEnd(ctx, node, result, 0);
     }
 
+    /**
+     * 执行 collect Next Ids 对应的业务逻辑。
+     *
+     * <p>方法会结合入参、当前对象状态和依赖组件完成处理，调用方需关注返回值以及可能产生的状态变更。
+     *
+     * @param result result 方法执行所需的业务参数
+     * @return 查询、转换或计算得到的结果集合
+     */
     // ══════════════════════════════════════════════════════════════
     // 工具方法
     // ══════════════════════════════════════════════════════════════
@@ -1096,6 +1207,14 @@ public class DagEngine {
                 .collect(Collectors.toList());
     }
 
+    /**
+     * 执行 status For Outcome 对应的业务逻辑。
+     *
+     * <p>方法会结合入参、当前对象状态和依赖组件完成处理，调用方需关注返回值以及可能产生的状态变更。
+     *
+     * @param outcome outcome 方法执行所需的业务参数
+     * @return 方法执行后的业务结果
+     */
     private NodeStatus statusForOutcome(NodeOutcome outcome) {
         if (outcome == null) return NodeStatus.SUCCESS;
         return switch (outcome) {
@@ -1108,6 +1227,14 @@ public class DagEngine {
         };
     }
 
+    /**
+     * 执行 trace Status 对应的业务逻辑。
+     *
+     * <p>方法会结合入参、当前对象状态和依赖组件完成处理，调用方需关注返回值以及可能产生的状态变更。
+     *
+     * @param result result 方法执行所需的业务参数
+     * @return 计算得到的数值结果
+     */
     private int traceStatus(NodeResult result) {
         if (!result.success()) {
             return 2;
@@ -1121,6 +1248,16 @@ public class DagEngine {
         return 1;
     }
 
+    /**
+     * 执行 pending Response 对应的业务逻辑。
+     *
+     * <p>实现会处理 MQ 消息、路由或发送记录，影响异步触发链路。
+     *
+     * @param nodeId nodeId 对应的业务主键或标识
+     * @param nodeType nodeType 节点相关对象、标识或配置
+     * @param result result 方法执行所需的业务参数
+     * @return 按业务键组织的映射结果
+     */
     private Map<String, Object> pendingResponse(String nodeId, String nodeType, NodeResult result) {
         Map<String, Object> response = new LinkedHashMap<>();
         response.put(MapFieldKeys.PENDING, true);
@@ -1199,6 +1336,16 @@ public class DagEngine {
         return resolved;
     }
 
+    /**
+     * 执行 enrich Wait Resume Payload 对应的业务逻辑。
+     *
+     * <p>方法会结合入参、当前对象状态和依赖组件完成处理，调用方需关注返回值以及可能产生的状态变更。
+     *
+     * @param resolved resolved 方法执行所需的业务参数
+     * @param ctx 执行上下文，提供当前画布、用户和节点运行态数据
+     * @param nodeId nodeId 对应的业务主键或标识
+     * @param nodeType nodeType 节点相关对象、标识或配置
+     */
     private void enrichWaitResumePayload(Map<String, Object> resolved,
                                          ExecutionContext ctx,
                                          String nodeId,
@@ -1261,6 +1408,15 @@ public class DagEngine {
         }
     }
 
+    /**
+     * 写入或记录 mark Skipped Path 相关的业务数据。
+     *
+     * <p>方法会结合入参、当前对象状态和依赖组件完成处理，调用方需关注返回值以及可能产生的状态变更。
+     *
+     * @param graph graph 方法执行所需的业务参数
+     * @param nodeId nodeId 对应的业务主键或标识
+     * @param ctx 执行上下文，提供当前画布、用户和节点运行态数据
+     */
     private void markSkippedPath(DagGraph graph, String nodeId, ExecutionContext ctx) {
         if (nodeId == null || nodeId.isBlank()) {
             return;
@@ -1284,6 +1440,16 @@ public class DagEngine {
         }
     }
 
+    /**
+     * 执行 all Upstream Skipped 对应的业务逻辑。
+     *
+     * <p>方法会结合入参、当前对象状态和依赖组件完成处理，调用方需关注返回值以及可能产生的状态变更。
+     *
+     * @param graph graph 方法执行所需的业务参数
+     * @param nodeId nodeId 对应的业务主键或标识
+     * @param ctx 执行上下文，提供当前画布、用户和节点运行态数据
+     * @return 判断结果，true 表示校验通过或条件成立
+     */
     private boolean allUpstreamSkipped(DagGraph graph, String nodeId, ExecutionContext ctx) {
         List<String> upstreamIds = graph.upstream(nodeId);
         return !upstreamIds.isEmpty()

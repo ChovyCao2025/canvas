@@ -28,6 +28,7 @@ import java.util.List;
 @RequiredArgsConstructor
 public class SystemOptionController {
 
+    /** 系统选项服务，用于管理全局配置项。 */
     private final SystemOptionService service;
 
     @GetMapping
@@ -43,6 +44,15 @@ public class SystemOptionController {
                 .map(R::ok);
     }
 
+    /**
+     * 处理 update 对应的 HTTP 接口请求。
+     *
+     * <p>方法负责接收控制层参数、调用领域服务并封装统一响应。
+     *
+     * @param id id 对应的业务主键或标识
+     * @param body body 请求体、消息体或事件载荷
+     * @return 异步执行结果，订阅后产生节点结果或业务响应
+     */
     @PutMapping("/{id}")
     public Mono<R<Void>> update(@PathVariable Long id, @RequestBody SystemOptionDO body) {
         return Mono.<Void>fromRunnable(() -> service.updateEditable(id, body))

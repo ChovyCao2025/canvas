@@ -35,9 +35,12 @@ import java.util.concurrent.atomic.AtomicBoolean;
 @RequiredArgsConstructor
 public class InFlightExecutionRegistry {
 
+    /** 阻塞式 Redis 模板，用于分布式执行槽位计数。 */
     private final StringRedisTemplate redis;
+    /** Redis key 工具，集中生成执行槽位相关 key。 */
     private final RedisKeyUtil keys;
 
+    /** 执行槽位过期和崩溃自愈使用的全局超时秒数。 */
     @Value("${canvas.execution.global-timeout-sec:600}")
     private long globalTimeoutSec;
 
@@ -75,6 +78,7 @@ public class InFlightExecutionRegistry {
 
         Long result;
         try {
+            // Lua 内一次完成清僵尸、计数检查和 ZADD，避免多实例并发超卖 slot。
             result = redis.execute(
                     ACQUIRE_SCRIPT,
                     List.of(canvasKey, globalKey),
@@ -125,6 +129,7 @@ public class InFlightExecutionRegistry {
             Disposable.Swap removed = map.remove(executionId);
             if (removed != null) {
                 if (map.isEmpty()) localRegistry.remove(canvasId);
+                // 执行结束释放 Redis slot；若失败，ZSET score 到期会兜底清理。
                 releaseRedisSlot(keys.inflightCanvas(canvasId), keys.inflightGlobal(), executionId);
             }
         }
@@ -141,6 +146,7 @@ public class InFlightExecutionRegistry {
         String globalKey = keys.inflightGlobal();
         map.forEach((execId, d) -> {
             if (!d.isDisposed()) {
+                // 本地 Disposable 只能取消当前 JVM 内的执行，跨机执行依赖各实例自己的 registry。
                 d.dispose();
                 log.info("[REGISTRY] FORCE 取消执行 canvasId={} executionId={}", canvasId, execId);
             }
@@ -157,6 +163,7 @@ public class InFlightExecutionRegistry {
     public int activeCount(Long canvasId) {
         try {
             String key = keys.inflightCanvas(canvasId);
+            // 读计数前先清理过期 score，减少崩溃残留对准入判断的影响。
             redis.opsForZSet().removeRangeByScore(key, 0, System.currentTimeMillis());
             Long count = redis.opsForZSet().zCard(key);
             return count == null ? 0 : count.intValue();
@@ -174,6 +181,7 @@ public class InFlightExecutionRegistry {
     public int totalActiveCount() {
         try {
             String key = keys.inflightGlobal();
+            // 全局计数同样先清僵尸，保持监控和准入的水位接近真实值。
             redis.opsForZSet().removeRangeByScore(key, 0, System.currentTimeMillis());
             Long count = redis.opsForZSet().zCard(key);
             return count == null ? 0 : count.intValue();
@@ -183,7 +191,16 @@ public class InFlightExecutionRegistry {
         }
     }
 
-    // ── Redis 操作 ────────────────────────────────────────────────────
+    /**
+     * 执行 release Redis Slot 对应的业务逻辑。
+     *
+     * <p>实现会读写 Redis 中的缓存、锁、路由或运行态数据。
+     *
+     * @param canvasKey canvasKey 画布相关对象或标识
+     * @param globalKey globalKey 对应的缓存键、配置键或业务键
+     * @param executionId executionId 对应的业务主键或标识
+     */
+// ── Redis 操作 ────────────────────────────────────────────────────
 
     private void releaseRedisSlot(String canvasKey, String globalKey, String executionId) {
         try {

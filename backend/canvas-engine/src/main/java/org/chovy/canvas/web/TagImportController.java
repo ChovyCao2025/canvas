@@ -52,12 +52,24 @@ import java.util.stream.IntStream;
 @RequiredArgsConstructor
 public class TagImportController {
 
+    /** Excel 导入允许的最大数据行数。 */
     static final int MAX_EXCEL_ROWS = 20_000;
+    /** Excel 模板和导入解析使用的固定表头。 */
     static final List<String> EXCEL_HEADERS = List.of("idType", "idValue", "tagCode", "tagValue", "tagTime");
+    /** 标签时间字段的标准解析格式。 */
     static final DateTimeFormatter TAG_TIME_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
+    /** 标签导入服务，用于处理 API 和 Excel 导入。 */
     private final TagImportService tagImportService;
 
+    /**
+     * 处理 api Push 对应的 HTTP 接口请求。
+     *
+     * <p>方法负责接收控制层参数、调用领域服务并封装统一响应。
+     *
+     * @param req 请求对象，承载调用方提交的业务参数
+     * @return 异步执行结果，订阅后产生节点结果或业务响应
+     */
     @PostMapping("/api-push")
     public Mono<R<TagImportResult>> apiPush(@RequestBody TagImportPushReq req) {
         return Mono.fromCallable(() -> tagImportService.importRows("API_PUSH", null, null, req.getRows()))
@@ -65,11 +77,19 @@ public class TagImportController {
                 .map(R::ok);
     }
 
+    /**
+     * 处理 download Excel Template 对应的 HTTP 接口请求。
+     *
+     * <p>方法负责接收控制层参数、调用领域服务并封装统一响应。
+     *
+     * @return 异步执行结果，订阅后产生节点结果或业务响应
+     */
     @GetMapping("/excel-template")
     public Mono<ResponseEntity<byte[]>> downloadExcelTemplate() {
         return Mono.fromCallable(TagImportController::createTemplateBytes)
                 .subscribeOn(Schedulers.boundedElastic())
                 .map(bytes -> ResponseEntity.ok()
+                        // 使用 attachment 响应头，避免浏览器直接尝试预览二进制 xlsx。
                         .header(HttpHeaders.CONTENT_DISPOSITION, ContentDisposition.attachment()
                                 .filename("tag-import-template.xlsx", StandardCharsets.UTF_8)
                                 .build()
@@ -84,10 +104,18 @@ public class TagImportController {
         return DataBufferUtils.join(filePart.content())
                 .flatMap(dataBuffer -> Mono.fromCallable(() -> importExcel(dataBuffer, filePart.filename()))
                         .subscribeOn(Schedulers.boundedElastic())
+                        // join 后必须释放 DataBuffer，避免大文件上传时堆外内存泄漏。
                         .doFinally(signalType -> DataBufferUtils.release(dataBuffer)))
                 .map(R::ok);
     }
 
+    /**
+     * 处理 list Batches 对应的 HTTP 接口请求。
+     *
+     * <p>方法负责接收控制层参数、调用领域服务并封装统一响应。
+     *
+     * @return 异步执行结果，订阅后产生节点结果或业务响应
+     */
     @GetMapping("/batches")
     public Mono<R<List<TagImportBatchDO>>> listBatches() {
         return Mono.fromCallable(tagImportService::listBatches)
@@ -102,6 +130,14 @@ public class TagImportController {
                 .map(R::ok);
     }
 
+    /**
+     * 查询或读取 read Rows 相关的业务数据。
+     *
+     * <p>方法会结合入参、当前对象状态和依赖组件完成处理，调用方需关注返回值以及可能产生的状态变更。
+     *
+     * @param bytes bytes 方法执行所需的业务参数
+     * @return 查询、转换或计算得到的结果集合
+     */
     static List<TagImportRow> readRows(byte[] bytes) {
         try (ExcelReader reader = ExcelUtil.getReader(new ByteArrayInputStream(bytes), 0)) {
             reader.setIgnoreEmptyRow(true);
@@ -109,12 +145,22 @@ public class TagImportController {
             if (maps.size() > MAX_EXCEL_ROWS) {
                 throw new IllegalArgumentException("excel row count exceeds 20000");
             }
+            // Excel 首行是表头，业务行号从第 2 行开始，便于错误明细回显给用户。
             return IntStream.range(0, maps.size())
                     .mapToObj(index -> toImportRow(index + 2, maps.get(index)))
                     .toList();
         }
     }
 
+    /**
+     * 构建、解析或转换 to Import Row 相关的业务数据。
+     *
+     * <p>方法会结合入参、当前对象状态和依赖组件完成处理，调用方需关注返回值以及可能产生的状态变更。
+     *
+     * @param rowNo rowNo 方法执行所需的业务参数
+     * @param map map 方法执行所需的业务参数
+     * @return 方法执行后的业务结果
+     */
     static TagImportRow toImportRow(int rowNo, Map<String, ?> map) {
         TagImportRow row = new TagImportRow();
         row.setRowNo(rowNo);
@@ -126,6 +172,14 @@ public class TagImportController {
         return row;
     }
 
+    /**
+     * 执行 normalize Value 对应的业务逻辑。
+     *
+     * <p>方法会结合入参、当前对象状态和依赖组件完成处理，调用方需关注返回值以及可能产生的状态变更。
+     *
+     * @param value value 待写入、比较或转换的业务值
+     * @return 转换或查询得到的字符串结果
+     */
     static String normalizeValue(Object value) {
         if (value == null) {
             return null;
@@ -134,13 +188,30 @@ public class TagImportController {
         return text.isEmpty() ? null : text;
     }
 
+    /**
+     * 执行 import Excel 对应的业务逻辑。
+     *
+     * <p>方法会结合入参、当前对象状态和依赖组件完成处理，调用方需关注返回值以及可能产生的状态变更。
+     *
+     * @param dataBuffer dataBuffer 方法执行所需的业务参数
+     * @param fileName fileName 方法执行所需的业务参数
+     * @return 方法执行后的业务结果
+     */
     private TagImportResult importExcel(DataBuffer dataBuffer, String fileName) {
         byte[] bytes = new byte[dataBuffer.readableByteCount()];
+        // 读取到 byte[] 后交给 Hutool ExcelReader，避免阻塞解析发生在 Netty 线程。
         dataBuffer.read(bytes);
         List<TagImportRow> rows = readRows(bytes);
         return tagImportService.importRows("EXCEL_IMPORT", fileName, null, rows);
     }
 
+    /**
+     * 创建或新增 create Template Bytes 相关的业务数据。
+     *
+     * <p>方法会结合入参、当前对象状态和依赖组件完成处理，调用方需关注返回值以及可能产生的状态变更。
+     *
+     * @return 方法执行后的业务结果
+     */
     private static byte[] createTemplateBytes() {
         ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
         try (ExcelWriter writer = ExcelUtil.getWriter(true)) {
@@ -151,10 +222,19 @@ public class TagImportController {
         }
     }
 
+    /**
+     * 构建、解析或转换 parse Tag Time 相关的业务数据。
+     *
+     * <p>方法会结合入参、当前对象状态和依赖组件完成处理，调用方需关注返回值以及可能产生的状态变更。
+     *
+     * @param value value 待写入、比较或转换的业务值
+     * @return 方法执行后的业务结果
+     */
     private static LocalDateTime parseTagTime(Object value) {
         if (value == null) {
             return null;
         }
+        // Hutool 读取 Excel 日期时可能返回多种 Java 时间类型，逐个兼容后再解析字符串。
         if (value instanceof LocalDateTime localDateTime) {
             return localDateTime;
         }
