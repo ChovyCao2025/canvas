@@ -52,6 +52,10 @@ public class RedisKeyUtil {
     // ── 分布式并发注册表（InFlightExecutionRegistry）────────────────
     /** 每个画布当前正在执行的任务集合（ZSET，score=过期时间戳ms）。 */
     public String inflightCanvas(Long canvasId) { return prefix + ":inflight:canvas:" + canvasId; }
+    /** 每个 execution lane 当前正在执行的任务集合（ZSET，score=过期时间戳ms）。 */
+    public String inflightLane(org.chovy.canvas.engine.lane.ExecutionLane lane) {
+        return prefix + ":inflight:lane:" + lane.key();
+    }
     /** 全局正在执行的任务集合（ZSET，score=过期时间戳ms）。 */
     public String inflightGlobal()              { return prefix + ":inflight:global"; }
     /**

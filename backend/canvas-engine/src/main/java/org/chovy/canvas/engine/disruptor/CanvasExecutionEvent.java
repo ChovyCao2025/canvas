@@ -1,5 +1,7 @@
 package org.chovy.canvas.engine.disruptor;
 
+import org.chovy.canvas.engine.lane.ExecutionLane;
+
 import java.util.Map;
 
 /**
@@ -28,6 +30,8 @@ public class CanvasExecutionEvent {
 
     /** 消息 ID（用于 MQ 幂等/追踪）。 */
     public String msgId;
+    /** 预解析执行 lane。为空时由执行服务按触发上下文解析。 */
+    public ExecutionLane executionLane;
     public String requestId;
     public CanvasDisruptorService.DispatchOptions dispatchOptions;
 
@@ -35,6 +39,6 @@ public class CanvasExecutionEvent {
     public void reset() {
         canvasId = null; userId = null; triggerType = null;
         triggerNodeType = null; matchKey = null; payload = null; msgId = null;
-        requestId = null; dispatchOptions = null;
+        executionLane = null; requestId = null; dispatchOptions = null;
     }
 }

@@ -2,6 +2,8 @@ package org.chovy.canvas.engine.trigger;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.chovy.canvas.engine.lane.ExecutionLane;
+import org.chovy.canvas.engine.lane.ExecutionLaneAdmissionResult;
 import org.chovy.canvas.infrastructure.redis.RedisKeyUtil;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.redis.core.StringRedisTemplate;
@@ -47,6 +49,8 @@ public class InFlightExecutionRegistry {
      */
     private final ConcurrentHashMap<Long, ConcurrentHashMap<String, Disposable.Swap>> localRegistry =
             new ConcurrentHashMap<>();
+    /** executionId → lane，用于结束或 Kill Switch 时释放对应 lane ZSET。 */
+    private final ConcurrentHashMap<String, ExecutionLane> localExecutionLanes = new ConcurrentHashMap<>();
 
     /**
      * 原子获取分布式执行槽位。
@@ -64,11 +68,24 @@ public class InFlightExecutionRegistry {
      */
     public Optional<Disposable.Swap> tryAcquire(Long canvasId, String executionId,
                                                 int canvasLimit, int globalLimit) {
-        if (canvasLimit <= 0 || globalLimit <= 0) {
-            return Optional.empty();
-        }
+        ExecutionLaneAdmissionResult result = tryAcquire(
+                canvasId, executionId, ExecutionLane.STANDARD, canvasLimit, globalLimit, globalLimit);
+        return result.allowed() ? Optional.of(result.slot()) : Optional.empty();
+    }
 
+    /**
+     * 原子获取分布式执行槽位（画布 + lane + 全局三层预算）。
+     */
+    public ExecutionLaneAdmissionResult tryAcquire(Long canvasId, String executionId,
+                                                   ExecutionLane lane,
+                                                   int canvasLimit, int laneLimit, int globalLimit) {
+        if (canvasLimit <= 0 || laneLimit <= 0 || globalLimit <= 0) {
+            return ExecutionLaneAdmissionResult.rejected(
+                    ExecutionLaneAdmissionResult.Reason.REGISTRY_UNAVAILABLE, 0, 0, 0);
+        }
+        ExecutionLane effectiveLane = lane != null ? lane : ExecutionLane.STANDARD;
         String canvasKey = keys.inflightCanvas(canvasId);
+        String laneKey = keys.inflightLane(effectiveLane);
         String globalKey = keys.inflightGlobal();
         long nowMs = System.currentTimeMillis();
         long expiryMs = nowMs + globalTimeoutSec * 1000L;
@@ -77,21 +94,27 @@ public class InFlightExecutionRegistry {
         try {
             result = redis.execute(
                     ACQUIRE_SCRIPT,
-                    List.of(canvasKey, globalKey),
+                    List.of(canvasKey, laneKey, globalKey),
                     String.valueOf(nowMs),
                     String.valueOf(expiryMs),
                     String.valueOf(canvasLimit),
+                    String.valueOf(laneLimit),
                     String.valueOf(globalLimit),
                     executionId
             );
         } catch (Exception e) {
             log.error("[REGISTRY] Redis acquire 失败，拒绝本次执行以防雪崩 canvasId={}: {}", canvasId, e.getMessage());
-            return Optional.empty();
+            return ExecutionLaneAdmissionResult.rejected(
+                    ExecutionLaneAdmissionResult.Reason.REGISTRY_UNAVAILABLE, 0, 0, 0);
         }
 
         if (result == null || result <= 0) {
-            log.debug("[REGISTRY] 并发槽位不足 canvasId={} result={}", canvasId, result);
-            return Optional.empty();
+            log.debug("[REGISTRY] 并发槽位不足 canvasId={} lane={} result={}", canvasId, effectiveLane, result);
+            return ExecutionLaneAdmissionResult.rejected(
+                    mapReason(result),
+                    activeCount(canvasId),
+                    laneActiveCount(effectiveLane),
+                    totalActiveCount());
         }
 
         // Redis 准入成功，再注册本地槽位（用于 Kill Switch）
@@ -104,15 +127,19 @@ public class InFlightExecutionRegistry {
             localRegistered.set(true);
             return map;
         });
+        localExecutionLanes.put(localExecutionKey(canvasId, executionId), effectiveLane);
 
         if (!localRegistered.get()) {
             // 本地注册失败（极罕见），回滚 Redis 槽位
-            releaseRedisSlot(canvasKey, globalKey, executionId);
-            return Optional.empty();
+            localExecutionLanes.remove(localExecutionKey(canvasId, executionId));
+            releaseRedisSlot(canvasKey, laneKey, globalKey, executionId);
+            return ExecutionLaneAdmissionResult.rejected(
+                    ExecutionLaneAdmissionResult.Reason.REGISTRY_UNAVAILABLE, 0, 0, 0);
         }
 
-        log.debug("[REGISTRY] 准入执行 canvasId={} executionId={}", canvasId, executionId);
-        return Optional.of(slot);
+        log.debug("[REGISTRY] 准入执行 canvasId={} lane={} executionId={}",
+                canvasId, effectiveLane, executionId);
+        return ExecutionLaneAdmissionResult.allowed(slot, 0, 0, 0);
     }
 
     /**
@@ -125,7 +152,12 @@ public class InFlightExecutionRegistry {
             Disposable.Swap removed = map.remove(executionId);
             if (removed != null) {
                 if (map.isEmpty()) localRegistry.remove(canvasId);
-                releaseRedisSlot(keys.inflightCanvas(canvasId), keys.inflightGlobal(), executionId);
+                ExecutionLane lane = localExecutionLanes.remove(localExecutionKey(canvasId, executionId));
+                releaseRedisSlot(
+                        keys.inflightCanvas(canvasId),
+                        keys.inflightLane(lane != null ? lane : ExecutionLane.STANDARD),
+                        keys.inflightGlobal(),
+                        executionId);
             }
         }
     }
@@ -144,7 +176,12 @@ public class InFlightExecutionRegistry {
                 d.dispose();
                 log.info("[REGISTRY] FORCE 取消执行 canvasId={} executionId={}", canvasId, execId);
             }
-            releaseRedisSlot(canvasKey, globalKey, execId);
+            ExecutionLane lane = localExecutionLanes.remove(localExecutionKey(canvasId, execId));
+            releaseRedisSlot(
+                    canvasKey,
+                    keys.inflightLane(lane != null ? lane : ExecutionLane.STANDARD),
+                    globalKey,
+                    execId);
         });
         return map.size();
     }
@@ -183,47 +220,84 @@ public class InFlightExecutionRegistry {
         }
     }
 
+    /** 当前 lane 维度活跃数（读 Redis ZSET，先清过期条目）。 */
+    public int laneActiveCount(ExecutionLane lane) {
+        try {
+            String key = keys.inflightLane(lane != null ? lane : ExecutionLane.STANDARD);
+            redis.opsForZSet().removeRangeByScore(key, 0, System.currentTimeMillis());
+            Long count = redis.opsForZSet().zCard(key);
+            return count == null ? 0 : count.intValue();
+        } catch (Exception e) {
+            log.warn("[REGISTRY] laneActiveCount Redis 读取失败，降级本地计数 lane={}: {}",
+                    lane, e.getMessage());
+            ExecutionLane effectiveLane = lane != null ? lane : ExecutionLane.STANDARD;
+            return (int) localExecutionLanes.values().stream().filter(effectiveLane::equals).count();
+        }
+    }
+
     // ── Redis 操作 ────────────────────────────────────────────────────
 
-    private void releaseRedisSlot(String canvasKey, String globalKey, String executionId) {
+    private void releaseRedisSlot(String canvasKey, String laneKey, String globalKey, String executionId) {
         try {
-            redis.execute(RELEASE_SCRIPT, List.of(canvasKey, globalKey), executionId);
+            redis.execute(RELEASE_SCRIPT, List.of(canvasKey, laneKey, globalKey), executionId);
         } catch (Exception e) {
             // ZREM 失败不影响业务，条目会在 TTL（score=expiryMs）到期后被 ZREMRANGEBYSCORE 自动清除
             log.warn("[REGISTRY] Redis ZREM 失败，等待 TTL 自愈 executionId={}: {}", executionId, e.getMessage());
         }
     }
 
+    private static String localExecutionKey(Long canvasId, String executionId) {
+        return canvasId + ":" + executionId;
+    }
+
+    private static ExecutionLaneAdmissionResult.Reason mapReason(Long result) {
+        if (result == null) {
+            return ExecutionLaneAdmissionResult.Reason.REGISTRY_UNAVAILABLE;
+        }
+        return switch (result.intValue()) {
+            case -1 -> ExecutionLaneAdmissionResult.Reason.CANVAS_LIMIT;
+            case -2 -> ExecutionLaneAdmissionResult.Reason.LANE_LIMIT;
+            case -3 -> ExecutionLaneAdmissionResult.Reason.GLOBAL_LIMIT;
+            default -> ExecutionLaneAdmissionResult.Reason.REGISTRY_UNAVAILABLE;
+        };
+    }
+
     // ── Lua 脚本 ─────────────────────────────────────────────────────
 
     /**
      * 原子获取槽位脚本。
-     * KEYS[1]=canvasKey, KEYS[2]=globalKey
-     * ARGV[1]=nowMs, ARGV[2]=expiryMs, ARGV[3]=canvasLimit, ARGV[4]=globalLimit, ARGV[5]=memberId
-     * 返回：1=成功；-1=画布维度超限；-2=全局维度超限
+     * KEYS[1]=canvasKey, KEYS[2]=laneKey, KEYS[3]=globalKey
+     * ARGV[1]=nowMs, ARGV[2]=expiryMs, ARGV[3]=canvasLimit, ARGV[4]=laneLimit, ARGV[5]=globalLimit, ARGV[6]=memberId
+     * 返回：1=成功；-1=画布维度超限；-2=lane 维度超限；-3=全局维度超限
      */
     private static final RedisScript<Long> ACQUIRE_SCRIPT = RedisScript.of(
             "redis.call('ZREMRANGEBYSCORE', KEYS[1], 0, ARGV[1])\n" +
             "redis.call('ZREMRANGEBYSCORE', KEYS[2], 0, ARGV[1])\n" +
+            "redis.call('ZREMRANGEBYSCORE', KEYS[3], 0, ARGV[1])\n" +
             "local cc = tonumber(redis.call('ZCARD', KEYS[1]))\n" +
-            "local gc = tonumber(redis.call('ZCARD', KEYS[2]))\n" +
+            "local lc = tonumber(redis.call('ZCARD', KEYS[2]))\n" +
+            "local gc = tonumber(redis.call('ZCARD', KEYS[3]))\n" +
             "if cc >= tonumber(ARGV[3]) then return -1 end\n" +
-            "if gc >= tonumber(ARGV[4]) then return -2 end\n" +
-            "redis.call('ZADD', KEYS[1], tonumber(ARGV[2]), ARGV[5])\n" +
-            "redis.call('ZADD', KEYS[2], tonumber(ARGV[2]), ARGV[5])\n" +
+            "if lc >= tonumber(ARGV[4]) then return -2 end\n" +
+            "if gc >= tonumber(ARGV[5]) then return -3 end\n" +
+            "redis.call('ZADD', KEYS[1], tonumber(ARGV[2]), ARGV[6])\n" +
+            "redis.call('ZADD', KEYS[2], tonumber(ARGV[2]), ARGV[6])\n" +
+            "redis.call('ZADD', KEYS[3], tonumber(ARGV[2]), ARGV[6])\n" +
             "redis.call('PEXPIREAT', KEYS[1], tonumber(ARGV[2]) + 60000)\n" +
             "redis.call('PEXPIREAT', KEYS[2], tonumber(ARGV[2]) + 60000)\n" +
+            "redis.call('PEXPIREAT', KEYS[3], tonumber(ARGV[2]) + 60000)\n" +
             "return 1",
             Long.class
     );
 
     /**
      * 原子释放槽位脚本。
-     * KEYS[1]=canvasKey, KEYS[2]=globalKey; ARGV[1]=memberId
+     * KEYS[1]=canvasKey, KEYS[2]=laneKey, KEYS[3]=globalKey; ARGV[1]=memberId
      */
     private static final RedisScript<Long> RELEASE_SCRIPT = RedisScript.of(
             "redis.call('ZREM', KEYS[1], ARGV[1])\n" +
             "redis.call('ZREM', KEYS[2], ARGV[1])\n" +
+            "redis.call('ZREM', KEYS[3], ARGV[1])\n" +
             "return 1",
             Long.class
     );

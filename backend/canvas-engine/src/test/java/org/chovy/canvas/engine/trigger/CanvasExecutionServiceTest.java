@@ -19,6 +19,7 @@ import org.chovy.canvas.dal.dataobject.CanvasExecutionDlqDO;
 import org.chovy.canvas.dal.mapper.CanvasExecutionDlqMapper;
 import org.chovy.canvas.dal.mapper.CanvasExecutionMapper;
 import org.chovy.canvas.dal.mapper.CanvasExecutionStatsMapper;
+import org.chovy.canvas.config.ExecutionLaneProperties;
 import org.chovy.canvas.engine.context.ExecutionContext;
 import org.chovy.canvas.engine.context.NodeStatus;
 import org.chovy.canvas.engine.dag.DagGraph;
@@ -26,6 +27,9 @@ import org.chovy.canvas.engine.dag.DagParser;
 import org.chovy.canvas.engine.disruptor.CanvasDisruptorService;
 import org.chovy.canvas.engine.handler.HandlerRegistry;
 import org.chovy.canvas.engine.handlers.MqTriggerHandler;
+import org.chovy.canvas.engine.lane.ExecutionLane;
+import org.chovy.canvas.engine.lane.ExecutionLaneAdmissionResult;
+import org.chovy.canvas.engine.lane.ExecutionLaneResolver;
 import org.chovy.canvas.engine.scheduler.CanvasMetrics;
 import org.chovy.canvas.engine.scheduler.CircuitBreakerRegistry;
 import org.chovy.canvas.engine.scheduler.DagEngine;
@@ -49,11 +53,11 @@ import reactor.core.publisher.Mono;
 import java.lang.reflect.Method;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
@@ -110,6 +114,8 @@ class CanvasExecutionServiceTest {
                 mqTriggerHandler,
                 dlqMapper,
                 priorityConfig,
+                new ExecutionLaneResolver(),
+                testLaneProperties(),
                 rocketMQTemplate,
                 objectMapper,
                 cdpUserService,
@@ -121,6 +127,19 @@ class CanvasExecutionServiceTest {
         ReflectionTestUtils.setField(sut, "ctxTtlSec", 86400L);
         ReflectionTestUtils.setField(sut, "globalTimeoutSec", 600L);
         ReflectionTestUtils.setField(sut, "globalMaxConcurrency", 1000);
+    }
+
+    private static ExecutionLaneProperties testLaneProperties() {
+        ExecutionLaneProperties properties = new ExecutionLaneProperties();
+        properties.getLight().setMaxConcurrency(1000);
+        properties.getStandard().setMaxConcurrency(1000);
+        properties.getHeavy().setMaxConcurrency(500);
+        properties.getRetry().setMaxConcurrency(1000);
+        return properties;
+    }
+
+    private static ExecutionLaneAdmissionResult acquiredSlot() {
+        return ExecutionLaneAdmissionResult.allowed(Disposables.swap(), 0, 0, 0);
     }
 
     @Test
@@ -141,8 +160,8 @@ class CanvasExecutionServiceTest {
 
         DagGraph graph = graphWithTriggerNode(NodeType.DIRECT_CALL, null);
         when(configCache.get(10L, 101L)).thenReturn(graph);
-        when(executionRegistry.tryAcquire(eq(10L), any(), eq(1000), eq(1000)))
-                .thenReturn(Optional.of(Disposables.swap()));
+        when(executionRegistry.tryAcquire(eq(10L), any(), any(ExecutionLane.class), eq(1000), anyInt(), eq(1000)))
+                .thenReturn(acquiredSlot());
         when(dagEngine.execute(eq(graph), eq("trigger"), any()))
                 .thenReturn(Mono.just(Map.of("ok", true)));
         when(executionMapper.insert(any(CanvasExecutionDO.class))).thenThrow(new RuntimeException("db down"));
@@ -170,8 +189,8 @@ class CanvasExecutionServiceTest {
         DagGraph graph = graphWithTriggerNode(NodeType.MQ_TRIGGER, "topic-request-retry");
         when(configCache.get(46L, 101L)).thenReturn(graph);
         when(mqTriggerHandler.resolveTopic(any())).thenReturn("topic-request-retry");
-        when(executionRegistry.tryAcquire(eq(46L), any(), eq(1000), eq(1000)))
-                .thenReturn(Optional.of(Disposables.swap()));
+        when(executionRegistry.tryAcquire(eq(46L), any(), any(ExecutionLane.class), eq(1000), anyInt(), eq(1000)))
+                .thenReturn(acquiredSlot());
         when(dagEngine.execute(eq(graph), eq("trigger"), any())).thenReturn(Mono.just(Map.of("ok", true)));
 
         Map<String, Object> result = sut.triggerFromExecutionRequest(
@@ -212,8 +231,8 @@ class CanvasExecutionServiceTest {
                 Map.of("hub-a", 0, "hub-b", 0)
         );
         when(configCache.get(47L, 101L)).thenReturn(graph);
-        when(executionRegistry.tryAcquire(eq(47L), any(), eq(1000), eq(1000)))
-                .thenReturn(Optional.of(Disposables.swap()));
+        when(executionRegistry.tryAcquire(eq(47L), any(), any(ExecutionLane.class), eq(1000), anyInt(), eq(1000)))
+                .thenReturn(acquiredSlot());
         when(dagEngine.execute(eq(graph), eq("hub-b"), any())).thenReturn(Mono.just(Map.of("ok", true)));
 
         Map<String, Object> result = sut.trigger(
@@ -432,8 +451,8 @@ class CanvasExecutionServiceTest {
         when(ctxStore.exists(32L, "user-3")).thenReturn(false);
         DagGraph graph = graphWithTriggerNode(NodeType.DIRECT_CALL, null);
         when(configCache.get(32L, 101L)).thenReturn(graph);
-        when(executionRegistry.tryAcquire(eq(32L), any(), eq(1000), eq(1000)))
-                .thenReturn(Optional.of(Disposables.swap()));
+        when(executionRegistry.tryAcquire(eq(32L), any(), any(ExecutionLane.class), eq(1000), anyInt(), eq(1000)))
+                .thenReturn(acquiredSlot());
         when(dagEngine.execute(eq(graph), eq("trigger"), any())).thenReturn(Mono.just(Map.of("ok", true)));
 
         Map<String, Object> result = sut.trigger(
@@ -463,8 +482,8 @@ class CanvasExecutionServiceTest {
         when(ctxStore.exists(43L, "user-14")).thenReturn(false);
         DagGraph graph = graphWithTriggerNode(NodeType.DIRECT_CALL, null);
         when(configCache.get(43L, 101L)).thenReturn(graph);
-        when(executionRegistry.tryAcquire(eq(43L), any(), eq(1000), eq(1000)))
-                .thenReturn(Optional.of(Disposables.swap()));
+        when(executionRegistry.tryAcquire(eq(43L), any(), any(ExecutionLane.class), eq(1000), anyInt(), eq(1000)))
+                .thenReturn(acquiredSlot());
         when(dagEngine.execute(eq(graph), eq("trigger"), any())).thenReturn(Mono.just(Map.of("ok", true)));
 
         Map<String, Object> result = sut.trigger(
@@ -496,8 +515,8 @@ class CanvasExecutionServiceTest {
                 .thenReturn("dedup:45:user-16:perf_20260523_005:direct:1");
         DagGraph graph = graphWithTriggerNode(NodeType.DIRECT_CALL, null);
         when(configCache.get(45L, 101L)).thenReturn(graph);
-        when(executionRegistry.tryAcquire(eq(45L), any(), eq(1000), eq(1000)))
-                .thenReturn(Optional.of(Disposables.swap()));
+        when(executionRegistry.tryAcquire(eq(45L), any(), any(ExecutionLane.class), eq(1000), anyInt(), eq(1000)))
+                .thenReturn(acquiredSlot());
         when(dagEngine.execute(eq(graph), eq("trigger"), any())).thenReturn(Mono.just(Map.of("ok", true)));
 
         Map<String, Object> result = sut.trigger(
@@ -638,8 +657,8 @@ class CanvasExecutionServiceTest {
                 Map.of("start", List.of()),
                 Map.of("start", 0));
         when(configCache.get(10L, 100L)).thenReturn(graph);
-        when(executionRegistry.tryAcquire(eq(10L), any(), eq(1000), eq(1000)))
-                .thenReturn(Optional.of(Disposables.swap()));
+        when(executionRegistry.tryAcquire(eq(10L), any(), any(ExecutionLane.class), eq(1000), anyInt(), eq(1000)))
+                .thenReturn(acquiredSlot());
         when(dagEngine.execute(eq(graph), eq("start"), any()))
                 .thenAnswer(invocation -> {
                     ExecutionContext ctx = invocation.getArgument(2);

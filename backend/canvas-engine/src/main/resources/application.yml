@@ -67,7 +67,7 @@ canvas:
   execution:
     global-timeout-sec: 600
     context-ttl-sec: 86400
-    max-concurrency: 1000
+    max-concurrency: 3000
     max-retry: 3
     retry-base-delay-ms: 1000
     retry-max-delay-ms: 30000
@@ -79,6 +79,19 @@ canvas:
       high-max-concurrency-ratio: 2.0
       overflow-retry-delay-ms: 5000
       overflow-max-retry: 3
+  execution-lane:
+    light:
+      max-concurrency: 600
+      queue-limit: 2000
+    standard:
+      max-concurrency: 1800
+      queue-limit: 10000
+    heavy:
+      max-concurrency: 300
+      queue-limit: 1000
+    retry:
+      max-concurrency: 300
+      queue-limit: 3000
   execution-request:
     dispatch-batch-size: 200
     dispatch-fixed-delay-ms: 1000

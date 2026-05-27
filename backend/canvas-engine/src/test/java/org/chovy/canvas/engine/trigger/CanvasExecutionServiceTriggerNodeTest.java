@@ -2,6 +2,7 @@ package org.chovy.canvas.engine.trigger;
 
 import cn.hutool.core.lang.Snowflake;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.chovy.canvas.config.ExecutionLaneProperties;
 import org.chovy.canvas.dal.mapper.CanvasMapper;
 import org.chovy.canvas.dal.mapper.CanvasVersionMapper;
 import org.chovy.canvas.common.enums.NodeType;
@@ -15,6 +16,7 @@ import org.chovy.canvas.engine.dag.DagGraph;
 import org.chovy.canvas.engine.dag.DagParser;
 import org.chovy.canvas.engine.disruptor.CanvasDisruptorService;
 import org.chovy.canvas.engine.handlers.MqTriggerHandler;
+import org.chovy.canvas.engine.lane.ExecutionLaneResolver;
 import org.chovy.canvas.engine.scheduler.DagEngine;
 import org.chovy.canvas.infrastructure.cache.CanvasConfigCache;
 import org.chovy.canvas.infrastructure.cache.CanvasEntityCache;
@@ -114,6 +116,8 @@ class CanvasExecutionServiceTriggerNodeTest {
                 mqTriggerHandler,
                 mock(CanvasExecutionDlqMapper.class),
                 new TriggerPriorityConfig(),
+                new ExecutionLaneResolver(),
+                new ExecutionLaneProperties(),
                 mock(RocketMQTemplate.class),
                 new ObjectMapper(),
                 mock(CdpUserService.class),

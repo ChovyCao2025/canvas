@@ -1,0 +1,64 @@
+{
+  "targetConcurrency": 4000,
+  "observationWindowSeconds": 1800,
+  "lanes": {
+    "LIGHT": { "concurrency": 800, "share": 0.2 },
+    "STANDARD": { "concurrency": 2400, "share": 0.6 },
+    "HEAVY": { "concurrency": 400, "share": 0.1 },
+    "RETRY": { "concurrency": 400, "share": 0.1 }
+  },
+  "stopGates": [
+    "RUNNER_FAILED",
+    "VERIFIER_FAIL",
+    "P95_EXCEEDED",
+    "LIGHT_STANDARD_STARVED_BY_HEAVY_OR_RETRY",
+    "ASYNC_WRITE_BACKLOG_GROWING",
+    "REDIS_EXECUTION_STATE_LATENCY_SUSTAINED",
+    "MYSQL_POOL_SATURATION",
+    "ROCKETMQ_BACKLOG_UNBOUNDED",
+    "ADAPTIVE_RETRY_CANNOT_DRAIN_BACKLOG",
+    "DOWNSTREAM_BULKHEAD_OPEN_NO_RECOVERY"
+  ],
+  "profiles": [
+    {
+      "name": "readiness-mixed-4000",
+      "description": "4000 readiness mixed profile: LIGHT 800, STANDARD 2400, HEAVY 400, RETRY 400.",
+      "mode": "event",
+      "eventCode": "PERF_ORDER_PAID",
+      "stages": [
+        { "count": 12000, "concurrency": 800 },
+        { "count": 40000, "concurrency": 2400 },
+        { "count": 70000, "concurrency": 4000 }
+      ],
+      "maxFailed": 0,
+      "maxP95Ms": 1200,
+      "waitAfterRunMs": 30000
+    },
+    {
+      "name": "readiness-retry-heavy-isolation-4000",
+      "description": "RETRY and HEAVY each reach 400 while LIGHT and STANDARD remain protected.",
+      "mode": "event",
+      "eventCode": "PERF_HEAVY_FLOW",
+      "stages": [
+        { "count": 10000, "concurrency": 400 },
+        { "count": 30000, "concurrency": 800 }
+      ],
+      "maxFailed": 0,
+      "maxP95Ms": 3000,
+      "waitAfterRunMs": 30000
+    },
+    {
+      "name": "readiness-downstream-bulkhead-4000",
+      "description": "A slow downstream dependency must not degrade LIGHT or STANDARD for the full window.",
+      "mode": "event",
+      "eventCode": "PERF_SLOW_DOWNSTREAM",
+      "stages": [
+        { "count": 8000, "concurrency": 500 },
+        { "count": 30000, "concurrency": 1600 }
+      ],
+      "maxFailed": 200,
+      "maxP95Ms": 5000,
+      "waitAfterRunMs": 30000
+    }
+  ]
+}

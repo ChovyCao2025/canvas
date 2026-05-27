@@ -1,6 +1,7 @@
 package org.chovy.canvas.engine.trigger;
 
 import org.chovy.canvas.infrastructure.redis.RedisKeyUtil;
+import org.chovy.canvas.engine.lane.ExecutionLane;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -38,6 +39,10 @@ class InFlightExecutionRegistryTest {
     @BeforeEach
     void setUp() {
         when(keys.inflightCanvas(anyLong())).thenAnswer(invocation -> "canvas:" + invocation.getArgument(0));
+        when(keys.inflightLane(any())).thenAnswer(invocation -> {
+            ExecutionLane lane = invocation.getArgument(0);
+            return "lane:" + lane.key();
+        });
         when(keys.inflightGlobal()).thenReturn("global");
     }
 
@@ -45,7 +50,7 @@ class InFlightExecutionRegistryTest {
     void tryAcquireRejectsWhenCanvasLimitReached() {
         InFlightExecutionRegistry registry = registry();
         when(redis.execute(any(RedisScript.class), anyList(),
-                anyString(), anyString(), anyString(), anyString(), anyString()))
+                anyString(), anyString(), anyString(), anyString(), anyString(), anyString()))
                 .thenReturn(1L, -1L);
         when(redis.opsForZSet()).thenReturn(zSetOps);
         when(zSetOps.zCard(anyString())).thenReturn(1L);
@@ -63,8 +68,8 @@ class InFlightExecutionRegistryTest {
     void tryAcquireRejectsWhenGlobalLimitReached() {
         InFlightExecutionRegistry registry = registry();
         when(redis.execute(any(RedisScript.class), anyList(),
-                anyString(), anyString(), anyString(), anyString(), anyString()))
-                .thenReturn(1L, -2L);
+                anyString(), anyString(), anyString(), anyString(), anyString(), anyString()))
+                .thenReturn(1L, -3L);
         when(redis.opsForZSet()).thenReturn(zSetOps);
         when(zSetOps.zCard(anyString())).thenReturn(1L);
 
@@ -80,7 +85,7 @@ class InFlightExecutionRegistryTest {
     void cancelAllDisposesRegisteredSubscription() {
         InFlightExecutionRegistry registry = registry();
         when(redis.execute(any(RedisScript.class), anyList(),
-                anyString(), anyString(), anyString(), anyString(), anyString()))
+                anyString(), anyString(), anyString(), anyString(), anyString(), anyString()))
                 .thenReturn(1L);
         when(redis.opsForZSet()).thenReturn(zSetOps);
         when(zSetOps.zCard(anyString())).thenReturn(0L);
