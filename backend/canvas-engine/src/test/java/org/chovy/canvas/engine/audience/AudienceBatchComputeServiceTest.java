@@ -53,7 +53,8 @@ class AudienceBatchComputeServiceTest {
                 new ObjectMapper(),
                 mock(SqlWhereGenerator.class),
                 mock(AudienceEvaluationContextFetcher.class),
-                mock(JdbcConfigResolver.class)
+                mock(JdbcConfigResolver.class),
+                mock(CdpAudienceSourceService.class)
         );
 
         AudienceComputeResult result = service.compute(
@@ -66,5 +67,51 @@ class AudienceBatchComputeServiceTest {
         var runCaptor = org.mockito.ArgumentCaptor.forClass(AudienceComputeRunDO.class);
         verify(computeRunMapper).updateById(runCaptor.capture());
         assertThat(runCaptor.getValue().getStatus()).isEqualTo("SKIPPED_LOCK");
+    }
+
+    @Test
+    void computeViaCdpTagSavesBitmap() throws Exception {
+        AudienceDefinitionMapper definitionMapper = mock(AudienceDefinitionMapper.class);
+        AudienceStatMapper statMapper = mock(AudienceStatMapper.class);
+        AudienceComputeRunMapper computeRunMapper = mock(AudienceComputeRunMapper.class);
+        StringRedisTemplate redis = mock(StringRedisTemplate.class);
+        ValueOperations<String, String> valueOps = mock(ValueOperations.class);
+        AudienceBitmapStore bitmapStore = mock(AudienceBitmapStore.class);
+        CdpAudienceSourceService cdpAudienceSourceService = mock(CdpAudienceSourceService.class);
+
+        org.chovy.canvas.dal.dataobject.AudienceDefinitionDO definition = new org.chovy.canvas.dal.dataobject.AudienceDefinitionDO();
+        definition.setId(9L);
+        definition.setName("CDP VIP");
+        definition.setEnabled(1);
+        definition.setDataSourceType("CDP_TAG");
+        definition.setRuleJson("{\"logic\":\"AND\",\"conditions\":[{\"field\":\"high_value\",\"op\":\"=\",\"value\":\"VIP\"}]}");
+
+        when(definitionMapper.selectById(9L)).thenReturn(definition);
+        when(redis.opsForValue()).thenReturn(valueOps);
+        when(valueOps.setIfAbsent(eq("audience:compute:lock:9"), eq("1"), any(Duration.class))).thenReturn(true);
+        when(cdpAudienceSourceService.resolveUserIds("CDP_TAG", definition.getRuleJson()))
+                .thenReturn(java.util.List.of("u1", "u2"));
+
+        AudienceBatchComputeService service = new AudienceBatchComputeService(
+                definitionMapper,
+                statMapper,
+                computeRunMapper,
+                mock(RuleEvaluatorRouter.class),
+                bitmapStore,
+                redis,
+                new ObjectMapper(),
+                mock(SqlWhereGenerator.class),
+                mock(AudienceEvaluationContextFetcher.class),
+                mock(JdbcConfigResolver.class),
+                cdpAudienceSourceService
+        );
+
+        AudienceComputeResult result = service.compute(9L);
+
+        assertThat(result.success()).isTrue();
+        assertThat(result.status()).isEqualTo("READY");
+        var bitmapCaptor = org.mockito.ArgumentCaptor.forClass(org.roaringbitmap.RoaringBitmap.class);
+        verify(bitmapStore).save(eq(9L), bitmapCaptor.capture());
+        assertThat(bitmapCaptor.getValue().getCardinality()).isEqualTo(2);
     }
 }

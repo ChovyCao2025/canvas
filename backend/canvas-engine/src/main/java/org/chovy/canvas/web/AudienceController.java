@@ -17,10 +17,14 @@ import org.chovy.canvas.dal.dataobject.AsyncTaskDO;
 import org.chovy.canvas.domain.task.AsyncTaskCreateResult;
 import org.chovy.canvas.domain.task.AsyncTaskService;
 import org.chovy.canvas.domain.task.AsyncTaskStatus;
+import org.chovy.canvas.dto.audience.AudiencePreviewReq;
+import org.chovy.canvas.dto.audience.AudiencePreviewResp;
+import org.chovy.canvas.dto.audience.AudienceSourceFieldDTO;
 import org.chovy.canvas.dto.task.ComputeTaskResp;
 import org.chovy.canvas.engine.audience.AudienceBatchComputeService;
 import org.chovy.canvas.engine.audience.AudienceComputeTaskRunner;
 import org.chovy.canvas.engine.audience.AudienceSchedulerService;
+import org.chovy.canvas.engine.audience.CdpAudienceSourceService;
 import org.chovy.canvas.perf.PerfRunContext;
 import org.springframework.security.core.context.ReactiveSecurityContextHolder;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -58,6 +62,7 @@ public class AudienceController {
     private final AsyncTaskService taskService;
     private final AudienceComputeTaskRunner computeTaskRunner;
     private final NotificationService notificationService;
+    private final CdpAudienceSourceService cdpAudienceSourceService;
 
     /** 分页查询人群定义。 */
     @GetMapping
@@ -71,6 +76,26 @@ public class AudienceController {
                     new LambdaQueryWrapper<AudienceDefinitionDO>().orderByDesc(AudienceDefinitionDO::getId)
             );
             return R.ok(PageResult.of(result.getTotal(), result.getRecords()));
+        }).subscribeOn(Schedulers.boundedElastic());
+    }
+
+    /** 查询 CDP 人群数据源可用于圈选的字段。 */
+    @GetMapping("/source-fields")
+    public Mono<R<List<AudienceSourceFieldDTO>>> sourceFields(@RequestParam String dataSourceType) {
+        return Mono.fromCallable(() -> R.ok(cdpAudienceSourceService.listSourceFields(dataSourceType)))
+                .subscribeOn(Schedulers.boundedElastic());
+    }
+
+    /** 预览 CDP 人群规则命中用户，不保存人群定义。 */
+    @PostMapping("/preview")
+    public Mono<R<AudiencePreviewResp>> preview(@RequestBody AudiencePreviewReq req) {
+        return Mono.fromCallable(() -> {
+            if (!cdpAudienceSourceService.supports(req.dataSourceType())) {
+                throw new IllegalArgumentException("Unsupported CDP audience source: " + req.dataSourceType());
+            }
+            List<String> userIds = cdpAudienceSourceService.resolveUserIds(req.dataSourceType(), req.ruleJson());
+            int limit = req.sampleLimit() == null ? 10 : Math.max(1, Math.min(req.sampleLimit(), 100));
+            return R.ok(new AudiencePreviewResp(userIds.size(), userIds.stream().limit(limit).toList()));
         }).subscribeOn(Schedulers.boundedElastic());
     }
 

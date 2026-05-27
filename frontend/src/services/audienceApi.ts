@@ -6,6 +6,25 @@
 import type { R, PageResult } from '../types'
 import http from './api'
 
+export type AudienceDataSourceType = 'TAGGER_API' | 'JDBC' | 'CDP_TAG' | 'CDP_PROFILE' | 'CDP_IDENTITY'
+
+export interface AudienceSourceField {
+  name: string
+  label: string
+  valueType: string
+}
+
+export interface AudiencePreviewPayload {
+  dataSourceType: AudienceDataSourceType
+  ruleJson: string
+  sampleLimit?: number
+}
+
+export interface AudiencePreviewResp {
+  estimatedSize: number
+  sampleUserIds: string[]
+}
+
 /**
  * 人群定义。ruleJson 由前端规则编辑器生成，后端按 engineType 解释执行。
  */
@@ -26,7 +45,7 @@ export interface AudienceDefinition {
   engineType: 'AVIATOR' | 'QL'
 
   /** 数据源类型。 */
-  dataSourceType: 'TAGGER_API' | 'JDBC'
+  dataSourceType: AudienceDataSourceType
 
   /** 数据源配置 JSON 字符串。 */
   dataSourceConfig?: string
@@ -95,4 +114,8 @@ export const audienceApi = {
     http.post<R<ComputeTaskResp>, R<ComputeTaskResp>>(`/canvas/audiences/${id}/compute`),
   stat: (id: number) =>
     http.get<R<AudienceStat>, R<AudienceStat>>(`/canvas/audiences/${id}/stat`),
+  sourceFields: (dataSourceType: AudienceDataSourceType) =>
+    http.get<R<AudienceSourceField[]>, R<AudienceSourceField[]>>('/canvas/audiences/source-fields', { params: { dataSourceType } }),
+  preview: (body: AudiencePreviewPayload) =>
+    http.post<R<AudiencePreviewResp>, R<AudiencePreviewResp>>('/canvas/audiences/preview', body),
 }
