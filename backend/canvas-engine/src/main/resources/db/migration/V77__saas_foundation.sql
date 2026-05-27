@@ -12,7 +12,7 @@ CREATE TABLE IF NOT EXISTS tenant (
   updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   UNIQUE KEY uk_tenant_key (tenant_key),
   KEY idx_tenant_status (status)
-);
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 INSERT INTO tenant (tenant_key, name, status, plan_code, quota_json, remark, created_by)
 VALUES ('default', '默认租户', 'ACTIVE', 'default',
