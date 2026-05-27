@@ -1,14 +1,15 @@
-import { useEffect, useMemo, useState } from 'react'
-import { Button, Card, Empty, Input, Space, Switch, Table, Tag, Tooltip, Typography, message } from 'antd'
-import { CopyOutlined, SearchOutlined } from '@ant-design/icons'
+// Runtime API docs page backed by the OpenAPI spec exposed at /v3/api-docs.
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import { Alert, Button, Card, Empty, Input, Space, Spin, Switch, Table, Tag, Tooltip, Typography, message } from 'antd'
+import { CopyOutlined, ReloadOutlined, SearchOutlined } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
 import {
-  API_DOCS,
   filterApiDocEndpoints,
   formatJsonExample,
   getApiDocCategorySummaries,
 } from './apiDocs'
 import type { ApiDocEndpoint, ApiDocParam } from './apiDocs'
+import { fetchOpenApiSpec, parseOpenApiEndpoints } from './openApiDocs'
 
 const { Paragraph, Text, Title } = Typography
 
@@ -143,11 +144,39 @@ export default function ApiDocsPage() {
   const [keyword, setKeyword] = useState('')
   const [showInternal, setShowInternal] = useState(false)
   const [category, setCategory] = useState<string | undefined>()
+  const [apiEndpoints, setApiEndpoints] = useState<ApiDocEndpoint[]>([])
+  const [warnings, setWarnings] = useState<string[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | undefined>()
 
-  const categorySourceEndpoints = useMemo(() => filterApiDocEndpoints({
+  const loadOpenApiDocs = useCallback(async () => {
+    setLoading(true)
+    setError(undefined)
+
+    try {
+      const spec = await fetchOpenApiSpec()
+      const result = parseOpenApiEndpoints(spec)
+      setApiEndpoints(result.endpoints)
+      setWarnings(result.warnings)
+    } catch (nextError) {
+      setApiEndpoints([])
+      setWarnings([])
+      setError(nextError instanceof Error ? nextError.message : '加载 /v3/api-docs 失败')
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    void loadOpenApiDocs()
+  }, [loadOpenApiDocs])
+
+  const disabled = loading || Boolean(error)
+
+  const categorySourceEndpoints = useMemo(() => filterApiDocEndpoints(apiEndpoints, {
     showInternal,
     keyword,
-  }), [keyword, showInternal])
+  }), [apiEndpoints, keyword, showInternal])
 
   const categorySummaries = useMemo(
     () => getApiDocCategorySummaries(categorySourceEndpoints),
@@ -162,15 +191,15 @@ export default function ApiDocsPage() {
     }
   }, [category, selectedCategory])
 
-  const endpoints = useMemo(() => filterApiDocEndpoints({
+  const endpoints = useMemo(() => filterApiDocEndpoints(apiEndpoints, {
     showInternal,
     keyword,
     category: selectedCategory,
-  }), [keyword, selectedCategory, showInternal])
+  }), [apiEndpoints, keyword, selectedCategory, showInternal])
 
   const totalVisibleCount = categorySourceEndpoints.length
-  const publicCount = API_DOCS.filter(endpoint => !endpoint.internal).length
-  const internalCount = API_DOCS.length - publicCount
+  const publicCount = apiEndpoints.filter(endpoint => !endpoint.internal).length
+  const internalCount = apiEndpoints.length - publicCount
 
   return (
     <div style={{ padding: 24, minWidth: 0 }}>
@@ -182,6 +211,38 @@ export default function ApiDocsPage() {
             打开“显示内部管理 API”后，可查看画布、配置、观测、运维和用户管理等后台接口。
           </Paragraph>
         </div>
+
+        {loading ? (
+          <Card size="small" style={{ borderRadius: 8 }}>
+            <Space>
+              <Spin size="small" />
+              <Text type="secondary">正在加载 /v3/api-docs...</Text>
+            </Space>
+          </Card>
+        ) : null}
+
+        {error ? (
+          <Alert
+            type="error"
+            showIcon
+            message="OpenAPI 文档加载失败"
+            description={`请求 /v3/api-docs 未成功：${error}`}
+            action={(
+              <Button size="small" icon={<ReloadOutlined />} onClick={loadOpenApiDocs}>
+                重试
+              </Button>
+            )}
+          />
+        ) : null}
+
+        {!error && warnings.length > 0 ? (
+          <Alert
+            type="warning"
+            showIcon
+            message={`OpenAPI 解析跳过 ${warnings.length} 项`}
+            description={warnings.slice(0, 3).join('；')}
+          />
+        ) : null}
 
         <div style={{
           display: 'flex',
@@ -201,6 +262,7 @@ export default function ApiDocsPage() {
                 placeholder="搜索标题、路径、方法或分类"
                 value={keyword}
                 onChange={event => setKeyword(event.target.value)}
+                disabled={disabled}
               />
 
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
@@ -212,7 +274,7 @@ export default function ApiDocsPage() {
                     </Text>
                   </div>
                 </div>
-                <Switch checked={showInternal} onChange={setShowInternal} />
+                <Switch checked={showInternal} onChange={setShowInternal} disabled={disabled} />
               </div>
 
               <div>
@@ -222,6 +284,7 @@ export default function ApiDocsPage() {
                     block
                     type={!selectedCategory ? 'primary' : 'default'}
                     onClick={() => setCategory(undefined)}
+                    disabled={disabled}
                     style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
                   >
                     <span>全部 API</span>
@@ -233,6 +296,7 @@ export default function ApiDocsPage() {
                       block
                       type={selectedCategory === summary.key ? 'primary' : 'default'}
                       onClick={() => setCategory(summary.key)}
+                      disabled={disabled}
                       style={{
                         height: 'auto',
                         minHeight: 42,
@@ -270,13 +334,14 @@ export default function ApiDocsPage() {
                 ) : null}
               </div>
 
-              {endpoints.length > 0 ? (
-                endpoints.map(endpoint => <EndpointCard key={endpoint.id} endpoint={endpoint} />)
-              ) : (
+              {!loading && !error && endpoints.length > 0
+                ? endpoints.map(endpoint => <EndpointCard key={endpoint.id} endpoint={endpoint} />)
+                : null}
+              {!loading && !error && endpoints.length === 0 ? (
                 <Card size="small" style={{ borderRadius: 8 }}>
                   <Empty description="没有匹配的 API" />
                 </Card>
-              )}
+              ) : null}
             </Space>
           </div>
         </div>
