@@ -16,6 +16,9 @@ public class SystemOptionDO {
     @TableId(type = IdType.AUTO)
     private Long id;
 
+    @TableField("tenant_id")
+    private Long tenantId;
+
     private String category;
     private String optionKey;
     private String label;

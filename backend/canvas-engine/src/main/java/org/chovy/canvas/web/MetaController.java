@@ -3,6 +3,8 @@ package org.chovy.canvas.web;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import org.chovy.canvas.common.MapFieldKeys;
 import org.chovy.canvas.common.R;
+import org.chovy.canvas.common.tenant.TenantContext;
+import org.chovy.canvas.common.tenant.TenantContextResolver;
 import org.chovy.canvas.domain.meta.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -51,6 +53,7 @@ public class MetaController {
     private final ObjectMapper objectMapper;
     private final SystemOptionService systemOptionService;
     private final AbExperimentGroupService abExperimentGroupService;
+    private final TenantContextResolver tenantContextResolver;
 
     @Value("${canvas.integration.tagger-service-url}")
     private String taggerUrl;
@@ -94,22 +97,26 @@ public class MetaController {
 
     @GetMapping("/options")
     public Mono<R<List<StubOption>>> getOptions(@RequestParam String category) {
-        return Mono.fromCallable(() -> systemOptionService.activeOptions(category))
-                .subscribeOn(Schedulers.boundedElastic())
-                .map(R::ok);
+        return currentTenant()
+                .flatMap(context -> Mono.fromCallable(() -> systemOptionService.activeOptions(
+                                category, context.tenantId()))
+                        .subscribeOn(Schedulers.boundedElastic())
+                        .map(R::ok));
     }
 
     @GetMapping("/options/batch")
     public Mono<R<Map<String, List<StubOption>>>> getOptionsBatch(@RequestParam List<String> categories) {
-        return Mono.fromCallable(() -> categories.stream()
-                        .distinct()
-                        .collect(Collectors.toMap(
-                                category -> category,
-                                systemOptionService::activeOptions,
-                                (left, right) -> left,
-                                java.util.LinkedHashMap::new)))
-                .subscribeOn(Schedulers.boundedElastic())
-                .map(R::ok);
+        return currentTenant()
+                .flatMap(context -> Mono.fromCallable(() -> categories.stream()
+                                .distinct()
+                                .collect(Collectors.toMap(
+                                        category -> category,
+                                        category -> systemOptionService.activeOptions(
+                                                category, context.tenantId()),
+                                        (left, right) -> left,
+                                        java.util.LinkedHashMap::new)))
+                        .subscribeOn(Schedulers.boundedElastic())
+                        .map(R::ok));
     }
 
     /**
@@ -119,9 +126,11 @@ public class MetaController {
      */
     @GetMapping("/mq-topics")
     public Mono<R<List<StubOption>>> getMqTopics() {
-        return Mono.fromCallable(() -> systemOptionService.activeOptions("mq_topic_legacy"))
-                .subscribeOn(Schedulers.boundedElastic())
-                .map(R::ok);
+        return currentTenant()
+                .flatMap(context -> Mono.fromCallable(() -> systemOptionService.activeOptions(
+                                "mq_topic_legacy", context.tenantId()))
+                        .subscribeOn(Schedulers.boundedElastic())
+                        .map(R::ok));
     }
 
     /**
@@ -153,9 +162,11 @@ public class MetaController {
      */
     @GetMapping("/coupon-types")
     public Mono<R<List<StubOption>>> getCouponTypes() {
-        return Mono.fromCallable(() -> systemOptionService.activeOptions("coupon_type"))
-                .subscribeOn(Schedulers.boundedElastic())
-                .map(R::ok);
+        return currentTenant()
+                .flatMap(context -> Mono.fromCallable(() -> systemOptionService.activeOptions(
+                                "coupon_type", context.tenantId()))
+                        .subscribeOn(Schedulers.boundedElastic())
+                        .map(R::ok));
     }
 
     /**
@@ -165,9 +176,11 @@ public class MetaController {
      */
     @GetMapping("/reach-scenes")
     public Mono<R<List<StubOption>>> getReachScenes() {
-        return Mono.fromCallable(() -> systemOptionService.activeOptions("reach_scene"))
-                .subscribeOn(Schedulers.boundedElastic())
-                .map(R::ok);
+        return currentTenant()
+                .flatMap(context -> Mono.fromCallable(() -> systemOptionService.activeOptions(
+                                "reach_scene", context.tenantId()))
+                        .subscribeOn(Schedulers.boundedElastic())
+                        .map(R::ok));
     }
 
     /**
@@ -287,9 +300,11 @@ public class MetaController {
     /** 获取业务线列表。 */
     @GetMapping("/biz-lines")
     public Mono<R<List<StubOption>>> getBizLines() {
-        return Mono.fromCallable(() -> systemOptionService.activeOptions("biz_line"))
-                .subscribeOn(Schedulers.boundedElastic())
-                .map(R::ok);
+        return currentTenant()
+                .flatMap(context -> Mono.fromCallable(() -> systemOptionService.activeOptions(
+                                "biz_line", context.tenantId()))
+                        .subscribeOn(Schedulers.boundedElastic())
+                        .map(R::ok));
     }
 
     @GetMapping("/identity-types")
@@ -327,17 +342,21 @@ public class MetaController {
     /** 获取业务线对应可选 API 列表。 */
     @GetMapping("/biz-lines/{key}/apis")
     public Mono<R<List<StubOption>>> getBizLineApis(@PathVariable String key) {
-        return Mono.fromCallable(() -> systemOptionService.activeOptions("biz_line_api"))
-                .subscribeOn(Schedulers.boundedElastic())
-                .map(R::ok);
+        return currentTenant()
+                .flatMap(context -> Mono.fromCallable(() -> systemOptionService.activeOptions(
+                                "biz_line_api", context.tenantId()))
+                        .subscribeOn(Schedulers.boundedElastic())
+                        .map(R::ok));
     }
 
     /** 获取行为策略类型列表。 */
     @GetMapping("/behavior-strategy-types")
     public Mono<R<List<StubOption>>> getBehaviorStrategyTypes() {
-        return Mono.fromCallable(() -> systemOptionService.activeOptions("behavior_strategy_type"))
-                .subscribeOn(Schedulers.boundedElastic())
-                .map(R::ok);
+        return currentTenant()
+                .flatMap(context -> Mono.fromCallable(() -> systemOptionService.activeOptions(
+                                "behavior_strategy_type", context.tenantId()))
+                        .subscribeOn(Schedulers.boundedElastic())
+                        .map(R::ok));
     }
 
     /** 按类型获取消息编码列表。 */
@@ -345,9 +364,11 @@ public class MetaController {
     public Mono<R<List<StubOption>>> getMessageCodes(
             @RequestParam(defaultValue = "IN_APP") String type) {
         String category = "MQ".equals(type) ? "message_code_mq" : "message_code_in_app";
-        return Mono.fromCallable(() -> systemOptionService.activeOptions(category))
-                .subscribeOn(Schedulers.boundedElastic())
-                .map(R::ok);
+        return currentTenant()
+                .flatMap(context -> Mono.fromCallable(() -> systemOptionService.activeOptions(
+                                category, context.tenantId()))
+                        .subscribeOn(Schedulers.boundedElastic())
+                        .map(R::ok));
     }
 
     /**
@@ -431,6 +452,10 @@ public class MetaController {
         f.setDataType(type);
         f.setSourceNodeType(source);
         return f;
+    }
+
+    private Mono<TenantContext> currentTenant() {
+        return tenantContextResolver.current();
     }
 
     private static String str(Object o) {
