@@ -21,6 +21,6 @@ public class UserUpdateReq {
     /** 新密码（可选，服务层会做非空判断后再加密）。 */
     private String password;
 
-    /** 角色（可选）：ADMIN / OPERATOR。 */
+    /** 角色（可选）：SUPER_ADMIN / TENANT_ADMIN / OPERATOR。 */
     private String role;
 }

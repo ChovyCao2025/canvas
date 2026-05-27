@@ -1,6 +1,8 @@
 package org.chovy.canvas.auth.domain;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.chovy.canvas.common.tenant.RoleNames;
+import org.chovy.canvas.common.tenant.TenantContext;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -31,7 +33,8 @@ class SysUserServiceTest {
         when(encoder.encode("Secret1")).thenReturn("$2a$encoded-password");
         SysUserService service = new SysUserService(sysUserMapper, encoder);
 
-        SysUserDO created = service.create("operator", "Secret1", "运营人员", "OPERATOR");
+        SysUserDO created = service.create("operator", "Secret1", "运营人员",
+                RoleNames.OPERATOR, 3L, superAdmin());
 
         ArgumentCaptor<SysUserDO> captor = ArgumentCaptor.forClass(SysUserDO.class);
         verify(sysUserMapper).insert(captor.capture());
@@ -39,7 +42,8 @@ class SysUserServiceTest {
         assertThat(inserted.getUsername()).isEqualTo("operator");
         assertThat(inserted.getPassword()).isEqualTo("$2a$encoded-password");
         assertThat(inserted.getDisplayName()).isEqualTo("运营人员");
-        assertThat(inserted.getRole()).isEqualTo("OPERATOR");
+        assertThat(inserted.getRole()).isEqualTo(RoleNames.OPERATOR);
+        assertThat(inserted.getTenantId()).isEqualTo(3L);
         assertThat(inserted.getEnabled()).isEqualTo(1);
 
         String json = new ObjectMapper().writeValueAsString(created);
@@ -54,7 +58,8 @@ class SysUserServiceTest {
         when(sysUserMapper.selectOne(any())).thenReturn(existing);
         SysUserService service = new SysUserService(sysUserMapper, encoder);
 
-        assertThatThrownBy(() -> service.create("operator", "Secret1", "运营人员", "OPERATOR"))
+        assertThatThrownBy(() -> service.create("operator", "Secret1", "运营人员",
+                RoleNames.OPERATOR, 3L, superAdmin()))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("用户名已存在");
     }
@@ -63,7 +68,8 @@ class SysUserServiceTest {
     void createRejectsUnsupportedRole() {
         SysUserService service = new SysUserService(sysUserMapper, encoder);
 
-        assertThatThrownBy(() -> service.create("operator", "Secret1", "运营人员", "GUEST"))
+        assertThatThrownBy(() -> service.create("operator", "Secret1", "运营人员",
+                "GUEST", 3L, superAdmin()))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("角色");
     }
@@ -72,8 +78,13 @@ class SysUserServiceTest {
     void createRejectsShortPassword() {
         SysUserService service = new SysUserService(sysUserMapper, encoder);
 
-        assertThatThrownBy(() -> service.create("operator", "12345", "运营人员", "OPERATOR"))
+        assertThatThrownBy(() -> service.create("operator", "12345", "运营人员",
+                RoleNames.OPERATOR, 3L, superAdmin()))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("密码");
+    }
+
+    private TenantContext superAdmin() {
+        return new TenantContext(1L, RoleNames.SUPER_ADMIN, "root");
     }
 }

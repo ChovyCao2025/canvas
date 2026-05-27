@@ -1,5 +1,6 @@
 package org.chovy.canvas.config;
 
+import org.chovy.canvas.common.tenant.RoleNames;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
@@ -19,6 +20,13 @@ import reactor.core.publisher.Mono;
 @Configuration
 @EnableWebFluxSecurity
 public class SecurityConfig {
+
+    static final String[] SUPER_ADMIN_ROUTE_ROLES = {RoleNames.ADMIN, RoleNames.SUPER_ADMIN};
+    static final String[] TENANT_ADMIN_ROUTE_ROLES = {
+            RoleNames.ADMIN,
+            RoleNames.SUPER_ADMIN,
+            RoleNames.TENANT_ADMIN
+    };
 
     /** 密码编码器（BCrypt）。 */
     @Bean
@@ -56,15 +64,20 @@ public class SecurityConfig {
                         .pathMatchers("/canvas/ws/notifications").permitAll()
                         // 运维接口：无需登录（内网调用，不对外暴露）
                         .pathMatchers("/ops/**").permitAll()
-                        // 仅 ADMIN 可发布/下线/Kill/灰度/回滚
+                        // 画布管理动作：SaaS rollout 期间允许 legacy ADMIN、新 SUPER_ADMIN、TENANT_ADMIN。
                         .pathMatchers(HttpMethod.POST,
                                 "/canvas/*/publish", "/canvas/*/offline",
                                 "/canvas/*/kill", "/canvas/*/canary",
                                 "/canvas/*/promote-canary", "/canvas/*/rollback-canary",
                                 "/canvas/*/rollback", "/canvas/*/approve", "/canvas/*/reject",
-                                "/canvas/import").hasRole("ADMIN")
+                                "/canvas/import").hasAnyRole(TENANT_ADMIN_ROUTE_ROLES)
+                        // 租户管理：rollout 期间 legacy ADMIN 与新 SUPER_ADMIN 都视为超级管理员。
+                        .pathMatchers("/admin/tenants", "/admin/tenants/**")
+                        .hasAnyRole(SUPER_ADMIN_ROUTE_ROLES)
+                        .pathMatchers("/admin/users", "/admin/users/**")
+                        .hasAnyRole(TENANT_ADMIN_ROUTE_ROLES)
                         // 管理员接口
-                        .pathMatchers("/admin/**").hasRole("ADMIN")
+                        .pathMatchers("/admin/**").hasAnyRole(TENANT_ADMIN_ROUTE_ROLES)
                         // 其余接口需要登录
                         .anyExchange().authenticated()
                 )
