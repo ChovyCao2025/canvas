@@ -1,57 +1,32 @@
 /**
- * 组件职责：节点配置面板的说明卡片，展示节点摘要、风险提示和运行策略。
+ * 组件职责：节点配置面板的紧凑 Inspector 展示组件。
  *
  * 维护说明：该组件只负责 presentation，不发起网络请求。
  */
 import type { CSSProperties, ReactNode } from 'react'
-import { Typography } from 'antd'
 
-/** 配置面板外层浅灰背景色。 */
-const PANEL_SURFACE = '#f5f5f7'
-/** 配置卡片背景色。 */
+const PANEL_SURFACE = '#f8fafc'
 const PANEL_CARD = '#ffffff'
-/** 配置卡片边框色。 */
-const PANEL_BORDER = '#c7c7cc'
+const PANEL_BORDER = '#d9e1ec'
 
-/**
- * 配置面板普通卡片的基础视觉样式。
- */
 const CARD_STYLE: CSSProperties = {
   background: PANEL_CARD,
   border: `1px solid ${PANEL_BORDER}`,
-  borderRadius: 22,
-  boxShadow: '0 10px 28px rgba(0, 0, 0, 0.045)',
+  borderRadius: 8,
+  boxShadow: 'none',
 }
 
-/**
- * TAGGER 节点的专属配色。
- */
-const TAGGER_STYLES = {
-  title: '#1d1d1f',
-  description: '#6f7c91',
-}
-
-/**
- * 分支路由卡片配色（成功分支 / 失败分支）。
- */
 const ROUTE_STYLES = {
   success: {
-    background: '#eff6ff',
-    border: '1px solid #bfdbfe',
-    title: '#1d4ed8',
-    value: '#1e3a8a',
+    title: '#1677ff',
+    value: '#334155',
   },
   danger: {
-    background: '#fef2f2',
-    border: '1px solid #fecaca',
     title: '#dc2626',
-    value: '#991b1b',
+    value: '#334155',
   },
 } as const
 
-/**
- * 节点头卡片视图模型。
- */
 export interface NodeHeaderCardProps {
   /** 头卡主题。 */
   tone: 'default' | 'tagger'
@@ -74,154 +49,115 @@ export interface NodeHeaderCardProps {
   categoryColor?: string
 }
 
-/** 根据分类色生成头卡内徽章、状态和元信息的半透明样式。 */
-function getHeaderPillStyles(color: string) {
+function getPillStyle(color: string, weight: 'strong' | 'soft' = 'strong'): CSSProperties {
   return {
-    badge: {
-      background: `${color}12`,
-      color,
-      border: `1px solid ${color}33`,
-    },
-    status: {
-      background: `${color}10`,
-      color,
-      border: `1px solid ${color}30`,
-    },
-    meta: {
-      background: `${color}0d`,
-      color,
-      border: `1px solid ${color}24`,
-    },
+    height: 22,
+    display: 'inline-flex',
+    alignItems: 'center',
+    maxWidth: '100%',
+    borderRadius: 999,
+    padding: '0 8px',
+    color: weight === 'strong' ? color : '#475569',
+    background: weight === 'strong' ? `${color}10` : PANEL_SURFACE,
+    border: `1px solid ${weight === 'strong' ? `${color}30` : '#dbe4ef'}`,
+    fontSize: 11,
+    fontWeight: 760,
+    lineHeight: '20px',
+    whiteSpace: 'nowrap',
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
   }
 }
 
 /** 节点配置面板顶部标题卡片。 */
 export function NodeHeaderCard({
-  tone,
+  typeBadge,
   title,
   description,
   statusLabel,
   categoryLabel,
   categoryColor,
+  metaBadges,
 }: NodeHeaderCardProps) {
-  const isTagger = tone === 'tagger'
   const resolvedCategoryColor = categoryColor ?? '#475569'
-  const pillStyles = getHeaderPillStyles(resolvedCategoryColor)
-  const headerBackground = isTagger
-    ? `linear-gradient(135deg, ${resolvedCategoryColor}12 0%, #ffffff 58%, ${resolvedCategoryColor}0a 100%)`
-    : PANEL_CARD
+  const badges = [typeBadge, ...(categoryLabel ? [categoryLabel] : []), ...metaBadges]
 
   return (
     <div
       style={{
-        marginBottom: 16,
-        padding: '24px 24px 26px',
-        background: headerBackground,
-        border: `1px solid ${resolvedCategoryColor}35`,
-        borderRadius: 26,
-        boxShadow: `0 12px 32px ${resolvedCategoryColor}14`,
+        ...CARD_STYLE,
+        marginBottom: 10,
+        padding: 12,
         overflow: 'hidden',
       }}
     >
-      <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'flex-start', gap: 10 }}>
-        {categoryLabel && (
-          <div
-            style={{
-              minWidth: 0,
-              maxWidth: 120,
-              borderRadius: 999,
-              minHeight: 34,
-              lineHeight: '18px',
-              padding: '7px 15px',
-              fontSize: 13,
-              fontWeight: 700,
-              color: pillStyles.meta.color,
-              background: pillStyles.meta.background,
-              border: pillStyles.meta.border,
-              whiteSpace: 'nowrap',
-            }}
-          >
-            {categoryLabel}
+      <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 6, marginBottom: 9 }}>
+        {badges.map((badge, index) => (
+          <div key={`${badge}-${index}`} style={getPillStyle(resolvedCategoryColor, index === 0 ? 'strong' : 'soft')}>
+            {badge}
           </div>
-        )}
-        <div
-          style={{
-            minWidth: 0,
-            maxWidth: 110,
-            borderRadius: 999,
-            minHeight: 34,
-            lineHeight: '18px',
-            padding: '7px 15px',
-            fontSize: 13,
-            fontWeight: 700,
-            color: pillStyles.status.color,
-            background: pillStyles.status.background,
-            border: pillStyles.status.border,
-            whiteSpace: 'nowrap',
-          }}
-        >
+        ))}
+        <div style={{ ...getPillStyle(resolvedCategoryColor, 'soft'), marginLeft: 'auto' }}>
           {statusLabel}
         </div>
       </div>
 
-      <Typography.Title level={5} style={{
-        margin: '22px 0 0',
-        color: isTagger ? TAGGER_STYLES.title : '#1d1d1f',
-        fontSize: 18,
-        lineHeight: 1.35,
-        fontWeight: 700,
-        letterSpacing: 0,
-      }}>
+      <div
+        style={{
+          margin: 0,
+          color: '#0f172a',
+          fontSize: 15,
+          lineHeight: 1.35,
+          fontWeight: 780,
+          letterSpacing: 0,
+          wordBreak: 'break-word',
+        }}
+      >
         {title}
-      </Typography.Title>
+      </div>
 
       {description && (
-        <div style={{ color: isTagger ? TAGGER_STYLES.description : '#6e6e73', fontSize: 14, fontWeight: 600, lineHeight: 1.7, marginTop: 14 }}>
+        <div style={{ color: '#64748b', fontSize: 12, lineHeight: 1.55, marginTop: 7 }}>
           {description}
         </div>
       )}
-
     </div>
   )
 }
 
-/**
- * 通用分节容器卡片。
- */
 export interface ConfigSectionCardProps {
   /** 分节标题。 */
   title: string
+
+  /** 标题右侧摘要。 */
+  summary?: string
 
   /** 分节内容。 */
   children: ReactNode
 }
 
 /** 配置面板内部分区卡片。 */
-export function ConfigSectionCard({ title, children }: ConfigSectionCardProps) {
+export function ConfigSectionCard({ title, summary, children }: ConfigSectionCardProps) {
   return (
-    <section style={{ ...CARD_STYLE, padding: '20px 20px 22px', marginBottom: 16 }}>
-      <div style={{ marginBottom: 16, fontSize: 14, fontWeight: 650, color: '#1d1d1f' }}>
-        {title}
+    <section style={{ ...CARD_STYLE, padding: '10px 10px 4px', marginBottom: 10 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, marginBottom: 9, fontSize: 12, fontWeight: 780, color: '#334155' }}>
+        <span>{title}</span>
+        {summary && <span style={{ color: '#94a3b8', fontWeight: 700 }}>{summary}</span>}
       </div>
       {children}
     </section>
   )
 }
 
-/**
- * 无标题表单容器，避免“配置详情”标题增加冗余层级。
- */
+/** 无标题表单容器，保留给少量兼容路径使用。 */
 export function ConfigFormCard({ children }: { children: ReactNode }) {
   return (
-    <section style={{ ...CARD_STYLE, padding: '20px 20px 6px', marginBottom: 16 }}>
+    <section style={{ ...CARD_STYLE, padding: '10px 10px 4px', marginBottom: 10 }}>
       {children}
     </section>
   )
 }
 
-/**
- * 字段摘要行（左侧字段名 + 右侧值）。
- */
 export interface FieldSummaryRowProps {
   /** 字段标签。 */
   label: string
@@ -230,7 +166,6 @@ export interface FieldSummaryRowProps {
   value: string
 }
 
-/** 配置摘要列表 props。 */
 export interface ConfigSummaryListProps {
   /** 摘要行列表。 */
   rows: FieldSummaryRowProps[]
@@ -239,8 +174,8 @@ export interface ConfigSummaryListProps {
 /** 配置摘要列表组件。 */
 export function ConfigSummaryList({ rows }: ConfigSummaryListProps) {
   return (
-    <section style={{ ...CARD_STYLE, padding: 18, marginBottom: 16 }}>
-      <div style={{ display: 'grid', gap: 10 }}>
+    <section style={{ ...CARD_STYLE, padding: 10, marginBottom: 10 }}>
+      <div style={{ display: 'grid', gap: 6 }}>
         {rows.map((row) => (
           <FieldSummaryRow key={row.label} label={row.label} value={row.value} />
         ))}
@@ -254,25 +189,22 @@ export function FieldSummaryRow({ label, value }: FieldSummaryRowProps) {
   return (
     <div
       style={{
-        padding: '16px 18px',
+        padding: '8px 9px',
         background: PANEL_SURFACE,
-        border: '1px solid #dedee5',
-        borderRadius: 17,
+        border: '1px solid #e7edf5',
+        borderRadius: 8,
       }}
     >
-      <div style={{ color: '#6e6e73', fontSize: 14, fontWeight: 600, marginBottom: 6, lineHeight: 1.35 }}>
+      <div style={{ color: '#64748b', fontSize: 12, fontWeight: 700, marginBottom: 4, lineHeight: 1.35 }}>
         {label}
       </div>
-      <div style={{ color: '#1d1d1f', fontSize: 14, fontWeight: 500, lineHeight: 1.35, wordBreak: 'break-word' }}>
+      <div style={{ color: '#172033', fontSize: 12, fontWeight: 650, lineHeight: 1.35, wordBreak: 'break-word' }}>
         {value}
       </div>
     </div>
   )
 }
 
-/**
- * 分支去向摘要卡片。
- */
 export interface BranchRouteCardProps {
   /** 路由标签。 */
   label: string
@@ -287,23 +219,27 @@ export interface BranchRouteCardProps {
 /** 分支流向摘要卡片。 */
 export function BranchRouteCard({ label, value, tone }: BranchRouteCardProps) {
   const styles = ROUTE_STYLES[tone]
+  const unconnected = value === '未连接'
 
   return (
     <div
       style={{
-        padding: '16px 18px',
-        borderRadius: 17,
-        background: PANEL_SURFACE,
-        border: '1px solid #dedee5',
+        minHeight: 38,
+        display: 'grid',
+        gridTemplateColumns: '62px 1fr',
+        alignItems: 'center',
+        gap: 8,
+        padding: '8px 9px',
+        borderRadius: 8,
+        background: unconnected ? '#fffbeb' : PANEL_SURFACE,
+        border: `1px solid ${unconnected ? '#fde68a' : '#e7edf5'}`,
       }}
     >
-      <div style={{ minWidth: 0 }}>
-        <div style={{ color: styles.title, fontSize: 14, fontWeight: 600, marginBottom: 6, lineHeight: 1.35 }}>
-          {label}
-        </div>
-        <div style={{ color: styles.value, fontSize: 14, fontWeight: 500, lineHeight: 1.35, wordBreak: 'break-word' }}>
-          {value}
-        </div>
+      <div style={{ color: unconnected ? '#b45309' : styles.title, fontSize: 12, fontWeight: 780, lineHeight: 1.35 }}>
+        {label}
+      </div>
+      <div style={{ color: unconnected ? '#92400e' : styles.value, fontSize: 12, fontWeight: 680, lineHeight: 1.35, wordBreak: 'break-word' }}>
+        {value}
       </div>
     </div>
   )

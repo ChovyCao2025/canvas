@@ -1,36 +1,35 @@
 /**
- * 测试职责：验证配置面板控件统一视觉样式的关键尺寸和颜色。
+ * 测试职责：验证配置面板控件的必要尺寸契约。
  *
- * 维护说明：这些断言保护输入框/下拉框的布局契约，调整设计时需要同步更新。
+ * 维护说明：只锁定会影响“大框突兀感”和复杂行密度的关键值。
  */
 import { describe, expect, it } from 'vitest'
-import { getControlChrome, getControlLabelStyle } from './controlChrome'
+import { getControlChrome, getControlLabelStyle, getInlineControlChrome } from './controlChrome'
 
 describe('controlChrome', () => {
-  it('returns the heavier iOS-like select/input shell', () => {
+  it('uses compact main controls for the right inspector', () => {
     const chrome = getControlChrome()
 
-    expect(chrome.height).toBe(52)
-    expect(chrome.borderRadius).toBe(18)
-    expect(chrome.border).toBe('1px solid #d8e3f2')
-    expect(chrome.background).toBe('linear-gradient(180deg,#ffffff 0%,#f6f8fb 100%)')
-    expect(chrome.boxShadow).toBe(
-      'inset 0 1px 0 rgba(255,255,255,.95), 0 5px 14px rgba(15,23,42,.04)',
-    )
+    expect(chrome.height).toBe(40)
+    expect(chrome.borderRadius).toBe(8)
+    expect(chrome.paddingInline).toBe(10)
+    expect(chrome.border).toBe('1px solid #d9e1ec')
+    expect(chrome.background).toBe('#ffffff')
+    expect(chrome.boxShadow).toBe('none')
   })
 
-  it('keeps enough horizontal padding for select affordances', () => {
-    const chrome = getControlChrome()
+  it('uses dense inline controls for rules and mappings', () => {
+    const chrome = getInlineControlChrome()
 
-    expect(chrome.height).toBe(52)
-    expect(chrome.borderRadius).toBe(18)
-    expect(chrome.paddingInline).toBe(16)
+    expect(chrome.height).toBe(32)
+    expect(chrome.borderRadius).toBe(7)
+    expect(chrome.paddingInline).toBe(8)
   })
 
-  it('returns a subdued field label style', () => {
+  it('keeps field labels subdued without becoming tiny', () => {
     const labelStyle = getControlLabelStyle()
 
-    expect(labelStyle.fontSize).toBe(11)
-    expect(labelStyle.color).toBe('#7b8798')
+    expect(labelStyle.fontSize).toBe(12)
+    expect(labelStyle.color).toBe('#64748b')
   })
 })

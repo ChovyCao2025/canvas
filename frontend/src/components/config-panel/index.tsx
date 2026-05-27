@@ -19,9 +19,7 @@ import { useSystemOptions } from '../../hooks/useSystemOptions'
 import CronBuilder from './CronBuilder'
 import {
   BranchRouteCard,
-  ConfigFormCard,
   ConfigSectionCard,
-  ConfigSummaryList,
   NodeHeaderCard,
 } from './InspectorCards'
 import {
@@ -97,7 +95,7 @@ export function resolveDataSourceTemplate(src: string, values: Record<string, un
 
 /** 统一渲染配置项标题，避免每个 Form.Item 重复写样式。 */
 function renderControlLabel(label: string): React.ReactNode {
-  return <div style={{ ...getControlLabelStyle(), margin: '0 6px 6px' }}>{label}</div>
+  return <div style={{ ...getControlLabelStyle(), margin: '0 4px 5px' }}>{label}</div>
 }
 
 /** 通用数据源加载：任意 dataSource URL，自动缓存，无需逐个注册 */
@@ -331,9 +329,56 @@ export default function ConfigPanel({ nodeId, nodeData, onChange, nodes, readonl
     fields: visibleFields.map(({ key, label, type }) => ({ key, label, type })),
     getNodeName,
   })
+  const visibleFieldByKey = new Map(visibleFields.map(field => [field.key, field]))
+  const groupedSections = presentation.fieldGroups.some(group => group.key === 'basic')
+    ? presentation.fieldGroups
+    : [{ key: 'basic' as const, title: '基础配置', fields: [] }, ...presentation.fieldGroups]
+
+  /** 根据 schema 字段渲染具体控件，分组只改变布局，不改变字段名和回写路径。 */
+  const renderConfigField = (field: SchemaField) => {
+    // api-input-params / event-attr-preview 自己管理渲染，不能被外层 Form.Item 包住
+    if (field.type === 'api-input-params') {
+      return (
+        <div key={field.key} style={{ marginBottom: 10 }}>
+          <ApiCallInputParams
+            label={field.label}
+            apiKeyField={field.apiKeyField ?? 'apiKey'}
+            defsSource={field.defsSource ?? '/meta/api-definitions'}
+          />
+        </div>
+      )
+    }
+    if (field.type === 'event-attr-preview') {
+      return (
+        <div key={field.key} style={{ marginBottom: 10 }}>
+          {renderControlLabel(field.label)}
+          <EventAttrPreview />
+        </div>
+      )
+    }
+    if (field.type === 'delay-input') {
+      return (
+        <div key={field.key} style={{ marginBottom: 10 }}>
+          {renderControlLabel(field.label)}
+          <DelayInput
+            valueFieldKey={field.key}
+            unitFieldKey="unit"
+            unitOptions={sharedOptions.delayUnits}
+            applyFormPatch={applyFormPatch}
+          />
+        </div>
+      )
+    }
+    return (
+      <Form.Item key={field.key} name={field.key} label={renderControlLabel(field.label)}
+        rules={field.required ? [{ required: true, message: `请填写${field.label}` }] : []}>
+        {renderControl(field, options, ctxFields, form, sharedOptions, applyFormPatch, nodeId, getNodeName, nodeData)}
+      </Form.Item>
+    )
+  }
 
   return (
-    <div style={{ padding: '20px 18px 16px', overflowY: 'auto', height: '100%', background: '#f5f5f7' }}>
+    <div style={{ padding: 12, overflowY: 'auto', height: '100%', background: '#f8fafc' }}>
       <style>{CONTROL_CHROME_SELECTOR_CSS}</style>
       {loading && <Spin size="small" style={{ display: 'block', marginBottom: 8 }} />}
 
@@ -349,55 +394,23 @@ export default function ConfigPanel({ nodeId, nodeData, onChange, nodes, readonl
         onValuesChange={handleValuesChange}
         disabled={readonly}
       >
-        {presentation.summaryRows.length > 0 && (
-          <ConfigSummaryList rows={presentation.summaryRows} />
-        )}
-
-        <ConfigFormCard>
-          <Form.Item name="name" label={renderControlLabel('节点名称')} rules={[{ required: true }]}>
-            <Input className="config-panel-ios-input" style={controlChrome} />
-          </Form.Item>
-
-          {visibleFields.map(field => {
-            // api-input-params / event-attr-preview 自己管理渲染，不能被外层 Form.Item 包住
-            if (field.type === 'api-input-params') {
-              return <ApiCallInputParams key={field.key} label={field.label}
-                apiKeyField={field.apiKeyField ?? 'apiKey'}
-                defsSource={field.defsSource ?? '/meta/api-definitions'} />
-            }
-          if (field.type === 'event-attr-preview') {
-            return (
-              <div key={field.key} style={{ marginBottom: 16 }}>
-                {renderControlLabel(field.label)}
-                <EventAttrPreview />
-              </div>
-            )
-          }
-          if (field.type === 'delay-input') {
-            return (
-              <div key={field.key} style={{ marginBottom: 16 }}>
-                {renderControlLabel(field.label)}
-                <DelayInput
-                  valueFieldKey={field.key}
-                  unitFieldKey="unit"
-                  unitOptions={sharedOptions.delayUnits}
-                  applyFormPatch={applyFormPatch}
-                />
-              </div>
-            )
-          }
-          return (
-            <Form.Item key={field.key} name={field.key} label={renderControlLabel(field.label)}
-              rules={field.required ? [{ required: true, message: `请填写${field.label}` }] : []}>
-              {renderControl(field, options, ctxFields, form, sharedOptions, applyFormPatch, nodeId, getNodeName, nodeData)}
-            </Form.Item>
-            )
-          })}
-        </ConfigFormCard>
+        {groupedSections.map(group => (
+          <ConfigSectionCard key={group.key} title={group.title} summary={group.summary}>
+            {group.key === 'basic' && (
+              <Form.Item name="name" label={renderControlLabel('节点名称')} rules={[{ required: true }]}>
+                <Input className="config-panel-ios-input" style={controlChrome} />
+              </Form.Item>
+            )}
+            {group.fields.map((groupField) => {
+              const field = visibleFieldByKey.get(groupField.key)
+              return field ? renderConfigField(field) : null
+            })}
+          </ConfigSectionCard>
+        ))}
 
         {presentation.branchRoutes.length > 0 && (
-          <ConfigSectionCard title="分支结果">
-            <div style={{ display: 'grid', gap: 10 }}>
+          <ConfigSectionCard title="出口路由">
+            <div style={{ display: 'grid', gap: 7 }}>
               {presentation.branchRoutes.map((route) => (
                 <BranchRouteCard key={route.label} {...route} />
               ))}
@@ -584,15 +597,15 @@ function ConditionRuleList({ ctxFields, operatorOptions, fieldKey }: {
   return (
     <div>
       {rules.map((rule, i) => (
-        <Space key={i} style={{ display: 'flex', marginBottom: 4 }} align="center">
-          <Select className="config-panel-ios-select" classNames={CONTROL_SELECT_CLASS_NAMES} size="small" style={{ width: 100 }} placeholder="字段"
+        <div key={i} style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 58px minmax(0, 1fr) 28px', gap: 6, marginBottom: 6, alignItems: 'center' }}>
+          <Select className="config-panel-ios-select" classNames={CONTROL_SELECT_CLASS_NAMES} size="small" style={{ width: '100%' }} placeholder="字段"
             value={rule.field || undefined}
             options={ctxFields.map(f => ({ label: f.fieldName, value: f.fieldKey }))}
             onChange={v => update(i, 'field', v)} showSearch />
-          <Select className="config-panel-ios-select" classNames={CONTROL_SELECT_CLASS_NAMES} size="small" style={{ width: 80 }} value={rule.operator}
+          <Select className="config-panel-ios-select" classNames={CONTROL_SELECT_CLASS_NAMES} size="small" style={{ width: '100%' }} value={rule.operator}
             options={operatorOptions}
             onChange={v => update(i, 'operator', v)} />
-          <AutoComplete className="config-panel-ios-auto-complete" classNames={CONTROL_SELECT_CLASS_NAMES} size="small" style={{ width: 110 }}
+          <AutoComplete className="config-panel-ios-auto-complete" classNames={CONTROL_SELECT_CLASS_NAMES} size="small" style={{ width: '100%' }}
             placeholder="值或 ${key}"
             value={rule.value}
             options={ctxFields.map(f => ({ value: '${' + f.fieldKey + '}', label: f.fieldName }))}
@@ -600,9 +613,9 @@ function ConditionRuleList({ ctxFields, operatorOptions, fieldKey }: {
             filterOption={(input, opt) => String(opt?.label ?? '').toLowerCase().includes(input.toLowerCase())}
           />
           <Button size="small" danger icon={<DeleteOutlined />} onClick={() => remove(i)} />
-        </Space>
+        </div>
       ))}
-      <Button size="small" type="dashed" icon={<PlusOutlined />} onClick={add}>
+      <Button size="small" type="dashed" icon={<PlusOutlined />} onClick={add} style={{ width: '100%' }}>
         添加条件
       </Button>
     </div>
@@ -637,26 +650,26 @@ function ContextValueList({ ctxFields, valueTypeOptions }: {
   return (
     <div>
       {items.map((item, i) => (
-        <Space key={i} style={{ display: 'flex', marginBottom: 4 }} align="center">
-          <Input size="small" style={{ ...inlineChrome, width: 80 }} placeholder="字段名"
+        <div key={i} style={{ display: 'grid', gridTemplateColumns: '68px 72px minmax(0, 1fr) 28px', gap: 6, marginBottom: 6, alignItems: 'center' }}>
+          <Input size="small" style={{ ...inlineChrome, width: '100%' }} placeholder="字段名"
             value={item.name} onChange={e => update(i, 'name', e.target.value)} />
-          <Select className="config-panel-ios-select" classNames={CONTROL_SELECT_CLASS_NAMES} size="small" style={{ width: 80 }} value={item.valueType}
+          <Select className="config-panel-ios-select" classNames={CONTROL_SELECT_CLASS_NAMES} size="small" style={{ width: '100%' }} value={item.valueType}
             options={valueTypeOptions}
             onChange={v => update(i, 'valueType', v)} />
           {item.valueType === 'CONTEXT'
-            ? <AutoComplete className="config-panel-ios-auto-complete" classNames={CONTROL_SELECT_CLASS_NAMES} size="small" style={{ width: 110 }}
+            ? <AutoComplete className="config-panel-ios-auto-complete" classNames={CONTROL_SELECT_CLASS_NAMES} size="small" style={{ width: '100%' }}
                 placeholder="${key} 或字段名"
                 value={item.value || undefined}
                 options={ctxFields.map(f => ({ value: '${' + f.fieldKey + '}', label: f.fieldName }))}
                 onChange={v => update(i, 'value', v)}
                 filterOption={(input, opt) => String(opt?.label ?? '').toLowerCase().includes(input.toLowerCase())} />
-            : <Input size="small" style={{ ...inlineChrome, width: 110 }} placeholder="值"
+            : <Input size="small" style={{ ...inlineChrome, width: '100%' }} placeholder="值"
                 value={item.value} onChange={e => update(i, 'value', e.target.value)} />
           }
           <Button size="small" danger icon={<DeleteOutlined />} onClick={() => remove(i)} />
-        </Space>
+        </div>
       ))}
-      <Button size="small" type="dashed" icon={<PlusOutlined />} onClick={add}>添加</Button>
+      <Button size="small" type="dashed" icon={<PlusOutlined />} onClick={add} style={{ width: '100%' }}>添加</Button>
     </div>
   )
 }
@@ -686,19 +699,18 @@ function ParamDefineList({ paramTypeOptions }: { paramTypeOptions: { label: stri
   return (
     <div>
       {items.map((p, i) => (
-        <Space key={i} style={{ display: 'flex', marginBottom: 4 }} align="center">
-          <Input size="small" style={{ ...inlineChrome, width: 90 }} placeholder="参数名"
+        <div key={i} style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 72px 46px 28px', gap: 6, marginBottom: 6, alignItems: 'center' }}>
+          <Input size="small" style={{ ...inlineChrome, width: '100%' }} placeholder="参数名"
             value={p.name} onChange={e => update(i, 'name', e.target.value)} />
-          <Select className="config-panel-ios-select" classNames={CONTROL_SELECT_CLASS_NAMES} size="small" style={{ width: 80 }} value={p.dataType}
+          <Select className="config-panel-ios-select" classNames={CONTROL_SELECT_CLASS_NAMES} size="small" style={{ width: '100%' }} value={p.dataType}
             options={paramTypeOptions}
             onChange={v => update(i, 'dataType', v)} />
-          <Switch size="small" checked={!!p.required}
+          <Switch size="small" checked={!!p.required} checkedChildren="必" unCheckedChildren="选"
             onChange={v => update(i, 'required', v)} />
-          <Tag style={{ marginLeft: -4, cursor: 'default' }}>必填</Tag>
           <Button size="small" danger icon={<DeleteOutlined />} onClick={() => remove(i)} />
-        </Space>
+        </div>
       ))}
-      <Button size="small" type="dashed" icon={<PlusOutlined />} onClick={add}>添加参数</Button>
+      <Button size="small" type="dashed" icon={<PlusOutlined />} onClick={add} style={{ width: '100%' }}>添加参数</Button>
     </div>
   )
 }
@@ -766,22 +778,22 @@ function BranchList({ ctxFields, operatorOptions, relationOptions }: {
           {/* 条件列表 */}
           <div style={{ padding: '6px 10px' }}>
             {b.conditions?.map((c, ci) => (
-              <Space key={ci} style={{ display: 'flex', marginBottom: 4 }}>
-                <Select className="config-panel-ios-select" classNames={CONTROL_SELECT_CLASS_NAMES} size="small" style={{ width: 90 }} placeholder="字段"
+              <div key={ci} style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 56px minmax(0, 1fr) 28px', gap: 6, marginBottom: 6, alignItems: 'center' }}>
+                <Select className="config-panel-ios-select" classNames={CONTROL_SELECT_CLASS_NAMES} size="small" style={{ width: '100%' }} placeholder="字段"
                   value={c.field || undefined}
                   options={ctxFields.map(f => ({ label: f.fieldName, value: f.fieldKey }))}
                   onChange={v => updateCondition(i, ci, 'field', v)} showSearch />
-                <Select className="config-panel-ios-select" classNames={CONTROL_SELECT_CLASS_NAMES} size="small" style={{ width: 72 }} value={c.operator}
+                <Select className="config-panel-ios-select" classNames={CONTROL_SELECT_CLASS_NAMES} size="small" style={{ width: '100%' }} value={c.operator}
                   options={operatorOptions}
                   onChange={v => updateCondition(i, ci, 'operator', v)} />
-                <AutoComplete className="config-panel-ios-auto-complete" classNames={CONTROL_SELECT_CLASS_NAMES} size="small" style={{ width: 100 }}
+                <AutoComplete className="config-panel-ios-auto-complete" classNames={CONTROL_SELECT_CLASS_NAMES} size="small" style={{ width: '100%' }}
                   placeholder="值或 ${key}"
                   value={c.value}
                   options={ctxFields.map(f => ({ value: '${' + f.fieldKey + '}', label: f.fieldName }))}
                   onChange={v => updateCondition(i, ci, 'value', v)}
                   filterOption={(input, opt) => String(opt?.label ?? '').toLowerCase().includes(input.toLowerCase())} />
                 <Button size="small" danger icon={<DeleteOutlined />} onClick={() => removeCondition(i, ci)} />
-              </Space>
+              </div>
             ))}
             <Button size="small" type="dashed" icon={<PlusOutlined />} onClick={() => addCondition(i)}>
               添加条件
@@ -928,15 +940,15 @@ function PriorityList() {
   return (
     <div>
       {priorities.map((p, i) => (
-        <Space key={i} style={{ display: 'flex', marginBottom: 4 }}>
-          <InputNumber size="small" style={{ ...inlineChrome, width: 60 }} placeholder="优先级"
+        <div key={i} style={{ display: 'grid', gridTemplateColumns: '60px minmax(0, 1fr) 28px', gap: 6, marginBottom: 6 }}>
+          <InputNumber size="small" style={{ ...inlineChrome, width: '100%' }} placeholder="优先级"
             value={p.order} onChange={v => update(i, 'order', v ?? i + 1)} min={1} />
-          <Input size="small" style={{ ...inlineChrome, width: 110 }} placeholder="后继节点ID"
+          <Input size="small" style={{ ...inlineChrome, width: '100%' }} placeholder="后继节点ID"
             value={p.nextNodeId ?? ''} onChange={e => update(i, 'nextNodeId', e.target.value)} />
           <Button size="small" danger icon={<DeleteOutlined />} onClick={() => remove(i)} />
-        </Space>
+        </div>
       ))}
-      <Button size="small" type="dashed" icon={<PlusOutlined />} onClick={add}>添加优先级</Button>
+      <Button size="small" type="dashed" icon={<PlusOutlined />} onClick={add} style={{ width: '100%' }}>添加优先级</Button>
       <div style={{ fontSize: 11, color: '#999', marginTop: 4 }}>
         按 order 从小到大依次尝试，第一个成功则停止
       </div>
@@ -970,20 +982,20 @@ function KeyValueMapping({ fieldKey, ctxFields }: { fieldKey: string; ctxFields:
   return (
     <div>
       {entries.map(([k, v], i) => (
-        <Space key={i} style={{ display: 'flex', marginBottom: 4 }}>
-          <Input size="small" style={{ ...inlineChrome, width: 90 }} placeholder="子流程字段名"
+        <div key={i} style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 14px minmax(0, 1fr) 28px', gap: 6, marginBottom: 6, alignItems: 'center' }}>
+          <Input size="small" style={{ ...inlineChrome, width: '100%' }} placeholder="子流程字段名"
             value={k} onChange={e => updateKey(k, e.target.value)} />
           <span style={{ fontSize: 12 }}>←</span>
-          <AutoComplete className="config-panel-ios-auto-complete" classNames={CONTROL_SELECT_CLASS_NAMES} size="small" style={{ width: 130 }}
+          <AutoComplete className="config-panel-ios-auto-complete" classNames={CONTROL_SELECT_CLASS_NAMES} size="small" style={{ width: '100%' }}
             placeholder="${key} 或固定值"
             value={v || undefined}
             options={ctxFields.map(f => ({ value: '${' + f.fieldKey + '}', label: f.fieldName }))}
             onChange={nv => updateVal(k, nv)}
             filterOption={(input, opt) => String(opt?.label ?? '').toLowerCase().includes(input.toLowerCase())} />
           <Button size="small" danger icon={<DeleteOutlined />} onClick={() => remove(k)} />
-        </Space>
+        </div>
       ))}
-      <Button size="small" type="dashed" icon={<PlusOutlined />} onClick={add}>添加映射</Button>
+      <Button size="small" type="dashed" icon={<PlusOutlined />} onClick={add} style={{ width: '100%' }}>添加映射</Button>
     </div>
   )
 }

@@ -8,22 +8,22 @@ import type { CSSProperties } from 'react'
 /** 标准大尺寸控件外观，用于右侧配置面板的主要输入项。 */
 export function getControlChrome(): CSSProperties {
   return {
-    height: 60,
-    borderRadius: 18,
-    paddingInline: 22,
-    border: '1px solid transparent',
-    background: '#f5f5f7',
-    boxShadow: 'inset 0 0 0 1px #c7c7cc',
+    height: 40,
+    borderRadius: 8,
+    paddingInline: 10,
+    border: '1px solid #d9e1ec',
+    background: '#ffffff',
+    boxShadow: 'none',
   }
 }
 
 /** 行内小控件外观，用于动态列表、表格内字段等紧凑场景。 */
 export function getInlineControlChrome(): CSSProperties {
   return {
-    height: 30,
-    borderRadius: 10,
-    paddingInline: 9,
-    border: '1px solid #c7c7cc',
+    height: 32,
+    borderRadius: 7,
+    paddingInline: 8,
+    border: '1px solid #d9e1ec',
     background: '#ffffff',
   }
 }
@@ -31,9 +31,9 @@ export function getInlineControlChrome(): CSSProperties {
 /** 表单标签统一样式，保持复杂 schema 字段的标题层级一致。 */
 export function getControlLabelStyle(): CSSProperties {
   return {
-    fontSize: 14,
-    fontWeight: 600,
-    color: '#6e6e73',
+    fontSize: 12,
+    fontWeight: 700,
+    color: '#64748b',
   }
 }
 
@@ -50,24 +50,24 @@ export const CONTROL_SELECT_CLASS_NAMES = {
  */
 export const CONTROL_CHROME_SELECTOR_CSS = `
   .config-panel-form .ant-form-item {
-    margin-bottom: 16px;
+    margin-bottom: 10px;
   }
 
   .config-panel-form .ant-form-item-label {
-    padding-bottom: 6px !important;
+    padding-bottom: 5px !important;
   }
 
   .config-panel-form .ant-form-item-label > label {
     height: auto !important;
-    color: #1d1d1f !important;
-    font-size: 14px !important;
-    font-weight: 600 !important;
+    color: #64748b !important;
+    font-size: 12px !important;
+    font-weight: 700 !important;
     line-height: 1.35 !important;
   }
 
   .config-panel-ios-select.ant-select-single,
   .config-panel-ios-auto-complete.ant-select-single {
-    height: 60px !important;
+    height: 40px !important;
   }
 
   .config-panel-ios-select .ant-select-selector,
@@ -75,10 +75,10 @@ export const CONTROL_CHROME_SELECTOR_CSS = `
   .config-panel-ios-input-number,
   .config-panel-ios-textarea,
   .config-panel-ios-input {
-    border-radius: 18px !important;
-    border: 1px solid transparent !important;
-    background: #f5f5f7 !important;
-    box-shadow: inset 0 0 0 1px #c7c7cc !important;
+    border-radius: 8px !important;
+    border: 1px solid #d9e1ec !important;
+    background: #ffffff !important;
+    box-shadow: none !important;
     transition: border-color .16s ease, box-shadow .16s ease, background-color .16s ease !important;
   }
 
@@ -87,8 +87,9 @@ export const CONTROL_CHROME_SELECTOR_CSS = `
   .config-panel-ios-input-number:hover,
   .config-panel-ios-textarea:hover,
   .config-panel-ios-input:hover {
-    background: #f0f0f2 !important;
-    box-shadow: inset 0 0 0 1px #aeb0b8 !important;
+    background: #f8fafc !important;
+    border-color: #c5d1e0 !important;
+    box-shadow: none !important;
   }
 
   .config-panel-ios-select.ant-select-focused .ant-select-selector,
@@ -97,15 +98,16 @@ export const CONTROL_CHROME_SELECTOR_CSS = `
   .config-panel-ios-textarea:focus-within,
   .config-panel-ios-input:focus {
     background: #ffffff !important;
-    box-shadow: 0 0 0 4px rgba(0,113,227,.14), inset 0 0 0 1px #0071e3 !important;
+    border-color: #1677ff !important;
+    box-shadow: 0 0 0 3px rgba(22,119,255,.12) !important;
     outline: none !important;
   }
 
   .config-panel-ios-select .ant-select-selector,
   .config-panel-ios-auto-complete .ant-select-selector {
-    height: 60px !important;
-    min-height: 60px !important;
-    padding: 0 22px !important;
+    height: 40px !important;
+    min-height: 40px !important;
+    padding: 0 10px !important;
     align-items: center !important;
   }
 
@@ -113,10 +115,10 @@ export const CONTROL_CHROME_SELECTOR_CSS = `
   .config-panel-ios-select .ant-select-selection-item,
   .config-panel-ios-auto-complete .ant-select-selection-placeholder,
   .config-panel-ios-auto-complete .ant-select-selection-item {
-    line-height: 58px !important;
-    font-size: 14px !important;
-    font-weight: 500 !important;
-    color: #1d1d1f !important;
+    line-height: 38px !important;
+    font-size: 13px !important;
+    font-weight: 650 !important;
+    color: #172033 !important;
     overflow: hidden !important;
     text-overflow: ellipsis !important;
     white-space: nowrap !important;
@@ -124,15 +126,15 @@ export const CONTROL_CHROME_SELECTOR_CSS = `
 
   .config-panel-ios-select.ant-select-single .ant-select-selector .ant-select-selection-search,
   .config-panel-ios-auto-complete.ant-select-single .ant-select-selector .ant-select-selection-search {
-    inset-inline-start: 22px !important;
-    inset-inline-end: 64px !important;
+    inset-inline-start: 10px !important;
+    inset-inline-end: 36px !important;
   }
 
   .config-panel-ios-select.ant-select-single .ant-select-selector .ant-select-selection-search-input,
   .config-panel-ios-auto-complete.ant-select-single .ant-select-selector .ant-select-selection-search-input {
-    height: 58px !important;
-    font-size: 14px !important;
-    font-weight: 500 !important;
+    height: 38px !important;
+    font-size: 13px !important;
+    font-weight: 650 !important;
   }
 
   .config-panel-ios-input-number {
@@ -156,8 +158,8 @@ export const CONTROL_CHROME_SELECTOR_CSS = `
   .config-panel-ios-textarea textarea,
   .config-panel-ios-input {
     font-size: 14px;
-    font-weight: 500;
-    color: #1d1d1f;
+    font-weight: 650;
+    color: #172033;
   }
 
   .config-panel-ios-input-number input {
@@ -167,86 +169,86 @@ export const CONTROL_CHROME_SELECTOR_CSS = `
   .config-panel-ios-textarea,
   .config-panel-ios-textarea textarea,
   .config-panel-ios-input {
-    padding-inline: 22px !important;
+    padding-inline: 10px !important;
   }
 
   .config-panel-ios-select .ant-select-arrow,
   .config-panel-ios-auto-complete .ant-select-arrow {
-    width: 34px !important;
-    height: 34px !important;
-    inset-inline-end: 13px !important;
+    width: 24px !important;
+    height: 24px !important;
+    inset-inline-end: 7px !important;
     display: inline-flex !important;
     align-items: center !important;
     justify-content: center !important;
-    margin-top: -17px !important;
-    border-radius: 999px !important;
-    background: rgba(255,255,255,.86) !important;
-    box-shadow: inset 0 0 0 1px rgba(0,0,0,.06) !important;
-    color: #6e6e73 !important;
+    margin-top: -12px !important;
+    border-radius: 7px !important;
+    background: #f8fafc !important;
+    box-shadow: none !important;
+    color: #64748b !important;
     font-size: 12px !important;
   }
 
   .config-panel-ios-select .ant-select-arrow svg,
   .config-panel-ios-auto-complete .ant-select-arrow svg {
-    width: 14px !important;
-    height: 14px !important;
+    width: 12px !important;
+    height: 12px !important;
   }
 
   .config-panel-ios-select.ant-select-sm.ant-select-single,
   .config-panel-ios-auto-complete.ant-select-sm.ant-select-single {
-    height: 30px !important;
+    height: 32px !important;
   }
 
   .config-panel-ios-select.ant-select-sm .ant-select-selector,
   .config-panel-ios-auto-complete.ant-select-sm .ant-select-selector {
-    min-height: 30px !important;
-    height: 30px !important;
-    border-radius: 10px !important;
-    padding: 0 9px !important;
+    min-height: 32px !important;
+    height: 32px !important;
+    border-radius: 7px !important;
+    padding: 0 8px !important;
   }
 
   .config-panel-ios-select.ant-select-sm .ant-select-selection-placeholder,
   .config-panel-ios-select.ant-select-sm .ant-select-selection-item,
   .config-panel-ios-auto-complete.ant-select-sm .ant-select-selection-placeholder,
   .config-panel-ios-auto-complete.ant-select-sm .ant-select-selection-item {
-    line-height: 28px !important;
+    line-height: 30px !important;
     font-size: 12px !important;
   }
 
   .config-panel-ios-select.ant-select-sm.ant-select-single .ant-select-selector .ant-select-selection-search,
   .config-panel-ios-auto-complete.ant-select-sm.ant-select-single .ant-select-selector .ant-select-selection-search {
-    inset-inline-start: 9px !important;
-    inset-inline-end: 34px !important;
+    inset-inline-start: 8px !important;
+    inset-inline-end: 30px !important;
   }
 
   .config-panel-ios-select.ant-select-sm.ant-select-single .ant-select-selector .ant-select-selection-search-input,
   .config-panel-ios-auto-complete.ant-select-sm.ant-select-single .ant-select-selector .ant-select-selection-search-input {
-    height: 28px !important;
+    height: 30px !important;
     font-size: 12px !important;
   }
 
   .config-panel-ios-select.ant-select-sm .ant-select-arrow,
   .config-panel-ios-auto-complete.ant-select-sm .ant-select-arrow {
-    width: 22px !important;
-    height: 22px !important;
+    width: 20px !important;
+    height: 20px !important;
     inset-inline-end: 5px !important;
-    margin-top: -11px !important;
+    margin-top: -10px !important;
   }
 
   .config-panel-ios-dropdown {
-    padding: 6px !important;
-    border-radius: 16px !important;
+    padding: 5px !important;
+    border-radius: 10px !important;
     border: 1px solid rgba(0,0,0,.08) !important;
     background: rgba(255,255,255,.96) !important;
-    box-shadow: 0 18px 48px rgba(0,0,0,.14) !important;
-    backdrop-filter: blur(18px);
+    box-shadow: 0 10px 26px rgba(15,23,42,.12) !important;
+    backdrop-filter: blur(10px);
   }
 
   .config-panel-ios-dropdown .ant-select-item {
-    min-height: 34px !important;
-    padding: 7px 10px !important;
-    border-radius: 12px !important;
-    color: #1d1d1f !important;
+    min-height: 32px !important;
+    padding: 6px 8px !important;
+    border-radius: 7px !important;
+    color: #172033 !important;
     font-size: 13px !important;
     font-weight: 500 !important;
   }
