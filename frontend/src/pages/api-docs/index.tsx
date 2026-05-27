@@ -330,7 +330,9 @@ export default function ApiDocsPage() {
                   当前展示 <Text strong>{endpoints.length}</Text> 个接口
                 </Text>
                 {selectedCategory ? (
-                  <Button size="small" onClick={() => setCategory(undefined)}>清除分类</Button>
+                  <Button size="small" onClick={() => setCategory(undefined)} disabled={loading || Boolean(error)}>
+                    清除分类
+                  </Button>
                 ) : null}
               </div>
 
