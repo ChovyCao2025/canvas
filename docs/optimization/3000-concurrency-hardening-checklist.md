@@ -39,3 +39,59 @@ Stop condition:
 - retry backlog, DLQ growth, Disruptor overflow, and MQ backlog have stop gates
 - rollback and degrade actions have been exercised
 - 4000 remains blocked until this checklist passes
+
+## Default Mixed Traffic Profile
+
+The default 3000 profile is:
+
+| Lane | Concurrency | Share | Purpose |
+| --- | ---: | ---: | --- |
+| LIGHT | 600 | 20% | direct calls, short DAGs, low downstream fanout |
+| STANDARD | 1800 | 60% | normal event, MQ, behavior, and API-triggered flows |
+| HEAVY | 300 | 10% | audience batch, high fanout DAGs, expensive script or large payload flows |
+| RETRY | 300 | 10% | overflow and request retry recovery |
+| Global | 3000 | 100% | total cluster active execution budget |
+
+Pass conditions:
+
+- `LIGHT` and `STANDARD` runner p95 stays at or below 1000 ms in `default-mixed-3000`.
+- `HEAVY` active execution count never borrows protected `LIGHT` or `STANDARD` budget.
+- `RETRY` active execution count never borrows protected `LIGHT` or `STANDARD` budget.
+- No unbounded retry backlog, DLQ growth, Disruptor overflow, or MQ backlog growth appears during the observation window.
+
+Stop conditions:
+
+- lane total exceeds global budget
+- Redis p95 stays above 20 ms or p99 stays above 50 ms through one observation window
+- MySQL active connections stay at or above 85% of pool max, or slow SQL above 1000 ms appears in two consecutive samples
+- normal MQ backlog grows while RETRY is draining
+- Disruptor overflow grows for two consecutive samples
+- DLQ grows after downstream recovery
+
+## Lane Budget Tuning Rules
+
+Default budget:
+
+- `LIGHT`: 600
+- `STANDARD`: 1800
+- `HEAVY`: 300
+- `RETRY`: 300
+- `global`: 3000
+
+Guardrails:
+
+- `LIGHT` and `STANDARD` are protected lanes.
+- `HEAVY` cannot borrow from `LIGHT` or `STANDARD`.
+- `RETRY` cannot borrow from `LIGHT` or `STANDARD`.
+- Increase `RETRY` only when downstream health is good and retry backlog is shrinking.
+- If `LIGHT` or `STANDARD` latency degrades, reduce `HEAVY` and `RETRY` first.
+- If Redis or MySQL latency degrades, do not increase any lane budget.
+- If a downstream timeout rises, reduce the lane that calls that dependency instead of raising global concurrency.
+
+Incident tuning order:
+
+1. Reduce `RETRY` budget or lengthen retry backoff.
+2. Reduce `HEAVY` budget or pause heavy jobs.
+3. Disable low-priority scheduled and replay traffic.
+4. Preserve `LIGHT` and `STANDARD` if their dependencies remain healthy.
+5. Scale application instances only after Redis, MySQL, RocketMQ, and downstream capacity are confirmed.
