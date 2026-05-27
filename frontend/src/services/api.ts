@@ -66,6 +66,9 @@ export interface SysUser {
   /** 用户 ID。 */
   id: number
 
+  /** 租户 ID。 */
+  tenantId: number | null
+
   /** 用户名。 */
   username: string
 
@@ -92,6 +95,9 @@ interface AdminCreateUserReq {
 
   /** 用户角色。 */
   role: string
+
+  /** 所属租户。 */
+  tenantId: number
 }
 
 /** 管理员更新用户请求体。 */
@@ -121,6 +127,48 @@ export const adminApi = {
     http.put<R<void>, R<void>>(`/admin/users/${id}`, body),
   disableUser: (id: number) =>
     http.put<R<void>, R<void>>(`/admin/users/${id}/disable`),
+}
+
+export interface Tenant {
+  id: number
+  tenantKey: string
+  name: string
+  status: 'ACTIVE' | 'DISABLED' | string
+  planCode?: string
+  quotaJson?: string
+  remark?: string
+  createdBy?: string
+  createdAt?: string
+  updatedBy?: string
+  updatedAt?: string
+}
+
+export interface TenantUsage {
+  tenantId: number
+  canvasCount: number
+  publishedCanvasCount: number
+  executionCount: number
+  failedExecutionCount: number
+  dlqCount: number
+}
+
+interface TenantCreateReq {
+  name: string
+  tenantKey: string
+  planCode?: string
+  quotaJson?: string
+}
+
+export const tenantApi = {
+  list: () => http.get<R<Tenant[]>, R<Tenant[]>>('/admin/tenants'),
+  create: (body: TenantCreateReq) =>
+    http.post<R<Tenant>, R<Tenant>>('/admin/tenants', body),
+  disable: (id: number) =>
+    http.put<R<void>, R<void>>(`/admin/tenants/${id}/disable`),
+  activate: (id: number) =>
+    http.put<R<void>, R<void>>(`/admin/tenants/${id}/activate`),
+  usage: (id: number) =>
+    http.get<R<TenantUsage>, R<TenantUsage>>(`/admin/tenants/${id}/usage`),
 }
 
 // ── 画布管理 ─────────────────────────────────────────────────

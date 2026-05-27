@@ -3,7 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { Spin } from 'antd'
 import { AuthProvider } from './context/AuthContext'
 import { NotificationProvider } from './context/NotificationContext'
-import { RequireAuth, RequireAdmin } from './auth/guards'
+import { RequireAuth, RequireAdmin, RequireSuperAdmin } from './auth/guards'
 
 const AppLayout = lazy(() => import('./components/layout/AppLayout'))
 const LoginPage = lazy(() => import('./pages/login'))
@@ -12,6 +12,7 @@ const CanvasListPage = lazy(() => import('./pages/canvas-list'))
 const CanvasEditorPage = lazy(() => import('./pages/canvas-editor'))
 const CanvasStatsPage = lazy(() => import('./pages/canvas-stats'))
 const AdminUsersPage = lazy(() => import('./pages/admin'))
+const TenantAdminPage = lazy(() => import('./pages/tenant-admin'))
 const ApiConfigPage = lazy(() => import('./pages/api-config'))
 const DataSourceConfigPage = lazy(() => import('./pages/data-source-config'))
 const AbExperimentPage = lazy(() => import('./pages/ab-experiment'))
@@ -71,6 +72,12 @@ export default function App() {
                   <Route path="/event-config" element={<EventConfigPage />} />
                   <Route path="/api-docs" element={<ApiDocsPage />} />
                   <Route path="/system-options" element={<SystemOptionsPage />} />
+                </Route>
+              </Route>
+
+              <Route element={<RequireSuperAdmin />}>
+                <Route element={<AppLayout />}>
+                  <Route path="/admin/tenants" element={<TenantAdminPage />} />
                 </Route>
               </Route>
             </Routes>

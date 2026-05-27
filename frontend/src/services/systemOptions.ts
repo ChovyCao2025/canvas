@@ -50,7 +50,7 @@ export const systemOptionsApi = {
         .join('&'),
     }),
 
-  adminList: (params?: { category?: string; enabled?: number; keyword?: string }) =>
+  adminList: (params?: { category?: string; enabled?: number; keyword?: string; tenantId?: number }) =>
     http.get<R<PageResult<SystemOption>>, R<PageResult<SystemOption>>>('/admin/system-options', { params }),
 
   update: (id: number, body: Partial<SystemOption>) =>

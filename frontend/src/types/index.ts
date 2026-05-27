@@ -255,6 +255,7 @@ export interface StubOption {
 
 export interface SystemOption {
   id: number
+  tenantId?: number | null
   category: string
   optionKey: string
   label: string
