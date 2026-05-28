@@ -7,11 +7,11 @@ import type { CSSProperties, ReactNode } from 'react'
 
 const PANEL_SURFACE = '#f8fafc'
 const PANEL_CARD = '#ffffff'
-const PANEL_BORDER = '#d9e1ec'
+const PANEL_BORDER = '#6b8fa8'
 
 const CARD_STYLE: CSSProperties = {
   background: PANEL_CARD,
-  border: `1px solid ${PANEL_BORDER}`,
+  border: `2px solid ${PANEL_BORDER}`,
   borderRadius: 8,
   boxShadow: 'none',
 }
@@ -49,7 +49,24 @@ export interface NodeHeaderCardProps {
   categoryColor?: string
 }
 
-function getPillStyle(color: string, weight: 'strong' | 'soft' = 'strong'): CSSProperties {
+function getTypePillStyle(color: string): CSSProperties {
+  return {
+    height: 22,
+    display: 'inline-flex',
+    alignItems: 'center',
+    borderRadius: 999,
+    padding: '0 9px',
+    color: '#fff',
+    background: color,
+    fontSize: 11,
+    fontWeight: 760,
+    lineHeight: '20px',
+    whiteSpace: 'nowrap',
+    flexShrink: 0,
+  }
+}
+
+function getMetaPillStyle(color: string): CSSProperties {
   return {
     height: 22,
     display: 'inline-flex',
@@ -57,15 +74,34 @@ function getPillStyle(color: string, weight: 'strong' | 'soft' = 'strong'): CSSP
     maxWidth: '100%',
     borderRadius: 999,
     padding: '0 8px',
-    color: weight === 'strong' ? color : '#475569',
-    background: weight === 'strong' ? `${color}10` : PANEL_SURFACE,
-    border: `1px solid ${weight === 'strong' ? `${color}30` : '#dbe4ef'}`,
+    color,
+    background: `${color}10`,
+    border: `1px solid ${color}30`,
     fontSize: 11,
     fontWeight: 760,
     lineHeight: '20px',
     whiteSpace: 'nowrap',
     overflow: 'hidden',
     textOverflow: 'ellipsis',
+  }
+}
+
+function getStatusPillStyle(label: string): CSSProperties {
+  const configured = label === '已配置'
+  return {
+    height: 22,
+    display: 'inline-flex',
+    alignItems: 'center',
+    borderRadius: 999,
+    padding: '0 8px',
+    color: configured ? '#16a34a' : '#d97706',
+    background: configured ? '#f0fdf4' : '#fffbeb',
+    border: `1px solid ${configured ? '#bbf7d0' : '#fde68a'}`,
+    fontSize: 11,
+    fontWeight: 760,
+    lineHeight: '20px',
+    whiteSpace: 'nowrap',
+    flexShrink: 0,
   }
 }
 
@@ -80,27 +116,43 @@ export function NodeHeaderCard({
   metaBadges,
 }: NodeHeaderCardProps) {
   const resolvedCategoryColor = categoryColor ?? '#475569'
-  const badges = [typeBadge, ...(categoryLabel ? [categoryLabel] : []), ...metaBadges]
 
   return (
     <div
       style={{
-        ...CARD_STYLE,
+        background: `${resolvedCategoryColor}1a`,
+        border: `1px solid ${resolvedCategoryColor}45`,
+        borderRadius: 8,
         marginBottom: 10,
         padding: 12,
         overflow: 'hidden',
       }}
     >
-      <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 6, marginBottom: 9 }}>
-        {badges.map((badge, index) => (
-          <div key={`${badge}-${index}`} style={getPillStyle(resolvedCategoryColor, index === 0 ? 'strong' : 'soft')}>
-            {badge}
-          </div>
-        ))}
-        <div style={{ ...getPillStyle(resolvedCategoryColor, 'soft'), marginLeft: 'auto' }}>
+      {/* 行1：节点类型（左）+ 配置状态（右），固定不折行 */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: (categoryLabel || metaBadges.length > 0) ? 6 : 9 }}>
+        <div style={getTypePillStyle(resolvedCategoryColor)}>
+          {typeBadge}
+        </div>
+        <div style={{ ...getStatusPillStyle(statusLabel), marginLeft: 'auto' }}>
           {statusLabel}
         </div>
       </div>
+
+      {/* 行2+：分类 + 其余 meta，从左折行 */}
+      {(categoryLabel || metaBadges.length > 0) && (
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 9 }}>
+          {categoryLabel && (
+            <div style={getMetaPillStyle(resolvedCategoryColor)}>
+              {categoryLabel}
+            </div>
+          )}
+          {metaBadges.map((badge, index) => (
+            <div key={`${badge}-${index}`} style={getMetaPillStyle(resolvedCategoryColor)}>
+              {badge}
+            </div>
+          ))}
+        </div>
+      )}
 
       <div
         style={{
@@ -132,14 +184,20 @@ export interface ConfigSectionCardProps {
   /** 标题右侧摘要。 */
   summary?: string
 
+  /** 分类主题色，用于染色边框。 */
+  accentColor?: string
+
   /** 分节内容。 */
   children: ReactNode
 }
 
 /** 配置面板内部分区卡片。 */
-export function ConfigSectionCard({ title, summary, children }: ConfigSectionCardProps) {
+export function ConfigSectionCard({ title, summary, accentColor, children }: ConfigSectionCardProps) {
+  const style = accentColor
+    ? { ...CARD_STYLE, border: `1px solid ${accentColor}28`, padding: '10px 10px 4px', marginBottom: 10 }
+    : { ...CARD_STYLE, padding: '10px 10px 4px', marginBottom: 10 }
   return (
-    <section style={{ ...CARD_STYLE, padding: '10px 10px 4px', marginBottom: 10 }}>
+    <section style={style}>
       <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, marginBottom: 9, fontSize: 12, fontWeight: 780, color: '#334155' }}>
         <span>{title}</span>
         {summary && <span style={{ color: '#94a3b8', fontWeight: 700 }}>{summary}</span>}

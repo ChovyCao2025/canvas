@@ -377,14 +377,16 @@ export default function ConfigPanel({ nodeId, nodeData, onChange, nodes, readonl
     )
   }
 
+  const accentColor = CATEGORY_SOLID[nodeData.category] ?? '#475569'
+
   return (
-    <div style={{ padding: 12, overflowY: 'auto', height: '100%', background: '#f8fafc' }}>
+    <div style={{ padding: 12, overflowY: 'auto', height: '100%', background: `${accentColor}0d` }}>
       <style>{CONTROL_CHROME_SELECTOR_CSS}</style>
       {loading && <Spin size="small" style={{ display: 'block', marginBottom: 8 }} />}
 
       <NodeHeaderCard
         {...presentation.header}
-        categoryColor={CATEGORY_SOLID[nodeData.category] ?? '#475569'}
+        categoryColor={accentColor}
       />
 
       <Form
@@ -395,7 +397,7 @@ export default function ConfigPanel({ nodeId, nodeData, onChange, nodes, readonl
         disabled={readonly}
       >
         {groupedSections.map(group => (
-          <ConfigSectionCard key={group.key} title={group.title} summary={group.summary}>
+          <ConfigSectionCard key={group.key} title={group.title} summary={group.summary} accentColor={accentColor}>
             {group.key === 'basic' && (
               <Form.Item name="name" label={renderControlLabel('节点名称')} rules={[{ required: true }]}>
                 <Input className="config-panel-ios-input" style={controlChrome} />
@@ -409,7 +411,7 @@ export default function ConfigPanel({ nodeId, nodeData, onChange, nodes, readonl
         ))}
 
         {presentation.branchRoutes.length > 0 && (
-          <ConfigSectionCard title="出口路由">
+          <ConfigSectionCard title="出口路由" accentColor={accentColor}>
             <div style={{ display: 'grid', gap: 7 }}>
               {presentation.branchRoutes.map((route) => (
                 <BranchRouteCard key={route.label} {...route} />
@@ -595,27 +597,44 @@ function ConditionRuleList({ ctxFields, operatorOptions, fieldKey }: {
   }
 
   return (
-    <div>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
       {rules.map((rule, i) => (
-        <div key={i} style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 58px minmax(0, 1fr) 28px', gap: 6, marginBottom: 6, alignItems: 'center' }}>
-          <Select className="config-panel-ios-select" classNames={CONTROL_SELECT_CLASS_NAMES} size="small" style={{ width: '100%' }} placeholder="字段"
+        <div key={i} style={{
+          background: '#f0f7ff', border: '1px solid #dbeafe',
+          borderRadius: 8, padding: '8px 10px',
+        }}>
+          {/* 顶栏：编号 + 删除 */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+            <span style={{ fontSize: 11, fontWeight: 700, color: '#1677ff' }}>#{i + 1}</span>
+            <Button size="small" danger icon={<DeleteOutlined />} onClick={() => remove(i)}
+              style={{ width: 24, height: 24, minWidth: 24, padding: 0, borderRadius: 6 }} />
+          </div>
+          {/* 行1：字段（全宽） */}
+          <Select className="config-panel-ios-select" classNames={CONTROL_SELECT_CLASS_NAMES}
+            size="small" style={{ width: '100%', marginBottom: 6 }} placeholder="字段"
             value={rule.field || undefined}
             options={ctxFields.map(f => ({ label: f.fieldName, value: f.fieldKey }))}
-            onChange={v => update(i, 'field', v)} showSearch />
-          <Select className="config-panel-ios-select" classNames={CONTROL_SELECT_CLASS_NAMES} size="small" style={{ width: '100%' }} value={rule.operator}
-            options={operatorOptions}
-            onChange={v => update(i, 'operator', v)} />
-          <AutoComplete className="config-panel-ios-auto-complete" classNames={CONTROL_SELECT_CLASS_NAMES} size="small" style={{ width: '100%' }}
-            placeholder="值或 ${key}"
-            value={rule.value}
-            options={ctxFields.map(f => ({ value: '${' + f.fieldKey + '}', label: f.fieldName }))}
-            onChange={v => update(i, 'value', v)}
-            filterOption={(input, opt) => String(opt?.label ?? '').toLowerCase().includes(input.toLowerCase())}
-          />
-          <Button size="small" danger icon={<DeleteOutlined />} onClick={() => remove(i)} />
+            onChange={v => update(i, 'field', v)} showSearch
+            dropdownStyle={{ minWidth: 200 }} />
+          {/* 行2：操作符 + 值 */}
+          <div style={{ display: 'flex', gap: 6 }}>
+            <Select className="config-panel-ios-select" classNames={CONTROL_SELECT_CLASS_NAMES}
+              size="small" style={{ width: 90 }} value={rule.operator}
+              options={operatorOptions}
+              onChange={v => update(i, 'operator', v)} />
+            <AutoComplete className="config-panel-ios-auto-complete" classNames={CONTROL_SELECT_CLASS_NAMES}
+              size="small" style={{ flex: 1, minWidth: 0 }}
+              placeholder="值或 ${key}"
+              value={rule.value}
+              options={ctxFields.map(f => ({ value: '${' + f.fieldKey + '}', label: f.fieldName }))}
+              onChange={v => update(i, 'value', v)}
+              filterOption={(input, opt) => String(opt?.label ?? '').toLowerCase().includes(input.toLowerCase())}
+            />
+          </div>
         </div>
       ))}
-      <Button size="small" type="dashed" icon={<PlusOutlined />} onClick={add} style={{ width: '100%' }}>
+      <Button size="small" type="dashed" icon={<PlusOutlined />} onClick={add}
+        style={{ width: '100%', borderColor: '#93c5fd', color: '#1677ff' }}>
         添加条件
       </Button>
     </div>
@@ -782,7 +801,8 @@ function BranchList({ ctxFields, operatorOptions, relationOptions }: {
                 <Select className="config-panel-ios-select" classNames={CONTROL_SELECT_CLASS_NAMES} size="small" style={{ width: '100%' }} placeholder="字段"
                   value={c.field || undefined}
                   options={ctxFields.map(f => ({ label: f.fieldName, value: f.fieldKey }))}
-                  onChange={v => updateCondition(i, ci, 'field', v)} showSearch />
+                  onChange={v => updateCondition(i, ci, 'field', v)} showSearch
+                  dropdownStyle={{ minWidth: 200 }} />
                 <Select className="config-panel-ios-select" classNames={CONTROL_SELECT_CLASS_NAMES} size="small" style={{ width: '100%' }} value={c.operator}
                   options={operatorOptions}
                   onChange={v => updateCondition(i, ci, 'operator', v)} />

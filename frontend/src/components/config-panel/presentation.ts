@@ -197,7 +197,7 @@ function buildBranchRoutes(
 
 /** TAGGER 节点根据圈选模式追加更可读的徽标。 */
 function resolveTaggerMetaBadges(mode: unknown, displayMode: string | undefined): string[] {
-  if (mode === 'audience') return ['人群圈选', 'Audience Segment']
+  if (mode === 'audience') return []
   if (typeof displayMode === 'string' && displayMode.trim()) return [displayMode.trim()]
   if (typeof mode === 'string' && mode.trim()) return [mode.trim()]
   if (typeof mode === 'number' || typeof mode === 'boolean') return [String(mode)]

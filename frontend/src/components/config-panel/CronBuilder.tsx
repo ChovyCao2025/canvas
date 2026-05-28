@@ -193,27 +193,31 @@ export default function CronBuilder({ value, onChange, frequencyOptions, weekday
       {/* ── 简单模式（自然语言句式）── */}
       {!advanced && (
         <div style={{
-          display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap',
+          display: 'flex', flexDirection: 'column', gap: 8,
           background: '#f8f9fb', borderRadius: 10, padding: '12px 16px',
         }}>
+          {/* 行1：用户 */}
           <span style={{ color: '#8c8c8c', fontSize: 14 }}>用户</span>
 
-          <GreenSelect
-            value={freq} onChange={v => handleFreq(v as Freq)}
-            options={frequencyOptions?.length ? frequencyOptions : FREQ_OPTIONS}
-          />
-
-          {freq === 'weekly' && (
+          {/* 行2：频率 + 几日/周几 */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
             <GreenSelect
-              value={weekday}
-              onChange={v => handleWd(+(v as number))}
-              options={weekdayOptions?.length ? weekdayOptions : WEEKDAY_OPTIONS}
+              value={freq} onChange={v => handleFreq(v as Freq)}
+              options={frequencyOptions?.length ? frequencyOptions : FREQ_OPTIONS}
             />
-          )}
-          {freq === 'monthly' && (
-            <GreenSelect value={dayOfMonth} onChange={v => handleDom(+(v as number))} options={DAY_OPTIONS} />
-          )}
+            {freq === 'weekly' && (
+              <GreenSelect
+                value={weekday}
+                onChange={v => handleWd(+(v as number))}
+                options={weekdayOptions?.length ? weekdayOptions : WEEKDAY_OPTIONS}
+              />
+            )}
+            {freq === 'monthly' && (
+              <GreenSelect value={dayOfMonth} onChange={v => handleDom(+(v as number))} options={DAY_OPTIONS} />
+            )}
+          </div>
 
+          {/* 行3：时间（hourly 无此行） */}
           {freq !== 'hourly' && (
             <TimeSelect
               hour={hour} minute={minute}
@@ -221,6 +225,7 @@ export default function CronBuilder({ value, onChange, frequencyOptions, weekday
             />
           )}
 
+          {/* 行4：进入旅程 */}
           <span style={{ color: '#8c8c8c', fontSize: 14 }}>进入旅程</span>
         </div>
       )}

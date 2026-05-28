@@ -1,6 +1,7 @@
 package org.chovy.canvas.web;
 
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
@@ -31,6 +32,7 @@ public class EventReportAuthService {
     private final String secret;
     private final Clock clock;
 
+    @Autowired
     public EventReportAuthService(@Value("${canvas.events.report-secret:}") String secret) {
         this(secret, Clock.systemUTC());
     }

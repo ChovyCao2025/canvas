@@ -58,7 +58,9 @@ echo "[4/6] 安装本地 cache SDK..."
 echo "[5/6] 启动后端..."
 (
   cd backend
-  mvn -pl canvas-engine -am -Dmaven.test.skip=true spring-boot:run
+  CANVAS_JWT_SECRET=${CANVAS_JWT_SECRET:-local-dev-jwt-secret-at-least-32-bytes} \
+  JAVA_HOME=$(/usr/libexec/java_home -v 21) \
+  mvn -f canvas-engine/pom.xml -Dmaven.test.skip=true spring-boot:run
 ) > "$ROOT_DIR/backend.log" 2>&1 &
 BACKEND_PID=$!
 
@@ -124,7 +126,9 @@ echo "[4/6] 安装本地 cache SDK..."
 echo "[5/6] 启动后端..."
 (
   cd backend
-  mvn -pl canvas-engine -am -Dmaven.test.skip=true spring-boot:run
+  CANVAS_JWT_SECRET=${CANVAS_JWT_SECRET:-local-dev-jwt-secret-at-least-32-bytes} \
+  JAVA_HOME=$(/usr/libexec/java_home -v 21) \
+  mvn -f canvas-engine/pom.xml -Dmaven.test.skip=true spring-boot:run
 ) > "$ROOT_DIR/backend.log" 2>&1 &
 BACKEND_PID=$!
 
@@ -197,7 +201,7 @@ Write-Host "[5/6] 启动后端..."
 Start-Process powershell -ArgumentList @(
     "-NoExit",
     "-Command",
-    "cd `"$RootDir\backend`"; mvn -pl canvas-engine -am -Dmaven.test.skip=true spring-boot:run"
+    "`$env:CANVAS_JWT_SECRET = if (`$env:CANVAS_JWT_SECRET) { `$env:CANVAS_JWT_SECRET } else { 'local-dev-jwt-secret-at-least-32-bytes' }; cd `"$RootDir\backend`"; mvn -f canvas-engine/pom.xml -Dmaven.test.skip=true spring-boot:run"
 )
 
 Write-Host "[6/6] 启动前端..."
@@ -250,14 +254,22 @@ JAVA_HOME=$(/usr/libexec/java_home -v 21) mvn -q -pl canvas-cache-sdk install -D
 ## 4. 启动后端
 
 ```bash
-cd /Users/photonpay/project/canvas/backend/canvas-engine
-JAVA_HOME=/Users/photonpay/Library/Java/JavaVirtualMachines/ms-21.0.11/Contents/Home \
-    /opt/homebrew/bin/mvn spring-boot:run \
-    -Dmaven.test.skip=true \
-    -f /Users/photonpay/project/canvas/backend/canvas-engine/pom.xml
+cd /Users/photonpay/project/canvas/backend
+
+CANVAS_JWT_SECRET=local-dev-jwt-secret-at-least-32-bytes \
+JAVA_HOME=$(/usr/libexec/java_home -v 21) \
+mvn -f canvas-engine/pom.xml -Dmaven.test.skip=true spring-boot:run
 # 启动完成标志：Started CanvasEngineApplication
 # Swagger UI: http://localhost:8080/swagger-ui.html
 # 健康检查:   http://localhost:8080/actuator/health
+```
+
+如果 Flyway 报 `Found more than one migration with version ...`，通常是 `target/classes`
+里残留了旧迁移文件。先清理构建产物再启动：
+
+```bash
+cd /Users/photonpay/project/canvas/backend
+JAVA_HOME=$(/usr/libexec/java_home -v 21) mvn -f canvas-engine/pom.xml clean
 ```
 
 ## 5. 启动前端
@@ -290,5 +302,6 @@ SPRING_DATASOURCE_URL="jdbc:mysql://host:3306/canvas_db?..." \
 SPRING_DATA_REDIS_HOST=host \
 ROCKETMQ_NAME_SERVER=host:9876 \
 CANVAS_JWT_SECRET=your-secret \
-mvn -Dmaven.test.skip=true spring-boot:run
+JAVA_HOME=$(/usr/libexec/java_home -v 21) \
+mvn -f canvas-engine/pom.xml -Dmaven.test.skip=true spring-boot:run
 ```

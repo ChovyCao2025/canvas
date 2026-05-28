@@ -6,6 +6,7 @@ import org.chovy.canvas.auth.util.JwtUtil;
 import org.chovy.canvas.dal.dataobject.SysUserDO;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.JwtException;
+import io.jsonwebtoken.Jwts;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.http.HttpHeaders;
@@ -77,13 +78,16 @@ public class JwtAuthFilter implements WebFilter {
                                             || user.getRole() == null || user.getRole().isBlank()) {
                                         return unauthorized(exchange);
                                     }
-                                    // principal 仍保持 Claims 类型，兼容现有控制器；权限以 DB 当前角色为准。
-                                    claims.put("username", user.getUsername());
-                                    claims.put("role", user.getRole());
-                                    claims.put("displayName", user.getDisplayName());
+                                    // JJWT 0.12 parser returns immutable Claims. Build a new principal snapshot.
+                                    Claims principalClaims = Jwts.claims()
+                                            .add(claims)
+                                            .add("username", user.getUsername())
+                                            .add("role", user.getRole())
+                                            .add("displayName", user.getDisplayName())
+                                            .build();
                                     UsernamePasswordAuthenticationToken auth =
                                             new UsernamePasswordAuthenticationToken(
-                                                    claims, null,
+                                                    principalClaims, null,
                                                     List.of(new SimpleGrantedAuthority("ROLE_" + user.getRole()))
                                             );
                                     return chain.filter(exchange)

@@ -11,8 +11,9 @@ import {
 import {
   PlusOutlined, EditOutlined, CloudUploadOutlined,
   StopOutlined, CopyOutlined, ThunderboltOutlined, BarChartOutlined, EyeOutlined,
-  MoreOutlined,
+  MoreOutlined, TeamOutlined,
 } from '@ant-design/icons'
+import type { MenuProps } from 'antd'
 import { useNavigate } from 'react-router-dom'
 import type { ColumnsType } from 'antd/es/table'
 import { canvasApi } from '../../services/api'
@@ -149,10 +150,11 @@ export default function CanvasListPage() {
   // 表格列定义：状态 + 操作按钮集中在列表页。
   // 按钮展示会根据状态和角色动态收敛，减少误操作。
   const columns: ColumnsType<Canvas> = [
-    { title: 'ID', dataIndex: 'id', width: 80 },
+    { title: 'ID', dataIndex: 'id', width: 80, align: 'center' },
     {
       title: '名称',
       dataIndex: 'name',
+      align: 'center',
       render: (name, record) => (
         <Space size={6}>
           <Button type="link" onClick={() => navigate(`/canvas/${record.id}/edit`)}>
@@ -162,11 +164,12 @@ export default function CanvasListPage() {
         </Space>
       ),
     },
-    { title: '描述', dataIndex: 'description', ellipsis: true },
+    { title: '描述', dataIndex: 'description', ellipsis: true, align: 'center' },
     {
       title: '状态',
       dataIndex: 'status',
       width: 100,
+      align: 'center',
       render: (status: number) => {
         const { label, color } = STATUS_MAP[status] ?? { label: '未知', color: 'default' }
         return <Tag color={color}>{label}</Tag>
@@ -176,72 +179,78 @@ export default function CanvasListPage() {
       title: '更新时间',
       dataIndex: 'updatedAt',
       width: 180,
+      align: 'center',
       render: (v: string) => v?.replace('T', ' ').slice(0, 19),
     },
     {
       title: '操作',
-      width: 240,
-      render: (_, record) => (
-        <Space size={4}>
-          <Tooltip title="查看">
-            <Button size="small" icon={<EyeOutlined />}
-              onClick={() => navigate(`/canvas/${record.id}/edit?readonly=true`)} />
-          </Tooltip>
-          <Tooltip title="编辑">
-            <Button size="small" icon={<EditOutlined />}
-              onClick={() => navigate(`/canvas/${record.id}/edit`)} />
-          </Tooltip>
-
-          {record.status !== 1 && isAdmin && (
-            <Tooltip title="发布">
-              <Button size="small" type="primary" icon={<CloudUploadOutlined />}
-                onClick={() => handlePublish(record.id)} />
+      width: 200,
+      align: 'center',
+      render: (_, record) => {
+        const moreItems: MenuProps['items'] = [
+          {
+            key: 'clone',
+            icon: <CopyOutlined />,
+            label: '克隆',
+            onClick: () => handleClone(record.id),
+          },
+          {
+            key: 'stats',
+            icon: <BarChartOutlined />,
+            label: '效果看板',
+            onClick: () => navigate(`/canvas/${record.id}/stats`),
+          },
+          {
+            key: 'users',
+            icon: <TeamOutlined />,
+            label: '用户数据',
+            onClick: () => navigate(`/canvas/${record.id}/users`),
+          },
+          { type: 'divider' },
+          {
+            key: 'archive',
+            label: <span style={{ color: '#ff4d4f' }}>归档画布</span>,
+            onClick: () => handleArchive(record.id, record.name),
+          },
+        ]
+        return (
+          <Space size={4}>
+            <Tooltip title="查看">
+              <Button size="small" icon={<EyeOutlined />}
+                onClick={() => navigate(`/canvas/${record.id}/edit?readonly=true`)} />
             </Tooltip>
-          )}
-
-          {record.status === 1 && isAdmin && (
-            <Tooltip title="下线">
-              <Button size="small" danger icon={<StopOutlined />}
-                onClick={() => handleOffline(record.id)} />
+            <Tooltip title="编辑">
+              <Button size="small" icon={<EditOutlined />}
+                onClick={() => navigate(`/canvas/${record.id}/edit`)} />
             </Tooltip>
-          )}
 
-          {record.status === 1 && isAdmin && (
-            <Tooltip title="紧急停止">
-              <Button size="small" danger ghost icon={<ThunderboltOutlined />}
-                onClick={() => handleKill(record.id)} />
-            </Tooltip>
-          )}
+            {record.status !== 1 && isAdmin && (
+              <Tooltip title="发布">
+                <Button size="small" type="primary" icon={<CloudUploadOutlined />}
+                  onClick={() => handlePublish(record.id)} />
+              </Tooltip>
+            )}
 
-          <Tooltip title="克隆">
-            <Button size="small" icon={<CopyOutlined />}
-              onClick={() => handleClone(record.id)} />
-          </Tooltip>
+            {record.status === 1 && isAdmin && (
+              <Tooltip title="下线">
+                <Button size="small" danger icon={<StopOutlined />}
+                  onClick={() => handleOffline(record.id)} />
+              </Tooltip>
+            )}
 
-          <Tooltip title="效果看板">
-            <Button size="small" icon={<BarChartOutlined />}
-              onClick={() => navigate(`/canvas/${record.id}/stats`)} />
-          </Tooltip>
-          <Button size="small" onClick={() => navigate(`/canvas/${record.id}/users`)}>
-            用户数据
-          </Button>
+            {record.status === 1 && isAdmin && (
+              <Tooltip title="紧急停止">
+                <Button size="small" danger ghost icon={<ThunderboltOutlined />}
+                  onClick={() => handleKill(record.id)} />
+              </Tooltip>
+            )}
 
-          <Dropdown
-            menu={{
-              items: [
-                {
-                  key: 'archive',
-                  label: <span style={{ color: '#ff4d4f' }}>归档画布</span>,
-                  onClick: () => handleArchive(record.id, record.name),
-                },
-              ],
-            }}
-            trigger={['click']}
-          >
-            <Button size="small" icon={<MoreOutlined />} />
-          </Dropdown>
-        </Space>
-      ),
+            <Dropdown menu={{ items: moreItems }} trigger={['click']}>
+              <Button size="small" icon={<MoreOutlined />} />
+            </Dropdown>
+          </Space>
+        )
+      },
     },
   ]
 

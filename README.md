@@ -57,17 +57,21 @@ docker compose -f docker-compose.local.yml ps
 ### 2.2 启动后端
 
 ```bash
-cd backend/canvas-engine
+cd backend
 
-# 方式一：Maven（需全局安装 mvn）
-mvn spring-boot:run
+# 方式一：Maven（需 Java 21、全局安装 mvn）
+CANVAS_JWT_SECRET=local-dev-jwt-secret-at-least-32-bytes \
+JAVA_HOME=$(/usr/libexec/java_home -v 21) \
+mvn -f canvas-engine/pom.xml -Dmaven.test.skip=true spring-boot:run
 
 # 方式二：IDE（IntelliJ IDEA / VS Code）
+# 配置 Java 21，并设置环境变量 CANVAS_JWT_SECRET，长度至少 32 字节。
 # 直接运行 CanvasEngineApplication.java 的 main 方法
 
 # 方式三：先打包再运行
-mvn package -DskipTests
-java -jar target/canvas-engine-1.0.0-SNAPSHOT.jar
+JAVA_HOME=$(/usr/libexec/java_home -v 21) mvn -f canvas-engine/pom.xml package -DskipTests
+CANVAS_JWT_SECRET=local-dev-jwt-secret-at-least-32-bytes \
+java -jar canvas-engine/target/canvas-engine-1.0.0-SNAPSHOT.jar
 ```
 
 启动后访问：
@@ -75,7 +79,15 @@ java -jar target/canvas-engine-1.0.0-SNAPSHOT.jar
 - **健康检查**：http://localhost:8080/actuator/health
 - **Prometheus 指标**：http://localhost:8080/actuator/prometheus
 
-**首次启动**：Flyway 自动执行 V1～V7 迁移，建表并插入初始节点类型数据。
+**首次启动**：Flyway 自动执行迁移，建表并插入初始节点类型数据。
+
+如果 Flyway 报 `Found more than one migration with version ...`，通常是 `target/classes`
+里残留了旧迁移文件。先清理构建产物再启动：
+
+```bash
+cd backend
+JAVA_HOME=$(/usr/libexec/java_home -v 21) mvn -f canvas-engine/pom.xml clean
+```
 
 ### 2.3 启动前端
 
@@ -354,7 +366,7 @@ Flyway 在**服务启动时自动执行**，无需手动操作。
 | `SPRING_DATASOURCE_URL` | localhost:3306/canvas_db | MySQL 连接串 |
 | `SPRING_DATA_REDIS_HOST` | localhost | Redis 主机 |
 | `ROCKETMQ_NAME_SERVER` | localhost:9876 | RocketMQ namesrv 地址 |
-| `CANVAS_JWT_SECRET` | （内置，需替换）| JWT 签名密钥，**生产必须更换** |
+| `CANVAS_JWT_SECRET` | 无，必须配置 | JWT 签名密钥，至少 32 字节，**生产必须更换** |
 | `CANVAS_JWT_EXPIRY_HOURS` | 24 | Token 有效期（小时） |
 | `CANVAS_EXECUTION_GLOBAL_TIMEOUT_SEC` | 600 | 单次执行超时（秒） |
 | `CANVAS_GROOVY_TIMEOUT_MS` | 5000 | Groovy 脚本超时（毫秒） |
@@ -399,7 +411,7 @@ canvas/
 │       │   │   └── trigger/        触发路由 + 执行编排 + Watchdog
 │       │   └── infra/              Redis（路由/ctx） + Caffeine L1 缓存
 │       ├── main/resources/
-│       │   ├── db/migration/       Flyway V1-V7
+│       │   ├── db/migration/       Flyway migrations
 │       │   ├── application.yml     主配置
 │       │   └── logback-spring.xml  结构化 JSON 日志（prod）
 │       └── test/                   单元测试（IF/Selector/LogicRelation/AbSplit/DagParser）
@@ -446,7 +458,11 @@ docker compose -f docker-compose.local.yml ps
 确认 `rocketmq-namesrv` 和 `rocketmq-broker` 为 running，且 `9876`、`10911` 端口未被其他进程占用。
 如果连接外部 RocketMQ，设置：
 ```bash
-ROCKETMQ_NAME_SERVER=your-rocketmq-host:9876 mvn spring-boot:run
+cd backend
+ROCKETMQ_NAME_SERVER=your-rocketmq-host:9876 \
+CANVAS_JWT_SECRET=local-dev-jwt-secret-at-least-32-bytes \
+JAVA_HOME=$(/usr/libexec/java_home -v 21) \
+mvn -f canvas-engine/pom.xml -Dmaven.test.skip=true spring-boot:run
 ```
 
 ### Q: Flyway 报错 `Found non-empty schema(s) ... without schema history table`

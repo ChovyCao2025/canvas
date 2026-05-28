@@ -11,6 +11,7 @@ import org.chovy.canvas.engine.trigger.CanvasExecutionService;
 import jakarta.annotation.PreDestroy;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 
 import java.util.Arrays;
@@ -44,8 +45,8 @@ public class CanvasDisruptorService {
 
     /** 初始化 Disruptor、worker pool 和异常处理器。 */
     public CanvasDisruptorService(
-            CanvasExecutionService executionService,
-            CanvasExecutionRequestExecutor requestExecutor,
+            @Lazy CanvasExecutionService executionService,
+            @Lazy CanvasExecutionRequestExecutor requestExecutor,
             CanvasMetrics metrics,
             @Value("${canvas.disruptor.ring-buffer-size:65536}") int ringBufferSize,
             @Value("${canvas.disruptor.consumers:0}") int configuredConsumers
