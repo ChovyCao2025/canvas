@@ -10,6 +10,7 @@ import { CopyOutlined, DeleteOutlined } from '@ant-design/icons'
 import type { CanvasNodeData } from './constants'
 import { CATEGORY_COLORS, TRIGGER_TYPES, TERMINAL_TYPES } from './constants'
 import { getOutletHandles, hasOutletSchema } from './outletSchema'
+import { getNodeConfigHint } from './nodeConfigHint'
 import { useCanvasActions } from '../../context/CanvasActionsContext'
 
 /**
@@ -84,6 +85,7 @@ const CanvasNode = memo(({ data, id, selected }: NodeProps) => {
   const isStart     = d.nodeType === 'START'
   const isEnd       = d.nodeType === 'END'
   const isAudienceTagger = d.nodeType === 'TAGGER' && d.bizConfig?.mode === 'audience'
+  const configHint = getNodeConfigHint(d.nodeType, d.bizConfig)
 
   // 根据节点类型和配置动态计算当前节点应该暴露哪些分支出口
   const branchHandles = getOutletHandles({
@@ -149,6 +151,11 @@ const CanvasNode = memo(({ data, id, selected }: NodeProps) => {
         </div>
         <div style={{ background: '#fff', padding: '8px 10px', fontSize: 12, color: '#262626', lineHeight: 1.4, minHeight: 36, borderBottomLeftRadius: 6, borderBottomRightRadius: 6 }}>
           {d.name || '未命名'}
+          {configHint && (
+            <div style={{ marginTop: 6, fontSize: 11, color: '#8c8c8c' }}>
+              {configHint}
+            </div>
+          )}
           {isAudienceTagger && (
             <div style={{ marginTop: 6, fontSize: 11, color: '#8c8c8c' }}>
               人群 ID: {String(d.bizConfig?.audienceId ?? '未配置')}

@@ -1,21 +1,24 @@
 # 画布触发
-## 1. 事件上报触发
+## 1. 关键地址
+- RocketMQ Dashboard：http://localhost:8081/
+- 画布界面: http://localhost:3000/   User: admin  Password: Admin@123
+## 2. 事件上报触发
 ```bash
 bash scripts/report-order-complete.sh 
 ```
-## 2. 直调触发
+## 3. 直调触发
 ```bash
 bash scripts/direct-call.sh {CANVAS_ID}
 ```
 其中 CANVAS_ID 为画布 ID，默认值为 11。
 
-## 3. 画布失效触发
+## 4. 画布失效触发
 ```bash
 curl -X POST http://localhost:8080/ops/cache/invalidate/{CANVAS_ID}
 ```
 其中 CANVAS_ID 为画布 ID，默认值为 11。
 
-## 4. Groovy 表达式提示
+## 5. Groovy 表达式提示
 现在的 GROOVY 节点本质上执行一段受限 Groovy 脚本，最后只要 return Map，Map 里的字段会写入上下文，后续 API_CALL / IF / SEND_MQ 都能用 ${字段名} 引用。
 
 当前可用绑定变量：
@@ -111,7 +114,7 @@ return [
 - 适合做字段加工、规则派生、轻量计算；不适合做外部 HTTP、DB、文件、线程这类副作用操作。
 
 
-## 5. DIRECT_RETURN 节点使用
+## 6. DIRECT_RETURN 节点使用
 DIRECT_RETURN 一般只用于“同步直调画布”的场景，也就是业务系统调用画布后，需要马上拿到一个业务结果。
 
 #### 典型场景：
@@ -142,7 +145,7 @@ curl -s -X POST "http://localhost:8080/canvas/execute/direct/16" \
     }'
 ```
 
-## 6. 消息队列触发
+## 7. 消息队列触发
 ```bash
 sh scripts/trigger-canvas-14-mq.sh
 ```

@@ -32,6 +32,7 @@ import {
 } from './controlChrome'
 import { normalizeFieldOptions, resolveDisplayValue } from './displayValues'
 import { buildConfigPanelPresentation, resolveContextValueListFieldKey } from './presentation'
+import { resolveApiInputParamsFieldKey } from './apiInputParams'
 
 /** API 参数定义的最小形态，用于事件属性预览等只读控件。 */
 interface ApiParamDef { name: string; displayName: string; type: string; required: boolean }
@@ -356,6 +357,7 @@ export default function ConfigPanel({ nodeId, nodeData, onChange, nodes, readonl
         <div key={field.key} style={{ marginBottom: 10 }}>
           <ApiCallInputParams
             label={field.label}
+            fieldKey={resolveApiInputParamsFieldKey(field.key)}
             apiKeyField={field.apiKeyField ?? 'apiKey'}
             defsSource={field.defsSource ?? '/meta/api-definitions'}
           />
@@ -1264,11 +1266,11 @@ function DelayInput({
   )
 }
 
-// ── API_CALL 动态入参编辑器 ─────────────────────────────────────────
-// 每个参数渲染独立的 Form.Item name={['inputParams', paramName]}
-// 这样 onChange 会正常触发，值会回写到 canvas 节点 config
-function ApiCallInputParams({ label, apiKeyField = 'apiKey', defsSource = '/meta/api-definitions' }: {
-  label: string; apiKeyField?: string; defsSource?: string
+// ── 动态入参编辑器（API_CALL / SEND_MQ 等复用）────────────────────
+// 每个参数渲染独立的 Form.Item name={[fieldKey, paramName]}
+// 这样 onChange 会正常触发，值会按 schema.key 回写到 canvas 节点 config。
+function ApiCallInputParams({ label, fieldKey, apiKeyField = 'apiKey', defsSource = '/meta/api-definitions' }: {
+  label: string; fieldKey: string; apiKeyField?: string; defsSource?: string
 }) {
   const form   = Form.useFormInstance()
   const apiKey = Form.useWatch(apiKeyField, form)
@@ -1285,13 +1287,13 @@ function ApiCallInputParams({ label, apiKeyField = 'apiKey', defsSource = '/meta
       let schema: ApiParamDef[] = []
       try { schema = def ? JSON.parse(def.requestSchema || '[]') : [] } catch {}
       setParams(schema)
-      // 切换接口时清理不属于新 schema 的旧 inputParams 键
+      // 切换定义时清理不属于新 schema 的旧参数键。
       const schemaKeys = new Set(schema.map(p => p.name))
-      const cur: Record<string, unknown> = form.getFieldValue('inputParams') ?? {}
+      const cur: Record<string, unknown> = form.getFieldValue(fieldKey) ?? {}
       if (Object.keys(cur).some(k => !schemaKeys.has(k))) {
         const next: Record<string, unknown> = {}
         schema.forEach(p => { if (cur[p.name] !== undefined) next[p.name] = cur[p.name] })
-        form.setFieldValue('inputParams', next)
+        form.setFieldValue(fieldKey, next)
       }
     }
     if (rawCache.has(defsSource)) { pick(rawCache.get(defsSource)!); return }
@@ -1309,7 +1311,7 @@ function ApiCallInputParams({ label, apiKeyField = 'apiKey', defsSource = '/meta
       {params.map(p => (
         <Form.Item
           key={p.name}
-          name={['inputParams', p.name]}
+          name={[fieldKey, p.name]}
           label={
             <span style={getControlLabelStyle()}>
               {p.displayName || p.name}
