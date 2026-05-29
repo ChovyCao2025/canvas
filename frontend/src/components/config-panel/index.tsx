@@ -10,6 +10,7 @@ import {
   Typography, Spin, Space, Tag, Tooltip, AutoComplete, DatePicker,
 } from 'antd'
 import { PlusOutlined, DeleteOutlined, QuestionCircleOutlined } from '@ant-design/icons'
+import dayjs from 'dayjs'
 import http, { metaApi, canvasApi } from '../../services/api'
 import type { NodeTypeRegistry, ContextField, StubOption, Canvas } from '../../types'
 import type { CanvasNodeData } from '../canvas/constants'
@@ -76,6 +77,19 @@ export function getDataSourceDependencies(src?: string): string[] {
 /** 判断 dataSource 依赖值是否缺失；缺失时不发起远程请求。 */
 function isBlankDependencyValue(value: unknown): boolean {
   return value == null || (typeof value === 'string' && value.trim() === '')
+}
+
+function toDatePickerValue(value: unknown) {
+  if (value == null || value === '') return value
+  if (dayjs.isDayjs(value)) return value
+  const parsed = dayjs(value as string | number | Date)
+  return parsed.isValid() ? parsed : null
+}
+
+function fromDatePickerValue(value: unknown): string | undefined {
+  if (value == null || value === '') return undefined
+  if (dayjs.isDayjs(value)) return value.format('YYYY-MM-DDTHH:mm:ss')
+  return String(value)
 }
 
 /** 用当前表单值填充 dataSource URL 模板；有依赖缺失时返回 null。 */
@@ -217,9 +231,9 @@ export default function ConfigPanel({ nodeId, nodeData, onChange, nodes, readonl
 
   // 加载 select 下拉选项：dataSource 优先，其次 optionCategory，最后保留 field.options 兜底
   useEffect(() => {
-    if (!schema) return
+    if (!schema || !nodeData) return
     let cancelled = false
-    const fields = parseSchema(schema.configSchema)
+    const fields = getRenderableSchemaFields(schema.configSchema, nodeData.nodeType)
     fields.filter(f => f.type === 'select' && f.dataSource).forEach(f => {
       const src = resolveDataSourceTemplate(f.dataSource!, formValues)
       if (!src) {
@@ -248,7 +262,7 @@ export default function ConfigPanel({ nodeId, nodeData, onChange, nodes, readonl
         )
       })
     return () => { cancelled = true }
-  }, [formValues, schema])
+  }, [formValues, schema, nodeData])
 
   // 同步表单初始值
   useEffect(() => {
@@ -262,7 +276,7 @@ export default function ConfigPanel({ nodeId, nodeData, onChange, nodes, readonl
   /** 表单变化后把 name 和 bizConfig 拆开回传给画布编辑器。 */
   const handleValuesChange = useCallback((changed: Record<string, unknown>, all: Record<string, unknown>) => {
     if (!nodeId || !nodeData) return
-    const schemaFields = parseSchema(schema?.configSchema)
+    const schemaFields = getRenderableSchemaFields(schema?.configSchema, nodeData.nodeType)
     const changedKeys = new Set(Object.keys(changed))
     const clearedFields = schemaFields
       .filter((field) =>
@@ -285,7 +299,7 @@ export default function ConfigPanel({ nodeId, nodeData, onChange, nodes, readonl
     const { name, ...rest } = nextValues
     onChange(nodeId, {
       ...(name !== undefined ? { name: name as string } : {}),
-      bizConfig: rest,
+      bizConfig: { ...(nodeData.bizConfig ?? {}), ...rest },
     })
   }, [form, nodeData, nodeId, onChange, schema])
 
@@ -297,7 +311,7 @@ export default function ConfigPanel({ nodeId, nodeData, onChange, nodes, readonl
     const { name, ...rest } = all
     onChange(nodeId, {
       ...(name !== undefined ? { name: name as string } : {}),
-      bizConfig: rest,
+      bizConfig: { ...(nodeData.bizConfig ?? {}), ...rest },
     })
   }, [form, nodeData, nodeId, onChange])
 
@@ -309,7 +323,7 @@ export default function ConfigPanel({ nodeId, nodeData, onChange, nodes, readonl
     )
   }
 
-  const fields = parseSchema(schema?.configSchema)
+  const fields = getRenderableSchemaFields(schema?.configSchema, nodeData.nodeType)
   // visible/showWhen 都由 schema 控制，前端只实现轻量表达式判断。
   const visibleFields = fields.filter((f) =>
     evaluateVisible(f.visible, formValues) &&
@@ -369,9 +383,26 @@ export default function ConfigPanel({ nodeId, nodeData, onChange, nodes, readonl
         </div>
       )
     }
+    // select/radio 控件的选项 value 均为 string（toSelectOptions 统一 String() 处理），
+    // 但 bizConfig 中存储的 ID 可能是 number（如 audienceId）。
+    // getValueProps 在渲染时将数值转成字符串，确保 Select 能找到匹配选项并回显名称。
+    const needsStringCoerce = field.type === 'select' || field.type === 'radio'
+    const isDateTime = field.type === 'datetime'
     return (
-      <Form.Item key={field.key} name={field.key} label={renderControlLabel(field.label)}
-        rules={field.required ? [{ required: true, message: `请填写${field.label}` }] : []}>
+      <Form.Item
+        key={field.key}
+        name={field.key}
+        label={renderControlLabel(field.label)}
+        rules={field.required ? [{ required: true, message: `请填写${field.label}` }] : []}
+        getValueProps={
+          isDateTime
+            ? (val) => ({ value: toDatePickerValue(val) })
+            : needsStringCoerce
+              ? (val) => ({ value: val != null ? String(val) : val })
+              : undefined
+        }
+        getValueFromEvent={isDateTime ? fromDatePickerValue : undefined}
+      >
         {renderControl(field, options, ctxFields, form, sharedOptions, applyFormPatch, nodeId, getNodeName, nodeData)}
       </Form.Item>
     )
@@ -628,7 +659,11 @@ function ConditionRuleList({ ctxFields, operatorOptions, fieldKey }: {
               value={rule.value}
               options={ctxFields.map(f => ({ value: '${' + f.fieldKey + '}', label: f.fieldName }))}
               onChange={v => update(i, 'value', v)}
-              filterOption={(input, opt) => String(opt?.label ?? '').toLowerCase().includes(input.toLowerCase())}
+              filterOption={(input, opt) =>
+                input.includes('$') &&
+                String(opt?.label ?? '').toLowerCase().includes(input.replace(/\$\{?/, '').toLowerCase())
+              }
+              dropdownStyle={{ minWidth: 220 }}
             />
           </div>
         </div>
@@ -811,7 +846,11 @@ function BranchList({ ctxFields, operatorOptions, relationOptions }: {
                   value={c.value}
                   options={ctxFields.map(f => ({ value: '${' + f.fieldKey + '}', label: f.fieldName }))}
                   onChange={v => updateCondition(i, ci, 'value', v)}
-                  filterOption={(input, opt) => String(opt?.label ?? '').toLowerCase().includes(input.toLowerCase())} />
+                  filterOption={(input, opt) =>
+                    input.includes('$') &&
+                    String(opt?.label ?? '').toLowerCase().includes(input.replace(/\$\{?/, '').toLowerCase())
+                  }
+                  dropdownStyle={{ minWidth: 220 }} />
                 <Button size="small" danger icon={<DeleteOutlined />} onClick={() => removeCondition(i, ci)} />
               </div>
             ))}
@@ -1065,6 +1104,12 @@ interface SchemaField {
 /** 安全解析后端 configSchema，解析失败时按空 schema 处理。 */
 function parseSchema(raw: string | undefined): SchemaField[] {
   try { return raw ? JSON.parse(raw) : [] } catch { return [] }
+}
+
+function getRenderableSchemaFields(raw: string | undefined, nodeType: string): SchemaField[] {
+  const fields = parseSchema(raw)
+  if (nodeType !== 'SCHEDULED_TRIGGER') return fields
+  return fields.filter(field => field.key !== 'userSource' && field.type !== 'user-source-config')
 }
 
 // ── 事件属性只读预览控件 ──────────────────────────────────────────

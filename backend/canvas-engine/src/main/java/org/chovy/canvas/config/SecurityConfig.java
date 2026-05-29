@@ -60,6 +60,10 @@ public class SecurityConfig {
                                 "/v3/api-docs/**", "/webjars/**").permitAll()
                         // OpenAPI：事件上报无需登录（业务系统直接调用）
                         .pathMatchers(HttpMethod.POST, "/canvas/events/report").permitAll()
+                        // OpenAPI：直调执行无需登录（业务系统直接调用，内网不对外暴露）
+                        .pathMatchers(HttpMethod.POST, "/canvas/execute/direct/*").permitAll()
+                        // OpenAPI：行为触发无需登录（业务系统直接调用，内网不对外暴露）
+                        .pathMatchers(HttpMethod.POST, "/canvas/trigger/behavior").permitAll()
                         // WebSocket 使用一次性票据鉴权；票据接口本身仍要求登录。
                         .pathMatchers("/canvas/ws/notifications").permitAll()
                         // 运维接口：无需登录（内网调用，不对外暴露）

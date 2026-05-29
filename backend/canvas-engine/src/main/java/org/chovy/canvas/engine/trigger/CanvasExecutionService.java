@@ -424,7 +424,7 @@ public class CanvasExecutionService {
                 .timeout(Duration.ofSeconds(globalTimeoutSec));
 
         // 4. 组装响应式链：持久化记录 → 绑定取消句柄 → 处理结果/错误 → 释放分布式锁
-        return insertExecution(finalExec)
+        return persistExecutionStart(finalExec, isResume)
                 .then(executionMono
                         .doOnSubscribe(sub -> {
                             // 绑定取消句柄，Kill Switch 可通过 registry 取消当前 Reactor 订阅。
@@ -557,7 +557,8 @@ public class CanvasExecutionService {
         //    ⚠️ 分布式：L1 是 JVM 本地，画布下线后最多延迟一个缓存 TTL 才感知
         CanvasDO canvas = validateAndLoadCanvas(canvasId, dryRun);
         boolean internalContinuation = isInternalContinuationTrigger(triggerType);
-        boolean quotaBypass = internalContinuation;
+        boolean scheduledBatch = Boolean.TRUE.equals(payload.get(MapFieldKeys.SCHEDULED_BATCH));
+        boolean quotaBypass = internalContinuation || scheduledBatch;
         ExecutionLane executionLane = executionLaneOverride != null
                 ? executionLaneOverride
                 : executionLaneResolver.resolve(
@@ -566,7 +567,7 @@ public class CanvasExecutionService {
 
         // B. 幂等去重（Redis SETNX，跨机安全）
         //    isResume=true 表示 Redis 中存有该用户的上下文快照（画布已暂停等待中）
-        boolean isResume = !dryRun && ctxStore.exists(canvasId, userId);
+        boolean isResume = shouldResumeExistingContext(canvasId, userId, dryRun, internalContinuation);
         DedupResult dedup = performDedupCheck(canvasId, userId, msgId, isResume, dryRun, overflowRetry,
                 persistentRequest, internalContinuation);
         if (dedup.deduplicated()){
@@ -577,7 +578,7 @@ public class CanvasExecutionService {
 
         // C. 前置资格校验（不扣减配额）
         //    WAIT/GOAL 恢复触发跳过此检查：恢复不是新触发，冷却期不应拦截恢复路径
-        if (!dryRun && !internalContinuation) {
+        if (!dryRun && !internalContinuation && !scheduledBatch) {
             preCheckService.checkWithoutQuotaAccounting(canvas, userId);
             if (overflowRetry) {
                 log.debug("[ENGINE] 溢出重试跳过配额扣减（扣减在 doExecute 中进行）canvasId={} userId={}", canvasId, userId);
@@ -688,6 +689,15 @@ public class CanvasExecutionService {
         if (acquiredDedupKey != null) {
             ctxStore.releaseDedup(acquiredDedupKey);
         }
+    }
+
+    /**
+     * 只有 WAIT/审批/超时等内部继续触发才允许恢复 Redis 中的旧上下文。
+     * 普通 DIRECT_CALL / EVENT / MQ 是新的业务触发，即使同用户存在挂起上下文也必须新建 execution。
+     */
+    private boolean shouldResumeExistingContext(Long canvasId, String userId,
+                                                boolean dryRun, boolean internalContinuation) {
+        return !dryRun && internalContinuation && ctxStore.exists(canvasId, userId);
     }
 
     /** 构建准备阶段输出 Map，供执行阶段解包上下文、图和准入信息。 */
@@ -1088,6 +1098,9 @@ public class CanvasExecutionService {
 
     /** 确保执行上下文中的用户已写入 CDP 用户画像。 */
     private void ensureCdpUser(ExecutionContext ctx) {
+        if (CanvasSchedulerService.isScheduledBatchUser(ctx.getUserId())) {
+            return;
+        }
         if (StrUtil.isNotBlank(ctx.getUserId())) {
             cdpUserService.ensureUser(ctx.getUserId(), "CANVAS_EXECUTION", ctx.getExecutionId());
         }
@@ -1176,7 +1189,9 @@ public class CanvasExecutionService {
                 || NodeType.AGGREGATE.equals(triggerNodeType)
                 || NodeType.LOGIC_RELATION.equals(triggerNodeType)
                 || NodeType.THRESHOLD.equals(triggerNodeType)
-                || NodeType.MANUAL_APPROVAL.equals(triggerNodeType);
+                || NodeType.MANUAL_APPROVAL.equals(triggerNodeType)
+                || NodeType.SCHEDULED_TRIGGER.equals(triggerNodeType)
+                || NodeType.TAGGER.equals(triggerNodeType);
     }
 
     /** 判断执行上下文中是否存在 WAITING 节点状态。 */
@@ -1311,6 +1326,33 @@ public class CanvasExecutionService {
     /** 在线程池中插入执行记录，避免阻塞响应式执行链。 */
     private Mono<Void> insertExecution(CanvasExecutionDO exec) {
         return Mono.fromRunnable(() -> executionMapper.insert(exec))
+                .subscribeOn(Schedulers.boundedElastic())
+                .then();
+    }
+
+    /** 恢复旧 execution 时不能再次 INSERT 同一个主键，只需把 PAUSED 记录标回 RUNNING。 */
+    private Mono<Void> persistExecutionStart(CanvasExecutionDO exec, boolean isResume) {
+        if (!isResume) {
+            return insertExecution(exec);
+        }
+        return markExecutionRunning(exec);
+    }
+
+    /** 将已挂起的执行记录重新置为 RUNNING，便于后续成功/失败/再次挂起更新同一条记录。 */
+    private Mono<Void> markExecutionRunning(CanvasExecutionDO exec) {
+        if (exec == null) return Mono.empty();
+        CanvasExecutionDO update = new CanvasExecutionDO();
+        update.setStatus(ExecutionStatus.RUNNING.getCode());
+        return Mono.fromRunnable(() -> {
+                    int updated = executionMapper.update(update,
+                            new LambdaUpdateWrapper<CanvasExecutionDO>()
+                                    .eq(CanvasExecutionDO::getId, exec.getId())
+                                    .eq(CanvasExecutionDO::getStatus, ExecutionStatus.PAUSED.getCode()));
+                    if (updated == 0) {
+                        log.warn("[ENGINE] resume execution 未置为 RUNNING，可能状态已变化 executionId={}",
+                                exec.getId());
+                    }
+                })
                 .subscribeOn(Schedulers.boundedElastic())
                 .then();
     }

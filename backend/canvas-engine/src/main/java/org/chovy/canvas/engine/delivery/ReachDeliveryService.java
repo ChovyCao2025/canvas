@@ -178,36 +178,36 @@ public class ReachDeliveryService {
 
     /** 标准化触达投递请求，封装节点执行产生的渠道、模板、变量和幂等键。 */
     public record DeliveryRequest(
-            /** 画布执行实例 ID。 */
+            /* 画布执行实例 ID。 */
             String executionId,
-            /** 画布 ID。 */
+            /* 画布 ID。 */
             Long canvasId,
-            /** 接收触达的用户 ID。 */
+            /* 接收触达的用户 ID。 */
             String userId,
-            /** 发起触达的节点 ID。 */
+            /* 发起触达的节点 ID。 */
             String nodeId,
-            /** 触达渠道。 */
+            /* 触达渠道。 */
             String channel,
-            /** 渠道模板 ID。 */
+            /* 渠道模板 ID。 */
             String templateId,
-            /** 发送给触达平台的标准化载荷。 */
+            /* 发送给触达平台的标准化载荷。 */
             Map<String, Object> payload,
-            /** 幂等键，用于避免重复触达。 */
+            /* 幂等键，用于避免重复触达。 */
             String idempotencyKey
     ) {
     }
 
     /** 触达投递结果，返回是否发送、是否命中幂等、记录 ID 和外部渠道回执。 */
     public record DeliveryResult(
-            /** 是否已成功提交触达。 */
+            /* 是否已成功提交触达。 */
             boolean sent,
-            /** 是否命中幂等重复请求。 */
+            /* 是否命中幂等重复请求。 */
             boolean duplicate,
-            /** 对应的发送记录 ID。 */
+            /* 对应的发送记录 ID。 */
             Long recordId,
-            /** 外部渠道返回的消息 ID。 */
+            /* 外部渠道返回的消息 ID。 */
             String externalMessageId,
-            /** 失败原因，成功时为空。 */
+            /* 失败原因，成功时为空。 */
             String errorMessage
     ) {
     }

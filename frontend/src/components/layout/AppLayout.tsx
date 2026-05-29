@@ -14,6 +14,7 @@ import {
   DatabaseOutlined,
   IdcardOutlined,
   BankOutlined,
+  EyeOutlined,
 } from '@ant-design/icons'
 import { Outlet, useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
@@ -78,23 +79,12 @@ export default function AppLayout() {
 
   /** 根据当前菜单高亮项计算需要展开的父级菜单。 */
   const getDesiredOpenKeys = () => {
-    // 保证进入子页面时，父菜单分组同步展开，减少额外点击
-    if (selectedKey === 'api-docs') return ['developer']
-    if ([
-      'api-config',
-      'data-source-config',
-      'ab-experiments',
-      'tag-config',
-      'identity-types',
-      'tag-import',
-      'audiences',
-      'mq-config',
-      'event-config',
-      'system-options',
-      'admin-tenants',
-      'admin-users',
-    ].includes(selectedKey)) return ['settings']
     if (selectedKey === 'home') return []
+    if (selectedKey === 'cdp-users') return ['insight']
+    if (selectedKey === 'api-docs') return ['developer']
+    if (['audiences', 'tag-config', 'identity-types', 'tag-import', 'ab-experiments'].includes(selectedKey)) return ['data']
+    if (['api-config', 'data-source-config', 'mq-config', 'event-config'].includes(selectedKey)) return ['integration']
+    if (['system-options', 'admin-tenants', 'admin-users'].includes(selectedKey)) return ['settings']
     return ['marketing']
   }
 
@@ -122,49 +112,31 @@ export default function AppLayout() {
           label: '旅程管理',
           onClick: () => navigate('/canvas'),
         },
+      ],
+    },
+    {
+      key: 'insight',
+      icon: <EyeOutlined />,
+      label: '用户洞察',
+      children: [
         {
           key: 'cdp-users',
           icon: <IdcardOutlined />,
-          label: 'CDP 用户中心',
+          label: '用户中心',
           onClick: () => navigate('/cdp/users'),
         },
       ],
     },
     ...(isAdmin ? [{
-      key: 'developer',
-      icon: <BookOutlined />,
-      label: '开发者文档',
+      key: 'data',
+      icon: <DatabaseOutlined />,
+      label: '数据管理',
       children: [
         {
-          key: 'api-docs',
-          icon: <ApiOutlined />,
-          label: 'API 说明',
-          onClick: () => navigate('/api-docs'),
-        },
-      ],
-    }] : []),
-    ...(isAdmin ? [{
-      key: 'settings',
-      icon: <SettingOutlined />,
-      label: '系统设置',
-      children: [
-        {
-          key: 'api-config',
-          icon: <ApiOutlined />,
-          label: 'API 接口配置',
-          onClick: () => navigate('/api-config'),
-        },
-        {
-          key: 'data-source-config',
-          icon: <DatabaseOutlined />,
-          label: '数据源配置',
-          onClick: () => navigate('/data-source-config'),
-        },
-        {
-          key: 'ab-experiments',
-          icon: <ExperimentOutlined />,
-          label: 'AB 实验管理',
-          onClick: () => navigate('/ab-experiments'),
+          key: 'audiences',
+          icon: <TeamOutlined />,
+          label: '人群管理',
+          onClick: () => navigate('/audiences'),
         },
         {
           key: 'tag-config',
@@ -185,10 +157,29 @@ export default function AppLayout() {
           onClick: () => navigate('/tag-import'),
         },
         {
-          key: 'audiences',
-          icon: <TeamOutlined />,
-          label: '人群管理',
-          onClick: () => navigate('/audiences'),
+          key: 'ab-experiments',
+          icon: <ExperimentOutlined />,
+          label: 'AB 实验管理',
+          onClick: () => navigate('/ab-experiments'),
+        },
+      ],
+    }] : []),
+    ...(isAdmin ? [{
+      key: 'integration',
+      icon: <ApiOutlined />,
+      label: '集成配置',
+      children: [
+        {
+          key: 'api-config',
+          icon: <ApiOutlined />,
+          label: 'API 接口配置',
+          onClick: () => navigate('/api-config'),
+        },
+        {
+          key: 'data-source-config',
+          icon: <DatabaseOutlined />,
+          label: '数据源配置',
+          onClick: () => navigate('/data-source-config'),
         },
         {
           key: 'mq-config',
@@ -202,6 +193,26 @@ export default function AppLayout() {
           label: '事件配置',
           onClick: () => navigate('/event-config'),
         },
+      ],
+    }] : []),
+    ...(isAdmin ? [{
+      key: 'developer',
+      icon: <BookOutlined />,
+      label: '开发者文档',
+      children: [
+        {
+          key: 'api-docs',
+          icon: <ApiOutlined />,
+          label: 'API 说明',
+          onClick: () => navigate('/api-docs'),
+        },
+      ],
+    }] : []),
+    ...(isAdmin ? [{
+      key: 'settings',
+      icon: <SettingOutlined />,
+      label: '系统设置',
+      children: [
         {
           key: 'system-options',
           icon: <SettingOutlined />,
@@ -215,7 +226,6 @@ export default function AppLayout() {
           onClick: () => navigate('/admin/tenants'),
         }] : []),
         ...(isAdmin ? [{
-          // 管理员才显示用户管理入口
           key: 'admin-users',
           icon: <TeamOutlined />,
           label: '用户管理',

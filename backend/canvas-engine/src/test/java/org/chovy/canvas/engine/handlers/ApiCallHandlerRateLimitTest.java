@@ -327,6 +327,31 @@ class ApiCallHandlerRateLimitTest {
         assertThat(keyCaptor.getValue()).matches("testenv:ratelimit:test_api:\\d+");
     }
 
+    @Test
+    @DisplayName("API_CALL 支持引用上游 Groovy 输出作为请求入参")
+    void executeAsync_resolves_groovy_output_context_reference_for_request_params() {
+        ApiDefinitionDO def = enabledDefinition(null);
+        when(apiDefinitionCache.getEnabled("test_api")).thenReturn(def);
+        when(ctx.getContextValue("score")).thenReturn(88);
+        ExchangeFunction exchangeFunction = request -> Mono.just(ClientResponse.create(HttpStatus.OK)
+                .header("Content-Type", MediaType.APPLICATION_JSON_VALUE)
+                .body("{\"accepted\":true}")
+                .build());
+        ApiCallHandler handler = new ApiCallHandler(
+                apiDefinitionCache, WebClient.builder().exchangeFunction(exchangeFunction),
+                new com.fasterxml.jackson.databind.ObjectMapper(), payloadBuilder, redis, defaultKeys());
+
+        NodeResult result = handler.executeAsync(Map.of(
+                "apiKey", "test_api",
+                "inputParams", Map.of("userId", "$${score}")), ctx).block();
+
+        assertThat(result.success()).isTrue();
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<Map<String, Object>> paramsCaptor = ArgumentCaptor.forClass(Map.class);
+        verify(payloadBuilder).build(paramsCaptor.capture(), same(ctx), anyString(), eq(false));
+        assertThat(paramsCaptor.getValue()).containsEntry("userId", 88);
+    }
+
     private static Instant fixedInstant() {
         return Instant.ofEpochSecond(1_700_000_000L);
     }

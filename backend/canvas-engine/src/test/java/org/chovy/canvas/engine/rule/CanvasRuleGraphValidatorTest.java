@@ -47,6 +47,45 @@ class CanvasRuleGraphValidatorTest {
                 .hasMessageContaining("必须先经过汇聚节点");
     }
 
+    @Test
+    void rejectsScheduledTriggerWithoutAudienceTaggerDownstream() {
+        DagParser.CanvasNode schedule = node("schedule", NodeType.SCHEDULED_TRIGGER, Map.of(
+                "scheduleType", "ONCE",
+                "triggerTime", "2026-05-29T23:00:00",
+                "nextNodeId", "api"
+        ));
+        DagParser.CanvasNode api = node("api", NodeType.API_CALL, Map.of("nextNodeId", "end"));
+        DagGraph graph = graph(
+                Map.of("schedule", schedule, "api", api),
+                Map.of("schedule", List.of("api"), "api", List.of()),
+                Map.of("schedule", List.of(), "api", List.of("schedule")));
+
+        assertThatThrownBy(() -> validator.validateOrThrow(graph))
+                .isInstanceOf(RuleValidationException.class)
+                .hasMessageContaining("schedule")
+                .hasMessageContaining("人群筛选 TAGGER");
+    }
+
+    @Test
+    void allowsScheduledTriggerToAudienceTaggerDownstream() {
+        DagParser.CanvasNode schedule = node("schedule", NodeType.SCHEDULED_TRIGGER, Map.of(
+                "scheduleType", "ONCE",
+                "triggerTime", "2026-05-29T23:00:00",
+                "nextNodeId", "audience"
+        ));
+        DagParser.CanvasNode audience = node("audience", NodeType.TAGGER, Map.of(
+                "mode", "audience",
+                "audienceId", 90001,
+                "hitNextNodeId", "end"
+        ));
+        DagGraph graph = graph(
+                Map.of("schedule", schedule, "audience", audience),
+                Map.of("schedule", List.of("audience"), "audience", List.of()),
+                Map.of("schedule", List.of(), "audience", List.of("schedule")));
+
+        validator.validateOrThrow(graph);
+    }
+
     private static DagParser.CanvasNode node(String id, String type, Map<String, Object> config) {
         DagParser.CanvasNode node = new DagParser.CanvasNode();
         node.setId(id);
@@ -58,9 +97,15 @@ class CanvasRuleGraphValidatorTest {
 
     private static DagGraph graph(Map<String, DagParser.CanvasNode> nodes,
                                   Map<String, List<String>> upstream) {
+        return graph(nodes, Map.of(), upstream);
+    }
+
+    private static DagGraph graph(Map<String, DagParser.CanvasNode> nodes,
+                                  Map<String, List<String>> downstream,
+                                  Map<String, List<String>> upstream) {
         return new DagGraph(
                 nodes,
-                Map.of(),
+                downstream,
                 upstream,
                 nodes.keySet().stream().collect(java.util.stream.Collectors.toMap(id -> id, id -> upstream.getOrDefault(id, List.of()).size()))
         );

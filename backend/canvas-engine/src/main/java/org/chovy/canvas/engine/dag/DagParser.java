@@ -197,7 +197,7 @@ public class DagParser {
             String type = node != null ? node.getType() : null;
             if (!isConvergenceNode(type)) {
                 throw new IllegalArgumentException(
-                        "多分支收敛必须使用 HUB/LOGIC_RELATION/AGGREGATE/THRESHOLD 节点: nodeId="
+                        "多分支收敛必须使用 HUB/LOGIC_RELATION/AGGREGATE/THRESHOLD 节点，或汇入 END 结束节点: nodeId="
                                 + entry.getKey() + " type=" + type + " upstream=" + upstream);
             }
         }
@@ -207,7 +207,8 @@ public class DagParser {
         return NodeType.HUB.equals(type)
                 || NodeType.LOGIC_RELATION.equals(type)
                 || NodeType.AGGREGATE.equals(type)
-                || NodeType.THRESHOLD.equals(type);
+                || NodeType.THRESHOLD.equals(type)
+                || NodeType.END.equals(type);
     }
 
     // ── 内部 DTO ─────────────────────────────────────────────────

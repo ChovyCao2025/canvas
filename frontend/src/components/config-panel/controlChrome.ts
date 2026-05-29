@@ -124,6 +124,25 @@ export const CONTROL_CHROME_SELECTOR_CSS = `
     white-space: nowrap !important;
   }
 
+  /* placeholder 单独设浅色，覆盖上面的深色规则 */
+  .config-panel-ios-select .ant-select-selection-placeholder,
+  .config-panel-ios-auto-complete .ant-select-selection-placeholder {
+    color: #b8c4ce !important;
+    font-weight: 400 !important;
+  }
+
+  /* sm AutoComplete 搜索框垂直居中 */
+  .config-panel-ios-auto-complete.ant-select-sm .ant-select-selector .ant-select-selection-search {
+    top: 0 !important;
+    bottom: 0 !important;
+    display: flex !important;
+    align-items: center !important;
+  }
+
+  .config-panel-ios-auto-complete.ant-select-sm .ant-select-selector .ant-select-selection-search-input {
+    height: 100% !important;
+  }
+
   .config-panel-ios-select.ant-select-single .ant-select-selector .ant-select-selection-search,
   .config-panel-ios-auto-complete.ant-select-single .ant-select-selector .ant-select-selection-search {
     inset-inline-start: 10px !important;
@@ -224,7 +243,14 @@ export const CONTROL_CHROME_SELECTOR_CSS = `
   .config-panel-ios-select.ant-select-sm.ant-select-single .ant-select-selector .ant-select-selection-search-input,
   .config-panel-ios-auto-complete.ant-select-sm.ant-select-single .ant-select-selector .ant-select-selection-search-input {
     height: 30px !important;
+    line-height: 30px !important;
     font-size: 12px !important;
+  }
+
+  .config-panel-ios-auto-complete .ant-select-selector .ant-select-selection-search-input::placeholder,
+  .config-panel-ios-auto-complete.ant-select-sm .ant-select-selector .ant-select-selection-search-input::placeholder {
+    color: #b8c4ce !important;
+    opacity: 1 !important;
   }
 
   .config-panel-ios-select.ant-select-sm .ant-select-arrow,

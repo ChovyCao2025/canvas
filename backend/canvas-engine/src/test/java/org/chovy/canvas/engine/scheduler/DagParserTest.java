@@ -132,4 +132,19 @@ class DagParserTest {
             assertThat(parser.parse(json).upstream("merge")).containsExactlyInAnyOrder("a", "b");
         }
     }
+
+    @Test
+    @DisplayName("END 结束节点允许多条分支直接结束")
+    void end_node_allows_multi_input() {
+        String json = """
+            {"nodes":[
+              {"id":"start","type":"MQ_TRIGGER","config":{"successNodeId":"a","failNodeId":"b"}},
+              {"id":"a","type":"DELAY","config":{"nextNodeId":"end"}},
+              {"id":"b","type":"DELAY","config":{"nextNodeId":"end"}},
+              {"id":"end","type":"END","config":{}}
+            ]}
+            """;
+
+        assertThat(parser.parse(json).upstream("end")).containsExactlyInAnyOrder("a", "b");
+    }
 }

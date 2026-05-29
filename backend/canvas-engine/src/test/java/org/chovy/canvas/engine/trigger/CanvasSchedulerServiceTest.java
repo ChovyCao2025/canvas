@@ -27,4 +27,10 @@ class CanvasSchedulerServiceTest {
             assertThat(millis).isBetween(0L, 59_999L);
         }
     }
+
+    @Test
+    void extractsNodeIdFromScheduleTaskKey() {
+        assertThat(CanvasSchedulerService.nodeIdFromTaskKey("62:scheduled-node")).isEqualTo("scheduled-node");
+        assertThat(CanvasSchedulerService.nodeIdFromTaskKey("scheduled-node")).isEqualTo("scheduled-node");
+    }
 }

@@ -52,7 +52,7 @@ canvas:
     secret: ${CANVAS_JWT_SECRET:}
     expiry-hours: 24
   events:
-    report-secret: ${CANVAS_EVENT_REPORT_SECRET:}
+    report-secret: ${CANVAS_EVENT_REPORT_SECRET:canvas-event-report-secret-2026!!}
   cors:
     # 生产环境必须改为实际前端域名，禁止用 * 上线
     # 覆盖方式：CANVAS_CORS_ALLOWED_ORIGINS=https://canvas.yourcompany.com

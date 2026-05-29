@@ -1,16 +1,25 @@
 package org.chovy.canvas.engine.handlers;
 
 import org.chovy.canvas.common.MapFieldKeys;
+import org.chovy.canvas.common.enums.NodeType;
+import org.chovy.canvas.common.enums.TriggerType;
+import org.chovy.canvas.engine.audience.AudienceUserResolver;
 import org.chovy.canvas.engine.audience.AudienceBitmapStore;
 import org.chovy.canvas.engine.context.ExecutionContext;
 import org.chovy.canvas.engine.handler.NodeHandler;
 import org.chovy.canvas.engine.handler.NodeHandlerType;
 import org.chovy.canvas.engine.handler.NodeResult;
+import org.chovy.canvas.engine.trigger.CanvasExecutionService;
+import org.chovy.canvas.engine.trigger.CanvasSchedulerService;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Component;
+import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
+import reactor.core.scheduler.Schedulers;
 
 import java.util.Map;
+import java.util.UUID;
 
 /**
  * 统一 Tagger 节点入口（TAGGER）。
@@ -33,6 +42,8 @@ public class TaggerHandler implements NodeHandler {
 
     /** 人群 bitmap 查询能力（audience 模式）。 */
     private final AudienceBitmapStore   audienceBitmapStore;
+    private final AudienceUserResolver audienceUserResolver;
+    private final CanvasExecutionService executionService;
 
     /**
      * 构造 TaggerHandler 实例，并根据入参初始化依赖、配置或内部状态。
@@ -46,10 +57,14 @@ public class TaggerHandler implements NodeHandler {
     @Autowired
     public TaggerHandler(TaggerOfflineHandler offlineHandler,
                          TaggerRealtimeHandler realtimeHandler,
-                         AudienceBitmapStore audienceBitmapStore) {
+                         AudienceBitmapStore audienceBitmapStore,
+                         AudienceUserResolver audienceUserResolver,
+                         @Lazy CanvasExecutionService executionService) {
         this.offlineHandler = offlineHandler;
         this.realtimeHandler = realtimeHandler;
         this.audienceBitmapStore = audienceBitmapStore;
+        this.audienceUserResolver = audienceUserResolver;
+        this.executionService = executionService;
     }
 
     /**
@@ -91,6 +106,9 @@ public class TaggerHandler implements NodeHandler {
             return Mono.just(NodeResult.fail("TAGGER[audience]: audienceId 未配置"));
         }
         Long audienceId = Long.parseLong(String.valueOf(audienceIdRaw));
+        if (isScheduledBatchContext(ctx)) {
+            return fanOutAudienceUsers(config, ctx, audienceId);
+        }
         // 判断当前 userId 是否在离线计算好的人群 bitmap 里
         boolean hit = audienceBitmapStore.isMember(audienceId, ctx.getUserId());
         String nextNodeId = hit
@@ -100,5 +118,47 @@ public class TaggerHandler implements NodeHandler {
                 MapFieldKeys.AUDIENCE_HIT, hit,
                 MapFieldKeys.AUDIENCE_ID, audienceId
         )));
+    }
+
+    private Mono<NodeResult> fanOutAudienceUsers(Map<String, Object> config, ExecutionContext ctx, Long audienceId) {
+        String nodeId = String.valueOf(config.getOrDefault(MapFieldKeys.NODE_ID_INTERNAL, ""));
+        if (nodeId.isBlank()) {
+            return Mono.just(NodeResult.fail("TAGGER[audience]: 批处理缺少节点 ID"));
+        }
+        return Mono.fromCallable(() -> audienceUserResolver.resolve(audienceId))
+                .subscribeOn(Schedulers.boundedElastic())
+                .flatMap(userIds -> {
+                    if (userIds.isEmpty()) {
+                        return Mono.just(NodeResult.ok(null, Map.of(
+                                MapFieldKeys.AUDIENCE_ID, audienceId,
+                                "fanoutCount", 0
+                        )));
+                    }
+                    Map<String, Object> payload = Map.of(
+                            MapFieldKeys.AUDIENCE_ID, audienceId,
+                            "scheduledBatchExecutionId", ctx.getExecutionId()
+                    );
+                    return Flux.fromIterable(userIds)
+                            .flatMap(userId -> executionService.trigger(
+                                    ctx.getCanvasId(),
+                                    userId,
+                                    TriggerType.SCHEDULED,
+                                    NodeType.TAGGER,
+                                    nodeId,
+                                    payload,
+                                    UUID.randomUUID().toString(),
+                                    false
+                            ), 32)
+                            .then(Mono.just(NodeResult.ok(null, Map.of(
+                                    MapFieldKeys.AUDIENCE_ID, audienceId,
+                                    "fanoutCount", userIds.size()
+                            ))));
+                });
+    }
+
+    private boolean isScheduledBatchContext(ExecutionContext ctx) {
+        return ctx != null
+                && Boolean.TRUE.equals(ctx.getTriggerPayload().get(MapFieldKeys.SCHEDULED_BATCH))
+                && CanvasSchedulerService.isScheduledBatchUser(ctx.getUserId());
     }
 }

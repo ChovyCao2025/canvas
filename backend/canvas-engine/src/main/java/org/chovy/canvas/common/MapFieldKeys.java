@@ -657,6 +657,12 @@ public final class MapFieldKeys {
     /** 当前节点ID(内部注入键)。 */
     public static final String NODE_ID_INTERNAL = "__nodeId";
 
+    /** 定时触发批处理执行标记。 */
+    public static final String SCHEDULED_BATCH = "__scheduledBatch";
+
+    /** 定时批处理对应的触发节点 ID。 */
+    public static final String SCHEDULED_TRIGGER_NODE_ID = "__scheduledTriggerNodeId";
+
     /** 成功计数。 */
     public static final String SUCCESS_COUNT = "successCount";
 

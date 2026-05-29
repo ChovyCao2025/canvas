@@ -995,7 +995,22 @@ function EditorInner({ detail, onStatusChange, onCanvasNameChange }: {
           if (!cfg.topicKey) errors.push(`节点「${d.name}」必须选择消息主题`)
           break
         case 'SCHEDULED_TRIGGER':
-          if (!cfg.cronExpression) errors.push(`节点「${d.name}」必须配置 Cron 表达式`)
+          if (!cfg.scheduleType) {
+            errors.push(`节点「${d.name}」必须选择触发类型`)
+          } else if (cfg.scheduleType === 'CRON' && !cfg.cronExpression) {
+            errors.push(`节点「${d.name}」必须配置 Cron 表达式`)
+          } else if (cfg.scheduleType === 'ONCE' && !cfg.triggerTime) {
+            errors.push(`节点「${d.name}」必须配置触发时间`)
+          }
+          if (!cfg.nextNodeId) {
+            errors.push(`节点「${d.name}」必须连接人群筛选节点`)
+          } else {
+            const nextNode = rfNodes.find(candidate => candidate.id === cfg.nextNodeId)
+            const nextData = nextNode?.data as CanvasNodeData | undefined
+            if (nextData?.nodeType !== 'TAGGER' || nextData.bizConfig?.mode !== 'audience') {
+              errors.push(`节点「${d.name}」只负责定时，下游必须先连接「Tagger 标签」并选择人群筛选`)
+            }
+          }
           break
         case 'THRESHOLD': {
           if (!cfg.thresholdMode) { errors.push(`节点「${d.name}」必须配置触发条件`); break }

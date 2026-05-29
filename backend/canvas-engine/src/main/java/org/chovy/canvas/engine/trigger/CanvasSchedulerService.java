@@ -22,6 +22,9 @@ import reactor.core.publisher.Mono;
 
 import java.time.Duration;
 import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
+import java.time.ZoneId;
+import java.time.format.DateTimeParseException;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ScheduledFuture;
@@ -46,6 +49,7 @@ public class CanvasSchedulerService {
     private final CanvasExecutionService executionService;
     /** 调度注册器。 */
     private final ScheduleRegistrar      scheduleRegistrar;
+    private static final String SCHEDULED_BATCH_USER_PREFIX = "__scheduled_batch__:";
 
     /** 兼容旧测试和默认本地调度器的构造器，生产可替换 ScheduleRegistrar 实现。 */
     @Autowired
@@ -131,7 +135,7 @@ public class CanvasSchedulerService {
                     log.info("[SCHEDULER] 注册 CRON 任务 canvasId={} nodeId={} cron={}", canvasId, nodeId, cronExpr);
                 } else if (triggerTimeStr != null) {
                     log.info("[SCHEDULER] 注册 ONCE 任务 canvasId={} nodeId={} at={}",
-                            canvasId, nodeId, LocalDateTime.parse(triggerTimeStr));
+                            canvasId, nodeId, parseTriggerTime(triggerTimeStr, timezone));
                 }
             } catch (RuntimeException e) {
                 removePendingJitterGroup(scheduleKey.id(), group);
@@ -207,18 +211,10 @@ public class CanvasSchedulerService {
         cancelScheduledTrigger(new ScheduleKey("canvas", taskKey));
     }
 
-    /** 解析定时节点用户来源，并为每个用户安排带随机抖动的触发。 */
-    @SuppressWarnings("unchecked")
+    /** 定时节点到点后只启动一次批处理执行，用户展开交给后续人群节点。 */
     private void triggerForAllUsers(Long canvasId, String nodeId, Map<String, Object> cfg, PendingJitterGroup group) {
-        Map<String, Object> src = (Map<String, Object>) cfg.getOrDefault("userSource", Map.of());
-        String sourceType       = (String) src.getOrDefault("type", "USER_LIST");
-        List<String> userIds    = resolveUserIds(sourceType, src);
-
-        log.info("[SCHEDULER] 定时触发 canvasId={} 用户数={}", canvasId, userIds.size());
-
-        for (String userId : userIds) {
-            scheduleTriggerWithJitter(group, canvasId, userId, calcJitter(jitterMaxMs));
-        }
+        log.info("[SCHEDULER] 定时批处理触发 canvasId={} nodeId={}", canvasId, nodeId);
+        scheduleTriggerWithJitter(group, canvasId, scheduledBatchUserId(canvasId, nodeId), Duration.ZERO);
     }
 
     /** 创建并登记 jitter 分组，服务关闭后不再接受新分组。 */
@@ -294,7 +290,7 @@ public class CanvasSchedulerService {
         if (cronExpr != null && !cronExpr.isBlank()) {
             callback = () -> triggerForAllUsers(canvasId, nodeId, cfg, group);
         } else {
-            triggerTime = LocalDateTime.parse(triggerTimeStr);
+            triggerTime = parseTriggerTime(triggerTimeStr, timezone);
             callback = () -> {
                 try {
                     triggerForAllUsers(canvasId, nodeId, cfg, group);
@@ -321,6 +317,16 @@ public class CanvasSchedulerService {
                 callback,
                 metadata
         );
+    }
+
+    private LocalDateTime parseTriggerTime(String triggerTimeStr, String timezone) {
+        try {
+            return LocalDateTime.parse(triggerTimeStr);
+        } catch (DateTimeParseException ignored) {
+            return OffsetDateTime.parse(triggerTimeStr)
+                    .atZoneSameInstant(ZoneId.of(timezone))
+                    .toLocalDateTime();
+        }
     }
 
     /** 生成画布定时节点的稳定调度 key。 */
@@ -359,14 +365,35 @@ public class CanvasSchedulerService {
             // 任务已被下线/关闭，延迟到期的 jitter 触发直接丢弃。
             return;
         }
+        String nodeId = nodeIdFromTaskKey(group.taskKey);
         executionService.trigger(
                         canvasId, userId, TriggerType.SCHEDULED,
-                        NodeType.SCHEDULED_TRIGGER, null,
-                        Map.of(), java.util.UUID.randomUUID().toString(), false)
+                        NodeType.SCHEDULED_TRIGGER, nodeId,
+                        Map.of(
+                                MapFieldKeys.SCHEDULED_BATCH, true,
+                                MapFieldKeys.SCHEDULED_TRIGGER_NODE_ID, nodeId
+                        ),
+                        java.util.UUID.randomUUID().toString(), false)
                 .subscribe(
                         null,
                         e -> log.warn("[SCHEDULER] 用户触发失败 userId={}: {}", userId, e.getMessage())
                 );
+    }
+
+    public static boolean isScheduledBatchUser(String userId) {
+        return userId != null && userId.startsWith(SCHEDULED_BATCH_USER_PREFIX);
+    }
+
+    private static String scheduledBatchUserId(Long canvasId, String nodeId) {
+        return SCHEDULED_BATCH_USER_PREFIX + canvasId + ":" + nodeId;
+    }
+
+    static String nodeIdFromTaskKey(String taskKey) {
+        if (taskKey == null || taskKey.isBlank()) {
+            return "";
+        }
+        int separator = taskKey.indexOf(':');
+        return separator >= 0 ? taskKey.substring(separator + 1) : taskKey;
     }
 
     /** 根据用户来源类型解析定时触发目标用户列表。 */

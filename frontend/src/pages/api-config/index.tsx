@@ -7,7 +7,7 @@ import { useEffect, useState } from 'react'
 import {
   Button, Table, Tag, Space, Modal, Form, Input, InputNumber,
   Select, Switch, message, Typography, Popconfirm,
-  Divider, Tabs,
+  Divider, Tabs, Tooltip,
 } from 'antd'
 import { PlusOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
@@ -304,7 +304,18 @@ export default function ApiConfigPage() {
     { title: 'ID',   dataIndex: 'id',     width: 60 },
     { title: '名称', dataIndex: 'name' },
     { title: 'apiKey', dataIndex: 'apiKey', ellipsis: true },
-    { title: 'URL',  dataIndex: 'url',    ellipsis: true },
+    {
+      title: 'URL',
+      dataIndex: 'url',
+      ellipsis: { showTitle: false },
+      render: (url: string) => (
+        <Tooltip title={url}>
+          <span style={{ display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            {url}
+          </span>
+        </Tooltip>
+      ),
+    },
     {
       title: '方法', dataIndex: 'method', width: 72,
       render: (m: string) => <Tag color={m === 'GET' ? 'blue' : 'green'}>{m}</Tag>,
@@ -364,14 +375,14 @@ export default function ApiConfigPage() {
               <Form.Item name="apiKey" label="apiKey（唯一标识）" rules={[{ required: true }]}>
                 <Input placeholder="如：query_user_info" />
               </Form.Item>
-              <Space style={{ width: '100%' }}>
-                <Form.Item name="url" label="URL" style={{ flex: 1 }} rules={[{ required: true }]}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 112px', gap: 12 }}>
+                <Form.Item name="url" label="URL" rules={[{ required: true }]}>
                   <Input placeholder="https://api.example.com/v1/user" />
                 </Form.Item>
-                <Form.Item name="method" label="方法" style={{ width: 100 }} rules={[{ required: true }]}>
+                <Form.Item name="method" label="方法" rules={[{ required: true }]}>
                   <Select options={methodOptions} />
                 </Form.Item>
-              </Space>
+              </div>
               <Form.Item name="description" label="说明">
                 <Input.TextArea rows={2} />
               </Form.Item>
