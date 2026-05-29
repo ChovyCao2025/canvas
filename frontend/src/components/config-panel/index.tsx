@@ -31,7 +31,7 @@ import {
   getControlLabelStyle,
 } from './controlChrome'
 import { normalizeFieldOptions, resolveDisplayValue } from './displayValues'
-import { buildConfigPanelPresentation } from './presentation'
+import { buildConfigPanelPresentation, resolveContextValueListFieldKey } from './presentation'
 
 /** API 参数定义的最小形态，用于事件属性预览等只读控件。 */
 interface ApiParamDef { name: string; displayName: string; type: string; required: boolean }
@@ -555,7 +555,11 @@ function renderControl(
         fieldKey={getConditionRuleListFieldKey(field.key)}
       />
     case 'context-value-list':
-      return <ContextValueList ctxFields={ctxFields} valueTypeOptions={sharedOptions.contextValueTypes} />
+      return <ContextValueList
+        ctxFields={ctxFields}
+        valueTypeOptions={sharedOptions.contextValueTypes}
+        fieldKey={resolveContextValueListFieldKey(field.key)}
+      />
     case 'param-define-list':
       return <ParamDefineList paramTypeOptions={sharedOptions.paramTypes} />
     case 'branch-list':
@@ -680,12 +684,12 @@ function ConditionRuleList({ ctxFields, operatorOptions, fieldKey }: {
 interface ContextValueItem { name: string; valueType: 'CUSTOM' | 'CONTEXT'; value: string }
 
 /** 上下文引用值列表，支持固定值和 ${contextKey} 两种来源。 */
-function ContextValueList({ ctxFields, valueTypeOptions }: {
+function ContextValueList({ ctxFields, valueTypeOptions, fieldKey }: {
   ctxFields: ContextField[]
   valueTypeOptions: { label: string; value: string }[]
+  fieldKey: string
 }) {
   const form = Form.useFormInstance()
-  const fieldKey = 'bizData'
   const items: ContextValueItem[] = Form.useWatch(fieldKey, form) ?? []
   const inlineChrome = getInlineControlChrome()
 
@@ -702,25 +706,38 @@ function ContextValueList({ ctxFields, valueTypeOptions }: {
   }
 
   return (
-    <div>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
       {items.map((item, i) => (
-        <div key={i} style={{ display: 'grid', gridTemplateColumns: '68px 72px minmax(0, 1fr) 28px', gap: 6, marginBottom: 6, alignItems: 'center' }}>
-          <Input size="small" style={{ ...inlineChrome, width: '100%' }} placeholder="字段名"
+        <div key={i} style={{
+          background: '#f0f7ff',
+          border: '1px solid #dbeafe',
+          borderRadius: 8,
+          padding: '8px 10px',
+        }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+            <span style={{ fontSize: 11, fontWeight: 700, color: '#1677ff' }}>#{i + 1}</span>
+            <Button size="small" danger icon={<DeleteOutlined />} onClick={() => remove(i)}
+              style={{ width: 24, height: 24, minWidth: 24, padding: 0, borderRadius: 6 }} />
+          </div>
+
+          <Input size="small" style={{ ...inlineChrome, width: '100%', marginBottom: 6 }} placeholder="字段名"
             value={item.name} onChange={e => update(i, 'name', e.target.value)} />
-          <Select className="config-panel-ios-select" classNames={CONTROL_SELECT_CLASS_NAMES} size="small" style={{ width: '100%' }} value={item.valueType}
-            options={valueTypeOptions}
-            onChange={v => update(i, 'valueType', v)} />
-          {item.valueType === 'CONTEXT'
-            ? <AutoComplete className="config-panel-ios-auto-complete" classNames={CONTROL_SELECT_CLASS_NAMES} size="small" style={{ width: '100%' }}
-                placeholder="${key} 或字段名"
-                value={item.value || undefined}
-                options={ctxFields.map(f => ({ value: '${' + f.fieldKey + '}', label: f.fieldName }))}
-                onChange={v => update(i, 'value', v)}
-                filterOption={(input, opt) => String(opt?.label ?? '').toLowerCase().includes(input.toLowerCase())} />
-            : <Input size="small" style={{ ...inlineChrome, width: '100%' }} placeholder="值"
-                value={item.value} onChange={e => update(i, 'value', e.target.value)} />
-          }
-          <Button size="small" danger icon={<DeleteOutlined />} onClick={() => remove(i)} />
+
+          <div style={{ display: 'grid', gridTemplateColumns: '82px minmax(0, 1fr)', gap: 6, alignItems: 'center' }}>
+            <Select className="config-panel-ios-select" classNames={CONTROL_SELECT_CLASS_NAMES} size="small" style={{ width: '100%' }} value={item.valueType}
+              options={valueTypeOptions}
+              onChange={v => update(i, 'valueType', v)} />
+            {item.valueType === 'CONTEXT'
+              ? <AutoComplete className="config-panel-ios-auto-complete" classNames={CONTROL_SELECT_CLASS_NAMES} size="small" style={{ width: '100%' }}
+                  placeholder="${key} 或字段名"
+                  value={item.value || undefined}
+                  options={ctxFields.map(f => ({ value: '${' + f.fieldKey + '}', label: f.fieldName }))}
+                  onChange={v => update(i, 'value', v)}
+                  filterOption={(input, opt) => String(opt?.label ?? '').toLowerCase().includes(input.toLowerCase())} />
+              : <Input size="small" style={{ ...inlineChrome, width: '100%' }} placeholder="值"
+                  value={item.value} onChange={e => update(i, 'value', e.target.value)} />
+            }
+          </div>
         </div>
       ))}
       <Button size="small" type="dashed" icon={<PlusOutlined />} onClick={add} style={{ width: '100%' }}>添加</Button>

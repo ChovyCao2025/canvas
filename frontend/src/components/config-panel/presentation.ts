@@ -101,6 +101,11 @@ function resolveGroupKey(type: string): ConfigPanelFieldGroupKey {
   return 'basic'
 }
 
+/** context-value-list 类型字段必须写回 schema 声明的 key，DIRECT_RETURN 使用 data，触达类节点使用 bizData。 */
+export function resolveContextValueListFieldKey(fieldKey: string): string {
+  return fieldKey
+}
+
 /** 把可见字段归并为右侧配置面板分组。 */
 function buildFieldGroups(fields: ConfigPanelPresentationField[]): ConfigPanelFieldGroup[] {
   const grouped = new Map<ConfigPanelFieldGroupKey, ConfigPanelPresentationField[]>()

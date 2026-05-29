@@ -5,7 +5,7 @@
  */
 import { describe, expect, it } from 'vitest'
 import type { CanvasNodeData } from '../../types/canvas'
-import { buildConfigPanelPresentation } from './presentation'
+import { buildConfigPanelPresentation, resolveContextValueListFieldKey } from './presentation'
 
 /** 构造 TAGGER 节点默认样本，测试用例按需覆盖字段。 */
 const taggerNode = (overrides: Partial<CanvasNodeData> = {}): CanvasNodeData => ({
@@ -28,6 +28,11 @@ const routeNames: Record<string, string> = {
 }
 
 describe('buildConfigPanelPresentation', () => {
+  it('uses the schema field key for context-value-list bindings', () => {
+    expect(resolveContextValueListFieldKey('data')).toBe('data')
+    expect(resolveContextValueListFieldKey('bizData')).toBe('bizData')
+  })
+
   it('groups visible schema fields by editing intent', () => {
     const model = buildConfigPanelPresentation({
       nodeData: {

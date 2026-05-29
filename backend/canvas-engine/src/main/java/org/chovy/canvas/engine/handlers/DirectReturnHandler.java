@@ -34,19 +34,23 @@ public class DirectReturnHandler implements NodeHandler {
     @SuppressWarnings("unchecked")
     public Mono<NodeResult> executeAsync(Map<String, Object> config, ExecutionContext ctx) {
         // data 每一项描述一个“返回字段映射规则”
-        List<Map<String, Object>> data = (List<Map<String, Object>>) config.get("data");
+        List<Map<String, Object>> data = (List<Map<String, Object>>) config.getOrDefault("data", config.get("bizData"));
         Map<String, Object> result = new HashMap<>();
 
         if (data != null) {
             for (Map<String, Object> item : data) {
-                String name      = (String) item.get("name");
-                String valueType = (String) item.get("valueType");
-                String value     = (String) item.get("value");
+                String name      = string(item.getOrDefault("name", item.get("key")));
+                String valueType = string(item.get("valueType"));
+                String value     = string(item.get("value"));
+                if (name == null || name.isBlank()) {
+                    continue;
+                }
                 // name 作为响应字段名，value 作为字段来源或常量值
                 // CONTEXT: 从上下文读取；其他类型按字面值回传
-                if ("CONTEXT".equals(valueType)) {
+                if ("CONTEXT".equals(valueType) || isContextTemplate(value)) {
                     // 从上下文取值时，value 表示字段 key
-                    result.put(name, ctx.getContextValue(value));
+                    String contextKey = normalizeContextKey(value);
+                    result.put(name, contextKey == null ? null : ctx.getContextValue(contextKey));
                 } else {
                     // 非 CONTEXT 视作常量值直接透传
                     result.put(name, value);
@@ -67,4 +71,22 @@ public class DirectReturnHandler implements NodeHandler {
      */
     @Override
     public boolean isBenefitNode() { return false; }
+
+    private static String string(Object value) {
+        return value == null ? null : value.toString();
+    }
+
+    private static boolean isContextTemplate(String value) {
+        return value != null && value.startsWith("${") && value.endsWith("}");
+    }
+
+    private static String normalizeContextKey(String value) {
+        if (value == null) {
+            return null;
+        }
+        if (isContextTemplate(value)) {
+            return value.substring(2, value.length() - 1);
+        }
+        return value;
+    }
 }

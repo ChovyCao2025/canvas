@@ -74,6 +74,17 @@ services:
       - canvas-rocketmq-logs:/home/rocketmq/logs
       - canvas-rocketmq-store:/home/rocketmq/store
 
+  # RocketMQ Dashboard：可视化查看 topic/consumer/group 等信息。
+  rocketmq-dashboard:
+    image: apacherocketmq/rocketmq-dashboard:latest
+    environment:
+      - JAVA_OPTS=-Drocketmq.namesrv.addr=rocketmq-namesrv:9876
+    depends_on:
+      rocketmq-namesrv:
+        condition: service_started
+    ports:
+      - "8081:8082"
+
 volumes:
   canvas-mysql-data:
   canvas-redis-data:
