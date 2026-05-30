@@ -20,4 +20,14 @@ class CanvasExampleTemplateSqlTest {
         assertThat(fixSql).contains("template_key = 'component_groovy_transform'");
         assertThat(fixSql).contains("JSON_OBJECT('userId', '$${score}')");
     }
+
+    @Test
+    void later_migration_addsDirectCallEntryToSaasExpansionSignalExample() throws Exception {
+        String fixSql = Files.readString(Path.of("src/main/resources/db/migration/V83__fix_saas_expansion_signal_direct_entry.sql"));
+
+        assertThat(fixSql).contains("template_key = 'saas_expansion_signal'");
+        assertThat(fixSql).contains("\"type\":\"DIRECT_CALL\"");
+        assertThat(fixSql).contains("\"nextNodeId\":\"api_a\"");
+        assertThat(fixSql).contains("c.source_template_key = 'saas_expansion_signal'");
+    }
 }

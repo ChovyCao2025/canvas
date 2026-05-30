@@ -23,6 +23,10 @@ export function hydrateBackendNodeOutletSchemas(
   )
 
   return nodes.map(node => {
+    if (node.type === 'DIRECT_CALL') {
+      const { outletSchema: _legacyOutletSchema, ...directCallNode } = node
+      return directCallNode
+    }
     if (hasStoredOutletSchema(node)) return node
     const outletSchema = outletSchemaByType.get(node.type)
     if (!outletSchema) return node

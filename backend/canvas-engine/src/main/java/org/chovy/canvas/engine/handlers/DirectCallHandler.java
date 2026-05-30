@@ -8,6 +8,7 @@ import org.springframework.stereotype.Component;
 import org.chovy.canvas.engine.handler.NodeResult;
 import reactor.core.publisher.Mono;
 
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -35,6 +36,7 @@ public class DirectCallHandler implements NodeHandler {
     public Mono<NodeResult> executeAsync(Map<String, Object> config, ExecutionContext ctx) {
         List<Map<String, Object>> inputParams = (List<Map<String, Object>>) config.get(MapFieldKeys.INPUT_PARAMS);
         String nextNodeId = (String) config.get(MapFieldKeys.NEXT_NODE_ID);
+        List<Map<String, Object>> branches = (List<Map<String, Object>>) config.get(MapFieldKeys.BRANCHES);
 
         // 对每个参数仅做“是否存在”校验，类型校验交由业务节点自行处理
         if (inputParams != null) {
@@ -47,6 +49,19 @@ public class DirectCallHandler implements NodeHandler {
                     // 缺参直接 fail，避免后续节点在空值上继续执行
                     return Mono.just(NodeResult.fail("业务直调必填参数缺失: " + name));
                 }
+            }
+        }
+
+        if (branches != null && !branches.isEmpty()) {
+            Map<String, String> branchMap = new LinkedHashMap<>();
+            for (int i = 0; i < branches.size(); i++) {
+                Object target = branches.get(i).get(MapFieldKeys.NEXT_NODE_ID);
+                if (target instanceof String targetId && !targetId.isBlank()) {
+                    branchMap.put("branch-" + i, targetId);
+                }
+            }
+            if (!branchMap.isEmpty()) {
+                return Mono.just(NodeResult.multiNext(branchMap, null));
             }
         }
 

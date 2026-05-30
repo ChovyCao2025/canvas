@@ -77,4 +77,42 @@ describe('graph hydration', () => {
 
     expect(hydrateBackendNodeOutletSchemas(nodes, registry)[0].outletSchema).toBe(storedOutletSchema)
   })
+
+  it('drops stale stored outlet schema from DIRECT_CALL so branch handles can render', () => {
+    const legacyDirectCallOutletSchema = JSON.stringify([
+      { id: 'success', label: '继续', targetField: 'nextNodeId' },
+    ])
+    const nodes: BackendNode[] = [
+      {
+        id: 'direct',
+        type: 'DIRECT_CALL',
+        name: 'API入口',
+        category: '入口节点',
+        x: 0,
+        y: 0,
+        config: {
+          branches: [
+            { label: '渠道 A', nextNodeId: 'api_a' },
+            { label: '渠道 B', nextNodeId: 'api_b' },
+          ],
+        },
+        outletSchema: legacyDirectCallOutletSchema,
+      },
+    ]
+    const registry = [
+      {
+        typeKey: 'DIRECT_CALL',
+        typeName: 'API入口',
+        category: '入口节点',
+        configSchema: '[]',
+        outputSchema: '[]',
+        outletSchema: '[]',
+        isTrigger: 1,
+        isTerminal: 0,
+        enabled: 1,
+      },
+    ] satisfies NodeTypeRegistry[]
+
+    expect(hydrateBackendNodeOutletSchemas(nodes, registry)[0].outletSchema).toBeUndefined()
+  })
 })

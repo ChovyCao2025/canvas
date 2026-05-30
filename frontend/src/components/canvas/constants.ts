@@ -58,6 +58,15 @@ export const TRIGGER_TYPES = new Set(['START'])
 /** 终止节点类型：没有后继出口。 */
 export const TERMINAL_TYPES = new Set(['DIRECT_RETURN', 'END'])
 
+/** 发布前要求至少存在一个真实可触发的业务入口。 */
+export const PUBLISH_TRIGGER_NODE_TYPES = new Set([
+  'EVENT_TRIGGER',
+  'MQ_TRIGGER',
+  'SCHEDULED_TRIGGER',
+  'DIRECT_CALL',
+  'AUDIENCE_TRIGGER',
+])
+
 /**
  * 节点类型编码 -> 默认显示名。
  *
@@ -67,7 +76,7 @@ export const DEFAULT_NAMES: Record<string, string> = {
   TAGGER:            'Tagger 标签',
   EVENT_TRIGGER:     '事件触发',
   MQ_TRIGGER:        'MQ消息触发',
-  DIRECT_CALL:       '业务直调',
+  DIRECT_CALL:       'API入口',
   SCHEDULED_TRIGGER: '定时触发',
   TAGGER_REALTIME:   'Tagger实时标签',
   IF_CONDITION:      'IF判断',
@@ -96,7 +105,6 @@ export const DEFAULT_NAMES: Record<string, string> = {
   FREQUENCY_CAP:     '频率限制',
   CANVAS_TRIGGER:    '触发子画布',
   SUB_FLOW_REF:      '子流程引用',
-  API_TRIGGER:       'API触发',
   AUDIENCE_TRIGGER:  '受众触发',
   SEND_EMAIL:        '发送邮件',
   SEND_SMS:          '发送短信',

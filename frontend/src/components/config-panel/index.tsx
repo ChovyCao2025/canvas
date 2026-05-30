@@ -570,6 +570,8 @@ function renderControl(
         operatorOptions={sharedOptions.conditionOps}
         relationOptions={sharedOptions.logicRelations}
       />
+    case 'broadcast-branch-list':
+      return <BroadcastBranchList onBranchesChange={branches => applyFormPatch({ branches })} />
     case 'ab-group-list':
       return (
         <AbGroupList
@@ -784,6 +786,60 @@ function ParamDefineList({ paramTypeOptions }: { paramTypeOptions: { label: stri
         </div>
       ))}
       <Button size="small" type="dashed" icon={<PlusOutlined />} onClick={add} style={{ width: '100%' }}>添加参数</Button>
+    </div>
+  )
+}
+
+// ── 广播分支控件（broadcast-branch-list）────────────────────────────
+interface BroadcastBranchItem { label: string; nextNodeId?: string }
+
+/** 多下游广播分支；后继节点由画布连线写回 nextNodeId。 */
+function BroadcastBranchList({ onBranchesChange }: { onBranchesChange: (branches: BroadcastBranchItem[]) => void }) {
+  const form = Form.useFormInstance()
+  const branches: BroadcastBranchItem[] = Form.useWatch('branches', form) ?? []
+  const inlineChrome = getInlineControlChrome()
+
+  const commitBranches = (next: BroadcastBranchItem[]) => {
+    form.setFieldValue('branches', next)
+    onBranchesChange(next)
+  }
+  const addBranch = () => commitBranches([
+    ...branches,
+    { label: `分支 ${branches.length + 1}`, nextNodeId: undefined },
+  ])
+  const removeBranch = (index: number) => {
+    const next = [...branches]
+    next.splice(index, 1)
+    commitBranches(next)
+  }
+  const updateBranch = (index: number, label: string) => {
+    const next = [...branches]
+    next[index] = { ...next[index], label }
+    commitBranches(next)
+  }
+
+  return (
+    <div>
+      {branches.map((branch, index) => (
+        <div key={index} style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 28px', gap: 6, marginBottom: 6, alignItems: 'center' }}>
+          <Input
+            size="small"
+            style={{ ...inlineChrome, width: '100%' }}
+            placeholder={`分支 ${index + 1}`}
+            value={branch.label}
+            onChange={event => updateBranch(index, event.target.value)}
+          />
+          <Button size="small" danger icon={<DeleteOutlined />} onClick={() => removeBranch(index)} />
+        </div>
+      ))}
+      <Button size="small" type="dashed" icon={<PlusOutlined />} onClick={addBranch} style={{ width: '100%' }}>
+        添加下游分支
+      </Button>
+      {branches.length > 0 && (
+        <div style={{ fontSize: 11, color: '#8c8c8c', marginTop: 4 }}>
+          每个分支会在 API 入口触发时同时执行，后继节点通过画布连线自动设置
+        </div>
+      )}
     </div>
   )
 }

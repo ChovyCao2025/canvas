@@ -42,6 +42,40 @@ function edgeId(sourceId: string, targetId: string, sourceHandle: string): strin
     : `${sourceId}->${targetId}::${sourceHandle}`
 }
 
+/** 合并一条出口边：同一 source + handle 替换，不同 handle 保留。 */
+export function mergeOutletEdge(edges: Edge[], edge: Edge): Edge[] {
+  const sourceHandle = edge.sourceHandle ?? 'default'
+  return [
+    ...edges.filter(item =>
+      item.id !== edge.id
+      && (item.source !== edge.source || (item.sourceHandle ?? 'default') !== sourceHandle),
+    ),
+    edge,
+  ]
+}
+
+/** API 入口使用单个可视出口，所有下游连线反推为 branches。 */
+export function appendDirectCallBranch(
+  cfg: Record<string, unknown>,
+  target: string,
+  targetLabel?: string,
+): BizConfig {
+  const next = { ...(cfg as BizConfig) }
+  const branches = [...(next.branches ?? [])]
+  const existing = branches.find(branch => branch.nextNodeId === target)
+  if (existing) return next
+
+  next.nextNodeId = undefined
+  next.branches = [
+    ...branches,
+    {
+      label: targetLabel?.trim() || `分支 ${branches.length + 1}`,
+      nextNodeId: target,
+    },
+  ]
+  return next
+}
+
 /** 旧版固定 handle 对应的后端字段，用于动态 outlet 迁移时清理影子字段。 */
 function legacyFieldForHandle(sourceHandle: string): OutletTargetField | undefined {
   return FIELD_HANDLES.find(item => item.handleId === sourceHandle)?.field
@@ -59,7 +93,11 @@ function clearShadowedLegacyField(next: BizConfig, sourceHandle: string, field: 
 function patchIndexedOutlet(next: BizConfig, sourceHandle: string, target: string): boolean {
   if (sourceHandle.startsWith('branch-')) {
     const idx = parseInt(sourceHandle.split('-')[1], 10)
-    next.branches = (next.branches ?? []).map((branch, i) =>
+    const branches = [...(next.branches ?? [])]
+    while (branches.length <= idx) {
+      branches.push({ label: `分支 ${branches.length + 1}`, nextNodeId: undefined })
+    }
+    next.branches = branches.map((branch, i) =>
       i === idx ? { ...branch, nextNodeId: target } : branch,
     )
     return true
@@ -178,6 +216,9 @@ export function deriveEdges(backendNodes: BackendNode[]): Edge[] {
     }
 
     const dynamicItems = parseOutletSchemaItems(node.outletSchema)
+    const directCallFanOut = node.type === 'DIRECT_CALL'
+      && Array.isArray(config.branches)
+      && config.branches.length > 0
     // 动态 outletSchema 优先于固定 FIELD_HANDLES，支持后端配置驱动的新增出口。
     dynamicItems.forEach(item => {
       const field = getOutletTargetField(item.id, node.outletSchema)
@@ -186,14 +227,19 @@ export function deriveEdges(backendNodes: BackendNode[]): Edge[] {
     })
 
     // 没有动态 schema 的旧节点继续按固定字段映射生成连线。
-    if (dynamicItems.length === 0) {
+    if (dynamicItems.length === 0 && !directCallFanOut) {
       FIELD_HANDLES.forEach(({ field, handleId }) => {
         push(config[field], handleId)
       })
     }
 
-    // 集合型分支用 handle ID 保存索引或业务 key，便于拖线时回写到正确项。
-    config.branches?.forEach((branch, index) => push(branch.nextNodeId, `branch-${index}`))
+    // DIRECT_CALL 的多下游分支由同一个可视出口连出，避免出现不可删除的“新增分支”假出口。
+    if (node.type === 'DIRECT_CALL') {
+      config.branches?.forEach(branch => push(branch.nextNodeId, 'default'))
+    } else {
+      // 集合型分支用 handle ID 保存索引或业务 key，便于拖线时回写到正确项。
+      config.branches?.forEach((branch, index) => push(branch.nextNodeId, `branch-${index}`))
+    }
     config.priorities?.forEach((priority, index) => push(priority.nextNodeId, `priority-${index}`))
     config.groups?.forEach(group => push(group.nextNodeId, `group-${group.groupKey}`))
     config.paths?.forEach((path, index) =>
@@ -243,6 +289,14 @@ export function clearEdgeRef(
 ): BizConfig {
   const next = { ...(cfg as BizConfig) }
   const sourceHandle = edge.sourceHandle ?? 'default'
+  if (sourceHandle === 'default' && Array.isArray(next.branches)) {
+    const branches = next.branches.filter(branch => branch.nextNodeId !== edge.target)
+    if (branches.length !== next.branches.length) {
+      next.branches = branches
+      next.nextNodeId = undefined
+      return next
+    }
+  }
   if (clearIndexedOutlet(next, sourceHandle)) return next
 
   const dynamicItems = parseOutletSchemaItems(outletSchema)

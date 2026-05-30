@@ -15,6 +15,13 @@ describe('getBranchHandles', () => {
     expect(getBranchHandles('API_CALL', {})).toEqual([])
   })
 
+  it('DIRECT_CALL uses the default outlet and does not render branch handles', () => {
+    expect(getBranchHandles('DIRECT_CALL', {
+      branches: [{ label: '查询用户' }, { label: '查询订单' }],
+    })).toEqual([])
+    expect(getBranchHandles('DIRECT_CALL', {})).toEqual([])
+  })
+
   it('IF_CONDITION returns fixed success+fail handles', () => {
     const handles = getBranchHandles('IF_CONDITION', {})
     expect(handles).toHaveLength(2)

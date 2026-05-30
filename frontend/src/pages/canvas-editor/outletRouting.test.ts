@@ -6,8 +6,10 @@
 import type { Edge } from '@xyflow/react'
 import { describe, expect, it } from 'vitest'
 import {
+  appendDirectCallBranch,
   clearEdgeRef,
   deriveEdges,
+  mergeOutletEdge,
   patchBizConfig,
 } from './outletRouting'
 
@@ -42,6 +44,15 @@ describe('outlet routing helpers', () => {
     expect(result.branches).toEqual([
       { label: 'A', nextNodeId: undefined },
       { label: 'B', nextNodeId: 'node_b' },
+    ])
+  })
+
+  it('creates missing branch slots when routing a legacy direct-call branch handle', () => {
+    const result = patchBizConfig({}, 'branch-1', 'node_b')
+
+    expect(result.branches).toEqual([
+      { label: '分支 1', nextNodeId: undefined },
+      { label: '分支 2', nextNodeId: 'node_b' },
     ])
   })
 
@@ -83,6 +94,67 @@ describe('outlet routing helpers', () => {
     ])
   })
 
+  it('derives DIRECT_CALL fan-out branches as multiple default outlet edges', () => {
+    expect(deriveEdges([
+      {
+        id: 'direct',
+        type: 'DIRECT_CALL',
+        name: 'API入口',
+        x: 0,
+        y: 0,
+        config: {
+          nextNodeId: 'api_a',
+          branches: [
+            { label: '渠道 A', nextNodeId: 'api_a' },
+            { label: '渠道 B', nextNodeId: 'api_b' },
+          ],
+        },
+      },
+    ])).toEqual([
+      {
+        id: 'direct->api_a',
+        source: 'direct',
+        target: 'api_a',
+        sourceHandle: 'default',
+      },
+      {
+        id: 'direct->api_b',
+        source: 'direct',
+        target: 'api_b',
+        sourceHandle: 'default',
+      },
+    ])
+  })
+
+  it('appends a DIRECT_CALL branch from a default outlet connection', () => {
+    expect(appendDirectCallBranch({
+      branches: [{ label: '查询用户', nextNodeId: 'api_user' }],
+    }, 'api_order', '查询订单')).toEqual({
+      branches: [
+        { label: '查询用户', nextNodeId: 'api_user' },
+        { label: '查询订单', nextNodeId: 'api_order' },
+      ],
+    })
+  })
+
+  it('removes the matching DIRECT_CALL branch when deleting a default outlet edge', () => {
+    expect(clearEdgeRef({
+      branches: [
+        { label: '查询用户', nextNodeId: 'api_user' },
+        { label: '查询订单', nextNodeId: 'api_order' },
+      ],
+    }, {
+      id: 'direct->api_user',
+      source: 'direct',
+      target: 'api_user',
+      sourceHandle: 'default',
+    })).toEqual({
+      branches: [
+        { label: '查询订单', nextNodeId: 'api_order' },
+      ],
+    })
+  })
+
   it('does not derive shadowed legacy handles when dynamic schema declares the handle id', () => {
     expect(deriveEdges([
       {
@@ -111,5 +183,21 @@ describe('outlet routing helpers', () => {
     const schema = JSON.stringify([{ id: 'continue', label: '继续' }])
 
     expect(patchBizConfig({}, 'continue', 'node_b', schema)).toEqual({})
+  })
+
+  it('preserves other branch handle edges from the same source when merging a new outlet edge', () => {
+    const existing: Edge[] = [
+      { id: 'direct->api_a::branch-0', source: 'direct', target: 'api_a', sourceHandle: 'branch-0' },
+    ]
+
+    expect(mergeOutletEdge(existing, {
+      id: 'direct->api_b::branch-1',
+      source: 'direct',
+      target: 'api_b',
+      sourceHandle: 'branch-1',
+    })).toEqual([
+      { id: 'direct->api_a::branch-0', source: 'direct', target: 'api_a', sourceHandle: 'branch-0' },
+      { id: 'direct->api_b::branch-1', source: 'direct', target: 'api_b', sourceHandle: 'branch-1' },
+    ])
   })
 })

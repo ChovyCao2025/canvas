@@ -71,6 +71,10 @@ export function getBranchHandles(
       return []
     }
 
+    case 'DIRECT_CALL': {
+      return []
+    }
+
     // API_CALL 暂不实现分支 Handle，保留单路 default 输出
     case 'SELECTOR': {
       const branches = (bizConfig.branches as { label?: string }[]) ?? []

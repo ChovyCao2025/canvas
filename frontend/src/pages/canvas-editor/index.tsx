@@ -6,7 +6,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   ReactFlow, ReactFlowProvider,
-  addEdge, useNodesState, useEdgesState,
+  useNodesState, useEdgesState,
   useReactFlow, Background, Controls, MiniMap,
   type Connection, type Node, type Edge, type NodeChange, type EdgeChange, type XYPosition,
 } from '@xyflow/react'
@@ -30,7 +30,7 @@ import NodePanel from '../../components/node-panel'
 import ConfigPanel from '../../components/config-panel'
 import ExecutionTracePanel from '../../components/canvas/ExecutionTracePanel'
 import {
-  TRIGGER_TYPES, TERMINAL_TYPES,
+  PUBLISH_TRIGGER_NODE_TYPES, TRIGGER_TYPES, TERMINAL_TYPES,
 } from '../../components/canvas/constants'
 
 import HoverEdge from '../../components/canvas/HoverEdge'
@@ -56,7 +56,7 @@ import {
   shouldExpandExecutionLimits,
 } from './settingsPresentation'
 import { applyInsertIntoEdge, buildConfigDefaultsFromSchema, buildNodeExpansion, buildPlaceholderEdge } from './insertNode'
-import { clearEdgeRef, deriveEdges, patchBizConfig } from './outletRouting'
+import { appendDirectCallBranch, clearEdgeRef, deriveEdges, mergeOutletEdge, patchBizConfig } from './outletRouting'
 
 /** 日期范围选择器别名，用于有效期配置抽屉。 */
 const { RangePicker } = DatePicker
@@ -220,13 +220,15 @@ function downstreamEdgeId(sourceId: string, targetId: string, sourceHandle: stri
 
 /** 同一 source + handle 只允许有一条连线，新边会替换旧边。 */
 function replaceOutletEdge(edges: Edge[], edge: Edge): Edge[] {
-  const sourceHandle = edge.sourceHandle ?? 'default'
-  return addEdge(
+  return mergeOutletEdge(edges, edge)
+}
+
+/** API 入口单出口允许连接多个下游；重复目标去重。 */
+function appendDirectCallEdge(edges: Edge[], edge: Edge): Edge[] {
+  return [
+    ...edges.filter(item => item.id !== edge.id),
     edge,
-    edges.filter(item =>
-      item.source !== edge.source || (item.sourceHandle ?? 'default') !== sourceHandle,
-    ),
-  )
+  ]
 }
 
 /** 选中边后插入节点，返回要删除的旧边和要新增的边。 */
@@ -453,6 +455,9 @@ function EditorInner({ detail, onStatusChange, onCanvasNameChange }: {
     }
     if (nodeType === 'IF_CONDITION') {
       return { rules: [] }
+    }
+    if (nodeType === 'DIRECT_CALL') {
+      return {}
     }
     if (nodeType === 'PRIORITY') {
       return { priorities: [{ order: 1, nextNodeId: undefined }] }
@@ -882,21 +887,29 @@ function EditorInner({ detail, onStatusChange, onCanvasNameChange }: {
   const onConnect = useCallback((conn: Connection) => {
     const { source, sourceHandle, target } = conn
     if (!source || !target || !sourceHandle) return
+    const allNodes = getNodes()
+    const sourceNode = allNodes.find(node => node.id === source)?.data as CanvasNodeData | undefined
+    const targetNode = allNodes.find(node => node.id === target)?.data as CanvasNodeData | undefined
+    const isDirectCallFanOut = sourceNode?.nodeType === 'DIRECT_CALL' && sourceHandle === 'default'
     snapshot('连线')
     setNodes(prev => prev.map(n => {
       if (n.id !== source) return n
       const d = n.data as CanvasNodeData
-      return { ...n, data: { ...d, bizConfig: patchBizConfig(d.bizConfig, sourceHandle, target, d.outletSchema) } }
+      const bizConfig = isDirectCallFanOut
+        ? appendDirectCallBranch(d.bizConfig, target, targetNode?.name)
+        : patchBizConfig(d.bizConfig, sourceHandle, target, d.outletSchema)
+      return { ...n, data: { ...d, bizConfig } }
     }))
-    setEdges(prev => replaceOutletEdge(prev, {
+    const edge = {
       id: downstreamEdgeId(source, target, sourceHandle),
       source,
       target,
       sourceHandle,
       targetHandle: conn.targetHandle,
-    }))
+    }
+    setEdges(prev => isDirectCallFanOut ? appendDirectCallEdge(prev, edge) : replaceOutletEdge(prev, edge))
     setIsDirty(true)
-  }, [snapshot, setNodes, setEdges])
+  }, [getNodes, snapshot, setNodes, setEdges])
 
   // 节点删除时清理引用
   const onNodesChangeWrapped = useCallback((changes: NodeChange[]) => {
@@ -979,10 +992,9 @@ function EditorInner({ detail, onStatusChange, onCanvasNameChange }: {
   /** 发布前本地校验（减少不必要的服务端请求）*/
   const validateBeforePublish = useCallback((rfNodes: Node<CanvasNodeData>[]): string[] => {
     const errors: string[] = []
-    // START 之后必须连接一个触发器节点（事件/MQ/定时/直调/API/受众）
-    const TRIGGER_NODE_TYPES = new Set(['EVENT_TRIGGER', 'MQ_TRIGGER', 'SCHEDULED_TRIGGER', 'DIRECT_CALL', 'API_TRIGGER', 'AUDIENCE_TRIGGER'])
-    const hasTrigger = rfNodes.some(n => TRIGGER_NODE_TYPES.has(n.data.nodeType))
-    if (!hasTrigger) errors.push('画布必须包含至少一个触发器节点（事件触发 / MQ 触发 / 定时触发 / 直调 / API / 受众）')
+    // START 之后必须连接一个触发器节点（事件/MQ/定时/API入口/受众）
+    const hasTrigger = rfNodes.some(n => PUBLISH_TRIGGER_NODE_TYPES.has(n.data.nodeType))
+    if (!hasTrigger) errors.push('画布必须包含至少一个触发器节点（事件触发 / MQ 触发 / 定时触发 / API入口 / 受众）')
 
     rfNodes.forEach(n => {
       const d = n.data as CanvasNodeData
