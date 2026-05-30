@@ -14,7 +14,7 @@ bash scripts/direct-call.sh {CANVAS_ID}
 
 ## 4. 画布失效触发
 ```bash
-curl -X POST http://localhost:8080/ops/cache/invalidate/{CANVAS_ID}
+sh scripts/direct-call.sh  {CANVAS_ID}
 ```
 其中 CANVAS_ID 为画布 ID，默认值为 11。
 

@@ -115,4 +115,32 @@ describe('graph hydration', () => {
 
     expect(hydrateBackendNodeOutletSchemas(nodes, registry)[0].outletSchema).toBeUndefined()
   })
+
+  it('keeps START branches during hydration so the entry can fan out', () => {
+    const nodes: BackendNode[] = [
+      {
+        id: 'start',
+        type: 'START',
+        name: '开始',
+        category: '流程控制',
+        x: 0,
+        y: 0,
+        config: {
+          nextNodeId: 'trigger',
+          branches: [
+            { label: '历史分支 A', nextNodeId: 'api_a' },
+            { label: '历史分支 B', nextNodeId: 'api_b' },
+          ],
+        },
+      },
+    ]
+
+    expect(hydrateBackendNodeOutletSchemas(nodes, [])[0].config).toEqual({
+      nextNodeId: 'trigger',
+      branches: [
+        { label: '历史分支 A', nextNodeId: 'api_a' },
+        { label: '历史分支 B', nextNodeId: 'api_b' },
+      ],
+    })
+  })
 })

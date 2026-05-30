@@ -40,7 +40,7 @@ import { CanvasActionsContext } from '../../context/CanvasActionsContext'
 import { useAuth } from '../../context/AuthContext'
 import { getCanvasGraphReloadKey } from './graphReloadKey'
 import { hydrateBackendNodeOutletSchemas } from './graphHydration'
-import { CANVAS_CONNECTION_RADIUS } from './connectionInteraction'
+import { CANVAS_CONNECTION_RADIUS, canCreateCanvasConnection } from './connectionInteraction'
 import {
   clearCanvasLocalDraft,
   isLocalDraftDifferentFromServer,
@@ -451,7 +451,7 @@ function EditorInner({ detail, onStatusChange, onCanvasNameChange }: {
   /** 为部分复杂节点提供默认 bizConfig，确保拖入后立即有可配置的分支结构。 */
   const buildDefaultBizConfig = useCallback((nodeType: string): BizConfig => {
     if (nodeType === 'SELECTOR') {
-      return { branches: [{ label: '如果', nextNodeId: undefined }] }
+      return { branches: [{ label: '如果', strategyRelation: 'AND', conditions: [], nextNodeId: undefined }] }
     }
     if (nodeType === 'IF_CONDITION') {
       return { rules: [] }
@@ -890,12 +890,14 @@ function EditorInner({ detail, onStatusChange, onCanvasNameChange }: {
     const allNodes = getNodes()
     const sourceNode = allNodes.find(node => node.id === source)?.data as CanvasNodeData | undefined
     const targetNode = allNodes.find(node => node.id === target)?.data as CanvasNodeData | undefined
-    const isDirectCallFanOut = sourceNode?.nodeType === 'DIRECT_CALL' && sourceHandle === 'default'
+    if (!canCreateCanvasConnection(conn, allNodes as Node<CanvasNodeData>[], getEdges())) return
+    const isSingleOutletFanOut = (sourceNode?.nodeType === 'DIRECT_CALL' || sourceNode?.nodeType === 'START')
+      && sourceHandle === 'default'
     snapshot('连线')
     setNodes(prev => prev.map(n => {
       if (n.id !== source) return n
       const d = n.data as CanvasNodeData
-      const bizConfig = isDirectCallFanOut
+      const bizConfig = isSingleOutletFanOut
         ? appendDirectCallBranch(d.bizConfig, target, targetNode?.name)
         : patchBizConfig(d.bizConfig, sourceHandle, target, d.outletSchema)
       return { ...n, data: { ...d, bizConfig } }
@@ -907,9 +909,9 @@ function EditorInner({ detail, onStatusChange, onCanvasNameChange }: {
       sourceHandle,
       targetHandle: conn.targetHandle,
     }
-    setEdges(prev => isDirectCallFanOut ? appendDirectCallEdge(prev, edge) : replaceOutletEdge(prev, edge))
+    setEdges(prev => isSingleOutletFanOut ? appendDirectCallEdge(prev, edge) : replaceOutletEdge(prev, edge))
     setIsDirty(true)
-  }, [getNodes, snapshot, setNodes, setEdges])
+  }, [getNodes, getEdges, snapshot, setNodes, setEdges])
 
   // 节点删除时清理引用
   const onNodesChangeWrapped = useCallback((changes: NodeChange[]) => {
@@ -978,15 +980,8 @@ function EditorInner({ detail, onStatusChange, onCanvasNameChange }: {
 
   // 连线规则
   const isValidConnection = useCallback((conn: Connection) => {
-    const allNodes = getNodes()
-    const src = allNodes.find(n => n.id === conn.source)?.data as CanvasNodeData | undefined
-    const tgt = allNodes.find(n => n.id === conn.target)?.data as CanvasNodeData | undefined
-    if (!src || !tgt) return false
-    if (TRIGGER_TYPES.has(tgt.nodeType)) return false
-    if (TERMINAL_TYPES.has(src.nodeType)) return false  // 终止节点无出边
-    if (conn.source === conn.target) return false        // 禁止自环
-    return true
-  }, [getNodes])
+    return canCreateCanvasConnection(conn, getNodes() as Node<CanvasNodeData>[], getEdges())
+  }, [getNodes, getEdges])
 
   // 保存
   /** 发布前本地校验（减少不必要的服务端请求）*/
@@ -1055,6 +1050,15 @@ function EditorInner({ detail, onStatusChange, onCanvasNameChange }: {
           break
         case 'COUPON':
           if (!cfg.couponTypeKey) errors.push(`节点「${d.name}」必须选择券类型`)
+          break
+        case 'COMMIT_ACTION':
+          if (!cfg.actionType) {
+            errors.push(`节点「${d.name}」必须选择动作类型`)
+          } else if (cfg.actionType === 'COUPON' && !cfg.couponTypeKey) {
+            errors.push(`节点「${d.name}」选择发券动作时必须选择券类型`)
+          } else if (cfg.actionType === 'POINTS_OPERATION' && cfg.points == null) {
+            errors.push(`节点「${d.name}」选择积分动作时必须配置积分`)
+          }
           break
       }
     })

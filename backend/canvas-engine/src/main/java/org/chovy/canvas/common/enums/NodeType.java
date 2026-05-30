@@ -129,6 +129,8 @@ public final class NodeType {
     public static final String TAG_OPERATION      = "TAG_OPERATION";
     /** 积分操作 */
     public static final String POINTS_OPERATION   = "POINTS_OPERATION";
+    /** 通用提交动作 */
+    public static final String COMMIT_ACTION      = "COMMIT_ACTION";
     /** 创建人工任务 */
     public static final String CREATE_TASK        = "CREATE_TASK";
     /** 记录事件 */

@@ -137,6 +137,18 @@ describe('outlet routing helpers', () => {
     })
   })
 
+  it('converts an existing single nextNodeId when appending a fan-out branch', () => {
+    expect(appendDirectCallBranch({
+      nextNodeId: 'trigger_a',
+    }, 'trigger_b', '入口 B')).toEqual({
+      nextNodeId: undefined,
+      branches: [
+        { label: '分支 1', nextNodeId: 'trigger_a' },
+        { label: '入口 B', nextNodeId: 'trigger_b' },
+      ],
+    })
+  })
+
   it('removes the matching DIRECT_CALL branch when deleting a default outlet edge', () => {
     expect(clearEdgeRef({
       branches: [
@@ -175,6 +187,38 @@ describe('outlet routing helpers', () => {
         source: 'wait_1',
         target: 'node_b',
         sourceHandle: 'success',
+      },
+    ])
+  })
+
+  it('derives START fan-out branches as multiple default outlet edges', () => {
+    expect(deriveEdges([
+      {
+        id: 'start',
+        type: 'START',
+        name: '开始',
+        x: 0,
+        y: 0,
+        config: {
+          nextNodeId: 'trigger',
+          branches: [
+            { label: '历史分支 A', nextNodeId: 'api_a' },
+            { label: '历史分支 B', nextNodeId: 'api_b' },
+          ],
+        },
+      },
+    ])).toEqual([
+      {
+        id: 'start->api_a',
+        source: 'start',
+        target: 'api_a',
+        sourceHandle: 'default',
+      },
+      {
+        id: 'start->api_b',
+        source: 'start',
+        target: 'api_b',
+        sourceHandle: 'default',
       },
     ])
   })

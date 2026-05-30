@@ -35,7 +35,6 @@ import reactor.util.retry.Retry;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.*;
-import java.util.concurrent.Executors;
 import java.util.stream.Collectors;
 
 /**
@@ -151,10 +150,13 @@ public class DagEngine {
     private long retryMaxDelayMs;
 
     /**
-     * 虚拟线程调度器，供阻塞型 Handler 和延迟兜底任务使用。
+     * 特殊节点等待超时调度器。
+     *
+     * <p>Mono.delay 需要支持 time-based scheduling 的 Scheduler；
+     * fromExecutorService 包装虚拟线程池不具备定时能力。
      */
-    private static final Scheduler VIRTUAL =
-            Schedulers.fromExecutorService(Executors.newVirtualThreadPerTaskExecutor());
+    private static final Scheduler SPECIAL_NODE_TIMEOUT_SCHEDULER =
+            Schedulers.newBoundedElastic(16, 10_000, "canvas-special-node-timeout", 60, true);
 
     // ══════════════════════════════════════════════════════════════
     // 公开入口
@@ -218,7 +220,9 @@ public class DagEngine {
                     || NodeType.SEND_PUSH.equals(node.getType())
                     || NodeType.SEND_IN_APP.equals(node.getType())
                     || NodeType.SEND_WECHAT.equals(node.getType())
+                    || NodeType.COUPON.equals(node.getType())
                     || NodeType.POINTS_OPERATION.equals(node.getType())
+                    || NodeType.COMMIT_ACTION.equals(node.getType())
                     || NodeType.LOOP.equals(node.getType())
                     || NodeType.GOTO.equals(node.getType())
                     || NodeType.TAGGER.equals(node.getType());
@@ -298,8 +302,8 @@ public class DagEngine {
                                 log.warn("[ENGINE] 防资损：节点失败但整体判定成功 nodeId={}", nodeId);
                                 return Mono.just(Map.of());
                             }
-                            return Mono.error(
-                                    new RuntimeException("节点 " + nodeId + " 失败: " + result.errorMessage()));
+                            return triggerFailureAwareDownstream(graph, nodeId, node.getType(), ctx, depth,
+                                    result.errorMessage());
                         }
 
                         // ── 阶段 6：写输出，设状态，触发下游 ──────────
@@ -629,7 +633,7 @@ public class DagEngine {
                 int timeoutSec = config.get("timeout") instanceof Number n
                         ? n.intValue() : (int) globalTimeout;
 
-                Mono.delay(Duration.ofSeconds(timeoutSec), VIRTUAL)
+                Mono.delay(Duration.ofSeconds(timeoutSec), SPECIAL_NODE_TIMEOUT_SCHEDULER)
                         .subscribe(__ -> handleSpecialNodeTimeout(graph, nodeId, node, config, ctx, depth,
                                 "LOGIC_RELATION", timeoutSec));
                 log.debug("[LOGIC_RELATION] 启动等待超时定时器 {}s nodeId={}", timeoutSec, nodeId);
@@ -718,7 +722,7 @@ public class DagEngine {
                 int timeoutSec = HubHandler.getTimeoutSeconds(config);
 
                 // 延迟任务：超时后若 Hub 仍未完成则标记 FAILED，持久化 ctx，触发执行恢复
-                Mono.delay(Duration.ofSeconds(timeoutSec), VIRTUAL)
+                Mono.delay(Duration.ofSeconds(timeoutSec), SPECIAL_NODE_TIMEOUT_SCHEDULER)
                         .subscribe(__ -> handleSpecialNodeTimeout(graph, nodeId, node, config, ctx, depth,
                                 "HUB", timeoutSec));
 
@@ -769,7 +773,7 @@ public class DagEngine {
                 ctx.getHubStartTimes().putIfAbsent(timerKey, System.currentTimeMillis());
                 int timeoutSec = config.get("timeout") instanceof Number n ? n.intValue() : (int) globalTimeout;
 
-                Mono.delay(Duration.ofSeconds(timeoutSec), VIRTUAL)
+                Mono.delay(Duration.ofSeconds(timeoutSec), SPECIAL_NODE_TIMEOUT_SCHEDULER)
                         .subscribe(__ -> handleSpecialNodeTimeout(graph, nodeId, node, config, ctx, depth,
                                 "AGGREGATE", timeoutSec));
                 log.debug("[AGGREGATE] 启动超时定时器 {}s nodeId={}", timeoutSec, nodeId);
@@ -799,7 +803,7 @@ public class DagEngine {
         String timerKey = "th:" + nodeId;
         if (!ctx.getScheduledHubTimeouts().add(timerKey)) return;
         int timeoutSec = config.get("timeout") instanceof Number n ? n.intValue() : (int) globalTimeout;
-        Mono.delay(Duration.ofSeconds(timeoutSec), VIRTUAL)
+        Mono.delay(Duration.ofSeconds(timeoutSec), SPECIAL_NODE_TIMEOUT_SCHEDULER)
                 .subscribe(__ -> handleSpecialNodeTimeout(graph, nodeId, node, config, ctx, depth,
                         "THRESHOLD", timeoutSec));
     }
@@ -917,7 +921,8 @@ public class DagEngine {
                         long durationMs = System.currentTimeMillis() - nodeStartMs;
                         writeTraceEnd(ctx, node, result, durationMs);
                         if (ctx.isBenefitGranted() || ctx.isUserReached()) return Mono.just(Map.of());
-                        return Mono.error(new RuntimeException("节点 " + nodeId + " 失败: " + result.errorMessage()));
+                        return triggerFailureAwareDownstream(graph, nodeId, node.getType(), ctx, depth,
+                                result.errorMessage());
                     }
                     // ── 路径B：WAITING（THRESHOLD 阈值未满足）─────────────────
                     // executeHandlerWithRepeat 对 success=true 的结果会走 repeat 检查，
@@ -991,6 +996,46 @@ public class DagEngine {
                 // 下游分支并行推进；汇聚节点依赖 NodeGate/repeat 保证单 execution 内不漏信号。
                 .flatMap(nextId -> executeNode(graph, nextId, ctx, depth + 1))
                 .last(Map.of());
+    }
+
+    /**
+     * 当上游失败时，仅将失败信号继续传递给显式汇聚/判定节点。
+     *
+     * <p>普通业务节点仍然保持失败即中断，避免副作用链路被意外放开。
+     */
+    private Mono<Map<String, Object>> triggerFailureAwareDownstream(DagGraph graph,
+                                                                     String sourceNodeId,
+                                                                     String sourceType,
+                                                                     ExecutionContext ctx,
+                                                                     int depth,
+                                                                     String errorMessage) {
+        List<String> nextIds = graph.downstream(sourceNodeId).stream()
+                .filter(nextId -> {
+                    DagParser.CanvasNode nextNode = graph.getNode(nextId);
+                    return nextNode != null && isFailureAwareConvergenceNode(nextNode.getType());
+                })
+                .distinct()
+                .toList();
+
+        if (nextIds.isEmpty()) {
+            return Mono.error(new RuntimeException("节点 " + sourceNodeId + " 失败: " + errorMessage));
+        }
+
+        log.debug("[ENGINE] 失败信号继续传递到汇聚节点 sourceNodeId={} sourceType={} downstream={}",
+                sourceNodeId, sourceType, nextIds);
+        return Flux.fromIterable(nextIds)
+                .flatMap(nextId -> executeNode(graph, nextId, ctx, depth + 1))
+                .last(Map.of());
+    }
+
+    /**
+     * 失败信号可继续传递的汇聚节点类型。
+     */
+    private boolean isFailureAwareConvergenceNode(String nodeType) {
+        return NodeType.HUB.equals(nodeType)
+                || NodeType.AGGREGATE.equals(nodeType)
+                || NodeType.LOGIC_RELATION.equals(nodeType)
+                || NodeType.THRESHOLD.equals(nodeType);
     }
 
     /**

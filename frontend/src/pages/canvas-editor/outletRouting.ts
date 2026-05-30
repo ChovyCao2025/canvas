@@ -62,8 +62,19 @@ export function appendDirectCallBranch(
 ): BizConfig {
   const next = { ...(cfg as BizConfig) }
   const branches = [...(next.branches ?? [])]
+  let seededFromNextNode = false
+  if (branches.length === 0 && typeof next.nextNodeId === 'string' && next.nextNodeId.length > 0) {
+    branches.push({ label: '分支 1', nextNodeId: next.nextNodeId })
+    seededFromNextNode = true
+  }
   const existing = branches.find(branch => branch.nextNodeId === target)
-  if (existing) return next
+  if (existing) {
+    if (seededFromNextNode) {
+      next.nextNodeId = undefined
+      next.branches = branches
+    }
+    return next
+  }
 
   next.nextNodeId = undefined
   next.branches = [
@@ -216,7 +227,7 @@ export function deriveEdges(backendNodes: BackendNode[]): Edge[] {
     }
 
     const dynamicItems = parseOutletSchemaItems(node.outletSchema)
-    const directCallFanOut = node.type === 'DIRECT_CALL'
+    const singleOutletFanOut = (node.type === 'DIRECT_CALL' || node.type === 'START')
       && Array.isArray(config.branches)
       && config.branches.length > 0
     // 动态 outletSchema 优先于固定 FIELD_HANDLES，支持后端配置驱动的新增出口。
@@ -227,14 +238,14 @@ export function deriveEdges(backendNodes: BackendNode[]): Edge[] {
     })
 
     // 没有动态 schema 的旧节点继续按固定字段映射生成连线。
-    if (dynamicItems.length === 0 && !directCallFanOut) {
+    if (dynamicItems.length === 0 && !singleOutletFanOut) {
       FIELD_HANDLES.forEach(({ field, handleId }) => {
         push(config[field], handleId)
       })
     }
 
-    // DIRECT_CALL 的多下游分支由同一个可视出口连出，避免出现不可删除的“新增分支”假出口。
-    if (node.type === 'DIRECT_CALL') {
+    // START / DIRECT_CALL 的多下游分支由同一个可视出口连出，避免出现不可删除的“新增分支”假出口。
+    if (node.type === 'DIRECT_CALL' || node.type === 'START') {
       config.branches?.forEach(branch => push(branch.nextNodeId, 'default'))
     } else {
       // 集合型分支用 handle ID 保存索引或业务 key，便于拖线时回写到正确项。

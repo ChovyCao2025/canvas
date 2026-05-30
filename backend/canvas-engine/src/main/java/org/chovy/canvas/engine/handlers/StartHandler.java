@@ -8,6 +8,8 @@ import org.springframework.stereotype.Component;
 import org.chovy.canvas.engine.handler.NodeResult;
 import reactor.core.publisher.Mono;
 
+import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -28,8 +30,22 @@ public class StartHandler implements NodeHandler {
      * <p>START 是编排锚点，不承担业务判断逻辑。
      */
     @Override
+    @SuppressWarnings("unchecked")
     public Mono<NodeResult> executeAsync(Map<String, Object> config, ExecutionContext ctx) {
-        // START 配置只关心 nextNodeId
+        List<Map<String, Object>> branches = (List<Map<String, Object>>) config.get(MapFieldKeys.BRANCHES);
+        if (branches != null && !branches.isEmpty()) {
+            Map<String, String> branchMap = new LinkedHashMap<>();
+            for (int i = 0; i < branches.size(); i++) {
+                Object target = branches.get(i).get(MapFieldKeys.NEXT_NODE_ID);
+                if (target instanceof String targetId && !targetId.isBlank()) {
+                    branchMap.put("branch-" + i, targetId);
+                }
+            }
+            if (!branchMap.isEmpty()) {
+                return Mono.just(NodeResult.multiNext(branchMap, null));
+            }
+        }
+
         String nextNodeId = (String) config.get(MapFieldKeys.NEXT_NODE_ID);
         // 不产出额外 output，避免污染上下文字段
         // 若 nextNodeId 为空，调度器会在后续阶段识别为异常配置

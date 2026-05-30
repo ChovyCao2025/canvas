@@ -50,11 +50,15 @@ public class CouponHandler implements NodeHandler {
         Map<String, Object> p = (Map<String, Object>) config.getOrDefault(MapFieldKeys.PARAMS, Map.of());
         String nextNodeId     = (String) config.get(MapFieldKeys.NEXT_NODE_ID);
 
-        // 组装调用体：executionId:coupon 作为幂等键，避免重试重复发券
+        String nodeId = (String) config.getOrDefault(MapFieldKeys.NODE_ID_INTERNAL, "coupon");
+        String idempotencyKey = (String) config.getOrDefault(MapFieldKeys.IDEMPOTENCY_KEY,
+                ctx.getExecutionId() + ":" + nodeId);
+
+        // 组装调用体：默认使用 executionId:nodeId 作为幂等键，避免同一画布多个券节点互相冲突
         Map<String, Object> body = new HashMap<>(p);
         body.put(MapFieldKeys.COUPON_TYPE_KEY, couponTypeKey);
         body.put(MapFieldKeys.USER_ID, ctx.getUserId());
-        body.put(MapFieldKeys.IDEMPOTENCY_KEY, ctx.getExecutionId() + ":coupon");
+        body.put(MapFieldKeys.IDEMPOTENCY_KEY, idempotencyKey);
 
         return webClient.post().uri("/issue").bodyValue(body)
                 .retrieve()

@@ -92,4 +92,21 @@ class DirectCallNodeDefinitionMigrationTest {
         assertThat(sql).contains("'$.nodes[1].config.nextNodeId'");
         assertThat(sql).contains("'$.nodes[1].outletSchema'");
     }
+
+    @Test
+    void migrationRepairsCanvas42AsExecutableSelectorDemo() throws Exception {
+        ClassPathResource migration =
+                new ClassPathResource("db/migration/V89__repair_canvas42_selector_demo.sql");
+
+        String sql = migration.getContentAsString(StandardCharsets.UTF_8);
+
+        assertThat(sql).contains("示例：人群圈选三路分流");
+        assertThat(sql).contains("\"id\": \"start\"");
+        assertThat(sql).contains("\"type\": \"START\"");
+        assertThat(sql).contains("\"type\": \"DIRECT_CALL\"");
+        assertThat(sql).contains("\"type\": \"SELECTOR\"");
+        assertThat(sql).contains("\"field\": \"userTier\"");
+        assertThat(sql).contains("\"elseNodeId\": \"aud_notify_default\"");
+        assertThat(sql).contains("UPDATE canvas_version cv");
+    }
 }

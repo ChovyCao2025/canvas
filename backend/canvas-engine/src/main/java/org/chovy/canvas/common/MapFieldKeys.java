@@ -97,6 +97,9 @@ public final class MapFieldKeys {
     /** 推荐结果列表。 */
     public static final String RECOMMENDATIONS = "recommendations";
 
+    /** 提交动作类型。 */
+    public static final String ACTION_TYPE = "actionType";
+
     /** 积分台账ID。 */
     public static final String POINTS_LEDGER_ID = "pointsLedgerId";
 

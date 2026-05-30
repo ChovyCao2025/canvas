@@ -847,6 +847,13 @@ function BroadcastBranchList({ onBranchesChange }: { onBranchesChange: (branches
 // ── SELECTOR 分支列表控件（branch-list）────────────────────────────
 interface BranchItem { label: string; strategyRelation: string; conditions: ConditionRule[]; nextNodeId?: string }
 
+/** SELECTOR 分支标题按 IF / ELSE IF / ELSE 心智模型展示。 */
+export function getSelectorBranchLabel(index: number, total: number, conditionCount: number) {
+  if (index === 0) return '如果'
+  if (index === total - 1 && conditionCount === 0) return '否则'
+  return '否则如果'
+}
+
 /** SELECTOR 分支配置控件；实际后继节点由画布连线写回 nextNodeId。 */
 function BranchList({ ctxFields, operatorOptions, relationOptions }: {
   ctxFields: ContextField[]
@@ -855,12 +862,12 @@ function BranchList({ ctxFields, operatorOptions, relationOptions }: {
 }) {
   const form = Form.useFormInstance()
   const branches: BranchItem[] = Form.useWatch('branches', form) ?? []
+  const inlineChrome = getInlineControlChrome()
 
-  const LABELS = ['如果', '否则如果', '否则如果', '否则如果', '否则如果']
   /** 追加一个 SELECTOR 分支，默认使用 AND 关系。 */
   const addBranch = () => form.setFieldValue('branches', [
     ...branches,
-    { label: LABELS[Math.min(branches.length, LABELS.length - 1)], strategyRelation: 'AND', conditions: [], nextNodeId: undefined }
+    { label: branches.length === 0 ? '如果' : '否则如果', strategyRelation: 'AND', conditions: [], nextNodeId: undefined }
   ])
   /** 删除指定分支，同时保留其他分支顺序。 */
   const removeBranch = (i: number) => {
@@ -885,38 +892,43 @@ function BranchList({ ctxFields, operatorOptions, relationOptions }: {
     const next = [...branches]; (next[bi].conditions[ci] as any)[k] = v; form.setFieldValue('branches', next)
   }
 
-  const LABEL_COLORS: Record<string, string> = { '如果': '#1677ff', '否则如果': '#fa8c16', '否则': '#8c8c8c' }
-
   return (
-    <div>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
       {branches.map((b, i) => (
-        <div key={i} style={{ marginBottom: 8, border: '1px solid #e8e8e8', borderRadius: 6, overflow: 'hidden' }}>
-          {/* 分支标题行 */}
-          <div style={{ background: '#fafafa', padding: '6px 10px', display: 'flex', alignItems: 'center', gap: 8, borderBottom: b.conditions?.length ? '1px solid #f0f0f0' : 'none' }}>
-            <Tag color={LABEL_COLORS[b.label] ?? 'default'} style={{ margin: 0 }}>{b.label}</Tag>
-            <Select className="config-panel-ios-select" classNames={CONTROL_SELECT_CLASS_NAMES} size="small" style={{ width: 92 }} value={b.strategyRelation}
+        <div key={i} style={{
+          background: '#f0f7ff',
+          border: '1px solid #dbeafe',
+          borderRadius: 8,
+          padding: '8px 10px',
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 7 }}>
+            <span style={{ fontSize: 11, fontWeight: 760, color: '#1677ff', minWidth: 44 }}>
+              {getSelectorBranchLabel(i, branches.length, b.conditions?.length ?? 0)}
+            </span>
+            <Input size="small" style={{ ...inlineChrome, flex: 1, minWidth: 0 }} value={b.label}
+              placeholder="分支名称" onChange={e => updateBranch(i, 'label', e.target.value)} />
+            <Select className="config-panel-ios-select" classNames={CONTROL_SELECT_CLASS_NAMES} size="small" style={{ width: 82 }} value={b.strategyRelation ?? 'AND'}
               options={relationOptions}
               onChange={v => updateBranch(i, 'strategyRelation', v)} />
-            <span style={{ flex: 1, fontSize: 11, color: '#999' }}>
-              {b.conditions?.length
-                ? `${b.conditions.length} 个条件`
-                : <span style={{ color: '#f5222d' }}>无条件 = 必走此分支</span>}
-            </span>
-            <Button size="small" type="text" danger icon={<DeleteOutlined />} onClick={() => removeBranch(i)} />
+            <Button size="small" danger icon={<DeleteOutlined />} onClick={() => removeBranch(i)}
+              style={{ width: 24, height: 24, minWidth: 24, padding: 0, borderRadius: 6 }} />
           </div>
-          {/* 条件列表 */}
-          <div style={{ padding: '6px 10px' }}>
-            {b.conditions?.map((c, ci) => (
-              <div key={ci} style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 56px minmax(0, 1fr) 28px', gap: 6, marginBottom: 6, alignItems: 'center' }}>
-                <Select className="config-panel-ios-select" classNames={CONTROL_SELECT_CLASS_NAMES} size="small" style={{ width: '100%' }} placeholder="字段"
-                  value={c.field || undefined}
-                  options={ctxFields.map(f => ({ label: f.fieldName, value: f.fieldKey }))}
-                  onChange={v => updateCondition(i, ci, 'field', v)} showSearch
-                  dropdownStyle={{ minWidth: 200 }} />
-                <Select className="config-panel-ios-select" classNames={CONTROL_SELECT_CLASS_NAMES} size="small" style={{ width: '100%' }} value={c.operator}
+
+          {b.conditions?.map((c, ci) => (
+            <div key={ci} style={{ marginBottom: 6 }}>
+              <Select className="config-panel-ios-select" classNames={CONTROL_SELECT_CLASS_NAMES}
+                size="small" style={{ width: '100%', marginBottom: 6 }} placeholder="字段"
+                value={c.field || undefined}
+                options={ctxFields.map(f => ({ label: f.fieldName, value: f.fieldKey }))}
+                onChange={v => updateCondition(i, ci, 'field', v)} showSearch
+                dropdownStyle={{ minWidth: 200 }} />
+              <div style={{ display: 'flex', gap: 6 }}>
+                <Select className="config-panel-ios-select" classNames={CONTROL_SELECT_CLASS_NAMES}
+                  size="small" style={{ width: 90 }} value={c.operator}
                   options={operatorOptions}
                   onChange={v => updateCondition(i, ci, 'operator', v)} />
-                <AutoComplete className="config-panel-ios-auto-complete" classNames={CONTROL_SELECT_CLASS_NAMES} size="small" style={{ width: '100%' }}
+                <AutoComplete className="config-panel-ios-auto-complete" classNames={CONTROL_SELECT_CLASS_NAMES}
+                  size="small" style={{ flex: 1, minWidth: 0 }}
                   placeholder="值或 ${key}"
                   value={c.value}
                   options={ctxFields.map(f => ({ value: '${' + f.fieldKey + '}', label: f.fieldName }))}
@@ -926,17 +938,19 @@ function BranchList({ ctxFields, operatorOptions, relationOptions }: {
                     String(opt?.label ?? '').toLowerCase().includes(input.replace(/\$\{?/, '').toLowerCase())
                   }
                   dropdownStyle={{ minWidth: 220 }} />
-                <Button size="small" danger icon={<DeleteOutlined />} onClick={() => removeCondition(i, ci)} />
+                <Button size="small" danger icon={<DeleteOutlined />} onClick={() => removeCondition(i, ci)}
+                  style={{ width: 24, height: 24, minWidth: 24, padding: 0, borderRadius: 6 }} />
               </div>
-            ))}
-            <Button size="small" type="dashed" icon={<PlusOutlined />} onClick={() => addCondition(i)}>
-              添加条件
-            </Button>
-          </div>
+            </div>
+          ))}
+          <Button size="small" type="dashed" icon={<PlusOutlined />} onClick={() => addCondition(i)}
+            style={{ width: '100%', borderColor: '#93c5fd', color: '#1677ff' }}>
+            添加条件
+          </Button>
         </div>
       ))}
       <Button size="small" type="dashed" icon={<PlusOutlined />} onClick={addBranch}
-        style={{ width: '100%' }}>
+        style={{ width: '100%', borderColor: '#93c5fd', color: '#1677ff' }}>
         {branches.length === 0 ? '添加第一个分支（如果）' : '添加分支（否则如果）'}
       </Button>
       {branches.length > 0 && (

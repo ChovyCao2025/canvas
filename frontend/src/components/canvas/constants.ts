@@ -88,6 +88,7 @@ export const DEFAULT_NAMES: Record<string, string> = {
   PRIORITY:          '优先级',
   AB_SPLIT:          'AB分流',
   TAGGER_OFFLINE:    'Tagger离线标签',
+  COMMIT_ACTION:     '提交动作',
   COUPON:            '代金券',
   IN_APP_NOTIFY:     '端内通知',
   REACH_PLATFORM:    '触达平台',

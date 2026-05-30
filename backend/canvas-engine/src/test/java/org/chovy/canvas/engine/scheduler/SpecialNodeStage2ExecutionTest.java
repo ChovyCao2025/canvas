@@ -96,6 +96,36 @@ class SpecialNodeStage2ExecutionTest {
     }
 
     @Test
+    void failedUpstreamNotifiesAggregateAndRoutesByAggregateResult() {
+        DagEngine engine = engineWithHandlers(new FailingHandler());
+        DagParser.CanvasNode aggregate = node("aggregate", NodeType.AGGREGATE);
+        aggregate.setConfig(Map.of(
+                "evaluateMode", "count",
+                "minCount", 1,
+                MapFieldKeys.SUCCESS_NODE_ID, "successEnd",
+                MapFieldKeys.FAIL_NODE_ID, "failEnd"
+        ));
+        DagGraph graph = graph(List.of(
+                node("fail", "TEST_FAIL"),
+                aggregate,
+                node("successEnd", "TEST_SOURCE"),
+                node("failEnd", "TEST_SOURCE")
+        ), Map.of(
+                "fail", List.of("aggregate"),
+                "aggregate", List.of("successEnd", "failEnd")
+        ));
+        ExecutionContext ctx = context();
+
+        Map<String, Object> result = engine.execute(graph, "fail", ctx).block();
+
+        assertThat(ctx.getNodeStatus("fail")).isEqualTo(NodeStatus.FAILED);
+        assertThat(ctx.getNodeStatus("aggregate")).isEqualTo(NodeStatus.SUCCESS);
+        assertThat(ctx.getNodeStatus("successEnd")).isEqualTo(NodeStatus.SKIPPED);
+        assertThat(ctx.getNodeStatus("failEnd")).isEqualTo(NodeStatus.SUCCESS);
+        assertThat(result).isEmpty();
+    }
+
+    @Test
     void thresholdTransitionsFromWaitingToSuccessAsSignalsAccumulate() {
         DagEngine engine = engineWithHandlers();
         DagParser.CanvasNode threshold = node("threshold", NodeType.THRESHOLD);
