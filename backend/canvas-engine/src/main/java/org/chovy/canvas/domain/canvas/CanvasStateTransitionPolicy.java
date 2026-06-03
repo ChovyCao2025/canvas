@@ -35,6 +35,17 @@ public class CanvasStateTransitionPolicy {
         }
     }
 
+    public void assertDraftUpdateAllowed(CanvasDO canvas) {
+        CanvasStatusEnum source = statusOf(canvas);
+        if (source == CanvasStatusEnum.KILLED || source == CanvasStatusEnum.ARCHIVED) {
+            reject(source, CanvasStatusEnum.DRAFT);
+        }
+    }
+
+    public boolean isPublished(CanvasDO canvas) {
+        return statusOf(canvas) == CanvasStatusEnum.PUBLISHED;
+    }
+
     private static CanvasStatusEnum statusOf(CanvasDO canvas) {
         if (canvas == null) {
             throw new IllegalArgumentException("canvas must not be null");

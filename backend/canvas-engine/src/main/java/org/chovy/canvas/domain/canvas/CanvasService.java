@@ -75,6 +75,8 @@ public class CanvasService {
     private final org.springframework.data.redis.core.StringRedisTemplate redis;
     /** 画布事务服务，封装只涉及数据库写入的事务边界。 */
     private final CanvasTransactionService canvasTransactionService;
+    /** 画布状态策略，集中约束生命周期和编辑边界。 */
+    private final CanvasStateTransitionPolicy stateTransitionPolicy;
     /** 示例画布配置属性，控制示例数据展示和过滤。 */
     private final CanvasExamplesProperties examplesProperties;
     /** 后台任务执行器，用于发布旁路预编译等异步工作。 */
@@ -136,17 +138,14 @@ public class CanvasService {
     public void updateDraft(Long id, CanvasUpdateReq req) {
         CanvasDO canvas = canvasMapper.selectById(id);
         if (canvas == null) throw new IllegalArgumentException("画布不存在: " + id);
+        stateTransitionPolicy.assertDraftUpdateAllowed(canvas);
+        assertPublishedRuntimePolicyUnchanged(canvas, req);
 
         canvas.setName(req.getName());
         canvas.setDescription(req.getDescription());
-        if (req.getTriggerType() != null) canvas.setTriggerType(req.getTriggerType());
-        canvas.setCronExpression(req.getCronExpression());
-        canvas.setValidStart(req.getValidStart());
-        canvas.setValidEnd(req.getValidEnd());
-        canvas.setMaxTotalExecutions(req.getMaxTotalExecutions());
-        canvas.setPerUserDailyLimit(req.getPerUserDailyLimit());
-        canvas.setPerUserTotalLimit(req.getPerUserTotalLimit());
-        canvas.setCooldownSeconds(req.getCooldownSeconds());
+        if (!stateTransitionPolicy.isPublished(canvas)) {
+            applyRuntimePolicyFields(canvas, req);
+        }
         canvasMapper.updateById(canvas);
 
         if (req.getGraphJson() == null) return;
@@ -165,6 +164,37 @@ public class CanvasService {
             v.setCreatedBy(req.getUpdatedBy());
             canvasVersionMapper.insert(v);
         }
+    }
+
+    private void applyRuntimePolicyFields(CanvasDO canvas, CanvasUpdateReq req) {
+        if (req.getTriggerType() != null) canvas.setTriggerType(req.getTriggerType());
+        canvas.setCronExpression(req.getCronExpression());
+        canvas.setValidStart(req.getValidStart());
+        canvas.setValidEnd(req.getValidEnd());
+        canvas.setMaxTotalExecutions(req.getMaxTotalExecutions());
+        canvas.setPerUserDailyLimit(req.getPerUserDailyLimit());
+        canvas.setPerUserTotalLimit(req.getPerUserTotalLimit());
+        canvas.setCooldownSeconds(req.getCooldownSeconds());
+    }
+
+    private void assertPublishedRuntimePolicyUnchanged(CanvasDO canvas, CanvasUpdateReq req) {
+        if (!stateTransitionPolicy.isPublished(canvas)) return;
+        boolean changed = changed(req.getTriggerType(), canvas.getTriggerType())
+                || changed(req.getCronExpression(), canvas.getCronExpression())
+                || changed(req.getValidStart(), canvas.getValidStart())
+                || changed(req.getValidEnd(), canvas.getValidEnd())
+                || changed(req.getMaxTotalExecutions(), canvas.getMaxTotalExecutions())
+                || changed(req.getPerUserDailyLimit(), canvas.getPerUserDailyLimit())
+                || changed(req.getPerUserTotalLimit(), canvas.getPerUserTotalLimit())
+                || changed(req.getCooldownSeconds(), canvas.getCooldownSeconds());
+        if (changed) {
+            throw new IllegalStateException(
+                    "Cannot update published runtime policy; offline or publish a new version first");
+        }
+    }
+
+    private static boolean changed(Object requested, Object current) {
+        return requested != null && !Objects.equals(requested, current);
     }
 
     /**
