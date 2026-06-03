@@ -88,6 +88,22 @@ class DagEnginePendingTest {
                 eq(NodeStatus.SUCCESS), eq(Map.of("ok", true)));
     }
 
+    @Test
+    void finalSkippedNodesArePersistedIncrementally() {
+        ContextPersistenceService ctxStore = mock(ContextPersistenceService.class);
+        DagEngine engine = engineWithHandlers(ctxStore, new TestSuccessHandler());
+        DagGraph graph = graph(List.of(
+                node("success", "TEST_SUCCESS"),
+                node("unreachable", "TEST_UNREACHED")
+        ));
+        ExecutionContext ctx = context();
+
+        engine.execute(graph, "success", ctx).block();
+
+        assertThat(ctx.getNodeStatus("unreachable")).isEqualTo(NodeStatus.SKIPPED);
+        verify(ctxStore).saveNodeState("exec-pending-test", "unreachable", NodeStatus.SKIPPED, Map.of());
+    }
+
     private DagEngine engineWithHandlers(NodeHandler... handlers) {
         return engineWithHandlers(mock(ContextPersistenceService.class), handlers);
     }

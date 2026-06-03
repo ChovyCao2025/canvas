@@ -1257,6 +1257,7 @@ public class DagEngine {
         graph.getNodeMap().forEach((nodeId, node) -> {
             if (ctx.setNodeStatusIfAbsent(nodeId, NodeStatus.SKIPPED)) {
                 // 只为从未进入状态机的节点补 SKIPPED，避免覆盖已执行/等待/失败节点。
+                saveNodeStateSafely(ctx, nodeId, NodeStatus.SKIPPED, Map.of());
                 skippedTraces.add(CanvasExecutionTraceDO.builder()
                         .executionId(ctx.getExecutionId())
                         .nodeId(nodeId)
