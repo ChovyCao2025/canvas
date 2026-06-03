@@ -48,6 +48,8 @@ import {
   writeCanvasLocalDraft,
 } from './localDraft'
 import { buildCanvasNameUpdate, getCanvasNameStatusGap, shouldShowCanvasNameActions } from './canvasNameUpdate'
+import { clearCanvasEditorAutosave, scheduleCanvasEditorAutosave } from './canvasEditorAutosave'
+import { cleanCanvasBizConfigRefs, cloneCanvasNodeBizConfigForPaste } from './canvasEditorClipboard'
 import {
   type CanvasTriggerType,
   getExecutionLimitsSummary,
@@ -156,47 +158,6 @@ function sameSaveSnapshot(a: {
     && a.canvasName === b.canvasName
     && JSON.stringify(a.canvasSettings) === JSON.stringify(b.canvasSettings)
     && a.description === b.description
-}
-
-// ── 清理被删节点的引用 ────────────────────────────────────────
-
-function cleanRefs(cfg: Record<string, unknown>, deletedIds: Set<string>): BizConfig {
-  /** 如果引用目标已被删除，则把该引用字段清空。 */
-  const clean = (v: unknown) => (typeof v === 'string' && deletedIds.has(v) ? undefined : v)
-  const biz = cfg as BizConfig
-  return {
-    ...cfg,
-    nextNodeId:    clean(biz.nextNodeId)    as string | undefined,
-    successNodeId: clean(biz.successNodeId) as string | undefined,
-    failNodeId:    clean(biz.failNodeId)    as string | undefined,
-    elseNodeId:    clean(biz.elseNodeId)    as string | undefined,
-    approveNodeId: clean(biz.approveNodeId) as string | undefined,
-    rejectNodeId:  clean(biz.rejectNodeId)  as string | undefined,
-    hitNextNodeId: clean(biz.hitNextNodeId) as string | undefined,
-    missNextNodeId: clean(biz.missNextNodeId) as string | undefined,
-    timeoutNodeId: clean(biz.timeoutNodeId) as string | undefined,
-    suppressedNodeId: clean(biz.suppressedNodeId) as string | undefined,
-    skippedNodeId: clean(biz.skippedNodeId) as string | undefined,
-    allowedNodeId: clean(biz.allowedNodeId) as string | undefined,
-    quietNodeId: clean(biz.quietNodeId) as string | undefined,
-    availableNodeId: clean(biz.availableNodeId) as string | undefined,
-    unavailableNodeId: clean(biz.unavailableNodeId) as string | undefined,
-    passNodeId: clean(biz.passNodeId) as string | undefined,
-    cappedNodeId: clean(biz.cappedNodeId) as string | undefined,
-    fallbackNodeId: clean(biz.fallbackNodeId) as string | undefined,
-    exitNodeId: clean(biz.exitNodeId) as string | undefined,
-    loopStartNodeId: clean(biz.loopStartNodeId) as string | undefined,
-    targetNodeId: clean(biz.targetNodeId) as string | undefined,
-    maxExceededNodeId: clean(biz.maxExceededNodeId) as string | undefined,
-    goalMetNodeId: clean(biz.goalMetNodeId) as string | undefined,
-    goalNotMetNodeId: clean(biz.goalNotMetNodeId) as string | undefined,
-    branches:   biz.branches?.map(b   => ({ ...b, nextNodeId: clean(b.nextNodeId) as string | undefined })),
-    priorities: biz.priorities?.map(p => ({ ...p, nextNodeId: clean(p.nextNodeId) as string | undefined })),
-    groups:     biz.groups?.map(g     => ({ ...g, nextNodeId: clean(g.nextNodeId) as string | undefined })),
-    paths:      biz.paths?.map(p      => ({ ...p, nextNodeId: clean(p.nextNodeId) as string | undefined })),
-    variants:   biz.variants?.map(v   => ({ ...v, nextNodeId: clean(v.nextNodeId) as string | undefined })),
-    bands:      biz.bands?.map(b      => ({ ...b, nextNodeId: clean(b.nextNodeId) as string | undefined })),
-  }
 }
 
 // ── 撤销/重做历史 ─────────────────────────────────────────────
@@ -499,11 +460,8 @@ function EditorInner({ detail, onStatusChange, onCanvasNameChange }: {
   // ── Auto-save：最后一次改动 3s 后静默保存 ─────────────────────
   useEffect(() => {
     if (!isDirty) return
-    clearTimeout(autoSaveTimer.current)
-    autoSaveTimer.current = setTimeout(() => {
-      handleSave(/* silent */ true)
-    }, 3000)
-    return () => clearTimeout(autoSaveTimer.current)
+    autoSaveTimer.current = scheduleCanvasEditorAutosave(isDirty, handleSave, autoSaveTimer.current)
+    return () => clearCanvasEditorAutosave(autoSaveTimer.current)
   })
 
   /** 把当前内存中的未保存内容写入 localStorage，防刷新丢失。 */
@@ -686,7 +644,7 @@ function EditorInner({ detail, onStatusChange, onCanvasNameChange }: {
               ...(n.data as CanvasNodeData),
               name: (n.data as CanvasNodeData).name + ' (副本)',
               traceColor: undefined,           // 不继承轨迹颜色
-              bizConfig: cleanRefs((n.data as CanvasNodeData).bizConfig, existingIds), // 连线关系不复制
+              bizConfig: cloneCanvasNodeBizConfigForPaste((n.data as CanvasNodeData).bizConfig, existingIds),
             },
           }))
           setNodes(prev => [...prev, ...pasted])
@@ -838,7 +796,7 @@ function EditorInner({ detail, onStatusChange, onCanvasNameChange }: {
   }, [])
 
   // 拖已有节点到占位框上：松手时检测命中并自动连线
-  const onNodeDragStop = useCallback((_: React.MouseEvent, draggedNode: Node) => {
+  const onNodeDragStop = useCallback((_: MouseEvent | TouchEvent, draggedNode: Node<CanvasNodeData> | Node<PlaceholderData>) => {
     setDraggingNodeId(null)
     if (readonly) return
     const d = draggedNode.data as CanvasNodeData
@@ -933,7 +891,7 @@ function EditorInner({ detail, onStatusChange, onCanvasNameChange }: {
         .filter(n => !ids.has(n.id))
         .map(n => {
           const d = n.data as CanvasNodeData
-          return { ...n, data: { ...d, bizConfig: cleanRefs(d.bizConfig, ids) } }
+          return { ...n, data: { ...d, bizConfig: cleanCanvasBizConfigRefs(d.bizConfig, ids) } }
         })
       )
       setEdges(prev => prev.filter(e => !ids.has(e.source) && !ids.has(e.target)))
@@ -1411,7 +1369,13 @@ function EditorInner({ detail, onStatusChange, onCanvasNameChange }: {
     const ids = new Set([nodeId])
     setNodes(prev => prev
       .filter(n => !ids.has(n.id))
-      .map(n => ({ ...n, data: { ...(n.data as CanvasNodeData), bizConfig: cleanRefs((n.data as CanvasNodeData).bizConfig ?? {}, ids) } }))
+      .map(n => ({
+        ...n,
+        data: {
+          ...(n.data as CanvasNodeData),
+          bizConfig: cleanCanvasBizConfigRefs((n.data as CanvasNodeData).bizConfig ?? {}, ids),
+        },
+      }))
     )
     setEdges(prev => prev.filter(e => !ids.has(e.source) && !ids.has(e.target)))
     if (selectedNodeId === nodeId) setSelectedNodeId(null)
@@ -1433,7 +1397,7 @@ function EditorInner({ detail, onStatusChange, onCanvasNameChange }: {
       data: {
         ...(node.data as CanvasNodeData),
         traceColor: undefined,
-        bizConfig: cleanRefs((node.data as CanvasNodeData).bizConfig ?? {}, existingIds),
+        bizConfig: cleanCanvasBizConfigRefs((node.data as CanvasNodeData).bizConfig ?? {}, existingIds),
       },
     }])
     setIsDirty(true)
