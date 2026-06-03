@@ -677,6 +677,7 @@ public class DagEngine {
                 writeTraceStart(ctx, node);
                 ctx.setNodeStatus(nodeId, NodeStatus.FAILED);
                 writeTraceEnd(ctx, node, NodeResult.fail("AND 上游失败，条件不可满足"), 0);
+                saveNodeStateSafely(ctx, nodeId, NodeStatus.FAILED, Map.of());
                 gate.executing.set(false);
                 log.warn("[ENGINE] LOGIC_RELATION AND 上游失败，立即 FAILED nodeId={}", nodeId);
                 if (ctx.isBenefitGranted() || ctx.isUserReached()) return Mono.just(Map.of());
@@ -1205,6 +1206,7 @@ public class DagEngine {
             // 所有分支均失败
             if (fallbackNextId != null) {
                 ctx.setNodeStatus(priorityNodeId, NodeStatus.PARTIAL_FAIL);
+                saveNodeStateSafely(ctx, priorityNodeId, NodeStatus.PARTIAL_FAIL, Map.of());
                 log.debug("[PRIORITY] 所有分支失败，走 fallback nextId={}", fallbackNextId);
                 if (ctx.isNodeDone(fallbackNextId)) {
                     log.debug("[PRIORITY] fallback 已作为分支执行过，按节点幂等跳过 nextId={}", fallbackNextId);

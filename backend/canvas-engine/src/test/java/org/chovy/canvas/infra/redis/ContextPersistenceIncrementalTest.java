@@ -11,6 +11,7 @@ import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.Duration;
+import java.util.LinkedHashMap;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -27,9 +28,11 @@ class ContextPersistenceIncrementalTest {
         HashOperations<String, Object, Object> hashes = mock(HashOperations.class);
         when(redis.opsForHash()).thenReturn(hashes);
         ContextPersistenceService service = service(redis);
+        Map<String, Object> output = new LinkedHashMap<>();
+        output.put("amount", 42);
+        output.put("ok", true);
 
-        service.saveNodeState("exec-1", "node-1", NodeStatus.SUCCESS,
-                Map.of("amount", 42, "ok", true));
+        service.saveNodeState("exec-1", "node-1", NodeStatus.SUCCESS, output);
 
         verify(hashes).putAll(eq("canvas:node-state:exec-1:node-1"), eq(Map.of(
                 "status", "SUCCESS",

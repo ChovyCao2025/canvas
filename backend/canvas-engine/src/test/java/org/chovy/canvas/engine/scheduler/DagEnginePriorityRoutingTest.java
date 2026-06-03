@@ -24,6 +24,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 /**
@@ -62,7 +63,8 @@ class DagEnginePriorityRoutingTest {
     @Test
     void priority_does_not_reexecute_same_node_when_fallback_matches_failed_branch() {
         TestFailHandler failHandler = new TestFailHandler();
-        DagEngine engine = engineWithHandlers(failHandler, new TestOkHandler());
+        ContextPersistenceService ctxStore = mock(ContextPersistenceService.class);
+        DagEngine engine = engineWithHandlers(ctxStore, failHandler, new TestOkHandler());
         DagGraph graph = graph(List.of(
                 priorityNode("priority", List.of(
                         Map.of("order", 1, "nextNodeId", "fail")
@@ -77,9 +79,14 @@ class DagEnginePriorityRoutingTest {
         assertThat(ctx.getNodeStatus("priority")).isEqualTo(NodeStatus.PARTIAL_FAIL);
         assertThat(ctx.getNodeStatus("fail")).isEqualTo(NodeStatus.FAILED);
         assertThat(failHandler.calls()).isEqualTo(1);
+        verify(ctxStore).saveNodeState("exec-priority-test", "priority", NodeStatus.PARTIAL_FAIL, Map.of());
     }
 
     private DagEngine engineWithHandlers(NodeHandler... handlers) {
+        return engineWithHandlers(mock(ContextPersistenceService.class), handlers);
+    }
+
+    private DagEngine engineWithHandlers(ContextPersistenceService ctxStore, NodeHandler... handlers) {
         List<NodeHandler> allHandlers = new java.util.ArrayList<>();
         allHandlers.add(new PriorityHandler());
         allHandlers.addAll(List.of(handlers));
@@ -97,7 +104,7 @@ class DagEnginePriorityRoutingTest {
                 cbRegistry,
                 mock(CanvasMetrics.class),
                 new ObjectMapper(),
-                mock(ContextPersistenceService.class),
+                ctxStore,
                 mock(org.chovy.canvas.engine.trigger.CanvasExecutionService.class)
         );
         ReflectionTestUtils.setField(engine, "maxRetry", 1);
