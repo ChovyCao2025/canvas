@@ -169,9 +169,10 @@
 
 ## 九、压测
 
-- [stressTest/2026-05-27-local-container-capacity-testing-design.md](stressTest/2026-05-27-local-container-capacity-testing-design.md) — 本地容器容量测试设计
-- [stressTest/并发量评估报告.md](stressTest/并发量评估报告.md) — 并发量评估报告
-- [stressTest/老板汇报版-并发评估摘要.md](stressTest/老板汇报版-并发评估摘要.md) — 并发评估摘要（管理层版）
+- [stressTest/README.md](stressTest/README.md) — 压测唯一入口与硬规则
+- [stressTest/local-capacity-runbook.md](stressTest/local-capacity-runbook.md) — 本地容量压测执行手册
+- [stressTest/performance-audit.md](stressTest/performance-audit.md) — 旧方案审计与新规则
+- [stressTest/report-template.md](stressTest/report-template.md) — 容量报告模板
 
 ## 十、图片资源
 
