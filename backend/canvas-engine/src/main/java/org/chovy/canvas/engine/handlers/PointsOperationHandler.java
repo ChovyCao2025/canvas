@@ -9,10 +9,13 @@ import org.chovy.canvas.engine.context.ExecutionContext;
 import org.chovy.canvas.engine.handler.NodeHandler;
 import org.chovy.canvas.engine.handler.NodeHandlerType;
 import org.chovy.canvas.engine.handler.NodeResult;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Component;
 import reactor.core.publisher.Mono;
+import reactor.core.scheduler.Schedulers;
 
 import java.time.LocalDateTime;
+import java.util.HashMap;
 import java.util.Map;
 
 /**
@@ -49,6 +52,12 @@ public class PointsOperationHandler implements NodeHandler {
      */
     @Override
     public Mono<NodeResult> executeAsync(Map<String, Object> config, ExecutionContext ctx) {
+        return Mono.fromCallable(() -> executeBlocking(config, ctx))
+                .subscribeOn(Schedulers.boundedElastic())
+                .onErrorResume(e -> Mono.just(NodeResult.fail("POINTS_OPERATION: " + e.getMessage())));
+    }
+
+    private NodeResult executeBlocking(Map<String, Object> config, ExecutionContext ctx) {
         String idempotencyKey = string(config, "idempotencyKey",
                 ctx.getExecutionId() + ":" + string(config, "__nodeId", "points"));
         CustomerPointsLedgerDO existing = ledgerMapper.selectOne(new LambdaQueryWrapper<CustomerPointsLedgerDO>()
@@ -56,8 +65,8 @@ public class PointsOperationHandler implements NodeHandler {
                 .last("LIMIT 1"));
         if (existing != null) {
             // 命中幂等流水时直接返回原流水 ID，避免重复发放或扣减积分。
-            return Mono.just(NodeResult.ok(string(config, "nextNodeId", null),
-                    Map.of(MapFieldKeys.POINTS_LEDGER_ID, existing.getId(), MapFieldKeys.DUPLICATE, true)));
+            return NodeResult.ok(string(config, "nextNodeId", null),
+                    Map.of(MapFieldKeys.POINTS_LEDGER_ID, existing.getId(), MapFieldKeys.DUPLICATE, true));
         }
 
         CustomerPointsLedgerDO ledger = new CustomerPointsLedgerDO();
@@ -72,9 +81,18 @@ public class PointsOperationHandler implements NodeHandler {
             ledger.setExpiresAt(LocalDateTime.now().plusDays(days.longValue()));
         }
         ledger.setCreatedAt(LocalDateTime.now());
-        ledgerMapper.insert(ledger);
-        return Mono.just(NodeResult.ok(string(config, "nextNodeId", null),
-                Map.of(MapFieldKeys.POINTS_LEDGER_ID, ledger.getId(), MapFieldKeys.DUPLICATE, false)));
+        try {
+            ledgerMapper.insert(ledger);
+        } catch (DuplicateKeyException e) {
+            return NodeResult.ok(string(config, "nextNodeId", null),
+                    Map.of(MapFieldKeys.DUPLICATE, true, "idempotent", true));
+        }
+        Map<String, Object> output = new HashMap<>();
+        if (ledger.getId() != null) {
+            output.put(MapFieldKeys.POINTS_LEDGER_ID, ledger.getId());
+        }
+        output.put(MapFieldKeys.DUPLICATE, false);
+        return NodeResult.ok(string(config, "nextNodeId", null), output);
     }
 
     /**

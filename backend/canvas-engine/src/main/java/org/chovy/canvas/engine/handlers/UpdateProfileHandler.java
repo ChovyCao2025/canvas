@@ -13,6 +13,7 @@ import org.chovy.canvas.engine.handler.NodeHandlerType;
 import org.chovy.canvas.engine.handler.NodeResult;
 import org.springframework.stereotype.Component;
 import reactor.core.publisher.Mono;
+import reactor.core.scheduler.Schedulers;
 
 import java.time.LocalDateTime;
 import java.util.LinkedHashMap;
@@ -59,6 +60,13 @@ public class UpdateProfileHandler implements NodeHandler {
     @Override
     @SuppressWarnings("unchecked")
     public Mono<NodeResult> executeAsync(Map<String, Object> config, ExecutionContext ctx) {
+        return Mono.fromCallable(() -> executeBlocking(config, ctx))
+                .subscribeOn(Schedulers.boundedElastic())
+                .onErrorResume(e -> Mono.just(NodeResult.fail("UPDATE_PROFILE: " + e.getMessage())));
+    }
+
+    @SuppressWarnings("unchecked")
+    private NodeResult executeBlocking(Map<String, Object> config, ExecutionContext ctx) {
         CustomerProfileDO profile = profileMapper.selectOne(new LambdaQueryWrapper<CustomerProfileDO>()
                 .eq(CustomerProfileDO::getUserId, ctx.getUserId())
                 .last("LIMIT 1"));
@@ -84,7 +92,7 @@ public class UpdateProfileHandler implements NodeHandler {
         } else {
             profileMapper.updateById(profile);
         }
-        return Mono.just(NodeResult.ok(string(config, "nextNodeId", null), Map.of(MapFieldKeys.PROFILE_UPDATED, true)));
+        return NodeResult.ok(string(config, "nextNodeId", null), Map.of(MapFieldKeys.PROFILE_UPDATED, true));
     }
 
     /**

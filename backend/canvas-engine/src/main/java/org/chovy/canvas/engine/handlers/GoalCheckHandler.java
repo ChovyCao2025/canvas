@@ -14,6 +14,7 @@ import org.chovy.canvas.engine.wait.WaitSubscriptionService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import reactor.core.publisher.Mono;
+import reactor.core.scheduler.Schedulers;
 
 import java.time.Clock;
 import java.time.Duration;
@@ -112,9 +113,13 @@ public class GoalCheckHandler implements NodeHandler {
         String mode = string(config, "mode", "SYNC").toUpperCase();
         if ("ASYNC".equals(mode)) {
             // ASYNC 模式登记目标事件监听，先挂起当前流程。
-            return Mono.just(asyncWait(config, ctx));
+            return Mono.fromCallable(() -> asyncWait(config, ctx))
+                    .subscribeOn(Schedulers.boundedElastic())
+                    .onErrorResume(e -> Mono.just(NodeResult.fail("GOAL_CHECK: " + e.getMessage())));
         }
-        return Mono.just(syncCheck(config, ctx));
+        return Mono.fromCallable(() -> syncCheck(config, ctx))
+                .subscribeOn(Schedulers.boundedElastic())
+                .onErrorResume(e -> Mono.just(NodeResult.fail("GOAL_CHECK: " + e.getMessage())));
     }
 
     /**

@@ -14,6 +14,7 @@ import org.chovy.canvas.infrastructure.cache.CanvasConfigCache;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Component;
+import reactor.core.scheduler.Schedulers;
 
 import java.time.Duration;
 import java.util.HashMap;
@@ -86,13 +87,46 @@ public class CanvasTriggerHandler implements NodeHandler {
             return Mono.just(NodeResult.fail("CANVAS_TRIGGER 检测到循环调用: " + targetCanvasId));
         }
 
-        // 4) 校验目标画布存在且已发布（只有发布版本可被调用）
+        return Mono.fromCallable(() -> prepareTrigger(config, ctx, targetCanvasId, invokeMode, nextNodeId, paramMapping))
+                .subscribeOn(Schedulers.boundedElastic())
+                .flatMap(prepared -> {
+                    if (prepared.failure() != null) {
+                        return Mono.just(prepared.failure());
+                    }
+                    if ("ASYNC".equals(prepared.invokeMode())) {
+                        // ASYNC 模式 fire-and-forget，父流程立即继续，不合并子画布输出。
+                        dagEngine.execute(prepared.childGraph(), prepared.triggerNodeId(), prepared.childCtx()).subscribe();
+                        log.info("[CANVAS_TRIGGER] ASYNC 触发子画布 canvasId={}", prepared.targetCanvasId());
+                        return Mono.just(NodeResult.ok(prepared.nextNodeId(), Map.of()));
+                    }
+
+                    // SYNC：直接 flatMap 子执行链，无需 block()
+                    return dagEngine.execute(prepared.childGraph(), prepared.triggerNodeId(), prepared.childCtx())
+                            .map(result -> {
+                                log.info("[CANVAS_TRIGGER] SYNC 子画布完成 canvasId={}", prepared.targetCanvasId());
+                                // SYNC 模式把子画布最终输出合并回父流程当前节点输出。
+                                return NodeResult.ok(prepared.nextNodeId(), result != null ? result : Map.of());
+                            });
+                })
+                .onErrorResume(e -> {
+                    log.error("[CANVAS_TRIGGER] 执行失败: {}", e.getMessage());
+                    return Mono.just(NodeResult.fail("子画布执行失败: " + e.getMessage()));
+                });
+    }
+
+    private PreparedCanvasTrigger prepareTrigger(Map<String, Object> config,
+                                                 ExecutionContext ctx,
+                                                 Long targetCanvasId,
+                                                 String invokeMode,
+                                                 String nextNodeId,
+                                                 Map<String, Object> paramMapping) {
+        // 校验目标画布存在且已发布（只有发布版本可被调用）
         CanvasDO target = canvasMapper.selectById(targetCanvasId);
         if (target == null || target.getStatus() != 1) {
-            return Mono.just(NodeResult.fail("目标画布未发布: " + targetCanvasId));
+            return PreparedCanvasTrigger.failure(NodeResult.fail("目标画布未发布: " + targetCanvasId));
         }
 
-        // 5) 构造子执行上下文，继承用户与调用链信息
+        // 构造子执行上下文，继承用户与调用链信息
         ExecutionContext childCtx = new ExecutionContext();
         childCtx.setExecutionId(ctx.getExecutionId() + ":sub:" + UUID.randomUUID().toString().substring(0, 8));
         childCtx.setCanvasId(targetCanvasId);
@@ -100,39 +134,38 @@ public class CanvasTriggerHandler implements NodeHandler {
         childCtx.setUserId(ctx.getUserId());
         childCtx.setTriggerType("CANVAS_TRIGGER");
 
-        // 6) 按映射规则把父上下文字段写入子触发载荷
+        // 按映射规则把父上下文字段写入子触发载荷
         paramMapping.forEach((childKey, parentKeyObj) -> {
             String parentKey = String.valueOf(parentKeyObj).replace("ctx.", "");
             Object val = ctx.getContextValue(parentKey);
             if (val != null) childCtx.getTriggerPayload().put(childKey, val);
         });
 
-        // 7) 追加调用栈（用于下一层继续防循环）
+        // 追加调用栈（用于下一层继续防循环）
         childCtx.getCallStack().addAll(ctx.getCallStack());
         childCtx.getCallStack().add(ctx.getCanvasId());
 
-        // 8) 获取目标发布图并定位入口触发节点
+        // 获取目标发布图并定位入口触发节点
         DagGraph childGraph = configCache.get(targetCanvasId, target.getPublishedVersionId());
         String triggerNodeId = childGraph.entryNodes().isEmpty() ? null : childGraph.entryNodes().get(0);
-        if (triggerNodeId == null) return Mono.just(NodeResult.fail("目标画布无触发器节点"));
-
-        if ("ASYNC".equals(invokeMode)) {
-            // ASYNC 模式 fire-and-forget，父流程立即继续，不合并子画布输出。
-            dagEngine.execute(childGraph, triggerNodeId, childCtx).subscribe();
-            log.info("[CANVAS_TRIGGER] ASYNC 触发子画布 canvasId={}", targetCanvasId);
-            return Mono.just(NodeResult.ok(nextNodeId, Map.of()));
+        if (triggerNodeId == null) {
+            return PreparedCanvasTrigger.failure(NodeResult.fail("目标画布无触发器节点"));
         }
 
-        // SYNC：直接 flatMap 子执行链，无需 block()
-        return dagEngine.execute(childGraph, triggerNodeId, childCtx)
-                .map(result -> {
-                    log.info("[CANVAS_TRIGGER] SYNC 子画布完成 canvasId={}", targetCanvasId);
-                    // SYNC 模式把子画布最终输出合并回父流程当前节点输出。
-                    return NodeResult.ok(nextNodeId, result != null ? result : Map.of());
-                })
-                .onErrorResume(e -> {
-                    log.error("[CANVAS_TRIGGER] 执行失败: {}", e.getMessage());
-                    return Mono.just(NodeResult.fail("子画布执行失败: " + e.getMessage()));
-                });
+        return new PreparedCanvasTrigger(null, childGraph, triggerNodeId, childCtx, nextNodeId, invokeMode, targetCanvasId);
+    }
+
+    private record PreparedCanvasTrigger(
+            NodeResult failure,
+            DagGraph childGraph,
+            String triggerNodeId,
+            ExecutionContext childCtx,
+            String nextNodeId,
+            String invokeMode,
+            Long targetCanvasId
+    ) {
+        static PreparedCanvasTrigger failure(NodeResult failure) {
+            return new PreparedCanvasTrigger(failure, null, null, null, null, null, null);
+        }
     }
 }

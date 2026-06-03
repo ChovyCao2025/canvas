@@ -10,8 +10,10 @@ import org.chovy.canvas.engine.context.ExecutionContext;
 import org.chovy.canvas.engine.handler.NodeHandler;
 import org.chovy.canvas.engine.handler.NodeHandlerType;
 import org.chovy.canvas.engine.handler.NodeResult;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Component;
 import reactor.core.publisher.Mono;
+import reactor.core.scheduler.Schedulers;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -52,25 +54,37 @@ public class TagOperationHandler implements NodeHandler {
     @Override
     @SuppressWarnings("unchecked")
     public Mono<NodeResult> executeAsync(Map<String, Object> config, ExecutionContext ctx) {
+        return Mono.fromCallable(() -> executeBlocking(config, ctx))
+                .subscribeOn(Schedulers.boundedElastic())
+                .onErrorResume(e -> Mono.just(NodeResult.fail("TAG_OPERATION: " + e.getMessage())));
+    }
+
+    @SuppressWarnings("unchecked")
+    private NodeResult executeBlocking(Map<String, Object> config, ExecutionContext ctx) {
         List<Map<String, Object>> operations = (List<Map<String, Object>>) config.getOrDefault("operations", List.of());
         int changed = 0;
-        for (Map<String, Object> op : operations) {
-            String operation = string(op, "operation", "ADD");
-            List<Object> tags = (List<Object>) op.getOrDefault("tags", List.of());
-            for (Object tag : tags) {
-                if (tag == null || tag.toString().isBlank()) continue;
-                if ("REMOVE".equalsIgnoreCase(operation)) {
-                    // REMOVE 直接删除用户标签记录，是不可回滚的数据库副作用。
-                    changed += tagMapper.delete(new LambdaQueryWrapper<CustomerTagDO>()
-                            .eq(CustomerTagDO::getUserId, ctx.getUserId())
-                            .eq(CustomerTagDO::getTag, tag.toString()));
-                } else {
-                    upsertTag(ctx, tag.toString(), op);
-                    changed++;
+        try {
+            for (Map<String, Object> op : operations) {
+                String operation = string(op, "operation", "ADD");
+                List<Object> tags = (List<Object>) op.getOrDefault("tags", List.of());
+                for (Object tag : tags) {
+                    if (tag == null || tag.toString().isBlank()) continue;
+                    if ("REMOVE".equalsIgnoreCase(operation)) {
+                        // REMOVE 直接删除用户标签记录，是不可回滚的数据库副作用。
+                        changed += tagMapper.delete(new LambdaQueryWrapper<CustomerTagDO>()
+                                .eq(CustomerTagDO::getUserId, ctx.getUserId())
+                                .eq(CustomerTagDO::getTag, tag.toString()));
+                    } else {
+                        upsertTag(ctx, tag.toString(), op);
+                        changed++;
+                    }
                 }
             }
+        } catch (DuplicateKeyException e) {
+            return NodeResult.ok(string(config, "nextNodeId", null),
+                    Map.of(MapFieldKeys.TAGS_CHANGED, changed, "idempotent", true));
         }
-        return Mono.just(NodeResult.ok(string(config, "nextNodeId", null), Map.of(MapFieldKeys.TAGS_CHANGED, changed)));
+        return NodeResult.ok(string(config, "nextNodeId", null), Map.of(MapFieldKeys.TAGS_CHANGED, changed));
     }
 
     /**

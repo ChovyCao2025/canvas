@@ -11,6 +11,7 @@ import org.chovy.canvas.engine.handler.NodeHandlerType;
 import org.chovy.canvas.engine.handler.NodeResult;
 import org.springframework.stereotype.Component;
 import reactor.core.publisher.Mono;
+import reactor.core.scheduler.Schedulers;
 
 import java.util.Map;
 
@@ -58,6 +59,13 @@ public class TrackEventHandler implements NodeHandler {
         if (eventCode == null || eventCode.isBlank()) {
             return Mono.just(NodeResult.fail("TRACK_EVENT 必须配置 eventCode"));
         }
+        return Mono.fromCallable(() -> executeBlocking(config, ctx, eventCode))
+                .subscribeOn(Schedulers.boundedElastic())
+                .onErrorResume(e -> Mono.just(NodeResult.fail("TRACK_EVENT: " + e.getMessage())));
+    }
+
+    @SuppressWarnings("unchecked")
+    private NodeResult executeBlocking(Map<String, Object> config, ExecutionContext ctx, String eventCode) {
         Map<String, Object> attributes = config.get("attributes") instanceof Map<?, ?> map
                 ? (Map<String, Object>) map
                 : Map.of();
@@ -69,9 +77,9 @@ public class TrackEventHandler implements NodeHandler {
         event.setCanvasCount(0);
         // 事件追踪节点会落库一条 EventLog，供目标检测和后续分析复用。
         eventLogMapper.insert(event);
-        return Mono.just(NodeResult.ok(
+        return NodeResult.ok(
                 string(config, "nextNodeId", null),
-                Map.of(MapFieldKeys.EVENT_LOG_ID, event.getId())));
+                Map.of(MapFieldKeys.EVENT_LOG_ID, event.getId()));
     }
 
     /**

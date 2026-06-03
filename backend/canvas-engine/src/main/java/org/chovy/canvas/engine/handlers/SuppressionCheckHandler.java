@@ -9,6 +9,7 @@ import org.chovy.canvas.engine.handler.NodeResult;
 import org.chovy.canvas.engine.policy.MarketingPolicyService;
 import org.springframework.stereotype.Component;
 import reactor.core.publisher.Mono;
+import reactor.core.scheduler.Schedulers;
 
 import java.util.Map;
 
@@ -47,6 +48,12 @@ public class SuppressionCheckHandler implements NodeHandler {
      */
     @Override
     public Mono<NodeResult> executeAsync(Map<String, Object> config, ExecutionContext ctx) {
+        return Mono.fromCallable(() -> executeBlocking(config, ctx))
+                .subscribeOn(Schedulers.boundedElastic())
+                .onErrorResume(e -> Mono.just(NodeResult.fail("SUPPRESSION_CHECK: " + e.getMessage())));
+    }
+
+    private NodeResult executeBlocking(Map<String, Object> config, ExecutionContext ctx) {
         String channel = string(config, "channel", "ALL");
         String allowedNodeId = string(config, "allowedNodeId", string(config, "nextNodeId", null));
         String suppressedNodeId = string(config, "suppressedNodeId", null);
@@ -56,17 +63,17 @@ public class SuppressionCheckHandler implements NodeHandler {
         MarketingPolicyService.PolicyDecision consent = policyService.consentAllowed(
                 ctx.getUserId(), channel, requireConsent);
         if (!consent.allowed()) {
-            return Mono.just(NodeResult.suppressed(
-                    "suppressed", suppressedNodeId, consent.reasonCode(), consent.reasonMessage()));
+            return NodeResult.suppressed(
+                    "suppressed", suppressedNodeId, consent.reasonCode(), consent.reasonMessage());
         }
 
         MarketingPolicyService.PolicyDecision suppression = policyService.suppressionAllowed(ctx.getUserId(), channel);
         if (!suppression.allowed()) {
             // 命中退订、黑名单等抑制策略时走 suppressed 分支。
-            return Mono.just(NodeResult.suppressed(
-                    "suppressed", suppressedNodeId, suppression.reasonCode(), suppression.reasonMessage()));
+            return NodeResult.suppressed(
+                    "suppressed", suppressedNodeId, suppression.reasonCode(), suppression.reasonMessage());
         }
-        return Mono.just(NodeResult.routed("allowed", allowedNodeId, Map.of(MapFieldKeys.POLICY_ALLOWED, true)));
+        return NodeResult.routed("allowed", allowedNodeId, Map.of(MapFieldKeys.POLICY_ALLOWED, true));
     }
 
     /**

@@ -15,6 +15,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import reactor.core.publisher.Mono;
+import reactor.core.scheduler.Schedulers;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -83,6 +84,17 @@ public class ManualApprovalHandler implements NodeHandler {
         }
 
         // 首次进入：创建审批记录，挂起流程
+        return Mono.fromCallable(() -> createPendingApproval(config, ctx, nodeId, approvalId, onTimeout, timeoutHours))
+                .subscribeOn(Schedulers.boundedElastic());
+    }
+
+    @SuppressWarnings("unchecked")
+    private NodeResult createPendingApproval(Map<String, Object> config,
+                                             ExecutionContext ctx,
+                                             String nodeId,
+                                             String approvalId,
+                                             String onTimeout,
+                                             int timeoutHours) {
         List<String> approvers = (List<String>) config.getOrDefault("approvers", List.of());
         CanvasManualApprovalDO approval;
         try {
@@ -103,7 +115,7 @@ public class ManualApprovalHandler implements NodeHandler {
                     approvalId, approvers, timeoutHours);
         } catch (Exception e) {
             log.error("[MANUAL_APPROVAL] 创建审批记录失败: {}", e.getMessage());
-            return Mono.just(NodeResult.fail("创建审批记录失败: " + e.getMessage()));
+            return NodeResult.fail("创建审批记录失败: " + e.getMessage());
         }
 
         try {
@@ -117,11 +129,11 @@ public class ManualApprovalHandler implements NodeHandler {
                 log.error("[MANUAL_APPROVAL] 审批通知失败后的补偿删除也失败 approvalId={}: {}",
                         approvalId, cleanupError.getMessage());
             }
-            return Mono.just(NodeResult.fail("审批通知发送失败: " + e.getMessage()));
+            return NodeResult.fail("审批通知发送失败: " + e.getMessage());
         }
 
         // 返回 PENDING，由 DagEngine 统一写 WAITING 并停止下游调度。
-        return Mono.just(NodeResult.pending(null, "MANUAL_APPROVAL_PENDING", "等待人工审批"));
+        return NodeResult.pending(null, "MANUAL_APPROVAL_PENDING", "等待人工审批");
     }
 
     /**

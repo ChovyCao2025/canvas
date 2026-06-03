@@ -8,6 +8,7 @@ import org.chovy.canvas.engine.handler.NodeHandlerType;
 import org.chovy.canvas.engine.handler.NodeResult;
 import org.springframework.stereotype.Component;
 import reactor.core.publisher.Mono;
+import reactor.core.scheduler.Schedulers;
 
 import java.util.Map;
 
@@ -59,23 +60,27 @@ public class CdpTagWriteHandler implements NodeHandler {
         String sourceRefId = ctx.getExecutionId();
         String idempotencyKey = sourceRefId + ":CDP_TAG_WRITE:" + userId + ":" + tagCode;
 
-        // setTag 是外部 CDP 写入副作用，幂等键确保同一执行重试不会重复写标签。
-        tagService.setTag(userId, new CdpTagWriteReq(
-                tagCode,
-                tagValue,
-                reason,
-                null,
-                "CANVAS",
-                sourceRefId,
-                null,
-                idempotencyKey
-        ));
+        return Mono.fromCallable(() -> {
+                    // setTag 是外部 CDP 写入副作用，幂等键确保同一执行重试不会重复写标签。
+                    tagService.setTag(userId, new CdpTagWriteReq(
+                            tagCode,
+                            tagValue,
+                            reason,
+                            null,
+                            "CANVAS",
+                            sourceRefId,
+                            null,
+                            idempotencyKey
+                    ));
 
-        return Mono.just(NodeResult.ok(nextNodeId, Map.of(
-                "tagCode", tagCode,
-                "tagValue", tagValue,
-                "tagWriteStatus", "SUCCESS"
-        )));
+                    return NodeResult.ok(nextNodeId, Map.of(
+                            "tagCode", tagCode,
+                            "tagValue", tagValue,
+                            "tagWriteStatus", "SUCCESS"
+                    ));
+                })
+                .subscribeOn(Schedulers.boundedElastic())
+                .onErrorResume(e -> Mono.just(NodeResult.fail("CDP_TAG_WRITE: " + e.getMessage())));
     }
 
     /**

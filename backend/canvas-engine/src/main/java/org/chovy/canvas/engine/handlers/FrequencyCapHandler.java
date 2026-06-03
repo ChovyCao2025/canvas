@@ -9,6 +9,7 @@ import org.chovy.canvas.engine.handler.NodeResult;
 import org.chovy.canvas.engine.policy.MarketingPolicyService;
 import org.springframework.stereotype.Component;
 import reactor.core.publisher.Mono;
+import reactor.core.scheduler.Schedulers;
 
 import java.time.Duration;
 import java.util.Map;
@@ -48,6 +49,12 @@ public class FrequencyCapHandler implements NodeHandler {
      */
     @Override
     public Mono<NodeResult> executeAsync(Map<String, Object> config, ExecutionContext ctx) {
+        return Mono.fromCallable(() -> executeBlocking(config, ctx))
+                .subscribeOn(Schedulers.boundedElastic())
+                .onErrorResume(e -> Mono.just(NodeResult.fail("FREQUENCY_CAP: " + e.getMessage())));
+    }
+
+    private NodeResult executeBlocking(Map<String, Object> config, ExecutionContext ctx) {
         String nodeId = string(config, "__nodeId", "frequency-cap");
         String scope = string(config, "scope", "JOURNEY");
         String channel = string(config, "channel", "ALL");
@@ -63,10 +70,10 @@ public class FrequencyCapHandler implements NodeHandler {
                 ctx.getUserId(), ctx.getCanvasId(), nodeId, scope, channel, maxCount, window);
         if (!decision.allowed()) {
             // 超出频控时返回 suppressed，调度层可记录抑制原因并走 capped 分支。
-            return Mono.just(NodeResult.suppressed(
-                    "capped", cappedNodeId, decision.reasonCode(), decision.reasonMessage()));
+            return NodeResult.suppressed(
+                    "capped", cappedNodeId, decision.reasonCode(), decision.reasonMessage());
         }
-        return Mono.just(NodeResult.routed("pass", passNodeId, Map.of(MapFieldKeys.FREQUENCY_ALLOWED, true)));
+        return NodeResult.routed("pass", passNodeId, Map.of(MapFieldKeys.FREQUENCY_ALLOWED, true));
     }
 
     /**

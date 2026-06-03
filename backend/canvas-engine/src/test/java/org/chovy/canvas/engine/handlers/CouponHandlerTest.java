@@ -8,13 +8,17 @@ import org.chovy.canvas.config.WebClientConfig;
 import org.chovy.canvas.engine.context.ExecutionContext;
 import org.chovy.canvas.engine.handler.NodeResult;
 import org.junit.jupiter.api.Test;
+import org.springframework.http.HttpStatus;
+import org.springframework.web.reactive.function.client.ClientResponse;
 import org.springframework.web.reactive.function.client.WebClient;
+import reactor.core.publisher.Mono;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -73,6 +77,28 @@ class CouponHandlerTest {
         } finally {
             server.stop(0);
         }
+    }
+
+    @Test
+    void rejectsMissingCouponTypeKeyWithoutCallingCouponService() {
+        AtomicBoolean called = new AtomicBoolean(false);
+        WebClient.Builder builder = WebClient.builder().exchangeFunction(request -> {
+            called.set(true);
+            return Mono.just(ClientResponse.create(HttpStatus.OK)
+                    .header("Content-Type", "application/json")
+                    .body("{\"status\":\"SUCCESS\",\"couponId\":\"coupon-1\"}")
+                    .build());
+        });
+        CouponHandler handler = new CouponHandler(builder, "http://coupon.local");
+        ExecutionContext ctx = new ExecutionContext();
+        ctx.setExecutionId("exec-1");
+        ctx.setUserId("user-1");
+
+        NodeResult result = handler.executeAsync(Map.of(), ctx).block();
+
+        assertThat(result.success()).isFalse();
+        assertThat(result.errorMessage()).contains("couponTypeKey");
+        assertThat(called).isFalse();
     }
 
     private HttpServer couponServer(AtomicReference<Map<String, Object>> capturedBody) throws IOException {

@@ -10,6 +10,7 @@ import org.chovy.canvas.engine.handler.NodeHandlerType;
 import org.chovy.canvas.engine.handler.NodeResult;
 import org.springframework.stereotype.Component;
 import reactor.core.publisher.Mono;
+import reactor.core.scheduler.Schedulers;
 
 import java.time.LocalDateTime;
 import java.util.Map;
@@ -48,6 +49,12 @@ public class CreateTaskHandler implements NodeHandler {
      */
     @Override
     public Mono<NodeResult> executeAsync(Map<String, Object> config, ExecutionContext ctx) {
+        return Mono.fromCallable(() -> executeBlocking(config, ctx))
+                .subscribeOn(Schedulers.boundedElastic())
+                .onErrorResume(e -> Mono.just(NodeResult.fail("CREATE_TASK: " + e.getMessage())));
+    }
+
+    private NodeResult executeBlocking(Map<String, Object> config, ExecutionContext ctx) {
         CustomerTaskRecordDO task = new CustomerTaskRecordDO();
         task.setUserId(ctx.getUserId());
         task.setTaskType(string(config, "taskType", "FOLLOW_UP"));
@@ -64,7 +71,7 @@ public class CreateTaskHandler implements NodeHandler {
         task.setUpdatedAt(task.getCreatedAt());
         // 创建任务是 CRM 侧副作用，插入成功后把 taskId 写回上下文。
         taskMapper.insert(task);
-        return Mono.just(NodeResult.ok(string(config, "nextNodeId", null), Map.of(MapFieldKeys.TASK_ID, task.getId())));
+        return NodeResult.ok(string(config, "nextNodeId", null), Map.of(MapFieldKeys.TASK_ID, task.getId()));
     }
 
     /**
