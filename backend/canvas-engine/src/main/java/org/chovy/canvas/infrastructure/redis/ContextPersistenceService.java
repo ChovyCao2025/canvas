@@ -19,6 +19,8 @@ import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
 
 /**
  * ExecutionContext 在 Redis 中的持久化（多阶段执行挂起/恢复）。
@@ -88,8 +90,11 @@ public class ContextPersistenceService {
             // 恢复执行直接反序列化完整上下文，保持挂起前的节点状态和用户变量。
             ExecutionContext ctx = objectMapper.readValue(json, ExecutionContext.class);
             ctx.rebuildDerivedState();
+            mergeIncrementalNodeStates(ctx);
             emitContextTrace(ctx, "CONTEXT_LOAD");
             return ctx;
+        } catch (IllegalStateException e) {
+            throw e;
         } catch (Exception e) {
             log.error("反序列化 ExecutionContext 失败: {}", e.getMessage());
             return null;
@@ -106,51 +111,96 @@ public class ContextPersistenceService {
         return redis.hasKey(keys.context(canvasId, userId));
     }
 
-    /** 增量保存单节点状态和输出；失败只记录日志，不阻断 DAG 执行。 */
+    /** 增量保存单节点状态和输出；失败时抛出异常，由调用方决定是否 fail-closed。 */
     public void saveNodeState(String executionId, String nodeId, NodeStatus status, Map<String, Object> output) {
+        String key = keys.nodeState(executionId, nodeId);
+        String indexKey = keys.nodeStateIndex(executionId);
+        String resetKey = keys.nodeStateResetIndex(executionId);
+        boolean hashWriteAttempted = false;
+        boolean hashCleaned = false;
         try {
-            String key = keys.nodeState(executionId, nodeId);
+            Long added = redis.opsForSet().add(indexKey, nodeId);
+            if (added == null) {
+                throw new IllegalStateException("Failed to index node state");
+            }
+            if (!Boolean.TRUE.equals(redis.expire(indexKey, Duration.ofSeconds(ttlSec)))) {
+                throw new IllegalStateException("Failed to refresh node state index TTL");
+            }
             Map<String, String> fields = new LinkedHashMap<>();
             fields.put("status", status.name());
             fields.put("output", objectMapper.writeValueAsString(output == null ? Map.of() : output));
+            hashWriteAttempted = true;
             redis.opsForHash().putAll(key, fields);
             if (!Boolean.TRUE.equals(redis.expire(key, Duration.ofSeconds(ttlSec)))) {
                 redis.delete(key);
+                hashCleaned = true;
                 log.warn("[CTX] 节点增量状态 TTL 刷新失败，已删除 key={} executionId={} nodeId={}",
                         key, executionId, nodeId);
+                throw new IllegalStateException("Failed to refresh node state TTL");
             }
+            redis.opsForSet().remove(resetKey, nodeId);
         } catch (Exception e) {
+            if (hashWriteAttempted && !hashCleaned) {
+                try {
+                    redis.delete(key);
+                } catch (Exception deleteError) {
+                    log.warn("[CTX] 节点增量状态 TTL 异常后删除失败 key={} executionId={} nodeId={}: {}",
+                            key, executionId, nodeId, deleteError.getMessage());
+                }
+            }
             log.warn("[CTX] 保存节点增量状态失败 executionId={} nodeId={}: {}",
                     executionId, nodeId, e.getMessage());
+            throw new IllegalStateException("Failed to save node state to Redis", e);
         }
     }
 
     /** 删除单节点增量状态。 */
     public void deleteNodeState(String executionId, String nodeId) {
+        String resetKey = keys.nodeStateResetIndex(executionId);
         try {
+            markNodeStateReset(executionId, nodeId, resetKey);
             redis.delete(keys.nodeState(executionId, nodeId));
+            redis.opsForSet().remove(keys.nodeStateIndex(executionId), nodeId);
         } catch (Exception e) {
             log.warn("[CTX] 删除节点增量状态失败 executionId={} nodeId={}: {}",
                     executionId, nodeId, e.getMessage());
+            throw new IllegalStateException("Failed to delete node state from Redis", e);
+        }
+    }
+
+    private void markNodeStateReset(String executionId, String nodeId, String resetKey) {
+        Long added = redis.opsForSet().add(resetKey, nodeId);
+        if (added == null) {
+            throw new IllegalStateException("Failed to mark node state reset");
+        }
+        if (!Boolean.TRUE.equals(redis.expire(resetKey, Duration.ofSeconds(ttlSec)))) {
+            throw new IllegalStateException("Failed to refresh node state reset marker TTL");
         }
     }
 
     /** 加载单节点增量状态；不存在或状态不可解析时返回 null。 */
     public NodeState loadNodeState(String executionId, String nodeId) {
+        Map<Object, Object> fields;
         try {
-            Map<Object, Object> fields = redis.opsForHash().entries(keys.nodeState(executionId, nodeId));
-            if (fields == null || fields.isEmpty()) {
-                return null;
-            }
-            Object rawStatus = fields.get("status");
-            if (rawStatus == null) {
-                return null;
-            }
+            fields = redis.opsForHash().entries(keys.nodeState(executionId, nodeId));
+        } catch (Exception e) {
+            log.error("[CTX] 读取节点增量状态失败，恢复路径 fail-closed executionId={} nodeId={}: {}",
+                    executionId, nodeId, e.getMessage());
+            throw new IllegalStateException("Failed to load node state from Redis", e);
+        }
+        if (fields == null || fields.isEmpty()) {
+            return null;
+        }
+        Object rawStatus = fields.get("status");
+        if (rawStatus == null) {
+            return null;
+        }
+        try {
             NodeStatus status = NodeStatus.valueOf(rawStatus.toString());
             return new NodeState(status, parseNodeOutput(executionId, nodeId, fields.get("output")));
-        } catch (Exception e) {
-            log.warn("[CTX] 加载节点增量状态失败 executionId={} nodeId={}: {}",
-                    executionId, nodeId, e.getMessage());
+        } catch (IllegalArgumentException e) {
+            log.warn("[CTX] 节点状态不可解析 executionId={} nodeId={} status={}: {}",
+                    executionId, nodeId, rawStatus, e.getMessage());
             return null;
         }
     }
@@ -170,17 +220,62 @@ public class ContextPersistenceService {
         return states;
     }
 
+    private void mergeIncrementalNodeStates(ExecutionContext ctx) {
+        String executionId = ctx.getExecutionId();
+        if (executionId == null || executionId.isBlank()) {
+            return;
+        }
+        try {
+            Set<String> resetNodeIdSet = redis.opsForSet().members(keys.nodeStateResetIndex(executionId));
+            if (resetNodeIdSet != null && !resetNodeIdSet.isEmpty()) {
+                List<String> resetNodeIds = resetNodeIdSet.stream()
+                        .filter(nodeId -> nodeId != null && !nodeId.isBlank())
+                        .sorted()
+                        .toList();
+                if (!resetNodeIds.isEmpty()) {
+                    throw new IllegalStateException("Pending node state reset markers: " + resetNodeIds);
+                }
+            }
+            Set<String> nodeIds = redis.opsForSet().members(keys.nodeStateIndex(executionId));
+            if (nodeIds == null || nodeIds.isEmpty()) {
+                return;
+            }
+            for (String nodeId : nodeIds) {
+                if (nodeId == null || nodeId.isBlank()) {
+                    continue;
+                }
+                NodeState state = loadNodeState(executionId, nodeId);
+                if (state == null) {
+                    throw new IllegalStateException("Missing indexed node state: " + nodeId);
+                }
+                ctx.setNodeStatus(nodeId, state.status());
+                ctx.putNodeOutput(nodeId, state.output());
+            }
+            ctx.rebuildDerivedState();
+        } catch (Exception e) {
+            log.error("[CTX] 合并节点增量状态失败，恢复路径 fail-closed executionId={}: {}",
+                    executionId, e.getMessage());
+            throw new IllegalStateException("Failed to merge incremental node states", e);
+        }
+    }
+
     /**
      * 尝试获取跨 JVM 节点执行门控。
      *
-     * <p>使用 Redis SETNX + TTL 作为 crash-safe barrier。Redis 异常时 fail closed，
-     * 返回 false，避免在无法确认互斥状态时重复执行有副作用的节点。
+     * <p>使用 Redis Lua SET NX + TTL 作为 crash-safe barrier。获取失败时同脚本写入
+     * repeat 信号，避免 SETNX 失败与 repeat 标记之间的竞态窗口。Redis 异常时
+     * fail closed，返回 false，避免在无法确认互斥状态时重复执行有副作用的节点。
      */
-    public boolean tryAcquireNodeGate(String executionId, String nodeId, Duration ttl) {
+    public boolean tryAcquireNodeGate(String executionId, String nodeId, String ownerToken, Duration ttl) {
         try {
+            Objects.requireNonNull(ownerToken, "ownerToken must not be null");
             Duration effectiveTtl = ttl == null ? Duration.ofSeconds(ttlSec) : ttl;
-            return Boolean.TRUE.equals(
-                    redis.opsForValue().setIfAbsent(keys.gate(executionId, nodeId), "1", effectiveTtl));
+            long ttlMs = Math.max(1L, effectiveTtl.toMillis());
+            Long acquired = redis.execute(NODE_GATE_ACQUIRE_SCRIPT,
+                    List.of(keys.gate(executionId, nodeId), keys.gateRepeat(executionId, nodeId)),
+                    ownerToken,
+                    Long.toString(ttlMs));
+            return Long.valueOf(1L).equals(acquired);
         } catch (Exception e) {
             log.warn("[CTX] 获取节点 Redis gate 失败，已 fail-closed executionId={} nodeId={}: {}",
                     executionId, nodeId, e.getMessage());
@@ -192,15 +287,48 @@ public class ContextPersistenceService {
      * 释放跨 JVM 节点执行门控。
      *
      * <p>释放失败只记录日志，gate TTL 会兜底清理，避免释放异常改写业务执行结果。
+     *
+     * @return true 表示释放前存在 repeat 信号且已被原子消费；调用方可立即重入执行
      */
-    public void releaseNodeGate(String executionId, String nodeId) {
+    public boolean releaseNodeGate(String executionId, String nodeId, String ownerToken) {
+        if (ownerToken == null || ownerToken.isBlank()) {
+            log.warn("[CTX] 跳过节点 Redis gate 释放，ownerToken 为空 executionId={} nodeId={}",
+                    executionId, nodeId);
+            return false;
+        }
         try {
-            redis.delete(keys.gate(executionId, nodeId));
+            Long repeat = redis.execute(NODE_GATE_RELEASE_SCRIPT,
+                    List.of(keys.gate(executionId, nodeId), keys.gateRepeat(executionId, nodeId)),
+                    ownerToken);
+            return Long.valueOf(1L).equals(repeat);
         } catch (Exception e) {
             log.warn("[CTX] 释放节点 Redis gate 失败 executionId={} nodeId={}: {}",
                     executionId, nodeId, e.getMessage());
+            return false;
         }
     }
+
+    /** 节点 gate 释放脚本：只允许当前 owner 删除锁，并原子消费释放前 repeat 信号。 */
+    private static final RedisScript<Long> NODE_GATE_RELEASE_SCRIPT = RedisScript.of(
+            "if redis.call('GET', KEYS[1]) == ARGV[1] then "
+                    + "local repeat = redis.call('GET', KEYS[2]); "
+                    + "redis.call('DEL', KEYS[1]); "
+                    + "if repeat then redis.call('DEL', KEYS[2]); return 1 else return 0 end "
+                    + "else return 0 end",
+            Long.class
+    );
+
+    /** 节点 gate 获取脚本：获取失败时在同一 Redis 原子操作内写入 repeat 信号。 */
+    private static final RedisScript<Long> NODE_GATE_ACQUIRE_SCRIPT = RedisScript.of(
+            "if redis.call('SET', KEYS[1], ARGV[1], 'NX', 'PX', ARGV[2]) then "
+                    + "redis.call('DEL', KEYS[2]); "
+                    + "return 1 "
+                    + "else "
+                    + "redis.call('SET', KEYS[2], '1', 'PX', ARGV[2]); "
+                    + "return 0 "
+                    + "end",
+            Long.class
+    );
 
     private Map<String, Object> parseNodeOutput(String executionId, String nodeId, Object rawOutput) {
         if (rawOutput == null || rawOutput.toString().isBlank()) {
@@ -214,7 +342,7 @@ public class ContextPersistenceService {
         } catch (Exception e) {
             log.warn("[CTX] 节点输出 JSON 解析失败 executionId={} nodeId={}: {}",
                     executionId, nodeId, e.getMessage());
-            return Map.of();
+            throw new IllegalStateException("Failed to parse node output from Redis", e);
         }
     }
 

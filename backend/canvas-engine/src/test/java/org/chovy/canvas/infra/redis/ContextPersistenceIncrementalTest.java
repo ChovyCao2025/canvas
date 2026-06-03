@@ -7,7 +7,10 @@ import org.chovy.canvas.infrastructure.redis.ContextPersistenceService;
 import org.chovy.canvas.infrastructure.redis.RedisKeyUtil;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.mockito.InOrder;
+import org.springframework.data.redis.RedisConnectionFailureException;
 import org.springframework.data.redis.core.HashOperations;
+import org.springframework.data.redis.core.SetOperations;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.test.util.ReflectionTestUtils;
 
@@ -16,9 +19,13 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.anyMap;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -29,8 +36,12 @@ class ContextPersistenceIncrementalTest {
         ObjectMapper objectMapper = new ObjectMapper();
         StringRedisTemplate redis = mock(StringRedisTemplate.class);
         HashOperations<String, Object, Object> hashes = mock(HashOperations.class);
+        SetOperations<String, String> sets = mock(SetOperations.class);
         when(redis.opsForHash()).thenReturn(hashes);
+        when(redis.opsForSet()).thenReturn(sets);
         when(redis.expire("canvas:node-state:exec-1:node-1", Duration.ofSeconds(123))).thenReturn(true);
+        when(sets.add("canvas:node-state-index:exec-1", "node-1")).thenReturn(1L);
+        when(redis.expire("canvas:node-state-index:exec-1", Duration.ofSeconds(123))).thenReturn(true);
         ContextPersistenceService service = service(redis, objectMapper);
         Map<String, Object> output = new LinkedHashMap<>();
         output.put("amount", 42);
@@ -45,30 +56,155 @@ class ContextPersistenceIncrementalTest {
                 .containsEntry("amount", 42)
                 .containsEntry("ok", true);
         verify(redis).expire("canvas:node-state:exec-1:node-1", Duration.ofSeconds(123));
+        verify(sets).add("canvas:node-state-index:exec-1", "node-1");
+        verify(redis).expire("canvas:node-state-index:exec-1", Duration.ofSeconds(123));
+    }
+
+    @Test
+    void saveNodeState_indexesNodeBeforeWritingHash() {
+        StringRedisTemplate redis = mock(StringRedisTemplate.class);
+        HashOperations<String, Object, Object> hashes = mock(HashOperations.class);
+        SetOperations<String, String> sets = mock(SetOperations.class);
+        when(redis.opsForHash()).thenReturn(hashes);
+        when(redis.opsForSet()).thenReturn(sets);
+        when(sets.add("canvas:node-state-index:exec-1", "node-1")).thenReturn(1L);
+        when(redis.expire("canvas:node-state-index:exec-1", Duration.ofSeconds(123))).thenReturn(true);
+        when(redis.expire("canvas:node-state:exec-1:node-1", Duration.ofSeconds(123))).thenReturn(true);
+        ContextPersistenceService service = service(redis);
+
+        service.saveNodeState("exec-1", "node-1", NodeStatus.SUCCESS, Map.of());
+
+        InOrder order = inOrder(sets, hashes);
+        order.verify(sets).add("canvas:node-state-index:exec-1", "node-1");
+        order.verify(hashes).putAll(eq("canvas:node-state:exec-1:node-1"), anyMap());
     }
 
     @Test
     void saveNodeState_deletesHashWhenTtlRefreshFails() {
         StringRedisTemplate redis = mock(StringRedisTemplate.class);
         HashOperations<String, Object, Object> hashes = mock(HashOperations.class);
+        SetOperations<String, String> sets = mock(SetOperations.class);
         when(redis.opsForHash()).thenReturn(hashes);
+        when(redis.opsForSet()).thenReturn(sets);
+        when(sets.add("canvas:node-state-index:exec-1", "node-1")).thenReturn(1L);
+        when(redis.expire("canvas:node-state-index:exec-1", Duration.ofSeconds(123))).thenReturn(true);
         when(redis.expire("canvas:node-state:exec-1:node-1", Duration.ofSeconds(123))).thenReturn(false);
         ContextPersistenceService service = service(redis);
 
-        service.saveNodeState("exec-1", "node-1", NodeStatus.SUCCESS, Map.of());
+        assertThatThrownBy(() -> service.saveNodeState("exec-1", "node-1", NodeStatus.SUCCESS, Map.of()))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("Failed to save node state to Redis");
 
         verify(hashes).putAll(eq("canvas:node-state:exec-1:node-1"), anyMap());
         verify(redis).delete("canvas:node-state:exec-1:node-1");
+        verify(sets, never()).remove("canvas:node-state-index:exec-1", "node-1");
+    }
+
+    @Test
+    void saveNodeState_deletesHashWhenTtlRefreshThrows() {
+        StringRedisTemplate redis = mock(StringRedisTemplate.class);
+        HashOperations<String, Object, Object> hashes = mock(HashOperations.class);
+        SetOperations<String, String> sets = mock(SetOperations.class);
+        when(redis.opsForHash()).thenReturn(hashes);
+        when(redis.opsForSet()).thenReturn(sets);
+        when(sets.add("canvas:node-state-index:exec-1", "node-1")).thenReturn(1L);
+        when(redis.expire("canvas:node-state-index:exec-1", Duration.ofSeconds(123))).thenReturn(true);
+        when(redis.expire("canvas:node-state:exec-1:node-1", Duration.ofSeconds(123)))
+                .thenThrow(new RedisConnectionFailureException("redis down"));
+        ContextPersistenceService service = service(redis);
+
+        assertThatThrownBy(() -> service.saveNodeState("exec-1", "node-1", NodeStatus.SUCCESS, Map.of()))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("Failed to save node state to Redis");
+
+        verify(hashes).putAll(eq("canvas:node-state:exec-1:node-1"), anyMap());
+        verify(redis).delete("canvas:node-state:exec-1:node-1");
+        verify(sets, never()).remove("canvas:node-state-index:exec-1", "node-1");
+    }
+
+    @Test
+    void saveNodeState_deletesHashWhenHashWriteThrows() {
+        StringRedisTemplate redis = mock(StringRedisTemplate.class);
+        HashOperations<String, Object, Object> hashes = mock(HashOperations.class);
+        SetOperations<String, String> sets = mock(SetOperations.class);
+        when(redis.opsForHash()).thenReturn(hashes);
+        when(redis.opsForSet()).thenReturn(sets);
+        when(sets.add("canvas:node-state-index:exec-1", "node-1")).thenReturn(1L);
+        when(redis.expire("canvas:node-state-index:exec-1", Duration.ofSeconds(123))).thenReturn(true);
+        doThrow(new RedisConnectionFailureException("redis down"))
+                .when(hashes).putAll(eq("canvas:node-state:exec-1:node-1"), anyMap());
+        ContextPersistenceService service = service(redis);
+
+        assertThatThrownBy(() -> service.saveNodeState("exec-1", "node-1", NodeStatus.SUCCESS, Map.of()))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("Failed to save node state to Redis");
+
+        verify(redis).delete("canvas:node-state:exec-1:node-1");
+        verify(sets, never()).remove("canvas:node-state-index:exec-1", "node-1");
+    }
+
+    @Test
+    void deleteNodeState_keepsResetMarkerWhenResetMarkerTtlFails() {
+        StringRedisTemplate redis = mock(StringRedisTemplate.class);
+        SetOperations<String, String> sets = mock(SetOperations.class);
+        when(redis.opsForSet()).thenReturn(sets);
+        when(sets.add("canvas:node-state-reset:exec-1", "node-1")).thenReturn(1L);
+        when(redis.expire("canvas:node-state-reset:exec-1", Duration.ofSeconds(123))).thenReturn(false);
+        ContextPersistenceService service = service(redis);
+
+        assertThatThrownBy(() -> service.deleteNodeState("exec-1", "node-1"))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("Failed to delete node state from Redis");
+
+        verify(sets, never()).remove("canvas:node-state-reset:exec-1", "node-1");
+        verify(redis, never()).delete("canvas:node-state:exec-1:node-1");
     }
 
     @Test
     void deleteNodeState_deletesRedisKey() {
         StringRedisTemplate redis = mock(StringRedisTemplate.class);
+        SetOperations<String, String> sets = mock(SetOperations.class);
+        when(redis.opsForSet()).thenReturn(sets);
+        when(sets.add("canvas:node-state-reset:exec-1", "node-1")).thenReturn(1L);
+        when(redis.expire("canvas:node-state-reset:exec-1", Duration.ofSeconds(123))).thenReturn(true);
         ContextPersistenceService service = service(redis);
 
         service.deleteNodeState("exec-1", "node-1");
 
         verify(redis).delete("canvas:node-state:exec-1:node-1");
+        verify(sets).remove("canvas:node-state-index:exec-1", "node-1");
+    }
+
+    @Test
+    void deleteNodeState_marksResetBeforeDeletingHash() {
+        StringRedisTemplate redis = mock(StringRedisTemplate.class);
+        SetOperations<String, String> sets = mock(SetOperations.class);
+        when(redis.opsForSet()).thenReturn(sets);
+        when(sets.add("canvas:node-state-reset:exec-1", "node-1")).thenReturn(1L);
+        when(redis.expire("canvas:node-state-reset:exec-1", Duration.ofSeconds(123))).thenReturn(true);
+        ContextPersistenceService service = service(redis);
+
+        service.deleteNodeState("exec-1", "node-1");
+
+        InOrder order = inOrder(sets, redis);
+        order.verify(sets).add("canvas:node-state-reset:exec-1", "node-1");
+        order.verify(redis).delete("canvas:node-state:exec-1:node-1");
+    }
+
+    @Test
+    void deleteNodeState_failsClosedWhenRedisDeleteFails() {
+        StringRedisTemplate redis = mock(StringRedisTemplate.class);
+        SetOperations<String, String> sets = mock(SetOperations.class);
+        when(redis.opsForSet()).thenReturn(sets);
+        when(sets.add("canvas:node-state-reset:exec-1", "node-1")).thenReturn(1L);
+        when(redis.expire("canvas:node-state-reset:exec-1", Duration.ofSeconds(123))).thenReturn(true);
+        when(redis.delete("canvas:node-state:exec-1:node-1"))
+                .thenThrow(new RedisConnectionFailureException("redis down"));
+        ContextPersistenceService service = service(redis);
+
+        assertThatThrownBy(() -> service.deleteNodeState("exec-1", "node-1"))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("Failed to delete node state from Redis");
     }
 
     @Test
@@ -100,7 +236,21 @@ class ContextPersistenceIncrementalTest {
     }
 
     @Test
-    void loadNodeState_returnsEmptyOutputWhenOutputJsonInvalid() {
+    void loadNodeState_failsClosedWhenRedisReadFails() {
+        StringRedisTemplate redis = mock(StringRedisTemplate.class);
+        HashOperations<String, Object, Object> hashes = mock(HashOperations.class);
+        when(redis.opsForHash()).thenReturn(hashes);
+        when(hashes.entries("canvas:node-state:exec-1:node-1"))
+                .thenThrow(new RedisConnectionFailureException("redis down"));
+        ContextPersistenceService service = service(redis);
+
+        assertThatThrownBy(() -> service.loadNodeState("exec-1", "node-1"))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("Failed to load node state from Redis");
+    }
+
+    @Test
+    void loadNodeState_failsClosedWhenOutputJsonInvalid() {
         StringRedisTemplate redis = mock(StringRedisTemplate.class);
         HashOperations<String, Object, Object> hashes = mock(HashOperations.class);
         when(redis.opsForHash()).thenReturn(hashes);
@@ -110,10 +260,9 @@ class ContextPersistenceIncrementalTest {
         ));
         ContextPersistenceService service = service(redis);
 
-        ContextPersistenceService.NodeState loaded = service.loadNodeState("exec-1", "node-1");
-
-        assertThat(loaded.status()).isEqualTo(NodeStatus.FAILED);
-        assertThat(loaded.output()).isEmpty();
+        assertThatThrownBy(() -> service.loadNodeState("exec-1", "node-1"))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("Failed to parse node output from Redis");
     }
 
     private ContextPersistenceService service(StringRedisTemplate redis) {

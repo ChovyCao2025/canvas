@@ -8,15 +8,20 @@ import org.chovy.canvas.dal.dataobject.CanvasDO;
 import org.chovy.canvas.dal.dataobject.CanvasExecutionDO;
 import org.chovy.canvas.dal.mapper.CanvasExecutionMapper;
 import org.chovy.canvas.domain.cdp.CdpUserService;
+import org.chovy.canvas.engine.context.ExecutionContext;
+import org.chovy.canvas.engine.context.NodeStatus;
+import org.chovy.canvas.engine.dag.DagGraph;
 import org.chovy.canvas.engine.dag.DagParser;
 import org.chovy.canvas.engine.disruptor.CanvasDisruptorService;
 import org.chovy.canvas.engine.handlers.MqTriggerHandler;
 import org.chovy.canvas.engine.lane.ExecutionLaneResolver;
 import org.chovy.canvas.engine.scheduler.DagEngine;
+import org.chovy.canvas.engine.scheduler.NodeStatePersistenceException;
 import org.chovy.canvas.infrastructure.cache.CanvasConfigCache;
 import org.chovy.canvas.infrastructure.cache.CanvasEntityCache;
 import org.chovy.canvas.infrastructure.redis.ContextPersistenceService;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.springframework.test.util.ReflectionTestUtils;
 import reactor.core.publisher.Mono;
 
@@ -106,6 +111,35 @@ class CanvasExecutionServiceResumeTest {
                 false);
 
         assertThat(ReflectionTestUtils.getField(admission, "admissionLimit")).isEqualTo(50);
+    }
+
+    @Test
+    void nodeStatePersistenceErrorWithWaitingNodeDoesNotSavePausedContext() {
+        CanvasExecutionMapper mapper = mock(CanvasExecutionMapper.class);
+        when(mapper.update(any(CanvasExecutionDO.class), any())).thenReturn(1);
+        ContextPersistenceService ctxStore = mock(ContextPersistenceService.class);
+        CanvasExecutionService service = service(mapper, ctxStore);
+        CanvasExecutionDO exec = new CanvasExecutionDO();
+        exec.setId("exec-paused-fail");
+        ExecutionContext ctx = new ExecutionContext();
+        ctx.setExecutionId("exec-paused-fail");
+        ctx.setCanvasId(11L);
+        ctx.setUserId("user-1");
+        ctx.setNodeStatus("wait", NodeStatus.WAITING);
+        Throwable error = new NodeStatePersistenceException(
+                "Failed to persist node state before releasing Redis gate",
+                new RuntimeException("redis down"));
+
+        Mono<Map<String, Object>> mono = ReflectionTestUtils.invokeMethod(
+                service, "handleError", error, exec, ctx, mock(DagGraph.class), false, false);
+        Map<String, Object> response = mono.block();
+
+        assertThat(response).containsEntry("executionId", "exec-paused-fail");
+        verify(ctxStore, never()).save(ctx);
+        verify(ctxStore).delete(11L, "user-1");
+        ArgumentCaptor<CanvasExecutionDO> update = ArgumentCaptor.forClass(CanvasExecutionDO.class);
+        verify(mapper).update(update.capture(), any());
+        assertThat(update.getValue().getStatus()).isEqualTo(ExecutionStatus.FAILED.getCode());
     }
 
     private CanvasExecutionService service(CanvasExecutionMapper mapper, ContextPersistenceService ctxStore) {

@@ -96,9 +96,24 @@ public class RedisKeyUtil {
         return prefix + ":node-state:" + executionId + ":" + nodeId;
     }
 
+    /** 节点级增量状态索引：canvas:node-state-index:{executionId}。 */
+    public String nodeStateIndex(String executionId) {
+        return prefix + ":node-state-index:" + executionId;
+    }
+
+    /** 节点级重入 reset marker：canvas:node-state-reset:{executionId}。 */
+    public String nodeStateResetIndex(String executionId) {
+        return prefix + ":node-state-reset:" + executionId;
+    }
+
     /** 节点执行门控 key：canvas:gate:{executionId}:{nodeId}。 */
     public String gate(String executionId, String nodeId) {
         return prefix + ":gate:" + executionId + ":" + nodeId;
+    }
+
+    /** 节点执行 repeat 信号 key：canvas:gate-repeat:{executionId}:{nodeId}。 */
+    public String gateRepeat(String executionId, String nodeId) {
+        return prefix + ":gate-repeat:" + executionId + ":" + nodeId;
     }
 
     /**

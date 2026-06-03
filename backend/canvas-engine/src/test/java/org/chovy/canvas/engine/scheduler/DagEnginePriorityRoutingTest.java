@@ -22,9 +22,12 @@ import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -83,12 +86,42 @@ class DagEnginePriorityRoutingTest {
         verify(ctxStore).saveNodeState("exec-priority-test", "priority", NodeStatus.PARTIAL_FAIL, Map.of());
     }
 
+    @Test
+    void priorityBranchNodeStatePersistenceFailureFailsClosedWithoutTryingNextBranch() {
+        ContextPersistenceService ctxStore = mock(ContextPersistenceService.class);
+        doThrow(new RuntimeException("redis down"))
+                .when(ctxStore).saveNodeState("exec-priority-test", "ok-a",
+                        NodeStatus.SUCCESS, Map.of("ok", true));
+        TestOkHandler okHandler = new TestOkHandler();
+        DagEngine engine = engineWithHandlers(ctxStore, okHandler);
+        DagGraph graph = graph(List.of(
+                priorityNode("priority", List.of(
+                        Map.of("order", 1, "nextNodeId", "ok-a"),
+                        Map.of("order", 2, "nextNodeId", "ok-b")
+                ), null),
+                node("ok-a", "TEST_OK"),
+                node("ok-b", "TEST_OK")
+        ));
+        ExecutionContext ctx = context();
+
+        assertThatThrownBy(() -> engine.execute(graph, "priority", ctx).block())
+                .isInstanceOf(NodeStatePersistenceException.class)
+                .hasMessageContaining("Failed to persist node state before releasing Redis gate");
+
+        assertThat(okHandler.calls()).isEqualTo(1);
+        assertThat(ctx.getNodeStatus("ok-a")).isEqualTo(NodeStatus.SUCCESS);
+        assertThat(ctx.getNodeStatus("ok-b")).isEqualTo(NodeStatus.PENDING);
+        verify(ctxStore, never()).saveNodeState("exec-priority-test", "ok-b",
+                NodeStatus.SUCCESS, Map.of("ok", true));
+        verify(ctxStore, never()).save(ctx);
+    }
+
     private DagEngine engineWithHandlers(NodeHandler... handlers) {
         return engineWithHandlers(mock(ContextPersistenceService.class), handlers);
     }
 
     private DagEngine engineWithHandlers(ContextPersistenceService ctxStore, NodeHandler... handlers) {
-        when(ctxStore.tryAcquireNodeGate(anyString(), anyString(), any())).thenReturn(true);
+        when(ctxStore.tryAcquireNodeGate(anyString(), anyString(), anyString(), any())).thenReturn(true);
         List<NodeHandler> allHandlers = new java.util.ArrayList<>();
         allHandlers.add(new PriorityHandler());
         allHandlers.addAll(List.of(handlers));

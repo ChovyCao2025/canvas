@@ -14,9 +14,11 @@ import org.chovy.canvas.engine.handler.NodeHandlerType;
 import org.chovy.canvas.engine.handler.NodeResult;
 import org.chovy.canvas.infrastructure.redis.ContextPersistenceService;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.springframework.test.util.ReflectionTestUtils;
 import reactor.core.publisher.Mono;
 
+import java.time.Duration;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -90,7 +92,7 @@ class DagEngineCommitActionTest {
     @Test
     void gotoReentryDeletesStaleNodeStateForResetNodes() {
         ContextPersistenceService ctxStore = mock(ContextPersistenceService.class);
-        when(ctxStore.tryAcquireNodeGate(anyString(), anyString(), any())).thenReturn(true);
+        when(ctxStore.tryAcquireNodeGate(anyString(), anyString(), anyString(), any())).thenReturn(true);
         DagEngine engine = engineWithHandlers(ctxStore, new TestGotoHandler(), new TestOkHandler());
         DagGraph graph = graph(List.of(
                 node("goto", NodeType.GOTO, Map.of("targetNodeId", "target")),
@@ -102,28 +104,61 @@ class DagEngineCommitActionTest {
 
         engine.execute(graph, "goto", ctx).block();
 
+        assertThat(ctx.getNodeStatus("goto")).isEqualTo(NodeStatus.SUCCESS);
         verify(ctxStore).deleteNodeState("exec-commit-action-test", "target");
+        verify(ctxStore, never()).deleteNodeState("exec-commit-action-test", "goto");
+        verify(ctxStore, never()).saveNodeState("exec-commit-action-test", "goto", NodeStatus.SKIPPED, Map.of());
+    }
+
+    @Test
+    void gotoReentryFailsClosedWhenStaleNodeStateDeleteFails() {
+        ContextPersistenceService ctxStore = mock(ContextPersistenceService.class);
+        when(ctxStore.tryAcquireNodeGate(anyString(), anyString(), anyString(), any())).thenReturn(true);
+        doThrow(new IllegalStateException("redis down"))
+                .when(ctxStore).deleteNodeState("exec-commit-action-test", "target");
+        DagEngine engine = engineWithHandlers(ctxStore, new TestGotoHandler(), new TestOkHandler());
+        DagGraph graph = graph(List.of(
+                node("goto", NodeType.GOTO, Map.of("targetNodeId", "target")),
+                node("target", "TEST_OK", Map.of())
+        ), Map.of("target", List.of("goto")));
+        ExecutionContext ctx = context();
+        ctx.setNodeStatus("target", NodeStatus.SUCCESS);
+        ctx.putNodeOutput("target", Map.of("stale", true));
+
+        assertThatThrownBy(() -> engine.execute(graph, "goto", ctx).block())
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("Failed to delete node state before reentry reset");
+
+        assertThat(ctx.getNodeStatus("target")).isEqualTo(NodeStatus.SUCCESS);
+        assertThat(ctx.getNodeOutputs().get("target")).containsEntry("stale", true);
+        verify(ctxStore).deleteNodeState("exec-commit-action-test", "target");
+        verify(ctxStore, never()).save(ctx);
+        verify(ctxStore, never()).saveNodeState("exec-commit-action-test", "target",
+                NodeStatus.SUCCESS, Map.of("ok", true));
     }
 
     @Test
     void successfulHandlerReleasesRedisNodeGate() {
         ContextPersistenceService ctxStore = mock(ContextPersistenceService.class);
-        when(ctxStore.tryAcquireNodeGate(anyString(), anyString(), any())).thenReturn(true);
+        when(ctxStore.tryAcquireNodeGate(anyString(), anyString(), anyString(), any())).thenReturn(true);
         DagEngine engine = engineWithHandlers(ctxStore, new TestOkHandler());
         DagGraph graph = graph(List.of(node("ok", "TEST_OK", Map.of())), Map.of());
         ExecutionContext ctx = context();
 
         engine.execute(graph, "ok", ctx).block();
 
-        verify(ctxStore).releaseNodeGate("exec-commit-action-test", "ok");
+        ArgumentCaptor<String> token = ArgumentCaptor.forClass(String.class);
+        verify(ctxStore).tryAcquireNodeGate(eq("exec-commit-action-test"), eq("ok"),
+                token.capture(), eq(Duration.ofSeconds(600)));
+        verify(ctxStore).releaseNodeGate("exec-commit-action-test", "ok", token.getValue());
     }
 
     @Test
     void redisNodeGateReleaseFailureDoesNotFailSuccessfulExecution() {
         ContextPersistenceService ctxStore = mock(ContextPersistenceService.class);
-        when(ctxStore.tryAcquireNodeGate(anyString(), anyString(), any())).thenReturn(true);
+        when(ctxStore.tryAcquireNodeGate(anyString(), anyString(), anyString(), any())).thenReturn(true);
         doThrow(new RuntimeException("redis down"))
-                .when(ctxStore).releaseNodeGate("exec-commit-action-test", "ok");
+                .when(ctxStore).releaseNodeGate(eq("exec-commit-action-test"), eq("ok"), anyString());
         DagEngine engine = engineWithHandlers(ctxStore, new TestOkHandler());
         DagGraph graph = graph(List.of(node("ok", "TEST_OK", Map.of())), Map.of());
         ExecutionContext ctx = context();
@@ -131,7 +166,23 @@ class DagEngineCommitActionTest {
         Map<String, Object> result = engine.execute(graph, "ok", ctx).block();
 
         assertThat(result).containsEntry("ok", true);
-        verify(ctxStore).releaseNodeGate("exec-commit-action-test", "ok");
+        verify(ctxStore).releaseNodeGate(eq("exec-commit-action-test"), eq("ok"), anyString());
+    }
+
+    @Test
+    void missingHandlerReleasesRedisAndLocalNodeGate() {
+        ContextPersistenceService ctxStore = mock(ContextPersistenceService.class);
+        when(ctxStore.tryAcquireNodeGate(anyString(), anyString(), anyString(), any())).thenReturn(true);
+        DagEngine engine = engineWithHandlers(ctxStore);
+        DagGraph graph = graph(List.of(node("missing", "TEST_MISSING", Map.of())), Map.of());
+        ExecutionContext ctx = context();
+
+        assertThatThrownBy(() -> engine.execute(graph, "missing", ctx).block())
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("未注册的节点类型");
+
+        assertThat(ctx.getGate("missing").executing.get()).isFalse();
+        verify(ctxStore).releaseNodeGate(eq("exec-commit-action-test"), eq("missing"), anyString());
     }
 
     private DagEngine engineWithHandlers(NodeHandler... handlers) {
@@ -139,7 +190,7 @@ class DagEngineCommitActionTest {
     }
 
     private DagEngine engineWithHandlers(ContextPersistenceService ctxStore, NodeHandler... handlers) {
-        when(ctxStore.tryAcquireNodeGate(anyString(), anyString(), any())).thenReturn(true);
+        when(ctxStore.tryAcquireNodeGate(anyString(), anyString(), anyString(), any())).thenReturn(true);
         HandlerRegistry handlerRegistry = new HandlerRegistry(List.of(handlers));
         ReflectionTestUtils.invokeMethod(handlerRegistry, "init");
 

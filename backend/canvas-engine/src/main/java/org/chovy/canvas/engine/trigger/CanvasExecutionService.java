@@ -33,6 +33,7 @@ import org.chovy.canvas.engine.lane.ExecutionLane;
 import org.chovy.canvas.engine.lane.ExecutionLaneAdmissionResult;
 import org.chovy.canvas.engine.lane.ExecutionLaneResolver;
 import org.chovy.canvas.engine.scheduler.DagEngine;
+import org.chovy.canvas.engine.scheduler.NodeStatePersistenceException;
 import org.chovy.canvas.infrastructure.cache.CanvasConfigCache;
 import org.chovy.canvas.infrastructure.cache.CanvasEntityCache;
 import org.chovy.canvas.infrastructure.mq.OverflowRetryMessage;
@@ -505,7 +506,8 @@ public class CanvasExecutionService {
             Throwable e, CanvasExecutionDO finalExec,
             ExecutionContext ctx, DagGraph graph, boolean dryRun, boolean isResume) {
         log.error("[ENGINE] 执行失败 executionId={}: {}", ctx.getExecutionId(), e.getMessage());
-        boolean paused = isPaused(ctx, graph);
+        boolean nodeStatePersistenceFailed = NodeStatePersistenceException.contains(e);
+        boolean paused = !nodeStatePersistenceFailed && isPaused(ctx, graph);
         Mono<Void> updateMono;
         if (paused) {
             if (!dryRun) {

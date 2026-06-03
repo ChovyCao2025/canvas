@@ -88,7 +88,7 @@ class DagEngineCircuitBreakerTest {
         when(cbRegistry.get(anyString())).thenReturn(breaker);
 
         ContextPersistenceService ctxStore = mock(ContextPersistenceService.class);
-        when(ctxStore.tryAcquireNodeGate(anyString(), anyString(), any())).thenReturn(true);
+        when(ctxStore.tryAcquireNodeGate(anyString(), anyString(), anyString(), any())).thenReturn(true);
 
         DagEngine engine = new DagEngine(
                 handlerRegistry,

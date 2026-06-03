@@ -3,6 +3,7 @@ package org.chovy.canvas.engine.scheduler;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.chovy.canvas.common.MapFieldKeys;
 import org.chovy.canvas.common.enums.NodeType;
+import org.chovy.canvas.dal.dataobject.CanvasExecutionTraceDO;
 import org.chovy.canvas.dal.mapper.CanvasExecutionDlqMapper;
 import org.chovy.canvas.engine.context.ExecutionContext;
 import org.chovy.canvas.engine.context.NodeStatus;
@@ -21,6 +22,7 @@ import org.chovy.canvas.engine.handlers.MergeHandler;
 import org.chovy.canvas.engine.handlers.ThresholdHandler;
 import org.chovy.canvas.infrastructure.redis.ContextPersistenceService;
 import org.junit.jupiter.api.Test;
+import org.mockito.InOrder;
 import org.springframework.test.util.ReflectionTestUtils;
 import reactor.core.publisher.Mono;
 
@@ -33,7 +35,13 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.doNothing;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -159,6 +167,119 @@ class SpecialNodeStage2ExecutionTest {
     }
 
     @Test
+    void thresholdLateRepeatDuringGateReleaseReentersImmediately() {
+        ContextPersistenceService ctxStore = mock(ContextPersistenceService.class);
+        when(ctxStore.tryAcquireNodeGate(anyString(), anyString(), anyString(), any())).thenReturn(true);
+        WaitThenSuccessThresholdHandler thresholdHandler = new WaitThenSuccessThresholdHandler();
+        DagEngine engine = engineWithHandlers(ctxStore, thresholdHandler);
+        DagParser.CanvasNode threshold = node("threshold", NodeType.THRESHOLD);
+        threshold.setConfig(new HashMap<>(Map.of("timeout", 3600)));
+        DagGraph graph = graph(List.of(threshold), Map.of());
+        ExecutionContext ctx = context();
+        doAnswer(invocation -> {
+            if (thresholdHandler.calls() == 1) {
+                ctx.getGate("threshold").repeatPending.set(true);
+            }
+            return false;
+        }).when(ctxStore).releaseNodeGate(eq("exec-special-stage2-test"), eq("threshold"), anyString());
+
+        engine.execute(graph, "threshold", ctx).block();
+
+        assertThat(thresholdHandler.calls()).isEqualTo(2);
+        assertThat(ctx.getNodeStatus("threshold")).isEqualTo(NodeStatus.SUCCESS);
+        assertThat(ctx.getNodeOutputs().get("threshold")).containsEntry("lateRepeat", true);
+    }
+
+    @Test
+    void thresholdRedisRepeatDuringGateReleaseReentersImmediately() {
+        ContextPersistenceService ctxStore = mock(ContextPersistenceService.class);
+        when(ctxStore.tryAcquireNodeGate(anyString(), anyString(), anyString(), any())).thenReturn(true);
+        when(ctxStore.releaseNodeGate(eq("exec-special-stage2-test"), eq("threshold"), anyString()))
+                .thenReturn(true)
+                .thenReturn(false);
+        WaitThenSuccessThresholdHandler thresholdHandler = new WaitThenSuccessThresholdHandler();
+        DagEngine engine = engineWithHandlers(ctxStore, thresholdHandler);
+        DagParser.CanvasNode threshold = node("threshold", NodeType.THRESHOLD);
+        threshold.setConfig(new HashMap<>(Map.of("timeout", 3600)));
+        DagGraph graph = graph(List.of(threshold), Map.of());
+        ExecutionContext ctx = context();
+
+        engine.execute(graph, "threshold", ctx).block();
+
+        assertThat(thresholdHandler.calls()).isEqualTo(2);
+        assertThat(ctx.getNodeStatus("threshold")).isEqualTo(NodeStatus.SUCCESS);
+        assertThat(ctx.getNodeOutputs().get("threshold")).containsEntry("lateRepeat", true);
+    }
+
+    @Test
+    void stage2SynchronousErrorAfterRedisGatePersistsFailureBeforeRelease() {
+        ContextPersistenceService ctxStore = mock(ContextPersistenceService.class);
+        when(ctxStore.tryAcquireNodeGate(anyString(), anyString(), anyString(), any())).thenReturn(true);
+        TraceWriteBuffer traceBuffer = mock(TraceWriteBuffer.class);
+        doThrow(new RuntimeException("trace down"))
+                .when(traceBuffer).offer(any(CanvasExecutionTraceDO.class));
+        DagEngine engine = engineWithHandlers(ctxStore, traceBuffer);
+        DagParser.CanvasNode threshold = node("threshold", NodeType.THRESHOLD);
+        threshold.setConfig(new HashMap<>(Map.of("timeout", 3600)));
+        DagGraph graph = graph(List.of(threshold), Map.of());
+        ExecutionContext ctx = context();
+
+        assertThatThrownBy(() -> engine.execute(graph, "threshold", ctx).block())
+                .isInstanceOf(RuntimeException.class)
+                .hasMessageContaining("trace down");
+
+        assertThat(ctx.getNodeStatus("threshold")).isEqualTo(NodeStatus.FAILED);
+        InOrder inOrder = inOrder(ctxStore);
+        inOrder.verify(ctxStore).saveNodeState("exec-special-stage2-test", "threshold",
+                NodeStatus.FAILED, Map.of());
+        inOrder.verify(ctxStore).releaseNodeGate(eq("exec-special-stage2-test"), eq("threshold"), anyString());
+    }
+
+    @Test
+    void stage2TraceEndFailureAfterSuccessPersistsNodeStateBeforeRelease() {
+        ContextPersistenceService ctxStore = mock(ContextPersistenceService.class);
+        when(ctxStore.tryAcquireNodeGate(anyString(), anyString(), anyString(), any())).thenReturn(true);
+        TraceWriteBuffer traceBuffer = traceBufferFailingOnSecondOffer();
+        DagEngine engine = engineWithHandlers(ctxStore, traceBuffer, new TerminalThresholdHandler());
+        DagParser.CanvasNode threshold = node("threshold", NodeType.THRESHOLD);
+        threshold.setConfig(new HashMap<>(Map.of("timeout", 3600)));
+        DagGraph graph = graph(List.of(threshold), Map.of());
+        ExecutionContext ctx = context();
+
+        assertThatThrownBy(() -> engine.execute(graph, "threshold", ctx).block())
+                .isInstanceOf(RuntimeException.class)
+                .hasMessageContaining("trace end down");
+
+        assertThat(ctx.getNodeStatus("threshold")).isEqualTo(NodeStatus.SUCCESS);
+        InOrder inOrder = inOrder(ctxStore);
+        inOrder.verify(ctxStore).saveNodeState("exec-special-stage2-test", "threshold",
+                NodeStatus.SUCCESS, Map.of("ok", true));
+        inOrder.verify(ctxStore).releaseNodeGate(eq("exec-special-stage2-test"), eq("threshold"), anyString());
+    }
+
+    @Test
+    void stage2TraceEndFailureAfterFailurePersistsNodeStateBeforeRelease() {
+        ContextPersistenceService ctxStore = mock(ContextPersistenceService.class);
+        when(ctxStore.tryAcquireNodeGate(anyString(), anyString(), anyString(), any())).thenReturn(true);
+        TraceWriteBuffer traceBuffer = traceBufferFailingOnSecondOffer();
+        DagEngine engine = engineWithHandlers(ctxStore, traceBuffer, new FailingThresholdHandler());
+        DagParser.CanvasNode threshold = node("threshold", NodeType.THRESHOLD);
+        threshold.setConfig(new HashMap<>(Map.of("timeout", 3600)));
+        DagGraph graph = graph(List.of(threshold), Map.of());
+        ExecutionContext ctx = context();
+
+        assertThatThrownBy(() -> engine.execute(graph, "threshold", ctx).block())
+                .isInstanceOf(RuntimeException.class)
+                .hasMessageContaining("trace end down");
+
+        assertThat(ctx.getNodeStatus("threshold")).isEqualTo(NodeStatus.FAILED);
+        InOrder inOrder = inOrder(ctxStore);
+        inOrder.verify(ctxStore).saveNodeState("exec-special-stage2-test", "threshold",
+                NodeStatus.FAILED, Map.of());
+        inOrder.verify(ctxStore).releaseNodeGate(eq("exec-special-stage2-test"), eq("threshold"), anyString());
+    }
+
+    @Test
     void nodeFailurePropagatesToCallerInsteadOfReturningErrorMap() {
         DagEngine engine = engineWithHandlers(new FailingHandler());
         DagGraph graph = graph(List.of(
@@ -191,6 +312,18 @@ class SpecialNodeStage2ExecutionTest {
     }
 
     private DagEngine engineWithHandlers(NodeHandler... extraHandlers) {
+        ContextPersistenceService ctxStore = mock(ContextPersistenceService.class);
+        when(ctxStore.tryAcquireNodeGate(anyString(), anyString(), anyString(), any())).thenReturn(true);
+        return engineWithHandlers(ctxStore, extraHandlers);
+    }
+
+    private DagEngine engineWithHandlers(ContextPersistenceService ctxStore, NodeHandler... extraHandlers) {
+        return engineWithHandlers(ctxStore, mock(TraceWriteBuffer.class), extraHandlers);
+    }
+
+    private DagEngine engineWithHandlers(ContextPersistenceService ctxStore,
+                                         TraceWriteBuffer traceBuffer,
+                                         NodeHandler... extraHandlers) {
         List<NodeHandler> handlers = new ArrayList<>();
         handlers.add(new HubHandler());
         handlers.add(new AggregateHandler(new GroovyHandler(mock(GroovyScriptCache.class))));
@@ -209,12 +342,12 @@ class SpecialNodeStage2ExecutionTest {
 
         DagEngine engine = new DagEngine(
                 handlerRegistry,
-                mock(TraceWriteBuffer.class),
+                traceBuffer,
                 mock(CanvasExecutionDlqMapper.class),
                 cbRegistry,
                 mock(CanvasMetrics.class),
                 new ObjectMapper(),
-                mock(ContextPersistenceService.class),
+                ctxStore,
                 mock(org.chovy.canvas.engine.trigger.CanvasExecutionService.class)
         );
         ReflectionTestUtils.setField(engine, "maxRetry", 1);
@@ -222,6 +355,14 @@ class SpecialNodeStage2ExecutionTest {
         ReflectionTestUtils.setField(engine, "retryMaxDelayMs", 10L);
         ReflectionTestUtils.setField(engine, "globalTimeout", 600L);
         return engine;
+    }
+
+    private TraceWriteBuffer traceBufferFailingOnSecondOffer() {
+        TraceWriteBuffer traceBuffer = mock(TraceWriteBuffer.class);
+        doNothing()
+                .doThrow(new RuntimeException("trace end down"))
+                .when(traceBuffer).offer(any(CanvasExecutionTraceDO.class));
+        return traceBuffer;
     }
 
     private ExecutionContext context() {
@@ -312,6 +453,39 @@ class SpecialNodeStage2ExecutionTest {
 
     @NodeHandlerType("TEST_FAIL")
     static class FailingHandler implements NodeHandler {
+        @Override
+        public Mono<NodeResult> executeAsync(Map<String, Object> config, ExecutionContext ctx) {
+            return Mono.just(NodeResult.fail("boom"));
+        }
+    }
+
+    @NodeHandlerType(NodeType.THRESHOLD)
+    static class WaitThenSuccessThresholdHandler implements NodeHandler {
+        private final AtomicInteger calls = new AtomicInteger();
+
+        @Override
+        public Mono<NodeResult> executeAsync(Map<String, Object> config, ExecutionContext ctx) {
+            if (calls.incrementAndGet() == 1) {
+                return Mono.just(NodeResult.waiting());
+            }
+            return Mono.just(NodeResult.terminal(Map.of("lateRepeat", true)));
+        }
+
+        int calls() {
+            return calls.get();
+        }
+    }
+
+    @NodeHandlerType(NodeType.THRESHOLD)
+    static class TerminalThresholdHandler implements NodeHandler {
+        @Override
+        public Mono<NodeResult> executeAsync(Map<String, Object> config, ExecutionContext ctx) {
+            return Mono.just(NodeResult.terminal(Map.of("ok", true)));
+        }
+    }
+
+    @NodeHandlerType(NodeType.THRESHOLD)
+    static class FailingThresholdHandler implements NodeHandler {
         @Override
         public Mono<NodeResult> executeAsync(Map<String, Object> config, ExecutionContext ctx) {
             return Mono.just(NodeResult.fail("boom"));

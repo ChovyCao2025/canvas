@@ -40,6 +40,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -224,8 +225,8 @@ public class DagEngine {
     private long retryMaxDelayMs;
 
     /** Redis 节点门控 TTL，进程崩溃后由 Redis 自动释放。 */
-    @Value("${canvas.execution.node-gate-ttl-sec:86400}")
-    private long nodeGateTtlSec = 86400L;
+    @Value("${canvas.execution.node-gate-ttl-sec:600}")
+    private long nodeGateTtlSec = 600L;
 
     /**
      * 特殊节点等待超时调度器。
@@ -248,10 +249,22 @@ public class DagEngine {
                                              ExecutionContext ctx) {
         // 从起始节点开始执行画布相关节点
         return executeNode(graph, triggerNodeId, ctx, 0)
-                .doOnTerminate(() -> writeSkippedNodesIfComplete(graph, ctx))
+                .doOnSuccess(__ -> writeSkippedNodesIfComplete(graph, ctx))
                 .doOnError(e -> {
                     log.error("[ENGINE] 执行出错 executionId={}: {}",
                             ctx.getExecutionId(), e.getMessage(), e);
+                    if (NodeStatePersistenceException.contains(e)) {
+                        log.error("[ENGINE] 节点状态持久化失败，跳过 SKIPPED 补写与 full-context 保存 executionId={}",
+                                ctx.getExecutionId());
+                        return;
+                    }
+                    try {
+                        writeSkippedNodesIfComplete(graph, ctx);
+                    } catch (NodeStatePersistenceException skippedError) {
+                        log.error("[ENGINE] SKIPPED 补写失败，跳过 full-context 保存 executionId={}: {}",
+                                ctx.getExecutionId(), skippedError.getMessage());
+                        return;
+                    }
                     ctxStore.save(ctx);
                 });
     }
@@ -356,7 +369,8 @@ public class DagEngine {
                 log.debug("[ENGINE] CAS 失败，发出 repeat 信号 nodeId={}", nodeId);
                 return Mono.just(Map.of());
             }
-            if (!tryAcquireRedisNodeGate(ctx, nodeId)) {
+            String redisGateToken = UUID.randomUUID().toString();
+            if (!tryAcquireRedisNodeGate(ctx, nodeId, redisGateToken)) {
                 nodeGate.executing.set(false);
                 nodeGate.repeatPending.set(false);
                 ctx.setNodeStatus(nodeId, NodeStatus.WAITING);
@@ -364,77 +378,102 @@ public class DagEngine {
                 return Mono.just(Map.of());
             }
             AtomicBoolean redisGateHeld = new AtomicBoolean(true);
+            AtomicBoolean localGateHeld = new AtomicBoolean(true);
 
             // ──────────────────────────────────────────────────────
-            // 阶段 5 + 6：执行 Handler（含 repeat 机制）
-            // repeat 必须在写 SUCCESS / 触发下游之前检查，
-            // 否则幂等检查（阶段3）会拦截 repeat 调用
+            // 阶段 5 + 6：执行 Handler。repeat 信号只能在节点状态持久化后消费，
+            // 避免有副作用 handler 在持久化前被重复执行。
             // ──────────────────────────────────────────────────────
-            writeTraceStart(ctx, node);
-            NodeHandler handler = handlerRegistry.get(node.getType());
-            long nodeStartMs = System.currentTimeMillis(); // 记录节点开始时间
+            try {
+                writeTraceStart(ctx, node);
+                NodeHandler handler = handlerRegistry.get(node.getType());
+                long nodeStartMs = System.currentTimeMillis(); // 记录节点开始时间
 
-            // 具体普通节点执行逻辑
-            return executeHandlerWithRepeat(handler, config, ctx, nodeGate,
-                    nodeId, node.getType())
-                    .<Map<String, Object>>flatMap(result -> {
+                // 具体普通节点执行逻辑
+                return executeHandlerWithRepeat(handler, config, ctx, nodeId, node.getType())
+                        .<Map<String, Object>>flatMap(result -> {
 
-                        if (!result.success()) {
-                            // 锁已由 executeHandlerWithRepeat 释放，此处只处理状态和 trace。
-                            ctx.setNodeStatus(nodeId, NodeStatus.FAILED);
-                            writeTraceEnd(ctx, node, result, System.currentTimeMillis() - nodeStartMs);
-                            saveNodeStateSafely(ctx, nodeId, NodeStatus.FAILED, result.output());
-                            releaseRedisNodeGateIfHeld(ctx, nodeId, redisGateHeld);
-                            // 防资损：已发券/已触达则整体 SUCCESS
+                            if (!result.success()) {
+                                // Handler 已结束，此处负责状态、trace 与 gate 释放。
+                                ctx.setNodeStatus(nodeId, NodeStatus.FAILED);
+                                saveNodeStateRequired(ctx, nodeId, NodeStatus.FAILED, result.output(), redisGateHeld);
+                                writeTraceEnd(ctx, node, result, System.currentTimeMillis() - nodeStartMs);
+                                boolean repeatAfterRelease = releaseExecutionGatesIfHeld(ctx, nodeId, nodeGate,
+                                        redisGateToken, redisGateHeld, localGateHeld);
+                                // 防资损：已发券/已触达则整体 SUCCESS
+                                if (ctx.isBenefitGranted() || ctx.isUserReached()) {
+                                    log.warn("[ENGINE] 防资损：节点失败但整体判定成功 nodeId={}", nodeId);
+                                    return drainTerminalRepeatIfNeeded(repeatAfterRelease, nodeId,
+                                            () -> executeNode(graph, nodeId, ctx, depth))
+                                            .then(Mono.just(Map.of()));
+                                }
+                                return drainTerminalRepeatIfNeeded(repeatAfterRelease, nodeId,
+                                        () -> executeNode(graph, nodeId, ctx, depth))
+                                        .then(triggerFailureAwareDownstream(graph, nodeId, node.getType(), ctx, depth,
+                                                result.errorMessage()));
+                            }
+
+                            // ── 阶段 6：写输出，设状态，触发下游 ──────────
+                            if (handler.isBenefitNode()) ctx.setBenefitGranted(true);
+                            if (handler.isReachNode()) ctx.setUserReached(true);
+                            if (result.output() != null && !result.output().isEmpty()) {
+                                ctx.putNodeOutput(nodeId, result.output());
+                            }
+
+                            NodeStatus status = statusForOutcome(result.outcome());
+                            ctx.setNodeStatus(nodeId, status);
+                            long durationMs = System.currentTimeMillis() - nodeStartMs;
+                            saveNodeStateRequired(ctx, nodeId, status, result.output(), redisGateHeld);
+                            writeTraceEnd(ctx, node, result, durationMs);
+                            metrics.recordNodeExecution(node.getType(), status.name(), durationMs);
+                            log.debug("[ENGINE] 节点完成 nodeId={} type={}", nodeId, node.getType());
+
+                            if (result.pending()) {
+                                boolean repeatAfterRelease = releaseExecutionGatesIfHeld(ctx, nodeId, nodeGate,
+                                        redisGateToken, redisGateHeld, localGateHeld);
+                                if (shouldReenterPendingNode(node.getType(), repeatAfterRelease)) {
+                                    return executeNode(graph, nodeId, ctx, depth);
+                                }
+                                logPendingRepeatConsumedIfNeeded(nodeId, node.getType(), repeatAfterRelease);
+                                return Mono.just(pendingResponse(nodeId, node.getType(), result));
+                            }
+
+                            boolean repeatAfterRelease = releaseExecutionGatesIfHeld(ctx, nodeId, nodeGate,
+                                    redisGateToken, redisGateHeld, localGateHeld);
+                            // 触发下游逻辑执行
+                            return drainTerminalRepeatIfNeeded(repeatAfterRelease, nodeId,
+                                    () -> executeNode(graph, nodeId, ctx, depth))
+                                    .then(triggerDownstream(graph, result, nodeId, node.getType(), ctx, depth));
+                        })
+                        .onErrorResume(e -> {
+                            if (e instanceof NodeStatePersistenceException) {
+                                log.error("[ENGINE] 节点状态持久化失败，保留 Redis gate 至 TTL nodeId={}: {}",
+                                        nodeId, e.getMessage());
+                                releaseExecutionGatesIfHeld(ctx, nodeId, nodeGate,
+                                        redisGateToken, redisGateHeld, localGateHeld);
+                                return Mono.error(e);
+                            }
+                            if (!ctx.isNodeDone(nodeId)) {
+                                log.error("[ENGINE] 节点异常 nodeId={}: {}", nodeId, e.getMessage());
+                                ctx.setNodeStatus(nodeId, NodeStatus.FAILED);
+                                saveNodeStateRequired(ctx, nodeId, NodeStatus.FAILED, Map.of(), redisGateHeld);
+                            } else {
+                                log.debug("[ENGINE] 下游执行异常 sourceNodeId={} status={}: {}",
+                                        nodeId, ctx.getNodeStatus(nodeId), e.getMessage());
+                            }
+                            releaseExecutionGatesIfHeld(ctx, nodeId, nodeGate,
+                                    redisGateToken, redisGateHeld, localGateHeld);
                             if (ctx.isBenefitGranted() || ctx.isUserReached()) {
-                                log.warn("[ENGINE] 防资损：节点失败但整体判定成功 nodeId={}", nodeId);
                                 return Mono.just(Map.of());
                             }
-                            return triggerFailureAwareDownstream(graph, nodeId, node.getType(), ctx, depth,
-                                    result.errorMessage());
-                        }
-
-                        // ── 阶段 6：写输出，设状态，触发下游 ──────────
-                        if (handler.isBenefitNode()) ctx.setBenefitGranted(true);
-                        if (handler.isReachNode()) ctx.setUserReached(true);
-                        if (result.output() != null && !result.output().isEmpty()) {
-                            ctx.putNodeOutput(nodeId, result.output());
-                        }
-
-                        NodeStatus status = statusForOutcome(result.outcome());
-                        ctx.setNodeStatus(nodeId, status);
-                        long durationMs = System.currentTimeMillis() - nodeStartMs;
-                        writeTraceEnd(ctx, node, result, durationMs);
-                        metrics.recordNodeExecution(node.getType(), status.name(), durationMs);
-                        saveNodeStateSafely(ctx, nodeId, status, result.output());
-                        log.debug("[ENGINE] 节点完成 nodeId={} type={}", nodeId, node.getType());
-
-                        if (result.pending()) {
-                            releaseRedisNodeGateIfHeld(ctx, nodeId, redisGateHeld);
-                            return Mono.just(pendingResponse(nodeId, node.getType(), result));
-                        }
-
-                        releaseRedisNodeGateIfHeld(ctx, nodeId, redisGateHeld);
-                        // 触发下游逻辑执行
-                        return triggerDownstream(graph, result, nodeId, node.getType(), ctx, depth);
-                    })
-                    .onErrorResume(e -> {
-                        nodeGate.executing.set(false); // 释放异常锁
-                        releaseRedisNodeGateIfHeld(ctx, nodeId, redisGateHeld);
-                        if (!ctx.isNodeDone(nodeId)) {
-                            log.error("[ENGINE] 节点异常 nodeId={}: {}", nodeId, e.getMessage());
-                            ctx.setNodeStatus(nodeId, NodeStatus.FAILED);
-                            saveNodeStateSafely(ctx, nodeId, NodeStatus.FAILED, Map.of());
-                        } else {
-                            log.debug("[ENGINE] 下游执行异常 sourceNodeId={} status={}: {}",
-                                    nodeId, ctx.getNodeStatus(nodeId), e.getMessage());
-                        }
-                        if (ctx.isBenefitGranted() || ctx.isUserReached()) {
-                            return Mono.just(Map.of());
-                        }
-                        return Mono.error(e);
-                    })
-                    .doFinally(__ -> releaseRedisNodeGateIfHeld(ctx, nodeId, redisGateHeld));
+                            return Mono.error(e);
+                        })
+                        .doFinally(__ -> releaseExecutionGatesIfHeld(ctx, nodeId, nodeGate,
+                                redisGateToken, redisGateHeld, localGateHeld));
+            } catch (Throwable e) {
+                return failSynchronousGateHeldPath(ctx, nodeId, nodeGate, redisGateToken,
+                        redisGateHeld, localGateHeld, e);
+            }
         });
     }
 
@@ -496,23 +535,23 @@ public class DagEngine {
      * <h3>三种到达场景（Case 1/2/3）</h3>
      * <pre>
      * Case 1 — 无并发：
-     *   A 抢到锁 → 执行 → 读 repeatPending=false → 释放锁 → 无 repeat
+     *   A 抢到锁 → 执行 → 持久化节点状态 → 外层释放 Redis gate 与本地锁
      *
      * Case 2 — 有并发（B 在 A 执行期间到达）：
      *   B CAS 失败 → 设 repeatPending=true
-     *   上游3在持锁期间到达 → CAS 失败 → repeatPending=true（此时 B 的 ctx 变更已可见）
+     *   A 先持久化终态/等待态 → 释放 gate 时消费 repeat → 走幂等重入或 THRESHOLD 重评估
      *
      * Case 3 — 竞态边界（B 在 A 释放锁后才到）：
-     *   A 释放锁 → B CAS 成功 → B 自己执行 → A 的 repeat CAS 失败 → 不重复
+     *   外层先释放 Redis gate，再释放本地锁；B 随后获取两层 gate 并自行执行或被幂等拦截
      * </pre>
      *
-     * @param nodeGate 节点执行门控，含独立的互斥锁（executing）和 repeat 信号（repeatPending）
+     * <p>注意：这里不再在持锁期间递归订阅 handler。repeat 信号由调用方在
+     * {@code saveNodeStateRequired(...)} 成功后、释放 gate 时统一消费。
      */
     // retryWhen 的链式调用在 Java 类型推断中会丢失泛型参数（见方法体内的 retried 转型）。
     private Mono<NodeResult> executeHandlerWithRepeat(NodeHandler handler,
                                                       Map<String, Object> config,
                                                       ExecutionContext ctx,
-                                                      NodeGate nodeGate,
                                                       String nodeId,
                                                       String nodeType) {
         CircuitBreakerRegistry.CircuitBreaker cb = cbRegistry.get(nodeType);
@@ -560,49 +599,9 @@ public class DagEngine {
                                     nodeId, sig.totalRetries() + 1, sig.failure().getMessage());
                         }));
 
-        Mono<NodeResult> withRetry = retried.onErrorResume(e -> {
+        return retried.onErrorResume(e -> {
             writeDlq(ctx, nodeId, nodeType, e);
             return Mono.just(NodeResult.fail("已写入DLQ: " + e.getMessage()));
-        });
-
-        // ── ③ repeat 保护：handler 执行完后检查并发信号 ────────────
-        // 执行链说明：
-        //   withRetry 被订阅（第一次）→ singleCall → handler.executeAsync（第一次调用）
-        //   → 结果进入 flatMap 的 lambda
-        //   → 若 needsRepeat=true：lambda 返回 withRetry.doFinally(__)
-        //   → flatMap 自动订阅这个新返回的 Mono（这就是 repeat 的触发点）
-        //   → withRetry 被订阅（第二次）→ singleCall → handler.executeAsync（第二次调用）
-        //   → doFinally 在第二次完成后执行，释放 executing 锁
-        //
-        // 注意：doFinally 本身不触发订阅，触发订阅的是 flatMap 对返回值的处理。
-        return withRetry.flatMap(result -> {
-            if (!result.success()) {
-                // 失败时由此处统一释放锁，调用方 flatMap 不再重复释放，
-                // 消除 repeat+failure 路径中 doFinally 与调用方双重释放的竞态窗口。
-                nodeGate.executing.set(false);
-                return Mono.just(result);
-            }
-
-            // 先读并清除 repeatPending，再释放 executing 锁。
-            // 顺序关键：必须在释放锁之前读信号，否则新协程抢锁后才来的请求会被遗漏。
-            // （详见 executeHandlerWithRepeat JavaDoc 中的 Case 3 分析）
-            boolean needsRepeat = nodeGate.repeatPending.getAndSet(false); // ← 读信号
-            nodeGate.executing.set(false); // 释放锁
-            // 二次补检：捕获在 getAndSet→set(false) 窗口期内到达并设置 repeatPending 的信号。
-            // 窗口期内 CAS 必然失败（锁仍被持有），对方已写入 repeatPending=true；
-            // 释放锁后立即再读一次可以收住该信号，将窗口从"单次读→释放"缩小到"释放→二次读"。
-            needsRepeat |= nodeGate.repeatPending.getAndSet(false);
-
-            if (needsRepeat && nodeGate.executing.compareAndSet(false, true)) {
-                // 重新持锁后返回 withRetry.doFinally(__)：
-                //   flatMap 订阅它 → handler 第二次执行（repeat）
-                //   doFinally → repeat 结束后释放锁（不管成功/失败/取消）
-                log.debug("[ENGINE] repeat nodeId={}", nodeId);
-                return withRetry.doFinally(__ -> nodeGate.executing.set(false));
-            }
-
-            // needsRepeat=false，或 CAS 失败（另一协程已接管）：不 repeat
-            return Mono.just(result);
         });
     }
 
@@ -697,14 +696,17 @@ public class DagEngine {
         if (LogicRelationHandler.shouldFailImmediately(relation, upstreamIds, ctx)) {
             NodeGate gate = ctx.getGate(nodeId);
             if (gate.executing.compareAndSet(false, true)) {
-                writeTraceStart(ctx, node);
-                ctx.setNodeStatus(nodeId, NodeStatus.FAILED);
-                writeTraceEnd(ctx, node, NodeResult.fail("AND 上游失败，条件不可满足"), 0);
-                saveNodeStateSafely(ctx, nodeId, NodeStatus.FAILED, Map.of());
-                gate.executing.set(false);
-                log.warn("[ENGINE] LOGIC_RELATION AND 上游失败，立即 FAILED nodeId={}", nodeId);
-                if (ctx.isBenefitGranted() || ctx.isUserReached()) return Mono.just(Map.of());
-                return Mono.error(new RuntimeException("LOGIC_RELATION AND 条件因上游失败不可满足"));
+                try {
+                    writeTraceStart(ctx, node);
+                    ctx.setNodeStatus(nodeId, NodeStatus.FAILED);
+                    saveNodeStateRequired(ctx, nodeId, NodeStatus.FAILED, Map.of());
+                    writeTraceEnd(ctx, node, NodeResult.fail("AND 上游失败，条件不可满足"), 0);
+                    log.warn("[ENGINE] LOGIC_RELATION AND 上游失败，立即 FAILED nodeId={}", nodeId);
+                    if (ctx.isBenefitGranted() || ctx.isUserReached()) return Mono.just(Map.of());
+                    return Mono.error(new RuntimeException("LOGIC_RELATION AND 条件因上游失败不可满足"));
+                } finally {
+                    gate.executing.set(false);
+                }
             }
             // CAS 失败：另一线程已在处理，当前线程幂等返回
             return Mono.just(Map.of());
@@ -731,7 +733,7 @@ public class DagEngine {
         // ──────────────────────────────────────────────────────────
         if (!LogicRelationHandler.checkCondition(relation, upstreamIds, ctx)) {
             if (ctx.setNodeStatusIfNotDone(nodeId, NodeStatus.WAITING)) {
-                saveNodeStateSafely(ctx, nodeId, NodeStatus.WAITING, Map.of());
+                saveNodeStateRequired(ctx, nodeId, NodeStatus.WAITING, Map.of());
             }
 
             // LOGIC_RELATION 等待超时（与 Hub 类似，防止第二触发永不到来）
@@ -826,7 +828,7 @@ public class DagEngine {
         // ──────────────────────────────────────────────────────────
         if (!HubHandler.allUpstreamDone(upstreamIds, ctx)) {
             if (ctx.setNodeStatusIfNotDone(nodeId, NodeStatus.WAITING)) {
-                saveNodeStateSafely(ctx, nodeId, NodeStatus.WAITING, Map.of());
+                saveNodeStateRequired(ctx, nodeId, NodeStatus.WAITING, Map.of());
             }
             if (ctx.getScheduledHubTimeouts().add(nodeId)) {
                 ctx.getHubStartTimes().putIfAbsent(nodeId, System.currentTimeMillis());
@@ -842,10 +844,10 @@ public class DagEngine {
                 // 已调度过定时器，检查是否已超时
                 long start = ctx.getHubStartTimes().getOrDefault(nodeId, System.currentTimeMillis());
                 int timeout = HubHandler.getTimeoutSeconds(config);
-                if (System.currentTimeMillis() - start > (long) timeout * 1000) {
-                    if (ctx.setNodeStatusIfNotDone(nodeId, NodeStatus.FAILED)) {
-                        saveNodeStateSafely(ctx, nodeId, NodeStatus.FAILED, Map.of());
-                    }
+                    if (System.currentTimeMillis() - start > (long) timeout * 1000) {
+                        if (ctx.setNodeStatusIfNotDone(nodeId, NodeStatus.FAILED)) {
+                            saveNodeStateRequired(ctx, nodeId, NodeStatus.FAILED, Map.of());
+                        }
                     return Mono.error(new RuntimeException("HUB 等待超时 nodeId=" + nodeId));
                 }
             }
@@ -881,7 +883,7 @@ public class DagEngine {
         if (!HubHandler.allUpstreamDone(upstreamIds, ctx)) {
             // 并发安全性同 handleHub：无锁，竞态下超时定时器是必要兜底。
             if (ctx.setNodeStatusIfNotDone(nodeId, NodeStatus.WAITING)) {
-                saveNodeStateSafely(ctx, nodeId, NodeStatus.WAITING, Map.of());
+                saveNodeStateRequired(ctx, nodeId, NodeStatus.WAITING, Map.of());
             }
             String timerKey = "ag:" + nodeId;
             if (ctx.getScheduledHubTimeouts().add(timerKey)) {
@@ -943,9 +945,28 @@ public class DagEngine {
         timeoutOutput.put(MapFieldKeys.REASON_CODE, "SPECIAL_NODE_TIMEOUT");
         timeoutOutput.put(MapFieldKeys.REASON_MESSAGE, label + " 等待超时");
         ctx.putNodeOutput(nodeId, timeoutOutput);
+        try {
+            saveNodeStateRequired(ctx, nodeId, NodeStatus.TIMEOUT, timeoutOutput);
+        } catch (NodeStatePersistenceException e) {
+            log.error("[{}] 超时节点状态持久化失败，停止超时分支并标记执行失败 nodeId={}: {}",
+                    label, nodeId, e.getMessage());
+            try {
+                ctxStore.delete(ctx.getCanvasId(), ctx.getUserId());
+            } catch (Exception deleteError) {
+                log.warn("[{}] 清理不可靠上下文失败 nodeId={}: {}", label, nodeId, deleteError.getMessage());
+            }
+            Map<String, Object> error = Map.of(
+                    MapFieldKeys.ERROR, e.getMessage(),
+                    MapFieldKeys.NODE_ID, nodeId,
+                    MapFieldKeys.OUTCOME, NodeOutcome.TIMEOUT.name());
+            executionService.completePausedExecution(ctx, ExecutionStatus.FAILED.getCode(), error)
+                    .subscribe(null,
+                            failure -> log.error("[{}] 超时节点持久化失败状态落库失败 nodeId={}: {}",
+                                    label, nodeId, failure.getMessage()));
+            return;
+        }
         writeTraceEnd(ctx, node, NodeResult.timeout(targetNodeId,
                 "SPECIAL_NODE_TIMEOUT", label + " 等待超时"), 0);
-        saveNodeStateSafely(ctx, nodeId, NodeStatus.TIMEOUT, timeoutOutput);
 
         if (targetNodeId == null || targetNodeId.isBlank()) {
             ctxStore.delete(ctx.getCanvasId(), ctx.getUserId());
@@ -1022,84 +1043,108 @@ public class DagEngine {
             nodeGate.repeatPending.set(true);
             return Mono.just(Map.of());
         }
-        if (!tryAcquireRedisNodeGate(ctx, nodeId)) {
+        String redisGateToken = UUID.randomUUID().toString();
+        if (!tryAcquireRedisNodeGate(ctx, nodeId, redisGateToken)) {
             nodeGate.executing.set(false);
             nodeGate.repeatPending.set(false);
             ctx.setNodeStatus(nodeId, NodeStatus.WAITING);
             return Mono.just(Map.of());
         }
         AtomicBoolean redisGateHeld = new AtomicBoolean(true);
+        AtomicBoolean localGateHeld = new AtomicBoolean(true);
 
-        writeTraceStart(ctx, node);
-        NodeHandler handler = handlerRegistry.get(node.getType());
-        long nodeStartMs = System.currentTimeMillis(); // 记录节点开始时间
+        try {
+            writeTraceStart(ctx, node);
+            NodeHandler handler = handlerRegistry.get(node.getType());
+            long nodeStartMs = System.currentTimeMillis(); // 记录节点开始时间
 
-        return executeHandlerWithRepeat(handler, config, ctx, nodeGate,
-                nodeId, node.getType())
-                .<Map<String, Object>>flatMap(result -> {
-                    // ── 路径A：FAILED ─────────────────────────────────────────
-                    // 锁已由 executeHandlerWithRepeat 统一释放，此处只处理状态和 trace。
-                    if (!result.success()) {
-                        ctx.setNodeStatus(nodeId, NodeStatus.FAILED);
-                        long durationMs = System.currentTimeMillis() - nodeStartMs;
-                        writeTraceEnd(ctx, node, result, durationMs);
-                        saveNodeStateSafely(ctx, nodeId, NodeStatus.FAILED, result.output());
-                        releaseRedisNodeGateIfHeld(ctx, nodeId, redisGateHeld);
-                        if (ctx.isBenefitGranted() || ctx.isUserReached()) return Mono.just(Map.of());
-                        return triggerFailureAwareDownstream(graph, nodeId, node.getType(), ctx, depth,
-                                result.errorMessage());
-                    }
-                    // ── 路径B：WAITING（THRESHOLD 阈值未满足）─────────────────
-                    // executeHandlerWithRepeat 对 success=true 的结果会走 repeat 检查，
-                    // 检查完后已执行 nodeGate.executing.set(false) 释放锁，此处不需再操作。
-                    if (result.pending()) {
+            return executeHandlerWithRepeat(handler, config, ctx, nodeId, node.getType())
+                    .<Map<String, Object>>flatMap(result -> {
+                        // ── 路径A：FAILED ─────────────────────────────────────────
+                        if (!result.success()) {
+                            ctx.setNodeStatus(nodeId, NodeStatus.FAILED);
+                            long durationMs = System.currentTimeMillis() - nodeStartMs;
+                            saveNodeStateRequired(ctx, nodeId, NodeStatus.FAILED, result.output(), redisGateHeld);
+                            writeTraceEnd(ctx, node, result, durationMs);
+                            boolean repeatAfterRelease = releaseExecutionGatesIfHeld(ctx, nodeId, nodeGate,
+                                    redisGateToken, redisGateHeld, localGateHeld);
+                            if (ctx.isBenefitGranted() || ctx.isUserReached()) {
+                                return drainTerminalRepeatIfNeeded(repeatAfterRelease, nodeId,
+                                        () -> executeNodeAfterStage2(graph, nodeId, node, config, ctx, depth))
+                                        .then(Mono.just(Map.of()));
+                            }
+                            return drainTerminalRepeatIfNeeded(repeatAfterRelease, nodeId,
+                                    () -> executeNodeAfterStage2(graph, nodeId, node, config, ctx, depth))
+                                    .then(triggerFailureAwareDownstream(graph, nodeId, node.getType(), ctx, depth,
+                                            result.errorMessage()));
+                        }
+                        // ── 路径B：WAITING（THRESHOLD 阈值未满足）─────────────────
+                        if (result.pending()) {
+                            if (result.output() != null && !result.output().isEmpty()) {
+                                ctx.putNodeOutput(nodeId, result.output());
+                            }
+                            NodeStatus status = statusForOutcome(result.outcome());
+                            ctx.setNodeStatus(nodeId, status);
+                            long durationMs = System.currentTimeMillis() - nodeStartMs;
+                            saveNodeStateRequired(ctx, nodeId, status, result.output(), redisGateHeld);
+                            writeTraceEnd(ctx, node, result, durationMs);
+                            metrics.recordNodeExecution(node.getType(), status.name(), durationMs);
+                            boolean repeatAfterRelease = releaseExecutionGatesIfHeld(ctx, nodeId, nodeGate,
+                                    redisGateToken, redisGateHeld, localGateHeld);
+                            if (shouldReenterPendingNode(node.getType(), repeatAfterRelease)) {
+                                return executeNodeAfterStage2(graph, nodeId, node, config, ctx, depth);
+                            }
+                            logPendingRepeatConsumedIfNeeded(nodeId, node.getType(), repeatAfterRelease);
+                            return Mono.just(pendingResponse(nodeId, node.getType(), result)); // 不触发下游，等待恢复
+                        }
+                        // ── 路径C：SUCCESS ────────────────────────────────────────
+                        if (handler.isBenefitNode()) ctx.setBenefitGranted(true);
+                        if (handler.isReachNode()) ctx.setUserReached(true);
                         if (result.output() != null && !result.output().isEmpty()) {
                             ctx.putNodeOutput(nodeId, result.output());
                         }
                         NodeStatus status = statusForOutcome(result.outcome());
                         ctx.setNodeStatus(nodeId, status);
                         long durationMs = System.currentTimeMillis() - nodeStartMs;
+                        saveNodeStateRequired(ctx, nodeId, status, result.output(), redisGateHeld);
                         writeTraceEnd(ctx, node, result, durationMs);
                         metrics.recordNodeExecution(node.getType(), status.name(), durationMs);
-                        saveNodeStateSafely(ctx, nodeId, status, result.output());
-                        releaseRedisNodeGateIfHeld(ctx, nodeId, redisGateHeld);
-                        return Mono.just(pendingResponse(nodeId, node.getType(), result)); // 不触发下游，等待恢复
-                    }
-                    // ── 路径C：SUCCESS ────────────────────────────────────────
-                    // 同路径B，锁已在 executeHandlerWithRepeat 中释放。
-                    if (handler.isBenefitNode()) ctx.setBenefitGranted(true);
-                    if (handler.isReachNode()) ctx.setUserReached(true);
-                    if (result.output() != null && !result.output().isEmpty()) {
-                        ctx.putNodeOutput(nodeId, result.output());
-                    }
-                    NodeStatus status = statusForOutcome(result.outcome());
-                    ctx.setNodeStatus(nodeId, status);
-                    long durationMs = System.currentTimeMillis() - nodeStartMs;
-                    writeTraceEnd(ctx, node, result, durationMs);
-                    metrics.recordNodeExecution(node.getType(), status.name(), durationMs);
-                    saveNodeStateSafely(ctx, nodeId, status, result.output());
-                    log.debug("[ENGINE] 节点完成 nodeId={} type={}", nodeId, node.getType());
-                    releaseRedisNodeGateIfHeld(ctx, nodeId, redisGateHeld);
-                    return triggerDownstream(graph, result, nodeId, node.getType(), ctx, depth);
-                })
-                .onErrorResume(e -> {
-                    // 异常时锁可能仍被持有（handler 内部抛出），在此统一释放
-                    nodeGate.executing.set(false);
-                    releaseRedisNodeGateIfHeld(ctx, nodeId, redisGateHeld);
-                    if (!ctx.isNodeDone(nodeId)) {
-                        log.error("[ENGINE] 节点异常 nodeId={}: {}", nodeId, e.getMessage());
-                        ctx.setNodeStatus(nodeId, NodeStatus.FAILED);
-                        saveNodeStateSafely(ctx, nodeId, NodeStatus.FAILED, Map.of());
-                    } else {
-                        log.debug("[ENGINE] 下游执行异常 sourceNodeId={} status={}: {}",
-                                nodeId, ctx.getNodeStatus(nodeId), e.getMessage());
-                    }
-                    if (ctx.isBenefitGranted() || ctx.isUserReached()) {
-                        return Mono.just(Map.of());
-                    }
-                    return Mono.error(e);
-                })
-                .doFinally(__ -> releaseRedisNodeGateIfHeld(ctx, nodeId, redisGateHeld));
+                        log.debug("[ENGINE] 节点完成 nodeId={} type={}", nodeId, node.getType());
+                        boolean repeatAfterRelease = releaseExecutionGatesIfHeld(ctx, nodeId, nodeGate,
+                                redisGateToken, redisGateHeld, localGateHeld);
+                        return drainTerminalRepeatIfNeeded(repeatAfterRelease, nodeId,
+                                () -> executeNodeAfterStage2(graph, nodeId, node, config, ctx, depth))
+                                .then(triggerDownstream(graph, result, nodeId, node.getType(), ctx, depth));
+                    })
+                    .onErrorResume(e -> {
+                        if (e instanceof NodeStatePersistenceException) {
+                            log.error("[ENGINE] 节点状态持久化失败，保留 Redis gate 至 TTL nodeId={}: {}",
+                                    nodeId, e.getMessage());
+                            releaseExecutionGatesIfHeld(ctx, nodeId, nodeGate,
+                                    redisGateToken, redisGateHeld, localGateHeld);
+                            return Mono.error(e);
+                        }
+                        if (!ctx.isNodeDone(nodeId)) {
+                            log.error("[ENGINE] 节点异常 nodeId={}: {}", nodeId, e.getMessage());
+                            ctx.setNodeStatus(nodeId, NodeStatus.FAILED);
+                            saveNodeStateRequired(ctx, nodeId, NodeStatus.FAILED, Map.of(), redisGateHeld);
+                        } else {
+                            log.debug("[ENGINE] 下游执行异常 sourceNodeId={} status={}: {}",
+                                    nodeId, ctx.getNodeStatus(nodeId), e.getMessage());
+                        }
+                        releaseExecutionGatesIfHeld(ctx, nodeId, nodeGate,
+                                redisGateToken, redisGateHeld, localGateHeld);
+                        if (ctx.isBenefitGranted() || ctx.isUserReached()) {
+                            return Mono.just(Map.of());
+                        }
+                        return Mono.error(e);
+                    })
+                    .doFinally(__ -> releaseExecutionGatesIfHeld(ctx, nodeId, nodeGate,
+                            redisGateToken, redisGateHeld, localGateHeld));
+        } catch (Throwable e) {
+            return failSynchronousGateHeldPath(ctx, nodeId, nodeGate, redisGateToken,
+                    redisGateHeld, localGateHeld, e);
+        }
     }
 
     // ══════════════════════════════════════════════════════════════
@@ -1225,14 +1270,14 @@ public class DagEngine {
             if (!visited.add(current)) {
                 continue;
             }
-            NodeStatus previousStatus = ctx.getNodeStatuses().get(current);
-            ctx.resetNodeStatusForReentry(current);
-            if (previousStatus != null && !ctx.getNodeStatuses().containsKey(current)) {
-                deleteNodeStateSafely(ctx, current);
-            }
             if (current.equals(sourceNodeId)) {
                 continue;
             }
+            NodeStatus previousStatus = ctx.getNodeStatuses().get(current);
+            if (isReentryResettable(previousStatus)) {
+                deleteNodeStateRequired(ctx, current);
+            }
+            ctx.resetNodeStatusForReentry(current);
             graph.downstream(current).forEach(queue::addLast);
         }
     }
@@ -1251,7 +1296,7 @@ public class DagEngine {
             // 所有分支均失败
             if (fallbackNextId != null) {
                 ctx.setNodeStatus(priorityNodeId, NodeStatus.PARTIAL_FAIL);
-                saveNodeStateSafely(ctx, priorityNodeId, NodeStatus.PARTIAL_FAIL, Map.of());
+                saveNodeStateRequired(ctx, priorityNodeId, NodeStatus.PARTIAL_FAIL, Map.of());
                 log.debug("[PRIORITY] 所有分支失败，走 fallback nextId={}", fallbackNextId);
                 if (ctx.isNodeDone(fallbackNextId)) {
                     log.debug("[PRIORITY] fallback 已作为分支执行过，按节点幂等跳过 nextId={}", fallbackNextId);
@@ -1277,6 +1322,9 @@ public class DagEngine {
                             fallbackNextId, priorityNodeId, graph, ctx, depth);
                 })
                 .onErrorResume(e -> {
+                    if (NodeStatePersistenceException.contains(e)) {
+                        return Mono.<Map<String, Object>>error(e);
+                    }
                     if (!ctx.isNodeDone(currentBranchId)) {
                         return Mono.<Map<String, Object>>error(e);
                     }
@@ -1302,7 +1350,7 @@ public class DagEngine {
         graph.getNodeMap().forEach((nodeId, node) -> {
             if (ctx.setNodeStatusIfAbsent(nodeId, NodeStatus.SKIPPED)) {
                 // 只为从未进入状态机的节点补 SKIPPED，避免覆盖已执行/等待/失败节点。
-                saveNodeStateSafely(ctx, nodeId, NodeStatus.SKIPPED, Map.of());
+                saveNodeStateRequired(ctx, nodeId, NodeStatus.SKIPPED, Map.of());
                 skippedTraces.add(CanvasExecutionTraceDO.builder()
                         .executionId(ctx.getExecutionId())
                         .nodeId(nodeId)
@@ -1449,29 +1497,82 @@ public class DagEngine {
         };
     }
 
-    private void saveNodeStateSafely(ExecutionContext ctx, String nodeId,
-                                     NodeStatus status, Map<String, Object> output) {
+    private void saveNodeStateRequired(ExecutionContext ctx,
+                                       String nodeId,
+                                       NodeStatus status,
+                                       Map<String, Object> output) {
+        saveNodeStateRequired(ctx, nodeId, status, output, new AtomicBoolean(false));
+    }
+
+    private void saveNodeStateRequired(ExecutionContext ctx,
+                                       String nodeId,
+                                       NodeStatus status,
+                                       Map<String, Object> output,
+                                       AtomicBoolean redisGateHeld) {
         try {
             ctxStore.saveNodeState(ctx.getExecutionId(), nodeId, status,
                     output == null ? Map.of() : output);
         } catch (Exception e) {
-            log.warn("[ENGINE] 节点增量状态持久化失败 executionId={} nodeId={} status={}: {}",
-                    ctx.getExecutionId(), nodeId, status, e.getMessage());
+            retainRedisNodeGateUntilTtl(ctx, nodeId, redisGateHeld, e);
+            throw new NodeStatePersistenceException(
+                    "Failed to persist node state before releasing Redis gate", e);
         }
     }
 
-    private void deleteNodeStateSafely(ExecutionContext ctx, String nodeId) {
+    private Mono<Map<String, Object>> failSynchronousGateHeldPath(ExecutionContext ctx,
+                                                                 String nodeId,
+                                                                 NodeGate nodeGate,
+                                                                 String redisGateToken,
+                                                                 AtomicBoolean redisGateHeld,
+                                                                 AtomicBoolean localGateHeld,
+                                                                 Throwable originalError) {
+        Throwable errorToPropagate = originalError;
         try {
-            ctxStore.deleteNodeState(ctx.getExecutionId(), nodeId);
-        } catch (Exception e) {
-            log.warn("[ENGINE] 节点增量状态删除失败 executionId={} nodeId={}: {}",
+            if (!ctx.isNodeDone(nodeId)) {
+                ctx.setNodeStatus(nodeId, NodeStatus.FAILED);
+                saveNodeStateRequired(ctx, nodeId, NodeStatus.FAILED, Map.of(), redisGateHeld);
+            }
+        } catch (NodeStatePersistenceException persistenceError) {
+            log.error("[ENGINE] 同步异常路径节点状态持久化失败，保留 Redis gate 至 TTL nodeId={}: {}",
+                    nodeId, persistenceError.getMessage());
+            errorToPropagate = persistenceError;
+        } finally {
+            releaseExecutionGatesIfHeld(ctx, nodeId, nodeGate,
+                    redisGateToken, redisGateHeld, localGateHeld);
+        }
+        return Mono.error(errorToPropagate);
+    }
+
+    private void retainRedisNodeGateUntilTtl(ExecutionContext ctx,
+                                             String nodeId,
+                                             AtomicBoolean redisGateHeld,
+                                             Exception e) {
+        if (redisGateHeld.compareAndSet(true, false)) {
+            log.error("[ENGINE] 节点增量状态持久化失败，Redis gate 将保留至 TTL executionId={} nodeId={}: {}",
                     ctx.getExecutionId(), nodeId, e.getMessage());
         }
     }
 
-    private boolean tryAcquireRedisNodeGate(ExecutionContext ctx, String nodeId) {
+    private void deleteNodeStateRequired(ExecutionContext ctx, String nodeId) {
         try {
-            return ctxStore.tryAcquireNodeGate(ctx.getExecutionId(), nodeId,
+            ctxStore.deleteNodeState(ctx.getExecutionId(), nodeId);
+        } catch (Exception e) {
+            log.error("[ENGINE] 重入前节点增量状态删除失败，恢复路径 fail-closed executionId={} nodeId={}: {}",
+                    ctx.getExecutionId(), nodeId, e.getMessage());
+            throw new NodeStatePersistenceException("Failed to delete node state before reentry reset", e);
+        }
+    }
+
+    private boolean isReentryResettable(NodeStatus status) {
+        return status != null
+                && status != NodeStatus.FAILED
+                && status != NodeStatus.TIMEOUT
+                && status != NodeStatus.PARTIAL_FAIL;
+    }
+
+    private boolean tryAcquireRedisNodeGate(ExecutionContext ctx, String nodeId, String ownerToken) {
+        try {
+            return ctxStore.tryAcquireNodeGate(ctx.getExecutionId(), nodeId, ownerToken,
                     Duration.ofSeconds(nodeGateTtlSec));
         } catch (Exception e) {
             log.warn("[ENGINE] Redis gate 获取失败，已 fail-closed executionId={} nodeId={}: {}",
@@ -1480,18 +1581,51 @@ public class DagEngine {
         }
     }
 
-    private void releaseRedisNodeGateIfHeld(ExecutionContext ctx, String nodeId, AtomicBoolean gateHeld) {
-        if (gateHeld.compareAndSet(true, false)) {
-            releaseRedisNodeGateSafely(ctx, nodeId);
+    private boolean releaseExecutionGatesIfHeld(ExecutionContext ctx,
+                                                String nodeId,
+                                                NodeGate nodeGate,
+                                                String redisGateToken,
+                                                AtomicBoolean redisGateHeld,
+                                                AtomicBoolean localGateHeld) {
+        boolean repeatPending = false;
+        if (redisGateHeld.compareAndSet(true, false)) {
+            repeatPending = releaseRedisNodeGateSafely(ctx, nodeId, redisGateToken);
         }
+        if (localGateHeld.compareAndSet(true, false)) {
+            nodeGate.executing.set(false);
+            repeatPending |= nodeGate.repeatPending.getAndSet(false);
+        }
+        return repeatPending;
     }
 
-    private void releaseRedisNodeGateSafely(ExecutionContext ctx, String nodeId) {
+    private boolean releaseRedisNodeGateSafely(ExecutionContext ctx, String nodeId, String ownerToken) {
         try {
-            ctxStore.releaseNodeGate(ctx.getExecutionId(), nodeId);
+            return ctxStore.releaseNodeGate(ctx.getExecutionId(), nodeId, ownerToken);
         } catch (Exception e) {
             log.warn("[ENGINE] Redis gate 释放失败 executionId={} nodeId={}: {}",
                     ctx.getExecutionId(), nodeId, e.getMessage());
+            return false;
+        }
+    }
+
+    private Mono<Void> drainTerminalRepeatIfNeeded(boolean repeatAfterRelease,
+                                                   String nodeId,
+                                                   Supplier<Mono<Map<String, Object>>> reentry) {
+        if (!repeatAfterRelease) {
+            return Mono.empty();
+        }
+        log.debug("[ENGINE] 终态节点消费到 repeat，执行幂等重入 nodeId={}", nodeId);
+        return reentry.get().then();
+    }
+
+    private boolean shouldReenterPendingNode(String nodeType, boolean repeatAfterRelease) {
+        return repeatAfterRelease && NodeType.THRESHOLD.equals(nodeType);
+    }
+
+    private void logPendingRepeatConsumedIfNeeded(String nodeId, String nodeType, boolean repeatAfterRelease) {
+        if (repeatAfterRelease) {
+            log.debug("[ENGINE] pending 节点消费到 repeat，跳过非重评估节点重入 nodeId={} type={}",
+                    nodeId, nodeType);
         }
     }
 
@@ -1702,7 +1836,7 @@ public class DagEngine {
             }
             if (ctx.setNodeStatusIfNotDone(current, NodeStatus.SKIPPED)) {
                 log.debug("[ENGINE] 立即标记 SKIPPED nodeId={}", current);
-                saveNodeStateSafely(ctx, current, NodeStatus.SKIPPED, Map.of());
+                saveNodeStateRequired(ctx, current, NodeStatus.SKIPPED, Map.of());
             }
             for (String downstream : graph.downstream(current)) {
                 if (allUpstreamSkipped(graph, downstream, ctx)) {
