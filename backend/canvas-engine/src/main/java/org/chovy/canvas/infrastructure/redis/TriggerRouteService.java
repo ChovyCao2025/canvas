@@ -38,8 +38,6 @@ public class TriggerRouteService {
     /** Redis key 工具，集中生成业务 key。 */
     private final RedisKeyUtil keys;
 
-    /** 响应式 Redis 连接工厂。 */
-    private final ReactiveRedisConnectionFactory reactiveFactory;
     /** 路由锁重试等待策略。 */
     private final RouteMutationWaiter routeMutationWaiter;
     /** 路由变更锁 TTL。 */
@@ -65,7 +63,6 @@ public class TriggerRouteService {
     ) {
         this.redis = redis;
         this.keys = keys;
-        this.reactiveFactory = reactiveFactory;
         this.routeMutationWaiter = Objects.requireNonNull(routeMutationWaiter, "routeMutationWaiter");
     }
 
@@ -206,16 +203,17 @@ public class TriggerRouteService {
 
     /**
      * 检查路由表是否为空（用 SCAN，不用 KEYS，设计文档 6.4节）。
-     * blockFirst() 在 @PostConstruct 非 reactive 上下文中调用，阻塞安全。
      */
     public boolean isRouteTableEmpty() {
+        ScanOptions options = ScanOptions.scanOptions()
+                .match(keys.triggerPattern())
+                .count(1)
+                .build();
         try {
-            // 只取第一条命中即可判空，避免全量扫描带来的资源消耗
-            java.nio.ByteBuffer firstKey = reactiveFactory.getReactiveConnection()
-                    .keyCommands()
-                    .scan(ScanOptions.scanOptions().match(keys.triggerPattern()).count(1).build())
-                    .blockFirst();
-            return firstKey == null;
+            // 只取第一条命中即可判空，避免全量扫描带来的资源消耗。
+            try (Cursor<String> cursor = redis.scan(options)) {
+                return cursor == null || !cursor.hasNext();
+            }
         } catch (Exception e) {
             // Redis 不可用时保守返回 true，由上层触发重建路由流程
             return true;

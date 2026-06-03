@@ -12,9 +12,11 @@ import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.ValueOperations;
 import org.springframework.test.util.ReflectionTestUtils;
 
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.time.Duration;
 import java.util.Collection;
 import java.util.List;
-import java.time.Duration;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -129,6 +131,22 @@ class TriggerRouteServiceTest {
         verify(txSetOps).add("test:trigger:mq:order.paid", "10");
         verify(txSetOps).add("test:trigger:behavior:ORDER_PAID", "10");
         verify(txSetOps).add("test:trigger:tagger:vip_level", "10");
+    }
+
+    @Test
+    void isRouteTableEmptyUsesStringRedisScan() {
+        Cursor<String> cursor = cursor("test:trigger:mq:order.paid");
+        when(redis.scan(any())).thenReturn(cursor);
+
+        assertThat(service.isRouteTableEmpty()).isFalse();
+    }
+
+    @Test
+    void triggerRouteServiceDoesNotBlockReactiveRedisScan() throws Exception {
+        String source = Files.readString(Path.of(
+                "src/main/java/org/chovy/canvas/infrastructure/redis/TriggerRouteService.java"));
+
+        assertThat(source).doesNotContain(".blockFirst(");
     }
 
     private static Cursor<String> cursor(String... values) {
