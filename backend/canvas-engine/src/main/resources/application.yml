@@ -116,6 +116,10 @@ canvas:
   mq:
     topic: CANVAS_MQ_TRIGGER
     consume-thread-number: ${CANVAS_MQ_CONSUME_THREAD:20}
+  notifications:
+    websocket:
+      max-sessions-per-user: ${CANVAS_NOTIFICATION_WS_MAX_SESSIONS_PER_USER:5}
+      max-total-sessions: ${CANVAS_NOTIFICATION_WS_MAX_TOTAL_SESSIONS:1000}
   scheduler:
     jitter-max-ms: 300000
     trigger-concurrency: 100

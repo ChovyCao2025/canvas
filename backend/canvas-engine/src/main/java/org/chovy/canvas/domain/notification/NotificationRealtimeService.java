@@ -7,11 +7,13 @@ import lombok.extern.slf4j.Slf4j;
 import org.chovy.canvas.dto.notification.NotificationDTO;
 import org.chovy.canvas.dto.notification.NotificationRealtimePayload;
 import org.chovy.canvas.infrastructure.redis.RedisKeyUtil;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.redis.connection.ReactiveRedisConnectionFactory;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.listener.ChannelTopic;
 import org.springframework.data.redis.listener.ReactiveRedisMessageListenerContainer;
 import org.springframework.stereotype.Service;
+import org.springframework.web.reactive.socket.CloseStatus;
 import org.springframework.web.reactive.socket.WebSocketSession;
 import reactor.core.Disposable;
 import reactor.core.publisher.Mono;
@@ -45,6 +47,10 @@ public class NotificationRealtimeService implements NotificationRealtimePublishe
     private final RedisKeyUtil keys;
     /** 本机维护的用户到 WebSocket 会话 sink 的映射。 */
     private final Map<String, Map<String, Sinks.Many<String>>> sessionsByUser = new ConcurrentHashMap<>();
+    /** 单用户最大 WebSocket 连接数。 */
+    private final int maxSessionsPerUser;
+    /** 当前服务实例最大 WebSocket 连接数。 */
+    private final int maxTotalSessions;
     /** 响应式 Redis 监听容器，用于订阅跨实例实时通知频道。 */
     private ReactiveRedisMessageListenerContainer listenerContainer;
     /** Redis 通知频道订阅句柄，应用关闭时释放。 */
@@ -55,11 +61,15 @@ public class NotificationRealtimeService implements NotificationRealtimePublishe
             ObjectMapper objectMapper,
             StringRedisTemplate redis,
             ReactiveRedisConnectionFactory reactiveRedisConnectionFactory,
-            RedisKeyUtil keys) {
+            RedisKeyUtil keys,
+            @Value("${canvas.notifications.websocket.max-sessions-per-user:5}") int maxSessionsPerUser,
+            @Value("${canvas.notifications.websocket.max-total-sessions:1000}") int maxTotalSessions) {
         this.objectMapper = objectMapper;
         this.redis = redis;
         this.reactiveRedisConnectionFactory = reactiveRedisConnectionFactory;
         this.keys = keys;
+        this.maxSessionsPerUser = Math.max(1, maxSessionsPerUser);
+        this.maxTotalSessions = Math.max(1, maxTotalSessions);
     }
 
     /** 订阅 Redis 实时通知频道，接收其他实例发布的通知。 */
@@ -97,8 +107,12 @@ public class NotificationRealtimeService implements NotificationRealtimePublishe
     public Mono<Void> register(String userId, WebSocketSession session, NotificationRealtimePayload initialPayload) {
         String sessionId = session.getId();
         Sinks.Many<String> sink = Sinks.many().unicast().onBackpressureBuffer();
+        if (!registerSession(userId, sessionId, sink)) {
+            log.warn("[NOTIFICATION_WS] 拒绝连接 userId={} sessionId={} activeUser={} activeTotal={}",
+                    userId, sessionId, activeSessionCount(userId), totalActiveSessionCount());
+            return session.close(CloseStatus.POLICY_VIOLATION);
+        }
         // 一个用户可同时存在多个浏览器会话，按 sessionId 独立维护推送通道。
-        sessionsByUser.computeIfAbsent(userId, ignored -> new ConcurrentHashMap<>()).put(sessionId, sink);
         emit(sink, initialPayload);
         Mono<Void> output = session.send(sink.asFlux().map(session::textMessage));
         Mono<Void> input = session.receive()
@@ -139,6 +153,26 @@ public class NotificationRealtimeService implements NotificationRealtimePublishe
         return sessions == null ? 0 : sessions.size();
     }
 
+    /** 返回当前服务实例全部活跃 WebSocket 会话数。 */
+    public int totalActiveSessionCount() {
+        return sessionsByUser.values().stream()
+                .mapToInt(Map::size)
+                .sum();
+    }
+
+    /** 在连接数上限内注册会话；检查和写入必须保持原子性。 */
+    private boolean registerSession(String userId, String sessionId, Sinks.Many<String> sink) {
+        synchronized (sessionsByUser) {
+            if (activeSessionCount(userId) >= maxSessionsPerUser
+                    || totalActiveSessionCount() >= maxTotalSessions) {
+                return false;
+            }
+            sessionsByUser.computeIfAbsent(userId, ignored -> new ConcurrentHashMap<>())
+                    .put(sessionId, sink);
+            return true;
+        }
+    }
+
     /** 处理其他实例通过 Redis 广播过来的实时通知。 */
     private void handleRemote(String raw) {
         try {
@@ -177,16 +211,18 @@ public class NotificationRealtimeService implements NotificationRealtimePublishe
 
     /** 注销 WebSocket 会话并在用户无会话时清理本地映射。 */
     private void unregister(String userId, String sessionId) {
-        Map<String, Sinks.Many<String>> sessions = sessionsByUser.get(userId);
-        if (sessions == null) {
-            return;
-        }
-        Sinks.Many<String> sink = sessions.remove(sessionId);
-        if (sink != null) {
-            sink.tryEmitComplete();
-        }
-        if (sessions.isEmpty()) {
-            sessionsByUser.remove(userId);
+        synchronized (sessionsByUser) {
+            Map<String, Sinks.Many<String>> sessions = sessionsByUser.get(userId);
+            if (sessions == null) {
+                return;
+            }
+            Sinks.Many<String> sink = sessions.remove(sessionId);
+            if (sink != null) {
+                sink.tryEmitComplete();
+            }
+            if (sessions.isEmpty()) {
+                sessionsByUser.remove(userId);
+            }
         }
     }
 }
