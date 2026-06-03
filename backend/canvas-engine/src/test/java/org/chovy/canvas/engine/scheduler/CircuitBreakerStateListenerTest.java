@@ -88,6 +88,7 @@ class CircuitBreakerStateListenerTest {
         @Override
         @SuppressWarnings("unchecked")
         public synchronized <T> T execute(RedisScript<T> script, List<String> keys, Object... args) {
+            assertThat(script).as("state reads must run through the Lua script").isNotNull();
             String action = String.valueOf(args[0]);
             CircuitBreakerRegistry.CircuitBreaker.State state =
                     states.getOrDefault(keys.get(0), CircuitBreakerRegistry.CircuitBreaker.State.CLOSED);

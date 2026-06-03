@@ -119,15 +119,30 @@ class CircuitBreakerRegistryRedisTest {
     }
 
     @Test
+    void registryConstructor_rejectsNullRedisTemplate() {
+        assertThatThrownBy(() -> new CircuitBreakerRegistry(null, 3, 30, 3,
+                "cb:", CHANNEL, 10))
+                .isInstanceOf(NullPointerException.class)
+                .hasMessageContaining("redisTemplate");
+    }
+
+    @Test
     void luaScript_containsAtomicHashTransitionsAndPublishesEvents() throws IOException {
         ClassPathResource script = new ClassPathResource("scripts/circuit_breaker_transition.lua");
 
         assertThat(script.exists()).isTrue();
         String lua = script.getContentAsString(StandardCharsets.UTF_8);
         assertThat(lua)
+                .contains("CHECK")
+                .contains("FAILURE")
+                .contains("SUCCESS")
+                .contains("READ")
                 .contains("redis.call('HINCRBY'")
                 .contains("redis.call('HSET'")
-                .contains("redis.call('PUBLISH'");
+                .contains("redis.call('PUBLISH'")
+                .contains("'failures'")
+                .contains("'opened_at'")
+                .contains("'half_tries'");
     }
 
     private CircuitBreakerRegistry redisRegistry(FakeRedisTemplate redis, int failureThreshold) {

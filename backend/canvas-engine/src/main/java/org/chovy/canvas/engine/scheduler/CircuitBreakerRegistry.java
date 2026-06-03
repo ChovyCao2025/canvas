@@ -3,7 +3,6 @@ package org.chovy.canvas.engine.scheduler;
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.ClassPathResource;
@@ -14,6 +13,7 @@ import org.springframework.stereotype.Component;
 import java.time.Clock;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -45,7 +45,7 @@ public class CircuitBreakerRegistry {
     /** 默认半开状态允许的探测次数。 */
     private final int defaultHalfOpenAttempts;
 
-    /** Redis 阻塞模板；不存在时保留 JVM 本地兼容模式。 */
+    /** Redis 阻塞模板；生产注册表必须依赖它持久化熔断状态。 */
     private final StringRedisTemplate redisTemplate;
 
     /** Redis Hash key 前缀，例如 cb:<serviceKey>。 */
@@ -67,26 +67,15 @@ public class CircuitBreakerRegistry {
 
     @Autowired
     public CircuitBreakerRegistry(
-            ObjectProvider<StringRedisTemplate> redisTemplateProvider,
+            StringRedisTemplate redisTemplate,
             @Value("${canvas.circuit-breaker.default.failure-threshold:5}") int defaultFailureThreshold,
             @Value("${canvas.circuit-breaker.default.open-duration-sec:30}") long defaultOpenDurationSec,
             @Value("${canvas.circuit-breaker.default.half-open-attempts:3}") int defaultHalfOpenAttempts,
             @Value("${canvas.circuit-breaker.redis.key-prefix:cb:}") String redisKeyPrefix,
             @Value("${canvas.circuit-breaker.redis.pub-sub-channel:circuit-breaker-events}") String eventsChannel,
             @Value("${canvas.circuit-breaker.redis.local-cache-ttl-sec:5}") long localCacheTtlSec) {
-        this(redisTemplateProvider.getIfAvailable(), defaultFailureThreshold, defaultOpenDurationSec,
-                defaultHalfOpenAttempts, redisKeyPrefix, eventsChannel, localCacheTtlSec);
-    }
-
-    CircuitBreakerRegistry(StringRedisTemplate redisTemplate,
-                           int defaultFailureThreshold,
-                           long defaultOpenDurationSec,
-                           int defaultHalfOpenAttempts,
-                           String redisKeyPrefix,
-                           String eventsChannel,
-                           long localCacheTtlSec) {
-        this(redisTemplate, defaultFailureThreshold, defaultOpenDurationSec, defaultHalfOpenAttempts,
-                redisKeyPrefix, eventsChannel, localCacheTtlSec, Clock.systemUTC());
+        this(redisTemplate, defaultFailureThreshold, defaultOpenDurationSec,
+                defaultHalfOpenAttempts, redisKeyPrefix, eventsChannel, localCacheTtlSec, Clock.systemUTC());
     }
 
     CircuitBreakerRegistry(StringRedisTemplate redisTemplate,
@@ -97,7 +86,7 @@ public class CircuitBreakerRegistry {
                            String eventsChannel,
                            long localCacheTtlSec,
                            Clock clock) {
-        this.redisTemplate = redisTemplate;
+        this.redisTemplate = Objects.requireNonNull(redisTemplate, "redisTemplate");
         this.defaultFailureThreshold = defaultFailureThreshold;
         this.defaultOpenDurationSec = defaultOpenDurationSec;
         this.defaultHalfOpenAttempts = defaultHalfOpenAttempts;
@@ -124,7 +113,7 @@ public class CircuitBreakerRegistry {
     public CircuitBreaker get(String nodeType) {
         return registry.computeIfAbsent(nodeType, k ->
                 new CircuitBreaker(nodeType, defaultFailureThreshold,
-                        defaultOpenDurationSec, defaultHalfOpenAttempts, redisTemplate == null ? null : this));
+                        defaultOpenDurationSec, defaultHalfOpenAttempts, this));
     }
 
     CircuitBreaker.State getState(String nodeType) {
@@ -134,9 +123,6 @@ public class CircuitBreakerRegistry {
         }
 
         CircuitBreaker breaker = get(nodeType);
-        if (redisTemplate == null) {
-            return breaker.localState();
-        }
         return runTransition(nodeType, ACTION_READ, breaker.failureThreshold,
                 breaker.openDurationMs, breaker.halfOpenAttempts).state();
     }
@@ -318,10 +304,6 @@ public class CircuitBreakerRegistry {
                 openedAt = System.currentTimeMillis();
                 log.warn("[CIRCUIT] {} CLOSED → OPEN（失败次数={}）", name, count);
             }
-        }
-
-        State localState() {
-            return state;
         }
 
         public enum State {
