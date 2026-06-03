@@ -6,8 +6,32 @@ import path from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { computeVerdict } from './verifier.mjs'
 import { createPerfFixtures, engineAccuracyTraceVerifierArgs } from './fixture.mjs'
+import {
+  aggregateWorkerSummaries,
+  assertDistributedReportable,
+  buildDistributedPlan,
+  distributedDirectory,
+  loadWorkerSummaries,
+  planFileFor,
+  readJson as readDistributedJson,
+  workerRunnerArgs,
+  workerSummaryFileFor,
+  writeJson as writeDistributedJson,
+} from './distributed-report.mjs'
 
-const COMMANDS = new Set(['doctor', 'fixture', 'smoke', 'threshold', 'soak', 'accuracy', 'report', 'cleanup'])
+const COMMANDS = new Set([
+  'doctor',
+  'fixture',
+  'smoke',
+  'threshold',
+  'soak',
+  'accuracy',
+  'report',
+  'cleanup',
+  'distributed-plan',
+  'distributed-worker',
+  'distributed-report',
+])
 
 const DEFAULTS = {
   baseUrl: 'http://localhost:8080',
@@ -31,6 +55,14 @@ const DEFAULTS = {
   count: 300000,
   concurrency: 100,
   wiremockUrl: 'http://localhost:8099',
+  distributedRoot: 'tmp/perf-distributed',
+  workerIds: '',
+  workerId: '',
+  totalCount: 300000,
+  totalConcurrency: 100,
+  planFile: '',
+  evidenceDir: '',
+  accuracy: false,
 }
 
 const FLAG_NAMES = {
@@ -55,10 +87,18 @@ const FLAG_NAMES = {
   '--count': 'count',
   '--concurrency': 'concurrency',
   '--wiremock-url': 'wiremockUrl',
+  '--distributed-root': 'distributedRoot',
+  '--worker-ids': 'workerIds',
+  '--worker-id': 'workerId',
+  '--total-count': 'totalCount',
+  '--total-concurrency': 'totalConcurrency',
+  '--plan-file': 'planFile',
+  '--evidence-dir': 'evidenceDir',
+  '--accuracy': 'accuracy',
 }
 
-const NUMBER_FLAGS = new Set(['matchedCanvasCount', 'minDurationMin', 'count', 'concurrency'])
-const BOOLEAN_FLAGS = new Set(['execute', 'rebuild'])
+const NUMBER_FLAGS = new Set(['matchedCanvasCount', 'minDurationMin', 'count', 'concurrency', 'totalCount', 'totalConcurrency'])
+const BOOLEAN_FLAGS = new Set(['execute', 'rebuild', 'accuracy'])
 
 function parseBoolean(flag, value) {
   if (value === 'true') return true
@@ -470,6 +510,26 @@ function failedRequestCount(summary) {
   return Number(summary.failed || 0)
 }
 
+function distributedPlanPath(config) {
+  if (config.planFile) {
+    return config.planFile
+  }
+  if (!config.perfRunId) {
+    throw new Error('--perf-run-id is required')
+  }
+  return planFileFor(config.distributedRoot, config.perfRunId)
+}
+
+function distributedEvidenceDirectory(config, plan) {
+  if (config.evidenceDir) {
+    return config.evidenceDir
+  }
+  if (config.planFile) {
+    return path.dirname(config.planFile)
+  }
+  return distributedDirectory(config.distributedRoot, plan.perfRunId)
+}
+
 async function defaultDoctor() {
   return { status: 'PASS' }
 }
@@ -720,6 +780,135 @@ async function defaultReport(config) {
   }
 }
 
+async function defaultDistributedPlan(config) {
+  if (!config.perfRunId) {
+    throw new Error('--perf-run-id is required for distributed-plan')
+  }
+  if (!config.workerIds) {
+    throw new Error('--worker-ids is required for distributed-plan')
+  }
+  const plan = buildDistributedPlan({
+    perfRunId: config.perfRunId,
+    mode: config.mode,
+    baseUrl: config.baseUrl,
+    eventCode: config.eventCode,
+    canvasId: config.canvasId,
+    eventSecretEnv: config.eventSecretEnv,
+    matchedCanvasCount: config.matchedCanvasCount,
+    reportType: config.reportType,
+    minDurationMin: config.minDurationMin,
+    totalCount: config.totalCount,
+    totalConcurrency: config.totalConcurrency,
+    workerIds: config.workerIds,
+    accuracy: config.accuracy,
+  })
+  const planFile = distributedPlanPath(config)
+  writeDistributedJson(planFile, plan)
+  return { status: 'PASS', plan, planFile }
+}
+
+async function defaultDistributedWorker(config, deps = {}) {
+  if (!config.workerId) {
+    throw new Error('--worker-id is required for distributed-worker')
+  }
+  const run = deps.runCommand || runCommand
+  const planFile = distributedPlanPath(config)
+  const plan = readDistributedJson(planFile)
+  const directory = distributedEvidenceDirectory(config, plan)
+  const summaryFile = workerSummaryFileFor(directory, config.workerId)
+  const runner = parseJsonCommandResult(
+    run(process.execPath, workerRunnerArgs({ plan, workerId: config.workerId, summaryFile })),
+    'perf-runner',
+  )
+  writeDistributedJson(summaryFile, runner)
+  return {
+    status: failedRequestCount(runner) > 0 ? 'FAIL' : 'PASS',
+    planFile,
+    summaryFile,
+    summary: runner,
+  }
+}
+
+async function defaultDistributedReport(config, deps = {}) {
+  const run = deps.runCommand || runCommand
+  const planFile = distributedPlanPath(config)
+  const plan = readDistributedJson(planFile)
+  const directory = distributedEvidenceDirectory(config, plan)
+  const workerSummaries = loadWorkerSummaries(plan, directory)
+  const summary = aggregateWorkerSummaries(plan, workerSummaries)
+  const summaryFile = path.join(directory, 'distributed-summary.json')
+  writeDistributedJson(summaryFile, summary)
+  assertDistributedReportable(summary, {
+    reportType: plan.accuracy ? 'fault' : plan.reportType,
+    minDurationMin: plan.minDurationMin,
+  })
+
+  const verifierArgs = [
+    'tools/perf/verifier.mjs',
+    '--mysql', config.mysql,
+    '--database', config.database,
+    '--mode', plan.mode,
+    '--perf-run-id', plan.perfRunId,
+    '--sent-success', String(summary.success),
+    '--matched-canvas-count', String(plan.accuracy ? 1 : plan.matchedCanvasCount),
+  ]
+  if (plan.accuracy) {
+    verifierArgs.push(...engineAccuracyTraceVerifierArgs())
+  }
+  const verifier = parseJsonCommandResult(run(process.execPath, verifierArgs), 'verifier')
+  const verifierEvidence = {
+    ...verifier,
+    perfRunId: plan.perfRunId,
+    sentSuccess: summary.success,
+  }
+  const verifierFile = path.join(directory, 'verifier.json')
+  writeDistributedJson(verifierFile, verifierEvidence)
+  assertVerifierEvidenceComplete(verifierEvidence, {
+    perfRunId: plan.perfRunId,
+    sentSuccess: summary.success,
+  })
+  assertCapacityReportable(verifierEvidence, { reportType: plan.reportType })
+
+  let sideEffect = null
+  let sideEffectFile = ''
+  if (plan.accuracy) {
+    const sideEffectArgs = [
+      'tools/perf/side-effect-verifier.mjs',
+      '--wiremock-url', config.wiremockUrl,
+      '--perf-run-id', plan.perfRunId,
+      '--sent-success', String(summary.success),
+      '--path', '/mock/reach/send',
+    ]
+    sideEffect = parseJsonCommandResult(run(process.execPath, sideEffectArgs), 'side-effect-verifier')
+    sideEffectFile = path.join(directory, 'side-effect-verifier.json')
+    writeDistributedJson(sideEffectFile, sideEffect)
+    if (sideEffect.verdict !== 'PASS') {
+      return {
+        status: 'FAIL',
+        reason: `side-effect verifier verdict ${sideEffect.verdict}`,
+        summary,
+        verifier,
+        sideEffect,
+        directory,
+        summaryFile,
+        verifierFile,
+        sideEffectFile,
+      }
+    }
+  }
+
+  return {
+    status: 'PASS',
+    summary,
+    verifier,
+    sideEffect,
+    directory,
+    summaryFile,
+    verifierFile,
+    sideEffectFile,
+  }
+}
+
 export async function runGuide(config, deps = {}) {
   const handlers = {
     doctor: deps.doctor || defaultDoctor,
@@ -730,6 +919,9 @@ export async function runGuide(config, deps = {}) {
     accuracy: deps.accuracy || ((activeConfig) => defaultAccuracy(activeConfig, deps)),
     report: deps.report || defaultReport,
     cleanup: deps.cleanup || defaultCleanup,
+    'distributed-plan': deps.distributedPlan || defaultDistributedPlan,
+    'distributed-worker': deps.distributedWorker || ((activeConfig) => defaultDistributedWorker(activeConfig, deps)),
+    'distributed-report': deps.distributedReport || ((activeConfig) => defaultDistributedReport(activeConfig, deps)),
   }
   return handlers[config.command](config)
 }

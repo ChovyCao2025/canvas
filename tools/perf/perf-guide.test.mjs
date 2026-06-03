@@ -15,6 +15,7 @@ import {
   runGuide,
   writeJson,
 } from './perf-guide.mjs'
+import { latencyBucketsForDurations } from './perf-runner.mjs'
 
 function completeVerifierEvidence(overrides = {}) {
   const evidence = {
@@ -72,6 +73,40 @@ function completeVerifierEvidence(overrides = {}) {
   }
 }
 
+function distributedWorkerSummary({
+  workerId,
+  seqStart,
+  seqCount,
+  durations,
+  perfRunId = 'perf_dist_001',
+  mode = 'event',
+  startedAt = '2026-06-03T00:00:00.000Z',
+  finishedAt = '2026-06-03T00:00:12.000Z',
+}) {
+  return {
+    perfRunId,
+    workerId,
+    mode,
+    seqStart,
+    seqCount,
+    sent: durations.length,
+    success: durations.length,
+    failed: 0,
+    p95Ms: durations.at(-1) || 0,
+    p99Ms: durations.at(-1) || 0,
+    minMs: durations[0] || 0,
+    maxMs: durations.at(-1) || 0,
+    avgMs: durations.length
+      ? durations.reduce((sum, duration) => sum + duration, 0) / durations.length
+      : 0,
+    latencyBuckets: latencyBucketsForDurations(durations),
+    startedAt,
+    finishedAt,
+    durationMs: 12_000,
+    machine: { hostname: workerId },
+  }
+}
+
 test('parseGuideArgs parses subcommand and common flags', () => {
   const config = parseGuideArgs([
     'doctor',
@@ -86,6 +121,217 @@ test('parseGuideArgs parses subcommand and common flags', () => {
 
 test('parseGuideArgs rejects unknown subcommand', () => {
   assert.throws(() => parseGuideArgs(['unknown']), /command must be one of/)
+})
+
+test('parseGuideArgs accepts distributed commands and worker settings', () => {
+  const args = parseGuideArgs([
+    'distributed-plan',
+    '--perf-run-id', 'perf_dist_001',
+    '--worker-ids', 'worker-01,worker-02',
+    '--total-count', '100',
+    '--total-concurrency', '10',
+    '--distributed-root', 'tmp/perf-distributed',
+  ])
+
+  assert.equal(args.command, 'distributed-plan')
+  assert.equal(args.perfRunId, 'perf_dist_001')
+  assert.equal(args.workerIds, 'worker-01,worker-02')
+  assert.equal(args.totalCount, 100)
+  assert.equal(args.totalConcurrency, 10)
+  assert.equal(args.distributedRoot, 'tmp/perf-distributed')
+})
+
+test('distributed-plan writes a plan file', async () => {
+  const root = mkdtempSync(path.join(tmpdir(), 'perf-guide-dist-'))
+  try {
+    const result = await runGuide(parseGuideArgs([
+      'distributed-plan',
+      '--perf-run-id', 'perf_dist_001',
+      '--worker-ids', 'worker-01,worker-02',
+      '--total-count', '100',
+      '--total-concurrency', '10',
+      '--distributed-root', root,
+    ]))
+
+    assert.equal(result.status, 'PASS')
+    assert.equal(result.plan.perfRunId, 'perf_dist_001')
+    assert.equal(result.plan.workers.length, 2)
+    assert.equal(JSON.parse(readFileSync(result.planFile, 'utf8')).perfRunId, 'perf_dist_001')
+  } finally {
+    rmSync(root, { recursive: true, force: true })
+  }
+})
+
+test('distributed-report uses report settings persisted in the plan', async () => {
+  const root = mkdtempSync(path.join(tmpdir(), 'perf-guide-dist-'))
+  try {
+    const planResult = await runGuide(parseGuideArgs([
+      'distributed-plan',
+      '--perf-run-id', 'perf_dist_001',
+      '--worker-ids', 'worker-01,worker-02',
+      '--total-count', '4',
+      '--total-concurrency', '2',
+      '--report-type', 'fault',
+      '--distributed-root', root,
+    ]))
+
+    const directory = path.dirname(planResult.planFile)
+    writeJson(path.join(directory, 'workers', 'worker-01', 'runner-summary.json'), distributedWorkerSummary({
+      workerId: 'worker-01',
+      seqStart: 1,
+      seqCount: 2,
+      durations: [100, 200],
+    }))
+    writeJson(path.join(directory, 'workers', 'worker-02', 'runner-summary.json'), distributedWorkerSummary({
+      workerId: 'worker-02',
+      seqStart: 3,
+      seqCount: 2,
+      durations: [50, 500],
+    }))
+
+    const result = await runGuide(parseGuideArgs([
+      'distributed-report',
+      '--plan-file', planResult.planFile,
+    ]), {
+      runCommand: () => ({
+        status: 0,
+        stdout: JSON.stringify(completeVerifierEvidence({
+          perfRunId: 'perf_dist_001',
+          planned: 4,
+          sentSuccess: 4,
+          accepted: 4,
+          expectedExecutions: 4,
+          actualExecutions: 4,
+          success: 4,
+        })),
+        stderr: '',
+      }),
+    })
+
+    assert.equal(result.status, 'PASS')
+    assert.equal(result.summary.p95Ms, 500)
+  } finally {
+    rmSync(root, { recursive: true, force: true })
+  }
+})
+
+test('distributed-report rejects incomplete verifier evidence', async () => {
+  const root = mkdtempSync(path.join(tmpdir(), 'perf-guide-dist-'))
+  try {
+    const planResult = await runGuide(parseGuideArgs([
+      'distributed-plan',
+      '--perf-run-id', 'perf_dist_001',
+      '--worker-ids', 'worker-01,worker-02',
+      '--total-count', '4',
+      '--total-concurrency', '2',
+      '--report-type', 'fault',
+      '--distributed-root', root,
+    ]))
+
+    const directory = path.dirname(planResult.planFile)
+    writeJson(path.join(directory, 'workers', 'worker-01', 'runner-summary.json'), distributedWorkerSummary({
+      workerId: 'worker-01',
+      seqStart: 1,
+      seqCount: 2,
+      durations: [100, 200],
+    }))
+    writeJson(path.join(directory, 'workers', 'worker-02', 'runner-summary.json'), distributedWorkerSummary({
+      workerId: 'worker-02',
+      seqStart: 3,
+      seqCount: 2,
+      durations: [50, 500],
+    }))
+
+    await assert.rejects(() => runGuide(parseGuideArgs([
+      'distributed-report',
+      '--plan-file', planResult.planFile,
+    ]), {
+      runCommand: () => ({
+        status: 0,
+        stdout: JSON.stringify({ verdict: 'PASS' }),
+        stderr: '',
+      }),
+    }), /verifier evidence field planned/)
+  } finally {
+    rmSync(root, { recursive: true, force: true })
+  }
+})
+
+test('distributed-report accuracy skips capacity duration and verifies side effects', async () => {
+  const root = mkdtempSync(path.join(tmpdir(), 'perf-guide-dist-'))
+  try {
+    const planResult = await runGuide(parseGuideArgs([
+      'distributed-plan',
+      '--perf-run-id', 'perf_dist_001',
+      '--mode', 'direct',
+      '--canvas-id', '42',
+      '--worker-ids', 'worker-01,worker-02',
+      '--total-count', '4',
+      '--total-concurrency', '2',
+      '--accuracy', 'true',
+      '--distributed-root', root,
+    ]))
+
+    const directory = path.dirname(planResult.planFile)
+    writeJson(path.join(directory, 'workers', 'worker-01', 'runner-summary.json'), distributedWorkerSummary({
+      workerId: 'worker-01',
+      seqStart: 1,
+      seqCount: 2,
+      durations: [100, 200],
+      mode: 'direct',
+    }))
+    writeJson(path.join(directory, 'workers', 'worker-02', 'runner-summary.json'), distributedWorkerSummary({
+      workerId: 'worker-02',
+      seqStart: 3,
+      seqCount: 2,
+      durations: [50, 500],
+      mode: 'direct',
+    }))
+
+    const calls = []
+    const result = await runGuide(parseGuideArgs([
+      'distributed-report',
+      '--plan-file', planResult.planFile,
+    ]), {
+      runCommand: (command, args) => {
+        calls.push([command, args])
+        if (args.includes('tools/perf/side-effect-verifier.mjs')) {
+          return {
+            status: 0,
+            stdout: JSON.stringify({ verdict: 'PASS', duplicateSideEffects: 0 }),
+            stderr: '',
+          }
+        }
+        return {
+          status: 0,
+          stdout: JSON.stringify(completeVerifierEvidence({
+            perfRunId: 'perf_dist_001',
+            planned: 4,
+            sentSuccess: 4,
+            accepted: 4,
+            expectedExecutions: 4,
+            actualExecutions: 4,
+            success: 4,
+            traceEnabled: true,
+            traceCounts: [
+              { nodeId: 'start', status: 1, statusName: 'success', expected: 4, actual: 4 },
+            ],
+            traceMismatch: 0,
+            traceMismatches: [],
+            traceVerdict: 'PASS',
+          })),
+          stderr: '',
+        }
+      },
+    })
+
+    assert.equal(result.status, 'PASS')
+    assert.equal(calls.length, 2)
+    assert.ok(calls[0][1].includes('--expect-trace'))
+    assert.ok(calls[1][1].includes('tools/perf/side-effect-verifier.mjs'))
+  } finally {
+    rmSync(root, { recursive: true, force: true })
+  }
 })
 
 test('assertCapacityReportable accepts PASS verifier for capacity report', () => {
