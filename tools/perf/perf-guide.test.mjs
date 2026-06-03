@@ -7,6 +7,7 @@ import path from 'node:path'
 import {
   assertCapacityReportable,
   assertRunnerReportable,
+  assertRunnerSummaryComplete,
   commandForCleanup,
   defaultRunScenario,
   parseGuideArgs,
@@ -117,6 +118,17 @@ test('assertRunnerReportable rejects mismatched run id', () => {
   }), /does not match/)
 })
 
+test('assertRunnerSummaryComplete rejects missing failed evidence', () => {
+  assert.throws(() => assertRunnerSummaryComplete({
+    perfRunId: 'perf_report_001',
+    sent: 100,
+    success: 100,
+    durationMs: 1_800_000,
+  }, {
+    perfRunId: 'perf_report_001',
+  }), /failed must be numeric/)
+})
+
 test('commandForCleanup defaults to ledger dry run', () => {
   assert.deepEqual(commandForCleanup({
     perfRunId: 'perf_20260523_001',
@@ -185,8 +197,14 @@ test('smoke stops after first verifier failure', async () => {
     runScenario: async ({ mode }) => {
       calls.push(mode)
       return mode === 'direct'
-        ? { summary: { success: 50, failed: 0 }, verifier: { verdict: 'FAIL' } }
-        : { summary: { success: 100, failed: 0 }, verifier: { verdict: 'PASS' } }
+        ? {
+            summary: { perfRunId: 'perf_smoke_001_direct', sent: 50, success: 50, failed: 0, durationMs: 1000 },
+            verifier: { verdict: 'FAIL' },
+          }
+        : {
+            summary: { perfRunId: 'perf_smoke_001_event', sent: 100, success: 100, failed: 0, durationMs: 1000 },
+            verifier: { verdict: 'PASS' },
+          }
     },
   })
 
@@ -204,7 +222,10 @@ test('smoke runs direct and event when both pass', async () => {
   ]), {
     runScenario: async ({ mode }) => {
       calls.push(mode)
-      return { summary: { success: 1, failed: 0 }, verifier: { verdict: 'PASS' } }
+      return {
+        summary: { perfRunId: `perf_smoke_001_${mode}`, sent: 1, success: 1, failed: 0, durationMs: 1000 },
+        verifier: { verdict: 'PASS' },
+      }
     },
   })
 
@@ -221,7 +242,10 @@ test('smoke fails when runner reports request failures', async () => {
   ]), {
     runScenario: async ({ mode }) => {
       calls.push(mode)
-      return { summary: { success: 49, failed: 1 }, verifier: { verdict: 'PASS' } }
+      return {
+        summary: { perfRunId: `perf_smoke_001_${mode}`, sent: 50, success: 49, failed: 1, durationMs: 1000 },
+        verifier: { verdict: 'PASS' },
+      }
     },
   })
 
@@ -229,6 +253,19 @@ test('smoke fails when runner reports request failures', async () => {
   assert.equal(result.failedMode, 'direct')
   assert.match(result.reason, /failed request/)
   assert.deepEqual(calls, ['direct'])
+})
+
+test('smoke fails closed when runner summary is incomplete', async () => {
+  await assert.rejects(() => runGuide(parseGuideArgs([
+    'smoke',
+    '--perf-run-id', 'perf_smoke_001',
+    '--canvas-id', '42',
+  ]), {
+    runScenario: async () => ({
+      summary: { perfRunId: 'perf_smoke_001_direct', sent: 50, success: 50, durationMs: 1000 },
+      verifier: { verdict: 'PASS' },
+    }),
+  }), /failed must be numeric/)
 })
 
 test('threshold delegates to threshold-runner with event secret env', async () => {
@@ -328,7 +365,7 @@ test('soak rejects run shorter than minimum duration', async () => {
     '--min-duration-min', '30',
   ]), {
     runScenario: async () => ({
-      summary: { durationMs: 60_000, success: 100, failed: 0 },
+      summary: { perfRunId: 'perf_soak_001', sent: 100, success: 100, failed: 0, durationMs: 60_000 },
       verifier: { verdict: 'PASS' },
     }),
   })
@@ -344,13 +381,26 @@ test('soak fails when runner reports request failures', async () => {
     '--min-duration-min', '30',
   ]), {
     runScenario: async () => ({
-      summary: { durationMs: 1_800_000, success: 299999, failed: 1 },
+      summary: { perfRunId: 'perf_soak_001', sent: 300000, success: 299999, failed: 1, durationMs: 1_800_000 },
       verifier: { verdict: 'PASS' },
     }),
   })
 
   assert.equal(result.status, 'FAIL')
   assert.match(result.reason, /failed request/)
+})
+
+test('soak fails closed when runner summary is incomplete', async () => {
+  await assert.rejects(() => runGuide(parseGuideArgs([
+    'soak',
+    '--perf-run-id', 'perf_soak_001',
+    '--min-duration-min', '30',
+  ]), {
+    runScenario: async () => ({
+      summary: { perfRunId: 'perf_soak_001', sent: 300000, success: 300000, durationMs: 1_800_000 },
+      verifier: { verdict: 'PASS' },
+    }),
+  }), /failed must be numeric/)
 })
 
 test('soak uses original perf run id for reportable evidence', async () => {
@@ -363,7 +413,7 @@ test('soak uses original perf run id for reportable evidence', async () => {
     runScenario: async (options) => {
       scenarioOptions = options
       return {
-        summary: { durationMs: 60_000, success: 100, failed: 0 },
+        summary: { perfRunId: 'perf_soak_001', sent: 100, success: 100, failed: 0, durationMs: 60_000 },
         verifier: { verdict: 'PASS' },
       }
     },
@@ -399,7 +449,7 @@ test('defaultRunScenario writes verifier evidence under provided perf run id', a
         if (args[0] === 'tools/perf/perf-runner.mjs') {
           return {
             status: 0,
-            stdout: JSON.stringify({ success: 1, failed: 0, durationMs: 60_000 }),
+            stdout: JSON.stringify({ perfRunId: 'perf_soak_001', sent: 1, success: 1, failed: 0, durationMs: 60_000 }),
             stderr: '',
           }
         }
@@ -416,7 +466,7 @@ test('defaultRunScenario writes verifier evidence under provided perf run id', a
     assert.equal(calls[1][1][calls[1][1].indexOf('--perf-run-id') + 1], 'perf_soak_001')
     assert.deepEqual(
       JSON.parse(readFileSync(path.join(runRoot, 'perf_soak_001', 'verifier.json'), 'utf8')),
-      { verdict: 'PASS' },
+      { verdict: 'PASS', perfRunId: 'perf_soak_001', sentSuccess: 1 },
     )
   } finally {
     rmSync(runRoot, { recursive: true, force: true })
@@ -436,6 +486,8 @@ test('report rejects pass verifier when runner has request failures', async () =
     })
     writeJson(path.join(runRoot, 'perf_report_001', 'verifier.json'), {
       verdict: 'PASS',
+      perfRunId: 'perf_report_001',
+      sentSuccess: 99,
     })
 
     await assert.rejects(() => runGuide(parseGuideArgs([
@@ -462,6 +514,8 @@ test('report rejects short capacity runs', async () => {
     })
     writeJson(path.join(runRoot, 'perf_report_002', 'verifier.json'), {
       verdict: 'PASS',
+      perfRunId: 'perf_report_002',
+      sentSuccess: 100,
     })
 
     await assert.rejects(() => runGuide(parseGuideArgs([
@@ -488,6 +542,8 @@ test('report accepts complete runner and verifier evidence', async () => {
     })
     writeJson(path.join(runRoot, 'perf_report_003', 'verifier.json'), {
       verdict: 'PASS',
+      perfRunId: 'perf_report_003',
+      sentSuccess: 100,
     })
 
     const result = await runGuide(parseGuideArgs([
@@ -500,6 +556,62 @@ test('report accepts complete runner and verifier evidence', async () => {
     assert.equal(result.status, 'PASS')
     assert.equal(result.verifierVerdict, 'PASS')
     assert.match(result.summaryPath, /runner-summary\.json$/)
+  } finally {
+    rmSync(runRoot, { recursive: true, force: true })
+  }
+})
+
+test('report rejects stale verifier evidence with mismatched run id', async () => {
+  const runRoot = mkdtempSync(path.join(tmpdir(), 'perf-guide-report-'))
+
+  try {
+    writeJson(path.join(runRoot, 'perf_report_004', 'runner-summary.json'), {
+      perfRunId: 'perf_report_004',
+      sent: 100,
+      success: 100,
+      failed: 0,
+      durationMs: 60_000,
+    })
+    writeJson(path.join(runRoot, 'perf_report_004', 'verifier.json'), {
+      verdict: 'PASS',
+      perfRunId: 'perf_report_old',
+      sentSuccess: 100,
+    })
+
+    await assert.rejects(() => runGuide(parseGuideArgs([
+      'report',
+      '--perf-run-id', 'perf_report_004',
+      '--run-root', runRoot,
+      '--min-duration-min', '1',
+    ])), /verifier perfRunId/)
+  } finally {
+    rmSync(runRoot, { recursive: true, force: true })
+  }
+})
+
+test('report rejects stale verifier evidence with mismatched sent success', async () => {
+  const runRoot = mkdtempSync(path.join(tmpdir(), 'perf-guide-report-'))
+
+  try {
+    writeJson(path.join(runRoot, 'perf_report_005', 'runner-summary.json'), {
+      perfRunId: 'perf_report_005',
+      sent: 100,
+      success: 90,
+      failed: 0,
+      durationMs: 60_000,
+    })
+    writeJson(path.join(runRoot, 'perf_report_005', 'verifier.json'), {
+      verdict: 'PASS',
+      perfRunId: 'perf_report_005',
+      sentSuccess: 100,
+    })
+
+    await assert.rejects(() => runGuide(parseGuideArgs([
+      'report',
+      '--perf-run-id', 'perf_report_005',
+      '--run-root', runRoot,
+      '--min-duration-min', '1',
+    ])), /sentSuccess/)
   } finally {
     rmSync(runRoot, { recursive: true, force: true })
   }

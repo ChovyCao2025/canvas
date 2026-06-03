@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { spawnSync } from 'node:child_process'
 import path from 'node:path'
 import { pathToFileURL } from 'node:url'
@@ -135,13 +135,17 @@ function requireNumericEvidence(value, field) {
   return value
 }
 
-export function assertRunnerReportable(summary, { reportType, minDurationMin, perfRunId = '' }) {
+export function assertRunnerSummaryComplete(summary, { perfRunId = '' } = {}) {
   for (const field of ['sent', 'success', 'failed', 'durationMs']) {
     requireNumericEvidence(summary[field], field)
   }
   if (perfRunId && summary.perfRunId !== perfRunId) {
     throw new Error(`runner summary perfRunId ${summary.perfRunId || '(missing)'} does not match ${perfRunId}`)
   }
+}
+
+export function assertRunnerReportable(summary, { reportType, minDurationMin, perfRunId = '' }) {
+  assertRunnerSummaryComplete(summary, { perfRunId })
   if (failedRequestCount(summary) > 0) {
     throw new Error(`runner reported ${failedRequestCount(summary)} failed request(s); run cannot be reported`)
   }
@@ -196,6 +200,8 @@ export async function defaultRunScenario(config, { mode, count, concurrency, per
   const directory = runDirectory(config, scenarioPerfRunId)
   mkdirSync(directory, { recursive: true })
   const summaryFile = path.join(directory, 'runner-summary.json')
+  const verifierFile = path.join(directory, 'verifier.json')
+  rmSync(verifierFile, { force: true })
   const runnerArgs = [
     'tools/perf/perf-runner.mjs',
     '--mode', mode,
@@ -231,7 +237,11 @@ export async function defaultRunScenario(config, { mode, count, concurrency, per
     run(process.execPath, verifierArgs),
     'verifier',
   )
-  writeJson(path.join(directory, 'verifier.json'), verifier)
+  writeJson(verifierFile, {
+    ...verifier,
+    perfRunId: scenarioPerfRunId,
+    sentSuccess: runner.success,
+  })
   return { summary: runner, verifier, directory, perfRunId: scenarioPerfRunId }
 }
 
@@ -269,6 +279,7 @@ async function defaultSmoke(config, deps = {}) {
   for (const scenario of modes) {
     const run = await runScenario(scenario)
     runs.push({ mode: scenario.mode, verifier: run.verifier, summary: run.summary })
+    assertRunnerSummaryComplete(run.summary)
     if (failedRequestCount(run.summary) > 0) {
       return {
         status: 'FAIL',
@@ -328,6 +339,7 @@ async function defaultSoak(config, deps = {}) {
     count: 300000,
     concurrency: 100,
   })
+  assertRunnerSummaryComplete(run.summary, { perfRunId: config.perfRunId })
   if (failedRequestCount(run.summary) > 0) {
     return {
       status: 'FAIL',
@@ -385,6 +397,12 @@ async function defaultReport(config) {
     minDurationMin: config.minDurationMin,
     perfRunId: config.perfRunId,
   })
+  if (verifier.perfRunId !== summary.perfRunId) {
+    throw new Error(`verifier perfRunId ${verifier.perfRunId || '(missing)'} does not match ${summary.perfRunId}`)
+  }
+  if (verifier.sentSuccess !== summary.success) {
+    throw new Error(`verifier sentSuccess ${verifier.sentSuccess ?? '(missing)'} does not match runner success ${summary.success}`)
+  }
   assertCapacityReportable(verifier, { reportType: config.reportType })
   return {
     status: 'PASS',
