@@ -2,13 +2,20 @@ package org.chovy.canvas.infrastructure.redis;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
+import org.springframework.data.redis.core.Cursor;
+import org.springframework.data.redis.core.RedisOperations;
+import org.springframework.data.redis.core.SessionCallback;
 import org.springframework.data.redis.connection.ReactiveRedisConnectionFactory;
 import org.springframework.data.redis.core.SetOperations;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.ValueOperations;
 import org.springframework.test.util.ReflectionTestUtils;
 
+import java.util.Collection;
+import java.util.List;
 import java.time.Duration;
+import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -87,5 +94,48 @@ class TriggerRouteServiceTest {
 
         assertThat(waitCalls).hasValue(2);
         verify(setOps).add("test:trigger:mq:order.paid", "202");
+    }
+
+    @Test
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    void replaceTriggerRoutesReplacesMqBehaviorAndTaggerFamilies() {
+        RedisOperations operations = mock(RedisOperations.class);
+        SetOperations txSetOps = mock(SetOperations.class);
+        when(operations.opsForSet()).thenReturn(txSetOps);
+        when(operations.exec()).thenReturn(List.of());
+        Cursor<String> mqCursor = cursor("test:trigger:mq:old");
+        Cursor<String> behaviorCursor = cursor("test:trigger:behavior:old");
+        Cursor<String> taggerCursor = cursor("test:trigger:tagger:old");
+        when(redis.scan(any()))
+                .thenReturn(mqCursor)
+                .thenReturn(behaviorCursor)
+                .thenReturn(taggerCursor);
+        when(redis.execute(any(SessionCallback.class))).thenAnswer(invocation -> {
+            SessionCallback callback = invocation.getArgument(0);
+            return callback.execute(operations);
+        });
+
+        service.replaceTriggerRoutes(
+                Map.of("order.paid", Set.of("10")),
+                Map.of("ORDER_PAID", Set.of("10")),
+                Map.of("vip_level", Set.of("10")));
+
+        ArgumentCaptor<Collection> deletedKeys = ArgumentCaptor.forClass(Collection.class);
+        verify(operations).delete(deletedKeys.capture());
+        assertThat(deletedKeys.getValue()).containsExactlyInAnyOrder(
+                "test:trigger:mq:old",
+                "test:trigger:behavior:old",
+                "test:trigger:tagger:old");
+        verify(txSetOps).add("test:trigger:mq:order.paid", "10");
+        verify(txSetOps).add("test:trigger:behavior:ORDER_PAID", "10");
+        verify(txSetOps).add("test:trigger:tagger:vip_level", "10");
+    }
+
+    private static Cursor<String> cursor(String... values) {
+        Cursor<String> cursor = mock(Cursor.class);
+        AtomicInteger index = new AtomicInteger();
+        when(cursor.hasNext()).thenAnswer(ignored -> index.get() < values.length);
+        when(cursor.next()).thenAnswer(ignored -> values[index.getAndIncrement()]);
+        return cursor;
     }
 }

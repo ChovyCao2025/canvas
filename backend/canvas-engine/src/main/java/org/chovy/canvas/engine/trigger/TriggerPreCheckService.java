@@ -3,6 +3,7 @@ package org.chovy.canvas.engine.trigger;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.chovy.canvas.common.enums.CanvasStatusEnum;
 import org.chovy.canvas.dal.dataobject.CanvasDO;
 import org.chovy.canvas.dal.mapper.CanvasMapper;
 import org.chovy.canvas.dal.dataobject.CanvasUserQuotaDO;
@@ -12,6 +13,7 @@ import org.springframework.data.redis.core.Cursor;
 import org.springframework.data.redis.core.ScanOptions;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.script.RedisScript;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
 import java.time.Duration;
@@ -266,6 +268,40 @@ public class TriggerPreCheckService {
                 log.warn("[QUOTA] 用量更新失败: {}", e.getMessage());
             }
         });
+    }
+
+    /** 定期修复非发布画布残留的永久配额 Redis key。 */
+    @Scheduled(cron = "${canvas.quota.reconcile-cron:0 30 3 * * *}")
+    public void reconcileInactiveCanvasQuotasJob() {
+        int count = reconcileInactiveCanvasQuotas();
+        log.info("[QUOTA] inactive canvas quota reconciliation completed canvases={}", count);
+    }
+
+    /**
+     * 清理所有非发布画布的永久配额 key。
+     *
+     * <p>该方法是幂等 repair 入口，用于修复 offline/kill/archive 外部清理失败后遗留的
+     * {@code canvas:global_count:*} 与 {@code canvas:quota:total:*} key。
+     */
+    public int reconcileInactiveCanvasQuotas() {
+        List<CanvasDO> inactive = canvasMapper.selectList(
+                new LambdaQueryWrapper<CanvasDO>()
+                        .ne(CanvasDO::getStatus, CanvasStatusEnum.PUBLISHED.getCode()));
+        if (inactive == null || inactive.isEmpty()) {
+            return 0;
+        }
+        int count = 0;
+        for (CanvasDO canvas : inactive) {
+            if (canvas.getId() == null) continue;
+            try {
+                cleanupCanvasQuotas(canvas.getId());
+                count++;
+            } catch (Exception e) {
+                log.error("[QUOTA] inactive canvas quota reconciliation failed canvasId={}: {}",
+                        canvas.getId(), e.getMessage());
+            }
+        }
+        return count;
     }
 
     /**

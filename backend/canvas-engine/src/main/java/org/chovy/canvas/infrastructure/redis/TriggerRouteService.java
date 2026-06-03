@@ -122,12 +122,7 @@ public class TriggerRouteService {
 
     /** 批量替换 MQ 触发路由表。 */
     public void replaceMqRoutes(Map<String, Set<String>> routes) {
-        // 先在内存中清洗快照，保证持锁期间只做 Redis IO，降低锁占用时间。
-        Map<String, Set<String>> snapshot = routes.entrySet().stream()
-                .filter(entry -> entry.getKey() != null && !entry.getKey().isBlank())
-                .map(entry -> Map.entry(entry.getKey(), sanitizeCanvasIds(entry.getValue())))
-                .filter(entry -> !entry.getValue().isEmpty())
-                .collect(Collectors.toUnmodifiableMap(Map.Entry::getKey, Map.Entry::getValue));
+        Map<String, Set<String>> snapshot = sanitizeRouteMap(routes);
         withRouteMutationLock(() -> {
             // ready 标记先删除，消费者会把“路由未就绪”视为可重试异常，避免读到半重建状态。
             markRouteRebuilding();
@@ -145,6 +140,47 @@ public class TriggerRouteService {
                     snapshot.forEach((topicKey, canvasIds) ->
                             operations.opsForSet().add(
                                     (K) keys.triggerMq(topicKey),
+                                    (V[]) canvasIds.toArray(String[]::new)));
+                    return operations.exec();
+                }
+            });
+            markRouteReady();
+        });
+    }
+
+    /** 批量替换全部触发路由表：MQ、行为事件和 tagger 实时触发。 */
+    public void replaceTriggerRoutes(Map<String, Set<String>> mqRoutes,
+                                     Map<String, Set<String>> behaviorRoutes,
+                                     Map<String, Set<String>> taggerRoutes) {
+        Map<String, Set<String>> mqSnapshot = sanitizeRouteMap(mqRoutes);
+        Map<String, Set<String>> behaviorSnapshot = sanitizeRouteMap(behaviorRoutes);
+        Map<String, Set<String>> taggerSnapshot = sanitizeRouteMap(taggerRoutes);
+        withRouteMutationLock(() -> {
+            markRouteRebuilding();
+            List<String> oldKeys = new ArrayList<>();
+            oldKeys.addAll(scanMqRouteKeys());
+            oldKeys.addAll(scanBehaviorRouteKeys());
+            oldKeys.addAll(scanTaggerRouteKeys());
+
+            redis.execute(new SessionCallback<List<Object>>() {
+                @Override
+                @SuppressWarnings("unchecked")
+                public <K, V> List<Object> execute(RedisOperations<K, V> operations) {
+                    operations.multi();
+                    if (!oldKeys.isEmpty()) {
+                        operations.delete((Collection<K>) oldKeys);
+                    }
+                    mqSnapshot.forEach((topicKey, canvasIds) ->
+                            operations.opsForSet().add(
+                                    (K) keys.triggerMq(topicKey),
+                                    (V[]) canvasIds.toArray(String[]::new)));
+                    behaviorSnapshot.forEach((eventCode, canvasIds) ->
+                            operations.opsForSet().add(
+                                    (K) keys.triggerBehavior(eventCode),
+                                    (V[]) canvasIds.toArray(String[]::new)));
+                    taggerSnapshot.forEach((tagCodeKey, canvasIds) ->
+                            operations.opsForSet().add(
+                                    (K) keys.triggerTagger(tagCodeKey),
                                     (V[]) canvasIds.toArray(String[]::new)));
                     return operations.exec();
                 }
@@ -254,18 +290,43 @@ public class TriggerRouteService {
 
     /** 使用 SCAN 查找当前命名空间下全部 MQ 路由 key。 */
     private List<String> scanMqRouteKeys() {
+        return scanRouteKeys(keys.triggerMqPattern());
+    }
+
+    /** 使用 SCAN 查找当前命名空间下全部行为事件路由 key。 */
+    private List<String> scanBehaviorRouteKeys() {
+        return scanRouteKeys(keys.triggerBehaviorPattern());
+    }
+
+    /** 使用 SCAN 查找当前命名空间下全部 tagger 路由 key。 */
+    private List<String> scanTaggerRouteKeys() {
+        return scanRouteKeys(keys.triggerTaggerPattern());
+    }
+
+    private List<String> scanRouteKeys(String pattern) {
         ScanOptions options = ScanOptions.scanOptions()
-                .match(keys.triggerMqPattern())
+                .match(pattern)
                 .count(1000)
                 .build();
         List<String> result = new ArrayList<>(1000);
         try (Cursor<String> cursor = redis.scan(options)) {
             while (cursor.hasNext()) {
-                // 使用 SCAN 渐进遍历当前命名空间 MQ 路由 key，避免 KEYS 阻塞 Redis。
+                // 使用 SCAN 渐进遍历当前命名空间路由 key，避免 KEYS 阻塞 Redis。
                 result.add(cursor.next());
             }
         }
         return result;
+    }
+
+    private Map<String, Set<String>> sanitizeRouteMap(Map<String, Set<String>> routes) {
+        if (routes == null || routes.isEmpty()) {
+            return Map.of();
+        }
+        return routes.entrySet().stream()
+                .filter(entry -> entry.getKey() != null && !entry.getKey().isBlank())
+                .map(entry -> Map.entry(entry.getKey(), sanitizeCanvasIds(entry.getValue())))
+                .filter(entry -> !entry.getValue().isEmpty())
+                .collect(Collectors.toUnmodifiableMap(Map.Entry::getKey, Map.Entry::getValue));
     }
 
     /** 过滤空值、空白值和非正整数，得到可写入 Redis 的画布 ID 集合。 */

@@ -56,6 +56,10 @@ public class RedisKeyUtil {
      * @return 转换或查询得到的字符串结果
      */
     public String triggerMqPattern()               { return prefix + ":trigger:mq:*"; }
+    /** 行为事件触发路由 key 扫描模式。 */
+    public String triggerBehaviorPattern()         { return prefix + ":trigger:behavior:*"; }
+    /** Tagger 实时触发路由 key 扫描模式。 */
+    public String triggerTaggerPattern()           { return prefix + ":trigger:tagger:*"; }
     /**
      * 执行 trigger Pattern 对应的业务逻辑。
      *
