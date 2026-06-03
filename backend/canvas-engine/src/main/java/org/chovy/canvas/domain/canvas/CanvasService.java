@@ -489,6 +489,11 @@ public class CanvasService {
         preCheckService.cleanupCanvasQuotas(canvasId);
     }
 
+    /** 驱逐运行态 CanvasDO 实体缓存，供灰度、晋升和回滚等状态变更在事务提交后调用。 */
+    public void invalidateRuntimeCanvas(Long canvasId) {
+        canvasExecutionService.invalidateCanvas(canvasId);
+    }
+
     /**
      * 执行 latest Draft 对应的业务逻辑。
      *

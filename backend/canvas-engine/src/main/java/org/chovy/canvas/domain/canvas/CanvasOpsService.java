@@ -13,6 +13,8 @@ import org.chovy.canvas.infrastructure.redis.TriggerRouteService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.transaction.annotation.Transactional;
 import org.chovy.canvas.dal.dataobject.CanvasDO;
 import org.chovy.canvas.dal.mapper.CanvasMapper;
@@ -171,6 +173,7 @@ public class CanvasOpsService {
         canvas.setCanaryVersionId(canary.getId());
         canvas.setCanaryPercent(percent);
         canvasMapper.updateById(canvas);
+        invalidateRuntimeCanvasAfterCommit(id);
     }
 
     /**
@@ -192,6 +195,7 @@ public class CanvasOpsService {
         canvas.setCanaryVersionId(null);
         canvas.setCanaryPercent(null);
         canvasMapper.updateById(canvas);
+        invalidateRuntimeCanvasAfterCommit(id);
     }
 
     /**
@@ -209,6 +213,7 @@ public class CanvasOpsService {
         canvas.setCanaryVersionId(null);
         canvas.setCanaryPercent(null);
         canvasMapper.updateById(canvas);
+        invalidateRuntimeCanvasAfterCommit(id);
     }
 
     /**
@@ -426,5 +431,23 @@ public class CanvasOpsService {
     /** 保留旧版本路由清理签名，实际清理由 CanvasService 统一处理。 */
     private void clearRoutes(Long id, CanvasDO canvas) {
         // 已由 canvasService.applyKillExternalCleanup 统一实现，保留签名兼容旧调用
+    }
+
+    /** 事务提交后驱逐运行态画布实体缓存，避免灰度字段或发布指针在执行侧滞留。 */
+    private void invalidateRuntimeCanvasAfterCommit(Long canvasId) {
+        if (canvasService == null) {
+            return;
+        }
+        Runnable invalidate = () -> canvasService.invalidateRuntimeCanvas(canvasId);
+        if (!TransactionSynchronizationManager.isSynchronizationActive()) {
+            invalidate.run();
+            return;
+        }
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+                invalidate.run();
+            }
+        });
     }
 }
