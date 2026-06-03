@@ -1,16 +1,19 @@
 package org.chovy.canvas.web;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.chovy.canvas.common.R;
 import org.chovy.canvas.common.enums.NodeType;
 import org.chovy.canvas.engine.disruptor.CanvasDisruptorService;
 import org.chovy.canvas.engine.trigger.CanvasExecutionService;
 import lombok.Data;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.server.reactive.ServerHttpRequest;
 import org.springframework.security.core.context.ReactiveSecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 import reactor.core.publisher.Mono;
 
 import io.jsonwebtoken.Claims;
+import java.io.IOException;
 import java.util.Map;
 import java.util.UUID;
 
@@ -28,6 +31,10 @@ public class ExecutionController {
     // 12.8节 Disruptor 分发
     /** Disruptor 投递服务，用于异步发布行为触发任务。 */
     private final CanvasDisruptorService disruptorService;
+    /** 机器请求签名校验服务。 */
+    private final MachineRequestAuthService machineRequestAuthService;
+    /** JSON 转换器，用于从原始请求体解析签名后的机器请求。 */
+    private final ObjectMapper objectMapper;
 
     /**
      * 业务直调接口：同步执行并等待结果
@@ -38,21 +45,26 @@ public class ExecutionController {
      */
     @PostMapping("/execute/direct/{canvasId}")
     public Mono<R<Map<String, Object>>> directCall(
+            ServerHttpRequest request,
             @PathVariable Long canvasId,
-            @RequestBody DirectCallReq req) {
-        // 设计文档 13.1节：调用方应提供 idempotencyKey，网络超时重试时保持相同值可防重复执行
-        // 未提供时生成随机 UUID（不保证幂等，业务方需知晓风险）
-        // 压测请求通过 inputParams.perfRunId 贯穿账本，通过 idempotencyKey 控制唯一输入键。
-        String dedupKey = (req.getIdempotencyKey() != null && !req.getIdempotencyKey().isBlank())
-                ? req.getIdempotencyKey()
-                : UUID.randomUUID().toString();
-        // 从 Reactor 安全上下文取当前登录用户，避免信任请求体里的 userId。
-        return currentUserId().flatMap(userId ->
-                executionService.trigger(
-                                canvasId, userId, NodeType.DIRECT_CALL,
-                                NodeType.DIRECT_CALL, null,
-                                req.getInputParams(), dedupKey, false)
-                        .map(R::ok));
+            @RequestBody Mono<String> rawBody) {
+        return rawBody.defaultIfEmpty("")
+                .flatMap(body -> {
+                    machineRequestAuthService.verify(request.getHeaders(), body);
+                    DirectCallReq req = readBody(body, DirectCallReq.class);
+                    String userId = requireUserId(req.getUserId());
+                    // 设计文档 13.1节：调用方应提供 idempotencyKey，网络超时重试时保持相同值可防重复执行
+                    // 未提供时生成随机 UUID（不保证幂等，业务方需知晓风险）
+                    // 压测请求通过 inputParams.perfRunId 贯穿账本，通过 idempotencyKey 控制唯一输入键。
+                    String dedupKey = (req.getIdempotencyKey() != null && !req.getIdempotencyKey().isBlank())
+                            ? req.getIdempotencyKey()
+                            : UUID.randomUUID().toString();
+                    return executionService.trigger(
+                                    canvasId, userId, NodeType.DIRECT_CALL,
+                                    NodeType.DIRECT_CALL, null,
+                                    req.getInputParams(), dedupKey, false)
+                            .map(R::ok);
+                });
     }
 
     /**
@@ -63,13 +75,20 @@ public class ExecutionController {
      * @return 成功响应
      */
     @PostMapping("/trigger/behavior")
-    public Mono<R<Void>> behaviorTrigger(@RequestBody BehaviorTriggerReq req) {
-        // 控制器只负责投递 Ring Buffer，实际画布执行由 Disruptor 消费线程异步完成。
-        disruptorService.publish(
-                req.getCanvasId(), req.getUserId(), "BEHAVIOR",
-                NodeType.EVENT_TRIGGER, req.getEventCode(),
-                req.getBehaviorData(), req.getEventId());
-        return Mono.just(R.ok());
+    public Mono<R<Void>> behaviorTrigger(
+            ServerHttpRequest request,
+            @RequestBody Mono<String> rawBody) {
+        return rawBody.defaultIfEmpty("")
+                .map(body -> {
+                    machineRequestAuthService.verify(request.getHeaders(), body);
+                    BehaviorTriggerReq req = readBody(body, BehaviorTriggerReq.class);
+                    // 控制器只负责投递 Ring Buffer，实际画布执行由 Disruptor 消费线程异步完成。
+                    disruptorService.publish(
+                            req.getCanvasId(), req.getUserId(), "BEHAVIOR",
+                            NodeType.EVENT_TRIGGER, req.getEventCode(),
+                            req.getBehaviorData(), req.getEventId());
+                    return R.ok();
+                });
     }
 
     /**
@@ -112,6 +131,21 @@ public class ExecutionController {
                     return username != null && !username.isBlank() ? username : "system";
                 })
                 .defaultIfEmpty("system");
+    }
+
+    private <T> T readBody(String body, Class<T> type) {
+        try {
+            return objectMapper.readValue(body, type);
+        } catch (IOException e) {
+            throw new IllegalArgumentException("请求体 JSON 不合法");
+        }
+    }
+
+    private String requireUserId(String userId) {
+        if (userId == null || userId.isBlank()) {
+            throw new IllegalArgumentException("userId 不能为空");
+        }
+        return userId;
     }
 
 
