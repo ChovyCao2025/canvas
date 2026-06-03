@@ -26,9 +26,10 @@ public class TaggerOfflineHandler implements NodeHandler {
 
     /** Tagger 离线查询客户端。 */
     private final WebClient webClient;
-    public TaggerOfflineHandler(@Value("${canvas.integration.tagger-service-url}") String url) {
+    public TaggerOfflineHandler(WebClient.Builder webClientBuilder,
+                                @Value("${canvas.integration.tagger-service-url}") String url) {
         // 与实时标签服务共用同一基础地址时，可通过路由路径区分接口
-        this.webClient = WebClient.builder().baseUrl(url).build();
+        this.webClient = webClientBuilder.clone().baseUrl(url).build();
     }
 
     /**

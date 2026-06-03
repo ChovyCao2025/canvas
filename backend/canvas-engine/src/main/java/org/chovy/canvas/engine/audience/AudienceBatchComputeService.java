@@ -69,6 +69,8 @@ public class AudienceBatchComputeService {
     private final AudienceDefinitionRuleValidator audienceRuleValidator;
     /** CDP 标签、画像和身份数据源解析器。 */
     private final CdpAudienceSourceService cdpAudienceSourceService;
+    /** 统一 HTTP 客户端构建器，继承全局超时、连接池和响应大小限制。 */
+    private final WebClient.Builder webClientBuilder;
 
     /** Tagger 服务地址。 */
     @Value("${canvas.integration.tagger-service-url}")
@@ -233,7 +235,7 @@ public class AudienceBatchComputeService {
             throw new IllegalArgumentException("seedTagCode is required for TAGGER_API");
         }
 
-        WebClient client = WebClient.builder().baseUrl(taggerUrl).build();
+        WebClient client = webClientBuilder.clone().baseUrl(taggerUrl).build();
         RoaringBitmap bitmap = new RoaringBitmap();
         int page = 1;
         while (true) {

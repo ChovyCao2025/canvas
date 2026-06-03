@@ -28,9 +28,10 @@ public class CouponHandler implements NodeHandler {
     /** 券系统 HTTP 客户端。 */
     private final WebClient webClient;
 
-    public CouponHandler(@Value("${canvas.integration.coupon-service-url}") String url) {
+    public CouponHandler(WebClient.Builder webClientBuilder,
+                         @Value("${canvas.integration.coupon-service-url}") String url) {
         // baseUrl 通过配置注入，便于多环境切换
-        this.webClient = WebClient.builder().baseUrl(url).build();
+        this.webClient = webClientBuilder.clone().baseUrl(url).build();
     }
 
     /**

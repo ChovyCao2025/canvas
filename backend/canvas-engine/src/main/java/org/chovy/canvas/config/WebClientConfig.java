@@ -30,13 +30,19 @@ public class WebClientConfig {
             @Value("${canvas.http-client.pending-acquire-timeout-ms:1000}") long pendingAcquireTimeoutMs,
             @Value("${canvas.http-client.connect-timeout-ms:1000}") int connectTimeoutMs,
             @Value("${canvas.http-client.response-timeout-ms:3000}") long responseTimeoutMs,
-            @Value("${canvas.http-client.write-timeout-ms:3000}") long writeTimeoutMs) {
+            @Value("${canvas.http-client.write-timeout-ms:3000}") long writeTimeoutMs,
+            @Value("${canvas.http-client.max-in-memory-bytes:1048576}") int maxInMemoryBytes,
+            @Value("${canvas.http-client.max-idle-sec:30}") long maxIdleSeconds,
+            @Value("${canvas.http-client.max-life-min:5}") long maxLifeMinutes) {
 
         // 连接池参数集中在配置项，避免出站 API 节点高并发时无界建连。
         ConnectionProvider provider = ConnectionProvider.builder("canvas-http")
                 .maxConnections(maxConnections)
                 .pendingAcquireMaxCount(pendingAcquireMaxCount)
                 .pendingAcquireTimeout(Duration.ofMillis(pendingAcquireTimeoutMs))
+                .maxIdleTime(Duration.ofSeconds(maxIdleSeconds))
+                .maxLifeTime(Duration.ofMinutes(maxLifeMinutes))
+                .evictInBackground(Duration.ofSeconds(30))
                 .build();
 
         // 同时设置连接、响应读取和写入超时，防止下游卡死拖住执行链路。
@@ -48,6 +54,7 @@ public class WebClientConfig {
                         .addHandlerLast(new WriteTimeoutHandler(writeTimeoutMs, TimeUnit.MILLISECONDS)));
 
         return WebClient.builder()
-                .clientConnector(new ReactorClientHttpConnector(httpClient));
+                .clientConnector(new ReactorClientHttpConnector(httpClient))
+                .codecs(configurer -> configurer.defaultCodecs().maxInMemorySize(maxInMemoryBytes));
     }
 }

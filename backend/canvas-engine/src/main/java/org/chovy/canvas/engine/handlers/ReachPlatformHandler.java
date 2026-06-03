@@ -24,9 +24,10 @@ public class ReachPlatformHandler implements NodeHandler {
 
     /** 触达平台 HTTP 客户端。 */
     private final WebClient webClient;
-    public ReachPlatformHandler(@Value("${canvas.integration.reach-platform-url}") String url) {
+    public ReachPlatformHandler(WebClient.Builder webClientBuilder,
+                                @Value("${canvas.integration.reach-platform-url}") String url) {
         // baseUrl 由配置注入，便于按环境切换触达网关
-        this.webClient = WebClient.builder().baseUrl(url).build();
+        this.webClient = webClientBuilder.clone().baseUrl(url).build();
     }
 
     /**
