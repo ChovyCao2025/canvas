@@ -13,9 +13,15 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
+import reactor.core.publisher.Mono;
 
+import java.time.Duration;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.Map;
+import java.util.Objects;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * Disruptor 分发层（设计文档 12.8节）。
@@ -42,6 +48,10 @@ public class CanvasDisruptorService {
     private final RingBuffer<CanvasExecutionEvent> ringBuffer;
     /** 画布执行指标组件。 */
     private final CanvasMetrics metrics;
+    /** 已订阅但尚未完成的 Reactor 执行数。 */
+    private final AtomicInteger inFlight = new AtomicInteger();
+    /** shutdown 后拒绝继续发布新事件。 */
+    private final AtomicBoolean accepting = new AtomicBoolean(true);
 
     /** 初始化 Disruptor、worker pool 和异常处理器。 */
     public CanvasDisruptorService(
@@ -111,7 +121,7 @@ public class CanvasDisruptorService {
     }
 
     /** 创建根据事件类型分派到画布执行或请求执行器的 worker。 */
-    private static WorkHandler<CanvasExecutionEvent> createWorkerHandler(CanvasExecutionService executionService, CanvasExecutionRequestExecutor requestExecutor) {
+    private WorkHandler<CanvasExecutionEvent> createWorkerHandler(CanvasExecutionService executionService, CanvasExecutionRequestExecutor requestExecutor) {
         return event -> {
             try {
                 if (event.requestId != null) {
@@ -129,29 +139,48 @@ public class CanvasDisruptorService {
     }
 
     /** 处理直接触发画布执行的 Disruptor 事件。 */
-    private static void handleCanvasEvent(CanvasExecutionService executionService, CanvasExecutionEvent event) {
+    private void handleCanvasEvent(CanvasExecutionService executionService, CanvasExecutionEvent event) {
         // 直接触发链路不落库，事件消费后立刻进入 DAG 执行。
-        executionService.triggerFromDisruptor(
-                        event.canvasId, event.userId, event.triggerType,
-                        event.triggerNodeType, event.matchKey,
-                        event.payload, event.msgId, event.executionLane, event.dispatchOptions)
-                .subscribe(
-                        null,
-                        e -> log.error("[DISRUPTOR] 执行失败 canvasId={} userId={}: {}",
-                                event.canvasId, event.userId, e.getMessage())
-                );
+        Long canvasId = event.canvasId;
+        String userId = event.userId;
+        String triggerType = event.triggerType;
+        String triggerNodeType = event.triggerNodeType;
+        String matchKey = event.matchKey;
+        Map<String, Object> payload = event.payload == null ? Map.of() : new HashMap<>(event.payload);
+        String msgId = event.msgId;
+        ExecutionLane executionLane = event.executionLane;
+        DispatchOptions dispatchOptions = event.dispatchOptions;
+
+        subscribeTracked(
+                executionService.triggerFromDisruptor(
+                        canvasId, userId, triggerType, triggerNodeType, matchKey,
+                        payload, msgId, executionLane, dispatchOptions),
+                e -> log.error("[DISRUPTOR] 执行失败 canvasId={} userId={}: {}",
+                        canvasId, userId, e.getMessage())
+        );
     }
 
     /** 处理已入库执行请求的 Disruptor 事件。 */
-    private static void handleRequestEvent(CanvasExecutionRequestExecutor requestExecutor, CanvasExecutionEvent event) {
+    private void handleRequestEvent(CanvasExecutionRequestExecutor requestExecutor, CanvasExecutionEvent event) {
         String requestId = event.requestId;
         // 已入库请求由 executor 接管状态迁移和失败重试，不在这里重复实现。
-        requestExecutor.execute(requestId)
-                .subscribe(
-                        null,
-                        e -> log.error("[DISRUPTOR] request 执行失败 requestId={}: {}",
-                                requestId, e.getMessage())
-                );
+        subscribeTracked(
+                requestExecutor.execute(requestId),
+                e -> log.error("[DISRUPTOR] request 执行失败 requestId={}: {}",
+                        requestId, e.getMessage())
+        );
+    }
+
+    private <T> void subscribeTracked(Mono<T> mono, java.util.function.Consumer<Throwable> onError) {
+        inFlight.incrementAndGet();
+        try {
+            Objects.requireNonNull(mono, "disruptor execution mono")
+                    .doFinally(signal -> inFlight.decrementAndGet())
+                    .subscribe(null, onError);
+        } catch (RuntimeException e) {
+            inFlight.decrementAndGet();
+            throw e;
+        }
     }
 
     /**
@@ -225,6 +254,7 @@ public class CanvasDisruptorService {
                          Map<String, Object> payload, String msgId,
                          ExecutionLane executionLane,
                          DispatchOptions dispatchOptions) {
+        assertAccepting();
         long sequence;
         try {
             // tryNext 失败说明 ring buffer 已满，属于上游回压信号。
@@ -254,6 +284,7 @@ public class CanvasDisruptorService {
 
     /** 发布已入库的执行请求 ID 事件。 */
     public void publishRequest(String requestId) {
+        assertAccepting();
         long sequence;
         try {
             // 请求事件和普通触发事件共享同一个 ring buffer，满时同样需要快速失败。
@@ -274,8 +305,33 @@ public class CanvasDisruptorService {
     /** 关闭服务时释放订阅和连接资源。 */
     @PreDestroy
     public void shutdown() {
+        if (!accepting.getAndSet(false)) {
+            return;
+        }
         disruptor.shutdown();
+        waitForInFlight(Duration.ofSeconds(10));
         log.info("[DISRUPTOR] 已关闭");
+    }
+
+    private void assertAccepting() {
+        if (!accepting.get()) {
+            throw new IllegalStateException("Disruptor is shutting down");
+        }
+    }
+
+    private void waitForInFlight(Duration timeout) {
+        long deadline = System.nanoTime() + timeout.toNanos();
+        while (inFlight.get() > 0 && System.nanoTime() < deadline) {
+            try {
+                Thread.sleep(10);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                break;
+            }
+        }
+        if (inFlight.get() > 0) {
+            log.warn("[DISRUPTOR] 关闭超时，仍有 inFlight={} 个执行未完成", inFlight.get());
+        }
     }
 
     /**
