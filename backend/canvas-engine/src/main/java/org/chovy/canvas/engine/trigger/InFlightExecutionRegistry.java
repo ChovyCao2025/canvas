@@ -151,19 +151,22 @@ public class InFlightExecutionRegistry {
      * 先移除本地槽位，再释放 Redis ZSET 中的条目（两步顺序不影响正确性，Redis 崩溃最多留僵尸条目，TTL 自愈）。
      */
     public void deregister(Long canvasId, String executionId) {
-        ConcurrentHashMap<String, Disposable.Swap> map = localRegistry.get(canvasId);
-        if (map != null) {
-            Disposable.Swap removed = map.remove(executionId);
-            if (removed != null) {
-                if (map.isEmpty()) localRegistry.remove(canvasId);
-                ExecutionLane lane = localExecutionLanes.remove(localExecutionKey(canvasId, executionId));
-                // 执行结束释放 Redis slot；若失败，ZSET score 到期会兜底清理。
-                releaseRedisSlot(
-                        keys.inflightCanvas(canvasId),
-                        keys.inflightLane(lane != null ? lane : ExecutionLane.STANDARD),
-                        keys.inflightGlobal(),
-                        executionId);
+        AtomicBoolean removed = new AtomicBoolean(false);
+        localRegistry.computeIfPresent(canvasId, (id, executions) -> {
+            Disposable.Swap slot = executions.remove(executionId);
+            if (slot != null) {
+                removed.set(true);
             }
+            return executions.isEmpty() ? null : executions;
+        });
+        if (removed.get()) {
+            ExecutionLane lane = localExecutionLanes.remove(localExecutionKey(canvasId, executionId));
+            // 执行结束释放 Redis slot；若失败，ZSET score 到期会兜底清理。
+            releaseRedisSlot(
+                    keys.inflightCanvas(canvasId),
+                    keys.inflightLane(lane != null ? lane : ExecutionLane.STANDARD),
+                    keys.inflightGlobal(),
+                    executionId);
         }
     }
 

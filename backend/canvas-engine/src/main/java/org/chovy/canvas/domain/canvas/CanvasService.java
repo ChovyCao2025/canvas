@@ -83,7 +83,7 @@ public class CanvasService {
      * @param req 创建请求信息
      * @return 新建的画布对象
      */
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public CanvasDO create(CanvasCreateReq req) {
         CanvasDO canvas = new CanvasDO();
         canvas.setName(req.getName());
@@ -129,7 +129,7 @@ public class CanvasService {
      * @param id  画布 ID
      * @param req 画布更新请求
      */
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public void updateDraft(Long id, CanvasUpdateReq req) {
         CanvasDO canvas = canvasMapper.selectById(id);
         if (canvas == null) throw new IllegalArgumentException("画布不存在: " + id);
@@ -442,7 +442,7 @@ public class CanvasService {
      * Reverts the current draft to the content of a historical version.
      * Does NOT affect the published version.
      */
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public void revertToVersion(Long canvasId, Long versionId) {
         CanvasVersionDO target = canvasVersionMapper.selectById(versionId);
         if (target == null) throw new IllegalArgumentException("版本不存在: " + versionId);

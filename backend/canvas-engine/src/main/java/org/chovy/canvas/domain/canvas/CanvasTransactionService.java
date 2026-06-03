@@ -43,7 +43,7 @@ public class CanvasTransactionService {
      *
      * @return {@link PublishResult} 包含新发布版本和旧 publishedVersionId（供清旧路由使用）
      */
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public PublishResult publishDb(Long canvasId, String graphJson, String operator) {
         CanvasDO canvas = canvasMapper.selectById(canvasId);
         if (canvas == null) throw new IllegalArgumentException("画布不存在: " + canvasId);
@@ -89,7 +89,7 @@ public class CanvasTransactionService {
      * 下线事务（DB-only）。
      * 返回下线前的 publishedVersionId，供事务外清理路由/缓存。
      */
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     Long offlineDb(Long id) {
         CanvasDO canvas = canvasMapper.selectById(id);
         if (canvas == null) throw new IllegalArgumentException("画布不存在: " + id);
@@ -115,7 +115,7 @@ public class CanvasTransactionService {
      * Kill 事务（DB-only）。
      * 返回 kill 前的 publishedVersionId，供事务外清理路由/缓存。
      */
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public Long killDb(Long id) {
         CanvasDO canvas = canvasMapper.selectById(id);
         if (canvas == null) throw new IllegalArgumentException("画布不存在: " + id);
@@ -137,7 +137,7 @@ public class CanvasTransactionService {
 // ── 归档事务 ──────────────────────────────────────────────────
 
     /** 归档事务（DB-only）：仅修改状态为 ARCHIVED，不清 publishedVersionId。 */
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     void archiveDb(Long id) {
         CanvasDO canvas = canvasMapper.selectById(id);
         if (canvas == null) throw new IllegalArgumentException("画布不存在: " + id);
