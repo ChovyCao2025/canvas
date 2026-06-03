@@ -128,6 +128,18 @@ export function assertCapacityReportable(verifier, { reportType }) {
   }
 }
 
+export function assertRunnerReportable(summary, { reportType, minDurationMin }) {
+  if (failedRequestCount(summary) > 0) {
+    throw new Error(`runner reported ${failedRequestCount(summary)} failed request(s); run cannot be reported`)
+  }
+  if (reportType === 'capacity') {
+    const requiredMs = minDurationMin * 60 * 1000
+    if ((summary.durationMs || 0) < requiredMs) {
+      throw new Error(`runner duration ${summary.durationMs || 0}ms is below required ${requiredMs}ms`)
+    }
+  }
+}
+
 export function commandForCleanup(config) {
   return [
     process.execPath,
@@ -345,13 +357,28 @@ async function defaultCleanup(config) {
 
 async function defaultReport(config) {
   const directory = runDirectory(config)
+  const summaryPath = path.join(directory, 'runner-summary.json')
   const verifierPath = path.join(directory, 'verifier.json')
+  if (!existsSync(summaryPath)) {
+    throw new Error(`missing runner summary evidence at ${summaryPath}`)
+  }
   if (!existsSync(verifierPath)) {
     throw new Error(`missing verifier evidence at ${verifierPath}`)
   }
+  const summary = readJson(summaryPath)
   const verifier = readJson(verifierPath)
+  assertRunnerReportable(summary, {
+    reportType: config.reportType,
+    minDurationMin: config.minDurationMin,
+  })
   assertCapacityReportable(verifier, { reportType: config.reportType })
-  return { status: 'PASS', verifierPath, verifierVerdict: verifier.verdict }
+  return {
+    status: 'PASS',
+    summaryPath,
+    verifierPath,
+    verifierVerdict: verifier.verdict,
+    durationMs: summary.durationMs || 0,
+  }
 }
 
 export async function runGuide(config, deps = {}) {

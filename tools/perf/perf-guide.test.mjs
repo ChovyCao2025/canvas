@@ -6,10 +6,12 @@ import path from 'node:path'
 
 import {
   assertCapacityReportable,
+  assertRunnerReportable,
   commandForCleanup,
   defaultRunScenario,
   parseGuideArgs,
   runGuide,
+  writeJson,
 } from './perf-guide.mjs'
 
 test('parseGuideArgs parses subcommand and common flags', () => {
@@ -58,6 +60,26 @@ test('assertCapacityReportable accepts expected failures for fault report', () =
   }, {
     reportType: 'fault',
   }))
+})
+
+test('assertRunnerReportable rejects failed runner requests', () => {
+  assert.throws(() => assertRunnerReportable({
+    failed: 1,
+    durationMs: 1_800_000,
+  }, {
+    reportType: 'capacity',
+    minDurationMin: 30,
+  }), /failed request/)
+})
+
+test('assertRunnerReportable rejects short capacity runs', () => {
+  assert.throws(() => assertRunnerReportable({
+    failed: 0,
+    durationMs: 60_000,
+  }, {
+    reportType: 'capacity',
+    minDurationMin: 30,
+  }), /duration/)
 })
 
 test('commandForCleanup defaults to ledger dry run', () => {
@@ -361,6 +383,79 @@ test('defaultRunScenario writes verifier evidence under provided perf run id', a
       JSON.parse(readFileSync(path.join(runRoot, 'perf_soak_001', 'verifier.json'), 'utf8')),
       { verdict: 'PASS' },
     )
+  } finally {
+    rmSync(runRoot, { recursive: true, force: true })
+  }
+})
+
+test('report rejects pass verifier when runner has request failures', async () => {
+  const runRoot = mkdtempSync(path.join(tmpdir(), 'perf-guide-report-'))
+
+  try {
+    writeJson(path.join(runRoot, 'perf_report_001', 'runner-summary.json'), {
+      failed: 1,
+      durationMs: 1_800_000,
+    })
+    writeJson(path.join(runRoot, 'perf_report_001', 'verifier.json'), {
+      verdict: 'PASS',
+    })
+
+    await assert.rejects(() => runGuide(parseGuideArgs([
+      'report',
+      '--perf-run-id', 'perf_report_001',
+      '--run-root', runRoot,
+      '--min-duration-min', '30',
+    ])), /failed request/)
+  } finally {
+    rmSync(runRoot, { recursive: true, force: true })
+  }
+})
+
+test('report rejects short capacity runs', async () => {
+  const runRoot = mkdtempSync(path.join(tmpdir(), 'perf-guide-report-'))
+
+  try {
+    writeJson(path.join(runRoot, 'perf_report_002', 'runner-summary.json'), {
+      failed: 0,
+      durationMs: 60_000,
+    })
+    writeJson(path.join(runRoot, 'perf_report_002', 'verifier.json'), {
+      verdict: 'PASS',
+    })
+
+    await assert.rejects(() => runGuide(parseGuideArgs([
+      'report',
+      '--perf-run-id', 'perf_report_002',
+      '--run-root', runRoot,
+      '--min-duration-min', '30',
+    ])), /duration/)
+  } finally {
+    rmSync(runRoot, { recursive: true, force: true })
+  }
+})
+
+test('report accepts complete runner and verifier evidence', async () => {
+  const runRoot = mkdtempSync(path.join(tmpdir(), 'perf-guide-report-'))
+
+  try {
+    writeJson(path.join(runRoot, 'perf_report_003', 'runner-summary.json'), {
+      failed: 0,
+      durationMs: 60_000,
+    })
+    writeJson(path.join(runRoot, 'perf_report_003', 'verifier.json'), {
+      verdict: 'PASS',
+    })
+
+    const result = await runGuide(parseGuideArgs([
+      'report',
+      '--perf-run-id', 'perf_report_003',
+      '--run-root', runRoot,
+      '--min-duration-min', '1',
+    ]))
+
+    assert.equal(result.status, 'PASS')
+    assert.equal(result.verifierVerdict, 'PASS')
+    assert.match(result.summaryPath, /runner-summary\.json$/)
   } finally {
     rmSync(runRoot, { recursive: true, force: true })
   }
