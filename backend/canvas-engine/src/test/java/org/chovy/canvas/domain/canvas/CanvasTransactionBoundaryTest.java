@@ -47,6 +47,7 @@ class CanvasTransactionBoundaryTest {
                 mock(TriggerRouteService.class),
                 mock(TriggerPreCheckService.class),
                 transactionService,
+                new CanvasStateTransitionPolicy(),
                 canvasService,
                 redis);
         when(transactionService.killDb(7L)).thenReturn(55L);

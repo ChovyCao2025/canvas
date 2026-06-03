@@ -40,6 +40,8 @@ public class CanvasOpsService {
     private final TriggerPreCheckService preCheckService;
     /** 画布事务服务，封装只涉及数据库写入的事务边界。 */
     private final CanvasTransactionService canvasTransactionService;
+    /** 画布状态策略，集中约束生命周期和编辑边界。 */
+    private final CanvasStateTransitionPolicy stateTransitionPolicy;
     /** 画布主服务，用于复用发布、回滚和外部状态清理能力。 */
     private final CanvasService canvasService;
     /** 阻塞式 Redis 模板，用于锁、去重、票据或跨实例通知。 */
@@ -57,6 +59,11 @@ public class CanvasOpsService {
     @Transactional
     public void saveWithOptimisticLock(Long id, String name, String description,
                                         String graphJson, int editVersion, String operator) {
+        CanvasDO canvas = canvasMapper.selectById(id);
+        if (canvas != null) {
+            stateTransitionPolicy.assertDraftUpdateAllowed(canvas);
+        }
+
         // CAS 更新 edit_version
         int updated = canvasMapper.updateEditVersion(id, editVersion, editVersion + 1, name, description);
         if (updated == 0) throw new IllegalStateException("CANVAS_010");  // 409 冲突

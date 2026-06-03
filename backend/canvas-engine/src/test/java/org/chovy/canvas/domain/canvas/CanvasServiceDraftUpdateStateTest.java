@@ -99,6 +99,27 @@ class CanvasServiceDraftUpdateStateTest {
         verify(versionMapper, never()).updateById(any(CanvasVersionDO.class));
     }
 
+    @Test
+    void revertToVersionRejectsKilledCanvas() {
+        CanvasMapper canvasMapper = mock(CanvasMapper.class);
+        CanvasVersionMapper versionMapper = mock(CanvasVersionMapper.class);
+        CanvasDO canvas = new CanvasDO();
+        canvas.setId(12L);
+        canvas.setStatus(CanvasStatusEnum.KILLED.getCode());
+        when(canvasMapper.selectById(12L)).thenReturn(canvas);
+        CanvasVersionDO target = draftVersion();
+        target.setCanvasId(12L);
+        when(versionMapper.selectById(102L)).thenReturn(target);
+        when(versionMapper.selectOne(any())).thenReturn(draftVersion());
+        CanvasService service = service(canvasMapper, versionMapper);
+
+        assertThatThrownBy(() -> service.revertToVersion(12L, 102L))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("KILLED");
+
+        verify(versionMapper, never()).updateById(any(CanvasVersionDO.class));
+    }
+
     private static CanvasService service(CanvasMapper canvasMapper, CanvasVersionMapper versionMapper) {
         return new CanvasService(
                 canvasMapper,

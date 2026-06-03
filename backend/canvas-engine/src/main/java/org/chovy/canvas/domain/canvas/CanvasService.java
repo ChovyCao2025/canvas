@@ -477,6 +477,10 @@ public class CanvasService {
      */
     @Transactional
     public void revertToVersion(Long canvasId, Long versionId) {
+        CanvasDO canvas = canvasMapper.selectById(canvasId);
+        if (canvas == null) throw new IllegalArgumentException("画布不存在: " + canvasId);
+        stateTransitionPolicy.assertDraftUpdateAllowed(canvas);
+
         CanvasVersionDO target = canvasVersionMapper.selectById(versionId);
         if (target == null) throw new IllegalArgumentException("版本不存在: " + versionId);
         if (!target.getCanvasId().equals(canvasId)) throw new IllegalArgumentException("版本不属于该画布");
