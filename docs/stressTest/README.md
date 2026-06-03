@@ -7,6 +7,7 @@
 - 唯一的 `perfRunId`
 - runner summary JSON
 - verifier JSON，且 `verdict: "PASS"`
+- 准确性测试的 side-effect verifier JSON，且 `verdict: "PASS"`
 - guide `report` 输出，且 `status: "PASS"`
 - 压测期间的监控快照
 - 环境与资源配置
@@ -21,7 +22,7 @@ node --test tools/perf/*.test.mjs
 node tools/perf/perf-guide.mjs doctor
 ```
 
-通过后继续阅读完整流程：
+通过后按完整流程执行 `fixture`、`smoke`、`accuracy`、`threshold`、`soak`、`report`、`cleanup`：
 
 - [本地容量压测操作手册](./local-capacity-runbook.md)
 - [压力测试方案审计](./performance-audit.md)
@@ -31,6 +32,7 @@ node tools/perf/perf-guide.mjs doctor
 
 - 如果 verifier 不是 `PASS`，停止并修复问题，不得进入容量规划。
 - 如果 runner `failed` 不是 `0`，停止并修复问题，不得进入容量规划。
+- 如果 accuracy 命令不是 `PASS`，停止并修复问题，不得进入 threshold 或 soak。
 - 如果 guide `report` 不是 `PASS`，不得发布吞吐、QPS、p95 或容量估算。
 - `PASS_WITH_EXPECTED_FAILURES` 只允许用于故障注入报告。
 - 不得在缺少对应 `perfRunId` 的情况下报告 QPS。

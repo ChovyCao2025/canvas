@@ -49,6 +49,11 @@ FROM canvas_execution_trace
 WHERE execution_id IN (
   SELECT id FROM perf_cleanup_execution_ids
 );
+SELECT COUNT(*) AS before_message_send_record_rows
+FROM message_send_record
+WHERE execution_id IN (
+  SELECT id FROM perf_cleanup_execution_ids
+);
 SELECT COUNT(*) AS before_request_rows FROM canvas_execution_request WHERE perf_run_id = '${id}';
 SELECT COUNT(*) AS before_dlq_rows FROM canvas_execution_dlq WHERE perf_run_id = '${id}';
 SELECT COUNT(*) AS before_audience_compute_run_rows FROM audience_compute_run WHERE perf_run_id = '${id}';
@@ -56,6 +61,10 @@ SELECT COUNT(*) AS before_perf_event_definitions FROM event_definition WHERE eve
 SELECT COUNT(*) AS before_perf_mq_definitions FROM mq_message_definition WHERE message_code LIKE 'PERF_%';
 
 DELETE FROM canvas_execution_trace
+WHERE execution_id IN (
+  SELECT id FROM perf_cleanup_execution_ids
+);
+DELETE FROM message_send_record
 WHERE execution_id IN (
   SELECT id FROM perf_cleanup_execution_ids
 );
@@ -70,6 +79,11 @@ SELECT COUNT(*) AS after_event_log_rows FROM event_log WHERE perf_run_id = '${id
 SELECT COUNT(*) AS after_execution_rows FROM canvas_execution WHERE perf_run_id = '${id}';
 SELECT COUNT(*) AS after_execution_trace_rows
 FROM canvas_execution_trace
+WHERE execution_id IN (
+  SELECT id FROM perf_cleanup_execution_ids
+);
+SELECT COUNT(*) AS after_message_send_record_rows
+FROM message_send_record
 WHERE execution_id IN (
   SELECT id FROM perf_cleanup_execution_ids
 );

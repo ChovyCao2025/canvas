@@ -16,6 +16,7 @@ const DEFAULT_ARGS = {
   expectedFailedWithRecord: 0,
   expectedRejectedWithRecord: 0,
   expectedDlq: 0,
+  traceExpectations: [],
 }
 
 const FLAG_NAMES = {
@@ -31,6 +32,8 @@ const FLAG_NAMES = {
   '--expected-failed-records': 'expectedFailedWithRecord',
   '--expected-rejected-records': 'expectedRejectedWithRecord',
   '--expected-dlq': 'expectedDlq',
+  '--expect-trace': 'traceExpectations',
+  '--trace-buffer-pending': 'traceBufferPending',
 }
 
 const NUMBER_ARGS = new Set([
@@ -42,8 +45,15 @@ const NUMBER_ARGS = new Set([
   'expectedFailedWithRecord',
   'expectedRejectedWithRecord',
   'expectedDlq',
+  'traceBufferPending',
 ])
 const MODES = new Set(['event', 'direct', 'mq', 'audience'])
+const TRACE_STATUS = new Map([
+  ['running', 0],
+  ['success', 1],
+  ['failed', 2],
+  ['skipped', 3],
+])
 
 function parseIntegerArg(flag, value, { allowNegative = false } = {}) {
   const pattern = allowNegative ? /^-?(0|[1-9]\d*)$/ : /^(0|[1-9]\d*)$/
@@ -99,10 +109,38 @@ function validateArgs(args) {
   if (args.expectedDlq < 0) {
     throw new Error('--expected-dlq must be a non-negative integer')
   }
+
+  if ((args.traceBufferPending || 0) < 0) {
+    throw new Error('--trace-buffer-pending must be a non-negative integer')
+  }
+}
+
+export function parseTraceExpectation(value) {
+  const match = /^([^:=]+):([^:=]+)=([^:=]+)$/.exec(value)
+  if (!match) {
+    throw new Error('--expect-trace expected NODE:STATUS=COUNT')
+  }
+  const [, nodeId, rawStatus, rawExpected] = match
+  const statusName = rawStatus.toLowerCase()
+  if (!TRACE_STATUS.has(statusName)) {
+    throw new Error('--expect-trace trace status must be running, success, failed, or skipped')
+  }
+  const expected = /^(0|[1-9]\d*)$/.test(rawExpected)
+    ? Number(rawExpected)
+    : rawExpected.toLowerCase()
+  if (typeof expected === 'string' && !['all', 'even', 'odd', 'none'].includes(expected)) {
+    throw new Error('--expect-trace count must be a non-negative integer or all, even, odd, none')
+  }
+  return {
+    nodeId,
+    status: TRACE_STATUS.get(statusName),
+    statusName,
+    expected,
+  }
 }
 
 export function parseVerifierArgs(argv) {
-  const args = { ...DEFAULT_ARGS }
+  const args = { ...DEFAULT_ARGS, traceExpectations: [] }
 
   for (let index = 0; index < argv.length; index += 2) {
     const flag = argv[index]
@@ -117,7 +155,9 @@ export function parseVerifierArgs(argv) {
     }
 
     const value = argv[index + 1]
-    if (NUMBER_ARGS.has(name)) {
+    if (name === 'traceExpectations') {
+      args.traceExpectations.push(parseTraceExpectation(value))
+    } else if (NUMBER_ARGS.has(name)) {
       if (name === 'audienceId') {
         const parsed = parseIntegerArg(flag, value)
         if (parsed <= 0) {
@@ -170,6 +210,10 @@ export function computeVerdict(input) {
     + input.retryPending
   const unexpectedLoss = Math.max(0, input.expectedExecutions - accounted)
   const wrongAudienceCount = input.wrongAudienceCount || 0
+  const traceMismatch = input.traceMismatch || 0
+  const traceFailed = input.traceFailed || 0
+  const traceDuplicateSuccess = input.traceDuplicateSuccess || 0
+  const traceBufferPending = input.traceBufferPending || 0
   const failures = [
     unexpectedLoss,
     duplicateExecution,
@@ -180,6 +224,10 @@ export function computeVerdict(input) {
     unexpectedFailedWithRecord,
     unexpectedRejectedWithRecord,
     unexpectedDlq,
+    traceMismatch,
+    traceFailed,
+    traceDuplicateSuccess,
+    traceBufferPending,
   ].filter((value) => value > 0)
   const expectedFailureRecords = Math.min(input.failedWithRecord, expectedFailedWithRecord)
     + Math.min(input.rejectedWithRecord, expectedRejectedWithRecord)
@@ -200,11 +248,67 @@ export function computeVerdict(input) {
     unexpectedDlq,
     unexpectedLoss,
     wrongAudienceCount,
+    traceMismatch,
+    traceFailed,
+    traceDuplicateSuccess,
+    traceBufferPending,
     verdict: failures.length > 0
       ? 'FAIL'
       : expectedFailureRecords > 0
         ? 'PASS_WITH_EXPECTED_FAILURES'
         : 'PASS',
+  }
+}
+
+function uniqueInputCount(args) {
+  return Math.max(0, args.sentSuccess - (args.intentionalDuplicates || 0))
+}
+
+export function expectedTraceCount(expected, args) {
+  if (typeof expected === 'number') {
+    return expected
+  }
+  const uniqueInputs = uniqueInputCount(args)
+  const multiplier = args.matchedCanvasCount || 1
+  if (expected === 'all') {
+    return uniqueInputs * multiplier
+  }
+  if (expected === 'even') {
+    return Math.floor(uniqueInputs / 2) * multiplier
+  }
+  if (expected === 'odd') {
+    return Math.ceil(uniqueInputs / 2) * multiplier
+  }
+  if (expected === 'none') {
+    return 0
+  }
+  throw new Error(`unknown trace expected count token ${expected}`)
+}
+
+export function evaluateTraceEvidence({
+  traceExpectations = [],
+  traceCounts = [],
+  traceFailed = 0,
+  traceDuplicateSuccess = 0,
+  traceBufferPending = 0,
+}) {
+  const mismatches = traceCounts.filter((count) => count.actual !== count.expected)
+  const traceMismatch = mismatches.length
+  const failures = [
+    traceMismatch,
+    traceFailed,
+    traceDuplicateSuccess,
+    traceBufferPending,
+  ].filter((value) => value > 0)
+  return {
+    traceEnabled: traceExpectations.length > 0,
+    traceCounts,
+    traceMismatch,
+    traceMismatches: mismatches,
+    traceFailed,
+    traceDuplicateSuccess,
+    traceBufferPending,
+    traceVerdict: failures.length > 0 ? 'FAIL' : 'PASS',
   }
 }
 
@@ -282,48 +386,118 @@ FROM (
   return 'SELECT 0 AS count'
 }
 
-function queryLedgers(args) {
-  const eventLog = queryCount({
+function traceNodeCountSql(expectation) {
+  return `
+SELECT COUNT(*) AS trace_node_count
+FROM canvas_execution_trace t
+JOIN canvas_execution e ON e.id = t.execution_id
+WHERE e.perf_run_id = :perfRunId
+  AND t.node_id = '${escapeSqlString(expectation.nodeId)}'
+  AND t.status = ${expectation.status}`
+}
+
+function failedTraceSql() {
+  return `
+SELECT COUNT(*) AS failed_trace
+FROM canvas_execution_trace t
+JOIN canvas_execution e ON e.id = t.execution_id
+WHERE e.perf_run_id = :perfRunId
+  AND t.status = 2`
+}
+
+function duplicateTraceSuccessSql() {
+  return `
+SELECT COUNT(*) AS duplicate_trace_success
+FROM (
+  SELECT t.execution_id, t.node_id
+  FROM canvas_execution_trace t
+  JOIN canvas_execution e ON e.id = t.execution_id
+  WHERE e.perf_run_id = :perfRunId
+    AND t.status = 1
+  GROUP BY t.execution_id, t.node_id
+  HAVING COUNT(*) > 1
+) duplicate_trace_success`
+}
+
+function queryTraceEvidence(args, query = queryCount) {
+  const traceExpectations = args.traceExpectations || []
+  if (traceExpectations.length === 0) {
+    return evaluateTraceEvidence({
+      traceExpectations,
+      traceBufferPending: args.traceBufferPending || 0,
+    })
+  }
+
+  const traceCounts = traceExpectations.map((expectation) => ({
+    nodeId: expectation.nodeId,
+    status: expectation.status,
+    statusName: expectation.statusName,
+    expected: expectedTraceCount(expectation.expected, args),
+    actual: query({
+      ...args,
+      sql: traceNodeCountSql(expectation),
+    }),
+  }))
+  const traceFailed = query({
+    ...args,
+    sql: failedTraceSql(),
+  })
+  const traceDuplicateSuccess = query({
+    ...args,
+    sql: duplicateTraceSuccessSql(),
+  })
+
+  return evaluateTraceEvidence({
+    traceExpectations,
+    traceCounts,
+    traceFailed,
+    traceDuplicateSuccess,
+    traceBufferPending: args.traceBufferPending || 0,
+  })
+}
+
+function queryLedgers(args, query = queryCount) {
+  const eventLog = query({
     ...args,
     sql: 'SELECT COUNT(*) AS count FROM event_log WHERE perf_run_id = :perfRunId',
   })
-  const requestRows = queryCount({
+  const requestRows = query({
     ...args,
     sql: 'SELECT COUNT(*) AS count FROM canvas_execution_request WHERE perf_run_id = :perfRunId',
   })
-  const requestSources = queryCount({
+  const requestSources = query({
     ...args,
     sql: 'SELECT COUNT(DISTINCT source_msg_id) AS count FROM canvas_execution_request WHERE perf_run_id = :perfRunId AND source_msg_id IS NOT NULL',
   })
-  const executions = queryCount({
+  const executions = query({
     ...args,
     sql: 'SELECT COUNT(*) AS count FROM canvas_execution WHERE perf_run_id = :perfRunId',
   })
-  const success = queryCount({
+  const success = query({
     ...args,
     sql: 'SELECT COUNT(*) AS count FROM canvas_execution WHERE perf_run_id = :perfRunId AND status = 2',
   })
-  const failed = queryCount({
+  const failed = query({
     ...args,
     sql: 'SELECT COUNT(*) AS count FROM canvas_execution WHERE perf_run_id = :perfRunId AND status = 3',
   })
-  const dlq = queryCount({
+  const dlq = query({
     ...args,
     sql: 'SELECT COUNT(*) AS count FROM canvas_execution_dlq WHERE perf_run_id = :perfRunId',
   })
-  const retryPending = queryCount({
+  const retryPending = query({
     ...args,
     sql: "SELECT COUNT(*) AS count FROM canvas_execution_request WHERE perf_run_id = :perfRunId AND status IN ('PENDING','RETRY','RUNNING')",
   })
-  const rejectedWithRecord = queryCount({
+  const rejectedWithRecord = query({
     ...args,
     sql: "SELECT COUNT(*) AS count FROM canvas_execution_request WHERE perf_run_id = :perfRunId AND status = 'FAILED'",
   })
-  const duplicateInput = queryCount({
+  const duplicateInput = query({
     ...args,
     sql: duplicateInputSqlForMode(args.mode),
   })
-  const audienceRuns = queryCount({
+  const audienceRuns = query({
     ...args,
     sql: 'SELECT COUNT(*) AS count FROM audience_compute_run WHERE perf_run_id = :perfRunId',
   })
@@ -367,12 +541,14 @@ export function expectedExecutionCount(args) {
   return uniqueInputs * args.matchedCanvasCount
 }
 
-export function verify(args) {
-  const ledgers = queryLedgers(args)
+export function verify(args, deps = {}) {
+  const query = deps.queryCount || queryCount
+  const ledgers = queryLedgers(args, query)
+  const traceEvidence = queryTraceEvidence(args, query)
   let wrongAudienceCount = 0
 
   if (args.audienceId > 0 && args.expectedAudienceCount >= 0) {
-    const actualAudienceCount = queryCount({
+    const actualAudienceCount = query({
       ...args,
       sql: `SELECT COALESCE((
         SELECT estimated_size
@@ -408,6 +584,7 @@ export function verify(args) {
     expectedDlq: args.expectedDlq,
     ackWithoutLedger: Math.max(0, args.sentSuccess - accepted),
     wrongAudienceCount,
+    ...traceEvidence,
     ledgerCounts: ledgers,
   })
 }

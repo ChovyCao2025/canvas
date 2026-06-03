@@ -43,6 +43,14 @@ function completeVerifierEvidence(overrides = {}) {
     ackWithoutLedger: 0,
     unexpectedLoss: 0,
     wrongAudienceCount: 0,
+    traceEnabled: false,
+    traceCounts: [],
+    traceMismatch: 0,
+    traceMismatches: [],
+    traceFailed: 0,
+    traceDuplicateSuccess: 0,
+    traceBufferPending: 0,
+    traceVerdict: 'PASS',
     ...overrides,
   }
   return {
@@ -131,6 +139,37 @@ test('assertVerifierEvidenceComplete accepts complete verifier evidence', () => 
     perfRunId: 'perf_report_001',
     sentSuccess: 100,
   }))
+})
+
+test('assertVerifierEvidenceComplete rejects missing trace evidence fields', () => {
+  const evidence = completeVerifierEvidence({
+    perfRunId: 'perf_report_001',
+    sentSuccess: 100,
+  })
+  delete evidence.traceMismatch
+
+  assert.throws(() => assertVerifierEvidenceComplete(evidence, {
+    perfRunId: 'perf_report_001',
+    sentSuccess: 100,
+  }), /traceMismatch/)
+})
+
+test('assertVerifierEvidenceComplete rejects internally inconsistent trace evidence', () => {
+  assert.throws(() => assertVerifierEvidenceComplete(completeVerifierEvidence({
+    perfRunId: 'perf_report_001',
+    sentSuccess: 100,
+    verdict: 'PASS',
+    traceEnabled: true,
+    traceCounts: [
+      { nodeId: 'event', status: 1, statusName: 'success', expected: 100, actual: 99 },
+    ],
+    traceMismatch: 0,
+    traceMismatches: [],
+    traceVerdict: 'PASS',
+  }), {
+    perfRunId: 'perf_report_001',
+    sentSuccess: 100,
+  }), /traceMismatch/)
 })
 
 test('assertVerifierEvidenceComplete rejects internally inconsistent verifier evidence', () => {
@@ -315,6 +354,41 @@ test('fixture command refuses rebuild without explicit flag', async () => {
 
   assert.equal(result.status, 'DRY_RUN')
   assert.match(result.message, /--rebuild true/)
+})
+
+test('fixture command creates and publishes standard perf canvases', async () => {
+  const client = {
+    async request(method, requestPath, { body } = {}) {
+      if (requestPath === '/auth/login') return { code: 0, data: { token: 'token-1' } }
+      if (requestPath.startsWith('/canvas/event-definitions')) return { code: 0, data: { total: 0, list: [] } }
+      if (requestPath.startsWith('/canvas/list')) return { code: 0, data: { total: 0, list: [] } }
+      if (method === 'POST' && requestPath === '/canvas') {
+        const ids = {
+          PERF_DIRECT_LIGHT: 11,
+          PERF_EVENT_LIGHT: 12,
+          PERF_ENGINE_ACCURACY: 13,
+        }
+        return { code: 0, data: { id: ids[body.name] } }
+      }
+      if (method === 'POST' && requestPath.endsWith('/publish?operator=perf')) {
+        return { code: 0, data: { id: 99 } }
+      }
+      throw new Error(`unexpected ${method} ${requestPath}`)
+    },
+  }
+
+  const result = await runGuide(parseGuideArgs(['fixture', '--rebuild', 'true']), {
+    fixtureClient: client,
+    env: {
+      PERF_ADMIN_USERNAME: 'admin',
+      PERF_ADMIN_PASSWORD: 'Admin@123',
+    },
+  })
+
+  assert.equal(result.status, 'READY')
+  assert.equal(result.directCanvasId, 11)
+  assert.equal(result.eventCanvasId, 12)
+  assert.equal(result.engineAccuracyCanvasId, 13)
 })
 
 test('smoke stops after first verifier failure', async () => {
@@ -592,6 +666,63 @@ test('soak uses original perf run id for reportable evidence', async () => {
   assert.equal(scenarioOptions.perfRunId, 'perf_soak_001')
 })
 
+test('accuracy runs runner, trace verifier, and side-effect verifier', async () => {
+  const calls = []
+  const result = await runGuide(parseGuideArgs([
+    'accuracy',
+    '--perf-run-id', 'perf_accuracy_001',
+    '--canvas-id', '13',
+    '--count', '2',
+    '--concurrency', '1',
+    '--wiremock-url', 'http://localhost:18099',
+  ]), {
+    runCommand: (command, args) => {
+      calls.push([command, args])
+      if (args[0] === 'tools/perf/perf-runner.mjs') {
+        return {
+          status: 0,
+          stdout: JSON.stringify({ perfRunId: 'perf_accuracy_001', sent: 2, success: 2, failed: 0, durationMs: 1000 }),
+          stderr: '',
+        }
+      }
+      if (args[0] === 'tools/perf/verifier.mjs') {
+        return {
+          status: 0,
+          stdout: JSON.stringify(completeVerifierEvidence({
+            perfRunId: 'perf_accuracy_001',
+            sentSuccess: 2,
+            planned: 2,
+            accepted: 2,
+            expectedExecutions: 2,
+            actualExecutions: 2,
+            success: 2,
+            traceEnabled: true,
+            traceCounts: [
+              { nodeId: 'direct', status: 1, statusName: 'success', expected: 2, actual: 2 },
+            ],
+          })),
+          stderr: '',
+        }
+      }
+      return {
+        status: 0,
+        stdout: JSON.stringify({ verdict: 'PASS', sideEffectVerdict: 'PASS', actualTotal: 2 }),
+        stderr: '',
+      }
+    },
+  })
+
+  assert.equal(result.status, 'PASS')
+  assert.equal(calls[0][1][0], 'tools/perf/perf-runner.mjs')
+  assert.equal(calls[1][1][0], 'tools/perf/verifier.mjs')
+  assert.ok(calls[1][1].includes('--expect-trace'))
+  assert.ok(calls[1][1].includes('send_even:success=even'))
+  assert.equal(calls[2][1][0], 'tools/perf/side-effect-verifier.mjs')
+  assert.deepEqual(calls[2][1].slice(calls[2][1].indexOf('--wiremock-url'), calls[2][1].indexOf('--wiremock-url') + 2), [
+    '--wiremock-url', 'http://localhost:18099',
+  ])
+})
+
 test('defaultRunScenario writes verifier evidence under provided perf run id', async () => {
   const runRoot = mkdtempSync(path.join(tmpdir(), 'perf-guide-'))
   const calls = []
@@ -825,6 +956,43 @@ test('report rejects stale verifier evidence with mismatched sent success', asyn
       '--run-root', runRoot,
       '--min-duration-min', '1',
     ])), /sentSuccess/)
+  } finally {
+    rmSync(runRoot, { recursive: true, force: true })
+  }
+})
+
+test('report rejects trace mismatch evidence', async () => {
+  const runRoot = mkdtempSync(path.join(tmpdir(), 'perf-guide-report-'))
+
+  try {
+    writeJson(path.join(runRoot, 'perf_report_006', 'runner-summary.json'), {
+      perfRunId: 'perf_report_006',
+      sent: 100,
+      success: 100,
+      failed: 0,
+      durationMs: 60_000,
+    })
+    writeJson(path.join(runRoot, 'perf_report_006', 'verifier.json'), completeVerifierEvidence({
+      verdict: 'FAIL',
+      perfRunId: 'perf_report_006',
+      sentSuccess: 100,
+      traceEnabled: true,
+      traceCounts: [
+        { nodeId: 'event', status: 1, statusName: 'success', expected: 100, actual: 99 },
+      ],
+      traceMismatch: 1,
+      traceMismatches: [
+        { nodeId: 'event', status: 1, statusName: 'success', expected: 100, actual: 99 },
+      ],
+      traceVerdict: 'FAIL',
+    }))
+
+    await assert.rejects(() => runGuide(parseGuideArgs([
+      'report',
+      '--perf-run-id', 'perf_report_006',
+      '--run-root', runRoot,
+      '--min-duration-min', '1',
+    ])), /verifier verdict FAIL/)
   } finally {
     rmSync(runRoot, { recursive: true, force: true })
   }

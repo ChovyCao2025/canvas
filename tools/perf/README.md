@@ -9,6 +9,7 @@ Use these scripts directly only for debugging or advanced investigation. Capacit
 ```bash
 node --test tools/perf/*.test.mjs
 node tools/perf/perf-guide.mjs doctor
+node tools/perf/perf-guide.mjs fixture --rebuild true
 node tools/perf/perf-guide.mjs smoke \
   --perf-run-id "$PERF_RUN_ID" \
   --canvas-id "$DIRECT_CANVAS_ID" \
@@ -19,6 +20,24 @@ node tools/perf/perf-guide.mjs smoke \
 After smoke passes, continue with threshold and soak in `docs/stressTest/local-capacity-runbook.md`. Run `perf-guide report` only for a soak run id that has guide-produced runner and verifier evidence.
 
 If verifier is not `PASS`, do not publish throughput, QPS, p95, or capacity estimates. `PASS_WITH_EXPECTED_FAILURES` is only valid for fault reports.
+
+## Fixtures
+
+Prepare the standard local test resources through the guide:
+
+```bash
+node tools/perf/perf-guide.mjs fixture \
+  --base-url http://localhost:8080 \
+  --rebuild true
+```
+
+The command creates and publishes:
+
+- `PERF_DIRECT_LIGHT`
+- `PERF_EVENT_LIGHT`
+- `PERF_ENGINE_ACCURACY`
+
+Use `PERF_ENGINE_ACCURACY` with `perf-guide accuracy` before capacity testing.
 
 ## Request Signing Secret
 
@@ -153,6 +172,45 @@ node tools/perf/verifier.mjs \
 ```
 
 Use the runner `success` value as `--sent-success`, not the requested `--count`, if any HTTP request failed. Accuracy verification must happen before using latency or throughput numbers.
+
+Trace-level accuracy example:
+
+```bash
+node tools/perf/verifier.mjs \
+  --mode direct \
+  --perf-run-id "$PERF_RUN_ID" \
+  --sent-success "$RUNNER_SUCCESS" \
+  --matched-canvas-count 1 \
+  --expect-trace direct:success=all \
+  --expect-trace normalize:success=all \
+  --expect-trace route_even:success=all \
+  --expect-trace send_even:success=even \
+  --expect-trace send_odd:success=odd \
+  --expect-trace send_even:skipped=odd \
+  --expect-trace send_odd:skipped=even \
+  --expect-trace join:success=all \
+  --expect-trace end:success=all
+```
+
+The guide wraps this command automatically:
+
+```bash
+node tools/perf/perf-guide.mjs accuracy \
+  --perf-run-id "$PERF_RUN_ID" \
+  --canvas-id "$ENGINE_ACCURACY_CANVAS_ID" \
+  --count 20000 \
+  --concurrency 100
+```
+
+Side-effect audit only:
+
+```bash
+node tools/perf/side-effect-verifier.mjs \
+  --perf-run-id "$PERF_RUN_ID" \
+  --sent-success "$RUNNER_SUCCESS" \
+  --wiremock-url http://localhost:8099 \
+  --path /mock/reach/send
+```
 
 ## Estimate Capacity
 

@@ -99,156 +99,46 @@ curl -sS http://localhost:8080/actuator/health
 docker stats --no-stream canvas-backend-perf canvas-mysql canvas-redis
 ```
 
-## 7. 创建或复用 PERF 测试资源
+## 7. 创建 PERF 测试资源
 
-先执行 guide 的测试资源安全闸门：
-
-```bash
-node tools/perf/perf-guide.mjs fixture --rebuild true
-```
-
-这个命令只确认操作者明确知道自己要准备测试资源；它不会自动创建画布。你需要创建或复用且只保留一个已发布的 direct 测试画布，以及一个已发布的 event 测试画布。
-
-登录并保存 token：
+执行一条命令创建并发布标准测试资源：
 
 ```bash
-export TOKEN=$(
-  curl -sS -X POST "$BASE_URL/auth/login" \
-    -H 'content-type: application/json' \
-    -d '{"username":"admin","password":"Admin@123"}' \
-  | node -e "let s='';process.stdin.on('data',c=>s+=c);process.stdin.on('end',()=>{const r=JSON.parse(s); if(!r.data || !r.data.token){console.error(s); process.exit(1)} console.log(r.data.token)})"
-)
+node tools/perf/perf-guide.mjs fixture \
+  --base-url "$BASE_URL" \
+  --rebuild true | tee tmp/perf-fixtures/fixture.json
 ```
 
-查看已有 `PERF_` 画布：
+该命令会登录本地后端，归档旧的同名 `PERF_` 画布，然后创建并发布三个画布：
+
+- `PERF_DIRECT_LIGHT`：direct 冒烟和直调轻链路。
+- `PERF_EVENT_LIGHT`：event 阈值和长稳测试，事件编码为 `PERF_ORDER_PAID`。
+- `PERF_ENGINE_ACCURACY`：高并发准确性测试，包含 `DIRECT_CALL -> GROOVY -> IF_CONDITION -> SEND_MESSAGE(even/odd) -> HUB -> END`。
+
+如果本地管理员账号不是默认值，先设置环境变量再执行 fixture：
 
 ```bash
-docker exec canvas-mysql mysql -uroot -proot -Dcanvas_db -e \
-"SELECT id,name,status,published_version_id FROM canvas WHERE name LIKE 'PERF_%' ORDER BY id;"
+export PERF_ADMIN_USERNAME=<local-admin-username>
+export PERF_ADMIN_PASSWORD=<local-admin-password>
 ```
 
-如果已经存在可用且已发布的测试资源，直接导出它们的 ID：
-
-```bash
-export DIRECT_CANVAS_ID=<published-PERF_DIRECT_LIGHT-id>
-export MATCHED_CANVAS_COUNT=1
-```
-
-如果缺少测试资源，先创建 event 和 MQ 定义：
-
-```bash
-docker exec canvas-mysql mysql -uroot -proot -Dcanvas_db -e "
-INSERT INTO event_definition
-  (name, event_code, attributes, description, enabled, created_by, created_at, updated_at)
-VALUES
-  ('压测订单支付事件', 'PERF_ORDER_PAID',
-   '[{\"name\":\"amount\",\"displayName\":\"金额\",\"type\":\"NUMBER\",\"required\":false},{\"name\":\"perfRunId\",\"displayName\":\"压测批次\",\"type\":\"STRING\",\"required\":false},{\"name\":\"perfInputId\",\"displayName\":\"输入ID\",\"type\":\"STRING\",\"required\":false}]',
-   '本机容量压测事件定义', 1, 'perf', NOW(), NOW())
-ON DUPLICATE KEY UPDATE
-  enabled = VALUES(enabled),
-  attributes = VALUES(attributes),
-  updated_at = NOW();
-
-INSERT INTO mq_message_definition
-  (name, message_code, topic, request_schema, description, enabled, created_by, created_at, updated_at)
-VALUES
-  ('压测 MQ 消息', 'PERF_MQ', 'PERF_MQ',
-   '[{\"name\":\"perfRunId\",\"displayName\":\"压测批次\",\"type\":\"STRING\",\"required\":false},{\"name\":\"perfInputId\",\"displayName\":\"输入ID\",\"type\":\"STRING\",\"required\":false},{\"name\":\"seq\",\"displayName\":\"序号\",\"type\":\"NUMBER\",\"required\":false}]',
-   '本机容量压测 MQ 定义', 1, 'perf', NOW(), NOW())
-ON DUPLICATE KEY UPDATE
-  topic = VALUES(topic),
-  request_schema = VALUES(request_schema),
-  enabled = VALUES(enabled),
-  updated_at = NOW();
-"
-```
-
-生成 direct 和 event 画布 payload：
-
-```bash
-node <<'NODE'
-const fs = require('fs')
-fs.mkdirSync('tmp/perf-fixtures', { recursive: true })
-
-function write(name, body) {
-  fs.writeFileSync(`tmp/perf-fixtures/${name}.json`, `${JSON.stringify(body, null, 2)}\n`)
-}
-
-function endNode() {
-  return { id: 'end', type: 'END', name: '结束', category: '流程控制', x: 420, y: 260, config: {}, bizConfig: {} }
-}
-
-write('direct-canvas', {
-  name: 'PERF_DIRECT_LIGHT',
-  description: '本机容量压测：直调轻链路',
-  triggerType: 'REALTIME',
-  createdBy: 'perf',
-  graphJson: JSON.stringify({
-    nodes: [
-      { id: 'direct', type: 'DIRECT_CALL', name: '直调触发', category: '触发器', x: 420, y: 80, config: { nextNodeId: 'end' }, bizConfig: { nextNodeId: 'end' } },
-      endNode(),
-    ],
-  }),
-})
-
-write('event-canvas', {
-  name: 'PERF_EVENT_LIGHT',
-  description: '本机容量压测：事件上报轻链路',
-  triggerType: 'REALTIME',
-  createdBy: 'perf',
-  graphJson: JSON.stringify({
-    nodes: [
-      { id: 'event', type: 'EVENT_TRIGGER', name: '压测事件', category: '行为策略', x: 420, y: 80, config: { eventCode: 'PERF_ORDER_PAID', nextNodeId: 'end' }, bizConfig: { eventCode: 'PERF_ORDER_PAID', nextNodeId: 'end' } },
-      endNode(),
-    ],
-  }),
-})
-NODE
-```
-
-创建并发布画布：
+导出后续命令需要的 ID：
 
 ```bash
 export DIRECT_CANVAS_ID=$(
-  curl -sS -X POST "$BASE_URL/canvas" \
-    -H "authorization: Bearer $TOKEN" \
-    -H 'content-type: application/json' \
-    -d @tmp/perf-fixtures/direct-canvas.json \
-  | node -e "let s='';process.stdin.on('data',c=>s+=c);process.stdin.on('end',()=>{const r=JSON.parse(s); if(!r.data || !r.data.id){console.error(s); process.exit(1)} console.log(r.data.id)})"
+  node -e "const r=require('./tmp/perf-fixtures/fixture.json'); console.log(r.directCanvasId)"
 )
-
-export EVENT_CANVAS_ID=$(
-  curl -sS -X POST "$BASE_URL/canvas" \
-    -H "authorization: Bearer $TOKEN" \
-    -H 'content-type: application/json' \
-    -d @tmp/perf-fixtures/event-canvas.json \
-  | node -e "let s='';process.stdin.on('data',c=>s+=c);process.stdin.on('end',()=>{const r=JSON.parse(s); if(!r.data || !r.data.id){console.error(s); process.exit(1)} console.log(r.data.id)})"
+export ENGINE_ACCURACY_CANVAS_ID=$(
+  node -e "const r=require('./tmp/perf-fixtures/fixture.json'); console.log(r.engineAccuracyCanvasId)"
 )
-
-curl -sS -X POST "$BASE_URL/canvas/$DIRECT_CANVAS_ID/publish?operator=perf" \
-  -H "authorization: Bearer $TOKEN" | tee tmp/perf-fixtures/direct-publish.json
-
-curl -sS -X POST "$BASE_URL/canvas/$EVENT_CANVAS_ID/publish?operator=perf" \
-  -H "authorization: Bearer $TOKEN" | tee tmp/perf-fixtures/event-publish.json
-
 export MATCHED_CANVAS_COUNT=1
-echo "DIRECT_CANVAS_ID=$DIRECT_CANVAS_ID"
-echo "EVENT_CANVAS_ID=$EVENT_CANVAS_ID"
+test -n "$DIRECT_CANVAS_ID"
+test -n "$ENGINE_ACCURACY_CANVAS_ID"
 ```
 
-确认只有一个已发布 event 测试画布匹配 `PERF_ORDER_PAID`：
+确认 event 压测只匹配一个已发布画布：
 
 ```bash
-docker exec canvas-mysql mysql -uroot -proot -Dcanvas_db -e \
-"SELECT c.id,c.name,c.status,c.published_version_id
- FROM canvas c
- JOIN canvas_version cv ON cv.id = c.published_version_id
- WHERE c.status = 1
-   AND c.published_version_id IS NOT NULL
-   AND cv.graph_json LIKE '%EVENT_TRIGGER%'
-   AND cv.graph_json LIKE '%PERF_ORDER_PAID%'
- ORDER BY c.id;"
-
 export EVENT_MATCH_COUNT=$(
   docker exec canvas-mysql mysql -N -B -uroot -proot -Dcanvas_db -e \
   "SELECT COUNT(*)
@@ -260,21 +150,9 @@ export EVENT_MATCH_COUNT=$(
      AND cv.graph_json LIKE '%PERF_ORDER_PAID%';"
 )
 test "$EVENT_MATCH_COUNT" = "1"
-
-export EVENT_MATCH_ID=$(
-  docker exec canvas-mysql mysql -N -B -uroot -proot -Dcanvas_db -e \
-  "SELECT c.id
-   FROM canvas c
-   JOIN canvas_version cv ON cv.id = c.published_version_id
-   WHERE c.status = 1
-     AND c.published_version_id IS NOT NULL
-     AND cv.graph_json LIKE '%EVENT_TRIGGER%'
-     AND cv.graph_json LIKE '%PERF_ORDER_PAID%';"
-)
-test "$EVENT_MATCH_ID" = "$EVENT_CANVAS_ID"
 ```
 
-如果多个已发布画布匹配 `PERF_ORDER_PAID`，或者匹配到的 ID 不是 `$EVENT_CANVAS_ID`，停止测试，先删除或下线重复画布。不要为了让 verifier 通过而调大 `MATCHED_CANVAS_COUNT`；那会改变被测工作量。
+如果这里不是 `1`，停止测试，重新执行 fixture 或手工下线重复画布。不要通过调大 `MATCHED_CANVAS_COUNT` 掩盖重复路由；那会改变真实工作量。
 
 ## 8. 冒烟测试
 
@@ -290,7 +168,43 @@ node tools/perf/perf-guide.mjs smoke \
 
 冒烟结果必须是 `PASS`。如果失败，先对这个 smoke id 执行 ledger cleanup，再修复原因，不能继续后续压测。
 
-## 9. 阈值测试
+## 9. 高并发准确性验证
+
+容量测试前必须先跑一次准确性验证。这个命令会对 `PERF_ENGINE_ACCURACY` 画布执行 direct 高并发请求，并自动完成三类校验：
+
+- 账本准确性：runner 成功数、执行记录、DLQ、重试队列和去重结果必须对齐。
+- Trace 准确性：`DIRECT_CALL`、`GROOVY`、`IF_CONDITION`、偶/奇触达分支、`HUB`、`END` 的成功/跳过次数必须符合预期。
+- 副作用准确性：WireMock `/mock/reach/send` 中同一个 `perfInputId + branch` 不能重复投递，偶/奇分支请求数必须符合 `seq` 分布。
+
+```bash
+export PERF_RUN_ID=perf_$(date +%Y%m%d_%H%M%S)_accuracy
+node tools/perf/perf-guide.mjs accuracy \
+  --base-url "$BASE_URL" \
+  --perf-run-id "$PERF_RUN_ID" \
+  --canvas-id "$ENGINE_ACCURACY_CANVAS_ID" \
+  --event-secret-env PERF_EVENT_SECRET \
+  --count 20000 \
+  --concurrency 100 \
+  --wiremock-url http://localhost:8099
+```
+
+返回结果必须是 `status: "PASS"`。该命令会写入：
+
+- `tmp/perf-runs/$PERF_RUN_ID/runner-summary.json`
+- `tmp/perf-runs/$PERF_RUN_ID/verifier.json`
+- `tmp/perf-runs/$PERF_RUN_ID/side-effect-verifier.json`
+
+如果失败，先查看 `reason` 和对应 JSON。常见含义如下：
+
+- `traceMismatch > 0`：节点执行轨迹数量与预期不一致，可能存在漏执行、重复执行或跳过记录缺失。
+- `traceFailed > 0`：某个节点留下失败 trace，不能进入容量测试。
+- `traceDuplicateSuccess > 0`：同一 execution 的同一节点有重复成功 trace。
+- `duplicateSideEffects > 0`：同一输入和分支对外投递了多次，核心副作用不准确。
+- `branchMismatch > 0`：偶/奇分支数量不符合 `seq` 分布，说明分支执行不可信。
+
+准确性验证失败时，不要继续 threshold 或 soak。先清理本次 `PERF_RUN_ID`，修复问题后换一个新的 `PERF_RUN_ID` 重跑。
+
+## 10. 阈值测试
 
 阈值测试开始前，在另一个终端启动监控采集，并在压测期间保持运行：
 
@@ -325,7 +239,7 @@ node tools/perf/perf-guide.mjs threshold \
 
 把输出中的 `stableStage` 作为当前稳定上限。如果结果是 `NO_STABLE_STAGE`，说明环境或测试资源尚不足以做容量测试，先修复再继续。
 
-## 10. 长稳测试
+## 11. 长稳测试
 
 把 long soak 的并发数设置为阈值测试输出的 `stableStage.concurrency`。`SOAK_COUNT` 要足够大，确保实际运行至少 30 分钟。
 
@@ -364,7 +278,7 @@ node tools/perf/perf-guide.mjs soak \
 
 如果实际运行时间低于 30 分钟，本次运行无效。遇到这种情况时，增大 `SOAK_COUNT`，换一个新的 `PERF_RUN_ID` 重新跑；不要为了让报告通过而降低 `--min-duration-min`。
 
-## 11. 生成报告闸门
+## 12. 生成报告闸门
 
 ```bash
 node tools/perf/perf-guide.mjs report \
@@ -375,7 +289,7 @@ node tools/perf/perf-guide.mjs report \
 
 report 闸门会检查 runner 和 verifier 证据是否属于同一个 `perfRunId`、请求失败数是否为 0、运行时长是否足够，以及 verifier 证据是否完整可信。
 
-## 12. 监控证据
+## 13. 监控证据
 
 监控快照必须在 threshold 和 soak 运行期间采集，不能在压测结束、系统空闲后补采。最终报告前确认文件存在：
 
@@ -385,7 +299,7 @@ ls -lh tmp/perf-monitor
 
 如果缺少监控数据，在报告模板中明确记录为证据缺口。
 
-## 13. 清理
+## 14. 清理
 
 预览 ledger 清理 SQL：
 
@@ -399,6 +313,8 @@ node tools/perf/perf-guide.mjs cleanup --perf-run-id "$PERF_RUN_ID"
 node tools/perf/perf-guide.mjs cleanup --perf-run-id "$PERF_RUN_ID" --execute true
 ```
 
+ledger 清理会删除该 `perfRunId` 对应的 `event_log`、`canvas_execution`、`canvas_execution_trace`、`canvas_execution_request`、`canvas_execution_dlq`、`audience_compute_run`，以及由这些 execution 产生的 `message_send_record`。
+
 完整清理只在全部压测结束后使用：
 
 ```bash
@@ -407,12 +323,13 @@ node tools/perf/perf-guide.mjs cleanup --perf-run-id "$PERF_RUN_ID" --scope all 
 
 `--scope all` 会删除 `PERF_%` event 和 MQ 定义。它不会删除已发布的 canvas 测试画布；如需移除或下线这些画布，需要单独处理。
 
-## 14. 完成检查清单
+## 15. 完成检查清单
 
 - 工具测试已通过。
 - 后端使用了非默认的本地签名密钥。
 - direct 和 event 测试画布已发布。
 - smoke 返回 `PASS`。
+- accuracy 返回 `PASS`，且 trace verifier 与 side-effect verifier 均为 `PASS`。
 - threshold 至少找到一个稳定阶段。
 - soak 返回 `PASS`，且实际运行不少于 30 分钟。
 - guide report 返回 `PASS`。

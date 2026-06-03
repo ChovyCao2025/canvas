@@ -10,6 +10,7 @@ test('buildCleanupSql with ledger scope preserves PERF namespace rows', () => {
   const sql = buildCleanupSql('perf_20260523_001', { scope: 'ledger' })
 
   assert.match(sql, /canvas_execution_trace/)
+  assert.match(sql, /message_send_record/)
   assert.match(sql, /audience_compute_run/)
   assert.match(sql, /perf_run_id = 'perf_20260523_001'/)
   assert.doesNotMatch(sql, /DELETE FROM event_definition WHERE event_code LIKE 'PERF_%'/)
@@ -29,9 +30,21 @@ test('buildCleanupSql prints counts before and after cleanup', () => {
   const sql = buildCleanupSql('perf_20260523_001')
 
   assert.match(sql, /before_event_log_rows/)
+  assert.match(sql, /before_message_send_record_rows/)
   assert.match(sql, /before_audience_compute_run_rows/)
   assert.match(sql, /after_event_log_rows/)
+  assert.match(sql, /after_message_send_record_rows/)
   assert.match(sql, /after_audience_compute_run_rows/)
+})
+
+test('buildCleanupSql deletes message send records before executions', () => {
+  const sql = buildCleanupSql('perf_20260523_001')
+  const messageDeleteIndex = sql.indexOf('DELETE FROM message_send_record')
+  const executionDeleteIndex = sql.indexOf('DELETE FROM canvas_execution WHERE')
+
+  assert.ok(messageDeleteIndex > -1)
+  assert.ok(executionDeleteIndex > messageDeleteIndex)
+  assert.match(sql, /execution_id IN \(\n  SELECT id FROM perf_cleanup_execution_ids\n\)/)
 })
 
 test('buildCleanupSql preserves execution ids for post-cleanup trace count', () => {

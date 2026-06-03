@@ -14,6 +14,7 @@
 
 - Runner summary 文件：
 - Verifier 文件：
+- Side-effect verifier 文件：
 - Guide report 输出：
 - 监控目录：
 - 清理记录：
@@ -29,8 +30,19 @@
 - Duplicate execution：
 - Retry pending：
 - DLQ：
+- Trace verdict：
+- Trace mismatch：
+- Trace failed：
+- Trace duplicate success：
+- Trace buffer pending：
+- Side-effect verdict：
+- Side-effect total mismatch：
+- Side-effect branch mismatch：
+- Duplicate side effects：
+- Missing side-effect input ID：
 
 如果 verifier verdict 不是 `PASS`，在这里停止，不得发布容量数字。
+如果 side-effect verdict 不是 `PASS`，在这里停止，不得发布容量数字。
 
 ## 性能
 

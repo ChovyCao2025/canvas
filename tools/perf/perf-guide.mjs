@@ -5,8 +5,9 @@ import { spawnSync } from 'node:child_process'
 import path from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { computeVerdict } from './verifier.mjs'
+import { createPerfFixtures, engineAccuracyTraceVerifierArgs } from './fixture.mjs'
 
-const COMMANDS = new Set(['doctor', 'fixture', 'smoke', 'threshold', 'soak', 'report', 'cleanup'])
+const COMMANDS = new Set(['doctor', 'fixture', 'smoke', 'threshold', 'soak', 'accuracy', 'report', 'cleanup'])
 
 const DEFAULTS = {
   baseUrl: 'http://localhost:8080',
@@ -29,6 +30,7 @@ const DEFAULTS = {
   minDurationMin: 30,
   count: 300000,
   concurrency: 100,
+  wiremockUrl: 'http://localhost:8099',
 }
 
 const FLAG_NAMES = {
@@ -52,6 +54,7 @@ const FLAG_NAMES = {
   '--min-duration-min': 'minDurationMin',
   '--count': 'count',
   '--concurrency': 'concurrency',
+  '--wiremock-url': 'wiremockUrl',
 }
 
 const NUMBER_FLAGS = new Set(['matchedCanvasCount', 'minDurationMin', 'count', 'concurrency'])
@@ -182,6 +185,10 @@ const VERIFIER_COUNT_FIELDS = [
   'ackWithoutLedger',
   'unexpectedLoss',
   'wrongAudienceCount',
+  'traceMismatch',
+  'traceFailed',
+  'traceDuplicateSuccess',
+  'traceBufferPending',
 ]
 
 const LEDGER_COUNT_FIELDS = [
@@ -204,6 +211,85 @@ function requireVerifierCount(value, field) {
   }
 }
 
+function assertTraceCountEntry(entry, field) {
+  if (!entry || typeof entry !== 'object' || Array.isArray(entry)) {
+    throw new Error(`verifier evidence field ${field} must be an object`)
+  }
+  if (typeof entry.nodeId !== 'string' || entry.nodeId.length === 0) {
+    throw new Error(`verifier evidence field ${field}.nodeId must be a non-empty string`)
+  }
+  requireVerifierCount(entry.status, `${field}.status`)
+  if (typeof entry.statusName !== 'string' || entry.statusName.length === 0) {
+    throw new Error(`verifier evidence field ${field}.statusName must be a non-empty string`)
+  }
+  requireVerifierCount(entry.expected, `${field}.expected`)
+  requireVerifierCount(entry.actual, `${field}.actual`)
+}
+
+function traceCountKey(entry) {
+  return [
+    entry.nodeId,
+    entry.status,
+    entry.statusName,
+    entry.expected,
+    entry.actual,
+  ].join('\u0000')
+}
+
+function assertTraceEvidenceComplete(verifier) {
+  if (typeof verifier.traceEnabled !== 'boolean') {
+    throw new Error('verifier evidence field traceEnabled must be a boolean')
+  }
+  if (!Array.isArray(verifier.traceCounts)) {
+    throw new Error('verifier evidence field traceCounts must be an array')
+  }
+  if (!Array.isArray(verifier.traceMismatches)) {
+    throw new Error('verifier evidence field traceMismatches must be an array')
+  }
+  if (!['PASS', 'FAIL'].includes(verifier.traceVerdict)) {
+    throw new Error('verifier evidence field traceVerdict must be PASS or FAIL')
+  }
+
+  verifier.traceCounts.forEach((entry, index) => {
+    assertTraceCountEntry(entry, `traceCounts.${index}`)
+  })
+  verifier.traceMismatches.forEach((entry, index) => {
+    assertTraceCountEntry(entry, `traceMismatches.${index}`)
+  })
+
+  if (!verifier.traceEnabled && verifier.traceCounts.length > 0) {
+    throw new Error('verifier traceCounts must be empty when traceEnabled is false')
+  }
+  if (verifier.traceEnabled && verifier.traceCounts.length === 0) {
+    throw new Error('verifier traceCounts must include at least one expectation when traceEnabled is true')
+  }
+
+  const derivedMismatches = verifier.traceCounts.filter((entry) => entry.actual !== entry.expected)
+  if (verifier.traceMismatch !== derivedMismatches.length) {
+    throw new Error(`verifier traceMismatch ${verifier.traceMismatch} does not match traceCounts mismatches ${derivedMismatches.length}`)
+  }
+
+  const expectedMismatchKeys = new Set(derivedMismatches.map(traceCountKey))
+  if (verifier.traceMismatches.length !== derivedMismatches.length) {
+    throw new Error(`verifier traceMismatches length ${verifier.traceMismatches.length} does not match traceMismatch ${derivedMismatches.length}`)
+  }
+  for (const mismatch of verifier.traceMismatches) {
+    if (!expectedMismatchKeys.has(traceCountKey(mismatch))) {
+      throw new Error('verifier traceMismatches must match mismatched traceCounts')
+    }
+  }
+
+  const expectedTraceVerdict = [
+    verifier.traceMismatch,
+    verifier.traceFailed,
+    verifier.traceDuplicateSuccess,
+    verifier.traceBufferPending,
+  ].some((value) => value > 0) ? 'FAIL' : 'PASS'
+  if (verifier.traceVerdict !== expectedTraceVerdict) {
+    throw new Error(`verifier traceVerdict ${verifier.traceVerdict} does not match recomputed ${expectedTraceVerdict}`)
+  }
+}
+
 export function assertVerifierEvidenceComplete(verifier, { perfRunId, sentSuccess }) {
   if (verifier.perfRunId !== perfRunId) {
     throw new Error(`verifier perfRunId ${verifier.perfRunId || '(missing)'} does not match ${perfRunId}`)
@@ -214,6 +300,7 @@ export function assertVerifierEvidenceComplete(verifier, { perfRunId, sentSucces
   for (const field of VERIFIER_COUNT_FIELDS) {
     requireVerifierCount(verifier[field], field)
   }
+  assertTraceEvidenceComplete(verifier)
   if (!verifier.ledgerCounts || typeof verifier.ledgerCounts !== 'object' || Array.isArray(verifier.ledgerCounts)) {
     throw new Error('verifier evidence field ledgerCounts must be an object')
   }
@@ -263,6 +350,10 @@ export function assertVerifierEvidenceComplete(verifier, { perfRunId, sentSucces
     'unexpectedDlq',
     'unexpectedLoss',
     'wrongAudienceCount',
+    'traceMismatch',
+    'traceFailed',
+    'traceDuplicateSuccess',
+    'traceBufferPending',
   ]) {
     if (verifier[field] !== recomputed[field]) {
       throw new Error(`verifier ${field} ${verifier[field]} does not match recomputed ${recomputed[field]}`)
@@ -383,14 +474,11 @@ async function defaultDoctor() {
   return { status: 'PASS' }
 }
 
-async function defaultFixture(config) {
-  if (!config.rebuild) {
-    return {
-      status: 'DRY_RUN',
-      message: 'fixture command requires --rebuild true to recreate PERF_ resources',
-    }
-  }
-  return { status: 'READY' }
+async function defaultFixture(config, deps = {}) {
+  return createPerfFixtures(config, {
+    client: deps.fixtureClient,
+    env: deps.env,
+  })
 }
 
 async function defaultSmoke(config, deps = {}) {
@@ -499,6 +587,96 @@ async function defaultSoak(config, deps = {}) {
   return { status: 'PASS', summary: run.summary, verifier: run.verifier }
 }
 
+async function defaultAccuracy(config, deps = {}) {
+  if (!config.perfRunId) {
+    throw new Error('--perf-run-id is required for accuracy')
+  }
+  if (!config.canvasId) {
+    throw new Error('--canvas-id is required for accuracy')
+  }
+  const run = deps.runCommand || runCommand
+  const directory = runDirectory(config)
+  mkdirSync(directory, { recursive: true })
+  const summaryFile = path.join(directory, 'runner-summary.json')
+  const verifierFile = path.join(directory, 'verifier.json')
+  const sideEffectFile = path.join(directory, 'side-effect-verifier.json')
+
+  const runnerArgs = [
+    'tools/perf/perf-runner.mjs',
+    '--mode', 'direct',
+    '--base-url', config.baseUrl,
+    '--perf-run-id', config.perfRunId,
+    '--canvas-id', config.canvasId,
+    '--event-secret-env', config.eventSecretEnv || 'PERF_EVENT_SECRET',
+    '--count', String(config.count),
+    '--concurrency', String(config.concurrency),
+    '--summary-file', summaryFile,
+  ]
+  const summary = parseJsonCommandResult(run(process.execPath, runnerArgs), 'perf-runner')
+  writeJson(summaryFile, summary)
+  assertRunnerSummaryComplete(summary, { perfRunId: config.perfRunId })
+
+  const verifierArgs = [
+    'tools/perf/verifier.mjs',
+    '--mysql', config.mysql,
+    '--database', config.database,
+    '--mode', 'direct',
+    '--perf-run-id', config.perfRunId,
+    '--sent-success', String(summary.success),
+    '--matched-canvas-count', '1',
+    ...engineAccuracyTraceVerifierArgs(),
+  ]
+  const verifier = parseJsonCommandResult(run(process.execPath, verifierArgs), 'verifier')
+  writeJson(verifierFile, {
+    ...verifier,
+    perfRunId: config.perfRunId,
+    sentSuccess: summary.success,
+  })
+
+  const sideEffectArgs = [
+    'tools/perf/side-effect-verifier.mjs',
+    '--wiremock-url', config.wiremockUrl,
+    '--perf-run-id', config.perfRunId,
+    '--sent-success', String(summary.success),
+    '--path', '/mock/reach/send',
+  ]
+  const sideEffect = parseJsonCommandResult(run(process.execPath, sideEffectArgs), 'side-effect-verifier')
+  writeJson(sideEffectFile, sideEffect)
+
+  if (failedRequestCount(summary) > 0) {
+    return {
+      status: 'FAIL',
+      reason: `runner reported ${failedRequestCount(summary)} failed request(s)`,
+      summary,
+      verifier,
+      sideEffect,
+      directory,
+    }
+  }
+  if (verifier.verdict !== 'PASS') {
+    return {
+      status: 'FAIL',
+      reason: `verifier verdict ${verifier.verdict}`,
+      summary,
+      verifier,
+      sideEffect,
+      directory,
+    }
+  }
+  if (sideEffect.verdict !== 'PASS') {
+    return {
+      status: 'FAIL',
+      reason: `side-effect verifier verdict ${sideEffect.verdict}`,
+      summary,
+      verifier,
+      sideEffect,
+      directory,
+    }
+  }
+
+  return { status: 'PASS', summary, verifier, sideEffect, directory }
+}
+
 async function defaultCleanup(config) {
   const [command, args] = commandForCleanup(config)
   const result = runCommand(command, args)
@@ -545,10 +723,11 @@ async function defaultReport(config) {
 export async function runGuide(config, deps = {}) {
   const handlers = {
     doctor: deps.doctor || defaultDoctor,
-    fixture: deps.fixture || defaultFixture,
+    fixture: deps.fixture || ((activeConfig) => defaultFixture(activeConfig, deps)),
     smoke: deps.smoke || ((activeConfig) => defaultSmoke(activeConfig, deps)),
     threshold: deps.threshold || ((activeConfig) => defaultThreshold(activeConfig, deps)),
     soak: deps.soak || ((activeConfig) => defaultSoak(activeConfig, deps)),
+    accuracy: deps.accuracy || ((activeConfig) => defaultAccuracy(activeConfig, deps)),
     report: deps.report || defaultReport,
     cleanup: deps.cleanup || defaultCleanup,
   }
