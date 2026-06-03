@@ -260,9 +260,21 @@ export EVENT_MATCH_COUNT=$(
      AND cv.graph_json LIKE '%PERF_ORDER_PAID%';"
 )
 test "$EVENT_MATCH_COUNT" = "1"
+
+export EVENT_MATCH_ID=$(
+  docker exec canvas-mysql mysql -N -B -uroot -proot -Dcanvas_db -e \
+  "SELECT c.id
+   FROM canvas c
+   JOIN canvas_version cv ON cv.id = c.published_version_id
+   WHERE c.status = 1
+     AND c.published_version_id IS NOT NULL
+     AND cv.graph_json LIKE '%EVENT_TRIGGER%'
+     AND cv.graph_json LIKE '%PERF_ORDER_PAID%';"
+)
+test "$EVENT_MATCH_ID" = "$EVENT_CANVAS_ID"
 ```
 
-If more than one published canvas matches `PERF_ORDER_PAID`, stop and remove or offline duplicates before testing. Do not raise `MATCHED_CANVAS_COUNT` to make verifier pass; that changes the measured workload.
+If more than one published canvas matches `PERF_ORDER_PAID`, or the matching id is not `$EVENT_CANVAS_ID`, stop and remove or offline duplicates before testing. Do not raise `MATCHED_CANVAS_COUNT` to make verifier pass; that changes the measured workload.
 
 ## 8. Smoke
 
