@@ -14,8 +14,9 @@ node tools/perf/perf-guide.mjs smoke \
   --canvas-id "$DIRECT_CANVAS_ID" \
   --matched-canvas-count "$MATCHED_CANVAS_COUNT" \
   --event-secret-env PERF_EVENT_SECRET
-node tools/perf/perf-guide.mjs report --perf-run-id "$PERF_RUN_ID" --report-type capacity
 ```
+
+After smoke passes, continue with threshold and soak in `docs/stressTest/local-capacity-runbook.md`. Run `perf-guide report` only for a soak run id that has guide-produced runner and verifier evidence.
 
 If verifier is not `PASS`, do not publish throughput, QPS, p95, or capacity estimates. `PASS_WITH_EXPECTED_FAILURES` is only valid for fault reports.
 
