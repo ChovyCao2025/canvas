@@ -7,6 +7,7 @@ const DEFAULT_ARGS = {
   mysql: 'mysql',
   database: 'canvas_db',
   perfRunId: '',
+  scope: 'ledger',
   execute: false,
 }
 
@@ -14,6 +15,7 @@ const FLAG_NAMES = {
   '--mysql': 'mysql',
   '--database': 'database',
   '--perf-run-id': 'perfRunId',
+  '--scope': 'scope',
   '--execute': 'execute',
 }
 
@@ -23,8 +25,14 @@ export function escapeSql(value) {
     .replaceAll("'", "''")
 }
 
-export function buildCleanupSql(perfRunId) {
+export function buildCleanupSql(perfRunId, { scope = 'ledger' } = {}) {
   const id = escapeSql(perfRunId)
+  const fixtureCleanupSql = scope === 'all'
+    ? `
+DELETE FROM event_definition WHERE event_code LIKE 'PERF_%';
+DELETE FROM mq_message_definition WHERE message_code LIKE 'PERF_%';
+`
+    : ''
 
   return `
 DROP TEMPORARY TABLE IF EXISTS perf_cleanup_execution_ids;
@@ -56,9 +64,7 @@ DELETE FROM canvas_execution_request WHERE perf_run_id = '${id}';
 DELETE FROM canvas_execution WHERE perf_run_id = '${id}';
 DELETE FROM event_log WHERE perf_run_id = '${id}';
 DELETE FROM audience_compute_run WHERE perf_run_id = '${id}';
-
-DELETE FROM event_definition WHERE event_code LIKE 'PERF_%';
-DELETE FROM mq_message_definition WHERE message_code LIKE 'PERF_%';
+${fixtureCleanupSql}
 
 SELECT COUNT(*) AS after_event_log_rows FROM event_log WHERE perf_run_id = '${id}';
 SELECT COUNT(*) AS after_execution_rows FROM canvas_execution WHERE perf_run_id = '${id}';
@@ -87,6 +93,13 @@ function parseBoolean(flag, value) {
   throw new Error(`${flag} must be true or false`)
 }
 
+function parseScope(flag, value) {
+  if (value === 'ledger' || value === 'all') {
+    return value
+  }
+  throw new Error(`${flag} must be ledger or all`)
+}
+
 export function parseCleanupArgs(argv) {
   const args = { ...DEFAULT_ARGS }
 
@@ -103,7 +116,11 @@ export function parseCleanupArgs(argv) {
     }
 
     const value = argv[index + 1]
-    args[name] = name === 'execute' ? parseBoolean(flag, value) : value
+    args[name] = name === 'execute'
+      ? parseBoolean(flag, value)
+      : name === 'scope'
+        ? parseScope(flag, value)
+        : value
   }
 
   if (!args.perfRunId) {
@@ -119,7 +136,7 @@ export function isCliEntrypoint(moduleUrl, argvPath) {
 
 function main() {
   const args = parseCleanupArgs(process.argv.slice(2))
-  const sql = buildCleanupSql(args.perfRunId)
+  const sql = buildCleanupSql(args.perfRunId, { scope: args.scope })
 
   if (!args.execute) {
     console.log(sql)

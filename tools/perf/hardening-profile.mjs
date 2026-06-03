@@ -109,7 +109,7 @@ export function renderThresholdCommand(profile, options = {}) {
   ]
 
   if (profile.mode === 'event') {
-    args.splice(3, 0, `--event-code ${profile.eventCode}`)
+    args.splice(3, 0, `--event-code ${profile.eventCode}`, '--event-secret-env PERF_EVENT_SECRET')
   }
 
   if (profile.mode === 'direct') {

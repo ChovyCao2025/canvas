@@ -3,10 +3,13 @@ import assert from 'node:assert/strict'
 import {
   buildEventPayload,
   buildDirectPayload,
+  buildEventSignatureHeaders,
+  buildSignedHeaders,
   chunkSeq,
   exitCodeForSummary,
   isCliEntrypoint,
   parseRunnerArgs,
+  resolveEventSecret,
   run,
 } from './perf-runner.mjs'
 
@@ -56,6 +59,109 @@ test('parseRunnerArgs reads required flags', () => {
   assert.equal(args.perfRunId, 'perf_20260523_001')
   assert.equal(args.count, 10)
   assert.equal(args.concurrency, 2)
+})
+
+test('buildEventSignatureHeaders signs timestamp and raw body', () => {
+  const headers = buildEventSignatureHeaders({
+    secret: '12345678901234567890123456789012',
+    timestamp: '1760000000000',
+    rawBody: '{"eventCode":"PERF_ORDER_PAID"}',
+  })
+
+  assert.equal(headers['X-Canvas-Timestamp'], '1760000000000')
+  assert.equal(
+    headers['X-Canvas-Signature'],
+    'sha256=b459181d5e6609aecf71072654181700c178d19e765700e19ce36fa458be21da',
+  )
+})
+
+test('resolveEventSecret reads only the configured environment variable', () => {
+  assert.deepEqual(resolveEventSecret({
+    mode: 'event',
+    eventSecret: '12345678901234567890123456789012',
+    eventSecretEnv: 'PERF_EVENT_SECRET',
+  }, {
+    PERF_EVENT_SECRET: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+  }), {
+    value: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+    source: 'env:PERF_EVENT_SECRET',
+  })
+})
+
+test('resolveEventSecret reads configured environment variable', () => {
+  assert.deepEqual(resolveEventSecret({
+    mode: 'event',
+    eventSecretEnv: 'PERF_EVENT_SECRET',
+  }, {
+    PERF_EVENT_SECRET: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+  }), {
+    value: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+    source: 'env:PERF_EVENT_SECRET',
+  })
+})
+
+test('buildSignedHeaders returns JSON headers when no event secret is configured', () => {
+  const headers = buildSignedHeaders({
+    args: { mode: 'event', eventSecretEnv: 'PERF_EVENT_SECRET' },
+    rawBody: '{}',
+    nowMs: () => 1760000000000,
+    env: {},
+  })
+
+  assert.deepEqual(headers, {
+    'content-type': 'application/json',
+  })
+})
+
+test('buildSignedHeaders includes event HMAC headers when secret is configured', () => {
+  const headers = buildSignedHeaders({
+    args: { mode: 'event', eventSecretEnv: 'PERF_EVENT_SECRET' },
+    rawBody: '{"eventCode":"PERF_ORDER_PAID"}',
+    nowMs: () => 1760000000000,
+    env: { PERF_EVENT_SECRET: '12345678901234567890123456789012' },
+  })
+
+  assert.equal(headers['content-type'], 'application/json')
+  assert.equal(headers['X-Canvas-Timestamp'], '1760000000000')
+  assert.equal(
+    headers['X-Canvas-Signature'],
+    'sha256=b459181d5e6609aecf71072654181700c178d19e765700e19ce36fa458be21da',
+  )
+})
+
+test('buildSignedHeaders includes machine HMAC headers for direct mode when secret is configured', () => {
+  const headers = buildSignedHeaders({
+    args: { mode: 'direct', eventSecretEnv: 'PERF_EVENT_SECRET' },
+    rawBody: '{"userId":"perf_user_1"}',
+    nowMs: () => 1760000000000,
+    env: { PERF_EVENT_SECRET: '12345678901234567890123456789012' },
+  })
+
+  assert.equal(headers['content-type'], 'application/json')
+  assert.equal(headers['X-Canvas-Timestamp'], '1760000000000')
+  assert.equal(
+    headers['X-Canvas-Signature'],
+    'sha256=f79510582ae819a259be30328a5f2835e25db4c560f0ab1d51a52c436409a5b8',
+  )
+})
+
+test('parseRunnerArgs accepts event secret env flag without exposing a secret value', () => {
+  const args = parseRunnerArgs([
+    '--mode', 'event',
+    '--perf-run-id', 'perf_20260523_001',
+    '--event-secret-env', 'CANVAS_EVENT_REPORT_SECRET',
+  ])
+
+  assert.equal('eventSecret' in args, false)
+  assert.equal(args.eventSecretEnv, 'CANVAS_EVENT_REPORT_SECRET')
+})
+
+test('parseRunnerArgs rejects event secret flag', () => {
+  assert.throws(() => parseRunnerArgs([
+    '--mode', 'event',
+    '--perf-run-id', 'perf_20260523_001',
+    '--event-secret', '12345678901234567890123456789012',
+  ]), /Unknown flag: --event-secret/)
 })
 
 test('parseRunnerArgs throws for unsupported mode', () => {
@@ -118,4 +224,22 @@ test('run includes metadata in zero-count summary', async () => {
   assert.equal(summary.success, 0)
   assert.equal(summary.failed, 0)
   assert.equal(summary.p95Ms, 0)
+})
+
+test('run summary records event signature source without leaking secret', async () => {
+  const summary = await run(parseRunnerArgs([
+    '--mode', 'event',
+    '--perf-run-id', 'perf_20260523_001',
+    '--count', '0',
+    '--event-secret-env', 'PERF_EVENT_SECRET',
+  ]), {
+    env: { PERF_EVENT_SECRET: '12345678901234567890123456789012' },
+    machineMetadata: () => ({}),
+  })
+
+  assert.deepEqual(summary.settings.eventSignature, {
+    enabled: true,
+    source: 'env:PERF_EVENT_SECRET',
+  })
+  assert.doesNotMatch(JSON.stringify(summary), /12345678901234567890123456789012/)
 })

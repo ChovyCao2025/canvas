@@ -1,49 +1,46 @@
-# Canvas Performance Testing
+# Canvas Performance Tools
 
-Local performance harness for load generation, correctness reconciliation, capacity estimation, and cleanup.
+This directory contains the low-level performance scripts. The only supported execution path for a capacity test is the guided runbook in `docs/stressTest/README.md`, using `tools/perf/perf-guide.mjs` for smoke, threshold, soak, report, and cleanup gates.
 
-## Prerequisites
+Use these scripts directly only for debugging or advanced investigation. Capacity numbers are valid only when the matching guide report accepts the runner and verifier evidence.
 
-- Java 21
-- Maven 3.9+
-- Node.js 18+
-- Docker dependencies from `docker-compose.local.yml`
-- Local backend on `http://localhost:8080`
-- Local MySQL reachable with `mysql -uroot -proot canvas_db`
-- For this machine, Maven commands may need:
+## Recommended Entry Point
 
 ```bash
-export JAVA_HOME=$(/usr/libexec/java_home -v 21)
-export PATH="$JAVA_HOME/bin:$PATH"
+node --test tools/perf/*.test.mjs
+node tools/perf/perf-guide.mjs doctor
+node tools/perf/perf-guide.mjs smoke \
+  --perf-run-id "$PERF_RUN_ID" \
+  --canvas-id "$DIRECT_CANVAS_ID" \
+  --matched-canvas-count "$MATCHED_CANVAS_COUNT" \
+  --event-secret-env PERF_EVENT_SECRET
 ```
+
+After smoke passes, continue with threshold and soak in `docs/stressTest/local-capacity-runbook.md`. Run `perf-guide report` only for a soak run id that has guide-produced runner and verifier evidence.
+
+If verifier is not `PASS`, do not publish throughput, QPS, p95, or capacity estimates. `PASS_WITH_EXPECTED_FAILURES` is only valid for fault reports.
+
+## Request Signing Secret
+
+Event and direct modes sign requests with HMAC headers when a secret is available through an environment variable. Do not pass secret values as command-line arguments.
+
+```bash
+export PERF_EVENT_SECRET="<local-secret-at-least-32-bytes>"
+```
+
+Use `--event-secret-env PERF_EVENT_SECRET` in event and direct commands. The runner records only whether signing was enabled and which env var was used; it does not print the secret value.
 
 ## Run IDs
 
-Every run uses a unique `perfRunId`:
+Use one unique run id per scenario:
 
 ```bash
 export PERF_RUN_ID=perf_$(date +%Y%m%d_%H%M%S)
 ```
 
-Use one run ID per scenario so verifier and cleanup queries stay isolated.
+Do not reuse a `PERF_RUN_ID` for capacity evidence. Reuse can mix old and new database rows or old local JSON files.
 
-## Small-Flow Smoke
-
-Before any capacity run, prove that the local fixtures, backend, middleware, verifier, and cleanup path are all wired correctly with a small isolated run:
-
-1. Create one fresh `PERF_RUN_ID`.
-2. Run one small scenario:
-   - event: `--count 100 --concurrency 10`
-   - direct: `--count 50 --concurrency 5`
-   - MQ: `--count 100`
-   - audience: `--count 1 --concurrency 1`
-3. Run the verifier for that same `PERF_RUN_ID`.
-4. Continue to capacity testing only when the verifier verdict is `PASS`.
-5. Run cleanup first as a dry run, then execute it with `--execute true`.
-
-This smoke run is intentionally small. Its job is correctness and isolation, not throughput.
-
-## HTTP Event Test
+## Event Runner
 
 ```bash
 node tools/perf/perf-runner.mjs \
@@ -51,24 +48,50 @@ node tools/perf/perf-runner.mjs \
   --base-url http://localhost:8080 \
   --perf-run-id "$PERF_RUN_ID" \
   --event-code PERF_ORDER_PAID \
+  --event-secret-env PERF_EVENT_SECRET \
   --count 10000 \
   --concurrency 100 \
   --summary-file "tmp/perf-$PERF_RUN_ID-event.json"
 ```
 
-The runner prints `sent`, `success`, `failed`, `p95Ms`, timestamps, run settings, and machine metadata. A nonzero `failed` count exits with code `2`.
+The runner prints `sent`, `success`, `failed`, `p95Ms`, timestamps, run settings, and machine metadata. Exit code `2` means the command completed with request failures; that run is not valid capacity evidence.
+
+## Direct Runner
+
+```bash
+node tools/perf/perf-runner.mjs \
+  --mode direct \
+  --base-url http://localhost:8080 \
+  --perf-run-id "$PERF_RUN_ID" \
+  --canvas-id "$DIRECT_CANVAS_ID" \
+  --event-secret-env PERF_EVENT_SECRET \
+  --count 1000 \
+  --concurrency 50 \
+  --summary-file "tmp/perf-$PERF_RUN_ID-direct.json"
+```
+
+Direct mode uses deterministic `idempotencyKey` values of the form `$PERF_RUN_ID:direct:<seq>`.
 
 ## Threshold Runner
 
-Use this wrapper after smoke passes. It runs staged pressure, verifies each run, and stops at the first unstable stage.
+Use the guide first:
 
-Event example:
+```bash
+node tools/perf/perf-guide.mjs threshold \
+  --mode event \
+  --event-code PERF_ORDER_PAID \
+  --event-secret-env PERF_EVENT_SECRET \
+  --matched-canvas-count 1
+```
+
+Advanced event example:
 
 ```bash
 node tools/perf/threshold-runner.mjs \
   --mode event \
   --base-url http://localhost:8080 \
   --event-code PERF_ORDER_PAID \
+  --event-secret-env PERF_EVENT_SECRET \
   --stages 1000:10,5000:50,10000:100,30000:200,50000:400 \
   --matched-canvas-count 1 \
   --max-failed 0 \
@@ -78,13 +101,14 @@ node tools/perf/threshold-runner.mjs \
   --run-id-prefix "perf_$(date +%Y%m%d_%H%M%S)"
 ```
 
-Direct example:
+Advanced direct example:
 
 ```bash
 node tools/perf/threshold-runner.mjs \
   --mode direct \
   --base-url http://localhost:8080 \
   --canvas-id "$DIRECT_CANVAS_ID" \
+  --event-secret-env PERF_EVENT_SECRET \
   --stages 1000:10,5000:50,10000:100,30000:200,50000:400 \
   --matched-canvas-count 1 \
   --max-failed 0 \
@@ -94,155 +118,21 @@ node tools/perf/threshold-runner.mjs \
   --run-id-prefix "perf_$(date +%Y%m%d_%H%M%S)"
 ```
 
-Verdicts:
+Threshold verdicts:
 
-- `MAX_STAGE_STABLE`: all configured stages passed. Add a higher stage if you still need the limit.
-- `THRESHOLD_FOUND`: the first unstable stage was found. Use `stableStage` as the current maximum stable point.
-- `NO_STABLE_STAGE`: even the first stage failed. Fix correctness or environment before capacity testing.
+- `MAX_STAGE_STABLE`: all configured stages passed.
+- `THRESHOLD_FOUND`: the first unstable stage was found; use `stableStage` as the current stable ceiling.
+- `NO_STABLE_STAGE`: even the first stage failed; fix environment, fixtures, or correctness before testing capacity.
 
 Stage failure reasons:
 
 - `RUNNER_FAILED`: HTTP request failures exceeded `--max-failed`.
 - `P95_EXCEEDED`: runner p95 exceeded `--max-p95-ms`.
-- `VERIFIER_FAIL`: correctness reconciliation failed. This result is not valid capacity data.
-
-## 3000 Hardening Profiles
-
-The 3000 production gate is driven by `tools/perf/3000-hardening-profiles.json`.
-
-Validate the profile file:
-
-```bash
-node -e "const p=require('./tools/perf/3000-hardening-profiles.json'); const total=Object.values(p.lanes).reduce((sum,l)=>sum+l.concurrency,0); if (total !== p.targetConcurrency) throw new Error(String(total)); console.log(total)"
-```
-
-Render the default mixed 3000 command:
-
-```bash
-node tools/perf/hardening-profile.mjs \
-  --profile default-mixed-3000 \
-  --run-id-prefix "perf_3000_gate_$(date +%Y%m%d_%H%M%S)"
-```
-
-Run the rendered command only after:
-
-- the small-flow smoke passes
-- impacted backend tests pass on Java 21
-- the 3000 code foundation is present in the branch
-- rollback and degrade actions from `docs/optimization/3000-concurrency-hardening-checklist.md` are ready
-
-Profiles required for 3000 completion:
-
-- `default-mixed-3000`
-- `retry-surge-300`
-- `heavy-surge-300`
-- `slow-downstream-standard`
-- `redis-registry-latency`
-- `rocketmq-backlog-recovery`
-
-## 4000 Readiness Profiles
-
-4000 is a readiness target after the 3000 gate passes. The starting profile lives in `tools/perf/4000-readiness-profiles.json`; it is not a production default.
-
-Validate the lane total:
-
-```bash
-node -e "const p=require('./tools/perf/4000-readiness-profiles.json'); const total=Object.values(p.lanes).reduce((sum,l)=>sum+l.concurrency,0); if (total !== p.targetConcurrency) throw new Error(String(total)); console.log(total)"
-```
-
-Render the mixed 4000 readiness command:
-
-```bash
-node tools/perf/hardening-profile.mjs \
-  --profile-file tools/perf/4000-readiness-profiles.json \
-  --profile readiness-mixed-4000 \
-  --out-dir tmp/perf-4000-readiness \
-  --run-id-prefix "perf_4000_readiness_$(date +%Y%m%d_%H%M%S)"
-```
-
-## Direct Call Test
-
-```bash
-node tools/perf/perf-runner.mjs \
-  --mode direct \
-  --base-url http://localhost:8080 \
-  --perf-run-id "$PERF_RUN_ID" \
-  --canvas-id 1 \
-  --count 1000 \
-  --concurrency 50 \
-  --summary-file "tmp/perf-$PERF_RUN_ID-direct.json"
-```
-
-Direct mode uses deterministic `idempotencyKey` values of the form `$PERF_RUN_ID:direct:<seq>`.
-
-### Direct Duplicate Test
-
-Use this to prove concurrent idempotency behavior. The runner reuses the first N direct keys at the tail of the run, where `N = floor(count * duplicateRate)`.
-
-```bash
-node tools/perf/perf-runner.mjs \
-  --mode direct \
-  --base-url http://localhost:8080 \
-  --perf-run-id "$PERF_RUN_ID" \
-  --canvas-id 1 \
-  --count 1000 \
-  --concurrency 100 \
-  --duplicate-rate 0.01 \
-  --summary-file "tmp/perf-$PERF_RUN_ID-direct-dup.json"
-```
-
-Then verify the intentional duplicate count:
-
-```bash
-node tools/perf/verifier.mjs \
-  --mode direct \
-  --perf-run-id "$PERF_RUN_ID" \
-  --sent-success 1000 \
-  --matched-canvas-count 1 \
-  --intentional-duplicates 10
-```
-
-The duplicate run is valid only when the verifier returns `PASS`. A `FAIL` means the system either executed duplicated inputs, lost accepted inputs, over-deduplicated, or left work unfinished.
-
-## Audience Compute Test
-
-```bash
-node tools/perf/perf-runner.mjs \
-  --mode audience \
-  --base-url http://localhost:8080 \
-  --perf-run-id "$PERF_RUN_ID" \
-  --audience-id 1 \
-  --count 10 \
-  --concurrency 2
-```
-
-Pass the expected audience size to the verifier when checking an audience run.
-Audience runs are isolated through `audience_compute_run.perf_run_id`.
-
-## RocketMQ Test
-
-Prefetch Maven dependencies before any timed run so artifact download latency is not mixed into the MQ measurement:
-
-```bash
-cd tools/perf/mq-producer
-export JAVA_HOME=$(/usr/libexec/java_home -v 21)
-export PATH="$JAVA_HOME/bin:$PATH"
-mvn -q -DskipTests dependency:go-offline
-```
-
-```bash
-cd tools/perf/mq-producer
-mvn -q test
-mvn -q exec:java \
-  -Dexec.mainClass=org.chovy.canvas.perf.mq.PerfMqProducer \
-  -Dexec.args="--name-server localhost:9876 --topic CANVAS_MQ_TRIGGER --tag PERF_MQ --perf-run-id $PERF_RUN_ID --count 10000 --user-modulo 1000"
-```
-
-The producer sends deterministic keys of the form `$PERF_RUN_ID:mq:<seq>`.
+- `VERIFIER_FAIL`: reconciliation failed. This is not valid capacity data.
 
 ## Verify Correctness
 
-Normal event or MQ run:
+Normal event run:
 
 ```bash
 node tools/perf/verifier.mjs \
@@ -252,35 +142,17 @@ node tools/perf/verifier.mjs \
   --matched-canvas-count 1
 ```
 
-Audience run:
+Direct run:
 
 ```bash
 node tools/perf/verifier.mjs \
-  --mode audience \
+  --mode direct \
   --perf-run-id "$PERF_RUN_ID" \
-  --sent-success 10 \
-  --audience-id 1 \
-  --expected-audience-count 10000
+  --sent-success 1000 \
+  --matched-canvas-count 1
 ```
 
-Fault scenario with expected failures:
-
-```bash
-node tools/perf/verifier.mjs \
-  --mode event \
-  --perf-run-id "$PERF_RUN_ID" \
-  --sent-success 10000 \
-  --matched-canvas-count 1 \
-  --expected-failed-records 50
-```
-
-Verdicts:
-
-- `PASS`: no loss, duplicate input, bad dedup, unfinished retry, DLQ, rejected record, or failed execution.
-- `PASS_WITH_EXPECTED_FAILURES`: only explicitly declared failure records were observed.
-- `FAIL`: unexpected loss, duplicate input, bad dedup, unfinished retry, wrong audience count, or unplanned failure records.
-
-For concurrent runs, use the runner `success` value as `--sent-success`, not the requested `--count`, if any HTTP request failed. Accuracy verification must happen before using latency or throughput numbers for capacity planning.
+Use the runner `success` value as `--sent-success`, not the requested `--count`, if any HTTP request failed. Accuracy verification must happen before using latency or throughput numbers.
 
 ## Estimate Capacity
 
@@ -300,32 +172,26 @@ node tools/perf/capacity-report.mjs \
   --downstream-calls-per-event 1
 ```
 
-Use `recommendedCapacity` as the first production planning value. Use `alertThreshold` for the first alert line. The default safety factor is `0.5`. The capacity report rejects `--verifier-verdict FAIL`; failed correctness data is not valid capacity input. `PASS_WITH_EXPECTED_FAILURES` is accepted only for explicitly declared fault scenarios and should be called out in the report.
-
-## Report Discipline
-
-Every saved performance report should include:
-
-- `PERF_RUN_ID`, scenario mode, requested count, successful sends, concurrency, duplicate rate, and verifier verdict.
-- Runner summary JSON from `--summary-file`, including measured p95 latency, CPU/core/memory/OS metadata, Node version, Java version, and JVM-related environment options.
-- Any local runtime details not visible to the process, especially container CPU/memory limits when the backend is not running directly on the host.
-- Backend deployment shape: app instance count, worker/thread settings, Disruptor settings, connection pools, and log level.
-- Dependency shape: MySQL version/config and safe write QPS, Redis version/config and safe ops, RocketMQ broker/topic/consumer config, and any downstream API rate limit.
-- Capacity inputs and the resulting bottleneck candidates from `capacity-report.mjs`.
-- Cleanup dry-run output and executed cleanup confirmation for the run ID.
+The capacity report rejects `--verifier-verdict FAIL`. `PASS_WITH_EXPECTED_FAILURES` is accepted only for explicitly declared fault scenarios and must not be used for ordinary capacity reports.
 
 ## Cleanup
 
-Preview SQL:
+Cleanup defaults to `--scope ledger`. Ledger cleanup deletes rows tied to the supplied `perfRunId` and preserves `PERF_%` event and MQ definitions.
+
+Preview ledger cleanup:
 
 ```bash
 node tools/perf/cleanup.mjs --perf-run-id "$PERF_RUN_ID"
 ```
 
-Execute cleanup:
+Execute ledger cleanup:
 
 ```bash
 node tools/perf/cleanup.mjs --perf-run-id "$PERF_RUN_ID" --execute true
 ```
 
-Cleanup deletes only rows tied to the given `perfRunId`, including audience compute run ledgers, plus `PERF_%` event and MQ fixture definitions. It does not delete canvas definitions.
+Use `--scope all` only after all local capacity testing is complete. It removes the `PERF_%` event and MQ definitions as well as the run ledger rows.
+
+```bash
+node tools/perf/cleanup.mjs --perf-run-id "$PERF_RUN_ID" --scope all --execute true
+```

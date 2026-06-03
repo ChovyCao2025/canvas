@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
 import { spawnSync } from 'node:child_process'
+import { createHmac } from 'node:crypto'
 import { mkdirSync, writeFileSync } from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
@@ -18,6 +19,7 @@ const DEFAULT_ARGS = {
   userPrefix: 'perf_user_',
   userModulo: 1000,
   duplicateRate: 0,
+  eventSecretEnv: 'PERF_EVENT_SECRET',
   summaryFile: '',
 }
 
@@ -33,6 +35,7 @@ const FLAG_NAMES = {
   '--user-prefix': 'userPrefix',
   '--user-modulo': 'userModulo',
   '--duplicate-rate': 'duplicateRate',
+  '--event-secret-env': 'eventSecretEnv',
   '--summary-file': 'summaryFile',
 }
 
@@ -272,17 +275,66 @@ function machineMetadata() {
   }
 }
 
-async function sendRequest(args, seq, { performanceNow }) {
+export function buildEventSignatureHeaders({ secret, timestamp, rawBody }) {
+  const signature = createHmac('sha256', secret)
+    .update(`${timestamp}\n${rawBody}`)
+    .digest('hex')
+
+  return {
+    'X-Canvas-Timestamp': String(timestamp),
+    'X-Canvas-Signature': `sha256=${signature}`,
+  }
+}
+
+export function resolveEventSecret(args, env = process.env) {
+  if (args.mode !== 'event' && args.mode !== 'direct') {
+    return { value: '', source: 'none' }
+  }
+
+  const envName = args.eventSecretEnv || 'PERF_EVENT_SECRET'
+  const envValue = env[envName] || ''
+  if (envValue) {
+    return { value: envValue, source: `env:${envName}` }
+  }
+
+  return { value: '', source: 'none' }
+}
+
+export function buildSignedHeaders({
+  args,
+  rawBody,
+  nowMs = () => Date.now(),
+  env = process.env,
+}) {
+  const headers = {
+    'content-type': 'application/json',
+  }
+  const secret = resolveEventSecret(args, env)
+
+  if (!secret.value) {
+    return headers
+  }
+
+  return {
+    ...headers,
+    ...buildEventSignatureHeaders({
+      secret: secret.value,
+      timestamp: String(nowMs()),
+      rawBody,
+    }),
+  }
+}
+
+async function sendRequest(args, seq, { performanceNow, nowMs = () => Date.now(), env = process.env }) {
   const request = buildRequest(args, seq)
+  const rawBody = JSON.stringify(request.body)
   const startedAt = performanceNow()
 
   try {
     const response = await fetch(request.url, {
       method: 'POST',
-      headers: {
-        'content-type': 'application/json',
-      },
-      body: JSON.stringify(request.body),
+      headers: buildSignedHeaders({ args, rawBody, nowMs, env }),
+      body: rawBody,
     })
 
     return {
@@ -298,7 +350,9 @@ async function sendRequest(args, seq, { performanceNow }) {
   }
 }
 
-function summarySettings(args) {
+function summarySettings(args, env = process.env) {
+  const eventSecret = resolveEventSecret(args, env)
+
   return {
     mode: args.mode,
     baseUrl: args.baseUrl,
@@ -311,11 +365,17 @@ function summarySettings(args) {
     userModulo: args.userModulo,
     duplicateRate: args.duplicateRate || 0,
     duplicateCount: args.duplicateCount || 0,
+    eventSignature: {
+      enabled: Boolean(eventSecret.value),
+      source: eventSecret.source,
+    },
   }
 }
 
 export async function run(args, deps = {}) {
   const now = deps.now || (() => new Date().toISOString())
+  const nowMs = deps.nowMs || (() => Date.now())
+  const env = deps.env || process.env
   const performanceNow = deps.performanceNow || (() => performance.now())
   const getMachineMetadata = deps.machineMetadata || machineMetadata
   const duplicateCount = args.mode === 'direct'
@@ -336,7 +396,7 @@ export async function run(args, deps = {}) {
     const results = await Promise.all(
       chunk.map(async (seq) => {
         sent += 1
-        return sendRequest(runArgs, seq, { performanceNow })
+        return sendRequest(runArgs, seq, { performanceNow, nowMs, env })
       }),
     )
 
@@ -370,7 +430,7 @@ export async function run(args, deps = {}) {
     startedAt,
     finishedAt,
     durationMs,
-    settings: summarySettings(runArgs),
+    settings: summarySettings(runArgs, env),
     machine: getMachineMetadata(),
   }
 }

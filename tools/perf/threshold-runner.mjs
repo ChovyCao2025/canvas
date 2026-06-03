@@ -12,6 +12,7 @@ const DEFAULT_ARGS = {
   mode: 'event',
   baseUrl: 'http://localhost:8080',
   eventCode: 'PERF_ORDER_PAID',
+  eventSecretEnv: 'PERF_EVENT_SECRET',
   canvasId: '',
   stages: '1000:10,5000:50,10000:100,30000:200,50000:400',
   matchedCanvasCount: 1,
@@ -28,6 +29,7 @@ const FLAG_NAMES = {
   '--mode': 'mode',
   '--base-url': 'baseUrl',
   '--event-code': 'eventCode',
+  '--event-secret-env': 'eventSecretEnv',
   '--canvas-id': 'canvasId',
   '--stages': 'stages',
   '--matched-canvas-count': 'matchedCanvasCount',
@@ -151,7 +153,7 @@ function stageRunId({ config, stage, stageIndex, now }) {
   return `${prefix}_${config.mode}_s${stageIndex + 1}_c${stage.concurrency}_n${stage.count}`
 }
 
-function runnerArgs({ config, stage, perfRunId, summaryFile }) {
+export function runnerArgs({ config, stage, perfRunId, summaryFile }) {
   const args = [
     path.join(SCRIPT_DIR, 'perf-runner.mjs'),
     '--mode', config.mode,
@@ -164,10 +166,12 @@ function runnerArgs({ config, stage, perfRunId, summaryFile }) {
 
   if (config.mode === 'event') {
     args.push('--event-code', config.eventCode)
+    args.push('--event-secret-env', config.eventSecretEnv || 'PERF_EVENT_SECRET')
   }
 
   if (config.mode === 'direct') {
     args.push('--canvas-id', config.canvasId)
+    args.push('--event-secret-env', config.eventSecretEnv || 'PERF_EVENT_SECRET')
   }
 
   return args
