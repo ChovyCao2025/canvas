@@ -42,6 +42,22 @@ test('runnerArgs passes event secret env to perf runner for event mode', () => {
   assert.deepEqual(args.slice(-2), ['--event-secret-env', 'PERF_EVENT_SECRET'])
 })
 
+test('runnerArgs passes event secret env to perf runner for direct mode', () => {
+  const args = runnerArgs({
+    config: {
+      mode: 'direct',
+      baseUrl: 'http://localhost:8080',
+      canvasId: '42',
+      eventSecretEnv: 'PERF_EVENT_SECRET',
+    },
+    stage: { count: 100, concurrency: 10 },
+    perfRunId: 'perf_20260523_001',
+    summaryFile: 'tmp/perf_20260523_001.json',
+  })
+
+  assert.deepEqual(args.slice(-2), ['--event-secret-env', 'PERF_EVENT_SECRET'])
+})
+
 test('parseThresholdArgs rejects explicit event secret flag', () => {
   assert.throws(() => parseThresholdArgs([
     '--mode', 'event',

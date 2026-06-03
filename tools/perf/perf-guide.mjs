@@ -4,6 +4,7 @@ import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node
 import { spawnSync } from 'node:child_process'
 import path from 'node:path'
 import { pathToFileURL } from 'node:url'
+import { computeVerdict } from './verifier.mjs'
 
 const COMMANDS = new Set(['doctor', 'fixture', 'smoke', 'threshold', 'soak', 'report', 'cleanup'])
 
@@ -157,6 +158,121 @@ export function assertRunnerSummaryComplete(summary, { perfRunId = '' } = {}) {
   }
 }
 
+const VERIFIER_COUNT_FIELDS = [
+  'planned',
+  'sentSuccess',
+  'accepted',
+  'expectedExecutions',
+  'actualExecutions',
+  'success',
+  'failedWithRecord',
+  'dlq',
+  'rejectedWithRecord',
+  'retryPending',
+  'duplicateExecution',
+  'intentionalDuplicates',
+  'expectedFailedWithRecord',
+  'expectedRejectedWithRecord',
+  'expectedDlq',
+  'unexpectedFailedWithRecord',
+  'unexpectedRejectedWithRecord',
+  'unexpectedDlq',
+  'deduplicated',
+  'unexpectedDedup',
+  'ackWithoutLedger',
+  'unexpectedLoss',
+  'wrongAudienceCount',
+]
+
+const LEDGER_COUNT_FIELDS = [
+  'eventLog',
+  'requestRows',
+  'requestSources',
+  'executions',
+  'success',
+  'failed',
+  'dlq',
+  'retryPending',
+  'rejectedWithRecord',
+  'duplicateInput',
+  'audienceRuns',
+]
+
+function requireVerifierCount(value, field) {
+  if (typeof value !== 'number' || !Number.isFinite(value) || value < 0 || !Number.isSafeInteger(value)) {
+    throw new Error(`verifier evidence field ${field} must be a non-negative integer`)
+  }
+}
+
+export function assertVerifierEvidenceComplete(verifier, { perfRunId, sentSuccess }) {
+  if (verifier.perfRunId !== perfRunId) {
+    throw new Error(`verifier perfRunId ${verifier.perfRunId || '(missing)'} does not match ${perfRunId}`)
+  }
+  if (verifier.sentSuccess !== sentSuccess) {
+    throw new Error(`verifier sentSuccess ${verifier.sentSuccess ?? '(missing)'} does not match runner success ${sentSuccess}`)
+  }
+  for (const field of VERIFIER_COUNT_FIELDS) {
+    requireVerifierCount(verifier[field], field)
+  }
+  if (!verifier.ledgerCounts || typeof verifier.ledgerCounts !== 'object' || Array.isArray(verifier.ledgerCounts)) {
+    throw new Error('verifier evidence field ledgerCounts must be an object')
+  }
+  for (const field of LEDGER_COUNT_FIELDS) {
+    requireVerifierCount(verifier.ledgerCounts[field], `ledgerCounts.${field}`)
+  }
+  if (verifier.planned !== sentSuccess) {
+    throw new Error(`verifier planned ${verifier.planned} does not match runner success ${sentSuccess}`)
+  }
+  for (const [field, ledgerField] of [
+    ['actualExecutions', 'executions'],
+    ['success', 'success'],
+    ['failedWithRecord', 'failed'],
+    ['dlq', 'dlq'],
+    ['rejectedWithRecord', 'rejectedWithRecord'],
+    ['retryPending', 'retryPending'],
+  ]) {
+    if (verifier[field] !== verifier.ledgerCounts[ledgerField]) {
+      throw new Error(`verifier ${field} ${verifier[field]} does not match ledgerCounts.${ledgerField} ${verifier.ledgerCounts[ledgerField]}`)
+    }
+  }
+  const rawVerifierEvidence = { ...verifier }
+  for (const field of [
+    'ackWithoutLedger',
+    'deduplicated',
+    'duplicateExecution',
+    'unexpectedDedup',
+    'unexpectedDlq',
+    'unexpectedFailedWithRecord',
+    'unexpectedLoss',
+    'unexpectedRejectedWithRecord',
+    'verdict',
+  ]) {
+    delete rawVerifierEvidence[field]
+  }
+  const recomputed = computeVerdict({
+    ...rawVerifierEvidence,
+    duplicateExecution: verifier.ledgerCounts.duplicateInput,
+  })
+  for (const field of [
+    'duplicateExecution',
+    'deduplicated',
+    'unexpectedDedup',
+    'ackWithoutLedger',
+    'unexpectedFailedWithRecord',
+    'unexpectedRejectedWithRecord',
+    'unexpectedDlq',
+    'unexpectedLoss',
+    'wrongAudienceCount',
+  ]) {
+    if (verifier[field] !== recomputed[field]) {
+      throw new Error(`verifier ${field} ${verifier[field]} does not match recomputed ${recomputed[field]}`)
+    }
+  }
+  if (verifier.verdict !== recomputed.verdict) {
+    throw new Error(`verifier verdict ${verifier.verdict} does not match recomputed ${recomputed.verdict}`)
+  }
+}
+
 export function assertRunnerReportable(summary, { reportType, minDurationMin, perfRunId = '' }) {
   assertRunnerSummaryComplete(summary, { perfRunId })
   if (failedRequestCount(summary) > 0) {
@@ -227,10 +343,11 @@ export async function defaultRunScenario(config, { mode, count, concurrency, per
 
   if (mode === 'direct') {
     runnerArgs.push('--canvas-id', config.canvasId)
+    runnerArgs.push('--event-secret-env', config.eventSecretEnv || 'PERF_EVENT_SECRET')
   }
   if (mode === 'event') {
     runnerArgs.push('--event-code', config.eventCode)
-    runnerArgs.push('--event-secret-env', config.eventSecretEnv)
+    runnerArgs.push('--event-secret-env', config.eventSecretEnv || 'PERF_EVENT_SECRET')
   }
 
   const runner = parseJsonCommandResult(
@@ -321,10 +438,11 @@ async function defaultThreshold(config, deps = {}) {
   ]
   if (config.mode === 'event') {
     args.push('--event-code', config.eventCode)
-    args.push('--event-secret-env', config.eventSecretEnv)
+    args.push('--event-secret-env', config.eventSecretEnv || 'PERF_EVENT_SECRET')
   }
   if (config.mode === 'direct') {
     args.push('--canvas-id', config.canvasId)
+    args.push('--event-secret-env', config.eventSecretEnv || 'PERF_EVENT_SECRET')
   }
   const result = parseJsonCommandResult(run(process.execPath, args), 'threshold-runner')
   const statuses = new Map([
@@ -410,12 +528,10 @@ async function defaultReport(config) {
     minDurationMin: config.minDurationMin,
     perfRunId: config.perfRunId,
   })
-  if (verifier.perfRunId !== summary.perfRunId) {
-    throw new Error(`verifier perfRunId ${verifier.perfRunId || '(missing)'} does not match ${summary.perfRunId}`)
-  }
-  if (verifier.sentSuccess !== summary.success) {
-    throw new Error(`verifier sentSuccess ${verifier.sentSuccess ?? '(missing)'} does not match runner success ${summary.success}`)
-  }
+  assertVerifierEvidenceComplete(verifier, {
+    perfRunId: summary.perfRunId,
+    sentSuccess: summary.success,
+  })
   assertCapacityReportable(verifier, { reportType: config.reportType })
   return {
     status: 'PASS',

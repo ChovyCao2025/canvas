@@ -25,14 +25,14 @@ export BASE_URL=http://localhost:8080
 mkdir -p tmp/perf-fixtures tmp/perf-runs tmp/perf-threshold tmp/perf-monitor
 ```
 
-Create a local event secret. Do not use the default sample value from `application.yml`.
+Create a local request signing secret. Do not use the default sample value from `application.yml`.
 
 ```bash
 export PERF_EVENT_SECRET="$(LC_ALL=C tr -dc 'A-Za-z0-9' </dev/urandom | head -c 40)"
 test ${#PERF_EVENT_SECRET} -ge 32
 ```
 
-The backend must receive the same value through `CANVAS_EVENT_REPORT_SECRET`. The perf tools receive only the env var name through `--event-secret-env PERF_EVENT_SECRET`.
+The backend must receive the same value through `CANVAS_EVENT_REPORT_SECRET`. In this project, direct machine requests default to the same backend secret as event reports. The perf tools receive only the env var name through `--event-secret-env PERF_EVENT_SECRET`.
 
 ## 3. Verify Tools
 

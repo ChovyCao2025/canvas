@@ -20,15 +20,15 @@ After smoke passes, continue with threshold and soak in `docs/stressTest/local-c
 
 If verifier is not `PASS`, do not publish throughput, QPS, p95, or capacity estimates. `PASS_WITH_EXPECTED_FAILURES` is only valid for fault reports.
 
-## Event Secret
+## Request Signing Secret
 
-Event mode signs requests with HMAC headers when a secret is available through an environment variable. Do not pass secret values as command-line arguments.
+Event and direct modes sign requests with HMAC headers when a secret is available through an environment variable. Do not pass secret values as command-line arguments.
 
 ```bash
 export PERF_EVENT_SECRET="<local-secret-at-least-32-bytes>"
 ```
 
-Use `--event-secret-env PERF_EVENT_SECRET` in event commands. The runner records only whether signing was enabled and which env var was used; it does not print the secret value.
+Use `--event-secret-env PERF_EVENT_SECRET` in event and direct commands. The runner records only whether signing was enabled and which env var was used; it does not print the secret value.
 
 ## Run IDs
 
@@ -64,6 +64,7 @@ node tools/perf/perf-runner.mjs \
   --base-url http://localhost:8080 \
   --perf-run-id "$PERF_RUN_ID" \
   --canvas-id "$DIRECT_CANVAS_ID" \
+  --event-secret-env PERF_EVENT_SECRET \
   --count 1000 \
   --concurrency 50 \
   --summary-file "tmp/perf-$PERF_RUN_ID-direct.json"
@@ -107,6 +108,7 @@ node tools/perf/threshold-runner.mjs \
   --mode direct \
   --base-url http://localhost:8080 \
   --canvas-id "$DIRECT_CANVAS_ID" \
+  --event-secret-env PERF_EVENT_SECRET \
   --stages 1000:10,5000:50,10000:100,30000:200,50000:400 \
   --matched-canvas-count 1 \
   --max-failed 0 \

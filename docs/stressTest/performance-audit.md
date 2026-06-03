@@ -14,7 +14,7 @@ The previous stress-test material had useful raw commands, but it was not safe e
 
 ## Blocking Issues Removed
 
-- Event pressure tests now support HMAC signing through `--event-secret-env`; secret values are not accepted as CLI flags.
+- Event and direct pressure tests now support HMAC signing through `--event-secret-env`; secret values are not accepted as CLI flags.
 - The active docs no longer contain historical capacity claims without runner and verifier evidence.
 - Cleanup defaults to ledger-only, so ordinary cleanup preserves `PERF_%` event and MQ definitions.
 - Guide report gates require complete runner evidence, verifier evidence, matching `perfRunId`, zero request failures, and capacity duration evidence.

@@ -171,6 +171,7 @@ export function runnerArgs({ config, stage, perfRunId, summaryFile }) {
 
   if (config.mode === 'direct') {
     args.push('--canvas-id', config.canvasId)
+    args.push('--event-secret-env', config.eventSecretEnv || 'PERF_EVENT_SECRET')
   }
 
   return args

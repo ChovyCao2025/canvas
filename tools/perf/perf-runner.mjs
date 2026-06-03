@@ -287,7 +287,7 @@ export function buildEventSignatureHeaders({ secret, timestamp, rawBody }) {
 }
 
 export function resolveEventSecret(args, env = process.env) {
-  if (args.mode !== 'event') {
+  if (args.mode !== 'event' && args.mode !== 'direct') {
     return { value: '', source: 'none' }
   }
 

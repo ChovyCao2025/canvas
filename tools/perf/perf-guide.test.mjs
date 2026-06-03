@@ -8,12 +8,61 @@ import {
   assertCapacityReportable,
   assertRunnerReportable,
   assertRunnerSummaryComplete,
+  assertVerifierEvidenceComplete,
   commandForCleanup,
   defaultRunScenario,
   parseGuideArgs,
   runGuide,
   writeJson,
 } from './perf-guide.mjs'
+
+function completeVerifierEvidence(overrides = {}) {
+  const evidence = {
+    verdict: 'PASS',
+    perfRunId: 'perf_report_001',
+    planned: 100,
+    sentSuccess: 100,
+    accepted: 100,
+    expectedExecutions: 100,
+    actualExecutions: 100,
+    success: 100,
+    failedWithRecord: 0,
+    dlq: 0,
+    rejectedWithRecord: 0,
+    retryPending: 0,
+    duplicateExecution: 0,
+    intentionalDuplicates: 0,
+    expectedFailedWithRecord: 0,
+    expectedRejectedWithRecord: 0,
+    expectedDlq: 0,
+    unexpectedFailedWithRecord: 0,
+    unexpectedRejectedWithRecord: 0,
+    unexpectedDlq: 0,
+    deduplicated: 0,
+    unexpectedDedup: 0,
+    ackWithoutLedger: 0,
+    unexpectedLoss: 0,
+    wrongAudienceCount: 0,
+    ...overrides,
+  }
+  return {
+    ...evidence,
+    ledgerCounts: {
+      eventLog: evidence.accepted,
+      requestRows: 0,
+      requestSources: 0,
+      executions: evidence.actualExecutions,
+      success: evidence.success,
+      failed: evidence.failedWithRecord,
+      dlq: evidence.dlq,
+      retryPending: evidence.retryPending,
+      rejectedWithRecord: evidence.rejectedWithRecord,
+      duplicateInput: 0,
+      audienceRuns: 0,
+      ...(overrides.ledgerCounts || {}),
+    },
+  }
+}
 
 test('parseGuideArgs parses subcommand and common flags', () => {
   const config = parseGuideArgs([
@@ -61,6 +110,39 @@ test('assertCapacityReportable accepts expected failures for fault report', () =
   }, {
     reportType: 'fault',
   }))
+})
+
+test('assertVerifierEvidenceComplete rejects truncated verifier evidence', () => {
+  assert.throws(() => assertVerifierEvidenceComplete({
+    verdict: 'PASS',
+    perfRunId: 'perf_report_001',
+    sentSuccess: 100,
+  }, {
+    perfRunId: 'perf_report_001',
+    sentSuccess: 100,
+  }), /verifier evidence field planned must be a non-negative integer/)
+})
+
+test('assertVerifierEvidenceComplete accepts complete verifier evidence', () => {
+  assert.doesNotThrow(() => assertVerifierEvidenceComplete(completeVerifierEvidence({
+    perfRunId: 'perf_report_001',
+    sentSuccess: 100,
+  }), {
+    perfRunId: 'perf_report_001',
+    sentSuccess: 100,
+  }))
+})
+
+test('assertVerifierEvidenceComplete rejects internally inconsistent verifier evidence', () => {
+  assert.throws(() => assertVerifierEvidenceComplete(completeVerifierEvidence({
+    perfRunId: 'perf_report_001',
+    sentSuccess: 100,
+    actualExecutions: 99,
+    success: 99,
+  }), {
+    perfRunId: 'perf_report_001',
+    sentSuccess: 100,
+  }), /unexpectedLoss/)
 })
 
 test('assertRunnerReportable rejects failed runner requests', () => {
@@ -339,7 +421,7 @@ test('threshold delegates to threshold-runner with event secret env', async () =
   assert.ok(calls[0][1].includes('PERF_EVENT_SECRET'))
 })
 
-test('threshold direct mode does not forward event secret env', async () => {
+test('threshold direct mode forwards event secret env for machine signing', async () => {
   const calls = []
   const result = await runGuide(parseGuideArgs([
     'threshold',
@@ -359,7 +441,8 @@ test('threshold direct mode does not forward event secret env', async () => {
 
   assert.equal(result.status, 'PASS')
   assert.ok(calls[0][1].includes('--canvas-id'))
-  assert.ok(!calls[0][1].includes('--event-secret-env'))
+  assert.ok(calls[0][1].includes('--event-secret-env'))
+  assert.ok(calls[0][1].includes('PERF_EVENT_SECRET'))
 })
 
 test('threshold forwards database and output directory settings', async () => {
@@ -559,6 +642,50 @@ test('defaultRunScenario writes verifier evidence under provided perf run id', a
   }
 })
 
+test('defaultRunScenario forwards event secret env for direct machine signing', async () => {
+  const runRoot = mkdtempSync(path.join(tmpdir(), 'perf-guide-'))
+  const calls = []
+
+  try {
+    await defaultRunScenario({
+      baseUrl: 'http://localhost:8080',
+      runRoot,
+      perfRunId: 'perf_smoke_001',
+      eventCode: 'PERF_ORDER_PAID',
+      eventSecretEnv: 'PERF_EVENT_SECRET',
+      canvasId: '42',
+      mysql: 'mysql',
+      database: 'canvas_db',
+      matchedCanvasCount: 1,
+    }, {
+      mode: 'direct',
+      count: 50,
+      concurrency: 5,
+    }, {
+      runCommand: (command, args) => {
+        calls.push([command, args])
+        if (args[0] === 'tools/perf/perf-runner.mjs') {
+          return {
+            status: 0,
+            stdout: JSON.stringify({ perfRunId: 'perf_smoke_001_direct', sent: 50, success: 50, failed: 0, durationMs: 1000 }),
+            stderr: '',
+          }
+        }
+        return {
+          status: 0,
+          stdout: JSON.stringify({ verdict: 'PASS' }),
+          stderr: '',
+        }
+      },
+    })
+
+    assert.ok(calls[0][1].includes('--event-secret-env'))
+    assert.ok(calls[0][1].includes('PERF_EVENT_SECRET'))
+  } finally {
+    rmSync(runRoot, { recursive: true, force: true })
+  }
+})
+
 test('report rejects pass verifier when runner has request failures', async () => {
   const runRoot = mkdtempSync(path.join(tmpdir(), 'perf-guide-report-'))
 
@@ -570,11 +697,15 @@ test('report rejects pass verifier when runner has request failures', async () =
       failed: 1,
       durationMs: 1_800_000,
     })
-    writeJson(path.join(runRoot, 'perf_report_001', 'verifier.json'), {
-      verdict: 'PASS',
+    writeJson(path.join(runRoot, 'perf_report_001', 'verifier.json'), completeVerifierEvidence({
       perfRunId: 'perf_report_001',
+      planned: 99,
       sentSuccess: 99,
-    })
+      accepted: 99,
+      expectedExecutions: 99,
+      actualExecutions: 99,
+      success: 99,
+    }))
 
     await assert.rejects(() => runGuide(parseGuideArgs([
       'report',
@@ -598,11 +729,10 @@ test('report rejects short capacity runs', async () => {
       failed: 0,
       durationMs: 60_000,
     })
-    writeJson(path.join(runRoot, 'perf_report_002', 'verifier.json'), {
-      verdict: 'PASS',
+    writeJson(path.join(runRoot, 'perf_report_002', 'verifier.json'), completeVerifierEvidence({
       perfRunId: 'perf_report_002',
       sentSuccess: 100,
-    })
+    }))
 
     await assert.rejects(() => runGuide(parseGuideArgs([
       'report',
@@ -626,11 +756,10 @@ test('report accepts complete runner and verifier evidence', async () => {
       failed: 0,
       durationMs: 60_000,
     })
-    writeJson(path.join(runRoot, 'perf_report_003', 'verifier.json'), {
-      verdict: 'PASS',
+    writeJson(path.join(runRoot, 'perf_report_003', 'verifier.json'), completeVerifierEvidence({
       perfRunId: 'perf_report_003',
       sentSuccess: 100,
-    })
+    }))
 
     const result = await runGuide(parseGuideArgs([
       'report',
@@ -658,11 +787,10 @@ test('report rejects stale verifier evidence with mismatched run id', async () =
       failed: 0,
       durationMs: 60_000,
     })
-    writeJson(path.join(runRoot, 'perf_report_004', 'verifier.json'), {
-      verdict: 'PASS',
+    writeJson(path.join(runRoot, 'perf_report_004', 'verifier.json'), completeVerifierEvidence({
       perfRunId: 'perf_report_old',
       sentSuccess: 100,
-    })
+    }))
 
     await assert.rejects(() => runGuide(parseGuideArgs([
       'report',
@@ -686,11 +814,10 @@ test('report rejects stale verifier evidence with mismatched sent success', asyn
       failed: 0,
       durationMs: 60_000,
     })
-    writeJson(path.join(runRoot, 'perf_report_005', 'verifier.json'), {
-      verdict: 'PASS',
+    writeJson(path.join(runRoot, 'perf_report_005', 'verifier.json'), completeVerifierEvidence({
       perfRunId: 'perf_report_005',
       sentSuccess: 100,
-    })
+    }))
 
     await assert.rejects(() => runGuide(parseGuideArgs([
       'report',

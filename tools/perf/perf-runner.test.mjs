@@ -129,17 +129,20 @@ test('buildSignedHeaders includes event HMAC headers when secret is configured',
   )
 })
 
-test('buildSignedHeaders leaves non-event modes unsigned when event secret exists', () => {
+test('buildSignedHeaders includes machine HMAC headers for direct mode when secret is configured', () => {
   const headers = buildSignedHeaders({
     args: { mode: 'direct', eventSecretEnv: 'PERF_EVENT_SECRET' },
-    rawBody: '{}',
+    rawBody: '{"userId":"perf_user_1"}',
     nowMs: () => 1760000000000,
     env: { PERF_EVENT_SECRET: '12345678901234567890123456789012' },
   })
 
-  assert.deepEqual(headers, {
-    'content-type': 'application/json',
-  })
+  assert.equal(headers['content-type'], 'application/json')
+  assert.equal(headers['X-Canvas-Timestamp'], '1760000000000')
+  assert.equal(
+    headers['X-Canvas-Signature'],
+    'sha256=f79510582ae819a259be30328a5f2835e25db4c560f0ab1d51a52c436409a5b8',
+  )
 })
 
 test('parseRunnerArgs accepts event secret env flag without exposing a secret value', () => {
