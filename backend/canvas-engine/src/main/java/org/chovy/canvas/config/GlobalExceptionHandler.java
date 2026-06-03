@@ -2,6 +2,7 @@ package org.chovy.canvas.config;
 
 import org.chovy.canvas.common.R;
 import org.chovy.canvas.engine.trigger.TriggerPreCheckService.TriggerRejectedException;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.ResponseStatus;
@@ -17,6 +18,7 @@ import org.springframework.web.server.ResponseStatusException;
  * - HTTP 状态码表达错误类别（4xx/5xx）；
  * - 业务语义放在 code/message，便于前端做稳定分支处理。
  */
+@Slf4j
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
@@ -80,7 +82,7 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(Exception.class)
     @ResponseStatus(HttpStatus.INTERNAL_SERVER_ERROR)
     public R<Void> handleGeneral(Exception e) {
-        // 兜底只返回业务化错误信息，避免 WebFlux 默认错误页或堆栈结构透出。
-        return R.fail("系统错误: " + e.getMessage());
+        log.error("Unhandled server exception", e);
+        return R.fail("系统错误，请联系管理员");
     }
 }

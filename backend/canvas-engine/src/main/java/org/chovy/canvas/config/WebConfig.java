@@ -3,6 +3,7 @@ package org.chovy.canvas.config;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.core.env.Environment;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.reactive.CorsWebFilter;
 import org.springframework.web.cors.reactive.UrlBasedCorsConfigurationSource;
@@ -20,20 +21,39 @@ import java.util.List;
 @Configuration
 public class WebConfig {
 
-    /**
-     * 允许的跨域来源（生产环境必须配置为实际前端域名）。
-     * 开发默认 * 仅供本地，生产通过环境变量覆盖：
-     *   CANVAS_CORS_ALLOWED_ORIGINS=https://canvas.yourcompany.com
-     */
-    @Value("${canvas.cors.allowed-origins:*}")
-    private List<String> allowedOrigins;
+    private final List<String> allowedOrigins;
+    private final boolean productionLike;
+
+    public WebConfig(
+            @Value("${canvas.cors.allowed-origins:*}") List<String> allowedOrigins,
+            Environment environment) {
+        this(allowedOrigins, ProductionSecurityValidator.isProductionLike(environment));
+    }
+
+    WebConfig(List<String> allowedOrigins, boolean productionLike) {
+        this.allowedOrigins = allowedOrigins == null || allowedOrigins.isEmpty()
+                ? List.of("*")
+                : allowedOrigins;
+        this.productionLike = productionLike;
+    }
 
     /** 全局 CORS 过滤器。 */
     @Bean
     public CorsWebFilter corsWebFilter() {
+        CorsConfiguration config = corsConfiguration();
+        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+        // 全路径生效，统一在网关/服务层处理跨域策略
+        source.registerCorsConfiguration("/**", config);
+        return new CorsWebFilter(source);
+    }
+
+    CorsConfiguration corsConfiguration() {
         CorsConfiguration config = new CorsConfiguration();
-        // "*" 通过 allowedOriginPattern 兼容携带凭据场景（本地开发）
         if (allowedOrigins.contains("*")) {
+            if (productionLike) {
+                throw new IllegalStateException("canvas.cors.allowed-origins 生产环境不能包含 *");
+            }
+            // "*" 通过 allowedOriginPattern 兼容携带凭据场景（本地开发）
             config.addAllowedOriginPattern("*");
         } else {
             allowedOrigins.forEach(config::addAllowedOrigin);
@@ -43,9 +63,6 @@ public class WebConfig {
         config.addAllowedHeader("*");
         // 允许浏览器在跨域请求中带 cookie / authorization header
         config.setAllowCredentials(true);
-        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
-        // 全路径生效，统一在网关/服务层处理跨域策略
-        source.registerCorsConfiguration("/**", config);
-        return new CorsWebFilter(source);
+        return config;
     }
 }

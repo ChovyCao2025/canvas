@@ -18,4 +18,10 @@ class SecurityConfigRoleTest {
         assertThat(SecurityConfig.TENANT_ADMIN_ROUTE_ROLES)
                 .containsExactly(RoleNames.ADMIN, RoleNames.SUPER_ADMIN, RoleNames.TENANT_ADMIN);
     }
+
+    @Test
+    void opsRoutesRequireAdminOrOperatorRoles() {
+        assertThat(SecurityConfig.OPS_ROUTE_ROLES)
+                .containsExactly(RoleNames.ADMIN, RoleNames.SUPER_ADMIN, RoleNames.TENANT_ADMIN, RoleNames.OPERATOR);
+    }
 }

@@ -27,6 +27,12 @@ public class SecurityConfig {
             RoleNames.SUPER_ADMIN,
             RoleNames.TENANT_ADMIN
     };
+    static final String[] OPS_ROUTE_ROLES = {
+            RoleNames.ADMIN,
+            RoleNames.SUPER_ADMIN,
+            RoleNames.TENANT_ADMIN,
+            RoleNames.OPERATOR
+    };
 
     /** 密码编码器（BCrypt）。 */
     @Bean
@@ -66,8 +72,8 @@ public class SecurityConfig {
                         .pathMatchers(HttpMethod.POST, "/canvas/trigger/behavior").permitAll()
                         // WebSocket 使用一次性票据鉴权；票据接口本身仍要求登录。
                         .pathMatchers("/canvas/ws/notifications").permitAll()
-                        // 运维接口：无需登录（内网调用，不对外暴露）
-                        .pathMatchers("/ops/**").permitAll()
+                        // 运维接口：只允许管理员或操作员访问。
+                        .pathMatchers("/ops/**").hasAnyRole(OPS_ROUTE_ROLES)
                         // 画布管理动作：SaaS rollout 期间允许 legacy ADMIN、新 SUPER_ADMIN、TENANT_ADMIN。
                         .pathMatchers(HttpMethod.POST,
                                 "/canvas/*/publish", "/canvas/*/offline",
