@@ -1,11 +1,21 @@
 package org.chovy.canvas.engine.scheduler;
 
+import com.github.benmanes.caffeine.cache.Cache;
+import com.github.benmanes.caffeine.cache.Caffeine;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.io.ClassPathResource;
+import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.data.redis.core.script.DefaultRedisScript;
 import org.springframework.stereotype.Component;
 
+import java.time.Clock;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /**
@@ -20,20 +30,88 @@ import java.util.concurrent.atomic.AtomicInteger;
 @Component
 public class CircuitBreakerRegistry {
 
+    private static final String SCRIPT_LOCATION = "scripts/circuit_breaker_transition.lua";
+    private static final String ACTION_CHECK = "CHECK";
+    private static final String ACTION_FAILURE = "FAILURE";
+    private static final String ACTION_SUCCESS = "SUCCESS";
+    private static final String ACTION_READ = "READ";
+
     /** 默认连续失败阈值。 */
-    @Value("${canvas.circuit-breaker.default.failure-threshold:5}")
-    private int defaultFailureThreshold;
+    private final int defaultFailureThreshold;
 
     /** 默认熔断打开后的冷却秒数。 */
-    @Value("${canvas.circuit-breaker.default.open-duration-sec:30}")
-    private long defaultOpenDurationSec;
+    private final long defaultOpenDurationSec;
 
     /** 默认半开状态允许的探测次数。 */
-    @Value("${canvas.circuit-breaker.default.half-open-attempts:3}")
-    private int defaultHalfOpenAttempts;
+    private final int defaultHalfOpenAttempts;
+
+    /** Redis 阻塞模板；不存在时保留 JVM 本地兼容模式。 */
+    private final StringRedisTemplate redisTemplate;
+
+    /** Redis Hash key 前缀，例如 cb:<serviceKey>。 */
+    private final String redisKeyPrefix;
+
+    /** Redis Pub/Sub 频道名。 */
+    private final String eventsChannel;
+
+    /** Redis Lua 脚本，保证状态读写与事件发布原子执行。 */
+    private final DefaultRedisScript<String> transitionScript;
+
+    /** 读取状态的本地短 TTL 缓存，事件监听器会更新该缓存。 */
+    private final Cache<String, CircuitBreaker.State> localStateCache;
+
+    private final Clock clock;
 
     /** 按节点类型缓存的熔断器实例。 */
     private final Map<String, CircuitBreaker> registry = new ConcurrentHashMap<>();
+
+    @Autowired
+    public CircuitBreakerRegistry(
+            ObjectProvider<StringRedisTemplate> redisTemplateProvider,
+            @Value("${canvas.circuit-breaker.default.failure-threshold:5}") int defaultFailureThreshold,
+            @Value("${canvas.circuit-breaker.default.open-duration-sec:30}") long defaultOpenDurationSec,
+            @Value("${canvas.circuit-breaker.default.half-open-attempts:3}") int defaultHalfOpenAttempts,
+            @Value("${canvas.circuit-breaker.redis.key-prefix:cb:}") String redisKeyPrefix,
+            @Value("${canvas.circuit-breaker.redis.pub-sub-channel:circuit-breaker-events}") String eventsChannel,
+            @Value("${canvas.circuit-breaker.redis.local-cache-ttl-sec:5}") long localCacheTtlSec) {
+        this(redisTemplateProvider.getIfAvailable(), defaultFailureThreshold, defaultOpenDurationSec,
+                defaultHalfOpenAttempts, redisKeyPrefix, eventsChannel, localCacheTtlSec);
+    }
+
+    CircuitBreakerRegistry(StringRedisTemplate redisTemplate,
+                           int defaultFailureThreshold,
+                           long defaultOpenDurationSec,
+                           int defaultHalfOpenAttempts,
+                           String redisKeyPrefix,
+                           String eventsChannel,
+                           long localCacheTtlSec) {
+        this(redisTemplate, defaultFailureThreshold, defaultOpenDurationSec, defaultHalfOpenAttempts,
+                redisKeyPrefix, eventsChannel, localCacheTtlSec, Clock.systemUTC());
+    }
+
+    CircuitBreakerRegistry(StringRedisTemplate redisTemplate,
+                           int defaultFailureThreshold,
+                           long defaultOpenDurationSec,
+                           int defaultHalfOpenAttempts,
+                           String redisKeyPrefix,
+                           String eventsChannel,
+                           long localCacheTtlSec,
+                           Clock clock) {
+        this.redisTemplate = redisTemplate;
+        this.defaultFailureThreshold = defaultFailureThreshold;
+        this.defaultOpenDurationSec = defaultOpenDurationSec;
+        this.defaultHalfOpenAttempts = defaultHalfOpenAttempts;
+        this.redisKeyPrefix = redisKeyPrefix == null || redisKeyPrefix.isBlank() ? "cb:" : redisKeyPrefix;
+        this.eventsChannel = eventsChannel == null || eventsChannel.isBlank()
+                ? "circuit-breaker-events" : eventsChannel;
+        this.transitionScript = new DefaultRedisScript<>();
+        this.transitionScript.setLocation(new ClassPathResource(SCRIPT_LOCATION));
+        this.transitionScript.setResultType(String.class);
+        this.localStateCache = Caffeine.newBuilder()
+                .expireAfterWrite(Math.max(1, localCacheTtlSec), TimeUnit.SECONDS)
+                .build();
+        this.clock = clock;
+    }
 
     /**
      * 查询或读取 get 相关的业务数据。
@@ -46,7 +124,64 @@ public class CircuitBreakerRegistry {
     public CircuitBreaker get(String nodeType) {
         return registry.computeIfAbsent(nodeType, k ->
                 new CircuitBreaker(nodeType, defaultFailureThreshold,
-                        defaultOpenDurationSec, defaultHalfOpenAttempts));
+                        defaultOpenDurationSec, defaultHalfOpenAttempts, redisTemplate == null ? null : this));
+    }
+
+    CircuitBreaker.State getState(String nodeType) {
+        CircuitBreaker.State cached = localStateCache.getIfPresent(nodeType);
+        if (cached != null) {
+            return cached;
+        }
+
+        CircuitBreaker breaker = get(nodeType);
+        if (redisTemplate == null) {
+            return breaker.localState();
+        }
+        return runTransition(nodeType, ACTION_READ, breaker.failureThreshold,
+                breaker.openDurationMs, breaker.halfOpenAttempts).state();
+    }
+
+    void updateLocalState(String serviceKey, CircuitBreaker.State state) {
+        localStateCache.put(serviceKey, state);
+    }
+
+    void invalidateLocalState(String serviceKey) {
+        localStateCache.invalidate(serviceKey);
+    }
+
+    private Transition runTransition(String serviceKey, String action, int failureThreshold,
+                                     long openDurationMs, int halfOpenAttempts) {
+        String redisKey = redisKey(serviceKey);
+        String result = redisTemplate.execute(
+                transitionScript,
+                List.of(redisKey),
+                action,
+                String.valueOf(failureThreshold),
+                String.valueOf(openDurationMs),
+                String.valueOf(halfOpenAttempts),
+                String.valueOf(clock.millis()),
+                eventsChannel
+        );
+        Transition transition = Transition.parse(result);
+        localStateCache.put(serviceKey, transition.state());
+        return transition;
+    }
+
+    private String redisKey(String serviceKey) {
+        return redisKeyPrefix + serviceKey;
+    }
+
+    private record Transition(CircuitBreaker.State state, boolean allowed, boolean changed) {
+        private static Transition parse(String result) {
+            if (result == null || result.isBlank()) {
+                throw new IllegalStateException("Redis circuit breaker script returned no state");
+            }
+            String[] parts = result.split("\\|");
+            CircuitBreaker.State state = CircuitBreaker.State.valueOf(parts[0]);
+            boolean allowed = parts.length < 2 || "1".equals(parts[1]) || "true".equalsIgnoreCase(parts[1]);
+            boolean changed = parts.length >= 3 && ("1".equals(parts[2]) || "true".equalsIgnoreCase(parts[2]));
+            return new Transition(state, allowed, changed);
+        }
     }
 
     // ── 内部熔断器实现 ────────────────────────────────────────────
@@ -61,6 +196,8 @@ public class CircuitBreakerRegistry {
         private final long     openDurationMs;
         /** 半开状态允许放行的探测次数。 */
         private final int      halfOpenAttempts;
+        /** Redis 后端；为空时使用原 JVM 本地实现。 */
+        private final CircuitBreakerRegistry redisRegistry;
 
         /** 当前熔断状态。 */
         private volatile State      state     = State.CLOSED;
@@ -83,10 +220,17 @@ public class CircuitBreakerRegistry {
          */
         public CircuitBreaker(String name, int failureThreshold,
                                long openDurationSec, int halfOpenAttempts) {
+            this(name, failureThreshold, openDurationSec, halfOpenAttempts, null);
+        }
+
+        private CircuitBreaker(String name, int failureThreshold,
+                               long openDurationSec, int halfOpenAttempts,
+                               CircuitBreakerRegistry redisRegistry) {
             this.name             = name;
             this.failureThreshold = failureThreshold;
             this.openDurationMs   = openDurationSec * 1000L;
             this.halfOpenAttempts = halfOpenAttempts;
+            this.redisRegistry    = redisRegistry;
         }
 
         /**
@@ -94,6 +238,21 @@ public class CircuitBreakerRegistry {
          * @throws CircuitBreakerOpenException 熔断打开时
          */
         public void checkState() {
+            if (redisRegistry != null) {
+                Transition transition = redisRegistry.runTransition(name, ACTION_CHECK,
+                        failureThreshold, openDurationMs, halfOpenAttempts);
+                if (transition.changed()) {
+                    log.info("[CIRCUIT] {} Redis transition -> {}", name, transition.state());
+                }
+                if (!transition.allowed()) {
+                    if (transition.state() == State.HALF_OPEN) {
+                        throw new CircuitBreakerOpenException("熔断器半开探测已满: " + name);
+                    }
+                    throw new CircuitBreakerOpenException("熔断器打开: " + name);
+                }
+                return;
+            }
+
             if (state == State.CLOSED) return;
 
             if (state == State.OPEN) {
@@ -117,6 +276,15 @@ public class CircuitBreakerRegistry {
 
         /** 记录成功：任何状态均重置失败计数，确保"连续失败"语义 */
         public void recordSuccess() {
+            if (redisRegistry != null) {
+                Transition transition = redisRegistry.runTransition(name, ACTION_SUCCESS,
+                        failureThreshold, openDurationMs, halfOpenAttempts);
+                if (transition.changed()) {
+                    log.info("[CIRCUIT] {} Redis -> CLOSED（成功恢复）", name);
+                }
+                return;
+            }
+
             if (state == State.HALF_OPEN) {
                 state = State.CLOSED;
                 log.info("[CIRCUIT] {} HALF_OPEN → CLOSED（探测成功）", name);
@@ -126,6 +294,15 @@ public class CircuitBreakerRegistry {
 
         /** 记录失败 */
         public void recordFailure() {
+            if (redisRegistry != null) {
+                Transition transition = redisRegistry.runTransition(name, ACTION_FAILURE,
+                        failureThreshold, openDurationMs, halfOpenAttempts);
+                if (transition.changed() && transition.state() == State.OPEN) {
+                    log.warn("[CIRCUIT] {} Redis -> OPEN", name);
+                }
+                return;
+            }
+
             if (state == State.HALF_OPEN) {
                 // 半开探测失败立即重开熔断，并刷新 openedAt 开始新一轮冷却。
                 state = State.OPEN;
@@ -143,7 +320,11 @@ public class CircuitBreakerRegistry {
             }
         }
 
-        enum State {
+        State localState() {
+            return state;
+        }
+
+        public enum State {
             /** 熔断关闭，正常放行并统计连续失败。 */
             CLOSED,
             /** 熔断打开，冷却期内直接拒绝调用。 */

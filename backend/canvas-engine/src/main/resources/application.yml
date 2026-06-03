@@ -134,6 +134,10 @@ canvas:
       failure-threshold: 5
       open-duration-sec: 30
       half-open-attempts: 3
+    redis:
+      key-prefix: cb:
+      pub-sub-channel: circuit-breaker-events
+      local-cache-ttl-sec: 5
   # 集成层外部系统 URL（dev 指向 WireMock）
   integration:
     coupon-service-url: http://localhost:8099/mock/coupon

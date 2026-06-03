@@ -2,8 +2,10 @@ package org.chovy.canvas.config;
 
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.data.redis.connection.RedisConnectionFactory;
 import org.springframework.data.redis.connection.ReactiveRedisConnectionFactory;
 import org.springframework.data.redis.core.ReactiveStringRedisTemplate;
+import org.springframework.data.redis.listener.RedisMessageListenerContainer;
 
 /**
  * Redis 相关 Bean 配置。
@@ -28,5 +30,13 @@ public class RedisConfig {
         // 用于 Pub/Sub 与轻量 reactive KV 访问
         // 业务上仍可按需注入 StringRedisTemplate 做阻塞查询
         return new ReactiveStringRedisTemplate(factory);
+    }
+
+    @Bean
+    public RedisMessageListenerContainer redisMessageListenerContainer(
+            RedisConnectionFactory factory) {
+        RedisMessageListenerContainer container = new RedisMessageListenerContainer();
+        container.setConnectionFactory(factory);
+        return container;
     }
 }
