@@ -39,13 +39,9 @@ import java.util.Objects;
  *       但可能存在多台机器同时扫出同一批记录的短窗口——CAS 失败的机器安全跳过。</li>
  * </ul>
  *
- * <p>⚠️ 已知问题（WAIT 恢复 + 配额限制的交互）：
- * {@link #trigger} 调用 {@code executionService.trigger(dryRun=false)}，
- * 该路径会经过 {@link TriggerPreCheckService#checkWithoutQuotaAccounting}（含冷却期 DB 软检查）
- * 和 {@link TriggerPreCheckService#consumeQuotaAndRecord}（扣减配额）。
- * 若画布配置了 cooldownSeconds，且原始触发与恢复时间间隔在冷却期内，恢复会被误拒；
- * 若画布有 perUserTotalLimit，每次 WAIT 恢复都会额外消耗用户配额。
- * 根治方案：在 isResume=true 时跳过 checkWithoutQuotaAccounting 和 consumeQuotaAndRecord。
+ * <p>WAIT 恢复触发会使用 TriggerType.WAIT_RESUME。
+ * CanvasExecutionService.isInternalContinuationTrigger 会跳过冷却期和配额扣减，
+ * 防止恢复路径被当成新触发。
  */
 @Slf4j
 @Service
@@ -274,7 +270,7 @@ public class WaitResumeService {
                         wait.getNodeId(),
                         payload,
                         msgId,
-                        false)  // dryRun=false，走完整 triggerInternal 路径（含冷却期检查，见类注释 ⚠️）
+                        false)  // dryRun=false；内部恢复触发会在 CanvasExecutionService 中跳过冷却期和配额扣减。
                 .subscribe(
                         ignored -> log.info("[WAIT] 恢复执行 waitId={} status={}", wait.getId(), status),
                         e -> log.error("[WAIT] 恢复执行失败 waitId={}: {}", wait.getId(), e.getMessage())

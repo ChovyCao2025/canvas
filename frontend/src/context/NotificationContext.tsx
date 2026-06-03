@@ -41,6 +41,37 @@ const NotificationContext = createContext<NotificationState>({
 /** WebSocket 不可用时的兜底轮询间隔。 */
 const FALLBACK_POLL_MS = 30000
 
+/** WebSocket 连续重试上限，超过后停留在 HTTP 轮询模式。 */
+export const MAX_RECONNECT_ATTEMPTS = 5
+
+interface ReconnectPlan {
+  mode: 'reconnect' | 'polling'
+  nextAttempt: number
+  delayMs?: number
+}
+
+/** 判断某个 WebSocket 生命周期事件是否仍属于当前活动连接。 */
+export function isActiveNotificationSocket(activeSocketId: string | null, socketId: string) {
+  return activeSocketId === socketId
+}
+
+/** 计算下一步重连动作；达到上限后保持轮询，不继续创建新 WebSocket。 */
+export function nextNotificationReconnectPlan(attempt: number): ReconnectPlan {
+  if (attempt >= MAX_RECONNECT_ATTEMPTS) {
+    return { mode: 'polling', nextAttempt: attempt }
+  }
+  return {
+    mode: 'reconnect',
+    nextAttempt: attempt + 1,
+    delayMs: nextNotificationReconnectDelay(attempt),
+  }
+}
+
+/** 创建客户端本地 socket 标识，用于隔离旧连接的延迟事件。 */
+function createSocketId() {
+  return globalThis.crypto?.randomUUID?.() ?? `socket-${Date.now()}-${Math.random().toString(36).slice(2)}`
+}
+
 /** 通知状态 Provider，负责在 HTTP 轮询和 WebSocket 实时通道之间切换。 */
 export function NotificationProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth()
@@ -49,6 +80,7 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
   const [connected, setConnected] = useState(false)
   const itemsRef = useRef<UserNotification[]>([])
   const wsRef = useRef<WebSocket | null>(null)
+  const activeSocketIdRef = useRef<string | null>(null)
   const reconnectAttemptRef = useRef(0)
   const reconnectTimerRef = useRef<number | null>(null)
   const fallbackTimerRef = useRef<number | null>(null)
@@ -129,9 +161,11 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
 
   /** 主动关闭当前 WebSocket，切换用户或卸载时调用。 */
   function closeSocket() {
-    if (wsRef.current) {
-      wsRef.current.close()
+    const socket = wsRef.current
+    if (socket) {
       wsRef.current = null
+      activeSocketIdRef.current = null
+      socket.close()
     }
   }
 
@@ -149,11 +183,15 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
       return
     }
     clearReconnectTimer()
-    const delay = nextNotificationReconnectDelay(reconnectAttemptRef.current)
+    const plan = nextNotificationReconnectPlan(reconnectAttemptRef.current)
+    if (plan.mode === 'polling') {
+      scheduleFallbackPolling()
+      return
+    }
     reconnectTimerRef.current = window.setTimeout(() => {
       connectRealtime().catch(() => undefined)
-    }, delay)
-    reconnectAttemptRef.current += 1
+    }, plan.delayMs)
+    reconnectAttemptRef.current = plan.nextAttempt
   }
 
   /** 处理服务端实时推送，合并通知列表并覆盖未读数。 */
@@ -175,14 +213,18 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
     }
     try {
       const ticketRes = await notificationApi.createWsTicket()
+      const socketId = createSocketId()
       const socket = new WebSocket(buildNotificationWebSocketUrl(ticketRes.data.ticket, window.location))
+      activeSocketIdRef.current = socketId
       wsRef.current = socket
       socket.onopen = () => {
+        if (!isActiveNotificationSocket(activeSocketIdRef.current, socketId)) return
         reconnectAttemptRef.current = 0
         setConnected(true)
         clearFallbackTimer()
       }
       socket.onmessage = (event) => {
+        if (!isActiveNotificationSocket(activeSocketIdRef.current, socketId)) return
         try {
           const payload = JSON.parse(event.data) as NotificationRealtimePayload
           handleRealtimePayload(payload)
@@ -191,12 +233,15 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
         }
       }
       socket.onerror = () => {
+        if (!isActiveNotificationSocket(activeSocketIdRef.current, socketId)) return
         setConnected(false)
         scheduleFallbackPolling()
       }
       socket.onclose = () => {
+        if (!isActiveNotificationSocket(activeSocketIdRef.current, socketId)) return
         setConnected(false)
         wsRef.current = null
+        activeSocketIdRef.current = null
         scheduleFallbackPolling()
         scheduleReconnect()
       }

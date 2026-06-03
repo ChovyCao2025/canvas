@@ -37,11 +37,12 @@ public class ReachDeliveryService {
     public ReachDeliveryService(
             MessageSendRecordMapper recordMapper,
             ObjectMapper objectMapper,
+            WebClient.Builder webClientBuilder,
             @Value("${canvas.integration.reach-platform-url}") String reachPlatformUrl
     ) {
         this.recordMapper = recordMapper;
         this.objectMapper = objectMapper;
-        this.webClient = WebClient.builder().baseUrl(reachPlatformUrl).build();
+        this.webClient = webClientBuilder.clone().baseUrl(reachPlatformUrl).build();
     }
 
     /** 执行触达投递并写入发送记录。 */

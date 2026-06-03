@@ -9,6 +9,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.function.LongSupplier;
 
 /**
  * 画布执行引擎核心监控指标（设计文档第 14.1 节）。
@@ -142,6 +143,13 @@ public class CanvasMetrics {
                 .tag("triggerType", triggerType)
                 .register(registry)
                 .increment();
+    }
+
+    /** Disruptor 待消费积压水位 Gauge。 */
+    public void registerDisruptorBacklogGauge(LongSupplier backlogSupplier) {
+        Gauge.builder("canvas.disruptor.backlog", backlogSupplier,
+                        supplier -> Math.max(0L, supplier.getAsLong()))
+                .register(registry);
     }
 
     /** 执行请求状态迁移计数（MQ/行为等异步触发的可靠投递层） */

@@ -53,10 +53,15 @@ canvas:
     expiry-hours: 24
   events:
     report-secret: ${CANVAS_EVENT_REPORT_SECRET:canvas-event-report-secret-2026!!}
+  public-trigger:
+    secret: ${CANVAS_PUBLIC_TRIGGER_SECRET:${CANVAS_EVENT_REPORT_SECRET:canvas-event-report-secret-2026!!}}
+  secret-cipher:
+    key: ${CANVAS_SECRET_CIPHER_KEY:MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY=}
   cors:
     # 生产环境必须改为实际前端域名，禁止用 * 上线
     # 覆盖方式：CANVAS_CORS_ALLOWED_ORIGINS=https://canvas.yourcompany.com
     allowed-origins: "*"
+    allow-credentials: true
   redis:
     key-prefix: canvas  # key 命名空间前缀（设计文档 25.3.1节），多环境共用 Redis 时修改
   version:
@@ -111,6 +116,10 @@ canvas:
   mq:
     topic: CANVAS_MQ_TRIGGER
     consume-thread-number: ${CANVAS_MQ_CONSUME_THREAD:20}
+  notifications:
+    websocket:
+      max-sessions-per-user: ${CANVAS_NOTIFICATION_WS_MAX_SESSIONS_PER_USER:5}
+      max-total-sessions: ${CANVAS_NOTIFICATION_WS_MAX_TOTAL_SESSIONS:1000}
   scheduler:
     jitter-max-ms: 300000
     trigger-concurrency: 100

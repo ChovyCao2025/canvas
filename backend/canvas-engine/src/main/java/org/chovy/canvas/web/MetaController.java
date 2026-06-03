@@ -64,6 +64,8 @@ public class MetaController {
     /** AB 实验分组服务，用于查询实验分组选项。 */
     private final AbExperimentGroupService abExperimentGroupService;
     private final TenantContextResolver tenantContextResolver;
+    /** 统一 HTTP 客户端构建器，继承全局超时、连接池和响应大小限制。 */
+    private final WebClient.Builder webClientBuilder;
 
     /** 标签服务地址，用于生成外部标签查询配置。 */
     @Value("${canvas.integration.tagger-service-url}")
@@ -301,7 +303,7 @@ public class MetaController {
                     if (dbList != null) return Mono.just(R.ok(dbList));
                     // fallback: 调 Tagger 服务
                     // 外部服务失败时降级为空列表，保持元数据页面可用。
-                    return WebClient.builder().baseUrl(taggerUrl).build()
+                    return webClientBuilder.clone().baseUrl(taggerUrl).build()
                             .get()
                             .uri(u -> u.path("/tags").queryParam("type", type).build())
                             .retrieve()

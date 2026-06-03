@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import org.chovy.canvas.dal.dataobject.DataSourceConfigDO;
 import org.chovy.canvas.dal.mapper.DataSourceConfigMapper;
+import org.chovy.canvas.security.SecretCipher;
 import org.springframework.stereotype.Component;
 
 import java.util.Map;
@@ -23,6 +24,8 @@ public class JdbcConfigResolver {
     private final ObjectMapper objectMapper;
     /** 数据源配置 Mapper，用于按 ID 读取真实连接信息。 */
     private final DataSourceConfigMapper dataSourceConfigMapper;
+    /** 敏感字段加解密工具。 */
+    private final SecretCipher secretCipher;
 
     /**
      * 构建、解析或转换 resolve 相关的业务数据。
@@ -65,7 +68,7 @@ public class JdbcConfigResolver {
                 baseTable,
                 requireDataSourceField(dataSource.getUrl(), "url"),
                 requireDataSourceField(dataSource.getUsername(), "username"),
-                requireDataSourceField(dataSource.getPassword(), "password"),
+                secretCipher.decrypt(requireDataSourceField(dataSource.getPassword(), "password")),
                 userIdColumn,
                 defaultIfBlank(dataSource.getDriverClassName(), "com.mysql.cj.jdbc.Driver"),
                 maxRows

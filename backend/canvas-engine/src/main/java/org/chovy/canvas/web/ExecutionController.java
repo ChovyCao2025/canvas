@@ -7,10 +7,14 @@ import org.chovy.canvas.engine.disruptor.CanvasDisruptorService;
 import org.chovy.canvas.engine.trigger.CanvasExecutionService;
 import lombok.Data;
 import lombok.RequiredArgsConstructor;
-import org.springframework.http.server.reactive.ServerHttpRequest;
+import org.chovy.canvas.security.PublicTriggerAuthService;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.core.context.ReactiveSecurityContextHolder;
+import org.springframework.http.server.reactive.ServerHttpRequest;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.server.ResponseStatusException;
 import reactor.core.publisher.Mono;
+import reactor.core.scheduler.Schedulers;
 
 import io.jsonwebtoken.Claims;
 import java.io.IOException;
@@ -31,9 +35,9 @@ public class ExecutionController {
     // 12.8节 Disruptor 分发
     /** Disruptor 投递服务，用于异步发布行为触发任务。 */
     private final CanvasDisruptorService disruptorService;
-    /** 机器请求签名校验服务。 */
-    private final MachineRequestAuthService machineRequestAuthService;
-    /** JSON 转换器，用于从原始请求体解析签名后的机器请求。 */
+    /** 公开触发接口签名校验服务。 */
+    private final PublicTriggerAuthService publicTriggerAuthService;
+    /** JSON 转换器，用于先验签 raw body，再解析请求体。 */
     private final ObjectMapper objectMapper;
 
     /**
@@ -48,17 +52,15 @@ public class ExecutionController {
             ServerHttpRequest request,
             @PathVariable Long canvasId,
             @RequestBody Mono<String> rawBody) {
-        return rawBody.defaultIfEmpty("")
-                .flatMap(body -> {
-                    machineRequestAuthService.verify(request.getHeaders(), body);
-                    DirectCallReq req = readBody(body, DirectCallReq.class);
-                    String userId = requireUserId(req.getUserId());
+        return parseSignedBody(request, rawBody, DirectCallReq.class)
+                .flatMap(req -> {
                     // 设计文档 13.1节：调用方应提供 idempotencyKey，网络超时重试时保持相同值可防重复执行
                     // 未提供时生成随机 UUID（不保证幂等，业务方需知晓风险）
                     // 压测请求通过 inputParams.perfRunId 贯穿账本，通过 idempotencyKey 控制唯一输入键。
                     String dedupKey = (req.getIdempotencyKey() != null && !req.getIdempotencyKey().isBlank())
                             ? req.getIdempotencyKey()
                             : UUID.randomUUID().toString();
+                    String userId = requireText(req.getUserId(), "userId");
                     return executionService.trigger(
                                     canvasId, userId, NodeType.DIRECT_CALL,
                                     NodeType.DIRECT_CALL, null,
@@ -78,13 +80,13 @@ public class ExecutionController {
     public Mono<R<Void>> behaviorTrigger(
             ServerHttpRequest request,
             @RequestBody Mono<String> rawBody) {
-        return rawBody.defaultIfEmpty("")
-                .map(body -> {
-                    machineRequestAuthService.verify(request.getHeaders(), body);
-                    BehaviorTriggerReq req = readBody(body, BehaviorTriggerReq.class);
+        return parseSignedBody(request, rawBody, BehaviorTriggerReq.class)
+                .map(req -> {
+                    Long canvasId = requireValue(req.getCanvasId(), "canvasId");
+                    String userId = requireText(req.getUserId(), "userId");
                     // 控制器只负责投递 Ring Buffer，实际画布执行由 Disruptor 消费线程异步完成。
                     disruptorService.publish(
-                            req.getCanvasId(), req.getUserId(), "BEHAVIOR",
+                            canvasId, userId, "BEHAVIOR",
                             NodeType.EVENT_TRIGGER, req.getEventCode(),
                             req.getBehaviorData(), req.getEventId());
                     return R.ok();
@@ -133,19 +135,31 @@ public class ExecutionController {
                 .defaultIfEmpty("system");
     }
 
-    private <T> T readBody(String body, Class<T> type) {
-        try {
-            return objectMapper.readValue(body, type);
-        } catch (IOException e) {
-            throw new IllegalArgumentException("请求体 JSON 不合法");
-        }
+    private <T> Mono<T> parseSignedBody(ServerHttpRequest request, Mono<String> rawBody, Class<T> bodyType) {
+        return rawBody.defaultIfEmpty("")
+                .flatMap(body -> Mono.fromCallable(() -> {
+                            publicTriggerAuthService.verify(request.getHeaders(), body);
+                            try {
+                                return objectMapper.readValue(body, bodyType);
+                            } catch (IOException e) {
+                                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "请求体 JSON 不合法", e);
+                            }
+                        })
+                        .subscribeOn(Schedulers.boundedElastic()));
     }
 
-    private String requireUserId(String userId) {
-        if (userId == null || userId.isBlank()) {
-            throw new IllegalArgumentException("userId 不能为空");
+    private String requireText(String value, String fieldName) {
+        if (value == null || value.isBlank()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, fieldName + " is required");
         }
-        return userId;
+        return value;
+    }
+
+    private <T> T requireValue(T value, String fieldName) {
+        if (value == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, fieldName + " is required");
+        }
+        return value;
     }
 
 

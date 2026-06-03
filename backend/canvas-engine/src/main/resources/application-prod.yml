@@ -1,0 +1,21 @@
+canvas:
+  cors:
+    allowed-origins: ${CANVAS_CORS_ALLOWED_ORIGINS}
+    allow-credentials: true
+  events:
+    report-secret: ${CANVAS_EVENT_REPORT_SECRET}
+  public-trigger:
+    secret: ${CANVAS_PUBLIC_TRIGGER_SECRET:${CANVAS_EVENT_REPORT_SECRET}}
+  secret-cipher:
+    key: ${CANVAS_SECRET_CIPHER_KEY}
+  jwt:
+    secret: ${CANVAS_JWT_SECRET}
+
+management:
+  endpoint:
+    health:
+      show-details: when-authorized
+
+springdoc:
+  swagger-ui:
+    enabled: false

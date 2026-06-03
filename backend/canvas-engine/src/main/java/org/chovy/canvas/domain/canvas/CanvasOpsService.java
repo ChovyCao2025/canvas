@@ -54,7 +54,7 @@ public class CanvasOpsService {
      * @param editVersion 当前编辑版本号
      * @param operator 操作人
      */
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public void saveWithOptimisticLock(Long id, String name, String description,
                                         String graphJson, int editVersion, String operator) {
         // CAS 更新 edit_version
@@ -123,7 +123,7 @@ public class CanvasOpsService {
      * @param percent 流量比例
      * @param operator 操作人
      */
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public void startCanary(Long id, int percent, String operator) {
         CanvasDO canvas = require(id);
         if (canvas.getStatus() != CanvasStatusEnum.PUBLISHED.getCode()) throw new IllegalStateException("画布未在发布状态");
@@ -149,7 +149,7 @@ public class CanvasOpsService {
      * 将灰度版本晋升为正式版本
      * @param id 画布 ID
      */
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public void promoteCanary(Long id) {
         CanvasDO canvas = require(id);
         if (canvas.getCanaryVersionId() == null) throw new IllegalStateException("无灰度版本");
@@ -165,7 +165,7 @@ public class CanvasOpsService {
      * 回滚灰度发布
      * @param id 画布 ID
      */
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public void rollbackCanary(Long id) {
         CanvasDO canvas = require(id);
         canvas.setCanaryVersionId(null);
@@ -186,7 +186,7 @@ public class CanvasOpsService {
      * 回滚画布到上一个版本
      * @param id 画布 ID
      */
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public void rollback(Long id) {
         CanvasDO canvas = require(id);
         if (canvas.getPreviousVersionId() == null) throw new IllegalStateException("无上一版本可回滚");
@@ -205,7 +205,7 @@ public class CanvasOpsService {
      * @param operator 操作人
      * @return 新的画布对象
      */
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public CanvasDO clone(Long id, String operator) {
         CanvasDO src = require(id);
         CanvasVersionDO srcDraft = latestDraft(id);

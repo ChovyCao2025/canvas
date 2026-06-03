@@ -2,9 +2,15 @@ package org.chovy.canvas.engine.context;
 
 import org.junit.jupiter.api.RepeatedTest;
 import org.junit.jupiter.api.Test;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.Executors;
+import java.util.stream.IntStream;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatNoException;
 
@@ -27,6 +33,33 @@ class ExecutionContextConcurrencyTest {
         assertThat(ctx.isNodeDone("timeout-node")).isTrue();
         assertThat(ctx.isNodeDone("suppressed-node")).isTrue();
         assertThat(ctx.isNodeDone("waiting-node")).isFalse();
+    }
+
+    @Test
+    void triggerPayloadAndCallStackUseConcurrentContainers() {
+        ExecutionContext ctx = new ExecutionContext();
+
+        assertThat(ctx.getTriggerPayload()).isInstanceOf(ConcurrentMap.class);
+        assertThat(ctx.getCallStack()).isInstanceOf(CopyOnWriteArrayList.class);
+
+        IntStream.range(0, 1_000).parallel().forEach(i -> {
+            ctx.getTriggerPayload().put("k" + i, i);
+            ctx.getCallStack().add((long) i);
+        });
+
+        assertThat(ctx.getTriggerPayload()).hasSize(1_000);
+        assertThat(ctx.getCallStack()).hasSize(1_000);
+    }
+
+    @Test
+    void triggerPayloadAndCallStackSettersKeepConcurrentContainers() {
+        ExecutionContext ctx = new ExecutionContext();
+
+        ctx.setTriggerPayload(new HashMap<>(Map.of("orderId", "O-1")));
+        ctx.setCallStack(new ArrayList<>(List.of(10L)));
+
+        assertThat(ctx.getTriggerPayload()).isInstanceOf(ConcurrentMap.class);
+        assertThat(ctx.getCallStack()).isInstanceOf(CopyOnWriteArrayList.class);
     }
 
     @RepeatedTest(20)

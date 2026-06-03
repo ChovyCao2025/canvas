@@ -18,6 +18,7 @@ import org.chovy.canvas.infrastructure.cache.CanvasConfigCache;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Component;
+import reactor.core.scheduler.Schedulers;
 
 import java.util.*;
 
@@ -102,26 +103,65 @@ public class SubFlowRefHandler implements NodeHandler {
             return Mono.just(NodeResult.fail("SUB_FLOW_REF 循环调用: " + subFlowId));
         }
 
+        return Mono.fromCallable(() -> prepareSubFlow(
+                        subFlowId, subFlowVersion, outputPrefix, nextNodeId, inputMapping, config, ctx))
+                .subscribeOn(Schedulers.boundedElastic())
+                .flatMap(prepared -> {
+                    if (prepared.failure() != null) {
+                        return Mono.just(prepared.failure());
+                    }
+                    return switch (prepared.subFlowType()) {
+                        case "STRATEGY_TABLE" -> {
+                            // 策略表子流程在当前线程内做多因子匹配，不启动完整 DAG。
+                            Map<String, Object> r = executeStrategyTable(prepared.graphRoot(), prepared.inputData(), ctx);
+                            yield r != null ? Mono.just(NodeResult.ok(prepared.nextNodeId(), r))
+                                            : Mono.just(NodeResult.fail("STRATEGY_TABLE 无匹配策略"));
+                        }
+                        case "DATA_TABLE" -> {
+                            // 数据表子流程按 lookupKey 查列值，未命中视为业务失败。
+                            Map<String, Object> r = executeDataTable(prepared.graphRoot(), prepared.inputData(), ctx);
+                            yield r != null ? Mono.just(NodeResult.ok(prepared.nextNodeId(), r))
+                                            : Mono.just(NodeResult.fail("DATA_TABLE 未找到 key"));
+                        }
+                        default -> executeWorkflow(prepared.subFlowId(), prepared.versionId(), prepared.inputData(),
+                                ctx, prepared.nextNodeId(), prepared.outputPrefix())
+                                .onErrorResume(e -> Mono.just(NodeResult.fail("子流程执行失败: " + e.getMessage())));
+                    };
+                })
+                .onErrorResume(e -> Mono.just(NodeResult.fail("SUB_FLOW_REF: " + e.getMessage())));
+    }
+
+    private PreparedSubFlow prepareSubFlow(Long subFlowId,
+                                           int subFlowVersion,
+                                           String outputPrefix,
+                                           String nextNodeId,
+                                           Map<String, Object> inputMapping,
+                                           Map<String, Object> config,
+                                           ExecutionContext ctx) {
         CanvasDO canvas = canvasMapper.selectById(subFlowId);
         if (canvas == null || canvas.getStatus() != 1) {
-            return Mono.just(NodeResult.fail("子流程画布未发布: " + subFlowId));
+            return PreparedSubFlow.failure(NodeResult.fail("子流程画布未发布: " + subFlowId));
         }
         Long versionId = subFlowVersion == -1
                 ? canvas.getPublishedVersionId()
                 : resolveVersion(subFlowId, subFlowVersion);
         // subFlowVersion=-1 使用当前发布版本；指定版本则按版本号解析。
-        if (versionId == null) return Mono.just(NodeResult.fail("子流程版本不存在: " + subFlowVersion));
+        if (versionId == null) {
+            return PreparedSubFlow.failure(NodeResult.fail("子流程版本不存在: " + subFlowVersion));
+        }
 
         // 加载子流程 graph_json
         CanvasVersionDO version = canvasVersionMapper.selectById(versionId);
-        if (version == null) return Mono.just(NodeResult.fail("子流程版本记录不存在"));
+        if (version == null) {
+            return PreparedSubFlow.failure(NodeResult.fail("子流程版本记录不存在"));
+        }
 
         // 解析 graph_json 顶层结构，判断子流程类型
         Map<String, Object> graphRoot;
         try {
             graphRoot = objectMapper.readValue(version.getGraphJson(), Map.class);
         } catch (Exception e) {
-            return Mono.just(NodeResult.fail("子流程 JSON 解析失败: " + e.getMessage()));
+            return PreparedSubFlow.failure(NodeResult.fail("子流程 JSON 解析失败: " + e.getMessage()));
         }
 
         String subFlowType = (String) graphRoot.getOrDefault("type", "WORKFLOW");
@@ -134,22 +174,23 @@ public class SubFlowRefHandler implements NodeHandler {
             if (val != null) inputData.put(childKey, val);
         });
 
-        return switch (subFlowType) {
-            case "STRATEGY_TABLE" -> {
-                // 策略表子流程在当前线程内做多因子匹配，不启动完整 DAG。
-                Map<String, Object> r = executeStrategyTable(graphRoot, inputData, ctx);
-                yield r != null ? Mono.just(NodeResult.ok(nextNodeId, r))
-                                : Mono.just(NodeResult.fail("STRATEGY_TABLE 无匹配策略"));
-            }
-            case "DATA_TABLE" -> {
-                // 数据表子流程按 lookupKey 查列值，未命中视为业务失败。
-                Map<String, Object> r = executeDataTable(graphRoot, inputData, ctx);
-                yield r != null ? Mono.just(NodeResult.ok(nextNodeId, r))
-                                : Mono.just(NodeResult.fail("DATA_TABLE 未找到 key"));
-            }
-            default -> executeWorkflow(subFlowId, versionId, inputData, ctx, nextNodeId, outputPrefix)
-                    .onErrorResume(e -> Mono.just(NodeResult.fail("子流程执行失败: " + e.getMessage())));
-        };
+        return new PreparedSubFlow(null, subFlowType, graphRoot, inputData, subFlowId,
+                versionId, nextNodeId, outputPrefix);
+    }
+
+    private record PreparedSubFlow(
+            NodeResult failure,
+            String subFlowType,
+            Map<String, Object> graphRoot,
+            Map<String, Object> inputData,
+            Long subFlowId,
+            Long versionId,
+            String nextNodeId,
+            String outputPrefix
+    ) {
+        static PreparedSubFlow failure(NodeResult failure) {
+            return new PreparedSubFlow(failure, null, null, null, null, null, null, null);
+        }
     }
 
 // ══ STRATEGY_TABLE（设计文档 20.3节）════════════════════════

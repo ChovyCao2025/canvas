@@ -63,7 +63,7 @@ const nodes: NodeTypeRegistry[] = [
 
 describe('nodeLibrary helpers', () => {
   it('always includes 全部 first and keeps the preferred category order', () => {
-    expect(buildCategoryOptions(nodes)).toEqual(['全部', '其他', '逻辑分支', '流程控制'])
+    expect(buildCategoryOptions(nodes)).toEqual(['全部', '流程控制', '逻辑分支', '其他'])
   })
 
   it('filters by category and keyword together', () => {

@@ -69,8 +69,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<LoginResp | null>(() => {
     try {
       const saved = localStorage.getItem('canvas_user')
-      const token = localStorage.getItem('canvas_token')
-      console.log('[AUTH] init token:', token?.slice(0,20), 'saved:', !!saved)
       return saved ? JSON.parse(saved) : null
     } catch {
       return null

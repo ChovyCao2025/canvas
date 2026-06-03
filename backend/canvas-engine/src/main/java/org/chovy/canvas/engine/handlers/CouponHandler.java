@@ -26,9 +26,10 @@ public class CouponHandler implements NodeHandler {
     /** 券系统 HTTP 客户端。 */
     private final WebClient webClient;
 
-    public CouponHandler(@Value("${canvas.integration.coupon-service-url}") String url) {
+    public CouponHandler(WebClient.Builder webClientBuilder,
+                         @Value("${canvas.integration.coupon-service-url}") String url) {
         // baseUrl 通过配置注入，便于多环境切换
-        this.webClient = WebClient.builder().baseUrl(url).build();
+        this.webClient = webClientBuilder.clone().baseUrl(url).build();
     }
 
     /**
@@ -45,6 +46,9 @@ public class CouponHandler implements NodeHandler {
     public Mono<NodeResult> executeAsync(Map<String, Object> config, ExecutionContext ctx) {
         // 节点配置：券种、附加参数和下游节点
         String couponTypeKey  = (String) config.get(MapFieldKeys.COUPON_TYPE_KEY);
+        if (couponTypeKey == null || couponTypeKey.isBlank()) {
+            return Mono.just(NodeResult.fail("COUPON: couponTypeKey 未配置"));
+        }
         Map<String, Object> p = (Map<String, Object>) config.getOrDefault(MapFieldKeys.PARAMS, Map.of());
         String nextNodeId     = (String) config.get(MapFieldKeys.NEXT_NODE_ID);
 

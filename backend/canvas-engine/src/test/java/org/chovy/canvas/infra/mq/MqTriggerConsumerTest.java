@@ -30,6 +30,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -101,6 +102,21 @@ class MqTriggerConsumerTest {
 
         verify(disruptorService).publishRequest("req-101");
         verify(disruptorService).publishRequest("req-202");
+    }
+
+    @Test
+    void onMessagePublishesDeterministicRequestIdForDuplicateMessage() {
+        when(routeService.getCanvasByMqTopic("ORDER_PAID")).thenReturn(Set.of("10"));
+        when(requestService.enqueue(eq(10L), eq("user-1"), eq(TriggerType.MQ),
+                eq(NodeType.MQ_TRIGGER), eq("ORDER_PAID"), any(), eq("MSG-1")))
+                .thenReturn("mq-10-deterministic");
+
+        consumer.onMessage(message("ORDER_PAID", "MSG-1",
+                "{\"userId\":\"user-1\",\"messageCode\":\"PAYMENT\",\"payload\":{\"orderId\":\"O-1\"}}"));
+        consumer.onMessage(message("ORDER_PAID", "MSG-1",
+                "{\"userId\":\"user-1\",\"messageCode\":\"PAYMENT\",\"payload\":{\"orderId\":\"O-1\"}}"));
+
+        verify(disruptorService, times(2)).publishRequest("mq-10-deterministic");
     }
 
     @Test

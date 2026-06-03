@@ -4,15 +4,20 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.chovy.canvas.common.enums.NodeType;
 import org.chovy.canvas.engine.disruptor.CanvasDisruptorService;
 import org.chovy.canvas.engine.trigger.CanvasExecutionService;
+import org.chovy.canvas.security.PublicTriggerAuthService;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpHeaders;
 import org.springframework.mock.http.server.reactive.MockServerHttpRequest;
 import org.springframework.web.server.ResponseStatusException;
 import reactor.core.publisher.Mono;
 
+import javax.crypto.Mac;
+import javax.crypto.spec.SecretKeySpec;
+import java.nio.charset.StandardCharsets;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
+import java.util.HexFormat;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -75,7 +80,7 @@ class ExecutionControllerMachineAuthTest {
     private ExecutionController newController(CanvasExecutionService executionService,
                                               CanvasDisruptorService disruptorService) {
         return new ExecutionController(executionService, disruptorService,
-                new MachineRequestAuthService(SECRET, CLOCK), objectMapper);
+                new PublicTriggerAuthService(SECRET, CLOCK), objectMapper);
     }
 
     private org.springframework.http.server.reactive.ServerHttpRequest request(HttpHeaders headers) {
@@ -85,11 +90,20 @@ class ExecutionControllerMachineAuthTest {
     }
 
     private HttpHeaders signedHeaders(String body) {
-        MachineRequestAuthService service = new MachineRequestAuthService(SECRET, CLOCK);
         String timestamp = String.valueOf(CLOCK.millis());
         HttpHeaders headers = new HttpHeaders();
-        headers.add(MachineRequestAuthService.TIMESTAMP_HEADER, timestamp);
-        headers.add(MachineRequestAuthService.SIGNATURE_HEADER, "sha256=" + service.signForTest(timestamp, body));
+        headers.add(EventReportAuthService.TIMESTAMP_HEADER, timestamp);
+        headers.add(EventReportAuthService.SIGNATURE_HEADER, "sha256=" + hmac(timestamp + "\n" + body));
         return headers;
+    }
+
+    private String hmac(String canonical) {
+        try {
+            Mac mac = Mac.getInstance("HmacSHA256");
+            mac.init(new SecretKeySpec(SECRET.getBytes(StandardCharsets.UTF_8), "HmacSHA256"));
+            return HexFormat.of().formatHex(mac.doFinal(canonical.getBytes(StandardCharsets.UTF_8)));
+        } catch (Exception e) {
+            throw new IllegalStateException(e);
+        }
     }
 }

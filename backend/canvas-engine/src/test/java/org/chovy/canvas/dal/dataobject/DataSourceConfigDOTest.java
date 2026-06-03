@@ -21,4 +21,18 @@ class DataSourceConfigDOTest {
         assertThat(json).doesNotContain("password");
         assertThat(parsed.getPassword()).isEqualTo("from-request");
     }
+
+    @Test
+    void passwordIsExcludedFromToStringAndEquality() {
+        DataSourceConfigDO first = new DataSourceConfigDO();
+        first.setName("warehouse");
+        first.setPassword("secret-1");
+        DataSourceConfigDO second = new DataSourceConfigDO();
+        second.setName("warehouse");
+        second.setPassword("secret-2");
+
+        assertThat(first.toString()).doesNotContain("secret-1");
+        assertThat(first).isEqualTo(second);
+        assertThat(first.hashCode()).isEqualTo(second.hashCode());
+    }
 }

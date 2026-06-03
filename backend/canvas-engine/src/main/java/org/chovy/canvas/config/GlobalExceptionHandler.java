@@ -3,11 +3,15 @@ package org.chovy.canvas.config;
 import org.chovy.canvas.common.R;
 import org.chovy.canvas.engine.trigger.TriggerPreCheckService.TriggerRejectedException;
 import lombok.extern.slf4j.Slf4j;
+import org.slf4j.MDC;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.server.ResponseStatusException;
+
+import java.util.Optional;
+import java.util.UUID;
 
 /**
  * 全局异常处理（设计文档第二十二章 22.1 节统一错误响应格式）。
@@ -21,6 +25,8 @@ import org.springframework.web.server.ResponseStatusException;
 @Slf4j
 @RestControllerAdvice
 public class GlobalExceptionHandler {
+
+    private static final String TRACE_ID_MDC_KEY = "traceId";
 
     /** 参数校验/业务前置校验失败。 */
     @ExceptionHandler(IllegalArgumentException.class)
@@ -83,6 +89,13 @@ public class GlobalExceptionHandler {
     @ResponseStatus(HttpStatus.INTERNAL_SERVER_ERROR)
     public R<Void> handleGeneral(Exception e) {
         log.error("Unhandled server exception", e);
-        return R.fail("系统错误，请联系管理员");
+        // 兜底不透传内部异常消息，调用方可用 traceId 关联服务端日志排查。
+        return R.fail(500, "系统错误", currentTraceId());
+    }
+
+    private String currentTraceId() {
+        return Optional.ofNullable(MDC.get(TRACE_ID_MDC_KEY))
+                .filter(traceId -> !traceId.isBlank())
+                .orElseGet(() -> UUID.randomUUID().toString());
     }
 }

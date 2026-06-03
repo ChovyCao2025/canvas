@@ -65,6 +65,8 @@ public class CanvasExecutionRequestService {
                     .replace("-", "")
                     .substring(0, 24);
         }
+        // 幂等边界必须包含 canvasId：同一条 RocketMQ 消息可以合法 fan-out 到多个画布。
+        // 因此不要用全局 UNIQUE(source_msg_id) 替代这个请求 ID。
         String raw = prefix + ":" + canvasId + ":" + sourceMsgId;
         return prefix + "-" + canvasId + "-" + sha256(raw).substring(0, 24);
     }

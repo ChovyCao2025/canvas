@@ -16,6 +16,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.EnableScheduling;
 import org.springframework.stereotype.Service;
+import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.Disposable;
 import reactor.core.Disposables;
 import reactor.core.publisher.Mono;
@@ -49,6 +50,8 @@ public class CanvasSchedulerService {
     private final CanvasExecutionService executionService;
     /** 调度注册器。 */
     private final ScheduleRegistrar      scheduleRegistrar;
+    /** 统一 HTTP 客户端构建器，继承全局超时、连接池和响应大小限制。 */
+    private final WebClient.Builder      webClientBuilder;
     private static final String SCHEDULED_BATCH_USER_PREFIX = "__scheduled_batch__:";
 
     /** 兼容旧测试和默认本地调度器的构造器，生产可替换 ScheduleRegistrar 实现。 */
@@ -56,9 +59,11 @@ public class CanvasSchedulerService {
     public CanvasSchedulerService(org.springframework.scheduling.TaskScheduler taskScheduler,
                                   org.chovy.canvas.dal.mapper.CanvasMapper canvasMapper,
                                   org.chovy.canvas.infrastructure.cache.CanvasConfigCache configCache,
-                                  CanvasExecutionService executionService) {
+                                  CanvasExecutionService executionService,
+                                  WebClient.Builder webClientBuilder) {
         this.executionService = executionService;
         this.scheduleRegistrar = new LegacyTaskSchedulerRegistrar(taskScheduler);
+        this.webClientBuilder = webClientBuilder;
     }
 
 
@@ -80,8 +85,8 @@ public class CanvasSchedulerService {
     /** 在 Bean 初始化完成后创建外部用户来源查询客户端。 */
     @PostConstruct
     void initClients() {
-        taggerClient  = org.springframework.web.reactive.function.client.WebClient.builder().baseUrl(taggerUrl).build();
-        apiCallClient = org.springframework.web.reactive.function.client.WebClient.builder().baseUrl(apiCallUrl).build();
+        taggerClient  = webClientBuilder.clone().baseUrl(taggerUrl).build();
+        apiCallClient = webClientBuilder.clone().baseUrl(apiCallUrl).build();
     }
 
     /** 带抖动的延迟调度任务分组，避免大量定时触发同时打入执行链路。 */

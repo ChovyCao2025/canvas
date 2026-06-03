@@ -5,6 +5,7 @@ import org.chovy.canvas.engine.context.ExecutionContext;
 import org.chovy.canvas.engine.delivery.ReachDeliveryService;
 import org.chovy.canvas.engine.handler.NodeResult;
 import org.junit.jupiter.api.Test;
+import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Mono;
 
 import java.util.Map;
@@ -45,7 +46,7 @@ class SendMessageHandlerTest {
         private final AtomicReference<DeliveryRequest> lastRequest = new AtomicReference<>();
 
         CapturingDeliveryService() {
-            super(null, new ObjectMapper(), "http://localhost");
+            super(null, new ObjectMapper(), WebClient.builder(), "http://localhost");
         }
 
         @Override
