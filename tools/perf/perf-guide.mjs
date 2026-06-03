@@ -165,16 +165,17 @@ export function parseJsonCommandResult(result, commandName) {
   }
 }
 
-export async function defaultRunScenario(config, { mode, count, concurrency }) {
-  const perfRunId = `${config.perfRunId}_${mode}`
-  const directory = runDirectory(config, perfRunId)
+export async function defaultRunScenario(config, { mode, count, concurrency, perfRunId }, deps = {}) {
+  const run = deps.runCommand || runCommand
+  const scenarioPerfRunId = perfRunId || (config.perfRunId ? `${config.perfRunId}_${mode}` : '')
+  const directory = runDirectory(config, scenarioPerfRunId)
   mkdirSync(directory, { recursive: true })
   const summaryFile = path.join(directory, 'runner-summary.json')
   const runnerArgs = [
     'tools/perf/perf-runner.mjs',
     '--mode', mode,
     '--base-url', config.baseUrl,
-    '--perf-run-id', perfRunId,
+    '--perf-run-id', scenarioPerfRunId,
     '--count', String(count),
     '--concurrency', String(concurrency),
     '--summary-file', summaryFile,
@@ -189,7 +190,7 @@ export async function defaultRunScenario(config, { mode, count, concurrency }) {
   }
 
   const runner = parseJsonCommandResult(
-    runCommand(process.execPath, runnerArgs),
+    run(process.execPath, runnerArgs),
     'perf-runner',
   )
   const verifierArgs = [
@@ -197,16 +198,16 @@ export async function defaultRunScenario(config, { mode, count, concurrency }) {
     '--mysql', config.mysql,
     '--database', config.database,
     '--mode', mode,
-    '--perf-run-id', perfRunId,
+    '--perf-run-id', scenarioPerfRunId,
     '--sent-success', String(runner.success),
     '--matched-canvas-count', String(config.matchedCanvasCount),
   ]
   const verifier = parseJsonCommandResult(
-    runCommand(process.execPath, verifierArgs),
+    run(process.execPath, verifierArgs),
     'verifier',
   )
   writeJson(path.join(directory, 'verifier.json'), verifier)
-  return { summary: runner, verifier, directory, perfRunId }
+  return { summary: runner, verifier, directory, perfRunId: scenarioPerfRunId }
 }
 
 async function defaultDoctor() {
@@ -230,7 +231,7 @@ async function defaultSmoke(config, deps = {}) {
   if (!config.canvasId) {
     throw new Error('--canvas-id is required for direct smoke')
   }
-  const runScenario = deps.runScenario || ((options) => defaultRunScenario(config, options))
+  const runScenario = deps.runScenario || ((options) => defaultRunScenario(config, options, deps))
   const modes = [
     { mode: 'direct', count: 50, concurrency: 5 },
     { mode: 'event', count: 100, concurrency: 10 },
@@ -253,6 +254,9 @@ async function defaultThreshold(config, deps = {}) {
     '--mode', config.mode,
     '--base-url', config.baseUrl,
     '--matched-canvas-count', String(config.matchedCanvasCount),
+    '--mysql', config.mysql,
+    '--database', config.database,
+    '--out-dir', config.thresholdRoot,
   ]
   if (config.mode === 'event') {
     args.push('--event-code', config.eventCode)
@@ -262,8 +266,16 @@ async function defaultThreshold(config, deps = {}) {
     args.push('--canvas-id', config.canvasId)
   }
   const result = parseJsonCommandResult(run(process.execPath, args), 'threshold-runner')
+  const statuses = new Map([
+    ['MAX_STAGE_STABLE', 'PASS'],
+    ['THRESHOLD_FOUND', 'PASS'],
+    ['NO_STABLE_STAGE', 'FAIL'],
+  ])
+  if (!statuses.has(result.verdict)) {
+    throw new Error(`unknown threshold verdict ${result.verdict}`)
+  }
   return {
-    status: result.verdict === 'NO_STABLE_STAGE' ? 'FAIL' : 'PASS',
+    status: statuses.get(result.verdict),
     ...result,
   }
 }
@@ -272,9 +284,10 @@ async function defaultSoak(config, deps = {}) {
   if (!config.perfRunId) {
     throw new Error('--perf-run-id is required for soak')
   }
-  const runScenario = deps.runScenario || ((options) => defaultRunScenario(config, options))
+  const runScenario = deps.runScenario || ((options) => defaultRunScenario(config, options, deps))
   const run = await runScenario({
     mode: config.mode,
+    perfRunId: config.perfRunId,
     count: 300000,
     concurrency: 100,
   })

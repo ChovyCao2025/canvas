@@ -1,9 +1,13 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
+import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import path from 'node:path'
 
 import {
   assertCapacityReportable,
   commandForCleanup,
+  defaultRunScenario,
   parseGuideArgs,
   runGuide,
 } from './perf-guide.mjs'
@@ -197,6 +201,50 @@ test('threshold direct mode does not forward event secret env', async () => {
   assert.ok(!calls[0][1].includes('--event-secret-env'))
 })
 
+test('threshold forwards database and output directory settings', async () => {
+  const calls = []
+  const result = await runGuide(parseGuideArgs([
+    'threshold',
+    '--mode', 'event',
+    '--mysql', 'mysql8',
+    '--database', 'canvas_perf',
+    '--threshold-root', 'tmp/perf-threshold-custom',
+  ]), {
+    runCommand: (command, args) => {
+      calls.push([command, args])
+      return {
+        status: 0,
+        stdout: JSON.stringify({ verdict: 'MAX_STAGE_STABLE' }),
+        stderr: '',
+      }
+    },
+  })
+
+  assert.equal(result.status, 'PASS')
+  assert.deepEqual(calls[0][1].slice(calls[0][1].indexOf('--mysql'), calls[0][1].indexOf('--mysql') + 2), [
+    '--mysql', 'mysql8',
+  ])
+  assert.deepEqual(calls[0][1].slice(calls[0][1].indexOf('--database'), calls[0][1].indexOf('--database') + 2), [
+    '--database', 'canvas_perf',
+  ])
+  assert.deepEqual(calls[0][1].slice(calls[0][1].indexOf('--out-dir'), calls[0][1].indexOf('--out-dir') + 2), [
+    '--out-dir', 'tmp/perf-threshold-custom',
+  ])
+})
+
+test('threshold rejects unknown verdict instead of reporting pass', async () => {
+  await assert.rejects(() => runGuide(parseGuideArgs([
+    'threshold',
+    '--mode', 'event',
+  ]), {
+    runCommand: () => ({
+      status: 0,
+      stdout: JSON.stringify({ verdict: 'PARTIAL_JSON' }),
+      stderr: '',
+    }),
+  }), /unknown threshold verdict PARTIAL_JSON/)
+})
+
 test('soak rejects run shorter than minimum duration', async () => {
   const result = await runGuide(parseGuideArgs([
     'soak',
@@ -211,6 +259,76 @@ test('soak rejects run shorter than minimum duration', async () => {
 
   assert.equal(result.status, 'FAIL')
   assert.match(result.reason, /duration/)
+})
+
+test('soak uses original perf run id for reportable evidence', async () => {
+  let scenarioOptions
+  const result = await runGuide(parseGuideArgs([
+    'soak',
+    '--perf-run-id', 'perf_soak_001',
+    '--min-duration-min', '1',
+  ]), {
+    runScenario: async (options) => {
+      scenarioOptions = options
+      return {
+        summary: { durationMs: 60_000, success: 100, failed: 0 },
+        verifier: { verdict: 'PASS' },
+      }
+    },
+  })
+
+  assert.equal(result.status, 'PASS')
+  assert.equal(scenarioOptions.perfRunId, 'perf_soak_001')
+})
+
+test('defaultRunScenario writes verifier evidence under provided perf run id', async () => {
+  const runRoot = mkdtempSync(path.join(tmpdir(), 'perf-guide-'))
+  const calls = []
+
+  try {
+    const result = await defaultRunScenario({
+      baseUrl: 'http://localhost:8080',
+      runRoot,
+      perfRunId: 'perf_soak_001',
+      eventCode: 'PERF_ORDER_PAID',
+      eventSecretEnv: 'PERF_EVENT_SECRET',
+      canvasId: '42',
+      mysql: 'mysql8',
+      database: 'canvas_perf',
+      matchedCanvasCount: 1,
+    }, {
+      mode: 'event',
+      count: 1,
+      concurrency: 1,
+      perfRunId: 'perf_soak_001',
+    }, {
+      runCommand: (command, args) => {
+        calls.push([command, args])
+        if (args[0] === 'tools/perf/perf-runner.mjs') {
+          return {
+            status: 0,
+            stdout: JSON.stringify({ success: 1, failed: 0, durationMs: 60_000 }),
+            stderr: '',
+          }
+        }
+        return {
+          status: 0,
+          stdout: JSON.stringify({ verdict: 'PASS' }),
+          stderr: '',
+        }
+      },
+    })
+
+    assert.equal(result.perfRunId, 'perf_soak_001')
+    assert.equal(calls[0][1][calls[0][1].indexOf('--perf-run-id') + 1], 'perf_soak_001')
+    assert.equal(calls[1][1][calls[1][1].indexOf('--perf-run-id') + 1], 'perf_soak_001')
+    assert.deepEqual(
+      JSON.parse(readFileSync(path.join(runRoot, 'perf_soak_001', 'verifier.json'), 'utf8')),
+      { verdict: 'PASS' },
+    )
+  } finally {
+    rmSync(runRoot, { recursive: true, force: true })
+  }
 })
 
 test('commandForCleanup treats string false as false for programmatic calls', () => {
