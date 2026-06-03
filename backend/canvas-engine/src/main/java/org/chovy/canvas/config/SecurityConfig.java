@@ -3,6 +3,7 @@ package org.chovy.canvas.config;
 import org.chovy.canvas.common.tenant.RoleNames;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.core.env.Environment;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -33,6 +34,12 @@ public class SecurityConfig {
             RoleNames.TENANT_ADMIN,
             RoleNames.OPERATOR
     };
+    static final String[] DOCUMENTATION_ROUTES = {
+            "/swagger-ui.html",
+            "/swagger-ui/**",
+            "/v3/api-docs/**",
+            "/webjars/**"
+    };
 
     /** 密码编码器（BCrypt）。 */
     @Bean
@@ -43,7 +50,7 @@ public class SecurityConfig {
     /** 主安全过滤链。 */
     @Bean
     public SecurityWebFilterChain securityWebFilterChain(
-            ServerHttpSecurity http, JwtAuthFilter jwtAuthFilter) {
+            ServerHttpSecurity http, JwtAuthFilter jwtAuthFilter, Environment environment) {
 
         return http
                 // API 服务不依赖浏览器表单态，关闭有状态防护入口后统一走 JWT。
@@ -59,13 +66,16 @@ public class SecurityConfig {
                     var buffer = response.bufferFactory().wrap(body.getBytes());
                     return response.writeWith(Mono.just(buffer));
                 }))
-                .authorizeExchange(ex -> ex
+                .authorizeExchange(ex -> {
                         // 公开接口
-                        .pathMatchers("/auth/login").permitAll()
-                        .pathMatchers("/swagger-ui.html", "/swagger-ui/**",
-                                "/v3/api-docs/**", "/webjars/**").permitAll()
+                        ex.pathMatchers("/auth/login").permitAll();
+                        if (publicDocumentationEnabled(environment)) {
+                            ex.pathMatchers(DOCUMENTATION_ROUTES).permitAll();
+                        } else {
+                            ex.pathMatchers(DOCUMENTATION_ROUTES).hasAnyRole(SUPER_ADMIN_ROUTE_ROLES);
+                        }
                         // OpenAPI：事件上报无需登录（业务系统直接调用）
-                        .pathMatchers(HttpMethod.POST, "/canvas/events/report").permitAll()
+                        ex.pathMatchers(HttpMethod.POST, "/canvas/events/report").permitAll()
                         // OpenAPI：直调执行无需登录（业务系统直接调用，内网不对外暴露）
                         .pathMatchers(HttpMethod.POST, "/canvas/execute/direct/*").permitAll()
                         // OpenAPI：行为触发无需登录（业务系统直接调用，内网不对外暴露）
@@ -99,10 +109,14 @@ public class SecurityConfig {
                         // 管理员接口
                         .pathMatchers("/admin/**").hasAnyRole(TENANT_ADMIN_ROUTE_ROLES)
                         // 其余接口需要登录
-                        .anyExchange().authenticated()
-                )
+                        .anyExchange().authenticated();
+                })
                 // JWT 过滤器必须位于认证阶段，先解析身份再进入后续授权判断。
                 .addFilterAt(jwtAuthFilter, SecurityWebFiltersOrder.AUTHENTICATION)
                 .build();
+    }
+
+    static boolean publicDocumentationEnabled(Environment environment) {
+        return !ProductionSecurityValidator.isProductionLike(environment);
     }
 }
