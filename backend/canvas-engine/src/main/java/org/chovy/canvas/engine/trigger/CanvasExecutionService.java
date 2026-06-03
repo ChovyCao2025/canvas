@@ -126,6 +126,10 @@ public class CanvasExecutionService {
     @org.springframework.beans.factory.annotation.Value("${canvas.execution.max-concurrency:3000}")
     private int globalMaxConcurrency;
 
+    /** 单画布最大并发执行数，防止热点画布占满全部全局 slot。 */
+    @org.springframework.beans.factory.annotation.Value("${canvas.execution.per-canvas-max-concurrent:50}")
+    private int perCanvasMaxConcurrent = 50;
+
 // ── 启动校验 ──────────────────────────────────────────────────
 
     /**
@@ -933,9 +937,9 @@ public class CanvasExecutionService {
         TriggerPriorityConfig.Priority priority = priorityConfig.of(triggerType);
         // ⚠️ 分布式注意：activeCount 仅统计本 JVM 内的活跃执行
         int active = executionRegistry.activeCount(canvasId);
-        // Fix 5: maxTotalExecutions 仅用于总触发量配额，不再作为并发上限
-        // 并发上限统一由 canvas.execution.max-concurrency（globalMaxConcurrency）控制
-        int maxConc = globalMaxConcurrency;
+        // Fix 5: maxTotalExecutions 仅用于总触发量配额，不再作为并发上限。
+        // 画布维度使用独立准入上限，避免单画布占满全部全局 slot。
+        int maxConc = Math.min(perCanvasMaxConcurrent, globalMaxConcurrency);
 
         // HIGH 优先级：超限仅告警，不拒绝（不能让高优先级任务被低优先级挤死）
         if (priority == TriggerPriorityConfig.Priority.HIGH) {
@@ -944,8 +948,8 @@ public class CanvasExecutionService {
                 log.error("[ENGINE] HIGH优先级超并发告警 canvasId={} active={}/{}",
                         canvasId, active, highMax);
             }
-            // 返回全局上限，后续 tryAcquireSlot 仍会做最终卡口
-            return AdmissionResult.granted(globalMaxConcurrency);
+            // 返回画布上限，后续 tryAcquireSlot 仍会做 lane/global 最终卡口
+            return AdmissionResult.granted(maxConc);
         }
 
         // LOW 优先级生效上限（= maxConc × lowRatio），NORMAL 使用 maxConc
