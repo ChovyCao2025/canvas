@@ -5,13 +5,17 @@ import org.chovy.canvas.common.enums.NodeType;
 import org.chovy.canvas.common.enums.TriggerType;
 import org.chovy.canvas.dal.dataobject.CanvasExecutionRequestDO;
 import org.chovy.canvas.dal.mapper.CanvasExecutionRequestMapper;
+import org.chovy.canvas.engine.lifecycle.ExecutionLifecycleException;
+import org.chovy.canvas.engine.lifecycle.ExecutionLifecycleGate;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -85,5 +89,20 @@ class CanvasExecutionRequestServiceTest {
         assertThat(first).startsWith("mq-10-");
         assertThat(second).startsWith("mq-10-");
         assertThat(second).isNotEqualTo(first);
+    }
+
+    @Test
+    void enqueueRejectsNewRequestsAfterLifecycleGateStopsAcceptingWork() {
+        CanvasExecutionRequestMapper mapper = mock(CanvasExecutionRequestMapper.class);
+        ExecutionLifecycleGate gate = new ExecutionLifecycleGate();
+        CanvasExecutionRequestService service = new CanvasExecutionRequestService(mapper, new ObjectMapper(), gate);
+        gate.beginShutdown();
+
+        assertThatThrownBy(() -> service.enqueue(10L, "user-7", TriggerType.MQ, NodeType.MQ_TRIGGER,
+                "order.paid", Map.of(), "MSG-1"))
+                .isInstanceOf(ExecutionLifecycleException.class)
+                .hasMessageContaining("execution-request:MQ");
+
+        verify(mapper, never()).insertIgnore(org.mockito.Mockito.any());
     }
 }

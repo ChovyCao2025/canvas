@@ -4,6 +4,8 @@ import com.lmax.disruptor.InsufficientCapacityException;
 import com.lmax.disruptor.RingBuffer;
 import org.chovy.canvas.engine.scheduler.CanvasMetrics;
 import org.chovy.canvas.engine.request.CanvasExecutionRequestExecutor;
+import org.chovy.canvas.engine.lifecycle.ExecutionLifecycleException;
+import org.chovy.canvas.engine.lifecycle.ExecutionLifecycleGate;
 import org.chovy.canvas.engine.reactive.BackgroundSubscriptionRegistry;
 import org.chovy.canvas.engine.trigger.CanvasExecutionService;
 import org.junit.jupiter.api.AfterEach;
@@ -97,6 +99,59 @@ class CanvasDisruptorServiceTest {
 
         verify(ringBuffer).publish(0L);
         verify(metrics).recordDisruptorPublished("REQUEST");
+    }
+
+    @Test
+    void publishRejectsNewCanvasEventsAfterLifecycleGateStopsAcceptingWork() throws Exception {
+        CanvasMetrics metrics = mock(CanvasMetrics.class);
+        ExecutionLifecycleGate gate = new ExecutionLifecycleGate();
+        service = new CanvasDisruptorService(
+                mock(CanvasExecutionService.class),
+                mock(CanvasExecutionRequestExecutor.class),
+                metrics,
+                1024,
+                1,
+                new BackgroundSubscriptionRegistry(),
+                gate);
+        gate.beginShutdown();
+
+        @SuppressWarnings("unchecked")
+        RingBuffer<CanvasExecutionEvent> ringBuffer = mock(RingBuffer.class);
+        ReflectionTestUtils.setField(service, "ringBuffer", ringBuffer);
+
+        assertThatThrownBy(() -> service.publish(
+                1L, "user-1", "MQ", "MQ_TRIGGER", "order.paid", Map.of(), "msg-1"))
+                .isInstanceOf(ExecutionLifecycleException.class)
+                .hasMessageContaining("disruptor:MQ");
+
+        verify(ringBuffer, never()).tryNext();
+        verify(metrics, never()).recordDisruptorPublished("MQ");
+    }
+
+    @Test
+    void publishRequestRejectsNewPersistentRequestsAfterLifecycleGateStopsAcceptingWork() throws Exception {
+        CanvasMetrics metrics = mock(CanvasMetrics.class);
+        ExecutionLifecycleGate gate = new ExecutionLifecycleGate();
+        service = new CanvasDisruptorService(
+                mock(CanvasExecutionService.class),
+                mock(CanvasExecutionRequestExecutor.class),
+                metrics,
+                1024,
+                1,
+                new BackgroundSubscriptionRegistry(),
+                gate);
+        gate.beginShutdown();
+
+        @SuppressWarnings("unchecked")
+        RingBuffer<CanvasExecutionEvent> ringBuffer = mock(RingBuffer.class);
+        ReflectionTestUtils.setField(service, "ringBuffer", ringBuffer);
+
+        assertThatThrownBy(() -> service.publishRequest("req-1"))
+                .isInstanceOf(ExecutionLifecycleException.class)
+                .hasMessageContaining("disruptor:REQUEST");
+
+        verify(ringBuffer, never()).tryNext();
+        verify(metrics, never()).recordDisruptorPublished("REQUEST");
     }
 
     @Test

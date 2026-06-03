@@ -33,6 +33,7 @@ import org.chovy.canvas.engine.handlers.MqTriggerHandler;
 import org.chovy.canvas.engine.lane.ExecutionLane;
 import org.chovy.canvas.engine.lane.ExecutionLaneAdmissionResult;
 import org.chovy.canvas.engine.lane.ExecutionLaneResolver;
+import org.chovy.canvas.engine.lifecycle.ExecutionLifecycleGate;
 import org.chovy.canvas.engine.scheduler.DagEngine;
 import org.chovy.canvas.infrastructure.cache.CanvasConfigCache;
 import org.chovy.canvas.infrastructure.cache.CanvasEntityCache;
@@ -116,6 +117,8 @@ public class CanvasExecutionService {
     private final Snowflake snowflake;
     /** 后台任务执行器，用于最终一致统计写入等旁路任务。 */
     private final BackgroundTaskExecutor backgroundTaskExecutor;
+    /** 执行生命周期闸门，用于 shutdown 后拒绝新触发并统计在途执行。 */
+    private final ExecutionLifecycleGate lifecycleGate;
 
     /** 执行上下文在 Redis 中的保留秒数。 */
     @Value("${canvas.execution.context-ttl-sec:86400}")
@@ -181,7 +184,7 @@ public class CanvasExecutionService {
     public Mono<Map<String, Object>> triggerDryRun(
             Long canvasId, String userId,
             Map<String, Object> payload, String graphJson) {
-        return Mono.fromCallable(() -> {
+        Mono<Map<String, Object>> execution = Mono.fromCallable(() -> {
                     CanvasDO canvas = canvasMapper.selectById(canvasId);
                     if (canvas == null) throw new IllegalStateException("画布不存在: " + canvasId);
 
@@ -205,7 +208,7 @@ public class CanvasExecutionService {
                     if (triggerNodeId == null)
                         throw new IllegalStateException("画布没有入口节点，请确保存在触发器节点");
 
-                    return Map.of(
+                    return Map.<String, Object>of(
                             MapFieldKeys.CTX, ctx,
                             MapFieldKeys.GRAPH, graph,
                             MapFieldKeys.TRIGGER_NODE_ID, triggerNodeId);
@@ -242,6 +245,7 @@ public class CanvasExecutionService {
                                                 .thenReturn(resp);
                                     }));
                 });
+        return lifecycleGate.guard("canvas-trigger:" + TriggerType.DRY_RUN, execution);
     }
 
     /**
@@ -252,7 +256,7 @@ public class CanvasExecutionService {
             String triggerNodeType, String matchKey,
             Map<String, Object> payload, String msgId, boolean dryRun) {
         return triggerInternal(canvasId, userId, triggerType, triggerNodeType, matchKey,
-                payload, msgId, dryRun, false, 0, false, 0, null, null);
+                payload, msgId, dryRun, false, 0, false, 0, null, null, false);
     }
 
     /**
@@ -275,7 +279,7 @@ public class CanvasExecutionService {
             Map<String, Object> payload, String msgId,
             int priorAttemptCount, String lastError) {
         return triggerInternal(canvasId, userId, triggerType, triggerNodeType, matchKey,
-                payload, msgId, false, false, 0, true, priorAttemptCount, lastError, null);
+                payload, msgId, false, false, 0, true, priorAttemptCount, lastError, null, true);
     }
 
     /**
@@ -315,7 +319,7 @@ public class CanvasExecutionService {
                 ? dispatchOptions.getOverflowChainRetryCount()
                 : 0;
         return triggerInternal(canvasId, userId, triggerType, triggerNodeType, matchKey,
-                payload, msgId, false, overflowRetry, overflowChainRetryCount, false, 0, null, executionLane);
+                payload, msgId, false, overflowRetry, overflowChainRetryCount, false, 0, null, executionLane, true);
     }
 
     /** 统一触发入口，串联准备阶段和执行阶段的响应式流程。 */
@@ -325,8 +329,9 @@ public class CanvasExecutionService {
             Map<String, Object> payload, String msgId, boolean dryRun,
             boolean overflowRetry, int overflowChainRetryCount,
             boolean persistentRequest, int priorAttemptCount, String lastError,
-            ExecutionLane executionLaneOverride) {
-        return Mono.fromCallable(() ->
+            ExecutionLane executionLaneOverride,
+            boolean admissionAlreadyAccepted) {
+        Mono<Map<String, Object>> execution = Mono.fromCallable(() ->
                         // 校验与准备
                         prepareExecution(
                                 canvasId, userId, triggerType,
@@ -339,6 +344,14 @@ public class CanvasExecutionService {
                 .flatMap(
                         // 执行阶段
                         prep -> executeFromPrep(canvasId, userId, dryRun, prep));
+        String source = "canvas-trigger:" + normalizeTriggerSource(triggerType);
+        return admissionAlreadyAccepted
+                ? lifecycleGate.trackAccepted(source, execution)
+                : lifecycleGate.guard(source, execution);
+    }
+
+    private String normalizeTriggerSource(String triggerType) {
+        return triggerType == null || triggerType.isBlank() ? "UNKNOWN" : triggerType;
     }
 
     /**

@@ -2,10 +2,11 @@ package org.chovy.canvas.engine.request;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import lombok.RequiredArgsConstructor;
 import org.chovy.canvas.dal.dataobject.CanvasExecutionRequestDO;
 import org.chovy.canvas.dal.mapper.CanvasExecutionRequestMapper;
+import org.chovy.canvas.engine.lifecycle.ExecutionLifecycleGate;
 import org.chovy.canvas.perf.PerfRunContext;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.nio.charset.StandardCharsets;
@@ -21,13 +22,28 @@ import java.util.UUID;
  * <p>该层位于触发入口和 DAG 执行之间，核心目标是保护执行引擎稳定性。
  */
 @Service
-@RequiredArgsConstructor
 public class CanvasExecutionRequestService {
 
     /** 执行请求 Mapper，用于落库排队请求并支持幂等插入。 */
     private final CanvasExecutionRequestMapper mapper;
     /** Jackson ObjectMapper，用于 JSON 序列化和反序列化。 */
     private final ObjectMapper objectMapper;
+    /** 执行生命周期闸门，用于 shutdown 后拒绝新请求入队。 */
+    private final ExecutionLifecycleGate lifecycleGate;
+
+    public CanvasExecutionRequestService(CanvasExecutionRequestMapper mapper,
+                                         ObjectMapper objectMapper) {
+        this(mapper, objectMapper, new ExecutionLifecycleGate());
+    }
+
+    @Autowired
+    public CanvasExecutionRequestService(CanvasExecutionRequestMapper mapper,
+                                         ObjectMapper objectMapper,
+                                         ExecutionLifecycleGate lifecycleGate) {
+        this.mapper = mapper;
+        this.objectMapper = objectMapper;
+        this.lifecycleGate = lifecycleGate;
+    }
 
     /** 将触发请求写入执行请求表，供异步派发。 */
     public String enqueue(Long canvasId,
@@ -37,6 +53,7 @@ public class CanvasExecutionRequestService {
                           String matchKey,
                           Map<String, Object> payload,
                           String sourceMsgId) {
+        lifecycleGate.ensureAccepting("execution-request:" + normalizeSource(triggerType));
         String requestId = buildRequestId(canvasId, triggerType, sourceMsgId);
         CanvasExecutionRequestDO request = new CanvasExecutionRequestDO();
         request.setId(requestId);
@@ -67,6 +84,10 @@ public class CanvasExecutionRequestService {
         }
         String raw = prefix + ":" + canvasId + ":" + sourceMsgId;
         return prefix + "-" + canvasId + "-" + sha256(raw).substring(0, 24);
+    }
+
+    private String normalizeSource(String triggerType) {
+        return triggerType == null || triggerType.isBlank() ? "UNKNOWN" : triggerType;
     }
 
     /** 计算 SHA-256 十六进制摘要，用于稳定生成幂等请求后缀。 */
