@@ -6,6 +6,12 @@ Date: 2026-06-03
 
 This folder contains filtered, execution-oriented todo documents extracted from the original `docs/product-evolution` research and strategy files. Original source documents are archived under `../archive/2026-06-03/` after processing.
 
+## Implementation Planning
+
+- [Implementation Order](../IMPLEMENTATION_ORDER.md) lists the spec and plan files in execution order.
+- [Specs Index](../specs/INDEX.md) contains one spec per ordered capability or opportunity.
+- [Plans Index](../plans/INDEX.md) contains the matching implementation plans using the `superpowers:writing-plans` structure.
+
 ## Priority Model
 
 | Priority | Meaning |
