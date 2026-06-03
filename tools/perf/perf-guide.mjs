@@ -129,8 +129,8 @@ export function assertCapacityReportable(verifier, { reportType }) {
 }
 
 function requireNumericEvidence(value, field) {
-  if (typeof value !== 'number' || !Number.isFinite(value)) {
-    throw new Error(`runner summary field ${field} must be numeric`)
+  if (typeof value !== 'number' || !Number.isSafeInteger(value) || value < 0) {
+    throw new Error(`runner summary field ${field} must be a non-negative integer`)
   }
   return value
 }
@@ -141,6 +141,9 @@ export function assertRunnerSummaryComplete(summary, { perfRunId = '' } = {}) {
   }
   if (perfRunId && summary.perfRunId !== perfRunId) {
     throw new Error(`runner summary perfRunId ${summary.perfRunId || '(missing)'} does not match ${perfRunId}`)
+  }
+  if (summary.sent !== summary.success + summary.failed) {
+    throw new Error('runner summary sent must equal success plus failed')
   }
 }
 
@@ -323,8 +326,8 @@ async function defaultThreshold(config, deps = {}) {
     throw new Error(`unknown threshold verdict ${result.verdict}`)
   }
   return {
-    status: statuses.get(result.verdict),
     ...result,
+    status: statuses.get(result.verdict),
   }
 }
 

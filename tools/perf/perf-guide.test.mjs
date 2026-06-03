@@ -101,7 +101,7 @@ test('assertRunnerReportable rejects missing numeric runner evidence', () => {
     reportType: 'capacity',
     minDurationMin: 30,
     perfRunId: 'perf_report_001',
-  }), /sent must be numeric/)
+  }), /sent must be a non-negative integer/)
 })
 
 test('assertRunnerReportable rejects mismatched run id', () => {
@@ -126,7 +126,31 @@ test('assertRunnerSummaryComplete rejects missing failed evidence', () => {
     durationMs: 1_800_000,
   }, {
     perfRunId: 'perf_report_001',
-  }), /failed must be numeric/)
+  }), /failed must be a non-negative integer/)
+})
+
+test('assertRunnerSummaryComplete rejects inconsistent counters', () => {
+  assert.throws(() => assertRunnerSummaryComplete({
+    perfRunId: 'perf_report_001',
+    sent: 100,
+    success: 90,
+    failed: 0,
+    durationMs: 1_800_000,
+  }, {
+    perfRunId: 'perf_report_001',
+  }), /sent must equal success plus failed/)
+})
+
+test('assertRunnerSummaryComplete rejects negative counters', () => {
+  assert.throws(() => assertRunnerSummaryComplete({
+    perfRunId: 'perf_report_001',
+    sent: 100,
+    success: 101,
+    failed: -1,
+    durationMs: 1_800_000,
+  }, {
+    perfRunId: 'perf_report_001',
+  }), /failed must be a non-negative integer/)
 })
 
 test('commandForCleanup defaults to ledger dry run', () => {
@@ -265,7 +289,7 @@ test('smoke fails closed when runner summary is incomplete', async () => {
       summary: { perfRunId: 'perf_smoke_001_direct', sent: 50, success: 50, durationMs: 1000 },
       verifier: { verdict: 'PASS' },
     }),
-  }), /failed must be numeric/)
+  }), /failed must be a non-negative integer/)
 })
 
 test('threshold delegates to threshold-runner with event secret env', async () => {
@@ -358,6 +382,21 @@ test('threshold rejects unknown verdict instead of reporting pass', async () => 
   }), /unknown threshold verdict PARTIAL_JSON/)
 })
 
+test('threshold guide status cannot be overwritten by child JSON', async () => {
+  const result = await runGuide(parseGuideArgs([
+    'threshold',
+    '--mode', 'event',
+  ]), {
+    runCommand: () => ({
+      status: 0,
+      stdout: JSON.stringify({ verdict: 'NO_STABLE_STAGE', status: 'PASS' }),
+      stderr: '',
+    }),
+  })
+
+  assert.equal(result.status, 'FAIL')
+})
+
 test('soak rejects run shorter than minimum duration', async () => {
   const result = await runGuide(parseGuideArgs([
     'soak',
@@ -400,7 +439,7 @@ test('soak fails closed when runner summary is incomplete', async () => {
       summary: { perfRunId: 'perf_soak_001', sent: 300000, success: 300000, durationMs: 1_800_000 },
       verifier: { verdict: 'PASS' },
     }),
-  }), /failed must be numeric/)
+  }), /failed must be a non-negative integer/)
 })
 
 test('soak uses original perf run id for reportable evidence', async () => {
@@ -595,7 +634,7 @@ test('report rejects stale verifier evidence with mismatched sent success', asyn
   try {
     writeJson(path.join(runRoot, 'perf_report_005', 'runner-summary.json'), {
       perfRunId: 'perf_report_005',
-      sent: 100,
+      sent: 90,
       success: 90,
       failed: 0,
       durationMs: 60_000,
