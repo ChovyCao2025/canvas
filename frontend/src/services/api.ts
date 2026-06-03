@@ -17,7 +17,19 @@ import type { HomeOverview } from '../pages/home/homeOverview'
  * 统一 HTTP 客户端。
  * 约定：后端统一返回 R<T> 包装，调用方直接拿到解包后的对象。
  */
-const http = axios.create({ baseURL: '/' })
+export const http = axios.create({ baseURL: '/' })
+
+/** 后端业务错误；HTTP 200 但 R.code 非 0 时抛出。 */
+export class ApiBusinessError extends Error {
+  constructor(
+    public readonly code: number,
+    message?: string,
+    public readonly data?: unknown,
+  ) {
+    super(message || `API business error: ${code}`)
+    this.name = 'ApiBusinessError'
+  }
+}
 
 // 请求拦截：自动带 JWT token
 http.interceptors.request.use((config) => {
@@ -30,8 +42,17 @@ http.interceptors.request.use((config) => {
 // 响应拦截：解包 R<T>；401 跳转登录
 http.interceptors.response.use(
   // 后端返回结构统一为 { code, message, data }
-  // 这里直接返回 res.data，业务侧不需要每次再写一次 .data
-  (res) => res.data,
+  // 这里保留 R<T> 包装，业务侧继续通过 res.data 读取载荷。
+  (res) => {
+    const payload = res.data
+    if (payload && typeof payload === 'object' && 'code' in payload) {
+      const wrapped = payload as { code?: unknown; message?: string; data?: unknown }
+      if (wrapped.code !== 0) {
+        return Promise.reject(new ApiBusinessError(Number(wrapped.code), wrapped.message, wrapped.data))
+      }
+    }
+    return payload
+  },
   (err) => {
     if (err.response?.status === 401) {
       // token 失效后强制回到登录页，避免页面在无权限状态下继续操作
