@@ -1,6 +1,7 @@
 package org.chovy.canvas.engine.handlers;
 
 import org.chovy.canvas.common.MapFieldKeys;
+import org.chovy.canvas.engine.concurrent.BackgroundTaskExecutor;
 import org.chovy.canvas.engine.context.ExecutionContext;
 import org.chovy.canvas.engine.handler.NodeHandler;
 import org.chovy.canvas.engine.handler.NodeHandlerType;
@@ -39,6 +40,8 @@ public class GroovyHandler implements NodeHandler {
 
     /** Groovy 脚本编译缓存，避免运行时重复编译脚本。 */
     private final GroovyScriptCache scriptCache;
+    /** 后台任务执行器，用于隔离脚本运行和超时控制。 */
+    private final BackgroundTaskExecutor backgroundTaskExecutor;
 
     /** Groovy 脚本单次执行超时时间，单位毫秒。 */
     @Value("${canvas.groovy.timeout-ms:5000}")
@@ -53,9 +56,6 @@ public class GroovyHandler implements NodeHandler {
 
     /** GroovyShell 对象池，用于复用安全沙箱配置。 */
     private BlockingQueue<groovy.lang.GroovyShell> shellPool;
-
-    /** 虚拟线程执行器，用于隔离脚本运行和超时控制。 */
-    private final ExecutorService vte = Executors.newVirtualThreadPerTaskExecutor();
 
     /**
      * 注册、调度或初始化 init 相关的业务数据。
@@ -169,7 +169,7 @@ public class GroovyHandler implements NodeHandler {
             String cacheKey = ctx.getCanvasId() + ":__groovy__:" + GroovyScriptCache.hash(code);
 
             // 脚本放到虚拟线程里执行，主响应式链路只等待 Future 结果和超时。
-            Future<Object> future = vte.submit(() -> {
+            Future<Object> future = backgroundTaskExecutor.submit("groovy-script-" + ctx.getExecutionId(), () -> {
                 Script script = scriptCache.getOrCompile(cacheKey, code, finalShell);
                 script.setBinding(binding);
                 return script.run();

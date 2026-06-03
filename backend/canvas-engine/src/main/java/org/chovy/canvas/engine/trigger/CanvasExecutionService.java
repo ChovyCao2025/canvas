@@ -20,6 +20,7 @@ import org.chovy.canvas.common.enums.ExecutionStatus;
 import org.chovy.canvas.common.enums.NodeType;
 import org.chovy.canvas.common.enums.TriggerType;
 import org.chovy.canvas.domain.cdp.CdpUserService;
+import org.chovy.canvas.engine.concurrent.BackgroundTaskExecutor;
 import org.chovy.canvas.dal.dataobject.CanvasExecutionDO;
 import org.chovy.canvas.dal.dataobject.CanvasExecutionDlqDO;
 import org.chovy.canvas.dal.mapper.CanvasExecutionDlqMapper;
@@ -113,6 +114,8 @@ public class CanvasExecutionService {
     private final RedisKeyUtil redisKeys;
     /** 雪花 ID 生成器。 */
     private final Snowflake snowflake;
+    /** 后台任务执行器，用于最终一致统计写入等旁路任务。 */
+    private final BackgroundTaskExecutor backgroundTaskExecutor;
 
     /** 执行上下文在 Redis 中的保留秒数。 */
     @Value("${canvas.execution.context-ttl-sec:86400}")
@@ -1389,7 +1392,7 @@ public class CanvasExecutionService {
 
     /** 异步累加画布每日执行统计，失败不影响主执行链路。 */
     private void incrementStats(Long canvasId, int finalStatus, String userId) {
-        Thread.ofVirtual().start(() -> {
+        backgroundTaskExecutor.submitBestEffort("execution-stats-" + canvasId, () -> {
             try {
                 statsMapper.upsertDailyIncrement(canvasId, java.time.LocalDate.now(), finalStatus);
             } catch (Exception e) {

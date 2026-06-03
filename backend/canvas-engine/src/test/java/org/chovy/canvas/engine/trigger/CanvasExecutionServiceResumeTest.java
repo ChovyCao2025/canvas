@@ -7,6 +7,7 @@ import org.chovy.canvas.config.ExecutionLaneProperties;
 import org.chovy.canvas.dal.dataobject.CanvasExecutionDO;
 import org.chovy.canvas.dal.mapper.CanvasExecutionMapper;
 import org.chovy.canvas.domain.cdp.CdpUserService;
+import org.chovy.canvas.engine.concurrent.BackgroundTaskExecutor;
 import org.chovy.canvas.engine.dag.DagParser;
 import org.chovy.canvas.engine.disruptor.CanvasDisruptorService;
 import org.chovy.canvas.engine.handlers.MqTriggerHandler;
@@ -102,6 +103,7 @@ class CanvasExecutionServiceResumeTest {
                 mock(CanvasDisruptorService.class),
                 mock(org.springframework.data.redis.core.StringRedisTemplate.class),
                 mock(org.chovy.canvas.infrastructure.redis.RedisKeyUtil.class),
-                new Snowflake(1, 1));
+                new Snowflake(1, 1),
+                mock(BackgroundTaskExecutor.class));
     }
 }

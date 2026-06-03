@@ -12,6 +12,7 @@ import org.chovy.canvas.engine.audience.AudienceBatchComputeService;
 import org.chovy.canvas.engine.audience.AudienceComputeTaskRunner;
 import org.chovy.canvas.engine.audience.AudienceSchedulerService;
 import org.chovy.canvas.engine.audience.CdpAudienceSourceService;
+import org.chovy.canvas.engine.concurrent.BackgroundTaskExecutor;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
@@ -51,6 +52,8 @@ class AudienceControllerTaskTest {
     private NotificationService notificationService;
     @Mock
     private CdpAudienceSourceService cdpAudienceSourceService;
+    @Mock
+    private BackgroundTaskExecutor backgroundTaskExecutor;
 
     @Test
     void compute_returnsTaskIdAndStartsRunnerWhenTaskCreated() {
@@ -249,7 +252,8 @@ class AudienceControllerTaskTest {
                 taskService,
                 runner,
                 notificationService,
-                cdpAudienceSourceService);
+                cdpAudienceSourceService,
+                backgroundTaskExecutor);
     }
 
     private AudienceDefinitionDO audience(Long id, String name) {

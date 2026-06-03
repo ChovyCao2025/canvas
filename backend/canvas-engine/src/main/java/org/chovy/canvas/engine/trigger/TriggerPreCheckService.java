@@ -7,6 +7,7 @@ import org.chovy.canvas.dal.dataobject.CanvasDO;
 import org.chovy.canvas.dal.mapper.CanvasMapper;
 import org.chovy.canvas.dal.dataobject.CanvasUserQuotaDO;
 import org.chovy.canvas.dal.mapper.CanvasUserQuotaMapper;
+import org.chovy.canvas.engine.concurrent.BackgroundTaskExecutor;
 import org.springframework.data.redis.core.Cursor;
 import org.springframework.data.redis.core.ScanOptions;
 import org.springframework.data.redis.core.StringRedisTemplate;
@@ -56,6 +57,8 @@ public class TriggerPreCheckService {
     private final CanvasUserQuotaMapper quotaMapper;
     /** 阻塞式 Redis 模板，用于锁、去重、票据或跨实例通知。 */
     private final StringRedisTemplate redis;
+    /** 后台任务执行器，用于配额最终一致写入和清理。 */
+    private final BackgroundTaskExecutor backgroundTaskExecutor;
 
     /** 画布全局触发次数 Redis key 模板。 */
     private static final String GLOBAL_COUNT_KEY = "canvas:global_count:";
@@ -256,7 +259,7 @@ public class TriggerPreCheckService {
      * 2. 运营后台统计看板（无需强一致）。
      */
     private void updateQuotaAsync(Long canvasId, String userId) {
-        Thread.ofVirtual().start(() -> {
+        backgroundTaskExecutor.submitBestEffort("quota-update-" + canvasId, () -> {
             try {
                 quotaMapper.upsertUsage(canvasId, userId, LocalDate.now(), LocalDateTime.now());
             } catch (Exception e) {
@@ -291,7 +294,7 @@ public class TriggerPreCheckService {
         log.info("[QUOTA] 已删除全局触发计数 canvasId={}", canvasId);
 
         // 2. 异步 SCAN + DEL 用户总触发量（可能是海量 key，不阻塞调用方）
-        Thread.ofVirtual().start(() -> {
+        backgroundTaskExecutor.submitBestEffort("quota-cleanup-" + canvasId, () -> {
             String pattern = QUOTA_KEY + "total:" + canvasId + ":*";
             ScanOptions options = ScanOptions.scanOptions().match(pattern).count(500).build();
             int deleted = 0;

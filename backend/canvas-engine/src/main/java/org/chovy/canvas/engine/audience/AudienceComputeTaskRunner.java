@@ -3,6 +3,7 @@ package org.chovy.canvas.engine.audience;
 import lombok.extern.slf4j.Slf4j;
 import org.chovy.canvas.domain.notification.NotificationService;
 import org.chovy.canvas.domain.task.AsyncTaskService;
+import org.chovy.canvas.engine.concurrent.BackgroundTaskExecutor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -37,6 +38,8 @@ public class AudienceComputeTaskRunner {
     private final Duration lockRetryDelay;
     /** 人群计算锁重试等待策略。 */
     private final LockRetryWaiter lockRetryWaiter;
+    /** 后台任务执行器，用于异步人群计算任务。 */
+    private final BackgroundTaskExecutor backgroundTaskExecutor;
 
     /**
      * 构造 AudienceComputeTaskRunner 实例，并根据入参初始化依赖、配置或内部状态。
@@ -51,9 +54,20 @@ public class AudienceComputeTaskRunner {
     public AudienceComputeTaskRunner(
             AudienceBatchComputeService computeService,
             AsyncTaskService asyncTaskService,
+            NotificationService notificationService,
+            BackgroundTaskExecutor backgroundTaskExecutor
+    ) {
+        this(computeService, asyncTaskService, notificationService, DEFAULT_LOCK_RETRY_DELAY,
+                AudienceComputeTaskRunner::defaultLockRetryWait, backgroundTaskExecutor);
+    }
+
+    AudienceComputeTaskRunner(
+            AudienceBatchComputeService computeService,
+            AsyncTaskService asyncTaskService,
             NotificationService notificationService
     ) {
-        this(computeService, asyncTaskService, notificationService, DEFAULT_LOCK_RETRY_DELAY);
+        this(computeService, asyncTaskService, notificationService, DEFAULT_LOCK_RETRY_DELAY,
+                AudienceComputeTaskRunner::defaultLockRetryWait, new BackgroundTaskExecutor());
     }
 
     /**
@@ -73,7 +87,7 @@ public class AudienceComputeTaskRunner {
             Duration lockRetryDelay
     ) {
         this(computeService, asyncTaskService, notificationService, lockRetryDelay,
-                AudienceComputeTaskRunner::defaultLockRetryWait);
+                AudienceComputeTaskRunner::defaultLockRetryWait, new BackgroundTaskExecutor());
     }
 
     AudienceComputeTaskRunner(
@@ -83,11 +97,24 @@ public class AudienceComputeTaskRunner {
             Duration lockRetryDelay,
             LockRetryWaiter lockRetryWaiter
     ) {
+        this(computeService, asyncTaskService, notificationService, lockRetryDelay,
+                lockRetryWaiter, new BackgroundTaskExecutor());
+    }
+
+    AudienceComputeTaskRunner(
+            AudienceBatchComputeService computeService,
+            AsyncTaskService asyncTaskService,
+            NotificationService notificationService,
+            Duration lockRetryDelay,
+            LockRetryWaiter lockRetryWaiter,
+            BackgroundTaskExecutor backgroundTaskExecutor
+    ) {
         this.computeService = computeService;
         this.asyncTaskService = asyncTaskService;
         this.notificationService = notificationService;
         this.lockRetryDelay = lockRetryDelay;
         this.lockRetryWaiter = Objects.requireNonNull(lockRetryWaiter, "lockRetryWaiter");
+        this.backgroundTaskExecutor = Objects.requireNonNull(backgroundTaskExecutor, "backgroundTaskExecutor");
     }
 
     /**
@@ -101,7 +128,8 @@ public class AudienceComputeTaskRunner {
      * @param operator operator 操作人标识
      */
     public void start(String taskId, Long audienceId, String audienceName, String operator) {
-        Thread.ofVirtual().start(() -> runNow(taskId, audienceId, audienceName, operator));
+        backgroundTaskExecutor.submit("audience-compute-" + taskId,
+                () -> runNow(taskId, audienceId, audienceName, operator));
     }
 
     /**

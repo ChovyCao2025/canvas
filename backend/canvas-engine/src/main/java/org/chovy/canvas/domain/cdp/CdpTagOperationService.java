@@ -11,6 +11,7 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import java.util.stream.Collectors;
 import org.chovy.canvas.dal.dataobject.CdpTagOperationDO;
 import org.chovy.canvas.dal.mapper.CdpTagOperationMapper;
+import org.chovy.canvas.engine.concurrent.BackgroundTaskExecutor;
 
 /**
  * CDP 标签操作 CDP 领域服务。
@@ -26,6 +27,8 @@ public class CdpTagOperationService {
     private final CdpTagOperationMapper operationMapper;
     /** CDP 标签服务。 */
     private final CdpTagService tagService;
+    /** 后台任务执行器，用于批量打标任务。 */
+    private final BackgroundTaskExecutor backgroundTaskExecutor;
 
     /** 创建新记录，并执行必要的唯一性、格式和默认值处理。 */
     public CdpTagOperationDO create(CdpBatchTagReq req) {
@@ -45,7 +48,7 @@ public class CdpTagOperationService {
         operationMapper.insert(op);
 
         // 批量打标可能耗时较长，创建操作记录后交给虚拟线程逐用户执行并回写统计。
-        Thread.ofVirtual().start(() -> run(op, userIds, req));
+        backgroundTaskExecutor.submit("cdp-tag-operation-" + op.getId(), () -> run(op, userIds, req));
         return op;
     }
 

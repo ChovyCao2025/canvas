@@ -21,6 +21,7 @@ import org.chovy.canvas.dto.audience.AudiencePreviewReq;
 import org.chovy.canvas.dto.audience.AudiencePreviewResp;
 import org.chovy.canvas.dto.audience.AudienceSourceFieldDTO;
 import org.chovy.canvas.dto.task.ComputeTaskResp;
+import org.chovy.canvas.engine.concurrent.BackgroundTaskExecutor;
 import org.chovy.canvas.engine.audience.AudienceBatchComputeService;
 import org.chovy.canvas.engine.audience.AudienceComputeTaskRunner;
 import org.chovy.canvas.engine.audience.AudienceSchedulerService;
@@ -42,6 +43,7 @@ import reactor.core.scheduler.Schedulers;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.RejectedExecutionException;
 
 /**
  * Audience HTTP 控制器，根路由为 {@code /canvas/audiences}。
@@ -70,6 +72,8 @@ public class AudienceController {
     /** 通知服务，用于发送人群任务通知。 */
     private final NotificationService notificationService;
     private final CdpAudienceSourceService cdpAudienceSourceService;
+    /** 后台任务执行器，用于压测人群计算等旁路任务。 */
+    private final BackgroundTaskExecutor backgroundTaskExecutor;
 
     /** 分页查询人群定义。 */
     @GetMapping
@@ -171,10 +175,14 @@ public class AudienceController {
             String perfInputId = req == null || req.getPerfInputId() == null || req.getPerfInputId().isBlank()
                     ? null
                     : req.getPerfInputId();
-            return Mono.fromRunnable(() -> Thread.ofVirtual().start(
-                            () -> computeService.compute(id, perfRunId, perfInputId)))
+            return Mono.fromCallable(() -> {
+                        backgroundTaskExecutor.submit("audience-perf-compute-" + id,
+                                () -> computeService.compute(id, perfRunId, perfInputId));
+                        return R.ok(new ComputeTaskResp(perfTaskId(perfRunId, perfInputId), "QUEUED"));
+                    })
                     .subscribeOn(Schedulers.boundedElastic())
-                    .thenReturn(R.ok(new ComputeTaskResp(perfTaskId(perfRunId, perfInputId), "QUEUED")));
+                    .onErrorMap(RejectedExecutionException.class,
+                            e -> new IllegalStateException("后台任务队列已满，请稍后重试", e));
         }
 
         return currentUser().flatMap(operator ->

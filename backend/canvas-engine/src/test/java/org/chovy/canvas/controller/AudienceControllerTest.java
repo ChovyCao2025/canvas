@@ -10,6 +10,7 @@ import org.chovy.canvas.engine.audience.AudienceBatchComputeService;
 import org.chovy.canvas.engine.audience.AudienceComputeTaskRunner;
 import org.chovy.canvas.engine.audience.AudienceSchedulerService;
 import org.chovy.canvas.engine.audience.CdpAudienceSourceService;
+import org.chovy.canvas.engine.concurrent.BackgroundTaskExecutor;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -31,24 +32,30 @@ class AudienceControllerTest {
     @Test
     void computePassesPerfRunContextToComputeService() {
         AudienceBatchComputeService computeService = mock(AudienceBatchComputeService.class);
-        AudienceController controller = new AudienceController(
-                mock(AudienceDefinitionMapper.class),
-                mock(AudienceStatMapper.class),
-                computeService,
-                mock(AudienceSchedulerService.class),
-                mock(AsyncTaskService.class),
-                mock(AudienceComputeTaskRunner.class),
-                mock(NotificationService.class),
-                mock(CdpAudienceSourceService.class)
-        );
-        AudienceController.ComputeReq req = new AudienceController.ComputeReq();
-        req.setPerfRunId("perf_20260523_001");
-        req.setPerfInputId("perf_20260523_001:audience:1");
+        BackgroundTaskExecutor backgroundTaskExecutor = new BackgroundTaskExecutor();
+        try {
+            AudienceController controller = new AudienceController(
+                    mock(AudienceDefinitionMapper.class),
+                    mock(AudienceStatMapper.class),
+                    computeService,
+                    mock(AudienceSchedulerService.class),
+                    mock(AsyncTaskService.class),
+                    mock(AudienceComputeTaskRunner.class),
+                    mock(NotificationService.class),
+                    mock(CdpAudienceSourceService.class),
+                    backgroundTaskExecutor
+            );
+            AudienceController.ComputeReq req = new AudienceController.ComputeReq();
+            req.setPerfRunId("perf_20260523_001");
+            req.setPerfInputId("perf_20260523_001:audience:1");
 
-        controller.compute(1L, req).block();
+            controller.compute(1L, req).block();
 
-        verify(computeService, timeout(1_000))
-                .compute(1L, "perf_20260523_001", "perf_20260523_001:audience:1");
+            verify(computeService, timeout(1_000))
+                    .compute(1L, "perf_20260523_001", "perf_20260523_001:audience:1");
+        } finally {
+            backgroundTaskExecutor.shutdown();
+        }
     }
 
     @Test
@@ -88,7 +95,8 @@ class AudienceControllerTest {
                 mock(AsyncTaskService.class),
                 mock(AudienceComputeTaskRunner.class),
                 mock(NotificationService.class),
-                cdpAudienceSourceService
+                cdpAudienceSourceService,
+                mock(BackgroundTaskExecutor.class)
         );
     }
 }

@@ -1,6 +1,7 @@
 package org.chovy.canvas.engine.handlers;
 
 import org.chovy.canvas.engine.context.ExecutionContext;
+import org.chovy.canvas.engine.concurrent.BackgroundTaskExecutor;
 import org.chovy.canvas.engine.handler.NodeResult;
 import org.junit.jupiter.api.Test;
 import org.springframework.test.util.ReflectionTestUtils;
@@ -20,23 +21,28 @@ class GroovyHandlerValidationTest {
 
     @Test
     void validate_rules_are_applied_to_script_output() {
-        GroovyHandler handler = new GroovyHandler(new GroovyScriptCache());
-        handler.init();
-        ReflectionTestUtils.setField(handler, "timeoutMs", 1000L);
-        ReflectionTestUtils.setField(handler, "maxOutputKb", 64);
-        ExecutionContext ctx = new ExecutionContext();
-        ctx.setCanvasId(1L);
-        ctx.setExecutionId("exec_1");
+        BackgroundTaskExecutor backgroundTaskExecutor = new BackgroundTaskExecutor();
+        try {
+            GroovyHandler handler = new GroovyHandler(new GroovyScriptCache(), backgroundTaskExecutor);
+            handler.init();
+            ReflectionTestUtils.setField(handler, "timeoutMs", 1000L);
+            ReflectionTestUtils.setField(handler, "maxOutputKb", 64);
+            ExecutionContext ctx = new ExecutionContext();
+            ctx.setCanvasId(1L);
+            ctx.setExecutionId("exec_1");
 
-        NodeResult result = handler.executeAsync(Map.of(
-                "code", "return [result: true, score: 5]",
-                "validateResult", true,
-                "validateRules", List.of(Map.of(
-                        "field", "score",
-                        "operator", "GT",
-                        "value", "10"))), ctx).block();
+            NodeResult result = handler.executeAsync(Map.of(
+                    "code", "return [result: true, score: 5]",
+                    "validateResult", true,
+                    "validateRules", List.of(Map.of(
+                            "field", "score",
+                            "operator", "GT",
+                            "value", "10"))), ctx).block();
 
-        assertThat(result.success()).isFalse();
-        assertThat(result.errorMessage()).contains("输出校验不通过");
+            assertThat(result.success()).isFalse();
+            assertThat(result.errorMessage()).contains("输出校验不通过");
+        } finally {
+            backgroundTaskExecutor.shutdown();
+        }
     }
 }

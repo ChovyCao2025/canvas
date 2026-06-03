@@ -9,6 +9,7 @@ import org.chovy.canvas.common.PageResult;
 import org.chovy.canvas.common.enums.CanvasStatusEnum;
 import org.chovy.canvas.common.enums.VersionStatus;
 import org.chovy.canvas.dto.*;
+import org.chovy.canvas.engine.concurrent.BackgroundTaskExecutor;
 import org.chovy.canvas.engine.dag.DagGraph;
 import org.chovy.canvas.engine.dag.DagParser;
 import org.chovy.canvas.engine.handlers.GroovyHandler;
@@ -76,6 +77,8 @@ public class CanvasService {
     private final CanvasTransactionService canvasTransactionService;
     /** 示例画布配置属性，控制示例数据展示和过滤。 */
     private final CanvasExamplesProperties examplesProperties;
+    /** 后台任务执行器，用于发布旁路预编译等异步工作。 */
+    private final BackgroundTaskExecutor backgroundTaskExecutor;
 
     /**
      * 创建画布
@@ -536,7 +539,7 @@ public class CanvasService {
      * 异步执行，不阻塞发布流程。
      */
     private void precompileGroovyNodes(Long canvasId, DagGraph graph) {
-        Thread.ofVirtual().start(() -> {
+        backgroundTaskExecutor.submitBestEffort("groovy-precompile-" + canvasId, () -> {
             // 脚本预编译是发布后的旁路优化，失败不应阻塞发布主链路。
             graph.getNodeMap().forEach((nodeId, node) -> {
                 if (!NodeType.GROOVY.equals(node.getType())) return;
