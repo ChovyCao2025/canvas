@@ -128,7 +128,20 @@ export function assertCapacityReportable(verifier, { reportType }) {
   }
 }
 
-export function assertRunnerReportable(summary, { reportType, minDurationMin }) {
+function requireNumericEvidence(value, field) {
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
+    throw new Error(`runner summary field ${field} must be numeric`)
+  }
+  return value
+}
+
+export function assertRunnerReportable(summary, { reportType, minDurationMin, perfRunId = '' }) {
+  for (const field of ['sent', 'success', 'failed', 'durationMs']) {
+    requireNumericEvidence(summary[field], field)
+  }
+  if (perfRunId && summary.perfRunId !== perfRunId) {
+    throw new Error(`runner summary perfRunId ${summary.perfRunId || '(missing)'} does not match ${perfRunId}`)
+  }
   if (failedRequestCount(summary) > 0) {
     throw new Error(`runner reported ${failedRequestCount(summary)} failed request(s); run cannot be reported`)
   }
@@ -370,6 +383,7 @@ async function defaultReport(config) {
   assertRunnerReportable(summary, {
     reportType: config.reportType,
     minDurationMin: config.minDurationMin,
+    perfRunId: config.perfRunId,
   })
   assertCapacityReportable(verifier, { reportType: config.reportType })
   return {

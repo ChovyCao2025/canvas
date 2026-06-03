@@ -64,22 +64,57 @@ test('assertCapacityReportable accepts expected failures for fault report', () =
 
 test('assertRunnerReportable rejects failed runner requests', () => {
   assert.throws(() => assertRunnerReportable({
+    perfRunId: 'perf_report_001',
+    sent: 100,
+    success: 99,
     failed: 1,
     durationMs: 1_800_000,
   }, {
     reportType: 'capacity',
     minDurationMin: 30,
+    perfRunId: 'perf_report_001',
   }), /failed request/)
 })
 
 test('assertRunnerReportable rejects short capacity runs', () => {
   assert.throws(() => assertRunnerReportable({
+    perfRunId: 'perf_report_001',
+    sent: 100,
+    success: 100,
     failed: 0,
     durationMs: 60_000,
   }, {
     reportType: 'capacity',
     minDurationMin: 30,
+    perfRunId: 'perf_report_001',
   }), /duration/)
+})
+
+test('assertRunnerReportable rejects missing numeric runner evidence', () => {
+  assert.throws(() => assertRunnerReportable({
+    perfRunId: 'perf_report_001',
+    success: 100,
+    failed: 0,
+    durationMs: 1_800_000,
+  }, {
+    reportType: 'capacity',
+    minDurationMin: 30,
+    perfRunId: 'perf_report_001',
+  }), /sent must be numeric/)
+})
+
+test('assertRunnerReportable rejects mismatched run id', () => {
+  assert.throws(() => assertRunnerReportable({
+    perfRunId: 'perf_report_other',
+    sent: 100,
+    success: 100,
+    failed: 0,
+    durationMs: 1_800_000,
+  }, {
+    reportType: 'capacity',
+    minDurationMin: 30,
+    perfRunId: 'perf_report_001',
+  }), /does not match/)
 })
 
 test('commandForCleanup defaults to ledger dry run', () => {
@@ -393,6 +428,9 @@ test('report rejects pass verifier when runner has request failures', async () =
 
   try {
     writeJson(path.join(runRoot, 'perf_report_001', 'runner-summary.json'), {
+      perfRunId: 'perf_report_001',
+      sent: 100,
+      success: 99,
       failed: 1,
       durationMs: 1_800_000,
     })
@@ -416,6 +454,9 @@ test('report rejects short capacity runs', async () => {
 
   try {
     writeJson(path.join(runRoot, 'perf_report_002', 'runner-summary.json'), {
+      perfRunId: 'perf_report_002',
+      sent: 100,
+      success: 100,
       failed: 0,
       durationMs: 60_000,
     })
@@ -439,6 +480,9 @@ test('report accepts complete runner and verifier evidence', async () => {
 
   try {
     writeJson(path.join(runRoot, 'perf_report_003', 'runner-summary.json'), {
+      perfRunId: 'perf_report_003',
+      sent: 100,
+      success: 100,
       failed: 0,
       durationMs: 60_000,
     })
