@@ -10,7 +10,7 @@ public enum NodeStatus {
     /** 执行中。 */
     RUNNING,
 
-    /** LOGIC_RELATION / HUB 条件未满足，等待更多上游触发（多阶段执行挂起状态） */
+    /** 汇聚条件未满足，等待更多上游触发（多阶段执行挂起状态） */
     WAITING,
 
     /** 执行成功。 */
@@ -19,15 +19,12 @@ public enum NodeStatus {
     /** 执行失败。 */
     FAILED,
 
-    /** 等待/目标节点超时。 */
+    /** 等待或汇聚节点超时。 */
     TIMEOUT,
 
     /** 被营销授权、抑制名单或策略保护拦截。 */
     SUPPRESSED,
 
-    /** 被策略跳过（如 PRIORITY 未命中）。 */
-    SKIPPED,
-
-    /** PRIORITY 所有分支失败但有 nextNodeId。 */
-    PARTIAL_FAIL   // PRIORITY 所有分支失败但有 nextNodeId
+    /** 未被当前执行路径选中。 */
+    SKIPPED
 }

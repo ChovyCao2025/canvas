@@ -76,26 +76,14 @@ public final class MapFieldKeys {
     /** 等待状态。 */
     public static final String WAIT_STATUS = "waitStatus";
 
-    /** 转移后的旅程ID。 */
-    public static final String TRANSFERRED_JOURNEY_ID = "transferredJourneyId";
-
-    /** 分流路径标识。 */
-    public static final String SPLIT_PATH = "splitPath";
-
     /** MQ发送结果标记。 */
     public static final String MQ_SENT = "mqSent";
 
     /** 标签值。 */
     public static final String TAG_VALUE = "tagValue";
 
-    /** 模板展开标记。 */
-    public static final String TEMPLATE_EXPANDED = "templateExpanded";
-
     /** 事件匹配标记。 */
     public static final String EVENT_MATCHED = "eventMatched";
-
-    /** 推荐结果列表。 */
-    public static final String RECOMMENDATIONS = "recommendations";
 
     /** 提交动作类型。 */
     public static final String ACTION_TYPE = "actionType";
@@ -109,15 +97,6 @@ public final class MapFieldKeys {
     /** 策略放行标记。 */
     public static final String POLICY_ALLOWED = "policyAllowed";
 
-    /** 分组通过标记。 */
-    public static final String GROUP_PASSED = "groupPassed";
-
-    /** AB分组标识。 */
-    public static final String AB_GROUP = "abGroup";
-
-    /** 汇聚完成标记。 */
-    public static final String MERGED = "merged";
-
     /** 人群命中标记。 */
     public static final String AUDIENCE_MATCHED = "audienceMatched";
 
@@ -127,17 +106,8 @@ public final class MapFieldKeys {
     /** 任务ID。 */
     public static final String TASK_ID = "taskId";
 
-    /** API触发标记。 */
-    public static final String API_TRIGGERED = "apiTriggered";
-
     /** 标签变更标记。 */
     public static final String TAGS_CHANGED = "tagsChanged";
-
-    /** 跳转计数。 */
-    public static final String JUMP_COUNT = "jumpCount";
-
-    /** 跳转超限标记。 */
-    public static final String JUMP_EXCEEDED = "jumpExceeded";
 
     /** 渠道可用标记。 */
     public static final String CHANNEL_AVAILABLE = "channelAvailable";
@@ -147,24 +117,6 @@ public final class MapFieldKeys {
 
     /** 画像更新标记。 */
     public static final String PROFILE_UPDATED = "profileUpdated";
-
-    /** 目标达成标记。 */
-    public static final String GOAL_MET = "goalMet";
-
-    /** 评分值。 */
-    public static final String SCORE = "score";
-
-    /** 评分分段。 */
-    public static final String SCORE_BAND = "scoreBand";
-
-    /** 循环迭代次数。 */
-    public static final String LOOP_ITERATIONS = "loopIterations";
-
-    /** 循环退出标记。 */
-    public static final String LOOP_EXITED = "loopExited";
-
-    /** 循环超限标记。 */
-    public static final String LOOP_EXCEEDED = "loopExceeded";
 
     /** 上下文对象键。 */
     public static final String CTX = "ctx";
@@ -238,20 +190,8 @@ public final class MapFieldKeys {
     /** 事件属性。 */
     public static final String EVENT_ATTRIBUTES = "eventAttributes";
 
-    /** 目标恢复状态(内部键)。 */
-    public static final String GOAL_RESUME_STATUS = "__goalResumeStatus";
-
     /** 等待恢复状态(内部键)。 */
     public static final String WAIT_RESUME_STATUS = "__waitResumeStatus";
-
-    /** 目标达成分支节点ID。 */
-    public static final String GOAL_MET_NODE_ID = "goalMetNodeId";
-
-    /** 目标未达成分支节点ID。 */
-    public static final String GOAL_NOT_MET_NODE_ID = "goalNotMetNodeId";
-
-    /** 审批结果(内部键)。 */
-    public static final String APPROVAL_RESULT = "__approvalResult";
 
     /** 通用类型字段。 */
     public static final String TYPE = "type";
@@ -450,59 +390,8 @@ public final class MapFieldKeys {
     /** 失败分支节点ID。 */
     public static final String FAIL_NODE_ID = "failNodeId";
 
-    /** else分支节点ID。 */
-    public static final String ELSE_NODE_ID = "elseNodeId";
-
-    /** 审批通过分支节点ID。 */
-    public static final String APPROVE_NODE_ID = "approveNodeId";
-
-    /** 审批拒绝分支节点ID。 */
-    public static final String REJECT_NODE_ID = "rejectNodeId";
-
-    /** 抑制分支节点ID。 */
-    public static final String SUPPRESSED_NODE_ID = "suppressedNodeId";
-
-    /** 放行分支节点ID。 */
-    public static final String ALLOWED_NODE_ID = "allowedNodeId";
-
-    /** 静默分支节点ID。 */
-    public static final String QUIET_NODE_ID = "quietNodeId";
-
-    /** 可达分支节点ID。 */
-    public static final String AVAILABLE_NODE_ID = "availableNodeId";
-
-    /** 不可达分支节点ID。 */
-    public static final String UNAVAILABLE_NODE_ID = "unavailableNodeId";
-
-    /** 通过分支节点ID。 */
-    public static final String PASS_NODE_ID = "passNodeId";
-
-    /** 频控触发分支节点ID。 */
-    public static final String CAPPED_NODE_ID = "cappedNodeId";
-
-    /** 跳过分支节点ID。 */
-    public static final String SKIPPED_NODE_ID = "skippedNodeId";
-
-    /** 超上限分支节点ID。 */
-    public static final String MAX_EXCEEDED_NODE_ID = "maxExceededNodeId";
-
     /** 分支列表。 */
     public static final String BRANCHES = "branches";
-
-    /** 优先级配置列表。 */
-    public static final String PRIORITIES = "priorities";
-
-    /** 组配置列表。 */
-    public static final String GROUPS = "groups";
-
-    /** 路径配置列表。 */
-    public static final String PATHS = "paths";
-
-    /** 变体配置列表。 */
-    public static final String VARIANTS = "variants";
-
-    /** 分段配置列表。 */
-    public static final String BANDS = "bands";
 
     /** 条件列表。 */
     public static final String CONDITIONS = "conditions";
@@ -512,21 +401,6 @@ public final class MapFieldKeys {
 
     /** 分配策略。 */
     public static final String ALLOCATION_STRATEGY = "allocationStrategy";
-
-    /** 实验键。 */
-    public static final String EXPERIMENT_KEY = "experimentKey";
-
-    /** 实验名称。 */
-    public static final String EXPERIMENT_NAME = "experimentName";
-
-    /** 变体ID。 */
-    public static final String VARIANT_ID = "variantId";
-
-    /** 路径ID。 */
-    public static final String PATH_ID = "pathId";
-
-    /** 是否对照组。 */
-    public static final String IS_CONTROL = "isControl";
 
     /** 随机策略值。 */
     public static final String RANDOM = "RANDOM";

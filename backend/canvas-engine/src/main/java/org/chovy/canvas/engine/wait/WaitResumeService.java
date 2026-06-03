@@ -137,8 +137,7 @@ public class WaitResumeService {
 
     /** 判断等待订阅到期后是否应走超时分支而非普通完成分支。 */
     private boolean timeoutDriven(CanvasWaitSubscriptionDO wait) {
-        return WaitSubscriptionService.WAIT_TYPE_EVENT.equals(wait.getWaitType())
-                || WaitSubscriptionService.WAIT_TYPE_GOAL.equals(wait.getWaitType());
+        return WaitSubscriptionService.WAIT_TYPE_EVENT.equals(wait.getWaitType());
     }
 
     /** 按订阅中保存的过滤条件判断事件属性是否满足恢复条件。 */
@@ -230,11 +229,7 @@ public class WaitResumeService {
         if (!eventAttributes.isEmpty()) {
             payload.put(MapFieldKeys.EVENT_ATTRIBUTES, eventAttributes);
         }
-        if (WaitSubscriptionService.WAIT_TYPE_GOAL.equals(wait.getWaitType())) {
-            payload.put(MapFieldKeys.GOAL_RESUME_STATUS, status);
-        } else {
-            payload.put(MapFieldKeys.WAIT_RESUME_STATUS, status);
-        }
+        payload.put(MapFieldKeys.WAIT_RESUME_STATUS, status);
         return payload;
     }
 
@@ -256,8 +251,6 @@ public class WaitResumeService {
      *
      * <p>triggerType / nodeType 根据 waitType 和 status 决定：
      * <pre>
-     *   GOAL_CHECK + EXPIRED  → GOAL_CHECK_TIMEOUT / GOAL_CHECK
-     *   GOAL_CHECK + COMPLETED → GOAL_CHECK_RESUME / GOAL_CHECK
      *   UNTIL_EVENT + EXPIRED → WAIT_TIMEOUT / WAIT
      *   UNTIL_EVENT + COMPLETED → WAIT_RESUME / WAIT
      * </pre>
@@ -268,12 +261,9 @@ public class WaitResumeService {
      * 能更新为 COMPLETED/EXPIRED，因此幂等保护此处退化为防守性措施）。
      */
     private void trigger(CanvasWaitSubscriptionDO wait, String status, Map<String, Object> payload) {
-        boolean goal = WaitSubscriptionService.WAIT_TYPE_GOAL.equals(wait.getWaitType());
         boolean expired = WaitSubscriptionService.STATUS_EXPIRED.equals(status);
-        String nodeType = goal ? NodeType.GOAL_CHECK : NodeType.WAIT;
-        String triggerType = goal
-                ? (expired ? TriggerType.GOAL_CHECK_TIMEOUT : TriggerType.GOAL_CHECK_RESUME)
-                : (expired ? TriggerType.WAIT_TIMEOUT : TriggerType.WAIT_RESUME);
+        String nodeType = NodeType.WAIT;
+        String triggerType = expired ? TriggerType.WAIT_TIMEOUT : TriggerType.WAIT_RESUME;
         String msgId = wait.getExecutionId() + ":wait:" + wait.getId() + ":" + status;
 
         executionService.trigger(

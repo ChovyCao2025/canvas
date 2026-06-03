@@ -7,8 +7,8 @@ import java.time.LocalDateTime;
 /**
  * A/B 实验定义（ab_experiment）。
  *
- * <p>注册可在 AB_SPLIT 节点中引用的实验，由实验平台管理分流规则（命中率、分桶等）。
- * AB_SPLIT 节点执行时通过 experimentKey 查询实验平台，
+ * <p>注册可在 SPLIT 节点中引用的实验，由实验平台管理分流规则（命中率、分桶等）。
+ * SPLIT 节点执行时通过 experimentKey 查询实验平台，
  * 根据返回的分组（group）路由到对应分支。
  */
 @Data
@@ -22,7 +22,7 @@ public class AbExperimentDO {
     /** 实验显示名称 */
     private String name;
 
-    /** 实验唯一标识，AB_SPLIT 节点通过此 key 查询实验分组结果 */
+    /** 实验唯一标识，SPLIT 节点通过此 key 查询实验分组结果 */
     private String experimentKey;
 
     /** 实验描述 */

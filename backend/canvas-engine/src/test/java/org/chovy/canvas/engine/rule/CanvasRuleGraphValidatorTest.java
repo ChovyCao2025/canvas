@@ -36,7 +36,7 @@ class CanvasRuleGraphValidatorTest {
     void rejectsDirectMergeIntoSideEffectNode() {
         DagParser.CanvasNode sourceA = node("a", NodeType.IF_CONDITION, Map.of("successNodeId", "coupon"));
         DagParser.CanvasNode sourceB = node("b", NodeType.IF_CONDITION, Map.of("successNodeId", "coupon"));
-        DagParser.CanvasNode coupon = node("coupon", NodeType.COUPON, Map.of("nextNodeId", "end"));
+        DagParser.CanvasNode coupon = node("coupon", NodeType.COMMIT_ACTION, Map.of("nextNodeId", "end"));
         DagGraph graph = graph(
                 Map.of("a", sourceA, "b", sourceB, "coupon", coupon),
                 Map.of("a", List.of(), "b", List.of(), "coupon", List.of("a", "b")));

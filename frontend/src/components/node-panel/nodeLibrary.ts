@@ -7,10 +7,11 @@ import type { NodeTypeRegistry } from '../../types'
 
 /** 默认展示在“常用节点”区域的节点类型，帮助新用户快速找到高频能力。 */
 export const DEFAULT_COMMON_NODE_TYPES = [
+  'DIRECT_CALL',
+  'IF_CONDITION',
+  'SPLIT',
+  'SEND_MESSAGE',
   'API_CALL',
-  'DELAY',
-  'MANUAL_APPROVAL',
-  'SEND_MQ',
 ]
 
 /** “全部”分类的固定文案，过滤时作为特殊分类处理。 */
@@ -18,22 +19,34 @@ const ALL_CATEGORIES_LABEL = '全部'
 
 /** 业务上更符合使用频率的分类顺序；未列入分类会按中文名称排在后面。 */
 const CATEGORY_ORDER = [
-  '其他',
-  '逻辑分支',
-  '流程控制',
-  '行为策略',
-  '用户触达',
-  '权益发放',
+  '基础控制',
+  '入口触发',
+  '条件与分流',
+  '等待与汇聚',
+  '动作执行',
+  '消息触达',
+  '数据与权益',
+  '流程复用',
 ]
 
 /** 后端没有维护 description 时的兜底摘要，避免节点库出现空说明。 */
 const SUMMARY_FALLBACK: Record<string, string> = {
+  DIRECT_CALL: '外部系统同步调用并进入旅程',
+  EVENT_TRIGGER: '业务事件上报后进入旅程',
+  MQ_TRIGGER: '消费业务消息后进入旅程',
+  SCHEDULED_TRIGGER: '按时间计划触发旅程',
+  IF_CONDITION: '按规则判断后选择路径',
+  SPLIT: '按比例或随机策略分流',
+  WAIT: '等待时间或事件后继续',
+  HUB: '等待多条路径汇合后继续',
+  AGGREGATE: '等待全量上游后汇总判断',
+  THRESHOLD: '达到阈值后提前触发',
   API_CALL: '请求外部服务并拿回结果',
-  CANVAS_TRIGGER: '复用已有流程能力',
-  DELAY: '等待一段时间后继续执行',
-  GROOVY: '处理复杂逻辑或字段加工',
-  MANUAL_APPROVAL: '等待人工确认后继续流程',
   SEND_MQ: '发送一条业务消息给下游系统',
+  GROOVY: '处理复杂逻辑或字段加工',
+  SEND_MESSAGE: '通过配置渠道向用户发送消息',
+  TAGGER: '读取或判断用户标签/人群',
+  COMMIT_ACTION: '提交权益或关键副作用动作',
   SUB_FLOW_REF: '引用已有子流程片段',
 }
 

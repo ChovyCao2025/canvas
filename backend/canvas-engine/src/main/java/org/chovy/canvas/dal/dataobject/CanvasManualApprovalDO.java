@@ -8,8 +8,7 @@ import java.time.LocalDateTime;
 /**
  * 人工审批记录（canvas_manual_approval）。
  *
- * <p>当画布执行到 MANUAL_APPROVAL 节点时创建该记录，执行流程挂起等待人工操作。
- * 审批完成（通过/拒绝/超时）后，Watchdog 或 API 回写结果并恢复执行。
+ * <p>审批流模块创建该记录后，Watchdog 或 API 回写通过、拒绝或超时结果。
  */
 @Data
 @Builder
@@ -29,7 +28,7 @@ public class CanvasManualApprovalDO {
     /** 所属画布 ID */
     private Long canvasId;
 
-    /** 所属 MANUAL_APPROVAL 节点 ID */
+    /** 审批来源节点或流程步骤 ID */
     private String nodeId;
 
     /** 触发该执行的用户 ID（被审批对象） */

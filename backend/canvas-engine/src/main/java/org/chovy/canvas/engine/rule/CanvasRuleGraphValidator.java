@@ -17,10 +17,8 @@ public class CanvasRuleGraphValidator {
 
     private static final Set<String> SAFE_MULTI_UPSTREAM_TYPES = Set.of(
             NodeType.HUB,
-            NodeType.LOGIC_RELATION,
             NodeType.AGGREGATE,
             NodeType.THRESHOLD,
-            NodeType.MERGE,
             NodeType.END
     );
 
@@ -65,22 +63,6 @@ public class CanvasRuleGraphValidator {
                 if (Boolean.TRUE.equals(config.get(MapFieldKeys.VALIDATE_RESULT))) {
                     RuleGroup rule = ruleParser.parseCanvasRules((List<Map<String, Object>>) config.get(MapFieldKeys.VALIDATE_RULES));
                     errors.addAll(ruleValidator.validate(rule, options(nodeId, MapFieldKeys.VALIDATE_RULES, false)));
-                }
-            }
-            if (NodeType.SELECTOR.equals(type)) {
-                List<Map<String, Object>> branches = (List<Map<String, Object>>) config.getOrDefault(MapFieldKeys.BRANCHES, List.of());
-                for (int i = 0; i < branches.size(); i++) {
-                    Map<String, Object> branch = branches.get(i);
-                    List<Map<String, Object>> conditions = (List<Map<String, Object>>) branch.get(MapFieldKeys.CONDITIONS);
-                    if (conditions == null) {
-                        conditions = (List<Map<String, Object>>) branch.get("rules");
-                    }
-                    boolean isLastBranch = i == branches.size() - 1;
-                    boolean explicitMatchAll = Boolean.TRUE.equals(branch.get("matchAll"));
-                    RuleGroup rule = ruleParser.parseCanvasRules(conditions);
-                    errors.addAll(ruleValidator.validate(
-                            new RuleGroup(rule.logic(), rule.children(), explicitMatchAll),
-                            options(nodeId, "branches[" + i + "]", isLastBranch || explicitMatchAll)));
                 }
             }
         } catch (RuleValidationException e) {

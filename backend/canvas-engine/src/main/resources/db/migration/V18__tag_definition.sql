@@ -1,4 +1,4 @@
--- V18: 标签定义管理表（TAGGER_OFFLINE/REALTIME 节点标签来源）
+-- V18: 标签定义管理表（TAGGER 标签来源）
 CREATE TABLE `tag_definition` (
   `id`          BIGINT       NOT NULL AUTO_INCREMENT,
   `name`        VARCHAR(64)  NOT NULL COMMENT '标签显示名称',

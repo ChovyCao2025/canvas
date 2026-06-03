@@ -3,7 +3,7 @@
  *
  * 维护说明：这里是画布编辑器右侧属性面板的核心，负责把表单变更归一化后回传节点 data。
  */
-import { useEffect, useState, useCallback, useRef } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import type { Node } from '@xyflow/react'
 import {
   Form, Input, InputNumber, Select, Switch, Button,
@@ -155,7 +155,6 @@ export default function ConfigPanel({ nodeId, nodeData, onChange, nodes, readonl
   const [form] = Form.useForm()
   const controlChrome = getControlChrome()
   const { raw: conditionOps } = useSystemOptions('condition_operator')
-  const { raw: logicRelations } = useSystemOptions('logic_relation')
   const { raw: contextValueTypes } = useSystemOptions('context_value_type')
   const { raw: paramTypes } = useSystemOptions('param_type')
   const { raw: delayUnits } = useSystemOptions('delay_unit')
@@ -165,7 +164,6 @@ export default function ConfigPanel({ nodeId, nodeData, onChange, nodes, readonl
   // 复杂控件共用的字典选项在这里集中转换，避免子控件各自请求。
   const sharedOptions = {
     conditionOps: selectOptionsFromStubs(conditionOps),
-    logicRelations: selectOptionsFromStubs(logicRelations),
     contextValueTypes: selectOptionsFromStubs(contextValueTypes),
     paramTypes: selectOptionsFromStubs(paramTypes),
     delayUnits: selectOptionsFromStubs(delayUnits),
@@ -486,7 +484,7 @@ function renderControl(
   _form: ReturnType<typeof Form.useForm>[0],
   sharedOptions: SharedConfigOptions,
   applyFormPatch: (patch: Record<string, unknown>) => void,
-  nodeId?: string | null,
+  _nodeId?: string | null,
   getNodeName?: (id: string | undefined) => string | null,
   nodeData?: CanvasNodeData | null,
 ): React.ReactNode {
@@ -564,24 +562,10 @@ function renderControl(
       />
     case 'param-define-list':
       return <ParamDefineList paramTypeOptions={sharedOptions.paramTypes} />
-    case 'branch-list':
-      return <BranchList
-        ctxFields={ctxFields}
-        operatorOptions={sharedOptions.conditionOps}
-        relationOptions={sharedOptions.logicRelations}
-      />
+    case 'split-branch-list':
+      return <SplitBranchList onBranchesChange={branches => applyFormPatch({ branches })} />
     case 'broadcast-branch-list':
       return <BroadcastBranchList onBranchesChange={branches => applyFormPatch({ branches })} />
-    case 'ab-group-list':
-      return (
-        <AbGroupList
-          nodeId={nodeId}
-          getNodeName={getNodeName ?? (() => null)}
-          onGroupsChange={groups => applyFormPatch({ groups })}
-        />
-      )
-    case 'priority-list':
-      return <PriorityList />
     case 'key-value':
       return <KeyValueMapping fieldKey={field.key} ctxFields={ctxFields} />
     case 'canvas-select':
@@ -593,10 +577,9 @@ function renderControl(
   }
 }
 
-// ── 条件规则列表控件（IF判断 / SELECTOR / MQ_TRIGGER 等）─────────
+// ── 条件规则列表控件（IF判断 / MQ_TRIGGER 等）─────────
 interface SharedConfigOptions {
   conditionOps: { label: string; value: string }[]
-  logicRelations: { label: string; value: string }[]
   contextValueTypes: { label: string; value: string }[]
   paramTypes: { label: string; value: string }[]
   delayUnits: { label: string; value: string }[]
@@ -614,7 +597,7 @@ export function getConditionRuleListFieldKey(schemaFieldKey?: string) {
   return schemaFieldKey && schemaFieldKey.trim() ? schemaFieldKey : 'rules'
 }
 
-/** 条件规则列表控件，用于 IF、SELECTOR、MQ_TRIGGER 等节点。 */
+/** 条件规则列表控件，用于 IF、MQ_TRIGGER 等节点。 */
 function ConditionRuleList({ ctxFields, operatorOptions, fieldKey }: {
   ctxFields: ContextField[]
   operatorOptions: { label: string; value: string }[]
@@ -684,7 +667,7 @@ function ConditionRuleList({ ctxFields, operatorOptions, fieldKey }: {
   )
 }
 
-// ── 上下文引用值列表控件（IN_APP_NOTIFY / GROOVY inputParams 等）─
+// ── 上下文引用值列表控件（SEND_MESSAGE / GROOVY inputParams 等）─
 interface ContextValueItem { name: string; valueType: 'CUSTOM' | 'CONTEXT'; value: string }
 
 /** 上下文引用值列表，支持固定值和 ${contextKey} 两种来源。 */
@@ -844,267 +827,80 @@ function BroadcastBranchList({ onBranchesChange }: { onBranchesChange: (branches
   )
 }
 
-// ── SELECTOR 分支列表控件（branch-list）────────────────────────────
-interface BranchItem { label: string; strategyRelation: string; conditions: ConditionRule[]; nextNodeId?: string }
-
-/** SELECTOR 分支标题按 IF / ELSE IF / ELSE 心智模型展示。 */
-export function getSelectorBranchLabel(index: number, total: number, conditionCount: number) {
-  if (index === 0) return '如果'
-  if (index === total - 1 && conditionCount === 0) return '否则'
-  return '否则如果'
+// ── SPLIT 分支控件（split-branch-list）────────────────────────────
+interface SplitBranchItem {
+  branchId?: string
+  id?: string
+  label?: string
+  weight?: number
+  nextNodeId?: string
 }
 
-/** SELECTOR 分支配置控件；实际后继节点由画布连线写回 nextNodeId。 */
-function BranchList({ ctxFields, operatorOptions, relationOptions }: {
-  ctxFields: ContextField[]
-  operatorOptions: { label: string; value: string }[]
-  relationOptions: { label: string; value: string }[]
-}) {
+/** 通用分流分支配置；后继节点由画布连线写回 nextNodeId。 */
+function SplitBranchList({ onBranchesChange }: { onBranchesChange: (branches: SplitBranchItem[]) => void }) {
   const form = Form.useFormInstance()
-  const branches: BranchItem[] = Form.useWatch('branches', form) ?? []
+  const branches: SplitBranchItem[] = Form.useWatch('branches', form) ?? []
   const inlineChrome = getInlineControlChrome()
 
-  /** 追加一个 SELECTOR 分支，默认使用 AND 关系。 */
-  const addBranch = () => form.setFieldValue('branches', [
-    ...branches,
-    { label: branches.length === 0 ? '如果' : '否则如果', strategyRelation: 'AND', conditions: [], nextNodeId: undefined }
-  ])
-  /** 删除指定分支，同时保留其他分支顺序。 */
-  const removeBranch = (i: number) => {
-    const next = [...branches]; next.splice(i, 1); form.setFieldValue('branches', next)
+  const branchKey = (branch: SplitBranchItem, index: number) => String(branch.branchId ?? branch.id ?? `branch_${index + 1}`)
+  const nextBranchId = () => {
+    const used = new Set(branches.map(branchKey))
+    let index = branches.length + 1
+    while (used.has(`branch_${index}`)) index += 1
+    return `branch_${index}`
   }
-  /** 更新指定分支的标题、关系或后继节点字段。 */
-  const updateBranch = (i: number, k: keyof BranchItem, v: unknown) => {
-    const next = [...branches]; (next[i] as any)[k] = v; form.setFieldValue('branches', next)
-  }
-  /** 在指定分支下追加一条条件。 */
-  const addCondition = (branchIdx: number) => {
-    const next = [...branches]
-    next[branchIdx] = { ...next[branchIdx], conditions: [...(next[branchIdx].conditions ?? []), { field: '', operator: 'EQ', value: '', isCustom: true }] }
+  const commitBranches = (next: SplitBranchItem[]) => {
     form.setFieldValue('branches', next)
+    onBranchesChange(next)
   }
-  /** 删除指定分支下的指定条件。 */
-  const removeCondition = (bi: number, ci: number) => {
-    const next = [...branches]; next[bi].conditions.splice(ci, 1); form.setFieldValue('branches', next)
+  const add = () => commitBranches([
+    ...branches,
+    { branchId: nextBranchId(), label: `分支 ${branches.length + 1}`, weight: 50, nextNodeId: undefined },
+  ])
+  const remove = (index: number) => {
+    const next = [...branches]
+    next.splice(index, 1)
+    commitBranches(next)
   }
-  /** 更新指定分支条件中的字段、操作符或比较值。 */
-  const updateCondition = (bi: number, ci: number, k: string, v: string) => {
-    const next = [...branches]; (next[bi].conditions[ci] as any)[k] = v; form.setFieldValue('branches', next)
-  }
-
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-      {branches.map((b, i) => (
-        <div key={i} style={{
-          background: '#f0f7ff',
-          border: '1px solid #dbeafe',
-          borderRadius: 8,
-          padding: '8px 10px',
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 7 }}>
-            <span style={{ fontSize: 11, fontWeight: 760, color: '#1677ff', minWidth: 44 }}>
-              {getSelectorBranchLabel(i, branches.length, b.conditions?.length ?? 0)}
-            </span>
-            <Input size="small" style={{ ...inlineChrome, flex: 1, minWidth: 0 }} value={b.label}
-              placeholder="分支名称" onChange={e => updateBranch(i, 'label', e.target.value)} />
-            <Select className="config-panel-ios-select" classNames={CONTROL_SELECT_CLASS_NAMES} size="small" style={{ width: 82 }} value={b.strategyRelation ?? 'AND'}
-              options={relationOptions}
-              onChange={v => updateBranch(i, 'strategyRelation', v)} />
-            <Button size="small" danger icon={<DeleteOutlined />} onClick={() => removeBranch(i)}
-              style={{ width: 24, height: 24, minWidth: 24, padding: 0, borderRadius: 6 }} />
-          </div>
-
-          {b.conditions?.map((c, ci) => (
-            <div key={ci} style={{ marginBottom: 6 }}>
-              <Select className="config-panel-ios-select" classNames={CONTROL_SELECT_CLASS_NAMES}
-                size="small" style={{ width: '100%', marginBottom: 6 }} placeholder="字段"
-                value={c.field || undefined}
-                options={ctxFields.map(f => ({ label: f.fieldName, value: f.fieldKey }))}
-                onChange={v => updateCondition(i, ci, 'field', v)} showSearch
-                dropdownStyle={{ minWidth: 200 }} />
-              <div style={{ display: 'flex', gap: 6 }}>
-                <Select className="config-panel-ios-select" classNames={CONTROL_SELECT_CLASS_NAMES}
-                  size="small" style={{ width: 90 }} value={c.operator}
-                  options={operatorOptions}
-                  onChange={v => updateCondition(i, ci, 'operator', v)} />
-                <AutoComplete className="config-panel-ios-auto-complete" classNames={CONTROL_SELECT_CLASS_NAMES}
-                  size="small" style={{ flex: 1, minWidth: 0 }}
-                  placeholder="值或 ${key}"
-                  value={c.value}
-                  options={ctxFields.map(f => ({ value: '${' + f.fieldKey + '}', label: f.fieldName }))}
-                  onChange={v => updateCondition(i, ci, 'value', v)}
-                  filterOption={(input, opt) =>
-                    input.includes('$') &&
-                    String(opt?.label ?? '').toLowerCase().includes(input.replace(/\$\{?/, '').toLowerCase())
-                  }
-                  dropdownStyle={{ minWidth: 220 }} />
-                <Button size="small" danger icon={<DeleteOutlined />} onClick={() => removeCondition(i, ci)}
-                  style={{ width: 24, height: 24, minWidth: 24, padding: 0, borderRadius: 6 }} />
-              </div>
-            </div>
-          ))}
-          <Button size="small" type="dashed" icon={<PlusOutlined />} onClick={() => addCondition(i)}
-            style={{ width: '100%', borderColor: '#93c5fd', color: '#1677ff' }}>
-            添加条件
-          </Button>
-        </div>
-      ))}
-      <Button size="small" type="dashed" icon={<PlusOutlined />} onClick={addBranch}
-        style={{ width: '100%', borderColor: '#93c5fd', color: '#1677ff' }}>
-        {branches.length === 0 ? '添加第一个分支（如果）' : '添加分支（否则如果）'}
-      </Button>
-      {branches.length > 0 && (
-        <div style={{ fontSize: 11, color: '#8c8c8c', marginTop: 4 }}>
-          最后一个分支若无条件，则作为「否则」兜底；每个分支的后继节点通过画布连线自动设置
-        </div>
-      )}
-    </div>
-  )
-}
-
-// ── AB 分流分组路由控件（ab-group-list）────────────────────────────
-interface AbGroup { groupKey: string; label?: string; nextNodeId?: string }
-
-/** AB 分流分组展示控件，分组来自实验配置，后继节点来自画布连线。 */
-function AbGroupList({ nodeId, getNodeName, onGroupsChange }: {
-  nodeId?: string | null
-  getNodeName: (id: string | undefined) => string | null
-  onGroupsChange: (groups: AbGroup[]) => void
-}) {
-  const form = Form.useFormInstance()
-  const groups: AbGroup[] = Form.useWatch('groups', form) ?? []
-  const experimentKey = Form.useWatch('experimentKey', form)
-  const [loading, setLoading] = useState(false)
-  const [loadError, setLoadError] = useState(false)
-  const previousExperimentKeyRef = useRef<string>()
-
-  // 切换节点时重置实验 key 记忆，避免把上一个节点的禁用分组带到当前节点。
-  useEffect(() => {
-    previousExperimentKeyRef.current = undefined
-  }, [nodeId])
-
-  useEffect(() => {
-    if (!experimentKey) return
-    const currentExperimentKey = String(experimentKey)
-    const previousExperimentKey = previousExperimentKeyRef.current
-    const experimentChanged = previousExperimentKey !== undefined && previousExperimentKey !== currentExperimentKey
-    setLoading(true)
-    setLoadError(false)
-    metaApi.getAbExperimentGroups(currentExperimentKey)
-      .then(res => {
-        const existing: AbGroup[] = form.getFieldValue('groups') ?? []
-        const existingByKey = new Map(existing.map(group => [group.groupKey, group]))
-        const loaded = res.data.map(option => ({
-          groupKey: option.key,
-          label: option.label,
-          nextNodeId: existingByKey.get(option.key)?.nextNodeId,
-        }))
-        const loadedKeys = new Set(loaded.map(group => group.groupKey))
-        // 同一实验下保留历史禁用分组，切换实验时丢弃旧分组防止误连线。
-        const disabledHistory = experimentChanged
-          ? []
-          : existing
-              .filter(group => group.groupKey && !loadedKeys.has(group.groupKey))
-              .map(group => ({
-                ...group,
-                label: group.label ?? `已禁用：${group.groupKey}`,
-              }))
-        const next = [...loaded, ...disabledHistory]
-        previousExperimentKeyRef.current = currentExperimentKey
-        if (JSON.stringify(existing) !== JSON.stringify(next)) {
-          form.setFieldValue('groups', next)
-          onGroupsChange(next)
-        }
-      })
-      .catch(() => setLoadError(true))
-      .finally(() => setLoading(false))
-  }, [experimentKey, form, onGroupsChange])
-
-  const bucketSize = groups.length > 0 ? Math.floor(100 / groups.length) : 0
-
-  if (!experimentKey) {
-    return <Text type="secondary" style={{ fontSize: 12 }}>请先选择实验</Text>
-  }
-  if (loading) {
-    return <Spin size="small" />
-  }
-  if (loadError) {
-    return <Text type="danger" style={{ fontSize: 12 }}>分组加载失败</Text>
-  }
-  if (!groups.length) {
-    return <Text type="secondary" style={{ fontSize: 12 }}>该实验未配置启用分组</Text>
+  const update = (index: number, patch: Partial<SplitBranchItem>) => {
+    const next = [...branches]
+    next[index] = { ...next[index], ...patch }
+    commitBranches(next)
   }
 
   return (
     <div>
-      {groups.map((g, i) => {
-        const start = i * bucketSize
-        const end   = i === groups.length - 1 ? 100 : start + bucketSize
-        const successorName = getNodeName(g.nextNodeId)
-        return (
-          <div key={i} style={{ marginBottom: 8, padding: '6px 8px', background: '#fafafa', borderRadius: 6, border: '1px solid #f0f0f0' }}>
-            <Space style={{ width: '100%', justifyContent: 'space-between' }}>
-              <Space size={4}>
-                <Tag color={g.label?.startsWith('已禁用') ? 'default' : 'blue'} style={{ fontSize: 11 }}>
-                  {g.label ?? g.groupKey}
-                </Tag>
-                <Text code style={{ fontSize: 11 }}>{g.groupKey}</Text>
-                <Text style={{ fontSize: 11, color: '#8c8c8c' }}>bucket {start}–{end}%</Text>
-              </Space>
-            </Space>
-            <Space style={{ marginTop: 4 }} size={4}>
-              {successorName
-                ? <Tag color="blue" style={{ fontSize: 11 }}>→ {successorName}</Tag>
-                : <Tag color="warning" style={{ fontSize: 11 }}>⚠ 未连线</Tag>
-              }
-            </Space>
-          </div>
-        )
-      })}
-      <div style={{ fontSize: 11, color: '#8c8c8c', marginTop: 6 }}>
-        分组来自 AB 实验管理；连线时边上会显示分组 Key
-      </div>
-    </div>
-  )
-}
-
-// ── 优先级列表控件（priority-list）────────────────────────────────
-interface PriorityItem { order: number; nextNodeId?: string }
-
-/** 优先级路由列表，按 order 从小到大尝试。 */
-function PriorityList() {
-  const form = Form.useFormInstance()
-  const priorities: PriorityItem[] = Form.useWatch('priorities', form) ?? []
-  const inlineChrome = getInlineControlChrome()
-  /** 追加一个优先级路由项，默认排在当前列表末尾。 */
-  const add = () => form.setFieldValue('priorities', [...priorities, { order: priorities.length + 1, nextNodeId: undefined }])
-  /** 删除指定优先级路由项。 */
-  const remove = (i: number) => { const n = [...priorities]; n.splice(i, 1); form.setFieldValue('priorities', n) }
-  /** 更新优先级顺序或后继节点 ID。 */
-  const update = (i: number, k: keyof PriorityItem, v: string | number) => {
-    const n = [...priorities]; (n[i] as any)[k] = v; form.setFieldValue('priorities', n)
-  }
-
-  return (
-    <div>
-      {priorities.map((p, i) => (
-        <div key={i} style={{ display: 'grid', gridTemplateColumns: '60px minmax(0, 1fr) 28px', gap: 6, marginBottom: 6 }}>
-          <InputNumber size="small" style={{ ...inlineChrome, width: '100%' }} placeholder="优先级"
-            value={p.order} onChange={v => update(i, 'order', v ?? i + 1)} min={1} />
-          <Input size="small" style={{ ...inlineChrome, width: '100%' }} placeholder="后继节点ID"
-            value={p.nextNodeId ?? ''} onChange={e => update(i, 'nextNodeId', e.target.value)} />
-          <Button size="small" danger icon={<DeleteOutlined />} onClick={() => remove(i)} />
+      {branches.map((branch, index) => (
+        <div key={branchKey(branch, index)} style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 82px 28px', gap: 6, marginBottom: 6, alignItems: 'center' }}>
+          <Input
+            size="small"
+            style={{ ...inlineChrome, width: '100%' }}
+            placeholder={`分支 ${index + 1}`}
+            value={branch.label}
+            onChange={event => update(index, { label: event.target.value })}
+          />
+          <InputNumber
+            size="small"
+            style={{ ...inlineChrome, width: '100%' }}
+            min={0}
+            max={100}
+            precision={0}
+            value={branch.weight}
+            placeholder="权重"
+            onChange={value => update(index, { weight: value ?? 0 })}
+          />
+          <Button size="small" danger icon={<DeleteOutlined />} onClick={() => remove(index)} />
         </div>
       ))}
-      <Button size="small" type="dashed" icon={<PlusOutlined />} onClick={add} style={{ width: '100%' }}>添加优先级</Button>
+      <Button size="small" type="dashed" icon={<PlusOutlined />} onClick={add} style={{ width: '100%' }}>添加分支</Button>
       <div style={{ fontSize: 11, color: '#999', marginTop: 4 }}>
-        按 order 从小到大依次尝试，第一个成功则停止
+        分支权重用于流量分配；后继节点通过画布连线自动设置
       </div>
     </div>
   )
 }
 
-// ── 键值映射控件（CANVAS_TRIGGER paramMapping / SUB_FLOW_REF inputMapping）
+// ── 键值映射控件（SUB_FLOW_REF inputMapping）
 /** 子流程/画布调用参数映射控件，左侧是目标字段，右侧是上下文或固定值。 */
 function KeyValueMapping({ fieldKey, ctxFields }: { fieldKey: string; ctxFields: ContextField[] }) {
   const form = Form.useFormInstance()
@@ -1148,7 +944,7 @@ function KeyValueMapping({ fieldKey, ctxFields }: { fieldKey: string; ctxFields:
   )
 }
 
-// ── 画布选择控件（CANVAS_TRIGGER / SUB_FLOW_REF）─────────────────
+// ── 画布选择控件（SUB_FLOW_REF）─────────────────
 let canvasListCache: Canvas[] | null = null
 
 /** 已发布画布选择器，用于配置调用其他画布的节点。 */

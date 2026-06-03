@@ -15,7 +15,7 @@ import java.util.Objects;
 /**
  * Wait Subscription 等待订阅服务。
  *
- * <p>负责 WAIT/GOAL_CHECK 类节点的挂起、恢复和订阅状态维护，使长周期画布可以跨事件继续执行。
+ * <p>负责 WAIT 节点的挂起、恢复和订阅状态维护，使长周期画布可以跨事件继续执行。
  * <p>该服务需要保证恢复幂等，避免同一个等待订阅被并发重复触发。
  */
 @Service
@@ -23,8 +23,6 @@ public class WaitSubscriptionService {
 
     /** 事件到达等待类型常量。 */
     public static final String WAIT_TYPE_EVENT = "UNTIL_EVENT";
-    /** 目标达成等待类型常量。 */
-    public static final String WAIT_TYPE_GOAL = "GOAL_CHECK";
 
     /** 等待订阅生效状态常量。 */
     public static final String STATUS_ACTIVE = "ACTIVE";
@@ -107,36 +105,8 @@ public class WaitSubscriptionService {
         return wait;
     }
 
-    /** 创建目标达成等待订阅记录。 */
-    public CanvasWaitSubscriptionDO createGoalWait(
-            String executionId,
-            Long canvasId,
-            Long versionId,
-            String userId,
-            String nodeId,
-            String eventCode,
-            String resumePayload,
-            LocalDateTime expiresAt
-    ) {
-        Objects.requireNonNull(eventCode, "eventCode");
-        CanvasWaitSubscriptionDO wait = newWait(
-                executionId,
-                canvasId,
-                versionId,
-                userId,
-                nodeId,
-                WAIT_TYPE_GOAL,
-                eventCode,
-                null,
-                resumePayload,
-                expiresAt
-        );
-        mapper.insert(wait);
-        return wait;
-    }
-
     /**
-     * 查找指定用户在该 eventCode 下所有 ACTIVE 的等待订阅（含 GOAL_CHECK）。
+     * 查找指定用户在该 eventCode 下所有 ACTIVE 的等待订阅。
      *
      * <p>上限 100 条：正常场景下一个 (eventCode, userId) 组合最多几条，
      * 若因 bug 积累过多也不会拉垮 HTTP 线程。超出部分不处理（已有 CAS 保护，不会漏恢复正常数量）。
@@ -147,7 +117,7 @@ public class WaitSubscriptionService {
 
         LocalDateTime now = now();
         return mapper.selectList(new LambdaQueryWrapper<CanvasWaitSubscriptionDO>()
-                .in(CanvasWaitSubscriptionDO::getWaitType, WAIT_TYPE_EVENT, WAIT_TYPE_GOAL)
+                .eq(CanvasWaitSubscriptionDO::getWaitType, WAIT_TYPE_EVENT)
                 .eq(CanvasWaitSubscriptionDO::getEventCode, eventCode)
                 .eq(CanvasWaitSubscriptionDO::getUserId, userId)
                 .eq(CanvasWaitSubscriptionDO::getStatus, STATUS_ACTIVE)

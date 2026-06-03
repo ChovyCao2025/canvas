@@ -16,4 +16,4 @@ CREATE TABLE `canvas_wait_subscription` (
   PRIMARY KEY (`id`),
   INDEX `idx_event_wait` (`event_code`, `user_id`, `status`),
   INDEX `idx_expire` (`status`, `expires_at`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='等待订阅，用于 WAIT/GOAL_CHECK 挂起、唤醒和超时恢复';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='等待订阅，用于 WAIT 挂起、唤醒和超时恢复';

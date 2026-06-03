@@ -43,30 +43,6 @@ export interface Branch {
   [k: string]: unknown
 }
 
-/** 优先级节点中的单条优先级路由。 */
-export interface Priority {
-  /** 优先级顺序，数字越小越先执行。 */
-  order?: number
-
-  /** 当前优先级命中后继节点。 */
-  nextNodeId?: string
-
-  /** 预留扩展字段。 */
-  [k: string]: unknown
-}
-
-/** AB 分流节点中的单个分组路由。 */
-export interface AbGroup {
-  /** 分组 key（用于 hash 分桶）。 */
-  groupKey?: string
-
-  /** 当前分组后继节点。 */
-  nextNodeId?: string
-
-  /** 预留扩展字段。 */
-  [k: string]: unknown
-}
-
 // bizConfig 结构（对应 config 字段）
 export interface BizConfig {
   /** 默认后继节点。 */
@@ -78,15 +54,6 @@ export interface BizConfig {
   /** 失败分支后继。 */
   failNodeId?: string
 
-  /** 兜底分支后继。 */
-  elseNodeId?: string
-
-  /** 审批通过分支后继。 */
-  approveNodeId?: string
-
-  /** 审批驳回分支后继。 */
-  rejectNodeId?: string
-
   /** 阈值命中分支后继。 */
   hitNextNodeId?: string
 
@@ -95,34 +62,9 @@ export interface BizConfig {
 
   runtimePolicy?: Record<string, unknown>
   timeoutNodeId?: string
-  suppressedNodeId?: string
-  skippedNodeId?: string
-  allowedNodeId?: string
-  quietNodeId?: string
-  availableNodeId?: string
-  unavailableNodeId?: string
-  passNodeId?: string
-  cappedNodeId?: string
-  fallbackNodeId?: string
-  exitNodeId?: string
-  loopStartNodeId?: string
-  targetNodeId?: string
-  maxExceededNodeId?: string
-  goalMetNodeId?: string
-  goalNotMetNodeId?: string
 
-  /** 条件分支列表（SELECTOR 等节点使用）。 */
+  /** 多分支列表，供 DIRECT_CALL fan-out 和 SPLIT 使用。 */
   branches?: Branch[]
-
-  /** 优先级分支列表。 */
-  priorities?: Priority[]
-
-  /** AB 分流分组列表。 */
-  groups?: AbGroup[]
-
-  paths?: Branch[]
-  variants?: Branch[]
-  bands?: Branch[]
 
   /** 其余节点特有配置。 */
   [key: string]: unknown

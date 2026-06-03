@@ -93,46 +93,13 @@ public class DagParser {
         addIfPresent(targets, c.get(MapFieldKeys.NEXT_NODE_ID));
         addIfPresent(targets, c.get(MapFieldKeys.SUCCESS_NODE_ID));
         addIfPresent(targets, c.get(MapFieldKeys.FAIL_NODE_ID));
-        addIfPresent(targets, c.get(MapFieldKeys.ELSE_NODE_ID));
-        addIfPresent(targets, c.get(MapFieldKeys.APPROVE_NODE_ID));
-        addIfPresent(targets, c.get(MapFieldKeys.REJECT_NODE_ID));
         addIfPresent(targets, c.get(MapFieldKeys.TIMEOUT_NODE_ID));
-        addIfPresent(targets, c.get(MapFieldKeys.SUPPRESSED_NODE_ID));
-        addIfPresent(targets, c.get(MapFieldKeys.ALLOWED_NODE_ID));
-        addIfPresent(targets, c.get(MapFieldKeys.QUIET_NODE_ID));
-        addIfPresent(targets, c.get(MapFieldKeys.AVAILABLE_NODE_ID));
-        addIfPresent(targets, c.get(MapFieldKeys.UNAVAILABLE_NODE_ID));
-        addIfPresent(targets, c.get(MapFieldKeys.PASS_NODE_ID));
-        addIfPresent(targets, c.get(MapFieldKeys.CAPPED_NODE_ID));
-        addIfPresent(targets, c.get(MapFieldKeys.SKIPPED_NODE_ID));
-        addIfPresent(targets, c.get(MapFieldKeys.MAX_EXCEEDED_NODE_ID));
-        addIfPresent(targets, c.get(MapFieldKeys.GOAL_MET_NODE_ID));
-        addIfPresent(targets, c.get(MapFieldKeys.GOAL_NOT_MET_NODE_ID));
+        addIfPresent(targets, c.get(MapFieldKeys.HIT_NEXT_NODE_ID));
+        addIfPresent(targets, c.get(MapFieldKeys.MISS_NEXT_NODE_ID));
 
         List<?> branches = (List<?>) c.get(MapFieldKeys.BRANCHES);
         if (branches != null) branches.forEach(b ->
                 // 分支类节点的出口保存在数组项里，需要逐项展开为图边。
-                addIfPresent(targets, ((Map<?, ?>) b).get(MapFieldKeys.NEXT_NODE_ID)));
-
-        List<?> priorities = (List<?>) c.get(MapFieldKeys.PRIORITIES);
-        if (priorities != null) priorities.forEach(p ->
-                addIfPresent(targets, ((Map<?, ?>) p).get(MapFieldKeys.NEXT_NODE_ID)));
-
-        List<?> groups = (List<?>) c.get(MapFieldKeys.GROUPS);
-        if (groups != null) groups.forEach(g ->
-                addIfPresent(targets, ((Map<?, ?>) g).get(MapFieldKeys.NEXT_NODE_ID)));
-
-        List<?> paths = (List<?>) c.get(MapFieldKeys.PATHS);
-        if (paths != null) paths.forEach(p ->
-                addIfPresent(targets, ((Map<?, ?>) p).get(MapFieldKeys.NEXT_NODE_ID)));
-
-        List<?> variants = (List<?>) c.get(MapFieldKeys.VARIANTS);
-        if (variants != null) variants.forEach(v ->
-                // 实验组/变体的 nextNodeId 也参与 DAG 校验，避免隐藏出口绕过环检测。
-                addIfPresent(targets, ((Map<?, ?>) v).get(MapFieldKeys.NEXT_NODE_ID)));
-
-        List<?> bands = (List<?>) c.get(MapFieldKeys.BANDS);
-        if (bands != null) bands.forEach(b ->
                 addIfPresent(targets, ((Map<?, ?>) b).get(MapFieldKeys.NEXT_NODE_ID)));
 
         // 保持原顺序返回，便于调试时与原始 JSON 对齐
@@ -197,7 +164,7 @@ public class DagParser {
             String type = node != null ? node.getType() : null;
             if (!isConvergenceNode(type)) {
                 throw new IllegalArgumentException(
-                        "多分支收敛必须使用 HUB/LOGIC_RELATION/AGGREGATE/THRESHOLD 节点，或汇入 END 结束节点: nodeId="
+                        "多分支收敛必须使用 HUB/AGGREGATE/THRESHOLD 节点，或汇入 END 结束节点: nodeId="
                                 + entry.getKey() + " type=" + type + " upstream=" + upstream);
             }
         }
@@ -205,7 +172,6 @@ public class DagParser {
 
     private boolean isConvergenceNode(String type) {
         return NodeType.HUB.equals(type)
-                || NodeType.LOGIC_RELATION.equals(type)
                 || NodeType.AGGREGATE.equals(type)
                 || NodeType.THRESHOLD.equals(type)
                 || NodeType.END.equals(type);

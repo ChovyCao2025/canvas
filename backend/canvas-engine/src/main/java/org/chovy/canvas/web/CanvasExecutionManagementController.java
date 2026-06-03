@@ -2,7 +2,6 @@ package org.chovy.canvas.web;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import org.chovy.canvas.common.MapFieldKeys;
-import org.chovy.canvas.common.enums.NodeType;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.jsonwebtoken.Claims;
 import org.chovy.canvas.common.R;
@@ -10,7 +9,6 @@ import org.chovy.canvas.dal.dataobject.CanvasManualApprovalDO;
 import org.chovy.canvas.dal.mapper.CanvasManualApprovalMapper;
 import org.chovy.canvas.common.enums.ApprovalStatus;
 import org.chovy.canvas.domain.notification.NotificationEventService;
-import org.chovy.canvas.engine.handlers.ManualApprovalHandler;
 import org.chovy.canvas.engine.trigger.CanvasExecutionService;
 import org.chovy.canvas.infrastructure.redis.ContextPersistenceService;
 import lombok.RequiredArgsConstructor;
@@ -142,36 +140,7 @@ public class CanvasExecutionManagementController {
         }
         notificationEventService.approvalResult(approval, result, approver);
 
-        // 3. 从 Redis 恢复 ctx，写入审批结果
-        // 人工审批挂起时上下文保存在 Redis，恢复前必须重新加载最新执行上下文。
-        var ctx = ctxStore.load(approval.getCanvasId(), approval.getUserId());
-        if (ctx == null) {
-            log.warn("[APPROVAL] ctx 已不存在（可能已过期）executionId={}", executionId);
-            return;
-        }
-
-        // 写入审批结果到 ctx.flatContext（ManualApprovalHandler 下次执行时读取）
-        String resultKey = ManualApprovalHandler.APPROVAL_RESULT_KEY + approval.getNodeId();
-        ctx.getFlatContext().put(resultKey, result);
-
-        // 4. 持久化更新后的 ctx 回 Redis
-        ctxStore.save(ctx);
-
-        // 5. 重新触发画布执行（从 MANUAL_APPROVAL 节点的触发器入口重新进入）
-        // 这里显式订阅是为了在同步管理请求返回后继续恢复执行链路。
-        executionService.trigger(
-                        approval.getCanvasId(),
-                        approval.getUserId(),
-                        "MANUAL_APPROVAL_RESUME",
-                        NodeType.MANUAL_APPROVAL,
-                        approval.getNodeId(),
-                        Map.of(MapFieldKeys.APPROVAL_RESULT, result),
-                        executionId + ":resume:" + result,
-                        false)
-                .subscribe(
-                        r -> log.info("[APPROVAL] 恢复执行完成 executionId={} result={}", executionId, result),
-                        e -> log.error("[APPROVAL] 恢复执行失败 executionId={}: {}", executionId, e.getMessage())
-                );
+        log.info("[APPROVAL] 审批记录已更新 executionId={} result={}", executionId, result);
     }
 
     /**

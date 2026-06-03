@@ -84,6 +84,31 @@ describe('buildConfigPanelPresentation', () => {
     ])
   })
 
+  it('builds SPLIT route summaries from branch ids', () => {
+    const model = buildConfigPanelPresentation({
+      nodeData: {
+        nodeType: 'SPLIT',
+        name: '通用分流',
+        category: '条件与分流',
+        bizConfig: {
+          branches: [
+            { branchId: 'a', label: 'A组', weight: 30, nextNodeId: 'coupon-node' },
+            { branchId: 'b', label: 'B组', weight: 70, nextNodeId: undefined },
+          ],
+        },
+      },
+      formValues: {},
+      displayValues: {},
+      fields: [],
+      getNodeName: (id) => routeNames[id ?? ''] ?? null,
+    })
+
+    expect(model.branchRoutes).toEqual([
+      { label: 'A组 30%', value: '发送优惠券', tone: 'success' },
+      { label: 'B组 70%', value: '未连接', tone: 'success' },
+    ])
+  })
+
   it('keeps tagger mode badges and routes readable', () => {
     const model = buildConfigPanelPresentation({
       nodeData: taggerNode(),
@@ -98,7 +123,7 @@ describe('buildConfigPanelPresentation', () => {
 
     expect(model.header.tone).toBe('tagger')
     expect(model.header.typeBadge).toBe('TAGGER')
-    expect(model.header.metaBadges).toEqual(['人群圈选', 'Audience Segment', '2 出口'])
+    expect(model.header.metaBadges).toEqual(['2 出口'])
     expect(model.summaryRows).toEqual([
       { label: '模式展示', value: '人群圈选' },
       { label: '圈选对象', value: 'audience_vip' },

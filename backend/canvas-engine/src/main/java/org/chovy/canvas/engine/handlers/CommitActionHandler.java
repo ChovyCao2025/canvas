@@ -21,6 +21,9 @@ import java.util.Map;
 @Component
 @NodeHandlerType(NodeType.COMMIT_ACTION)
 public class CommitActionHandler implements NodeHandler {
+    static final String ACTION_ISSUE_COUPON = "ISSUE_COUPON";
+    static final String ACTION_POINTS = "POINTS";
+
     private final NodeHandler couponHandler;
     private final NodeHandler pointsHandler;
 
@@ -37,8 +40,8 @@ public class CommitActionHandler implements NodeHandler {
             return Mono.just(NodeResult.fail("COMMIT_ACTION: actionType 未配置"));
         }
         return switch (actionType) {
-            case NodeType.COUPON -> couponHandler.executeAsync(config, ctx);
-            case NodeType.POINTS_OPERATION -> pointsHandler.executeAsync(config, ctx);
+            case ACTION_ISSUE_COUPON -> couponHandler.executeAsync(config, ctx);
+            case ACTION_POINTS -> pointsHandler.executeAsync(config, ctx);
             default -> Mono.just(NodeResult.fail("COMMIT_ACTION: 未知提交动作类型 " + actionType));
         };
     }

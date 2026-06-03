@@ -29,20 +29,6 @@ import static org.mockito.Mockito.when;
 class DagEngineCommitActionTest {
 
     @Test
-    void couponReceivesNodeIdForNodeScopedIdempotencyKey() {
-        DagEngine engine = engineWithHandlers(new TestCouponHandler());
-        DagGraph graph = graph(List.of(
-                node("coupon-a", NodeType.COUPON, Map.of())
-        ), Map.of());
-        ExecutionContext ctx = context();
-
-        engine.execute(graph, "coupon-a", ctx).block();
-
-        assertThat(ctx.getNodeOutputs().get("coupon-a"))
-                .containsEntry("seenNodeId", "coupon-a");
-    }
-
-    @Test
     void commitActionSuccessMakesLaterFailureOverallSuccessful() {
         DagEngine engine = engineWithHandlers(new TestCommitActionHandler(), new TestFailHandler());
         DagGraph graph = graph(List.of(
@@ -122,15 +108,6 @@ class DagEngineCommitActionTest {
         node.setConfig(config);
         node.setBizConfig(Map.of());
         return node;
-    }
-
-    @NodeHandlerType(NodeType.COUPON)
-    static class TestCouponHandler implements NodeHandler {
-        @Override
-        public Mono<NodeResult> executeAsync(Map<String, Object> config, ExecutionContext ctx) {
-            return Mono.just(NodeResult.ok((String) config.get(MapFieldKeys.NEXT_NODE_ID),
-                    Map.of("seenNodeId", config.get(MapFieldKeys.NODE_ID_INTERNAL))));
-        }
     }
 
     @NodeHandlerType("COMMIT_ACTION")

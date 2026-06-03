@@ -20,7 +20,6 @@ import org.chovy.canvas.engine.handler.NodeHandler;
 import org.chovy.canvas.engine.handler.NodeRouteResolver;
 import org.chovy.canvas.engine.handler.NodeResult;
 import org.chovy.canvas.engine.handlers.HubHandler;
-import org.chovy.canvas.engine.handlers.LogicRelationHandler;
 import org.chovy.canvas.infrastructure.redis.ContextPersistenceService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -77,7 +76,6 @@ import java.util.stream.Collectors;
  * <h3>核心机制</h3>
  * 1. 单节点 6 阶段执行（7.4节）<br>
  * 2. repeat 并发保护（7.5节）—— 在写 SUCCESS 之前检查 repeat，防止幂等拦截<br>
- * 3. LOGIC_RELATION AND 模式立即失败（7.7节）<br>
  * 4. Hub 超时延迟任务（设计文档 Hub 定义）<br>
  * 5. Priority 串行依序尝试（4.6节）<br>
  * 6. 执行结束批量写入 SKIPPED（7.7节）
@@ -210,32 +208,18 @@ public class DagEngine {
             if (node.getBizConfig() != null) rawConfig.putAll(node.getBizConfig());
             if (node.getConfig() != null) rawConfig.putAll(node.getConfig());
 
-            boolean needsNodeId = NodeType.MANUAL_APPROVAL.equals(node.getType())
-                    || NodeType.API_CALL.equals(node.getType())
+            boolean needsNodeId = NodeType.API_CALL.equals(node.getType())
                     || NodeType.WAIT.equals(node.getType())
-                    || NodeType.GOAL_CHECK.equals(node.getType())
-                    || NodeType.FREQUENCY_CAP.equals(node.getType())
-                    || NodeType.SEND_EMAIL.equals(node.getType())
-                    || NodeType.SEND_SMS.equals(node.getType())
-                    || NodeType.SEND_PUSH.equals(node.getType())
-                    || NodeType.SEND_IN_APP.equals(node.getType())
-                    || NodeType.SEND_WECHAT.equals(node.getType())
-                    || NodeType.COUPON.equals(node.getType())
-                    || NodeType.POINTS_OPERATION.equals(node.getType())
+                    || NodeType.SEND_MESSAGE.equals(node.getType())
                     || NodeType.COMMIT_ACTION.equals(node.getType())
-                    || NodeType.LOOP.equals(node.getType())
-                    || NodeType.GOTO.equals(node.getType())
                     || NodeType.TAGGER.equals(node.getType());
             Map<String, Object> config = needsNodeId
                     ? resolveConfigWithNodeId(rawConfig, ctx, nodeId, node.getType())
                     : resolveConfig(rawConfig, ctx);
 
             // ──────────────────────────────────────────────────────
-            // 阶段 2：LOGIC_RELATION / HUB / AGGREGATE / THRESHOLD 特殊处理
+            // 阶段 2：HUB / AGGREGATE / THRESHOLD 特殊处理
             // ──────────────────────────────────────────────────────
-            if (NodeType.LOGIC_RELATION.equals(node.getType())) {
-                return handleLogicRelation(graph, nodeId, node, config, ctx, depth);
-            }
             if (NodeType.HUB.equals(node.getType())) {
                 return handleHub(graph, nodeId, node, config, ctx, depth);
             }
@@ -383,13 +367,13 @@ public class DagEngine {
      *   第一次：CAS 胜者持锁执行
      *   第二次：胜者释放锁后，因 repeatPending=true 重入执行
      *
-     * 对于 HUB/LOGIC_RELATION/AGGREGATE：handler 是纯路由逻辑，无副作用，两次调用无害。
+     * 对于 HUB/AGGREGATE：handler 是纯路由逻辑，无副作用，两次调用无害。
      * 对于 THRESHOLD：两次调用是语义必要的（第二次才能看到全部上游状态）。
      * 对于普通节点（发消息、发券、调 API 等）：若两条并发 trigger 同时到达且 handler
      *   执行期间存在竞争，handler 的副作用会执行两次。
      *
      * 因此，Canvas DAG 的设计约束是：
-     *   多分支收敛必须经由显式的收敛节点（HUB / LOGIC_RELATION / AGGREGATE / THRESHOLD）。
+     *   多分支收敛必须经由显式的收敛节点（HUB / AGGREGATE / THRESHOLD）。
      *   普通节点的直接上游在同一 execution 内只应有一条活跃路径，不应出现无收敛节点的菱形拓扑。
      *   若违反此约束，普通节点的副作用（发消息、扣库存等）可能被执行两次。
      * </pre>
@@ -522,7 +506,7 @@ public class DagEngine {
      */
     private Mono<Map<String, Object>> terminalSpecialNodeResult(String nodeId, ExecutionContext ctx) {
         NodeStatus status = ctx.getNodeStatus(nodeId);
-        if (status == NodeStatus.FAILED || status == NodeStatus.TIMEOUT || status == NodeStatus.PARTIAL_FAIL) {
+        if (status == NodeStatus.FAILED || status == NodeStatus.TIMEOUT) {
             // 特殊汇聚节点进入失败类终态后不再恢复执行，防止超时恢复重复改写路由结果。
             return Mono.error(new RuntimeException("节点 " + nodeId + " 已处于终态: " + status));
         }
@@ -564,86 +548,6 @@ public class DagEngine {
         } catch (Exception e) {
             log.error("[DLQ] 序列化失败: {}", e.getMessage());
         }
-    }
-
-    // ══════════════════════════════════════════════════════════════
-    // LOGIC_RELATION 处理（设计文档 7.4 阶段 2 + 7.7 节边界行为）
-    // ══════════════════════════════════════════════════════════════
-
-    private Mono<Map<String, Object>> handleLogicRelation(DagGraph graph, String nodeId,
-                                                          DagParser.CanvasNode node,
-                                                          Map<String, Object> config,
-                                                          ExecutionContext ctx,
-                                                          int depth) {
-        Mono<Map<String, Object>> terminal = terminalSpecialNodeResult(nodeId, ctx);
-        if (terminal != null) {
-            return terminal;
-        }
-        List<String> upstreamIds = graph.upstream(nodeId);
-        String relation = (String) config.getOrDefault("relation", "AND");
-
-        // AND 模式：上游有 FAILED/SKIPPED → 立即失败（7.7节）
-        //
-        // handleLogicRelation 在 executeNode 第2阶段提前返回，绕过了第3阶段（isNodeDone）和
-        // 第4阶段（CAS），多条上游并发完成时多线程会同时进入此分支。
-        // 用 CAS 保证 writeTrace 和 setStatus 只由一个线程执行；
-        // 其他线程 CAS 失败后幂等返回，由赢家负责向外传播 Mono.error。
-        if (LogicRelationHandler.shouldFailImmediately(relation, upstreamIds, ctx)) {
-            NodeGate gate = ctx.getGate(nodeId);
-            if (gate.executing.compareAndSet(false, true)) {
-                writeTraceStart(ctx, node);
-                ctx.setNodeStatus(nodeId, NodeStatus.FAILED);
-                writeTraceEnd(ctx, node, NodeResult.fail("AND 上游失败，条件不可满足"), 0);
-                gate.executing.set(false);
-                log.warn("[ENGINE] LOGIC_RELATION AND 上游失败，立即 FAILED nodeId={}", nodeId);
-                if (ctx.isBenefitGranted() || ctx.isUserReached()) return Mono.just(Map.of());
-                return Mono.error(new RuntimeException("LOGIC_RELATION AND 条件因上游失败不可满足"));
-            }
-            // CAS 失败：另一线程已在处理，当前线程幂等返回
-            return Mono.just(Map.of());
-        }
-
-        // 条件未满足：进入等待态，设置 WAITING 状态（供 isPaused 检测）
-        //
-        // ── 并发安全性说明 ──────────────────────────────────────────
-        // 此处没有加锁，多个上游并发完成时多条线程可能同时走到这里：
-        //
-        //   场景A（至少一条线程看到"条件已满足"）：
-        //     该线程进入 executeNodeAfterStage2，由 stage 4 的 CAS 保证只执行一次。
-        //
-        //   场景B（所有线程都读到"条件未满足"，全部返回 WAITING）：
-        //     这是真实可能发生的竞态——A、B 两个上游几乎同时完成，
-        //     Thread-A 触发本节点时读到 B=PENDING，Thread-B 触发时读到 A=PENDING，
-        //     两条线程都走了 WAITING 分支，没有人进入 executeNodeAfterStage2。
-        //     此时节点会卡死，直到下方的超时定时器介入。
-        //
-        //   因此超时不是可选的"安全网"，而是并发正确性的必要兜底：
-        //   超时触发新的 execution，最终驱动节点从 WAITING 状态恢复。
-        //
-        //   setNodeStatus(WAITING) 多线程同时写相同值，幂等，没有问题。
-        // ──────────────────────────────────────────────────────────
-        if (!LogicRelationHandler.checkCondition(relation, upstreamIds, ctx)) {
-            ctx.setNodeStatusIfNotDone(nodeId, NodeStatus.WAITING);
-
-            // LOGIC_RELATION 等待超时（与 Hub 类似，防止第二触发永不到来）
-            // config 中可选配置 timeout 字段（秒），默认等于全局执行超时
-            // ConcurrentHashSet.add() 保证定时器只被调度一次（多线程同时进入时）
-            if (ctx.getScheduledHubTimeouts().add("lr:" + nodeId)) {
-                ctx.getHubStartTimes().putIfAbsent("lr:" + nodeId, System.currentTimeMillis());
-                int timeoutSec = config.get("timeout") instanceof Number n
-                        ? n.intValue() : (int) globalTimeout;
-
-                Mono.delay(Duration.ofSeconds(timeoutSec), SPECIAL_NODE_TIMEOUT_SCHEDULER)
-                        .subscribe(__ -> handleSpecialNodeTimeout(graph, nodeId, node, config, ctx, depth,
-                                "LOGIC_RELATION", timeoutSec));
-                log.debug("[LOGIC_RELATION] 启动等待超时定时器 {}s nodeId={}", timeoutSec, nodeId);
-            }
-            log.debug("[ENGINE] LOGIC_RELATION 条件未满足，进入 WAITING nodeId={}", nodeId);
-            return Mono.just(Map.of());
-        }
-
-        // 条件满足 → 走正常节点执行流程（阶段 3-6）
-        return executeNodeAfterStage2(graph, nodeId, node, config, ctx, depth);
     }
 
     /** 特殊等待节点的全局超时秒数兜底。 */
@@ -702,7 +606,7 @@ public class DagEngine {
 
         // 所有上游未完成：进入等待态
         //
-        // ── 并发安全性说明（与 LOGIC_RELATION 相同） ───────────────
+        // ── 并发安全性说明 ───────────────
         // 此处无锁：多条上游并发完成时，多条线程可能同时执行以下检查。
         //
         //   正常路径：最后一条线程必然看到 allUpstreamDone=true，
@@ -788,7 +692,7 @@ public class DagEngine {
     }
 
     // ══════════════════════════════════════════════════════════════
-    // 阶段 3-6 公共入口（LOGIC_RELATION / HUB / AGGREGATE 满足条件后调用）
+    // 阶段 3-6 公共入口（HUB / AGGREGATE 满足条件后调用）
     // ══════════════════════════════════════════════════════════════
 
     /**
@@ -964,34 +868,20 @@ public class DagEngine {
                 });
     }
 
-    // ══════════════════════════════════════════════════════════════
-    // 触发下游节点（含 Priority 串行逻辑，设计文档 4.6 节）
-    // ══════════════════════════════════════════════════════════════
-
     private Mono<Map<String, Object>> triggerDownstream(DagGraph graph, NodeResult result,
                                                         String sourceNodeId, String sourceType,
                                                         ExecutionContext ctx,
                                                         int depth) {
         // 立即标记未走的分支入口为 SKIPPED（设计文档 7.7节两阶段写入 - 阶段一）
-        // 目的：让 LOGIC_RELATION(AND) 在执行中即时检测到上游 SKIPPED，而不是等到执行结束
+        // 目的：让汇聚节点在执行中即时检测到上游 SKIPPED，而不是等到执行结束
         markNonTakenBranchesSkipped(graph, sourceNodeId, sourceType, result, ctx);
 
-        // PRIORITY 节点：串行依序尝试，第一个成功则停止（4.6节）
-        if (NodeType.PRIORITY.equals(sourceType) && result.branchMap() != null) {
-            String fallbackNextId = NodeRouteResolver.resolveFallbackTarget(result);
-            List<String> orderedBranches = NodeRouteResolver.resolvePriorityBranchTargets(result);
-            return tryPrioritySequentially(orderedBranches, fallbackNextId, sourceNodeId,
-                    graph, ctx, depth + 1);
-        }
-
-        // 普通节点：收集所有下游并行触发
+        // 收集所有下游并行触发
         List<String> nextIds = collectNextIds(result);
         if (nextIds.isEmpty()) {
             // 叶子节点直接返回自身输出，作为本次 DAG 执行响应的一部分。
             return Mono.just(result.output() != null ? result.output() : Map.of());
         }
-        prepareControlFlowReentry(graph, result, sourceNodeId, sourceType, nextIds, ctx);
-
         return Flux.fromIterable(nextIds)
                 // 下游分支并行推进；汇聚节点依赖 NodeGate/repeat 保证单 execution 内不漏信号。
                 .flatMap(nextId -> executeNode(graph, nextId, ctx, depth + 1))
@@ -1034,37 +924,7 @@ public class DagEngine {
     private boolean isFailureAwareConvergenceNode(String nodeType) {
         return NodeType.HUB.equals(nodeType)
                 || NodeType.AGGREGATE.equals(nodeType)
-                || NodeType.LOGIC_RELATION.equals(nodeType)
                 || NodeType.THRESHOLD.equals(nodeType);
-    }
-
-    /**
-     * 执行 prepare Control Flow Reentry 对应的业务逻辑。
-     *
-     * <p>方法会结合入参、当前对象状态和依赖组件完成处理，调用方需关注返回值以及可能产生的状态变更。
-     *
-     * @param graph graph 方法执行所需的业务参数
-     * @param result result 方法执行所需的业务参数
-     * @param sourceNodeId sourceNodeId 对应的业务主键或标识
-     * @param sourceType sourceType 类型标识或分类条件
-     * @param nextIds nextIds 方法执行所需的业务参数
-     * @param ctx 执行上下文，提供当前画布、用户和节点运行态数据
-     */
-    private void prepareControlFlowReentry(DagGraph graph, NodeResult result, String sourceNodeId,
-                                           String sourceType, List<String> nextIds, ExecutionContext ctx) {
-        boolean looping = NodeType.LOOP.equals(sourceType)
-                && result.routes() != null
-                && result.routes().containsKey("loop");
-        boolean jumping = NodeType.GOTO.equals(sourceType)
-                && result.routes() != null
-                && result.routes().containsKey("goto");
-        if (!looping && !jumping) {
-            return;
-        }
-        for (String nextId : nextIds) {
-            // LOOP/GOTO 回流到旧路径前清理可达节点状态，使下一轮能重新通过幂等检查。
-            resetReachableUntilSource(graph, nextId, sourceNodeId, ctx);
-        }
     }
 
     /**
@@ -1093,56 +953,6 @@ public class DagEngine {
             }
             graph.downstream(current).forEach(queue::addLast);
         }
-    }
-
-    /**
-     * Priority 串行执行：按顺序尝试每个分支，成功则停止，失败则尝试下一个。
-     * 全部失败时若有 fallback(nextNodeId) 则走 fallback（设 PARTIAL_FAIL），否则整体 FAILED。
-     */
-    private Mono<Map<String, Object>> tryPrioritySequentially(List<String> branches,
-                                                              String fallbackNextId,
-                                                              String priorityNodeId,
-                                                              DagGraph graph,
-                                                              ExecutionContext ctx,
-                                                              int depth) {
-        if (branches.isEmpty()) {
-            // 所有分支均失败
-            if (fallbackNextId != null) {
-                ctx.setNodeStatus(priorityNodeId, NodeStatus.PARTIAL_FAIL);
-                log.debug("[PRIORITY] 所有分支失败，走 fallback nextId={}", fallbackNextId);
-                if (ctx.isNodeDone(fallbackNextId)) {
-                    log.debug("[PRIORITY] fallback 已作为分支执行过，按节点幂等跳过 nextId={}", fallbackNextId);
-                    return Mono.just(Map.of());
-                }
-                return executeNode(graph, fallbackNextId, ctx, depth);
-            }
-            log.debug("[PRIORITY] 所有分支失败，无 fallback，整体 FAILED");
-            return Mono.error(new RuntimeException("PRIORITY 所有分支均失败"));
-        }
-
-        String currentBranchId = branches.getFirst();
-        return executeNode(graph, currentBranchId, ctx, depth)
-                .<Map<String, Object>>flatMap(__ -> {
-                    if (ctx.getNodeStatus(currentBranchId) == NodeStatus.SUCCESS) {
-                        log.debug("[PRIORITY] 分支成功，停止 branchId={}", currentBranchId);
-                        return Mono.just(Map.of());
-                    }
-                    // 当前分支失败，尝试下一个
-                    log.debug("[PRIORITY] 分支失败，尝试下一个 branchId={}", currentBranchId);
-                    return tryPrioritySequentially(
-                            branches.subList(1, branches.size()),
-                            fallbackNextId, priorityNodeId, graph, ctx, depth);
-                })
-                .onErrorResume(e -> {
-                    if (!ctx.isNodeDone(currentBranchId)) {
-                        return Mono.<Map<String, Object>>error(e);
-                    }
-                    log.debug("[PRIORITY] 分支异常结束，尝试下一个 branchId={} reason={}",
-                            currentBranchId, e.getMessage());
-                    return tryPrioritySequentially(
-                            branches.subList(1, branches.size()),
-                            fallbackNextId, priorityNodeId, graph, ctx, depth);
-                });
     }
 
     // ══════════════════════════════════════════════════════════════
@@ -1439,18 +1249,12 @@ public class DagEngine {
         if (NodeType.WAIT.equals(nodeType) && payload.containsKey(MapFieldKeys.WAIT_RESUME_STATUS)) {
             resolved.put(MapFieldKeys.WAIT_RESUME_STATUS, payload.get(MapFieldKeys.WAIT_RESUME_STATUS));
         }
-        if (NodeType.GOAL_CHECK.equals(nodeType) && payload.containsKey(MapFieldKeys.GOAL_RESUME_STATUS)) {
-            resolved.put(MapFieldKeys.GOAL_RESUME_STATUS, payload.get(MapFieldKeys.GOAL_RESUME_STATUS));
-        }
     }
 
     /**
      * 立即标记未走分支的入口节点为 SKIPPED（设计文档 7.7节 阶段一写入）。
-     * 必要性：LOGIC_RELATION(AND) 在执行中检查上游 SKIPPED，
-     * 若 SKIPPED 只在执行结束后才写，则 LOGIC_RELATION 永远看到 PENDING，永久等待。
      * 覆盖场景：
      * IF_CONDITION  → 标记未走的 success/fail 分支入口
-     * SELECTOR      → 标记未命中的所有 branch 入口（含 else）
      */
     @SuppressWarnings("unchecked")
     private void markNonTakenBranchesSkipped(DagGraph graph, String sourceNodeId,
@@ -1470,22 +1274,6 @@ public class DagEngine {
             String skippedId = takenId != null && takenId.equals(successId) ? failId : successId;
             markSkippedPath(graph, skippedId, ctx);
 
-        } else if ("SELECTOR".equals(sourceType)) {
-            // 标记所有未走的 branch 入口
-            java.util.List<Map<String, Object>> branches =
-                    (java.util.List<Map<String, Object>>) cfg.getOrDefault(MapFieldKeys.BRANCHES, List.of());
-            String elseId = (String) cfg.get(MapFieldKeys.ELSE_NODE_ID);
-            String takenId = result.nextNodeId(); // SELECTOR 走的那条
-
-            branches.forEach(b -> {
-                String branchNext = (String) b.get(MapFieldKeys.NEXT_NODE_ID);
-                if (branchNext != null && !branchNext.equals(takenId)) {
-                    markSkippedPath(graph, branchNext, ctx);
-                }
-            });
-            if (elseId != null && !elseId.equals(takenId)) {
-                markSkippedPath(graph, elseId, ctx);
-            }
         }
     }
 

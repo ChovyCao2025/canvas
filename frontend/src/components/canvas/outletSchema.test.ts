@@ -10,12 +10,11 @@ describe('outlet schema', () => {
   it('parses dynamic outlet handles from registry json', () => {
     const schema = JSON.stringify([
       { id: 'success', label: '通过', color: '#52c41a', targetField: 'nextNodeId' },
-      { id: 'suppressed', label: '被抑制', color: '#f5222d' },
+      { id: 'suppressed', label: '被抑制', color: '#f5222d', targetField: 'suppressedNodeId' },
     ])
 
     expect(parseOutletSchema(schema)).toEqual([
       { id: 'success', label: '通过', color: '#52c41a' },
-      { id: 'suppressed', label: '被抑制', color: '#f5222d' },
     ])
   })
 

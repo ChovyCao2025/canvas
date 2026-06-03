@@ -25,8 +25,8 @@ import static org.assertj.core.api.Assertions.*;
  * <pre>
  * - Removed the 3-arg executeNode overload entirely.
  * - Added {@code int depth} to executeNodeAfterStage2, triggerDownstream,
- *   tryPrioritySequentially, handleLogicRelation, handleHub, handleAggregate.
- * - Downstream calls pass {@code depth + 1}; PRIORITY lateral calls pass {@code depth}.
+ *   handleHub, handleAggregate.
+ * - Downstream calls pass {@code depth + 1}.
  * </pre>
  *
  * Because DagEngine depends on many Spring beans (HandlerRegistry, TraceWriteBuffer, etc.),
@@ -94,30 +94,6 @@ class DagEngineDepthTest {
             Class<?>[] params = m.getParameterTypes();
             assertThat(params[params.length - 1])
                     .as("Last parameter of triggerDownstream must be int (depth), "
-                            + "found: %s", params[params.length - 1].getSimpleName())
-                    .isEqualTo(int.class);
-        }
-    }
-
-    /**
-     * tryPrioritySequentially must accept a depth parameter so the counter is threaded
-     * through PRIORITY branch execution.
-     */
-    @Test
-    @DisplayName("tryPrioritySequentially must accept int depth as last parameter")
-    void tryPrioritySequentially_mustHaveDepthParam() {
-        List<Method> methods = Arrays.stream(DagEngine.class.getDeclaredMethods())
-                .filter(m -> m.getName().equals("tryPrioritySequentially"))
-                .collect(Collectors.toList());
-
-        assertThat(methods)
-                .as("tryPrioritySequentially method must exist")
-                .isNotEmpty();
-
-        for (Method m : methods) {
-            Class<?>[] params = m.getParameterTypes();
-            assertThat(params[params.length - 1])
-                    .as("Last parameter of tryPrioritySequentially must be int (depth), "
                             + "found: %s", params[params.length - 1].getSimpleName())
                     .isEqualTo(int.class);
         }

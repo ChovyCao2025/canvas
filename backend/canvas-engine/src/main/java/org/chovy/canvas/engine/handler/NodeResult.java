@@ -66,7 +66,7 @@ public record NodeResult(
         return new NodeResult(null, null, null, null, null, Map.of(), false, errorMessage, false,
                 NodeOutcome.FAIL, Map.of(), "NODE_FAILED", errorMessage, null);
     }
-    /** 多分支节点（如 PRIORITY / AB_SPLIT / SELECTOR）。 */
+    /** 多出口节点结果。 */
     public static NodeResult multiNext(Map<String, String> branchMap, String elseNodeId) {
         // branchMap key 仅作为分支标签，value 才是实际节点 ID
         return new NodeResult(null, null, null, elseNodeId, branchMap, Map.of(), true, null, false,

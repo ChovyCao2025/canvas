@@ -33,26 +33,17 @@ describe('outlet routing helpers', () => {
     expect(result.nextNodeId).toBeUndefined()
   })
 
-  it('preserves indexed branch routing', () => {
+  it('writes SPLIT branch targets by branch id', () => {
     const result = patchBizConfig({
       branches: [
-        { label: 'A', nextNodeId: undefined },
-        { label: 'B', nextNodeId: undefined },
+        { branchId: 'a', label: 'A', weight: 30, nextNodeId: undefined },
+        { branchId: 'b', label: 'B', weight: 70, nextNodeId: undefined },
       ],
-    }, 'branch-1', 'node_b', waitOutletSchema)
+    }, 'branch-b', 'node_b', waitOutletSchema)
 
     expect(result.branches).toEqual([
-      { label: 'A', nextNodeId: undefined },
-      { label: 'B', nextNodeId: 'node_b' },
-    ])
-  })
-
-  it('creates missing branch slots when routing a legacy direct-call branch handle', () => {
-    const result = patchBizConfig({}, 'branch-1', 'node_b')
-
-    expect(result.branches).toEqual([
-      { label: '分支 1', nextNodeId: undefined },
-      { label: '分支 2', nextNodeId: 'node_b' },
+      { branchId: 'a', label: 'A', weight: 30, nextNodeId: undefined },
+      { branchId: 'b', label: 'B', weight: 70, nextNodeId: 'node_b' },
     ])
   })
 
@@ -167,6 +158,25 @@ describe('outlet routing helpers', () => {
     })
   })
 
+  it('clears SPLIT branch targets by branch id', () => {
+    expect(clearEdgeRef({
+      branches: [
+        { branchId: 'a', label: 'A', weight: 30, nextNodeId: 'api_a' },
+        { branchId: 'b', label: 'B', weight: 70, nextNodeId: 'api_b' },
+      ],
+    }, {
+      id: 'split->api_b::branch-b',
+      source: 'split',
+      target: 'api_b',
+      sourceHandle: 'branch-b',
+    })).toEqual({
+      branches: [
+        { branchId: 'a', label: 'A', weight: 30, nextNodeId: 'api_a' },
+        { branchId: 'b', label: 'B', weight: 70, nextNodeId: undefined },
+      ],
+    })
+  })
+
   it('does not derive shadowed legacy handles when dynamic schema declares the handle id', () => {
     expect(deriveEdges([
       {
@@ -219,6 +229,37 @@ describe('outlet routing helpers', () => {
         source: 'start',
         target: 'api_b',
         sourceHandle: 'default',
+      },
+    ])
+  })
+
+  it('derives SPLIT branch edges using branch ids', () => {
+    expect(deriveEdges([
+      {
+        id: 'split',
+        type: 'SPLIT',
+        name: '通用分流',
+        x: 0,
+        y: 0,
+        config: {
+          branches: [
+            { branchId: 'a', label: 'A', weight: 30, nextNodeId: 'api_a' },
+            { branchId: 'b', label: 'B', weight: 70, nextNodeId: 'api_b' },
+          ],
+        },
+      },
+    ])).toEqual([
+      {
+        id: 'split->api_a::branch-a',
+        source: 'split',
+        target: 'api_a',
+        sourceHandle: 'branch-a',
+      },
+      {
+        id: 'split->api_b::branch-b',
+        source: 'split',
+        target: 'api_b',
+        sourceHandle: 'branch-b',
       },
     ])
   })

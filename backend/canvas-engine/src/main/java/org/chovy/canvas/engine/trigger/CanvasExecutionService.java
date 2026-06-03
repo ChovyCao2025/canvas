@@ -1151,7 +1151,7 @@ public class CanvasExecutionService {
      *
      * <p>匹配规则（按 triggerNodeType 分支）：
      * <ul>
-     *   <li>WAIT / GOAL_CHECK：nodeId 直接等于 matchKey（matchKey 即 nodeId）；</li>
+     *   <li>WAIT：nodeId 直接等于 matchKey（matchKey 即 nodeId）；</li>
      *   <li>MQ_TRIGGER：用 MqTriggerHandler 解析节点 config 中的 topic，与 matchKey 比对；</li>
      *   <li>其他（EVENT_TRIGGER 等）：从 bizConfig 或 config 中取 eventCode / topicKey 与 matchKey 比对。</li>
      * </ul>
@@ -1184,12 +1184,9 @@ public class CanvasExecutionService {
     /** 判断触发类型是否应直接按节点 ID 与 matchKey 匹配。 */
     private boolean matchesByNodeId(String triggerNodeType) {
         return NodeType.WAIT.equals(triggerNodeType)
-                || NodeType.GOAL_CHECK.equals(triggerNodeType)
                 || NodeType.HUB.equals(triggerNodeType)
                 || NodeType.AGGREGATE.equals(triggerNodeType)
-                || NodeType.LOGIC_RELATION.equals(triggerNodeType)
                 || NodeType.THRESHOLD.equals(triggerNodeType)
-                || NodeType.MANUAL_APPROVAL.equals(triggerNodeType)
                 || NodeType.SCHEDULED_TRIGGER.equals(triggerNodeType)
                 || NodeType.TAGGER.equals(triggerNodeType);
     }
@@ -1207,14 +1204,10 @@ public class CanvasExecutionService {
     private static boolean isInternalContinuationTrigger(String triggerType) {
         return org.chovy.canvas.common.enums.TriggerType.WAIT_RESUME.equals(triggerType)
                 || org.chovy.canvas.common.enums.TriggerType.WAIT_TIMEOUT.equals(triggerType)
-                || org.chovy.canvas.common.enums.TriggerType.GOAL_CHECK_RESUME.equals(triggerType)
-                || org.chovy.canvas.common.enums.TriggerType.GOAL_CHECK_TIMEOUT.equals(triggerType)
                 || org.chovy.canvas.common.enums.TriggerType.HUB_TIMEOUT.equals(triggerType)
-                || org.chovy.canvas.common.enums.TriggerType.LOGIC_RELATION_TIMEOUT.equals(triggerType)
                 || org.chovy.canvas.common.enums.TriggerType.AGGREGATE_TIMEOUT.equals(triggerType)
                 || org.chovy.canvas.common.enums.TriggerType.THRESHOLD_TIMEOUT.equals(triggerType)
-                || org.chovy.canvas.common.enums.TriggerType.MANUAL_APPROVAL_TIMEOUT.equals(triggerType)
-                || "MANUAL_APPROVAL_RESUME".equals(triggerType);
+                ;
     }
 
     /** 将并发溢出的触发请求发送到 RocketMQ 延迟重试队列。 */

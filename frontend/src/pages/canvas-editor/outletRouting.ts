@@ -7,32 +7,14 @@ import type { Edge } from '@xyflow/react'
 import { getOutletTargetField, parseOutletSchemaItems, type OutletTargetField } from '../../components/canvas/outletSchema'
 import type { BackendNode, BizConfig } from '../../types/canvas'
 
-/** 固定出口 handle 到后端 bizConfig 目标字段的兼容映射。 */
+/** 固定出口 handle 到后端 bizConfig 目标字段的映射。 */
 const FIELD_HANDLES: Array<{ field: OutletTargetField; handleId: string }> = [
   { field: 'nextNodeId', handleId: 'default' },
   { field: 'successNodeId', handleId: 'success' },
   { field: 'failNodeId', handleId: 'fail' },
-  { field: 'elseNodeId', handleId: 'else' },
-  { field: 'approveNodeId', handleId: 'approve' },
-  { field: 'rejectNodeId', handleId: 'reject' },
   { field: 'hitNextNodeId', handleId: 'hit' },
   { field: 'missNextNodeId', handleId: 'miss' },
   { field: 'timeoutNodeId', handleId: 'timeout' },
-  { field: 'suppressedNodeId', handleId: 'suppressed' },
-  { field: 'skippedNodeId', handleId: 'skipped' },
-  { field: 'allowedNodeId', handleId: 'allowed' },
-  { field: 'quietNodeId', handleId: 'quiet' },
-  { field: 'availableNodeId', handleId: 'available' },
-  { field: 'unavailableNodeId', handleId: 'unavailable' },
-  { field: 'passNodeId', handleId: 'pass' },
-  { field: 'cappedNodeId', handleId: 'capped' },
-  { field: 'fallbackNodeId', handleId: 'fallback' },
-  { field: 'exitNodeId', handleId: 'exit' },
-  { field: 'loopStartNodeId', handleId: 'loop' },
-  { field: 'targetNodeId', handleId: 'goto' },
-  { field: 'maxExceededNodeId', handleId: 'max_exceeded' },
-  { field: 'goalMetNodeId', handleId: 'goal_met' },
-  { field: 'goalNotMetNodeId', handleId: 'goal_not_met' },
 ]
 
 /** 生成 React Flow edge ID；非默认出口把 handle 写入 ID，避免多出口边冲突。 */
@@ -100,55 +82,22 @@ function clearShadowedLegacyField(next: BizConfig, sourceHandle: string, field: 
   }
 }
 
-/** 写入带索引/业务 key 的动态集合出口，例如 branch-0、group-A、variant-B。 */
+function branchHandleKey(branch: Record<string, unknown>, index: number): string {
+  return String(branch.branchId ?? branch.id ?? `branch_${index + 1}`)
+}
+
+/** 写入带业务 key 的动态集合出口，例如 SPLIT 的 branch-a。 */
 function patchIndexedOutlet(next: BizConfig, sourceHandle: string, target: string): boolean {
   if (sourceHandle.startsWith('branch-')) {
-    const idx = parseInt(sourceHandle.split('-')[1], 10)
+    const key = sourceHandle.replace('branch-', '')
     const branches = [...(next.branches ?? [])]
-    while (branches.length <= idx) {
-      branches.push({ label: `分支 ${branches.length + 1}`, nextNodeId: undefined })
+    const index = branches.findIndex((branch, i) => branchHandleKey(branch, i) === key)
+    if (index === -1) {
+      branches.push({ branchId: key, label: `分支 ${branches.length + 1}`, nextNodeId: target })
+    } else {
+      branches[index] = { ...branches[index], nextNodeId: target }
     }
-    next.branches = branches.map((branch, i) =>
-      i === idx ? { ...branch, nextNodeId: target } : branch,
-    )
-    return true
-  }
-  if (sourceHandle.startsWith('priority-')) {
-    const idx = parseInt(sourceHandle.split('-')[1], 10)
-    next.priorities = (next.priorities ?? []).map((priority, i) =>
-      i === idx ? { ...priority, nextNodeId: target } : priority,
-    )
-    return true
-  }
-  if (sourceHandle.startsWith('group-')) {
-    const key = sourceHandle.replace('group-', '')
-    next.groups = (next.groups ?? []).map(group =>
-      group.groupKey === key ? { ...group, nextNodeId: target } : group,
-    )
-    return true
-  }
-  if (sourceHandle.startsWith('path-')) {
-    const key = sourceHandle.replace('path-', '')
-    next.paths = (next.paths ?? []).map(path => {
-      const id = String(path.pathId ?? path.id ?? '')
-      return id === key ? { ...path, nextNodeId: target } : path
-    })
-    return true
-  }
-  if (sourceHandle.startsWith('variant-')) {
-    const key = sourceHandle.replace('variant-', '')
-    next.variants = (next.variants ?? []).map(variant => {
-      const id = String(variant.variantId ?? variant.id ?? '')
-      return id === key ? { ...variant, nextNodeId: target } : variant
-    })
-    return true
-  }
-  if (sourceHandle.startsWith('band-')) {
-    const key = sourceHandle.replace('band-', '')
-    next.bands = (next.bands ?? []).map(band => {
-      const id = String(band.bandId ?? band.id ?? '')
-      return id === key ? { ...band, nextNodeId: target } : band
-    })
+    next.branches = branches
     return true
   }
   return false
@@ -157,48 +106,10 @@ function patchIndexedOutlet(next: BizConfig, sourceHandle: string, target: strin
 /** 清理带索引/业务 key 的动态集合出口引用。 */
 function clearIndexedOutlet(next: BizConfig, sourceHandle: string): boolean {
   if (sourceHandle.startsWith('branch-')) {
-    const idx = parseInt(sourceHandle.split('-')[1], 10)
+    const key = sourceHandle.replace('branch-', '')
     next.branches = (next.branches ?? []).map((branch, i) =>
-      i === idx ? { ...branch, nextNodeId: undefined } : branch,
+      branchHandleKey(branch, i) === key ? { ...branch, nextNodeId: undefined } : branch,
     )
-    return true
-  }
-  if (sourceHandle.startsWith('priority-')) {
-    const idx = parseInt(sourceHandle.split('-')[1], 10)
-    next.priorities = (next.priorities ?? []).map((priority, i) =>
-      i === idx ? { ...priority, nextNodeId: undefined } : priority,
-    )
-    return true
-  }
-  if (sourceHandle.startsWith('group-')) {
-    const key = sourceHandle.replace('group-', '')
-    next.groups = (next.groups ?? []).map(group =>
-      group.groupKey === key ? { ...group, nextNodeId: undefined } : group,
-    )
-    return true
-  }
-  if (sourceHandle.startsWith('path-')) {
-    const key = sourceHandle.replace('path-', '')
-    next.paths = (next.paths ?? []).map(path => {
-      const id = String(path.pathId ?? path.id ?? '')
-      return id === key ? { ...path, nextNodeId: undefined } : path
-    })
-    return true
-  }
-  if (sourceHandle.startsWith('variant-')) {
-    const key = sourceHandle.replace('variant-', '')
-    next.variants = (next.variants ?? []).map(variant => {
-      const id = String(variant.variantId ?? variant.id ?? '')
-      return id === key ? { ...variant, nextNodeId: undefined } : variant
-    })
-    return true
-  }
-  if (sourceHandle.startsWith('band-')) {
-    const key = sourceHandle.replace('band-', '')
-    next.bands = (next.bands ?? []).map(band => {
-      const id = String(band.bandId ?? band.id ?? '')
-      return id === key ? { ...band, nextNodeId: undefined } : band
-    })
     return true
   }
   return false
@@ -207,7 +118,7 @@ function clearIndexedOutlet(next: BizConfig, sourceHandle: string): boolean {
 /**
  * 从后端节点配置推导 React Flow 边集合。
  *
- * 后端主存是节点 config 中的 nextNodeId/branches/groups 等字段；
+ * 后端主存是节点 config 中的 nextNodeId/branches 等字段；
  * 编辑器加载时通过这个函数还原可视化连线。
  */
 export function deriveEdges(backendNodes: BackendNode[]): Edge[] {
@@ -248,20 +159,8 @@ export function deriveEdges(backendNodes: BackendNode[]): Edge[] {
     if (node.type === 'DIRECT_CALL' || node.type === 'START') {
       config.branches?.forEach(branch => push(branch.nextNodeId, 'default'))
     } else {
-      // 集合型分支用 handle ID 保存索引或业务 key，便于拖线时回写到正确项。
-      config.branches?.forEach((branch, index) => push(branch.nextNodeId, `branch-${index}`))
+      config.branches?.forEach((branch, index) => push(branch.nextNodeId, `branch-${branchHandleKey(branch, index)}`))
     }
-    config.priorities?.forEach((priority, index) => push(priority.nextNodeId, `priority-${index}`))
-    config.groups?.forEach(group => push(group.nextNodeId, `group-${group.groupKey}`))
-    config.paths?.forEach((path, index) =>
-      push(path.nextNodeId, `path-${String(path.pathId ?? path.id ?? `path_${index + 1}`)}`),
-    )
-    config.variants?.forEach((variant, index) =>
-      push(variant.nextNodeId, `variant-${String(variant.variantId ?? variant.id ?? `variant_${index + 1}`)}`),
-    )
-    config.bands?.forEach((band, index) =>
-      push(band.nextNodeId, `band-${String(band.bandId ?? band.id ?? `band_${index + 1}`)}`),
-    )
   })
 
   return edges

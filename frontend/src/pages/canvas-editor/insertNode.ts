@@ -133,11 +133,7 @@ function buildNode(
   return node
 }
 
-/**
- * 根据拖入的节点类型生成实际要落到画布上的节点集合。
- *
- * 普通节点是一进一出；TEMPLATE_NODE 会展开为合规检查、渠道可达、邮件发送三段模板。
- */
+/** 根据拖入的节点类型生成实际要落到画布上的节点集合。 */
 export function buildNodeExpansion(input: {
   nodeId: string
   nodeType: string
@@ -146,66 +142,12 @@ export function buildNodeExpansion(input: {
   bizConfig: BizConfig
   outletSchema?: string
 }): NodeExpansion {
-  if (input.nodeType !== 'TEMPLATE_NODE') {
-    const node = buildNode(input.nodeId, input.nodeType, input.category, input.position, input.bizConfig, input.outletSchema)
-    return {
-      entryNodeId: node.id,
-      exitNodeId: node.id,
-      exitHandleId: 'default',
-      nodes: [node],
-      edges: [],
-    }
-  }
-
-  // 模板节点用于一键插入常见触达链路，节点 ID 以主节点 ID 为前缀保证可追踪。
-  const suppressionId = `${input.nodeId}_sup`
-  const channelId = `${input.nodeId}_ch`
-  const emailId = `${input.nodeId}_mail`
-  const x = input.position.x
-  const y = input.position.y
-  const suppression = buildNode(
-    suppressionId,
-    'SUPPRESSION_CHECK',
-    '合规保护',
-    { x, y },
-    {
-      channel: 'ALL',
-      requireConsent: true,
-      allowedNodeId: channelId,
-    },
-    '[{"id":"allowed","label":"允许","color":"#52c41a","targetField":"allowedNodeId"},{"id":"suppressed","label":"抑制","color":"#f5222d","targetField":"suppressedNodeId"}]',
-  )
-  const channel = buildNode(
-    channelId,
-    'CHANNEL_AVAILABILITY',
-    '合规保护',
-    { x, y: y + 128 },
-    {
-      channel: 'EMAIL',
-      availableNodeId: emailId,
-    },
-    '[{"id":"available","label":"可达","color":"#52c41a","targetField":"availableNodeId"},{"id":"unavailable","label":"不可达","color":"#f5222d","targetField":"unavailableNodeId"}]',
-  )
-  const email = buildNode(
-    emailId,
-    'SEND_EMAIL',
-    '消息触达',
-    { x, y: y + 256 },
-    {
-      templateId: '',
-      subject: '',
-    },
-    '[{"id":"success","label":"成功","color":"#52c41a","targetField":"successNodeId"},{"id":"fail","label":"失败","color":"#f5222d","targetField":"failNodeId"}]',
-  )
-
+  const node = buildNode(input.nodeId, input.nodeType, input.category, input.position, input.bizConfig, input.outletSchema)
   return {
-    entryNodeId: suppressionId,
-    exitNodeId: emailId,
-    exitHandleId: 'success',
-    nodes: [suppression, channel, email],
-    edges: [
-      buildPlaceholderEdge(suppressionId, 'allowed', channelId),
-      buildPlaceholderEdge(channelId, 'available', emailId),
-    ],
+    entryNodeId: node.id,
+    exitNodeId: node.id,
+    exitHandleId: 'default',
+    nodes: [node],
+    edges: [],
   }
 }

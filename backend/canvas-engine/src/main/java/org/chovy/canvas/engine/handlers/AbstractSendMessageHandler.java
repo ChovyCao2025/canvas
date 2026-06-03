@@ -40,6 +40,10 @@ abstract class AbstractSendMessageHandler implements NodeHandler {
      */
     protected abstract String channel();
 
+    protected String channel(Map<String, Object> config) {
+        return channel();
+    }
+
     /**
      * 执行当前节点或服务的核心处理流程。
      *
@@ -51,12 +55,13 @@ abstract class AbstractSendMessageHandler implements NodeHandler {
      */
     @Override
     public Mono<NodeResult> executeAsync(Map<String, Object> config, ExecutionContext ctx) {
-        String nodeId = string(config, "__nodeId", channel().toLowerCase() + "-send");
+        String channel = channel(config);
+        String nodeId = string(config, "__nodeId", channel.toLowerCase() + "-send");
         String templateId = string(config, "templateId", string(config, "template_id", null));
         String successNodeId = string(config, "successNodeId", string(config, "nextNodeId", null));
         String failNodeId = string(config, "failNodeId", null);
         String idempotencyKey = string(config, "idempotencyKey",
-                ctx.getExecutionId() + ":" + nodeId + ":" + channel());
+                ctx.getExecutionId() + ":" + nodeId + ":" + channel);
 
         // 发送请求里固定带执行、画布、用户、节点和渠道信息，便于触达记录做幂等与审计。
         ReachDeliveryService.DeliveryRequest request = deliveryService.request(
@@ -64,7 +69,7 @@ abstract class AbstractSendMessageHandler implements NodeHandler {
                 ctx.getCanvasId(),
                 ctx.getUserId(),
                 nodeId,
-                channel(),
+                channel,
                 templateId,
                 content(config),
                 variables(config, ctx),

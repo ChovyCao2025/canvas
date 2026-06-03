@@ -64,7 +64,7 @@ public class AbExperimentController {
     @PostMapping
     public Mono<R<AbExperimentDO>> create(@RequestBody AbExperimentDO body) {
         return Mono.fromCallable(() -> {
-            // 默认启用：新建后可立即被 AB_SPLIT 节点选择
+            // 默认启用：新建后可立即被 SPLIT 节点选择
             if (body.getEnabled() == null) body.setEnabled(1);
             abExperimentMapper.insert(body);
             abExperimentGroupService.ensureDefaultGroups(body.getId());

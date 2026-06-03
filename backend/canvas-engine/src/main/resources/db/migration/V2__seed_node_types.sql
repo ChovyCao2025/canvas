@@ -1,168 +1,50 @@
--- ============================================================
--- V2 预置节点类型 & 上下文字段
--- ============================================================
+-- V2 governed canvas node catalog seed
 
--- ---- 行为策略类（触发器）----
-INSERT INTO node_type_registry (type_key, type_name, category, handler_class, config_schema, output_schema, is_trigger, is_terminal, description) VALUES
-('MQ_TRIGGER', 'MQ消息', '行为策略',
- 'org.chovy.canvas.engine.handlers.MqTriggerHandler',
- '[{"key":"topicKey","label":"消息主题","type":"select","dataSource":"/meta/mq-topics","required":true},{"key":"validateResult","label":"开启消息校验","type":"toggle"},{"key":"validateRules","label":"校验规则","type":"condition-rule-list","visible":"validateResult==true"}]',
- '[{"fieldKey":"orderId","fieldName":"订单号","dataType":"STRING"},{"fieldKey":"userId","fieldName":"用户ID","dataType":"STRING"}]',
- 1, 0, '监听业务MQ消息触发流程'),
+INSERT INTO node_type_registry
+  (type_key, type_name, category, handler_class, config_schema, output_schema, is_trigger, is_terminal, description, enabled)
+VALUES
+('START','开始','基础控制','org.chovy.canvas.engine.handlers.StartHandler','[]','[]',0,0,'画布流程起点。',1),
+('END','结束','基础控制','org.chovy.canvas.engine.handlers.EndHandler','[]','[]',0,1,'画布流程终点。',1),
+('DIRECT_RETURN','直调返回','基础控制','org.chovy.canvas.engine.handlers.DirectReturnHandler','[{"key":"buildType","label":"构建方式","type":"radio","defaultValue":"CUSTOM","options":[{"label":"自定义","value":"CUSTOM"}]},{"key":"data","label":"返回数据","type":"context-value-list"}]','[]',0,1,'配合直调入口同步返回结果。',1),
+('DIRECT_CALL','API入口','入口触发','org.chovy.canvas.engine.handlers.DirectCallHandler','[]','[]',1,0,'外部系统通过直调接口触发画布；下游分支由画布连线自动生成。',1),
+('EVENT_TRIGGER','事件触发','入口触发','org.chovy.canvas.engine.handlers.EventTriggerHandler','[{"key":"eventCode","label":"事件","type":"select","dataSource":"/meta/event-definitions","required":true},{"key":"eventAttrs","label":"事件属性","type":"event-attr-preview","dataSource":"/meta/event-definitions/{eventCode}/attrs"}]','[{"fieldKey":"eventCode","fieldName":"事件编码","dataType":"STRING"},{"fieldKey":"userId","fieldName":"用户ID","dataType":"STRING"}]',1,0,'业务事件上报后触发画布。',1),
+('MQ_TRIGGER','MQ消息触发','入口触发','org.chovy.canvas.engine.handlers.MqTriggerHandler','[{"key":"topicKey","label":"消息主题","type":"select","dataSource":"/meta/mq-topics","required":true},{"key":"validateResult","label":"开启消息校验","type":"toggle"},{"key":"validateRules","label":"校验规则","type":"condition-rule-list","visible":"validateResult==true"}]','[{"fieldKey":"orderId","fieldName":"订单号","dataType":"STRING"},{"fieldKey":"userId","fieldName":"用户ID","dataType":"STRING"}]',1,0,'消费业务 MQ 消息后触发画布。',1),
+('SCHEDULED_TRIGGER','定时触发','入口触发','org.chovy.canvas.engine.handlers.ScheduledTriggerHandler','[{"key":"scheduleType","label":"触发类型","type":"radio","required":true,"options":[{"label":"指定时间(ONCE)","value":"ONCE"},{"label":"周期(CRON)","value":"CRON"}]},{"key":"cronExpression","label":"Cron 表达式","type":"cron","visible":"scheduleType==CRON","required":true},{"key":"triggerTime","label":"触发时间","type":"datetime","visible":"scheduleType==ONCE","required":true},{"key":"timezone","label":"时区","type":"input","defaultValue":"Asia/Shanghai"}]','[]',1,0,'按固定时间或周期触发画布。',1),
+('IF_CONDITION','IF判断','条件与分流','org.chovy.canvas.engine.handlers.IfConditionHandler','[{"key":"rules","label":"条件规则","type":"condition-rule-list","required":true}]','[]',0,0,'按规则判断后选择成功或失败路径。',1),
+('SPLIT','通用分流','条件与分流','org.chovy.canvas.engine.handlers.SplitHandler','[{"key":"splitKey","label":"分流键","type":"text","defaultValue":"default"},{"key":"allocationStrategy","label":"分配策略","type":"select","defaultValue":"CONSISTENT","options":[{"label":"稳定分配","value":"CONSISTENT"},{"label":"随机分配","value":"RANDOM"}]},{"key":"branches","label":"分支","type":"split-branch-list","required":true}]','[{"fieldKey":"splitBranch","fieldName":"分流分支","dataType":"STRING"}]',0,0,'按权重进行稳定或随机分流。',1),
+('WAIT','等待','等待与汇聚','org.chovy.canvas.engine.handlers.WaitHandler','[{"key":"waitType","label":"等待类型","type":"select","required":true,"defaultValue":"DURATION","options":[{"label":"固定时长","value":"DURATION"},{"label":"直到指定时间","value":"UNTIL_DATE"},{"label":"直到相对时间","value":"RELATIVE_TIME"},{"label":"时间窗口","value":"TIME_WINDOW"},{"label":"直到事件发生","value":"UNTIL_EVENT"}]},{"key":"duration","label":"等待时长","type":"duration","visible":"waitType==DURATION","required":true},{"key":"untilDate","label":"等待到","type":"datetime","visible":"waitType==UNTIL_DATE","required":true},{"key":"time","label":"相对时间","type":"time","visible":"waitType==RELATIVE_TIME","required":true},{"key":"timeWindow","label":"允许窗口","type":"time-window","visible":"waitType==TIME_WINDOW","required":true},{"key":"eventCode","label":"目标事件","type":"select","dataSource":"/meta/event-definitions","visible":"waitType==UNTIL_EVENT","required":true},{"key":"maxWait","label":"最长等待","type":"duration","visible":"waitType==UNTIL_EVENT","required":true}]','[{"fieldKey":"waitStatus","fieldName":"等待结果","dataType":"STRING"}]',0,0,'等待一段时间、指定时间窗口或指定事件后继续。',1),
+('HUB','集线器','等待与汇聚','org.chovy.canvas.engine.handlers.HubHandler','[{"key":"timeout","label":"等待超时(秒)","type":"number","defaultValue":600}]','[]',0,0,'等待多条上游路径汇合后继续，不评估结果。',1),
+('AGGREGATE','聚合评估','等待与汇聚','org.chovy.canvas.engine.handlers.AggregateHandler','[{"key":"evaluateMode","label":"评估方式","type":"select","required":true,"defaultValue":"count","options":[{"label":"成功数 >= N","value":"count"},{"label":"成功率 >= N%","value":"rate"},{"label":"自定义脚本","value":"script"}]},{"key":"minCount","label":"最少成功数 N","type":"number","defaultValue":1,"visible":"evaluateMode==count"},{"key":"minRate","label":"最低成功率","type":"number","defaultValue":50,"visible":"evaluateMode==rate"},{"key":"evaluateScript","label":"评估脚本","type":"multi-text","visible":"evaluateMode==script"}]','[{"fieldKey":"successCount","fieldName":"成功上游数","dataType":"NUMBER"},{"fieldKey":"failCount","fieldName":"失败上游数","dataType":"NUMBER"},{"fieldKey":"totalCount","fieldName":"上游总数","dataType":"NUMBER"},{"fieldKey":"passed","fieldName":"是否通过评估","dataType":"BOOLEAN"}]',0,0,'等待全部上游完成后汇总评估。',1),
+('THRESHOLD','阈值触发','等待与汇聚','org.chovy.canvas.engine.handlers.ThresholdHandler','[{"key":"thresholdMode","label":"触发条件","type":"select","required":true,"defaultValue":"min_success","options":[{"label":"成功数 >= N","value":"min_success"},{"label":"完成数 >= N","value":"min_done"},{"label":"任意上游失败","value":"any_fail"}]},{"key":"threshold","label":"阈值 N","type":"number","defaultValue":1,"visible":"thresholdMode==min_success||thresholdMode==min_done"}]','[{"fieldKey":"successCount","fieldName":"成功上游数","dataType":"NUMBER"},{"fieldKey":"doneCount","fieldName":"已完成上游数","dataType":"NUMBER"},{"fieldKey":"totalCount","fieldName":"上游总数","dataType":"NUMBER"}]',0,0,'上游完成时流式评估，达到阈值后提前路由。',1),
+('API_CALL','接口调用','动作执行','org.chovy.canvas.engine.handlers.ApiCallHandler','[{"key":"bizLineKey","label":"业务线","type":"select","dataSource":"/meta/biz-lines","required":true},{"key":"apiKey","label":"接口","type":"select","dataSource":"/meta/biz-lines/{bizLineKey}/apis","required":true},{"key":"params","label":"请求参数","type":"context-value-list"},{"key":"validateResult","label":"开启结果校验","type":"toggle"},{"key":"validateRules","label":"校验规则","type":"condition-rule-list","visible":"validateResult==true"}]','[]',0,0,'调用外部或内部服务并写回结果。',1),
+('SEND_MQ','发送MQ','动作执行','org.chovy.canvas.engine.handlers.SendMqHandler','[{"key":"messageCodeKey","label":"消息类型","type":"select","dataSource":"/meta/message-codes?type=MQ","required":true},{"key":"params","label":"消息参数","type":"context-value-list"}]','[]',0,0,'向下游系统发送业务 MQ。',1),
+('GROOVY','Groovy脚本','动作执行','org.chovy.canvas.engine.handlers.GroovyHandler','[{"key":"inputParams","label":"输入参数","type":"context-value-list"},{"key":"code","label":"脚本代码","type":"code-editor","language":"groovy","required":true},{"key":"outputParams","label":"输出参数","type":"param-define-list"},{"key":"validateResult","label":"开启输出校验","type":"toggle"},{"key":"validateRules","label":"校验规则","type":"condition-rule-list","visible":"validateResult==true"}]','[]',0,0,'执行 Groovy 脚本处理复杂逻辑或字段加工。',1),
+('SEND_MESSAGE','发送消息','消息触达','org.chovy.canvas.engine.handlers.SendMessageHandler','[{"key":"channel","label":"渠道","type":"select","required":true,"options":[{"label":"邮件","value":"EMAIL"},{"label":"短信","value":"SMS"},{"label":"Push","value":"PUSH"},{"label":"站内信","value":"IN_APP"},{"label":"微信","value":"WECHAT"}]},{"key":"templateId","label":"模板","type":"text"},{"key":"title","label":"标题","type":"text"},{"key":"body","label":"正文","type":"multi-text"},{"key":"variables","label":"变量映射","type":"key-value"}]','[{"fieldKey":"sendRecordId","fieldName":"发送记录ID","dataType":"NUMBER"},{"fieldKey":"sendStatus","fieldName":"发送状态","dataType":"STRING"},{"fieldKey":"externalMessageId","fieldName":"外部消息ID","dataType":"STRING"}]',0,0,'通过统一触达服务发送消息，记录发送结果并支持幂等。',1),
+('TAGGER','Tagger 标签','数据与权益','org.chovy.canvas.engine.handlers.TaggerHandler','[{"key":"mode","label":"标签模式","type":"radio","required":true,"options":[{"label":"实时标签","value":"realtime"},{"label":"离线标签","value":"offline"},{"label":"人群圈选","value":"audience"}]},{"key":"tagCodeKey","label":"标签","type":"select","dataSource":"/meta/tagger-tags","required":true,"showWhen":"mode!=audience"},{"key":"audienceId","label":"人群","type":"select","dataSource":"/canvas/audiences/ready","required":true,"showWhen":"mode==audience"}]','[{"fieldKey":"tagValue","fieldName":"标签值","dataType":"STRING"}]',0,0,'读取或判断用户标签和人群。',1),
+('COMMIT_ACTION','提交动作','数据与权益','org.chovy.canvas.engine.handlers.CommitActionHandler','[{"key":"actionType","label":"动作类型","type":"select","required":true,"options":[{"label":"发放代金券","value":"ISSUE_COUPON"},{"label":"积分操作","value":"POINTS"}]},{"key":"couponTypeKey","label":"券类型","type":"select","dataSource":"/meta/coupon-types"},{"key":"params","label":"券参数","type":"dynamic-params","paramsSource":"couponTypeKey"},{"key":"operation","label":"积分操作","type":"select","defaultValue":"GRANT","options":[{"label":"发放","value":"GRANT"},{"label":"扣减","value":"DEDUCT"}]},{"key":"points","label":"积分","type":"number"},{"key":"pointsType","label":"积分类型","type":"text","defaultValue":"MARKETING"},{"key":"idempotencyKey","label":"幂等键","type":"text"}]','[{"fieldKey":"couponAmount","fieldName":"券面额","dataType":"NUMBER"},{"fieldKey":"couponId","fieldName":"券ID","dataType":"STRING"},{"fieldKey":"pointsLedgerId","fieldName":"积分流水ID","dataType":"NUMBER"},{"fieldKey":"duplicate","fieldName":"是否重复","dataType":"BOOLEAN"}]',0,0,'提交权益或关键副作用动作。',1),
+('SUB_FLOW_REF','子流程引用','流程复用','org.chovy.canvas.engine.handlers.SubFlowRefHandler','[{"key":"subFlowId","label":"子流程ID","type":"canvas-select","required":true},{"key":"subFlowVersion","label":"版本(-1=最新)","type":"number","defaultValue":-1},{"key":"inputMapping","label":"输入映射","type":"key-value"},{"key":"outputPrefix","label":"输出前缀","type":"input","required":true}]','[]',0,0,'引用已有子流程并写回输出。',1)
+ON DUPLICATE KEY UPDATE
+  type_name = VALUES(type_name),
+  category = VALUES(category),
+  handler_class = VALUES(handler_class),
+  config_schema = VALUES(config_schema),
+  output_schema = VALUES(output_schema),
+  is_trigger = VALUES(is_trigger),
+  is_terminal = VALUES(is_terminal),
+  description = VALUES(description),
+  enabled = VALUES(enabled);
 
-('BEHAVIOR_IN_APP', '端内用户行为', '行为策略',
- 'org.chovy.canvas.engine.handlers.BehaviorInAppHandler',
- '[{"key":"strategyRelation","label":"策略关系","type":"radio","options":[{"label":"且(AND)","value":"AND"},{"label":"或(OR)","value":"OR"}],"required":true},{"key":"strategies","label":"行为策略列表","type":"behavior-strategy-list","required":true}]',
- '[]',
- 1, 0, '监听端内用户行为事件'),
-
-('DIRECT_CALL', '业务直调', '行为策略',
- 'org.chovy.canvas.engine.handlers.DirectCallHandler',
- '[{"key":"inputParams","label":"入参定义","type":"param-define-list"}]',
- '[]',
- 1, 0, '业务方HTTP调用直接触发活动'),
-
-('TAGGER_REALTIME', 'Tagger实时标签', '行为策略',
- 'org.chovy.canvas.engine.handlers.TaggerRealtimeHandler',
- '[{"key":"tagCodeKey","label":"标签","type":"select","dataSource":"/meta/tagger-tags?type=realtime","required":true}]',
- '[]',
- 1, 0, '监听Tagger实时标签MQ事件');
-
--- ---- 逻辑分支类 ----
-INSERT INTO node_type_registry (type_key, type_name, category, handler_class, config_schema, output_schema, is_trigger, is_terminal, description) VALUES
-('IF_CONDITION', 'IF判断', '逻辑分支',
- 'org.chovy.canvas.engine.handlers.IfConditionHandler',
- '[{"key":"rules","label":"条件规则","type":"condition-rule-list","required":true}]',
- '[]',
- 0, 0, '单条件判断，分成功/失败两路'),
-
-('SELECTOR', '条件选择器', '逻辑分支',
- 'org.chovy.canvas.engine.handlers.SelectorHandler',
- '[{"key":"branches","label":"分支条件","type":"branch-list","required":true}]',
- '[]',
- 0, 0, '多条件分支，按顺序匹配第一个命中项'),
-
-('LOGIC_RELATION', '逻辑关系', '逻辑分支',
- 'org.chovy.canvas.engine.handlers.LogicRelationHandler',
- '[{"key":"relation","label":"关系类型","type":"radio","options":[{"label":"且(AND)","value":"AND"},{"label":"或(OR)","value":"OR"}],"required":true}]',
- '[]',
- 0, 0, '等待多个上游节点，AND/OR组合判断'),
-
-('HUB', '集线器', '逻辑分支',
- 'org.chovy.canvas.engine.handlers.HubHandler',
- '[{"key":"timeout","label":"等待超时(秒)","type":"number","defaultValue":600,"required":false}]',
- '[]',
- 0, 0, '等待所有上游节点完成（不论成功失败）后继续，超时后标记FAILED'),
-
-('PRIORITY', '优先级', '逻辑分支',
- 'org.chovy.canvas.engine.handlers.PriorityHandler',
- '[{"key":"priorities","label":"优先级列表","type":"priority-list","required":true}]',
- '[]',
- 0, 0, '按优先级顺序尝试子节点，成功即止');
-
--- ---- 人群圈选类 ----
-INSERT INTO node_type_registry (type_key, type_name, category, handler_class, config_schema, output_schema, is_trigger, is_terminal, description) VALUES
-('AB_SPLIT', 'AB分流', '人群圈选',
- 'org.chovy.canvas.engine.handlers.AbSplitHandler',
- '[{"key":"experimentKey","label":"实验","type":"select","dataSource":"/meta/ab-experiments","required":true},{"key":"groups","label":"分组路由","type":"ab-group-list","required":true}]',
- '[{"fieldKey":"abGroup","fieldName":"AB分组","dataType":"STRING"}]',
- 0, 0, '基于Hash确定性分流到不同实验组'),
-
-('TAGGER_OFFLINE', 'Tagger离线标签', '人群圈选',
- 'org.chovy.canvas.engine.handlers.TaggerOfflineHandler',
- '[{"key":"tagCodeKey","label":"离线标签","type":"select","dataSource":"/meta/tagger-tags?type=offline","required":true},{"key":"params","label":"标签参数","type":"key-value"}]',
- '[{"fieldKey":"tagValue","fieldName":"标签值","dataType":"STRING"}]',
- 0, 0, '获取离线标签，为空则拦截流程');
-
--- ---- 权益发放类 ----
-INSERT INTO node_type_registry (type_key, type_name, category, handler_class, config_schema, output_schema, is_trigger, is_terminal, description) VALUES
-('COUPON', '代金券', '权益发放',
- 'org.chovy.canvas.engine.handlers.CouponHandler',
- '[{"key":"couponTypeKey","label":"券类型","type":"select","dataSource":"/meta/coupon-types","required":true},{"key":"params","label":"券参数","type":"dynamic-params","paramsSource":"couponTypeKey"}]',
- '[{"fieldKey":"couponAmount","fieldName":"券面额","dataType":"NUMBER"},{"fieldKey":"couponId","fieldName":"券ID","dataType":"STRING"}]',
- 0, 0, '发放代金券，含防资损保护');
-
--- ---- 用户触达类 ----
-INSERT INTO node_type_registry (type_key, type_name, category, handler_class, config_schema, output_schema, is_trigger, is_terminal, description) VALUES
-('IN_APP_NOTIFY', '端内通知', '用户触达',
- 'org.chovy.canvas.engine.handlers.InAppNotifyHandler',
- '[{"key":"messageCodeKey","label":"消息类型","type":"select","dataSource":"/meta/message-codes?type=IN_APP","required":true},{"key":"bizData","label":"业务数据","type":"context-value-list"}]',
- '[]',
- 0, 0, 'MQTT推送端内实时通知'),
-
-('REACH_PLATFORM', '触达平台', '用户触达',
- 'org.chovy.canvas.engine.handlers.ReachPlatformHandler',
- '[{"key":"serviceSceneKey","label":"触达场景","type":"select","dataSource":"/meta/reach-scenes","required":true},{"key":"bizData","label":"业务数据","type":"context-value-list"}]',
- '[]',
- 0, 0, '通过触达平台发Push/短信等'),
-
-('DIRECT_RETURN', '直调返回', '用户触达',
- 'org.chovy.canvas.engine.handlers.DirectReturnHandler',
- '[{"key":"buildType","label":"构建方式","type":"radio","options":[{"label":"自定义","value":"CUSTOM"}]},{"key":"data","label":"返回数据","type":"context-value-list"}]',
- '[]',
- 0, 1, '配合业务直调，定义同步返回数据');
-
--- ---- 其他类 ----
-INSERT INTO node_type_registry (type_key, type_name, category, handler_class, config_schema, output_schema, is_trigger, is_terminal, description) VALUES
-('API_CALL', '接口调用', '其他',
- 'org.chovy.canvas.engine.handlers.ApiCallHandler',
- '[{"key":"bizLineKey","label":"业务线","type":"select","dataSource":"/meta/biz-lines","required":true},{"key":"apiKey","label":"接口","type":"select","dataSource":"/meta/biz-lines/{bizLineKey}/apis","required":true},{"key":"params","label":"请求参数","type":"context-value-list"},{"key":"validateResult","label":"开启结果校验","type":"toggle"},{"key":"validateRules","label":"校验规则","type":"condition-rule-list","visible":"validateResult==true"}]',
- '[]',
- 0, 0, '调用业务线内部HTTP接口'),
-
-('DELAY', '延迟器', '其他',
- 'org.chovy.canvas.engine.handlers.DelayHandler',
- '[{"key":"duration","label":"延迟时长","type":"number","required":true},{"key":"unit","label":"时间单位","type":"select","options":[{"label":"秒","value":"SECOND"},{"label":"分钟","value":"MINUTE"},{"label":"小时","value":"HOUR"}],"required":true}]',
- '[]',
- 0, 0, '延迟指定时长后继续执行'),
-
-('SEND_MQ', '发送MQ', '其他',
- 'org.chovy.canvas.engine.handlers.SendMqHandler',
- '[{"key":"messageCodeKey","label":"消息类型","type":"select","dataSource":"/meta/message-codes?type=MQ","required":true},{"key":"params","label":"消息参数","type":"context-value-list"}]',
- '[]',
- 0, 0, '向下游发出MQ消息'),
-
-('GROOVY', 'Groovy脚本', '其他',
- 'org.chovy.canvas.engine.handlers.GroovyHandler',
- '[{"key":"inputParams","label":"输入参数","type":"context-value-list"},{"key":"code","label":"脚本代码","type":"code-editor","language":"groovy","required":true},{"key":"outputParams","label":"输出参数","type":"param-define-list"},{"key":"validateResult","label":"开启输出校验","type":"toggle"},{"key":"validateRules","label":"校验规则","type":"condition-rule-list","visible":"validateResult==true"}]',
- '[]',
- 0, 0, '执行Groovy脚本处理复杂业务逻辑');
-
--- ---- 第十八章扩展节点 ----
-INSERT INTO node_type_registry (type_key, type_name, category, handler_class, config_schema, output_schema, is_trigger, is_terminal, description) VALUES
-('SCHEDULED_TRIGGER', '定时触发', '行为策略',
- 'org.chovy.canvas.engine.handlers.ScheduledTriggerHandler',
- '[{"key":"scheduleType","label":"触发类型","type":"radio","options":[{"label":"指定时间(ONCE)","value":"ONCE"},{"label":"周期(CRON)","value":"CRON"}],"required":true},{"key":"cronExpression","label":"Cron表达式","type":"input","visible":"scheduleType==CRON","required":true},{"key":"triggerTime","label":"触发时间","type":"datetime","visible":"scheduleType==ONCE","required":true},{"key":"timezone","label":"时区","type":"input","defaultValue":"Asia/Shanghai"},{"key":"userSource","label":"用户来源","type":"user-source-config","required":true}]',
- '[]',
- 1, 0, '按Cron或指定时间批量触发，从Tagger/列表/API获取用户'),
-
-('MANUAL_APPROVAL', '人工审批', '其他',
- 'org.chovy.canvas.engine.handlers.ManualApprovalHandler',
- '[{"key":"approvers","label":"审批人","type":"multi-user","required":true},{"key":"timeoutHours","label":"超时时间(小时)","type":"number","defaultValue":24},{"key":"onTimeout","label":"超时处理","type":"radio","options":[{"label":"拒绝","value":"REJECT"},{"label":"通过","value":"APPROVE"},{"label":"持续等待","value":"KEEP_WAITING"}],"required":true},{"key":"approveNodeId","label":"审批通过后节点","type":"node-select"},{"key":"rejectNodeId","label":"审批拒绝后节点","type":"node-select"}]',
- '[]',
- 0, 0, '挂起流程等待指定人员审批，超时按策略处理'),
-
-('CANVAS_TRIGGER', '触发子画布', '其他',
- 'org.chovy.canvas.engine.handlers.CanvasTriggerHandler',
- '[{"key":"targetCanvasId","label":"目标画布ID","type":"canvas-select","required":true},{"key":"invokeMode","label":"调用模式","type":"radio","options":[{"label":"同步等待","value":"SYNC"},{"label":"异步触发","value":"ASYNC"}],"required":true},{"key":"paramMapping","label":"参数映射","type":"key-value"},{"key":"nextNodeId","label":"下游节点","type":"node-select"}]',
- '[]',
- 0, 0, '在当前画布中触发另一个画布，支持同步/异步');
-
--- ---- 第二十章子流程节点 ----
-INSERT INTO node_type_registry (type_key, type_name, category, handler_class, config_schema, output_schema, is_trigger, is_terminal, description) VALUES
-('SUB_FLOW_REF', '子流程引用', '其他',
- 'org.chovy.canvas.engine.handlers.SubFlowRefHandler',
- '[{"key":"subFlowId","label":"子流程ID","type":"canvas-select","required":true},{"key":"subFlowVersion","label":"版本(-1=最新)","type":"number","defaultValue":-1},{"key":"inputMapping","label":"输入映射","type":"key-value"},{"key":"outputPrefix","label":"输出前缀","type":"input","required":true},{"key":"nextNodeId","label":"下游节点","type":"node-select"}]',
- '[]',
- 0, 0, '引用并执行子流程（策略表格/数据表格/工作流），输出带前缀写回父上下文');
-
--- ---- 预置上下文字段 ----
 INSERT INTO context_field (field_key, field_name, data_type, source_node_type, description) VALUES
-('orderId',        '订单号',   'STRING',  'MQ_TRIGGER,API_CALL', '业务订单唯一标识'),
-('userId',         '用户ID',   'STRING',  'MQ_TRIGGER',          '触发用户ID'),
-('departureDate',  '出发日期', 'STRING',  'MQ_TRIGGER',          '机票出发日期'),
-('marketIdentity', '市场身份', 'STRING',  'TAGGER_OFFLINE',      '新客/老客等身份标识'),
-('couponAmount',   '券面额',   'NUMBER',  'COUPON',              '发放的代金券金额'),
-('couponId',       '券ID',     'STRING',  'COUPON',              '发放的券唯一标识'),
-('abGroup',        'AB分组',   'STRING',  'AB_SPLIT',            '实验分组标识，如A/B'),
-('tagValue',       '标签值',   'STRING',  'TAGGER_OFFLINE',      '离线标签值');
+('orderId','订单号','STRING','MQ_TRIGGER,API_CALL','业务订单唯一标识'),
+('userId','用户ID','STRING','MQ_TRIGGER,EVENT_TRIGGER,DIRECT_CALL','触发用户ID'),
+('eventCode','事件编码','STRING','EVENT_TRIGGER','触发事件编码'),
+('tagValue','标签值','STRING','TAGGER','用户标签值'),
+('splitBranch','分流分支','STRING','SPLIT','通用分流命中的分支'),
+('couponAmount','券面额','NUMBER','COMMIT_ACTION','发放的代金券金额'),
+('couponId','券ID','STRING','COMMIT_ACTION','发放的券唯一标识'),
+('pointsLedgerId','积分流水ID','NUMBER','COMMIT_ACTION','积分操作流水ID')
+ON DUPLICATE KEY UPDATE
+  field_name = VALUES(field_name),
+  data_type = VALUES(data_type),
+  source_node_type = VALUES(source_node_type),
+  description = VALUES(description);

@@ -140,8 +140,7 @@ public class CanvasRouteInitializer {
                 case NodeType.EVENT_TRIGGER -> { String k = (String) cfg.get("eventCode"); if (k != null) triggerRouteService.registerBehavior(canvasId, k); }
                 // MQ_TRIGGER：topicKey 可能来自不同字段，复用 handler 的解析逻辑
                 case NodeType.MQ_TRIGGER       -> { String k = mqTriggerHandler.resolveTopic(cfg); if (!k.isEmpty()) triggerRouteService.registerMq(canvasId, k); }
-                // TAGGER_REALTIME：tagCodeKey 路由
-                case NodeType.TAGGER_REALTIME  -> { String k = (String) cfg.get("tagCodeKey"); if (k != null) triggerRouteService.registerTagger(canvasId, k); }
+                case NodeType.TAGGER -> { if ("realtime".equals(String.valueOf(cfg.getOrDefault("mode", "")))) { String k = (String) cfg.get("tagCodeKey"); if (k != null) triggerRouteService.registerTagger(canvasId, k); } }
                 default -> {}
             }
         }

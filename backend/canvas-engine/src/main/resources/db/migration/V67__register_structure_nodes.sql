@@ -1,25 +1,2 @@
-INSERT INTO node_type_registry
-  (type_key, type_name, category, handler_class,
-   config_schema, output_schema, outlet_schema, summary_template, runtime_policy_schema,
-   risk_level, is_trigger, is_terminal, description, enabled)
-VALUES
-('MERGE','合并','结构复用','org.chovy.canvas.engine.handlers.MergeHandler',
- '[{"key":"mergeType","label":"合并模式","type":"select","defaultValue":"ANY","options":[{"label":"任意到达","value":"ANY"},{"label":"全部到达","value":"ALL"}]}]',
- '[{"name":"merged","type":"BOOLEAN","label":"已合并"}]',
- '[{"id":"success","label":"继续","color":"#52c41a","targetField":"nextNodeId"}]',
- '合并','[]','LOW',0,0,'将多条路径汇合到同一后续节点。',1),
-('LOOP','循环','结构复用','org.chovy.canvas.engine.handlers.LoopHandler',
- '[{"key":"loopStartNodeId","label":"循环目标","type":"node-select","required":true},{"key":"maxIterations","label":"最大次数","type":"number","required":true,"defaultValue":3},{"key":"exitField","label":"退出字段","type":"text"},{"key":"exitValue","label":"退出值","type":"text"}]',
- '[{"name":"loopIterations","type":"NUMBER","label":"循环次数"},{"name":"loopExceeded","type":"BOOLEAN","label":"是否超限"}]',
- '[{"id":"loop","label":"继续循环","color":"#1677ff","targetField":"loopStartNodeId"},{"id":"exit","label":"退出","color":"#52c41a","targetField":"exitNodeId"},{"id":"max_exceeded","label":"超限","color":"#f5222d","targetField":"maxExceededNodeId"}]',
- '循环（最多 {{maxIterations}} 次）','[]','HIGH',0,0,'受控回边循环，必须配置最大次数。',1),
-('GOTO','跳转','结构复用','org.chovy.canvas.engine.handlers.GotoHandler',
- '[{"key":"targetNodeId","label":"目标节点","type":"node-select","required":true},{"key":"maxJumps","label":"最大跳转次数","type":"number","required":true,"defaultValue":1}]',
- '[{"name":"jumpCount","type":"NUMBER","label":"跳转次数"},{"name":"jumpExceeded","type":"BOOLEAN","label":"是否超限"}]',
- '[{"id":"goto","label":"跳转","color":"#1677ff","targetField":"targetNodeId"},{"id":"max_exceeded","label":"超限","color":"#f5222d","targetField":"maxExceededNodeId"}]',
- '跳转','[]','HIGH',0,0,'受控跳转到指定节点，必须配置最大跳转次数。',1),
-('TRANSFER_JOURNEY','跳转旅程','结构复用','org.chovy.canvas.engine.handlers.TransferJourneyHandler',
- '[{"key":"targetJourneyId","label":"目标旅程ID","type":"number","required":true},{"key":"carryContext","label":"携带上下文","type":"switch","defaultValue":true}]',
- '[{"name":"transferredJourneyId","type":"NUMBER","label":"目标旅程ID"}]',
- '[{"id":"success","label":"继续","color":"#52c41a","targetField":"nextNodeId"}]',
- '跳转旅程（{{targetJourneyId}}）','[]','HIGH',0,0,'触发另一个旅程，并可携带当前上下文。',1);
+-- V67__register_structure_nodes.sql: no-op after governed node catalog consolidation.
+SELECT 1;

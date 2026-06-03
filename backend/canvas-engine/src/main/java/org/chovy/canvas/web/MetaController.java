@@ -411,7 +411,7 @@ public class MetaController {
 
     /**
      * 根据画布中使用的事件/API 节点动态推导可用上下文字段。
-     * 供 IF_CONDITION、SELECTOR 等节点的条件规则面板使用。
+     * 供 IF_CONDITION 等节点的条件规则面板使用。
      *
      * @param eventCodes     EVENT_TRIGGER 节点的 eventCode 列表
      * @param apiKeys        API_CALL 节点的 apiKey 列表（与 outputPrefixes 按索引对应）

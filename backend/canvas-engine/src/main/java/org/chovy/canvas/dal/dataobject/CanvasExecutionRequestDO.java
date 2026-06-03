@@ -34,7 +34,7 @@ public class CanvasExecutionRequestDO {
     /** 触发类型，如 MQ、BEHAVIOR、DIRECT_CALL 或 DLQ_REPLAY */
     private String triggerType;
 
-    /** 触发节点类型，如 MQ_TRIGGER、EVENT_TRIGGER、API_TRIGGER */
+    /** 触发节点类型，如 MQ_TRIGGER、EVENT_TRIGGER、DIRECT_CALL */
     private String triggerNodeType;
 
     /** 触发匹配键，MQ 场景通常为 topic/tag，行为事件场景通常为 eventCode */

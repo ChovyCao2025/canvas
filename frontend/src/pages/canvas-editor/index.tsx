@@ -8,7 +8,7 @@ import {
   ReactFlow, ReactFlowProvider,
   useNodesState, useEdgesState,
   useReactFlow, Background, Controls, MiniMap,
-  type Connection, type Node, type Edge, type NodeChange, type EdgeChange, type XYPosition,
+  type Connection, type Node, type Edge, type NodeChange, type EdgeChange, type XYPosition, type OnNodeDrag,
 } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
 import './settingsPanel.css'
@@ -169,33 +169,10 @@ function cleanRefs(cfg: Record<string, unknown>, deletedIds: Set<string>): BizCo
     nextNodeId:    clean(biz.nextNodeId)    as string | undefined,
     successNodeId: clean(biz.successNodeId) as string | undefined,
     failNodeId:    clean(biz.failNodeId)    as string | undefined,
-    elseNodeId:    clean(biz.elseNodeId)    as string | undefined,
-    approveNodeId: clean(biz.approveNodeId) as string | undefined,
-    rejectNodeId:  clean(biz.rejectNodeId)  as string | undefined,
     hitNextNodeId: clean(biz.hitNextNodeId) as string | undefined,
     missNextNodeId: clean(biz.missNextNodeId) as string | undefined,
     timeoutNodeId: clean(biz.timeoutNodeId) as string | undefined,
-    suppressedNodeId: clean(biz.suppressedNodeId) as string | undefined,
-    skippedNodeId: clean(biz.skippedNodeId) as string | undefined,
-    allowedNodeId: clean(biz.allowedNodeId) as string | undefined,
-    quietNodeId: clean(biz.quietNodeId) as string | undefined,
-    availableNodeId: clean(biz.availableNodeId) as string | undefined,
-    unavailableNodeId: clean(biz.unavailableNodeId) as string | undefined,
-    passNodeId: clean(biz.passNodeId) as string | undefined,
-    cappedNodeId: clean(biz.cappedNodeId) as string | undefined,
-    fallbackNodeId: clean(biz.fallbackNodeId) as string | undefined,
-    exitNodeId: clean(biz.exitNodeId) as string | undefined,
-    loopStartNodeId: clean(biz.loopStartNodeId) as string | undefined,
-    targetNodeId: clean(biz.targetNodeId) as string | undefined,
-    maxExceededNodeId: clean(biz.maxExceededNodeId) as string | undefined,
-    goalMetNodeId: clean(biz.goalMetNodeId) as string | undefined,
-    goalNotMetNodeId: clean(biz.goalNotMetNodeId) as string | undefined,
     branches:   biz.branches?.map(b   => ({ ...b, nextNodeId: clean(b.nextNodeId) as string | undefined })),
-    priorities: biz.priorities?.map(p => ({ ...p, nextNodeId: clean(p.nextNodeId) as string | undefined })),
-    groups:     biz.groups?.map(g     => ({ ...g, nextNodeId: clean(g.nextNodeId) as string | undefined })),
-    paths:      biz.paths?.map(p      => ({ ...p, nextNodeId: clean(p.nextNodeId) as string | undefined })),
-    variants:   biz.variants?.map(v   => ({ ...v, nextNodeId: clean(v.nextNodeId) as string | undefined })),
-    bands:      biz.bands?.map(b      => ({ ...b, nextNodeId: clean(b.nextNodeId) as string | undefined })),
   }
 }
 
@@ -450,46 +427,19 @@ function EditorInner({ detail, onStatusChange, onCanvasNameChange }: {
 
   /** 为部分复杂节点提供默认 bizConfig，确保拖入后立即有可配置的分支结构。 */
   const buildDefaultBizConfig = useCallback((nodeType: string): BizConfig => {
-    if (nodeType === 'SELECTOR') {
-      return { branches: [{ label: '如果', strategyRelation: 'AND', conditions: [], nextNodeId: undefined }] }
-    }
     if (nodeType === 'IF_CONDITION') {
       return { rules: [] }
     }
     if (nodeType === 'DIRECT_CALL') {
       return {}
     }
-    if (nodeType === 'PRIORITY') {
-      return { priorities: [{ order: 1, nextNodeId: undefined }] }
-    }
-    if (nodeType === 'AB_SPLIT') {
-      return { groups: [{ groupKey: 'A', nextNodeId: undefined }, { groupKey: 'B', nextNodeId: undefined }] }
-    }
-    if (nodeType === 'RANDOM_SPLIT') {
+    if (nodeType === 'SPLIT') {
       return {
+        splitKey: 'default',
         allocationStrategy: 'CONSISTENT',
-        paths: [
-          { pathId: 'path_a', label: '路径 A', weight: 50, nextNodeId: undefined },
-          { pathId: 'path_b', label: '路径 B', weight: 50, nextNodeId: undefined },
-        ],
-      }
-    }
-    if (nodeType === 'EXPERIMENT') {
-      return {
-        experimentKey: 'experiment',
-        allocationStrategy: 'CONSISTENT',
-        variants: [
-          { variantId: 'A', label: '方案 A', weight: 50, isControl: true, nextNodeId: undefined },
-          { variantId: 'B', label: '方案 B', weight: 50, nextNodeId: undefined },
-        ],
-      }
-    }
-    if (nodeType === 'SCORING') {
-      return {
-        rules: [],
-        bands: [
-          { bandId: 'high', label: '高分', min: 80, max: 2147483647, nextNodeId: undefined },
-          { bandId: 'low', label: '低分', min: -2147483648, max: 79, nextNodeId: undefined },
+        branches: [
+          { branchId: 'a', label: 'A组', weight: 50, nextNodeId: undefined },
+          { branchId: 'b', label: 'B组', weight: 50, nextNodeId: undefined },
         ],
       }
     }
@@ -732,7 +682,7 @@ function EditorInner({ detail, onStatusChange, onCanvasNameChange }: {
     // 有分支出口的普通节点不能安全插入到默认边中间，改为空白创建或占位吸附。
     const branchHandles = getOutletHandles({ nodeType, bizConfig: defaultBizConfig, outletSchema })
     const edgeInsertActive = insertContext?.kind === 'edge'
-    const edgeEligible = branchHandles.length === 0 || nodeType === 'TEMPLATE_NODE'
+    const edgeEligible = branchHandles.length === 0
     const resolvedContext = placeholderContext
       ?? (edgeInsertActive && edgeEligible ? insertContext : { kind: 'blank' as const })
     const newPos: XYPosition = resolvedContext.kind === 'placeholder' && hitPlaceholder
@@ -838,7 +788,7 @@ function EditorInner({ detail, onStatusChange, onCanvasNameChange }: {
   }, [])
 
   // 拖已有节点到占位框上：松手时检测命中并自动连线
-  const onNodeDragStop = useCallback((_: React.MouseEvent, draggedNode: Node) => {
+  const onNodeDragStop = useCallback<OnNodeDrag>((_, draggedNode) => {
     setDraggingNodeId(null)
     if (readonly) return
     const d = draggedNode.data as CanvasNodeData
@@ -1040,23 +990,30 @@ function EditorInner({ detail, onStatusChange, onCanvasNameChange }: {
           if (!cfg.successNodeId) errors.push(`节点「${d.name}」未配置成功分支（连线到 success handle）`)
           if (!cfg.failNodeId)    errors.push(`节点「${d.name}」未配置失败分支（连线到 fail handle）`)
           break
-        case 'SELECTOR': {
+        case 'SPLIT': {
           const branches = cfg.branches as any[] | undefined
-          if (!branches?.length) errors.push(`节点「${d.name}」至少需要配置一个分支`)
+          if (!branches?.length) {
+            errors.push(`节点「${d.name}」至少需要配置一个分支`)
+            break
+          }
+          branches.forEach((branch, index) => {
+            if (!branch.nextNodeId) errors.push(`节点「${d.name}」第 ${index + 1} 个分支未连线`)
+            if (branch.weight == null) errors.push(`节点「${d.name}」第 ${index + 1} 个分支必须配置权重`)
+          })
           break
         }
         case 'GROOVY':
           if (!cfg.code) errors.push(`节点「${d.name}」Groovy 脚本不能为空`)
           break
-        case 'COUPON':
-          if (!cfg.couponTypeKey) errors.push(`节点「${d.name}」必须选择券类型`)
+        case 'SEND_MESSAGE':
+          if (!cfg.channel) errors.push(`节点「${d.name}」必须选择消息渠道`)
           break
         case 'COMMIT_ACTION':
           if (!cfg.actionType) {
             errors.push(`节点「${d.name}」必须选择动作类型`)
-          } else if (cfg.actionType === 'COUPON' && !cfg.couponTypeKey) {
+          } else if (cfg.actionType === 'ISSUE_COUPON' && !cfg.couponTypeKey) {
             errors.push(`节点「${d.name}」选择发券动作时必须选择券类型`)
-          } else if (cfg.actionType === 'POINTS_OPERATION' && cfg.points == null) {
+          } else if (cfg.actionType === 'POINTS' && cfg.points == null) {
             errors.push(`节点「${d.name}」选择积分动作时必须配置积分`)
           }
           break

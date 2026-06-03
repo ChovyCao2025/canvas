@@ -1,27 +1,2 @@
-INSERT INTO node_type_registry
-  (type_key, type_name, category, handler_class,
-   config_schema, output_schema, outlet_schema, summary_template, runtime_policy_schema,
-   risk_level, is_trigger, is_terminal, description, enabled)
-VALUES
-('RANDOM_SPLIT','随机分流','流程控制','org.chovy.canvas.engine.handlers.RandomSplitHandler',
- '[{"key":"allocationStrategy","label":"分配策略","type":"select","defaultValue":"CONSISTENT","options":[{"label":"稳定分配","value":"CONSISTENT"},{"label":"每次随机","value":"RANDOM"}]},{"key":"paths","label":"路径","type":"json","required":true}]',
- '[{"name":"splitPath","type":"STRING","label":"命中路径"}]',
- '[]','随机分流','[]','LOW',0,0,'按权重将用户分配到多个路径，可选择稳定 Hash 或每次随机。',1),
-('EXPERIMENT','实验','流程控制','org.chovy.canvas.engine.handlers.ExperimentHandler',
- '[{"key":"experimentKey","label":"实验键","type":"text","required":true},{"key":"allocationStrategy","label":"分配策略","type":"select","defaultValue":"CONSISTENT","options":[{"label":"稳定分配","value":"CONSISTENT"},{"label":"每次随机","value":"RANDOM"}]},{"key":"variants","label":"实验组","type":"json","required":true}]',
- '[{"name":"experimentKey","type":"STRING","label":"实验键"},{"name":"variantId","type":"STRING","label":"实验组"},{"name":"isControl","type":"BOOLEAN","label":"是否对照组"}]',
- '[]','实验（{{experimentKey}}）','[]','MEDIUM',0,0,'按权重分配实验组并输出实验归因字段。',1),
-('SCORING','用户评分','决策增强','org.chovy.canvas.engine.handlers.ScoringHandler',
- '[{"key":"rules","label":"评分规则","type":"json","required":true},{"key":"bands","label":"分数段","type":"json"}]',
- '[{"name":"score","type":"NUMBER","label":"分数"},{"name":"scoreBand","type":"STRING","label":"分数段"}]',
- '[]','用户评分','[]','MEDIUM',0,0,'根据上下文字段计算用户分数并按分数段分流。',1),
-('RECOMMENDATION','推荐','决策增强','org.chovy.canvas.engine.handlers.RecommendationHandler',
- '[{"key":"fallbackItems","label":"兜底推荐","type":"json"},{"key":"limit","label":"数量","type":"number","defaultValue":3}]',
- '[{"name":"recommendations","type":"ARRAY","label":"推荐结果"}]',
- '[{"id":"success","label":"成功","color":"#52c41a","targetField":"successNodeId"}]',
- '推荐（{{limit}}）','[]','MEDIUM',0,0,'输出推荐商品或内容列表；默认使用兜底推荐。',1),
-('AI_NEXT_BEST_ACTION','AI 下一步动作','决策增强','org.chovy.canvas.engine.handlers.AiNextBestActionHandler',
- '[{"key":"fallbackAction","label":"兜底动作","type":"text","defaultValue":"continue"},{"key":"fallbackRoute","label":"兜底出口","type":"text","defaultValue":"fallback"}]',
- '[{"name":"nextBestAction","type":"STRING","label":"下一步动作"},{"name":"aiFallbackUsed","type":"BOOLEAN","label":"是否使用兜底"}]',
- '[{"id":"fallback","label":"兜底","color":"#faad14","targetField":"fallbackNodeId"}]',
- 'AI 下一步动作','[]','HIGH',0,0,'为用户选择下一步最佳动作；默认本地兜底，后续可接入 AI 服务。',1);
+-- V66__register_decision_nodes.sql: no-op after governed node catalog consolidation.
+SELECT 1;

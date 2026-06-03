@@ -51,7 +51,7 @@ public class ExecutionContext {
     /** 扁平化快速查找 Map，O(1)。由 putNodeOutput 维护 */
     private final Map<String, Object> flatContext = new ConcurrentHashMap<>();
 
-    /** 各节点执行状态（需持久化，多阶段恢复时 LOGIC_RELATION 依赖此状态） */
+    /** 各节点执行状态（需持久化，多阶段恢复和汇聚判断依赖此状态） */
     private Map<String, NodeStatus> nodeStatuses = new ConcurrentHashMap<>();
 
     /** 防资损：已发放权益 */
@@ -68,12 +68,6 @@ public class ExecutionContext {
      * 持久化：多阶段恢复后仍需检查 Hub 是否已超时。
      */
     private Map<String, Long> hubStartTimes = new ConcurrentHashMap<>();
-
-    /** LOOP 节点迭代次数（nodeId → count），持久化以支持挂起恢复后的边界控制。 */
-    private Map<String, Integer> loopIterations = new ConcurrentHashMap<>();
-
-    /** GOTO 节点跳转次数（nodeId → count），持久化以防无界跳转。 */
-    private Map<String, Integer> jumpCounts = new ConcurrentHashMap<>();
 
     /**
      * 每节点的执行门控，分离互斥锁与 repeat 信号。
@@ -215,7 +209,7 @@ public class ExecutionContext {
     private static boolean isTerminalStatus(NodeStatus s) {
         return s == NodeStatus.SUCCESS || s == NodeStatus.FAILED
                 || s == NodeStatus.TIMEOUT || s == NodeStatus.SUPPRESSED
-                || s == NodeStatus.SKIPPED || s == NodeStatus.PARTIAL_FAIL;
+                || s == NodeStatus.SKIPPED;
     }
 
     /**
@@ -240,7 +234,7 @@ public class ExecutionContext {
     public void resetNodeStatusForReentry(String nodeId) {
         nodeStatuses.computeIfPresent(nodeId, (key, status) ->
                 // 重入只清理可重新执行的非终态/成功态，失败类终态保留给恢复和告警判断。
-                status == NodeStatus.FAILED || status == NodeStatus.TIMEOUT || status == NodeStatus.PARTIAL_FAIL
+                status == NodeStatus.FAILED || status == NodeStatus.TIMEOUT
                         ? status
                         : null);
     }
@@ -257,7 +251,7 @@ public class ExecutionContext {
         NodeStatus s = getNodeStatus(nodeId);
         return s == NodeStatus.SUCCESS || s == NodeStatus.FAILED
                 || s == NodeStatus.TIMEOUT || s == NodeStatus.SUPPRESSED
-                || s == NodeStatus.SKIPPED || s == NodeStatus.PARTIAL_FAIL;
+                || s == NodeStatus.SKIPPED;
     }
 
     /**

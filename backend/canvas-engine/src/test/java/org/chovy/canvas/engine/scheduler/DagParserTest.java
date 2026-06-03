@@ -31,7 +31,7 @@ class DagParserTest {
               {"id":"n1","type":"MQ_TRIGGER","name":"触发","config":{"nextNodeId":"n2"}},
               {"id":"n2","type":"IF_CONDITION","name":"判断",
                "config":{"rules":[],"successNodeId":"n3","failNodeId":null}},
-              {"id":"n3","type":"COUPON","name":"发券","config":{}}
+              {"id":"n3","type":"COMMIT_ACTION","name":"发券","config":{}}
             ]}
             """;
         DagGraph g = parser.parse(json);
@@ -47,7 +47,7 @@ class DagParserTest {
         String json = """
             {"nodes":[
               {"id":"n1","type":"MQ_TRIGGER","config":{"nextNodeId":"n2"}},
-              {"id":"n2","type":"DELAY","config":{"nextNodeId":"n1"}}
+              {"id":"n2","type":"WAIT","config":{"nextNodeId":"n1"}}
             ]}
             """;
         assertThatThrownBy(() -> parser.parse(json))
@@ -63,8 +63,8 @@ class DagParserTest {
               {"id":"n1","type":"MQ_TRIGGER","config":{"nextNodeId":"n2"}},
               {"id":"n2","type":"IF_CONDITION",
                "config":{"successNodeId":"n3","failNodeId":"n4"}},
-              {"id":"n3","type":"COUPON","config":{}},
-              {"id":"n4","type":"REACH_PLATFORM","config":{}}
+              {"id":"n3","type":"COMMIT_ACTION","config":{}},
+              {"id":"n4","type":"SEND_MESSAGE","config":{}}
             ]}
             """;
         DagGraph g = parser.parse(json);
@@ -81,21 +81,36 @@ class DagParserTest {
             {"nodes":[
               {"id":"n1","type":"WAIT","name":"等待",
                "outletSchema":"[{\\\"id\\\":\\\"success\\\",\\\"label\\\":\\\"继续\\\"}]",
-               "config":{"timeoutNodeId":"n2","suppressedNodeId":"n3","skippedNodeId":"n4",
-                         "maxExceededNodeId":"n5","goalMetNodeId":"n6","goalNotMetNodeId":"n7"}},
+               "config":{"nextNodeId":"n2","timeoutNodeId":"n3"}},
               {"id":"n2","type":"END","config":{}},
-              {"id":"n3","type":"END","config":{}},
-              {"id":"n4","type":"END","config":{}},
-              {"id":"n5","type":"END","config":{}},
-              {"id":"n6","type":"END","config":{}},
-              {"id":"n7","type":"END","config":{}}
+              {"id":"n3","type":"END","config":{}}
             ]}
             """;
 
         DagGraph g = parser.parse(json);
 
         assertThat(g.getNode("n1").getOutletSchema()).contains("success");
-        assertThat(g.downstream("n1")).containsExactlyInAnyOrder("n2", "n3", "n4", "n5", "n6", "n7");
+        assertThat(g.downstream("n1")).containsExactlyInAnyOrder("n2", "n3");
+    }
+
+    @Test
+    @DisplayName("SPLIT 分支数组中的 nextNodeId 会被识别")
+    void split_branches_are_edges() {
+        String json = """
+            {"nodes":[
+              {"id":"split","type":"SPLIT",
+               "config":{"branches":[
+                 {"branchId":"a","nextNodeId":"a"},
+                 {"branchId":"b","nextNodeId":"b"}
+               ]}},
+              {"id":"a","type":"END","config":{}},
+              {"id":"b","type":"END","config":{}}
+            ]}
+            """;
+
+        DagGraph g = parser.parse(json);
+
+        assertThat(g.downstream("split")).containsExactlyInAnyOrder("a", "b");
     }
 
     @Test
@@ -104,9 +119,9 @@ class DagParserTest {
         String json = """
             {"nodes":[
               {"id":"start","type":"MQ_TRIGGER","config":{"successNodeId":"a","failNodeId":"b"}},
-              {"id":"a","type":"DELAY","config":{"nextNodeId":"send"}},
-              {"id":"b","type":"DELAY","config":{"nextNodeId":"send"}},
-              {"id":"send","type":"SEND_SMS","config":{}}
+              {"id":"a","type":"WAIT","config":{"nextNodeId":"send"}},
+              {"id":"b","type":"WAIT","config":{"nextNodeId":"send"}},
+              {"id":"send","type":"SEND_MESSAGE","config":{}}
             ]}
             """;
 
@@ -119,12 +134,12 @@ class DagParserTest {
     @Test
     @DisplayName("显式收敛节点允许多入边")
     void convergence_nodes_allow_multi_input() {
-        for (String type : java.util.List.of("HUB", "LOGIC_RELATION", "AGGREGATE", "THRESHOLD")) {
+        for (String type : java.util.List.of("HUB", "AGGREGATE", "THRESHOLD")) {
             String json = """
                 {"nodes":[
                   {"id":"start","type":"MQ_TRIGGER","config":{"successNodeId":"a","failNodeId":"b"}},
-                  {"id":"a","type":"DELAY","config":{"nextNodeId":"merge"}},
-                  {"id":"b","type":"DELAY","config":{"nextNodeId":"merge"}},
+                  {"id":"a","type":"WAIT","config":{"nextNodeId":"merge"}},
+                  {"id":"b","type":"WAIT","config":{"nextNodeId":"merge"}},
                   {"id":"merge","type":"%s","config":{}}
                 ]}
                 """.formatted(type);
@@ -139,8 +154,8 @@ class DagParserTest {
         String json = """
             {"nodes":[
               {"id":"start","type":"MQ_TRIGGER","config":{"successNodeId":"a","failNodeId":"b"}},
-              {"id":"a","type":"DELAY","config":{"nextNodeId":"end"}},
-              {"id":"b","type":"DELAY","config":{"nextNodeId":"end"}},
+              {"id":"a","type":"WAIT","config":{"nextNodeId":"end"}},
+              {"id":"b","type":"WAIT","config":{"nextNodeId":"end"}},
               {"id":"end","type":"END","config":{}}
             ]}
             """;

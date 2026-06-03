@@ -149,51 +149,5 @@ INSERT INTO ab_experiment_group (experiment_id, group_key, label, sort_order, en
 SELECT id, 'B', 'B组', 20, 1 FROM ab_experiment
 ON DUPLICATE KEY UPDATE label = VALUES(label), sort_order = VALUES(sort_order);
 
-UPDATE node_type_registry
-SET config_schema = JSON_REMOVE(JSON_SET(config_schema, '$[0].optionCategory', 'schedule_type'), '$[0].options')
-WHERE type_key = 'SCHEDULED_TRIGGER';
-
-UPDATE node_type_registry
-SET config_schema = JSON_REMOVE(JSON_SET(config_schema, '$[2].optionCategory', 'approval_timeout_action'), '$[2].options')
-WHERE type_key = 'MANUAL_APPROVAL';
-
-UPDATE node_type_registry
-SET config_schema = JSON_REMOVE(JSON_SET(config_schema, '$[1].optionCategory', 'canvas_invoke_mode'), '$[1].options')
-WHERE type_key = 'CANVAS_TRIGGER';
-
-UPDATE node_type_registry
-SET config_schema = JSON_REMOVE(JSON_SET(config_schema, '$[0].optionCategory', 'logic_relation'), '$[0].options')
-WHERE type_key = 'LOGIC_RELATION';
-
-UPDATE node_type_registry
-SET config_schema = JSON_REMOVE(JSON_SET(config_schema, '$[0].optionCategory', 'direct_return_build_type'), '$[0].options')
-WHERE type_key = 'DIRECT_RETURN';
-
-UPDATE node_type_registry
-SET config_schema = JSON_REMOVE(JSON_SET(config_schema, '$[0].optionCategory', 'tagger_mode'), '$[0].options')
-WHERE type_key = 'TAGGER';
-
-UPDATE node_type_registry
-SET config_schema = JSON_REMOVE(JSON_SET(config_schema, '$[0].optionCategory', 'threshold_mode'), '$[0].options')
-WHERE type_key = 'THRESHOLD';
-
-UPDATE node_type_registry
-SET config_schema = JSON_REMOVE(JSON_SET(config_schema, '$[0].optionCategory', 'aggregate_evaluate_mode'), '$[0].options')
-WHERE type_key = 'AGGREGATE';
-
-UPDATE node_type_registry
-SET config_schema = JSON_REMOVE(JSON_SET(config_schema, '$[1].optionCategory', 'delay_unit'), '$[1].options')
-WHERE type_key = 'DELAY'
-  AND JSON_UNQUOTE(JSON_EXTRACT(config_schema, '$[1].key')) = 'unit';
-
-UPDATE node_type_registry
-SET config_schema = JSON_REMOVE(JSON_SET(config_schema, '$[0].optionCategory', 'start_trigger_type'), '$[0].options')
-WHERE type_key = 'START';
-
-UPDATE node_type_registry
-SET config_schema = JSON_REMOVE(JSON_SET(config_schema, '$[0].optionCategory', 'behavior_trigger_type'), '$[0].options')
-WHERE type_key = 'BEHAVIOR_TRIGGER';
-
-UPDATE node_type_registry
-SET config_schema = JSON_REMOVE(JSON_SET(config_schema, '$[0].optionCategory', 'logic_relation'), '$[0].options')
-WHERE type_key = 'BEHAVIOR_STRATEGY';
+-- Governed node catalog schemas are consolidated in V90.
+SELECT 1;

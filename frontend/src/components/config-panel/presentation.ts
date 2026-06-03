@@ -89,7 +89,7 @@ const GROUP_ORDER: ConfigPanelFieldGroupKey[] = ['basic', 'rules', 'mapping', 'p
 
 /** 根据控件类型判断字段在紧凑 inspector 中的分组。 */
 function resolveGroupKey(type: string): ConfigPanelFieldGroupKey {
-  if (['condition-rule-list', 'branch-list', 'priority-list', 'ab-group-list', 'cron', 'delay-input'].includes(type)) {
+  if (['condition-rule-list', 'split-branch-list', 'broadcast-branch-list', 'cron'].includes(type)) {
     return 'rules'
   }
   if (['context-value-list', 'param-define-list', 'key-value', 'api-input-params'].includes(type)) {
@@ -129,28 +129,10 @@ function buildFieldGroups(fields: ConfigPanelPresentationField[]): ConfigPanelFi
 /** 从集合型出口 handle 中解析目标节点 ID。 */
 function resolveIndexedRouteTarget(handleId: string, bizConfig: CanvasNodeData['bizConfig']): string | undefined {
   if (handleId.startsWith('branch-')) {
-    const index = Number(handleId.replace('branch-', ''))
-    return bizConfig.branches?.[index]?.nextNodeId
-  }
-  if (handleId.startsWith('priority-')) {
-    const index = Number(handleId.replace('priority-', ''))
-    return bizConfig.priorities?.[index]?.nextNodeId
-  }
-  if (handleId.startsWith('group-')) {
-    const key = handleId.replace('group-', '')
-    return bizConfig.groups?.find(group => group.groupKey === key)?.nextNodeId
-  }
-  if (handleId.startsWith('path-')) {
-    const key = handleId.replace('path-', '')
-    return bizConfig.paths?.find(path => String(path.pathId ?? path.id ?? '') === key)?.nextNodeId
-  }
-  if (handleId.startsWith('variant-')) {
-    const key = handleId.replace('variant-', '')
-    return bizConfig.variants?.find(variant => String(variant.variantId ?? variant.id ?? '') === key)?.nextNodeId
-  }
-  if (handleId.startsWith('band-')) {
-    const key = handleId.replace('band-', '')
-    return bizConfig.bands?.find(band => String(band.bandId ?? band.id ?? '') === key)?.nextNodeId
+    const key = handleId.replace('branch-', '')
+    return bizConfig.branches?.find((branch, index) =>
+      String(branch.branchId ?? branch.id ?? `branch_${index + 1}`) === key,
+    )?.nextNodeId
   }
   return undefined
 }
@@ -159,17 +141,8 @@ function resolveIndexedRouteTarget(handleId: string, bizConfig: CanvasNodeData['
 function resolveRouteTone(handleId: string, label: string): 'success' | 'danger' {
   const dangerIds = new Set([
     'fail',
-    'else',
     'miss',
-    'reject',
     'timeout',
-    'suppressed',
-    'skipped',
-    'unavailable',
-    'capped',
-    'fallback',
-    'max_exceeded',
-    'goal_not_met',
   ])
   if (dangerIds.has(handleId)) return 'danger'
   if (/未|不|失败|拒绝|否则/.test(label)) return 'danger'

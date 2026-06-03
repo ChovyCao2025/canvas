@@ -18,8 +18,8 @@ describe('graph hydration', () => {
     const nodes: BackendNode[] = [
       {
         id: 'send_1',
-        type: 'SEND_EMAIL',
-        name: '发送邮件',
+        type: 'SEND_MESSAGE',
+        name: '发送消息',
         category: '消息触达',
         x: 0,
         y: 0,
@@ -28,8 +28,8 @@ describe('graph hydration', () => {
     ]
     const registry = [
       {
-        typeKey: 'SEND_EMAIL',
-        typeName: '发送邮件',
+        typeKey: 'SEND_MESSAGE',
+        typeName: '发送消息',
         category: '消息触达',
         configSchema: '[]',
         outputSchema: '[]',
@@ -52,8 +52,8 @@ describe('graph hydration', () => {
     const nodes: BackendNode[] = [
       {
         id: 'send_1',
-        type: 'SEND_EMAIL',
-        name: '发送邮件',
+        type: 'SEND_MESSAGE',
+        name: '发送消息',
         category: '消息触达',
         x: 0,
         y: 0,
@@ -63,8 +63,8 @@ describe('graph hydration', () => {
     ]
     const registry = [
       {
-        typeKey: 'SEND_EMAIL',
-        typeName: '发送邮件',
+        typeKey: 'SEND_MESSAGE',
+        typeName: '发送消息',
         category: '消息触达',
         configSchema: '[]',
         outputSchema: '[]',

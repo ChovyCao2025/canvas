@@ -26,7 +26,7 @@ public class AbExperimentGroupDO {
     /** 所属 AB 实验 ID，对应 ab_experiment.id */
     private Long experimentId;
 
-    /** 实验平台返回的分组标识，用于匹配 AB_SPLIT 节点出口 */
+    /** 实验平台返回的分组标识，用于匹配 SPLIT 节点出口 */
     private String groupKey;
 
     /** 分组展示名称，如 A 组、B 组或对照组 */

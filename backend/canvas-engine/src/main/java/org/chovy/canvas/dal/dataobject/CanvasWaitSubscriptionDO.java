@@ -10,7 +10,7 @@ import java.time.LocalDateTime;
 /**
  * 画布等待订阅记录（canvas_wait_subscription）。
  *
- * <p>当 DAG 执行到 WAIT_UNTIL_EVENT 或 GOAL_CHECK 节点时，引擎暂停执行并在此表写入一条
+ * <p>当 DAG 执行到 WAIT 节点的事件等待模式时，引擎暂停执行并在此表写入一条
  * ACTIVE 订阅记录，等待以下两种条件之一满足后恢复：
  * <ol>
  *   <li>事件上报：{@code POST /canvas/events/report} 触发 {@link WaitResumeService#resumeEventWaits}，
@@ -48,14 +48,13 @@ public class CanvasWaitSubscriptionDO {
      * 等待类型，决定恢复触发方式：
      * <ul>
      *   <li>{@code UNTIL_EVENT}：等待特定事件（可设置超时）；</li>
-     *   <li>{@code GOAL_CHECK}：等待目标达成事件（可设置超时，超时视为目标未达成）；</li>
      *   <li>{@code UNTIL_TIME}：等待到指定时间（定时扫描恢复，无 eventCode）。</li>
      * </ul>
      */
     private String waitType;
 
     /**
-     * 等待的事件编码，UNTIL_EVENT 和 GOAL_CHECK 必填，UNTIL_TIME 为 null。
+     * 等待的事件编码，UNTIL_EVENT 必填，UNTIL_TIME 为 null。
      * 事件上报时按此字段 + userId 查找订阅记录。
      */
     private String eventCode;
@@ -84,7 +83,7 @@ public class CanvasWaitSubscriptionDO {
      * <ul>
      *   <li>{@code ACTIVE}：等待中；</li>
      *   <li>{@code COMPLETED}：事件到达，正常恢复；</li>
-     *   <li>{@code EXPIRED}：超时未收到事件，以超时状态恢复（WAIT 节点走超时分支，GOAL_CHECK 视为未达成）。</li>
+     *   <li>{@code EXPIRED}：超时未收到事件，以超时状态恢复（WAIT 节点走超时分支）。</li>
      * </ul>
      */
     private String status;

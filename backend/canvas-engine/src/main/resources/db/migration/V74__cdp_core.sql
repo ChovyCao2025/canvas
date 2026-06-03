@@ -93,26 +93,5 @@ CREATE TABLE cdp_tag_operation (
     INDEX idx_tag_operation_status (status, created_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='CDP批量标签任务';
 
-INSERT INTO node_type_registry
-(type_key, type_name, category, handler_class, config_schema, output_schema, is_trigger, is_terminal, description, enabled)
-VALUES
-(
-  'CDP_TAG_WRITE',
-  '写用户标签',
-  '行为策略',
-  'org.chovy.canvas.engine.handlers.CdpTagWriteHandler',
-  '[{"key":"tagCode","label":"标签","type":"select","dataSource":"/meta/tagger-tags","required":true},{"key":"valueMode","label":"标签值来源","type":"radio","required":true,"options":[{"label":"固定值","value":"fixed"},{"label":"上下文字段","value":"context"}]},{"key":"tagValue","label":"标签值","type":"text","showWhen":"valueMode==fixed"},{"key":"tagValueField","label":"上下文字段","type":"select","dataSource":"/meta/context-fields","showWhen":"valueMode==context"},{"key":"reason","label":"原因","type":"text"},{"key":"nextNodeId","label":"下一节点","type":"node-select"}]',
-  '[{"fieldKey":"tagCode","fieldName":"标签编码","dataType":"STRING"},{"fieldKey":"tagValue","fieldName":"标签值","dataType":"STRING"},{"fieldKey":"tagWriteStatus","fieldName":"标签写入状态","dataType":"STRING"}]',
-  0,
-  0,
-  '将当前执行用户写入CDP标签实例表',
-  1
-)
-ON DUPLICATE KEY UPDATE
-  type_name = VALUES(type_name),
-  category = VALUES(category),
-  handler_class = VALUES(handler_class),
-  config_schema = VALUES(config_schema),
-  output_schema = VALUES(output_schema),
-  description = VALUES(description),
-  enabled = VALUES(enabled);
+-- Node catalog registration is handled by V90.
+SELECT 1;

@@ -46,7 +46,7 @@ public class EventDefinitionServiceImpl implements EventDefinitionService {
     private final TriggerRouteService triggerRouteService;
     /** Jackson ObjectMapper，用于 JSON 序列化和反序列化。 */
     private final ObjectMapper objectMapper;
-    /** 等待恢复服务，用于唤醒因事件挂起的 WAIT/GOAL_CHECK 节点。 */
+    /** 等待恢复服务，用于唤醒因事件挂起的 WAIT 节点。 */
     private final WaitResumeService waitResumeService;
     /** 事件定义缓存服务。 */
     private final EventDefinitionCacheService eventDefinitionCacheService;
@@ -64,7 +64,7 @@ public class EventDefinitionServiceImpl implements EventDefinitionService {
      * 1. validateReportReq     — 参数 + 事件定义校验（二级缓存，L1 Caffeine 10min / L2 Redis 1h）
      * 2. triggerAllCanvas      — 查 Redis 路由表获取订阅画布，逐个写 Disruptor RingBuffer（异步）
      * 3. writeEventLog         — 记录 event_log（canvasTriggered 已知，写入真实数量）
-     * 4. resumeWaitsAndBuild   — 唤醒因该事件挂起的 WAIT/GOAL_CHECK 节点，并构建返回 Map
+     * 4. resumeWaitsAndBuild   — 唤醒因该事件挂起的 WAIT 节点，并构建返回 Map
      * </pre>
      *
      * 步骤2是纯异步（Disruptor → CanvasExecutionService），步骤4的 wait 恢复是同步完成 DB 状态更新
@@ -90,7 +90,7 @@ public class EventDefinitionServiceImpl implements EventDefinitionService {
         // 步骤3：写 event_log
         EventLogDO eventLog = writeEventLog(req, payload, canvasIds);
 
-        // 步骤4：恢复 WAIT/GOAL_CHECK 节点，并组装返回 Map
+        // 步骤4：恢复 WAIT 节点，并组装返回 Map
         return resumeWaitsAndBuildResult(req, payload, eventId, eventLog, canvasIds);
     }
 
@@ -111,7 +111,7 @@ public class EventDefinitionServiceImpl implements EventDefinitionService {
     private Map<String, Object> resumeWaitsAndBuildResult(
             EventReportReq req, Map<String, Object> payload,
             String eventId, EventLogDO eventLog, Set<String> canvasIds) {
-        // 查询并恢复挂起的 WAIT/GOAL_CHECK 节点，返回实际恢复数量
+        // 查询并恢复挂起的 WAIT 节点，返回实际恢复数量
         int waitsResumed = waitResumeService.resumeEventWaits(
                 req.getEventCode(),
                 req.getUserId(),

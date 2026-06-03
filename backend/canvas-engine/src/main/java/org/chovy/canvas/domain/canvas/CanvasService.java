@@ -480,7 +480,8 @@ public class CanvasService {
                     String k = mqTriggerHandler.resolveTopic(cfg);
                     if (!k.isEmpty()) triggerRouteService.registerMq(canvasId, k);
                 }
-                case NodeType.TAGGER_REALTIME -> {
+                case NodeType.TAGGER -> {
+                    if (!"realtime".equals(String.valueOf(cfg.getOrDefault("mode", "")))) continue;
                     String k = (String) cfg.get("tagCodeKey");
                     if (k != null) triggerRouteService.registerTagger(canvasId, k);
                 }
@@ -510,7 +511,8 @@ public class CanvasService {
                     String k = mqTriggerHandler.resolveTopic(cfg);
                     if (!k.isEmpty()) triggerRouteService.removeMq(canvasId, k);
                 }
-                case NodeType.TAGGER_REALTIME -> {
+                case NodeType.TAGGER -> {
+                    if (!"realtime".equals(String.valueOf(cfg.getOrDefault("mode", "")))) continue;
                     String k = (String) cfg.get("tagCodeKey");
                     if (k != null) triggerRouteService.removeTagger(canvasId, k);
                 }

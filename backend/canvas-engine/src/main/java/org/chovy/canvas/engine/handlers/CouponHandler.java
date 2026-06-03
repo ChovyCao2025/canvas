@@ -3,7 +3,6 @@ package org.chovy.canvas.engine.handlers;
 import org.chovy.canvas.common.MapFieldKeys;
 import org.chovy.canvas.engine.context.ExecutionContext;
 import org.chovy.canvas.engine.handler.NodeHandler;
-import org.chovy.canvas.engine.handler.NodeHandlerType;
 import org.chovy.canvas.engine.handler.NodeResult;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -21,8 +20,7 @@ import java.util.*;
  * 3) 把关键结果（couponId/couponAmount）写入上下文输出。
  */
 @Slf4j
-@Component
-@NodeHandlerType("COUPON")
+@Component("couponHandler")
 public class CouponHandler implements NodeHandler {
 
     /** 券系统 HTTP 客户端。 */

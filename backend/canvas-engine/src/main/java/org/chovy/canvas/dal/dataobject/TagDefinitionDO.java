@@ -27,8 +27,8 @@ public class TagDefinitionDO {
     /**
      * 标签类型。
      * <ul>
-     *   <li>{@code offline} — 离线标签，由 TAGGER_OFFLINE 节点处理，异步写入标签平台</li>
-     *   <li>{@code realtime} — 实时标签，由 TAGGER_REALTIME 节点处理，同步打标</li>
+     *   <li>{@code offline} — 离线标签，由 TAGGER 节点异步写入标签平台</li>
+     *   <li>{@code realtime} — 实时标签，由 TAGGER 节点同步打标</li>
      * </ul>
      */
     private String tagType;

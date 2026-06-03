@@ -58,33 +58,6 @@ public final class NodeRouteResolver {
     }
 
     /**
-     * 构建、解析或转换 resolve Priority Branch Targets 相关的业务数据。
-     *
-     * <p>方法会结合入参、当前对象状态和依赖组件完成处理，调用方需关注返回值以及可能产生的状态变更。
-     *
-     * @param result result 方法执行所需的业务参数
-     * @return 查询、转换或计算得到的结果集合
-     */
-    public static List<String> resolvePriorityBranchTargets(NodeResult result) {
-        List<String> targets = new ArrayList<>();
-        if (result.routes() != null && !result.routes().isEmpty()) {
-            for (Map.Entry<String, String> entry : result.routes().entrySet()) {
-                if (!MapFieldKeys.ELSE.equals(entry.getKey())) {
-                    // 优先级节点只返回候选分支，else 由所有候选失败后再处理。
-                    addIfPresent(targets, entry.getValue());
-                }
-            }
-            return targets;
-        }
-        if (result.branchMap() != null) {
-            for (Map.Entry<String, String> entry : result.branchMap().entrySet()) {
-                addIfPresent(targets, entry.getValue());
-            }
-        }
-        return targets;
-    }
-
-    /**
      * 构建、解析或转换 resolve Fallback Target 相关的业务数据。
      *
      * <p>方法会结合入参、当前对象状态和依赖组件完成处理，调用方需关注返回值以及可能产生的状态变更。
@@ -95,7 +68,7 @@ public final class NodeRouteResolver {
     public static String resolveFallbackTarget(NodeResult result) {
         String target = null;
         if (result.routes() != null && result.routes().containsKey(MapFieldKeys.ELSE)) {
-            // 新版 routes 中的 else 优先级高于历史 elseNodeId。
+            // routes 中的 else 优先级高于兼容字段 elseNodeId。
             target = result.routes().get(MapFieldKeys.ELSE);
         } else {
             target = result.elseNodeId();

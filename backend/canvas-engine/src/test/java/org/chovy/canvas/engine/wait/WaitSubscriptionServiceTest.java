@@ -76,42 +76,6 @@ class WaitSubscriptionServiceTest {
     }
 
     @Test
-    void createGoalWait_persistsActiveGoalSubscription() {
-        WaitSubscriptionService service = new WaitSubscriptionService(mapper, CLOCK);
-        LocalDateTime expiresAt = LocalDateTime.of(2026, 5, 24, 18, 0);
-
-        CanvasWaitSubscriptionDO created = service.createGoalWait(
-                "exec-1",
-                10L,
-                20L,
-                "user-1",
-                "goal-1",
-                "ORDER_PAID",
-                "{\"sourceNodeId\":\"goal-1\"}",
-                expiresAt
-        );
-
-        ArgumentCaptor<CanvasWaitSubscriptionDO> captor = ArgumentCaptor.forClass(CanvasWaitSubscriptionDO.class);
-        verify(mapper).insert(captor.capture());
-        CanvasWaitSubscriptionDO inserted = captor.getValue();
-
-        assertThat(created).isSameAs(inserted);
-        assertThat(inserted.getExecutionId()).isEqualTo("exec-1");
-        assertThat(inserted.getCanvasId()).isEqualTo(10L);
-        assertThat(inserted.getVersionId()).isEqualTo(20L);
-        assertThat(inserted.getUserId()).isEqualTo("user-1");
-        assertThat(inserted.getNodeId()).isEqualTo("goal-1");
-        assertThat(inserted.getWaitType()).isEqualTo(WaitSubscriptionService.WAIT_TYPE_GOAL);
-        assertThat(inserted.getEventCode()).isEqualTo("ORDER_PAID");
-        assertThat(inserted.getEventFilters()).isNull();
-        assertThat(inserted.getResumePayload()).isEqualTo("{\"sourceNodeId\":\"goal-1\"}");
-        assertThat(inserted.getExpiresAt()).isEqualTo(expiresAt);
-        assertThat(inserted.getStatus()).isEqualTo(WaitSubscriptionService.STATUS_ACTIVE);
-        assertThat(inserted.getCreatedAt()).isEqualTo(LocalDateTime.of(2026, 5, 23, 18, 15, 30));
-        assertThat(inserted.getUpdatedAt()).isEqualTo(inserted.getCreatedAt());
-    }
-
-    @Test
     void findActiveEventWaits_returnsMapperResults() {
         WaitSubscriptionService service = new WaitSubscriptionService(mapper, CLOCK);
         CanvasWaitSubscriptionDO wait = new CanvasWaitSubscriptionDO();

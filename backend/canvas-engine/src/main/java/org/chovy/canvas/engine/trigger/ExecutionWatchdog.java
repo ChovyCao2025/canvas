@@ -1,16 +1,13 @@
 package org.chovy.canvas.engine.trigger;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import org.chovy.canvas.common.enums.NodeType;
 import org.chovy.canvas.dal.dataobject.CanvasManualApprovalDO;
 import org.chovy.canvas.dal.mapper.CanvasManualApprovalMapper;
 import org.chovy.canvas.common.enums.ApprovalOnTimeoutAction;
 import org.chovy.canvas.common.enums.ApprovalStatus;
 import org.chovy.canvas.common.enums.ExecutionStatus;
-import org.chovy.canvas.common.enums.TriggerType;
 import org.chovy.canvas.dal.dataobject.CanvasExecutionDO;
 import org.chovy.canvas.dal.mapper.CanvasExecutionMapper;
-import org.chovy.canvas.engine.handlers.ManualApprovalHandler;
 import org.chovy.canvas.engine.wait.WaitResumeService;
 import org.chovy.canvas.infrastructure.redis.ContextPersistenceService;
 import lombok.RequiredArgsConstructor;
@@ -150,29 +147,6 @@ public class ExecutionWatchdog {
         approval.setResultAt(LocalDateTime.now());
         approvalMapper.updateById(approval);
 
-        // 2) 向 ctx 写入超时判定，让 DAG 在 MANUAL_APPROVAL 节点继续路由
-        var ctx = ctxStore.load(approval.getCanvasId(), approval.getUserId());
-        if (ctx == null) {
-            log.warn("[WATCHDOG] ctx 不存在，跳过恢复 executionId={}", approval.getExecutionId());
-            return;
-        }
-
-        String resultKey = ManualApprovalHandler.APPROVAL_RESULT_KEY + approval.getNodeId();
-        // 通过约定 key 把“超时决策结果”传给审批节点后续路由逻辑
-        ctx.getFlatContext().put(resultKey, result);
-        // 先持久化 ctx 再触发恢复，确保恢复链路能读到审批超时决策。
-        ctxStore.save(ctx);
-
-        // 3) 复用 trigger() 恢复执行，走统一幂等/并发保护链路
-        executionService.trigger(
-                        approval.getCanvasId(), approval.getUserId(),
-                        TriggerType.MANUAL_APPROVAL_TIMEOUT, NodeType.MANUAL_APPROVAL,
-                        null, Map.of(), approval.getExecutionId() + ":timeout", false)
-                .subscribe(
-                        null,
-                        e -> log.error("[WATCHDOG] 超时恢复失败: {}", e.getMessage())
-                );
-
-        log.info("[WATCHDOG] 超时处理完成 approvalId={} result={}", approval.getId(), result);
+        log.info("[WATCHDOG] 审批超时记录已更新 approvalId={} result={}", approval.getId(), result);
     }
 }

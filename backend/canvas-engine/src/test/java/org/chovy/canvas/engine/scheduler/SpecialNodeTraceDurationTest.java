@@ -13,7 +13,7 @@ import static org.assertj.core.api.Assertions.*;
 
 /**
  * Structural test documenting that {@code executeNodeAfterStage2} — the execution path
- * shared by all 4 special node types (HUB, AGGREGATE, LOGIC_RELATION, THRESHOLD) —
+ * shared by all special convergence node types (HUB, AGGREGATE, THRESHOLD) —
  * now captures {@code nodeStartMs} and passes {@code durationMs} to the 4-arg
  * {@code writeTraceEnd} overload, matching the behaviour of the ordinary node path
  * in {@code executeNode}.
@@ -63,7 +63,7 @@ class SpecialNodeTraceDurationTest {
         assertThat(fourArgOverloads)
                 .as("The 4-arg writeTraceEnd(ctx, node, result, long durationMs) overload must exist. "
                         + "executeNodeAfterStage2 uses this overload to record real duration for "
-                        + "HUB / AGGREGATE / LOGIC_RELATION / THRESHOLD traces.")
+                        + "HUB / AGGREGATE / THRESHOLD traces.")
                 .isNotEmpty();
 
         // Verify the 4th parameter is long (durationMs)

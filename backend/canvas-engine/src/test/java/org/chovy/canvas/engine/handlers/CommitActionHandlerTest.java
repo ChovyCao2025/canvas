@@ -1,7 +1,6 @@
 package org.chovy.canvas.engine.handlers;
 
 import org.chovy.canvas.common.MapFieldKeys;
-import org.chovy.canvas.common.enums.NodeType;
 import org.chovy.canvas.engine.context.ExecutionContext;
 import org.chovy.canvas.engine.handler.NodeHandler;
 import org.chovy.canvas.engine.handler.NodeResult;
@@ -22,7 +21,7 @@ class CommitActionHandlerTest {
         ExecutionContext ctx = context();
 
         NodeResult result = handler.executeAsync(Map.of(
-                MapFieldKeys.ACTION_TYPE, NodeType.COUPON,
+                MapFieldKeys.ACTION_TYPE, CommitActionHandler.ACTION_ISSUE_COUPON,
                 MapFieldKeys.NODE_ID_INTERNAL, "coupon-a",
                 MapFieldKeys.NEXT_NODE_ID, "next"
         ), ctx).block();
@@ -40,7 +39,7 @@ class CommitActionHandlerTest {
         ExecutionContext ctx = context();
 
         NodeResult result = handler.executeAsync(Map.of(
-                MapFieldKeys.ACTION_TYPE, NodeType.POINTS_OPERATION,
+                MapFieldKeys.ACTION_TYPE, CommitActionHandler.ACTION_POINTS,
                 MapFieldKeys.NODE_ID_INTERNAL, "points-a",
                 MapFieldKeys.NEXT_NODE_ID, "next"
         ), ctx).block();
