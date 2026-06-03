@@ -13,6 +13,8 @@ import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Mono;
 import reactor.test.StepVerifier;
 
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.time.Duration;
 import java.util.List;
 import java.util.Map;
@@ -52,6 +54,15 @@ class CanvasSchedulerServiceTest {
     void extractsNodeIdFromScheduleTaskKey() {
         assertThat(CanvasSchedulerService.nodeIdFromTaskKey("62:scheduled-node")).isEqualTo("scheduled-node");
         assertThat(CanvasSchedulerService.nodeIdFromTaskKey("scheduled-node")).isEqualTo("scheduled-node");
+    }
+
+    @Test
+    void schedulerClosedLifecycleStateIsAtomic() throws Exception {
+        String source = Files.readString(Path.of(
+                "src/main/java/org/chovy/canvas/engine/trigger/CanvasSchedulerService.java"));
+
+        assertThat(source).contains("AtomicBoolean closed");
+        assertThat(source).doesNotContain("private boolean closed");
     }
 
     @Test

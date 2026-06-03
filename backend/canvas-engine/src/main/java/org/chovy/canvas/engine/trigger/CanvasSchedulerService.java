@@ -113,7 +113,7 @@ public class CanvasSchedulerService {
     /** 调度生命周期锁，保护注册、取消和关闭过程的并发状态。 */
     private final Object lifecycleLock = new Object();
     /** 调度服务是否已关闭。 */
-    private boolean closed;
+    private final AtomicBoolean closed = new AtomicBoolean(false);
 
     /**
      * 注册、调度或初始化 register Scheduled Triggers 相关的业务数据。
@@ -193,7 +193,7 @@ public class CanvasSchedulerService {
         List<PendingJitterGroup> groups;
         List<ScheduleKey> scheduleKeys;
         synchronized (lifecycleLock) {
-            closed = true;
+            closed.set(true);
             groups = new ArrayList<>(pendingJitterTasks.values());
             scheduleKeys = pendingJitterTasks.keySet().stream()
                     .map(taskKey -> new ScheduleKey("canvas", taskKey))
@@ -244,7 +244,7 @@ public class CanvasSchedulerService {
     /** 创建并登记 jitter 分组，服务关闭后不再接受新分组。 */
     PendingJitterGroup createPendingJitterGroup(String taskKey) {
         synchronized (lifecycleLock) {
-            if (closed) {
+            if (closed.get()) {
                 return null;
             }
             PendingJitterGroup group = new PendingJitterGroup(taskKey);
