@@ -88,6 +88,10 @@ if action == 'CHECK' then
 end
 
 if action == 'FAILURE' then
+    if state == 'OPEN' then
+        return 'OPEN|1|0'
+    end
+
     if state == 'HALF_OPEN' then
         redis.call('HSET', key,
                 'state', 'OPEN',

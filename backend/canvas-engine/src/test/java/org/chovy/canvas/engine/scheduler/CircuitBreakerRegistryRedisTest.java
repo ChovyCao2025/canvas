@@ -73,6 +73,23 @@ class CircuitBreakerRegistryRedisTest {
     }
 
     @Test
+    void recordFailure_whileOpenDoesNotExtendOpenWindow() {
+        FakeRedisTemplate redis = new FakeRedisTemplate();
+        CircuitBreakerRegistry registry = redisRegistry(redis, 1);
+        CircuitBreakerRegistry.CircuitBreaker breaker = registry.get("already-open");
+
+        breaker.recordFailure();
+        long openedAt = redis.openedAt("cb:already-open");
+        int failures = redis.failures("cb:already-open");
+
+        breaker.recordFailure();
+
+        assertThat(redis.openedAt("cb:already-open")).isEqualTo(openedAt);
+        assertThat(redis.failures("cb:already-open")).isEqualTo(failures);
+        assertThat(redis.publishedMessages()).containsExactly("cb:already-open:OPEN");
+    }
+
+    @Test
     void stateIsSharedAcrossTwoRegistryInstances() {
         FakeRedisTemplate redis = new FakeRedisTemplate();
         CircuitBreakerRegistry instanceA = redisRegistry(redis, 2);
@@ -90,7 +107,8 @@ class CircuitBreakerRegistryRedisTest {
     @Test
     void concurrentFailureRecording_hasNoLostUpdates() throws Exception {
         FakeRedisTemplate redis = new FakeRedisTemplate();
-        CircuitBreakerRegistry registry = redisRegistry(redis, 20);
+        int threshold = 20;
+        CircuitBreakerRegistry registry = redisRegistry(redis, threshold);
         CircuitBreakerRegistry.CircuitBreaker breaker = registry.get("concurrent-service");
         int workers = 32;
         CountDownLatch start = new CountDownLatch(1);
@@ -113,7 +131,7 @@ class CircuitBreakerRegistryRedisTest {
         assertThat(pool.awaitTermination(5, TimeUnit.SECONDS)).isTrue();
 
         assertThat(failures).isEmpty();
-        assertThat(redis.failures("cb:concurrent-service")).isEqualTo(workers);
+        assertThat(redis.failures("cb:concurrent-service")).isEqualTo(threshold);
         assertThat(registry.getState("concurrent-service"))
                 .isEqualTo(CircuitBreakerRegistry.CircuitBreaker.State.OPEN);
     }
@@ -182,6 +200,10 @@ class CircuitBreakerRegistryRedisTest {
             return records.get(redisKey).failures;
         }
 
+        long openedAt(String redisKey) {
+            return records.get(redisKey).openedAt;
+        }
+
         private TransitionResult check(String key, BreakerRecord record, long openDurationMs,
                                        int halfOpenAttempts, long now, String channel) {
             boolean changed = false;
@@ -204,6 +226,9 @@ class CircuitBreakerRegistryRedisTest {
 
         private TransitionResult failure(String key, BreakerRecord record, int threshold,
                                          long now, String channel) {
+            if (record.state == CircuitBreakerRegistry.CircuitBreaker.State.OPEN) {
+                return new TransitionResult(record.state, true, false);
+            }
             if (record.state == CircuitBreakerRegistry.CircuitBreaker.State.HALF_OPEN) {
                 record.state = CircuitBreakerRegistry.CircuitBreaker.State.OPEN;
                 record.failures = threshold;
