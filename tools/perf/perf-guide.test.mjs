@@ -106,3 +106,121 @@ test('runGuide dispatches doctor command', async () => {
   assert.equal(result.status, 'PASS')
   assert.deepEqual(calls, ['doctor'])
 })
+
+test('fixture command refuses rebuild without explicit flag', async () => {
+  const result = await runGuide(parseGuideArgs(['fixture']), {})
+
+  assert.equal(result.status, 'DRY_RUN')
+  assert.match(result.message, /--rebuild true/)
+})
+
+test('smoke stops after first verifier failure', async () => {
+  const calls = []
+  const result = await runGuide(parseGuideArgs([
+    'smoke',
+    '--perf-run-id', 'perf_smoke_001',
+    '--canvas-id', '42',
+  ]), {
+    runScenario: async ({ mode }) => {
+      calls.push(mode)
+      return mode === 'direct'
+        ? { summary: { success: 50, failed: 0 }, verifier: { verdict: 'FAIL' } }
+        : { summary: { success: 100, failed: 0 }, verifier: { verdict: 'PASS' } }
+    },
+  })
+
+  assert.equal(result.status, 'FAIL')
+  assert.equal(result.failedMode, 'direct')
+  assert.deepEqual(calls, ['direct'])
+})
+
+test('smoke runs direct and event when both pass', async () => {
+  const calls = []
+  const result = await runGuide(parseGuideArgs([
+    'smoke',
+    '--perf-run-id', 'perf_smoke_001',
+    '--canvas-id', '42',
+  ]), {
+    runScenario: async ({ mode }) => {
+      calls.push(mode)
+      return { summary: { success: 1, failed: 0 }, verifier: { verdict: 'PASS' } }
+    },
+  })
+
+  assert.equal(result.status, 'PASS')
+  assert.deepEqual(calls, ['direct', 'event'])
+})
+
+test('threshold delegates to threshold-runner with event secret env', async () => {
+  const calls = []
+  const result = await runGuide(parseGuideArgs([
+    'threshold',
+    '--mode', 'event',
+    '--event-secret-env', 'PERF_EVENT_SECRET',
+  ]), {
+    runCommand: (command, args) => {
+      calls.push([command, args])
+      return {
+        status: 0,
+        stdout: JSON.stringify({ verdict: 'MAX_STAGE_STABLE' }),
+        stderr: '',
+      }
+    },
+  })
+
+  assert.equal(result.status, 'PASS')
+  assert.equal(calls[0][0], process.execPath)
+  assert.ok(calls[0][1].includes('--event-secret-env'))
+  assert.ok(calls[0][1].includes('PERF_EVENT_SECRET'))
+})
+
+test('threshold direct mode does not forward event secret env', async () => {
+  const calls = []
+  const result = await runGuide(parseGuideArgs([
+    'threshold',
+    '--mode', 'direct',
+    '--canvas-id', '42',
+    '--event-secret-env', 'PERF_EVENT_SECRET',
+  ]), {
+    runCommand: (command, args) => {
+      calls.push([command, args])
+      return {
+        status: 0,
+        stdout: JSON.stringify({ verdict: 'MAX_STAGE_STABLE' }),
+        stderr: '',
+      }
+    },
+  })
+
+  assert.equal(result.status, 'PASS')
+  assert.ok(calls[0][1].includes('--canvas-id'))
+  assert.ok(!calls[0][1].includes('--event-secret-env'))
+})
+
+test('soak rejects run shorter than minimum duration', async () => {
+  const result = await runGuide(parseGuideArgs([
+    'soak',
+    '--perf-run-id', 'perf_soak_001',
+    '--min-duration-min', '30',
+  ]), {
+    runScenario: async () => ({
+      summary: { durationMs: 60_000, success: 100, failed: 0 },
+      verifier: { verdict: 'PASS' },
+    }),
+  })
+
+  assert.equal(result.status, 'FAIL')
+  assert.match(result.reason, /duration/)
+})
+
+test('commandForCleanup treats string false as false for programmatic calls', () => {
+  const [, args] = commandForCleanup({
+    perfRunId: 'perf_20260523_003',
+    scope: 'ledger',
+    execute: 'false',
+  })
+
+  assert.deepEqual(args.slice(args.indexOf('--execute'), args.indexOf('--execute') + 2), [
+    '--execute', 'false',
+  ])
+})

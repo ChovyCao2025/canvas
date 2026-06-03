@@ -135,7 +135,7 @@ export function commandForCleanup(config) {
       'tools/perf/cleanup.mjs',
       '--perf-run-id', config.perfRunId,
       '--scope', config.scope || 'ledger',
-      '--execute', String(Boolean(config.execute)),
+      '--execute', String(config.execute === true),
       '--mysql', config.mysql || 'mysql',
       '--database', config.database || 'canvas_db',
     ],
@@ -154,6 +154,61 @@ export function runCommand(command, args, options = {}) {
   return result
 }
 
+export function parseJsonCommandResult(result, commandName) {
+  if (result.status !== 0 && result.status !== 2) {
+    throw new Error(`${commandName} failed: ${result.stderr || result.stdout}`)
+  }
+  try {
+    return JSON.parse(result.stdout)
+  } catch (error) {
+    throw new Error(`${commandName} did not output JSON: ${error.message}`)
+  }
+}
+
+export async function defaultRunScenario(config, { mode, count, concurrency }) {
+  const perfRunId = `${config.perfRunId}_${mode}`
+  const directory = runDirectory(config, perfRunId)
+  mkdirSync(directory, { recursive: true })
+  const summaryFile = path.join(directory, 'runner-summary.json')
+  const runnerArgs = [
+    'tools/perf/perf-runner.mjs',
+    '--mode', mode,
+    '--base-url', config.baseUrl,
+    '--perf-run-id', perfRunId,
+    '--count', String(count),
+    '--concurrency', String(concurrency),
+    '--summary-file', summaryFile,
+  ]
+
+  if (mode === 'direct') {
+    runnerArgs.push('--canvas-id', config.canvasId)
+  }
+  if (mode === 'event') {
+    runnerArgs.push('--event-code', config.eventCode)
+    runnerArgs.push('--event-secret-env', config.eventSecretEnv)
+  }
+
+  const runner = parseJsonCommandResult(
+    runCommand(process.execPath, runnerArgs),
+    'perf-runner',
+  )
+  const verifierArgs = [
+    'tools/perf/verifier.mjs',
+    '--mysql', config.mysql,
+    '--database', config.database,
+    '--mode', mode,
+    '--perf-run-id', perfRunId,
+    '--sent-success', String(runner.success),
+    '--matched-canvas-count', String(config.matchedCanvasCount),
+  ]
+  const verifier = parseJsonCommandResult(
+    runCommand(process.execPath, verifierArgs),
+    'verifier',
+  )
+  writeJson(path.join(directory, 'verifier.json'), verifier)
+  return { summary: runner, verifier, directory, perfRunId }
+}
+
 async function defaultDoctor() {
   return { status: 'PASS' }
 }
@@ -166,6 +221,81 @@ async function defaultFixture(config) {
     }
   }
   return { status: 'READY' }
+}
+
+async function defaultSmoke(config, deps = {}) {
+  if (!config.perfRunId) {
+    throw new Error('--perf-run-id is required for smoke')
+  }
+  if (!config.canvasId) {
+    throw new Error('--canvas-id is required for direct smoke')
+  }
+  const runScenario = deps.runScenario || ((options) => defaultRunScenario(config, options))
+  const modes = [
+    { mode: 'direct', count: 50, concurrency: 5 },
+    { mode: 'event', count: 100, concurrency: 10 },
+  ]
+  const runs = []
+  for (const scenario of modes) {
+    const run = await runScenario(scenario)
+    runs.push({ mode: scenario.mode, verifier: run.verifier, summary: run.summary })
+    if (run.verifier.verdict !== 'PASS') {
+      return { status: 'FAIL', failedMode: scenario.mode, runs }
+    }
+  }
+  return { status: 'PASS', runs }
+}
+
+async function defaultThreshold(config, deps = {}) {
+  const run = deps.runCommand || runCommand
+  const args = [
+    'tools/perf/threshold-runner.mjs',
+    '--mode', config.mode,
+    '--base-url', config.baseUrl,
+    '--matched-canvas-count', String(config.matchedCanvasCount),
+  ]
+  if (config.mode === 'event') {
+    args.push('--event-code', config.eventCode)
+    args.push('--event-secret-env', config.eventSecretEnv)
+  }
+  if (config.mode === 'direct') {
+    args.push('--canvas-id', config.canvasId)
+  }
+  const result = parseJsonCommandResult(run(process.execPath, args), 'threshold-runner')
+  return {
+    status: result.verdict === 'NO_STABLE_STAGE' ? 'FAIL' : 'PASS',
+    ...result,
+  }
+}
+
+async function defaultSoak(config, deps = {}) {
+  if (!config.perfRunId) {
+    throw new Error('--perf-run-id is required for soak')
+  }
+  const runScenario = deps.runScenario || ((options) => defaultRunScenario(config, options))
+  const run = await runScenario({
+    mode: config.mode,
+    count: 300000,
+    concurrency: 100,
+  })
+  const requiredMs = config.minDurationMin * 60 * 1000
+  if ((run.summary.durationMs || 0) < requiredMs) {
+    return {
+      status: 'FAIL',
+      reason: `duration ${run.summary.durationMs || 0}ms is below required ${requiredMs}ms`,
+      summary: run.summary,
+      verifier: run.verifier,
+    }
+  }
+  if (run.verifier.verdict !== 'PASS') {
+    return {
+      status: 'FAIL',
+      reason: `verifier verdict ${run.verifier.verdict}`,
+      summary: run.summary,
+      verifier: run.verifier,
+    }
+  }
+  return { status: 'PASS', summary: run.summary, verifier: run.verifier }
 }
 
 async function defaultCleanup(config) {
@@ -195,9 +325,9 @@ export async function runGuide(config, deps = {}) {
   const handlers = {
     doctor: deps.doctor || defaultDoctor,
     fixture: deps.fixture || defaultFixture,
-    smoke: deps.smoke || (async () => ({ status: 'NOT_IMPLEMENTED' })),
-    threshold: deps.threshold || (async () => ({ status: 'NOT_IMPLEMENTED' })),
-    soak: deps.soak || (async () => ({ status: 'NOT_IMPLEMENTED' })),
+    smoke: deps.smoke || ((activeConfig) => defaultSmoke(activeConfig, deps)),
+    threshold: deps.threshold || ((activeConfig) => defaultThreshold(activeConfig, deps)),
+    soak: deps.soak || ((activeConfig) => defaultSoak(activeConfig, deps)),
     report: deps.report || defaultReport,
     cleanup: deps.cleanup || defaultCleanup,
   }
