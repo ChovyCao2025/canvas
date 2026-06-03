@@ -58,14 +58,14 @@ public class AudienceUserResolver {
         return userIds;
     }
 
-    public long resolveAndProcess(Long audienceId, Consumer<String> processor) {
+    public int resolveAndProcess(Long audienceId, Consumer<String> processor) {
         AudienceDefinitionDO definition = definitionMapper.selectById(audienceId);
         if (definition == null || definition.getEnabled() == null || definition.getEnabled() == 0) {
             throw new IllegalArgumentException("Audience not found or disabled: " + audienceId);
         }
         String sourceType = definition.getDataSourceType();
         if (cdpAudienceSourceService.supports(sourceType)) {
-            long count = 0;
+            int count = 0;
             for (String userId : cdpAudienceSourceService.resolveUserIds(sourceType, definition.getRuleJson())) {
                 processor.accept(userId);
                 count++;
@@ -78,7 +78,7 @@ public class AudienceUserResolver {
         throw new IllegalStateException("Unsupported audience source for scheduled fan-out: " + sourceType);
     }
 
-    private long resolveJdbc(AudienceDefinitionDO definition, Consumer<String> processor) {
+    private int resolveJdbc(AudienceDefinitionDO definition, Consumer<String> processor) {
         DataSource dataSource = null;
         try {
             JdbcConfig jdbcConfig = jdbcConfigResolver.resolve(definition.getDataSourceConfig());
@@ -92,7 +92,7 @@ public class AudienceUserResolver {
                 params.addValue("__maxRows", jdbcConfig.maxRows());
             }
             BoundSql boundSql = bindNamedParameters(sql, params);
-            long count = 0;
+            int count = 0;
             try (Connection connection = dataSource.getConnection();
                  PreparedStatement ps = connection.prepareStatement(
                          boundSql.sql(), ResultSet.TYPE_FORWARD_ONLY, ResultSet.CONCUR_READ_ONLY)) {
