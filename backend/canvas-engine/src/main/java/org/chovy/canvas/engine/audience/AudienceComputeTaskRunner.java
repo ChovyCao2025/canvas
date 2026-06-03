@@ -9,6 +9,8 @@ import org.springframework.stereotype.Service;
 import java.time.Duration;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Objects;
+import java.util.concurrent.locks.LockSupport;
 
 /**
  * Audience Compute Task Runner 人群计算组件。
@@ -33,6 +35,8 @@ public class AudienceComputeTaskRunner {
     private final NotificationService notificationService;
     /** 人群计算锁被占用时的实际重试间隔。 */
     private final Duration lockRetryDelay;
+    /** 人群计算锁重试等待策略。 */
+    private final LockRetryWaiter lockRetryWaiter;
 
     /**
      * 构造 AudienceComputeTaskRunner 实例，并根据入参初始化依赖、配置或内部状态。
@@ -68,10 +72,22 @@ public class AudienceComputeTaskRunner {
             NotificationService notificationService,
             Duration lockRetryDelay
     ) {
+        this(computeService, asyncTaskService, notificationService, lockRetryDelay,
+                AudienceComputeTaskRunner::defaultLockRetryWait);
+    }
+
+    AudienceComputeTaskRunner(
+            AudienceBatchComputeService computeService,
+            AsyncTaskService asyncTaskService,
+            NotificationService notificationService,
+            Duration lockRetryDelay,
+            LockRetryWaiter lockRetryWaiter
+    ) {
         this.computeService = computeService;
         this.asyncTaskService = asyncTaskService;
         this.notificationService = notificationService;
         this.lockRetryDelay = lockRetryDelay;
+        this.lockRetryWaiter = Objects.requireNonNull(lockRetryWaiter, "lockRetryWaiter");
     }
 
     /**
@@ -213,7 +229,22 @@ public class AudienceComputeTaskRunner {
         if (lockRetryDelay.isZero() || lockRetryDelay.isNegative()) {
             return;
         }
-        Thread.sleep(lockRetryDelay.toMillis());
+        lockRetryWaiter.waitBeforeRetry(lockRetryDelay);
+    }
+
+    private static void defaultLockRetryWait(Duration delay) throws InterruptedException {
+        if (Thread.currentThread().isInterrupted()) {
+            throw new InterruptedException("Interrupted before audience compute lock retry wait");
+        }
+        LockSupport.parkNanos(delay.toNanos());
+        if (Thread.currentThread().isInterrupted()) {
+            throw new InterruptedException("Interrupted during audience compute lock retry wait");
+        }
+    }
+
+    @FunctionalInterface
+    interface LockRetryWaiter {
+        void waitBeforeRetry(Duration delay) throws InterruptedException;
     }
 
     /**

@@ -4,8 +4,11 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import org.chovy.canvas.common.MapFieldKeys;
+import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.client.WebClient;
+import reactor.core.publisher.Mono;
+import reactor.core.scheduler.Schedulers;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -37,18 +40,31 @@ public class AudienceEvaluationContextFetcher {
      * @return 字段名到字段值的映射
      */
     public Map<String, Object> fetch(WebClient client, String userId, String ruleJson) throws Exception {
-        List<String> fields = extractFields(ruleJson);
-        if (fields.isEmpty()) {
-            // 规则不依赖任何字段时，返回空上下文即可
-            return Map.of();
-        }
-        Map<String, Object> response = client.post()
-                .uri("/offline/user-tags/query")
-                // 只把规则里出现过的字段传给 Tagger，降低单用户上下文拉取成本。
-                .bodyValue(Map.of(MapFieldKeys.USER_ID, userId, MapFieldKeys.TAG_CODES, fields))
-                .retrieve()
-                .bodyToMono(new org.springframework.core.ParameterizedTypeReference<Map<String, Object>>() {})
-                .block();
+        return fetchAsync(client, userId, ruleJson).block();
+    }
+
+    /** 以非阻塞方式拉取某用户的人群评估上下文。 */
+    public Mono<Map<String, Object>> fetchAsync(WebClient client, String userId, String ruleJson) {
+        return Mono.fromCallable(() -> extractFields(ruleJson))
+                .subscribeOn(Schedulers.boundedElastic())
+                .flatMap(fields -> {
+                    if (fields.isEmpty()) {
+                        // 规则不依赖任何字段时，返回空上下文即可
+                        return Mono.just(Map.<String, Object>of());
+                    }
+                    return client.post()
+                            .uri("/offline/user-tags/query")
+                            // 只把规则里出现过的字段传给 Tagger，降低单用户上下文拉取成本。
+                            .bodyValue(Map.of(MapFieldKeys.USER_ID, userId, MapFieldKeys.TAG_CODES, fields))
+                            .retrieve()
+                            .bodyToMono(new ParameterizedTypeReference<Map<String, Object>>() {})
+                            .map(AudienceEvaluationContextFetcher::extractTagContext)
+                            .defaultIfEmpty(Map.of());
+                });
+    }
+
+    /** 从标签服务响应中提取规则求值上下文。 */
+    private static Map<String, Object> extractTagContext(Map<String, Object> response) {
         Object tags = response == null ? null : response.get("tags");
         if (!(tags instanceof Map<?, ?> tagMap)) {
             // 标签服务返回结构异常时降级为空上下文

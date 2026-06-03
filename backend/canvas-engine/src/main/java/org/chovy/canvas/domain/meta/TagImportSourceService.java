@@ -12,6 +12,8 @@ import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
+import reactor.core.publisher.Mono;
+import reactor.core.scheduler.Schedulers;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -88,16 +90,21 @@ public class TagImportSourceService {
 
     /** 执行一次远程标签来源拉取并导入结果。 */
     public TagImportResult run(Long id) {
-        TagImportSourceDO source = requireExisting(id);
-        if (source.getEnabled() == null || source.getEnabled() != 1) {
-            throw new IllegalArgumentException("tag import source is disabled: " + id);
-        }
+        return runAsync(id).block();
+    }
 
-        // 来源拉取只负责取数和字段映射，行级校验、批次统计和 CDP 写入统一交给 TagImportService。
-        JsonNode response = executeRequest(source);
-        List<Map<String, Object>> records = resolveRecords(source, response);
-        List<TagImportRow> rows = mapRows(source, records);
-        return tagImportService.importRows("API_PULL", null, source.getUrl(), rows);
+    /** 异步执行一次远程标签来源拉取并导入结果，避免阻塞 WebFlux 事件循环线程。 */
+    public Mono<TagImportResult> runAsync(Long id) {
+        return Mono.fromCallable(() -> {
+                    TagImportSourceDO source = requireExisting(id);
+                    if (source.getEnabled() == null || source.getEnabled() != 1) {
+                        throw new IllegalArgumentException("tag import source is disabled: " + id);
+                    }
+                    return source;
+                })
+                .subscribeOn(Schedulers.boundedElastic())
+                .flatMap(source -> executeRequestAsync(source)
+                        .flatMap(response -> importResponseAsync(source, response)));
     }
 
     /**
@@ -127,8 +134,8 @@ public class TagImportSourceService {
         return source;
     }
 
-    /** 按来源配置发起 HTTP 请求并返回 JSON 响应体。 */
-    private JsonNode executeRequest(TagImportSourceDO source) {
+    /** 按来源配置发起 HTTP 请求并以非阻塞 Mono 返回 JSON 响应体。 */
+    private Mono<JsonNode> executeRequestAsync(TagImportSourceDO source) {
         OutboundUrlValidator.validateHttpUrl(source.getUrl());
         HttpMethod method = resolveMethod(source.getMethod());
         WebClient.RequestBodyUriSpec request = webClientBuilder.build().method(method);
@@ -140,7 +147,18 @@ public class TagImportSourceService {
                     .contentType(MediaType.APPLICATION_JSON)
                     .bodyValue(parseBodyTemplate(source.getBodyTemplate()));
         }
-        return spec.retrieve().bodyToMono(JsonNode.class).block();
+        return spec.retrieve().bodyToMono(JsonNode.class);
+    }
+
+    /** 将远程响应转换为导入行，并在线程池中执行阻塞的事务导入逻辑。 */
+    private Mono<TagImportResult> importResponseAsync(TagImportSourceDO source, JsonNode response) {
+        return Mono.fromCallable(() -> {
+                    // 来源拉取只负责取数和字段映射，行级校验、批次统计和 CDP 写入统一交给 TagImportService。
+                    List<Map<String, Object>> records = resolveRecords(source, response);
+                    List<TagImportRow> rows = mapRows(source, records);
+                    return tagImportService.importRows("API_PULL", null, source.getUrl(), rows);
+                })
+                .subscribeOn(Schedulers.boundedElastic());
     }
 
     /** 将配置中的 JSON 头信息追加到 WebClient 请求。 */

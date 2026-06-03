@@ -11,7 +11,6 @@ import org.chovy.canvas.engine.dag.DagGraph;
 import org.chovy.canvas.engine.dag.DagParser;
 import org.chovy.canvas.engine.handlers.MqTriggerHandler;
 import jakarta.annotation.PostConstruct;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Component;
@@ -21,6 +20,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
+import java.util.concurrent.locks.LockSupport;
 
 /**
  * 服务重启后触发路由表全量重建（设计文档第 6.4 节）。
@@ -32,7 +32,6 @@ import java.util.UUID;
  */
 @Slf4j
 @Component
-@RequiredArgsConstructor
 public class CanvasRouteInitializer {
 
     /** 画布数据访问组件，用于扫描已发布画布。 */
@@ -47,9 +46,43 @@ public class CanvasRouteInitializer {
     private final MqTriggerHandler      mqTriggerHandler;
     /** Redis 模板，用于启动重建锁和路由状态标记。 */
     private final StringRedisTemplate   redis;
+    /** 启动时其他实例持有重建锁后的等待策略。 */
+    private final StartupRouteWaiter startupRouteWaiter;
 
     /** 启动路由重建的分布式锁 key。 */
     private static final String REBUILD_LOCK = "canvas:route-init:lock";
+    /** 其他实例持有启动重建锁时，本实例等待 ready 标记的窗口。 */
+    private static final Duration REBUILD_LOCK_RETRY_DELAY = Duration.ofSeconds(2);
+
+    public CanvasRouteInitializer(
+            CanvasMapper canvasMapper,
+            CanvasVersionMapper canvasVersionMapper,
+            DagParser dagParser,
+            TriggerRouteService triggerRouteService,
+            MqTriggerHandler mqTriggerHandler,
+            StringRedisTemplate redis
+    ) {
+        this(canvasMapper, canvasVersionMapper, dagParser, triggerRouteService, mqTriggerHandler, redis,
+                CanvasRouteInitializer::defaultStartupRouteWait);
+    }
+
+    CanvasRouteInitializer(
+            CanvasMapper canvasMapper,
+            CanvasVersionMapper canvasVersionMapper,
+            DagParser dagParser,
+            TriggerRouteService triggerRouteService,
+            MqTriggerHandler mqTriggerHandler,
+            StringRedisTemplate redis,
+            StartupRouteWaiter startupRouteWaiter
+    ) {
+        this.canvasMapper = canvasMapper;
+        this.canvasVersionMapper = canvasVersionMapper;
+        this.dagParser = dagParser;
+        this.triggerRouteService = triggerRouteService;
+        this.mqTriggerHandler = mqTriggerHandler;
+        this.redis = redis;
+        this.startupRouteWaiter = Objects.requireNonNull(startupRouteWaiter, "startupRouteWaiter");
+    }
 
     /**
      * 启动阶段路由初始化。
@@ -73,7 +106,11 @@ public class CanvasRouteInitializer {
             // 另一实例正在重建，等待 2s 后不再重建（它会完成）
             log.info("[ROUTE_INIT] 另一实例正在重建路由表，本实例跳过");
             // 等待窗口给持锁实例完成 ready 标记；本实例不抢重建，减少启动风暴下的重复写。
-            try { Thread.sleep(2000); } catch (InterruptedException ignored) {}
+            try {
+                startupRouteWaiter.waitBeforeSkip(REBUILD_LOCK_RETRY_DELAY);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
             return;
         }
 
@@ -144,5 +181,20 @@ public class CanvasRouteInitializer {
                 default -> {}
             }
         }
+    }
+
+    private static void defaultStartupRouteWait(Duration delay) throws InterruptedException {
+        if (Thread.currentThread().isInterrupted()) {
+            throw new InterruptedException("Interrupted before route init wait");
+        }
+        LockSupport.parkNanos(delay.toNanos());
+        if (Thread.currentThread().isInterrupted()) {
+            throw new InterruptedException("Interrupted during route init wait");
+        }
+    }
+
+    @FunctionalInterface
+    interface StartupRouteWaiter {
+        void waitBeforeSkip(Duration delay) throws InterruptedException;
     }
 }

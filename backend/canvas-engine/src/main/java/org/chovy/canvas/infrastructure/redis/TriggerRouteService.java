@@ -1,6 +1,5 @@
 package org.chovy.canvas.infrastructure.redis;
 
-import lombok.RequiredArgsConstructor;
 import org.springframework.data.redis.connection.ReactiveRedisConnectionFactory;
 import org.springframework.data.redis.core.Cursor;
 import org.springframework.data.redis.core.RedisOperations;
@@ -19,6 +18,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
 import java.util.Set;
+import java.util.concurrent.locks.LockSupport;
 import java.util.stream.Collectors;
 
 /**
@@ -30,7 +30,6 @@ import java.util.stream.Collectors;
  * - set members: 命中的 canvasId 集合。
  */
 @Service
-@RequiredArgsConstructor
 public class TriggerRouteService {
 
     /** 阻塞式 Redis 模板，用于 Set 增删查。 */
@@ -41,10 +40,34 @@ public class TriggerRouteService {
 
     /** 响应式 Redis 连接工厂。 */
     private final ReactiveRedisConnectionFactory reactiveFactory;
+    /** 路由锁重试等待策略。 */
+    private final RouteMutationWaiter routeMutationWaiter;
     /** 路由变更锁 TTL。 */
     private static final Duration ROUTE_MUTATION_LOCK_TTL = Duration.ofSeconds(30);
+    /** 等待路由变更锁的单次重试间隔。 */
+    private static final Duration ROUTE_MUTATION_LOCK_RETRY_DELAY = Duration.ofMillis(50);
     /** 等待路由变更锁的最大毫秒数。 */
     private static final long ROUTE_MUTATION_LOCK_WAIT_MS = 5_000L;
+
+    public TriggerRouteService(
+            StringRedisTemplate redis,
+            RedisKeyUtil keys,
+            ReactiveRedisConnectionFactory reactiveFactory
+    ) {
+        this(redis, keys, reactiveFactory, TriggerRouteService::defaultRouteMutationWait);
+    }
+
+    TriggerRouteService(
+            StringRedisTemplate redis,
+            RedisKeyUtil keys,
+            ReactiveRedisConnectionFactory reactiveFactory,
+            RouteMutationWaiter routeMutationWaiter
+    ) {
+        this.redis = redis;
+        this.keys = keys;
+        this.reactiveFactory = reactiveFactory;
+        this.routeMutationWaiter = Objects.requireNonNull(routeMutationWaiter, "routeMutationWaiter");
+    }
 
     /** 注册 MQ 触发路由：topicKey -> canvasId。 */
     public void registerMq(Long canvasId, String topicKey) {
@@ -187,7 +210,7 @@ public class TriggerRouteService {
             }
             try {
                 // 短暂轮询等待发布/初始化中的路由变更完成，避免直接放大并发冲突。
-                Thread.sleep(50);
+                routeMutationWaiter.waitBeforeRetry();
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
                 throw new IllegalStateException("Interrupted while waiting for route mutation lock", e);
@@ -212,6 +235,21 @@ public class TriggerRouteService {
                 return 0
                 """;
         redis.execute(RedisScript.of(script, Long.class), List.of(lockKey), token);
+    }
+
+    private static void defaultRouteMutationWait() throws InterruptedException {
+        if (Thread.currentThread().isInterrupted()) {
+            throw new InterruptedException("Interrupted before route mutation lock retry wait");
+        }
+        LockSupport.parkNanos(ROUTE_MUTATION_LOCK_RETRY_DELAY.toNanos());
+        if (Thread.currentThread().isInterrupted()) {
+            throw new InterruptedException("Interrupted during route mutation lock retry wait");
+        }
+    }
+
+    @FunctionalInterface
+    interface RouteMutationWaiter {
+        void waitBeforeRetry() throws InterruptedException;
     }
 
     /** 使用 SCAN 查找当前命名空间下全部 MQ 路由 key。 */

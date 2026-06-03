@@ -10,6 +10,7 @@ import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.Duration;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
@@ -67,5 +68,24 @@ class TriggerRouteServiceTest {
         when(setOps.members("test:trigger:mq:order.paid")).thenReturn(Set.of("101", "bad", "  ", "-1"));
 
         assertThat(service.getCanvasByMqTopic("order.paid")).containsExactly("101");
+    }
+
+    @Test
+    void registerMqUsesManagedWaiterBetweenRouteMutationLockAttempts() {
+        AtomicInteger waitCalls = new AtomicInteger();
+        RedisKeyUtil keys = new RedisKeyUtil();
+        ReflectionTestUtils.setField(keys, "prefix", "test");
+        TriggerRouteService routeService = new TriggerRouteService(
+                redis,
+                keys,
+                mock(ReactiveRedisConnectionFactory.class),
+                waitCalls::incrementAndGet);
+        when(valueOps.setIfAbsent(eq("test:trigger:routes:mutation-lock"), any(), any(Duration.class)))
+                .thenReturn(false, false, true);
+
+        routeService.registerMq(202L, "order.paid");
+
+        assertThat(waitCalls).hasValue(2);
+        verify(setOps).add("test:trigger:mq:order.paid", "202");
     }
 }

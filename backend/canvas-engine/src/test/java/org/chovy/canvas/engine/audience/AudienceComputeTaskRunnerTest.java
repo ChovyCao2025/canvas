@@ -9,7 +9,9 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.Duration;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicInteger;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
@@ -170,5 +172,25 @@ class AudienceComputeTaskRunnerTest {
                 "VIP 人群 · 已有计算任务正在运行",
                 "/audiences?highlight=7&taskId=task_retry",
                 "task_retry");
+    }
+
+    @Test
+    void runNow_usesInjectedRetryWaiterBetweenLockConflicts() {
+        AtomicInteger waitCalls = new AtomicInteger();
+        when(computeService.compute(7L))
+                .thenReturn(AudienceComputeResult.inProgress(7L, "VIP 人群", "已有计算任务正在运行"))
+                .thenReturn(AudienceComputeResult.ready(7L, "VIP 人群", 12L, 2));
+        when(asyncTaskService.subscribers("task_waiter")).thenReturn(List.of("operator"));
+        AudienceComputeTaskRunner runner = new AudienceComputeTaskRunner(
+                computeService,
+                asyncTaskService,
+                notificationService,
+                Duration.ofMillis(50),
+                delay -> waitCalls.incrementAndGet());
+
+        runner.runNow("task_waiter", 7L, "VIP 人群", "operator");
+
+        assertThat(waitCalls).hasValue(1);
+        verify(asyncTaskService).markSucceeded("task_waiter", "{\"audienceId\":7,\"estimatedSize\":12,\"bitmapSizeKb\":2}");
     }
 }

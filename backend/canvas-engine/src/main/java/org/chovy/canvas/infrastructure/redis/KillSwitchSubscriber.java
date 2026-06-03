@@ -1,13 +1,14 @@
 package org.chovy.canvas.infrastructure.redis;
 
 import jakarta.annotation.PostConstruct;
+import jakarta.annotation.PreDestroy;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.chovy.canvas.engine.trigger.InFlightExecutionRegistry;
 import org.springframework.data.redis.connection.ReactiveRedisConnectionFactory;
-import org.springframework.data.redis.listener.ChannelTopic;
 import org.springframework.data.redis.listener.ReactiveRedisMessageListenerContainer;
 import org.springframework.stereotype.Component;
+import reactor.core.Disposable;
 
 /**
  * Kill Switch 订阅者（设计文档 13.9节）。
@@ -31,6 +32,10 @@ public class KillSwitchSubscriber {
 
     /** Kill Switch 的 Redis 模式订阅频道。 */
     private static final String KILL_PATTERN = "canvas:kill:*";
+    /** Redis 模式订阅容器，应用关闭时需要释放。 */
+    private ReactiveRedisMessageListenerContainer listenerContainer;
+    /** Redis 模式订阅句柄，应用关闭时需要取消。 */
+    private Disposable subscription;
 
     /**
      * 执行 subscribe 对应的业务逻辑。
@@ -40,11 +45,10 @@ public class KillSwitchSubscriber {
     @PostConstruct
     void subscribe() {
         try {
-            ReactiveRedisMessageListenerContainer container =
-                    new ReactiveRedisMessageListenerContainer(factory);
+            listenerContainer = new ReactiveRedisMessageListenerContainer(factory);
 
             // 使用 pSubscribe（模式订阅）匹配所有 canvasId 的 kill 频道
-            container.receive(new org.springframework.data.redis.listener.PatternTopic(KILL_PATTERN))
+            subscription = listenerContainer.receive(new org.springframework.data.redis.listener.PatternTopic(KILL_PATTERN))
                     .doOnNext(msg -> {
                         String channel = msg.getChannel();   // "canvas:kill:{canvasId}"
                         String mode    = msg.getMessage();   // "GRACEFUL" or "FORCE"
@@ -75,6 +79,21 @@ public class KillSwitchSubscriber {
             log.info("[KILL] Kill Switch 订阅启动，监听模式: {}", KILL_PATTERN);
         } catch (Exception e) {
             log.warn("[KILL] Kill Switch 订阅失败（Redis 未连接时忽略）: {}", e.getMessage());
+        }
+    }
+
+    /** 关闭服务时释放 Redis 模式订阅资源。 */
+    @PreDestroy
+    void shutdown() {
+        if (subscription != null && !subscription.isDisposed()) {
+            subscription.dispose();
+        }
+        if (listenerContainer != null) {
+            try {
+                listenerContainer.destroy();
+            } catch (Exception e) {
+                log.warn("[KILL] Kill Switch 订阅容器关闭失败: {}", e.getMessage());
+            }
         }
     }
 }

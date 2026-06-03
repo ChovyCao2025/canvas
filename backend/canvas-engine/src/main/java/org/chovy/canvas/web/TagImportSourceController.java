@@ -100,8 +100,7 @@ public class TagImportSourceController {
      */
     @PostMapping("/{id}/run")
     public Mono<R<TagImportResult>> run(@PathVariable Long id) {
-        return Mono.fromCallable(() -> tagImportSourceService.run(id))
-                .subscribeOn(Schedulers.boundedElastic())
+        return tagImportSourceService.runAsync(id)
                 .map(R::ok);
     }
 }

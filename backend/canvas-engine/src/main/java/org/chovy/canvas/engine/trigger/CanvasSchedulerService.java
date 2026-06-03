@@ -19,6 +19,7 @@ import org.springframework.stereotype.Service;
 import reactor.core.Disposable;
 import reactor.core.Disposables;
 import reactor.core.publisher.Mono;
+import reactor.core.scheduler.Schedulers;
 
 import java.time.Duration;
 import java.time.LocalDateTime;
@@ -399,70 +400,100 @@ public class CanvasSchedulerService {
     /** 根据用户来源类型解析定时触发目标用户列表。 */
     @SuppressWarnings("unchecked")
     private List<String> resolveUserIds(String sourceType, Map<String, Object> src) {
+        List<String> userIds = resolveUserIdsAsync(sourceType, src).block();
+        return userIds == null ? List.of() : userIds;
+    }
+
+    /** 根据用户来源类型异步解析定时触发目标用户列表。 */
+    @SuppressWarnings("unchecked")
+    Mono<List<String>> resolveUserIdsAsync(String sourceType, Map<String, Object> src) {
+        Map<String, Object> safeSrc = src == null ? Map.of() : src;
         return switch (sourceType) {
-            case "USER_LIST" -> (List<String>) src.getOrDefault("userIds", List.of());
+            case "USER_LIST" -> Mono.fromCallable(() -> (List<String>) safeSrc.getOrDefault("userIds", List.of()))
+                    .subscribeOn(Schedulers.boundedElastic());
 
-            case "TAGGER_GROUP" -> {
-                // 调用 Tagger 离线用户列表接口获取指定标签的用户 ID 列表
-                String tagCode = (String) src.get("tagCode");
-                int limit = src.get("limit") instanceof Number n ? n.intValue() : 10000;
-                int pageSize = src.get("pageSize") instanceof Number n ? n.intValue() : 1000;
-                if (tagCode == null) { log.warn("[SCHEDULER] TAGGER_GROUP 缺少 tagCode"); yield List.of(); }
-                try {
-                    List<String> result = new java.util.ArrayList<>();
-                    int page = 1;
-                    while (result.size() < limit) {
-                        int currentPage = page;
-                        @SuppressWarnings("unchecked")
-                        java.util.Map<String, Object> resp = taggerClient.get()
-                                .uri(u -> u.path("/offline/users")
-                                        .queryParam("tagCode", tagCode)
-                                        .queryParam("page", currentPage)
-                                        .queryParam("size", pageSize).build())
-                                .retrieve()
-                                .bodyToMono(java.util.Map.class)
-                                .block();
-                        List<String> batch = resp != null ? (List<String>) resp.getOrDefault("userIds", List.of()) : List.of();
-                        result.addAll(batch);
-                        if (batch.size() < pageSize) break; // 最后一页
-                        page++;
-                    }
-                    log.info("[SCHEDULER] TAGGER_GROUP tagCode={} 拉取 {} 个用户", tagCode, result.size());
-                    yield result.subList(0, Math.min(result.size(), limit));
-                } catch (Exception e) {
-                    log.error("[SCHEDULER] TAGGER_GROUP 用户列表拉取失败: {}", e.getMessage());
-                    yield List.of();
-                }
-            }
+            case "TAGGER_GROUP" -> resolveTaggerGroupUserIdsAsync(safeSrc);
 
-            case "USER_API" -> {
-                // 调用自定义接口获取用户列表
-                String apiKey = (String) src.get("apiKey");
-                if (apiKey == null) { log.warn("[SCHEDULER] USER_API 缺少 apiKey"); yield List.of(); }
-                try {
-                    @SuppressWarnings("unchecked")
-                    java.util.Map<String, Object> resp = apiCallClient.post()
-                            .uri("/call")
-                            .bodyValue(java.util.Map.of(
-                                    MapFieldKeys.API_KEY, apiKey,
-                                    MapFieldKeys.PARAMS, src.getOrDefault(MapFieldKeys.PARAMS, java.util.Map.of())))
-                            .retrieve()
-                            .bodyToMono(java.util.Map.class)
-                            .block();
-                    List<String> userIds = resp != null ? (List<String>) resp.getOrDefault("userIds", List.of()) : List.of();
-                    log.info("[SCHEDULER] USER_API apiKey={} 返回 {} 个用户", apiKey, userIds.size());
-                    yield userIds;
-                } catch (Exception e) {
-                    log.error("[SCHEDULER] USER_API 用户列表获取失败: {}", e.getMessage());
-                    yield List.of();
-                }
-            }
+            case "USER_API" -> resolveUserApiUserIdsAsync(safeSrc);
 
             default -> {
                 log.warn("[SCHEDULER] 未知 userSource type={}", sourceType);
-                yield List.of();
+                yield Mono.just(List.of());
             }
         };
+    }
+
+    private Mono<List<String>> resolveTaggerGroupUserIdsAsync(Map<String, Object> src) {
+        // 调用 Tagger 离线用户列表接口获取指定标签的用户 ID 列表
+        String tagCode = (String) src.get("tagCode");
+        int limit = src.get("limit") instanceof Number n ? n.intValue() : 10000;
+        int pageSize = src.get("pageSize") instanceof Number n ? n.intValue() : 1000;
+        if (tagCode == null) {
+            log.warn("[SCHEDULER] TAGGER_GROUP 缺少 tagCode");
+            return Mono.just(List.of());
+        }
+        return fetchTaggerGroupPage(tagCode, Math.max(limit, 0), Math.max(pageSize, 1), 1, new ArrayList<>())
+                .doOnNext(result -> log.info("[SCHEDULER] TAGGER_GROUP tagCode={} 拉取 {} 个用户", tagCode, result.size()))
+                .onErrorResume(e -> {
+                    log.error("[SCHEDULER] TAGGER_GROUP 用户列表拉取失败: {}", e.getMessage());
+                    return Mono.just(List.of());
+                });
+    }
+
+    @SuppressWarnings("unchecked")
+    private Mono<List<String>> fetchTaggerGroupPage(
+            String tagCode, int limit, int pageSize, int page, List<String> result) {
+        if (result.size() >= limit) {
+            return Mono.just(trimToLimit(result, limit));
+        }
+        return taggerClient.get()
+                .uri(u -> u.path("/offline/users")
+                        .queryParam("tagCode", tagCode)
+                        .queryParam("page", page)
+                        .queryParam("size", pageSize)
+                        .build())
+                .retrieve()
+                .bodyToMono(java.util.Map.class)
+                .flatMap(resp -> {
+                    List<String> batch = resp != null
+                            ? (List<String>) resp.getOrDefault("userIds", List.of())
+                            : List.of();
+                    result.addAll(batch);
+                    if (batch.size() < pageSize) {
+                        return Mono.just(trimToLimit(result, limit));
+                    }
+                    return fetchTaggerGroupPage(tagCode, limit, pageSize, page + 1, result);
+                });
+    }
+
+    @SuppressWarnings("unchecked")
+    private Mono<List<String>> resolveUserApiUserIdsAsync(Map<String, Object> src) {
+        // 调用自定义接口获取用户列表
+        String apiKey = (String) src.get("apiKey");
+        if (apiKey == null) {
+            log.warn("[SCHEDULER] USER_API 缺少 apiKey");
+            return Mono.just(List.of());
+        }
+        return apiCallClient.post()
+                .uri("/call")
+                .bodyValue(java.util.Map.of(
+                        MapFieldKeys.API_KEY, apiKey,
+                        MapFieldKeys.PARAMS, src.getOrDefault(MapFieldKeys.PARAMS, java.util.Map.of())))
+                .retrieve()
+                .bodyToMono(java.util.Map.class)
+                .map(resp -> resp != null ? (List<String>) resp.getOrDefault("userIds", List.of()) : List.<String>of())
+                .doOnNext(userIds -> log.info("[SCHEDULER] USER_API apiKey={} 返回 {} 个用户", apiKey, userIds.size()))
+                .onErrorResume(e -> {
+                    log.error("[SCHEDULER] USER_API 用户列表获取失败: {}", e.getMessage());
+                    return Mono.just(List.of());
+                });
+    }
+
+    private static List<String> trimToLimit(List<String> result, int limit) {
+        if (limit <= 0) {
+            return List.of();
+        }
+        return List.copyOf(result.subList(0, Math.min(result.size(), limit)));
     }
 
     /** 生成 [0, jitterMaxMs) 区间内的随机延迟；jitterMaxMs=0 时返回 ZERO。可静态调用，便于单测。 */
