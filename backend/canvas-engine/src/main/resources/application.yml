@@ -57,6 +57,7 @@ canvas:
     # 生产环境必须改为实际前端域名，禁止用 * 上线
     # 覆盖方式：CANVAS_CORS_ALLOWED_ORIGINS=https://canvas.yourcompany.com
     allowed-origins: "*"
+    allow-credentials: true
   redis:
     key-prefix: canvas  # key 命名空间前缀（设计文档 25.3.1节），多环境共用 Redis 时修改
   version:
