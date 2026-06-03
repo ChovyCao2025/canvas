@@ -78,6 +78,7 @@ canvas:
     global-timeout-sec: 600
     context-ttl-sec: 86400
     max-concurrency: 3000
+    local-registry-max-entries: 10000
     max-retry: 3
     retry-base-delay-ms: 1000
     retry-max-delay-ms: 30000

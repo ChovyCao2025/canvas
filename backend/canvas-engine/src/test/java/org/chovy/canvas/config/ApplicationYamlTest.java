@@ -18,6 +18,7 @@ class ApplicationYamlTest {
         assertThat(properties.getProperty("spring.lifecycle.timeout-per-shutdown-phase")).isEqualTo("30s");
         assertThat(properties.getProperty("canvas.shutdown.background-task-drain-timeout-ms")).isEqualTo("30000");
         assertThat(properties.getProperty("canvas.shutdown.background-subscription-drain-timeout-ms")).isEqualTo("30000");
+        assertThat(properties.getProperty("canvas.execution.local-registry-max-entries")).isEqualTo("10000");
     }
 
     private Properties applicationProperties() {

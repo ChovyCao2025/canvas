@@ -68,9 +68,43 @@ class InFlightExecutionRegistryLaneTest {
         assertThat(registry.laneActiveCount(ExecutionLane.HEAVY)).isEqualTo(300);
     }
 
+    @Test
+    void tryAcquireRejectsWhenLocalRegistryLimitIsReached() {
+        InFlightExecutionRegistry registry = registry();
+        ReflectionTestUtils.setField(registry, "localRegistryMaxEntries", 1);
+        when(redis.execute(any(RedisScript.class), anyList(),
+                anyString(), anyString(), anyString(), anyString(), anyString(), anyString()))
+                .thenReturn(1L);
+
+        ExecutionLaneAdmissionResult first = registry.tryAcquire(
+                10L, "exec-1", ExecutionLane.STANDARD, 3000, 1800, 3000);
+        ExecutionLaneAdmissionResult second = registry.tryAcquire(
+                10L, "exec-2", ExecutionLane.STANDARD, 3000, 1800, 3000);
+
+        assertThat(first.allowed()).isTrue();
+        assertThat(second.allowed()).isFalse();
+        assertThat(second.reason()).isEqualTo(ExecutionLaneAdmissionResult.Reason.REGISTRY_UNAVAILABLE);
+    }
+
+    @Test
+    void fallbackCountsPruneExpiredLocalEntries() {
+        InFlightExecutionRegistry registry = registry();
+        ReflectionTestUtils.setField(registry, "globalTimeoutSec", 0L);
+        when(redis.execute(any(RedisScript.class), anyList(),
+                anyString(), anyString(), anyString(), anyString(), anyString(), anyString()))
+                .thenReturn(1L);
+        registry.tryAcquire(10L, "exec-expired", ExecutionLane.STANDARD, 3000, 1800, 3000);
+        when(redis.opsForZSet()).thenThrow(new IllegalStateException("redis down"));
+
+        assertThat(registry.activeCount(10L)).isZero();
+        assertThat(registry.totalActiveCount()).isZero();
+        assertThat(registry.laneActiveCount(ExecutionLane.STANDARD)).isZero();
+    }
+
     private InFlightExecutionRegistry registry() {
         InFlightExecutionRegistry registry = new InFlightExecutionRegistry(redis, keys);
         ReflectionTestUtils.setField(registry, "globalTimeoutSec", 600L);
+        ReflectionTestUtils.setField(registry, "localRegistryMaxEntries", 10000);
         return registry;
     }
 }

@@ -46,6 +46,10 @@ public class InFlightExecutionRegistry {
     @Value("${canvas.execution.global-timeout-sec:600}")
     private long globalTimeoutSec;
 
+    /** 本地 Kill Switch 注册表最大条目数，防止异常路径漏清理后无界增长。 */
+    @Value("${canvas.execution.local-registry-max-entries:10000}")
+    private int localRegistryMaxEntries;
+
     /**
      * JVM 本地注册表，仅供 Kill Switch 使用。
      * canvasId → { executionId → Reactor 订阅槽位 }
@@ -54,6 +58,8 @@ public class InFlightExecutionRegistry {
             new ConcurrentHashMap<>();
     /** executionId → lane，用于结束或 Kill Switch 时释放对应 lane ZSET。 */
     private final ConcurrentHashMap<String, ExecutionLane> localExecutionLanes = new ConcurrentHashMap<>();
+    /** executionId → 本地过期时间，用于 Redis 不可用或异常漏清理时回收本地索引。 */
+    private final ConcurrentHashMap<String, Long> localExecutionExpiries = new ConcurrentHashMap<>();
 
     /**
      * 原子获取分布式执行槽位。
@@ -122,6 +128,17 @@ public class InFlightExecutionRegistry {
         }
 
         // Redis 准入成功，再注册本地槽位（用于 Kill Switch）
+        pruneExpiredLocalEntries(nowMs);
+        if (isLocalRegistryFull()) {
+            log.error("[REGISTRY] 本地执行注册表已达上限 localMax={}，回滚 Redis slot canvasId={} executionId={}",
+                    localRegistryMaxEntries, canvasId, executionId);
+            releaseRedisSlot(canvasKey, laneKey, globalKey, executionId);
+            return ExecutionLaneAdmissionResult.rejected(
+                    ExecutionLaneAdmissionResult.Reason.REGISTRY_UNAVAILABLE,
+                    activeCount(canvasId),
+                    laneActiveCount(effectiveLane),
+                    totalActiveCount());
+        }
         AtomicBoolean localRegistered = new AtomicBoolean(false);
         Disposable.Swap slot = Disposables.swap();
         localRegistry.compute(canvasId, (id, current) -> {
@@ -140,6 +157,7 @@ public class InFlightExecutionRegistry {
             return ExecutionLaneAdmissionResult.rejected(
                     ExecutionLaneAdmissionResult.Reason.REGISTRY_UNAVAILABLE, 0, 0, 0);
         }
+        localExecutionExpiries.put(localExecutionKey(canvasId, executionId), expiryMs);
 
         log.debug("[REGISTRY] 准入执行 canvasId={} lane={} executionId={}",
                 canvasId, effectiveLane, executionId);
@@ -156,7 +174,9 @@ public class InFlightExecutionRegistry {
             Disposable.Swap removed = map.remove(executionId);
             if (removed != null) {
                 if (map.isEmpty()) localRegistry.remove(canvasId);
-                ExecutionLane lane = localExecutionLanes.remove(localExecutionKey(canvasId, executionId));
+                String localKey = localExecutionKey(canvasId, executionId);
+                ExecutionLane lane = localExecutionLanes.remove(localKey);
+                localExecutionExpiries.remove(localKey);
                 // 执行结束释放 Redis slot；若失败，ZSET score 到期会兜底清理。
                 releaseRedisSlot(
                         keys.inflightCanvas(canvasId),
@@ -182,7 +202,9 @@ public class InFlightExecutionRegistry {
                 d.dispose();
                 log.info("[REGISTRY] FORCE 取消执行 canvasId={} executionId={}", canvasId, execId);
             }
-            ExecutionLane lane = localExecutionLanes.remove(localExecutionKey(canvasId, execId));
+            String localKey = localExecutionKey(canvasId, execId);
+            ExecutionLane lane = localExecutionLanes.remove(localKey);
+            localExecutionExpiries.remove(localKey);
             releaseRedisSlot(
                     canvasKey,
                     keys.inflightLane(lane != null ? lane : ExecutionLane.STANDARD),
@@ -206,6 +228,7 @@ public class InFlightExecutionRegistry {
             return count == null ? 0 : count.intValue();
         } catch (Exception e) {
             log.warn("[REGISTRY] activeCount Redis 读取失败，降级本地计数 canvasId={}: {}", canvasId, e.getMessage());
+            pruneExpiredLocalEntries(System.currentTimeMillis());
             ConcurrentHashMap<String, Disposable.Swap> map = localRegistry.get(canvasId);
             return map == null ? 0 : map.size();
         }
@@ -224,6 +247,7 @@ public class InFlightExecutionRegistry {
             return count == null ? 0 : count.intValue();
         } catch (Exception e) {
             log.warn("[REGISTRY] totalActiveCount Redis 读取失败，降级本地计数: {}", e.getMessage());
+            pruneExpiredLocalEntries(System.currentTimeMillis());
             return localRegistry.values().stream().mapToInt(ConcurrentHashMap::size).sum();
         }
     }
@@ -238,9 +262,47 @@ public class InFlightExecutionRegistry {
         } catch (Exception e) {
             log.warn("[REGISTRY] laneActiveCount Redis 读取失败，降级本地计数 lane={}: {}",
                     lane, e.getMessage());
+            pruneExpiredLocalEntries(System.currentTimeMillis());
             ExecutionLane effectiveLane = lane != null ? lane : ExecutionLane.STANDARD;
             return (int) localExecutionLanes.values().stream().filter(effectiveLane::equals).count();
         }
+    }
+
+    private boolean isLocalRegistryFull() {
+        return localRegistryMaxEntries > 0 && totalLocalRegistrySize() >= localRegistryMaxEntries;
+    }
+
+    private int totalLocalRegistrySize() {
+        return localRegistry.values().stream().mapToInt(ConcurrentHashMap::size).sum();
+    }
+
+    private void pruneExpiredLocalEntries(long nowMs) {
+        localExecutionExpiries.forEach((localKey, expiryMs) -> {
+            if (expiryMs != null && expiryMs <= nowMs) {
+                removeExpiredLocalEntry(localKey);
+            }
+        });
+    }
+
+    private void removeExpiredLocalEntry(String localKey) {
+        int separator = localKey.indexOf(':');
+        if (separator <= 0 || separator >= localKey.length() - 1) {
+            localExecutionLanes.remove(localKey);
+            localExecutionExpiries.remove(localKey);
+            return;
+        }
+        try {
+            Long canvasId = Long.valueOf(localKey.substring(0, separator));
+            String executionId = localKey.substring(separator + 1);
+            localRegistry.computeIfPresent(canvasId, (id, current) -> {
+                current.remove(executionId);
+                return current.isEmpty() ? null : current;
+            });
+        } catch (NumberFormatException ignored) {
+            // Defensive cleanup for unexpected legacy keys.
+        }
+        localExecutionLanes.remove(localKey);
+        localExecutionExpiries.remove(localKey);
     }
 
     // ── Redis 操作 ────────────────────────────────────────────────────
