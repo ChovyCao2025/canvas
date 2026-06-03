@@ -1,0 +1,39 @@
+# Product Evolution Implementation Order
+
+Date: 2026-06-03
+
+This index converts the product-evolution todo queue into ordered spec and plan files. Implement in filename order unless a dependency note in a spec says otherwise.
+
+| Order | Capability | Spec | Plan | Source |
+|-------|------------|------|------|--------|
+| P0-001 | Production Safety And Compliance | [Spec](specs/p0-001-production-safety-and-compliance.md) | [Plan](plans/p0-001-production-safety-and-compliance-plan.md) | todo/p0/production-safety-and-compliance-stopgaps.md |
+| P0-002 | Frontend Resilience And A11y | [Spec](specs/p0-002-frontend-resilience-and-a11y.md) | [Plan](plans/p0-002-frontend-resilience-and-a11y-plan.md) | todo/p0/frontend-resilience-and-a11y-stopgaps.md |
+| P1-001 | Operating Loop And Effect Closure | [Spec](specs/p1-001-operating-loop-and-effect-closure.md) | [Plan](plans/p1-001-operating-loop-and-effect-closure-plan.md) | todo/p1/operating-loop-and-effect-closure.md |
+| P1-002 | Operator Visibility And Testability | [Spec](specs/p1-002-operator-visibility-and-testability.md) | [Plan](plans/p1-002-operator-visibility-and-testability-plan.md) | todo/p1/operator-visibility-and-testability.md |
+| P1-003 | Mautic Inspired Quick Adoptions | [Spec](specs/p1-003-mautic-inspired-quick-adoptions.md) | [Plan](plans/p1-003-mautic-inspired-quick-adoptions-plan.md) | todo/p1/mautic-inspired-quick-adoptions.md |
+| P2-001 | Collaboration Personalization And Reporting | [Spec](specs/p2-001-collaboration-personalization-and-reporting.md) | [Plan](plans/p2-001-collaboration-personalization-and-reporting-plan.md) | todo/p2/collaboration-personalization-and-reporting.md |
+| P2-002 | Plugin And Integration Foundations | [Spec](specs/p2-002-plugin-and-integration-foundations.md) | [Plan](plans/p2-002-plugin-and-integration-foundations-plan.md) | todo/p2/plugin-and-integration-foundations.md |
+| P2-003 | Platform Product Evolution Workstreams | [Spec](specs/p2-003-platform-product-evolution-workstreams.md) | [Plan](plans/p2-003-platform-product-evolution-workstreams-plan.md) | todo/p2/platform-product-evolution-workstreams.md |
+| P2-004 | Technical Migration Candidates | [Spec](specs/p2-004-technical-migration-candidates.md) | [Plan](plans/p2-004-technical-migration-candidates-plan.md) | todo/p2/technical-migration-candidates.md |
+| P2-005 | Message Template Center | [Spec](specs/p2-005-message-template-center.md) | [Plan](plans/p2-005-message-template-center-plan.md) | todo/p2/product-opportunities-from-filtered-scope.md#message-template-center |
+| P2-006 | Sandbox Demo And Sales Enablement | [Spec](specs/p2-006-sandbox-demo-sales-enablement.md) | [Plan](plans/p2-006-sandbox-demo-sales-enablement-plan.md) | todo/p2/product-opportunities-from-filtered-scope.md#sandbox-demo-canvas-and-sales-enablement |
+| P2-007 | Analytics Command Center | [Spec](specs/p2-007-analytics-command-center.md) | [Plan](plans/p2-007-analytics-command-center-plan.md) | todo/p2/product-opportunities-from-filtered-scope.md#analytics-command-center |
+| P2-008 | Integration Readiness | [Spec](specs/p2-008-integration-readiness.md) | [Plan](plans/p2-008-integration-readiness-plan.md) | todo/p2/product-opportunities-from-filtered-scope.md#integration-readiness |
+| P2-009 | Product Usage Analytics And Feedback Loop | [Spec](specs/p2-009-product-usage-analytics-feedback-loop.md) | [Plan](plans/p2-009-product-usage-analytics-feedback-loop-plan.md) | todo/p2/product-opportunities-from-filtered-scope.md#product-usage-analytics-and-feedback-loop |
+| P2-010 | Audience Operations And Data Quality | [Spec](specs/p2-010-audience-operations-data-quality.md) | [Plan](plans/p2-010-audience-operations-data-quality-plan.md) | todo/p2/product-opportunities-from-filtered-scope.md#audience-operations-and-data-quality |
+| P2-011 | Editor Productivity Beyond Baseline | [Spec](specs/p2-011-editor-productivity-beyond-baseline.md) | [Plan](plans/p2-011-editor-productivity-beyond-baseline-plan.md) | todo/p2/product-opportunities-from-filtered-scope.md#editor-productivity-beyond-baseline |
+| P2-012 | Channel Intelligence And Scheduling | [Spec](specs/p2-012-channel-intelligence-and-scheduling.md) | [Plan](plans/p2-012-channel-intelligence-and-scheduling-plan.md) | todo/p2/product-opportunities-from-filtered-scope.md#channel-intelligence-and-scheduling |
+| P2-013 | Knowledge Base And Best Practice Library | [Spec](specs/p2-013-knowledge-base-best-practice-library.md) | [Plan](plans/p2-013-knowledge-base-best-practice-library-plan.md) | todo/p2/product-opportunities-from-filtered-scope.md#knowledge-base-and-best-practice-library |
+| P2-014 | Design System And Guided Experience | [Spec](specs/p2-014-design-system-guided-experience.md) | [Plan](plans/p2-014-design-system-guided-experience-plan.md) | todo/p2/product-opportunities-from-filtered-scope.md#design-system-and-guided-experience |
+| P3-001 | Ecosystem And Plugin Marketplace Strategy | [Spec](specs/p3-001-ecosystem-and-plugin-marketplace-strategy.md) | [Plan](plans/p3-001-ecosystem-and-plugin-marketplace-strategy-plan.md) | todo/p3/ecosystem-and-plugin-marketplace-strategy.md |
+| P3-002 | Long Term AI Commerce And Ecosystem Bets | [Spec](specs/p3-002-long-term-ai-commerce-and-ecosystem-bets.md) | [Plan](plans/p3-002-long-term-ai-commerce-and-ecosystem-bets-plan.md) | todo/p3/long-term-ai-commerce-and-ecosystem-bets.md |
+| P3-003 | Long Term Architecture Evolution | [Spec](specs/p3-003-long-term-architecture-evolution.md) | [Plan](plans/p3-003-long-term-architecture-evolution-plan.md) | todo/p3/long-term-architecture-evolution.md |
+| P3-004 | Commercial Model And Billing | [Spec](specs/p3-004-commercial-model-and-billing.md) | [Plan](plans/p3-004-commercial-model-and-billing-plan.md) | todo/p3/strategic-opportunities-from-filtered-scope.md#commercial-model-and-billing |
+| P3-005 | Value Added Services And Customer Success | [Spec](specs/p3-005-value-added-services-and-customer-success.md) | [Plan](plans/p3-005-value-added-services-and-customer-success-plan.md) | todo/p3/strategic-opportunities-from-filtered-scope.md#value-added-services-and-customer-success |
+| P3-006 | Ecosystem And Partner Program | [Spec](specs/p3-006-ecosystem-and-partner-program.md) | [Plan](plans/p3-006-ecosystem-and-partner-program-plan.md) | todo/p3/strategic-opportunities-from-filtered-scope.md#ecosystem-and-partner-program |
+| P3-007 | AI Native Marketing Operations | [Spec](specs/p3-007-ai-native-marketing-operations.md) | [Plan](plans/p3-007-ai-native-marketing-operations-plan.md) | todo/p3/strategic-opportunities-from-filtered-scope.md#ai-native-marketing-operations |
+| P3-008 | Industry Packaging | [Spec](specs/p3-008-industry-packaging.md) | [Plan](plans/p3-008-industry-packaging-plan.md) | todo/p3/strategic-opportunities-from-filtered-scope.md#industry-packaging |
+| P3-009 | Globalization And Regional Expansion | [Spec](specs/p3-009-globalization-and-regional-expansion.md) | [Plan](plans/p3-009-globalization-and-regional-expansion-plan.md) | todo/p3/strategic-opportunities-from-filtered-scope.md#globalization-and-regional-expansion |
+| P3-010 | Advanced Privacy And Compliance | [Spec](specs/p3-010-advanced-privacy-and-compliance.md) | [Plan](plans/p3-010-advanced-privacy-and-compliance-plan.md) | todo/p3/strategic-opportunities-from-filtered-scope.md#advanced-privacy-and-compliance |
+| P3-011 | Advanced Architecture And Deployment Strategy | [Spec](specs/p3-011-advanced-architecture-and-deployment-strategy.md) | [Plan](plans/p3-011-advanced-architecture-and-deployment-strategy-plan.md) | todo/p3/strategic-opportunities-from-filtered-scope.md#advanced-architecture-and-deployment-strategy |
+| P3-012 | Product Led Growth And Community | [Spec](specs/p3-012-product-led-growth-and-community.md) | [Plan](plans/p3-012-product-led-growth-and-community-plan.md) | todo/p3/strategic-opportunities-from-filtered-scope.md#product-led-growth-and-community |
