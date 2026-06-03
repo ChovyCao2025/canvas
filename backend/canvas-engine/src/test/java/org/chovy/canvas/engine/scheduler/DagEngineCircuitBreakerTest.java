@@ -25,6 +25,7 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -44,6 +45,37 @@ class DagEngineCircuitBreakerTest {
 
         assertThat(handler.calls()).isZero();
         verify(breaker, never()).recordFailure();
+        verify(breaker, never()).recordSuccess();
+    }
+
+    @Test
+    void successBookkeepingErrorDoesNotRecordSyntheticFailure() {
+        CountingHandler handler = new CountingHandler();
+        CircuitBreakerRegistry.CircuitBreaker breaker = mock(CircuitBreakerRegistry.CircuitBreaker.class);
+        doThrow(new RuntimeException("redis down")).when(breaker).recordSuccess();
+        DagEngine engine = engine(handler, breaker);
+
+        assertThatThrownBy(() -> engine.execute(graph(node("success", "TEST_BLOCKED")), "success", context()).block())
+                .isInstanceOf(RuntimeException.class)
+                .hasMessageContaining("redis down");
+
+        assertThat(handler.calls()).isEqualTo(1);
+        verify(breaker).recordSuccess();
+        verify(breaker, never()).recordFailure();
+    }
+
+    @Test
+    void failureBookkeepingErrorIsNotRecordedTwice() {
+        FailingHandler handler = new FailingHandler();
+        CircuitBreakerRegistry.CircuitBreaker breaker = mock(CircuitBreakerRegistry.CircuitBreaker.class);
+        doThrow(new RuntimeException("redis down")).when(breaker).recordFailure();
+        DagEngine engine = engine(handler, breaker);
+
+        assertThatThrownBy(() -> engine.execute(graph(node("fail", "TEST_FAILING")), "fail", context()).block())
+                .isInstanceOf(RuntimeException.class)
+                .hasMessageContaining("redis down");
+
+        verify(breaker, times(1)).recordFailure();
         verify(breaker, never()).recordSuccess();
     }
 
@@ -111,6 +143,14 @@ class DagEngineCircuitBreakerTest {
 
         int calls() {
             return calls.get();
+        }
+    }
+
+    @NodeHandlerType("TEST_FAILING")
+    static class FailingHandler implements NodeHandler {
+        @Override
+        public Mono<NodeResult> executeAsync(Map<String, Object> config, ExecutionContext ctx) {
+            return Mono.just(NodeResult.fail("handler failed"));
         }
     }
 }

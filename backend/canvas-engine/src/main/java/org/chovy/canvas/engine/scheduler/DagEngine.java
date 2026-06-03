@@ -502,15 +502,20 @@ public class DagEngine {
                     } catch (CircuitBreakerRegistry.CircuitBreakerOpenException e) {
                         return Mono.just(NodeResult.circuitBreakerOpen(e.getMessage()));
                     }
-                    return handler.executeAsync(config, ctx); // ← handler 真正在这里被调用
+                    try {
+                        return handler.executeAsync(config, ctx) // ← handler 真正在这里被调用
+                                .doOnError(e -> cb.recordFailure());
+                    } catch (Throwable e) {
+                        cb.recordFailure();
+                        return Mono.error(e);
+                    }
                 })
                 .doOnNext(r -> {
                     if (r.success()) cb.recordSuccess();
                     else if (!NodeResult.REASON_CIRCUIT_BREAKER_OPEN.equals(r.reasonCode())) {
                         cb.recordFailure();
                     }
-                })
-                .doOnError(e -> cb.recordFailure());
+                });
 
         // ── ② withRetry：singleCall + 指数退避重试 + DLQ 兜底 ────
         // withRetry 本身也是惰性的（基于 singleCall 的 Mono.defer）：
