@@ -252,4 +252,3 @@ node tools/perf/perf-guide.mjs doctor
 ```
 
 如果本地依赖可用，再用两个本地 worker 目录模拟多压测机，执行一次小流量 distributed accuracy。
-

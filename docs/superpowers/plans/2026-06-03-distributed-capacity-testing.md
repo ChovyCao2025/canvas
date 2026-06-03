@@ -286,4 +286,3 @@ git commit -m "feat: support distributed perf testing"
 - [ ] **Step 6: Merge to main**
 
 From `/Users/photonpay/project/canvas`, merge the branch into `main` without reverting unrelated dirty `docs/product-evolution` changes. If main has unrelated dirty changes, verify they do not overlap with this branch and merge only after tests pass on the feature branch.
-
