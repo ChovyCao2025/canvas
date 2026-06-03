@@ -6,6 +6,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
+import java.time.Duration;
 import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
@@ -14,6 +15,7 @@ import java.util.concurrent.Future;
 import java.util.concurrent.FutureTask;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.Semaphore;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
@@ -23,26 +25,37 @@ import java.util.concurrent.atomic.AtomicBoolean;
 @Component
 public class BackgroundTaskExecutor {
 
+    private static final Duration DEFAULT_DRAIN_TIMEOUT = Duration.ofSeconds(30);
+
     private final ExecutorService executor;
     private final Semaphore permits;
     private final Set<Future<?>> active = java.util.concurrent.ConcurrentHashMap.newKeySet();
     private final AtomicBoolean closed = new AtomicBoolean(false);
+    private final Duration drainTimeout;
 
     public BackgroundTaskExecutor() {
-        this(256, Executors.newVirtualThreadPerTaskExecutor());
+        this(256, Executors.newVirtualThreadPerTaskExecutor(), DEFAULT_DRAIN_TIMEOUT);
     }
 
     @Autowired
-    public BackgroundTaskExecutor(@Value("${canvas.background.max-tasks:256}") int maxTasks) {
-        this(maxTasks, Executors.newVirtualThreadPerTaskExecutor());
+    public BackgroundTaskExecutor(
+            @Value("${canvas.background.max-tasks:256}") int maxTasks,
+            @Value("${canvas.shutdown.background-task-drain-timeout-ms:30000}") long drainTimeoutMs) {
+        this(maxTasks, Executors.newVirtualThreadPerTaskExecutor(),
+                Duration.ofMillis(Math.max(0, drainTimeoutMs)));
     }
 
     BackgroundTaskExecutor(int maxTasks, ExecutorService executor) {
+        this(maxTasks, executor, DEFAULT_DRAIN_TIMEOUT);
+    }
+
+    BackgroundTaskExecutor(int maxTasks, ExecutorService executor, Duration drainTimeout) {
         if (maxTasks < 1) {
             throw new IllegalArgumentException("maxTasks must be positive");
         }
         this.executor = executor;
         this.permits = new Semaphore(maxTasks);
+        this.drainTimeout = drainTimeout == null ? Duration.ZERO : drainTimeout;
     }
 
     public Future<?> submit(String name, Runnable task) {
@@ -95,9 +108,22 @@ public class BackgroundTaskExecutor {
         if (!closed.compareAndSet(false, true)) {
             return;
         }
+        executor.shutdown();
+        if (awaitTermination()) {
+            return;
+        }
         active.forEach(future -> future.cancel(true));
-        active.clear();
         executor.shutdownNow();
+        active.removeIf(Future::isDone);
+    }
+
+    private boolean awaitTermination() {
+        try {
+            return executor.awaitTermination(Math.max(0, drainTimeout.toNanos()), TimeUnit.NANOSECONDS);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            return false;
+        }
     }
 
     private class TrackedFutureTask<T> extends FutureTask<T> {

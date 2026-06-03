@@ -2,6 +2,7 @@ package org.chovy.canvas.engine.concurrent;
 
 import org.junit.jupiter.api.Test;
 
+import java.time.Duration;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
@@ -88,7 +89,8 @@ class BackgroundTaskExecutorTest {
 
     @Test
     void shutdownCancelsActiveTasksAndRejectsNewSubmissions() throws Exception {
-        BackgroundTaskExecutor executor = new BackgroundTaskExecutor(1, Executors.newSingleThreadExecutor());
+        BackgroundTaskExecutor executor = new BackgroundTaskExecutor(
+                1, Executors.newSingleThreadExecutor(), Duration.ZERO);
         CountDownLatch entered = new CountDownLatch(1);
 
         Future<?> future = executor.submit("blocked", () -> {
@@ -103,6 +105,38 @@ class BackgroundTaskExecutorTest {
         assertThat(executor.activeCount()).isZero();
         assertThatThrownBy(() -> executor.submit("after-shutdown", () -> {
         })).isInstanceOf(RejectedExecutionException.class);
+    }
+
+    @Test
+    void shutdownWaitsForActiveTaskToCompleteBeforeCancelling() throws Exception {
+        BackgroundTaskExecutor executor = new BackgroundTaskExecutor(
+                1, Executors.newSingleThreadExecutor(), Duration.ofMillis(500));
+        CountDownLatch entered = new CountDownLatch(1);
+        CountDownLatch release = new CountDownLatch(1);
+        var shutdownExecutor = Executors.newSingleThreadExecutor();
+
+        try {
+            Future<?> task = executor.submit("blocked", () -> {
+                entered.countDown();
+                await(release);
+            });
+            assertThat(entered.await(1, TimeUnit.SECONDS)).isTrue();
+
+            Future<?> shutdown = shutdownExecutor.submit(executor::shutdown);
+            Thread.sleep(50);
+            assertThat(shutdown.isDone()).isFalse();
+
+            release.countDown();
+            shutdown.get(1, TimeUnit.SECONDS);
+            task.get(1, TimeUnit.SECONDS);
+
+            assertThat(task.isCancelled()).isFalse();
+            assertThat(executor.activeCount()).isZero();
+        } finally {
+            release.countDown();
+            shutdownExecutor.shutdownNow();
+            executor.shutdown();
+        }
     }
 
     private static void await(CountDownLatch latch) {
