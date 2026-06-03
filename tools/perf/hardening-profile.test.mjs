@@ -81,6 +81,7 @@ test('renderThresholdCommand prints a deterministic threshold-runner command', (
   assert.match(command, /node tools\/perf\/threshold-runner\.mjs/)
   assert.match(command, /--mode event/)
   assert.match(command, /--event-code PERF_ORDER_PAID/)
+  assert.match(command, /--event-secret-env PERF_EVENT_SECRET/)
   assert.match(command, /--stages 10000:600,50000:3000/)
   assert.match(command, /--max-failed 0/)
   assert.match(command, /--max-p95-ms 1000/)
