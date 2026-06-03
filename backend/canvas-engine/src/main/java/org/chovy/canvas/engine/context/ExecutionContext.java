@@ -6,6 +6,7 @@ import lombok.Setter;
 import lombok.ToString;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /**
@@ -43,7 +44,7 @@ public class ExecutionContext {
     private String matchKey;
 
     /** 触发器携带的原始数据（写入 ctx 时的 payload） */
-    private Map<String, Object> triggerPayload = new HashMap<>();
+    private Map<String, Object> triggerPayload = new ConcurrentHashMap<>();
 
     /** 各节点产出数据历史（nodeId → {fieldKey → value}），供轨迹查询 */
     private final Map<String, Map<String, Object>> nodeOutputs = new ConcurrentHashMap<>();
@@ -61,7 +62,7 @@ public class ExecutionContext {
     private volatile boolean userReached = false;
 
     /** 子流程调用链，防循环（callStack 中记录正在执行的 canvasId） */
-    private List<Long> callStack = new ArrayList<>();
+    private List<Long> callStack = new CopyOnWriteArrayList<>();
 
     /**
      * Hub 节点首次进入等待的时间戳（ms）。
@@ -115,6 +116,18 @@ public class ExecutionContext {
     /** 获取所有节点的输出（只读），用于聚合评估等需要跨节点读输出的场景 */
     public Map<String, Map<String, Object>> getNodeOutputs() {
         return java.util.Collections.unmodifiableMap(nodeOutputs);
+    }
+
+    public void setTriggerPayload(Map<String, Object> triggerPayload) {
+        this.triggerPayload = triggerPayload == null
+                ? new ConcurrentHashMap<>()
+                : new ConcurrentHashMap<>(triggerPayload);
+    }
+
+    public void setCallStack(List<Long> callStack) {
+        this.callStack = callStack == null
+                ? new CopyOnWriteArrayList<>()
+                : new CopyOnWriteArrayList<>(callStack);
     }
 
     /**

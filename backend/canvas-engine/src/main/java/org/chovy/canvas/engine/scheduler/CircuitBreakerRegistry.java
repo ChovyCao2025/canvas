@@ -83,6 +83,15 @@ public class CircuitBreakerRegistry {
          */
         public CircuitBreaker(String name, int failureThreshold,
                                long openDurationSec, int halfOpenAttempts) {
+            if (failureThreshold <= 0) {
+                throw new IllegalArgumentException("failureThreshold must be greater than 0");
+            }
+            if (openDurationSec <= 0) {
+                throw new IllegalArgumentException("openDurationSec must be greater than 0");
+            }
+            if (halfOpenAttempts <= 0) {
+                throw new IllegalArgumentException("halfOpenAttempts must be greater than 0");
+            }
             this.name             = name;
             this.failureThreshold = failureThreshold;
             this.openDurationMs   = openDurationSec * 1000L;
@@ -93,7 +102,7 @@ public class CircuitBreakerRegistry {
          * 调用前检查：OPEN 状态直接抛出，HALF_OPEN 按 attempt 数控制。
          * @throws CircuitBreakerOpenException 熔断打开时
          */
-        public void checkState() {
+        public synchronized void checkState() {
             if (state == State.CLOSED) return;
 
             if (state == State.OPEN) {
@@ -116,7 +125,7 @@ public class CircuitBreakerRegistry {
         }
 
         /** 记录成功：任何状态均重置失败计数，确保"连续失败"语义 */
-        public void recordSuccess() {
+        public synchronized void recordSuccess() {
             if (state == State.HALF_OPEN) {
                 state = State.CLOSED;
                 log.info("[CIRCUIT] {} HALF_OPEN → CLOSED（探测成功）", name);
@@ -125,7 +134,7 @@ public class CircuitBreakerRegistry {
         }
 
         /** 记录失败 */
-        public void recordFailure() {
+        public synchronized void recordFailure() {
             if (state == State.HALF_OPEN) {
                 // 半开探测失败立即重开熔断，并刷新 openedAt 开始新一轮冷却。
                 state = State.OPEN;
