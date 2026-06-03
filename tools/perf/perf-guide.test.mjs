@@ -153,6 +153,30 @@ test('assertRunnerSummaryComplete rejects negative counters', () => {
   }), /failed must be a non-negative integer/)
 })
 
+test('assertRunnerSummaryComplete accepts fractional duration evidence', () => {
+  assert.doesNotThrow(() => assertRunnerSummaryComplete({
+    perfRunId: 'perf_report_001',
+    sent: 100,
+    success: 100,
+    failed: 0,
+    durationMs: 1800.25,
+  }, {
+    perfRunId: 'perf_report_001',
+  }))
+})
+
+test('assertRunnerSummaryComplete rejects negative duration evidence', () => {
+  assert.throws(() => assertRunnerSummaryComplete({
+    perfRunId: 'perf_report_001',
+    sent: 100,
+    success: 100,
+    failed: 0,
+    durationMs: -0.1,
+  }, {
+    perfRunId: 'perf_report_001',
+  }), /durationMs must be a non-negative number/)
+})
+
 test('commandForCleanup defaults to ledger dry run', () => {
   assert.deepEqual(commandForCleanup({
     perfRunId: 'perf_20260523_001',

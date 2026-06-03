@@ -129,15 +129,21 @@ export function assertCapacityReportable(verifier, { reportType }) {
 }
 
 function requireNumericEvidence(value, field) {
-  if (typeof value !== 'number' || !Number.isSafeInteger(value) || value < 0) {
+  if (typeof value !== 'number' || !Number.isFinite(value) || value < 0) {
     throw new Error(`runner summary field ${field} must be a non-negative integer`)
   }
   return value
 }
 
 export function assertRunnerSummaryComplete(summary, { perfRunId = '' } = {}) {
-  for (const field of ['sent', 'success', 'failed', 'durationMs']) {
+  for (const field of ['sent', 'success', 'failed']) {
     requireNumericEvidence(summary[field], field)
+    if (!Number.isSafeInteger(summary[field])) {
+      throw new Error(`runner summary field ${field} must be a non-negative integer`)
+    }
+  }
+  if (typeof summary.durationMs !== 'number' || !Number.isFinite(summary.durationMs) || summary.durationMs < 0) {
+    throw new Error('runner summary field durationMs must be a non-negative number')
   }
   if (perfRunId && summary.perfRunId !== perfRunId) {
     throw new Error(`runner summary perfRunId ${summary.perfRunId || '(missing)'} does not match ${perfRunId}`)
