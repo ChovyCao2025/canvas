@@ -68,6 +68,28 @@ test('commandForCleanup defaults to ledger dry run', () => {
       '--perf-run-id', 'perf_20260523_001',
       '--scope', 'ledger',
       '--execute', 'false',
+      '--mysql', 'mysql',
+      '--database', 'canvas_db',
+    ],
+  ])
+})
+
+test('commandForCleanup forwards custom mysql and database settings', () => {
+  assert.deepEqual(commandForCleanup({
+    perfRunId: 'perf_20260523_002',
+    scope: 'ledger',
+    execute: false,
+    mysql: 'mysql8',
+    database: 'canvas_perf',
+  }), [
+    process.execPath,
+    [
+      'tools/perf/cleanup.mjs',
+      '--perf-run-id', 'perf_20260523_002',
+      '--scope', 'ledger',
+      '--execute', 'false',
+      '--mysql', 'mysql8',
+      '--database', 'canvas_perf',
     ],
   ])
 })

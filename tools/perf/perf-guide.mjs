@@ -136,6 +136,8 @@ export function commandForCleanup(config) {
       '--perf-run-id', config.perfRunId,
       '--scope', config.scope || 'ledger',
       '--execute', String(Boolean(config.execute)),
+      '--mysql', config.mysql || 'mysql',
+      '--database', config.database || 'canvas_db',
     ],
   ]
 }
