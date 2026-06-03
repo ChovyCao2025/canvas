@@ -210,6 +210,10 @@ export async function defaultRunScenario(config, { mode, count, concurrency, per
   return { summary: runner, verifier, directory, perfRunId: scenarioPerfRunId }
 }
 
+function failedRequestCount(summary) {
+  return Number(summary.failed || 0)
+}
+
 async function defaultDoctor() {
   return { status: 'PASS' }
 }
@@ -240,6 +244,14 @@ async function defaultSmoke(config, deps = {}) {
   for (const scenario of modes) {
     const run = await runScenario(scenario)
     runs.push({ mode: scenario.mode, verifier: run.verifier, summary: run.summary })
+    if (failedRequestCount(run.summary) > 0) {
+      return {
+        status: 'FAIL',
+        failedMode: scenario.mode,
+        reason: `runner reported ${failedRequestCount(run.summary)} failed request(s)`,
+        runs,
+      }
+    }
     if (run.verifier.verdict !== 'PASS') {
       return { status: 'FAIL', failedMode: scenario.mode, runs }
     }
@@ -291,6 +303,14 @@ async function defaultSoak(config, deps = {}) {
     count: 300000,
     concurrency: 100,
   })
+  if (failedRequestCount(run.summary) > 0) {
+    return {
+      status: 'FAIL',
+      reason: `runner reported ${failedRequestCount(run.summary)} failed request(s)`,
+      summary: run.summary,
+      verifier: run.verifier,
+    }
+  }
   const requiredMs = config.minDurationMin * 60 * 1000
   if ((run.summary.durationMs || 0) < requiredMs) {
     return {

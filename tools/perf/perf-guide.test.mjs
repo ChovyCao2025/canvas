@@ -155,6 +155,25 @@ test('smoke runs direct and event when both pass', async () => {
   assert.deepEqual(calls, ['direct', 'event'])
 })
 
+test('smoke fails when runner reports request failures', async () => {
+  const calls = []
+  const result = await runGuide(parseGuideArgs([
+    'smoke',
+    '--perf-run-id', 'perf_smoke_001',
+    '--canvas-id', '42',
+  ]), {
+    runScenario: async ({ mode }) => {
+      calls.push(mode)
+      return { summary: { success: 49, failed: 1 }, verifier: { verdict: 'PASS' } }
+    },
+  })
+
+  assert.equal(result.status, 'FAIL')
+  assert.equal(result.failedMode, 'direct')
+  assert.match(result.reason, /failed request/)
+  assert.deepEqual(calls, ['direct'])
+})
+
 test('threshold delegates to threshold-runner with event secret env', async () => {
   const calls = []
   const result = await runGuide(parseGuideArgs([
@@ -259,6 +278,22 @@ test('soak rejects run shorter than minimum duration', async () => {
 
   assert.equal(result.status, 'FAIL')
   assert.match(result.reason, /duration/)
+})
+
+test('soak fails when runner reports request failures', async () => {
+  const result = await runGuide(parseGuideArgs([
+    'soak',
+    '--perf-run-id', 'perf_soak_001',
+    '--min-duration-min', '30',
+  ]), {
+    runScenario: async () => ({
+      summary: { durationMs: 1_800_000, success: 299999, failed: 1 },
+      verifier: { verdict: 'PASS' },
+    }),
+  })
+
+  assert.equal(result.status, 'FAIL')
+  assert.match(result.reason, /failed request/)
 })
 
 test('soak uses original perf run id for reportable evidence', async () => {
