@@ -3,6 +3,8 @@ spring:
     name: canvas-engine
   main:
     web-application-type: reactive
+  lifecycle:
+    timeout-per-shutdown-phase: 30s
   datasource:
     url: jdbc:mysql://localhost:3306/canvas_db?useUnicode=true&characterEncoding=utf8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true
     username: root
@@ -44,6 +46,7 @@ mybatis-plus:
 
 server:
   port: 8080
+  shutdown: graceful
 
 canvas:
   datasource:
