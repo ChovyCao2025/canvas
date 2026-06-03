@@ -348,7 +348,7 @@ class SpecialNodeStage2ExecutionTest {
                 mock(CanvasMetrics.class),
                 new ObjectMapper(),
                 ctxStore,
-                mock(org.chovy.canvas.engine.trigger.CanvasExecutionService.class)
+                mock(org.chovy.canvas.infrastructure.redis.RedisDelayQueue.class)
         );
         ReflectionTestUtils.setField(engine, "maxRetry", 1);
         ReflectionTestUtils.setField(engine, "retryBaseDelayMs", 1L);

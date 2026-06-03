@@ -226,6 +226,18 @@ public final class MapFieldKeys {
     /** 超时分支节点ID。 */
     public static final String TIMEOUT_NODE_ID = "timeoutNodeId";
 
+    /** 特殊节点超时 timer key。 */
+    public static final String TIMEOUT_TIMER_KEY = "__timeoutTimerKey";
+
+    /** 特殊节点超时调度时间戳。 */
+    public static final String TIMEOUT_SCHEDULED_AT_EPOCH_MS = "__timeoutScheduledAtEpochMs";
+
+    /** 特殊节点超时触发时间戳。 */
+    public static final String TIMEOUT_FIRE_AT_EPOCH_MS = "__timeoutFireAtEpochMs";
+
+    /** 特殊节点等待超时秒数。 */
+    public static final String TIMEOUT_SECONDS = "__timeoutSeconds";
+
     /** 等待订阅ID。 */
     public static final String WAIT_SUBSCRIPTION_ID = "waitSubscriptionId";
 

@@ -3,7 +3,6 @@ package org.chovy.canvas.engine.scheduler;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.chovy.canvas.common.DataMaskingUtil;
 import org.chovy.canvas.common.MapFieldKeys;
-import org.chovy.canvas.common.enums.ExecutionStatus;
 import org.chovy.canvas.common.enums.NodeType;
 import org.chovy.canvas.common.enums.TriggerType;
 import org.chovy.canvas.dal.dataobject.CanvasExecutionDlqDO;
@@ -22,13 +21,12 @@ import org.chovy.canvas.engine.handler.NodeResult;
 import org.chovy.canvas.engine.handlers.HubHandler;
 import org.chovy.canvas.engine.handlers.LogicRelationHandler;
 import org.chovy.canvas.infrastructure.redis.ContextPersistenceService;
+import org.chovy.canvas.infrastructure.redis.RedisDelayQueue;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Component;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
-import reactor.core.scheduler.Scheduler;
 import reactor.core.scheduler.Schedulers;
 import reactor.util.retry.Retry;
 
@@ -175,9 +173,8 @@ public class DagEngine {
     private final ObjectMapper objectMapper;
     /** 执行上下文 Redis 持久化服务。 */
     private final ContextPersistenceService ctxStore;
-    // @Lazy 避免与 CanvasExecutionService → DagEngine 的循环依赖
-    /** 画布执行服务，用于超时恢复等内部触发。 */
-    private final org.chovy.canvas.engine.trigger.CanvasExecutionService executionService;
+    /** Redis 延迟队列，用于跨进程恢复特殊节点超时。 */
+    private final RedisDelayQueue delayQueue;
 
     /**
      * 构造 DagEngine 实例，并根据入参初始化依赖、配置或内部状态。
@@ -191,7 +188,7 @@ public class DagEngine {
      * @param metrics metrics 方法执行所需的业务参数
      * @param objectMapper objectMapper 方法执行所需的业务参数
      * @param ctxStore ctxStore 方法执行所需的业务参数
-     * @param executionService executionService 方法执行所需的业务参数
+     * @param delayQueue delayQueue 方法执行所需的业务参数
      */
     public DagEngine(HandlerRegistry handlerRegistry,
                      TraceWriteBuffer traceBuffer,
@@ -200,7 +197,7 @@ public class DagEngine {
                      CanvasMetrics metrics,
                      ObjectMapper objectMapper,
                      ContextPersistenceService ctxStore,
-                     @Lazy org.chovy.canvas.engine.trigger.CanvasExecutionService executionService) {
+                     RedisDelayQueue delayQueue) {
         this.handlerRegistry = handlerRegistry;
         // traceMapper 保留供 writeSkippedNodes 直接写入；批量写走 traceBuffer
         this.traceBuffer = traceBuffer;
@@ -209,7 +206,7 @@ public class DagEngine {
         this.metrics = metrics;
         this.objectMapper = objectMapper;
         this.ctxStore = ctxStore;
-        this.executionService = executionService;
+        this.delayQueue = delayQueue;
     }
 
     /** 节点执行最大重试次数。 */
@@ -227,15 +224,6 @@ public class DagEngine {
     /** Redis 节点门控 TTL，进程崩溃后由 Redis 自动释放。 */
     @Value("${canvas.execution.node-gate-ttl-sec:600}")
     private long nodeGateTtlSec = 600L;
-
-    /**
-     * 特殊节点等待超时调度器。
-     *
-     * <p>Mono.delay 需要支持 time-based scheduling 的 Scheduler；
-     * fromExecutorService 包装虚拟线程池不具备定时能力。
-     */
-    private static final Scheduler SPECIAL_NODE_TIMEOUT_SCHEDULER =
-            Schedulers.newBoundedElastic(16, 10_000, "canvas-special-node-timeout", 60, true);
 
     // ══════════════════════════════════════════════════════════════
     // 公开入口
@@ -324,6 +312,11 @@ public class DagEngine {
             // ──────────────────────────────────────────────────────
             // 阶段 2：LOGIC_RELATION / HUB / AGGREGATE / THRESHOLD 特殊处理
             // ──────────────────────────────────────────────────────
+            Mono<Map<String, Object>> timeoutContinuation = specialTimeoutContinuationIfNeeded(
+                    graph, nodeId, node, config, ctx, depth);
+            if (timeoutContinuation != null) {
+                return timeoutContinuation;
+            }
             if (NodeType.LOGIC_RELATION.equals(node.getType())) {
                 return handleLogicRelation(graph, nodeId, node, config, ctx, depth);
             }
@@ -638,6 +631,95 @@ public class DagEngine {
         return null;
     }
 
+    private Mono<Map<String, Object>> specialTimeoutContinuationIfNeeded(DagGraph graph,
+                                                                         String nodeId,
+                                                                         DagParser.CanvasNode node,
+                                                                         Map<String, Object> config,
+                                                                         ExecutionContext ctx,
+                                                                         int depth) {
+        if (!RedisDelayQueue.isSpecialTimeoutTrigger(ctx.getTriggerType())) {
+            return null;
+        }
+        if (!nodeId.equals(ctx.getMatchKey()) || !node.getType().equals(ctx.getTriggerNodeType())) {
+            return null;
+        }
+        String expectedTriggerType;
+        try {
+            expectedTriggerType = RedisDelayQueue.triggerTypeForNodeType(node.getType());
+        } catch (IllegalArgumentException e) {
+            return Mono.just(skippedSpecialTimeout(nodeId, "unsupported-node-type"));
+        }
+        if (!expectedTriggerType.equals(ctx.getTriggerType())) {
+            return Mono.just(skippedSpecialTimeout(nodeId, "trigger-type-mismatch"));
+        }
+        String timerKey = RedisDelayQueue.timerKey(node.getType(), nodeId);
+        if (!timeoutPayloadMatches(ctx, timerKey)) {
+            return Mono.just(skippedSpecialTimeout(nodeId, "stale-timeout-payload"));
+        }
+        if (ctx.getNodeStatus(nodeId) != NodeStatus.WAITING) {
+            return Mono.just(skippedSpecialTimeout(nodeId, "node-not-waiting"));
+        }
+        int timeoutSec = timeoutSecondsForSpecialNode(node.getType(), config);
+        return executeSpecialNodeTimeout(graph, nodeId, node, config, ctx, depth,
+                specialNodeLabel(node.getType()), timeoutSec);
+    }
+
+    private boolean timeoutPayloadMatches(ExecutionContext ctx, String timerKey) {
+        Map<String, Object> payload = ctx.getTriggerPayload();
+        if (!Objects.equals(ctx.getExecutionId(), stringValue(payload.get(MapFieldKeys.EXECUTION_ID)))) {
+            return false;
+        }
+        if (!Objects.equals(ctx.getVersionId(), longValue(payload.get(MapFieldKeys.VERSION_ID)))) {
+            return false;
+        }
+        if (!Objects.equals(timerKey, stringValue(payload.get(MapFieldKeys.TIMEOUT_TIMER_KEY)))) {
+            return false;
+        }
+        Long scheduledAt = longValue(payload.get(MapFieldKeys.TIMEOUT_SCHEDULED_AT_EPOCH_MS));
+        return scheduledAt != null && Objects.equals(ctx.getHubStartTimes().get(timerKey), scheduledAt);
+    }
+
+    private Map<String, Object> skippedSpecialTimeout(String nodeId, String reason) {
+        Map<String, Object> skipped = new LinkedHashMap<>();
+        skipped.put(MapFieldKeys.SKIPPED, reason);
+        skipped.put(MapFieldKeys.NODE_ID, nodeId);
+        return skipped;
+    }
+
+    private int timeoutSecondsForSpecialNode(String nodeType, Map<String, Object> config) {
+        if (NodeType.HUB.equals(nodeType)) {
+            return HubHandler.getTimeoutSeconds(config);
+        }
+        return config.get("timeout") instanceof Number n ? n.intValue() : (int) globalTimeout;
+    }
+
+    private String specialNodeLabel(String nodeType) {
+        return switch (nodeType) {
+            case NodeType.LOGIC_RELATION -> "LOGIC_RELATION";
+            case NodeType.AGGREGATE -> "AGGREGATE";
+            case NodeType.THRESHOLD -> "THRESHOLD";
+            default -> "HUB";
+        };
+    }
+
+    private String stringValue(Object value) {
+        return value == null ? null : value.toString();
+    }
+
+    private Long longValue(Object value) {
+        if (value instanceof Number n) {
+            return n.longValue();
+        }
+        if (value instanceof String s && !s.isBlank()) {
+            try {
+                return Long.parseLong(s);
+            } catch (NumberFormatException ignored) {
+                return null;
+            }
+        }
+        return null;
+    }
+
     /**
      * 写入死信队列（13.3节）
      */
@@ -739,14 +821,13 @@ public class DagEngine {
             // LOGIC_RELATION 等待超时（与 Hub 类似，防止第二触发永不到来）
             // config 中可选配置 timeout 字段（秒），默认等于全局执行超时
             // ConcurrentHashSet.add() 保证定时器只被调度一次（多线程同时进入时）
-            if (ctx.getScheduledHubTimeouts().add("lr:" + nodeId)) {
-                ctx.getHubStartTimes().putIfAbsent("lr:" + nodeId, System.currentTimeMillis());
+            String timerKey = RedisDelayQueue.timerKey(node.getType(), nodeId);
+            if (ctx.getScheduledHubTimeouts().add(timerKey)) {
+                ctx.getHubStartTimes().putIfAbsent(timerKey, System.currentTimeMillis());
                 int timeoutSec = config.get("timeout") instanceof Number n
                         ? n.intValue() : (int) globalTimeout;
 
-                Mono.delay(Duration.ofSeconds(timeoutSec), SPECIAL_NODE_TIMEOUT_SCHEDULER)
-                        .subscribe(__ -> handleSpecialNodeTimeout(graph, nodeId, node, config, ctx, depth,
-                                "LOGIC_RELATION", timeoutSec));
+                scheduleSpecialNodeTimeoutRequired(ctx, nodeId, node.getType(), timerKey, timeoutSec);
                 log.debug("[LOGIC_RELATION] 启动等待超时定时器 {}s nodeId={}", timeoutSec, nodeId);
             }
             log.debug("[ENGINE] LOGIC_RELATION 条件未满足，进入 WAITING nodeId={}", nodeId);
@@ -830,19 +911,17 @@ public class DagEngine {
             if (ctx.setNodeStatusIfNotDone(nodeId, NodeStatus.WAITING)) {
                 saveNodeStateRequired(ctx, nodeId, NodeStatus.WAITING, Map.of());
             }
-            if (ctx.getScheduledHubTimeouts().add(nodeId)) {
-                ctx.getHubStartTimes().putIfAbsent(nodeId, System.currentTimeMillis());
+            String timerKey = RedisDelayQueue.timerKey(node.getType(), nodeId);
+            if (ctx.getScheduledHubTimeouts().add(timerKey)) {
+                ctx.getHubStartTimes().putIfAbsent(timerKey, System.currentTimeMillis());
                 int timeoutSec = HubHandler.getTimeoutSeconds(config);
 
-                // 延迟任务：超时后若 Hub 仍未完成则标记 FAILED，持久化 ctx，触发执行恢复
-                Mono.delay(Duration.ofSeconds(timeoutSec), SPECIAL_NODE_TIMEOUT_SCHEDULER)
-                        .subscribe(__ -> handleSpecialNodeTimeout(graph, nodeId, node, config, ctx, depth,
-                                "HUB", timeoutSec));
+                scheduleSpecialNodeTimeoutRequired(ctx, nodeId, node.getType(), timerKey, timeoutSec);
 
                 log.debug("[HUB] 启动超时定时器 {}s nodeId={}", timeoutSec, nodeId);
             } else {
                 // 已调度过定时器，检查是否已超时
-                long start = ctx.getHubStartTimes().getOrDefault(nodeId, System.currentTimeMillis());
+                long start = ctx.getHubStartTimes().getOrDefault(timerKey, System.currentTimeMillis());
                 int timeout = HubHandler.getTimeoutSeconds(config);
                     if (System.currentTimeMillis() - start > (long) timeout * 1000) {
                         if (ctx.setNodeStatusIfNotDone(nodeId, NodeStatus.FAILED)) {
@@ -890,9 +969,7 @@ public class DagEngine {
                 ctx.getHubStartTimes().putIfAbsent(timerKey, System.currentTimeMillis());
                 int timeoutSec = config.get("timeout") instanceof Number n ? n.intValue() : (int) globalTimeout;
 
-                Mono.delay(Duration.ofSeconds(timeoutSec), SPECIAL_NODE_TIMEOUT_SCHEDULER)
-                        .subscribe(__ -> handleSpecialNodeTimeout(graph, nodeId, node, config, ctx, depth,
-                                "AGGREGATE", timeoutSec));
+                scheduleSpecialNodeTimeoutRequired(ctx, nodeId, node.getType(), timerKey, timeoutSec);
                 log.debug("[AGGREGATE] 启动超时定时器 {}s nodeId={}", timeoutSec, nodeId);
             }
             return Mono.just(Map.of());
@@ -920,21 +997,41 @@ public class DagEngine {
         String timerKey = "th:" + nodeId;
         if (!ctx.getScheduledHubTimeouts().add(timerKey)) return;
         int timeoutSec = config.get("timeout") instanceof Number n ? n.intValue() : (int) globalTimeout;
-        Mono.delay(Duration.ofSeconds(timeoutSec), SPECIAL_NODE_TIMEOUT_SCHEDULER)
-                .subscribe(__ -> handleSpecialNodeTimeout(graph, nodeId, node, config, ctx, depth,
-                        "THRESHOLD", timeoutSec));
+        ctx.getHubStartTimes().putIfAbsent(timerKey, System.currentTimeMillis());
+        scheduleSpecialNodeTimeoutRequired(ctx, nodeId, node.getType(), timerKey, timeoutSec);
     }
 
-    private void handleSpecialNodeTimeout(DagGraph graph,
-                                          String nodeId,
-                                          DagParser.CanvasNode node,
-                                          Map<String, Object> config,
-                                          ExecutionContext ctx,
-                                          int depth,
-                                          String label,
-                                          int timeoutSec) {
+    private void scheduleSpecialNodeTimeoutRequired(ExecutionContext ctx,
+                                                    String nodeId,
+                                                    String nodeType,
+                                                    String timerKey,
+                                                    long timeoutSec) {
+        try {
+            if (Objects.equals(timerKey, RedisDelayQueue.timerKey(nodeType, nodeId))) {
+                delayQueue.scheduleSpecialNodeTimeout(ctx, nodeId, nodeType, timeoutSec);
+            } else {
+                delayQueue.scheduleSpecialNodeTimeout(ctx, nodeId, nodeType, timerKey, timeoutSec);
+            }
+        } catch (Exception e) {
+            log.error("[ENGINE] 特殊节点超时定时器调度失败，fail-closed executionId={} nodeId={}: {}",
+                    ctx.getExecutionId(), nodeId, e.getMessage());
+            Map<String, Object> errorOutput = Map.of(MapFieldKeys.ERROR, "SPECIAL_TIMEOUT_QUEUE_SCHEDULE_FAILED");
+            ctx.setNodeStatus(nodeId, NodeStatus.FAILED);
+            saveNodeStateRequired(ctx, nodeId, NodeStatus.FAILED, errorOutput);
+            throw new SpecialNodeTimeoutFailureException("Failed to schedule special node timeout", e);
+        }
+    }
+
+    private Mono<Map<String, Object>> executeSpecialNodeTimeout(DagGraph graph,
+                                                                String nodeId,
+                                                                DagParser.CanvasNode node,
+                                                                Map<String, Object> config,
+                                                                ExecutionContext ctx,
+                                                                int depth,
+                                                                String label,
+                                                                int timeoutSec) {
         if (!ctx.setNodeStatusIfNotDone(nodeId, NodeStatus.TIMEOUT)) {
-            return;
+            return Mono.just(skippedSpecialTimeout(nodeId, "node-terminal"));
         }
         log.warn("[{}] 等待超时 timeout={}s nodeId={}", label, timeoutSec, nodeId);
         String targetNodeId = resolveSpecialTimeoutTarget(config);
@@ -945,66 +1042,17 @@ public class DagEngine {
         timeoutOutput.put(MapFieldKeys.REASON_CODE, "SPECIAL_NODE_TIMEOUT");
         timeoutOutput.put(MapFieldKeys.REASON_MESSAGE, label + " 等待超时");
         ctx.putNodeOutput(nodeId, timeoutOutput);
-        try {
-            saveNodeStateRequired(ctx, nodeId, NodeStatus.TIMEOUT, timeoutOutput);
-        } catch (NodeStatePersistenceException e) {
-            log.error("[{}] 超时节点状态持久化失败，停止超时分支并标记执行失败 nodeId={}: {}",
-                    label, nodeId, e.getMessage());
-            try {
-                ctxStore.delete(ctx.getCanvasId(), ctx.getUserId());
-            } catch (Exception deleteError) {
-                log.warn("[{}] 清理不可靠上下文失败 nodeId={}: {}", label, nodeId, deleteError.getMessage());
-            }
-            Map<String, Object> error = Map.of(
-                    MapFieldKeys.ERROR, e.getMessage(),
-                    MapFieldKeys.NODE_ID, nodeId,
-                    MapFieldKeys.OUTCOME, NodeOutcome.TIMEOUT.name());
-            executionService.completePausedExecution(ctx, ExecutionStatus.FAILED.getCode(), error)
-                    .subscribe(null,
-                            failure -> log.error("[{}] 超时节点持久化失败状态落库失败 nodeId={}: {}",
-                                    label, nodeId, failure.getMessage()));
-            return;
-        }
+        saveNodeStateRequired(ctx, nodeId, NodeStatus.TIMEOUT, timeoutOutput);
         writeTraceEnd(ctx, node, NodeResult.timeout(targetNodeId,
                 "SPECIAL_NODE_TIMEOUT", label + " 等待超时"), 0);
 
         if (targetNodeId == null || targetNodeId.isBlank()) {
-            ctxStore.delete(ctx.getCanvasId(), ctx.getUserId());
-            executionService.completePausedExecution(ctx, ExecutionStatus.FAILED.getCode(), timeoutOutput)
-                    .subscribe(null,
-                            e -> log.error("[{}] 超时终态落库失败 nodeId={}: {}", label, nodeId, e.getMessage()));
-            return;
+            return Mono.error(new SpecialNodeTimeoutFailureException(
+                    label + " 等待超时且未配置超时分支 nodeId=" + nodeId));
         }
 
-        ctxStore.save(ctx);
-        executeNode(graph, targetNodeId, ctx, depth + 1)
-                .defaultIfEmpty(Map.of())
-                .flatMap(result -> completeSpecialTimeoutContinuation(graph, ctx, result))
-                .onErrorResume(e -> {
-                    Map<String, Object> error = Map.of(
-                            MapFieldKeys.ERROR, e.getMessage(),
-                            MapFieldKeys.NODE_ID, nodeId,
-                            MapFieldKeys.OUTCOME, NodeOutcome.TIMEOUT.name());
-                    ctxStore.delete(ctx.getCanvasId(), ctx.getUserId());
-                    return executionService.completePausedExecution(ctx,
-                            ExecutionStatus.FAILED.getCode(), error);
-                })
-                .subscribe(null,
-                        e -> log.error("[{}] 超时分支执行失败 nodeId={}: {}", label, nodeId, e.getMessage()));
-    }
-
-    private Mono<Void> completeSpecialTimeoutContinuation(
-            DagGraph graph, ExecutionContext ctx, Map<String, Object> result) {
-        Map<String, Object> safeResult = result == null ? Map.of() : result;
-        if (hasWaitingNodes(ctx)) {
-            ctxStore.save(ctx);
-            return executionService.completePausedExecution(ctx,
-                    ExecutionStatus.PAUSED.getCode(), safeResult);
-        }
-        writeSkippedNodesIfComplete(graph, ctx);
-        ctxStore.delete(ctx.getCanvasId(), ctx.getUserId());
-        return executionService.completePausedExecution(ctx,
-                ExecutionStatus.SUCCESS.getCode(), safeResult);
+        return executeNode(graph, targetNodeId, ctx, depth + 1)
+                .defaultIfEmpty(Map.of());
     }
 
     private String resolveSpecialTimeoutTarget(Map<String, Object> config) {
@@ -1277,9 +1325,28 @@ public class DagEngine {
             if (isReentryResettable(previousStatus)) {
                 deleteNodeStateRequired(ctx, current);
             }
+            if (previousStatus == null || isReentryResettable(previousStatus)) {
+                clearSpecialTimeoutGeneration(graph.getNode(current), current, ctx);
+            }
             ctx.resetNodeStatusForReentry(current);
             graph.downstream(current).forEach(queue::addLast);
         }
+    }
+
+    private void clearSpecialTimeoutGeneration(DagParser.CanvasNode node, String nodeId, ExecutionContext ctx) {
+        if (node == null || !isSpecialWaitingNode(node.getType())) {
+            return;
+        }
+        String timerKey = RedisDelayQueue.timerKey(node.getType(), nodeId);
+        ctx.getScheduledHubTimeouts().remove(timerKey);
+        ctx.getHubStartTimes().remove(timerKey);
+    }
+
+    private boolean isSpecialWaitingNode(String nodeType) {
+        return NodeType.HUB.equals(nodeType)
+                || NodeType.LOGIC_RELATION.equals(nodeType)
+                || NodeType.AGGREGATE.equals(nodeType)
+                || NodeType.THRESHOLD.equals(nodeType);
     }
 
     /**

@@ -116,6 +116,16 @@ public class RedisKeyUtil {
         return prefix + ":gate-repeat:" + executionId + ":" + nodeId;
     }
 
+    /** 特殊节点超时延迟队列：canvas:delay-queue。 */
+    public String delayQueue() {
+        return prefix + ":delay-queue";
+    }
+
+    /** 特殊节点超时处理中队列：canvas:delay-queue:inflight。 */
+    public String delayQueueInflight() {
+        return prefix + ":delay-queue:inflight";
+    }
+
     /**
      * 执行 resume Lock 对应的业务逻辑。
      *

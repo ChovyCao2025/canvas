@@ -34,10 +34,12 @@ import org.chovy.canvas.engine.lane.ExecutionLaneAdmissionResult;
 import org.chovy.canvas.engine.lane.ExecutionLaneResolver;
 import org.chovy.canvas.engine.scheduler.DagEngine;
 import org.chovy.canvas.engine.scheduler.NodeStatePersistenceException;
+import org.chovy.canvas.engine.scheduler.SpecialNodeTimeoutFailureException;
 import org.chovy.canvas.infrastructure.cache.CanvasConfigCache;
 import org.chovy.canvas.infrastructure.cache.CanvasEntityCache;
 import org.chovy.canvas.infrastructure.mq.OverflowRetryMessage;
 import org.chovy.canvas.infrastructure.redis.ContextPersistenceService;
+import org.chovy.canvas.infrastructure.redis.RedisDelayQueue;
 import org.chovy.canvas.infrastructure.redis.RedisKeyUtil;
 import jakarta.annotation.PostConstruct;
 import org.chovy.canvas.perf.PerfRunContext;
@@ -507,7 +509,8 @@ public class CanvasExecutionService {
             ExecutionContext ctx, DagGraph graph, boolean dryRun, boolean isResume) {
         log.error("[ENGINE] 执行失败 executionId={}: {}", ctx.getExecutionId(), e.getMessage());
         boolean nodeStatePersistenceFailed = NodeStatePersistenceException.contains(e);
-        boolean paused = !nodeStatePersistenceFailed && isPaused(ctx, graph);
+        boolean specialTimeoutTerminalFailure = SpecialNodeTimeoutFailureException.contains(e);
+        boolean paused = !nodeStatePersistenceFailed && !specialTimeoutTerminalFailure && isPaused(ctx, graph);
         Mono<Void> updateMono;
         if (paused) {
             if (!dryRun) {
@@ -558,22 +561,26 @@ public class CanvasExecutionService {
      * </ul>
      */
     private Map<String, ?> prepareExecution(Long canvasId, String userId, String triggerType, String triggerNodeType, String matchKey, Map<String, Object> payload, String msgId, boolean dryRun, boolean overflowRetry, int overflowChainRetryCount, boolean persistentRequest, int priorAttemptCount, String lastError, ExecutionLane executionLaneOverride) {
+        Map<String, Object> safePayload = payload == null ? Map.of() : payload;
 
         // A. 从 Caffeine L1 缓存加载画布实体，验证存在且已发布
         //    ⚠️ 分布式：L1 是 JVM 本地，画布下线后最多延迟一个缓存 TTL 才感知
         CanvasDO canvas = validateAndLoadCanvas(canvasId, dryRun);
         boolean internalContinuation = isInternalContinuationTrigger(triggerType);
-        boolean scheduledBatch = Boolean.TRUE.equals(payload.get(MapFieldKeys.SCHEDULED_BATCH));
+        boolean scheduledBatch = Boolean.TRUE.equals(safePayload.get(MapFieldKeys.SCHEDULED_BATCH));
         boolean quotaBypass = internalContinuation || scheduledBatch;
         ExecutionLane executionLane = executionLaneOverride != null
                 ? executionLaneOverride
                 : executionLaneResolver.resolve(
-                        triggerType, triggerNodeType, payload,
+                        triggerType, triggerNodeType, safePayload,
                         overflowRetry, persistentRequest, priorAttemptCount);
 
         // B. 幂等去重（Redis SETNX，跨机安全）
         //    isResume=true 表示 Redis 中存有该用户的上下文快照（画布已暂停等待中）
         boolean isResume = shouldResumeExistingContext(canvasId, userId, dryRun, internalContinuation);
+        if (!dryRun && RedisDelayQueue.isSpecialTimeoutTrigger(triggerType) && !isResume) {
+            return Map.<String, Object>of(MapFieldKeys.SKIPPED, "stale-timeout");
+        }
         DedupResult dedup = performDedupCheck(canvasId, userId, msgId, isResume, dryRun, overflowRetry,
                 persistentRequest, internalContinuation);
         if (dedup.deduplicated()){
@@ -597,7 +604,7 @@ public class CanvasExecutionService {
         if (!dryRun) {
             AdmissionResult admission = resolveAdmission(
                     canvasId, userId, triggerType, triggerNodeType,
-                    matchKey, payload, msgId, canvas,
+                    matchKey, safePayload, msgId, canvas,
                     overflowChainRetryCount, persistentRequest);
             if (admission.isOverflow()) {
                 releaseDedupIfPresent(acquiredDedupKey);
@@ -609,7 +616,7 @@ public class CanvasExecutionService {
         // E. 创建/恢复执行上下文，resumeLock 跨机安全（Redis SETNX）
         return buildPrepMap(
                 canvasId, userId, triggerType,
-                triggerNodeType, matchKey, payload,
+                triggerNodeType, matchKey, safePayload,
                 dryRun, isResume, canvas,
                 admissionLimit, acquiredDedupKey, quotaBypass,
                 executionLane);
@@ -649,6 +656,14 @@ public class CanvasExecutionService {
                 }
                 resumeLockAcquired = true;
                 ctx = ctxStore.load(canvasId, userId);
+                if (RedisDelayQueue.isSpecialTimeoutTrigger(triggerType)) {
+                    if (ctx == null || !specialTimeoutPayloadMatchesContext(ctx, payload)) {
+                        ctxStore.releaseResumeLock(canvasId, userId, resumeLockInstanceId);
+                        resumeLockAcquired = false;
+                        releaseDedupIfPresent(acquiredDedupKey);
+                        return Map.<String, Object>of(MapFieldKeys.SKIPPED, "stale-timeout");
+                    }
+                }
                 if (ctx == null) {
                     ctx = newContext(canvasId, resolveVersionId(canvas, userId, false), userId, triggerType);
                 }
@@ -704,6 +719,32 @@ public class CanvasExecutionService {
     private boolean shouldResumeExistingContext(Long canvasId, String userId,
                                                 boolean dryRun, boolean internalContinuation) {
         return !dryRun && internalContinuation && ctxStore.exists(canvasId, userId);
+    }
+
+    private boolean specialTimeoutPayloadMatchesContext(ExecutionContext ctx, Map<String, Object> payload) {
+        if (ctx == null || payload == null) {
+            return false;
+        }
+        return Objects.equals(ctx.getExecutionId(), stringValue(payload.get(MapFieldKeys.EXECUTION_ID)))
+                && Objects.equals(ctx.getVersionId(), longValue(payload.get(MapFieldKeys.VERSION_ID)));
+    }
+
+    private String stringValue(Object value) {
+        return value == null ? null : value.toString();
+    }
+
+    private Long longValue(Object value) {
+        if (value instanceof Number n) {
+            return n.longValue();
+        }
+        if (value instanceof String s && !s.isBlank()) {
+            try {
+                return Long.parseLong(s);
+            } catch (NumberFormatException ignored) {
+                return null;
+            }
+        }
+        return null;
     }
 
     /** 构建准备阶段输出 Map，供执行阶段解包上下文、图和准入信息。 */
