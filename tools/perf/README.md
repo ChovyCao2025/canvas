@@ -1,6 +1,6 @@
 # Canvas Performance Tools
 
-This directory contains the low-level performance scripts. The only supported execution path for a capacity test is the guided runbook in `docs/stressTest/README.md`, using `tools/perf/perf-guide.mjs` for smoke, threshold, soak, report, and cleanup gates.
+This directory contains the low-level performance scripts. The only supported execution path for a capacity test is the guided runbook in `docs/stressTest/README.md`, using `tools/perf/perf-guide.mjs` for smoke, threshold, soak, report, cleanup, and distributed gates.
 
 Use these scripts directly only for debugging or advanced investigation. Capacity numbers are valid only when the matching guide report accepts the runner and verifier evidence.
 
@@ -17,9 +17,46 @@ node tools/perf/perf-guide.mjs smoke \
   --event-secret-env PERF_EVENT_SECRET
 ```
 
-After smoke passes, continue with threshold and soak in `docs/stressTest/local-capacity-runbook.md`. Run `perf-guide report` only for a soak run id that has guide-produced runner and verifier evidence.
+After smoke passes, continue with threshold and soak in `docs/stressTest/local-capacity-runbook.md`. For multiple load workers or multiple backend nodes, first pass local smoke and accuracy, then use `docs/stressTest/distributed-capacity-runbook.md`. Run `perf-guide report` or `perf-guide distributed-report` only for run ids that have guide-produced runner and verifier evidence.
 
 If verifier is not `PASS`, do not publish throughput, QPS, p95, or capacity estimates. `PASS_WITH_EXPECTED_FAILURES` is only valid for fault reports.
+
+## Distributed Runs
+
+Distributed runs use one global `perfRunId` and split request sequence ranges across workers. Do not start multiple workers by hand with the same `--count` range; that creates duplicate `perfInputId` values and invalidates the verifier evidence.
+
+Control machine:
+
+```bash
+node tools/perf/perf-guide.mjs distributed-plan \
+  --base-url "$BASE_URL" \
+  --perf-run-id "$PERF_RUN_ID" \
+  --mode event \
+  --event-code PERF_ORDER_PAID \
+  --event-secret-env PERF_EVENT_SECRET \
+  --matched-canvas-count 1 \
+  --worker-ids worker-01,worker-02,worker-03 \
+  --total-count 300000 \
+  --total-concurrency 300 \
+  --distributed-root tmp/perf-distributed
+```
+
+Each load worker:
+
+```bash
+node tools/perf/perf-guide.mjs distributed-worker \
+  --plan-file "tmp/perf-distributed/$PERF_RUN_ID/plan.json" \
+  --worker-id worker-01
+```
+
+Control machine after collecting every worker summary:
+
+```bash
+node tools/perf/perf-guide.mjs distributed-report \
+  --plan-file "tmp/perf-distributed/$PERF_RUN_ID/plan.json"
+```
+
+Use `--accuracy true` on `distributed-plan` for distributed engine accuracy checks. That path runs the global verifier with trace expectations and then runs the WireMock side-effect verifier.
 
 ## Fixtures
 
