@@ -1,0 +1,62 @@
+package org.chovy.canvas.engine.context;
+
+import org.junit.jupiter.api.Test;
+
+import java.util.Map;
+
+import static org.assertj.core.api.Assertions.assertThat;
+
+class ExecutionContextNamespaceTest {
+
+    @Test
+    void putNodeOutput_namespacesFlatContextKeysToPreventCollisions() {
+        ExecutionContext ctx = new ExecutionContext();
+
+        ctx.putNodeOutput("node-A", Map.of("result", "from-A"));
+        ctx.putNodeOutput("node-B", Map.of("result", "from-B"));
+
+        assertThat(ctx.getNodeOutput("node-A", "result")).isEqualTo("from-A");
+        assertThat(ctx.getNodeOutput("node-B", "result")).isEqualTo("from-B");
+        assertThat(ctx.getFlatContext()).containsEntry("node-A.result", "from-A");
+        assertThat(ctx.getFlatContext()).containsEntry("node-B.result", "from-B");
+        assertThat(ctx.getFlatContext()).doesNotContainKey("result");
+    }
+
+    @Test
+    void getContextValueSupportsNamespacedExactLookupAndBareLatestCompatibility() {
+        ExecutionContext ctx = new ExecutionContext();
+        ctx.setTriggerPayload(Map.of("status", "from-trigger"));
+
+        ctx.putNodeOutput("node-A", Map.of("status", "pending"));
+        ctx.putNodeOutput("node-B", Map.of("status", "completed"));
+
+        assertThat(ctx.getContextValue("node-A.status")).isEqualTo("pending");
+        assertThat(ctx.getContextValue("node-B.status")).isEqualTo("completed");
+        assertThat(ctx.getContextValue("status")).isEqualTo("completed");
+    }
+
+    @Test
+    void getContextValueKeepsCompatibilityForBareBusinessKeysContainingDots() {
+        ExecutionContext ctx = new ExecutionContext();
+
+        ctx.putNodeOutput("api", Map.of("user.level", "VIP"));
+
+        assertThat(ctx.getContextValue("api.user.level")).isEqualTo("VIP");
+        assertThat(ctx.getContextValue("user.level")).isEqualTo("VIP");
+    }
+
+    @Test
+    void overwritingSameNodeOutputReplacesOldFlatKeysAndSizeEstimate() {
+        ExecutionContext ctx = new ExecutionContext();
+
+        ctx.putNodeOutput("node-A", Map.of("old", "value", "count", "1"));
+        int firstSize = ctx.getApproxSizeBytes();
+
+        ctx.putNodeOutput("node-A", Map.of("count", "2"));
+
+        assertThat(ctx.getNodeOutput("node-A", "old")).isNull();
+        assertThat(ctx.getNodeOutput("node-A", "count")).isEqualTo("2");
+        assertThat(ctx.getFlatContext()).doesNotContainKey("node-A.old");
+        assertThat(ctx.getApproxSizeBytes()).isLessThan(firstSize);
+    }
+}

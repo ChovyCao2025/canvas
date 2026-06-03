@@ -45,8 +45,9 @@ public class ExecutionContext {
     /** 触发器携带的原始数据（写入 ctx 时的 payload） */
     private Map<String, Object> triggerPayload = new HashMap<>();
 
-    /** 各节点产出数据历史（nodeId → {fieldKey → value}），供轨迹查询 */
-    private final Map<String, Map<String, Object>> nodeOutputs = new ConcurrentHashMap<>();
+    /** 各节点产出数据历史（nodeId → {fieldKey → value}），供轨迹查询；保留插入顺序用于超限淘汰 */
+    private final Map<String, Map<String, Object>> nodeOutputs =
+            Collections.synchronizedMap(new LinkedHashMap<>());
 
     /** 扁平化快速查找 Map，O(1)。由 putNodeOutput 维护 */
     private final Map<String, Object> flatContext = new ConcurrentHashMap<>();
@@ -114,7 +115,9 @@ public class ExecutionContext {
 
     /** 获取所有节点的输出（只读），用于聚合评估等需要跨节点读输出的场景 */
     public Map<String, Map<String, Object>> getNodeOutputs() {
-        return java.util.Collections.unmodifiableMap(nodeOutputs);
+        synchronized (nodeOutputs) {
+            return Collections.unmodifiableMap(new LinkedHashMap<>(nodeOutputs));
+        }
     }
 
     /**
@@ -125,21 +128,32 @@ public class ExecutionContext {
      * @param nodeId nodeId 对应的业务主键或标识
      * @param output output 方法执行所需的业务参数
      */
-    public void putNodeOutput(String nodeId, Map<String, Object> output) {
-        // nodeOutputs 保留按节点分组的完整快照，flatContext 提供跨节点字段的快速读取。
-        nodeOutputs.put(nodeId, output);
-        flatContext.putAll(output);
+    public synchronized void putNodeOutput(String nodeId, Map<String, Object> output) {
+        Map<String, Object> snapshot = output == null ? Map.of() : new LinkedHashMap<>(output);
+        int incomingSize = estimateNodeOutputSize(nodeId, snapshot);
+        if (incomingSize > MAX_SIZE_BYTES) {
+            throw new ContextOverflowException(
+                    "Context output for nodeId=" + nodeId + " exceeds 1MB limit: "
+                            + incomingSize + " bytes",
+                    approxSizeBytes.get());
+        }
 
-        // 大小监控：累加估算字节数（设计文档 13.7节）
-        // 使用轻量累加而非每次 JSON 序列化，避免 O(n) 开销
-        output.forEach((k, v) ->
-            approxSizeBytes.addAndGet(k.length() + (v != null ? v.toString().length() : 4)));
+        removeNodeOutput(nodeId);
+        evictOldestNodesUntilFits(incomingSize);
+        if (approxSizeBytes.get() + incomingSize > MAX_SIZE_BYTES) {
+            throw new ContextOverflowException(
+                    "Context exceeds 1MB limit: " + approxSizeBytes.get()
+                            + " bytes. Node output rejected for nodeId=" + nodeId,
+                    approxSizeBytes.get());
+        }
 
-        if (approxSizeBytes.get() > MAX_SIZE_BYTES) {
-            // 不截断（截断可能破坏防资损逻辑），仅记录 WARN
-            // 调用方可通过检查 isOversized() 决定是否中止
-        } else if (approxSizeBytes.get() > WARN_SIZE_BYTES) {
-            // 超过 512KB 提前预警，便于排查超大字段
+        nodeOutputs.put(nodeId, snapshot);
+        snapshot.forEach((fieldKey, value) ->
+                flatContext.put(namespacedKey(nodeId, fieldKey), value));
+        approxSizeBytes.addAndGet(incomingSize);
+
+        if (approxSizeBytes.get() > WARN_SIZE_BYTES) {
+            // 超过 512KB 提前预警，便于排查超大字段；日志在调用侧统一补充执行信息。
         }
     }
 
@@ -161,8 +175,107 @@ public class ExecutionContext {
 
     public Object getContextValue(String fieldKey) {
         Object val = flatContext.get(fieldKey);
+        if (val != null) {
+            return val;
+        }
+
+        Object latest = null;
+        synchronized (nodeOutputs) {
+            for (Map<String, Object> output : nodeOutputs.values()) {
+                Object candidate = output.get(fieldKey);
+                if (candidate != null) {
+                    latest = candidate;
+                }
+            }
+        }
+        if (latest != null) {
+            return latest;
+        }
+
         // 节点输出优先于触发载荷，允许下游节点读取上游加工后的同名字段。
-        return val != null ? val : triggerPayload.get(fieldKey);
+        return triggerPayload.get(fieldKey);
+    }
+
+    /** Read one output field from a specific node without flat-key collision risk. */
+    public Object getNodeOutput(String nodeId, String fieldKey) {
+        return flatContext.get(namespacedKey(nodeId, fieldKey));
+    }
+
+    private void evictOldestNodesUntilFits(int incomingSize) {
+        synchronized (nodeOutputs) {
+            Iterator<Map.Entry<String, Map<String, Object>>> it = nodeOutputs.entrySet().iterator();
+            while (approxSizeBytes.get() + incomingSize > MAX_SIZE_BYTES && it.hasNext()) {
+                Map.Entry<String, Map<String, Object>> entry = it.next();
+                removeFlatOutput(entry.getKey(), entry.getValue());
+                approxSizeBytes.addAndGet(-estimateNodeOutputSize(entry.getKey(), entry.getValue()));
+                it.remove();
+            }
+        }
+    }
+
+    private void removeNodeOutput(String nodeId) {
+        Map<String, Object> previous;
+        synchronized (nodeOutputs) {
+            previous = nodeOutputs.remove(nodeId);
+        }
+        if (previous != null) {
+            removeFlatOutput(nodeId, previous);
+            approxSizeBytes.addAndGet(-estimateNodeOutputSize(nodeId, previous));
+        }
+    }
+
+    private void removeFlatOutput(String nodeId, Map<String, Object> output) {
+        output.keySet().forEach(fieldKey -> flatContext.remove(namespacedKey(nodeId, fieldKey)));
+    }
+
+    private static String namespacedKey(String nodeId, String fieldKey) {
+        return nodeId + "." + fieldKey;
+    }
+
+    private static int estimateNodeOutputSize(String nodeId, Map<String, Object> output) {
+        int size = 2; // object braces
+        for (Map.Entry<String, Object> entry : output.entrySet()) {
+            size += namespacedKey(nodeId, entry.getKey()).length();
+            size += estimateValueSize(entry.getValue());
+            size += 4; // quotes, colon/comma approximation
+        }
+        return size;
+    }
+
+    private static int estimateValueSize(Object value) {
+        if (value == null) {
+            return 4;
+        }
+        if (value instanceof CharSequence sequence) {
+            return sequence.length() + 2;
+        }
+        if (value instanceof Number || value instanceof Boolean) {
+            return String.valueOf(value).length();
+        }
+        if (value instanceof Map<?, ?> map) {
+            int size = 2;
+            for (Map.Entry<?, ?> entry : map.entrySet()) {
+                size += String.valueOf(entry.getKey()).length() + 4;
+                size += estimateValueSize(entry.getValue());
+            }
+            return size;
+        }
+        if (value instanceof Iterable<?> iterable) {
+            int size = 2;
+            for (Object item : iterable) {
+                size += estimateValueSize(item) + 1;
+            }
+            return size;
+        }
+        if (value.getClass().isArray()) {
+            int size = 2;
+            int length = java.lang.reflect.Array.getLength(value);
+            for (int i = 0; i < length; i++) {
+                size += estimateValueSize(java.lang.reflect.Array.get(value, i)) + 1;
+            }
+            return size;
+        }
+        return String.valueOf(value).length() + 2;
     }
 
     /**
