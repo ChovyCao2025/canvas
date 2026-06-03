@@ -236,7 +236,14 @@ echo "DIRECT_CANVAS_ID=$DIRECT_CANVAS_ID"
 echo "EVENT_CANVAS_ID=$EVENT_CANVAS_ID"
 ```
 
-Confirm exactly one published event fixture matches `PERF_ORDER_PAID`. If more than one published canvas matches, set `MATCHED_CANVAS_COUNT` to the actual count or remove the duplicate fixture before testing.
+Confirm exactly one published event fixture matches `PERF_ORDER_PAID`.
+
+```bash
+docker exec canvas-mysql mysql -uroot -proot -Dcanvas_db -e \
+"SELECT id,name,status,published_version_id FROM canvas WHERE name LIKE 'PERF_EVENT%' ORDER BY id;"
+```
+
+If more than one published canvas matches `PERF_ORDER_PAID`, stop and remove or offline duplicates before testing. Do not raise `MATCHED_CANVAS_COUNT` to make verifier pass; that changes the measured workload.
 
 ## 8. Smoke
 
@@ -254,6 +261,21 @@ The smoke result must be `PASS`. If it fails, run ledger cleanup for the smoke i
 
 ## 9. Threshold
 
+Start monitor capture in another terminal before threshold and keep capturing during the run:
+
+```bash
+export PERF_MONITOR_TAG=threshold_$(date +%Y%m%d_%H%M%S)
+docker stats --no-stream canvas-backend-perf canvas-mysql canvas-redis | tee "tmp/perf-monitor/docker-$PERF_MONITOR_TAG.txt"
+curl -sS http://localhost:8080/actuator/prometheus > "tmp/perf-monitor/prom-$PERF_MONITOR_TAG.txt"
+docker exec canvas-mysql mysql -uroot -proot -Dcanvas_db -e "
+SHOW GLOBAL STATUS LIKE 'Threads_connected';
+SHOW GLOBAL STATUS LIKE 'Questions';
+SHOW GLOBAL STATUS LIKE 'Innodb_row_lock%';
+SHOW FULL PROCESSLIST;
+" | tee "tmp/perf-monitor/mysql-$PERF_MONITOR_TAG.txt"
+docker exec canvas-redis redis-cli INFO stats | tee "tmp/perf-monitor/redis-$PERF_MONITOR_TAG.txt"
+```
+
 ```bash
 node tools/perf/perf-guide.mjs threshold \
   --mode event \
@@ -267,6 +289,19 @@ node tools/perf/perf-guide.mjs threshold \
 Use `stableStage` as the current stable ceiling. `NO_STABLE_STAGE` means the environment or fixture is not valid enough for capacity testing.
 
 ## 10. Soak
+
+Start monitor capture in another terminal before starting soak, then repeat it periodically during the 30-minute run:
+
+```bash
+export PERF_MONITOR_TAG=soak_$(date +%Y%m%d_%H%M%S)
+while true; do
+  date
+  docker stats --no-stream canvas-backend-perf canvas-mysql canvas-redis
+  curl -sS http://localhost:8080/actuator/prometheus > "tmp/perf-monitor/prom-$PERF_MONITOR_TAG-$(date +%H%M%S).txt"
+  docker exec canvas-redis redis-cli INFO stats | egrep 'instantaneous_ops_per_sec|total_commands_processed|rejected_connections|expired_keys|evicted_keys'
+  sleep 30
+done | tee "tmp/perf-monitor/live-$PERF_MONITOR_TAG.txt"
+```
 
 ```bash
 export PERF_RUN_ID=perf_$(date +%Y%m%d_%H%M%S)_soak
@@ -292,20 +327,12 @@ node tools/perf/perf-guide.mjs report \
 
 The report gate checks that runner and verifier evidence belong to the same `perfRunId`, that request failures are zero, and that duration is long enough.
 
-## 12. Monitor Snapshots
+## 12. Monitor Evidence
 
-Capture these during threshold and soak runs:
+Monitor snapshots must be captured during threshold and soak, not after the run is idle. Confirm the files exist before final reporting:
 
 ```bash
-docker stats --no-stream canvas-backend-perf canvas-mysql canvas-redis | tee "tmp/perf-monitor/docker-$PERF_RUN_ID.txt"
-curl -sS http://localhost:8080/actuator/prometheus > "tmp/perf-monitor/prom-$PERF_RUN_ID.txt"
-docker exec canvas-mysql mysql -uroot -proot -Dcanvas_db -e "
-SHOW GLOBAL STATUS LIKE 'Threads_connected';
-SHOW GLOBAL STATUS LIKE 'Questions';
-SHOW GLOBAL STATUS LIKE 'Innodb_row_lock%';
-SHOW FULL PROCESSLIST;
-" | tee "tmp/perf-monitor/mysql-$PERF_RUN_ID.txt"
-docker exec canvas-redis redis-cli INFO stats | tee "tmp/perf-monitor/redis-$PERF_RUN_ID.txt"
+ls -lh tmp/perf-monitor
 ```
 
 If monitoring is missing, record it as an evidence gap in the report template.
