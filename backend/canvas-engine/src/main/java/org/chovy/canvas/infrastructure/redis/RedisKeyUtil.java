@@ -92,6 +92,9 @@ public class RedisKeyUtil {
      */
 // ── 执行上下文 ─────────────────────────────────────────────────
     public String context(Long canvasId, String userId)  { return prefix + ":" + canvasId + ":user:" + userId; }
+    public String nodeState(String executionId, String nodeId) {
+        return prefix + ":node-state:" + executionId + ":" + nodeId;
+    }
     /**
      * 执行 resume Lock 对应的业务逻辑。
      *

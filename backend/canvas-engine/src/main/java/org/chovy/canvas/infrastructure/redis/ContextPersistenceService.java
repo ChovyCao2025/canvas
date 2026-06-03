@@ -1,8 +1,10 @@
 package org.chovy.canvas.infrastructure.redis;
 
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.chovy.canvas.dal.dataobject.CanvasExecutionTraceDO;
 import org.chovy.canvas.engine.context.ExecutionContext;
+import org.chovy.canvas.engine.context.NodeStatus;
 import org.chovy.canvas.engine.scheduler.TraceWriteBuffer;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -13,7 +15,10 @@ import org.springframework.stereotype.Service;
 
 import java.time.Duration;
 import java.time.LocalDateTime;
+import java.util.Collection;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * ExecutionContext 在 Redis 中的持久化（多阶段执行挂起/恢复）。
@@ -49,6 +54,9 @@ public class ContextPersistenceService {
     /** 上下文快照过期时间（秒），默认 24 小时。 */
     @Value("${canvas.execution.context-ttl-sec:86400}")
     private long ttlSec;
+
+    public record NodeState(NodeStatus status, Map<String, Object> output) {
+    }
 
     /**
      * 创建或新增 save 相关的业务数据。
@@ -96,6 +104,72 @@ public class ContextPersistenceService {
     /** 判断上下文是否存在（常用于恢复分支判断）。 */
     public boolean exists(Long canvasId, String userId) {
         return redis.hasKey(keys.context(canvasId, userId));
+    }
+
+    /** 增量保存单节点状态和输出；失败只记录日志，不阻断 DAG 执行。 */
+    public void saveNodeState(String executionId, String nodeId, NodeStatus status, Map<String, Object> output) {
+        try {
+            String key = keys.nodeState(executionId, nodeId);
+            Map<String, String> fields = new LinkedHashMap<>();
+            fields.put("status", status.name());
+            fields.put("output", objectMapper.writeValueAsString(output == null ? Map.of() : output));
+            redis.opsForHash().putAll(key, fields);
+            redis.expire(key, Duration.ofSeconds(ttlSec));
+        } catch (Exception e) {
+            log.warn("[CTX] 保存节点增量状态失败 executionId={} nodeId={}: {}",
+                    executionId, nodeId, e.getMessage());
+        }
+    }
+
+    /** 加载单节点增量状态；不存在或状态不可解析时返回 null。 */
+    public NodeState loadNodeState(String executionId, String nodeId) {
+        try {
+            Map<Object, Object> fields = redis.opsForHash().entries(keys.nodeState(executionId, nodeId));
+            if (fields == null || fields.isEmpty()) {
+                return null;
+            }
+            Object rawStatus = fields.get("status");
+            if (rawStatus == null) {
+                return null;
+            }
+            NodeStatus status = NodeStatus.valueOf(rawStatus.toString());
+            return new NodeState(status, parseNodeOutput(executionId, nodeId, fields.get("output")));
+        } catch (Exception e) {
+            log.warn("[CTX] 加载节点增量状态失败 executionId={} nodeId={}: {}",
+                    executionId, nodeId, e.getMessage());
+            return null;
+        }
+    }
+
+    /** 批量加载指定节点状态，供后续恢复逻辑按需使用。 */
+    public Map<String, NodeState> loadNodeStates(String executionId, Collection<String> nodeIds) {
+        if (nodeIds == null || nodeIds.isEmpty()) {
+            return Map.of();
+        }
+        Map<String, NodeState> states = new LinkedHashMap<>();
+        for (String nodeId : nodeIds) {
+            NodeState state = loadNodeState(executionId, nodeId);
+            if (state != null) {
+                states.put(nodeId, state);
+            }
+        }
+        return states;
+    }
+
+    private Map<String, Object> parseNodeOutput(String executionId, String nodeId, Object rawOutput) {
+        if (rawOutput == null || rawOutput.toString().isBlank()) {
+            return Map.of();
+        }
+        try {
+            Map<String, Object> output = objectMapper.readValue(rawOutput.toString(),
+                    new TypeReference<Map<String, Object>>() {
+                    });
+            return output == null ? Map.of() : output;
+        } catch (Exception e) {
+            log.warn("[CTX] 节点输出 JSON 解析失败 executionId={} nodeId={}: {}",
+                    executionId, nodeId, e.getMessage());
+            return Map.of();
+        }
     }
 
     /**

@@ -370,6 +370,7 @@ public class DagEngine {
                             // 锁已由 executeHandlerWithRepeat 释放，此处只处理状态和 trace。
                             ctx.setNodeStatus(nodeId, NodeStatus.FAILED);
                             writeTraceEnd(ctx, node, result, System.currentTimeMillis() - nodeStartMs);
+                            saveNodeStateSafely(ctx, nodeId, NodeStatus.FAILED, result.output());
                             // 防资损：已发券/已触达则整体 SUCCESS
                             if (ctx.isBenefitGranted() || ctx.isUserReached()) {
                                 log.warn("[ENGINE] 防资损：节点失败但整体判定成功 nodeId={}", nodeId);
@@ -391,6 +392,7 @@ public class DagEngine {
                         long durationMs = System.currentTimeMillis() - nodeStartMs;
                         writeTraceEnd(ctx, node, result, durationMs);
                         metrics.recordNodeExecution(node.getType(), status.name(), durationMs);
+                        saveNodeStateSafely(ctx, nodeId, status, result.output());
                         log.debug("[ENGINE] 节点完成 nodeId={} type={}", nodeId, node.getType());
 
                         if (result.pending()) {
@@ -404,6 +406,7 @@ public class DagEngine {
                         nodeGate.executing.set(false); // 释放异常锁
                         ctx.setNodeStatus(nodeId, NodeStatus.FAILED);
                         log.error("[ENGINE] 节点异常 nodeId={}: {}", nodeId, e.getMessage());
+                        saveNodeStateSafely(ctx, nodeId, NodeStatus.FAILED, Map.of());
                         if (ctx.isBenefitGranted() || ctx.isUserReached()) {
                             return Mono.just(Map.of());
                         }
@@ -703,7 +706,9 @@ public class DagEngine {
         //   setNodeStatus(WAITING) 多线程同时写相同值，幂等，没有问题。
         // ──────────────────────────────────────────────────────────
         if (!LogicRelationHandler.checkCondition(relation, upstreamIds, ctx)) {
-            ctx.setNodeStatusIfNotDone(nodeId, NodeStatus.WAITING);
+            if (ctx.setNodeStatusIfNotDone(nodeId, NodeStatus.WAITING)) {
+                saveNodeStateSafely(ctx, nodeId, NodeStatus.WAITING, Map.of());
+            }
 
             // LOGIC_RELATION 等待超时（与 Hub 类似，防止第二触发永不到来）
             // config 中可选配置 timeout 字段（秒），默认等于全局执行超时
@@ -796,7 +801,9 @@ public class DagEngine {
         //   scheduledHubTimeouts.add() 是 ConcurrentHashSet，保证定时器只调度一次。
         // ──────────────────────────────────────────────────────────
         if (!HubHandler.allUpstreamDone(upstreamIds, ctx)) {
-            ctx.setNodeStatusIfNotDone(nodeId, NodeStatus.WAITING);  // 设 WAITING 供 isPaused 检测
+            if (ctx.setNodeStatusIfNotDone(nodeId, NodeStatus.WAITING)) {
+                saveNodeStateSafely(ctx, nodeId, NodeStatus.WAITING, Map.of());
+            }
             if (ctx.getScheduledHubTimeouts().add(nodeId)) {
                 ctx.getHubStartTimes().putIfAbsent(nodeId, System.currentTimeMillis());
                 int timeoutSec = HubHandler.getTimeoutSeconds(config);
@@ -812,7 +819,9 @@ public class DagEngine {
                 long start = ctx.getHubStartTimes().getOrDefault(nodeId, System.currentTimeMillis());
                 int timeout = HubHandler.getTimeoutSeconds(config);
                 if (System.currentTimeMillis() - start > (long) timeout * 1000) {
-                    ctx.setNodeStatusIfNotDone(nodeId, NodeStatus.FAILED);
+                    if (ctx.setNodeStatusIfNotDone(nodeId, NodeStatus.FAILED)) {
+                        saveNodeStateSafely(ctx, nodeId, NodeStatus.FAILED, Map.of());
+                    }
                     return Mono.error(new RuntimeException("HUB 等待超时 nodeId=" + nodeId));
                 }
             }
@@ -847,7 +856,9 @@ public class DagEngine {
 
         if (!HubHandler.allUpstreamDone(upstreamIds, ctx)) {
             // 并发安全性同 handleHub：无锁，竞态下超时定时器是必要兜底。
-            ctx.setNodeStatusIfNotDone(nodeId, NodeStatus.WAITING);
+            if (ctx.setNodeStatusIfNotDone(nodeId, NodeStatus.WAITING)) {
+                saveNodeStateSafely(ctx, nodeId, NodeStatus.WAITING, Map.of());
+            }
             String timerKey = "ag:" + nodeId;
             if (ctx.getScheduledHubTimeouts().add(timerKey)) {
                 ctx.getHubStartTimes().putIfAbsent(timerKey, System.currentTimeMillis());
@@ -910,6 +921,7 @@ public class DagEngine {
         ctx.putNodeOutput(nodeId, timeoutOutput);
         writeTraceEnd(ctx, node, NodeResult.timeout(targetNodeId,
                 "SPECIAL_NODE_TIMEOUT", label + " 等待超时"), 0);
+        saveNodeStateSafely(ctx, nodeId, NodeStatus.TIMEOUT, timeoutOutput);
 
         if (targetNodeId == null || targetNodeId.isBlank()) {
             ctxStore.delete(ctx.getCanvasId(), ctx.getUserId());
@@ -1000,6 +1012,7 @@ public class DagEngine {
                         ctx.setNodeStatus(nodeId, NodeStatus.FAILED);
                         long durationMs = System.currentTimeMillis() - nodeStartMs;
                         writeTraceEnd(ctx, node, result, durationMs);
+                        saveNodeStateSafely(ctx, nodeId, NodeStatus.FAILED, result.output());
                         if (ctx.isBenefitGranted() || ctx.isUserReached()) return Mono.just(Map.of());
                         return triggerFailureAwareDownstream(graph, nodeId, node.getType(), ctx, depth,
                                 result.errorMessage());
@@ -1016,6 +1029,7 @@ public class DagEngine {
                         long durationMs = System.currentTimeMillis() - nodeStartMs;
                         writeTraceEnd(ctx, node, result, durationMs);
                         metrics.recordNodeExecution(node.getType(), status.name(), durationMs);
+                        saveNodeStateSafely(ctx, nodeId, status, result.output());
                         return Mono.just(pendingResponse(nodeId, node.getType(), result)); // 不触发下游，等待恢复
                     }
                     // ── 路径C：SUCCESS ────────────────────────────────────────
@@ -1030,6 +1044,7 @@ public class DagEngine {
                     long durationMs = System.currentTimeMillis() - nodeStartMs;
                     writeTraceEnd(ctx, node, result, durationMs);
                     metrics.recordNodeExecution(node.getType(), status.name(), durationMs);
+                    saveNodeStateSafely(ctx, nodeId, status, result.output());
                     log.debug("[ENGINE] 节点完成 nodeId={} type={}", nodeId, node.getType());
                     return triggerDownstream(graph, result, nodeId, node.getType(), ctx, depth);
                 })
@@ -1037,6 +1052,7 @@ public class DagEngine {
                     // 异常时锁可能仍被持有（handler 内部抛出），在此统一释放
                     nodeGate.executing.set(false);
                     ctx.setNodeStatus(nodeId, NodeStatus.FAILED);
+                    saveNodeStateSafely(ctx, nodeId, NodeStatus.FAILED, Map.of());
                     if (ctx.isBenefitGranted() || ctx.isUserReached()) {
                         return Mono.just(Map.of());
                     }
@@ -1385,6 +1401,17 @@ public class DagEngine {
         };
     }
 
+    private void saveNodeStateSafely(ExecutionContext ctx, String nodeId,
+                                     NodeStatus status, Map<String, Object> output) {
+        try {
+            ctxStore.saveNodeState(ctx.getExecutionId(), nodeId, status,
+                    output == null ? Map.of() : output);
+        } catch (Exception e) {
+            log.warn("[ENGINE] 节点增量状态持久化失败 executionId={} nodeId={} status={}: {}",
+                    ctx.getExecutionId(), nodeId, status, e.getMessage());
+        }
+    }
+
     /**
      * 执行 trace Status 对应的业务逻辑。
      *
@@ -1592,6 +1619,7 @@ public class DagEngine {
             }
             if (ctx.setNodeStatusIfNotDone(current, NodeStatus.SKIPPED)) {
                 log.debug("[ENGINE] 立即标记 SKIPPED nodeId={}", current);
+                saveNodeStateSafely(ctx, current, NodeStatus.SKIPPED, Map.of());
             }
             for (String downstream : graph.downstream(current)) {
                 if (allUpstreamSkipped(graph, downstream, ctx)) {
