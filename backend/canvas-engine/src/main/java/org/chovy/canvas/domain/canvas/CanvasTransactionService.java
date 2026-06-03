@@ -1,10 +1,10 @@
 package org.chovy.canvas.domain.canvas;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.chovy.canvas.common.enums.CanvasStatusEnum;
 import org.chovy.canvas.common.enums.VersionStatus;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.chovy.canvas.dal.dataobject.CanvasDO;
@@ -20,13 +20,27 @@ import org.chovy.canvas.dal.mapper.CanvasVersionMapper;
  */
 @Slf4j
 @Service
-@RequiredArgsConstructor
 public class CanvasTransactionService {
 
     /** 画布 Mapper，仅在事务内修改画布主表状态。 */
     private final CanvasMapper canvasMapper;
     /** 画布版本 Mapper。 */
     private final CanvasVersionMapper canvasVersionMapper;
+    /** 画布状态机，集中约束生命周期转换。 */
+    private final CanvasStateTransitionPolicy stateTransitionPolicy;
+
+    CanvasTransactionService(CanvasMapper canvasMapper, CanvasVersionMapper canvasVersionMapper) {
+        this(canvasMapper, canvasVersionMapper, new CanvasStateTransitionPolicy());
+    }
+
+    @Autowired
+    public CanvasTransactionService(CanvasMapper canvasMapper,
+                                    CanvasVersionMapper canvasVersionMapper,
+                                    CanvasStateTransitionPolicy stateTransitionPolicy) {
+        this.canvasMapper = canvasMapper;
+        this.canvasVersionMapper = canvasVersionMapper;
+        this.stateTransitionPolicy = stateTransitionPolicy;
+    }
 
 // ── 发布事务 ──────────────────────────────────────────────────
 
@@ -47,6 +61,7 @@ public class CanvasTransactionService {
     public PublishResult publishDb(Long canvasId, String graphJson, String operator) {
         CanvasDO canvas = canvasMapper.selectById(canvasId);
         if (canvas == null) throw new IllegalArgumentException("画布不存在: " + canvasId);
+        stateTransitionPolicy.assertTransition(canvas, CanvasStatusEnum.PUBLISHED);
 
         // 先保留旧发布版本 ID，事务提交后由调用方据此清理旧 Redis 路由和调度。
         Long oldPublishedVersionId = canvas.getPublishedVersionId();
@@ -93,6 +108,7 @@ public class CanvasTransactionService {
     Long offlineDb(Long id) {
         CanvasDO canvas = canvasMapper.selectById(id);
         if (canvas == null) throw new IllegalArgumentException("画布不存在: " + id);
+        stateTransitionPolicy.assertTransition(canvas, CanvasStatusEnum.OFFLINE);
         // publishedVersionId 在清空前返回，供事务外清理该版本的路由、调度和缓存。
         Long publishedVersionId = canvas.getPublishedVersionId();
         canvas.setStatus(CanvasStatusEnum.OFFLINE.getCode());
@@ -119,6 +135,7 @@ public class CanvasTransactionService {
     public Long killDb(Long id) {
         CanvasDO canvas = canvasMapper.selectById(id);
         if (canvas == null) throw new IllegalArgumentException("画布不存在: " + id);
+        stateTransitionPolicy.assertTransition(canvas, CanvasStatusEnum.KILLED);
         // Kill 与下线同样先切 DB 状态，再由事务外广播和清理运行时状态。
         Long publishedVersionId = canvas.getPublishedVersionId();
         canvas.setStatus(CanvasStatusEnum.KILLED.getCode());
@@ -141,6 +158,7 @@ public class CanvasTransactionService {
     void archiveDb(Long id) {
         CanvasDO canvas = canvasMapper.selectById(id);
         if (canvas == null) throw new IllegalArgumentException("画布不存在: " + id);
+        stateTransitionPolicy.assertTransition(canvas, CanvasStatusEnum.ARCHIVED);
         // 归档保留 publishedVersionId 审计线索，外部状态是否清理由调用方按归档前状态判断。
         canvas.setStatus(CanvasStatusEnum.ARCHIVED.getCode());
         canvasMapper.updateById(canvas);
