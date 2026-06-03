@@ -1,7 +1,9 @@
 package org.chovy.canvas.infrastructure.redis;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.chovy.canvas.dal.dataobject.CanvasExecutionTraceDO;
 import org.chovy.canvas.engine.context.ExecutionContext;
+import org.chovy.canvas.engine.scheduler.TraceWriteBuffer;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -10,6 +12,7 @@ import org.springframework.data.redis.core.script.RedisScript;
 import org.springframework.stereotype.Service;
 
 import java.time.Duration;
+import java.time.LocalDateTime;
 import java.util.List;
 
 /**
@@ -40,6 +43,9 @@ public class ContextPersistenceService {
      */
     private final RedisKeyUtil keys;
 
+    /** 执行轨迹写入缓冲区，用于记录上下文持久化关键事件。 */
+    private final TraceWriteBuffer traceBuffer;
+
     /** 上下文快照过期时间（秒），默认 24 小时。 */
     @Value("${canvas.execution.context-ttl-sec:86400}")
     private long ttlSec;
@@ -60,6 +66,7 @@ public class ContextPersistenceService {
             // 覆盖写 + TTL 续期：每次挂起/恢复都会刷新上下文生命周期
             redis.opsForValue().set(keys.context(ctx.getCanvasId(), ctx.getUserId()),
                     json, Duration.ofSeconds(ttlSec));
+            emitContextTrace(ctx, "CONTEXT_SAVE");
         } catch (Exception e) {
             log.error("保存 ExecutionContext 失败: {}", e.getMessage());
         }
@@ -73,6 +80,7 @@ public class ContextPersistenceService {
             // 恢复执行直接反序列化完整上下文，保持挂起前的节点状态和用户变量。
             ExecutionContext ctx = objectMapper.readValue(json, ExecutionContext.class);
             ctx.rebuildDerivedState();
+            emitContextTrace(ctx, "CONTEXT_LOAD");
             return ctx;
         } catch (Exception e) {
             log.error("反序列化 ExecutionContext 失败: {}", e.getMessage());
@@ -176,5 +184,21 @@ public class ContextPersistenceService {
     /** 构造完整 dedup key，供调用方持有以便后续释放或可观测。 */
     public String buildDedupKey(Long canvasId, String userId, String msgId) {
         return keys.dedup(canvasId, userId, msgId);
+    }
+
+    private void emitContextTrace(ExecutionContext ctx, String nodeId) {
+        try {
+            CanvasExecutionTraceDO trace = CanvasExecutionTraceDO.builder()
+                    .executionId(ctx.getExecutionId())
+                    .nodeId(nodeId)
+                    .nodeType("SYSTEM")
+                    .status(1)
+                    .startedAt(LocalDateTime.now())
+                    .build();
+            traceBuffer.addTrace(trace, true);
+        } catch (Exception e) {
+            log.warn("[CTX] critical context trace emission failed nodeId={} executionId={}: {}",
+                    nodeId, ctx.getExecutionId(), e.getMessage());
+        }
     }
 }
