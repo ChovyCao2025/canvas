@@ -246,7 +246,7 @@ public class SubFlowRefHandler implements NodeHandler {
         childCtx.setTriggerType(TriggerType.SUB_FLOW_REF);
         childCtx.getCallStack().addAll(ctx.getCallStack());
         childCtx.getCallStack().add(ctx.getCanvasId());
-        childCtx.getTriggerPayload().putAll(inputData);
+        childCtx.putTriggerPayloadValues(inputData);
 
         // WORKFLOW 子流程复用 DagEngine 执行，使用独立 childCtx 隔离节点状态。
         DagGraph graph = configCache.get(subFlowId, versionId);

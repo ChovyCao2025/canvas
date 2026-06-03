@@ -85,7 +85,7 @@ class ManualApprovalHandlerTest {
         ManualApprovalHandler handler = new ManualApprovalHandler(
                 mock(CanvasManualApprovalMapper.class), new ObjectMapper(), mock(NotificationEventService.class));
         ExecutionContext ctx = baseContext();
-        ctx.getTriggerPayload().put(ManualApprovalHandler.APPROVAL_RESULT_KEY + "approval-1",
+        ctx.putTriggerPayloadValue(ManualApprovalHandler.APPROVAL_RESULT_KEY + "approval-1",
                 ApprovalStatus.REJECTED);
 
         var result = handler.executeAsync(Map.of(
@@ -103,7 +103,7 @@ class ManualApprovalHandlerTest {
         ManualApprovalHandler handler = new ManualApprovalHandler(
                 mock(CanvasManualApprovalMapper.class), new ObjectMapper(), mock(NotificationEventService.class));
         ExecutionContext ctx = baseContext();
-        ctx.getTriggerPayload().put(ManualApprovalHandler.APPROVAL_RESULT_KEY + "approval-1",
+        ctx.putTriggerPayloadValue(ManualApprovalHandler.APPROVAL_RESULT_KEY + "approval-1",
                 ApprovalStatus.REJECTED);
 
         var result = handler.executeAsync(Map.of(

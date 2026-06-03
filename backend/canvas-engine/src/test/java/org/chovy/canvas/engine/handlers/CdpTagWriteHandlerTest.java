@@ -54,7 +54,7 @@ class CdpTagWriteHandlerTest {
         ExecutionContext ctx = new ExecutionContext();
         ctx.setExecutionId("exec-1");
         ctx.setUserId("u1");
-        ctx.getTriggerPayload().put("vipFlag", "true");
+        ctx.putTriggerPayloadValue("vipFlag", "true");
 
         handler.executeAsync(Map.of(
                 "tagCode", "vip",

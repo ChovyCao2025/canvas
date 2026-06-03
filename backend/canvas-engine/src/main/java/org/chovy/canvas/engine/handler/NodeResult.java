@@ -45,7 +45,7 @@ public record NodeResult(
 
 // 说明：
     // - nextNodeId 与 success/fail/branchMap 互斥使用；
-    // - output 会合并到 ExecutionContext.flatContext（由调度层处理）。
+    // - output 会记录为 ExecutionContext 节点输出，flatContext 由上下文派生维护。
 
     /** 普通单路成功（nextNodeId）。 */
     public static NodeResult ok(String nextNodeId, Map<String, Object> output) {

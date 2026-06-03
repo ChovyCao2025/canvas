@@ -30,7 +30,7 @@ class ContextPersistenceServiceTest {
         ExecutionContext ctx = new ExecutionContext();
         ctx.setCanvasId(10L);
         ctx.setUserId("user-1");
-        ctx.getTriggerPayload().put("password", "secret-value");
+        ctx.putRuntimeContextValue("password", "secret-value");
 
         service.save(ctx);
 

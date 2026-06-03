@@ -25,6 +25,18 @@ class ExecutionContextMemoryLimitTest {
     }
 
     @Test
+    void putNodeOutput_rejectsUtf8SerializedContextOverLimit() {
+        ExecutionContext ctx = new ExecutionContext();
+        String largeValue = "汉".repeat(400_000);
+
+        assertThatThrownBy(() -> ctx.putNodeOutput("oversized", Map.of("data", largeValue)))
+                .isInstanceOf(ContextOverflowException.class)
+                .hasMessageContaining("1MB");
+        assertThat(ctx.getNodeOutputs()).isEmpty();
+        assertThat(ctx.getApproxSizeBytes()).isLessThan(1_024 * 1_024);
+    }
+
+    @Test
     void putNodeOutput_evictsOldestOutputsBeforeAcceptingNewOutput() {
         ExecutionContext ctx = new ExecutionContext();
         String value = "x".repeat(350_000);
@@ -63,6 +75,32 @@ class ExecutionContextMemoryLimitTest {
         assertThat(json.length).isLessThan(1_024 * 1_024);
         assertThat(new String(json, java.nio.charset.StandardCharsets.UTF_8))
                 .doesNotContain("flatContext");
+    }
+
+    @Test
+    void triggerPayloadSetterEnforcesSerializedContextLimitAndUpdatesAccounting() {
+        ExecutionContext ctx = new ExecutionContext();
+
+        assertThatThrownBy(() -> ctx.setTriggerPayload(Map.of("data", "汉".repeat(400_000))))
+                .isInstanceOf(ContextOverflowException.class)
+                .hasMessageContaining("1MB");
+
+        assertThat(ctx.getTriggerPayload()).isEmpty();
+        assertThat(ctx.getApproxSizeBytes()).isLessThan(1_024 * 1_024);
+
+        ctx.setTriggerPayload(Map.of("data", "ok"));
+
+        assertThat(ctx.getTriggerPayload()).containsEntry("data", "ok");
+        assertThat(ctx.getApproxSizeBytes()).isGreaterThan(0);
+    }
+
+    @Test
+    void triggerPayloadGetterIsReadOnlySoSizeAccountingCannotBeBypassed() {
+        ExecutionContext ctx = new ExecutionContext();
+
+        assertThatThrownBy(() -> ctx.getTriggerPayload().put("data", "x"))
+                .isInstanceOf(UnsupportedOperationException.class);
+        assertThat(ctx.getApproxSizeBytes()).isLessThan(1_024 * 1_024);
     }
 
     @Test

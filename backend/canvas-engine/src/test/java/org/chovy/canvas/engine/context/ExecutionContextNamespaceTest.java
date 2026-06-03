@@ -5,6 +5,7 @@ import org.junit.jupiter.api.Test;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class ExecutionContextNamespaceTest {
 
@@ -58,5 +59,17 @@ class ExecutionContextNamespaceTest {
         assertThat(ctx.getNodeOutput("node-A", "count")).isEqualTo("2");
         assertThat(ctx.getFlatContext()).doesNotContainKey("node-A.old");
         assertThat(ctx.getApproxSizeBytes()).isLessThan(firstSize);
+    }
+
+    @Test
+    void getNodeOutputsReturnsReadOnlyInnerOutputMaps() {
+        ExecutionContext ctx = new ExecutionContext();
+
+        ctx.putNodeOutput("node-A", Map.of("result", "original"));
+
+        assertThatThrownBy(() -> ctx.getNodeOutputs().get("node-A").put("result", "mutated"))
+                .isInstanceOf(UnsupportedOperationException.class);
+        assertThat(ctx.getNodeOutput("node-A", "result")).isEqualTo("original");
+        assertThat(ctx.getContextValue("result")).isEqualTo("original");
     }
 }

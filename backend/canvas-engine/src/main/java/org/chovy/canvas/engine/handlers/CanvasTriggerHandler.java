@@ -104,7 +104,7 @@ public class CanvasTriggerHandler implements NodeHandler {
         paramMapping.forEach((childKey, parentKeyObj) -> {
             String parentKey = String.valueOf(parentKeyObj).replace("ctx.", "");
             Object val = ctx.getContextValue(parentKey);
-            if (val != null) childCtx.getTriggerPayload().put(childKey, val);
+            if (val != null) childCtx.putTriggerPayloadValue(childKey, val);
         });
 
         // 7) 追加调用栈（用于下一层继续防循环）

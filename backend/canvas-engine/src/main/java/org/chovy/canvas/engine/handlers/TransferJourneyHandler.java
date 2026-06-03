@@ -56,9 +56,8 @@ public class TransferJourneyHandler implements NodeHandler {
         Long targetJourneyId = Long.parseLong(target.toString());
         Map<String, Object> payload = new HashMap<>();
         if (Boolean.TRUE.equals(config.get("carryContext"))) {
-            // carryContext 打开时将父旅程上下文和触发载荷一并传入目标旅程。
+            // carryContext 打开时导出父旅程上下文；导出结果已包含触发载荷且保留节点输出优先级。
             payload.putAll(ctx.exportContextValues());
-            payload.putAll(ctx.getTriggerPayload());
         }
         payload.put(MapFieldKeys.SOURCE_EXECUTION_ID, ctx.getExecutionId());
         // 旅程转移是异步触发副作用，当前旅程不等待目标旅程执行结果。

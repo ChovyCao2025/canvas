@@ -187,7 +187,7 @@ public class CanvasExecutionService {
                     if (canvas == null) throw new IllegalStateException("画布不存在: " + canvasId);
 
                     ExecutionContext ctx = newContext(canvasId, -1L, userId, TriggerType.DRY_RUN);
-                    ctx.getTriggerPayload().putAll(sanitizePayload(payload));
+                    ctx.putTriggerPayloadValues(sanitizePayload(payload));
                     ctx.setPerfRunId(PerfRunContext.extract(ctx.getTriggerPayload()));
 
                     DagGraph graph;
@@ -660,7 +660,7 @@ public class CanvasExecutionService {
             // 补充上下文信息
             populateContext(triggerType, triggerNodeType, matchKey, payload, ctx);
             ctx.setQuotaBypass(quotaBypass);
-            ctx.getTriggerPayload().put(MapFieldKeys.EXECUTION_LANE, executionLane.name());
+            ctx.putTriggerPayloadValue(MapFieldKeys.EXECUTION_LANE, executionLane.name());
 
 
             // 查找画布内容
@@ -725,7 +725,7 @@ public class CanvasExecutionService {
         ctx.setTriggerType(triggerType);
         ctx.setTriggerNodeType(triggerNodeType);
         ctx.setMatchKey(matchKey);
-        ctx.getTriggerPayload().putAll(sanitizePayload(payload));
+        ctx.putTriggerPayloadValues(sanitizePayload(payload));
         ctx.setPerfRunId(PerfRunContext.extract(ctx.getTriggerPayload()));
     }
 
@@ -1096,7 +1096,7 @@ public class CanvasExecutionService {
         ctx.setVersionId(versionId);
         ctx.setUserId(userId);
         ctx.setTriggerType(triggerType);
-        if (userId != null) ctx.getTriggerPayload().put(MapFieldKeys.USER_ID, userId);
+        if (userId != null) ctx.putTriggerPayloadValue(MapFieldKeys.USER_ID, userId);
         return ctx;
     }
 
