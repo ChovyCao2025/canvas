@@ -240,7 +240,26 @@ Confirm exactly one published event fixture matches `PERF_ORDER_PAID`.
 
 ```bash
 docker exec canvas-mysql mysql -uroot -proot -Dcanvas_db -e \
-"SELECT id,name,status,published_version_id FROM canvas WHERE name LIKE 'PERF_EVENT%' ORDER BY id;"
+"SELECT c.id,c.name,c.status,c.published_version_id
+ FROM canvas c
+ JOIN canvas_version cv ON cv.id = c.published_version_id
+ WHERE c.status = 1
+   AND c.published_version_id IS NOT NULL
+   AND cv.graph_json LIKE '%EVENT_TRIGGER%'
+   AND cv.graph_json LIKE '%PERF_ORDER_PAID%'
+ ORDER BY c.id;"
+
+export EVENT_MATCH_COUNT=$(
+  docker exec canvas-mysql mysql -N -B -uroot -proot -Dcanvas_db -e \
+  "SELECT COUNT(*)
+   FROM canvas c
+   JOIN canvas_version cv ON cv.id = c.published_version_id
+   WHERE c.status = 1
+     AND c.published_version_id IS NOT NULL
+     AND cv.graph_json LIKE '%EVENT_TRIGGER%'
+     AND cv.graph_json LIKE '%PERF_ORDER_PAID%';"
+)
+test "$EVENT_MATCH_COUNT" = "1"
 ```
 
 If more than one published canvas matches `PERF_ORDER_PAID`, stop and remove or offline duplicates before testing. Do not raise `MATCHED_CANVAS_COUNT` to make verifier pass; that changes the measured workload.
@@ -265,15 +284,19 @@ Start monitor capture in another terminal before threshold and keep capturing du
 
 ```bash
 export PERF_MONITOR_TAG=threshold_$(date +%Y%m%d_%H%M%S)
-docker stats --no-stream canvas-backend-perf canvas-mysql canvas-redis | tee "tmp/perf-monitor/docker-$PERF_MONITOR_TAG.txt"
-curl -sS http://localhost:8080/actuator/prometheus > "tmp/perf-monitor/prom-$PERF_MONITOR_TAG.txt"
-docker exec canvas-mysql mysql -uroot -proot -Dcanvas_db -e "
-SHOW GLOBAL STATUS LIKE 'Threads_connected';
-SHOW GLOBAL STATUS LIKE 'Questions';
-SHOW GLOBAL STATUS LIKE 'Innodb_row_lock%';
-SHOW FULL PROCESSLIST;
-" | tee "tmp/perf-monitor/mysql-$PERF_MONITOR_TAG.txt"
-docker exec canvas-redis redis-cli INFO stats | tee "tmp/perf-monitor/redis-$PERF_MONITOR_TAG.txt"
+while true; do
+  date
+  docker stats --no-stream canvas-backend-perf canvas-mysql canvas-redis
+  curl -sS http://localhost:8080/actuator/prometheus > "tmp/perf-monitor/prom-$PERF_MONITOR_TAG-$(date +%H%M%S).txt"
+  docker exec canvas-mysql mysql -uroot -proot -Dcanvas_db -e "
+  SHOW GLOBAL STATUS LIKE 'Threads_connected';
+  SHOW GLOBAL STATUS LIKE 'Questions';
+  SHOW GLOBAL STATUS LIKE 'Innodb_row_lock%';
+  SHOW FULL PROCESSLIST;
+  "
+  docker exec canvas-redis redis-cli INFO stats | egrep 'instantaneous_ops_per_sec|total_commands_processed|rejected_connections|expired_keys|evicted_keys'
+  sleep 30
+done | tee "tmp/perf-monitor/live-$PERF_MONITOR_TAG.txt"
 ```
 
 ```bash
@@ -289,6 +312,13 @@ node tools/perf/perf-guide.mjs threshold \
 Use `stableStage` as the current stable ceiling. `NO_STABLE_STAGE` means the environment or fixture is not valid enough for capacity testing.
 
 ## 10. Soak
+
+Set the soak concurrency from the threshold `stableStage.concurrency`. Set the count high enough for the run to last at least 30 minutes at that concurrency.
+
+```bash
+export SOAK_CONCURRENCY=<stableStage.concurrency>
+export SOAK_COUNT=<count-large-enough-for-30-minutes>
+```
 
 Start monitor capture in another terminal before starting soak, then repeat it periodically during the 30-minute run:
 
@@ -311,10 +341,12 @@ node tools/perf/perf-guide.mjs soak \
   --mode event \
   --event-secret-env PERF_EVENT_SECRET \
   --matched-canvas-count "$MATCHED_CANVAS_COUNT" \
+  --count "$SOAK_COUNT" \
+  --concurrency "$SOAK_CONCURRENCY" \
   --min-duration-min 30
 ```
 
-The run is invalid if actual duration is below 30 minutes. Do not lower `--min-duration-min` for a capacity report.
+The run is invalid if actual duration is below 30 minutes. If the run finishes too quickly, increase `SOAK_COUNT` and rerun with a new `PERF_RUN_ID`; do not lower `--min-duration-min` for a capacity report.
 
 ## 11. Report
 

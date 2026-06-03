@@ -466,6 +466,29 @@ test('soak fails closed when runner summary is incomplete', async () => {
   }), /failed must be a non-negative integer/)
 })
 
+test('soak forwards configured count and concurrency', async () => {
+  let scenarioOptions
+  const result = await runGuide(parseGuideArgs([
+    'soak',
+    '--perf-run-id', 'perf_soak_001',
+    '--count', '600000',
+    '--concurrency', '200',
+    '--min-duration-min', '1',
+  ]), {
+    runScenario: async (options) => {
+      scenarioOptions = options
+      return {
+        summary: { perfRunId: 'perf_soak_001', sent: 600000, success: 600000, failed: 0, durationMs: 60_000 },
+        verifier: { verdict: 'PASS' },
+      }
+    },
+  })
+
+  assert.equal(result.status, 'PASS')
+  assert.equal(scenarioOptions.count, 600000)
+  assert.equal(scenarioOptions.concurrency, 200)
+})
+
 test('soak uses original perf run id for reportable evidence', async () => {
   let scenarioOptions
   const result = await runGuide(parseGuideArgs([

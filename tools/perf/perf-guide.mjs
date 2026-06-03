@@ -26,6 +26,8 @@ const DEFAULTS = {
   rebuild: false,
   reportType: 'capacity',
   minDurationMin: 30,
+  count: 300000,
+  concurrency: 100,
 }
 
 const FLAG_NAMES = {
@@ -47,9 +49,11 @@ const FLAG_NAMES = {
   '--rebuild': 'rebuild',
   '--report-type': 'reportType',
   '--min-duration-min': 'minDurationMin',
+  '--count': 'count',
+  '--concurrency': 'concurrency',
 }
 
-const NUMBER_FLAGS = new Set(['matchedCanvasCount', 'minDurationMin'])
+const NUMBER_FLAGS = new Set(['matchedCanvasCount', 'minDurationMin', 'count', 'concurrency'])
 const BOOLEAN_FLAGS = new Set(['execute', 'rebuild'])
 
 function parseBoolean(flag, value) {
@@ -345,8 +349,8 @@ async function defaultSoak(config, deps = {}) {
   const run = await runScenario({
     mode: config.mode,
     perfRunId: config.perfRunId,
-    count: 300000,
-    concurrency: 100,
+    count: config.count,
+    concurrency: config.concurrency,
   })
   assertRunnerSummaryComplete(run.summary, { perfRunId: config.perfRunId })
   if (failedRequestCount(run.summary) > 0) {
