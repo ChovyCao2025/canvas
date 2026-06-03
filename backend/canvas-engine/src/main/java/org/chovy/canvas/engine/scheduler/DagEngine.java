@@ -35,7 +35,12 @@ import reactor.util.retry.Retry;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.*;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Semaphore;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 /**
  * DAG 执行调度器（精确实现设计文档第七章）。
@@ -85,6 +90,74 @@ import java.util.stream.Collectors;
 @Slf4j
 @Component
 public class DagEngine {
+
+    /**
+     * Fan-out batch submission with semaphore-based concurrency limiting.
+     * Prevents large audience triggers from submitting all user executions at once.
+     */
+    public static final class FanOutBatcher {
+        private final int batchSize;
+        private final Semaphore semaphore;
+        private final ExecutorService executor;
+
+        public FanOutBatcher(int batchSize, int maxConcurrent) {
+            if (batchSize <= 0) {
+                throw new IllegalArgumentException("batchSize must be positive");
+            }
+            if (maxConcurrent <= 0) {
+                throw new IllegalArgumentException("maxConcurrent must be positive");
+            }
+            this.batchSize = batchSize;
+            this.semaphore = new Semaphore(maxConcurrent);
+            this.executor = Executors.newVirtualThreadPerTaskExecutor();
+        }
+
+        public void fanOut(Stream<String> userIds, java.util.function.Consumer<List<String>> processor) {
+            Objects.requireNonNull(userIds, "userIds must not be null");
+            Objects.requireNonNull(processor, "processor must not be null");
+            List<CompletableFuture<Void>> futures = new ArrayList<>();
+            List<String> batch = new ArrayList<>(batchSize);
+            try (userIds) {
+                userIds.forEach(userId -> {
+                    batch.add(userId);
+                    if (batch.size() == batchSize) {
+                        futures.add(submitBatch(batch, processor));
+                        batch.clear();
+                    }
+                });
+            }
+            if (!batch.isEmpty()) {
+                futures.add(submitBatch(batch, processor));
+            }
+            futures.forEach(CompletableFuture::join);
+        }
+
+        public void shutdown() {
+            executor.shutdown();
+        }
+
+        private CompletableFuture<Void> submitBatch(List<String> batch,
+                                                    java.util.function.Consumer<List<String>> processor) {
+            List<String> submittedBatch = List.copyOf(batch);
+            acquirePermit();
+            return CompletableFuture.runAsync(() -> {
+                try {
+                    processor.accept(submittedBatch);
+                } finally {
+                    semaphore.release();
+                }
+            }, executor);
+        }
+
+        private void acquirePermit() {
+            try {
+                semaphore.acquire();
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                throw new IllegalStateException("Fan-out interrupted", e);
+            }
+        }
+    }
 
     /** 节点处理器注册表。 */
     private final HandlerRegistry handlerRegistry;
