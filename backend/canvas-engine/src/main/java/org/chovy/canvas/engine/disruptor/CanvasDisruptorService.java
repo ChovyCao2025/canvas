@@ -78,6 +78,7 @@ public class CanvasDisruptorService {
 
         // 启动 Disruptor 并返回 RingBuffer
         ringBuffer = startDisruptor(ringBufferSize, consumers);
+        metrics.registerDisruptorBacklogGauge(this::backlog);
     }
 
     /** 启动 Disruptor 并返回对外发布事件的 RingBuffer。 */
@@ -246,6 +247,11 @@ public class CanvasDisruptorService {
                                      int overflowChainRetryCount) {
         publish(canvasId, userId, triggerType, triggerNodeType, matchKey, payload, msgId,
                 ExecutionLane.RETRY, DispatchOptions.overflowRetry(overflowChainRetryCount));
+    }
+
+    /** 当前 RingBuffer 已占用槽位数，作为待消费积压水位。 */
+    public long backlog() {
+        return Math.max(0L, ringBuffer.getBufferSize() - ringBuffer.remainingCapacity());
     }
 
     /** 写入 RingBuffer 事件槽位并发布到 worker pool。 */
