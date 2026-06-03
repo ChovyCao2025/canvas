@@ -6,8 +6,13 @@ import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 
 import java.util.List;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 
@@ -34,6 +39,66 @@ class TraceWriteBufferTest {
         verify(mapper).insertBatch(captor.capture());
         assertThat(captor.getValue()).hasSize(2);
         assertThat(buffer.pendingCount()).isZero();
+    }
+
+    @Test
+    void addTrace_nonCriticalSamplesAboveEightyPercentCapacity() {
+        CanvasExecutionTraceMapper mapper = mock(CanvasExecutionTraceMapper.class);
+        TraceWriteBuffer buffer = new TraceWriteBuffer(mapper);
+
+        for (int i = 0; i < 40_000; i++) {
+            assertThat(buffer.addTrace(trace("exec-" + i, "node-" + i), false)).isTrue();
+        }
+
+        int accepted = 0;
+        int rejected = 0;
+        for (int i = 0; i < 1_000; i++) {
+            if (buffer.addTrace(trace("overflow-" + i, "node-" + i), false)) {
+                accepted++;
+            } else {
+                rejected++;
+            }
+        }
+
+        assertThat(accepted).isGreaterThan(0);
+        assertThat(rejected).isGreaterThan(0);
+        assertThat(buffer.pendingCount()).isEqualTo(40_000 + accepted);
+        assertThat(buffer.pendingCount()).isLessThan(41_000);
+    }
+
+    @Test
+    void addTrace_criticalFlushesAndEnqueuesWhenFull() {
+        CanvasExecutionTraceMapper mapper = mock(CanvasExecutionTraceMapper.class);
+        TraceWriteBuffer buffer = new TraceWriteBuffer(mapper);
+
+        for (int i = 0; i < 50_000; i++) {
+            buffer.addTrace(trace("exec-" + i, "node-" + i), true);
+        }
+
+        assertThat(buffer.pendingCount()).isEqualTo(50_000);
+        assertThat(buffer.addTrace(trace("critical", "node-critical"), true)).isTrue();
+
+        assertThat(buffer.pendingCount()).isLessThan(50_000);
+        verify(mapper, atLeastOnce()).insertBatch(anyList());
+    }
+
+    @Test
+    void scheduledFlushUsesDedicatedThread() throws Exception {
+        CanvasExecutionTraceMapper mapper = mock(CanvasExecutionTraceMapper.class);
+        TraceWriteBuffer buffer = new TraceWriteBuffer(mapper);
+        CountDownLatch latch = new CountDownLatch(1);
+        AtomicReference<String> threadName = new AtomicReference<>();
+
+        buffer.onScheduledFlushForTest(thread -> {
+            threadName.set(thread.getName());
+            latch.countDown();
+        });
+        buffer.startScheduler();
+
+        assertThat(latch.await(2, TimeUnit.SECONDS)).isTrue();
+        assertThat(threadName.get()).startsWith("trace-write-buffer-flush-");
+
+        buffer.shutdownFlush();
     }
 
     private CanvasExecutionTraceDO trace(String executionId, String nodeId) {
