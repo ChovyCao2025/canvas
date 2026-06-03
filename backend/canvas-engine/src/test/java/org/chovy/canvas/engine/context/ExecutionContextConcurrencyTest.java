@@ -2,6 +2,7 @@ package org.chovy.canvas.engine.context;
 
 import org.junit.jupiter.api.RepeatedTest;
 import org.junit.jupiter.api.Test;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
@@ -67,5 +68,29 @@ class ExecutionContextConcurrencyTest {
         }
         assertThatNoException().isThrownBy(() ->
             ctx.getNodeOutputs().forEach((k, v) -> { /* read all */ }));
+    }
+
+    @Test
+    void putNodeOutputStoresImmutableNodeSnapshot() {
+        ExecutionContext ctx = new ExecutionContext();
+        Map<String, Object> output = new HashMap<>();
+        output.put("score", 88);
+
+        ctx.putNodeOutput("api", output);
+        output.put("score", 99);
+
+        assertThat(ctx.getNodeOutputs().get("api")).containsEntry("score", 88);
+        assertThat(ctx.getContextValue("score")).isEqualTo(88);
+    }
+
+    @Test
+    void putNodeOutputExposesNodeQualifiedFlatKeysForFieldCollisions() {
+        ExecutionContext ctx = new ExecutionContext();
+
+        ctx.putNodeOutput("branch-a", Map.of("status", "approved"));
+        ctx.putNodeOutput("branch-b", Map.of("status", "rejected"));
+
+        assertThat(ctx.getContextValue("branch-a.status")).isEqualTo("approved");
+        assertThat(ctx.getContextValue("branch-b.status")).isEqualTo("rejected");
     }
 }

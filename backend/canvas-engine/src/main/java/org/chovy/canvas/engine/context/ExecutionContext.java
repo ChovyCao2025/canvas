@@ -107,8 +107,15 @@ public class ExecutionContext {
     // ── 写入节点输出 ────────────────────────────────────────────
 
     /** 获取所有节点的输出（只读），用于聚合评估等需要跨节点读输出的场景 */
-    public Map<String, Map<String, Object>> getNodeOutputs() {
-        return java.util.Collections.unmodifiableMap(nodeOutputs);
+    public synchronized Map<String, Map<String, Object>> getNodeOutputs() {
+        Map<String, Map<String, Object>> snapshot = new HashMap<>();
+        nodeOutputs.forEach((nodeId, output) -> snapshot.put(nodeId, output));
+        return Collections.unmodifiableMap(snapshot);
+    }
+
+    /** 获取扁平上下文只读快照，避免调用方绕过 putNodeOutput 写入边界。 */
+    public synchronized Map<String, Object> getFlatContext() {
+        return Collections.unmodifiableMap(new HashMap<>(flatContext));
     }
 
     /**
@@ -119,14 +126,16 @@ public class ExecutionContext {
      * @param nodeId nodeId 对应的业务主键或标识
      * @param output output 方法执行所需的业务参数
      */
-    public void putNodeOutput(String nodeId, Map<String, Object> output) {
-        // nodeOutputs 保留按节点分组的完整快照，flatContext 提供跨节点字段的快速读取。
-        nodeOutputs.put(nodeId, output);
-        flatContext.putAll(output);
+    public synchronized void putNodeOutput(String nodeId, Map<String, Object> output) {
+        // nodeOutputs 保留按节点分组的不可变快照，flatContext 提供跨节点字段的快速读取。
+        Map<String, Object> outputSnapshot = Collections.unmodifiableMap(new HashMap<>(output));
+        nodeOutputs.put(nodeId, outputSnapshot);
+        flatContext.putAll(outputSnapshot);
+        outputSnapshot.forEach((key, value) -> flatContext.put(nodeId + "." + key, value));
 
         // 大小监控：累加估算字节数（设计文档 13.7节）
         // 使用轻量累加而非每次 JSON 序列化，避免 O(n) 开销
-        output.forEach((k, v) ->
+        outputSnapshot.forEach((k, v) ->
             approxSizeBytes.addAndGet(k.length() + (v != null ? v.toString().length() : 4)));
 
         if (approxSizeBytes.get() > MAX_SIZE_BYTES) {
@@ -138,10 +147,10 @@ public class ExecutionContext {
     }
 
     /** 是否超过 1MB 上限 */
-    public boolean isOversized() { return approxSizeBytes.get() > MAX_SIZE_BYTES; }
+    public synchronized boolean isOversized() { return approxSizeBytes.get() > MAX_SIZE_BYTES; }
 
     /** 获取估算大小（字节） */
-    public int getApproxSizeBytes() { return approxSizeBytes.get(); }
+    public synchronized int getApproxSizeBytes() { return approxSizeBytes.get(); }
 
     /**
      * 查询或读取 get Context Value 相关的业务数据。
@@ -153,7 +162,7 @@ public class ExecutionContext {
      */
 // ── 读取上下文字段，O(1) ─────────────────────────────────────
 
-    public Object getContextValue(String fieldKey) {
+    public synchronized Object getContextValue(String fieldKey) {
         Object val = flatContext.get(fieldKey);
         // 节点输出优先于触发载荷，允许下游节点读取上游加工后的同名字段。
         return val != null ? val : triggerPayload.get(fieldKey);
