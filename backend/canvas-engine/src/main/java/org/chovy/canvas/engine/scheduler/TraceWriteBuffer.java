@@ -54,6 +54,8 @@ public class TraceWriteBuffer {
     private final CanvasExecutionTraceMapper traceMapper;
     /** 当前待刷盘轨迹数量。 */
     private final AtomicInteger pending = new AtomicInteger(0);
+    /** 串行化 flush 与关闭前最终 drain，避免 in-flight 失败重入遗漏关键轨迹。 */
+    private final Object flushLock = new Object();
     /** 高水位非关键轨迹采样计数器。 */
     private final AtomicInteger nonCriticalSampleCounter = new AtomicInteger(0);
     /** 防止 Spring lifecycle 或测试重复启动定时线程。 */
@@ -98,14 +100,16 @@ public class TraceWriteBuffer {
 
     /** 每 500ms 批量刷盘，每批最多 200 条 */
     public void flush() {
-        if (pending.get() <= 0) return;
+        synchronized (flushLock) {
+            if (pending.get() <= 0) return;
 
-        for (int i = 0; i < MAX_BATCHES_PER_FLUSH; i++) {
-            List<TraceEntry> batch = drainEntries();
-            if (batch.isEmpty()) return;
-            // 单次调度最多刷 MAX_BATCHES_PER_FLUSH 批，避免 flush 长时间占用调度线程。
-            if (!writeEntries(batch)) {
-                return;
+            for (int i = 0; i < MAX_BATCHES_PER_FLUSH; i++) {
+                List<TraceEntry> batch = drainEntries();
+                if (batch.isEmpty()) return;
+                // 单次调度最多刷 MAX_BATCHES_PER_FLUSH 批，避免 flush 长时间占用调度线程。
+                if (!writeEntries(batch)) {
+                    return;
+                }
             }
         }
     }
@@ -114,33 +118,35 @@ public class TraceWriteBuffer {
     @PreDestroy
     public void shutdownFlush() {
         shutdownScheduler();
-        int remaining = pending.get();
-        if (remaining == 0) return;
-        log.info("[TRACE_BUFFER] 关闭前刷盘，剩余 {} 条", remaining);
-        // 循环直到清空，不受 BATCH_SIZE 限制
-        List<TraceEntry> batch = new ArrayList<>(BATCH_SIZE);
-        TraceEntry item;
-        int drained = 0;
-        while (drained < remaining && (item = buffer.poll()) != null) {
-            drained++;
-            batch.add(item);
-            pending.decrementAndGet();
-            if (batch.size() >= BATCH_SIZE) {
-                if (!writeEntries(batch)) {
-                    log.warn("[TRACE_BUFFER] 关闭刷盘未完成，剩余 {} 条", pending.get());
-                    return;
+        synchronized (flushLock) {
+            int remaining = pending.get();
+            if (remaining == 0) return;
+            log.info("[TRACE_BUFFER] 关闭前刷盘，剩余 {} 条", remaining);
+            // 循环直到清空，不受 BATCH_SIZE 限制
+            List<TraceEntry> batch = new ArrayList<>(BATCH_SIZE);
+            TraceEntry item;
+            int drained = 0;
+            while (drained < remaining && (item = buffer.poll()) != null) {
+                drained++;
+                batch.add(item);
+                pending.decrementAndGet();
+                if (batch.size() >= BATCH_SIZE) {
+                    if (!writeEntries(batch)) {
+                        log.warn("[TRACE_BUFFER] 关闭刷盘未完成，剩余 {} 条", pending.get());
+                        return;
+                    }
+                    batch = new ArrayList<>(BATCH_SIZE);
                 }
-                batch = new ArrayList<>(BATCH_SIZE);
             }
-        }
-        if (!batch.isEmpty() && !writeEntries(batch)) {
-            log.warn("[TRACE_BUFFER] 关闭刷盘未完成，剩余 {} 条", pending.get());
-            return;
-        }
-        if (pending.get() == 0) {
-            log.info("[TRACE_BUFFER] 关闭刷盘完成");
-        } else {
-            log.warn("[TRACE_BUFFER] 关闭刷盘未完成，剩余 {} 条", pending.get());
+            if (!batch.isEmpty() && !writeEntries(batch)) {
+                log.warn("[TRACE_BUFFER] 关闭刷盘未完成，剩余 {} 条", pending.get());
+                return;
+            }
+            if (pending.get() == 0) {
+                log.info("[TRACE_BUFFER] 关闭刷盘完成");
+            } else {
+                log.warn("[TRACE_BUFFER] 关闭刷盘未完成，剩余 {} 条", pending.get());
+            }
         }
     }
 

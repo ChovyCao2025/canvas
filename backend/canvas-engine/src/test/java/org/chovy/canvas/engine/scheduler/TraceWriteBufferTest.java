@@ -8,11 +8,13 @@ import org.mockito.ArgumentCaptor;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.Mockito.atLeastOnce;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
@@ -103,6 +105,50 @@ class TraceWriteBufferTest {
         assertThat(retriedBatch).hasSize(1);
         assertThat(retriedBatch.getFirst().getNodeId()).isEqualTo("critical-node");
         assertThat(buffer.pendingCount()).isZero();
+    }
+
+    @Test
+    void shutdownFlushWaitsForInFlightFlushRequeueBeforeFinalDrain() throws Exception {
+        CanvasExecutionTraceMapper mapper = mock(CanvasExecutionTraceMapper.class);
+        CountDownLatch firstInsertStarted = new CountDownLatch(1);
+        CountDownLatch releaseFirstInsert = new CountDownLatch(1);
+        CountDownLatch shutdownReturned = new CountDownLatch(1);
+        AtomicInteger insertCalls = new AtomicInteger(0);
+        doAnswer(invocation -> {
+            if (insertCalls.incrementAndGet() == 1) {
+                firstInsertStarted.countDown();
+                assertThat(releaseFirstInsert.await(2, TimeUnit.SECONDS)).isTrue();
+                throw new RuntimeException("db down");
+            }
+            return null;
+        }).when(mapper).insertBatch(anyList());
+        TraceWriteBuffer buffer = new TraceWriteBuffer(mapper);
+        buffer.addTrace(trace("critical-exec", "critical-node"), true);
+
+        Thread flushThread = new Thread(buffer::flush, "trace-buffer-test-flush");
+        flushThread.start();
+        assertThat(firstInsertStarted.await(2, TimeUnit.SECONDS)).isTrue();
+
+        Thread shutdownThread = new Thread(() -> {
+            buffer.shutdownFlush();
+            shutdownReturned.countDown();
+        }, "trace-buffer-test-shutdown");
+        shutdownThread.start();
+
+        assertThat(shutdownReturned.await(100, TimeUnit.MILLISECONDS)).isFalse();
+        releaseFirstInsert.countDown();
+        flushThread.join(2_000);
+        shutdownThread.join(2_000);
+
+        assertThat(flushThread.isAlive()).isFalse();
+        assertThat(shutdownThread.isAlive()).isFalse();
+        assertThat(shutdownReturned.getCount()).isZero();
+        assertThat(buffer.pendingCount()).isZero();
+
+        ArgumentCaptor<List<CanvasExecutionTraceDO>> captor = ArgumentCaptor.forClass(List.class);
+        verify(mapper, times(2)).insertBatch(captor.capture());
+        assertThat(captor.getAllValues().get(1)).hasSize(1);
+        assertThat(captor.getAllValues().get(1).getFirst().getNodeId()).isEqualTo("critical-node");
     }
 
     @Test
