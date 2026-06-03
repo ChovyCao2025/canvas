@@ -216,8 +216,7 @@ public class ContextPersistenceService {
         try {
             redis.execute(RESUME_LOCK_RELEASE_SCRIPT, List.of(key), token);
         } catch (Exception e) {
-            log.warn("[CTX] resumeLock Lua 释放失败，降级 DEL key={}: {}", key, e.getMessage());
-            redis.delete(key);
+            log.warn("[CTX] resumeLock Lua 释放失败，保留锁等待 TTL 过期 key={}: {}", key, e.getMessage());
         }
     }
 

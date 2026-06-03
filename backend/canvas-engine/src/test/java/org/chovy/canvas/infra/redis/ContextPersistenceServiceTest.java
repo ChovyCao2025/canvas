@@ -20,6 +20,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.doThrow;
 
 class ContextPersistenceServiceTest {
 
@@ -104,6 +105,19 @@ class ContextPersistenceServiceTest {
                 .thenReturn(backup);
 
         assertThat(service.exists(10L, "user-1")).isTrue();
+    }
+
+    @Test
+    void releaseResumeLockDoesNotFallbackToPlainDeleteWhenTokenedLuaFails() {
+        StringRedisTemplate redis = mock(StringRedisTemplate.class);
+        CanvasExecutionMapper executionMapper = mock(CanvasExecutionMapper.class);
+        ContextPersistenceService service = service(redis, executionMapper);
+        doThrow(new IllegalStateException("redis fail"))
+                .when(redis).execute(any(), eq(java.util.List.of("canvas:resume-lock:10:user-1")), eq("token-1"));
+
+        service.releaseResumeLock(10L, "user-1", "token-1");
+
+        verify(redis, never()).delete("canvas:resume-lock:10:user-1");
     }
 
     private static ContextPersistenceService service(StringRedisTemplate redis,
