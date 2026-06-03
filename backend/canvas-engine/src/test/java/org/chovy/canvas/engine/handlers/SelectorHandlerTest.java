@@ -21,7 +21,7 @@ class SelectorHandlerTest {
     @DisplayName("命中第一个分支")
     void first_branch_match() {
         ExecutionContext ctx = new ExecutionContext();
-        ctx.getFlatContext().put("tripPhase", "待出行");
+        ctx.putRuntimeContextValue("tripPhase", "待出行");
 
         Map<String, Object> config = Map.of(
                 "branches", List.of(
@@ -39,7 +39,7 @@ class SelectorHandlerTest {
     @DisplayName("第一个不命中，第二个命中")
     void second_branch_match() {
         ExecutionContext ctx = new ExecutionContext();
-        ctx.getFlatContext().put("tripPhase", "预出行");
+        ctx.putRuntimeContextValue("tripPhase", "预出行");
 
         Map<String, Object> config = Map.of(
                 "branches", List.of(
@@ -57,7 +57,7 @@ class SelectorHandlerTest {
     @DisplayName("兼容历史 branches.rules 字段")
     void legacy_rules_field_matches_branch_conditions() {
         ExecutionContext ctx = new ExecutionContext();
-        ctx.getFlatContext().put("score", "50");
+        ctx.putRuntimeContextValue("score", "50");
 
         Map<String, Object> config = Map.of(
                 "branches", List.of(
@@ -91,7 +91,7 @@ class SelectorHandlerTest {
     @DisplayName("全不命中走 elseNodeId")
     void all_miss_goes_else() {
         ExecutionContext ctx = new ExecutionContext();
-        ctx.getFlatContext().put("tripPhase", "已取消");
+        ctx.putRuntimeContextValue("tripPhase", "已取消");
 
         Map<String, Object> config = Map.of(
                 "branches", List.of(branch("待出行", "node_hotel")),
@@ -106,7 +106,7 @@ class SelectorHandlerTest {
     @DisplayName("全不命中无 else → 流程自然结束（SUCCESS，无后续节点）")
     void all_miss_no_else_terminal() {
         ExecutionContext ctx = new ExecutionContext();
-        ctx.getFlatContext().put("tripPhase", "已取消");
+        ctx.putRuntimeContextValue("tripPhase", "已取消");
 
         Map<String, Object> config = Map.of(
                 "branches", List.of(branch("待出行", "node_hotel"))

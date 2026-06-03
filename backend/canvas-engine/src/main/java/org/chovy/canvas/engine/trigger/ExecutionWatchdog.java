@@ -159,7 +159,7 @@ public class ExecutionWatchdog {
 
         String resultKey = ManualApprovalHandler.APPROVAL_RESULT_KEY + approval.getNodeId();
         // 通过约定 key 把“超时决策结果”传给审批节点后续路由逻辑
-        ctx.getFlatContext().put(resultKey, result);
+        ctx.putRuntimeContextValue(resultKey, result);
         // 先持久化 ctx 再触发恢复，确保恢复链路能读到审批超时决策。
         ctxStore.save(ctx);
 

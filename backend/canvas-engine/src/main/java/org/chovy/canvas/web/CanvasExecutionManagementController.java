@@ -152,7 +152,7 @@ public class CanvasExecutionManagementController {
 
         // 写入审批结果到 ctx.flatContext（ManualApprovalHandler 下次执行时读取）
         String resultKey = ManualApprovalHandler.APPROVAL_RESULT_KEY + approval.getNodeId();
-        ctx.getFlatContext().put(resultKey, result);
+        ctx.putRuntimeContextValue(resultKey, result);
 
         // 4. 持久化更新后的 ctx 回 Redis
         ctxStore.save(ctx);

@@ -57,7 +57,7 @@ public class TransferJourneyHandler implements NodeHandler {
         Map<String, Object> payload = new HashMap<>();
         if (Boolean.TRUE.equals(config.get("carryContext"))) {
             // carryContext 打开时将父旅程上下文和触发载荷一并传入目标旅程。
-            payload.putAll(ctx.getFlatContext());
+            payload.putAll(ctx.exportContextValues());
             payload.putAll(ctx.getTriggerPayload());
         }
         payload.put(MapFieldKeys.SOURCE_EXECUTION_ID, ctx.getExecutionId());

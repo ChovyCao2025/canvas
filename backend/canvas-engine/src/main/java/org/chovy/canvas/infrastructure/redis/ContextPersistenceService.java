@@ -71,7 +71,9 @@ public class ContextPersistenceService {
         if (json == null) return null;
         try {
             // 恢复执行直接反序列化完整上下文，保持挂起前的节点状态和用户变量。
-            return objectMapper.readValue(json, ExecutionContext.class);
+            ExecutionContext ctx = objectMapper.readValue(json, ExecutionContext.class);
+            ctx.rebuildDerivedState();
+            return ctx;
         } catch (Exception e) {
             log.error("反序列化 ExecutionContext 失败: {}", e.getMessage());
             return null;

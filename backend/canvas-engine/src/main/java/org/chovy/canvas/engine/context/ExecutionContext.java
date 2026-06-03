@@ -1,6 +1,7 @@
 package org.chovy.canvas.engine.context;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonSetter;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.ToString;
@@ -49,7 +50,8 @@ public class ExecutionContext {
     private final Map<String, Map<String, Object>> nodeOutputs =
             Collections.synchronizedMap(new LinkedHashMap<>());
 
-    /** 扁平化快速查找 Map，O(1)。由 putNodeOutput 维护 */
+    /** 扁平化快速查找 Map，O(1)。由 putNodeOutput 维护；由 nodeOutputs 派生，不参与持久化 */
+    @JsonIgnore
     private final Map<String, Object> flatContext = new ConcurrentHashMap<>();
 
     /** 各节点执行状态（需持久化，多阶段恢复时 LOGIC_RELATION 依赖此状态） */
@@ -120,6 +122,24 @@ public class ExecutionContext {
         }
     }
 
+    @JsonSetter("nodeOutputs")
+    void restoreNodeOutputs(Map<String, Map<String, Object>> restoredNodeOutputs) {
+        synchronized (nodeOutputs) {
+            nodeOutputs.clear();
+            if (restoredNodeOutputs != null) {
+                restoredNodeOutputs.forEach((nodeId, output) ->
+                        nodeOutputs.put(nodeId, output == null ? Map.of() : new LinkedHashMap<>(output)));
+            }
+        }
+        rebuildDerivedState();
+    }
+
+    /** 获取派生的扁平上下文快照（只读），内部写入必须走 putNodeOutput/putRuntimeContextValue。 */
+    @JsonIgnore
+    public Map<String, Object> getFlatContext() {
+        return Collections.unmodifiableMap(new LinkedHashMap<>(flatContext));
+    }
+
     /**
      * 写入或记录 put Node Output 相关的业务数据。
      *
@@ -150,7 +170,7 @@ public class ExecutionContext {
         nodeOutputs.put(nodeId, snapshot);
         snapshot.forEach((fieldKey, value) ->
                 flatContext.put(namespacedKey(nodeId, fieldKey), value));
-        approxSizeBytes.addAndGet(incomingSize);
+        approxSizeBytes.set(estimateSerializedStateSize());
 
         if (approxSizeBytes.get() > WARN_SIZE_BYTES) {
             // 超过 512KB 提前预警，便于排查超大字段；日志在调用侧统一补充执行信息。
@@ -158,9 +178,11 @@ public class ExecutionContext {
     }
 
     /** 是否超过 1MB 上限 */
+    @JsonIgnore
     public boolean isOversized() { return approxSizeBytes.get() > MAX_SIZE_BYTES; }
 
     /** 获取估算大小（字节） */
+    @JsonIgnore
     public int getApproxSizeBytes() { return approxSizeBytes.get(); }
 
     /**
@@ -198,7 +220,54 @@ public class ExecutionContext {
 
     /** Read one output field from a specific node without flat-key collision risk. */
     public Object getNodeOutput(String nodeId, String fieldKey) {
-        return flatContext.get(namespacedKey(nodeId, fieldKey));
+        synchronized (nodeOutputs) {
+            Map<String, Object> output = nodeOutputs.get(nodeId);
+            return output == null ? null : output.get(fieldKey);
+        }
+    }
+
+    /** 写入运行期恢复信号等非节点输出值，避免调用方直接修改派生 flatContext。 */
+    public synchronized void putRuntimeContextValue(String fieldKey, Object value) {
+        boolean hadPrevious = triggerPayload.containsKey(fieldKey);
+        Object previous = triggerPayload.get(fieldKey);
+        int previousSize = hadPrevious ? estimateMapEntrySize(fieldKey, previous) : 0;
+        int incomingSize = estimateMapEntrySize(fieldKey, value);
+
+        approxSizeBytes.addAndGet(-previousSize);
+        evictOldestNodesUntilFits(incomingSize);
+        if (approxSizeBytes.get() + incomingSize > MAX_SIZE_BYTES) {
+            if (hadPrevious) {
+                approxSizeBytes.addAndGet(previousSize);
+            }
+            throw new ContextOverflowException(
+                    "Context exceeds 1MB limit: " + approxSizeBytes.get()
+                            + " bytes. Runtime value rejected for key=" + fieldKey,
+                    approxSizeBytes.get());
+        }
+
+        triggerPayload.put(fieldKey, value);
+        approxSizeBytes.set(estimateSerializedStateSize());
+    }
+
+    /** 导出跨旅程/子流程可携带的上下文，保留裸字段兼容性并包含 namespaced 字段。 */
+    public Map<String, Object> exportContextValues() {
+        Map<String, Object> exported = new LinkedHashMap<>(triggerPayload);
+        synchronized (nodeOutputs) {
+            nodeOutputs.values().forEach(exported::putAll);
+        }
+        exported.putAll(flatContext);
+        return exported;
+    }
+
+    /** 反序列化或批量恢复后重建派生索引和大小估算。 */
+    public synchronized void rebuildDerivedState() {
+        flatContext.clear();
+        synchronized (nodeOutputs) {
+            nodeOutputs.forEach((nodeId, output) ->
+                    output.forEach((fieldKey, value) ->
+                            flatContext.put(namespacedKey(nodeId, fieldKey), value)));
+        }
+        approxSizeBytes.set(estimateSerializedStateSize());
     }
 
     private void evictOldestNodesUntilFits(int incomingSize) {
@@ -235,11 +304,27 @@ public class ExecutionContext {
     private static int estimateNodeOutputSize(String nodeId, Map<String, Object> output) {
         int size = 2; // object braces
         for (Map.Entry<String, Object> entry : output.entrySet()) {
-            size += namespacedKey(nodeId, entry.getKey()).length();
-            size += estimateValueSize(entry.getValue());
-            size += 4; // quotes, colon/comma approximation
+            size += estimateMapEntrySize(entry.getKey(), entry.getValue());
+        }
+        size += nodeId.length() + 4;
+        return size;
+    }
+
+    private int estimateSerializedStateSize() {
+        int size = 512; // fixed ExecutionContext field overhead approximation
+        synchronized (nodeOutputs) {
+            for (Map.Entry<String, Map<String, Object>> entry : nodeOutputs.entrySet()) {
+                size += estimateNodeOutputSize(entry.getKey(), entry.getValue());
+            }
+        }
+        for (Map.Entry<String, Object> entry : triggerPayload.entrySet()) {
+            size += estimateMapEntrySize(entry.getKey(), entry.getValue());
         }
         return size;
+    }
+
+    private static int estimateMapEntrySize(String key, Object value) {
+        return String.valueOf(key).length() + estimateValueSize(value) + 4;
     }
 
     private static int estimateValueSize(Object value) {
