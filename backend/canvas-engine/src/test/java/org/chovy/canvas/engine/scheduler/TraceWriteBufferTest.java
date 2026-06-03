@@ -13,6 +13,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.Mockito.atLeastOnce;
+import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
@@ -64,7 +65,7 @@ class TraceWriteBufferTest {
     }
 
     @Test
-    void flushDropsBatchAfterWriteFailureAndClearsPendingByDesign() {
+    void flushDropsNonCriticalBatchAfterWriteFailureAndClearsPendingByDesign() {
         CanvasExecutionTraceMapper mapper = mock(CanvasExecutionTraceMapper.class);
         doThrow(new RuntimeException("db down")).when(mapper).insertBatch(anyList());
         TraceWriteBuffer buffer = new TraceWriteBuffer(mapper);
@@ -77,6 +78,45 @@ class TraceWriteBufferTest {
         verify(mapper).insertBatch(anyList());
         // Current design treats traces as best-effort audit data once write is attempted.
         assertThat(buffer.pendingCount()).isZero();
+    }
+
+    @Test
+    void flushRequeuesCriticalTracesAfterBatchInsertFailure() {
+        CanvasExecutionTraceMapper mapper = mock(CanvasExecutionTraceMapper.class);
+        doThrow(new RuntimeException("db down"))
+                .doNothing()
+                .when(mapper).insertBatch(anyList());
+        TraceWriteBuffer buffer = new TraceWriteBuffer(mapper);
+
+        buffer.addTrace(trace("critical-exec", "critical-node"), true);
+        buffer.addTrace(trace("normal-exec", "normal-node"), false);
+
+        buffer.flush();
+
+        assertThat(buffer.pendingCount()).isEqualTo(1);
+
+        buffer.flush();
+
+        ArgumentCaptor<List<CanvasExecutionTraceDO>> captor = ArgumentCaptor.forClass(List.class);
+        verify(mapper, times(2)).insertBatch(captor.capture());
+        List<CanvasExecutionTraceDO> retriedBatch = captor.getAllValues().get(1);
+        assertThat(retriedBatch).hasSize(1);
+        assertThat(retriedBatch.getFirst().getNodeId()).isEqualTo("critical-node");
+        assertThat(buffer.pendingCount()).isZero();
+    }
+
+    @Test
+    void addTrace_nonCriticalStartsSamplingAtReservedThreshold() {
+        CanvasExecutionTraceMapper mapper = mock(CanvasExecutionTraceMapper.class);
+        TraceWriteBuffer buffer = new TraceWriteBuffer(mapper);
+
+        for (int i = 0; i < 39_999; i++) {
+            assertThat(buffer.addTrace(trace("exec-" + i, "node-" + i), false)).isTrue();
+        }
+
+        assertThat(buffer.addTrace(trace("threshold", "node-39999"), false)).isTrue();
+        assertThat(buffer.addTrace(trace("sampled", "node-40000"), false)).isFalse();
+        assertThat(buffer.pendingCount()).isEqualTo(40_000);
     }
 
     @Test

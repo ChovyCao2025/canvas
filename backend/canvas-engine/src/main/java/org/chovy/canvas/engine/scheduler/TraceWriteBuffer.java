@@ -48,7 +48,7 @@ public class TraceWriteBuffer {
     private static final AtomicInteger THREAD_SEQUENCE = new AtomicInteger(1);
 
     /** 待批量写入的执行轨迹内存队列。 */
-    private final ConcurrentLinkedQueue<CanvasExecutionTraceDO> buffer =
+    private final ConcurrentLinkedQueue<TraceEntry> buffer =
             new ConcurrentLinkedQueue<>();
     /** 执行轨迹 Mapper。 */
     private final CanvasExecutionTraceMapper traceMapper;
@@ -101,10 +101,12 @@ public class TraceWriteBuffer {
         if (pending.get() <= 0) return;
 
         for (int i = 0; i < MAX_BATCHES_PER_FLUSH; i++) {
-            List<CanvasExecutionTraceDO> batch = drainBatch();
+            List<TraceEntry> batch = drainEntries();
             if (batch.isEmpty()) return;
             // 单次调度最多刷 MAX_BATCHES_PER_FLUSH 批，避免 flush 长时间占用调度线程。
-            writeBatch(batch);
+            if (!writeEntries(batch)) {
+                return;
+            }
         }
     }
 
@@ -116,18 +118,30 @@ public class TraceWriteBuffer {
         if (remaining == 0) return;
         log.info("[TRACE_BUFFER] 关闭前刷盘，剩余 {} 条", remaining);
         // 循环直到清空，不受 BATCH_SIZE 限制
-        List<CanvasExecutionTraceDO> batch = new ArrayList<>(BATCH_SIZE);
-        CanvasExecutionTraceDO item;
-        while ((item = buffer.poll()) != null) {
+        List<TraceEntry> batch = new ArrayList<>(BATCH_SIZE);
+        TraceEntry item;
+        int drained = 0;
+        while (drained < remaining && (item = buffer.poll()) != null) {
+            drained++;
             batch.add(item);
             pending.decrementAndGet();
             if (batch.size() >= BATCH_SIZE) {
-                writeBatch(batch);
+                if (!writeEntries(batch)) {
+                    log.warn("[TRACE_BUFFER] 关闭刷盘未完成，剩余 {} 条", pending.get());
+                    return;
+                }
                 batch = new ArrayList<>(BATCH_SIZE);
             }
         }
-        if (!batch.isEmpty()) writeBatch(batch);
-        log.info("[TRACE_BUFFER] 关闭刷盘完成");
+        if (!batch.isEmpty() && !writeEntries(batch)) {
+            log.warn("[TRACE_BUFFER] 关闭刷盘未完成，剩余 {} 条", pending.get());
+            return;
+        }
+        if (pending.get() == 0) {
+            log.info("[TRACE_BUFFER] 关闭刷盘完成");
+        } else {
+            log.warn("[TRACE_BUFFER] 关闭刷盘未完成，剩余 {} 条", pending.get());
+        }
     }
 
     void onScheduledFlushForTest(Consumer<Thread> callback) {
@@ -135,30 +149,24 @@ public class TraceWriteBuffer {
     }
 
     private boolean addNonCriticalTrace(CanvasExecutionTraceDO trace) {
-        int current = pending.get();
-        if (current >= MAX_CAPACITY) {
-            log.warn("[TRACE_BUFFER] 缓冲区已满（{}），降级丢弃非关键轨迹 executionId={}",
-                    MAX_CAPACITY, trace.getExecutionId());
-            return false;
-        }
-        if (current >= NON_CRITICAL_SAMPLING_THRESHOLD && shouldDropNonCriticalSample(trace)) {
-            return false;
-        }
-        if (tryEnqueue(trace)) {
+        EnqueueResult result = tryEnqueue(trace, false);
+        if (result == EnqueueResult.ENQUEUED) {
             return true;
         }
-        log.warn("[TRACE_BUFFER] 缓冲区已满（{}），降级丢弃非关键轨迹 executionId={}",
-                MAX_CAPACITY, trace.getExecutionId());
+        if (result == EnqueueResult.FULL) {
+            log.warn("[TRACE_BUFFER] 缓冲区已满（{}），降级丢弃非关键轨迹 executionId={}",
+                    MAX_CAPACITY, trace.getExecutionId());
+        }
         return false;
     }
 
     private boolean addCriticalTrace(CanvasExecutionTraceDO trace) {
         for (int i = 0; i < CRITICAL_ENQUEUE_ATTEMPTS; i++) {
-            if (tryEnqueue(trace)) {
+            if (tryEnqueue(trace, true) == EnqueueResult.ENQUEUED) {
                 return true;
             }
             flush();
-            if (tryEnqueue(trace)) {
+            if (tryEnqueue(trace, true) == EnqueueResult.ENQUEUED) {
                 return true;
             }
             briefBackoff();
@@ -167,30 +175,35 @@ public class TraceWriteBuffer {
                 + trace.getExecutionId());
     }
 
-    private boolean tryEnqueue(CanvasExecutionTraceDO trace) {
+    private EnqueueResult tryEnqueue(CanvasExecutionTraceDO trace, boolean critical) {
         while (true) {
             int current = pending.get();
             if (current >= MAX_CAPACITY) {
-                return false;
+                return EnqueueResult.FULL;
+            }
+            if (!critical
+                    && current >= NON_CRITICAL_SAMPLING_THRESHOLD
+                    && shouldDropNonCriticalSample(trace, current)) {
+                return EnqueueResult.DROPPED_SAMPLE;
             }
             if (pending.compareAndSet(current, current + 1)) {
                 // 只入内存队列，真正 DB 写入由后台 flush 批量完成。
-                buffer.offer(trace);
-                return true;
+                buffer.offer(new TraceEntry(trace, critical));
+                return EnqueueResult.ENQUEUED;
             }
         }
     }
 
-    private boolean shouldDropNonCriticalSample(CanvasExecutionTraceDO trace) {
+    private boolean shouldDropNonCriticalSample(CanvasExecutionTraceDO trace, int current) {
         int sample = nonCriticalSampleCounter.incrementAndGet();
         boolean drop = sample % NON_CRITICAL_SAMPLE_RATE != 0;
         if (drop) {
             if (sample % 1_000 == 1) {
                 log.warn("[TRACE_BUFFER] 缓冲区高水位（pending={}），采样丢弃非关键轨迹 executionId={}",
-                        pending.get(), trace.getExecutionId());
+                        current, trace.getExecutionId());
             } else {
                 log.debug("[TRACE_BUFFER] 缓冲区高水位（pending={}），采样丢弃非关键轨迹 executionId={}",
-                        pending.get(), trace.getExecutionId());
+                        current, trace.getExecutionId());
             }
         }
         return drop;
@@ -245,16 +258,9 @@ public class TraceWriteBuffer {
         }
     }
 
-    /**
-     * 执行 drain Batch 对应的业务逻辑。
-     *
-     * <p>方法会结合入参、当前对象状态和依赖组件完成处理，调用方需关注返回值以及可能产生的状态变更。
-     *
-     * @return 查询、转换或计算得到的结果集合
-     */
-    private List<CanvasExecutionTraceDO> drainBatch() {
-        List<CanvasExecutionTraceDO> batch = new ArrayList<>(BATCH_SIZE);
-        CanvasExecutionTraceDO item;
+    private List<TraceEntry> drainEntries() {
+        List<TraceEntry> batch = new ArrayList<>(BATCH_SIZE);
+        TraceEntry item;
         while (batch.size() < BATCH_SIZE && (item = buffer.poll()) != null) {
             batch.add(item);
         }
@@ -265,21 +271,38 @@ public class TraceWriteBuffer {
         return batch;
     }
 
-    /**
-     * 写入或记录 write Batch 相关的业务数据。
-     *
-     * <p>实现会通过持久化层读取或写入数据库记录。
-     *
-     * @param batch batch 方法执行所需的业务参数
-     */
-    private void writeBatch(List<CanvasExecutionTraceDO> batch) {
+    private boolean writeEntries(List<TraceEntry> batch) {
+        List<CanvasExecutionTraceDO> traces = batch.stream().map(TraceEntry::trace).toList();
         try {
-            traceMapper.insertBatch(batch);
-            log.debug("[TRACE_BUFFER] 批量写入 {} 条", batch.size());
+            traceMapper.insertBatch(traces);
+            log.debug("[TRACE_BUFFER] 批量写入 {} 条", traces.size());
+            return true;
         } catch (Exception e) {
-            // trace 是旁路审计数据，写失败只记录日志，不反向影响节点执行结果。
-            log.error("[TRACE_BUFFER] 批量写入失败: {}", e.getMessage());
+            int requeued = requeueCriticalEntries(batch);
+            log.error("[TRACE_BUFFER] 批量写入失败: {}, 已重试保留关键轨迹 {} 条", e.getMessage(), requeued);
+            return false;
         }
+    }
+
+    private int requeueCriticalEntries(List<TraceEntry> batch) {
+        int requeued = 0;
+        for (TraceEntry entry : batch) {
+            if (entry.critical()) {
+                buffer.offer(entry);
+                pending.incrementAndGet();
+                requeued++;
+            }
+        }
+        return requeued;
+    }
+
+    private record TraceEntry(CanvasExecutionTraceDO trace, boolean critical) {
+    }
+
+    private enum EnqueueResult {
+        ENQUEUED,
+        DROPPED_SAMPLE,
+        FULL
     }
 
     /**
