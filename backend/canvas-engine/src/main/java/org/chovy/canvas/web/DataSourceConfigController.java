@@ -1,12 +1,12 @@
 package org.chovy.canvas.web;
 
-import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import lombok.RequiredArgsConstructor;
 import org.chovy.canvas.common.PageResult;
 import org.chovy.canvas.common.R;
+import org.chovy.canvas.common.tenant.TenantContext;
+import org.chovy.canvas.common.tenant.TenantContextResolver;
 import org.chovy.canvas.dal.dataobject.DataSourceConfigDO;
-import org.chovy.canvas.dal.mapper.DataSourceConfigMapper;
+import org.chovy.canvas.domain.datasource.DataSourceConfigService;
 import org.chovy.canvas.domain.datasource.DataSourceTableMeta;
 import org.springframework.boot.jdbc.DataSourceBuilder;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -39,8 +39,10 @@ import java.util.List;
 @RequiredArgsConstructor
 public class DataSourceConfigController {
 
-    /** 数据源配置 Mapper，用于读写数据源配置。 */
-    private final DataSourceConfigMapper dataSourceConfigMapper;
+    /** 数据源配置领域服务，集中处理租户边界和凭据加密。 */
+    private final DataSourceConfigService dataSourceConfigService;
+    /** 当前租户上下文解析器。 */
+    private final TenantContextResolver tenantContextResolver;
 
     @GetMapping
     public Mono<R<PageResult<DataSourceConfigDO>>> list(
@@ -49,18 +51,9 @@ public class DataSourceConfigController {
             @RequestParam(required = false) String type,
             @RequestParam(required = false) Integer enabled
     ) {
-        return Mono.fromCallable(() -> {
-            LambdaQueryWrapper<DataSourceConfigDO> wrapper = new LambdaQueryWrapper<DataSourceConfigDO>()
-                    .orderByDesc(DataSourceConfigDO::getId);
-            if (type != null && !type.isBlank()) {
-                wrapper.eq(DataSourceConfigDO::getType, type);
-            }
-            if (enabled != null) {
-                wrapper.eq(DataSourceConfigDO::getEnabled, enabled);
-            }
-            Page<DataSourceConfigDO> result = dataSourceConfigMapper.selectPage(new Page<>(page, size), wrapper);
-            return R.ok(PageResult.of(result.getTotal(), result.getRecords()));
-        }).subscribeOn(Schedulers.boundedElastic());
+        return currentTenant().flatMap(context ->
+                Mono.fromCallable(() -> R.ok(dataSourceConfigService.list(page, size, type, enabled, context)))
+                        .subscribeOn(Schedulers.boundedElastic()));
     }
 
     /**
@@ -74,8 +67,9 @@ public class DataSourceConfigController {
     @GetMapping("/{id}/tables")
     public Mono<R<List<DataSourceTableMeta>>> listTables(@PathVariable Long id) {
         // JDBC 元数据读取会建立真实数据库连接，必须放在线程池中执行。
-        return Mono.fromCallable(() -> R.ok(readJdbcTables(id)))
-                .subscribeOn(Schedulers.boundedElastic());
+        return currentTenant().flatMap(context ->
+                Mono.fromCallable(() -> R.ok(readJdbcTables(id, context)))
+                        .subscribeOn(Schedulers.boundedElastic()));
     }
 
     /**
@@ -88,11 +82,9 @@ public class DataSourceConfigController {
      */
     @PostMapping
     public Mono<R<DataSourceConfigDO>> create(@RequestBody DataSourceConfigDO body) {
-        return Mono.fromCallable(() -> {
-            normalize(body);
-            dataSourceConfigMapper.insert(body);
-            return R.ok(body);
-        }).subscribeOn(Schedulers.boundedElastic());
+        return currentTenant().flatMap(context ->
+                Mono.fromCallable(() -> R.ok(dataSourceConfigService.create(body, context)))
+                        .subscribeOn(Schedulers.boundedElastic()));
     }
 
     /**
@@ -106,12 +98,12 @@ public class DataSourceConfigController {
      */
     @PutMapping("/{id}")
     public Mono<R<Void>> update(@PathVariable Long id, @RequestBody DataSourceConfigDO body) {
-        return Mono.fromCallable(() -> {
-            body.setId(id);
-            normalize(body);
-            dataSourceConfigMapper.updateById(body);
-            return R.<Void>ok();
-        }).subscribeOn(Schedulers.boundedElastic());
+        return currentTenant().flatMap(context ->
+                Mono.fromCallable(() -> {
+                            dataSourceConfigService.update(id, body, context);
+                            return R.<Void>ok();
+                        })
+                        .subscribeOn(Schedulers.boundedElastic()));
     }
 
     /**
@@ -124,52 +116,12 @@ public class DataSourceConfigController {
      */
     @DeleteMapping("/{id}")
     public Mono<R<Void>> delete(@PathVariable Long id) {
-        return Mono.fromCallable(() -> {
-            dataSourceConfigMapper.deleteById(id);
-            return R.<Void>ok();
-        }).subscribeOn(Schedulers.boundedElastic());
-    }
-
-    /**
-     * 执行 normalize 对应的业务逻辑。
-     *
-     * <p>方法会结合入参、当前对象状态和依赖组件完成处理，调用方需关注返回值以及可能产生的状态变更。
-     *
-     * @param body body 请求体、消息体或事件载荷
-     */
-    private static void normalize(DataSourceConfigDO body) {
-        if (body.getType() == null || body.getType().isBlank()) {
-            body.setType("JDBC");
-        }
-        // 当前只支持 JDBC 数据源，先阻断未知类型避免后续按错误驱动建连。
-        if (!"JDBC".equals(body.getType())) {
-            throw new IllegalArgumentException("Unsupported data source type: " + body.getType());
-        }
-        requireText(body.getName(), "name");
-        requireText(body.getUrl(), "url");
-        requireText(body.getUsername(), "username");
-        requireText(body.getPassword(), "password");
-        if (body.getDriverClassName() == null || body.getDriverClassName().isBlank()) {
-            // 管理端未传驱动时按 MySQL 默认值补齐，保持旧配置兼容。
-            body.setDriverClassName("com.mysql.cj.jdbc.Driver");
-        }
-        if (body.getEnabled() == null) {
-            body.setEnabled(1);
-        }
-    }
-
-    /**
-     * 执行 require Text 对应的业务逻辑。
-     *
-     * <p>方法会结合入参、当前对象状态和依赖组件完成处理，调用方需关注返回值以及可能产生的状态变更。
-     *
-     * @param value value 待写入、比较或转换的业务值
-     * @param field field 方法执行所需的业务参数
-     */
-    private static void requireText(String value, String field) {
-        if (value == null || value.isBlank()) {
-            throw new IllegalArgumentException("Missing data source field: " + field);
-        }
+        return currentTenant().flatMap(context ->
+                Mono.fromCallable(() -> {
+                            dataSourceConfigService.delete(id, context);
+                            return R.<Void>ok();
+                        })
+                        .subscribeOn(Schedulers.boundedElastic()));
     }
 
     /**
@@ -180,11 +132,8 @@ public class DataSourceConfigController {
      * @param id id 对应的业务主键或标识
      * @return 查询、转换或计算得到的结果集合
      */
-    private List<DataSourceTableMeta> readJdbcTables(Long id) throws Exception {
-        DataSourceConfigDO config = dataSourceConfigMapper.selectById(id);
-        if (config == null) {
-            throw new IllegalArgumentException("Data source not found: " + id);
-        }
+    private List<DataSourceTableMeta> readJdbcTables(Long id, TenantContext context) throws Exception {
+        DataSourceConfigDO config = dataSourceConfigService.requireVisible(id, context);
         if (config.getEnabled() == null || config.getEnabled() == 0) {
             throw new IllegalArgumentException("Data source disabled: " + id);
         }
@@ -195,7 +144,7 @@ public class DataSourceConfigController {
                 .driverClassName(config.getDriverClassName())
                 .url(config.getUrl())
                 .username(config.getUsername())
-                .password(config.getPassword())
+                .password(dataSourceConfigService.decryptPassword(config.getPassword()))
                 .build();
         try (Connection connection = dataSource.getConnection()) {
             // 通过 JDBC DatabaseMetaData 读取表和视图，不执行用户表数据查询。
@@ -232,5 +181,10 @@ public class DataSourceConfigController {
             }
         }
         return columns;
+    }
+
+    private Mono<TenantContext> currentTenant() {
+        return tenantContextResolver.current()
+                .switchIfEmpty(Mono.error(new IllegalStateException("tenant context is required")));
     }
 }

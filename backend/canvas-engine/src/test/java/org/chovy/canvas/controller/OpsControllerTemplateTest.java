@@ -1,5 +1,8 @@
 package org.chovy.canvas.web;
 
+import org.chovy.canvas.common.tenant.RoleNames;
+import org.chovy.canvas.common.tenant.TenantContext;
+import org.chovy.canvas.common.tenant.TenantContextResolver;
 import org.chovy.canvas.dal.mapper.CanvasManualApprovalMapper;
 import org.chovy.canvas.dal.dataobject.CanvasDO;
 import org.chovy.canvas.dal.mapper.CanvasMapper;
@@ -15,6 +18,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import reactor.core.publisher.Mono;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -36,6 +40,7 @@ class OpsControllerTemplateTest {
     @Mock CanvasVersionMapper canvasVersionMapper;
     @Mock CanvasManualApprovalMapper approvalMapper;
     @Mock CanvasConfigCache configCache;
+    @Mock TenantContextResolver tenantContextResolver;
 
     @Test
     void createFromTemplateCreatesDraftVersionWithTemplateGraph() {
@@ -51,15 +56,19 @@ class OpsControllerTemplateTest {
             canvas.setId(88L);
             return 1;
         }).when(canvasMapper).insert(any(CanvasDO.class));
+        when(tenantContextResolver.current())
+                .thenReturn(Mono.just(new TenantContext(42L, RoleNames.TENANT_ADMIN, "operator")));
 
         OpsController controller = new OpsController(
-                templateMapper, canvasMapper, canvasVersionMapper, approvalMapper, configCache);
+                templateMapper, canvasMapper, canvasVersionMapper,
+                approvalMapper, configCache, tenantContextResolver);
         OpsController.FromTemplateReq req = new OpsController.FromTemplateReq();
         req.setName("我的新客发券流程");
 
         CanvasDO created = controller.createFromTemplate(5L, req).block().getData();
 
         assertThat(created.getId()).isEqualTo(88L);
+        assertThat(created.getTenantId()).isEqualTo(42L);
         assertThat(created.getName()).isEqualTo("我的新客发券流程");
         assertThat(created.getStatus()).isEqualTo(CanvasStatusEnum.DRAFT.getCode());
         assertThat(created.getIsExample()).isEqualTo(0);
@@ -68,6 +77,7 @@ class OpsControllerTemplateTest {
         ArgumentCaptor<CanvasVersionDO> versionCaptor = ArgumentCaptor.forClass(CanvasVersionDO.class);
         verify(canvasVersionMapper).insert(versionCaptor.capture());
         CanvasVersionDO version = versionCaptor.getValue();
+        assertThat(version.getTenantId()).isEqualTo(42L);
         assertThat(version.getCanvasId()).isEqualTo(88L);
         assertThat(version.getVersion()).isEqualTo(1);
         assertThat(version.getGraphJson()).isEqualTo("{\"nodes\":[]}");

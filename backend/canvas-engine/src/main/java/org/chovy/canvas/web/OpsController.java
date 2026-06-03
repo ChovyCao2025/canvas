@@ -1,6 +1,8 @@
 package org.chovy.canvas.web;
 
 import org.chovy.canvas.common.R;
+import org.chovy.canvas.common.tenant.TenantContext;
+import org.chovy.canvas.common.tenant.TenantContextResolver;
 import org.chovy.canvas.domain.canvas.*;
 import org.chovy.canvas.common.enums.ApprovalStatus;
 import org.chovy.canvas.common.enums.CanvasStatusEnum;
@@ -40,6 +42,8 @@ public class OpsController {
     private final CanvasManualApprovalMapper approvalMapper;
     /** 画布配置缓存，用于刷新画布配置缓存。 */
     private final CanvasConfigCache configCache;
+    /** 当前租户上下文解析器。 */
+    private final TenantContextResolver tenantContextResolver;
 
     /**
      * 处理 invalidate Cache 对应的 HTTP 接口请求。
@@ -59,9 +63,11 @@ public class OpsController {
      */
     @PostMapping("/ops/cache/invalidate/{id}")
     public Mono<R<String>> invalidateCache(@PathVariable Long id) {
-        return Mono.fromCallable(() -> {
+        return currentTenant().flatMap(context -> Mono.fromCallable(() -> {
             CanvasDO canvas = canvasMapper.selectById(id);
-            if (canvas == null) return R.<String>fail("画布不存在: " + id);
+            if (canvas == null || !java.util.Objects.equals(canvas.getTenantId(), context.tenantId())) {
+                return R.<String>fail("画布不存在: " + id);
+            }
             if (canvas.getPublishedVersionId() != null) {
                 configCache.invalidate(id, canvas.getPublishedVersionId());
             }
@@ -69,7 +75,7 @@ public class OpsController {
                 configCache.invalidate(id, canvas.getCanaryVersionId());
             }
             return R.ok("已失效画布 " + id + " 的缓存");
-        }).subscribeOn(Schedulers.boundedElastic());
+        }).subscribeOn(Schedulers.boundedElastic()));
     }
 
     // ── 画布模板（23.1节） ─────────────────────────────────────────
@@ -102,9 +108,11 @@ public class OpsController {
     public Mono<R<CanvasTemplateDO>> saveAsTemplate(
             @PathVariable Long id,
             @RequestBody SaveTemplateReq req) {
-        return Mono.fromCallable(() -> {
+        return currentTenant().flatMap(context -> Mono.fromCallable(() -> {
             CanvasDO canvas = canvasMapper.selectById(id);
-            if (canvas == null) throw new IllegalArgumentException("画布不存在");
+            if (canvas == null || !java.util.Objects.equals(canvas.getTenantId(), context.tenantId())) {
+                throw new IllegalArgumentException("画布不存在");
+            }
             CanvasTemplateDO tpl = new CanvasTemplateDO();
             tpl.setName(req.getName() != null ? req.getName() : canvas.getName() + " 模板");
             tpl.setDescription(req.getDescription());
@@ -112,16 +120,17 @@ public class OpsController {
             // 获取最新草稿的 graphJson
             var draft = canvasVersionMapper.selectOne(
                     new LambdaQueryWrapper<CanvasVersionDO>()
+                            .eq(CanvasVersionDO::getTenantId, context.tenantId())
                             .eq(CanvasVersionDO::getCanvasId, id)
                             .eq(CanvasVersionDO::getStatus, 0)
                             .orderByDesc(CanvasVersionDO::getVersion).last("LIMIT 1"));
             tpl.setGraphJson(draft != null ? draft.getGraphJson() : "{\"nodes\":[]}");
             tpl.setIsOfficial(0);
             tpl.setUseCount(0);
-            tpl.setCreatedBy("current_user");
+            tpl.setCreatedBy(defaultIfBlank(context.username(), "current_user"));
             templateMapper.insert(tpl);
             return tpl;
-        }).subscribeOn(Schedulers.boundedElastic()).map(R::ok);
+        }).subscribeOn(Schedulers.boundedElastic()).map(R::ok));
     }
 
     /**
@@ -134,25 +143,27 @@ public class OpsController {
     @PostMapping("/canvas/from-template/{templateId}")
     public Mono<R<CanvasDO>> createFromTemplate(@PathVariable Long templateId,
                                               @RequestBody FromTemplateReq req) {
-        return Mono.fromCallable(() -> {
+        return currentTenant().flatMap(context -> Mono.fromCallable(() -> {
             CanvasTemplateDO tpl = templateMapper.selectById(templateId);
             if (tpl == null) throw new IllegalArgumentException("模板不存在");
 
             CanvasDO canvas = new CanvasDO();
+            canvas.setTenantId(context.tenantId());
             canvas.setName(req.getName() != null ? req.getName() : tpl.getName() + " (副本)");
             canvas.setDescription(tpl.getDescription());
             canvas.setStatus(CanvasStatusEnum.DRAFT.getCode());
-            canvas.setCreatedBy("current_user");
+            canvas.setCreatedBy(defaultIfBlank(context.username(), "current_user"));
             canvas.setIsExample(0);
             canvas.setSourceTemplateKey(null);
             canvasMapper.insert(canvas);
 
             CanvasVersionDO version = new CanvasVersionDO();
+            version.setTenantId(context.tenantId());
             version.setCanvasId(canvas.getId());
             version.setVersion(1);
             version.setGraphJson(tpl.getGraphJson());
             version.setStatus(VersionStatus.DRAFT.getCode());
-            version.setCreatedBy("current_user");
+            version.setCreatedBy(defaultIfBlank(context.username(), "current_user"));
             canvasVersionMapper.insert(version);
 
             // 更新模板使用次数
@@ -160,7 +171,7 @@ public class OpsController {
             templateMapper.updateById(tpl);
 
             return canvas;
-        }).subscribeOn(Schedulers.boundedElastic()).map(R::ok);
+        }).subscribeOn(Schedulers.boundedElastic()).map(R::ok));
     }
 
 // ── 发布审批（23.2节） ─────────────────────────────────────────
@@ -207,5 +218,14 @@ public class OpsController {
 
         /** 新建画布名称（可选，不传则使用模板名 + 副本后缀）。 */
         private String name;
+    }
+
+    private Mono<TenantContext> currentTenant() {
+        return tenantContextResolver.current()
+                .switchIfEmpty(Mono.error(new IllegalStateException("tenant context is required")));
+    }
+
+    private static String defaultIfBlank(String value, String defaultValue) {
+        return value == null || value.isBlank() ? defaultValue : value;
     }
 }

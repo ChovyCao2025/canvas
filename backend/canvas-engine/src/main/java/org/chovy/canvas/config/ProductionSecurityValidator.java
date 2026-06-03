@@ -4,6 +4,8 @@ import org.springframework.beans.factory.SmartInitializingSingleton;
 import org.springframework.core.env.Environment;
 import org.springframework.stereotype.Component;
 
+import org.chovy.canvas.domain.datasource.DataSourceCredentialCipher;
+
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -32,6 +34,7 @@ public class ProductionSecurityValidator implements SmartInitializingSingleton {
         }
         List<String> failures = new ArrayList<>();
         validateDatasource(failures);
+        validateDataSourceCredentialSecret(failures);
         validateJwt(failures);
         validateEventSecret(failures);
         validateCors(failures);
@@ -58,6 +61,20 @@ public class ProductionSecurityValidator implements SmartInitializingSingleton {
         }
         if ("root".equals(password)) {
             failures.add("spring.datasource.password 不能使用 root");
+        }
+    }
+
+    private void validateDataSourceCredentialSecret(List<String> failures) {
+        String secret = value("canvas.datasource.credential-secret");
+        if (secret == null || secret.isBlank()) {
+            failures.add("canvas.datasource.credential-secret 必须配置");
+            return;
+        }
+        if (DataSourceCredentialCipher.DEFAULT_SECRET.equals(secret)) {
+            failures.add("canvas.datasource.credential-secret 不能使用默认示例密钥");
+        }
+        if (secret.getBytes(StandardCharsets.UTF_8).length < 32) {
+            failures.add("canvas.datasource.credential-secret 长度不能少于 32 字节");
         }
     }
 

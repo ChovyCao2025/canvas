@@ -59,7 +59,14 @@ public class CanvasOpsService {
     @Transactional
     public void saveWithOptimisticLock(Long id, String name, String description,
                                         String graphJson, int editVersion, String operator) {
-        CanvasDO canvas = canvasMapper.selectById(id);
+        saveWithOptimisticLock(id, name, description, graphJson, editVersion, operator, null);
+    }
+
+    @Transactional
+    public void saveWithOptimisticLock(Long id, String name, String description,
+                                        String graphJson, int editVersion, String operator,
+                                        Long tenantId) {
+        CanvasDO canvas = tenantId == null ? canvasMapper.selectById(id) : require(id, tenantId);
         if (canvas != null) {
             stateTransitionPolicy.assertDraftUpdateAllowed(canvas);
         }
@@ -76,6 +83,7 @@ public class CanvasOpsService {
                 canvasVersionMapper.updateById(draft);
             } else {
                 CanvasVersionDO v = new CanvasVersionDO();
+                v.setTenantId(canvas != null ? canvas.getTenantId() : null);
                 v.setCanvasId(id); v.setVersion(1); v.setGraphJson(graphJson);
                 v.setStatus(VersionStatus.DRAFT.getCode()); v.setCreatedBy(operator);
                 canvasVersionMapper.insert(v);
@@ -96,6 +104,13 @@ public class CanvasOpsService {
      * 外部副作用失败不会回滚 DB，路由/缓存最终会通过 TTL 或下次操作自愈。
      */
     public void kill(Long id, String mode) {
+        kill(id, mode, null);
+    }
+
+    public void kill(Long id, String mode, Long tenantId) {
+        if (tenantId != null) {
+            require(id, tenantId);
+        }
         // Step 1: 事务内 DB 操作，返回下线前的 publishedVersionId 供外部清理使用
         Long publishedVersionId = canvasTransactionService.killDb(id);
 
@@ -132,7 +147,12 @@ public class CanvasOpsService {
      */
     @Transactional
     public void startCanary(Long id, int percent, String operator) {
-        CanvasDO canvas = require(id);
+        startCanary(id, percent, operator, null);
+    }
+
+    @Transactional
+    public void startCanary(Long id, int percent, String operator, Long tenantId) {
+        CanvasDO canvas = require(id, tenantId);
         if (canvas.getStatus() != CanvasStatusEnum.PUBLISHED.getCode()) throw new IllegalStateException("画布未在发布状态");
 
         // 生成灰度版本快照（复用当前草稿），与正式发布一样保留不可变版本
@@ -140,6 +160,7 @@ public class CanvasOpsService {
         if (draft == null) throw new IllegalStateException("无草稿可灰度");
 
         CanvasVersionDO canary = new CanvasVersionDO();
+        canary.setTenantId(canvas.getTenantId());
         canary.setCanvasId(id);
         canary.setVersion(nextVer(id));
         canary.setGraphJson(draft.getGraphJson());
@@ -158,7 +179,12 @@ public class CanvasOpsService {
      */
     @Transactional
     public void promoteCanary(Long id) {
-        CanvasDO canvas = require(id);
+        promoteCanary(id, null);
+    }
+
+    @Transactional
+    public void promoteCanary(Long id, Long tenantId) {
+        CanvasDO canvas = require(id, tenantId);
         if (canvas.getCanaryVersionId() == null) throw new IllegalStateException("无灰度版本");
 
         canvas.setPreviousVersionId(canvas.getPublishedVersionId());
@@ -174,7 +200,12 @@ public class CanvasOpsService {
      */
     @Transactional
     public void rollbackCanary(Long id) {
-        CanvasDO canvas = require(id);
+        rollbackCanary(id, null);
+    }
+
+    @Transactional
+    public void rollbackCanary(Long id, Long tenantId) {
+        CanvasDO canvas = require(id, tenantId);
         canvas.setCanaryVersionId(null);
         canvas.setCanaryPercent(null);
         canvasMapper.updateById(canvas);
@@ -195,7 +226,12 @@ public class CanvasOpsService {
      */
     @Transactional
     public void rollback(Long id) {
-        CanvasDO canvas = require(id);
+        rollback(id, null);
+    }
+
+    @Transactional
+    public void rollback(Long id, Long tenantId) {
+        CanvasDO canvas = require(id, tenantId);
         if (canvas.getPreviousVersionId() == null) throw new IllegalStateException("无上一版本可回滚");
 
         Long tmp = canvas.getPublishedVersionId();
@@ -214,10 +250,16 @@ public class CanvasOpsService {
      */
     @Transactional
     public CanvasDO clone(Long id, String operator) {
-        CanvasDO src = require(id);
+        return clone(id, operator, null);
+    }
+
+    @Transactional
+    public CanvasDO clone(Long id, String operator, Long tenantId) {
+        CanvasDO src = require(id, tenantId);
         CanvasVersionDO srcDraft = latestDraft(id);
 
         CanvasDO copy = new CanvasDO();
+        copy.setTenantId(src.getTenantId());
         copy.setName(src.getName() + " (副本)");
         copy.setDescription(src.getDescription());
         copy.setStatus(CanvasStatusEnum.DRAFT.getCode());
@@ -230,6 +272,7 @@ public class CanvasOpsService {
         if (srcDraft != null) {
             // 只克隆最新草稿为新画布的草稿版本，不继承发布态、灰度和外部路由状态。
             CanvasVersionDO v = new CanvasVersionDO();
+            v.setTenantId(src.getTenantId());
             v.setCanvasId(copy.getId()); v.setVersion(1);
             v.setGraphJson(srcDraft.getGraphJson());
             v.setStatus(VersionStatus.DRAFT.getCode()); v.setCreatedBy(operator);
@@ -250,10 +293,20 @@ public class CanvasOpsService {
      */
     @SuppressWarnings("unchecked")
     public java.util.Map<String, Object> diff(Long canvasId, Long v1Id, Long v2Id) {
+        return diff(canvasId, v1Id, v2Id, null);
+    }
 
+    @SuppressWarnings("unchecked")
+    public java.util.Map<String, Object> diff(Long canvasId, Long v1Id, Long v2Id, Long tenantId) {
+        require(canvasId, tenantId);
         CanvasVersionDO v1 = canvasVersionMapper.selectById(v1Id);
         CanvasVersionDO v2 = canvasVersionMapper.selectById(v2Id);
         if (v1 == null || v2 == null) throw new IllegalArgumentException("版本不存在");
+        if (tenantId != null
+                && (!java.util.Objects.equals(v1.getTenantId(), tenantId)
+                || !java.util.Objects.equals(v2.getTenantId(), tenantId))) {
+            throw new IllegalArgumentException("版本不存在");
+        }
 
         // 解析两个版本的节点列表
         java.util.List<java.util.Map<String, Object>> nodes1 = parseNodes(v1.getGraphJson());
@@ -340,8 +393,15 @@ public class CanvasOpsService {
 
     /** 按 ID 查询画布，不存在时抛出业务异常。 */
     private CanvasDO require(Long id) {
+        return require(id, null);
+    }
+
+    private CanvasDO require(Long id, Long tenantId) {
         CanvasDO c = canvasMapper.selectById(id);
         if (c == null) throw new IllegalArgumentException("画布不存在: " + id);
+        if (tenantId != null && !java.util.Objects.equals(c.getTenantId(), tenantId)) {
+            throw new IllegalArgumentException("画布不存在: " + id);
+        }
         return c;
     }
 

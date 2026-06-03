@@ -67,6 +67,7 @@ public class CanvasTransactionService {
         Long oldPublishedVersionId = canvas.getPublishedVersionId();
 
         CanvasVersionDO published = new CanvasVersionDO();
+        published.setTenantId(canvas.getTenantId());
         published.setCanvasId(canvasId);
         published.setVersion(nextVersionNumber(canvasId));
         published.setGraphJson(graphJson);

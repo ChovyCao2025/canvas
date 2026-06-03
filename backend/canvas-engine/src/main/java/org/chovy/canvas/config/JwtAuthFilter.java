@@ -83,6 +83,7 @@ public class JwtAuthFilter implements WebFilter {
                                             .add(claims)
                                             .add("username", user.getUsername())
                                             .add("role", user.getRole())
+                                            .add("tenantId", user.getTenantId())
                                             .add("displayName", user.getDisplayName())
                                             .build();
                                     UsernamePasswordAuthenticationToken auth =

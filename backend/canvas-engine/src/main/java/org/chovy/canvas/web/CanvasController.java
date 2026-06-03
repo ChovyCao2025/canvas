@@ -2,6 +2,8 @@ package org.chovy.canvas.web;
 
 import org.chovy.canvas.common.PageResult;
 import org.chovy.canvas.common.R;
+import org.chovy.canvas.common.tenant.TenantContext;
+import org.chovy.canvas.common.tenant.TenantContextResolver;
 import org.chovy.canvas.domain.canvas.*;
 import org.chovy.canvas.domain.notification.NotificationEventService;
 import org.chovy.canvas.dto.*;
@@ -31,6 +33,8 @@ public class CanvasController {
     private final CanvasOpsService opsService;
     /** 通知事件服务，用于发送画布运营通知。 */
     private final NotificationEventService notificationEventService;
+    /** 当前租户上下文解析器。 */
+    private final TenantContextResolver tenantContextResolver;
 
     /**
      * 创建画布
@@ -40,9 +44,10 @@ public class CanvasController {
      */
     @PostMapping
     public Mono<R<CanvasDO>> create(@RequestBody CanvasCreateReq req) {
-        return Mono.fromCallable(() -> canvasService.create(req))
-                .subscribeOn(Schedulers.boundedElastic())
-                .map(R::ok);
+        return currentTenant().flatMap(context ->
+                Mono.fromCallable(() -> canvasService.create(req, context.tenantId()))
+                        .subscribeOn(Schedulers.boundedElastic())
+                        .map(R::ok));
     }
 
     /**
@@ -53,9 +58,10 @@ public class CanvasController {
      */
     @GetMapping("/{id}")
     public Mono<R<CanvasDetailDTO>> getById(@PathVariable Long id) {
-        return Mono.fromCallable(() -> canvasService.getById(id))
-                .subscribeOn(Schedulers.boundedElastic())
-                .map(detail -> detail != null ? R.ok(detail) : R.fail("画布不存在"));
+        return currentTenant().flatMap(context ->
+                Mono.fromCallable(() -> canvasService.getById(id, context.tenantId()))
+                        .subscribeOn(Schedulers.boundedElastic())
+                        .map(detail -> detail != null ? R.ok(detail) : R.fail("画布不存在")));
     }
 
     /**
@@ -67,9 +73,10 @@ public class CanvasController {
      */
     @PutMapping("/{id}")
     public Mono<R<Void>> update(@PathVariable Long id, @RequestBody CanvasUpdateReq req) {
-        return Mono.<Void>fromRunnable(() -> canvasService.updateDraft(id, req))
-                .subscribeOn(Schedulers.boundedElastic())
-                .thenReturn(R.ok());
+        return currentTenant().flatMap(context ->
+                Mono.<Void>fromRunnable(() -> canvasService.updateDraft(id, req, context.tenantId()))
+                        .subscribeOn(Schedulers.boundedElastic())
+                        .thenReturn(R.ok()));
     }
 
     /**
@@ -80,9 +87,10 @@ public class CanvasController {
      */
     @GetMapping("/list")
     public Mono<R<PageResult<CanvasDO>>> list(CanvasListQuery query) {
-        return Mono.fromCallable(() -> canvasService.list(query))
-                .subscribeOn(Schedulers.boundedElastic())
-                .map(R::ok);
+        return currentTenant().flatMap(context ->
+                Mono.fromCallable(() -> canvasService.list(query, context.tenantId()))
+                        .subscribeOn(Schedulers.boundedElastic())
+                        .map(R::ok));
     }
 
     /**
@@ -96,16 +104,16 @@ public class CanvasController {
     public Mono<R<CanvasVersionDO>> publish(
             @PathVariable Long id,
             @RequestParam(defaultValue = "system") String operator) {
-        return Mono.fromCallable(() -> {
+        return currentTenant().flatMap(context -> Mono.fromCallable(() -> {
                     // 发布会修改版本状态并刷新运行配置，属于阻塞事务操作。
-                    CanvasVersionDO version = canvasService.publish(id, operator);
+                    CanvasVersionDO version = canvasService.publish(id, operator, context.tenantId());
                     notifyCanvasChange("CANVAS_PUBLISHED", id, "画布已发布",
                             "operator=" + operator + " versionId=" + version.getId(),
                             "INFO", operator);
                     return version;
                 })
                 .subscribeOn(Schedulers.boundedElastic())
-                .map(R::ok);
+                .map(R::ok));
     }
 
     /**
@@ -119,26 +127,26 @@ public class CanvasController {
     public Mono<R<Void>> offline(
             @PathVariable Long id,
             @RequestParam(defaultValue = "system") String operator) {
-        return Mono.<Void>fromRunnable(() -> {
-                    canvasService.offline(id, operator);
+        return currentTenant().flatMap(context -> Mono.<Void>fromRunnable(() -> {
+                    canvasService.offline(id, operator, context.tenantId());
                     notifyCanvasChange("CANVAS_OFFLINE", id, "画布已下线",
                             "operator=" + operator, "WARNING", operator);
                 })
                 .subscribeOn(Schedulers.boundedElastic())
-                .thenReturn(R.ok());
+                .thenReturn(R.ok()));
     }
 
     @PostMapping("/{id}/archive")
     public Mono<R<Void>> archive(
             @PathVariable Long id,
             @RequestParam(defaultValue = "system") String operator) {
-        return Mono.<Void>fromRunnable(() -> {
-                    canvasService.archive(id, operator);
+        return currentTenant().flatMap(context -> Mono.<Void>fromRunnable(() -> {
+                    canvasService.archive(id, operator, context.tenantId());
                     notifyCanvasChange("CANVAS_ARCHIVED", id, "画布已归档",
                             "operator=" + operator, "WARNING", operator);
                 })
                 .subscribeOn(Schedulers.boundedElastic())
-                .thenReturn(R.ok());
+                .thenReturn(R.ok()));
     }
 
     /**
@@ -154,9 +162,10 @@ public class CanvasController {
             @PathVariable Long id,
             @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "20") int size) {
-        return Mono.fromCallable(() -> canvasService.getVersions(id, page, size))
-                .subscribeOn(Schedulers.boundedElastic())
-                .map(R::ok);
+        return currentTenant().flatMap(context ->
+                Mono.fromCallable(() -> canvasService.getVersions(id, page, size, context.tenantId()))
+                        .subscribeOn(Schedulers.boundedElastic())
+                        .map(R::ok));
     }
 
     /**
@@ -170,9 +179,10 @@ public class CanvasController {
     public Mono<R<CanvasVersionDO>> getVersion(
             @PathVariable Long id,
             @PathVariable Long versionId) {
-        return Mono.fromCallable(() -> canvasService.getVersion(id, versionId))
-                .subscribeOn(Schedulers.boundedElastic())
-                .map(v -> v != null ? R.ok(v) : R.fail("版本不存在"));
+        return currentTenant().flatMap(context ->
+                Mono.fromCallable(() -> canvasService.getVersion(id, versionId, context.tenantId()))
+                        .subscribeOn(Schedulers.boundedElastic())
+                        .map(v -> v != null ? R.ok(v) : R.fail("版本不存在")));
     }
 
 
@@ -188,14 +198,18 @@ public class CanvasController {
     @PostMapping("/{id}/kill")
     public Mono<R<Void>> kill(@PathVariable Long id,
                               @RequestParam(defaultValue = "GRACEFUL") String mode) {
-        return currentUser().flatMap(operator ->
+        return currentTenant().zipWith(currentUser()).flatMap(tuple -> {
+            TenantContext context = tuple.getT1();
+            String operator = tuple.getT2();
+            return
                 Mono.<Void>fromRunnable(() -> {
-                            opsService.kill(id, mode);
+                            opsService.kill(id, mode, context.tenantId());
                             notifyCanvasChange("CANVAS_KILLED", id, "画布执行已终止",
                                     "operator=" + operator + " mode=" + mode, "ERROR", operator);
                         })
                         .subscribeOn(Schedulers.boundedElastic())
-                        .thenReturn(R.ok()));
+                        .thenReturn(R.ok());
+        });
     }
 
     /**
@@ -204,9 +218,10 @@ public class CanvasController {
     @PostMapping("/{id}/revert/{versionId}")
     public Mono<R<Void>> revertToVersion(@PathVariable Long id,
                                          @PathVariable Long versionId) {
-        return Mono.<Void>fromRunnable(() -> canvasService.revertToVersion(id, versionId))
-                .subscribeOn(Schedulers.boundedElastic())
-                .thenReturn(R.ok());
+        return currentTenant().flatMap(context ->
+                Mono.<Void>fromRunnable(() -> canvasService.revertToVersion(id, versionId, context.tenantId()))
+                        .subscribeOn(Schedulers.boundedElastic())
+                        .thenReturn(R.ok()));
     }
 
     /**
@@ -219,14 +234,18 @@ public class CanvasController {
     @PostMapping("/{id}/canary")
     public Mono<R<Void>> startCanary(@PathVariable Long id,
                                      @RequestParam int percent) {
-        return currentUser().flatMap(operator ->
+        return currentTenant().zipWith(currentUser()).flatMap(tuple -> {
+            TenantContext context = tuple.getT1();
+            String operator = tuple.getT2();
+            return
                 Mono.<Void>fromRunnable(() -> {
-                            opsService.startCanary(id, percent, operator);
+                            opsService.startCanary(id, percent, operator, context.tenantId());
                             notifyCanvasChange("CANVAS_CANARY_STARTED", id, "画布灰度已启动",
                                     "operator=" + operator + " percent=" + percent, "INFO", operator);
                         })
                         .subscribeOn(Schedulers.boundedElastic())
-                        .thenReturn(R.ok()));
+                        .thenReturn(R.ok());
+        });
     }
 
     /**
@@ -237,14 +256,18 @@ public class CanvasController {
      */
     @PostMapping("/{id}/promote-canary")
     public Mono<R<Void>> promoteCanary(@PathVariable Long id) {
-        return currentUser().flatMap(operator ->
+        return currentTenant().zipWith(currentUser()).flatMap(tuple -> {
+            TenantContext context = tuple.getT1();
+            String operator = tuple.getT2();
+            return
                 Mono.<Void>fromRunnable(() -> {
-                            opsService.promoteCanary(id);
+                            opsService.promoteCanary(id, context.tenantId());
                             notifyCanvasChange("CANVAS_CANARY_PROMOTED", id, "灰度版本已转正",
                                     "operator=" + operator, "SUCCESS", operator);
                         })
                         .subscribeOn(Schedulers.boundedElastic())
-                        .thenReturn(R.ok()));
+                        .thenReturn(R.ok());
+        });
     }
 
     /**
@@ -255,14 +278,18 @@ public class CanvasController {
      */
     @PostMapping("/{id}/rollback-canary")
     public Mono<R<Void>> rollbackCanary(@PathVariable Long id) {
-        return currentUser().flatMap(operator ->
+        return currentTenant().zipWith(currentUser()).flatMap(tuple -> {
+            TenantContext context = tuple.getT1();
+            String operator = tuple.getT2();
+            return
                 Mono.<Void>fromRunnable(() -> {
-                            opsService.rollbackCanary(id);
+                            opsService.rollbackCanary(id, context.tenantId());
                             notifyCanvasChange("CANVAS_CANARY_ROLLED_BACK", id, "灰度发布已回滚",
                                     "operator=" + operator, "WARNING", operator);
                         })
                         .subscribeOn(Schedulers.boundedElastic())
-                        .thenReturn(R.ok()));
+                        .thenReturn(R.ok());
+        });
     }
 
     /**
@@ -273,14 +300,18 @@ public class CanvasController {
      */
     @PostMapping("/{id}/rollback")
     public Mono<R<Void>> rollback(@PathVariable Long id) {
-        return currentUser().flatMap(operator ->
+        return currentTenant().zipWith(currentUser()).flatMap(tuple -> {
+            TenantContext context = tuple.getT1();
+            String operator = tuple.getT2();
+            return
                 Mono.<Void>fromRunnable(() -> {
-                            opsService.rollback(id);
+                            opsService.rollback(id, context.tenantId());
                             notifyCanvasChange("CANVAS_ROLLED_BACK", id, "画布已回滚",
                                     "operator=" + operator, "WARNING", operator);
                         })
                         .subscribeOn(Schedulers.boundedElastic())
-                        .thenReturn(R.ok()));
+                        .thenReturn(R.ok());
+        });
     }
 
     /**
@@ -291,15 +322,19 @@ public class CanvasController {
      */
     @PostMapping("/{id}/clone")
     public Mono<R<CanvasDO>> clone(@PathVariable Long id) {
-        return currentUser().flatMap(operator ->
+        return currentTenant().zipWith(currentUser()).flatMap(tuple -> {
+            TenantContext context = tuple.getT1();
+            String operator = tuple.getT2();
+            return
                 Mono.fromCallable(() -> {
-                            CanvasDO canvas = opsService.clone(id, operator);
+                            CanvasDO canvas = opsService.clone(id, operator, context.tenantId());
                             notifyCanvasChange("CANVAS_CLONED", canvas.getId(), "画布已克隆",
                                     "operator=" + operator + " sourceCanvasId=" + id, "INFO", operator);
                             return canvas;
                         })
                         .subscribeOn(Schedulers.boundedElastic())
-                        .map(R::ok));
+                        .map(R::ok);
+        });
     }
 
     /**
@@ -314,9 +349,10 @@ public class CanvasController {
     public Mono<R<Map<String, Object>>> diff(@PathVariable Long id,
                                              @PathVariable Long v1,
                                              @PathVariable Long v2) {
-        return Mono.fromCallable(() -> opsService.diff(id, v1, v2))
-                .subscribeOn(Schedulers.boundedElastic())
-                .map(R::ok);
+        return currentTenant().flatMap(context ->
+                Mono.fromCallable(() -> opsService.diff(id, v1, v2, context.tenantId()))
+                        .subscribeOn(Schedulers.boundedElastic())
+                        .map(R::ok));
     }
 
     /**
@@ -326,18 +362,22 @@ public class CanvasController {
     public Mono<R<Void>> safeUpdate(@PathVariable Long id,
                                     @RequestBody SafeUpdateReq req) {
 
-        return currentUser().flatMap(operator ->
+        return currentTenant().zipWith(currentUser()).flatMap(tuple -> {
+            TenantContext context = tuple.getT1();
+            String operator = tuple.getT2();
+            return
                 Mono.<Void>fromRunnable(() -> opsService.saveWithOptimisticLock(
                                 // editVersion 用于乐观锁，前端版本落后时返回可识别的冲突文案。
                                 id, req.getName(), req.getDescription(),
-                                req.getGraphJson(), req.getEditVersion(), operator))
+                                req.getGraphJson(), req.getEditVersion(), operator, context.tenantId()))
                         .subscribeOn(Schedulers.boundedElastic())
                         .thenReturn(R.ok())
                         .onErrorResume(e -> {
                             if ("CANVAS_010".equals(e.getMessage()))
                                 return Mono.just(R.fail("画布已被他人修改，请刷新后重试"));
                             return Mono.error(e);
-                        }));
+                        });
+        });
     }
 
     /**
@@ -357,6 +397,11 @@ public class CanvasController {
                 // 管控类操作统一记录 JWT 中的 username 作为审计操作人。
                 .map(c -> c.get("username", String.class))
                 .defaultIfEmpty("system");
+    }
+
+    private Mono<TenantContext> currentTenant() {
+        return tenantContextResolver.current()
+                .switchIfEmpty(Mono.error(new IllegalStateException("tenant context is required")));
     }
 
     /**

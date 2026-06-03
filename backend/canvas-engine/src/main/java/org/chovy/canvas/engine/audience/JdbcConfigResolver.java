@@ -4,7 +4,7 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import org.chovy.canvas.dal.dataobject.DataSourceConfigDO;
-import org.chovy.canvas.dal.mapper.DataSourceConfigMapper;
+import org.chovy.canvas.domain.datasource.DataSourceConfigService;
 import org.springframework.stereotype.Component;
 
 import java.util.Map;
@@ -21,8 +21,8 @@ public class JdbcConfigResolver {
 
     /** JSON 解析器，用于读取人群 JDBC 配置。 */
     private final ObjectMapper objectMapper;
-    /** 数据源配置 Mapper，用于按 ID 读取真实连接信息。 */
-    private final DataSourceConfigMapper dataSourceConfigMapper;
+    /** 数据源配置服务，用于按 ID 读取并解密真实连接信息。 */
+    private final DataSourceConfigService dataSourceConfigService;
 
     /**
      * 构建、解析或转换 resolve 相关的业务数据。
@@ -39,10 +39,7 @@ public class JdbcConfigResolver {
         Map<String, Object> config = objectMapper.readValue(configJson, new TypeReference<>() {});
         Long dataSourceId = longValue(config, "dataSourceId");
         // 人群配置只保存数据源引用和表级参数，真实连接信息从统一数据源表读取。
-        DataSourceConfigDO dataSource = dataSourceConfigMapper.selectById(dataSourceId);
-        if (dataSource == null) {
-            throw new IllegalArgumentException("Data source not found: " + dataSourceId);
-        }
+        DataSourceConfigDO dataSource = dataSourceConfigService.getForRuntime(dataSourceId);
         if (dataSource.getEnabled() == null || dataSource.getEnabled() == 0) {
             throw new IllegalArgumentException("Data source disabled: " + dataSourceId);
         }

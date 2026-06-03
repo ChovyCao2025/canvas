@@ -46,6 +46,8 @@ server:
   port: 8080
 
 canvas:
+  datasource:
+    credential-secret: ${CANVAS_DATASOURCE_CREDENTIAL_SECRET:canvas-local-datasource-secret-32b!}
   examples:
     enabled: ${CANVAS_EXAMPLES_ENABLED:true}
   jwt:

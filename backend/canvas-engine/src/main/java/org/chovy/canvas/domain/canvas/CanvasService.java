@@ -90,7 +90,13 @@ public class CanvasService {
      */
     @Transactional
     public CanvasDO create(CanvasCreateReq req) {
+        return create(req, null);
+    }
+
+    @Transactional
+    public CanvasDO create(CanvasCreateReq req, Long tenantId) {
         CanvasDO canvas = new CanvasDO();
+        canvas.setTenantId(tenantId);
         canvas.setName(req.getName());
         canvas.setDescription(req.getDescription());
         canvas.setStatus(CanvasStatusEnum.DRAFT.getCode());
@@ -99,6 +105,7 @@ public class CanvasService {
         // 若带初始 JSON，创建第一个草稿版本
         if (StrUtil.isNotBlank(req.getGraphJson())) {
             CanvasVersionDO v = new CanvasVersionDO();
+            v.setTenantId(tenantId);
             v.setCanvasId(canvas.getId());
             v.setVersion(1);
             v.setGraphJson(req.getGraphJson());
@@ -116,10 +123,14 @@ public class CanvasService {
      * @return 画布详情 DTO
      */
     public CanvasDetailDTO getById(Long id) {
-        CanvasDO canvas = canvasMapper.selectById(id);
+        return getById(id, null);
+    }
+
+    public CanvasDetailDTO getById(Long id, Long tenantId) {
+        CanvasDO canvas = requireCanvasOrNull(id, tenantId);
         if (canvas == null) return null;
 
-        CanvasVersionDO draft = latestDraft(id);
+        CanvasVersionDO draft = latestDraft(id, tenantId);
 
         CanvasDetailDTO dto = new CanvasDetailDTO();
         dto.setCanvas(canvas);
@@ -136,8 +147,12 @@ public class CanvasService {
      */
     @Transactional
     public void updateDraft(Long id, CanvasUpdateReq req) {
-        CanvasDO canvas = canvasMapper.selectById(id);
-        if (canvas == null) throw new IllegalArgumentException("画布不存在: " + id);
+        updateDraft(id, req, null);
+    }
+
+    @Transactional
+    public void updateDraft(Long id, CanvasUpdateReq req, Long tenantId) {
+        CanvasDO canvas = requireCanvas(id, tenantId);
         stateTransitionPolicy.assertDraftUpdateAllowed(canvas);
         assertPublishedRuntimePolicyUnchanged(canvas, req);
 
@@ -150,13 +165,14 @@ public class CanvasService {
 
         if (req.getGraphJson() == null) return;
 
-        CanvasVersionDO existing = latestDraft(id);
+        CanvasVersionDO existing = latestDraft(id, tenantId);
         if (existing != null) {
             existing.setGraphJson(req.getGraphJson());
             canvasVersionMapper.updateById(existing);
         } else {
             int nextVer = nextVersionNumber(id);
             CanvasVersionDO v = new CanvasVersionDO();
+            v.setTenantId(canvas.getTenantId());
             v.setCanvasId(id);
             v.setVersion(nextVer);
             v.setGraphJson(req.getGraphJson());
@@ -204,7 +220,12 @@ public class CanvasService {
      * @return 分页结果
      */
     public PageResult<CanvasDO> list(CanvasListQuery q) {
+        return list(q, null);
+    }
+
+    public PageResult<CanvasDO> list(CanvasListQuery q, Long tenantId) {
         LambdaQueryWrapper<CanvasDO> wrapper = new LambdaQueryWrapper<CanvasDO>()
+                .eq(tenantId != null, CanvasDO::getTenantId, tenantId)
                 .eq(q.getStatus() != null, CanvasDO::getStatus, q.getStatus())
                 .ne(q.getStatus() == null, CanvasDO::getStatus, CanvasStatusEnum.ARCHIVED.getCode())
                 .eq(!examplesProperties.isEnabled(), CanvasDO::getIsExample, 0)
@@ -230,6 +251,10 @@ public class CanvasService {
      * 发布锁（Redis SETNX，TTL 30s）贯穿全流程，防并发发布。
      */
     public CanvasVersionDO publish(Long id, String operator) {
+        return publish(id, operator, null);
+    }
+
+    public CanvasVersionDO publish(Long id, String operator, Long tenantId) {
 
         // 并发发布保护：同一画布同时只允许一个发布操作
         String lockKey = "canvas:publish:lock:" + id;
@@ -241,10 +266,9 @@ public class CanvasService {
 
         try {
             // 阶段1：验证（事务外，全部读操作）
-            CanvasDO canvas = canvasMapper.selectById(id);
-            if (canvas == null) throw new IllegalArgumentException("画布不存在: " + id);
+            CanvasDO canvas = requireCanvas(id, tenantId);
 
-            CanvasVersionDO draft = latestDraft(id);
+            CanvasVersionDO draft = latestDraft(id, tenantId);
             if (draft == null) throw new IllegalStateException("没有可发布的草稿");
 
             DagGraph graph = dagParser.parse(draft.getGraphJson());
@@ -252,7 +276,7 @@ public class CanvasService {
                 throw new IllegalStateException("画布缺少有效触发器节点");
             }
             // 子流程依赖必须在发布事务前完成校验，避免 DB 已切发布态后运行时才发现断链。
-            validateSubFlowDependencies(id, graph);
+            validateSubFlowDependencies(id, graph, canvas.getTenantId());
             canvasRuleGraphValidator.validateOrThrow(graph);
 
             // 阶段2：DB 事务（只写 DB，不碰 Redis/Scheduler/Cache）
@@ -305,6 +329,10 @@ public class CanvasService {
      * 若子流程未发布，运行时会失败，应在发布时就拦截。
      */
     private void validateSubFlowDependencies(Long canvasId, DagGraph graph) {
+        validateSubFlowDependencies(canvasId, graph, null);
+    }
+
+    private void validateSubFlowDependencies(Long canvasId, DagGraph graph, Long tenantId) {
         java.util.List<String> errors = new java.util.ArrayList<>();
         graph.getNodeMap().forEach((nodeId, node) -> {
             if (!NodeType.SUB_FLOW_REF.equals(node.getType())) return;
@@ -316,6 +344,8 @@ public class CanvasService {
             CanvasDO subFlow = canvasMapper.selectById(subFlowId);
             if (subFlow == null) {
                 errors.add("节点「" + node.getName() + "」引用的子流程 ID=" + subFlowId + " 不存在");
+            } else if (tenantId != null && !Objects.equals(subFlow.getTenantId(), tenantId)) {
+                errors.add("节点「" + node.getName() + "」引用的子流程 ID=" + subFlowId + " 不属于当前租户");
             } else if (!Objects.equals(subFlow.getStatus(), CanvasStatusEnum.PUBLISHED.getCode())) {
                 errors.add("节点「" + node.getName() + "」引用的子流程「" + subFlow.getName() + "」未发布（当前状态: " + subFlow.getStatus() + "）");
             } else if (subFlowId.equals(canvasId)) {
@@ -336,6 +366,11 @@ public class CanvasService {
      * 两者耦合会导致状态不一致。事务外失败最多是"路由残留"，比"状态回滚"危害小。
      */
     public void offline(Long id, String operator) {
+        offline(id, operator, null);
+    }
+
+    public void offline(Long id, String operator, Long tenantId) {
+        requireCanvas(id, tenantId);
         Long publishedVersionId = canvasTransactionService.offlineDb(id);   // Step 1: 事务内 DB 操作
         if (publishedVersionId != null) {
             CanvasVersionDO v = canvasVersionMapper.selectById(publishedVersionId);
@@ -359,8 +394,11 @@ public class CanvasService {
      * </ol>
      */
     public void archive(Long id, String operator) {
-        CanvasDO canvas = canvasMapper.selectById(id);
-        if (canvas == null) throw new IllegalArgumentException("画布不存在: " + id);
+        archive(id, operator, null);
+    }
+
+    public void archive(Long id, String operator, Long tenantId) {
+        CanvasDO canvas = requireCanvas(id, tenantId);
         if (CanvasStatusEnum.ARCHIVED.getCode().equals(canvas.getStatus())) {
             throw new IllegalStateException("画布已归档: " + id);
         }
@@ -387,9 +425,15 @@ public class CanvasService {
      * 分页查询画布版本历史（按版本号倒序）。
      */
     public PageResult<CanvasVersionDO> getVersions(Long canvasId, int page, int size) {
+        return getVersions(canvasId, page, size, null);
+    }
+
+    public PageResult<CanvasVersionDO> getVersions(Long canvasId, int page, int size, Long tenantId) {
+        requireCanvas(canvasId, tenantId);
         com.baomidou.mybatisplus.extension.plugins.pagination.Page<CanvasVersionDO> p =
                 new com.baomidou.mybatisplus.extension.plugins.pagination.Page<>(page, size);
         LambdaQueryWrapper<CanvasVersionDO> q = new LambdaQueryWrapper<CanvasVersionDO>()
+                .eq(tenantId != null, CanvasVersionDO::getTenantId, tenantId)
                 .eq(CanvasVersionDO::getCanvasId, canvasId)
                 .orderByDesc(CanvasVersionDO::getVersion);
         var result = canvasVersionMapper.selectPage(p, q);
@@ -413,8 +457,14 @@ public class CanvasService {
      * 查询单个画布版本详情。
      */
     public CanvasVersionDO getVersion(Long canvasId, Long versionId) {
+        return getVersion(canvasId, versionId, null);
+    }
+
+    public CanvasVersionDO getVersion(Long canvasId, Long versionId, Long tenantId) {
+        requireCanvas(canvasId, tenantId);
         return canvasVersionMapper.selectOne(
                 new LambdaQueryWrapper<CanvasVersionDO>()
+                        .eq(tenantId != null, CanvasVersionDO::getTenantId, tenantId)
                         .eq(CanvasVersionDO::getCanvasId, canvasId)
                         .eq(CanvasVersionDO::getId, versionId)
         );
@@ -451,8 +501,13 @@ public class CanvasService {
 
     /** 查询最新草稿版本。 */
     private CanvasVersionDO latestDraft(Long canvasId) {
+        return latestDraft(canvasId, null);
+    }
+
+    private CanvasVersionDO latestDraft(Long canvasId, Long tenantId) {
         return canvasVersionMapper.selectOne(
                 new LambdaQueryWrapper<CanvasVersionDO>()
+                        .eq(tenantId != null, CanvasVersionDO::getTenantId, tenantId)
                         .eq(CanvasVersionDO::getCanvasId, canvasId)
                         .eq(CanvasVersionDO::getStatus, 0)
                         .orderByDesc(CanvasVersionDO::getVersion)
@@ -477,20 +532,28 @@ public class CanvasService {
      */
     @Transactional
     public void revertToVersion(Long canvasId, Long versionId) {
-        CanvasDO canvas = canvasMapper.selectById(canvasId);
-        if (canvas == null) throw new IllegalArgumentException("画布不存在: " + canvasId);
+        revertToVersion(canvasId, versionId, null);
+    }
+
+    @Transactional
+    public void revertToVersion(Long canvasId, Long versionId, Long tenantId) {
+        CanvasDO canvas = requireCanvas(canvasId, tenantId);
         stateTransitionPolicy.assertDraftUpdateAllowed(canvas);
 
         CanvasVersionDO target = canvasVersionMapper.selectById(versionId);
         if (target == null) throw new IllegalArgumentException("版本不存在: " + versionId);
         if (!target.getCanvasId().equals(canvasId)) throw new IllegalArgumentException("版本不属于该画布");
+        if (tenantId != null && !Objects.equals(target.getTenantId(), tenantId)) {
+            throw new IllegalArgumentException("版本不属于该画布");
+        }
 
-        CanvasVersionDO draft = latestDraft(canvasId);
+        CanvasVersionDO draft = latestDraft(canvasId, tenantId);
         if (draft != null) {
             draft.setGraphJson(target.getGraphJson());
             canvasVersionMapper.updateById(draft);
         } else {
             CanvasVersionDO newDraft = new CanvasVersionDO();
+            newDraft.setTenantId(canvas.getTenantId());
             newDraft.setCanvasId(canvasId);
             newDraft.setVersion(nextVersionNumber(canvasId));
             newDraft.setGraphJson(target.getGraphJson());
@@ -586,5 +649,24 @@ public class CanvasService {
             });
             log.info("[PUBLISH] Groovy 预编译完成 canvasId={}", canvasId);
         });
+    }
+
+    private CanvasDO requireCanvas(Long canvasId, Long tenantId) {
+        CanvasDO canvas = requireCanvasOrNull(canvasId, tenantId);
+        if (canvas == null) {
+            throw new IllegalArgumentException("画布不存在: " + canvasId);
+        }
+        return canvas;
+    }
+
+    private CanvasDO requireCanvasOrNull(Long canvasId, Long tenantId) {
+        CanvasDO canvas = canvasMapper.selectById(canvasId);
+        if (canvas == null) {
+            return null;
+        }
+        if (tenantId != null && !Objects.equals(canvas.getTenantId(), tenantId)) {
+            return null;
+        }
+        return canvas;
     }
 }

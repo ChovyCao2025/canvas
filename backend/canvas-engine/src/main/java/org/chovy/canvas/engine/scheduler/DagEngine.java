@@ -1004,6 +1004,7 @@ public class DagEngine {
             if (ctx.setNodeStatusIfAbsent(nodeId, NodeStatus.SKIPPED)) {
                 // 只为从未进入状态机的节点补 SKIPPED，避免覆盖已执行/等待/失败节点。
                 skippedTraces.add(CanvasExecutionTraceDO.builder()
+                        .tenantId(ctx.getTenantId())
                         .executionId(ctx.getExecutionId())
                         .nodeId(nodeId)
                         .nodeType(node.getType())
@@ -1056,6 +1057,7 @@ public class DagEngine {
 
     private void writeTraceStart(ExecutionContext ctx, DagParser.CanvasNode node) {
         CanvasExecutionTraceDO trace = CanvasExecutionTraceDO.builder()
+                .tenantId(ctx.getTenantId())
                 .executionId(ctx.getExecutionId())
                 .nodeId(node.getId())
                 .nodeType(node.getType())
@@ -1082,6 +1084,7 @@ public class DagEngine {
         }
 
         CanvasExecutionTraceDO trace = CanvasExecutionTraceDO.builder()
+                .tenantId(ctx.getTenantId())
                 .executionId(ctx.getExecutionId())
                 .nodeId(node.getId())
                 .nodeType(node.getType())

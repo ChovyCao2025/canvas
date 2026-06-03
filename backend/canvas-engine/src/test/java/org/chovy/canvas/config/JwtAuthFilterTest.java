@@ -58,6 +58,36 @@ class JwtAuthFilterTest {
         assertThat(principal.get("username", String.class)).isEqualTo("alice");
         assertThat(principal.get("role", String.class)).isEqualTo("ADMIN");
         assertThat(principal.get("displayName", String.class)).isEqualTo("Alice");
+        assertThat(principal.get("tenantId", Number.class).longValue()).isEqualTo(3L);
+    }
+
+    @Test
+    void filterUsesCurrentDatabaseTenantInsteadOfStaleTokenTenant() {
+        JwtUtil jwtUtil = new JwtUtil(SECRET, 24);
+        String token = jwtUtil.generate(user(7L, 3L, "stale", "USER", "Stale User", 1));
+
+        StringRedisTemplate redis = mock(StringRedisTemplate.class);
+        when(redis.hasKey(anyString())).thenReturn(false);
+        SysUserService userService = mock(SysUserService.class);
+        when(userService.findById(7L))
+                .thenReturn(user(7L, 42L, "alice", "TENANT_ADMIN", "Alice", 1));
+
+        JwtAuthFilter filter = new JwtAuthFilter(jwtUtil, redis, userService);
+        MockServerWebExchange exchange = MockServerWebExchange.from(
+                MockServerHttpRequest.get("/canvas/home/overview")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
+                        .build());
+        AtomicReference<Authentication> authentication = new AtomicReference<>();
+        WebFilterChain chain = ignored -> ReactiveSecurityContextHolder.getContext()
+                .map(SecurityContext::getAuthentication)
+                .doOnNext(authentication::set)
+                .then();
+
+        StepVerifier.create(filter.filter(exchange, chain))
+                .verifyComplete();
+
+        Claims principal = (Claims) authentication.get().getPrincipal();
+        assertThat(principal.get("tenantId", Number.class).longValue()).isEqualTo(42L);
     }
 
     private static SysUserDO user(Long id, Long tenantId, String username,

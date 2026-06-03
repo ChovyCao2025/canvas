@@ -185,7 +185,7 @@ public class CanvasExecutionService {
                     CanvasDO canvas = canvasMapper.selectById(canvasId);
                     if (canvas == null) throw new IllegalStateException("画布不存在: " + canvasId);
 
-                    ExecutionContext ctx = newContext(canvasId, -1L, userId, TriggerType.DRY_RUN);
+                    ExecutionContext ctx = newContext(canvas, -1L, userId, TriggerType.DRY_RUN);
                     ctx.getTriggerPayload().putAll(sanitizePayload(payload));
                     ctx.setPerfRunId(PerfRunContext.extract(ctx.getTriggerPayload()));
 
@@ -647,12 +647,14 @@ public class CanvasExecutionService {
                 resumeLockAcquired = true;
                 ctx = ctxStore.load(canvasId, userId);
                 if (ctx == null) {
-                    ctx = newContext(canvasId, resolveVersionId(canvas, userId, false), userId, triggerType);
+                    ctx = newContext(canvas, resolveVersionId(canvas, userId, false), userId, triggerType);
+                } else {
+                    ctx.setTenantId(canvas.getTenantId());
                 }
                 // 存入 ctx，后续 doExecute / handleSuccess / handleError 用于原子释放锁
                 ctx.setResumeLockToken(resumeLockInstanceId);
             } else {
-                ctx = newContext(canvasId, resolveVersionId(canvas, userId, dryRun), userId, triggerType);
+                ctx = newContext(canvas, resolveVersionId(canvas, userId, dryRun), userId, triggerType);
             }
 
 
@@ -1088,10 +1090,11 @@ public class CanvasExecutionService {
 // ── 私有帮助方法 ──────────────────────────────────────────────
 
     /** 创建新的执行上下文并写入基础画布、版本、用户和触发信息。 */
-    private ExecutionContext newContext(Long canvasId, Long versionId, String userId, String triggerType) {
+    private ExecutionContext newContext(CanvasDO canvas, Long versionId, String userId, String triggerType) {
         ExecutionContext ctx = new ExecutionContext();
         ctx.setExecutionId(UUID.randomUUID().toString());
-        ctx.setCanvasId(canvasId);
+        ctx.setCanvasId(canvas.getId());
+        ctx.setTenantId(canvas.getTenantId());
         ctx.setVersionId(versionId);
         ctx.setUserId(userId);
         ctx.setTriggerType(triggerType);
@@ -1310,6 +1313,7 @@ public class CanvasExecutionService {
     private CanvasExecutionDO createExecution(ExecutionContext ctx) {
         CanvasExecutionDO exec = new CanvasExecutionDO();
         exec.setId(ctx.getExecutionId());
+        exec.setTenantId(ctx.getTenantId());
         exec.setCanvasId(ctx.getCanvasId());
         exec.setVersionId(ctx.getVersionId());
         exec.setUserId(ctx.getUserId());

@@ -18,6 +18,10 @@ public class CanvasDO {
     /** 画布主键 ID */
     private Long id;
 
+    @TableField("tenant_id")
+    /** 所属租户 ID。 */
+    private Long tenantId;
+
     /** 画布名称 */
     private String name;
 

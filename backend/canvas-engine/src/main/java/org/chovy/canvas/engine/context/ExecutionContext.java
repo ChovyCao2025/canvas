@@ -24,6 +24,9 @@ public class ExecutionContext {
     /** 画布 ID。 */
     private Long canvasId;
 
+    /** 所属租户 ID。 */
+    private Long tenantId;
+
     /** 执行时锁定的版本 ID。 */
     private Long versionId;
 
