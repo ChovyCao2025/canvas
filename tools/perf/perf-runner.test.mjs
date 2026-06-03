@@ -45,6 +45,23 @@ test('chunkSeq groups sequence numbers by concurrency', () => {
   assert.deepEqual([...chunkSeq(5, 2)], [[1, 2], [3, 4], [5]])
 })
 
+test('chunkSeq supports a global sequence start', () => {
+  assert.deepEqual([...chunkSeq(5, 2, 101)], [[101, 102], [103, 104], [105]])
+})
+
+test('buildDirectPayload uses global sequence in idempotency key', () => {
+  const payload = buildDirectPayload({
+    perfRunId: 'perf_dist_001',
+    seq: 101,
+    userPrefix: 'perf_user_',
+    userModulo: 4,
+  })
+
+  assert.equal(payload.userId, 'perf_user_1')
+  assert.equal(payload.idempotencyKey, 'perf_dist_001:direct:101')
+  assert.equal(payload.inputParams.perfInputId, 'perf_dist_001:direct:101')
+})
+
 test('parseRunnerArgs reads required flags', () => {
   const args = parseRunnerArgs([
     '--mode', 'event',
@@ -59,6 +76,21 @@ test('parseRunnerArgs reads required flags', () => {
   assert.equal(args.perfRunId, 'perf_20260523_001')
   assert.equal(args.count, 10)
   assert.equal(args.concurrency, 2)
+})
+
+test('parseRunnerArgs accepts worker id and sequence start', () => {
+  const args = parseRunnerArgs([
+    '--mode', 'event',
+    '--base-url', 'http://localhost:8080',
+    '--perf-run-id', 'perf_dist_001',
+    '--count', '10',
+    '--concurrency', '2',
+    '--worker-id', 'worker-01',
+    '--seq-start', '101',
+  ])
+
+  assert.equal(args.workerId, 'worker-01')
+  assert.equal(args.seqStart, 101)
 })
 
 test('buildEventSignatureHeaders signs timestamp and raw body', () => {
@@ -224,6 +256,26 @@ test('run includes metadata in zero-count summary', async () => {
   assert.equal(summary.success, 0)
   assert.equal(summary.failed, 0)
   assert.equal(summary.p95Ms, 0)
+})
+
+test('run summary includes shard and latency bucket evidence', async () => {
+  const summary = await run(parseRunnerArgs([
+    '--mode', 'event',
+    '--perf-run-id', 'perf_dist_001',
+    '--count', '0',
+    '--worker-id', 'worker-01',
+    '--seq-start', '101',
+  ]), {
+    machineMetadata: () => ({ hostname: 'worker-host' }),
+  })
+
+  assert.equal(summary.workerId, 'worker-01')
+  assert.equal(summary.seqStart, 101)
+  assert.equal(summary.seqCount, 0)
+  assert.ok(Array.isArray(summary.latencyBuckets))
+  assert.equal(summary.minMs, 0)
+  assert.equal(summary.maxMs, 0)
+  assert.equal(summary.avgMs, 0)
 })
 
 test('run summary records event signature source without leaking secret', async () => {

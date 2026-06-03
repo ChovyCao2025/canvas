@@ -21,6 +21,8 @@ const DEFAULT_ARGS = {
   duplicateRate: 0,
   eventSecretEnv: 'PERF_EVENT_SECRET',
   summaryFile: '',
+  workerId: '',
+  seqStart: 1,
 }
 
 const FLAG_NAMES = {
@@ -37,10 +39,30 @@ const FLAG_NAMES = {
   '--duplicate-rate': 'duplicateRate',
   '--event-secret-env': 'eventSecretEnv',
   '--summary-file': 'summaryFile',
+  '--worker-id': 'workerId',
+  '--seq-start': 'seqStart',
 }
 
-const NUMBER_ARGS = new Set(['count', 'concurrency', 'userModulo'])
+const NUMBER_ARGS = new Set(['count', 'concurrency', 'userModulo', 'seqStart'])
 const MODES = new Set(['event', 'direct', 'audience'])
+export const LATENCY_BUCKET_UPPER_BOUNDS_MS = [
+  1,
+  2,
+  5,
+  10,
+  20,
+  50,
+  100,
+  200,
+  500,
+  1000,
+  2000,
+  5000,
+  10000,
+  30000,
+  60000,
+  'Inf',
+]
 
 function parseIntegerArg(flag, value, { allowZero }) {
   const pattern = allowZero ? /^(0|[1-9]\d*)$/ : /^[1-9]\d*$/
@@ -81,6 +103,10 @@ function validateArgs(args) {
 
   if (!Number.isSafeInteger(args.userModulo) || args.userModulo < 1) {
     throw new Error('--user-modulo must be a positive integer')
+  }
+
+  if (!Number.isSafeInteger(args.seqStart) || args.seqStart < 1) {
+    throw new Error('--seq-start must be a positive integer')
   }
 
   if (!args.perfRunId) {
@@ -165,18 +191,20 @@ export function duplicateCountFor(count, duplicateRate) {
   return Math.floor(count * duplicateRate)
 }
 
-export function logicalSeqForRequest(seq, count, duplicateCount) {
-  if (duplicateCount <= 0 || seq <= count - duplicateCount) {
+export function logicalSeqForRequest(seq, count, duplicateCount, seqStart = 1) {
+  const uniqueEnd = seqStart + count - duplicateCount - 1
+  if (duplicateCount <= 0 || seq <= uniqueEnd) {
     return seq
   }
 
-  return seq - (count - duplicateCount)
+  return seqStart + (seq - uniqueEnd - 1)
 }
 
-export function* chunkSeq(count, concurrency) {
-  for (let start = 1; start <= count; start += concurrency) {
+export function* chunkSeq(count, concurrency, seqStart = 1) {
+  const seqEnd = seqStart + count - 1
+  for (let start = seqStart; start <= seqEnd; start += concurrency) {
     const chunk = []
-    const end = Math.min(start + concurrency - 1, count)
+    const end = Math.min(start + concurrency - 1, seqEnd)
 
     for (let seq = start; seq <= end; seq += 1) {
       chunk.push(seq)
@@ -205,7 +233,7 @@ function buildRequest(args, seq) {
       throw new Error('--canvas-id is required for direct mode')
     }
 
-    const logicalSeq = logicalSeqForRequest(seq, args.count, args.duplicateCount || 0)
+    const logicalSeq = logicalSeqForRequest(seq, args.count, args.duplicateCount || 0, args.seqStart || 1)
 
     return {
       url: `${args.baseUrl}/canvas/execute/direct/${args.canvasId}`,
@@ -358,6 +386,9 @@ function summarySettings(args, env = process.env) {
     baseUrl: args.baseUrl,
     count: args.count,
     concurrency: args.concurrency,
+    workerId: args.workerId || '',
+    seqStart: args.seqStart || 1,
+    seqCount: args.count,
     eventCode: args.eventCode,
     canvasId: args.canvasId,
     audienceId: args.audienceId,
@@ -370,6 +401,34 @@ function summarySettings(args, env = process.env) {
       source: eventSecret.source,
     },
   }
+}
+
+function latencyBucketLabel(bound) {
+  return bound === 'Inf' ? 'Inf' : String(bound)
+}
+
+export function latencyBucketsForDurations(durations) {
+  return LATENCY_BUCKET_UPPER_BOUNDS_MS.map((upperBoundMs) => ({
+    leMs: latencyBucketLabel(upperBoundMs),
+    count: durations.filter((duration) => (
+      upperBoundMs === 'Inf' || duration <= upperBoundMs
+    )).length,
+  }))
+}
+
+function percentileForSortedDurations(durations, percentile) {
+  const index = Math.min(
+    durations.length - 1,
+    Math.max(0, Math.ceil(durations.length * percentile) - 1),
+  )
+  return durations.length === 0 ? 0 : durations[index]
+}
+
+function averageDuration(durations) {
+  if (durations.length === 0) {
+    return 0
+  }
+  return durations.reduce((sum, duration) => sum + duration, 0) / durations.length
 }
 
 export async function run(args, deps = {}) {
@@ -392,7 +451,7 @@ export async function run(args, deps = {}) {
   let failed = 0
   const durations = []
 
-  for (const chunk of chunkSeq(runArgs.count, runArgs.concurrency)) {
+  for (const chunk of chunkSeq(runArgs.count, runArgs.concurrency, runArgs.seqStart || 1)) {
     const results = await Promise.all(
       chunk.map(async (seq) => {
         sent += 1
@@ -412,21 +471,29 @@ export async function run(args, deps = {}) {
   }
 
   durations.sort((left, right) => left - right)
-  const p95Index = Math.min(
-    durations.length - 1,
-    Math.max(0, Math.ceil(durations.length * 0.95) - 1),
-  )
-  const p95Ms = durations.length === 0 ? 0 : durations[p95Index]
+  const p95Ms = percentileForSortedDurations(durations, 0.95)
+  const p99Ms = percentileForSortedDurations(durations, 0.99)
+  const minMs = durations.length === 0 ? 0 : durations[0]
+  const maxMs = durations.length === 0 ? 0 : durations[durations.length - 1]
+  const avgMs = averageDuration(durations)
   const finishedAt = now()
   const durationMs = performanceNow() - startedPerf
 
   return {
     perfRunId: runArgs.perfRunId,
+    workerId: runArgs.workerId || '',
     mode: runArgs.mode,
+    seqStart: runArgs.seqStart || 1,
+    seqCount: runArgs.count,
     sent,
     success,
     failed,
     p95Ms,
+    p99Ms,
+    minMs,
+    maxMs,
+    avgMs,
+    latencyBuckets: latencyBucketsForDurations(durations),
     startedAt,
     finishedAt,
     durationMs,
