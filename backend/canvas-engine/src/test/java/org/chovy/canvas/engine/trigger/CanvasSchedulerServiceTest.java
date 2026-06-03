@@ -2,7 +2,12 @@ package org.chovy.canvas.engine.trigger;
 
 import org.chovy.canvas.common.enums.NodeType;
 import org.chovy.canvas.common.enums.TriggerType;
+import org.chovy.canvas.engine.dag.DagGraph;
+import org.chovy.canvas.engine.dag.DagParser;
 import org.chovy.canvas.engine.reactive.BackgroundSubscriptionRegistry;
+import org.chovy.canvas.engine.schedule.ScheduleKey;
+import org.chovy.canvas.engine.schedule.ScheduleRegistrar;
+import org.chovy.canvas.engine.schedule.ScheduleRegistration;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -18,7 +23,10 @@ import java.nio.file.Path;
 import java.time.Duration;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -110,6 +118,31 @@ class CanvasSchedulerServiceTest {
                 .isEqualTo(1);
     }
 
+    @Test
+    void cancelAllRacingWithRegisterDoesNotLeaveRegisteredTask() throws Exception {
+        BlockingRegistrar registrar = new BlockingRegistrar();
+        CanvasSchedulerService service = new CanvasSchedulerService(
+                mock(CanvasExecutionService.class),
+                registrar);
+        var executor = Executors.newSingleThreadExecutor();
+
+        try {
+            Future<?> register = executor.submit(() ->
+                    service.registerScheduledTriggers(1L, scheduledGraph("scheduled-node")));
+            assertThat(registrar.registerEntered.await(2, TimeUnit.SECONDS)).isTrue();
+
+            service.cancelAll();
+            registrar.allowRegister.countDown();
+            register.get(2, TimeUnit.SECONDS);
+
+            assertThat(service.hasPendingJitterGroup("1:scheduled-node")).isFalse();
+            assertThat(registrar.hasRegistration(new ScheduleKey("canvas", "1:scheduled-node"))).isFalse();
+        } finally {
+            registrar.allowRegister.countDown();
+            executor.shutdownNow();
+        }
+    }
+
     private static WebClient taggerClient(AtomicInteger remoteCalls) {
         ExchangeFunction exchangeFunction = request -> {
             remoteCalls.incrementAndGet();
@@ -123,5 +156,44 @@ class CanvasSchedulerServiceTest {
                     .build());
         };
         return WebClient.builder().exchangeFunction(exchangeFunction).build();
+    }
+
+    private static DagGraph scheduledGraph(String nodeId) {
+        DagParser.CanvasNode node = new DagParser.CanvasNode();
+        node.setId(nodeId);
+        node.setType(NodeType.SCHEDULED_TRIGGER);
+        node.setConfig(Map.of("cronExpression", "0 0 * * * *"));
+        return new DagGraph(
+                Map.of(nodeId, node),
+                Map.of(nodeId, List.of()),
+                Map.of(nodeId, List.of()),
+                Map.of(nodeId, 0));
+    }
+
+    private static final class BlockingRegistrar implements ScheduleRegistrar {
+        private final Map<ScheduleKey, ScheduleRegistration> registrations = new ConcurrentHashMap<>();
+        private final CountDownLatch registerEntered = new CountDownLatch(1);
+        private final CountDownLatch allowRegister = new CountDownLatch(1);
+
+        @Override
+        public void register(ScheduleRegistration registration) {
+            registerEntered.countDown();
+            try {
+                allowRegister.await();
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                throw new IllegalStateException(e);
+            }
+            registrations.put(registration.key(), registration);
+        }
+
+        @Override
+        public void unregister(ScheduleKey key) {
+            registrations.remove(key);
+        }
+
+        private boolean hasRegistration(ScheduleKey key) {
+            return registrations.containsKey(key);
+        }
     }
 }

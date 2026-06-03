@@ -155,6 +155,13 @@ public class CanvasSchedulerService {
             try {
                 scheduleRegistrar.register(buildRegistration(
                         scheduleKey, canvasId, nodeId, cfg, timezone, cronExpr, triggerTimeStr, group));
+                if (!isCurrentPendingJitterGroup(scheduleKey.id(), group)) {
+                    // register 与 cancelAll/cancelScheduledTrigger 竞态时，注册完成后必须二次确认所有权。
+                    scheduleRegistrar.unregister(scheduleKey);
+                    group.terminate();
+                    group.dispose();
+                    continue;
+                }
                 if (cronExpr != null && !cronExpr.isBlank()) {
                     log.info("[SCHEDULER] 注册 CRON 任务 canvasId={} nodeId={} cron={}", canvasId, nodeId, cronExpr);
                 } else if (triggerTimeStr != null) {
