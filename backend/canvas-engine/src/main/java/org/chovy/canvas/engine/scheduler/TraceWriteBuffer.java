@@ -255,7 +255,7 @@ public class TraceWriteBuffer {
     private List<CanvasExecutionTraceDO> drainBatch() {
         List<CanvasExecutionTraceDO> batch = new ArrayList<>(BATCH_SIZE);
         CanvasExecutionTraceDO item;
-        while ((item = buffer.poll()) != null && batch.size() < BATCH_SIZE) {
+        while (batch.size() < BATCH_SIZE && (item = buffer.poll()) != null) {
             batch.add(item);
         }
         if (!batch.isEmpty()) {

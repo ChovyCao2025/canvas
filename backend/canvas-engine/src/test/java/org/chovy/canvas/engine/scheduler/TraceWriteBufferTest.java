@@ -13,7 +13,9 @@ import java.util.concurrent.atomic.AtomicReference;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.Mockito.atLeastOnce;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 
 /**
@@ -38,6 +40,42 @@ class TraceWriteBufferTest {
         ArgumentCaptor<List<CanvasExecutionTraceDO>> captor = ArgumentCaptor.forClass(List.class);
         verify(mapper).insertBatch(captor.capture());
         assertThat(captor.getValue()).hasSize(2);
+        assertThat(buffer.pendingCount()).isZero();
+    }
+
+    @Test
+    void flushPreservesTraceAtBatchBoundary() {
+        CanvasExecutionTraceMapper mapper = mock(CanvasExecutionTraceMapper.class);
+        TraceWriteBuffer buffer = new TraceWriteBuffer(mapper);
+
+        for (int i = 0; i < 201; i++) {
+            buffer.offer(trace("exec-" + i, "node-" + i));
+        }
+
+        buffer.flush();
+
+        ArgumentCaptor<List<CanvasExecutionTraceDO>> captor = ArgumentCaptor.forClass(List.class);
+        verify(mapper, times(2)).insertBatch(captor.capture());
+        assertThat(captor.getAllValues().get(0)).hasSize(200);
+        List<CanvasExecutionTraceDO> remainingBatch = captor.getAllValues().get(1);
+        assertThat(remainingBatch).hasSize(1);
+        assertThat(remainingBatch.getFirst().getNodeId()).isEqualTo("node-200");
+        assertThat(buffer.pendingCount()).isZero();
+    }
+
+    @Test
+    void flushDropsBatchAfterWriteFailureAndClearsPendingByDesign() {
+        CanvasExecutionTraceMapper mapper = mock(CanvasExecutionTraceMapper.class);
+        doThrow(new RuntimeException("db down")).when(mapper).insertBatch(anyList());
+        TraceWriteBuffer buffer = new TraceWriteBuffer(mapper);
+
+        buffer.offer(trace("exec-1", "node-1"));
+        buffer.offer(trace("exec-1", "node-2"));
+
+        buffer.flush();
+
+        verify(mapper).insertBatch(anyList());
+        // Current design treats traces as best-effort audit data once write is attempted.
         assertThat(buffer.pendingCount()).isZero();
     }
 
