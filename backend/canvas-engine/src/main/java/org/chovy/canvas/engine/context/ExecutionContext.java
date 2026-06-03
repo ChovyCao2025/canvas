@@ -154,7 +154,7 @@ public class ExecutionContext {
             nodeOutputs.clear();
             if (restoredNodeOutputs != null) {
                 restoredNodeOutputs.forEach((nodeId, output) ->
-                        nodeOutputs.put(nodeId, output == null ? Map.of() : new LinkedHashMap<>(output)));
+                        nodeOutputs.put(nodeId, snapshotPayload(output)));
             }
         }
         rebuildDerivedState();
@@ -178,24 +178,9 @@ public class ExecutionContext {
         Map<String, Map<String, Object>> previousNodeOutputs = snapshotNodeOutputs();
         Map<String, Object> previousFlatContext = new LinkedHashMap<>(flatContext);
         int previousSize = approxSizeBytes.get();
-        Map<String, Object> snapshot = output == null ? Map.of() : new LinkedHashMap<>(output);
-        int incomingSize = estimateNodeOutputSize(nodeId, snapshot);
-        if (incomingSize > MAX_SIZE_BYTES) {
-            throw new ContextOverflowException(
-                    "Context output for nodeId=" + nodeId + " exceeds 1MB limit: "
-                            + incomingSize + " bytes",
-                    approxSizeBytes.get());
-        }
+        Map<String, Object> snapshot = snapshotPayload(output);
 
         removeNodeOutput(nodeId);
-        evictOldestNodesUntilFits(incomingSize);
-        if (approxSizeBytes.get() + incomingSize > MAX_SIZE_BYTES) {
-            throw new ContextOverflowException(
-                    "Context exceeds 1MB limit: " + approxSizeBytes.get()
-                            + " bytes. Node output rejected for nodeId=" + nodeId,
-                    approxSizeBytes.get());
-        }
-
         nodeOutputs.put(nodeId, snapshot);
         snapshot.forEach((fieldKey, value) ->
                 flatContext.put(namespacedKey(nodeId, fieldKey), value));
@@ -285,7 +270,7 @@ public class ExecutionContext {
         Map<String, Map<String, Object>> previousNodeOutputs = snapshotNodeOutputs();
         Map<String, Object> previousFlatContext = new LinkedHashMap<>(flatContext);
 
-        triggerPayload.putAll(values);
+        triggerPayload.putAll(snapshotPayload(values));
         int size = evictOldestNodesUntilSerializedFits(null);
         if (size > MAX_SIZE_BYTES) {
             triggerPayload = previousPayload;
@@ -319,18 +304,6 @@ public class ExecutionContext {
         approxSizeBytes.set(estimateSerializedStateSize());
     }
 
-    private void evictOldestNodesUntilFits(int incomingSize) {
-        synchronized (nodeOutputs) {
-            Iterator<Map.Entry<String, Map<String, Object>>> it = nodeOutputs.entrySet().iterator();
-            while (approxSizeBytes.get() + incomingSize > MAX_SIZE_BYTES && it.hasNext()) {
-                Map.Entry<String, Map<String, Object>> entry = it.next();
-                removeFlatOutput(entry.getKey(), entry.getValue());
-                approxSizeBytes.addAndGet(-estimateNodeOutputSize(entry.getKey(), entry.getValue()));
-                it.remove();
-            }
-        }
-    }
-
     private int evictOldestNodesUntilSerializedFits(String protectedNodeId) {
         int size = estimateSerializedStateSize();
         synchronized (nodeOutputs) {
@@ -355,7 +328,6 @@ public class ExecutionContext {
         }
         if (previous != null) {
             removeFlatOutput(nodeId, previous);
-            approxSizeBytes.addAndGet(-estimateNodeOutputSize(nodeId, previous));
         }
     }
 
@@ -368,7 +340,33 @@ public class ExecutionContext {
     }
 
     private static Map<String, Object> snapshotPayload(Map<String, Object> payload) {
-        return payload == null ? new LinkedHashMap<>() : new LinkedHashMap<>(payload);
+        Map<String, Object> snapshot = new LinkedHashMap<>();
+        if (payload != null) {
+            payload.forEach((key, value) -> snapshot.put(key, deepImmutableValue(value)));
+        }
+        return snapshot;
+    }
+
+    private static Object deepImmutableValue(Object value) {
+        if (value instanceof Map<?, ?> map) {
+            Map<Object, Object> copied = new LinkedHashMap<>();
+            map.forEach((key, nestedValue) -> copied.put(key, deepImmutableValue(nestedValue)));
+            return Collections.unmodifiableMap(copied);
+        }
+        if (value instanceof Collection<?> collection) {
+            List<Object> copied = new ArrayList<>(collection.size());
+            collection.forEach(item -> copied.add(deepImmutableValue(item)));
+            return Collections.unmodifiableList(copied);
+        }
+        if (value != null && value.getClass().isArray()) {
+            int length = java.lang.reflect.Array.getLength(value);
+            List<Object> copied = new ArrayList<>(length);
+            for (int i = 0; i < length; i++) {
+                copied.add(deepImmutableValue(java.lang.reflect.Array.get(value, i)));
+            }
+            return Collections.unmodifiableList(copied);
+        }
+        return value;
     }
 
     private Map<String, Map<String, Object>> snapshotNodeOutputs() {
@@ -391,61 +389,12 @@ public class ExecutionContext {
         flatContext.putAll(restoredFlatContext);
     }
 
-    private static int estimateNodeOutputSize(String nodeId, Map<String, Object> output) {
-        int size = 2; // object braces
-        for (Map.Entry<String, Object> entry : output.entrySet()) {
-            size += estimateMapEntrySize(entry.getKey(), entry.getValue());
-        }
-        size += nodeId.length() + 4;
-        return size;
-    }
-
     private int estimateSerializedStateSize() {
         try {
             return SIZE_OBJECT_MAPPER.writeValueAsBytes(this).length;
         } catch (Exception e) {
             throw new IllegalStateException("Failed to estimate serialized execution context size", e);
         }
-    }
-
-    private static int estimateMapEntrySize(String key, Object value) {
-        return String.valueOf(key).length() + estimateValueSize(value) + 4;
-    }
-
-    private static int estimateValueSize(Object value) {
-        if (value == null) {
-            return 4;
-        }
-        if (value instanceof CharSequence sequence) {
-            return sequence.length() + 2;
-        }
-        if (value instanceof Number || value instanceof Boolean) {
-            return String.valueOf(value).length();
-        }
-        if (value instanceof Map<?, ?> map) {
-            int size = 2;
-            for (Map.Entry<?, ?> entry : map.entrySet()) {
-                size += String.valueOf(entry.getKey()).length() + 4;
-                size += estimateValueSize(entry.getValue());
-            }
-            return size;
-        }
-        if (value instanceof Iterable<?> iterable) {
-            int size = 2;
-            for (Object item : iterable) {
-                size += estimateValueSize(item) + 1;
-            }
-            return size;
-        }
-        if (value.getClass().isArray()) {
-            int size = 2;
-            int length = java.lang.reflect.Array.getLength(value);
-            for (int i = 0; i < length; i++) {
-                size += estimateValueSize(java.lang.reflect.Array.get(value, i)) + 1;
-            }
-            return size;
-        }
-        return String.valueOf(value).length() + 2;
     }
 
     /**
