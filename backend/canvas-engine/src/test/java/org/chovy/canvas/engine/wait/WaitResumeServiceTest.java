@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.chovy.canvas.common.enums.NodeType;
 import org.chovy.canvas.common.enums.TriggerType;
 import org.chovy.canvas.dal.dataobject.CanvasWaitSubscriptionDO;
+import org.chovy.canvas.engine.reactive.BackgroundSubscriptionRegistry;
 import org.chovy.canvas.engine.trigger.CanvasExecutionService;
 import org.junit.jupiter.api.Test;
 import reactor.core.publisher.Mono;
@@ -42,8 +43,9 @@ class WaitResumeServiceTest {
     void resumeEventWaitsCompletesAndTriggersWhenEventFiltersMatch() {
         WaitSubscriptionService waitSubscriptionService = mock(WaitSubscriptionService.class);
         CanvasExecutionService executionService = mock(CanvasExecutionService.class);
+        BackgroundSubscriptionRegistry backgroundSubscriptions = mock(BackgroundSubscriptionRegistry.class);
         WaitResumeService service = new WaitResumeService(
-                waitSubscriptionService, executionService, new ObjectMapper());
+                waitSubscriptionService, executionService, new ObjectMapper(), backgroundSubscriptions);
         CanvasWaitSubscriptionDO wait = waitRecord();
         wait.setEventFilters("{\"amount\":{\"gt\":100}}");
         when(waitSubscriptionService.findActiveEventWaits("ORDER_PAID", "user-1")).thenReturn(List.of(wait));
@@ -56,6 +58,7 @@ class WaitResumeServiceTest {
         assertThat(resumed).isEqualTo(1);
         verify(executionService).trigger(eq(10L), eq("user-1"), eq(TriggerType.WAIT_RESUME),
                 eq(NodeType.WAIT), eq("wait-1"), any(), any(), eq(false));
+        verify(backgroundSubscriptions).track(eq("wait-resume:exec-1:wait:1:COMPLETED"), any(), any());
     }
 
     private CanvasWaitSubscriptionDO waitRecord() {

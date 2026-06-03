@@ -4,14 +4,21 @@ import com.lmax.disruptor.InsufficientCapacityException;
 import com.lmax.disruptor.RingBuffer;
 import org.chovy.canvas.engine.scheduler.CanvasMetrics;
 import org.chovy.canvas.engine.request.CanvasExecutionRequestExecutor;
+import org.chovy.canvas.engine.reactive.BackgroundSubscriptionRegistry;
 import org.chovy.canvas.engine.trigger.CanvasExecutionService;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.test.util.ReflectionTestUtils;
+import reactor.core.publisher.Mono;
 
 import java.util.Map;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -90,5 +97,30 @@ class CanvasDisruptorServiceTest {
 
         verify(ringBuffer).publish(0L);
         verify(metrics).recordDisruptorPublished("REQUEST");
+    }
+
+    @Test
+    void workerTracksCanvasExecutionSubscriptionAsBackgroundTask() throws Exception {
+        CanvasExecutionService executionService = mock(CanvasExecutionService.class);
+        CanvasMetrics metrics = mock(CanvasMetrics.class);
+        BackgroundSubscriptionRegistry backgroundSubscriptions = new BackgroundSubscriptionRegistry();
+        CountDownLatch subscribed = new CountDownLatch(1);
+        when(executionService.triggerFromDisruptor(
+                eq(1L), eq("user-1"), eq("MQ"), eq("MQ_TRIGGER"), eq("order.paid"),
+                any(), eq("msg-1"), any(), any()))
+                .thenReturn(Mono.<Map<String, Object>>never().doOnSubscribe(subscription -> subscribed.countDown()));
+        service = new CanvasDisruptorService(
+                executionService,
+                mock(CanvasExecutionRequestExecutor.class),
+                metrics,
+                1024,
+                1,
+                backgroundSubscriptions);
+
+        service.publish(1L, "user-1", "MQ", "MQ_TRIGGER", "order.paid", Map.of(), "msg-1");
+
+        assertThat(subscribed.await(2, TimeUnit.SECONDS)).isTrue();
+        assertThat((Integer) ReflectionTestUtils.invokeMethod(backgroundSubscriptions, "activeCount"))
+                .isEqualTo(1);
     }
 }

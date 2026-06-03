@@ -88,11 +88,6 @@ public class TagImportSourceService {
         tagImportSourceMapper.deleteById(id);
     }
 
-    /** 执行一次远程标签来源拉取并导入结果。 */
-    public TagImportResult run(Long id) {
-        return runAsync(id).block();
-    }
-
     /** 异步执行一次远程标签来源拉取并导入结果，避免阻塞 WebFlux 事件循环线程。 */
     public Mono<TagImportResult> runAsync(Long id) {
         return Mono.fromCallable(() -> {

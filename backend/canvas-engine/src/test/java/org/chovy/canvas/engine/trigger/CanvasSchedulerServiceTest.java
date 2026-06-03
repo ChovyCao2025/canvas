@@ -1,5 +1,8 @@
 package org.chovy.canvas.engine.trigger;
 
+import org.chovy.canvas.common.enums.NodeType;
+import org.chovy.canvas.common.enums.TriggerType;
+import org.chovy.canvas.engine.reactive.BackgroundSubscriptionRegistry;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -13,10 +16,15 @@ import reactor.test.StepVerifier;
 import java.time.Duration;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 /**
  * Canvas Scheduler 测试类。
@@ -64,6 +72,31 @@ class CanvasSchedulerServiceTest {
                 .expectNext(List.of("u1", "u2", "u3"))
                 .verifyComplete();
         assertThat(remoteCalls).hasValue(2);
+    }
+
+    @Test
+    void dispatchScheduledTriggerTracksExecutionSubscriptionAsBackgroundTask() throws Exception {
+        CanvasExecutionService executionService = mock(CanvasExecutionService.class);
+        BackgroundSubscriptionRegistry backgroundSubscriptions = new BackgroundSubscriptionRegistry();
+        CountDownLatch subscribed = new CountDownLatch(1);
+        when(executionService.trigger(
+                eq(1L), eq("user-1"), eq(TriggerType.SCHEDULED),
+                eq(NodeType.SCHEDULED_TRIGGER), eq("scheduled-node"),
+                any(), any(), eq(false)))
+                .thenReturn(Mono.<Map<String, Object>>never()
+                        .doOnSubscribe(subscription -> subscribed.countDown()));
+        CanvasSchedulerService service = new CanvasSchedulerService(
+                executionService,
+                mock(org.chovy.canvas.engine.schedule.ScheduleRegistrar.class),
+                backgroundSubscriptions);
+        CanvasSchedulerService.PendingJitterGroup group =
+                service.createPendingJitterGroup("1:scheduled-node");
+
+        service.dispatchScheduledTrigger(group, 1L, "user-1");
+
+        assertThat(subscribed.await(2, TimeUnit.SECONDS)).isTrue();
+        assertThat((Integer) ReflectionTestUtils.invokeMethod(backgroundSubscriptions, "activeCount"))
+                .isEqualTo(1);
     }
 
     private static WebClient taggerClient(AtomicInteger remoteCalls) {

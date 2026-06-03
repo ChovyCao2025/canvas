@@ -7,6 +7,7 @@ import org.chovy.canvas.common.MapFieldKeys;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.client.WebClient;
+import org.springframework.web.client.RestClient;
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
 
@@ -31,16 +32,18 @@ public class AudienceEvaluationContextFetcher {
     private final ObjectMapper objectMapper;
     private final ConcurrentMap<String, List<String>> fieldCache = new ConcurrentHashMap<>();
 
-    /**
-     * 拉取某用户的人群评估上下文。
-     *
-     * @param client   标签服务客户端
-     * @param userId   用户标识
-     * @param ruleJson 人群规则 JSON
-     * @return 字段名到字段值的映射
-     */
-    public Map<String, Object> fetch(WebClient client, String userId, String ruleJson) throws Exception {
-        return fetchAsync(client, userId, ruleJson).block();
+    /** 使用同步 HTTP 客户端拉取某用户的人群评估上下文，供批计算虚拟线程任务使用。 */
+    public Map<String, Object> fetch(RestClient client, String userId, String ruleJson) throws Exception {
+        List<String> fields = extractFields(ruleJson);
+        if (fields.isEmpty()) {
+            return Map.of();
+        }
+        Map<String, Object> response = client.post()
+                .uri("/offline/user-tags/query")
+                .body(Map.of(MapFieldKeys.USER_ID, userId, MapFieldKeys.TAG_CODES, fields))
+                .retrieve()
+                .body(new ParameterizedTypeReference<>() {});
+        return extractTagContext(response);
     }
 
     /** 以非阻塞方式拉取某用户的人群评估上下文。 */

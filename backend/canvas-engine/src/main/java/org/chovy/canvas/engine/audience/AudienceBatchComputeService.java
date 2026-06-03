@@ -18,7 +18,7 @@ import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.stereotype.Service;
-import org.springframework.web.reactive.function.client.WebClient;
+import org.springframework.web.client.RestClient;
 
 import javax.sql.DataSource;
 import java.io.ByteArrayOutputStream;
@@ -233,7 +233,7 @@ public class AudienceBatchComputeService {
             throw new IllegalArgumentException("seedTagCode is required for TAGGER_API");
         }
 
-        WebClient client = WebClient.builder().baseUrl(taggerUrl).build();
+        RestClient client = RestClient.builder().baseUrl(taggerUrl).build();
         RoaringBitmap bitmap = new RoaringBitmap();
         int page = 1;
         while (true) {
@@ -246,8 +246,7 @@ public class AudienceBatchComputeService {
                             .queryParam("size", PAGE_SIZE)
                             .build())
                     .retrieve()
-                    .bodyToMono(new ParameterizedTypeReference<Map<String, Object>>() {})
-                    .block();
+                    .body(new ParameterizedTypeReference<>() {});
             List<String> userIds = extractUserIds(response);
             if (userIds.isEmpty()) {
                 break;

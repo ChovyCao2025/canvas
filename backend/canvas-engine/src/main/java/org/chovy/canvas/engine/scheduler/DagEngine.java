@@ -20,8 +20,10 @@ import org.chovy.canvas.engine.handler.NodeHandler;
 import org.chovy.canvas.engine.handler.NodeRouteResolver;
 import org.chovy.canvas.engine.handler.NodeResult;
 import org.chovy.canvas.engine.handlers.HubHandler;
+import org.chovy.canvas.engine.reactive.BackgroundSubscriptionRegistry;
 import org.chovy.canvas.infrastructure.redis.ContextPersistenceService;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Component;
@@ -34,6 +36,7 @@ import reactor.util.retry.Retry;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.*;
+import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
 /**
@@ -101,6 +104,8 @@ public class DagEngine {
     // @Lazy 避免与 CanvasExecutionService → DagEngine 的循环依赖
     /** 画布执行服务，用于超时恢复等内部触发。 */
     private final org.chovy.canvas.engine.trigger.CanvasExecutionService executionService;
+    /** 后台订阅注册器，用于托管 DLQ 写入和特殊节点超时回调。 */
+    private final BackgroundSubscriptionRegistry backgroundSubscriptions;
 
     /**
      * 构造 DagEngine 实例，并根据入参初始化依赖、配置或内部状态。
@@ -124,6 +129,20 @@ public class DagEngine {
                      ObjectMapper objectMapper,
                      ContextPersistenceService ctxStore,
                      @Lazy org.chovy.canvas.engine.trigger.CanvasExecutionService executionService) {
+        this(handlerRegistry, traceBuffer, dlqMapper, cbRegistry, metrics, objectMapper, ctxStore,
+                executionService, new BackgroundSubscriptionRegistry());
+    }
+
+    @Autowired
+    public DagEngine(HandlerRegistry handlerRegistry,
+                     TraceWriteBuffer traceBuffer,
+                     CanvasExecutionDlqMapper dlqMapper,
+                     CircuitBreakerRegistry cbRegistry,
+                     CanvasMetrics metrics,
+                     ObjectMapper objectMapper,
+                     ContextPersistenceService ctxStore,
+                     @Lazy org.chovy.canvas.engine.trigger.CanvasExecutionService executionService,
+                     BackgroundSubscriptionRegistry backgroundSubscriptions) {
         this.handlerRegistry = handlerRegistry;
         // traceMapper 保留供 writeSkippedNodes 直接写入；批量写走 traceBuffer
         this.traceBuffer = traceBuffer;
@@ -133,6 +152,7 @@ public class DagEngine {
         this.objectMapper = objectMapper;
         this.ctxStore = ctxStore;
         this.executionService = executionService;
+        this.backgroundSubscriptions = backgroundSubscriptions;
     }
 
     /** 节点执行最大重试次数。 */
@@ -155,6 +175,10 @@ public class DagEngine {
      */
     private static final Scheduler SPECIAL_NODE_TIMEOUT_SCHEDULER =
             Schedulers.newBoundedElastic(16, 10_000, "canvas-special-node-timeout", 60, true);
+
+    private void trackBackground(String name, Mono<?> source, Consumer<Throwable> onError) {
+        backgroundSubscriptions.track(name, source, onError);
+    }
 
     // ══════════════════════════════════════════════════════════════
     // 公开入口
@@ -541,9 +565,10 @@ public class DagEngine {
                     .failedAt(LocalDateTime.now())
                     .build();
             // DLQ 写入放到 boundedElastic，避免阻塞 Reactor 主执行链路。
-            Mono.fromRunnable(() -> dlqMapper.insert(dlq))
-                    .subscribeOn(Schedulers.boundedElastic())
-                    .subscribe(null, (Throwable e) -> log.error("[DLQ] 写入失败: {}", e.getMessage()));
+            trackBackground("dag-dlq:" + ctx.getExecutionId() + ":" + nodeId,
+                    Mono.fromRunnable(() -> dlqMapper.insert(dlq))
+                            .subscribeOn(Schedulers.boundedElastic()),
+                    e -> log.error("[DLQ] 写入失败: {}", e.getMessage()));
             log.warn("[DLQ] executionId={} nodeId={} reason={}", ctx.getExecutionId(), nodeId, msg);
         } catch (Exception e) {
             log.error("[DLQ] 序列化失败: {}", e.getMessage());
@@ -626,9 +651,7 @@ public class DagEngine {
                 int timeoutSec = HubHandler.getTimeoutSeconds(config);
 
                 // 延迟任务：超时后若 Hub 仍未完成则标记 FAILED，持久化 ctx，触发执行恢复
-                Mono.delay(Duration.ofSeconds(timeoutSec), SPECIAL_NODE_TIMEOUT_SCHEDULER)
-                        .subscribe(__ -> handleSpecialNodeTimeout(graph, nodeId, node, config, ctx, depth,
-                                "HUB", timeoutSec));
+                scheduleSpecialNodeTimeout(graph, nodeId, node, config, ctx, depth, "HUB", timeoutSec);
 
                 log.debug("[HUB] 启动超时定时器 {}s nodeId={}", timeoutSec, nodeId);
             } else {
@@ -677,9 +700,7 @@ public class DagEngine {
                 ctx.getHubStartTimes().putIfAbsent(timerKey, System.currentTimeMillis());
                 int timeoutSec = config.get("timeout") instanceof Number n ? n.intValue() : (int) globalTimeout;
 
-                Mono.delay(Duration.ofSeconds(timeoutSec), SPECIAL_NODE_TIMEOUT_SCHEDULER)
-                        .subscribe(__ -> handleSpecialNodeTimeout(graph, nodeId, node, config, ctx, depth,
-                                "AGGREGATE", timeoutSec));
+                scheduleSpecialNodeTimeout(graph, nodeId, node, config, ctx, depth, "AGGREGATE", timeoutSec);
                 log.debug("[AGGREGATE] 启动超时定时器 {}s nodeId={}", timeoutSec, nodeId);
             }
             return Mono.just(Map.of());
@@ -707,9 +728,22 @@ public class DagEngine {
         String timerKey = "th:" + nodeId;
         if (!ctx.getScheduledHubTimeouts().add(timerKey)) return;
         int timeoutSec = config.get("timeout") instanceof Number n ? n.intValue() : (int) globalTimeout;
-        Mono.delay(Duration.ofSeconds(timeoutSec), SPECIAL_NODE_TIMEOUT_SCHEDULER)
-                .subscribe(__ -> handleSpecialNodeTimeout(graph, nodeId, node, config, ctx, depth,
-                        "THRESHOLD", timeoutSec));
+        scheduleSpecialNodeTimeout(graph, nodeId, node, config, ctx, depth, "THRESHOLD", timeoutSec);
+    }
+
+    private void scheduleSpecialNodeTimeout(DagGraph graph,
+                                            String nodeId,
+                                            DagParser.CanvasNode node,
+                                            Map<String, Object> config,
+                                            ExecutionContext ctx,
+                                            int depth,
+                                            String label,
+                                            int timeoutSec) {
+        trackBackground("dag-timeout:" + ctx.getExecutionId() + ":" + label + ":" + nodeId,
+                Mono.delay(Duration.ofSeconds(timeoutSec), SPECIAL_NODE_TIMEOUT_SCHEDULER)
+                        .doOnNext(__ -> handleSpecialNodeTimeout(graph, nodeId, node, config, ctx, depth,
+                                label, timeoutSec)),
+                e -> log.error("[{}] 超时调度失败 nodeId={}: {}", label, nodeId, e.getMessage()));
     }
 
     private void handleSpecialNodeTimeout(DagGraph graph,
@@ -737,27 +771,27 @@ public class DagEngine {
 
         if (targetNodeId == null || targetNodeId.isBlank()) {
             ctxStore.delete(ctx.getCanvasId(), ctx.getUserId());
-            executionService.completePausedExecution(ctx, ExecutionStatus.FAILED.getCode(), timeoutOutput)
-                    .subscribe(null,
-                            e -> log.error("[{}] 超时终态落库失败 nodeId={}: {}", label, nodeId, e.getMessage()));
+            trackBackground("dag-timeout-complete:" + ctx.getExecutionId() + ":" + label + ":" + nodeId,
+                    executionService.completePausedExecution(ctx, ExecutionStatus.FAILED.getCode(), timeoutOutput),
+                    e -> log.error("[{}] 超时终态落库失败 nodeId={}: {}", label, nodeId, e.getMessage()));
             return;
         }
 
         ctxStore.save(ctx);
-        executeNode(graph, targetNodeId, ctx, depth + 1)
-                .defaultIfEmpty(Map.of())
-                .flatMap(result -> completeSpecialTimeoutContinuation(graph, ctx, result))
-                .onErrorResume(e -> {
-                    Map<String, Object> error = Map.of(
-                            MapFieldKeys.ERROR, e.getMessage(),
-                            MapFieldKeys.NODE_ID, nodeId,
-                            MapFieldKeys.OUTCOME, NodeOutcome.TIMEOUT.name());
-                    ctxStore.delete(ctx.getCanvasId(), ctx.getUserId());
-                    return executionService.completePausedExecution(ctx,
-                            ExecutionStatus.FAILED.getCode(), error);
-                })
-                .subscribe(null,
-                        e -> log.error("[{}] 超时分支执行失败 nodeId={}: {}", label, nodeId, e.getMessage()));
+        trackBackground("dag-timeout-continue:" + ctx.getExecutionId() + ":" + label + ":" + nodeId,
+                executeNode(graph, targetNodeId, ctx, depth + 1)
+                        .defaultIfEmpty(Map.of())
+                        .flatMap(result -> completeSpecialTimeoutContinuation(graph, ctx, result))
+                        .onErrorResume(e -> {
+                            Map<String, Object> error = Map.of(
+                                    MapFieldKeys.ERROR, e.getMessage(),
+                                    MapFieldKeys.NODE_ID, nodeId,
+                                    MapFieldKeys.OUTCOME, NodeOutcome.TIMEOUT.name());
+                            ctxStore.delete(ctx.getCanvasId(), ctx.getUserId());
+                            return executionService.completePausedExecution(ctx,
+                                    ExecutionStatus.FAILED.getCode(), error);
+                        }),
+                e -> log.error("[{}] 超时分支执行失败 nodeId={}: {}", label, nodeId, e.getMessage()));
     }
 
     private Mono<Void> completeSpecialTimeoutContinuation(

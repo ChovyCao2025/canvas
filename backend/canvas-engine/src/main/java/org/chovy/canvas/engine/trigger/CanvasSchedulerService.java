@@ -6,11 +6,11 @@ import org.chovy.canvas.common.enums.TriggerType;
 import org.chovy.canvas.common.enums.NodeType;
 import org.chovy.canvas.engine.dag.DagGraph;
 import org.chovy.canvas.engine.dag.DagParser;
+import org.chovy.canvas.engine.reactive.BackgroundSubscriptionRegistry;
 import org.chovy.canvas.engine.schedule.ScheduleKey;
 import org.chovy.canvas.engine.schedule.ScheduleRegistrar;
 import org.chovy.canvas.engine.schedule.ScheduleRegistration;
 import jakarta.annotation.PreDestroy;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
@@ -43,23 +43,46 @@ import org.chovy.canvas.dal.mapper.CanvasMapper;
 @Slf4j
 @Service
 @EnableScheduling
-@RequiredArgsConstructor
 public class CanvasSchedulerService {
 
     /** 画布执行服务，用于定时任务到期后触发画布执行。 */
     private final CanvasExecutionService executionService;
     /** 调度注册器。 */
     private final ScheduleRegistrar      scheduleRegistrar;
+    /** 后台订阅注册器，用于托管定时触发执行链。 */
+    private final BackgroundSubscriptionRegistry backgroundSubscriptions;
     private static final String SCHEDULED_BATCH_USER_PREFIX = "__scheduled_batch__:";
 
+    public CanvasSchedulerService(CanvasExecutionService executionService,
+                                  ScheduleRegistrar scheduleRegistrar) {
+        this(executionService, scheduleRegistrar, new BackgroundSubscriptionRegistry());
+    }
+
+    public CanvasSchedulerService(CanvasExecutionService executionService,
+                                  ScheduleRegistrar scheduleRegistrar,
+                                  BackgroundSubscriptionRegistry backgroundSubscriptions) {
+        this.executionService = executionService;
+        this.scheduleRegistrar = scheduleRegistrar;
+        this.backgroundSubscriptions = backgroundSubscriptions;
+    }
+
     /** 兼容旧测试和默认本地调度器的构造器，生产可替换 ScheduleRegistrar 实现。 */
-    @Autowired
     public CanvasSchedulerService(org.springframework.scheduling.TaskScheduler taskScheduler,
                                   org.chovy.canvas.dal.mapper.CanvasMapper canvasMapper,
                                   org.chovy.canvas.infrastructure.cache.CanvasConfigCache configCache,
                                   CanvasExecutionService executionService) {
+        this(taskScheduler, canvasMapper, configCache, executionService, new BackgroundSubscriptionRegistry());
+    }
+
+    @Autowired
+    public CanvasSchedulerService(org.springframework.scheduling.TaskScheduler taskScheduler,
+                                  org.chovy.canvas.dal.mapper.CanvasMapper canvasMapper,
+                                  org.chovy.canvas.infrastructure.cache.CanvasConfigCache configCache,
+                                  CanvasExecutionService executionService,
+                                  BackgroundSubscriptionRegistry backgroundSubscriptions) {
         this.executionService = executionService;
         this.scheduleRegistrar = new LegacyTaskSchedulerRegistrar(taskScheduler);
+        this.backgroundSubscriptions = backgroundSubscriptions;
     }
 
 
@@ -367,18 +390,17 @@ public class CanvasSchedulerService {
             return;
         }
         String nodeId = nodeIdFromTaskKey(group.taskKey);
-        executionService.trigger(
+        backgroundSubscriptions.track(
+                "scheduler:trigger:" + group.taskKey + ":" + userId,
+                executionService.trigger(
                         canvasId, userId, TriggerType.SCHEDULED,
                         NodeType.SCHEDULED_TRIGGER, nodeId,
                         Map.of(
                                 MapFieldKeys.SCHEDULED_BATCH, true,
                                 MapFieldKeys.SCHEDULED_TRIGGER_NODE_ID, nodeId
                         ),
-                        java.util.UUID.randomUUID().toString(), false)
-                .subscribe(
-                        null,
-                        e -> log.warn("[SCHEDULER] 用户触发失败 userId={}: {}", userId, e.getMessage())
-                );
+                        java.util.UUID.randomUUID().toString(), false),
+                e -> log.warn("[SCHEDULER] 用户触发失败 userId={}: {}", userId, e.getMessage()));
     }
 
     public static boolean isScheduledBatchUser(String userId) {
@@ -395,13 +417,6 @@ public class CanvasSchedulerService {
         }
         int separator = taskKey.indexOf(':');
         return separator >= 0 ? taskKey.substring(separator + 1) : taskKey;
-    }
-
-    /** 根据用户来源类型解析定时触发目标用户列表。 */
-    @SuppressWarnings("unchecked")
-    private List<String> resolveUserIds(String sourceType, Map<String, Object> src) {
-        List<String> userIds = resolveUserIdsAsync(sourceType, src).block();
-        return userIds == null ? List.of() : userIds;
     }
 
     /** 根据用户来源类型异步解析定时触发目标用户列表。 */

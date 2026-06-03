@@ -2,14 +2,16 @@ package org.chovy.canvas.engine.wait;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.chovy.canvas.common.MapFieldKeys;
 import org.chovy.canvas.common.enums.NodeType;
 import org.chovy.canvas.common.enums.TriggerType;
 import org.chovy.canvas.dal.dataobject.CanvasWaitSubscriptionDO;
+import org.chovy.canvas.engine.reactive.BackgroundSubscriptionRegistry;
 import org.chovy.canvas.engine.trigger.CanvasExecutionService;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import reactor.core.publisher.Mono;
 
 import java.time.LocalDateTime;
 import java.util.LinkedHashMap;
@@ -24,7 +26,7 @@ import java.util.Objects;
  * <ol>
  *   <li>事件驱动恢复（{@link #resumeEventWaits}）：
  *       事件上报时，查找与该 eventCode + userId 匹配的 ACTIVE 订阅，
- *       CAS 更新为 COMPLETED 后 fire-and-forget 触发引擎继续执行；</li>
+ *       CAS 更新为 COMPLETED 后通过后台订阅注册器触发引擎继续执行；</li>
  *   <li>超时驱动恢复（{@link #resumeDueWaits}）：
  *       定时任务扫描 expiresAt ≤ now 的 ACTIVE 记录，更新为 EXPIRED 或 COMPLETED
  *       后触发引擎走超时分支。</li>
@@ -49,7 +51,6 @@ import java.util.Objects;
  */
 @Slf4j
 @Service
-@RequiredArgsConstructor
 public class WaitResumeService {
 
     /** 等待订阅服务，用于查询和 CAS 完成等待记录。 */
@@ -58,6 +59,29 @@ public class WaitResumeService {
     private final CanvasExecutionService executionService;
     /** Jackson ObjectMapper，用于 JSON 序列化和反序列化。 */
     private final ObjectMapper objectMapper;
+    /** 后台订阅注册器，用于托管等待恢复的异步执行。 */
+    private final BackgroundSubscriptionRegistry backgroundSubscriptions;
+
+    public WaitResumeService(
+            WaitSubscriptionService waitSubscriptionService,
+            CanvasExecutionService executionService,
+            ObjectMapper objectMapper
+    ) {
+        this(waitSubscriptionService, executionService, objectMapper, new BackgroundSubscriptionRegistry());
+    }
+
+    @Autowired
+    public WaitResumeService(
+            WaitSubscriptionService waitSubscriptionService,
+            CanvasExecutionService executionService,
+            ObjectMapper objectMapper,
+            BackgroundSubscriptionRegistry backgroundSubscriptions
+    ) {
+        this.waitSubscriptionService = waitSubscriptionService;
+        this.executionService = executionService;
+        this.objectMapper = objectMapper;
+        this.backgroundSubscriptions = backgroundSubscriptions;
+    }
 
     /**
      * 事件驱动恢复：查找该用户在该 eventCode 下所有 ACTIVE 等待，逐一恢复。
@@ -103,13 +127,13 @@ public class WaitResumeService {
     }
 
     /**
-     * CAS 完成订阅 + fire-and-forget 触发引擎恢复执行。
+     * CAS 完成订阅 + 托管后台订阅触发引擎恢复执行。
      *
      * <p>步骤：
      * <ol>
      *   <li>组装 resumePayload（包含原快照 + 事件属性 + 恢复状态标记）；</li>
      *   <li>{@code completeWait}：{@code UPDATE ... WHERE status='ACTIVE'} CAS，失败则跳过；</li>
-     *   <li>{@code trigger}：异步触发引擎，.subscribe() 是 fire-and-forget，不等待执行完成。</li>
+     *   <li>{@code trigger}：异步触发引擎，并交给后台订阅注册器管理生命周期。</li>
      * </ol>
      *
      * @return 是否成功触发恢复（CAS 成功）
@@ -266,7 +290,7 @@ public class WaitResumeService {
         String triggerType = expired ? TriggerType.WAIT_TIMEOUT : TriggerType.WAIT_RESUME;
         String msgId = wait.getExecutionId() + ":wait:" + wait.getId() + ":" + status;
 
-        executionService.trigger(
+        Mono<Map<String, Object>> resume = executionService.trigger(
                         wait.getCanvasId(),
                         wait.getUserId(),
                         triggerType,
@@ -275,10 +299,9 @@ public class WaitResumeService {
                         payload,
                         msgId,
                         false)  // dryRun=false，走完整 triggerInternal 路径（含冷却期检查，见类注释 ⚠️）
-                .subscribe(
-                        ignored -> log.info("[WAIT] 恢复执行 waitId={} status={}", wait.getId(), status),
-                        e -> log.error("[WAIT] 恢复执行失败 waitId={}: {}", wait.getId(), e.getMessage())
-                );
+                .doOnSuccess(ignored -> log.info("[WAIT] 恢复执行 waitId={} status={}", wait.getId(), status));
+        backgroundSubscriptions.track("wait-resume:" + msgId, resume,
+                e -> log.error("[WAIT] 恢复执行失败 waitId={}: {}", wait.getId(), e.getMessage()));
     }
 
     /** 将恢复载荷序列化为等待订阅表中的 JSON 文本。 */

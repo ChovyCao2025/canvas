@@ -4,12 +4,14 @@ import com.lmax.disruptor.*;
 import com.lmax.disruptor.dsl.*;
 import com.lmax.disruptor.util.DaemonThreadFactory;
 import lombok.Getter;
+import org.chovy.canvas.engine.reactive.BackgroundSubscriptionRegistry;
 import org.chovy.canvas.engine.scheduler.CanvasMetrics;
 import org.chovy.canvas.engine.request.CanvasExecutionRequestExecutor;
 import org.chovy.canvas.engine.lane.ExecutionLane;
 import org.chovy.canvas.engine.trigger.CanvasExecutionService;
 import jakarta.annotation.PreDestroy;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
@@ -42,16 +44,21 @@ public class CanvasDisruptorService {
     private final RingBuffer<CanvasExecutionEvent> ringBuffer;
     /** 画布执行指标组件。 */
     private final CanvasMetrics metrics;
+    /** 后台订阅注册器，用于托管 worker 发起的异步执行。 */
+    private final BackgroundSubscriptionRegistry backgroundSubscriptions;
 
     /** 初始化 Disruptor、worker pool 和异常处理器。 */
+    @Autowired
     public CanvasDisruptorService(
             @Lazy CanvasExecutionService executionService,
             @Lazy CanvasExecutionRequestExecutor requestExecutor,
             CanvasMetrics metrics,
             @Value("${canvas.disruptor.ring-buffer-size:65536}") int ringBufferSize,
-            @Value("${canvas.disruptor.consumers:0}") int configuredConsumers
+            @Value("${canvas.disruptor.consumers:0}") int configuredConsumers,
+            BackgroundSubscriptionRegistry backgroundSubscriptions
     ) {
         this.metrics = metrics;
+        this.backgroundSubscriptions = backgroundSubscriptions;
 
         // consumers=0 时自动使用 CPU 核数
         int consumers = determineConsumerCount(configuredConsumers);
@@ -76,6 +83,17 @@ public class CanvasDisruptorService {
         ringBuffer = disruptor.start();
         log.info("[DISRUPTOR] 启动 ringBufferSize={} consumers={}", ringBufferSize, consumers);
         return ringBuffer;
+    }
+
+    CanvasDisruptorService(
+            CanvasExecutionService executionService,
+            CanvasExecutionRequestExecutor requestExecutor,
+            CanvasMetrics metrics,
+            int ringBufferSize,
+            int configuredConsumers
+    ) {
+        this(executionService, requestExecutor, metrics, ringBufferSize, configuredConsumers,
+                new BackgroundSubscriptionRegistry());
     }
 
     /** 配置默认异常处理器，确保单个事件异常不会中断消费线程。 */
@@ -105,21 +123,24 @@ public class CanvasDisruptorService {
         @SuppressWarnings("unchecked")
         WorkHandler<CanvasExecutionEvent>[] workers = new WorkHandler[consumers];
         // >>> 配置具体的 worker 处理逻辑
-        Arrays.fill(workers, createWorkerHandler(executionService, requestExecutor));
+        Arrays.fill(workers, createWorkerHandler(executionService, requestExecutor, backgroundSubscriptions));
         // WorkerPool 只会让一个 worker 拿到同一个 event，适合执行请求这种单消费语义。
         disruptor.handleEventsWithWorkerPool(workers);
     }
 
     /** 创建根据事件类型分派到画布执行或请求执行器的 worker。 */
-    private static WorkHandler<CanvasExecutionEvent> createWorkerHandler(CanvasExecutionService executionService, CanvasExecutionRequestExecutor requestExecutor) {
+    private static WorkHandler<CanvasExecutionEvent> createWorkerHandler(
+            CanvasExecutionService executionService,
+            CanvasExecutionRequestExecutor requestExecutor,
+            BackgroundSubscriptionRegistry backgroundSubscriptions) {
         return event -> {
             try {
                 if (event.requestId != null) {
                     // 处理请求类型事件
-                    handleRequestEvent(requestExecutor, event);
+                    handleRequestEvent(requestExecutor, event, backgroundSubscriptions);
                 } else {
                     // 处理画布执行类型事件
-                    handleCanvasEvent(executionService, event);
+                    handleCanvasEvent(executionService, event, backgroundSubscriptions);
                 }
             } finally {
                 // 复用前必须清空字段，否则下一次 ring buffer 取到的内容会串链路。
@@ -129,29 +150,33 @@ public class CanvasDisruptorService {
     }
 
     /** 处理直接触发画布执行的 Disruptor 事件。 */
-    private static void handleCanvasEvent(CanvasExecutionService executionService, CanvasExecutionEvent event) {
+    private static void handleCanvasEvent(
+            CanvasExecutionService executionService,
+            CanvasExecutionEvent event,
+            BackgroundSubscriptionRegistry backgroundSubscriptions) {
         // 直接触发链路不落库，事件消费后立刻进入 DAG 执行。
-        executionService.triggerFromDisruptor(
+        backgroundSubscriptions.track(
+                "disruptor:canvas:" + event.canvasId + ":" + event.userId + ":" + event.msgId,
+                executionService.triggerFromDisruptor(
                         event.canvasId, event.userId, event.triggerType,
                         event.triggerNodeType, event.matchKey,
-                        event.payload, event.msgId, event.executionLane, event.dispatchOptions)
-                .subscribe(
-                        null,
-                        e -> log.error("[DISRUPTOR] 执行失败 canvasId={} userId={}: {}",
-                                event.canvasId, event.userId, e.getMessage())
-                );
+                        event.payload, event.msgId, event.executionLane, event.dispatchOptions),
+                e -> log.error("[DISRUPTOR] 执行失败 canvasId={} userId={}: {}",
+                        event.canvasId, event.userId, e.getMessage()));
     }
 
     /** 处理已入库执行请求的 Disruptor 事件。 */
-    private static void handleRequestEvent(CanvasExecutionRequestExecutor requestExecutor, CanvasExecutionEvent event) {
+    private static void handleRequestEvent(
+            CanvasExecutionRequestExecutor requestExecutor,
+            CanvasExecutionEvent event,
+            BackgroundSubscriptionRegistry backgroundSubscriptions) {
         String requestId = event.requestId;
         // 已入库请求由 executor 接管状态迁移和失败重试，不在这里重复实现。
-        requestExecutor.execute(requestId)
-                .subscribe(
-                        null,
-                        e -> log.error("[DISRUPTOR] request 执行失败 requestId={}: {}",
-                                requestId, e.getMessage())
-                );
+        backgroundSubscriptions.track(
+                "disruptor:request:" + requestId,
+                requestExecutor.execute(requestId),
+                e -> log.error("[DISRUPTOR] request 执行失败 requestId={}: {}",
+                        requestId, e.getMessage()));
     }
 
     /**
