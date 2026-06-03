@@ -60,14 +60,14 @@ public class SecurityConfig {
                                 "/v3/api-docs/**", "/webjars/**").permitAll()
                         // OpenAPI：事件上报无需登录（业务系统直接调用）
                         .pathMatchers(HttpMethod.POST, "/canvas/events/report").permitAll()
-                        // OpenAPI：直调执行无需登录（业务系统直接调用，内网不对外暴露）
+                        // OpenAPI：直调执行无需登录，但控制器必须校验 HMAC 签名。
                         .pathMatchers(HttpMethod.POST, "/canvas/execute/direct/*").permitAll()
-                        // OpenAPI：行为触发无需登录（业务系统直接调用，内网不对外暴露）
+                        // OpenAPI：行为触发无需登录，但控制器必须校验 HMAC 签名。
                         .pathMatchers(HttpMethod.POST, "/canvas/trigger/behavior").permitAll()
                         // WebSocket 使用一次性票据鉴权；票据接口本身仍要求登录。
                         .pathMatchers("/canvas/ws/notifications").permitAll()
-                        // 运维接口：无需登录（内网调用，不对外暴露）
-                        .pathMatchers("/ops/**").permitAll()
+                        // 运维接口：必须由管理员调用。
+                        .pathMatchers("/ops/**").hasAnyRole(SUPER_ADMIN_ROUTE_ROLES)
                         // 画布管理动作：SaaS rollout 期间允许 legacy ADMIN、新 SUPER_ADMIN、TENANT_ADMIN。
                         .pathMatchers(HttpMethod.POST,
                                 "/canvas/*/publish", "/canvas/*/offline",

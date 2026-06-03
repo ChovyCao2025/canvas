@@ -4,6 +4,8 @@ canvas:
     allow-credentials: true
   events:
     report-secret: ${CANVAS_EVENT_REPORT_SECRET}
+  public-trigger:
+    secret: ${CANVAS_PUBLIC_TRIGGER_SECRET:${CANVAS_EVENT_REPORT_SECRET}}
   jwt:
     secret: ${CANVAS_JWT_SECRET}
 
