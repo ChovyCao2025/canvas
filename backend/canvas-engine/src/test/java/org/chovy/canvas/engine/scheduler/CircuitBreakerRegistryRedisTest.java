@@ -57,7 +57,7 @@ class CircuitBreakerRegistryRedisTest {
     }
 
     @Test
-    void recordSuccess_resetsOpenBreakerToClosedAndPublishesRecovery() {
+    void recordSuccess_whileOpenDoesNotCloseOrPublishRecovery() {
         FakeRedisTemplate redis = new FakeRedisTemplate();
         CircuitBreakerRegistry registry = redisRegistry(redis, 2);
         CircuitBreakerRegistry.CircuitBreaker breaker = registry.get("recovering");
@@ -67,9 +67,23 @@ class CircuitBreakerRegistryRedisTest {
         breaker.recordSuccess();
 
         assertThat(registry.getState("recovering"))
+                .isEqualTo(CircuitBreakerRegistry.CircuitBreaker.State.OPEN);
+        assertThat(redis.publishedMessages()).containsExactly("cb:recovering:OPEN");
+    }
+
+    @Test
+    void recordSuccess_fromHalfOpenProbeClosesAndPublishesRecovery() {
+        FakeRedisTemplate redis = new FakeRedisTemplate();
+        CircuitBreakerRegistry registry = redisRegistry(redis, 2);
+        redis.forceState("cb:recovering", CircuitBreakerRegistry.CircuitBreaker.State.HALF_OPEN);
+        CircuitBreakerRegistry.CircuitBreaker breaker = registry.get("recovering");
+
+        breaker.recordSuccess();
+
+        assertThat(registry.getState("recovering"))
                 .isEqualTo(CircuitBreakerRegistry.CircuitBreaker.State.CLOSED);
         assertThatCode(breaker::checkState).doesNotThrowAnyException();
-        assertThat(redis.publishedMessages()).contains("cb:recovering:OPEN", "cb:recovering:CLOSED");
+        assertThat(redis.publishedMessages()).containsExactly("cb:recovering:CLOSED");
     }
 
     @Test
@@ -204,6 +218,10 @@ class CircuitBreakerRegistryRedisTest {
             return records.get(redisKey).openedAt;
         }
 
+        void forceState(String redisKey, CircuitBreakerRegistry.CircuitBreaker.State state) {
+            records.computeIfAbsent(redisKey, ignored -> new BreakerRecord()).state = state;
+        }
+
         private TransitionResult check(String key, BreakerRecord record, long openDurationMs,
                                        int halfOpenAttempts, long now, String channel) {
             boolean changed = false;
@@ -253,7 +271,10 @@ class CircuitBreakerRegistryRedisTest {
         }
 
         private TransitionResult success(String key, BreakerRecord record, String channel) {
-            boolean changed = record.state != CircuitBreakerRegistry.CircuitBreaker.State.CLOSED
+            if (record.state == CircuitBreakerRegistry.CircuitBreaker.State.OPEN) {
+                return new TransitionResult(record.state, true, false);
+            }
+            boolean changed = record.state == CircuitBreakerRegistry.CircuitBreaker.State.HALF_OPEN
                     || record.failures != 0
                     || record.halfTries != 0
                     || record.openedAt != 0;

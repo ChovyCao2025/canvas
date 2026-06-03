@@ -500,13 +500,15 @@ public class DagEngine {
                     try {
                         cb.checkState(); // 熔断 OPEN 时抛异常，不可重试
                     } catch (CircuitBreakerRegistry.CircuitBreakerOpenException e) {
-                        return Mono.just(NodeResult.fail(e.getMessage()));
+                        return Mono.just(NodeResult.circuitBreakerOpen(e.getMessage()));
                     }
                     return handler.executeAsync(config, ctx); // ← handler 真正在这里被调用
                 })
                 .doOnNext(r -> {
                     if (r.success()) cb.recordSuccess();
-                    else cb.recordFailure();
+                    else if (!NodeResult.REASON_CIRCUIT_BREAKER_OPEN.equals(r.reasonCode())) {
+                        cb.recordFailure();
+                    }
                 })
                 .doOnError(e -> cb.recordFailure());
 

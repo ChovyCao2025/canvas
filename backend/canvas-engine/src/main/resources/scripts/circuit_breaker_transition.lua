@@ -42,11 +42,15 @@ if action == 'READ' then
 end
 
 if action == 'SUCCESS' then
+    if state == 'OPEN' then
+        return 'OPEN|1|0'
+    end
+
     local failures = tonumber(redis.call('HGET', key, 'failures') or '0')
     local half_tries = tonumber(redis.call('HGET', key, 'half_tries') or '0')
     local opened_at = tonumber(redis.call('HGET', key, 'opened_at') or '0')
     local changed = 0
-    if state ~= 'CLOSED' or failures ~= 0 or half_tries ~= 0 or opened_at ~= 0 then
+    if state == 'HALF_OPEN' or failures ~= 0 or half_tries ~= 0 or opened_at ~= 0 then
         changed = 1
     end
     state = 'CLOSED'

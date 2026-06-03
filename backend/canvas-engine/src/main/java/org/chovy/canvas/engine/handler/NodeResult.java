@@ -40,6 +40,9 @@ public record NodeResult(
         /** 挂起恢复时间戳，单位毫秒。 */
         Long resumeAtEpochMs
 ) {
+    /** Scheduler-level failure reason for calls rejected before handler execution by a circuit breaker. */
+    public static final String REASON_CIRCUIT_BREAKER_OPEN = "CIRCUIT_BREAKER_OPEN";
+
 // 说明：
     // - nextNodeId 与 success/fail/branchMap 互斥使用；
     // - output 会合并到 ExecutionContext.flatContext（由调度层处理）。
@@ -65,6 +68,12 @@ public record NodeResult(
     public static NodeResult fail(String errorMessage) {
         return new NodeResult(null, null, null, null, null, Map.of(), false, errorMessage, false,
                 NodeOutcome.FAIL, Map.of(), "NODE_FAILED", errorMessage, null);
+    }
+
+    /** Failure produced by scheduler admission, not by the downstream handler itself. */
+    public static NodeResult circuitBreakerOpen(String errorMessage) {
+        return new NodeResult(null, null, null, null, null, Map.of(), false, errorMessage, false,
+                NodeOutcome.FAIL, Map.of(), REASON_CIRCUIT_BREAKER_OPEN, errorMessage, null);
     }
     /** 多分支节点（如 PRIORITY / AB_SPLIT / SELECTOR）。 */
     public static NodeResult multiNext(Map<String, String> branchMap, String elseNodeId) {
