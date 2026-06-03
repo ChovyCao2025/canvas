@@ -26,7 +26,7 @@
 - `frontend/src/services/channelIntelligenceApi.ts`
 
 **Data And Config**
-- `backend/canvas-engine/src/main/resources/db/migration/V105__channel_intelligence_scheduling.sql`
+- `backend/canvas-engine/src/main/resources/db/migration/V110__channel_intelligence_scheduling.sql`
 
 **Tests**
 - `backend/canvas-engine/src/test/java/org/chovy/canvas/domain/channel/ChannelIntelligenceServiceTest.java`
@@ -35,8 +35,8 @@
 ### Task 1: Contract And Failing Tests
 
 **Files:**
-- Create or modify: `backend/canvas-engine/src/test/java/org/chovy/canvas/domain/channel/ChannelIntelligenceServiceTest.java`
-- Create or modify: `frontend/src/pages/channel-intelligence/channelIntelligence.test.tsx`
+- Create: `backend/canvas-engine/src/test/java/org/chovy/canvas/domain/channel/ChannelIntelligenceServiceTest.java`
+- Create: `frontend/src/pages/channel-intelligence/channelIntelligence.test.tsx`
 - Read: `docs/product-evolution/specs/p2-012-channel-intelligence-and-scheduling.md`
 
 - [ ] **Step 1: Write backend contract tests**
@@ -64,7 +64,7 @@ Expected: FAIL because the new page, component, service call, or state handling 
 **Files:**
 - `backend/canvas-engine/src/main/java/org/chovy/canvas/domain/channel/ChannelIntelligenceService.java`
 - `backend/canvas-engine/src/main/java/org/chovy/canvas/engine/handlers/PriorityHandler.java`
-- `backend/canvas-engine/src/main/resources/db/migration/V105__channel_intelligence_scheduling.sql`
+- `backend/canvas-engine/src/main/resources/db/migration/V110__channel_intelligence_scheduling.sql`
 - Test: `backend/canvas-engine/src/test/java/org/chovy/canvas/domain/channel/ChannelIntelligenceServiceTest.java`
 
 - [ ] **Step 1: Add additive data structures when the spec requires storage**

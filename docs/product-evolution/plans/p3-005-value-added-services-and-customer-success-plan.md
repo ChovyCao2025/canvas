@@ -26,7 +26,7 @@
 - `frontend/src/services/valueaddedservicesandcustomersuccessApi.ts`
 
 **Data And Config**
-- `backend/canvas-engine/src/main/resources/db/migration/V111__value_added_services_and_customer_success.sql`
+- `backend/canvas-engine/src/main/resources/db/migration/V120__value_added_services_and_customer_success.sql`
 
 **Tests**
 - `backend/canvas-engine/src/test/java/org/chovy/canvas/strategy/ValueAddedServicesAndCustomerSuccessTest.java`
@@ -35,8 +35,8 @@
 ### Task 1: Contract And Failing Tests
 
 **Files:**
-- Create or modify: `backend/canvas-engine/src/test/java/org/chovy/canvas/strategy/ValueAddedServicesAndCustomerSuccessTest.java`
-- Create or modify: `frontend/src/pages/value-added-services-and-customer-success/value-added-services-and-customer-success.test.tsx`
+- Create: `backend/canvas-engine/src/test/java/org/chovy/canvas/strategy/ValueAddedServicesAndCustomerSuccessTest.java`
+- Create: `frontend/src/pages/value-added-services-and-customer-success/value-added-services-and-customer-success.test.tsx`
 - Read: `docs/product-evolution/specs/p3-005-value-added-services-and-customer-success.md`
 
 - [ ] **Step 1: Write backend contract tests**
@@ -64,7 +64,7 @@ Expected: FAIL because the new page, component, service call, or state handling 
 **Files:**
 - `backend/canvas-engine/src/main/java/org/chovy/canvas/domain/valueaddedservicesandcustomersuccess/ValueAddedServicesAndCustomerSuccessService.java`
 - `backend/canvas-engine/src/main/java/org/chovy/canvas/web/ValueAddedServicesAndCustomerSuccessController.java`
-- `backend/canvas-engine/src/main/resources/db/migration/V111__value_added_services_and_customer_success.sql`
+- `backend/canvas-engine/src/main/resources/db/migration/V120__value_added_services_and_customer_success.sql`
 - Test: `backend/canvas-engine/src/test/java/org/chovy/canvas/strategy/ValueAddedServicesAndCustomerSuccessTest.java`
 
 - [ ] **Step 1: Add additive data structures when the spec requires storage**

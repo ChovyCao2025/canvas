@@ -51,7 +51,7 @@ The product roadmap can advance beyond stabilization without restarting from raw
 
 ### Data And Configuration Touchpoints
 
-- `backend/canvas-engine/src/main/resources/db/migration/V97__platform_product_evolution_workstreams.sql`
+- `backend/canvas-engine/src/main/resources/db/migration/V102__platform_product_evolution_workstreams.sql`
 
 ### Test Touchpoints
 

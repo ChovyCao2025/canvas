@@ -47,7 +47,7 @@ This keeps the strategy actionable by requiring discovery gates, MVP scope, and 
 
 ### Data And Configuration Touchpoints
 
-- `backend/canvas-engine/src/main/resources/db/migration/V116__advanced_privacy_and_compliance.sql`
+- `backend/canvas-engine/src/main/resources/db/migration/V125__advanced_privacy_and_compliance.sql`
 
 ### Test Touchpoints
 

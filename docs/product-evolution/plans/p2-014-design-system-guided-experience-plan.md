@@ -36,8 +36,8 @@
 ### Task 1: Contract And Failing Tests
 
 **Files:**
-- Create or modify: `backend/canvas-engine/src/test/java/org/chovy/canvas/domain/meta/SystemOptionServiceTest.java`
-- Create or modify: `frontend/src/components/empty/EmptyState.test.tsx`
+- Modify: `backend/canvas-engine/src/test/java/org/chovy/canvas/domain/meta/SystemOptionServiceTest.java`
+- Create: `frontend/src/components/empty/EmptyState.test.tsx`
 - Read: `docs/product-evolution/specs/p2-014-design-system-guided-experience.md`
 
 - [ ] **Step 1: Write backend contract tests**

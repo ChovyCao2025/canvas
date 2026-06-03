@@ -7,77 +7,98 @@ Implementation plan: `../plans/p1-001-operating-loop-and-effect-closure-plan.md`
 
 ## Goal
 
-Make the core operator loop measurable and reversible from template selection through preview, publish, attribution, receipt tracking, versioning, and audit review.
+Make the core operator loop measurable and reversible from template selection through pre-publish checks, publish, control-group holdout, conversion attribution, receipt tracking, version comparison, and rollback.
 
 ## User And Business Value
 
-Operators can launch faster, inspect expected impact before publish, measure outcome, and recover from bad releases.
+Operators can start from a proven template, understand publish risk before launch, measure incremental effect after launch, inspect delivery records, and recover from bad releases without asking engineering to query the database.
 
 ## In Scope
 
-- Template browsing and one-click clone from seeded templates.
-- Audience estimate, touch preview, test send, and dry-run visibility before publish.
-- Lightweight last-touch attribution with conversion event intake.
-- Global control group support for incremental lift measurement.
-- Canvas version visibility, diff, and rollback.
-- Channel receipt tracking and audit log UI.
+- Template browsing and one-click clone from existing `CanvasTemplateDO` records.
+- Pre-publish check endpoint and editor panel that blocks publish on structural errors and warns on risky configuration.
+- Canvas-level control group percentage with deterministic user holdout and auditable holdout records.
+- Last-touch conversion attribution from `event_log` conversion events to the latest successful `message_send_record` for the same user and canvas.
+- Canvas stats endpoints for send receipts and attribution summary.
+- Frontend stats additions for delivery status counts, conversions, conversion amount, and attributed send records.
+- Version diff access from the editor version drawer and existing draft revert flow.
 
 ## Out Of Scope
 
-- Full multi-touch attribution, predictive optimization, and AI journey creation.
-- Advanced report builder.
+- Multi-touch attribution, path-based attribution, predictive optimization, or AI journey creation.
+- Provider receipt webhooks and reconciliation jobs; those belong to `p0-003-delivery-outbox-receipts-and-reconciliation`.
+- Advanced report builder and arbitrary metric formulas.
+- Collaboration review comments; those belong to `p2-001-collaboration-personalization-and-reporting`.
 
 ## Functional Requirements
 
-1. The feature must expose the smallest useful operator or platform workflow described in the source item.
-2. The implementation must preserve tenant isolation, authorization, auditability, and rollback behavior for every new read or write path.
-3. New UI must use existing React, Ant Design, router, service, and test patterns unless a child spec justifies a new pattern.
-4. New backend behavior must use the existing Spring Boot, MyBatis, Flyway, controller, domain service, and test patterns.
-5. The implementation must include focused automated tests before code changes and a manual verification checklist for the core workflow.
+1. The canvas list page must expose a template catalog action that lists enabled templates and creates a draft canvas from a selected template.
+2. Publishing from the editor must first call `GET /canvas/{id}/pre-publish-checks`.
+3. A pre-publish result with any `ERROR` item must prevent publish and display the blocking item codes.
+4. A canvas may define `controlGroupPercent` from 0 to 50 and `controlGroupSalt`; held-out users must not execute the canvas and must be recorded in a holdout table.
+5. Event reporting must attribute conversion events whose `eventCode` matches a canvas `conversionEventCode` to the most recent sent touch for the same user and canvas within the configured attribution window.
+6. Attribution must be idempotent by event log and canvas so event retries do not double-count conversion value.
+7. Canvas stats must return delivery status counts from `message_send_record` and conversion summary from attribution records.
+8. The editor version drawer must expose a diff action that calls the existing backend diff endpoint and a revert action that keeps the current published version unchanged.
 
 ## Technical Scope
 
 ### Backend Touchpoints
 
+- `backend/canvas-engine/src/main/java/org/chovy/canvas/web/OpsController.java`
 - `backend/canvas-engine/src/main/java/org/chovy/canvas/web/CanvasController.java`
 - `backend/canvas-engine/src/main/java/org/chovy/canvas/web/CanvasStatsController.java`
-- `backend/canvas-engine/src/main/java/org/chovy/canvas/domain/canvas/CanvasOpsService.java`
-- `backend/canvas-engine/src/main/java/org/chovy/canvas/web/EventDefinitionController.java`
+- `backend/canvas-engine/src/main/java/org/chovy/canvas/domain/canvas/CanvasPrePublishCheckService.java`
+- `backend/canvas-engine/src/main/java/org/chovy/canvas/domain/canvas/CanvasControlGroupService.java`
+- `backend/canvas-engine/src/main/java/org/chovy/canvas/domain/canvas/CanvasAttributionService.java`
+- `backend/canvas-engine/src/main/java/org/chovy/canvas/engine/trigger/TriggerPreCheckService.java`
+- `backend/canvas-engine/src/main/java/org/chovy/canvas/service/impl/EventDefinitionServiceImpl.java`
+- `backend/canvas-engine/src/main/java/org/chovy/canvas/dal/dataobject/CanvasDO.java`
+- `backend/canvas-engine/src/main/java/org/chovy/canvas/dal/dataobject/CanvasControlGroupHoldoutDO.java`
+- `backend/canvas-engine/src/main/java/org/chovy/canvas/dal/dataobject/CanvasConversionAttributionDO.java`
+- `backend/canvas-engine/src/main/java/org/chovy/canvas/dal/mapper/CanvasControlGroupHoldoutMapper.java`
+- `backend/canvas-engine/src/main/java/org/chovy/canvas/dal/mapper/CanvasConversionAttributionMapper.java`
+- `backend/canvas-engine/src/main/resources/db/migration/V94__operating_loop_effect_closure.sql`
 
 ### Frontend Touchpoints
 
 - `frontend/src/pages/canvas-list/index.tsx`
+- `frontend/src/pages/canvas-list/templateCatalog.ts`
 - `frontend/src/pages/canvas-editor/index.tsx`
+- `frontend/src/pages/canvas-editor/prePublishChecks.ts`
 - `frontend/src/pages/canvas-stats/index.tsx`
+- `frontend/src/pages/canvas-stats/effectClosure.ts`
 - `frontend/src/services/api.ts`
-
-### Data And Configuration Touchpoints
-
-- `backend/canvas-engine/src/main/resources/db/migration/V92__operating_loop_effect_closure.sql`
 
 ### Test Touchpoints
 
-- `backend/canvas-engine/src/test/java/org/chovy/canvas/controller/CanvasStatsControllerTest.java`
-- `backend/canvas-engine/src/test/java/org/chovy/canvas/domain/canvas/CanvasOpsServiceTest.java`
-- `frontend/src/pages/canvas-list/templateCloneFlow.test.tsx`
-- `frontend/src/pages/canvas-editor/prePublishChecks.test.tsx`
+- `backend/canvas-engine/src/test/java/org/chovy/canvas/controller/OpsControllerTemplateTest.java`
+- `backend/canvas-engine/src/test/java/org/chovy/canvas/domain/canvas/CanvasPrePublishCheckServiceTest.java`
+- `backend/canvas-engine/src/test/java/org/chovy/canvas/domain/canvas/CanvasControlGroupServiceTest.java`
+- `backend/canvas-engine/src/test/java/org/chovy/canvas/domain/canvas/CanvasAttributionServiceTest.java`
+- `backend/canvas-engine/src/test/java/org/chovy/canvas/controller/CanvasStatsControllerEffectClosureTest.java`
+- `frontend/src/pages/canvas-list/templateCloneFlow.test.ts`
+- `frontend/src/pages/canvas-editor/prePublishChecks.test.ts`
+- `frontend/src/pages/canvas-stats/effectClosure.test.ts`
 
 ## Dependencies
 
-- P0 safety work must protect publish and send paths.
-- Attribution depends on stable conversion event intake and touchpoint recording.
+- P0-001 must protect tenant and send-policy paths before attribution and receipt views are considered production-safe.
+- P0-002 must provide the frontend jsdom/component test harness if UI rendering tests are added during execution.
+- P0-003 can later replace the simple receipt-count read model with provider-webhook reconciliation.
 
 ## Risks And Controls
 
-- Scope creep: keep the first implementation to the workflow in this spec and move broader ideas to a follow-up spec.
-- Tenant or permission regression: add backend tests for tenant-scoped data and role checks before exposing UI.
-- UI complexity: use one page or one panel first, then expand only after the workflow is verified.
-- Data migration risk: make every migration additive and reversible by disabling the new route or feature flag.
+- Control-group holdout changes who receives messages. Keep the initial percentage bounded to 50, default it to 0, and record every holdout decision.
+- Last-touch attribution can overclaim effect. Label the metric as last-touch and keep the algorithm deterministic, documented, and idempotent.
+- Pre-publish checks can block urgent launches. Use `ERROR` only for structural failures that would break execution; use `WARNING` for optimization suggestions.
+- Template cloning can duplicate stale examples. Filter the catalog to enabled templates and keep created canvases in `DRAFT`.
 
 ## Acceptance Criteria
 
-- The source item has a visible implemented workflow or a documented discovery exit if this is a P3 strategy item.
-- All changed backend endpoints reject unauthorized access and preserve tenant scoping.
-- All changed frontend routes handle loading, empty, error, and permission states.
-- Tests named in the plan pass in the local commands for backend and frontend slices.
-- The implementation includes rollout notes covering feature flag, migration, and rollback behavior.
+- Template catalog frontend helper tests pass and the backend template controller test proves clone creates a draft version from template graph JSON.
+- Pre-publish check tests prove invalid graph and missing trigger produce `ERROR`, while a valid event-trigger graph can publish.
+- Control-group tests prove the same canvas/user/salt always yields the same holdout decision and records held-out users once.
+- Attribution tests prove a conversion event maps to the latest prior sent record and duplicate event logs do not double-count.
+- Stats controller tests prove receipt counts and attribution summary are returned for a canvas.
+- Frontend helper tests prove receipt and attribution summaries produce stable KPI display models.

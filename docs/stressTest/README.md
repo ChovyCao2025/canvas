@@ -1,19 +1,19 @@
-# Canvas Stress Testing
+# Canvas 压力测试
 
-The only supported execution path for capacity testing is the local capacity runbook, with `tools/perf/perf-guide.mjs` enforcing correctness gates.
+本目录是本地容量压测的唯一有效入口。执行人应按 [本地容量压测操作手册](./local-capacity-runbook.md) 操作，并使用 `tools/perf/perf-guide.mjs` 做正确性闸门。
 
-Do not use archived capacity estimates as measured results. A capacity number is valid only when it is backed by:
+不要把历史归档中的容量估算当成实测结果。一个容量数字只有同时具备以下证据时才有效：
 
-- unique `perfRunId`
+- 唯一的 `perfRunId`
 - runner summary JSON
-- verifier JSON with `verdict: "PASS"`
-- guide `report` result with `status: "PASS"`
-- monitor snapshots
-- environment details
-- capacity input parameters
-- cleanup record
+- verifier JSON，且 `verdict: "PASS"`
+- guide `report` 输出，且 `status: "PASS"`
+- 压测期间的监控快照
+- 环境与资源配置
+- 容量估算输入参数
+- 清理记录
 
-## Quick Start
+## 快速开始
 
 ```bash
 cd /Users/photonpay/project/canvas
@@ -21,18 +21,18 @@ node --test tools/perf/*.test.mjs
 node tools/perf/perf-guide.mjs doctor
 ```
 
-Then follow the full runbook:
+通过后继续阅读完整流程：
 
-- [Local capacity runbook](./local-capacity-runbook.md)
-- [Performance audit](./performance-audit.md)
-- [Report template](./report-template.md)
+- [本地容量压测操作手册](./local-capacity-runbook.md)
+- [压力测试方案审计](./performance-audit.md)
+- [容量报告模板](./report-template.md)
 
-## Hard Rules
+## 硬性规则
 
-- If verifier is not `PASS`, stop and fix the run before capacity planning.
-- If runner `failed` is not `0`, stop and fix the run before capacity planning.
-- If guide `report` is not `PASS`, do not publish throughput, QPS, p95, or capacity estimates.
-- `PASS_WITH_EXPECTED_FAILURES` is for fault reports only.
-- Do not report QPS without the matching `perfRunId`.
-- Do not reuse a `perfRunId`.
-- Cleanup defaults to ledger-only. Full cleanup requires `--scope all --execute true`.
+- 如果 verifier 不是 `PASS`，停止并修复问题，不得进入容量规划。
+- 如果 runner `failed` 不是 `0`，停止并修复问题，不得进入容量规划。
+- 如果 guide `report` 不是 `PASS`，不得发布吞吐、QPS、p95 或容量估算。
+- `PASS_WITH_EXPECTED_FAILURES` 只允许用于故障注入报告。
+- 不得在缺少对应 `perfRunId` 的情况下报告 QPS。
+- 不得复用 `perfRunId`。
+- cleanup 默认只清理 ledger 数据。完整清理必须显式使用 `--scope all --execute true`。

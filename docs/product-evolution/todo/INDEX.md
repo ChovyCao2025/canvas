@@ -11,6 +11,7 @@ This folder contains filtered, execution-oriented todo documents extracted from 
 - [Implementation Order](../IMPLEMENTATION_ORDER.md) lists the spec and plan files in execution order.
 - [Specs Index](../specs/INDEX.md) contains one spec per ordered capability or opportunity.
 - [Plans Index](../plans/INDEX.md) contains the matching implementation plans using the `superpowers:writing-plans` structure.
+- [Optimization Coverage Matrix](../OPTIMIZATION_COVERAGE.md) records how `docs/optimization` was filtered into executable specs/plans, existing coverage, and deferred scope.
 
 ## Priority Model
 
@@ -55,6 +56,7 @@ The first cleanup intentionally reduced the original source material into execut
 
 - `p2/product-opportunities-from-filtered-scope.md` keeps medium-term product opportunities such as message templates, sandbox/demo, analytics, integrations, product usage analytics, audience operations, editor productivity, channel intelligence, knowledge base, and design-system work.
 - `p3/strategic-opportunities-from-filtered-scope.md` keeps long-term strategy such as billing, customer success, partner ecosystem, AI-native operations, industry packaging, globalization, advanced privacy, architecture strategy, and product-led growth.
+- `docs/optimization` follow-up review added two execution specs for AI_LLM productionization and churn prediction/smart timing because those are bounded product capabilities, while autonomous AI remains P3.
 
 These supplemental documents are opportunity queues. They do not override the P0/P1 execution order, and each item still requires a bounded follow-up spec before implementation.
 

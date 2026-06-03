@@ -26,7 +26,7 @@
 - `frontend/src/services/demoSandboxApi.ts`
 
 **Data And Config**
-- `backend/canvas-engine/src/main/resources/db/migration/V100__sandbox_demo_sales_enablement.sql`
+- `backend/canvas-engine/src/main/resources/db/migration/V105__sandbox_demo_sales_enablement.sql`
 
 **Tests**
 - `backend/canvas-engine/src/test/java/org/chovy/canvas/domain/demo/DemoSandboxServiceTest.java`
@@ -35,8 +35,8 @@
 ### Task 1: Contract And Failing Tests
 
 **Files:**
-- Create or modify: `backend/canvas-engine/src/test/java/org/chovy/canvas/domain/demo/DemoSandboxServiceTest.java`
-- Create or modify: `frontend/src/pages/demo-sandbox/demoSandbox.test.tsx`
+- Create: `backend/canvas-engine/src/test/java/org/chovy/canvas/domain/demo/DemoSandboxServiceTest.java`
+- Create: `frontend/src/pages/demo-sandbox/demoSandbox.test.tsx`
 - Read: `docs/product-evolution/specs/p2-006-sandbox-demo-sales-enablement.md`
 
 - [ ] **Step 1: Write backend contract tests**
@@ -64,7 +64,7 @@ Expected: FAIL because the new page, component, service call, or state handling 
 **Files:**
 - `backend/canvas-engine/src/main/java/org/chovy/canvas/web/DemoSandboxController.java`
 - `backend/canvas-engine/src/main/java/org/chovy/canvas/domain/demo/DemoSandboxService.java`
-- `backend/canvas-engine/src/main/resources/db/migration/V100__sandbox_demo_sales_enablement.sql`
+- `backend/canvas-engine/src/main/resources/db/migration/V105__sandbox_demo_sales_enablement.sql`
 - Test: `backend/canvas-engine/src/test/java/org/chovy/canvas/domain/demo/DemoSandboxServiceTest.java`
 
 - [ ] **Step 1: Add additive data structures when the spec requires storage**

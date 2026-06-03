@@ -28,7 +28,7 @@
 - `frontend/src/pages/system-options/index.tsx`
 
 **Data And Config**
-- `backend/canvas-engine/src/main/resources/db/migration/V97__platform_product_evolution_workstreams.sql`
+- `backend/canvas-engine/src/main/resources/db/migration/V102__platform_product_evolution_workstreams.sql`
 
 **Tests**
 - `backend/canvas-engine/src/test/java/org/chovy/canvas/platform/PlatformWorkstreamContractTest.java`
@@ -37,8 +37,8 @@
 ### Task 1: Contract And Failing Tests
 
 **Files:**
-- Create or modify: `backend/canvas-engine/src/test/java/org/chovy/canvas/platform/PlatformWorkstreamContractTest.java`
-- Create or modify: `frontend/src/pages/home/platformCommandCenter.test.tsx`
+- Create: `backend/canvas-engine/src/test/java/org/chovy/canvas/platform/PlatformWorkstreamContractTest.java`
+- Create: `frontend/src/pages/home/platformCommandCenter.test.tsx`
 - Read: `docs/product-evolution/specs/p2-003-platform-product-evolution-workstreams.md`
 
 - [ ] **Step 1: Write backend contract tests**
@@ -67,7 +67,7 @@ Expected: FAIL because the new page, component, service call, or state handling 
 - `backend/canvas-engine/src/main/java/org/chovy/canvas/web`
 - `backend/canvas-engine/src/main/java/org/chovy/canvas/domain`
 - `backend/canvas-engine/src/main/resources/db/migration`
-- `backend/canvas-engine/src/main/resources/db/migration/V97__platform_product_evolution_workstreams.sql`
+- `backend/canvas-engine/src/main/resources/db/migration/V102__platform_product_evolution_workstreams.sql`
 - Test: `backend/canvas-engine/src/test/java/org/chovy/canvas/platform/PlatformWorkstreamContractTest.java`
 
 - [ ] **Step 1: Add additive data structures when the spec requires storage**

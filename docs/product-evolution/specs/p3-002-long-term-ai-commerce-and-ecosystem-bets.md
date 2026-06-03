@@ -47,7 +47,7 @@ This keeps the strategy actionable by requiring discovery gates, MVP scope, and 
 
 ### Data And Configuration Touchpoints
 
-- `backend/canvas-engine/src/main/resources/db/migration/V108__long_term_ai_commerce_and_ecosystem_bets.sql`
+- `backend/canvas-engine/src/main/resources/db/migration/V117__long_term_ai_commerce_and_ecosystem_bets.sql`
 
 ### Test Touchpoints
 

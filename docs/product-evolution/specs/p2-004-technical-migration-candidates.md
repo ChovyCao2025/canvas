@@ -50,7 +50,7 @@ The team can make technology moves based on measured need instead of whitepaper 
 
 ### Data And Configuration Touchpoints
 
-- `backend/canvas-engine/src/main/resources/db/migration/V98__technical_migration_candidate_metrics.sql`
+- `backend/canvas-engine/src/main/resources/db/migration/V103__technical_migration_candidate_metrics.sql`
 
 ### Test Touchpoints
 

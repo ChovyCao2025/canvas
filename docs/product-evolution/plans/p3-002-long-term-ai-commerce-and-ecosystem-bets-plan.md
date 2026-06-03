@@ -26,7 +26,7 @@
 - `frontend/src/services/longtermaicommerceandecosystembetsApi.ts`
 
 **Data And Config**
-- `backend/canvas-engine/src/main/resources/db/migration/V108__long_term_ai_commerce_and_ecosystem_bets.sql`
+- `backend/canvas-engine/src/main/resources/db/migration/V117__long_term_ai_commerce_and_ecosystem_bets.sql`
 
 **Tests**
 - `backend/canvas-engine/src/test/java/org/chovy/canvas/strategy/LongTermAiCommerceAndEcosystemBetsTest.java`
@@ -35,8 +35,8 @@
 ### Task 1: Contract And Failing Tests
 
 **Files:**
-- Create or modify: `backend/canvas-engine/src/test/java/org/chovy/canvas/strategy/LongTermAiCommerceAndEcosystemBetsTest.java`
-- Create or modify: `frontend/src/pages/long-term-ai-commerce-and-ecosystem-bets/long-term-ai-commerce-and-ecosystem-bets.test.tsx`
+- Create: `backend/canvas-engine/src/test/java/org/chovy/canvas/strategy/LongTermAiCommerceAndEcosystemBetsTest.java`
+- Create: `frontend/src/pages/long-term-ai-commerce-and-ecosystem-bets/long-term-ai-commerce-and-ecosystem-bets.test.tsx`
 - Read: `docs/product-evolution/specs/p3-002-long-term-ai-commerce-and-ecosystem-bets.md`
 
 - [ ] **Step 1: Write backend contract tests**
@@ -64,7 +64,7 @@ Expected: FAIL because the new page, component, service call, or state handling 
 **Files:**
 - `backend/canvas-engine/src/main/java/org/chovy/canvas/domain/longtermaicommerceandecosystembets/LongTermAICommerceAndEcosystemBetsService.java`
 - `backend/canvas-engine/src/main/java/org/chovy/canvas/web/LongTermAICommerceAndEcosystemBetsController.java`
-- `backend/canvas-engine/src/main/resources/db/migration/V108__long_term_ai_commerce_and_ecosystem_bets.sql`
+- `backend/canvas-engine/src/main/resources/db/migration/V117__long_term_ai_commerce_and_ecosystem_bets.sql`
 - Test: `backend/canvas-engine/src/test/java/org/chovy/canvas/strategy/LongTermAiCommerceAndEcosystemBetsTest.java`
 
 - [ ] **Step 1: Add additive data structures when the spec requires storage**

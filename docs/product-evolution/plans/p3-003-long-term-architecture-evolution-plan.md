@@ -26,7 +26,7 @@
 - `frontend/src/services/longtermarchitectureevolutionApi.ts`
 
 **Data And Config**
-- `backend/canvas-engine/src/main/resources/db/migration/V109__long_term_architecture_evolution.sql`
+- `backend/canvas-engine/src/main/resources/db/migration/V118__long_term_architecture_evolution.sql`
 
 **Tests**
 - `backend/canvas-engine/src/test/java/org/chovy/canvas/strategy/LongTermArchitectureEvolutionTest.java`
@@ -35,8 +35,8 @@
 ### Task 1: Contract And Failing Tests
 
 **Files:**
-- Create or modify: `backend/canvas-engine/src/test/java/org/chovy/canvas/strategy/LongTermArchitectureEvolutionTest.java`
-- Create or modify: `frontend/src/pages/long-term-architecture-evolution/long-term-architecture-evolution.test.tsx`
+- Create: `backend/canvas-engine/src/test/java/org/chovy/canvas/strategy/LongTermArchitectureEvolutionTest.java`
+- Create: `frontend/src/pages/long-term-architecture-evolution/long-term-architecture-evolution.test.tsx`
 - Read: `docs/product-evolution/specs/p3-003-long-term-architecture-evolution.md`
 
 - [ ] **Step 1: Write backend contract tests**
@@ -64,7 +64,7 @@ Expected: FAIL because the new page, component, service call, or state handling 
 **Files:**
 - `backend/canvas-engine/src/main/java/org/chovy/canvas/domain/longtermarchitectureevolution/LongTermArchitectureEvolutionService.java`
 - `backend/canvas-engine/src/main/java/org/chovy/canvas/web/LongTermArchitectureEvolutionController.java`
-- `backend/canvas-engine/src/main/resources/db/migration/V109__long_term_architecture_evolution.sql`
+- `backend/canvas-engine/src/main/resources/db/migration/V118__long_term_architecture_evolution.sql`
 - Test: `backend/canvas-engine/src/test/java/org/chovy/canvas/strategy/LongTermArchitectureEvolutionTest.java`
 
 - [ ] **Step 1: Add additive data structures when the spec requires storage**

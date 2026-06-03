@@ -26,7 +26,7 @@
 - `frontend/src/components/feedback/FeedbackButton.tsx`
 
 **Data And Config**
-- `backend/canvas-engine/src/main/resources/db/migration/V103__product_usage_analytics_feedback.sql`
+- `backend/canvas-engine/src/main/resources/db/migration/V108__product_usage_analytics_feedback.sql`
 
 **Tests**
 - `backend/canvas-engine/src/test/java/org/chovy/canvas/domain/productanalytics/ProductAnalyticsServiceTest.java`
@@ -35,8 +35,8 @@
 ### Task 1: Contract And Failing Tests
 
 **Files:**
-- Create or modify: `backend/canvas-engine/src/test/java/org/chovy/canvas/domain/productanalytics/ProductAnalyticsServiceTest.java`
-- Create or modify: `frontend/src/services/productAnalytics.test.ts`
+- Create: `backend/canvas-engine/src/test/java/org/chovy/canvas/domain/productanalytics/ProductAnalyticsServiceTest.java`
+- Create: `frontend/src/services/productAnalytics.test.ts`
 - Read: `docs/product-evolution/specs/p2-009-product-usage-analytics-feedback-loop.md`
 
 - [ ] **Step 1: Write backend contract tests**
@@ -64,7 +64,7 @@ Expected: FAIL because the new page, component, service call, or state handling 
 **Files:**
 - `backend/canvas-engine/src/main/java/org/chovy/canvas/web/ProductAnalyticsController.java`
 - `backend/canvas-engine/src/main/java/org/chovy/canvas/domain/productanalytics/ProductAnalyticsService.java`
-- `backend/canvas-engine/src/main/resources/db/migration/V103__product_usage_analytics_feedback.sql`
+- `backend/canvas-engine/src/main/resources/db/migration/V108__product_usage_analytics_feedback.sql`
 - Test: `backend/canvas-engine/src/test/java/org/chovy/canvas/domain/productanalytics/ProductAnalyticsServiceTest.java`
 
 - [ ] **Step 1: Add additive data structures when the spec requires storage**

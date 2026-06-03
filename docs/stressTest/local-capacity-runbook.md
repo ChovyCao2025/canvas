@@ -1,21 +1,21 @@
-# Local Capacity Runbook
+# 本地容量压测操作手册
 
-This is the only supported execution path for local capacity testing. It uses `tools/perf/perf-guide.mjs` for gates and keeps raw scripts as advanced tools only.
+这是本地容量压测的唯一支持路径。关键闸门由 `tools/perf/perf-guide.mjs` 执行；底层脚本只作为高级调试工具使用。
 
-## 1. Stop Conditions
+## 1. 停止条件
 
-Stop immediately when any condition is true:
+只要出现以下任一情况，立即停止：
 
-- verifier is not `PASS`
-- runner `failed` is not `0`
-- guide command returns `status: "FAIL"`
-- guide `report` rejects the run
-- backend container restarts or is OOM-killed
-- MySQL, Redis, RocketMQ, or downstream mocks show sustained errors
+- verifier 不是 `PASS`
+- runner `failed` 不是 `0`
+- guide 命令返回 `status: "FAIL"`
+- guide `report` 拒绝本次运行
+- 后端容器重启或被 OOM kill
+- MySQL、Redis、RocketMQ 或下游 mock 持续报错
 
-Do not turn a failed or incomplete run into a capacity number.
+不要把失败、不完整或证据不足的运行结果整理成容量数字。
 
-## 2. Prepare Environment
+## 2. 准备环境
 
 ```bash
 cd /Users/photonpay/project/canvas
@@ -25,32 +25,32 @@ export BASE_URL=http://localhost:8080
 mkdir -p tmp/perf-fixtures tmp/perf-runs tmp/perf-threshold tmp/perf-monitor
 ```
 
-Create a local request signing secret. Do not use the default sample value from `application.yml`.
+创建本地请求签名密钥。不要使用 `application.yml` 里的默认示例值。
 
 ```bash
 export PERF_EVENT_SECRET="$(LC_ALL=C tr -dc 'A-Za-z0-9' </dev/urandom | head -c 40)"
 test ${#PERF_EVENT_SECRET} -ge 32
 ```
 
-The backend must receive the same value through `CANVAS_EVENT_REPORT_SECRET`. In this project, direct machine requests default to the same backend secret as event reports. The perf tools receive only the env var name through `--event-secret-env PERF_EVENT_SECRET`.
+后端必须通过 `CANVAS_EVENT_REPORT_SECRET` 接收同一个值。本项目中，direct 机器请求默认复用 event report 的后端密钥。压测工具只接收环境变量名，也就是 `--event-secret-env PERF_EVENT_SECRET`，不要把密钥明文放进命令行。
 
-## 3. Verify Tools
+## 3. 校验工具
 
 ```bash
 node --test tools/perf/*.test.mjs
 node tools/perf/perf-guide.mjs doctor
 ```
 
-Do not continue when either command fails.
+任一命令失败都不要继续。
 
-## 4. Start Dependencies
+## 4. 启动依赖
 
 ```bash
 docker compose -f docker-compose.local.yml up -d
 docker compose -f docker-compose.local.yml ps
 ```
 
-Verify basic dependency health:
+检查基础依赖是否可用：
 
 ```bash
 docker exec canvas-mysql mysql -uroot -proot -e "SELECT VERSION();"
@@ -58,7 +58,7 @@ docker exec canvas-redis redis-cli ping
 curl -sS http://localhost:8099/__admin/mappings | head
 ```
 
-## 5. Build Backend Image
+## 5. 构建后端镜像
 
 ```bash
 cd /Users/photonpay/project/canvas/backend
@@ -67,7 +67,7 @@ cd /Users/photonpay/project/canvas
 docker build -f backend/canvas-engine/Dockerfile.perf -t canvas-engine:perf .
 ```
 
-## 6. Start Fixed-Resource Backend
+## 6. 启动固定资源后端
 
 ```bash
 docker rm -f canvas-backend-perf 2>/dev/null || true
@@ -92,24 +92,24 @@ docker run -d \
   canvas-engine:perf
 ```
 
-Health check:
+健康检查：
 
 ```bash
 curl -sS http://localhost:8080/actuator/health
 docker stats --no-stream canvas-backend-perf canvas-mysql canvas-redis
 ```
 
-## 7. Create Or Reuse PERF Fixtures
+## 7. 创建或复用 PERF 测试资源
 
-First run the guide fixture safety gate:
+先执行 guide 的测试资源安全闸门：
 
 ```bash
 node tools/perf/perf-guide.mjs fixture --rebuild true
 ```
 
-This command confirms explicit operator intent. It does not create canvases. Create or reuse exactly one published direct fixture and one published event fixture.
+这个命令只确认操作者明确知道自己要准备测试资源；它不会自动创建画布。你需要创建或复用且只保留一个已发布的 direct 测试画布，以及一个已发布的 event 测试画布。
 
-Log in:
+登录并保存 token：
 
 ```bash
 export TOKEN=$(
@@ -120,21 +120,21 @@ export TOKEN=$(
 )
 ```
 
-Check existing `PERF_` canvases:
+查看已有 `PERF_` 画布：
 
 ```bash
 docker exec canvas-mysql mysql -uroot -proot -Dcanvas_db -e \
 "SELECT id,name,status,published_version_id FROM canvas WHERE name LIKE 'PERF_%' ORDER BY id;"
 ```
 
-If suitable published fixtures already exist, export their IDs:
+如果已经存在可用且已发布的测试资源，直接导出它们的 ID：
 
 ```bash
 export DIRECT_CANVAS_ID=<published-PERF_DIRECT_LIGHT-id>
 export MATCHED_CANVAS_COUNT=1
 ```
 
-If fixtures are missing, create event and MQ definitions:
+如果缺少测试资源，先创建 event 和 MQ 定义：
 
 ```bash
 docker exec canvas-mysql mysql -uroot -proot -Dcanvas_db -e "
@@ -163,7 +163,7 @@ ON DUPLICATE KEY UPDATE
 "
 ```
 
-Generate direct and event canvas payloads:
+生成 direct 和 event 画布 payload：
 
 ```bash
 node <<'NODE'
@@ -206,7 +206,7 @@ write('event-canvas', {
 NODE
 ```
 
-Create and publish the canvases:
+创建并发布画布：
 
 ```bash
 export DIRECT_CANVAS_ID=$(
@@ -236,7 +236,7 @@ echo "DIRECT_CANVAS_ID=$DIRECT_CANVAS_ID"
 echo "EVENT_CANVAS_ID=$EVENT_CANVAS_ID"
 ```
 
-Confirm exactly one published event fixture matches `PERF_ORDER_PAID`.
+确认只有一个已发布 event 测试画布匹配 `PERF_ORDER_PAID`：
 
 ```bash
 docker exec canvas-mysql mysql -uroot -proot -Dcanvas_db -e \
@@ -274,9 +274,9 @@ export EVENT_MATCH_ID=$(
 test "$EVENT_MATCH_ID" = "$EVENT_CANVAS_ID"
 ```
 
-If more than one published canvas matches `PERF_ORDER_PAID`, or the matching id is not `$EVENT_CANVAS_ID`, stop and remove or offline duplicates before testing. Do not raise `MATCHED_CANVAS_COUNT` to make verifier pass; that changes the measured workload.
+如果多个已发布画布匹配 `PERF_ORDER_PAID`，或者匹配到的 ID 不是 `$EVENT_CANVAS_ID`，停止测试，先删除或下线重复画布。不要为了让 verifier 通过而调大 `MATCHED_CANVAS_COUNT`；那会改变被测工作量。
 
-## 8. Smoke
+## 8. 冒烟测试
 
 ```bash
 export PERF_RUN_ID=perf_$(date +%Y%m%d_%H%M%S)_smoke
@@ -288,11 +288,11 @@ node tools/perf/perf-guide.mjs smoke \
   --event-secret-env PERF_EVENT_SECRET
 ```
 
-The smoke result must be `PASS`. If it fails, run ledger cleanup for the smoke id and fix the cause before continuing.
+冒烟结果必须是 `PASS`。如果失败，先对这个 smoke id 执行 ledger cleanup，再修复原因，不能继续后续压测。
 
-## 9. Threshold
+## 9. 阈值测试
 
-Start monitor capture in another terminal before threshold and keep capturing during the run:
+阈值测试开始前，在另一个终端启动监控采集，并在压测期间保持运行：
 
 ```bash
 export PERF_MONITOR_TAG=threshold_$(date +%Y%m%d_%H%M%S)
@@ -311,6 +311,8 @@ while true; do
 done | tee "tmp/perf-monitor/live-$PERF_MONITOR_TAG.txt"
 ```
 
+执行阈值测试：
+
 ```bash
 node tools/perf/perf-guide.mjs threshold \
   --mode event \
@@ -321,18 +323,18 @@ node tools/perf/perf-guide.mjs threshold \
   --threshold-root tmp/perf-threshold
 ```
 
-Use `stableStage` as the current stable ceiling. `NO_STABLE_STAGE` means the environment or fixture is not valid enough for capacity testing.
+把输出中的 `stableStage` 作为当前稳定上限。如果结果是 `NO_STABLE_STAGE`，说明环境或测试资源尚不足以做容量测试，先修复再继续。
 
-## 10. Soak
+## 10. 长稳测试
 
-Set the soak concurrency from the threshold `stableStage.concurrency`. Set the count high enough for the run to last at least 30 minutes at that concurrency.
+把 long soak 的并发数设置为阈值测试输出的 `stableStage.concurrency`。`SOAK_COUNT` 要足够大，确保实际运行至少 30 分钟。
 
 ```bash
 export SOAK_CONCURRENCY=<stableStage.concurrency>
 export SOAK_COUNT=<count-large-enough-for-30-minutes>
 ```
 
-Start monitor capture in another terminal before starting soak, then repeat it periodically during the 30-minute run:
+开始 long soak 前，在另一个终端启动监控采集，并在 30 分钟运行期间持续采集：
 
 ```bash
 export PERF_MONITOR_TAG=soak_$(date +%Y%m%d_%H%M%S)
@@ -344,6 +346,8 @@ while true; do
   sleep 30
 done | tee "tmp/perf-monitor/live-$PERF_MONITOR_TAG.txt"
 ```
+
+执行 long soak：
 
 ```bash
 export PERF_RUN_ID=perf_$(date +%Y%m%d_%H%M%S)_soak
@@ -358,9 +362,9 @@ node tools/perf/perf-guide.mjs soak \
   --min-duration-min 30
 ```
 
-The run is invalid if actual duration is below 30 minutes. If the run finishes too quickly, increase `SOAK_COUNT` and rerun with a new `PERF_RUN_ID`; do not lower `--min-duration-min` for a capacity report.
+如果实际运行时间低于 30 分钟，本次运行无效。遇到这种情况时，增大 `SOAK_COUNT`，换一个新的 `PERF_RUN_ID` 重新跑；不要为了让报告通过而降低 `--min-duration-min`。
 
-## 11. Report
+## 11. 生成报告闸门
 
 ```bash
 node tools/perf/perf-guide.mjs report \
@@ -369,49 +373,49 @@ node tools/perf/perf-guide.mjs report \
   --min-duration-min 30
 ```
 
-The report gate checks that runner and verifier evidence belong to the same `perfRunId`, that request failures are zero, and that duration is long enough.
+report 闸门会检查 runner 和 verifier 证据是否属于同一个 `perfRunId`、请求失败数是否为 0、运行时长是否足够，以及 verifier 证据是否完整可信。
 
-## 12. Monitor Evidence
+## 12. 监控证据
 
-Monitor snapshots must be captured during threshold and soak, not after the run is idle. Confirm the files exist before final reporting:
+监控快照必须在 threshold 和 soak 运行期间采集，不能在压测结束、系统空闲后补采。最终报告前确认文件存在：
 
 ```bash
 ls -lh tmp/perf-monitor
 ```
 
-If monitoring is missing, record it as an evidence gap in the report template.
+如果缺少监控数据，在报告模板中明确记录为证据缺口。
 
-## 13. Cleanup
+## 13. 清理
 
-Preview ledger cleanup:
+预览 ledger 清理 SQL：
 
 ```bash
 node tools/perf/perf-guide.mjs cleanup --perf-run-id "$PERF_RUN_ID"
 ```
 
-Execute ledger cleanup:
+执行 ledger 清理：
 
 ```bash
 node tools/perf/perf-guide.mjs cleanup --perf-run-id "$PERF_RUN_ID" --execute true
 ```
 
-Full cleanup is only for the end of all testing:
+完整清理只在全部压测结束后使用：
 
 ```bash
 node tools/perf/perf-guide.mjs cleanup --perf-run-id "$PERF_RUN_ID" --scope all --execute true
 ```
 
-`--scope all` removes `PERF_%` event and MQ definitions. It does not remove published canvas fixtures; remove or offline those separately if needed.
+`--scope all` 会删除 `PERF_%` event 和 MQ 定义。它不会删除已发布的 canvas 测试画布；如需移除或下线这些画布，需要单独处理。
 
-## 14. Completion Checklist
+## 14. 完成检查清单
 
-- Tool tests passed.
-- Backend used a non-default local event secret.
-- Direct and event fixtures were published.
-- Smoke returned `PASS`.
-- Threshold found at least one stable stage.
-- Soak returned `PASS` for at least 30 minutes.
-- Guide report returned `PASS`.
-- Monitor snapshots were saved.
-- Report template is filled with evidence paths.
-- Cleanup preview and cleanup execution were recorded.
+- 工具测试已通过。
+- 后端使用了非默认的本地签名密钥。
+- direct 和 event 测试画布已发布。
+- smoke 返回 `PASS`。
+- threshold 至少找到一个稳定阶段。
+- soak 返回 `PASS`，且实际运行不少于 30 分钟。
+- guide report 返回 `PASS`。
+- 监控快照已保存。
+- 报告模板已填写证据路径。
+- cleanup 预览和 cleanup 执行记录已保存。

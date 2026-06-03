@@ -36,8 +36,8 @@
 ### Task 1: Contract And Failing Tests
 
 **Files:**
-- Create or modify: `backend/canvas-engine/src/test/java/org/chovy/canvas/controller/CanvasControllerEditorProductivityTest.java`
-- Create or modify: `frontend/src/pages/canvas-editor/editorProductivity.test.tsx`
+- Create: `backend/canvas-engine/src/test/java/org/chovy/canvas/controller/CanvasControllerEditorProductivityTest.java`
+- Create: `frontend/src/pages/canvas-editor/editorProductivity.test.tsx`
 - Read: `docs/product-evolution/specs/p2-011-editor-productivity-beyond-baseline.md`
 
 - [ ] **Step 1: Write backend contract tests**

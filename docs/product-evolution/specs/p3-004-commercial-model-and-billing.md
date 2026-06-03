@@ -47,7 +47,7 @@ This keeps the strategy actionable by requiring discovery gates, MVP scope, and 
 
 ### Data And Configuration Touchpoints
 
-- `backend/canvas-engine/src/main/resources/db/migration/V110__commercial_model_and_billing.sql`
+- `backend/canvas-engine/src/main/resources/db/migration/V119__commercial_model_and_billing.sql`
 
 ### Test Touchpoints
 

@@ -1,27 +1,27 @@
-# Performance Testing Audit
+# 压力测试方案审计
 
-## Verdict
+## 结论
 
-The previous stress-test material had useful raw commands, but it was not safe enough for non-specialist execution. It mixed manual run steps, assumed event requests did not need signing, and allowed capacity narratives that were not tied to measured evidence.
+旧版压力测试材料包含一些有用的原始命令，但不适合非专业用户直接执行。主要问题是步骤过于依赖人工拼接、默认假设事件请求不需要签名，并且允许没有绑定实测证据的容量叙述。
 
-## What Was Reasonable
+## 保留的合理部分
 
-- The backend should be tested in fixed-resource containers.
-- Load generation should run on the host so backend resource limits remain meaningful.
-- `perfRunId` isolation is the right way to separate test data.
-- `verifier.mjs` checks correctness, not only HTTP success.
-- Capacity estimation must reject verifier `FAIL`.
+- 后端应运行在固定资源容器中，避免资源漂移影响结论。
+- 压测流量应从宿主机发起，让后端容器 CPU/内存限制保持有效。
+- 使用 `perfRunId` 隔离压测数据是正确做法。
+- `verifier.mjs` 不只检查 HTTP 成功，还会核对执行结果。
+- 容量估算必须拒绝 verifier `FAIL` 的数据。
 
-## Blocking Issues Removed
+## 已移除或修正的阻断问题
 
-- Event and direct pressure tests now support HMAC signing through `--event-secret-env`; secret values are not accepted as CLI flags.
-- The active docs no longer contain historical capacity claims without runner and verifier evidence.
-- Cleanup defaults to ledger-only, so ordinary cleanup preserves `PERF_%` event and MQ definitions.
-- Guide report gates require complete runner evidence, verifier evidence, matching `perfRunId`, zero request failures, and capacity duration evidence.
-- Soak runs shorter than the configured duration are invalid for capacity reporting.
+- event 和 direct 压测都通过 `--event-secret-env` 支持 HMAC 签名；不接受把密钥值作为命令行参数传入。
+- 当前有效文档不再保留缺少 runner/verifier 证据的历史容量结论。
+- cleanup 默认只清理 ledger 数据，普通清理不会删除 `PERF_%` 事件和 MQ 定义。
+- guide `report` 会检查完整 runner 证据、完整 verifier 证据、匹配的 `perfRunId`、零请求失败，以及容量报告所需的压测时长。
+- soak 实际运行时间短于配置要求时，不能用于容量报告。
 
-## Current Operating Model
+## 当前执行模型
 
-Use the runbook as the operator checklist. Use `perf-guide.mjs` for gates and reportability. Fixture creation remains explicit because it creates published local `PERF_` canvases and must not be hidden behind an unsafe automatic rebuild.
+操作手册是执行人的检查清单。所有关键闸门和报告有效性判断都通过 `perf-guide.mjs` 完成。测试资源创建仍保留为显式步骤，因为它会创建已发布的本地 `PERF_` 画布，不应隐藏在不透明的一键重建中。
 
-Only reports generated from `tools/perf/perf-guide.mjs report` and backed by verifier `PASS` are valid capacity evidence.
+只有由 `tools/perf/perf-guide.mjs report` 通过，并且 verifier 为 `PASS` 的报告，才能作为有效容量证据。

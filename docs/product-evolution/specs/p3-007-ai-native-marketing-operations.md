@@ -47,7 +47,7 @@ This keeps the strategy actionable by requiring discovery gates, MVP scope, and 
 
 ### Data And Configuration Touchpoints
 
-- `backend/canvas-engine/src/main/resources/db/migration/V113__ai_native_marketing_operations.sql`
+- `backend/canvas-engine/src/main/resources/db/migration/V122__ai_native_marketing_operations.sql`
 
 ### Test Touchpoints
 

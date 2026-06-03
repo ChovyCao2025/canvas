@@ -26,7 +26,7 @@
 - `frontend/src/services/commercialmodelandbillingApi.ts`
 
 **Data And Config**
-- `backend/canvas-engine/src/main/resources/db/migration/V110__commercial_model_and_billing.sql`
+- `backend/canvas-engine/src/main/resources/db/migration/V119__commercial_model_and_billing.sql`
 
 **Tests**
 - `backend/canvas-engine/src/test/java/org/chovy/canvas/strategy/CommercialModelAndBillingTest.java`
@@ -35,8 +35,8 @@
 ### Task 1: Contract And Failing Tests
 
 **Files:**
-- Create or modify: `backend/canvas-engine/src/test/java/org/chovy/canvas/strategy/CommercialModelAndBillingTest.java`
-- Create or modify: `frontend/src/pages/commercial-model-and-billing/commercial-model-and-billing.test.tsx`
+- Create: `backend/canvas-engine/src/test/java/org/chovy/canvas/strategy/CommercialModelAndBillingTest.java`
+- Create: `frontend/src/pages/commercial-model-and-billing/commercial-model-and-billing.test.tsx`
 - Read: `docs/product-evolution/specs/p3-004-commercial-model-and-billing.md`
 
 - [ ] **Step 1: Write backend contract tests**
@@ -64,7 +64,7 @@ Expected: FAIL because the new page, component, service call, or state handling 
 **Files:**
 - `backend/canvas-engine/src/main/java/org/chovy/canvas/domain/commercialmodelandbilling/CommercialModelAndBillingService.java`
 - `backend/canvas-engine/src/main/java/org/chovy/canvas/web/CommercialModelAndBillingController.java`
-- `backend/canvas-engine/src/main/resources/db/migration/V110__commercial_model_and_billing.sql`
+- `backend/canvas-engine/src/main/resources/db/migration/V119__commercial_model_and_billing.sql`
 - Test: `backend/canvas-engine/src/test/java/org/chovy/canvas/strategy/CommercialModelAndBillingTest.java`
 
 - [ ] **Step 1: Add additive data structures when the spec requires storage**

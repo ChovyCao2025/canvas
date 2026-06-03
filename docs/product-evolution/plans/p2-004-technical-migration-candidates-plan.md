@@ -26,7 +26,7 @@
 - `frontend/src/pages/canvas-editor/index.tsx`
 
 **Data And Config**
-- `backend/canvas-engine/src/main/resources/db/migration/V98__technical_migration_candidate_metrics.sql`
+- `backend/canvas-engine/src/main/resources/db/migration/V103__technical_migration_candidate_metrics.sql`
 
 **Tests**
 - `backend/canvas-engine/src/test/java/org/chovy/canvas/architecture/TechnicalMigrationCandidateTest.java`
@@ -35,8 +35,8 @@
 ### Task 1: Contract And Failing Tests
 
 **Files:**
-- Create or modify: `backend/canvas-engine/src/test/java/org/chovy/canvas/architecture/TechnicalMigrationCandidateTest.java`
-- Create or modify: `frontend/src/pages/technical-migration-candidates/technical-migration-candidates.test.tsx`
+- Create: `backend/canvas-engine/src/test/java/org/chovy/canvas/architecture/TechnicalMigrationCandidateTest.java`
+- Create: `frontend/src/pages/technical-migration-candidates/technical-migration-candidates.test.tsx`
 - Read: `docs/product-evolution/specs/p2-004-technical-migration-candidates.md`
 
 - [ ] **Step 1: Write backend contract tests**
@@ -65,7 +65,7 @@ Expected: FAIL because the new page, component, service call, or state handling 
 - `backend/canvas-engine/src/main/java/org/chovy/canvas/engine`
 - `backend/canvas-engine/src/main/java/org/chovy/canvas/infrastructure`
 - `backend/canvas-engine/src/test/java/org/chovy/canvas/perf`
-- `backend/canvas-engine/src/main/resources/db/migration/V98__technical_migration_candidate_metrics.sql`
+- `backend/canvas-engine/src/main/resources/db/migration/V103__technical_migration_candidate_metrics.sql`
 - Test: `backend/canvas-engine/src/test/java/org/chovy/canvas/architecture/TechnicalMigrationCandidateTest.java`
 
 - [ ] **Step 1: Add additive data structures when the spec requires storage**

@@ -26,7 +26,7 @@
 - `frontend/src/services/ecosystemandpartnerprogramApi.ts`
 
 **Data And Config**
-- `backend/canvas-engine/src/main/resources/db/migration/V112__ecosystem_and_partner_program.sql`
+- `backend/canvas-engine/src/main/resources/db/migration/V121__ecosystem_and_partner_program.sql`
 
 **Tests**
 - `backend/canvas-engine/src/test/java/org/chovy/canvas/strategy/EcosystemAndPartnerProgramTest.java`
@@ -35,8 +35,8 @@
 ### Task 1: Contract And Failing Tests
 
 **Files:**
-- Create or modify: `backend/canvas-engine/src/test/java/org/chovy/canvas/strategy/EcosystemAndPartnerProgramTest.java`
-- Create or modify: `frontend/src/pages/ecosystem-and-partner-program/ecosystem-and-partner-program.test.tsx`
+- Create: `backend/canvas-engine/src/test/java/org/chovy/canvas/strategy/EcosystemAndPartnerProgramTest.java`
+- Create: `frontend/src/pages/ecosystem-and-partner-program/ecosystem-and-partner-program.test.tsx`
 - Read: `docs/product-evolution/specs/p3-006-ecosystem-and-partner-program.md`
 
 - [ ] **Step 1: Write backend contract tests**
@@ -64,7 +64,7 @@ Expected: FAIL because the new page, component, service call, or state handling 
 **Files:**
 - `backend/canvas-engine/src/main/java/org/chovy/canvas/domain/ecosystemandpartnerprogram/EcosystemAndPartnerProgramService.java`
 - `backend/canvas-engine/src/main/java/org/chovy/canvas/web/EcosystemAndPartnerProgramController.java`
-- `backend/canvas-engine/src/main/resources/db/migration/V112__ecosystem_and_partner_program.sql`
+- `backend/canvas-engine/src/main/resources/db/migration/V121__ecosystem_and_partner_program.sql`
 - Test: `backend/canvas-engine/src/test/java/org/chovy/canvas/strategy/EcosystemAndPartnerProgramTest.java`
 
 - [ ] **Step 1: Add additive data structures when the spec requires storage**

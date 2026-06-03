@@ -26,7 +26,7 @@
 - `frontend/src/services/advancedarchitectureanddeploymentstrategyApi.ts`
 
 **Data And Config**
-- `backend/canvas-engine/src/main/resources/db/migration/V117__advanced_architecture_and_deployment_strategy.sql`
+- `backend/canvas-engine/src/main/resources/db/migration/V126__advanced_architecture_and_deployment_strategy.sql`
 
 **Tests**
 - `backend/canvas-engine/src/test/java/org/chovy/canvas/strategy/AdvancedArchitectureAndDeploymentStrategyTest.java`
@@ -35,8 +35,8 @@
 ### Task 1: Contract And Failing Tests
 
 **Files:**
-- Create or modify: `backend/canvas-engine/src/test/java/org/chovy/canvas/strategy/AdvancedArchitectureAndDeploymentStrategyTest.java`
-- Create or modify: `frontend/src/pages/advanced-architecture-and-deployment-strategy/advanced-architecture-and-deployment-strategy.test.tsx`
+- Create: `backend/canvas-engine/src/test/java/org/chovy/canvas/strategy/AdvancedArchitectureAndDeploymentStrategyTest.java`
+- Create: `frontend/src/pages/advanced-architecture-and-deployment-strategy/advanced-architecture-and-deployment-strategy.test.tsx`
 - Read: `docs/product-evolution/specs/p3-011-advanced-architecture-and-deployment-strategy.md`
 
 - [ ] **Step 1: Write backend contract tests**
@@ -64,7 +64,7 @@ Expected: FAIL because the new page, component, service call, or state handling 
 **Files:**
 - `backend/canvas-engine/src/main/java/org/chovy/canvas/domain/advancedarchitectureanddeploymentstrategy/AdvancedArchitectureAndDeploymentStrategyService.java`
 - `backend/canvas-engine/src/main/java/org/chovy/canvas/web/AdvancedArchitectureAndDeploymentStrategyController.java`
-- `backend/canvas-engine/src/main/resources/db/migration/V117__advanced_architecture_and_deployment_strategy.sql`
+- `backend/canvas-engine/src/main/resources/db/migration/V126__advanced_architecture_and_deployment_strategy.sql`
 - Test: `backend/canvas-engine/src/test/java/org/chovy/canvas/strategy/AdvancedArchitectureAndDeploymentStrategyTest.java`
 
 - [ ] **Step 1: Add additive data structures when the spec requires storage**

@@ -26,7 +26,7 @@
 - `frontend/src/components/help/ContextualHelp.tsx`
 
 **Data And Config**
-- `backend/canvas-engine/src/main/resources/db/migration/V106__knowledge_base_best_practices.sql`
+- `backend/canvas-engine/src/main/resources/db/migration/V111__knowledge_base_best_practices.sql`
 
 **Tests**
 - `backend/canvas-engine/src/test/java/org/chovy/canvas/domain/knowledge/KnowledgeBaseServiceTest.java`
@@ -35,8 +35,8 @@
 ### Task 1: Contract And Failing Tests
 
 **Files:**
-- Create or modify: `backend/canvas-engine/src/test/java/org/chovy/canvas/domain/knowledge/KnowledgeBaseServiceTest.java`
-- Create or modify: `frontend/src/pages/knowledge-base/knowledgeBase.test.tsx`
+- Create: `backend/canvas-engine/src/test/java/org/chovy/canvas/domain/knowledge/KnowledgeBaseServiceTest.java`
+- Create: `frontend/src/pages/knowledge-base/knowledgeBase.test.tsx`
 - Read: `docs/product-evolution/specs/p2-013-knowledge-base-best-practice-library.md`
 
 - [ ] **Step 1: Write backend contract tests**
@@ -64,7 +64,7 @@ Expected: FAIL because the new page, component, service call, or state handling 
 **Files:**
 - `backend/canvas-engine/src/main/java/org/chovy/canvas/web/KnowledgeBaseController.java`
 - `backend/canvas-engine/src/main/java/org/chovy/canvas/domain/knowledge/KnowledgeBaseService.java`
-- `backend/canvas-engine/src/main/resources/db/migration/V106__knowledge_base_best_practices.sql`
+- `backend/canvas-engine/src/main/resources/db/migration/V111__knowledge_base_best_practices.sql`
 - Test: `backend/canvas-engine/src/test/java/org/chovy/canvas/domain/knowledge/KnowledgeBaseServiceTest.java`
 
 - [ ] **Step 1: Add additive data structures when the spec requires storage**

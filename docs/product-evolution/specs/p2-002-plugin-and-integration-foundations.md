@@ -50,7 +50,7 @@ Core handlers, channel adapters, data exporters, and rule/template packs can evo
 
 ### Data And Configuration Touchpoints
 
-- `backend/canvas-engine/src/main/resources/db/migration/V96__plugin_integration_foundations.sql`
+- `backend/canvas-engine/src/main/resources/db/migration/V101__plugin_integration_foundations.sql`
 
 ### Test Touchpoints
 

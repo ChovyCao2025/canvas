@@ -47,7 +47,7 @@ This keeps the strategy actionable by requiring discovery gates, MVP scope, and 
 
 ### Data And Configuration Touchpoints
 
-- `backend/canvas-engine/src/main/resources/db/migration/V107__ecosystem_and_plugin_marketplace_strategy.sql`
+- `backend/canvas-engine/src/main/resources/db/migration/V116__ecosystem_and_plugin_marketplace_strategy.sql`
 
 ### Test Touchpoints
 

@@ -47,7 +47,7 @@ This keeps the strategy actionable by requiring discovery gates, MVP scope, and 
 
 ### Data And Configuration Touchpoints
 
-- `backend/canvas-engine/src/main/resources/db/migration/V115__globalization_and_regional_expansion.sql`
+- `backend/canvas-engine/src/main/resources/db/migration/V124__globalization_and_regional_expansion.sql`
 
 ### Test Touchpoints
 
