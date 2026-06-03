@@ -33,6 +33,7 @@ This folder contains filtered, execution-oriented todo documents extracted from 
 - [Collaboration Personalization And Reporting](p2/collaboration-personalization-and-reporting.md)
 - [Plugin And Integration Foundations](p2/plugin-and-integration-foundations.md)
 - [Platform Product Evolution Workstreams](p2/platform-product-evolution-workstreams.md)
+- [Product Opportunities From Filtered Scope](p2/product-opportunities-from-filtered-scope.md)
 - [Technical Migration Candidates](p2/technical-migration-candidates.md)
 
 ### P3
@@ -40,6 +41,16 @@ This folder contains filtered, execution-oriented todo documents extracted from 
 - [Ecosystem And Plugin Marketplace Strategy](p3/ecosystem-and-plugin-marketplace-strategy.md)
 - [Long-Term AI Commerce And Ecosystem Bets](p3/long-term-ai-commerce-and-ecosystem-bets.md)
 - [Long-Term Architecture Evolution](p3/long-term-architecture-evolution.md)
+- [Strategic Opportunities From Filtered Scope](p3/strategic-opportunities-from-filtered-scope.md)
+
+## Supplemental Extraction
+
+The first cleanup intentionally reduced the original source material into executable todo documents. After review, two supplemental documents were added to preserve useful ideas that were filtered out because they were too broad, strategic, dependency-heavy, or not ready for P0/P1 execution:
+
+- `p2/product-opportunities-from-filtered-scope.md` keeps medium-term product opportunities such as message templates, sandbox/demo, analytics, integrations, product usage analytics, audience operations, editor productivity, channel intelligence, knowledge base, and design-system work.
+- `p3/strategic-opportunities-from-filtered-scope.md` keeps long-term strategy such as billing, customer success, partner ecosystem, AI-native operations, industry packaging, globalization, advanced privacy, architecture strategy, and product-led growth.
+
+These supplemental documents are opportunity queues. They do not override the P0/P1 execution order, and each item still requires a bounded follow-up spec before implementation.
 
 ## Source Processing Log
 
