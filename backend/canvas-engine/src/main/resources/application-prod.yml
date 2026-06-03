@@ -6,6 +6,8 @@ canvas:
     report-secret: ${CANVAS_EVENT_REPORT_SECRET}
   public-trigger:
     secret: ${CANVAS_PUBLIC_TRIGGER_SECRET:${CANVAS_EVENT_REPORT_SECRET}}
+  secret-cipher:
+    key: ${CANVAS_SECRET_CIPHER_KEY}
   jwt:
     secret: ${CANVAS_JWT_SECRET}
 

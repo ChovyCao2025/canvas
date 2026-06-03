@@ -12,6 +12,7 @@ import java.util.List;
 public class ProductionConfigGuard implements SmartInitializingSingleton {
 
     private static final String DEFAULT_EVENT_REPORT_SECRET = "canvas-event-report-secret-2026!!";
+    private static final String DEFAULT_SECRET_CIPHER_KEY = "MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY=";
 
     private final List<String> allowedOrigins;
     private final boolean allowCredentials;
@@ -19,6 +20,7 @@ public class ProductionConfigGuard implements SmartInitializingSingleton {
     private final String jwtSecret;
     private final String datasourceUsername;
     private final String datasourcePassword;
+    private final String secretCipherKey;
 
     public ProductionConfigGuard(
             @Value("${canvas.cors.allowed-origins:}") List<String> allowedOrigins,
@@ -26,13 +28,15 @@ public class ProductionConfigGuard implements SmartInitializingSingleton {
             @Value("${canvas.events.report-secret:}") String eventReportSecret,
             @Value("${canvas.jwt.secret:}") String jwtSecret,
             @Value("${spring.datasource.username:}") String datasourceUsername,
-            @Value("${spring.datasource.password:}") String datasourcePassword) {
+            @Value("${spring.datasource.password:}") String datasourcePassword,
+            @Value("${canvas.secret-cipher.key:}") String secretCipherKey) {
         this.allowedOrigins = allowedOrigins;
         this.allowCredentials = allowCredentials;
         this.eventReportSecret = eventReportSecret;
         this.jwtSecret = jwtSecret;
         this.datasourceUsername = datasourceUsername;
         this.datasourcePassword = datasourcePassword;
+        this.secretCipherKey = secretCipherKey;
     }
 
     @Override
@@ -52,6 +56,10 @@ public class ProductionConfigGuard implements SmartInitializingSingleton {
         }
         if ("root".equals(datasourceUsername) || "root".equals(datasourcePassword)) {
             throw new IllegalStateException("root database credentials are forbidden in prod");
+        }
+        if (secretCipherKey == null || secretCipherKey.isBlank()
+                || DEFAULT_SECRET_CIPHER_KEY.equals(secretCipherKey)) {
+            throw new IllegalStateException("secret cipher key must be configured and cannot use the default value");
         }
     }
 

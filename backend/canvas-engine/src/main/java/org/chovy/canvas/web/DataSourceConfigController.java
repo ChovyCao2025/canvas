@@ -8,6 +8,7 @@ import org.chovy.canvas.common.R;
 import org.chovy.canvas.dal.dataobject.DataSourceConfigDO;
 import org.chovy.canvas.dal.mapper.DataSourceConfigMapper;
 import org.chovy.canvas.domain.datasource.DataSourceTableMeta;
+import org.chovy.canvas.security.SecretCipher;
 import org.springframework.boot.jdbc.DataSourceBuilder;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -41,6 +42,8 @@ public class DataSourceConfigController {
 
     /** 数据源配置 Mapper，用于读写数据源配置。 */
     private final DataSourceConfigMapper dataSourceConfigMapper;
+    /** 敏感字段加解密工具。 */
+    private final SecretCipher secretCipher;
 
     @GetMapping
     public Mono<R<PageResult<DataSourceConfigDO>>> list(
@@ -90,6 +93,7 @@ public class DataSourceConfigController {
     public Mono<R<DataSourceConfigDO>> create(@RequestBody DataSourceConfigDO body) {
         return Mono.fromCallable(() -> {
             normalize(body);
+            encryptPassword(body);
             dataSourceConfigMapper.insert(body);
             return R.ok(body);
         }).subscribeOn(Schedulers.boundedElastic());
@@ -109,6 +113,7 @@ public class DataSourceConfigController {
         return Mono.fromCallable(() -> {
             body.setId(id);
             normalize(body);
+            encryptPassword(body);
             dataSourceConfigMapper.updateById(body);
             return R.<Void>ok();
         }).subscribeOn(Schedulers.boundedElastic());
@@ -172,6 +177,10 @@ public class DataSourceConfigController {
         }
     }
 
+    private void encryptPassword(DataSourceConfigDO body) {
+        body.setPassword(secretCipher.encrypt(body.getPassword()));
+    }
+
     /**
      * 查询或读取 read Jdbc Tables 相关的业务数据。
      *
@@ -195,7 +204,7 @@ public class DataSourceConfigController {
                 .driverClassName(config.getDriverClassName())
                 .url(config.getUrl())
                 .username(config.getUsername())
-                .password(config.getPassword())
+                .password(secretCipher.decrypt(config.getPassword()))
                 .build();
         try (Connection connection = dataSource.getConnection()) {
             // 通过 JDBC DatabaseMetaData 读取表和视图，不执行用户表数据查询。

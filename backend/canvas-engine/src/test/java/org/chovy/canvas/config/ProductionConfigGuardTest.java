@@ -17,7 +17,8 @@ class ProductionConfigGuardTest {
                 "strong-secret-strong-secret-1234",
                 "jwt-secret-jwt-secret-jwt-secret-1234",
                 "canvas_app",
-                "not-root");
+                "not-root",
+                "YWJjZGVmZ2hpamtsbW5vcHFyc3R1dnd4eXoxMjM0NTY=");
 
         assertThatThrownBy(guard::validate)
                 .isInstanceOf(IllegalStateException.class)
@@ -32,7 +33,8 @@ class ProductionConfigGuardTest {
                 "canvas-event-report-secret-2026!!",
                 "jwt-secret-jwt-secret-jwt-secret-1234",
                 "canvas_app",
-                "not-root");
+                "not-root",
+                "YWJjZGVmZ2hpamtsbW5vcHFyc3R1dnd4eXoxMjM0NTY=");
 
         assertThatThrownBy(guard::validate)
                 .isInstanceOf(IllegalStateException.class)
@@ -47,7 +49,8 @@ class ProductionConfigGuardTest {
                 "strong-secret-strong-secret-1234",
                 " ",
                 "canvas_app",
-                "not-root");
+                "not-root",
+                "YWJjZGVmZ2hpamtsbW5vcHFyc3R1dnd4eXoxMjM0NTY=");
 
         assertThatThrownBy(guard::validate)
                 .isInstanceOf(IllegalStateException.class)
@@ -62,8 +65,25 @@ class ProductionConfigGuardTest {
                 "strong-secret-strong-secret-1234",
                 "jwt-secret-jwt-secret-jwt-secret-1234",
                 "canvas_app",
-                "not-root");
+                "not-root",
+                "YWJjZGVmZ2hpamtsbW5vcHFyc3R1dnd4eXoxMjM0NTY=");
 
         assertThatCode(guard::validate).doesNotThrowAnyException();
+    }
+
+    @Test
+    void rejectsDefaultSecretCipherKey() {
+        ProductionConfigGuard guard = new ProductionConfigGuard(
+                List.of("https://app.photonpay.com"),
+                true,
+                "strong-secret-strong-secret-1234",
+                "jwt-secret-jwt-secret-jwt-secret-1234",
+                "canvas_app",
+                "not-root",
+                "MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY=");
+
+        assertThatThrownBy(guard::validate)
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("secret cipher key");
     }
 }
