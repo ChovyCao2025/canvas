@@ -95,6 +95,12 @@ public class RedisKeyUtil {
     public String nodeState(String executionId, String nodeId) {
         return prefix + ":node-state:" + executionId + ":" + nodeId;
     }
+
+    /** 节点执行门控 key：canvas:gate:{executionId}:{nodeId}。 */
+    public String gate(String executionId, String nodeId) {
+        return prefix + ":gate:" + executionId + ":" + nodeId;
+    }
+
     /**
      * 执行 resume Lock 对应的业务逻辑。
      *

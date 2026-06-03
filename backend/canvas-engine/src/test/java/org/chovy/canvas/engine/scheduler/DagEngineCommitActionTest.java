@@ -25,6 +25,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -88,6 +90,7 @@ class DagEngineCommitActionTest {
     @Test
     void gotoReentryDeletesStaleNodeStateForResetNodes() {
         ContextPersistenceService ctxStore = mock(ContextPersistenceService.class);
+        when(ctxStore.tryAcquireNodeGate(anyString(), anyString(), any())).thenReturn(true);
         DagEngine engine = engineWithHandlers(ctxStore, new TestGotoHandler(), new TestOkHandler());
         DagGraph graph = graph(List.of(
                 node("goto", NodeType.GOTO, Map.of("targetNodeId", "target")),
@@ -102,11 +105,41 @@ class DagEngineCommitActionTest {
         verify(ctxStore).deleteNodeState("exec-commit-action-test", "target");
     }
 
+    @Test
+    void successfulHandlerReleasesRedisNodeGate() {
+        ContextPersistenceService ctxStore = mock(ContextPersistenceService.class);
+        when(ctxStore.tryAcquireNodeGate(anyString(), anyString(), any())).thenReturn(true);
+        DagEngine engine = engineWithHandlers(ctxStore, new TestOkHandler());
+        DagGraph graph = graph(List.of(node("ok", "TEST_OK", Map.of())), Map.of());
+        ExecutionContext ctx = context();
+
+        engine.execute(graph, "ok", ctx).block();
+
+        verify(ctxStore).releaseNodeGate("exec-commit-action-test", "ok");
+    }
+
+    @Test
+    void redisNodeGateReleaseFailureDoesNotFailSuccessfulExecution() {
+        ContextPersistenceService ctxStore = mock(ContextPersistenceService.class);
+        when(ctxStore.tryAcquireNodeGate(anyString(), anyString(), any())).thenReturn(true);
+        doThrow(new RuntimeException("redis down"))
+                .when(ctxStore).releaseNodeGate("exec-commit-action-test", "ok");
+        DagEngine engine = engineWithHandlers(ctxStore, new TestOkHandler());
+        DagGraph graph = graph(List.of(node("ok", "TEST_OK", Map.of())), Map.of());
+        ExecutionContext ctx = context();
+
+        Map<String, Object> result = engine.execute(graph, "ok", ctx).block();
+
+        assertThat(result).containsEntry("ok", true);
+        verify(ctxStore).releaseNodeGate("exec-commit-action-test", "ok");
+    }
+
     private DagEngine engineWithHandlers(NodeHandler... handlers) {
         return engineWithHandlers(mock(ContextPersistenceService.class), handlers);
     }
 
     private DagEngine engineWithHandlers(ContextPersistenceService ctxStore, NodeHandler... handlers) {
+        when(ctxStore.tryAcquireNodeGate(anyString(), anyString(), any())).thenReturn(true);
         HandlerRegistry handlerRegistry = new HandlerRegistry(List.of(handlers));
         ReflectionTestUtils.invokeMethod(handlerRegistry, "init");
 

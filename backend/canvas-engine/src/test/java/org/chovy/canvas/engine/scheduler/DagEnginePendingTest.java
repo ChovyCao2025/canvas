@@ -18,14 +18,17 @@ import reactor.core.publisher.Mono;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.clearInvocations;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -91,6 +94,7 @@ class DagEnginePendingTest {
     @Test
     void finalSkippedNodesArePersistedIncrementally() {
         ContextPersistenceService ctxStore = mock(ContextPersistenceService.class);
+        when(ctxStore.tryAcquireNodeGate(anyString(), anyString(), any())).thenReturn(true);
         DagEngine engine = engineWithHandlers(ctxStore, new TestSuccessHandler());
         DagGraph graph = graph(List.of(
                 node("success", "TEST_SUCCESS"),
@@ -104,11 +108,40 @@ class DagEnginePendingTest {
         verify(ctxStore).saveNodeState("exec-pending-test", "unreachable", NodeStatus.SKIPPED, Map.of());
     }
 
+    @Test
+    void redisNodeGateDenialSkipsHandlerAndReleasesLocalGate() {
+        ContextPersistenceService ctxStore = mock(ContextPersistenceService.class);
+        CountingSuccessHandler handler = new CountingSuccessHandler();
+        DagEngine engine = engineWithHandlers(ctxStore, handler);
+        when(ctxStore.tryAcquireNodeGate("exec-pending-test", "success", java.time.Duration.ofSeconds(86400)))
+                .thenReturn(false)
+                .thenReturn(true);
+        DagGraph graph = graph(List.of(node("success", "TEST_COUNTING_SUCCESS")));
+        ExecutionContext ctx = context();
+
+        Map<String, Object> denied = engine.execute(graph, "success", ctx).block();
+        assertThat(denied).isEmpty();
+        assertThat(handler.calls()).isZero();
+        assertThat(ctx.getGate("success").executing.get()).isFalse();
+        assertThat(ctx.getGate("success").repeatPending.get()).isFalse();
+        verify(ctxStore, never()).releaseNodeGate("exec-pending-test", "success");
+
+        clearInvocations(ctxStore);
+        Map<String, Object> allowed = engine.execute(graph, "success", ctx).block();
+
+        assertThat(allowed).containsEntry("ok", true);
+        assertThat(handler.calls()).isEqualTo(1);
+        assertThat(ctx.getGate("success").executing.get()).isFalse();
+        assertThat(ctx.getGate("success").repeatPending.get()).isFalse();
+        verify(ctxStore).releaseNodeGate("exec-pending-test", "success");
+    }
+
     private DagEngine engineWithHandlers(NodeHandler... handlers) {
         return engineWithHandlers(mock(ContextPersistenceService.class), handlers);
     }
 
     private DagEngine engineWithHandlers(ContextPersistenceService ctxStore, NodeHandler... handlers) {
+        when(ctxStore.tryAcquireNodeGate(anyString(), anyString(), any())).thenReturn(true);
         HandlerRegistry handlerRegistry = new HandlerRegistry(List.of(handlers));
         ReflectionTestUtils.invokeMethod(handlerRegistry, "init");
 
@@ -202,6 +235,21 @@ class DagEnginePendingTest {
         @Override
         public Mono<NodeResult> executeAsync(Map<String, Object> config, ExecutionContext ctx) {
             return Mono.just(NodeResult.terminal(Map.of("ok", true)));
+        }
+    }
+
+    @NodeHandlerType("TEST_COUNTING_SUCCESS")
+    static class CountingSuccessHandler implements NodeHandler {
+        private final AtomicInteger calls = new AtomicInteger();
+
+        @Override
+        public Mono<NodeResult> executeAsync(Map<String, Object> config, ExecutionContext ctx) {
+            calls.incrementAndGet();
+            return Mono.just(NodeResult.terminal(Map.of("ok", true)));
+        }
+
+        int calls() {
+            return calls.get();
         }
     }
 }

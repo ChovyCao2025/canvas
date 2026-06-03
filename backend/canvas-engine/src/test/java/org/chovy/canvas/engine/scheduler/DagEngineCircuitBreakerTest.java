@@ -22,6 +22,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -86,6 +87,9 @@ class DagEngineCircuitBreakerTest {
         CircuitBreakerRegistry cbRegistry = mock(CircuitBreakerRegistry.class);
         when(cbRegistry.get(anyString())).thenReturn(breaker);
 
+        ContextPersistenceService ctxStore = mock(ContextPersistenceService.class);
+        when(ctxStore.tryAcquireNodeGate(anyString(), anyString(), any())).thenReturn(true);
+
         DagEngine engine = new DagEngine(
                 handlerRegistry,
                 mock(TraceWriteBuffer.class),
@@ -93,7 +97,7 @@ class DagEngineCircuitBreakerTest {
                 cbRegistry,
                 mock(CanvasMetrics.class),
                 new ObjectMapper(),
-                mock(ContextPersistenceService.class),
+                ctxStore,
                 mock(org.chovy.canvas.engine.trigger.CanvasExecutionService.class)
         );
         ReflectionTestUtils.setField(engine, "maxRetry", 1);

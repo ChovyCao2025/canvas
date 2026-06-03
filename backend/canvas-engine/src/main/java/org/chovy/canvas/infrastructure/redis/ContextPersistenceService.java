@@ -170,6 +170,38 @@ public class ContextPersistenceService {
         return states;
     }
 
+    /**
+     * 尝试获取跨 JVM 节点执行门控。
+     *
+     * <p>使用 Redis SETNX + TTL 作为 crash-safe barrier。Redis 异常时 fail closed，
+     * 返回 false，避免在无法确认互斥状态时重复执行有副作用的节点。
+     */
+    public boolean tryAcquireNodeGate(String executionId, String nodeId, Duration ttl) {
+        try {
+            Duration effectiveTtl = ttl == null ? Duration.ofSeconds(ttlSec) : ttl;
+            return Boolean.TRUE.equals(
+                    redis.opsForValue().setIfAbsent(keys.gate(executionId, nodeId), "1", effectiveTtl));
+        } catch (Exception e) {
+            log.warn("[CTX] 获取节点 Redis gate 失败，已 fail-closed executionId={} nodeId={}: {}",
+                    executionId, nodeId, e.getMessage());
+            return false;
+        }
+    }
+
+    /**
+     * 释放跨 JVM 节点执行门控。
+     *
+     * <p>释放失败只记录日志，gate TTL 会兜底清理，避免释放异常改写业务执行结果。
+     */
+    public void releaseNodeGate(String executionId, String nodeId) {
+        try {
+            redis.delete(keys.gate(executionId, nodeId));
+        } catch (Exception e) {
+            log.warn("[CTX] 释放节点 Redis gate 失败 executionId={} nodeId={}: {}",
+                    executionId, nodeId, e.getMessage());
+        }
+    }
+
     private Map<String, Object> parseNodeOutput(String executionId, String nodeId, Object rawOutput) {
         if (rawOutput == null || rawOutput.toString().isBlank()) {
             return Map.of();
