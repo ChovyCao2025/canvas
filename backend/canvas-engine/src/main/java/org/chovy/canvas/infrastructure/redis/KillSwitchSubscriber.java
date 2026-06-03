@@ -2,9 +2,10 @@ package org.chovy.canvas.infrastructure.redis;
 
 import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.chovy.canvas.engine.reactive.BackgroundSubscriptionRegistry;
 import org.chovy.canvas.engine.trigger.InFlightExecutionRegistry;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.connection.ReactiveRedisConnectionFactory;
 import org.springframework.data.redis.listener.ReactiveRedisMessageListenerContainer;
 import org.springframework.stereotype.Component;
@@ -22,13 +23,14 @@ import reactor.core.Disposable;
  */
 @Slf4j
 @Component
-@RequiredArgsConstructor
 public class KillSwitchSubscriber {
 
     /** 响应式 Redis 连接工厂，用于创建 Pub/Sub 监听容器。 */
     private final ReactiveRedisConnectionFactory factory;
     /** 本机执行注册表，用于取消正在运行的画布执行。 */
     private final InFlightExecutionRegistry      registry;
+    /** 后台订阅注册器，用于托管 kill switch Redis 模式监听流。 */
+    private final BackgroundSubscriptionRegistry backgroundSubscriptions;
 
     /** Kill Switch 的 Redis 模式订阅频道。 */
     private static final String KILL_PATTERN = "canvas:kill:*";
@@ -36,6 +38,22 @@ public class KillSwitchSubscriber {
     private ReactiveRedisMessageListenerContainer listenerContainer;
     /** Redis 模式订阅句柄，应用关闭时需要取消。 */
     private Disposable subscription;
+
+    public KillSwitchSubscriber(ReactiveRedisConnectionFactory factory,
+                                InFlightExecutionRegistry registry) {
+        this(factory, registry, new BackgroundSubscriptionRegistry());
+    }
+
+    @Autowired
+    public KillSwitchSubscriber(ReactiveRedisConnectionFactory factory,
+                                InFlightExecutionRegistry registry,
+                                BackgroundSubscriptionRegistry backgroundSubscriptions) {
+        this.factory = factory;
+        this.registry = registry;
+        this.backgroundSubscriptions = backgroundSubscriptions == null
+                ? new BackgroundSubscriptionRegistry()
+                : backgroundSubscriptions;
+    }
 
     /**
      * 执行 subscribe 对应的业务逻辑。
@@ -48,33 +66,33 @@ public class KillSwitchSubscriber {
             listenerContainer = new ReactiveRedisMessageListenerContainer(factory);
 
             // 使用 pSubscribe（模式订阅）匹配所有 canvasId 的 kill 频道
-            subscription = listenerContainer.receive(new org.springframework.data.redis.listener.PatternTopic(KILL_PATTERN))
-                    .doOnNext(msg -> {
-                        String channel = msg.getChannel();   // "canvas:kill:{canvasId}"
-                        String mode    = msg.getMessage();   // "GRACEFUL" or "FORCE"
-                        try {
-                            // 频道名承载 canvasId，消息体只表达处理模式，便于按画布做模式订阅。
-                            Long canvasId = Long.parseLong(
-                                    channel.replace("canvas:kill:", ""));
+            subscription = backgroundSubscriptions.track(
+                    "kill-switch-redis",
+                    listenerContainer.receive(new org.springframework.data.redis.listener.PatternTopic(KILL_PATTERN))
+                            .doOnNext(msg -> {
+                                String channel = msg.getChannel();   // "canvas:kill:{canvasId}"
+                                String mode    = msg.getMessage();   // "GRACEFUL" or "FORCE"
+                                try {
+                                    // 频道名承载 canvasId，消息体只表达处理模式，便于按画布做模式订阅。
+                                    Long canvasId = Long.parseLong(
+                                            channel.replace("canvas:kill:", ""));
 
-                            if ("FORCE".equals(mode)) {
-                                // FORCE 需要跨 JVM 取消本机正在执行的订阅，其他实例收到同一 Pub/Sub 消息各自处理。
-                                int cancelled = registry.cancelAll(canvasId);
-                                log.warn("[KILL] FORCE 模式，取消 {} 个执行 canvasId={}",
-                                        cancelled, canvasId);
-                            } else {
-                                // GRACEFUL：拒绝新触发但不打断正在执行的
-                                // 执行引擎在 TriggerPreCheckService 中检查 canvas.status
-                                // 画布已被标记 status=4(KILLED)，新触发会被前置检查拦截
-                                log.info("[KILL] GRACEFUL 模式，新触发将被拦截 canvasId={}", canvasId);
-                            }
-                        } catch (NumberFormatException e) {
-                            log.error("[KILL] 解析 canvasId 失败 channel={}", channel);
-                        }
-                    }
-            )
-                    .doOnError(e -> log.error("[KILL] Kill Switch 订阅异常: {}", e.getMessage()))
-                    .subscribe();
+                                    if ("FORCE".equals(mode)) {
+                                        // FORCE 需要跨 JVM 取消本机正在执行的订阅，其他实例收到同一 Pub/Sub 消息各自处理。
+                                        int cancelled = registry.cancelAll(canvasId);
+                                        log.warn("[KILL] FORCE 模式，取消 {} 个执行 canvasId={}",
+                                                cancelled, canvasId);
+                                    } else {
+                                        // GRACEFUL：拒绝新触发但不打断正在执行的
+                                        // 执行引擎在 TriggerPreCheckService 中检查 canvas.status
+                                        // 画布已被标记 status=4(KILLED)，新触发会被前置检查拦截
+                                        log.info("[KILL] GRACEFUL 模式，新触发将被拦截 canvasId={}", canvasId);
+                                    }
+                                } catch (NumberFormatException e) {
+                                    log.error("[KILL] 解析 canvasId 失败 channel={}", channel);
+                                }
+                            }),
+                    e -> log.error("[KILL] Kill Switch 订阅异常: {}", e.getMessage()));
 
             log.info("[KILL] Kill Switch 订阅启动，监听模式: {}", KILL_PATTERN);
         } catch (Exception e) {

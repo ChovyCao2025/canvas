@@ -6,7 +6,9 @@ import jakarta.annotation.PreDestroy;
 import lombok.extern.slf4j.Slf4j;
 import org.chovy.canvas.dto.notification.NotificationDTO;
 import org.chovy.canvas.dto.notification.NotificationRealtimePayload;
+import org.chovy.canvas.engine.reactive.BackgroundSubscriptionRegistry;
 import org.chovy.canvas.infrastructure.redis.RedisKeyUtil;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.connection.ReactiveRedisConnectionFactory;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.listener.ChannelTopic;
@@ -43,6 +45,8 @@ public class NotificationRealtimeService implements NotificationRealtimePublishe
     private final ReactiveRedisConnectionFactory reactiveRedisConnectionFactory;
     /** Redis key 工具，集中生成业务 key。 */
     private final RedisKeyUtil keys;
+    /** 后台订阅注册器，用于托管跨实例通知 Redis 监听流。 */
+    private final BackgroundSubscriptionRegistry backgroundSubscriptions;
     /** 本机维护的用户到 WebSocket 会话 sink 的映射。 */
     private final Map<String, Map<String, Sinks.Many<String>>> sessionsByUser = new ConcurrentHashMap<>();
     /** 响应式 Redis 监听容器，用于订阅跨实例实时通知频道。 */
@@ -56,10 +60,24 @@ public class NotificationRealtimeService implements NotificationRealtimePublishe
             StringRedisTemplate redis,
             ReactiveRedisConnectionFactory reactiveRedisConnectionFactory,
             RedisKeyUtil keys) {
+        this(objectMapper, redis, reactiveRedisConnectionFactory, keys, new BackgroundSubscriptionRegistry());
+    }
+
+    /** 注入序列化、Redis 发布订阅、业务 key 和后台订阅依赖。 */
+    @Autowired
+    public NotificationRealtimeService(
+            ObjectMapper objectMapper,
+            StringRedisTemplate redis,
+            ReactiveRedisConnectionFactory reactiveRedisConnectionFactory,
+            RedisKeyUtil keys,
+            BackgroundSubscriptionRegistry backgroundSubscriptions) {
         this.objectMapper = objectMapper;
         this.redis = redis;
         this.reactiveRedisConnectionFactory = reactiveRedisConnectionFactory;
         this.keys = keys;
+        this.backgroundSubscriptions = backgroundSubscriptions == null
+                ? new BackgroundSubscriptionRegistry()
+                : backgroundSubscriptions;
     }
 
     /** 订阅 Redis 实时通知频道，接收其他实例发布的通知。 */
@@ -67,9 +85,11 @@ public class NotificationRealtimeService implements NotificationRealtimePublishe
     public void subscribeRedisChannel() {
         try {
             listenerContainer = new ReactiveRedisMessageListenerContainer(reactiveRedisConnectionFactory);
-            subscription = listenerContainer.receive(ChannelTopic.of(keys.notificationChannel()))
-                    .subscribe(message -> handleRemote(message.getMessage()),
-                            e -> log.error("[NOTIFICATION_WS] Redis 订阅异常: {}", e.getMessage(), e));
+            subscription = backgroundSubscriptions.track(
+                    "notification-realtime-redis",
+                    listenerContainer.receive(ChannelTopic.of(keys.notificationChannel()))
+                            .doOnNext(message -> handleRemote(message.getMessage())),
+                    e -> log.error("[NOTIFICATION_WS] Redis 订阅异常: {}", e.getMessage(), e));
         } catch (Exception e) {
             log.warn("[NOTIFICATION_WS] Redis 订阅启动失败，降级为单实例本地推送: {}", e.getMessage());
         }

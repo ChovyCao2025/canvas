@@ -2,11 +2,13 @@ package org.chovy.canvas.engine.reactive;
 
 import jakarta.annotation.PreDestroy;
 import lombok.extern.slf4j.Slf4j;
+import org.reactivestreams.Publisher;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import reactor.core.Disposable;
 import reactor.core.Disposables;
+import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 import java.time.Duration;
@@ -44,9 +46,16 @@ public class BackgroundSubscriptionRegistry {
      * Subscribe to a background Mono and remove it from the active set after termination.
      */
     public Disposable track(String name, Mono<?> source, Consumer<Throwable> onError) {
+        return track(name, (Publisher<?>) source, onError);
+    }
+
+    /**
+     * Subscribe to a background Publisher and remove it from the active set after termination.
+     */
+    public Disposable track(String name, Publisher<?> source, Consumer<Throwable> onError) {
         Disposable.Swap slot = Disposables.swap();
         active.add(slot);
-        Disposable subscription = source
+        Disposable subscription = Flux.from(source)
                 .doFinally(signalType -> remove(slot))
                 .subscribe(ignored -> {
                 }, error -> {

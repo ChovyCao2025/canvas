@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.chovy.canvas.common.MapFieldKeys;
 import org.chovy.canvas.dal.dataobject.CanvasExecutionRequestDO;
 import org.chovy.canvas.dal.mapper.CanvasExecutionRequestMapper;
+import org.chovy.canvas.engine.reactive.BackgroundSubscriptionRegistry;
 import org.chovy.canvas.engine.scheduler.CanvasMetrics;
 import org.chovy.canvas.engine.trigger.CanvasExecutionService;
 import org.chovy.canvas.perf.PerfRunContext;
@@ -49,6 +50,8 @@ public class CanvasExecutionRequestExecutor {
     private final long maxRetryDelayMs;
     /** RUNNING 请求心跳刷新间隔毫秒数。 */
     private final long heartbeatIntervalMs;
+    /** 后台订阅注册器，用于托管 RUNNING 心跳刷新流。 */
+    private final BackgroundSubscriptionRegistry backgroundSubscriptions;
 
     /**
      * 构造 CanvasExecutionRequestExecutor 实例，并根据入参初始化依赖、配置或内部状态。
@@ -62,7 +65,8 @@ public class CanvasExecutionRequestExecutor {
     public CanvasExecutionRequestExecutor(CanvasExecutionRequestMapper mapper,
                                           CanvasExecutionService executionService,
                                           ObjectMapper objectMapper) {
-        this(mapper, executionService, objectMapper, null, 5_000L, 5, 300L, 60_000L, 60_000L);
+        this(mapper, executionService, objectMapper, new BackgroundSubscriptionRegistry(),
+                null, 5_000L, 5, 300L, 60_000L, 60_000L);
     }
 
     /**
@@ -83,13 +87,15 @@ public class CanvasExecutionRequestExecutor {
                                           long retryDelayMs,
                                           int maxAttempts,
                                           long runningStaleSeconds) {
-        this(mapper, executionService, objectMapper, null, retryDelayMs, maxAttempts, runningStaleSeconds, 60_000L, 60_000L);
+        this(mapper, executionService, objectMapper, new BackgroundSubscriptionRegistry(),
+                null, retryDelayMs, maxAttempts, runningStaleSeconds, 60_000L, 60_000L);
     }
 
     @Autowired
     public CanvasExecutionRequestExecutor(CanvasExecutionRequestMapper mapper,
                                           CanvasExecutionService executionService,
                                           ObjectMapper objectMapper,
+                                          BackgroundSubscriptionRegistry backgroundSubscriptions,
                                           CanvasMetrics metrics,
                                           @Value("${canvas.execution-request.retry-delay-ms:5000}") long retryDelayMs,
                                           @Value("${canvas.execution-request.max-attempts:5}") int maxAttempts,
@@ -99,6 +105,9 @@ public class CanvasExecutionRequestExecutor {
         this.mapper = mapper;
         this.executionService = executionService;
         this.objectMapper = objectMapper;
+        this.backgroundSubscriptions = backgroundSubscriptions == null
+                ? new BackgroundSubscriptionRegistry()
+                : backgroundSubscriptions;
         this.metrics = metrics;
         this.retryDelayMs = retryDelayMs;
         this.maxAttempts = maxAttempts;
@@ -129,7 +138,7 @@ public class CanvasExecutionRequestExecutor {
                                           int maxAttempts,
                                           long runningStaleSeconds,
                                           long maxRetryDelayMs) {
-        this(mapper, executionService, objectMapper, metrics, retryDelayMs, maxAttempts,
+        this(mapper, executionService, objectMapper, new BackgroundSubscriptionRegistry(), metrics, retryDelayMs, maxAttempts,
                 runningStaleSeconds, maxRetryDelayMs, 60_000L);
     }
 
@@ -279,12 +288,14 @@ public class CanvasExecutionRequestExecutor {
     private Disposable startHeartbeat(String requestId, String runToken) {
         long intervalMs = Math.max(1L, heartbeatIntervalMs);
         // 心跳只负责刷新 RUNNING 时间戳，供调度器识别健康执行中的请求。
-        return Flux.interval(Duration.ofMillis(intervalMs))
-                .flatMap(ignored -> Mono.fromCallable(() ->
-                                mapper.touchRunning(requestId, LocalDateTime.now(), runToken))
-                        .subscribeOn(Schedulers.boundedElastic())
-                        .onErrorResume(e -> Mono.empty()))
-                .subscribe();
+        return backgroundSubscriptions.track(
+                "execution-request-heartbeat:" + requestId,
+                Flux.interval(Duration.ofMillis(intervalMs))
+                        .flatMap(ignored -> Mono.fromCallable(() ->
+                                        mapper.touchRunning(requestId, LocalDateTime.now(), runToken))
+                                .subscribeOn(Schedulers.boundedElastic())
+                                .onErrorResume(e -> Mono.empty())),
+                null);
     }
 
     /**
