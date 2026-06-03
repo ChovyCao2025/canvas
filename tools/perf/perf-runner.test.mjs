@@ -75,7 +75,7 @@ test('buildEventSignatureHeaders signs timestamp and raw body', () => {
   )
 })
 
-test('resolveEventSecret prefers explicit flag over environment', () => {
+test('resolveEventSecret reads only the configured environment variable', () => {
   assert.deepEqual(resolveEventSecret({
     mode: 'event',
     eventSecret: '12345678901234567890123456789012',
@@ -83,15 +83,14 @@ test('resolveEventSecret prefers explicit flag over environment', () => {
   }, {
     PERF_EVENT_SECRET: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
   }), {
-    value: '12345678901234567890123456789012',
-    source: 'flag',
+    value: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+    source: 'env:PERF_EVENT_SECRET',
   })
 })
 
 test('resolveEventSecret reads configured environment variable', () => {
   assert.deepEqual(resolveEventSecret({
     mode: 'event',
-    eventSecret: '',
     eventSecretEnv: 'PERF_EVENT_SECRET',
   }, {
     PERF_EVENT_SECRET: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
@@ -103,7 +102,7 @@ test('resolveEventSecret reads configured environment variable', () => {
 
 test('buildSignedHeaders returns JSON headers when no event secret is configured', () => {
   const headers = buildSignedHeaders({
-    args: { mode: 'event', eventSecret: '', eventSecretEnv: 'PERF_EVENT_SECRET' },
+    args: { mode: 'event', eventSecretEnv: 'PERF_EVENT_SECRET' },
     rawBody: '{}',
     nowMs: () => 1760000000000,
     env: {},
@@ -116,7 +115,7 @@ test('buildSignedHeaders returns JSON headers when no event secret is configured
 
 test('buildSignedHeaders includes event HMAC headers when secret is configured', () => {
   const headers = buildSignedHeaders({
-    args: { mode: 'event', eventSecret: '', eventSecretEnv: 'PERF_EVENT_SECRET' },
+    args: { mode: 'event', eventSecretEnv: 'PERF_EVENT_SECRET' },
     rawBody: '{"eventCode":"PERF_ORDER_PAID"}',
     nowMs: () => 1760000000000,
     env: { PERF_EVENT_SECRET: '12345678901234567890123456789012' },
@@ -130,6 +129,19 @@ test('buildSignedHeaders includes event HMAC headers when secret is configured',
   )
 })
 
+test('buildSignedHeaders leaves non-event modes unsigned when event secret exists', () => {
+  const headers = buildSignedHeaders({
+    args: { mode: 'direct', eventSecretEnv: 'PERF_EVENT_SECRET' },
+    rawBody: '{}',
+    nowMs: () => 1760000000000,
+    env: { PERF_EVENT_SECRET: '12345678901234567890123456789012' },
+  })
+
+  assert.deepEqual(headers, {
+    'content-type': 'application/json',
+  })
+})
+
 test('parseRunnerArgs accepts event secret env flag without exposing a secret value', () => {
   const args = parseRunnerArgs([
     '--mode', 'event',
@@ -137,8 +149,16 @@ test('parseRunnerArgs accepts event secret env flag without exposing a secret va
     '--event-secret-env', 'CANVAS_EVENT_REPORT_SECRET',
   ])
 
-  assert.equal(args.eventSecret, '')
+  assert.equal('eventSecret' in args, false)
   assert.equal(args.eventSecretEnv, 'CANVAS_EVENT_REPORT_SECRET')
+})
+
+test('parseRunnerArgs rejects event secret flag', () => {
+  assert.throws(() => parseRunnerArgs([
+    '--mode', 'event',
+    '--perf-run-id', 'perf_20260523_001',
+    '--event-secret', '12345678901234567890123456789012',
+  ]), /Unknown flag: --event-secret/)
 })
 
 test('parseRunnerArgs throws for unsupported mode', () => {

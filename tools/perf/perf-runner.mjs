@@ -19,7 +19,6 @@ const DEFAULT_ARGS = {
   userPrefix: 'perf_user_',
   userModulo: 1000,
   duplicateRate: 0,
-  eventSecret: '',
   eventSecretEnv: 'PERF_EVENT_SECRET',
   summaryFile: '',
 }
@@ -36,7 +35,6 @@ const FLAG_NAMES = {
   '--user-prefix': 'userPrefix',
   '--user-modulo': 'userModulo',
   '--duplicate-rate': 'duplicateRate',
-  '--event-secret': 'eventSecret',
   '--event-secret-env': 'eventSecretEnv',
   '--summary-file': 'summaryFile',
 }
@@ -291,10 +289,6 @@ export function buildEventSignatureHeaders({ secret, timestamp, rawBody }) {
 export function resolveEventSecret(args, env = process.env) {
   if (args.mode !== 'event') {
     return { value: '', source: 'none' }
-  }
-
-  if (args.eventSecret) {
-    return { value: args.eventSecret, source: 'flag' }
   }
 
   const envName = args.eventSecretEnv || 'PERF_EVENT_SECRET'
