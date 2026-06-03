@@ -6,6 +6,7 @@ import org.chovy.canvas.engine.scheduler.TraceWriteBuffer;
 import org.chovy.canvas.infrastructure.redis.ContextPersistenceService;
 import org.chovy.canvas.infrastructure.redis.RedisKeyUtil;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.springframework.data.redis.core.HashOperations;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.test.util.ReflectionTestUtils;
@@ -15,6 +16,7 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.anyMap;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
@@ -23,22 +25,50 @@ import static org.mockito.Mockito.when;
 class ContextPersistenceIncrementalTest {
 
     @Test
-    void saveNodeState_writesStatusAndOutputToRedisHash() {
+    void saveNodeState_writesStatusAndOutputToRedisHash() throws Exception {
+        ObjectMapper objectMapper = new ObjectMapper();
         StringRedisTemplate redis = mock(StringRedisTemplate.class);
         HashOperations<String, Object, Object> hashes = mock(HashOperations.class);
         when(redis.opsForHash()).thenReturn(hashes);
-        ContextPersistenceService service = service(redis);
+        when(redis.expire("canvas:node-state:exec-1:node-1", Duration.ofSeconds(123))).thenReturn(true);
+        ContextPersistenceService service = service(redis, objectMapper);
         Map<String, Object> output = new LinkedHashMap<>();
         output.put("amount", 42);
         output.put("ok", true);
 
         service.saveNodeState("exec-1", "node-1", NodeStatus.SUCCESS, output);
 
-        verify(hashes).putAll(eq("canvas:node-state:exec-1:node-1"), eq(Map.of(
-                "status", "SUCCESS",
-                "output", "{\"amount\":42,\"ok\":true}"
-        )));
+        ArgumentCaptor<Map<String, String>> fields = ArgumentCaptor.captor();
+        verify(hashes).putAll(eq("canvas:node-state:exec-1:node-1"), fields.capture());
+        assertThat(fields.getValue()).containsEntry("status", "SUCCESS");
+        assertThat(objectMapper.readValue(fields.getValue().get("output"), Map.class))
+                .containsEntry("amount", 42)
+                .containsEntry("ok", true);
         verify(redis).expire("canvas:node-state:exec-1:node-1", Duration.ofSeconds(123));
+    }
+
+    @Test
+    void saveNodeState_deletesHashWhenTtlRefreshFails() {
+        StringRedisTemplate redis = mock(StringRedisTemplate.class);
+        HashOperations<String, Object, Object> hashes = mock(HashOperations.class);
+        when(redis.opsForHash()).thenReturn(hashes);
+        when(redis.expire("canvas:node-state:exec-1:node-1", Duration.ofSeconds(123))).thenReturn(false);
+        ContextPersistenceService service = service(redis);
+
+        service.saveNodeState("exec-1", "node-1", NodeStatus.SUCCESS, Map.of());
+
+        verify(hashes).putAll(eq("canvas:node-state:exec-1:node-1"), anyMap());
+        verify(redis).delete("canvas:node-state:exec-1:node-1");
+    }
+
+    @Test
+    void deleteNodeState_deletesRedisKey() {
+        StringRedisTemplate redis = mock(StringRedisTemplate.class);
+        ContextPersistenceService service = service(redis);
+
+        service.deleteNodeState("exec-1", "node-1");
+
+        verify(redis).delete("canvas:node-state:exec-1:node-1");
     }
 
     @Test
@@ -87,8 +117,12 @@ class ContextPersistenceIncrementalTest {
     }
 
     private ContextPersistenceService service(StringRedisTemplate redis) {
+        return service(redis, new ObjectMapper());
+    }
+
+    private ContextPersistenceService service(StringRedisTemplate redis, ObjectMapper objectMapper) {
         ContextPersistenceService service = new ContextPersistenceService(
-                redis, new ObjectMapper(), new RedisKeyUtil(), mock(TraceWriteBuffer.class));
+                redis, objectMapper, new RedisKeyUtil(), mock(TraceWriteBuffer.class));
         ReflectionTestUtils.setField(service, "ttlSec", 123L);
         return service;
     }

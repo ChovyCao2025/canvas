@@ -22,8 +22,12 @@ import java.util.List;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 class DagEngineCommitActionTest {
@@ -59,7 +63,50 @@ class DagEngineCommitActionTest {
         assertThat(ctx.getNodeStatus("fail")).isEqualTo(NodeStatus.FAILED);
     }
 
+    @Test
+    void downstreamFailureDoesNotOverwriteUpstreamSuccessfulNodeState() {
+        ContextPersistenceService ctxStore = mock(ContextPersistenceService.class);
+        DagEngine engine = engineWithHandlers(ctxStore, new TestOkHandler(), new TestFailHandler());
+        DagGraph graph = graph(List.of(
+                node("ok", "TEST_OK", Map.of(MapFieldKeys.NEXT_NODE_ID, "fail")),
+                node("fail", "TEST_FAIL", Map.of())
+        ), Map.of("ok", List.of("fail")));
+        ExecutionContext ctx = context();
+
+        assertThatThrownBy(() -> engine.execute(graph, "ok", ctx).block())
+                .isInstanceOf(RuntimeException.class)
+                .hasMessageContaining("节点 fail 失败");
+
+        assertThat(ctx.getNodeStatus("ok")).isEqualTo(NodeStatus.SUCCESS);
+        assertThat(ctx.getNodeOutputs().get("ok")).containsEntry("ok", true);
+        verify(ctxStore).saveNodeState("exec-commit-action-test", "ok",
+                NodeStatus.SUCCESS, Map.of("ok", true));
+        verify(ctxStore, never()).saveNodeState(eq("exec-commit-action-test"), eq("ok"),
+                eq(NodeStatus.FAILED), eq(Map.of()));
+    }
+
+    @Test
+    void gotoReentryDeletesStaleNodeStateForResetNodes() {
+        ContextPersistenceService ctxStore = mock(ContextPersistenceService.class);
+        DagEngine engine = engineWithHandlers(ctxStore, new TestGotoHandler(), new TestOkHandler());
+        DagGraph graph = graph(List.of(
+                node("goto", NodeType.GOTO, Map.of("targetNodeId", "target")),
+                node("target", "TEST_OK", Map.of())
+        ), Map.of("target", List.of("goto")));
+        ExecutionContext ctx = context();
+        ctx.setNodeStatus("target", NodeStatus.SUCCESS);
+        ctx.putNodeOutput("target", Map.of("stale", true));
+
+        engine.execute(graph, "goto", ctx).block();
+
+        verify(ctxStore).deleteNodeState("exec-commit-action-test", "target");
+    }
+
     private DagEngine engineWithHandlers(NodeHandler... handlers) {
+        return engineWithHandlers(mock(ContextPersistenceService.class), handlers);
+    }
+
+    private DagEngine engineWithHandlers(ContextPersistenceService ctxStore, NodeHandler... handlers) {
         HandlerRegistry handlerRegistry = new HandlerRegistry(List.of(handlers));
         ReflectionTestUtils.invokeMethod(handlerRegistry, "init");
 
@@ -74,7 +121,7 @@ class DagEngineCommitActionTest {
                 cbRegistry,
                 mock(CanvasMetrics.class),
                 new ObjectMapper(),
-                mock(ContextPersistenceService.class),
+                ctxStore,
                 mock(org.chovy.canvas.engine.trigger.CanvasExecutionService.class)
         );
         ReflectionTestUtils.setField(engine, "maxRetry", 1);
@@ -143,6 +190,24 @@ class DagEngineCommitActionTest {
         @Override
         public boolean isBenefitNode() {
             return true;
+        }
+    }
+
+    @NodeHandlerType("TEST_OK")
+    static class TestOkHandler implements NodeHandler {
+        @Override
+        public Mono<NodeResult> executeAsync(Map<String, Object> config, ExecutionContext ctx) {
+            return Mono.just(NodeResult.ok((String) config.get(MapFieldKeys.NEXT_NODE_ID),
+                    Map.of("ok", true)));
+        }
+    }
+
+    @NodeHandlerType(NodeType.GOTO)
+    static class TestGotoHandler implements NodeHandler {
+        @Override
+        public Mono<NodeResult> executeAsync(Map<String, Object> config, ExecutionContext ctx) {
+            return Mono.just(NodeResult.routed("goto", (String) config.get("targetNodeId"),
+                    Map.of("jump", true)));
         }
     }
 

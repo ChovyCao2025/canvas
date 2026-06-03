@@ -404,9 +404,14 @@ public class DagEngine {
                     })
                     .onErrorResume(e -> {
                         nodeGate.executing.set(false); // 释放异常锁
-                        ctx.setNodeStatus(nodeId, NodeStatus.FAILED);
-                        log.error("[ENGINE] 节点异常 nodeId={}: {}", nodeId, e.getMessage());
-                        saveNodeStateSafely(ctx, nodeId, NodeStatus.FAILED, Map.of());
+                        if (!ctx.isNodeDone(nodeId)) {
+                            log.error("[ENGINE] 节点异常 nodeId={}: {}", nodeId, e.getMessage());
+                            ctx.setNodeStatus(nodeId, NodeStatus.FAILED);
+                            saveNodeStateSafely(ctx, nodeId, NodeStatus.FAILED, Map.of());
+                        } else {
+                            log.debug("[ENGINE] 下游执行异常 sourceNodeId={} status={}: {}",
+                                    nodeId, ctx.getNodeStatus(nodeId), e.getMessage());
+                        }
                         if (ctx.isBenefitGranted() || ctx.isUserReached()) {
                             return Mono.just(Map.of());
                         }
@@ -1052,8 +1057,14 @@ public class DagEngine {
                 .onErrorResume(e -> {
                     // 异常时锁可能仍被持有（handler 内部抛出），在此统一释放
                     nodeGate.executing.set(false);
-                    ctx.setNodeStatus(nodeId, NodeStatus.FAILED);
-                    saveNodeStateSafely(ctx, nodeId, NodeStatus.FAILED, Map.of());
+                    if (!ctx.isNodeDone(nodeId)) {
+                        log.error("[ENGINE] 节点异常 nodeId={}: {}", nodeId, e.getMessage());
+                        ctx.setNodeStatus(nodeId, NodeStatus.FAILED);
+                        saveNodeStateSafely(ctx, nodeId, NodeStatus.FAILED, Map.of());
+                    } else {
+                        log.debug("[ENGINE] 下游执行异常 sourceNodeId={} status={}: {}",
+                                nodeId, ctx.getNodeStatus(nodeId), e.getMessage());
+                    }
                     if (ctx.isBenefitGranted() || ctx.isUserReached()) {
                         return Mono.just(Map.of());
                     }
@@ -1184,7 +1195,11 @@ public class DagEngine {
             if (!visited.add(current)) {
                 continue;
             }
+            NodeStatus previousStatus = ctx.getNodeStatuses().get(current);
             ctx.resetNodeStatusForReentry(current);
+            if (previousStatus != null && !ctx.getNodeStatuses().containsKey(current)) {
+                deleteNodeStateSafely(ctx, current);
+            }
             if (current.equals(sourceNodeId)) {
                 continue;
             }
@@ -1412,6 +1427,15 @@ public class DagEngine {
         } catch (Exception e) {
             log.warn("[ENGINE] 节点增量状态持久化失败 executionId={} nodeId={} status={}: {}",
                     ctx.getExecutionId(), nodeId, status, e.getMessage());
+        }
+    }
+
+    private void deleteNodeStateSafely(ExecutionContext ctx, String nodeId) {
+        try {
+            ctxStore.deleteNodeState(ctx.getExecutionId(), nodeId);
+        } catch (Exception e) {
+            log.warn("[ENGINE] 节点增量状态删除失败 executionId={} nodeId={}: {}",
+                    ctx.getExecutionId(), nodeId, e.getMessage());
         }
     }
 

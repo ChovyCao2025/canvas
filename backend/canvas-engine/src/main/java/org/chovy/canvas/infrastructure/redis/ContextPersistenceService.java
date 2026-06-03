@@ -114,9 +114,23 @@ public class ContextPersistenceService {
             fields.put("status", status.name());
             fields.put("output", objectMapper.writeValueAsString(output == null ? Map.of() : output));
             redis.opsForHash().putAll(key, fields);
-            redis.expire(key, Duration.ofSeconds(ttlSec));
+            if (!Boolean.TRUE.equals(redis.expire(key, Duration.ofSeconds(ttlSec)))) {
+                redis.delete(key);
+                log.warn("[CTX] 节点增量状态 TTL 刷新失败，已删除 key={} executionId={} nodeId={}",
+                        key, executionId, nodeId);
+            }
         } catch (Exception e) {
             log.warn("[CTX] 保存节点增量状态失败 executionId={} nodeId={}: {}",
+                    executionId, nodeId, e.getMessage());
+        }
+    }
+
+    /** 删除单节点增量状态。 */
+    public void deleteNodeState(String executionId, String nodeId) {
+        try {
+            redis.delete(keys.nodeState(executionId, nodeId));
+        } catch (Exception e) {
+            log.warn("[CTX] 删除节点增量状态失败 executionId={} nodeId={}: {}",
                     executionId, nodeId, e.getMessage());
         }
     }
