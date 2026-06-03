@@ -150,9 +150,11 @@ public class ExecutionContext {
     }
 
     /** 是否超过 1MB 上限 */
+    @JsonIgnore
     public synchronized boolean isOversized() { return approxSizeBytes.get() > MAX_SIZE_BYTES; }
 
     /** 获取估算大小（字节） */
+    @JsonIgnore
     public synchronized int getApproxSizeBytes() { return approxSizeBytes.get(); }
 
     /**
