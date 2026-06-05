@@ -644,39 +644,6 @@ public class BiSelfServiceExportService {
         return approvalRowThreshold > 0 && rowLimit > approvalRowThreshold;
     }
 
-    private int retryAttempt(BiExportJobDO row) {
-        Integer current = row == null ? null : row.getRetryCount();
-        return Math.max(0, current == null ? 0 : current) + 1;
-    }
-
-    private int configuredMaxRetryCount(BiExportJobDO row) {
-        Integer rowMax = row == null ? null : row.getMaxRetryCount();
-        return Math.max(0, rowMax == null ? maxRetryCount : rowMax);
-    }
-
-    private void scheduleRetryAfterFailure(BiExportJobDO row, LocalDateTime failedAt) {
-        if (row == null) {
-            return;
-        }
-        int configuredMax = configuredMaxRetryCount(row);
-        row.setMaxRetryCount(configuredMax);
-        int currentRetryCount = Math.max(0, row.getRetryCount() == null ? 0 : row.getRetryCount());
-        if (configuredMax <= 0 || currentRetryCount >= configuredMax) {
-            row.setNextRetryAt(null);
-            row.setRetryExhaustedAt(failedAt);
-            return;
-        }
-        long delay = retryDelayMinutes(currentRetryCount);
-        row.setNextRetryAt(failedAt.plusMinutes(delay));
-        row.setRetryExhaustedAt(null);
-    }
-
-    private long retryDelayMinutes(int retryCount) {
-        double multiplier = Math.pow(retryBackoffMultiplier, Math.max(0, retryCount));
-        long delay = Math.round(retryInitialDelayMinutes * multiplier);
-        return Math.max(1, Math.min(delay, retryMaxDelayMinutes));
-    }
-
     private String approvalReason(BiExportJobCommand command, int rowLimit) {
         String reason = optionalText(command.approvalReason(), "approvalReason");
         if (reason != null) {
@@ -772,44 +739,6 @@ public class BiSelfServiceExportService {
         } catch (JsonProcessingException e) {
             throw new IllegalArgumentException("invalid BI export payload", e);
         }
-    }
-
-    private void scheduleRetryAfterFailure(BiExportJobDO row, LocalDateTime now) {
-        int retryCount = retryCount(row);
-        int rowMaxRetryCount = configuredMaxRetryCount(row);
-        row.setMaxRetryCount(rowMaxRetryCount);
-        if (row.getProgressPercent() == null) {
-            row.setProgressPercent(PROGRESS_QUEUED);
-        }
-        if (rowMaxRetryCount <= 0 || retryCount >= rowMaxRetryCount) {
-            row.setNextRetryAt(null);
-            row.setRetryExhaustedAt(now);
-            return;
-        }
-        row.setNextRetryAt(now.plusMinutes(retryDelayMinutes(retryCount + 1)));
-        row.setRetryExhaustedAt(null);
-    }
-
-    private int retryAttempt(BiExportJobDO row) {
-        return retryCount(row) + 1;
-    }
-
-    private int retryCount(BiExportJobDO row) {
-        return Math.max(0, row == null || row.getRetryCount() == null ? 0 : row.getRetryCount());
-    }
-
-    private int configuredMaxRetryCount(BiExportJobDO row) {
-        int rowMaxRetryCount = row == null || row.getMaxRetryCount() == null
-                ? maxRetryCount
-                : row.getMaxRetryCount();
-        return Math.max(0, rowMaxRetryCount);
-    }
-
-    private long retryDelayMinutes(int nextAttempt) {
-        int attempt = Math.max(1, nextAttempt);
-        double multiplier = Math.pow(retryBackoffMultiplier, attempt - 1);
-        long delay = Math.round(retryInitialDelayMinutes * multiplier);
-        return Math.max(1, Math.min(delay, retryMaxDelayMinutes));
     }
 
     private List<Long> tenantScope(Long tenantId) {

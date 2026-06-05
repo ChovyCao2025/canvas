@@ -5,6 +5,10 @@ Sequence: 005
 Source: `docs/optimization/todo/cdp_gap_analysis.md`, `docs/optimization/todo/2026-05-30-cdp-roadmap.md`, `docs/optimization/todo/2026-05-30-cdp-sdk-design.md`
 Implementation plan: `../plans/p1-005-cdp-write-key-management-and-authentication-plan.md`
 
+## Implementation Status
+
+Implemented on 2026-06-05 with the actual migration version `V100__cdp_write_key_management.sql` because `V97` is not the current migration sequence in this workspace. Focused Maven verification is currently blocked by unrelated backend compile errors in parallel BI, warehouse, analytics, and AI changes; P1-005 static checks confirm the write-key table, controller routes, and dedicated test files exist.
+
 ## Goal
 
 Create tenant-scoped CDP write keys and Basic Auth validation for the future `/cdp/events/track` ingestion endpoint.
@@ -12,7 +16,8 @@ Create tenant-scoped CDP write keys and Basic Auth validation for the future `/c
 ## Current Baseline
 
 - `POST /canvas/events/report` is protected by `EventReportAuthService` HMAC, but that endpoint is for canvas triggers.
-- There is no CDP write-key model, tenant-scoped SDK key storage, or admin API.
+- `cdp_write_key` stores tenant-scoped SDK key prefix and BCrypt hash without raw-key persistence.
+- `/cdp/write-keys` exposes tenant-scoped list, create, and disable admin actions.
 - P0-001 owns broader tenant safety; this slice only adds write-key identity and validation.
 
 ## In Scope
@@ -39,7 +44,7 @@ Create tenant-scoped CDP write keys and Basic Auth validation for the future `/c
 
 ## Technical Scope
 
-- `backend/canvas-engine/src/main/resources/db/migration/V97__cdp_write_key_management.sql`
+- `backend/canvas-engine/src/main/resources/db/migration/V100__cdp_write_key_management.sql`
 - `backend/canvas-engine/src/main/java/org/chovy/canvas/dal/dataobject/CdpWriteKeyDO.java`
 - `backend/canvas-engine/src/main/java/org/chovy/canvas/dal/mapper/CdpWriteKeyMapper.java`
 - `backend/canvas-engine/src/main/java/org/chovy/canvas/domain/cdp/CdpWriteKeyAuthService.java`
