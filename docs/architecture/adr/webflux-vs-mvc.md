@@ -82,7 +82,7 @@ Compatibility must include:
 
 Revisit this ADR only when all are true:
 
-- P0 reactive review candidates in `docs/architecture/webflux-mvc-migration-inventory.md` are closed or risk-accepted by owner.
+- P0 reactive review candidates in `docs/architecture/work-products/p3-05-runtime-model/webflux-mvc-migration-inventory.md` are closed or risk-accepted by owner.
 - A benchmark report exists and covers the endpoint families listed above.
 - A first-slice characterization test suite exists and passes on the current WebFlux runtime.
 - The selected slice has rollback, compatibility, observability, and owner signoff.
@@ -102,7 +102,7 @@ Architecture owner with backend, frontend, operations, and security reviewers. A
 ## Links
 
 - `docs/architecture/archive/completed/specs/P3-05-webflux-to-mvc-migration-spec.md`
-- `docs/architecture/webflux-mvc-migration-inventory.md`
-- `docs/architecture/webflux-mvc-first-slice.md`
+- `docs/architecture/work-products/p3-05-runtime-model/webflux-mvc-migration-inventory.md`
+- `docs/architecture/work-products/p3-05-runtime-model/webflux-mvc-first-slice.md`
 - `docs/architecture/evidence/P0-02-reactive-threading-inventory.md`
 - `docs/architecture/evidence/p3-05-webflux-mvc.md`

@@ -13,8 +13,8 @@
 ## Source Material
 
 - Spec: `../specs/P1-05-release-deployment-governance-spec.md`
-- Source package: `../../../todo/p1/release-deployment-governance/`
-- Coverage matrix: `../../../todo/coverage-matrix.md`
+- Source package: `../../../reviewed-packages/p1/release-deployment-governance/`
+- Coverage matrix: `../../../reviewed-packages/coverage-matrix.md`
 - Archive checklist: `../archive/reviews/production-deployment-checklist-2026-06-02.md`
 - K8s plan: `../archive/evolution/k8s-deployment-plan.md`
 

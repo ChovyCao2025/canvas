@@ -15,8 +15,8 @@
 ## Source Material
 
 - Spec: `../specs/P0-04-execution-concurrency-safety-spec.md`
-- Source package: `../../../todo/p0/execution-concurrency-safety/`
-- Coverage matrix: `../../../todo/coverage-matrix.md`
+- Source package: `../../../reviewed-packages/p0/execution-concurrency-safety/`
+- Coverage matrix: `../../../reviewed-packages/coverage-matrix.md`
 - Evidence: `../evidence/P0-04-execution-concurrency-safety.md`
 
 ## File Structure

@@ -14,21 +14,21 @@
 
 - Spec: `../specs/P3-09-identity-event-and-tenant-platform-spec.md`
 - Evolution doc: `../archive/evolution/architect-critical-review.md`
-- Coverage matrix: `../../../todo/coverage-matrix.md`
+- Coverage matrix: `../../../reviewed-packages/coverage-matrix.md`
 
 ## File Structure
 
 - Create: `docs/architecture/evidence/p3-09-platform-primitives.md`
-- Create: `docs/architecture/platform-primitives.md`
-- Create: `docs/architecture/event-schema-governance.md`
-- Create: `docs/architecture/tenant-platform-contract.md`
-- Create: `docs/architecture/engine-web-boundary.md`
+- Create: `docs/architecture/work-products/p3-09-platform-primitives/platform-primitives.md`
+- Create: `docs/architecture/work-products/p3-09-platform-primitives/event-schema-governance.md`
+- Create: `docs/architecture/work-products/p3-09-platform-primitives/tenant-platform-contract.md`
+- Create: `docs/architecture/work-products/p3-09-platform-primitives/engine-web-boundary.md`
 
 ### Task 1: Define OneID And Tenant Contracts
 
 **Files:**
-- Create: `docs/architecture/platform-primitives.md`
-- Create: `docs/architecture/tenant-platform-contract.md`
+- Create: `docs/architecture/work-products/p3-09-platform-primitives/platform-primitives.md`
+- Create: `docs/architecture/work-products/p3-09-platform-primitives/tenant-platform-contract.md`
 - Create: `docs/architecture/evidence/p3-09-platform-primitives.md`
 
 - [x] Define canonical OneID, source identity, merge, split, confidence, conflict, and audit rules.
@@ -38,9 +38,9 @@
 Run:
 
 ```bash
-test -f docs/architecture/platform-primitives.md
-test -f docs/architecture/tenant-platform-contract.md
-rg -n "OneID|source identity|merge|split|confidence|conflict|audit|tenant visibility|quota|tenant-scoped|compatibility" docs/architecture/platform-primitives.md docs/architecture/tenant-platform-contract.md
+test -f docs/architecture/work-products/p3-09-platform-primitives/platform-primitives.md
+test -f docs/architecture/work-products/p3-09-platform-primitives/tenant-platform-contract.md
+rg -n "OneID|source identity|merge|split|confidence|conflict|audit|tenant visibility|quota|tenant-scoped|compatibility" docs/architecture/work-products/p3-09-platform-primitives/platform-primitives.md docs/architecture/work-products/p3-09-platform-primitives/tenant-platform-contract.md
 ```
 
 Expected: identity and tenant contracts cover OneID lifecycle, auditability, quota, tenant visibility, and compatibility.
@@ -48,7 +48,7 @@ Expected: identity and tenant contracts cover OneID lifecycle, auditability, quo
 ### Task 2: Define Event Schema Governance
 
 **Files:**
-- Create: `docs/architecture/event-schema-governance.md`
+- Create: `docs/architecture/work-products/p3-09-platform-primitives/event-schema-governance.md`
 - Modify: `docs/architecture/evidence/p3-09-platform-primitives.md`
 
 - [x] Define schema owner, versioning, compatibility, replay, ordering, idempotency, deprecation, and retention rules.
@@ -58,8 +58,8 @@ Expected: identity and tenant contracts cover OneID lifecycle, auditability, quo
 Run:
 
 ```bash
-test -f docs/architecture/event-schema-governance.md
-rg -n "schema owner|versioning|compatibility|replay|ordering|idempotency|deprecation|retention|canvas lifecycle|execution lifecycle|customer identity|reach delivery|ops|schemaVersion|eventId" docs/architecture/event-schema-governance.md
+test -f docs/architecture/work-products/p3-09-platform-primitives/event-schema-governance.md
+rg -n "schema owner|versioning|compatibility|replay|ordering|idempotency|deprecation|retention|canvas lifecycle|execution lifecycle|customer identity|reach delivery|ops|schemaVersion|eventId" docs/architecture/work-products/p3-09-platform-primitives/event-schema-governance.md
 ```
 
 Expected: event governance covers lifecycle rules, initial families, and a concrete event-envelope example.
@@ -67,7 +67,7 @@ Expected: event governance covers lifecycle rules, initial families, and a concr
 ### Task 3: Define Degradation And Engine/Web Split
 
 **Files:**
-- Create: `docs/architecture/engine-web-boundary.md`
+- Create: `docs/architecture/work-products/p3-09-platform-primitives/engine-web-boundary.md`
 - Modify: `docs/architecture/evidence/p3-09-platform-primitives.md`
 - Modify: `docs/architecture/archive/completed/plans/P3-09-identity-event-and-tenant-platform-plan.md`
 
@@ -78,9 +78,9 @@ Expected: event governance covers lifecycle rules, initial families, and a concr
 Run:
 
 ```bash
-test -f docs/architecture/engine-web-boundary.md
-rg -n "fail-open|fail-closed|Redis|RocketMQ|datasource|WeCom|analytics|AI|API boundary|event boundary|data ownership|deployment|rollback|observability|contract tests" docs/architecture/engine-web-boundary.md
-git diff -- docs/architecture/evidence/p3-09-platform-primitives.md docs/architecture/platform-primitives.md docs/architecture/event-schema-governance.md docs/architecture/tenant-platform-contract.md docs/architecture/engine-web-boundary.md docs/architecture/archive/completed/plans/P3-09-identity-event-and-tenant-platform-plan.md
+test -f docs/architecture/work-products/p3-09-platform-primitives/engine-web-boundary.md
+rg -n "fail-open|fail-closed|Redis|RocketMQ|datasource|WeCom|analytics|AI|API boundary|event boundary|data ownership|deployment|rollback|observability|contract tests" docs/architecture/work-products/p3-09-platform-primitives/engine-web-boundary.md
+git diff -- docs/architecture/evidence/p3-09-platform-primitives.md docs/architecture/work-products/p3-09-platform-primitives/platform-primitives.md docs/architecture/work-products/p3-09-platform-primitives/event-schema-governance.md docs/architecture/work-products/p3-09-platform-primitives/tenant-platform-contract.md docs/architecture/work-products/p3-09-platform-primitives/engine-web-boundary.md docs/architecture/archive/completed/plans/P3-09-identity-event-and-tenant-platform-plan.md
 # Do not stage or commit in this session unless the user explicitly asks.
 ```
 

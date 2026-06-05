@@ -1,8 +1,8 @@
 # Spec: Frontend Accessibility And Quality
 
-Source package: `docs/architecture/todo/p2/frontend-accessibility-and-quality/`
+Source package: `docs/architecture/reviewed-packages/p2/frontend-accessibility-and-quality/`
 
-Coverage matrix: `docs/architecture/todo/coverage-matrix.md`
+Coverage matrix: `docs/architecture/reviewed-packages/coverage-matrix.md`
 
 
 ## Verification Status

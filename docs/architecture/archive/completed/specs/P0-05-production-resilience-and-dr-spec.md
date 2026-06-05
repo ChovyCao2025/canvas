@@ -1,8 +1,8 @@
 # Spec: Production Resilience And Disaster Recovery
 
-Source package: `docs/architecture/todo/p0/production-resilience-and-dr/`
+Source package: `docs/architecture/reviewed-packages/p0/production-resilience-and-dr/`
 
-Coverage matrix: `docs/architecture/todo/coverage-matrix.md`
+Coverage matrix: `docs/architecture/reviewed-packages/coverage-matrix.md`
 
 
 ## Verification Status

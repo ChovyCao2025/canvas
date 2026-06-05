@@ -15,8 +15,8 @@
 ## Source Material
 
 - Spec: `../specs/P0-01-security-hardening-spec.md`
-- Source package: `../../../todo/p0/security-hardening/`
-- Coverage matrix: `../../../todo/coverage-matrix.md`
+- Source package: `../../../reviewed-packages/p0/security-hardening/`
+- Coverage matrix: `../../../reviewed-packages/coverage-matrix.md`
 
 ## File Structure
 

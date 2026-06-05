@@ -1,8 +1,8 @@
 # Spec: Architecture Boundary Review
 
-Source package: `docs/architecture/todo/p3/platform-evolution/`
+Source package: `docs/architecture/reviewed-packages/p3/platform-evolution/`
 
-Coverage matrix: `docs/architecture/todo/coverage-matrix.md`
+Coverage matrix: `docs/architecture/reviewed-packages/coverage-matrix.md`
 
 ## Review Status
 

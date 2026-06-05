@@ -13,8 +13,8 @@
 ## Source Material
 
 - Spec: `../specs/P0-02-reactive-threading-and-transactions-spec.md`
-- Source package: `../../../todo/p0/reactive-threading-and-transactions/`
-- Coverage matrix: `../../../todo/coverage-matrix.md`
+- Source package: `../../../reviewed-packages/p0/reactive-threading-and-transactions/`
+- Coverage matrix: `../../../reviewed-packages/coverage-matrix.md`
 
 ## File Structure
 

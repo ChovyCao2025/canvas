@@ -15,8 +15,8 @@
 ## Source Material
 
 - Spec: `../specs/P1-01-dag-engine-and-handler-boundaries-spec.md`
-- Source package: `../../../todo/p1/dag-engine-and-handler-boundaries/`
-- Coverage matrix: `../../../todo/coverage-matrix.md`
+- Source package: `../../../reviewed-packages/p1/dag-engine-and-handler-boundaries/`
+- Coverage matrix: `../../../reviewed-packages/coverage-matrix.md`
 
 ## File Structure
 

@@ -17,7 +17,7 @@ The previous `evolution/` documents describe long-term target architecture and h
 - WeCom SCRM module: `docs/architecture/archive/completed/specs/P3-08-wecom-scrm-module-spec.md`, `docs/architecture/archive/completed/plans/P3-08-wecom-scrm-module-plan.md`;
 - identity, event, and tenant platform primitives: `docs/architecture/archive/completed/specs/P3-09-identity-event-and-tenant-platform-spec.md`, `docs/architecture/archive/completed/plans/P3-09-identity-event-and-tenant-platform-plan.md`.
 
-These are not immediate bug-fix todo items. They should remain P3 until P0/P1 risks are reduced and product/team capacity is confirmed.
+These are not immediate bug-fix tasks. They should remain P3 until P0/P1 risks are reduced and product/team capacity is confirmed.
 
 ## Acceptance Criteria
 

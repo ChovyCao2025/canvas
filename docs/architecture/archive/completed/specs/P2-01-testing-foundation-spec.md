@@ -1,8 +1,8 @@
 # Spec: Testing Foundation
 
-Source package: `docs/architecture/todo/p2/testing-foundation/`
+Source package: `docs/architecture/reviewed-packages/p2/testing-foundation/`
 
-Coverage matrix: `docs/architecture/todo/coverage-matrix.md`
+Coverage matrix: `docs/architecture/reviewed-packages/coverage-matrix.md`
 
 
 ## Verification Status

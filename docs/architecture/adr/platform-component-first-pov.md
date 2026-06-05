@@ -83,8 +83,8 @@ Stop the proof and do not expand Redisson if:
 
 ## Links
 
-- `docs/architecture/platform-component-decision-matrix.md`
-- `docs/architecture/platform-component-abstraction-plan.md`
+- `docs/architecture/work-products/p3-07-platform-components/platform-component-decision-matrix.md`
+- `docs/architecture/work-products/p3-07-platform-components/platform-component-abstraction-plan.md`
 - `docs/architecture/evidence/P0-04-execution-concurrency-safety.md`
 - `docs/architecture/evidence/P0-05-production-resilience-and-dr.md`
 - `docs/architecture/evidence/P2-04-dependency-abstraction-and-vendor-lock-in.md`

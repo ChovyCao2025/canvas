@@ -15,8 +15,8 @@
 ## Source Material
 
 - Spec: `../specs/P0-06-data-security-and-tenant-isolation-spec.md`
-- Source package: `../../../todo/p0/data-security-and-tenant-isolation/`
-- Coverage matrix: `../../../todo/coverage-matrix.md`
+- Source package: `../../../reviewed-packages/p0/data-security-and-tenant-isolation/`
+- Coverage matrix: `../../../reviewed-packages/coverage-matrix.md`
 
 ## File Structure
 

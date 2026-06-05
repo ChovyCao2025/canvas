@@ -1,12 +1,12 @@
 # Spec: Production Platform Components
 
-Source package: `docs/architecture/todo/p3/platform-evolution/`
+Source package: `docs/architecture/reviewed-packages/p3/platform-evolution/`
 
-Coverage matrix: `docs/architecture/todo/coverage-matrix.md`
+Coverage matrix: `docs/architecture/reviewed-packages/coverage-matrix.md`
 
 ## Verification Status
 
-Implemented as a component decision package. Redisson is accepted only for a proof-of-value behind a local coordination interface; other platform components are deferred or rejected for first proof. Evidence and decisions are in `docs/architecture/evidence/p3-07-platform-components.md`, `docs/architecture/platform-component-decision-matrix.md`, `docs/architecture/adr/platform-component-first-pov.md`, and `docs/architecture/platform-component-abstraction-plan.md`.
+Implemented as a component decision package. Redisson is accepted only for a proof-of-value behind a local coordination interface; other platform components are deferred or rejected for first proof. Evidence and decisions are in `docs/architecture/evidence/p3-07-platform-components.md`, `docs/architecture/work-products/p3-07-platform-components/platform-component-decision-matrix.md`, `docs/architecture/adr/platform-component-first-pov.md`, and `docs/architecture/work-products/p3-07-platform-components/platform-component-abstraction-plan.md`.
 
 ## Source Documents
 

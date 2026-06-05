@@ -13,13 +13,13 @@
 ## Source Material
 
 - Spec: `../specs/P2-05-compliance-data-governance-spec.md`
-- Source package: `../../../todo/p2/compliance-data-governance/`
-- Coverage matrix: `../../../todo/coverage-matrix.md`
+- Source package: `../../../reviewed-packages/p2/compliance-data-governance/`
+- Coverage matrix: `../../../reviewed-packages/coverage-matrix.md`
 
 ## File Structure
 
 - Read: `docs/architecture/archive/completed/specs/P2-05-compliance-data-governance-spec.md`
-- Read: `docs/architecture/todo/p2/compliance-data-governance/plan.md`
+- Read: `docs/architecture/reviewed-packages/p2/compliance-data-governance/plan.md`
 - Read: `backend/canvas-engine/src/main/resources/db/migration/V3__auth_and_supplements.sql`
 - Read: `backend/canvas-engine/src/main/resources/db/migration/V60__marketing_policy_tables.sql`
 - Read: `backend/canvas-engine/src/main/resources/db/migration/V71__data_source_config.sql`

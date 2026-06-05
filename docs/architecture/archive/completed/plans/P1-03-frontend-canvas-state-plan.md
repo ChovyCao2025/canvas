@@ -13,8 +13,8 @@
 ## Source Material
 
 - Spec: `../specs/P1-03-frontend-canvas-state-spec.md`
-- Source package: `../../../todo/p1/frontend-canvas-state/`
-- Coverage matrix: `../../../todo/coverage-matrix.md`
+- Source package: `../../../reviewed-packages/p1/frontend-canvas-state/`
+- Coverage matrix: `../../../reviewed-packages/coverage-matrix.md`
 
 ## File Structure
 

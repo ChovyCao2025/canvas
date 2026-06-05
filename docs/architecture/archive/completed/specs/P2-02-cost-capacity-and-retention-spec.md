@@ -1,8 +1,8 @@
 # Spec: Cost, Capacity, And Retention
 
-Source package: `docs/architecture/todo/p2/cost-capacity-and-retention/`
+Source package: `docs/architecture/reviewed-packages/p2/cost-capacity-and-retention/`
 
-Coverage matrix: `docs/architecture/todo/coverage-matrix.md`
+Coverage matrix: `docs/architecture/reviewed-packages/coverage-matrix.md`
 
 
 ## Verification Status

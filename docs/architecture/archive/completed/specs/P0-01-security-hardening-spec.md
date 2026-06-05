@@ -1,8 +1,8 @@
 # Spec: Security Hardening
 
-Source package: `docs/architecture/todo/p0/security-hardening/`
+Source package: `docs/architecture/reviewed-packages/p0/security-hardening/`
 
-Coverage matrix: `docs/architecture/todo/coverage-matrix.md`
+Coverage matrix: `docs/architecture/reviewed-packages/coverage-matrix.md`
 
 
 ## Verification Status

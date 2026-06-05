@@ -1,6 +1,6 @@
 # Architecture Plans
 
-This folder is the navigation entry for priority-prefixed implementation plans materialized from `docs/architecture/todo/`.
+This folder is the navigation entry for priority-prefixed implementation plans materialized from `docs/architecture/reviewed-packages/`.
 
 Completed plan files are archived under `../archive/completed/plans/`.
 
@@ -12,7 +12,7 @@ Active decisions live in archived specs and plans, ADRs, guides, reference docs,
 
 ## P3 Platform Evolution Entry Point
 
-`../archive/completed/plans/P3-01-platform-evolution-plan.md` is the platform-evolution entry point. Focused P3 implementation remains blocked until `../platform-evolution-promotion-checklist.md` has owner, success metrics, migration, rollback, operations, security, compliance, tenant impact, team capacity, verification command, and evidence path filled for the promoted item.
+`../archive/completed/plans/P3-01-platform-evolution-plan.md` is the platform-evolution entry point. Focused P3 implementation remains blocked until `../work-products/p3-01-platform-evolution/platform-evolution-promotion-checklist.md` has owner, success metrics, migration, rollback, operations, security, compliance, tenant impact, team capacity, verification command, and evidence path filled for the promoted item.
 
 | Priority | Plan | Spec |
 |---|---|---|

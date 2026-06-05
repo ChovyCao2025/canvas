@@ -10,8 +10,8 @@ Physical extraction remains deferred by `docs/architecture/adr/ADR-0006-service-
 
 ## Created Documents
 
-- `docs/architecture/domain-map.md`
-- `docs/architecture/domain-contract-inventory.md`
+- `docs/architecture/work-products/p3-02-service-boundaries/domain-map.md`
+- `docs/architecture/work-products/p3-02-service-boundaries/domain-contract-inventory.md`
 - `docs/architecture/adr/ADR-0007-first-extraction-candidate.md`
 
 ## Inventory Evidence
@@ -45,7 +45,7 @@ Canvas Authoring and Execution Runtime are explicitly not first candidates. They
 
 ## Contract Evidence
 
-`docs/architecture/domain-contract-inventory.md` records:
+`docs/architecture/work-products/p3-02-service-boundaries/domain-contract-inventory.md` records:
 
 - REST contracts for notification, delivery/receipt, CDP read-model dependency, and integration/provider dependency.
 - Event and MQ contracts for notification realtime events, WebSocket tickets, delivery wakeups, runtime system alerts, provider responses, and cache invalidation.
@@ -86,13 +86,13 @@ Result: 16 test files passed, 49 tests passed.
 Documentation checks:
 
 ```bash
-test -f docs/architecture/domain-map.md
-rg "Canvas Authoring|Execution Runtime|CDP / Audience|Reach / Notification|Integration|Platform|Data Platform / Analytics|forbidden dependencies" docs/architecture/domain-map.md
+test -f docs/architecture/work-products/p3-02-service-boundaries/domain-map.md
+rg "Canvas Authoring|Execution Runtime|CDP / Audience|Reach / Notification|Integration|Platform|Data Platform / Analytics|forbidden dependencies" docs/architecture/work-products/p3-02-service-boundaries/domain-map.md
 test -f docs/architecture/adr/ADR-0007-first-extraction-candidate.md
-rg "CDP / Audience|Reach / Notification|Integration / WeCom|coupling|data ownership|rollback|Deferred|ADR-0006" docs/architecture/domain-map.md docs/architecture/adr/ADR-0007-first-extraction-candidate.md
-test -f docs/architecture/domain-contract-inventory.md
-rg "REST|event|Redis key|MQ|table|DTO|tenant|synchronous API|read model|prohibited coupling|compatibility window" docs/architecture/domain-contract-inventory.md
-rg "old path|new path|dual-read|dual-write|compatibility window|rollback trigger|reconciliation|tenant context|trace context|idempotency|ADR-0006" docs/architecture/domain-contract-inventory.md docs/architecture/adr/ADR-0007-first-extraction-candidate.md
+rg "CDP / Audience|Reach / Notification|Integration / WeCom|coupling|data ownership|rollback|Deferred|ADR-0006" docs/architecture/work-products/p3-02-service-boundaries/domain-map.md docs/architecture/adr/ADR-0007-first-extraction-candidate.md
+test -f docs/architecture/work-products/p3-02-service-boundaries/domain-contract-inventory.md
+rg "REST|event|Redis key|MQ|table|DTO|tenant|synchronous API|read model|prohibited coupling|compatibility window" docs/architecture/work-products/p3-02-service-boundaries/domain-contract-inventory.md
+rg "old path|new path|dual-read|dual-write|compatibility window|rollback trigger|reconciliation|tenant context|trace context|idempotency|ADR-0006" docs/architecture/work-products/p3-02-service-boundaries/domain-contract-inventory.md docs/architecture/adr/ADR-0007-first-extraction-candidate.md
 ```
 
 Result: all documentation checks passed.

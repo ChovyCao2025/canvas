@@ -15,8 +15,8 @@
 ## Source Material
 
 - Spec: `../specs/P0-03-canvas-state-data-consistency-spec.md`
-- Source package: `../../../todo/p0/canvas-state-data-consistency/`
-- Coverage matrix: `../../../todo/coverage-matrix.md`
+- Source package: `../../../reviewed-packages/p0/canvas-state-data-consistency/`
+- Coverage matrix: `../../../reviewed-packages/coverage-matrix.md`
 - Evidence: `../evidence/P0-03-canvas-state-data-consistency.md`
 
 ## File Structure

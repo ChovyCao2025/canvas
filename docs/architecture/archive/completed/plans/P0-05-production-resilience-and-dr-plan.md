@@ -13,8 +13,8 @@
 ## Source Material
 
 - Spec: `../specs/P0-05-production-resilience-and-dr-spec.md`
-- Source package: `../../../todo/p0/production-resilience-and-dr/`
-- Coverage matrix: `../../../todo/coverage-matrix.md`
+- Source package: `../../../reviewed-packages/p0/production-resilience-and-dr/`
+- Coverage matrix: `../../../reviewed-packages/coverage-matrix.md`
 
 ## File Structure
 

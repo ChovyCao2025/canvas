@@ -1,6 +1,6 @@
 # Architecture Archive
 
-This folder contains source documents that were processed into the active architecture todo queue.
+This folder contains source documents that were processed into reviewed architecture packages, plus completed spec/plan packages.
 
 ## Categories
 
@@ -10,4 +10,4 @@ This folder contains source documents that were processed into the active archit
 - `evolution/`: long-term target architecture and migration documents.
 - `completed/`: completed priority-prefixed architecture specs and implementation plans.
 
-The archive is retained for traceability. Do not use historical source documents as the active implementation queue; use [../todo/README.md](../todo/README.md), [../specs/README.md](../specs/README.md), and [../plans/README.md](../plans/README.md) as the current entry points.
+The archive is retained for traceability. Do not use historical source documents as the active implementation queue; use [../reviewed-packages/README.md](../reviewed-packages/README.md), [../specs/README.md](../specs/README.md), [../plans/README.md](../plans/README.md), and [../work-products/README.md](../work-products/README.md) as the current entry points.

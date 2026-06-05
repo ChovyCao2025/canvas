@@ -1,8 +1,8 @@
 # Spec: Canvas State And Data Consistency
 
-Source package: `docs/architecture/todo/p0/canvas-state-data-consistency/`
+Source package: `docs/architecture/reviewed-packages/p0/canvas-state-data-consistency/`
 
-Coverage matrix: `docs/architecture/todo/coverage-matrix.md`
+Coverage matrix: `docs/architecture/reviewed-packages/coverage-matrix.md`
 
 
 ## Verification Status

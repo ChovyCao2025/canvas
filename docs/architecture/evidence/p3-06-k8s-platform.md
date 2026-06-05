@@ -8,7 +8,7 @@ P3-06 now has an operating model, application Helm chart, and rollout/rollback r
 
 ## Created Documents And Assets
 
-- `docs/architecture/k8s-operating-model.md`
+- `docs/architecture/work-products/p3-06-k8s-platform/k8s-operating-model.md`
 - `deploy/helm/canvas/Chart.yaml`
 - `deploy/helm/canvas/values.yaml`
 - `deploy/helm/canvas/values-staging.yaml`
@@ -44,8 +44,8 @@ P3-06 now has an operating model, application Helm chart, and rollout/rollback r
 ## Verification Commands
 
 ```bash
-test -f docs/architecture/k8s-operating-model.md
-rg -n "MySQL|Redis|RocketMQ|Ingress|Monitoring|Secrets|SLO|staging|production|managed service|self-operated" docs/architecture/k8s-operating-model.md
+test -f docs/architecture/work-products/p3-06-k8s-platform/k8s-operating-model.md
+rg -n "MySQL|Redis|RocketMQ|Ingress|Monitoring|Secrets|SLO|staging|production|managed service|self-operated" docs/architecture/work-products/p3-06-k8s-platform/k8s-operating-model.md
 test -f deploy/helm/canvas/Chart.yaml
 helm template canvas deploy/helm/canvas -f deploy/helm/canvas/values-staging.yaml >/tmp/canvas-staging.yaml
 rg -n "readinessProbe|livenessProbe|resources|secretKeyRef|actuator|Service|Ingress" /tmp/canvas-staging.yaml

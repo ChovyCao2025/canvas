@@ -14,7 +14,7 @@
 
 - Spec: `../specs/P3-00-architecture-boundary-review-spec.md`
 - Code verification: `../specs/P3-00-architecture-boundary-code-verification.md`
-- Coverage matrix: `../../../todo/coverage-matrix.md`
+- Coverage matrix: `../../../reviewed-packages/coverage-matrix.md`
 - Related specs: `../specs/P3-02-service-decomposition-and-domain-boundaries-spec.md`, `../specs/P3-03-data-platform-architecture-spec.md`, `../specs/P3-08-wecom-scrm-module-spec.md`
 
 ## File Structure

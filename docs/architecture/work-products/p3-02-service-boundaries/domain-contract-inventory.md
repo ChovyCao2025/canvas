@@ -2,7 +2,7 @@
 
 Date: 2026-06-05
 
-Status: Active P3-02 contract inventory. It supports `docs/architecture/domain-map.md` and `docs/architecture/adr/ADR-0007-first-extraction-candidate.md`.
+Status: Active P3-02 contract inventory. It supports `docs/architecture/work-products/p3-02-service-boundaries/domain-map.md` and `docs/architecture/adr/ADR-0007-first-extraction-candidate.md`.
 
 Chosen context for boundary hardening: Reach / Notification. Physical extraction is deferred until `docs/architecture/adr/ADR-0006-service-extraction-gate.md` is satisfied.
 
@@ -105,4 +105,4 @@ Backend characterization coverage required before extraction:
 
 Frontend API contract tests are not required for this P3-02 implementation because no route payload changes are made. If `NotificationDTO`, WebSocket payloads, or delivery API shapes change later, add focused frontend tests beside the changed service.
 
-No physical service extraction can start until this inventory, `docs/architecture/domain-map.md`, and `docs/architecture/adr/ADR-0007-first-extraction-candidate.md` are updated with passing verification evidence.
+No physical service extraction can start until this inventory, `docs/architecture/work-products/p3-02-service-boundaries/domain-map.md`, and `docs/architecture/adr/ADR-0007-first-extraction-candidate.md` are updated with passing verification evidence.

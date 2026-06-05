@@ -45,19 +45,19 @@ The boundary review is the first gate for:
 - Kubernetes deployment topology;
 - production platform components.
 
-P3-01 itself remains documentation-only except for the governance checklist in `docs/architecture/platform-evolution-promotion-checklist.md`.
+P3-01 itself remains documentation-only except for the governance checklist in `docs/architecture/work-products/p3-01-platform-evolution/platform-evolution-promotion-checklist.md`.
 
 ## Verification Commands
 
 ```bash
 test -f docs/architecture/evidence/p3-01-platform-evolution.md
 rg "service-architecture-design|target-architecture-overview|architect-critical-review|data-platform-architecture|production-practice-review|source evidence" docs/architecture/evidence/p3-01-platform-evolution.md
-test -f docs/architecture/platform-evolution-promotion-checklist.md
-rg "P3-01|platform-evolution entry point|owner|success metrics|migration|rollback|team capacity" docs/architecture/plans/README.md docs/architecture/platform-evolution-promotion-checklist.md
-rg "P0-01|P0-03|P0-06|P1-04|P1-05|risk acceptance|expiration date" docs/architecture/platform-evolution-promotion-checklist.md
-rg "P3-02|P3-03|P3-04|P3-05|P3-06|P3-07|P3-08|P3-09|ADR|evidence file" docs/architecture/platform-evolution-promotion-checklist.md
-rg "migration plan|rollback plan|operating model|on-call owner|runbook|test plan|data migration|observability|team capacity" docs/architecture/platform-evolution-promotion-checklist.md
-rg "P3 platform evolution" docs/architecture/todo/coverage-matrix.md
+test -f docs/architecture/work-products/p3-01-platform-evolution/platform-evolution-promotion-checklist.md
+rg "P3-01|platform-evolution entry point|owner|success metrics|migration|rollback|team capacity" docs/architecture/plans/README.md docs/architecture/work-products/p3-01-platform-evolution/platform-evolution-promotion-checklist.md
+rg "P0-01|P0-03|P0-06|P1-04|P1-05|risk acceptance|expiration date" docs/architecture/work-products/p3-01-platform-evolution/platform-evolution-promotion-checklist.md
+rg "P3-02|P3-03|P3-04|P3-05|P3-06|P3-07|P3-08|P3-09|ADR|evidence file" docs/architecture/work-products/p3-01-platform-evolution/platform-evolution-promotion-checklist.md
+rg "migration plan|rollback plan|operating model|on-call owner|runbook|test plan|data migration|observability|team capacity" docs/architecture/work-products/p3-01-platform-evolution/platform-evolution-promotion-checklist.md
+rg "P3 platform evolution" docs/architecture/reviewed-packages/coverage-matrix.md
 ```
 
 Result: all documentation checks passed.

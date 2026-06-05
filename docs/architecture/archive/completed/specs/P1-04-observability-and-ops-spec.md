@@ -1,8 +1,8 @@
 # Spec: Observability And Ops
 
-Source package: `docs/architecture/todo/p1/observability-and-ops/`
+Source package: `docs/architecture/reviewed-packages/p1/observability-and-ops/`
 
-Coverage matrix: `docs/architecture/todo/coverage-matrix.md`
+Coverage matrix: `docs/architecture/reviewed-packages/coverage-matrix.md`
 
 
 ## Verification Status

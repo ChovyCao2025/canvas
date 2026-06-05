@@ -16,12 +16,12 @@
 - Boundary review: `../specs/P3-00-architecture-boundary-review-spec.md`
 - Boundary evidence: `../evidence/p3-00-architecture-boundary-review.md`
 - Evolution doc: `../archive/evolution/k8s-deployment-plan.md`
-- Coverage matrix: `../../../todo/coverage-matrix.md`
+- Coverage matrix: `../../../reviewed-packages/coverage-matrix.md`
 
 ## File Structure
 
 - Create: `docs/architecture/evidence/p3-06-k8s-platform.md`
-- Create: `docs/architecture/k8s-operating-model.md`
+- Create: `docs/architecture/work-products/p3-06-k8s-platform/k8s-operating-model.md`
 - Create: `deploy/helm/canvas/Chart.yaml`
 - Create: `deploy/helm/canvas/values.yaml`
 - Create: `deploy/helm/canvas/values-staging.yaml`
@@ -36,7 +36,7 @@
 ### Task 1: Define Operating Model
 
 **Files:**
-- Create: `docs/architecture/k8s-operating-model.md`
+- Create: `docs/architecture/work-products/p3-06-k8s-platform/k8s-operating-model.md`
 - Create: `docs/architecture/evidence/p3-06-k8s-platform.md`
 
 - [x] Name owners for MySQL, Redis, RocketMQ, ingress, monitoring, secrets, image registry, and cluster upgrades.
@@ -46,8 +46,8 @@
 Run:
 
 ```bash
-test -f docs/architecture/k8s-operating-model.md
-rg -n "MySQL|Redis|RocketMQ|Ingress|Monitoring|Secrets|SLO|staging|production|managed service|self-operated" docs/architecture/k8s-operating-model.md
+test -f docs/architecture/work-products/p3-06-k8s-platform/k8s-operating-model.md
+rg -n "MySQL|Redis|RocketMQ|Ingress|Monitoring|Secrets|SLO|staging|production|managed service|self-operated" docs/architecture/work-products/p3-06-k8s-platform/k8s-operating-model.md
 ```
 
 Expected: operating model names dependency owners, environments, SLOs, and operating responsibility.
@@ -95,7 +95,7 @@ Run:
 ```bash
 test -f docs/architecture/runbooks/k8s-rollout-rollback.md
 rg -n "Smoke|Health|Metrics|Login|Rollback|Migration|Image|Config|Evidence" docs/architecture/runbooks/k8s-rollout-rollback.md
-git diff -- deploy/helm/canvas docs/architecture/k8s-operating-model.md docs/architecture/runbooks/k8s-rollout-rollback.md docs/architecture/evidence/p3-06-k8s-platform.md docs/architecture/archive/completed/plans/P3-06-k8s-deployment-platform-plan.md
+git diff -- deploy/helm/canvas docs/architecture/work-products/p3-06-k8s-platform/k8s-operating-model.md docs/architecture/runbooks/k8s-rollout-rollback.md docs/architecture/evidence/p3-06-k8s-platform.md docs/architecture/archive/completed/plans/P3-06-k8s-deployment-platform-plan.md
 # Do not stage or commit in this session unless the user explicitly asks.
 ```
 

@@ -1,12 +1,12 @@
 # Spec: WebFlux To MVC Migration
 
-Source package: `docs/architecture/todo/p3/platform-evolution/`
+Source package: `docs/architecture/reviewed-packages/p3/platform-evolution/`
 
-Coverage matrix: `docs/architecture/todo/coverage-matrix.md`
+Coverage matrix: `docs/architecture/reviewed-packages/coverage-matrix.md`
 
 ## Verification Status
 
-Implemented as a runtime decision package. MVC migration is deferred; WebFlux hardening plus hybrid containment remains the current path. Evidence and decisions are in `docs/architecture/evidence/p3-05-webflux-mvc.md`, `docs/architecture/webflux-mvc-migration-inventory.md`, `docs/architecture/adr/webflux-vs-mvc.md`, and `docs/architecture/webflux-mvc-first-slice.md`.
+Implemented as a runtime decision package. MVC migration is deferred; WebFlux hardening plus hybrid containment remains the current path. Evidence and decisions are in `docs/architecture/evidence/p3-05-webflux-mvc.md`, `docs/architecture/work-products/p3-05-runtime-model/webflux-mvc-migration-inventory.md`, `docs/architecture/adr/webflux-vs-mvc.md`, and `docs/architecture/work-products/p3-05-runtime-model/webflux-mvc-first-slice.md`.
 
 ## Source Documents
 

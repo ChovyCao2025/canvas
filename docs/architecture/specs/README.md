@@ -1,10 +1,10 @@
 # Architecture Specs
 
-This folder is the navigation entry for flattened, priority-prefixed specs materialized from `docs/architecture/todo/`.
+This folder is the navigation entry for flattened, priority-prefixed specs materialized from `docs/architecture/reviewed-packages/`.
 
 Completed spec files are archived under `../archive/completed/specs/`.
 
-For source-to-package traceability, keep using `../todo/coverage-matrix.md`.
+For source-to-package traceability, keep using `../reviewed-packages/coverage-matrix.md`.
 
 Supporting verification artifacts:
 

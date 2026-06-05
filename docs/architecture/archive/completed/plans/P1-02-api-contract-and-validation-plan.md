@@ -13,8 +13,8 @@
 ## Source Material
 
 - Spec: `../specs/P1-02-api-contract-and-validation-spec.md`
-- Source package: `../../../todo/p1/api-contract-and-validation/`
-- Coverage matrix: `../../../todo/coverage-matrix.md`
+- Source package: `../../../reviewed-packages/p1/api-contract-and-validation/`
+- Coverage matrix: `../../../reviewed-packages/coverage-matrix.md`
 
 ## File Structure
 

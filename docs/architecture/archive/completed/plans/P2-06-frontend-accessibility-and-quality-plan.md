@@ -13,13 +13,13 @@
 ## Source Material
 
 - Spec: `../specs/P2-06-frontend-accessibility-and-quality-spec.md`
-- Source package: `../../../todo/p2/frontend-accessibility-and-quality/`
-- Coverage matrix: `../../../todo/coverage-matrix.md`
+- Source package: `../../../reviewed-packages/p2/frontend-accessibility-and-quality/`
+- Coverage matrix: `../../../reviewed-packages/coverage-matrix.md`
 
 ## File Structure
 
 - Read: `docs/architecture/archive/completed/specs/P2-06-frontend-accessibility-and-quality-spec.md`
-- Read: `docs/architecture/todo/p2/frontend-accessibility-and-quality/plan.md`
+- Read: `docs/architecture/reviewed-packages/p2/frontend-accessibility-and-quality/plan.md`
 - Modify: `frontend/src/App.tsx`
 - Modify: `frontend/src/main.tsx`
 - Modify: `frontend/package.json`

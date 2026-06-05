@@ -1,8 +1,8 @@
 # Spec: Dependency Abstraction And Vendor Lock-In
 
-Source package: `docs/architecture/todo/p2/dependency-abstraction-and-vendor-lock-in/`
+Source package: `docs/architecture/reviewed-packages/p2/dependency-abstraction-and-vendor-lock-in/`
 
-Coverage matrix: `docs/architecture/todo/coverage-matrix.md`
+Coverage matrix: `docs/architecture/reviewed-packages/coverage-matrix.md`
 
 
 ## Verification Status

@@ -13,13 +13,13 @@
 ## Source Material
 
 - Spec: `../specs/P2-04-dependency-abstraction-and-vendor-lock-in-spec.md`
-- Source package: `../../../todo/p2/dependency-abstraction-and-vendor-lock-in/`
-- Coverage matrix: `../../../todo/coverage-matrix.md`
+- Source package: `../../../reviewed-packages/p2/dependency-abstraction-and-vendor-lock-in/`
+- Coverage matrix: `../../../reviewed-packages/coverage-matrix.md`
 
 ## File Structure
 
 - Read: `docs/architecture/archive/completed/specs/P2-04-dependency-abstraction-and-vendor-lock-in-spec.md`
-- Read: `docs/architecture/todo/p2/dependency-abstraction-and-vendor-lock-in/plan.md`
+- Read: `docs/architecture/reviewed-packages/p2/dependency-abstraction-and-vendor-lock-in/plan.md`
 - Read: `backend/canvas-engine/src/main/java/org/chovy/canvas/engine/handlers/SendMqHandler.java`
 - Read: `backend/canvas-engine/src/main/java/org/chovy/canvas/infrastructure/mq/MqTriggerConsumer.java`
 - Read: `backend/canvas-engine/src/main/java/org/chovy/canvas/infrastructure/cache/RocketMqCacheInvalidationPublisher.java`

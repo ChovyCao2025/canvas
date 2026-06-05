@@ -13,13 +13,13 @@
 ## Source Material
 
 - Spec: `../specs/P2-03-documentation-adr-and-runbooks-spec.md`
-- Source package: `../../../todo/p2/documentation-adr-and-runbooks/`
-- Coverage matrix: `../../../todo/coverage-matrix.md`
+- Source package: `../../../reviewed-packages/p2/documentation-adr-and-runbooks/`
+- Coverage matrix: `../../../reviewed-packages/coverage-matrix.md`
 
 ## File Structure
 
 - Read: `docs/architecture/archive/completed/specs/P2-03-documentation-adr-and-runbooks-spec.md`
-- Read: `docs/architecture/todo/p2/documentation-adr-and-runbooks/plan.md`
+- Read: `docs/architecture/reviewed-packages/p2/documentation-adr-and-runbooks/plan.md`
 - Read: `docs/architecture/archive/evolution/production-practice-review.md`
 - Read: `docs/architecture/archive/reviews/architect-checklist-report.md`
 - Read: `backend/canvas-engine/src/main/java/org/chovy/canvas/infrastructure/redis/RedisKeyUtil.java`

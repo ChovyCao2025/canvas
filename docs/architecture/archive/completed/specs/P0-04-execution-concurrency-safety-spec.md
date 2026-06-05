@@ -1,8 +1,8 @@
 # Spec: Execution Concurrency Safety
 
-Source package: `docs/architecture/todo/p0/execution-concurrency-safety/`
+Source package: `docs/architecture/reviewed-packages/p0/execution-concurrency-safety/`
 
-Coverage matrix: `docs/architecture/todo/coverage-matrix.md`
+Coverage matrix: `docs/architecture/reviewed-packages/coverage-matrix.md`
 
 
 ## Verification Status

@@ -13,8 +13,8 @@
 ## Source Material
 
 - Spec: `../specs/P1-04-observability-and-ops-spec.md`
-- Source package: `../../../todo/p1/observability-and-ops/`
-- Coverage matrix: `../../../todo/coverage-matrix.md`
+- Source package: `../../../reviewed-packages/p1/observability-and-ops/`
+- Coverage matrix: `../../../reviewed-packages/coverage-matrix.md`
 
 ## File Structure
 

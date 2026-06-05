@@ -1,13 +1,13 @@
 # Spec: Platform Evolution
 
-Source package: `docs/architecture/todo/p3/platform-evolution/`
+Source package: `docs/architecture/reviewed-packages/p3/platform-evolution/`
 
-Coverage matrix: `docs/architecture/todo/coverage-matrix.md`
+Coverage matrix: `docs/architecture/reviewed-packages/coverage-matrix.md`
 
 
 ## Verification Status
 
-Implemented as a governance/documentation package. Evidence, promotion gates, and focused P3 links are recorded in `docs/architecture/evidence/p3-01-platform-evolution.md`, `docs/architecture/platform-evolution-promotion-checklist.md`, `docs/architecture/plans/README.md`, and `docs/architecture/todo/coverage-matrix.md`.
+Implemented as a governance/documentation package. Evidence, promotion gates, and focused P3 links are recorded in `docs/architecture/evidence/p3-01-platform-evolution.md`, `docs/architecture/work-products/p3-01-platform-evolution/platform-evolution-promotion-checklist.md`, `docs/architecture/plans/README.md`, and `docs/architecture/reviewed-packages/coverage-matrix.md`.
 
 ## Content Group
 
@@ -22,7 +22,7 @@ This spec is the umbrella for long-term target architecture. Boundary decisions 
 - `P3-08-wecom-scrm-module-spec.md`
 - `P3-09-identity-event-and-tenant-platform-spec.md`
 
-These are not immediate bug-fix todo items. They should remain P3 until P0/P1 risks are reduced and product/team capacity is confirmed.
+These are not immediate bug-fix tasks. They should remain P3 until P0/P1 risks are reduced and product/team capacity is confirmed.
 
 ## Acceptance Criteria
 

@@ -1,6 +1,8 @@
-# Architecture Todo Index
+# Reviewed Architecture Packages
 
-This folder is the active architecture work queue. Items here were extracted from the previous architecture reviews and re-checked against the current repository.
+This folder contains reviewed architecture source packages. Items here were extracted from previous architecture reviews and re-checked against the current repository.
+
+This is not the active implementation backlog. Completed handoff documents live under `../archive/completed/specs/` and `../archive/completed/plans/`; supporting outputs from P3 work live under `../work-products/`.
 
 For source-to-package traceability, see [coverage-matrix.md](coverage-matrix.md).
 
@@ -14,7 +16,7 @@ Flattened priority-prefixed specs are available in [../specs/](../specs/README.m
 - `p3/`: long-term evolution and platform direction.
 - `needs-review/`: stale, duplicate, or decision-dependent findings.
 
-## Active Packages
+## Reviewed Packages
 
 | Priority | Package | Status |
 |---|---|---|

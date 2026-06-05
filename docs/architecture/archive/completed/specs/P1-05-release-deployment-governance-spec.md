@@ -1,8 +1,8 @@
 # Spec: Release And Deployment Governance
 
-Source package: `docs/architecture/todo/p1/release-deployment-governance/`
+Source package: `docs/architecture/reviewed-packages/p1/release-deployment-governance/`
 
-Coverage matrix: `docs/architecture/todo/coverage-matrix.md`
+Coverage matrix: `docs/architecture/reviewed-packages/coverage-matrix.md`
 
 
 ## Verification Status

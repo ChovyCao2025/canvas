@@ -147,7 +147,7 @@ Shared transactions are allowed inside the current monolith but are not allowed 
 
 Physical extraction can be reconsidered only when all conditions are true:
 
-- `docs/architecture/domain-contract-inventory.md` has current REST, event, Redis key, MQ, table, DTO, tenant, compatibility window, rollback trigger, and reconciliation details.
+- `docs/architecture/work-products/p3-02-service-boundaries/domain-contract-inventory.md` has current REST, event, Redis key, MQ, table, DTO, tenant, compatibility window, rollback trigger, and reconciliation details.
 - CDP/contactability dependencies use a read model or synchronous API instead of direct table reads.
 - Runtime system alerts use an event contract instead of direct `NotificationEventService` calls.
 - Delivery commands use a port and have idempotency tests.
@@ -184,5 +184,5 @@ Architecture owner with backend, frontend, data, security/compliance, and operat
 - `docs/architecture/evidence/p3-00-architecture-boundary-review.md`
 - `docs/architecture/adr/ADR-0006-service-extraction-gate.md`
 - `docs/architecture/archive/completed/specs/P3-02-service-decomposition-and-domain-boundaries-spec.md`
-- `docs/architecture/domain-map.md`
-- `docs/architecture/domain-contract-inventory.md`
+- `docs/architecture/work-products/p3-02-service-boundaries/domain-map.md`
+- `docs/architecture/work-products/p3-02-service-boundaries/domain-contract-inventory.md`

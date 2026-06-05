@@ -2,7 +2,7 @@
 
 Date: 2026-06-03
 
-This matrix audits every archived architecture document and maps its findings or major topics to the active todo queue. It is a coverage map, not proof that every claim is already fixed.
+This matrix audits every archived architecture document and maps its findings or major topics to the reviewed package record. It is a coverage map, not proof that every claim is already fixed.
 
 ## Status Legend
 
@@ -15,25 +15,25 @@ This matrix audits every archived architecture document and maps its findings or
 
 ## Package Legend
 
-- `P0/security`: `todo/p0/security-hardening`; `archive/completed/specs/P0-01-security-hardening-spec.md`; `archive/completed/plans/P0-01-security-hardening-plan.md`
-- `P0/reactive`: `todo/p0/reactive-threading-and-transactions`; `archive/completed/specs/P0-02-reactive-threading-and-transactions-spec.md`; `archive/completed/plans/P0-02-reactive-threading-and-transactions-plan.md`
-- `P0/state`: `todo/p0/canvas-state-data-consistency`; `archive/completed/specs/P0-03-canvas-state-data-consistency-spec.md`; `archive/completed/plans/P0-03-canvas-state-data-consistency-plan.md`
-- `P0/concurrency`: `todo/p0/execution-concurrency-safety`; `archive/completed/specs/P0-04-execution-concurrency-safety-spec.md`; `archive/completed/plans/P0-04-execution-concurrency-safety-plan.md`
-- `P0/resilience`: `todo/p0/production-resilience-and-dr`; `archive/completed/specs/P0-05-production-resilience-and-dr-spec.md`; `archive/completed/plans/P0-05-production-resilience-and-dr-plan.md`
-- `P0/data`: `todo/p0/data-security-and-tenant-isolation`; `archive/completed/specs/P0-06-data-security-and-tenant-isolation-spec.md`; `archive/completed/plans/P0-06-data-security-and-tenant-isolation-plan.md`
-- `P1/dag`: `todo/p1/dag-engine-and-handler-boundaries`; `archive/completed/specs/P1-01-dag-engine-and-handler-boundaries-spec.md`; `archive/completed/plans/P1-01-dag-engine-and-handler-boundaries-plan.md`
-- `P1/api`: `todo/p1/api-contract-and-validation`; `archive/completed/specs/P1-02-api-contract-and-validation-spec.md`; `archive/completed/plans/P1-02-api-contract-and-validation-plan.md`
-- `P1/frontend`: `todo/p1/frontend-canvas-state`; `archive/completed/specs/P1-03-frontend-canvas-state-spec.md`; `archive/completed/plans/P1-03-frontend-canvas-state-plan.md`
-- `P1/observability`: `todo/p1/observability-and-ops`; `archive/completed/specs/P1-04-observability-and-ops-spec.md`; `archive/completed/plans/P1-04-observability-and-ops-plan.md`
-- `P1/release`: `todo/p1/release-deployment-governance`; `archive/completed/specs/P1-05-release-deployment-governance-spec.md`; `archive/completed/plans/P1-05-release-deployment-governance-plan.md`
-- `P2/testing`: `todo/p2/testing-foundation`; `archive/completed/specs/P2-01-testing-foundation-spec.md`; `archive/completed/plans/P2-01-testing-foundation-plan.md`
-- `P2/capacity`: `todo/p2/cost-capacity-and-retention`; `archive/completed/specs/P2-02-cost-capacity-and-retention-spec.md`; `archive/completed/plans/P2-02-cost-capacity-and-retention-plan.md`
-- `P2/docs`: `todo/p2/documentation-adr-and-runbooks`; `archive/completed/specs/P2-03-documentation-adr-and-runbooks-spec.md`; `archive/completed/plans/P2-03-documentation-adr-and-runbooks-plan.md`
-- `P2/deps`: `todo/p2/dependency-abstraction-and-vendor-lock-in`; `archive/completed/specs/P2-04-dependency-abstraction-and-vendor-lock-in-spec.md`; `archive/completed/plans/P2-04-dependency-abstraction-and-vendor-lock-in-plan.md`
-- `P2/compliance`: `todo/p2/compliance-data-governance`; `archive/completed/specs/P2-05-compliance-data-governance-spec.md`; `archive/completed/plans/P2-05-compliance-data-governance-plan.md`
-- `P2/a11y`: `todo/p2/frontend-accessibility-and-quality`; `archive/completed/specs/P2-06-frontend-accessibility-and-quality-spec.md`; `archive/completed/plans/P2-06-frontend-accessibility-and-quality-plan.md`
+- `P0/security`: `reviewed-packages/p0/security-hardening`; `archive/completed/specs/P0-01-security-hardening-spec.md`; `archive/completed/plans/P0-01-security-hardening-plan.md`
+- `P0/reactive`: `reviewed-packages/p0/reactive-threading-and-transactions`; `archive/completed/specs/P0-02-reactive-threading-and-transactions-spec.md`; `archive/completed/plans/P0-02-reactive-threading-and-transactions-plan.md`
+- `P0/state`: `reviewed-packages/p0/canvas-state-data-consistency`; `archive/completed/specs/P0-03-canvas-state-data-consistency-spec.md`; `archive/completed/plans/P0-03-canvas-state-data-consistency-plan.md`
+- `P0/concurrency`: `reviewed-packages/p0/execution-concurrency-safety`; `archive/completed/specs/P0-04-execution-concurrency-safety-spec.md`; `archive/completed/plans/P0-04-execution-concurrency-safety-plan.md`
+- `P0/resilience`: `reviewed-packages/p0/production-resilience-and-dr`; `archive/completed/specs/P0-05-production-resilience-and-dr-spec.md`; `archive/completed/plans/P0-05-production-resilience-and-dr-plan.md`
+- `P0/data`: `reviewed-packages/p0/data-security-and-tenant-isolation`; `archive/completed/specs/P0-06-data-security-and-tenant-isolation-spec.md`; `archive/completed/plans/P0-06-data-security-and-tenant-isolation-plan.md`
+- `P1/dag`: `reviewed-packages/p1/dag-engine-and-handler-boundaries`; `archive/completed/specs/P1-01-dag-engine-and-handler-boundaries-spec.md`; `archive/completed/plans/P1-01-dag-engine-and-handler-boundaries-plan.md`
+- `P1/api`: `reviewed-packages/p1/api-contract-and-validation`; `archive/completed/specs/P1-02-api-contract-and-validation-spec.md`; `archive/completed/plans/P1-02-api-contract-and-validation-plan.md`
+- `P1/frontend`: `reviewed-packages/p1/frontend-canvas-state`; `archive/completed/specs/P1-03-frontend-canvas-state-spec.md`; `archive/completed/plans/P1-03-frontend-canvas-state-plan.md`
+- `P1/observability`: `reviewed-packages/p1/observability-and-ops`; `archive/completed/specs/P1-04-observability-and-ops-spec.md`; `archive/completed/plans/P1-04-observability-and-ops-plan.md`
+- `P1/release`: `reviewed-packages/p1/release-deployment-governance`; `archive/completed/specs/P1-05-release-deployment-governance-spec.md`; `archive/completed/plans/P1-05-release-deployment-governance-plan.md`
+- `P2/testing`: `reviewed-packages/p2/testing-foundation`; `archive/completed/specs/P2-01-testing-foundation-spec.md`; `archive/completed/plans/P2-01-testing-foundation-plan.md`
+- `P2/capacity`: `reviewed-packages/p2/cost-capacity-and-retention`; `archive/completed/specs/P2-02-cost-capacity-and-retention-spec.md`; `archive/completed/plans/P2-02-cost-capacity-and-retention-plan.md`
+- `P2/docs`: `reviewed-packages/p2/documentation-adr-and-runbooks`; `archive/completed/specs/P2-03-documentation-adr-and-runbooks-spec.md`; `archive/completed/plans/P2-03-documentation-adr-and-runbooks-plan.md`
+- `P2/deps`: `reviewed-packages/p2/dependency-abstraction-and-vendor-lock-in`; `archive/completed/specs/P2-04-dependency-abstraction-and-vendor-lock-in-spec.md`; `archive/completed/plans/P2-04-dependency-abstraction-and-vendor-lock-in-plan.md`
+- `P2/compliance`: `reviewed-packages/p2/compliance-data-governance`; `archive/completed/specs/P2-05-compliance-data-governance-spec.md`; `archive/completed/plans/P2-05-compliance-data-governance-plan.md`
+- `P2/a11y`: `reviewed-packages/p2/frontend-accessibility-and-quality`; `archive/completed/specs/P2-06-frontend-accessibility-and-quality-spec.md`; `archive/completed/plans/P2-06-frontend-accessibility-and-quality-plan.md`
 - `P3/boundary-review`: `archive/completed/specs/P3-00-architecture-boundary-review-spec.md`; `archive/completed/specs/P3-00-architecture-boundary-code-verification.md`; `archive/completed/plans/P3-00-architecture-boundary-review-plan.md`
-- `P3/evolution`: `todo/p3/platform-evolution`; `archive/completed/specs/P3-01-platform-evolution-spec.md`; `archive/completed/plans/P3-01-platform-evolution-plan.md`
+- `P3/evolution`: `reviewed-packages/p3/platform-evolution`; `archive/completed/specs/P3-01-platform-evolution-spec.md`; `archive/completed/plans/P3-01-platform-evolution-plan.md`
 - `P3/service-split`: `archive/completed/specs/P3-02-service-decomposition-and-domain-boundaries-spec.md`; `archive/completed/plans/P3-02-service-decomposition-and-domain-boundaries-plan.md`
 - `P3/data-platform`: `archive/completed/specs/P3-03-data-platform-architecture-spec.md`; `archive/completed/plans/P3-03-data-platform-architecture-plan.md`
 - `P3/multi-datasource`: `archive/completed/specs/P3-04-multi-datasource-isolation-spec.md`; `archive/completed/plans/P3-04-multi-datasource-isolation-plan.md`
@@ -42,11 +42,11 @@ This matrix audits every archived architecture document and maps its findings or
 - `P3/platform-components`: `archive/completed/specs/P3-07-production-platform-components-spec.md`; `archive/completed/plans/P3-07-production-platform-components-plan.md`
 - `P3/wecom`: `archive/completed/specs/P3-08-wecom-scrm-module-spec.md`; `archive/completed/plans/P3-08-wecom-scrm-module-plan.md`
 - `P3/identity-event-tenant`: `archive/completed/specs/P3-09-identity-event-and-tenant-platform-spec.md`; `archive/completed/plans/P3-09-identity-event-and-tenant-platform-plan.md`
-- `needs-review`: `todo/needs-review/stale-and-duplicate-findings.md`
+- `needs-review`: `reviewed-packages/needs-review/stale-and-duplicate-findings.md`
 
 ## P3 Platform Evolution Gate
 
-P3 platform evolution is blocked until `docs/architecture/platform-evolution-promotion-checklist.md` is complete for the promoted item. The checklist must include owner, success metrics, user value, dependencies, migration plan, rollback plan, operating model, on-call owner, runbook, test plan, data migration, observability, security, compliance, tenant impact, team capacity, verification command, and expected evidence path. Archived evolution documents remain source evidence, not active implementation authority.
+P3 platform evolution is blocked until `docs/architecture/work-products/p3-01-platform-evolution/platform-evolution-promotion-checklist.md` is complete for the promoted item. The checklist must include owner, success metrics, user value, dependencies, migration plan, rollback plan, operating model, on-call owner, runbook, test plan, data migration, observability, security, compliance, tenant impact, team capacity, verification command, and expected evidence path. Archived evolution documents remain source evidence, not active implementation authority.
 
 ## Document Coverage
 

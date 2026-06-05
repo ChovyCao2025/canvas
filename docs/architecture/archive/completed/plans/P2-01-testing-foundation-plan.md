@@ -13,14 +13,14 @@
 ## Source Material
 
 - Spec: `../specs/P2-01-testing-foundation-spec.md`
-- Source package: `../../../todo/p2/testing-foundation/`
-- Coverage matrix: `../../../todo/coverage-matrix.md`
+- Source package: `../../../reviewed-packages/p2/testing-foundation/`
+- Coverage matrix: `../../../reviewed-packages/coverage-matrix.md`
 
 ## File Structure
 
 - Read: `docs/architecture/archive/completed/specs/P2-01-testing-foundation-spec.md`
-- Read: `docs/architecture/todo/p2/testing-foundation/plan.md`
-- Read: `docs/architecture/todo/coverage-matrix.md`
+- Read: `docs/architecture/reviewed-packages/p2/testing-foundation/plan.md`
+- Read: `docs/architecture/reviewed-packages/coverage-matrix.md`
 - Modify: `backend/canvas-engine/pom.xml`
 - Modify: `.github/workflows/canvas-ci.yml`
 - Create: `backend/canvas-engine/src/test/java/org/chovy/canvas/testsupport/CanvasIntegrationTestBase.java`

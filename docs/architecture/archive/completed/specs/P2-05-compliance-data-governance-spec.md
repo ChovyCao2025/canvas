@@ -1,8 +1,8 @@
 # Spec: Compliance And Data Governance
 
-Source package: `docs/architecture/todo/p2/compliance-data-governance/`
+Source package: `docs/architecture/reviewed-packages/p2/compliance-data-governance/`
 
-Coverage matrix: `docs/architecture/todo/coverage-matrix.md`
+Coverage matrix: `docs/architecture/reviewed-packages/coverage-matrix.md`
 
 
 ## Verification Status

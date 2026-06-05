@@ -13,13 +13,13 @@
 ## Source Material
 
 - Spec: `../specs/P2-02-cost-capacity-and-retention-spec.md`
-- Source package: `../../../todo/p2/cost-capacity-and-retention/`
-- Coverage matrix: `../../../todo/coverage-matrix.md`
+- Source package: `../../../reviewed-packages/p2/cost-capacity-and-retention/`
+- Coverage matrix: `../../../reviewed-packages/coverage-matrix.md`
 
 ## File Structure
 
 - Read: `docs/architecture/archive/completed/specs/P2-02-cost-capacity-and-retention-spec.md`
-- Read: `docs/architecture/todo/p2/cost-capacity-and-retention/plan.md`
+- Read: `docs/architecture/reviewed-packages/p2/cost-capacity-and-retention/plan.md`
 - Read: `backend/canvas-engine/src/main/resources/application.yml`
 - Read: `backend/canvas-engine/src/main/resources/application-prod.yml`
 - Read: `docker-compose.local.yml`
