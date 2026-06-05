@@ -1,8 +1,8 @@
 /* @vitest-environment jsdom */
-import React, { act } from 'react'
-import { createRoot, type Root } from 'react-dom/client'
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { homeApi } from '../../services/api'
 import type { HomeOverview } from './homeOverview'
 import HomePage from './index'
@@ -25,56 +25,37 @@ vi.mock('../../services/api', () => ({
 
 const overviewMock = vi.mocked(homeApi.overview)
 
-let root: Root | null = null
-let container: HTMLDivElement | null = null
-;(globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
-
 describe('HomePage', () => {
   beforeEach(() => {
     navigateMock.mockReset()
     overviewMock.mockReset()
-    installBrowserShims()
-  })
-
-  afterEach(async () => {
-    if (root) {
-      await act(async () => {
-        root?.unmount()
-      })
-    }
-    root = null
-    container = null
-    document.body.innerHTML = ''
   })
 
   it('renders the material ops dashboard layout', async () => {
     overviewMock.mockResolvedValueOnce({ data: overview() })
 
-    await renderHome()
+    renderHome()
 
-    expect(text()).toContain('运营驾驶舱')
-    expect(text()).toContain('沉睡用户召回')
-    expect(text()).toContain('失败率 4.8%')
-    expect(text()).toContain('异常队列')
-    expect(text()).toContain('Top 旅程表现')
-    expect(text()).toContain('常用动作')
-    expect(text()).toContain('128,430')
+    expect(await screen.findByText('运营驾驶舱')).toBeInTheDocument()
+    expect(screen.getAllByText('沉睡用户召回').length).toBeGreaterThan(0)
+    expect(screen.getByText('失败率 4.8%')).toBeInTheDocument()
+    expect(screen.getByText('异常队列')).toBeInTheDocument()
+    expect(screen.getByText('Top 旅程表现')).toBeInTheDocument()
+    expect(screen.getByText('常用动作')).toBeInTheDocument()
+    expect(screen.getByText('128,430')).toBeInTheDocument()
   })
 
   it('filters loaded journey names locally without re-calling the API', async () => {
+    const user = userEvent.setup()
     overviewMock.mockResolvedValueOnce({ data: overview() })
 
-    await renderHome()
-    const search = inputByPlaceholder('搜索当前首页旅程')
+    renderHome()
+    await screen.findByText('新人激活 7 日链路')
 
-    await act(async () => {
-      search.value = '召回'
-      search.dispatchEvent(new Event('input', { bubbles: true }))
-      search.dispatchEvent(new Event('change', { bubbles: true }))
-    })
+    await user.type(screen.getByPlaceholderText('搜索当前首页旅程'), '召回')
 
-    expect(text()).not.toContain('新人激活 7 日链路')
-    expect(text()).toContain('沉睡用户召回')
+    expect(screen.queryByText('新人激活 7 日链路')).not.toBeInTheDocument()
+    expect(screen.getAllByText('沉睡用户召回').length).toBeGreaterThan(0)
     expect(overviewMock).toHaveBeenCalledTimes(1)
   })
 
@@ -86,27 +67,26 @@ describe('HomePage', () => {
       },
     })
 
-    await renderHome()
+    renderHome()
 
-    expect(text()).toContain('当前暂无高优先级异常')
-    expect(text()).toContain('近 7 天旅程运行稳定，可继续关注触达趋势和 Top 旅程表现')
+    expect(await screen.findByText('当前暂无高优先级异常')).toBeInTheDocument()
+    expect(screen.getByText('近 7 天旅程运行稳定，可继续关注触达趋势和 Top 旅程表现')).toBeInTheDocument()
   })
 
   it('retries after the first overview request fails', async () => {
+    const user = userEvent.setup()
     overviewMock
       .mockRejectedValueOnce(new Error('network down'))
       .mockResolvedValueOnce({ data: overview() })
 
-    await renderHome({ waitForData: false })
-    await waitFor(() => expect(text()).toContain('首页数据加载失败'))
+    renderHome()
+    expect(await screen.findByText('首页数据加载失败')).toBeInTheDocument()
 
-    await act(async () => {
-      buttonByText('重试').click()
-    })
+    await user.click(screen.getByRole('button', { name: /重\s*试/ }))
 
-    await waitFor(() => expect(text()).toContain('运营驾驶舱'))
-    await waitFor(() => expect(text()).toContain('沉睡用户召回'))
-    expect(overviewMock).toHaveBeenCalledTimes(2)
+    await waitFor(() => expect(overviewMock).toHaveBeenCalledTimes(2))
+    expect(await screen.findByText('运营驾驶舱')).toBeInTheDocument()
+    expect(screen.getAllByText('沉睡用户召回').length).toBeGreaterThan(0)
   })
 
   it('does not navigate aggregate no-execution attention to canvas 0 edit', async () => {
@@ -126,12 +106,11 @@ describe('HomePage', () => {
       },
     })
 
-    await renderHome()
+    renderHome()
 
-    const action = buttonInListItem('全部旅程', '查看')
-    await act(async () => {
-      action.click()
-    })
+    const aggregateItem = (await screen.findByText('全部旅程')).closest('li')
+    expect(aggregateItem).not.toBeNull()
+    fireEvent.click(within(aggregateItem as HTMLElement).getByRole('button', { name: '查看' }))
 
     expect(navigateMock).not.toHaveBeenCalledWith('/canvas/0/edit')
     for (const [path] of navigateMock.mock.calls) {
@@ -139,6 +118,14 @@ describe('HomePage', () => {
     }
   })
 })
+
+function renderHome() {
+  render(
+    <MemoryRouter>
+      <HomePage />
+    </MemoryRouter>,
+  )
+}
 
 function overview(): HomeOverview {
   return {
@@ -163,104 +150,4 @@ function overview(): HomeOverview {
       { canvasId: 3, name: '生日礼遇活动', type: 'NO_RECENT_EXECUTIONS', message: '近 7 天无执行记录', severity: 'info' },
     ],
   }
-}
-
-async function renderHome({ waitForData = true } = {}) {
-  container = document.createElement('div')
-  document.body.appendChild(container)
-  root = createRoot(container)
-
-  await act(async () => {
-    root?.render(
-      <MemoryRouter>
-        <HomePage />
-      </MemoryRouter>,
-    )
-  })
-
-  if (waitForData) {
-    await waitFor(() => expect(overviewMock).toHaveBeenCalledTimes(1))
-    await waitFor(() => expect(text()).toContain('运营驾驶舱'))
-  }
-}
-
-function text() {
-  return document.body.textContent ?? ''
-}
-
-function inputByPlaceholder(placeholder: string) {
-  const input = document.querySelector<HTMLInputElement>(`input[placeholder="${placeholder}"]`)
-  if (!input) throw new Error(`Input with placeholder "${placeholder}" not found`)
-  return input
-}
-
-function buttonByText(label: string) {
-  const button = Array.from(document.querySelectorAll('button'))
-    .find(element => element.textContent?.includes(label))
-    ?? document.querySelector<HTMLButtonElement>('.ant-alert-action button')
-  if (!button) throw new Error(`Button "${label}" not found`)
-  return button
-}
-
-function buttonInListItem(itemText: string, label: string) {
-  const item = Array.from(document.querySelectorAll('li'))
-    .find(element => element.textContent?.includes(itemText))
-  const button = item
-    ? Array.from(item.querySelectorAll('button')).find(element => element.textContent?.includes(label))
-    : null
-  if (!button) throw new Error(`Button "${label}" for "${itemText}" not found`)
-  return button
-}
-
-async function waitFor(assertion: () => void | Promise<void>) {
-  let lastError: unknown
-  for (let attempt = 0; attempt < 40; attempt += 1) {
-    try {
-      await assertion()
-      return
-    } catch (error) {
-      lastError = error
-      await act(async () => {
-        await new Promise(resolve => setTimeout(resolve, 25))
-      })
-    }
-  }
-  throw lastError
-}
-
-function installBrowserShims() {
-  const getComputedStyle = window.getComputedStyle.bind(window)
-  Object.defineProperty(window, 'getComputedStyle', {
-    writable: true,
-    value: (element: Element) => getComputedStyle(element),
-  })
-
-  Object.defineProperty(window, 'matchMedia', {
-    writable: true,
-    value: vi.fn().mockImplementation((query: string) => ({
-      matches: false,
-      media: query,
-      onchange: null,
-      addListener: vi.fn(),
-      removeListener: vi.fn(),
-      addEventListener: vi.fn(),
-      removeEventListener: vi.fn(),
-      dispatchEvent: vi.fn(),
-    })),
-  })
-
-  class ResizeObserverMock {
-    observe() {}
-    unobserve() {}
-    disconnect() {}
-  }
-
-  Object.defineProperty(window, 'ResizeObserver', {
-    writable: true,
-    value: ResizeObserverMock,
-  })
-  Object.defineProperty(globalThis, 'ResizeObserver', {
-    writable: true,
-    value: ResizeObserverMock,
-  })
 }

@@ -5,6 +5,7 @@ export default defineConfig({
   plugins: [react()],
   test: {
     environment: 'node',
+    setupFiles: ['./src/test/setupTests.ts'],
   },
   server: {
     port: 3000,
