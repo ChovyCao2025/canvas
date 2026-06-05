@@ -35,16 +35,16 @@
 - [architecture/archive/reviews/production-deployment-checklist-2026-06-02.md](architecture/archive/reviews/production-deployment-checklist-2026-06-02.md) — 生产部署检查清单历史材料
 
 ### 架构演进方案
-- [architecture/specs/P3-00-architecture-boundary-review-spec.md](architecture/specs/P3-00-architecture-boundary-review-spec.md) — 架构边界评审与服务拆分准入判断
-- [architecture/specs/P3-01-platform-evolution-spec.md](architecture/specs/P3-01-platform-evolution-spec.md) — 平台演进总入口与推广门禁
-- [architecture/specs/P3-02-service-decomposition-and-domain-boundaries-spec.md](architecture/specs/P3-02-service-decomposition-and-domain-boundaries-spec.md) — 服务划分与领域边界决策包
-- [architecture/specs/P3-03-data-platform-architecture-spec.md](architecture/specs/P3-03-data-platform-architecture-spec.md) — 数据中台薄切片决策包
-- [architecture/specs/P3-04-multi-datasource-isolation-spec.md](architecture/specs/P3-04-multi-datasource-isolation-spec.md) — 多数据源隔离决策包
-- [architecture/specs/P3-05-webflux-to-mvc-migration-spec.md](architecture/specs/P3-05-webflux-to-mvc-migration-spec.md) — WebFlux/MVC 运行时决策包
-- [architecture/specs/P3-06-k8s-deployment-platform-spec.md](architecture/specs/P3-06-k8s-deployment-platform-spec.md) — K8s 部署平台决策包
-- [architecture/specs/P3-07-production-platform-components-spec.md](architecture/specs/P3-07-production-platform-components-spec.md) — 生产平台组件决策包
-- [architecture/specs/P3-08-wecom-scrm-module-spec.md](architecture/specs/P3-08-wecom-scrm-module-spec.md) — 企微 SCRM 集成边界决策包
-- [architecture/specs/P3-09-identity-event-and-tenant-platform-spec.md](architecture/specs/P3-09-identity-event-and-tenant-platform-spec.md) — 身份、事件与租户平台原语决策包
+- [architecture/archive/specs/P3-00-architecture-boundary-review-spec.md](architecture/archive/specs/P3-00-architecture-boundary-review-spec.md) — 架构边界评审与服务拆分准入判断
+- [architecture/archive/specs/P3-01-platform-evolution-spec.md](architecture/archive/specs/P3-01-platform-evolution-spec.md) — 平台演进总入口与推广门禁
+- [architecture/archive/specs/P3-02-service-decomposition-and-domain-boundaries-spec.md](architecture/archive/specs/P3-02-service-decomposition-and-domain-boundaries-spec.md) — 服务划分与领域边界决策包
+- [architecture/archive/specs/P3-03-data-platform-architecture-spec.md](architecture/archive/specs/P3-03-data-platform-architecture-spec.md) — 数据中台薄切片决策包
+- [architecture/archive/specs/P3-04-multi-datasource-isolation-spec.md](architecture/archive/specs/P3-04-multi-datasource-isolation-spec.md) — 多数据源隔离决策包
+- [architecture/archive/specs/P3-05-webflux-to-mvc-migration-spec.md](architecture/archive/specs/P3-05-webflux-to-mvc-migration-spec.md) — WebFlux/MVC 运行时决策包
+- [architecture/archive/specs/P3-06-k8s-deployment-platform-spec.md](architecture/archive/specs/P3-06-k8s-deployment-platform-spec.md) — K8s 部署平台决策包
+- [architecture/archive/specs/P3-07-production-platform-components-spec.md](architecture/archive/specs/P3-07-production-platform-components-spec.md) — 生产平台组件决策包
+- [architecture/archive/specs/P3-08-wecom-scrm-module-spec.md](architecture/archive/specs/P3-08-wecom-scrm-module-spec.md) — 企微 SCRM 集成边界决策包
+- [architecture/archive/specs/P3-09-identity-event-and-tenant-platform-spec.md](architecture/archive/specs/P3-09-identity-event-and-tenant-platform-spec.md) — 身份、事件与租户平台原语决策包
 - [architecture/archive/evolution/](architecture/archive/evolution/) — 已处理的架构演进历史材料
 
 ### 架构整改方案
@@ -191,16 +191,16 @@
 | 系统整体设计 | `marketing-canvas-design.md` |
 | 技术选型理由 | `product-evolution/archive/2026-06-03/tech-selection-whitepaper.md` |
 | 当前架构问题 | `architecture/specs/README.md` + `architecture/todo/coverage-matrix.md` |
-| 架构如何演进 | `architecture/specs/P3-01-platform-evolution-spec.md` + `architecture/platform-evolution-promotion-checklist.md` |
+| 架构如何演进 | `architecture/archive/specs/P3-01-platform-evolution-spec.md` + `architecture/platform-evolution-promotion-checklist.md` |
 | 代码质量问题 | `code-review/deep-code-audit-all-rounds-summary.md` |
 | 安全漏洞 | `code-review/deep-code-audit-round9.md` + `round10.md` |
 | 产品战略方向 | `product-evolution/product-strategy-dual-track-2026-05-31.md` |
 | 产品功能缺什么 | `optimization/todo/marketing_platform_gap_analysis.md` |
 | 竞品对比 | `optimization/todo/competitor-analysis-report.md` |
 | 并发/性能 | `optimization/archive/2000并发目标专项-plan.md` |
-| 部署上线 | `architecture/specs/P1-05-release-deployment-governance-spec.md` + `architecture/specs/P3-06-k8s-deployment-platform-spec.md` |
+| 部署上线 | `architecture/archive/specs/P1-05-release-deployment-governance-spec.md` + `architecture/archive/specs/P3-06-k8s-deployment-platform-spec.md` |
 | 生产环境差距 | `product-evolution/production-design-gaps.md` |
 | 实施方案 | `architecture/plans/README.md` + `optimization/todo/plans/` 目录 |
-| 前端架构 | `architecture/specs/P1-03-frontend-canvas-state-spec.md` + `architecture/archive/reference/frontend-architecture.md` |
-| 后端架构 | `architecture/specs/P1-01-dag-engine-and-handler-boundaries-spec.md` + `architecture/archive/reference/backend-architecture.md` |
-| 数据库设计 | `architecture/specs/P0-06-data-security-and-tenant-isolation-spec.md` + `architecture/archive/reference/database-schema.md` |
+| 前端架构 | `architecture/archive/specs/P1-03-frontend-canvas-state-spec.md` + `architecture/archive/reference/frontend-architecture.md` |
+| 后端架构 | `architecture/archive/specs/P1-01-dag-engine-and-handler-boundaries-spec.md` + `architecture/archive/reference/backend-architecture.md` |
+| 数据库设计 | `architecture/archive/specs/P0-06-data-security-and-tenant-isolation-spec.md` + `architecture/archive/reference/database-schema.md` |

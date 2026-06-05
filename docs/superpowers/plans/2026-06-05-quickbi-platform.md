@@ -2966,3 +2966,51 @@ PATH="/opt/homebrew/bin:$PATH" npm run build
 Observed result: `biWorkbench` passed with 32 tests; frontend production build completed. Browser-level visual verification was not run because this environment did not expose an in-app Browser control tool during tool discovery.
 
 Remaining production work after this task: managed screenshot execution cluster, multi-page PDF rendering hardening, async export queue/progress/retry, external S3/OSS/MinIO storage provider, and AI BI agents.
+
+## Task 61: Add Self-Service Export Progress And Retry
+
+**Files:**
+- Create: `backend/canvas-engine/src/main/java/org/chovy/canvas/domain/bi/export/BiExportRetryResult.java`
+- Create: `backend/canvas-engine/src/main/resources/db/migration/V260__bi_export_progress_retry.sql`
+- Modify: `backend/canvas-engine/src/main/java/org/chovy/canvas/dal/dataobject/BiExportJobDO.java`
+- Modify: `backend/canvas-engine/src/main/java/org/chovy/canvas/domain/bi/export/BiExportJobView.java`
+- Modify: `backend/canvas-engine/src/main/java/org/chovy/canvas/domain/bi/export/BiSelfServiceExportService.java`
+- Modify: `backend/canvas-engine/src/main/java/org/chovy/canvas/web/bi/BiSelfServiceController.java`
+- Modify: `backend/canvas-engine/src/test/java/org/chovy/canvas/domain/bi/export/BiSelfServiceExportServiceTest.java`
+- Modify: `backend/canvas-engine/src/test/java/org/chovy/canvas/web/bi/BiSelfServiceControllerTest.java`
+- Modify: `frontend/src/services/biApi.ts`
+- Modify: `frontend/src/pages/bi/index.tsx`
+- Modify: `docs/superpowers/specs/2026-06-05-quickbi-platform-design.md`
+- Modify: `docs/superpowers/plans/2026-06-05-quickbi-platform.md`
+
+- [x] **Step 1: Add RED export progress/retry tests**
+
+Add service tests proving failed exports retain progress metadata, schedule retry state, and due failed exports can be retried through the original structured query. Add a controller test proving `POST /canvas/bi/self-service/exports/retry` uses the current tenant, username, and role. The RED focused compile failed on the expected missing `BiExportRetryResult` symbol.
+
+- [x] **Step 2: Persist export progress and retry metadata**
+
+Add `progress_percent`, `retry_count`, `max_retry_count`, `next_retry_at`, `last_retry_at`, and `retry_exhausted_at` to `bi_export_job` through `V260__bi_export_progress_retry.sql`, and expose those fields through the DO, backend view, and frontend API type.
+
+- [x] **Step 3: Implement failed export retry**
+
+`BiSelfServiceExportService` now sets `QUEUED`/`RUNNING`/`COMPLETED` progress, schedules failed exports with configurable retry backoff (`canvas.bi.export.retry.*`), and exposes `retryFailedExports(...)` to rerun due failed jobs from their persisted original request JSON. `BiSelfServiceController` exposes `POST /canvas/bi/self-service/exports/retry`.
+
+- [x] **Step 4: Surface export retry in the workbench**
+
+The BI workbench export task list now shows progress bars and failed-export retry metadata, shows retryable and retry-result summary tags, and adds a compact “重试失败” action beside cleanup.
+
+- [x] **Step 5: Verify export progress/retry slice**
+
+Observed on 2026-06-05:
+
+```bash
+PATH="/opt/homebrew/bin:$PATH" npm test -- biWorkbench
+PATH="/opt/homebrew/bin:$PATH" npm run build
+JAVA_HOME=/Users/photonpay/Library/Java/JavaVirtualMachines/ms-21.0.11/Contents/Home PATH="$JAVA_HOME/bin:$PATH" mvn -f backend/canvas-engine/pom.xml -DskipTests clean compile
+JAVA_HOME=/Users/photonpay/Library/Java/JavaVirtualMachines/ms-21.0.11/Contents/Home PATH="$JAVA_HOME/bin:$PATH" javac --release 21 -encoding UTF-8 -cp "backend/canvas-engine/target/classes:backend/canvas-engine/target/test-classes:$(cat /tmp/canvas-engine-test-classpath.txt)" -d backend/canvas-engine/target/test-classes backend/canvas-engine/src/test/java/org/chovy/canvas/domain/bi/export/BiSelfServiceExportServiceTest.java backend/canvas-engine/src/test/java/org/chovy/canvas/web/bi/BiSelfServiceControllerTest.java
+JAVA_HOME=/Users/photonpay/Library/Java/JavaVirtualMachines/ms-21.0.11/Contents/Home PATH="$JAVA_HOME/bin:$PATH" mvn -f backend/canvas-engine/pom.xml -Dtest=BiSelfServiceExportServiceTest,BiSelfServiceControllerTest -DfailIfNoTests=false -DforkCount=0 surefire:test
+```
+
+Observed result: `biWorkbench` passed with 32 tests; frontend production build completed; backend clean main compile succeeded; focused export service/controller tests passed with 17 tests, 0 failures, 0 errors, 0 skipped. During clean compile verification, Maven initially failed to delete generated `target/classes/org/chovy/canvas/domain/warehouse`; removing generated `backend/canvas-engine/target` and rerunning clean compile succeeded.
+
+Remaining production work after this task: managed screenshot execution cluster, multi-page PDF rendering hardening, true async export queue, external S3/OSS/MinIO storage provider, and AI BI agents.

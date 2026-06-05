@@ -128,6 +128,7 @@ Specs are ordered by priority and sequence. Each spec links to its matching impl
 | P2-076 | [CDP Warehouse Privacy Audience Bitmap Rebuild Proof](p2-076-cdp-warehouse-privacy-audience-bitmap-rebuild-proof.md) |
 | P2-077 | [CDP Warehouse Privacy Audience Bitmap Rebuild Automation](p2-077-cdp-warehouse-privacy-audience-bitmap-rebuild-automation.md) |
 | P2-078 | [CDP Warehouse Privacy Audience Bitmap Rebuild Automation Operations API](p2-078-cdp-warehouse-privacy-audience-bitmap-rebuild-automation-operations-api.md) |
+| P2-079 | [CDP Warehouse Privacy Audience Bitmap Rebuild Automation Run History](p2-079-cdp-warehouse-privacy-audience-bitmap-rebuild-automation-run-history.md) |
 | P3-001 | [Ecosystem And Plugin Marketplace Strategy](p3-001-ecosystem-and-plugin-marketplace-strategy.md) |
 | P3-002 | [Long Term AI Commerce And Ecosystem Bets](p3-002-long-term-ai-commerce-and-ecosystem-bets.md) |
 | P3-003 | [Long Term Architecture Evolution](p3-003-long-term-architecture-evolution.md) |

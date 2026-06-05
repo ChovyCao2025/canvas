@@ -128,6 +128,7 @@ Plans are ordered by priority and sequence. Each plan uses the superpowers writi
 | P2-076 | [CDP Warehouse Privacy Audience Bitmap Rebuild Proof](p2-076-cdp-warehouse-privacy-audience-bitmap-rebuild-proof-plan.md) |
 | P2-077 | [CDP Warehouse Privacy Audience Bitmap Rebuild Automation](p2-077-cdp-warehouse-privacy-audience-bitmap-rebuild-automation-plan.md) |
 | P2-078 | [CDP Warehouse Privacy Audience Bitmap Rebuild Automation Operations API](p2-078-cdp-warehouse-privacy-audience-bitmap-rebuild-automation-operations-api-plan.md) |
+| P2-079 | [CDP Warehouse Privacy Audience Bitmap Rebuild Automation Run History](p2-079-cdp-warehouse-privacy-audience-bitmap-rebuild-automation-run-history-plan.md) |
 | P3-001 | [Ecosystem And Plugin Marketplace Strategy](p3-001-ecosystem-and-plugin-marketplace-strategy-plan.md) |
 | P3-002 | [Long Term AI Commerce And Ecosystem Bets](p3-002-long-term-ai-commerce-and-ecosystem-bets-plan.md) |
 | P3-003 | [Long Term Architecture Evolution](p3-003-long-term-architecture-evolution-plan.md) |

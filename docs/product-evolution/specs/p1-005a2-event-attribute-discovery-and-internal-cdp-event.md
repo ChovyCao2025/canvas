@@ -5,6 +5,10 @@ Sequence: 005A2
 Source: `docs/optimization/todo/cdp_gap_analysis.md`, `docs/optimization/todo/2026-05-30-cdp-roadmap.md`, `docs/optimization/todo/marketing_platform_gap_analysis.md`
 Implementation plan: `../plans/p1-005a2-event-attribute-discovery-and-internal-cdp-event-plan.md`
 
+Implementation status: implemented on 2026-06-05. The actual Flyway migration is
+`backend/canvas-engine/src/main/resources/db/migration/V102__event_attribute_discovery_internal_event.sql`;
+the original `V97_2` filename was superseded by existing migration ordering.
+
 ## Goal
 
 Add event attribute discovery and emit a compact internal CDP event after each accepted event log row commits.
@@ -39,7 +43,7 @@ Add event attribute discovery and emit a compact internal CDP event after each a
 
 ## Technical Scope
 
-- `backend/canvas-engine/src/main/resources/db/migration/V97_2__event_attribute_discovery_internal_event.sql`
+- `backend/canvas-engine/src/main/resources/db/migration/V102__event_attribute_discovery_internal_event.sql`
 - `backend/canvas-engine/src/main/java/org/chovy/canvas/dal/dataobject/EventAttrDefinitionDO.java`
 - `backend/canvas-engine/src/main/java/org/chovy/canvas/dal/mapper/EventAttrDefinitionMapper.java`
 - `backend/canvas-engine/src/main/java/org/chovy/canvas/dal/dataobject/EventDefinitionDO.java`
@@ -53,3 +57,8 @@ Add event attribute discovery and emit a compact internal CDP event after each a
 - Schema test proves discovery fields and table exist.
 - Discovery tests prove create, update, and type inference.
 - Ingestion tests prove accepted rows publish internal events and duplicates do not.
+
+## Verification Evidence
+
+- `JAVA_HOME=/Users/photonpay/Library/Java/JavaVirtualMachines/ms-21.0.11/Contents/Home PATH="/Users/photonpay/Library/Java/JavaVirtualMachines/ms-21.0.11/Contents/Home/bin:$PATH" mvn -pl canvas-engine test -Dtest=EventAttributeDiscoverySchemaTest,EventAttributeDiscoveryServiceTest,CdpEventPublisherTest,CdpEventIngestionServiceTest -DfailIfNoTests=true`
+- Result on 2026-06-05: 11 tests run, 0 failures, 0 errors, 0 skipped.

@@ -67,6 +67,44 @@ class CdpWarehousePrivacyAudienceBitmapRebuildSchedulerTest {
     }
 
     @Test
+    void enabledSchedulerRecordsRunHistoryWhenConfigured() {
+        CdpWarehousePrivacyAudienceBitmapRebuildAutomationService automationService =
+                mock(CdpWarehousePrivacyAudienceBitmapRebuildAutomationService.class);
+        CdpWarehousePrivacyAudienceBitmapRebuildAutomationRunService runService =
+                mock(CdpWarehousePrivacyAudienceBitmapRebuildAutomationRunService.class);
+        CdpWarehouseJobLeaseService leaseService = mock(CdpWarehouseJobLeaseService.class);
+        CdpWarehousePrivacyAudienceBitmapRebuildAutomationService.AutomationResult result =
+                new CdpWarehousePrivacyAudienceBitmapRebuildAutomationService.AutomationResult(
+                        9L, "PASS", 1, 1, 1, 0, 0, List.of());
+        when(runService.runAndRecord(eq(9L), any(), eq("SCHEDULED")))
+                .thenReturn(new CdpWarehousePrivacyAudienceBitmapRebuildAutomationRunService.AutomationRunView(
+                        201L, 9L, "SCHEDULED", "PASS", "privacy-rebuild-scheduler",
+                        20, 50, true, 1, 1, 1, 0, 0,
+                        "{\"status\":\"PASS\"}", null, null, null, null, null, result));
+        when(leaseService.runWithLease(eq(9L), eq("CDP_WAREHOUSE_PRIVACY_AUDIENCE_REBUILD"),
+                any(Duration.class), any())).thenAnswer(invocation -> {
+            Supplier<Boolean> work = invocation.getArgument(3);
+            return work.get();
+        });
+        CdpWarehousePrivacyAudienceBitmapRebuildScheduler scheduler =
+                new CdpWarehousePrivacyAudienceBitmapRebuildScheduler(
+                        automationService, runService, leaseService, true, 9L, 20, 50, true,
+                        "privacy-rebuild-scheduler", 120);
+
+        boolean ran = scheduler.runCycle();
+
+        assertThat(ran).isTrue();
+        ArgumentCaptor<CdpWarehousePrivacyAudienceBitmapRebuildAutomationService.AutomationCommand> commandCaptor =
+                ArgumentCaptor.forClass(CdpWarehousePrivacyAudienceBitmapRebuildAutomationService.AutomationCommand.class);
+        verify(runService).runAndRecord(eq(9L), commandCaptor.capture(), eq("SCHEDULED"));
+        verify(automationService, never()).run(any(), any());
+        assertThat(commandCaptor.getValue().actor()).isEqualTo("privacy-rebuild-scheduler");
+        assertThat(commandCaptor.getValue().scanLimit()).isEqualTo(20);
+        assertThat(commandCaptor.getValue().audienceLimit()).isEqualTo(50);
+        assertThat(commandCaptor.getValue().retryFailed()).isTrue();
+    }
+
+    @Test
     void schedulerPreventsOverlappingExecution() {
         CdpWarehousePrivacyAudienceBitmapRebuildAutomationService automationService =
                 mock(CdpWarehousePrivacyAudienceBitmapRebuildAutomationService.class);

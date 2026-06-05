@@ -6,7 +6,7 @@ Accepted
 
 ## Context
 
-`docs/architecture/specs/P3-00-architecture-boundary-review-spec.md` and `docs/architecture/evidence/p3-00-architecture-boundary-review.md` both show that the current system has real anchors for seven bounded contexts, but the code still relies on shared `dal` mappers, one Flyway migration stream, cross-context service calls, and mixed tenant propagation.
+`docs/architecture/archive/specs/P3-00-architecture-boundary-review-spec.md` and `docs/architecture/evidence/p3-00-architecture-boundary-review.md` both show that the current system has real anchors for seven bounded contexts, but the code still relies on shared `dal` mappers, one Flyway migration stream, cross-context service calls, and mixed tenant propagation.
 
 The historical P3 service-split material is useful as a capability map. It is not an implementation approval for immediate physical services.
 
@@ -89,7 +89,7 @@ Architecture owner with backend, frontend, data, and operations reviewers for ea
 
 ## Linked Specs
 
-- `docs/architecture/specs/P3-00-architecture-boundary-review-spec.md`
-- `docs/architecture/specs/P3-00-architecture-boundary-code-verification.md`
-- `docs/architecture/plans/P3-00-architecture-boundary-review-plan.md`
+- `docs/architecture/archive/specs/P3-00-architecture-boundary-review-spec.md`
+- `docs/architecture/archive/specs/P3-00-architecture-boundary-code-verification.md`
+- `docs/architecture/archive/plans/P3-00-architecture-boundary-review-plan.md`
 - `docs/architecture/evidence/p3-00-architecture-boundary-review.md`

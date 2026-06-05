@@ -7,8 +7,8 @@ This audit records the current executable-state check for `docs/architecture` sp
 ## Checks Passed
 
 - Architecture spec and plan indexes link only to existing local files.
-- `docs/architecture/specs/` has 27 spec-supporting Markdown files, including the `P3-00` boundary code-verification artifact.
-- `docs/architecture/plans/` has 28 plan files, including the `P0-00` materialization plan.
+- `docs/architecture/archive/specs/` has 27 spec-supporting Markdown files, including the `P3-00` boundary code-verification artifact.
+- `docs/architecture/archive/plans/` has 28 plan files, including the `P0-00` materialization plan.
 - Every numbered architecture package spec from `P0-01` through `P3-09` has a matching implementation plan.
 - Every architecture plan includes the agentic-worker header, `Goal`, `Architecture`, `Tech Stack`, task sections, checkbox steps, fenced command blocks, `Run:` commands, and `Expected:` results.
 - Architecture plans do not stage or commit by default; version-control commit timing remains controlled by the repository owner unless explicitly requested.

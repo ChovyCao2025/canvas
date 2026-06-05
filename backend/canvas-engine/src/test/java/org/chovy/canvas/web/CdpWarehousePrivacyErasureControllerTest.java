@@ -3,6 +3,7 @@ package org.chovy.canvas.web;
 import org.chovy.canvas.common.R;
 import org.chovy.canvas.common.tenant.TenantContext;
 import org.chovy.canvas.common.tenant.TenantContextResolver;
+import org.chovy.canvas.domain.warehouse.CdpWarehousePrivacyAudienceBitmapRebuildAutomationRunService;
 import org.chovy.canvas.domain.warehouse.CdpWarehousePrivacyAudienceBitmapRebuildAutomationService;
 import org.chovy.canvas.domain.warehouse.CdpWarehousePrivacyAudienceBitmapRebuildService;
 import org.chovy.canvas.domain.warehouse.CdpWarehousePrivacyErasureExecutionService;
@@ -15,6 +16,7 @@ import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -150,6 +152,63 @@ class CdpWarehousePrivacyErasureControllerTest {
     }
 
     @Test
+    void runAudienceBitmapRebuildAutomationRecordsHistoryWhenConfigured() {
+        CdpWarehousePrivacyErasureService service = mock(CdpWarehousePrivacyErasureService.class);
+        CdpWarehousePrivacyErasureExecutionService executionService =
+                mock(CdpWarehousePrivacyErasureExecutionService.class);
+        CdpWarehousePrivacyAudienceBitmapRebuildService rebuildService =
+                mock(CdpWarehousePrivacyAudienceBitmapRebuildService.class);
+        CdpWarehousePrivacyAudienceBitmapRebuildAutomationService automationService =
+                mock(CdpWarehousePrivacyAudienceBitmapRebuildAutomationService.class);
+        CdpWarehousePrivacyAudienceBitmapRebuildAutomationRunService runService =
+                mock(CdpWarehousePrivacyAudienceBitmapRebuildAutomationRunService.class);
+        CdpWarehousePrivacyAudienceBitmapRebuildAutomationService.AutomationCommand command =
+                new CdpWarehousePrivacyAudienceBitmapRebuildAutomationService.AutomationCommand(
+                        "privacy-ops", 25, 100, true);
+        CdpWarehousePrivacyAudienceBitmapRebuildAutomationService.AutomationResult result =
+                new CdpWarehousePrivacyAudienceBitmapRebuildAutomationService.AutomationResult(
+                        9L, "PASS", 2, 1, 1, 1, 0, List.of());
+        when(runService.runAndRecord(9L, command, "MANUAL")).thenReturn(
+                automationRunView(201L, "MANUAL", "PASS", result));
+        CdpWarehousePrivacyErasureController controller =
+                new CdpWarehousePrivacyErasureController(
+                        service, executionService, rebuildService, automationService, runService, tenantResolver(9L));
+
+        R<CdpWarehousePrivacyAudienceBitmapRebuildAutomationService.AutomationResult> response =
+                controller.runAudienceBitmapRebuildAutomation(command).block();
+
+        assertThat(response.getData()).isSameAs(result);
+        verify(runService).runAndRecord(9L, command, "MANUAL");
+        verify(automationService, never()).run(9L, command);
+    }
+
+    @Test
+    void audienceBitmapRebuildAutomationRunHistoryUsesCurrentTenant() {
+        CdpWarehousePrivacyErasureService service = mock(CdpWarehousePrivacyErasureService.class);
+        CdpWarehousePrivacyAudienceBitmapRebuildAutomationService automationService =
+                mock(CdpWarehousePrivacyAudienceBitmapRebuildAutomationService.class);
+        CdpWarehousePrivacyAudienceBitmapRebuildAutomationRunService runService =
+                mock(CdpWarehousePrivacyAudienceBitmapRebuildAutomationRunService.class);
+        CdpWarehousePrivacyAudienceBitmapRebuildAutomationService.AutomationResult result =
+                new CdpWarehousePrivacyAudienceBitmapRebuildAutomationService.AutomationResult(
+                        9L, "PASS", 2, 1, 1, 1, 0, List.of());
+        List<CdpWarehousePrivacyAudienceBitmapRebuildAutomationRunService.AutomationRunView> rows =
+                List.of(automationRunView(201L, "MANUAL", "PASS", result));
+        CdpWarehousePrivacyAudienceBitmapRebuildAutomationRunService.AutomationRunView row =
+                automationRunView(201L, "MANUAL", "PASS", result);
+        when(runService.recent(9L, 10)).thenReturn(rows);
+        when(runService.get(9L, 201L)).thenReturn(row);
+        CdpWarehousePrivacyErasureController controller =
+                new CdpWarehousePrivacyErasureController(
+                        service, null, null, automationService, runService, tenantResolver(9L));
+
+        assertThat(controller.recentAudienceBitmapRebuildAutomationRuns(10).block().getData()).isSameAs(rows);
+        assertThat(controller.getAudienceBitmapRebuildAutomationRun(201L).block().getData()).isSameAs(row);
+        verify(runService).recent(9L, 10);
+        verify(runService).get(9L, 201L);
+    }
+
+    @Test
     void recentGetAndSummaryUseCurrentTenant() {
         CdpWarehousePrivacyErasureService service = mock(CdpWarehousePrivacyErasureService.class);
         List<CdpWarehousePrivacyErasureService.ErasureRequestView> rows =
@@ -170,6 +229,34 @@ class CdpWarehousePrivacyErasureControllerTest {
         verify(service).recent(9L, "RUNNING", 10);
         verify(service).get(9L, 101L);
         verify(service).summary(9L);
+    }
+
+    private CdpWarehousePrivacyAudienceBitmapRebuildAutomationRunService.AutomationRunView automationRunView(
+            Long id,
+            String triggerSource,
+            String status,
+            CdpWarehousePrivacyAudienceBitmapRebuildAutomationService.AutomationResult result) {
+        return new CdpWarehousePrivacyAudienceBitmapRebuildAutomationRunService.AutomationRunView(
+                id,
+                9L,
+                triggerSource,
+                status,
+                "privacy-ops",
+                25,
+                100,
+                true,
+                result.scanned(),
+                result.eligible(),
+                result.triggered(),
+                result.skipped(),
+                result.failed(),
+                "{\"status\":\"" + status + "\"}",
+                null,
+                NOW,
+                NOW.plusMinutes(1),
+                NOW,
+                NOW.plusMinutes(1),
+                result);
     }
 
     private CdpWarehousePrivacyErasureService.ErasureRequestView requestView(Long id, String status) {

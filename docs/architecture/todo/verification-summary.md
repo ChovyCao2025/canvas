@@ -43,6 +43,6 @@ All 35 Markdown files under the original `docs/architecture` tree were inventori
 
 ## Architecture Boundary Check
 
-The P3 boundary decision was verified against current backend packages, controllers, mappers, and migrations. The supporting report is [../specs/P3-00-architecture-boundary-code-verification.md](../specs/P3-00-architecture-boundary-code-verification.md).
+The P3 boundary decision was verified against current backend packages, controllers, mappers, and migrations. The supporting report is [../specs/P3-00-architecture-boundary-code-verification.md](../archive/specs/P3-00-architecture-boundary-code-verification.md).
 
 Result: the seven bounded contexts are supported by current code anchors, but physical service extraction is not ready. The main blockers are shared `dal` ownership, handler direct mapper access, Canvas/Execution/CDP cross-imports, embedded Reach delivery, Platform tenant usage cross-reads, and incomplete tenant propagation from `V78__saas_foundation.sql`.

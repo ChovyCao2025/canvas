@@ -6,7 +6,7 @@ Accepted - Deferred for physical extraction.
 
 ## Context
 
-`docs/architecture/specs/P3-02-service-decomposition-and-domain-boundaries-spec.md` requires a reversible service or bounded-context split. `docs/architecture/adr/ADR-0006-service-extraction-gate.md` blocks physical service extraction until data ownership, API contracts, event contracts, tenant propagation, idempotency, observability, rollout, rollback, and characterization tests are proven.
+`docs/architecture/archive/specs/P3-02-service-decomposition-and-domain-boundaries-spec.md` requires a reversible service or bounded-context split. `docs/architecture/adr/ADR-0006-service-extraction-gate.md` blocks physical service extraction until data ownership, API contracts, event contracts, tenant propagation, idempotency, observability, rollout, rollback, and characterization tests are proven.
 
 The current codebase has real bounded-context anchors, but it also has 85 controllers, 146 shared mappers, one Flyway stream, direct cross-context mapper reads, and runtime calls into CDP and notification services. New CDP warehouse and BI packages strengthen the need for a gate because they are still in the same deployable and datasource ownership model.
 
@@ -180,9 +180,9 @@ Architecture owner with backend, frontend, data, security/compliance, and operat
 
 ## Links
 
-- `docs/architecture/specs/P3-00-architecture-boundary-review-spec.md`
+- `docs/architecture/archive/specs/P3-00-architecture-boundary-review-spec.md`
 - `docs/architecture/evidence/p3-00-architecture-boundary-review.md`
 - `docs/architecture/adr/ADR-0006-service-extraction-gate.md`
-- `docs/architecture/specs/P3-02-service-decomposition-and-domain-boundaries-spec.md`
+- `docs/architecture/archive/specs/P3-02-service-decomposition-and-domain-boundaries-spec.md`
 - `docs/architecture/domain-map.md`
 - `docs/architecture/domain-contract-inventory.md`

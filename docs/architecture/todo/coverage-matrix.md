@@ -15,33 +15,33 @@ This matrix audits every archived architecture document and maps its findings or
 
 ## Package Legend
 
-- `P0/security`: `todo/p0/security-hardening`; `specs/P0-01-security-hardening-spec.md`; `plans/P0-01-security-hardening-plan.md`
-- `P0/reactive`: `todo/p0/reactive-threading-and-transactions`; `specs/P0-02-reactive-threading-and-transactions-spec.md`; `plans/P0-02-reactive-threading-and-transactions-plan.md`
-- `P0/state`: `todo/p0/canvas-state-data-consistency`; `specs/P0-03-canvas-state-data-consistency-spec.md`; `plans/P0-03-canvas-state-data-consistency-plan.md`
-- `P0/concurrency`: `todo/p0/execution-concurrency-safety`; `specs/P0-04-execution-concurrency-safety-spec.md`; `plans/P0-04-execution-concurrency-safety-plan.md`
-- `P0/resilience`: `todo/p0/production-resilience-and-dr`; `specs/P0-05-production-resilience-and-dr-spec.md`; `plans/P0-05-production-resilience-and-dr-plan.md`
-- `P0/data`: `todo/p0/data-security-and-tenant-isolation`; `specs/P0-06-data-security-and-tenant-isolation-spec.md`; `plans/P0-06-data-security-and-tenant-isolation-plan.md`
-- `P1/dag`: `todo/p1/dag-engine-and-handler-boundaries`; `specs/P1-01-dag-engine-and-handler-boundaries-spec.md`; `plans/P1-01-dag-engine-and-handler-boundaries-plan.md`
-- `P1/api`: `todo/p1/api-contract-and-validation`; `specs/P1-02-api-contract-and-validation-spec.md`; `plans/P1-02-api-contract-and-validation-plan.md`
-- `P1/frontend`: `todo/p1/frontend-canvas-state`; `specs/P1-03-frontend-canvas-state-spec.md`; `plans/P1-03-frontend-canvas-state-plan.md`
-- `P1/observability`: `todo/p1/observability-and-ops`; `specs/P1-04-observability-and-ops-spec.md`; `plans/P1-04-observability-and-ops-plan.md`
-- `P1/release`: `todo/p1/release-deployment-governance`; `specs/P1-05-release-deployment-governance-spec.md`; `plans/P1-05-release-deployment-governance-plan.md`
-- `P2/testing`: `todo/p2/testing-foundation`; `specs/P2-01-testing-foundation-spec.md`; `plans/P2-01-testing-foundation-plan.md`
-- `P2/capacity`: `todo/p2/cost-capacity-and-retention`; `specs/P2-02-cost-capacity-and-retention-spec.md`; `plans/P2-02-cost-capacity-and-retention-plan.md`
-- `P2/docs`: `todo/p2/documentation-adr-and-runbooks`; `specs/P2-03-documentation-adr-and-runbooks-spec.md`; `plans/P2-03-documentation-adr-and-runbooks-plan.md`
-- `P2/deps`: `todo/p2/dependency-abstraction-and-vendor-lock-in`; `specs/P2-04-dependency-abstraction-and-vendor-lock-in-spec.md`; `plans/P2-04-dependency-abstraction-and-vendor-lock-in-plan.md`
-- `P2/compliance`: `todo/p2/compliance-data-governance`; `specs/P2-05-compliance-data-governance-spec.md`; `plans/P2-05-compliance-data-governance-plan.md`
-- `P2/a11y`: `todo/p2/frontend-accessibility-and-quality`; `specs/P2-06-frontend-accessibility-and-quality-spec.md`; `plans/P2-06-frontend-accessibility-and-quality-plan.md`
-- `P3/boundary-review`: `specs/P3-00-architecture-boundary-review-spec.md`; `specs/P3-00-architecture-boundary-code-verification.md`; `plans/P3-00-architecture-boundary-review-plan.md`
-- `P3/evolution`: `todo/p3/platform-evolution`; `specs/P3-01-platform-evolution-spec.md`; `plans/P3-01-platform-evolution-plan.md`
-- `P3/service-split`: `specs/P3-02-service-decomposition-and-domain-boundaries-spec.md`; `plans/P3-02-service-decomposition-and-domain-boundaries-plan.md`
-- `P3/data-platform`: `specs/P3-03-data-platform-architecture-spec.md`; `plans/P3-03-data-platform-architecture-plan.md`
-- `P3/multi-datasource`: `specs/P3-04-multi-datasource-isolation-spec.md`; `plans/P3-04-multi-datasource-isolation-plan.md`
-- `P3/webflux-mvc`: `specs/P3-05-webflux-to-mvc-migration-spec.md`; `plans/P3-05-webflux-to-mvc-migration-plan.md`
-- `P3/k8s`: `specs/P3-06-k8s-deployment-platform-spec.md`; `plans/P3-06-k8s-deployment-platform-plan.md`
-- `P3/platform-components`: `specs/P3-07-production-platform-components-spec.md`; `plans/P3-07-production-platform-components-plan.md`
-- `P3/wecom`: `specs/P3-08-wecom-scrm-module-spec.md`; `plans/P3-08-wecom-scrm-module-plan.md`
-- `P3/identity-event-tenant`: `specs/P3-09-identity-event-and-tenant-platform-spec.md`; `plans/P3-09-identity-event-and-tenant-platform-plan.md`
+- `P0/security`: `todo/p0/security-hardening`; `archive/specs/P0-01-security-hardening-spec.md`; `archive/plans/P0-01-security-hardening-plan.md`
+- `P0/reactive`: `todo/p0/reactive-threading-and-transactions`; `archive/specs/P0-02-reactive-threading-and-transactions-spec.md`; `archive/plans/P0-02-reactive-threading-and-transactions-plan.md`
+- `P0/state`: `todo/p0/canvas-state-data-consistency`; `archive/specs/P0-03-canvas-state-data-consistency-spec.md`; `archive/plans/P0-03-canvas-state-data-consistency-plan.md`
+- `P0/concurrency`: `todo/p0/execution-concurrency-safety`; `archive/specs/P0-04-execution-concurrency-safety-spec.md`; `archive/plans/P0-04-execution-concurrency-safety-plan.md`
+- `P0/resilience`: `todo/p0/production-resilience-and-dr`; `archive/specs/P0-05-production-resilience-and-dr-spec.md`; `archive/plans/P0-05-production-resilience-and-dr-plan.md`
+- `P0/data`: `todo/p0/data-security-and-tenant-isolation`; `archive/specs/P0-06-data-security-and-tenant-isolation-spec.md`; `archive/plans/P0-06-data-security-and-tenant-isolation-plan.md`
+- `P1/dag`: `todo/p1/dag-engine-and-handler-boundaries`; `archive/specs/P1-01-dag-engine-and-handler-boundaries-spec.md`; `archive/plans/P1-01-dag-engine-and-handler-boundaries-plan.md`
+- `P1/api`: `todo/p1/api-contract-and-validation`; `archive/specs/P1-02-api-contract-and-validation-spec.md`; `archive/plans/P1-02-api-contract-and-validation-plan.md`
+- `P1/frontend`: `todo/p1/frontend-canvas-state`; `archive/specs/P1-03-frontend-canvas-state-spec.md`; `archive/plans/P1-03-frontend-canvas-state-plan.md`
+- `P1/observability`: `todo/p1/observability-and-ops`; `archive/specs/P1-04-observability-and-ops-spec.md`; `archive/plans/P1-04-observability-and-ops-plan.md`
+- `P1/release`: `todo/p1/release-deployment-governance`; `archive/specs/P1-05-release-deployment-governance-spec.md`; `archive/plans/P1-05-release-deployment-governance-plan.md`
+- `P2/testing`: `todo/p2/testing-foundation`; `archive/specs/P2-01-testing-foundation-spec.md`; `archive/plans/P2-01-testing-foundation-plan.md`
+- `P2/capacity`: `todo/p2/cost-capacity-and-retention`; `archive/specs/P2-02-cost-capacity-and-retention-spec.md`; `archive/plans/P2-02-cost-capacity-and-retention-plan.md`
+- `P2/docs`: `todo/p2/documentation-adr-and-runbooks`; `archive/specs/P2-03-documentation-adr-and-runbooks-spec.md`; `archive/plans/P2-03-documentation-adr-and-runbooks-plan.md`
+- `P2/deps`: `todo/p2/dependency-abstraction-and-vendor-lock-in`; `archive/specs/P2-04-dependency-abstraction-and-vendor-lock-in-spec.md`; `archive/plans/P2-04-dependency-abstraction-and-vendor-lock-in-plan.md`
+- `P2/compliance`: `todo/p2/compliance-data-governance`; `archive/specs/P2-05-compliance-data-governance-spec.md`; `archive/plans/P2-05-compliance-data-governance-plan.md`
+- `P2/a11y`: `todo/p2/frontend-accessibility-and-quality`; `archive/specs/P2-06-frontend-accessibility-and-quality-spec.md`; `archive/plans/P2-06-frontend-accessibility-and-quality-plan.md`
+- `P3/boundary-review`: `archive/specs/P3-00-architecture-boundary-review-spec.md`; `archive/specs/P3-00-architecture-boundary-code-verification.md`; `archive/plans/P3-00-architecture-boundary-review-plan.md`
+- `P3/evolution`: `todo/p3/platform-evolution`; `archive/specs/P3-01-platform-evolution-spec.md`; `archive/plans/P3-01-platform-evolution-plan.md`
+- `P3/service-split`: `archive/specs/P3-02-service-decomposition-and-domain-boundaries-spec.md`; `archive/plans/P3-02-service-decomposition-and-domain-boundaries-plan.md`
+- `P3/data-platform`: `archive/specs/P3-03-data-platform-architecture-spec.md`; `archive/plans/P3-03-data-platform-architecture-plan.md`
+- `P3/multi-datasource`: `archive/specs/P3-04-multi-datasource-isolation-spec.md`; `archive/plans/P3-04-multi-datasource-isolation-plan.md`
+- `P3/webflux-mvc`: `archive/specs/P3-05-webflux-to-mvc-migration-spec.md`; `archive/plans/P3-05-webflux-to-mvc-migration-plan.md`
+- `P3/k8s`: `archive/specs/P3-06-k8s-deployment-platform-spec.md`; `archive/plans/P3-06-k8s-deployment-platform-plan.md`
+- `P3/platform-components`: `archive/specs/P3-07-production-platform-components-spec.md`; `archive/plans/P3-07-production-platform-components-plan.md`
+- `P3/wecom`: `archive/specs/P3-08-wecom-scrm-module-spec.md`; `archive/plans/P3-08-wecom-scrm-module-plan.md`
+- `P3/identity-event-tenant`: `archive/specs/P3-09-identity-event-and-tenant-platform-spec.md`; `archive/plans/P3-09-identity-event-and-tenant-platform-plan.md`
 - `needs-review`: `todo/needs-review/stale-and-duplicate-findings.md`
 
 ## P3 Platform Evolution Gate

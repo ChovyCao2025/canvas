@@ -10,8 +10,8 @@ The architecture review material has been covered by active specs, matching plan
 
 Numbered package coverage is complete:
 
-- `docs/architecture/specs/` has 28 priority-prefixed files: 27 package specs plus the supporting `P3-00` code-verification artifact.
-- `docs/architecture/plans/` has 28 priority-prefixed files: 27 matching package plans plus the `P0-00` materialization plan.
+- `docs/architecture/archive/specs/` has 28 priority-prefixed files: 27 package specs plus the supporting `P3-00` code-verification artifact.
+- `docs/architecture/archive/plans/` has 28 priority-prefixed files: 27 matching package plans plus the `P0-00` materialization plan.
 - Every package spec from `P0-01` through `P3-09` has a matching plan.
 - Every package plan from `P0-01` through `P3-09` has a matching spec.
 - The intentional exceptions are `P3-00-architecture-boundary-code-verification.md` as supporting evidence and `P0-00-architecture-spec-plan-materialization-plan.md` as the original materialization plan.

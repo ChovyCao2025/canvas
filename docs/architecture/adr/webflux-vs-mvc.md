@@ -101,7 +101,7 @@ Architecture owner with backend, frontend, operations, and security reviewers. A
 
 ## Links
 
-- `docs/architecture/specs/P3-05-webflux-to-mvc-migration-spec.md`
+- `docs/architecture/archive/specs/P3-05-webflux-to-mvc-migration-spec.md`
 - `docs/architecture/webflux-mvc-migration-inventory.md`
 - `docs/architecture/webflux-mvc-first-slice.md`
 - `docs/architecture/evidence/P0-02-reactive-threading-inventory.md`

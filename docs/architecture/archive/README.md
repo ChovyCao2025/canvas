@@ -8,5 +8,7 @@ This folder contains source documents that were processed into the active archit
 - `reviews/`: prior review reports, risk reports, and production checklists.
 - `remediation/`: original remediation index and issue parts.
 - `evolution/`: long-term target architecture and migration documents.
+- `specs/`: completed priority-prefixed architecture specs.
+- `plans/`: completed priority-prefixed architecture implementation plans.
 
-The archive is retained for traceability. Do not use it as the active implementation queue; use [../todo/README.md](../todo/README.md) instead.
+The archive is retained for traceability. Do not use historical source documents as the active implementation queue; use [../todo/README.md](../todo/README.md), [../specs/README.md](../specs/README.md), and [../plans/README.md](../plans/README.md) as the current entry points.

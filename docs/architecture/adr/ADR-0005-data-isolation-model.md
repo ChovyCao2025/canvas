@@ -33,6 +33,6 @@ Security and data platform owners.
 
 ## Linked Specs
 
-- `docs/architecture/specs/P0-06-data-security-and-tenant-isolation-spec.md`
-- `docs/architecture/specs/P3-03-data-platform-architecture-spec.md`
-- `docs/architecture/specs/P3-04-multi-datasource-isolation-spec.md`
+- `docs/architecture/archive/specs/P0-06-data-security-and-tenant-isolation-spec.md`
+- `docs/architecture/archive/specs/P3-03-data-platform-architecture-spec.md`
+- `docs/architecture/archive/specs/P3-04-multi-datasource-isolation-spec.md`

@@ -22,14 +22,14 @@ All Redis keys must be built through `RedisKeyUtil`. The default namespace prefi
 | inflight global | `canvas:inflight:global` | execution admission registry | score expiry | ZSET execution IDs | timeout scanner removes stale entries | global admission rejection | `docs/architecture/capacity/slo-and-capacity-model.md` |
 | max concurrency config | `canvas:config:max-concurrency` | route/admission initializer | no TTL | string config value | deployment-controlled | mixed cluster limits | `docs/architecture/capacity/slo-and-capacity-model.md` |
 | event dedup | `canvas:event:dedup:<idempotencyKey>` | event ingestion service | 24h | string marker | natural TTL | duplicate event acceptance | `docs/architecture/capacity/retention-policy.md` |
-| login fail | `canvas:login:fail:<username>` | auth service | security window | numeric counter | natural TTL/reset on success | account lock noise | `docs/architecture/specs/P0-01-security-hardening-spec.md` |
-| login locked | `canvas:login:locked:<username>` | auth service | lock window | string marker | natural TTL/admin unlock | login outage for user | `docs/architecture/specs/P0-01-security-hardening-spec.md` |
-| revoked JWT | `canvas:jwt:revoked:<tokenHash>` | auth service | token expiry | string marker | natural TTL | revoked token reuse | `docs/architecture/specs/P0-01-security-hardening-spec.md` |
+| login fail | `canvas:login:fail:<username>` | auth service | security window | numeric counter | natural TTL/reset on success | account lock noise | `docs/architecture/archive/specs/P0-01-security-hardening-spec.md` |
+| login locked | `canvas:login:locked:<username>` | auth service | lock window | string marker | natural TTL/admin unlock | login outage for user | `docs/architecture/archive/specs/P0-01-security-hardening-spec.md` |
+| revoked JWT | `canvas:jwt:revoked:<tokenHash>` | auth service | token expiry | string marker | natural TTL | revoked token reuse | `docs/architecture/archive/specs/P0-01-security-hardening-spec.md` |
 | canvas config cache | `canvas:<canvasId>:v<versionId>:config` | `CanvasEntityCache`, `CanvasConfigCache` | cache policy TTL | serialized runtime config | `RocketMqCacheInvalidationPublisher` and `/ops/cache/invalidate/{id}` | stale graph execution | `docs/architecture/runbooks/cache-invalidation.md` |
 | cache invalidation channel | `canvas:cache:invalidate` | cache invalidation publisher/subscriber | channel only | invalidation event | publish event | cross-node stale cache | `docs/architecture/runbooks/cache-invalidation.md` |
 | kill switch | `canvas:kill:<canvasId>` | kill-switch subscriber/services | incident-defined | kill command marker/message | incident close or TTL | disabled active canvas | `docs/architecture/runbooks/failure-triage.md` |
-| notification websocket ticket | `canvas:notification:ws-ticket:<ticket>` | notification websocket ticket service | short auth window | ticket payload | natural TTL | websocket auth leakage | `docs/architecture/specs/P0-01-security-hardening-spec.md` |
-| notification channel | `canvas:notification:events` | notification realtime publisher | channel only | notification event | publish event | missed realtime notice | `docs/architecture/specs/P1-04-observability-and-ops-spec.md` |
+| notification websocket ticket | `canvas:notification:ws-ticket:<ticket>` | notification websocket ticket service | short auth window | ticket payload | natural TTL | websocket auth leakage | `docs/architecture/archive/specs/P0-01-security-hardening-spec.md` |
+| notification channel | `canvas:notification:events` | notification realtime publisher | channel only | notification event | publish event | missed realtime notice | `docs/architecture/archive/specs/P1-04-observability-and-ops-spec.md` |
 
 ## Update Rule
 

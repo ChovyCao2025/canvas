@@ -10,6 +10,21 @@
 
 ---
 
+## Implementation Status
+
+Status: implemented on 2026-06-05.
+
+Notes:
+- Actual migration version is `V102__event_attribute_discovery_internal_event.sql`; the original `V97_2` slot was superseded by existing migrations.
+- `EventAttrDefinitionDO`, `EventAttrDefinitionMapper`, `EventDefinitionDO` discovery fields, `EventAttributeDiscoveryService`, `CdpEventPublisher`, and the ingestion hook already existed before this slice and were verified against this plan.
+- This slice added explicit `canvas.cdp.event-topic` configuration plus focused schema, discovery service, publisher, and ingestion hook tests.
+- Commit was not performed in this session.
+
+Verification evidence:
+- Red run: focused Maven initially failed before execution because `canvas.cdp.event-topic` was not configured, then exposed a test Mockito overload ambiguity that was fixed in test code.
+- Green run: `JAVA_HOME=/Users/photonpay/Library/Java/JavaVirtualMachines/ms-21.0.11/Contents/Home PATH="/Users/photonpay/Library/Java/JavaVirtualMachines/ms-21.0.11/Contents/Home/bin:$PATH" mvn -pl canvas-engine test -Dtest=EventAttributeDiscoverySchemaTest,EventAttributeDiscoveryServiceTest,CdpEventPublisherTest,CdpEventIngestionServiceTest -DfailIfNoTests=true`
+- Result: 11 tests run, 0 failures, 0 errors, 0 skipped.
+
 ## Spec Reference
 
 - `docs/product-evolution/specs/p1-005a2-event-attribute-discovery-and-internal-cdp-event.md`
@@ -17,7 +32,7 @@
 
 ## File Structure
 
-- Create: `backend/canvas-engine/src/main/resources/db/migration/V97_2__event_attribute_discovery_internal_event.sql`
+- Create: `backend/canvas-engine/src/main/resources/db/migration/V102__event_attribute_discovery_internal_event.sql`
 - Create: `backend/canvas-engine/src/test/java/org/chovy/canvas/domain/cdp/EventAttributeDiscoverySchemaTest.java`
 - Create: `backend/canvas-engine/src/main/java/org/chovy/canvas/dal/dataobject/EventAttrDefinitionDO.java`
 - Create: `backend/canvas-engine/src/main/java/org/chovy/canvas/dal/mapper/EventAttrDefinitionMapper.java`
@@ -33,12 +48,12 @@
 
 **Files:**
 - Create: `backend/canvas-engine/src/test/java/org/chovy/canvas/domain/cdp/EventAttributeDiscoverySchemaTest.java`
-- Create: `backend/canvas-engine/src/main/resources/db/migration/V97_2__event_attribute_discovery_internal_event.sql`
+- Create: `backend/canvas-engine/src/main/resources/db/migration/V102__event_attribute_discovery_internal_event.sql`
 - Create: `backend/canvas-engine/src/main/java/org/chovy/canvas/dal/dataobject/EventAttrDefinitionDO.java`
 - Create: `backend/canvas-engine/src/main/java/org/chovy/canvas/dal/mapper/EventAttrDefinitionMapper.java`
 - Modify: `backend/canvas-engine/src/main/java/org/chovy/canvas/dal/dataobject/EventDefinitionDO.java`
 
-- [ ] **Step 1: Write schema test**
+- [x] **Step 1: Write schema test**
 
 ```java
 class EventAttributeDiscoverySchemaTest {
@@ -46,7 +61,7 @@ class EventAttributeDiscoverySchemaTest {
     @Test
     void migrationAddsDiscoveryControlsAndAttributeTable() throws Exception {
         String sql = Files.readString(Path.of(
-                "src/main/resources/db/migration/V97_2__event_attribute_discovery_internal_event.sql"));
+                "src/main/resources/db/migration/V102__event_attribute_discovery_internal_event.sql"));
 
         assertThat(sql)
                 .contains("ALTER TABLE event_definition")
@@ -60,7 +75,7 @@ class EventAttributeDiscoverySchemaTest {
 }
 ```
 
-- [ ] **Step 2: Run schema test and confirm red state**
+- [x] **Step 2: Run schema test and confirm red state**
 
 Run:
 
@@ -70,9 +85,9 @@ cd backend && mvn -pl canvas-engine test -Dtest=EventAttributeDiscoverySchemaTes
 
 Expected: FAIL because migration does not exist.
 
-- [ ] **Step 3: Add migration**
+- [x] **Step 3: Add migration**
 
-Create `V97_2__event_attribute_discovery_internal_event.sql`:
+Create `V102__event_attribute_discovery_internal_event.sql`:
 
 ```sql
 ALTER TABLE event_definition
@@ -98,7 +113,7 @@ CREATE TABLE IF NOT EXISTS event_attr_definition (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='Discovered event attribute definitions';
 ```
 
-- [ ] **Step 4: Add data object and event definition fields**
+- [x] **Step 4: Add data object and event definition fields**
 
 Create `EventAttrDefinitionDO.java`:
 
@@ -144,7 +159,7 @@ private Integer autoDiscover;
 private String discoveryMode;
 ```
 
-- [ ] **Step 5: Run schema test**
+- [x] **Step 5: Run schema test**
 
 Run:
 
@@ -160,7 +175,7 @@ Expected: PASS.
 - Create: `backend/canvas-engine/src/test/java/org/chovy/canvas/domain/cdp/EventAttributeDiscoveryServiceTest.java`
 - Create: `backend/canvas-engine/src/main/java/org/chovy/canvas/domain/cdp/EventAttributeDiscoveryService.java`
 
-- [ ] **Step 1: Write discovery tests**
+- [x] **Step 1: Write discovery tests**
 
 ```java
 @Test
@@ -202,7 +217,7 @@ void inferTypeClassifiesJsonAndDateLikeStrings() {
 }
 ```
 
-- [ ] **Step 2: Run discovery tests and confirm red state**
+- [x] **Step 2: Run discovery tests and confirm red state**
 
 Run:
 
@@ -212,7 +227,7 @@ cd backend && mvn -pl canvas-engine test -Dtest=EventAttributeDiscoveryServiceTe
 
 Expected: FAIL because service does not exist.
 
-- [ ] **Step 3: Implement discovery service**
+- [x] **Step 3: Implement discovery service**
 
 Create `EventAttributeDiscoveryService.java`:
 
@@ -268,7 +283,7 @@ public class EventAttributeDiscoveryService {
 }
 ```
 
-- [ ] **Step 4: Run discovery tests**
+- [x] **Step 4: Run discovery tests**
 
 Run:
 
@@ -286,7 +301,7 @@ Expected: PASS.
 - Modify: `backend/canvas-engine/src/main/resources/application.yml`
 - Modify: `backend/canvas-engine/src/test/java/org/chovy/canvas/domain/cdp/CdpEventIngestionServiceTest.java`
 
-- [ ] **Step 1: Extend ingestion tests**
+- [x] **Step 1: Extend ingestion tests**
 
 Add tests:
 
@@ -315,7 +330,7 @@ void duplicateEventDoesNotPublishInternalEvent() {
 }
 ```
 
-- [ ] **Step 2: Add publisher**
+- [x] **Step 2: Add publisher**
 
 Create `CdpEventPublisher.java`:
 
@@ -351,7 +366,7 @@ canvas:
     event-topic: ${CANVAS_CDP_EVENT_TOPIC:CDP_EVENT_INGESTED}
 ```
 
-- [ ] **Step 3: Hook discovery and publisher into ingestion**
+- [x] **Step 3: Hook discovery and publisher into ingestion**
 
 Inject:
 
@@ -372,7 +387,7 @@ return true;
 
 Keep duplicate returns before this block so duplicates do not discover or publish.
 
-- [ ] **Step 4: Run focused backend tests**
+- [x] **Step 4: Run focused backend tests**
 
 Run:
 
@@ -393,7 +408,7 @@ Expected: PASS.
 Run:
 
 ```bash
-git add backend/canvas-engine/src/main/resources/db/migration/V97_2__event_attribute_discovery_internal_event.sql \
+git add backend/canvas-engine/src/main/resources/db/migration/V102__event_attribute_discovery_internal_event.sql \
   backend/canvas-engine/src/main/java/org/chovy/canvas/dal/dataobject/EventAttrDefinitionDO.java \
   backend/canvas-engine/src/main/java/org/chovy/canvas/dal/dataobject/EventDefinitionDO.java \
   backend/canvas-engine/src/main/java/org/chovy/canvas/dal/mapper/EventAttrDefinitionMapper.java \

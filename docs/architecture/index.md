@@ -47,20 +47,20 @@ P2:
 P3:
 - [Platform evolution source queue](todo/p3/platform-evolution/spec.md)
 - [Platform evolution promotion checklist](platform-evolution-promotion-checklist.md)
-- [P3-00 Architecture boundary review](specs/P3-00-architecture-boundary-review-spec.md)
-- [P3-01 Platform evolution overview](specs/P3-01-platform-evolution-spec.md)
-- [P3-02 Service decomposition and domain boundaries](specs/P3-02-service-decomposition-and-domain-boundaries-spec.md)
-- [P3-03 Data platform architecture](specs/P3-03-data-platform-architecture-spec.md)
-- [P3-04 Multi datasource isolation](specs/P3-04-multi-datasource-isolation-spec.md)
-- [P3-05 WebFlux to MVC migration](specs/P3-05-webflux-to-mvc-migration-spec.md)
-- [P3-06 K8s deployment platform](specs/P3-06-k8s-deployment-platform-spec.md)
-- [P3-07 Production platform components](specs/P3-07-production-platform-components-spec.md)
-- [P3-08 WeCom SCRM module](specs/P3-08-wecom-scrm-module-spec.md)
-- [P3-09 Identity, event, and tenant platform](specs/P3-09-identity-event-and-tenant-platform-spec.md)
+- [P3-00 Architecture boundary review](archive/specs/P3-00-architecture-boundary-review-spec.md)
+- [P3-01 Platform evolution overview](archive/specs/P3-01-platform-evolution-spec.md)
+- [P3-02 Service decomposition and domain boundaries](archive/specs/P3-02-service-decomposition-and-domain-boundaries-spec.md)
+- [P3-03 Data platform architecture](archive/specs/P3-03-data-platform-architecture-spec.md)
+- [P3-04 Multi datasource isolation](archive/specs/P3-04-multi-datasource-isolation-spec.md)
+- [P3-05 WebFlux to MVC migration](archive/specs/P3-05-webflux-to-mvc-migration-spec.md)
+- [P3-06 K8s deployment platform](archive/specs/P3-06-k8s-deployment-platform-spec.md)
+- [P3-07 Production platform components](archive/specs/P3-07-production-platform-components-spec.md)
+- [P3-08 WeCom SCRM module](archive/specs/P3-08-wecom-scrm-module-spec.md)
+- [P3-09 Identity, event, and tenant platform](archive/specs/P3-09-identity-event-and-tenant-platform-spec.md)
 
 ## Verification Notes
 
-See [todo/verification-summary.md](todo/verification-summary.md) for evidence, [todo/coverage-matrix.md](todo/coverage-matrix.md) for source-to-package traceability, and [specs/P3-00-architecture-boundary-code-verification.md](specs/P3-00-architecture-boundary-code-verification.md) for the code-level architecture boundary check. Key corrections:
+See [todo/verification-summary.md](todo/verification-summary.md) for evidence, [todo/coverage-matrix.md](todo/coverage-matrix.md) for source-to-package traceability, and [specs/P3-00-architecture-boundary-code-verification.md](archive/specs/P3-00-architecture-boundary-code-verification.md) for the code-level architecture boundary check. Key corrections:
 
 - JWT secret startup validation exists; deployment config enforcement remains.
 - Tests exist; the remaining issue is critical-path and integration coverage.

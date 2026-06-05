@@ -43,7 +43,7 @@ class EventAttributeDiscoveryServiceTest {
 
         new EventAttributeDiscoveryService(attrMapper).discover(42L, "OrderComplete", Map.of("amount", 99.9));
 
-        verify(attrMapper).updateById(argThat(row -> row.getId().equals(9L)
+        verify(attrMapper).updateById(argThat((EventAttrDefinitionDO row) -> row.getId().equals(9L)
                 && row.getStatus().equals(EventAttrDefinitionDO.APPROVED)
                 && row.getLastSeenAt() != null));
     }

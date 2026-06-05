@@ -33,7 +33,7 @@ Runtime platform owner.
 
 ## Linked Specs
 
-- `docs/architecture/specs/P0-02-reactive-threading-and-transactions-spec.md`
-- `docs/architecture/specs/P0-04-execution-concurrency-safety-spec.md`
-- `docs/architecture/specs/P1-04-observability-and-ops-spec.md`
-- `docs/architecture/specs/P3-05-webflux-to-mvc-migration-spec.md`
+- `docs/architecture/archive/specs/P0-02-reactive-threading-and-transactions-spec.md`
+- `docs/architecture/archive/specs/P0-04-execution-concurrency-safety-spec.md`
+- `docs/architecture/archive/specs/P1-04-observability-and-ops-spec.md`
+- `docs/architecture/archive/specs/P3-05-webflux-to-mvc-migration-spec.md`
