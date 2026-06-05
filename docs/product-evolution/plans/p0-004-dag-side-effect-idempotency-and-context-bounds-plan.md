@@ -8,6 +8,11 @@
 
 **Tech Stack:** Java 21, Spring Boot, MyBatis, Flyway, Redis, JUnit 5, Mockito, existing DAG engine and handler contracts.
 
+## Implementation Status
+
+- Status: implemented and verified on 2026-06-05.
+- Commit: not created in this session because the worktree contains many unrelated and parallel product-evolution changes.
+
 ---
 
 ## Spec Reference
@@ -35,7 +40,7 @@
 - Create: `backend/canvas-engine/src/test/java/org/chovy/canvas/engine/scheduler/DagEngineContextCommitTest.java`
 - Create: `backend/canvas-engine/src/test/java/org/chovy/canvas/engine/context/ExecutionContextBoundsTest.java`
 - Create: `backend/canvas-engine/src/test/java/org/chovy/canvas/domain/canvas/CanvasValidationRuntimeGuardTest.java`
-- Create: `backend/canvas-engine/src/test/java/org/chovy/canvas/engine/wait/WaitResumeQuotaBypassTest.java`
+- Create: `backend/canvas-engine/src/test/java/org/chovy/canvas/engine/trigger/WaitResumeQuotaBypassTest.java`
 
 ### Task 1: Failing Tests For Idempotency And Context Commit
 
@@ -44,7 +49,7 @@
 - Create: `backend/canvas-engine/src/test/java/org/chovy/canvas/engine/scheduler/DagEngineContextCommitTest.java`
 - Create: `backend/canvas-engine/src/test/java/org/chovy/canvas/engine/context/ExecutionContextBoundsTest.java`
 
-- [ ] **Step 1: Write idempotency service tests**
+- [x] **Step 1: Write idempotency service tests**
 
 Create these idempotency service test methods:
 
@@ -56,7 +61,7 @@ Create these idempotency service test methods:
 @Test void duplicateOperationDoesNotReexecuteExternalSideEffect()
 ```
 
-- [ ] **Step 2: Write DAG commit tests**
+- [x] **Step 2: Write DAG commit tests**
 
 Use a test handler that mutates a local counter and returns success or failure. Create these DAG commit test methods:
 
@@ -66,11 +71,11 @@ Use a test handler that mutates a local counter and returns success or failure. 
 @Test void duplicateCompletedSideEffectReturnsCachedOutput()
 ```
 
-- [ ] **Step 3: Write context bounds tests**
+- [x] **Step 3: Write context bounds tests**
 
 Create `ExecutionContextBoundsTest` methods named `calculatesSerializedContextSize`, `emitsWarningAtThreshold`, `rejectsAboveHardMax`, `storesNodeScopedFlatKeys`, and `readsLegacyNestedContextForCompatibility`.
 
-- [ ] **Step 4: Run tests and confirm red state**
+- [x] **Step 4: Run tests and confirm red state**
 
 Run:
 
@@ -88,11 +93,11 @@ Expected: FAIL because idempotency service, staged context commit, and hard cont
 - Create: `backend/canvas-engine/src/main/java/org/chovy/canvas/engine/idempotency/NodeSideEffectRecord.java`
 - Test: `backend/canvas-engine/src/test/java/org/chovy/canvas/engine/idempotency/NodeSideEffectIdempotencyServiceTest.java`
 
-- [ ] **Step 1: Add additive table**
+- [x] **Step 1: Add additive table**
 
 Create `node_side_effect_idempotency` with tenant id, execution id, canvas id, node id, node type, operation key, idempotency key, status, attempt count, output JSON, error message, created at, updated at, and a unique key on tenant id plus idempotency key.
 
-- [ ] **Step 2: Implement service methods**
+- [x] **Step 2: Implement service methods**
 
 Implement:
 
@@ -106,7 +111,7 @@ String buildKey(ExecutionContext ctx, String nodeId, String nodeType, String ope
 
 Return a completed cached output without allowing another side effect when the key already completed.
 
-- [ ] **Step 3: Run idempotency tests**
+- [x] **Step 3: Run idempotency tests**
 
 Run:
 
@@ -125,15 +130,15 @@ Expected: PASS.
 - Test: `backend/canvas-engine/src/test/java/org/chovy/canvas/engine/scheduler/DagEngineContextCommitTest.java`
 - Test: `backend/canvas-engine/src/test/java/org/chovy/canvas/engine/context/ExecutionContextBoundsTest.java`
 
-- [ ] **Step 1: Add staged output commit**
+- [x] **Step 1: Add staged output commit**
 
 In `DagEngine`, keep handler output in a local variable until `NodeResult` is successful. Commit through `ctx.putNodeOutput(nodeId, output)` after idempotency completion, and skip output commit for failed, timeout, suppressed, or pending results unless the result explicitly carries persisted wait metadata.
 
-- [ ] **Step 2: Enforce context size and namespaced flat keys**
+- [x] **Step 2: Enforce context size and namespaced flat keys**
 
 Change `ExecutionContext.putNodeOutput` to serialize the candidate `nodeOutputs` or candidate output for sizing. Reject writes above `canvas.execution.context-max-bytes`. Write flat keys as `nodeId.fieldName` and retain legacy plain-field lookup only when no namespaced match exists.
 
-- [ ] **Step 3: Run DAG and context tests**
+- [x] **Step 3: Run DAG and context tests**
 
 Run:
 
@@ -149,17 +154,17 @@ Expected: PASS.
 - Modify: `backend/canvas-engine/src/main/java/org/chovy/canvas/domain/canvas/CanvasService.java`
 - Modify: `backend/canvas-engine/src/main/java/org/chovy/canvas/engine/trigger/CanvasExecutionService.java`
 - Create: `backend/canvas-engine/src/test/java/org/chovy/canvas/domain/canvas/CanvasValidationRuntimeGuardTest.java`
-- Create: `backend/canvas-engine/src/test/java/org/chovy/canvas/engine/wait/WaitResumeQuotaBypassTest.java`
+- Create: `backend/canvas-engine/src/test/java/org/chovy/canvas/engine/trigger/WaitResumeQuotaBypassTest.java`
 
-- [ ] **Step 1: Add validation guards**
+- [x] **Step 1: Add validation guards**
 
 Reject publish and dry-run validation when total node count exceeds `canvas.validation.max-node-count`, GOTO max jump count exceeds `canvas.validation.max-goto-jumps`, LOOP max iterations exceeds `canvas.validation.max-loop-iterations`, or transitive subflow dependencies contain a cycle.
 
-- [ ] **Step 2: Prove resume quota bypass**
+- [x] **Step 2: Prove resume quota bypass**
 
 Add tests where a WAIT resume payload enters `CanvasExecutionService.trigger` and verifies `TriggerPreCheckService.checkWithoutQuotaAccounting` and `consumeQuotaAndRecord` are not called for internal continuation trigger types.
 
-- [ ] **Step 3: Run guard and resume tests**
+- [x] **Step 3: Run guard and resume tests**
 
 Run:
 
@@ -175,7 +180,7 @@ Expected: PASS.
 - Modify: `docs/product-evolution/specs/p0-004-dag-side-effect-idempotency-and-context-bounds.md`
 - Modify: `docs/product-evolution/plans/p0-004-dag-side-effect-idempotency-and-context-bounds-plan.md`
 
-- [ ] **Step 1: Run focused backend suite**
+- [x] **Step 1: Run focused backend suite**
 
 Run:
 
@@ -185,15 +190,17 @@ cd backend && mvn -pl canvas-engine test -Dtest=NodeSideEffectIdempotencyService
 
 Expected: PASS.
 
-- [ ] **Step 2: Run affected existing tests**
+- [x] **Step 2: Run affected existing tests**
 
 Run:
 
 ```bash
-cd backend && mvn -pl canvas-engine test -Dtest=DagEnginePendingTest,DagEngineDepthTest,WaitHandlerTest,GoalCheckHandlerTest,CouponHandlerTest,CdpTagWriteHandlerTest
+cd backend && mvn -pl canvas-engine test -Dtest=DagEnginePendingTest,DagEngineDepthTest,WaitHandlerTest,CouponHandlerTest
 ```
 
 Expected: PASS.
+
+Note: `GoalCheckHandlerTest` and `CdpTagWriteHandlerTest` are not present in this repository snapshot, so the affected regression run uses the existing DAG, WAIT, and coupon tests.
 
 - [ ] **Step 3: Commit implementation slice**
 
@@ -205,3 +212,29 @@ git commit -m "feat: add DAG idempotency and context guards"
 ```
 
 Expected: commit contains only idempotency, DAG commit, context bounds, runtime guard, spec, and plan files.
+
+### Verification Evidence
+
+- BI publish approval compile unblock:
+
+```bash
+cd backend && mvn -pl canvas-engine clean test -Dtest=BiPublishApprovalServiceTest,BiPublishApprovalControllerTest
+```
+
+Result: 10 tests, 0 failures, 0 errors, 0 skipped.
+
+- Focused P0-004 backend suite:
+
+```bash
+cd backend && mvn -pl canvas-engine test -Dtest=NodeSideEffectIdempotencyServiceTest,DagEngineContextCommitTest,ExecutionContextBoundsTest,CanvasValidationRuntimeGuardTest,WaitResumeQuotaBypassTest
+```
+
+Result: 21 tests, 0 failures, 0 errors, 0 skipped.
+
+- Affected existing regression:
+
+```bash
+cd backend && mvn -pl canvas-engine test -Dtest=DagEnginePendingTest,DagEngineDepthTest,WaitHandlerTest,CouponHandlerTest
+```
+
+Result: 16 tests, 0 failures, 0 errors, 0 skipped.

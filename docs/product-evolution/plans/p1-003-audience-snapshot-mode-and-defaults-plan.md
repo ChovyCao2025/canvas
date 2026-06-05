@@ -8,6 +8,12 @@
 
 **Tech Stack:** Java 21, Spring Boot, MyBatis-Plus, Flyway, JUnit 5, Mockito, AssertJ, React 18, TypeScript, Ant Design, Vitest.
 
+## Implementation Status
+
+- Status: implemented and focused-verified on 2026-06-05.
+- Actual migration: `backend/canvas-engine/src/main/resources/db/migration/V252__audience_snapshot_mode_and_defaults.sql`; `V96`, `V250`, and `V251` were already occupied in the current migration sequence.
+- Commit status: not committed in this session because the worktree contains many unrelated and parallel product-evolution changes that need scope confirmation before staging.
+
 ---
 
 ## Spec Reference
@@ -16,7 +22,7 @@
 
 ## File Structure
 
-- Create: `backend/canvas-engine/src/main/resources/db/migration/V96__audience_snapshot_mode_and_defaults.sql`
+- Create: `backend/canvas-engine/src/main/resources/db/migration/V252__audience_snapshot_mode_and_defaults.sql`
 - Create: `backend/canvas-engine/src/test/java/org/chovy/canvas/domain/audience/AudienceSnapshotModeMigrationTest.java`
 - Create: `backend/canvas-engine/src/main/java/org/chovy/canvas/common/enums/AudienceSnapshotMode.java`
 - Create: `backend/canvas-engine/src/main/java/org/chovy/canvas/dal/dataobject/AudienceSnapshotDO.java`
@@ -34,13 +40,13 @@
 
 **Files:**
 - Create: `backend/canvas-engine/src/test/java/org/chovy/canvas/domain/audience/AudienceSnapshotModeMigrationTest.java`
-- Create: `backend/canvas-engine/src/main/resources/db/migration/V96__audience_snapshot_mode_and_defaults.sql`
+- Create: `backend/canvas-engine/src/main/resources/db/migration/V252__audience_snapshot_mode_and_defaults.sql`
 - Create: `backend/canvas-engine/src/main/java/org/chovy/canvas/common/enums/AudienceSnapshotMode.java`
 - Create: `backend/canvas-engine/src/main/java/org/chovy/canvas/dal/dataobject/AudienceSnapshotDO.java`
 - Create: `backend/canvas-engine/src/main/java/org/chovy/canvas/dal/mapper/AudienceSnapshotMapper.java`
 - Modify: `backend/canvas-engine/src/main/java/org/chovy/canvas/dal/dataobject/AudienceDefinitionDO.java`
 
-- [ ] **Step 1: Write migration contract test**
+- [x] **Step 1: Write migration contract test**
 
 Create `AudienceSnapshotModeMigrationTest.java`:
 
@@ -59,7 +65,7 @@ class AudienceSnapshotModeMigrationTest {
     @Test
     void migrationAddsAudienceModeSnapshotTableAndTaggerConfig() throws Exception {
         String sql = Files.readString(Path.of(
-                "src/main/resources/db/migration/V96__audience_snapshot_mode_and_defaults.sql"));
+                "src/main/resources/db/migration/V252__audience_snapshot_mode_and_defaults.sql"));
 
         assertThat(sql)
                 .contains("ALTER TABLE audience_definition")
@@ -74,7 +80,7 @@ class AudienceSnapshotModeMigrationTest {
 }
 ```
 
-- [ ] **Step 2: Run migration test and confirm red state**
+- [x] **Step 2: Run migration test and confirm red state**
 
 Run:
 
@@ -82,11 +88,11 @@ Run:
 cd backend && mvn -pl canvas-engine test -Dtest=AudienceSnapshotModeMigrationTest
 ```
 
-Expected: FAIL because `V96__audience_snapshot_mode_and_defaults.sql` does not exist.
+Expected: FAIL because `V252__audience_snapshot_mode_and_defaults.sql` does not exist.
 
-- [ ] **Step 3: Add migration**
+- [x] **Step 3: Add migration**
 
-Create `V96__audience_snapshot_mode_and_defaults.sql`:
+Create `V252__audience_snapshot_mode_and_defaults.sql`:
 
 ```sql
 ALTER TABLE audience_definition
@@ -113,7 +119,7 @@ SET config_schema = '[{"key":"mode","label":"标签模式","type":"radio","requi
 WHERE type_key = 'TAGGER';
 ```
 
-- [ ] **Step 4: Add enum and snapshot data objects**
+- [x] **Step 4: Add enum and snapshot data objects**
 
 Create `AudienceSnapshotMode.java`:
 
@@ -191,7 +197,7 @@ Add this field to `AudienceDefinitionDO`:
 private String defaultSnapshotMode;
 ```
 
-- [ ] **Step 5: Run schema contract test**
+- [x] **Step 5: Run schema contract test**
 
 Run:
 
@@ -207,7 +213,7 @@ Expected: PASS.
 - Modify: `backend/canvas-engine/src/main/java/org/chovy/canvas/web/AudienceController.java`
 - Modify: `backend/canvas-engine/src/test/java/org/chovy/canvas/controller/AudienceControllerTest.java`
 
-- [ ] **Step 1: Add controller tests**
+- [x] **Step 1: Add controller tests**
 
 Add tests to `AudienceControllerTest`:
 
@@ -254,7 +260,7 @@ private AudienceController testController(AudienceBatchComputeService computeSer
 }
 ```
 
-- [ ] **Step 2: Run controller tests and confirm red state**
+- [x] **Step 2: Run controller tests and confirm red state**
 
 Run:
 
@@ -264,7 +270,7 @@ cd backend && mvn -pl canvas-engine test -Dtest=AudienceControllerTest
 
 Expected: FAIL because `AudienceController` does not normalize `defaultSnapshotMode`.
 
-- [ ] **Step 3: Normalize create and update request bodies**
+- [x] **Step 3: Normalize create and update request bodies**
 
 In `AudienceController`, import `AudienceSnapshotMode` and add:
 
@@ -280,7 +286,7 @@ Call it before `computeService.create(body)` and before update persistence:
 normalizeDefaultSnapshotMode(body);
 ```
 
-- [ ] **Step 4: Run controller tests**
+- [x] **Step 4: Run controller tests**
 
 Run:
 
@@ -299,7 +305,7 @@ Expected: PASS.
 - Modify: `frontend/src/pages/audience-edit/index.tsx`
 - Modify: `frontend/src/pages/audience-list/index.tsx`
 
-- [ ] **Step 1: Add helper tests**
+- [x] **Step 1: Add helper tests**
 
 Create `audienceSnapshotMode.test.ts`:
 
@@ -321,7 +327,7 @@ describe('audience snapshot mode helpers', () => {
 })
 ```
 
-- [ ] **Step 2: Add helper**
+- [x] **Step 2: Add helper**
 
 Create `audienceSnapshotMode.ts`:
 
@@ -337,7 +343,7 @@ export function snapshotModeLabel(value?: string) {
 }
 ```
 
-- [ ] **Step 3: Extend API type**
+- [x] **Step 3: Extend API type**
 
 Add the field to the existing `AudienceDefinition` interface in `audienceApi.ts`:
 
@@ -351,7 +357,7 @@ Add the type import or local exported type:
 export type AudienceSnapshotMode = 'STATIC_LOCKED' | 'DYNAMIC_REFRESH'
 ```
 
-- [ ] **Step 4: Wire edit and list pages**
+- [x] **Step 4: Wire edit and list pages**
 
 In `audience-edit/index.tsx`, import `Radio` and the helper. Add a form item:
 
@@ -380,7 +386,7 @@ In `audience-list/index.tsx`, add a column:
 }
 ```
 
-- [ ] **Step 5: Run focused frontend test**
+- [x] **Step 5: Run focused frontend test**
 
 Run:
 
@@ -396,7 +402,7 @@ Expected: PASS.
 - Read: `docs/product-evolution/specs/p1-003-audience-snapshot-mode-and-defaults.md`
 - Read: `docs/product-evolution/plans/p1-003-audience-snapshot-mode-and-defaults-plan.md`
 
-- [ ] **Step 1: Run focused backend and frontend tests**
+- [x] **Step 1: Run focused backend and frontend tests**
 
 Run:
 
@@ -407,12 +413,40 @@ cd frontend && npm test -- audienceSnapshotMode.test.ts
 
 Expected: PASS for all named tests.
 
+### Verification Evidence
+
+- Focused backend suite plus Flyway migration policy:
+
+```bash
+cd backend && mvn -pl canvas-engine test -Dtest=AudienceSnapshotModeMigrationTest,AudienceControllerTest,FlywayMigrationPolicyTest
+```
+
+Result: 7 tests, 0 failures, 0 errors, 0 skipped.
+
+- Focused frontend helper suite:
+
+```bash
+cd frontend && npm test -- audienceSnapshotMode.test.ts
+```
+
+Result: 1 test file, 3 tests passed.
+
+- Warehouse E2E signature compatibility suite, run because Maven test compilation surfaced stale test constructors while verifying P1-003:
+
+```bash
+cd backend && mvn -pl canvas-engine test -Dtest=CdpWarehouseE2eCertificationRunServiceTest,CdpWarehousePhysicalE2eCertificationControllerTest,CdpWarehouseE2eCertificationGateControllerTest,CdpWarehouseE2eCertificationRunControllerTest
+```
+
+Result: 15 tests, 0 failures, 0 errors, 0 skipped.
+
+- Frontend production build was attempted by the frontend worker but is currently blocked by existing unrelated TypeScript errors in `frontend/src/pages/bi/index.tsx`.
+
 - [ ] **Step 2: Commit this slice**
 
 Run:
 
 ```bash
-git add backend/canvas-engine/src/main/resources/db/migration/V96__audience_snapshot_mode_and_defaults.sql \
+git add backend/canvas-engine/src/main/resources/db/migration/V252__audience_snapshot_mode_and_defaults.sql \
   backend/canvas-engine/src/main/java/org/chovy/canvas/common/enums/AudienceSnapshotMode.java \
   backend/canvas-engine/src/main/java/org/chovy/canvas/dal/dataobject/AudienceDefinitionDO.java \
   backend/canvas-engine/src/main/java/org/chovy/canvas/dal/dataobject/AudienceSnapshotDO.java \

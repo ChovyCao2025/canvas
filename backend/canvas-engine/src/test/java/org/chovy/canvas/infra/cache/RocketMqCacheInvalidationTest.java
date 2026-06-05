@@ -2,11 +2,11 @@ package org.chovy.canvas.infra.cache;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.apache.rocketmq.common.message.MessageExt;
-import org.apache.rocketmq.spring.core.RocketMQTemplate;
 import org.chovy.cache.CacheInvalidationEvent;
 import org.chovy.cache.TieredCacheManager;
 import org.chovy.canvas.infrastructure.cache.RocketMqCacheInvalidationConsumer;
 import org.chovy.canvas.infrastructure.cache.RocketMqCacheInvalidationPublisher;
+import org.chovy.canvas.infrastructure.mq.CanvasMessageBus;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
@@ -20,20 +20,20 @@ import static org.mockito.Mockito.verify;
 @ExtendWith(MockitoExtension.class)
 class RocketMqCacheInvalidationTest {
 
-    @Mock RocketMQTemplate rocketMQTemplate;
+    @Mock CanvasMessageBus messageBus;
     @Mock TieredCacheManager cacheManager;
 
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     @Test
     void publisherSendsInvalidationEventToBroadcastTopicWithCacheNameTag() {
-        RocketMqCacheInvalidationPublisher publisher = new RocketMqCacheInvalidationPublisher(rocketMQTemplate);
+        RocketMqCacheInvalidationPublisher publisher = new RocketMqCacheInvalidationPublisher(messageBus);
         ReflectionTestUtils.setField(publisher, "topic", "CACHE_INVALIDATE");
         CacheInvalidationEvent event = new CacheInvalidationEvent("sample", "42", 3L);
 
         publisher.publish(event);
 
-        verify(rocketMQTemplate).syncSend("CACHE_INVALIDATE:sample", event);
+        verify(messageBus).publishCacheInvalidation("CACHE_INVALIDATE", event);
     }
 
     @Test

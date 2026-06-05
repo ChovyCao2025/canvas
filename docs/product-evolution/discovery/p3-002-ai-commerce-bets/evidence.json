@@ -1,0 +1,87 @@
+{
+  "package": "p3-002-ai-commerce-bets",
+  "rollout": {
+    "migration": "none",
+    "runtimeChange": false,
+    "reason": "This strategy slice records AI commerce bet evidence only and does not execute AI actions."
+  },
+  "bets": [
+    {
+      "key": "ai-agent-assistance",
+      "owner": "AI Product",
+      "status": "Needs Evidence",
+      "customerEvidence": ["Operators need decision support before autonomous campaign actions are considered."],
+      "dependencyStatus": "Requires analytics event traces and operator feedback loops.",
+      "modelRiskStatus": "Requires hallucination, spend, and approval review.",
+      "approvalBoundary": "AI may draft recommendations; a human approves customer-facing or spend-affecting changes.",
+      "proofCommand": "node --test tools/strategy/ai-commerce-bets-evidence.test.mjs",
+      "rollback": "Disable AI recommendation entry point and keep manual workflows."
+    },
+    {
+      "key": "ai-native-operations",
+      "owner": "Operations Product",
+      "status": "Needs Evidence",
+      "customerEvidence": ["Ops automation demand must be validated with support and success teams."],
+      "dependencyStatus": "Requires stable audit logs and execution timeline evidence.",
+      "modelRiskStatus": "Requires bounded action catalog and auditability.",
+      "approvalBoundary": "AI cannot trigger production operations without operator confirmation.",
+      "proofCommand": "node --test tools/strategy/ai-commerce-bets-evidence.test.mjs",
+      "rollback": "Keep automation recommendations read-only."
+    },
+    {
+      "key": "commerce-expansion",
+      "owner": "Commerce Product",
+      "status": "Deferred",
+      "customerEvidence": ["Commerce workflows need industry and billing evidence first."],
+      "dependencyStatus": "Depends on commercial model and partner ecosystem decisions.",
+      "modelRiskStatus": "No model automation approved for transaction-affecting decisions.",
+      "approvalBoundary": "Human approval required for pricing, offer, or purchase-flow changes.",
+      "proofCommand": "node --test tools/strategy/ai-commerce-bets-evidence.test.mjs",
+      "rollback": "Keep commerce integrations out of product scope."
+    },
+    {
+      "key": "industry-packaging",
+      "owner": "Industry Product",
+      "status": "Needs Evidence",
+      "customerEvidence": ["Vertical package demand must be ranked by revenue and implementation cost."],
+      "dependencyStatus": "Requires template library and best-practice evidence.",
+      "modelRiskStatus": "AI-generated vertical guidance requires review before publishing.",
+      "approvalBoundary": "Industry content must be reviewed by product owner before customer release.",
+      "proofCommand": "node --test tools/strategy/ai-commerce-bets-evidence.test.mjs",
+      "rollback": "Keep vertical assets as internal discovery notes."
+    },
+    {
+      "key": "globalization",
+      "owner": "International Product",
+      "status": "Deferred",
+      "customerEvidence": ["Regional demand and localization cost are not yet ranked."],
+      "dependencyStatus": "Requires privacy, data residency, and localization decisions.",
+      "modelRiskStatus": "AI translation requires human review for customer-visible text.",
+      "approvalBoundary": "Human reviewer approves locale-specific content before release.",
+      "proofCommand": "node --test tools/strategy/ai-commerce-bets-evidence.test.mjs",
+      "rollback": "Do not expose unsupported locales."
+    },
+    {
+      "key": "privacy-readiness",
+      "owner": "Privacy",
+      "status": "Needs Evidence",
+      "customerEvidence": ["Privacy expectations must be tied to target regions and enterprise needs."],
+      "dependencyStatus": "Requires legal owner and data inventory.",
+      "modelRiskStatus": "AI processing must not expand data use without privacy review.",
+      "approvalBoundary": "Privacy owner approves data-use changes before child specs.",
+      "proofCommand": "node --test tools/strategy/ai-commerce-bets-evidence.test.mjs",
+      "rollback": "Block AI and regional features that expand regulated data use."
+    },
+    {
+      "key": "ecosystem-program",
+      "owner": "Partnerships",
+      "status": "Deferred",
+      "customerEvidence": ["Partner demand depends on marketplace and support model evidence."],
+      "dependencyStatus": "Depends on P3-001 marketplace governance.",
+      "modelRiskStatus": "Partner-facing AI claims require legal and product review.",
+      "approvalBoundary": "Partnership owner approves public claims and partner obligations.",
+      "proofCommand": "node --test tools/strategy/ai-commerce-bets-evidence.test.mjs",
+      "rollback": "Keep partner program in private discovery."
+    }
+  ]
+}

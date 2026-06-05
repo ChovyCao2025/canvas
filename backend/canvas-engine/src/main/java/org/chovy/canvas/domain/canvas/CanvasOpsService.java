@@ -11,9 +11,12 @@ import org.chovy.canvas.dal.mapper.CanvasExecutionRequestMapper;
 import org.chovy.canvas.engine.trigger.TriggerPreCheckService;
 import org.chovy.canvas.infrastructure.redis.TriggerRouteService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.chovy.canvas.dal.dataobject.CanvasDO;
 import org.chovy.canvas.dal.mapper.CanvasMapper;
 import org.chovy.canvas.dal.dataobject.CanvasVersionDO;
@@ -40,10 +43,17 @@ public class CanvasOpsService {
     private final TriggerPreCheckService preCheckService;
     /** 画布事务服务，封装只涉及数据库写入的事务边界。 */
     private final CanvasTransactionService canvasTransactionService;
+    /** 画布状态策略，集中约束生命周期和编辑边界。 */
+    private CanvasStateTransitionPolicy stateTransitionPolicy = new CanvasStateTransitionPolicy();
     /** 画布主服务，用于复用发布、回滚和外部状态清理能力。 */
     private final CanvasService canvasService;
     /** 阻塞式 Redis 模板，用于锁、去重、票据或跨实例通知。 */
     private final StringRedisTemplate redis;
+
+    @Autowired(required = false)
+    void setStateTransitionPolicy(CanvasStateTransitionPolicy stateTransitionPolicy) {
+        this.stateTransitionPolicy = stateTransitionPolicy;
+    }
 
     /**
      * 带乐观锁更新画布草稿信息
@@ -57,6 +67,11 @@ public class CanvasOpsService {
     @Transactional(rollbackFor = Exception.class)
     public void saveWithOptimisticLock(Long id, String name, String description,
                                         String graphJson, int editVersion, String operator) {
+        CanvasDO canvas = canvasMapper.selectById(id);
+        if (canvas != null) {
+            stateTransitionPolicy.assertDraftUpdateAllowed(canvas);
+        }
+
         // CAS 更新 edit_version
         int updated = canvasMapper.updateEditVersion(id, editVersion, editVersion + 1, name, description);
         if (updated == 0) throw new IllegalStateException("CANVAS_010");  // 409 冲突
@@ -89,6 +104,7 @@ public class CanvasOpsService {
      * 外部副作用失败不会回滚 DB，路由/缓存最终会通过 TTL 或下次操作自愈。
      */
     public void kill(Long id, String mode) {
+        CanvasDO canvas = require(id);
         // Step 1: 事务内 DB 操作，返回下线前的 publishedVersionId 供外部清理使用
         Long publishedVersionId = canvasTransactionService.killDb(id);
 
@@ -97,22 +113,29 @@ public class CanvasOpsService {
         redis.convertAndSend("canvas:kill:" + id, mode);
         if ("FORCE".equalsIgnoreCase(mode)) {
             // FORCE 模式需要同步落库终止存量 RUNNING 记录，避免执行态长期悬挂。
-            markRunningExecutionsFailed(id);
-            executionRequestMapper.markForceCancelledByCanvas(id, java.time.LocalDateTime.now());
+            markRunningExecutionsFailed(id, canvas.getTenantId());
+            if (canvas.getTenantId() == null) {
+                executionRequestMapper.markForceCancelledByCanvas(id, java.time.LocalDateTime.now());
+            } else {
+                executionRequestMapper.markForceCancelledByCanvasAndTenant(
+                        id, canvas.getTenantId(), java.time.LocalDateTime.now());
+            }
         }
         // 清理触发路由、调度任务、缓存、配额
         canvasService.applyKillExternalCleanup(id, publishedVersionId);
     }
 
     /** FORCE Kill 时将该画布仍处于 RUNNING 的执行记录统一标记为失败。 */
-    private void markRunningExecutionsFailed(Long canvasId) {
+    private void markRunningExecutionsFailed(Long canvasId, Long tenantId) {
         CanvasExecutionDO update = new CanvasExecutionDO();
         update.setStatus(ExecutionStatus.FAILED.getCode());
         update.setResult("{\"error\":\"FORCE_CANCELLED\"}");
-        executionMapper.update(update,
+        com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper<CanvasExecutionDO> wrapper =
                 new com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper<CanvasExecutionDO>()
                         .eq(CanvasExecutionDO::getCanvasId, canvasId)
-                        .eq(CanvasExecutionDO::getStatus, ExecutionStatus.RUNNING.getCode()));
+                        .eq(tenantId != null, CanvasExecutionDO::getTenantId, tenantId)
+                        .eq(CanvasExecutionDO::getStatus, ExecutionStatus.RUNNING.getCode());
+        executionMapper.update(update, wrapper);
     }
 
 // ── 灰度发布 ────────────────────────────────────────────────
@@ -126,7 +149,7 @@ public class CanvasOpsService {
     @Transactional(rollbackFor = Exception.class)
     public void startCanary(Long id, int percent, String operator) {
         CanvasDO canvas = require(id);
-        if (canvas.getStatus() != CanvasStatusEnum.PUBLISHED.getCode()) throw new IllegalStateException("画布未在发布状态");
+        stateTransitionPolicy.assertPublishedRuntimeMutationAllowed(canvas);
 
         // 生成灰度版本快照（复用当前草稿），与正式发布一样保留不可变版本
         CanvasVersionDO draft = latestDraft(id);
@@ -134,6 +157,7 @@ public class CanvasOpsService {
 
         CanvasVersionDO canary = new CanvasVersionDO();
         canary.setCanvasId(id);
+        canary.setTenantId(canvas.getTenantId());
         canary.setVersion(nextVer(id));
         canary.setGraphJson(draft.getGraphJson());
         canary.setStatus(VersionStatus.PUBLISHED.getCode());
@@ -143,6 +167,7 @@ public class CanvasOpsService {
         canvas.setCanaryVersionId(canary.getId());
         canvas.setCanaryPercent(percent);
         canvasMapper.updateById(canvas);
+        invalidateRuntimeCanvasAfterCommit(id);
     }
 
     /**
@@ -152,6 +177,7 @@ public class CanvasOpsService {
     @Transactional(rollbackFor = Exception.class)
     public void promoteCanary(Long id) {
         CanvasDO canvas = require(id);
+        stateTransitionPolicy.assertPublishedRuntimeMutationAllowed(canvas);
         if (canvas.getCanaryVersionId() == null) throw new IllegalStateException("无灰度版本");
 
         canvas.setPreviousVersionId(canvas.getPublishedVersionId());
@@ -159,6 +185,7 @@ public class CanvasOpsService {
         canvas.setCanaryVersionId(null);
         canvas.setCanaryPercent(null);
         canvasMapper.updateById(canvas);
+        invalidateRuntimeCanvasAfterCommit(id);
     }
 
     /**
@@ -168,9 +195,11 @@ public class CanvasOpsService {
     @Transactional(rollbackFor = Exception.class)
     public void rollbackCanary(Long id) {
         CanvasDO canvas = require(id);
+        stateTransitionPolicy.assertPublishedRuntimeMutationAllowed(canvas);
         canvas.setCanaryVersionId(null);
         canvas.setCanaryPercent(null);
         canvasMapper.updateById(canvas);
+        invalidateRuntimeCanvasAfterCommit(id);
     }
 
     /**
@@ -189,12 +218,14 @@ public class CanvasOpsService {
     @Transactional(rollbackFor = Exception.class)
     public void rollback(Long id) {
         CanvasDO canvas = require(id);
+        stateTransitionPolicy.assertPublishedRuntimeMutationAllowed(canvas);
         if (canvas.getPreviousVersionId() == null) throw new IllegalStateException("无上一版本可回滚");
 
         Long tmp = canvas.getPublishedVersionId();
         canvas.setPublishedVersionId(canvas.getPreviousVersionId());
         canvas.setPreviousVersionId(tmp);
         canvasMapper.updateById(canvas);
+        invalidateRuntimeCanvasAfterCommit(id);
     }
 
 // ── 克隆 ────────────────────────────────────────────────────
@@ -214,6 +245,7 @@ public class CanvasOpsService {
         copy.setName(src.getName() + " (副本)");
         copy.setDescription(src.getDescription());
         copy.setStatus(CanvasStatusEnum.DRAFT.getCode());
+        copy.setTenantId(src.getTenantId());
         copy.setCreatedBy(operator);
         copy.setIsExample(0);
         // 克隆结果必须脱离示例模板来源，避免后续示例同步把用户副本识别为官方示例。
@@ -224,6 +256,7 @@ public class CanvasOpsService {
             // 只克隆最新草稿为新画布的草稿版本，不继承发布态、灰度和外部路由状态。
             CanvasVersionDO v = new CanvasVersionDO();
             v.setCanvasId(copy.getId()); v.setVersion(1);
+            v.setTenantId(srcDraft.getTenantId() != null ? srcDraft.getTenantId() : src.getTenantId());
             v.setGraphJson(srcDraft.getGraphJson());
             v.setStatus(VersionStatus.DRAFT.getCode()); v.setCreatedBy(operator);
             canvasVersionMapper.insert(v);
@@ -359,5 +392,23 @@ public class CanvasOpsService {
     /** 保留旧版本路由清理签名，实际清理由 CanvasService 统一处理。 */
     private void clearRoutes(Long id, CanvasDO canvas) {
         // 已由 canvasService.applyKillExternalCleanup 统一实现，保留签名兼容旧调用
+    }
+
+    /** 事务提交后驱逐运行态画布实体缓存，避免灰度字段或发布指针在执行侧滞留。 */
+    private void invalidateRuntimeCanvasAfterCommit(Long canvasId) {
+        if (canvasService == null) {
+            return;
+        }
+        Runnable invalidate = () -> canvasService.invalidateRuntimeCanvas(canvasId);
+        if (!TransactionSynchronizationManager.isSynchronizationActive()) {
+            invalidate.run();
+            return;
+        }
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+                invalidate.run();
+            }
+        });
     }
 }

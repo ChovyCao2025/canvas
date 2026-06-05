@@ -5,16 +5,22 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mockito;
+import org.springframework.beans.factory.ObjectProvider;
 
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import org.chovy.canvas.dal.dataobject.CdpUserIdentityDO;
 import org.chovy.canvas.dal.mapper.CdpUserIdentityMapper;
 import org.chovy.canvas.dal.dataobject.CdpUserProfileDO;
 import org.chovy.canvas.dal.mapper.CdpUserProfileMapper;
+import org.chovy.canvas.domain.compliance.PiiMaskingService;
+import org.chovy.canvas.domain.warehouse.CdpWarehousePrivacyTombstoneService;
 
 /**
  * CDP 用户 测试类。
@@ -32,7 +38,7 @@ class CdpUserServiceTest {
     void setUp() {
         profileMapper = Mockito.mock(CdpUserProfileMapper.class);
         identityMapper = Mockito.mock(CdpUserIdentityMapper.class);
-        service = new CdpUserService(profileMapper, identityMapper);
+        service = new CdpUserService(profileMapper, identityMapper, new PiiMaskingService());
     }
 
     @Test
@@ -69,6 +75,44 @@ class CdpUserServiceTest {
     }
 
     @Test
+    void ensureUserBlocksTombstonedUserBeforeProfileMutation() {
+        CdpWarehousePrivacyTombstoneService tombstoneService =
+                Mockito.mock(CdpWarehousePrivacyTombstoneService.class);
+        doThrow(new CdpWarehousePrivacyTombstoneService.PrivacyTombstoneViolationException("blocked user"))
+                .when(tombstoneService)
+                .enforceNotBlocked(9L, "USER_ID", "u1", "CDP_USER_ENSURE");
+        CdpUserService guardedService = new CdpUserService(
+                profileMapper, identityMapper, new PiiMaskingService(), provider(tombstoneService));
+
+        assertThatThrownBy(() -> guardedService.ensureUser(9L, " u1 ", "CDP_EVENT", "OrderPaid"))
+                .isInstanceOf(CdpWarehousePrivacyTombstoneService.PrivacyTombstoneViolationException.class)
+                .hasMessageContaining("blocked user");
+
+        verify(tombstoneService).enforceNotBlocked(9L, "USER_ID", "u1", "CDP_USER_ENSURE");
+        verifyNoInteractions(profileMapper, identityMapper);
+    }
+
+    @Test
+    void ensureUserByIdentityBlocksTombstonedExternalIdentityBeforeProfileMutation() {
+        CdpWarehousePrivacyTombstoneService tombstoneService =
+                Mockito.mock(CdpWarehousePrivacyTombstoneService.class);
+        doThrow(new CdpWarehousePrivacyTombstoneService.PrivacyTombstoneViolationException("blocked email"))
+                .when(tombstoneService)
+                .enforceNotBlocked(9L, "EMAIL", "alice@example.com", "CDP_USER_ENSURE_IDENTITY");
+        CdpUserService guardedService = new CdpUserService(
+                profileMapper, identityMapper, new PiiMaskingService(), provider(tombstoneService));
+
+        assertThatThrownBy(() -> guardedService.ensureUserByIdentity(
+                9L, " email ", " alice@example.com ", "IMPORT", "job-1"))
+                .isInstanceOf(CdpWarehousePrivacyTombstoneService.PrivacyTombstoneViolationException.class)
+                .hasMessageContaining("blocked email");
+
+        verify(tombstoneService)
+                .enforceNotBlocked(9L, "EMAIL", "alice@example.com", "CDP_USER_ENSURE_IDENTITY");
+        verifyNoInteractions(profileMapper, identityMapper);
+    }
+
+    @Test
     void toDetailMasksPhoneAndEmail() {
         CdpUserProfileDO profile = new CdpUserProfileDO();
         profile.setUserId("u1");
@@ -81,5 +125,30 @@ class CdpUserServiceTest {
 
         assertThat(detail.phone()).isEqualTo("138****5678");
         assertThat(detail.email()).isEqualTo("a***e@example.com");
+    }
+
+    @Test
+    void toDetailMasksOpenIdAndSecretsInsidePropertiesJson() {
+        CdpUserProfileDO profile = new CdpUserProfileDO();
+        profile.setUserId("u1");
+        profile.setDisplayName("Alice");
+        profile.setStatus("ACTIVE");
+        profile.setPropertiesJson("{\"open_id\":\"wx_open_id_abcdef\",\"apiKey\":\"secret-token-123456\",\"safe\":\"visible\"}");
+
+        var detail = service.toDetail(profile);
+
+        assertThat(detail.propertiesJson()).contains("wx_o**********cdef");
+        assertThat(detail.propertiesJson()).contains("****3456");
+        assertThat(detail.propertiesJson()).contains("visible");
+        assertThat(detail.propertiesJson()).doesNotContain("wx_open_id_abcdef");
+        assertThat(detail.propertiesJson()).doesNotContain("secret-token-123456");
+    }
+
+    @SuppressWarnings("unchecked")
+    private ObjectProvider<CdpWarehousePrivacyTombstoneService> provider(
+            CdpWarehousePrivacyTombstoneService value) {
+        ObjectProvider<CdpWarehousePrivacyTombstoneService> provider = Mockito.mock(ObjectProvider.class);
+        when(provider.getIfAvailable()).thenReturn(value);
+        return provider;
     }
 }

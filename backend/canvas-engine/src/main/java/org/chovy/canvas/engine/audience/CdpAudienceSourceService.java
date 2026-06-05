@@ -164,6 +164,9 @@ public class CdpAudienceSourceService {
         fields.put("status", new AudienceSourceFieldDTO("status", "状态", "STRING"));
         fields.put("firstSeenAt", new AudienceSourceFieldDTO("firstSeenAt", "首次出现时间", "STRING"));
         fields.put("lastSeenAt", new AudienceSourceFieldDTO("lastSeenAt", "最近活跃时间", "STRING"));
+        fields.put("churn_probability", new AudienceSourceFieldDTO("churn_probability", "流失概率", "NUMBER"));
+        fields.put("churn_risk_band", new AudienceSourceFieldDTO("churn_risk_band", "流失风险", "STRING"));
+        fields.put("best_send_hour", new AudienceSourceFieldDTO("best_send_hour", "最佳发送小时", "NUMBER"));
         profileMapper.selectList(new LambdaQueryWrapper<CdpUserProfileDO>()
                         .eq(CdpUserProfileDO::getStatus, STATUS_ACTIVE))
                 .stream()

@@ -68,6 +68,7 @@ export const API_DOC_OVERRIDES: Record<string, ApiDocOverride> = {
     title: '上报业务事件',
     category: 'external-trigger',
     summary: '业务系统上报事件编码和用户属性，触发匹配画布执行。',
+    auth: 'hmac',
     internal: false,
     params: [bodyParam('eventCode', '事件编码'), bodyParam('userId', '业务用户 ID')],
     requestExample: {
@@ -80,6 +81,7 @@ export const API_DOC_OVERRIDES: Record<string, ApiDocOverride> = {
   [overrideKey('POST', '/canvas/trigger/behavior')]: {
     title: '触发行为策略',
     category: 'external-trigger',
+    auth: 'hmac',
     internal: false,
     params: [bodyParam('strategyType', '行为策略类型'), bodyParam('userId', '业务用户 ID')],
     requestExample: {
@@ -92,6 +94,7 @@ export const API_DOC_OVERRIDES: Record<string, ApiDocOverride> = {
   [overrideKey('POST', '/canvas/execute/direct/{canvasId}')]: {
     title: '直接执行画布',
     category: 'external-trigger',
+    auth: 'hmac',
     internal: false,
     params: [
       pathParam('canvasId', '画布 ID'),

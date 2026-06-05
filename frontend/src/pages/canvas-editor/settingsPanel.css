@@ -6,6 +6,24 @@
   gap: 16px;
 }
 
+.canvas-editor-main {
+  min-width: 0;
+}
+
+.canvas-editor-region {
+  position: relative;
+  min-height: 0;
+}
+
+.canvas-editor-region:focus-within {
+  outline: 2px solid rgba(22, 119, 255, 0.55);
+  outline-offset: -2px;
+}
+
+.canvas-editor-graph {
+  min-width: 360px;
+}
+
 /** 单个设置分区的卡片外观。 */
 .canvas-settings-card {
   border: 1px solid #f0f0f0;

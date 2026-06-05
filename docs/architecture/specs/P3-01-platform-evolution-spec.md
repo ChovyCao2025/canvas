@@ -7,7 +7,7 @@ Coverage matrix: `docs/architecture/todo/coverage-matrix.md`
 
 ## Verification Status
 
-Planning material, not directly verified implementation defects.
+Implemented as a governance/documentation package. Evidence, promotion gates, and focused P3 links are recorded in `docs/architecture/evidence/p3-01-platform-evolution.md`, `docs/architecture/platform-evolution-promotion-checklist.md`, `docs/architecture/plans/README.md`, and `docs/architecture/todo/coverage-matrix.md`.
 
 ## Content Group
 

@@ -40,6 +40,12 @@ public class CdpTagService {
     /** 为用户写入或更新 CDP 标签，并记录变更历史。 */
     @Transactional
     public CdpUserTagDO setTag(String userId, CdpTagWriteReq req) {
+        return setTag(null, userId, req);
+    }
+
+    /** 为指定租户内用户写入或更新 CDP 标签，并记录变更历史。 */
+    @Transactional
+    public CdpUserTagDO setTag(Long tenantId, String userId, CdpTagWriteReq req) {
         String normalizedUserId = requireText(userId, "userId");
         String tagCode = requireText(req.tagCode(), "tagCode");
         TagDefinitionDO def = getEnabledTag(tagCode);
@@ -49,7 +55,7 @@ public class CdpTagService {
         }
         String value = normalizeValue(def.getValueType(), req.tagValue());
 
-        CdpUserTagDO existing = userTagMapper.selectOne(new LambdaQueryWrapper<CdpUserTagDO>()
+        CdpUserTagDO existing = userTagMapper.selectOne(userTagQuery(tenantId)
                 .eq(CdpUserTagDO::getUserId, normalizedUserId)
                 .eq(CdpUserTagDO::getTagCode, tagCode));
         String oldValue = existing != null ? existing.getTagValue() : null;
@@ -59,18 +65,19 @@ public class CdpTagService {
             expiresAt = now.plusDays(def.getDefaultTtlDays());
         }
         // 先写历史表占用幂等键，重复请求直接短路，避免当前标签被重复覆盖。
-        boolean reserved = writeHistory(normalizedUserId, tagCode, oldValue, value, "SET", sourceType,
+        boolean reserved = writeHistory(tenantId, normalizedUserId, tagCode, oldValue, value, "SET", sourceType,
                 req.sourceRefId(), req.idempotencyKey(), req.reason(), req.operator());
         if (!reserved) {
-            return existing != null ? existing : userTagMapper.selectOne(new LambdaQueryWrapper<CdpUserTagDO>()
+            return existing != null ? existing : userTagMapper.selectOne(userTagQuery(tenantId)
                     .eq(CdpUserTagDO::getUserId, normalizedUserId)
                     .eq(CdpUserTagDO::getTagCode, tagCode));
         }
 
         // 标签写入前补齐用户主档，保证用户标签表不会出现孤立 userId。
-        userService.ensureUser(normalizedUserId, sourceType, req.sourceRefId());
+        userService.ensureUser(tenantId, normalizedUserId, sourceType, req.sourceRefId());
 
         CdpUserTagDO tag = existing != null ? existing : new CdpUserTagDO();
+        tag.setTenantId(tenantId);
         tag.setUserId(normalizedUserId);
         tag.setTagCode(tagCode);
         tag.setTagValue(value);
@@ -93,9 +100,14 @@ public class CdpTagService {
 
     /** 移除用户标签，并写入标签变更历史。 */
     public void removeTag(String userId, String tagCode, String reason, String operator) {
+        removeTag(null, userId, tagCode, reason, operator);
+    }
+
+    /** 移除指定租户内用户标签，并写入标签变更历史。 */
+    public void removeTag(Long tenantId, String userId, String tagCode, String reason, String operator) {
         String normalizedUserId = requireText(userId, "userId");
         String normalizedTagCode = requireText(tagCode, "tagCode");
-        CdpUserTagDO existing = userTagMapper.selectOne(new LambdaQueryWrapper<CdpUserTagDO>()
+        CdpUserTagDO existing = userTagMapper.selectOne(userTagQuery(tenantId)
                 .eq(CdpUserTagDO::getUserId, normalizedUserId)
                 .eq(CdpUserTagDO::getTagCode, normalizedTagCode));
         if (existing == null) {
@@ -104,13 +116,18 @@ public class CdpTagService {
         String oldValue = existing.getTagValue();
         existing.setStatus("REMOVED");
         userTagMapper.updateById(existing);
-        writeHistory(normalizedUserId, normalizedTagCode, oldValue, null, "REMOVE", "MANUAL",
+        writeHistory(tenantId, normalizedUserId, normalizedTagCode, oldValue, null, "REMOVE", "MANUAL",
                 null, null, reason, operator);
     }
 
     /** 查询用户当前生效标签。 */
     public List<CdpUserTagDTO> listCurrentTags(String userId) {
-        return userTagMapper.selectList(new LambdaQueryWrapper<CdpUserTagDO>()
+        return listCurrentTags(null, userId);
+    }
+
+    /** 查询指定租户内用户当前生效标签。 */
+    public List<CdpUserTagDTO> listCurrentTags(Long tenantId, String userId) {
+        return userTagMapper.selectList(userTagQuery(tenantId)
                         .eq(CdpUserTagDO::getUserId, requireText(userId, "userId"))
                         .eq(CdpUserTagDO::getStatus, "ACTIVE")
                         .orderByDesc(CdpUserTagDO::getUpdatedAt))
@@ -123,7 +140,12 @@ public class CdpTagService {
 
     /** 查询用户标签变更历史。 */
     public List<CdpUserTagHistoryDTO> listHistory(String userId) {
-        return historyMapper.selectList(new LambdaQueryWrapper<CdpUserTagHistoryDO>()
+        return listHistory(null, userId);
+    }
+
+    /** 查询指定租户内用户标签变更历史。 */
+    public List<CdpUserTagHistoryDTO> listHistory(Long tenantId, String userId) {
+        return historyMapper.selectList(tagHistoryQuery(tenantId)
                         .eq(CdpUserTagHistoryDO::getUserId, requireText(userId, "userId"))
                         .orderByDesc(CdpUserTagHistoryDO::getOperatedAt))
                 .stream()
@@ -146,10 +168,11 @@ public class CdpTagService {
     }
 
     /** 写入标签变更历史，并通过幂等键拦截重复写入。 */
-    private boolean writeHistory(String userId, String tagCode, String oldValue, String newValue,
+    private boolean writeHistory(Long tenantId, String userId, String tagCode, String oldValue, String newValue,
                                  String operation, String sourceType, String sourceRefId,
                                  String idempotencyKey, String reason, String operator) {
         CdpUserTagHistoryDO history = new CdpUserTagHistoryDO();
+        history.setTenantId(tenantId);
         history.setUserId(userId);
         history.setTagCode(tagCode);
         history.setOldValue(oldValue);
@@ -205,5 +228,21 @@ public class CdpTagService {
             throw new IllegalArgumentException(fieldName + "不能为空");
         }
         return value.trim();
+    }
+
+    private LambdaQueryWrapper<CdpUserTagDO> userTagQuery(Long tenantId) {
+        LambdaQueryWrapper<CdpUserTagDO> query = new LambdaQueryWrapper<>();
+        if (tenantId != null) {
+            query.eq(CdpUserTagDO::getTenantId, tenantId);
+        }
+        return query;
+    }
+
+    private LambdaQueryWrapper<CdpUserTagHistoryDO> tagHistoryQuery(Long tenantId) {
+        LambdaQueryWrapper<CdpUserTagHistoryDO> query = new LambdaQueryWrapper<>();
+        if (tenantId != null) {
+            query.eq(CdpUserTagHistoryDO::getTenantId, tenantId);
+        }
+        return query;
     }
 }

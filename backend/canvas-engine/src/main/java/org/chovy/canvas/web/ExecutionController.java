@@ -1,7 +1,17 @@
 package org.chovy.canvas.web;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Positive;
+import jakarta.validation.constraints.Size;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import org.chovy.canvas.common.R;
+import org.chovy.canvas.common.validation.ApiRequestValidation;
 import org.chovy.canvas.common.enums.NodeType;
 import org.chovy.canvas.engine.disruptor.CanvasDisruptorService;
 import org.chovy.canvas.engine.trigger.CanvasExecutionService;
@@ -11,6 +21,7 @@ import org.chovy.canvas.security.PublicTriggerAuthService;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.context.ReactiveSecurityContextHolder;
 import org.springframework.http.server.reactive.ServerHttpRequest;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
 import reactor.core.publisher.Mono;
@@ -28,6 +39,8 @@ import java.util.UUID;
 @RestController
 @RequestMapping("/canvas")
 @RequiredArgsConstructor
+@Validated
+@Tag(name = "Canvas Execution", description = "Direct, dry-run, and behavior trigger execution APIs.")
 public class ExecutionController {
 
     /** 执行服务，用于直调和 dry-run 画布执行。 */
@@ -48,6 +61,12 @@ public class ExecutionController {
      * @return 执行结果
      */
     @PostMapping("/execute/direct/{canvasId}")
+    @Operation(
+            operationId = "executeCanvasDirect",
+            summary = "Directly execute a published canvas",
+            description = "Public machine-to-machine trigger protected by HMAC headers. Callers should provide idempotencyKey for retry safety.",
+            security = @SecurityRequirement(name = "triggerHmac")
+    )
     public Mono<R<Map<String, Object>>> directCall(
             ServerHttpRequest request,
             @PathVariable Long canvasId,
@@ -77,6 +96,12 @@ public class ExecutionController {
      * @return 成功响应
      */
     @PostMapping("/trigger/behavior")
+    @Operation(
+            operationId = "triggerCanvasBehavior",
+            summary = "Asynchronously trigger a behavior event",
+            description = "Public machine-to-machine behavior trigger protected by HMAC headers and admitted through the Disruptor buffer.",
+            security = @SecurityRequirement(name = "triggerHmac")
+    )
     public Mono<R<Void>> behaviorTrigger(
             ServerHttpRequest request,
             @RequestBody Mono<String> rawBody) {
@@ -101,9 +126,15 @@ public class ExecutionController {
      * @return 干运行执行结果
      */
     @PostMapping("/execute/dry-run/{canvasId}")
+    @Operation(
+            operationId = "dryRunCanvasExecution",
+            summary = "Dry-run a canvas graph",
+            description = "Bearer-authenticated debug execution that uses the supplied graph JSON and does not create real side effects.",
+            security = @SecurityRequirement(name = "bearerAuth")
+    )
     public Mono<R<Map<String, Object>>> dryRun(
             @PathVariable Long canvasId,
-            @RequestBody DirectCallReq req) {
+            @Valid @RequestBody DirectCallReq req) {
         // dry-run 使用请求中的 graphJson，不读取线上发布版本，也不产生真实副作用。
         return currentUserId().flatMap(userId ->
                 executionService.triggerDryRun(
@@ -140,7 +171,7 @@ public class ExecutionController {
                 .flatMap(body -> Mono.fromCallable(() -> {
                             publicTriggerAuthService.verify(request.getHeaders(), body);
                             try {
-                                return objectMapper.readValue(body, bodyType);
+                                return ApiRequestValidation.validate(objectMapper.readValue(body, bodyType));
                             } catch (IOException e) {
                                 throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "请求体 JSON 不合法", e);
                             }
@@ -170,15 +201,22 @@ public class ExecutionController {
     static class DirectCallReq {
 
         /** 触发用户 ID。 */
+        @Schema(description = "Business user ID used as execution subject.", maxLength = 128)
+        @Size(max = 128)
         private String userId;
 
         /** 输入参数（注入到执行上下文 triggerPayload）。 */
+        @Schema(description = "Input parameters merged into triggerPayload.")
         private Map<String, Object> inputParams;
 
         /** 幂等键（建议调用方传入，便于重试去重）。 */
+        @Schema(description = "Caller-provided idempotency key for retry safety.", maxLength = 128)
+        @Size(max = 128)
         private String idempotencyKey;
 
         /** dry-run 时传入当前画布 graphJson，直接使用而不读 DB draft。 */
+        @Schema(description = "Graph JSON used only by dry-run execution.", maxLength = 1_000_000)
+        @Size(max = 1_000_000)
         private String graphJson;
     }
 
@@ -189,18 +227,31 @@ public class ExecutionController {
     static class BehaviorTriggerReq {
 
         /** 目标画布 ID。 */
+        @Schema(description = "Target canvas ID.")
+        @NotNull
+        @Positive
         private Long canvasId;
 
         /** 触发用户 ID。 */
+        @Schema(description = "Business user ID used as execution subject.", maxLength = 128)
+        @NotBlank
+        @Size(max = 128)
         private String userId;
 
         /** 行为事件编码。 */
+        @Schema(description = "Behavior event code.", maxLength = 128)
+        @NotBlank
+        @Size(max = 128)
         private String eventCode;
 
         /** 事件唯一 ID（用于幂等去重）。 */
+        @Schema(description = "Unique event ID used for deduplication.", maxLength = 128)
+        @NotBlank
+        @Size(max = 128)
         private String eventId;
 
         /** 行为事件载荷。 */
+        @Schema(description = "Behavior event payload.")
         private Map<String, Object> behaviorData;
     }
 }

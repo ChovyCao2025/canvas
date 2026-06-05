@@ -4,7 +4,9 @@
 
 **Goal:** Add flat project/folder metadata to canvases and expose exact list filters plus frontend list labels.
 
-**Architecture:** Add nullable metadata columns through `V96_1`, extend existing canvas DTO/DO/query objects, and centralize list wrapper construction in a small helper. Frontend filtering stays as pure parameter building before wiring Ant Design inputs into the canvas list.
+**Architecture:** Add nullable metadata columns through a current-sequence migration, extend existing canvas DTO/DO/query objects, and centralize list wrapper construction in a small helper. Frontend filtering stays as pure parameter building before wiring Ant Design inputs into the canvas list.
+
+**Implementation note:** Actual migration is `V259__canvas_project_folder_metadata.sql`; `V96_1` is not used because the repository's current Flyway sequence is already far beyond that version and `V258` is occupied by BI storage migration work.
 
 **Tech Stack:** Java 21, Spring Boot, MyBatis-Plus, Flyway, JUnit 5, AssertJ, React 18, TypeScript, Ant Design, Vitest.
 
@@ -16,7 +18,7 @@
 
 ## File Structure
 
-- Create: `backend/canvas-engine/src/main/resources/db/migration/V96_1__canvas_project_folder_metadata.sql`
+- Create: `backend/canvas-engine/src/main/resources/db/migration/V259__canvas_project_folder_metadata.sql`
 - Create: `backend/canvas-engine/src/test/java/org/chovy/canvas/domain/canvas/CanvasProjectMetadataMigrationTest.java`
 - Create: `backend/canvas-engine/src/test/java/org/chovy/canvas/domain/canvas/CanvasProjectFilterTest.java`
 - Create: `backend/canvas-engine/src/main/java/org/chovy/canvas/domain/canvas/CanvasListQuerySupport.java`
@@ -35,13 +37,13 @@
 
 **Files:**
 - Create: `backend/canvas-engine/src/test/java/org/chovy/canvas/domain/canvas/CanvasProjectMetadataMigrationTest.java`
-- Create: `backend/canvas-engine/src/main/resources/db/migration/V96_1__canvas_project_folder_metadata.sql`
+- Create: `backend/canvas-engine/src/main/resources/db/migration/V259__canvas_project_folder_metadata.sql`
 - Modify: `backend/canvas-engine/src/main/java/org/chovy/canvas/dal/dataobject/CanvasDO.java`
 - Modify: `backend/canvas-engine/src/main/java/org/chovy/canvas/dto/CanvasCreateReq.java`
 - Modify: `backend/canvas-engine/src/main/java/org/chovy/canvas/dto/CanvasUpdateReq.java`
 - Modify: `backend/canvas-engine/src/main/java/org/chovy/canvas/query/CanvasListQuery.java`
 
-- [ ] **Step 1: Write migration contract test**
+- [x] **Step 1: Write migration contract test**
 
 Create `CanvasProjectMetadataMigrationTest.java`:
 
@@ -60,7 +62,7 @@ class CanvasProjectMetadataMigrationTest {
     @Test
     void migrationAddsFlatProjectAndFolderColumns() throws Exception {
         String sql = Files.readString(Path.of(
-                "src/main/resources/db/migration/V96_1__canvas_project_folder_metadata.sql"));
+                "src/main/resources/db/migration/V259__canvas_project_folder_metadata.sql"));
 
         assertThat(sql)
                 .contains("ALTER TABLE canvas")
@@ -73,7 +75,7 @@ class CanvasProjectMetadataMigrationTest {
 }
 ```
 
-- [ ] **Step 2: Run migration test and confirm red state**
+- [x] **Step 2: Run migration test and confirm red state**
 
 Run:
 
@@ -81,11 +83,11 @@ Run:
 cd backend && mvn -pl canvas-engine test -Dtest=CanvasProjectMetadataMigrationTest
 ```
 
-Expected: FAIL because `V96_1__canvas_project_folder_metadata.sql` does not exist.
+Expected: FAIL because `V259__canvas_project_folder_metadata.sql` does not exist.
 
-- [ ] **Step 3: Add migration**
+- [x] **Step 3: Add migration**
 
-Create `V96_1__canvas_project_folder_metadata.sql`:
+Create `V259__canvas_project_folder_metadata.sql`:
 
 ```sql
 ALTER TABLE canvas
@@ -96,7 +98,7 @@ ALTER TABLE canvas
     ADD KEY idx_canvas_project_folder (project_key, folder_key, status, updated_at);
 ```
 
-- [ ] **Step 4: Add Java fields**
+- [x] **Step 4: Add Java fields**
 
 Add to `CanvasDO`, `CanvasCreateReq`, and `CanvasUpdateReq`:
 
@@ -114,7 +116,7 @@ private String projectKey;
 private String folderKey;
 ```
 
-- [ ] **Step 5: Run migration test**
+- [x] **Step 5: Run migration test**
 
 Run:
 
@@ -131,7 +133,7 @@ Expected: PASS.
 - Create: `backend/canvas-engine/src/main/java/org/chovy/canvas/domain/canvas/CanvasListQuerySupport.java`
 - Modify: `backend/canvas-engine/src/main/java/org/chovy/canvas/domain/canvas/CanvasService.java`
 
-- [ ] **Step 1: Write list filter test**
+- [x] **Step 1: Write list filter test**
 
 Create `CanvasProjectFilterTest.java`:
 
@@ -161,7 +163,7 @@ class CanvasProjectFilterTest {
 }
 ```
 
-- [ ] **Step 2: Run filter test and confirm red state**
+- [x] **Step 2: Run filter test and confirm red state**
 
 Run:
 
@@ -171,7 +173,7 @@ cd backend && mvn -pl canvas-engine test -Dtest=CanvasProjectFilterTest
 
 Expected: FAIL because `CanvasListQuerySupport` does not exist.
 
-- [ ] **Step 3: Add query support and service wiring**
+- [x] **Step 3: Add query support and service wiring**
 
 Create `CanvasListQuerySupport.java`:
 
@@ -225,7 +227,7 @@ In `CanvasService.list`:
 LambdaQueryWrapper<CanvasDO> wrapper = CanvasListQuerySupport.build(q, examplesProperties.isEnabled());
 ```
 
-- [ ] **Step 4: Run backend tests**
+- [x] **Step 4: Run backend tests**
 
 Run:
 
@@ -244,7 +246,7 @@ Expected: PASS.
 - Create: `frontend/src/pages/canvas-list/canvasProjectFilters.test.ts`
 - Modify: `frontend/src/pages/canvas-list/index.tsx`
 
-- [ ] **Step 1: Add helper tests**
+- [x] **Step 1: Add helper tests**
 
 Create `canvasProjectFilters.test.ts`:
 
@@ -280,7 +282,7 @@ describe('canvas project filters', () => {
 })
 ```
 
-- [ ] **Step 2: Add helper and type fields**
+- [x] **Step 2: Add helper and type fields**
 
 Create `canvasProjectFilters.ts`:
 
@@ -318,7 +320,7 @@ folderName?: string
 
 Add project/folder fields to `CanvasCreateReq`, `CanvasUpdateReq`, and `CanvasListQuery` in `api.ts`.
 
-- [ ] **Step 3: Wire list page filters**
+- [x] **Step 3: Wire list page filters**
 
 In `canvas-list/index.tsx`, add state:
 
@@ -353,7 +355,7 @@ Add table column:
 }
 ```
 
-- [ ] **Step 4: Run frontend tests**
+- [x] **Step 4: Run frontend tests**
 
 Run:
 
@@ -369,7 +371,7 @@ Expected: PASS.
 - Read: `docs/product-evolution/specs/p1-003f-canvas-project-folder-metadata.md`
 - Read: `docs/product-evolution/plans/p1-003f-canvas-project-folder-metadata-plan.md`
 
-- [ ] **Step 1: Run focused tests**
+- [x] **Step 1: Run focused tests**
 
 Run:
 
@@ -380,12 +382,38 @@ cd frontend && npm test -- canvasProjectFilters.test.ts
 
 Expected: PASS.
 
+### Verification Evidence
+
+- Backend project/folder metadata, import/export preservation, and controller loop suite:
+
+```bash
+cd backend && mvn -pl canvas-engine -Dtest=CanvasProjectMetadataMigrationTest,CanvasProjectFilterTest,CanvasImportExportServiceTest,CanvasProjectFolderMetadataServiceTest,CanvasControllerOperatorLoopTest -DfailIfNoTests=true test
+```
+
+Result: 13 tests, 0 failures, 0 errors, 0 skipped.
+
+- Frontend project/filter, import/export, local draft, and settings helper suites:
+
+```bash
+cd frontend && npm test -- canvasProjectFilters.test.ts importExportFlow.test.ts localDraft.test.ts settingsPresentation.test.ts
+```
+
+Result: 4 test files, 18 tests passed.
+
+- Frontend production build:
+
+```bash
+cd frontend && npm run build
+```
+
+Result: TypeScript and Vite build passed.
+
 - [ ] **Step 2: Commit this slice**
 
 Run:
 
 ```bash
-git add backend/canvas-engine/src/main/resources/db/migration/V96_1__canvas_project_folder_metadata.sql \
+git add backend/canvas-engine/src/main/resources/db/migration/V259__canvas_project_folder_metadata.sql \
   backend/canvas-engine/src/main/java/org/chovy/canvas/dal/dataobject/CanvasDO.java \
   backend/canvas-engine/src/main/java/org/chovy/canvas/dto/CanvasCreateReq.java \
   backend/canvas-engine/src/main/java/org/chovy/canvas/dto/CanvasUpdateReq.java \

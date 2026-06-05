@@ -37,6 +37,9 @@ export default function NodeLibraryItem({
   return (
     <div
       draggable
+      role="group"
+      tabIndex={0}
+      aria-label={`${node.typeName}节点库条目，可拖拽到画布，查看说明按钮可打开详情`}
       onDragStart={(event) => onDragStart(event, node)}
       style={{
         display: 'flex',
@@ -56,6 +59,14 @@ export default function NodeLibraryItem({
         event.currentTarget.style.boxShadow = `0 0 0 1px ${categoryColor}1f`
       }}
       onMouseLeave={(event) => {
+        event.currentTarget.style.borderColor = '#f0f0f0'
+        event.currentTarget.style.boxShadow = 'none'
+      }}
+      onFocus={(event) => {
+        event.currentTarget.style.borderColor = categoryColor
+        event.currentTarget.style.boxShadow = `0 0 0 2px ${categoryColor}33`
+      }}
+      onBlur={(event) => {
         event.currentTarget.style.borderColor = '#f0f0f0'
         event.currentTarget.style.boxShadow = 'none'
       }}

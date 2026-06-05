@@ -63,6 +63,10 @@ function settingsFromDetail(detail: CanvasDetail): CanvasSettingsLike {
     perUserDailyLimit: detail.canvas.perUserDailyLimit,
     perUserTotalLimit: detail.canvas.perUserTotalLimit,
     cooldownSeconds: detail.canvas.cooldownSeconds,
+    projectKey: detail.canvas.projectKey,
+    projectName: detail.canvas.projectName,
+    folderKey: detail.canvas.folderKey,
+    folderName: detail.canvas.folderName,
   }
 }
 

@@ -5,6 +5,7 @@ export default defineConfig({
   plugins: [react()],
   test: {
     environment: 'node',
+    setupFiles: ['./src/test/setupTests.ts'],
   },
   server: {
     port: 3000,
@@ -12,6 +13,7 @@ export default defineConfig({
       '/auth': { target: 'http://localhost:8080', changeOrigin: true },
       '/admin': { target: 'http://localhost:8080', changeOrigin: true },
       '/meta':  { target: 'http://localhost:8080', changeOrigin: true },
+      '/public/marketing-forms': { target: 'http://localhost:8080', changeOrigin: true },
       '/v3':    { target: 'http://localhost:8080', changeOrigin: true },
       '/canvas': {
         target: 'http://localhost:8080',

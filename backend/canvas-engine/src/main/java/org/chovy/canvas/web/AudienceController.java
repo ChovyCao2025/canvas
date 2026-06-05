@@ -2,12 +2,20 @@ package org.chovy.canvas.web;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import io.jsonwebtoken.Claims;
+import jakarta.validation.Valid;
 import lombok.Data;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.chovy.canvas.common.PageResult;
 import org.chovy.canvas.common.R;
+import org.chovy.canvas.common.enums.AudienceSnapshotMode;
+import org.chovy.canvas.common.tenant.TenantContext;
+import org.chovy.canvas.common.tenant.TenantContextResolver;
+import org.chovy.canvas.common.tenant.TenantScopeSupport;
 import org.chovy.canvas.dal.dataobject.AudienceDefinitionDO;
 import org.chovy.canvas.dal.mapper.AudienceDefinitionMapper;
 import org.chovy.canvas.dal.dataobject.AudienceStatDO;
@@ -25,8 +33,11 @@ import org.chovy.canvas.engine.audience.AudienceBatchComputeService;
 import org.chovy.canvas.engine.audience.AudienceComputeTaskRunner;
 import org.chovy.canvas.engine.audience.AudienceSchedulerService;
 import org.chovy.canvas.engine.audience.CdpAudienceSourceService;
+import org.chovy.canvas.infrastructure.concurrent.ManagedVirtualThreadExecutor;
 import org.chovy.canvas.perf.PerfRunContext;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.core.context.ReactiveSecurityContextHolder;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -53,6 +64,9 @@ import java.util.Map;
 @RestController
 @RequestMapping("/canvas/audiences")
 @RequiredArgsConstructor
+@Validated
+@Tag(name = "Audience", description = "Audience definition, preview, readiness, and compute APIs.")
+@SecurityRequirement(name = "bearerAuth")
 public class AudienceController {
 
     /** 人群定义 Mapper，用于读写人群定义。 */
@@ -70,24 +84,34 @@ public class AudienceController {
     /** 通知服务，用于发送人群任务通知。 */
     private final NotificationService notificationService;
     private final CdpAudienceSourceService cdpAudienceSourceService;
+    private final TenantContextResolver tenantContextResolver;
+    private final TenantScopeSupport tenantScopeSupport;
+    private ManagedVirtualThreadExecutor backgroundExecutor = ManagedVirtualThreadExecutor.direct();
+
+    @Autowired(required = false)
+    void setBackgroundExecutor(ManagedVirtualThreadExecutor backgroundExecutor) {
+        this.backgroundExecutor = backgroundExecutor;
+    }
 
     /** 分页查询人群定义。 */
     @GetMapping
+    @Operation(operationId = "listAudiences", summary = "List audience definitions")
     public Mono<R<PageResult<AudienceDefinitionDO>>> list(
             @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "20") int size
     ) {
-        return Mono.fromCallable(() -> {
+        return tenantContextResolver.currentOrError().flatMap(context -> Mono.fromCallable(() -> {
             Page<AudienceDefinitionDO> result = definitionMapper.selectPage(
                     new Page<>(page, size),
-                    new LambdaQueryWrapper<AudienceDefinitionDO>().orderByDesc(AudienceDefinitionDO::getId)
+                    audienceQuery(context).orderByDesc(AudienceDefinitionDO::getId)
             );
             return R.ok(PageResult.of(result.getTotal(), result.getRecords()));
-        }).subscribeOn(Schedulers.boundedElastic());
+        }).subscribeOn(Schedulers.boundedElastic()));
     }
 
     /** 查询 CDP 人群数据源可用于圈选的字段。 */
     @GetMapping("/source-fields")
+    @Operation(operationId = "listAudienceSourceFields", summary = "List audience source fields")
     public Mono<R<List<AudienceSourceFieldDTO>>> sourceFields(@RequestParam String dataSourceType) {
         return Mono.fromCallable(() -> R.ok(cdpAudienceSourceService.listSourceFields(dataSourceType)))
                 .subscribeOn(Schedulers.boundedElastic());
@@ -95,7 +119,8 @@ public class AudienceController {
 
     /** 预览 CDP 人群规则命中用户，不保存人群定义。 */
     @PostMapping("/preview")
-    public Mono<R<AudiencePreviewResp>> preview(@RequestBody AudiencePreviewReq req) {
+    @Operation(operationId = "previewAudience", summary = "Preview audience rule matches")
+    public Mono<R<AudiencePreviewResp>> preview(@Valid @RequestBody AudiencePreviewReq req) {
         return Mono.fromCallable(() -> {
             if (!cdpAudienceSourceService.supports(req.dataSourceType())) {
                 throw new IllegalArgumentException("Unsupported CDP audience source: " + req.dataSourceType());
@@ -108,23 +133,41 @@ public class AudienceController {
 
     /** 查询单个人群定义详情。 */
     @GetMapping("/{id}")
+    @Operation(operationId = "getAudience", summary = "Get audience definition")
     public Mono<R<AudienceDefinitionDO>> get(@PathVariable Long id) {
-        return Mono.fromCallable(() -> R.ok(definitionMapper.selectById(id)))
-                .subscribeOn(Schedulers.boundedElastic());
+        return tenantContextResolver.currentOrError().flatMap(context ->
+                Mono.fromCallable(() -> R.ok(requireAudience(id, context)))
+                        .subscribeOn(Schedulers.boundedElastic()));
     }
 
     /** 查询可用于实时判断的“READY 人群”列表。 */
     @GetMapping("/ready")
+    @Operation(operationId = "listReadyAudiences", summary = "List ready audiences")
     public Mono<R<List<AudienceDefinitionDO>>> listReady() {
-        return Mono.fromCallable(() -> R.ok(computeService.listReadyDefinitions()))
-                .subscribeOn(Schedulers.boundedElastic());
+        return tenantContextResolver.currentOrError().flatMap(context ->
+                Mono.fromCallable(() -> {
+                    List<AudienceStatDO> readyStats = statMapper.selectList(new LambdaQueryWrapper<AudienceStatDO>()
+                            .eq(AudienceStatDO::getStatus, "READY"));
+                    if (readyStats.isEmpty()) {
+                        return R.ok(List.<AudienceDefinitionDO>of());
+                    }
+                    List<Long> audienceIds = readyStats.stream().map(AudienceStatDO::getAudienceId).toList();
+                    return R.ok(definitionMapper.selectList(audienceQuery(context)
+                            .in(AudienceDefinitionDO::getId, audienceIds)
+                            .eq(AudienceDefinitionDO::getEnabled, 1)
+                            .orderByAsc(AudienceDefinitionDO::getId)));
+                }).subscribeOn(Schedulers.boundedElastic()));
     }
 
     /** 创建人群并触发首次计算，同时注册调度任务。 */
     @PostMapping
+    @Operation(operationId = "createAudience", summary = "Create audience definition")
     public Mono<R<AudienceDefinitionDO>> create(@RequestBody AudienceDefinitionDO body) {
-        return currentUser().flatMap(operator ->
+        return currentUser().zipWith(tenantContextResolver.currentOrError()).flatMap(tuple ->
                 Mono.fromCallable(() -> {
+                    String operator = tuple.getT1();
+                    applyTenantForWrite(body, tuple.getT2());
+                    normalizeDefaultSnapshotMode(body);
                     body.setCreatedBy(operator);
                     AudienceDefinitionDO created = computeService.create(body);
                     schedulerService.refresh(created, () -> computeService.compute(created.getId()));
@@ -135,18 +178,21 @@ public class AudienceController {
 
     /** 更新人群并触发重算，同时刷新调度任务。 */
     @PutMapping("/{id}")
+    @Operation(operationId = "updateAudience", summary = "Update audience definition")
     public Mono<R<Void>> update(@PathVariable Long id, @RequestBody AudienceDefinitionDO body) {
-        return currentUser().flatMap(operator ->
+        return currentUser().zipWith(tenantContextResolver.currentOrError()).flatMap(tuple ->
                 Mono.fromCallable(() -> {
+                    String operator = tuple.getT1();
+                    TenantContext context = tuple.getT2();
+                    requireAudience(id, context);
                     body.setId(id);
+                    applyTenantForWrite(body, context);
+                    normalizeDefaultSnapshotMode(body);
                     boolean updated = computeService.update(body);
                     if (!updated) {
                         throw new IllegalArgumentException("Audience not found: " + id);
                     }
-                    AudienceDefinitionDO saved = definitionMapper.selectById(id);
-                    if (saved == null) {
-                        throw new IllegalArgumentException("Audience not found: " + id);
-                    }
+                    AudienceDefinitionDO saved = requireAudience(id, context);
                     schedulerService.refresh(saved, () -> computeService.compute(saved.getId()));
                     enqueueCompute(saved, operator);
                     return R.<Void>ok();
@@ -155,38 +201,42 @@ public class AudienceController {
 
     /** 删除人群定义、统计数据与调度任务。 */
     @DeleteMapping("/{id}")
+    @Operation(operationId = "deleteAudience", summary = "Delete audience definition")
     public Mono<R<Void>> delete(@PathVariable Long id) {
-        return Mono.fromCallable(() -> {
+        return tenantContextResolver.currentOrError().flatMap(context -> Mono.fromCallable(() -> {
+            requireAudience(id, context);
             schedulerService.cancel(id);
             computeService.delete(id);
             return R.<Void>ok();
-        }).subscribeOn(Schedulers.boundedElastic());
+        }).subscribeOn(Schedulers.boundedElastic()));
     }
 
     /** 手动触发一次异步计算。 */
     @PostMapping("/{id}/compute")
+    @Operation(operationId = "computeAudience", summary = "Compute audience")
     public Mono<R<ComputeTaskResp>> compute(@PathVariable Long id, @RequestBody(required = false) ComputeReq req) {
         String perfRunId = extractPerfRunId(req);
         if (perfRunId != null) {
             String perfInputId = req == null || req.getPerfInputId() == null || req.getPerfInputId().isBlank()
                     ? null
                     : req.getPerfInputId();
-            return Mono.fromRunnable(() -> Thread.ofVirtual().start(
-                            () -> computeService.compute(id, perfRunId, perfInputId)))
-                    .subscribeOn(Schedulers.boundedElastic())
-                    .thenReturn(R.ok(new ComputeTaskResp(perfTaskId(perfRunId, perfInputId), "QUEUED")));
+            return tenantContextResolver.currentOrError().flatMap(context ->
+                    Mono.fromCallable(() -> {
+                        requireAudience(id, context);
+                        backgroundExecutor.submit(
+                                "audience-perf-compute-" + id,
+                                () -> computeService.compute(id, perfRunId, perfInputId));
+                        return R.ok(new ComputeTaskResp(perfTaskId(perfRunId, perfInputId), "QUEUED"));
+                    }).subscribeOn(Schedulers.boundedElastic()));
         }
 
-        return currentUser().flatMap(operator ->
+        return currentUser().zipWith(tenantContextResolver.currentOrError()).flatMap(tuple ->
                 Mono.fromCallable(() -> {
-                    AudienceDefinitionDO definition = definitionMapper.selectById(id);
-                    if (definition == null) {
-                        throw new IllegalArgumentException("Audience not found: " + id);
-                    }
+                    AudienceDefinitionDO definition = requireAudience(id, tuple.getT2());
                     if (definition.getEnabled() == null || definition.getEnabled() == 0) {
                         throw new IllegalStateException("Audience disabled: " + id);
                     }
-                    return R.ok(enqueueCompute(definition, operator));
+                    return R.ok(enqueueCompute(definition, tuple.getT1()));
                 }).subscribeOn(Schedulers.boundedElastic()));
     }
 
@@ -204,9 +254,13 @@ public class AudienceController {
 
     /** 查询人群计算状态统计。 */
     @GetMapping("/{id}/stat")
+    @Operation(operationId = "getAudienceStat", summary = "Get audience statistics")
     public Mono<R<AudienceStatDO>> stat(@PathVariable Long id) {
-        return Mono.fromCallable(() -> R.ok(statMapper.selectById(id)))
-                .subscribeOn(Schedulers.boundedElastic());
+        return tenantContextResolver.currentOrError().flatMap(context ->
+                Mono.fromCallable(() -> {
+                    requireAudience(id, context);
+                    return R.ok(statMapper.selectById(id));
+                }).subscribeOn(Schedulers.boundedElastic()));
     }
 
     /**
@@ -229,9 +283,9 @@ public class AudienceController {
                 operator);
         String taskId = result.task().getTaskId();
         if (result.created()) {
-            computeTaskRunner.start(taskId, definition.getId(), displayName, operator);
+            computeTaskRunner.start(taskId, definition.getId(), displayName, operator, definition.getTenantId());
         } else {
-            createCatchUpNotificationIfTerminal(result.task(), definition.getId(), displayName, operator);
+            createCatchUpNotificationIfTerminal(result.task(), definition, displayName, operator);
         }
         return new ComputeTaskResp(taskId, result.task().getStatus());
     }
@@ -246,10 +300,12 @@ public class AudienceController {
      * @param displayName 人群展示名
      * @param operator 当前操作人
      */
-    private void createCatchUpNotificationIfTerminal(AsyncTaskDO task, Long audienceId, String displayName, String operator) {
+    private void createCatchUpNotificationIfTerminal(
+            AsyncTaskDO task, AudienceDefinitionDO definition, String displayName, String operator) {
         if (task == null || !isTerminal(task.getStatus())) {
             return;
         }
+        Long audienceId = definition.getId();
         String type = AsyncTaskStatus.SUCCEEDED.name().equals(task.getStatus()) ? "TASK_SUCCEEDED" : "TASK_FAILED";
         String title = AsyncTaskStatus.SUCCEEDED.name().equals(task.getStatus()) ? "人群计算完成" : "人群计算失败";
         String detail = AsyncTaskStatus.SUCCEEDED.name().equals(task.getStatus())
@@ -257,6 +313,7 @@ public class AudienceController {
                 : defaultIfBlank(task.getErrorMsg(), "计算失败");
         try {
             notificationService.createForTask(
+                    definition.getTenantId(),
                     operator,
                     type,
                     title,
@@ -267,6 +324,35 @@ public class AudienceController {
             log.error("[AUDIENCE] failed to create catch-up notification taskId={} user={}: {}",
                     task.getTaskId(), operator, e.getMessage(), e);
         }
+    }
+
+    private LambdaQueryWrapper<AudienceDefinitionDO> audienceQuery(TenantContext context) {
+        return tenantScopeSupport.applyTenantFilter(
+                new LambdaQueryWrapper<>(),
+                AudienceDefinitionDO::getTenantId,
+                context);
+    }
+
+    private AudienceDefinitionDO requireAudience(Long id, TenantContext context) {
+        AudienceDefinitionDO definition = definitionMapper.selectOne(audienceQuery(context)
+                .eq(AudienceDefinitionDO::getId, id)
+                .last("LIMIT 1"));
+        if (definition == null) {
+            throw new IllegalArgumentException("Audience not found: " + id);
+        }
+        return definition;
+    }
+
+    private void applyTenantForWrite(AudienceDefinitionDO body, TenantContext context) {
+        if (context.tenantId() != null) {
+            body.setTenantId(context.tenantId());
+            return;
+        }
+        tenantScopeSupport.applyTenantFilter(new LambdaQueryWrapper<>(), AudienceDefinitionDO::getTenantId, context);
+    }
+
+    private void normalizeDefaultSnapshotMode(AudienceDefinitionDO body) {
+        body.setDefaultSnapshotMode(AudienceSnapshotMode.normalize(body.getDefaultSnapshotMode()).name());
     }
 
     /**

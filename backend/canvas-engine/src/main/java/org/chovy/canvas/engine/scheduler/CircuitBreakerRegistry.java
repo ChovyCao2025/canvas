@@ -6,7 +6,7 @@ import org.springframework.stereotype.Component;
 
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * 每个集成节点类型独立的熔断器（设计文档第 12.5 节）。
@@ -62,14 +62,9 @@ public class CircuitBreakerRegistry {
         /** 半开状态允许放行的探测次数。 */
         private final int      halfOpenAttempts;
 
-        /** 当前熔断状态。 */
-        private volatile State      state     = State.CLOSED;
-        /** CLOSED 状态下的连续失败计数。 */
-        private final AtomicInteger failures  = new AtomicInteger(0);
-        /** HALF_OPEN 状态下已放行的探测次数。 */
-        private final AtomicInteger halfTries = new AtomicInteger(0);
-        /** 熔断最近一次打开的时间戳。 */
-        private volatile long       openedAt  = 0;
+        /** 当前熔断状态快照，状态、失败计数、半开探测计数和打开时间必须一起原子变更。 */
+        private final AtomicReference<StateSnapshot> stateRef =
+                new AtomicReference<>(StateSnapshot.closed());
 
         /**
          * 构造 CircuitBreaker 实例，并根据入参初始化依赖、配置或内部状态。
@@ -102,53 +97,106 @@ public class CircuitBreakerRegistry {
          * 调用前检查：OPEN 状态直接抛出，HALF_OPEN 按 attempt 数控制。
          * @throws CircuitBreakerOpenException 熔断打开时
          */
-        public synchronized void checkState() {
-            if (state == State.CLOSED) return;
-
-            if (state == State.OPEN) {
-                // OPEN 冷却期已过才进入 HALF_OPEN 探测，冷却期内直接拒绝节点调用。
-                if (System.currentTimeMillis() - openedAt >= openDurationMs) {
-                    state = State.HALF_OPEN;
-                    halfTries.set(0);
-                    log.info("[CIRCUIT] {} OPEN → HALF_OPEN", name);
-                } else {
-                    throw new CircuitBreakerOpenException("熔断器打开: " + name);
+        public void checkState() {
+            while (true) {
+                StateSnapshot current = stateRef.get();
+                if (current.state == State.CLOSED) {
+                    return;
                 }
-            }
 
-            if (state == State.HALF_OPEN) {
-                // HALF_OPEN 只放行有限探测请求，避免恢复期瞬间放大下游压力。
-                if (halfTries.incrementAndGet() > halfOpenAttempts) {
+                if (current.state == State.OPEN) {
+                    if (System.currentTimeMillis() - current.openedAt < openDurationMs) {
+                        throw new CircuitBreakerOpenException("熔断器打开: " + name);
+                    }
+                    StateSnapshot next = new StateSnapshot(State.HALF_OPEN, 0, 1, current.openedAt);
+                    if (stateRef.compareAndSet(current, next)) {
+                        log.info("[CIRCUIT] {} OPEN → HALF_OPEN", name);
+                        return;
+                    }
+                    continue;
+                }
+
+                if (current.halfTries >= halfOpenAttempts) {
                     throw new CircuitBreakerOpenException("熔断器半开探测已满: " + name);
+                }
+                StateSnapshot next = current.withHalfTries(current.halfTries + 1);
+                if (stateRef.compareAndSet(current, next)) {
+                    return;
                 }
             }
         }
 
         /** 记录成功：任何状态均重置失败计数，确保"连续失败"语义 */
-        public synchronized void recordSuccess() {
-            if (state == State.HALF_OPEN) {
-                state = State.CLOSED;
-                log.info("[CIRCUIT] {} HALF_OPEN → CLOSED（探测成功）", name);
+        public void recordSuccess() {
+            while (true) {
+                StateSnapshot current = stateRef.get();
+                StateSnapshot next = switch (current.state) {
+                    case CLOSED -> current.failures == 0 && current.halfTries == 0
+                            ? current
+                            : StateSnapshot.closed();
+                    case OPEN -> current.failures == 0
+                            ? current
+                            : new StateSnapshot(State.OPEN, 0, current.halfTries, current.openedAt);
+                    case HALF_OPEN -> StateSnapshot.closed();
+                };
+                if (next == current || stateRef.compareAndSet(current, next)) {
+                    if (current.state == State.HALF_OPEN && next.state == State.CLOSED) {
+                        log.info("[CIRCUIT] {} HALF_OPEN → CLOSED（探测成功）", name);
+                    }
+                    return;
+                }
             }
-            failures.set(0); // CLOSED 状态也重置，防止"偶发失败"积累到阈值
         }
 
         /** 记录失败 */
-        public synchronized void recordFailure() {
-            if (state == State.HALF_OPEN) {
-                // 半开探测失败立即重开熔断，并刷新 openedAt 开始新一轮冷却。
-                state = State.OPEN;
-                openedAt = System.currentTimeMillis();
-                log.warn("[CIRCUIT] {} HALF_OPEN → OPEN（探测失败）", name);
-                return;
+        public void recordFailure() {
+            while (true) {
+                StateSnapshot current = stateRef.get();
+                if (current.state == State.OPEN) {
+                    return;
+                }
+
+                long now = System.currentTimeMillis();
+                StateSnapshot next;
+                if (current.state == State.HALF_OPEN) {
+                    next = new StateSnapshot(State.OPEN, 0, 0, now);
+                } else {
+                    int count = current.failures + 1;
+                    next = count >= failureThreshold
+                            ? new StateSnapshot(State.OPEN, count, 0, now)
+                            : new StateSnapshot(State.CLOSED, count, 0, 0);
+                }
+
+                if (stateRef.compareAndSet(current, next)) {
+                    if (current.state == State.HALF_OPEN) {
+                        log.warn("[CIRCUIT] {} HALF_OPEN → OPEN（探测失败）", name);
+                    } else if (next.state == State.OPEN) {
+                        log.warn("[CIRCUIT] {} CLOSED → OPEN（失败次数={}）", name, next.failures);
+                    }
+                    return;
+                }
+            }
+        }
+
+        State currentState() {
+            return stateRef.get().state;
+        }
+
+        int failureCount() {
+            return stateRef.get().failures;
+        }
+
+        int halfOpenTryCount() {
+            return stateRef.get().halfTries;
+        }
+
+        private record StateSnapshot(State state, int failures, int halfTries, long openedAt) {
+            static StateSnapshot closed() {
+                return new StateSnapshot(State.CLOSED, 0, 0, 0);
             }
 
-            int count = failures.incrementAndGet();
-            if (count >= failureThreshold) {
-                // CLOSED 状态累计连续失败达到阈值才打开熔断器。
-                state    = State.OPEN;
-                openedAt = System.currentTimeMillis();
-                log.warn("[CIRCUIT] {} CLOSED → OPEN（失败次数={}）", name, count);
+            StateSnapshot withHalfTries(int halfTries) {
+                return new StateSnapshot(state, failures, halfTries, openedAt);
             }
         }
 

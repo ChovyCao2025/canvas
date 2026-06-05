@@ -5,6 +5,10 @@ Sequence: 003E
 Source: `todo/p1/mautic-inspired-quick-adoptions.md`
 Implementation plan: `../plans/p1-003e-canvas-import-export-package-plan.md`
 
+## Implementation Status
+
+Implemented and focused-verified on 2026-06-05. Verification evidence is recorded in `../plans/p1-003e-canvas-import-export-package-plan.md`.
+
 ## Goal
 
 Add a versioned canvas package format so operators can export a sanitized journey and import it as a new draft.

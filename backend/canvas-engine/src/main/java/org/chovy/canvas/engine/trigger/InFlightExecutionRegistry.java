@@ -4,6 +4,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.chovy.canvas.engine.lane.ExecutionLane;
 import org.chovy.canvas.engine.lane.ExecutionLaneAdmissionResult;
+import org.chovy.canvas.engine.scheduler.CanvasMetrics;
 import org.chovy.canvas.infrastructure.redis.RedisKeyUtil;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.redis.core.StringRedisTemplate;
@@ -15,6 +16,7 @@ import reactor.core.Disposables;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
@@ -41,6 +43,8 @@ public class InFlightExecutionRegistry {
     private final StringRedisTemplate redis;
     /** Redis key 工具，集中生成执行槽位相关 key。 */
     private final RedisKeyUtil keys;
+    /** 执行注册表指标埋点器。 */
+    private final CanvasMetrics metrics;
 
     /** 执行槽位过期和崩溃自愈使用的全局超时秒数。 */
     @Value("${canvas.execution.global-timeout-sec:600}")
@@ -82,11 +86,13 @@ public class InFlightExecutionRegistry {
     public ExecutionLaneAdmissionResult tryAcquire(Long canvasId, String executionId,
                                                    ExecutionLane lane,
                                                    int canvasLimit, int laneLimit, int globalLimit) {
+        ExecutionLane effectiveLane = lane != null ? lane : ExecutionLane.STANDARD;
         if (canvasLimit <= 0 || laneLimit <= 0 || globalLimit <= 0) {
+            metrics.recordExecutionRegistryAdmission(
+                    effectiveLane.name(), ExecutionLaneAdmissionResult.Reason.REGISTRY_UNAVAILABLE.name());
             return ExecutionLaneAdmissionResult.rejected(
                     ExecutionLaneAdmissionResult.Reason.REGISTRY_UNAVAILABLE, 0, 0, 0);
         }
-        ExecutionLane effectiveLane = lane != null ? lane : ExecutionLane.STANDARD;
         String canvasKey = keys.inflightCanvas(canvasId);
         String laneKey = keys.inflightLane(effectiveLane);
         String globalKey = keys.inflightGlobal();
@@ -94,6 +100,7 @@ public class InFlightExecutionRegistry {
         long expiryMs = nowMs + globalTimeoutSec * 1000L;
 
         Long result;
+        long registryStartNs = System.nanoTime();
         try {
             // Lua 内一次完成清僵尸、计数检查和 ZADD，避免多实例并发超卖 slot。
             result = redis.execute(
@@ -106,7 +113,13 @@ public class InFlightExecutionRegistry {
                     String.valueOf(globalLimit),
                     executionId
             );
+            metrics.recordExecutionRegistryLatency(
+                    TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - registryStartNs));
         } catch (Exception e) {
+            metrics.recordExecutionRegistryLatency(
+                    TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - registryStartNs));
+            metrics.recordExecutionRegistryAdmission(
+                    effectiveLane.name(), ExecutionLaneAdmissionResult.Reason.REGISTRY_UNAVAILABLE.name());
             log.error("[REGISTRY] Redis acquire 失败，拒绝本次执行以防雪崩 canvasId={}: {}", canvasId, e.getMessage());
             return ExecutionLaneAdmissionResult.rejected(
                     ExecutionLaneAdmissionResult.Reason.REGISTRY_UNAVAILABLE, 0, 0, 0);
@@ -114,11 +127,17 @@ public class InFlightExecutionRegistry {
 
         if (result == null || result <= 0) {
             log.debug("[REGISTRY] 并发槽位不足 canvasId={} lane={} result={}", canvasId, effectiveLane, result);
+            ExecutionLaneAdmissionResult.Reason reason = mapReason(result);
+            int canvasActive = activeCount(canvasId);
+            int laneActive = laneActiveCount(effectiveLane);
+            int globalActive = totalActiveCount();
+            metrics.recordExecutionRegistryAdmission(effectiveLane.name(), reason.name());
+            metrics.setExecutionLaneActive(effectiveLane.name(), laneActive);
             return ExecutionLaneAdmissionResult.rejected(
-                    mapReason(result),
-                    activeCount(canvasId),
-                    laneActiveCount(effectiveLane),
-                    totalActiveCount());
+                    reason,
+                    canvasActive,
+                    laneActive,
+                    globalActive);
         }
 
         // Redis 准入成功，再注册本地槽位（用于 Kill Switch）
@@ -137,9 +156,14 @@ public class InFlightExecutionRegistry {
             // 本地注册失败（极罕见），回滚 Redis 槽位
             localExecutionLanes.remove(localExecutionKey(canvasId, executionId));
             releaseRedisSlot(canvasKey, laneKey, globalKey, executionId);
+            metrics.recordExecutionRegistryAdmission(
+                    effectiveLane.name(), ExecutionLaneAdmissionResult.Reason.REGISTRY_UNAVAILABLE.name());
             return ExecutionLaneAdmissionResult.rejected(
                     ExecutionLaneAdmissionResult.Reason.REGISTRY_UNAVAILABLE, 0, 0, 0);
         }
+
+        metrics.recordExecutionRegistryAdmission(effectiveLane.name(), ExecutionLaneAdmissionResult.Reason.NONE.name());
+        metrics.setExecutionLaneActive(effectiveLane.name(), localLaneActiveCount(effectiveLane));
 
         log.debug("[REGISTRY] 准入执行 canvasId={} lane={} executionId={}",
                 canvasId, effectiveLane, executionId);
@@ -259,6 +283,11 @@ public class InFlightExecutionRegistry {
 
     private static String localExecutionKey(Long canvasId, String executionId) {
         return canvasId + ":" + executionId;
+    }
+
+    private long localLaneActiveCount(ExecutionLane lane) {
+        ExecutionLane effectiveLane = lane != null ? lane : ExecutionLane.STANDARD;
+        return localExecutionLanes.values().stream().filter(effectiveLane::equals).count();
     }
 
     private static ExecutionLaneAdmissionResult.Reason mapReason(Long result) {

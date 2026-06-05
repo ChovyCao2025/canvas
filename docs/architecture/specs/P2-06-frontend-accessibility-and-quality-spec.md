@@ -7,7 +7,7 @@ Coverage matrix: `docs/architecture/todo/coverage-matrix.md`
 
 ## Verification Status
 
-Partially confirmed. The archived review flags accessibility and ErrorBoundary gaps; full accessibility audit still requires browser-level checks.
+Implemented and locally verified on 2026-06-05. The archived review flagged accessibility and ErrorBoundary gaps; this pass added reusable error boundaries, canvas-editor local isolation, a workflow accessibility audit, static accessibility helpers, component labels, and focused tests. Full certification still requires browser-level/manual assistive-technology review.
 
 ## Problems Covered
 
@@ -24,6 +24,19 @@ Partially confirmed. The archived review flags accessibility and ErrorBoundary g
 ## Acceptance Criteria
 
 - Global and route-level ErrorBoundaries exist.
+  - Status: implemented locally with reusable `ErrorBoundary`, existing `AppErrorBoundary` reuse, and route-group wrappers in `App.tsx`.
 - Canvas editor has error isolation for graph/config panels.
+  - Status: implemented locally for node library, graph canvas, execution trace, and config panel regions.
 - Keyboard navigation and screen-reader basics are checked for core workflows.
+  - Status: implemented locally in `docs/architecture/frontend/accessibility-audit.md` and `canvasEditorAccessibility.ts`.
 - Automated accessibility checks are added where practical.
+  - Status: implemented locally with `frontend/src/test/accessibilityChecks.ts` wired into config-panel, notification, and API-doc tests.
+
+## Evidence
+
+- `docs/architecture/frontend/accessibility-audit.md`
+- `docs/architecture/evidence/P2-06-frontend-accessibility-and-quality.md`
+- `frontend/src/components/layout/ErrorBoundary.test.tsx`
+- `frontend/src/pages/canvas-editor/CanvasEditorErrorBoundary.test.tsx`
+- `frontend/src/pages/canvas-editor/canvasEditorAccessibility.test.ts`
+- `frontend/src/pages/canvas-editor/editorLayout.test.ts`

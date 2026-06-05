@@ -5,6 +5,10 @@ Sequence: 003B
 Source: `todo/p1/mautic-inspired-quick-adoptions.md`
 Implementation plan: `../plans/p1-003b-publish-time-audience-snapshot-locking-plan.md`
 
+## Implementation Status
+
+Implemented and focused-verified on 2026-06-05. Verification evidence is recorded in `../plans/p1-003b-publish-time-audience-snapshot-locking-plan.md`.
+
 ## Goal
 
 Create durable audience snapshots during canvas publish when a `TAGGER(mode=audience)` node uses `STATIC_LOCKED`.

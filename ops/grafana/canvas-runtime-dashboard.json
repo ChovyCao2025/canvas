@@ -1,0 +1,115 @@
+{
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": {
+          "type": "grafana",
+          "uid": "-- Grafana --"
+        },
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
+      }
+    ]
+  },
+  "editable": true,
+  "graphTooltip": 0,
+  "panels": [
+    {
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "fieldConfig": { "defaults": { "unit": "ops" }, "overrides": [] },
+      "gridPos": { "h": 7, "w": 12, "x": 0, "y": 0 },
+      "id": 1,
+      "targets": [
+        { "expr": "sum(rate(canvas_execution_total{status=\"SUCCESS\"}[5m])) / clamp_min(sum(rate(canvas_execution_total[5m])), 1)", "legendFormat": "success rate", "refId": "A" },
+        { "expr": "sum(rate(canvas_execution_total{status=\"FAILED\"}[5m]))", "legendFormat": "failed/sec", "refId": "B" }
+      ],
+      "title": "Execution Success Rate",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] },
+      "gridPos": { "h": 7, "w": 12, "x": 12, "y": 0 },
+      "id": 2,
+      "targets": [
+        { "expr": "sum by (lane) (canvas_execution_active)", "legendFormat": "{{lane}} active", "refId": "A" },
+        { "expr": "sum by (status) (canvas_execution_request_backlog)", "legendFormat": "{{status}} requests", "refId": "B" }
+      ],
+      "title": "Execution Active And Queue Depth",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] },
+      "gridPos": { "h": 7, "w": 12, "x": 0, "y": 7 },
+      "id": 3,
+      "targets": [
+        { "expr": "sum by (queue) (canvas_retry_backlog)", "legendFormat": "{{queue}} retry backlog", "refId": "A" },
+        { "expr": "sum by (queue) (canvas_capacity_dlq_backlog)", "legendFormat": "{{queue}} dlq", "refId": "B" }
+      ],
+      "title": "Retry Backlog And DLQ",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] },
+      "gridPos": { "h": 7, "w": 12, "x": 12, "y": 7 },
+      "id": 4,
+      "targets": [
+        { "expr": "sum by (status) (canvas_delivery_outbox_status_count)", "legendFormat": "{{status}}", "refId": "A" }
+      ],
+      "title": "Delivery Outbox Status Counts",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "fieldConfig": { "defaults": { "unit": "ms" }, "overrides": [] },
+      "gridPos": { "h": 7, "w": 12, "x": 0, "y": 14 },
+      "id": 5,
+      "targets": [
+        { "expr": "histogram_quantile(0.95, sum(rate(canvas_redis_registry_latency_seconds_bucket[5m])) by (le, operation))", "legendFormat": "{{operation}} p95", "refId": "A" },
+        { "expr": "histogram_quantile(0.95, sum(rate(canvas_downstream_latency_seconds_bucket[5m])) by (le, system, operation))", "legendFormat": "{{system}}/{{operation}} p95", "refId": "B" }
+      ],
+      "title": "Redis Registry And Downstream Latency",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] },
+      "gridPos": { "h": 7, "w": 12, "x": 12, "y": 14 },
+      "id": 6,
+      "targets": [
+        { "expr": "max by (pool) (canvas_mysql_pool_pressure_percent)", "legendFormat": "{{pool}} pressure", "refId": "A" },
+        { "expr": "canvas_trace_buffer_pending", "legendFormat": "trace pending", "refId": "B" },
+        { "expr": "sum(rate(canvas_trace_dropped_total[5m]))", "legendFormat": "trace dropped/sec", "refId": "C" }
+      ],
+      "title": "MySQL Pressure And Trace Buffer",
+      "type": "timeseries"
+    }
+  ],
+  "refresh": "30s",
+  "schemaVersion": 39,
+  "tags": ["canvas", "runtime", "ops", "p0"],
+  "templating": {
+    "list": [
+      {
+        "current": { "selected": false, "text": "Prometheus", "value": "Prometheus" },
+        "hide": 0,
+        "label": "Prometheus",
+        "name": "DS_PROMETHEUS",
+        "query": "prometheus",
+        "refresh": 1,
+        "type": "datasource"
+      }
+    ]
+  },
+  "time": { "from": "now-6h", "to": "now" },
+  "timezone": "",
+  "title": "Canvas Runtime P0 Operations",
+  "uid": "canvas-runtime-p0-ops",
+  "version": 1
+}

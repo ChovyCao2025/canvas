@@ -20,7 +20,9 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -56,6 +58,30 @@ class TenantServiceTest {
         assertThat(inserted.getPlanCode()).isEqualTo("default");
         assertThat(inserted.getQuotaJson()).isEqualTo("{\"maxCanvases\":10}");
         assertThat(inserted.getCreatedBy()).isEqualTo("root");
+    }
+
+    @Test
+    void createTenantRejectsInvalidKeyBeforeMapperWrite() {
+        TenantService service = new TenantService(tenantMapper, canvasMapper, executionMapper, dlqMapper);
+
+        assertThatThrownBy(() -> service.create("Acme Co", "Acme 01", null, null, "root"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("key");
+
+        verify(tenantMapper, never()).insert(any(TenantDO.class));
+    }
+
+    @Test
+    void usageRejectsMissingTenantBeforeMapperReads() {
+        TenantService service = new TenantService(tenantMapper, canvasMapper, executionMapper, dlqMapper);
+
+        assertThatThrownBy(() -> service.usage(null))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("租户 ID");
+
+        verify(canvasMapper, never()).selectCount(any());
+        verify(executionMapper, never()).selectCount(any());
+        verify(dlqMapper, never()).selectCount(any());
     }
 
     @Test

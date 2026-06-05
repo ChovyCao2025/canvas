@@ -1,0 +1,102 @@
+groups:
+  - name: canvas-runtime
+    rules:
+      - alert: CanvasExecutionFailureRate
+        expr: sum(rate(canvas_runtime_execution_failures_total[5m])) > 0.05
+        for: 10m
+        labels:
+          severity: critical
+          service: canvas-engine
+        annotations:
+          summary: Canvas execution failure rate is elevated
+          description: Runtime execution failures exceeded 0.05 failures/sec for 10 minutes.
+
+      - alert: CanvasDlqBacklog
+        expr: canvas_runtime_dlq_backlog > 0
+        for: 15m
+        labels:
+          severity: warning
+          service: canvas-engine
+        annotations:
+          summary: Canvas DLQ backlog is non-empty
+          description: canvas_runtime_dlq_backlog has been above zero for 15 minutes.
+
+      - alert: CanvasRouteRebuildFailure
+        expr: increase(canvas_runtime_route_rebuild_failures_total[10m]) > 0
+        for: 0m
+        labels:
+          severity: critical
+          service: canvas-engine
+        annotations:
+          summary: Canvas route rebuild failed
+          description: Trigger route rebuild failed and runtime routing may be stale.
+
+      - alert: CanvasCacheInvalidationFailure
+        expr: increase(canvas_runtime_cache_invalidation_failures_total[10m]) > 0
+        for: 0m
+        labels:
+          severity: warning
+          service: canvas-engine
+        annotations:
+          summary: Canvas cache invalidation failed
+          description: A runtime cache invalidation operation failed.
+
+      - alert: CanvasRedisUnavailable
+        expr: canvas_runtime_redis_available == 0
+        for: 5m
+        labels:
+          severity: critical
+          service: canvas-engine
+        annotations:
+          summary: Redis health signal is unavailable
+          description: Canvas runtime Redis availability gauge is reporting unavailable.
+
+      - alert: CanvasMqUnavailable
+        expr: canvas_runtime_mq_available == 0
+        for: 5m
+        labels:
+          severity: critical
+          service: canvas-engine
+        annotations:
+          summary: MQ health signal is unavailable
+          description: Canvas runtime MQ availability gauge is reporting unavailable.
+
+      - alert: CanvasLanePressureHigh
+        expr: max(canvas_runtime_lane_pressure) > 0.85
+        for: 10m
+        labels:
+          severity: warning
+          service: canvas-engine
+        annotations:
+          summary: Canvas execution lane pressure is high
+          description: At least one execution lane has stayed above 85 percent pressure.
+
+      - alert: CanvasDisruptorPressureHigh
+        expr: canvas_runtime_disruptor_pressure > 0.85
+        for: 10m
+        labels:
+          severity: warning
+          service: canvas-engine
+        annotations:
+          summary: Canvas disruptor pressure is high
+          description: Disruptor backlog is above 85 percent of the ring buffer size.
+
+      - alert: CanvasHikariSaturation
+        expr: max(hikaricp_connections_active / clamp_min(hikaricp_connections_max, 1)) > 0.85
+        for: 10m
+        labels:
+          severity: warning
+          service: canvas-engine
+        annotations:
+          summary: Canvas database pool saturation is high
+          description: Hikari active connections are above 85 percent of max capacity.
+
+      - alert: CanvasShutdownDrainTimeout
+        expr: increase(canvas_runtime_shutdown_drain_timeout_total[30m]) > 0
+        for: 0m
+        labels:
+          severity: critical
+          service: canvas-engine
+        annotations:
+          summary: Canvas graceful shutdown drain timed out
+          description: Runtime shutdown drain timeout was recorded.

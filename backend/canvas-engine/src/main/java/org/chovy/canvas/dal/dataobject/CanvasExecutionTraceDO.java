@@ -23,6 +23,10 @@ public class CanvasExecutionTraceDO {
     /** 节点轨迹主键 ID */
     private Long id;
 
+    /** 所属租户 ID */
+    @TableField("tenant_id")
+    private Long tenantId;
+
     /** 所属执行记录 ID */
     private String executionId;
 

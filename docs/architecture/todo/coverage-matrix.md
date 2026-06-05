@@ -44,6 +44,10 @@ This matrix audits every archived architecture document and maps its findings or
 - `P3/identity-event-tenant`: `specs/P3-09-identity-event-and-tenant-platform-spec.md`; `plans/P3-09-identity-event-and-tenant-platform-plan.md`
 - `needs-review`: `todo/needs-review/stale-and-duplicate-findings.md`
 
+## P3 Platform Evolution Gate
+
+P3 platform evolution is blocked until `docs/architecture/platform-evolution-promotion-checklist.md` is complete for the promoted item. The checklist must include owner, success metrics, user value, dependencies, migration plan, rollback plan, operating model, on-call owner, runbook, test plan, data migration, observability, security, compliance, tenant impact, team capacity, verification command, and expected evidence path. Archived evolution documents remain source evidence, not active implementation authority.
+
 ## Document Coverage
 
 | Archived document | Coverage |
@@ -241,7 +245,7 @@ This matrix audits every archived architecture document and maps its findings or
 | Deep review sections 13-15: API/data/security/observability | P1/api, P0/data, P0/security, P1/observability | mapped |
 | Supplement review 1 cost architecture | P2/capacity | partially_confirmed |
 | Supplement review 2 DR/BCP | P0/resilience | partially_confirmed |
-| Supplement review 3 evolution feasibility | P3/evolution, needs-review | planning |
+| Supplement review 3 evolution feasibility | P3/evolution, needs-review | covered by P3-01 promotion gate; external roadmap decision remains |
 | Supplement review 4 team/org fit | P1/dag, P2/docs | needs_review for team facts |
 | Supplement review 5 vendor lock-in | P2/deps | confirmed risk |
 | Supplement review 6 knowledge management | P2/docs | partially_confirmed |
@@ -279,16 +283,16 @@ This matrix audits every archived architecture document and maps its findings or
 
 | Source point | Package | Status |
 |---|---|---|
-| Multi datasource isolation: current problem, 3 DBs, routing, Flyway, cross-DB transactions, migration, monitoring, tenant visibility | P0/data, P2/capacity, P3/multi-datasource | planning plus confirmed prerequisites |
-| Target architecture overview: current problems, bounded contexts, modules, data source isolation, API gateway, observability, roadmap | P3/evolution, P3/service-split, P3/multi-datasource, P1/observability, P0/data | planning |
-| WebFlux to MVC migration: problem, migration strategy, steps, risk, expected perf | P0/reactive, P3/webflux-mvc | planning; current mismatch confirmed |
-| Production practice review: XXL-JOB, production stack, Redisson, Nacos, Knife4j, logs, Feign/Sentinel, Spring Boot Admin, ClickHouse | P2/deps, P1/release, P1/observability, P3/platform-components | planning |
-| Data platform architecture: need, warehouse layers, CDC/Flink, OLAP, governance, API layer, integration, K8s, roadmap, risk | P3/data-platform, P2/compliance | planning |
-| Service architecture design: 12 services, communication, event bus, deployment, priority, module layout, build/start order | P3/service-split | planning |
-| K8s deployment plan: Helm, values, Deployment, HPA, Redis HA, MySQL, RocketMQ, CI/CD, observability, security, steps | P1/release, P1/observability, P0/resilience, P3/k8s | planning |
-| Architecture evolution roadmap: phases, baseline, tasks, dependencies, resources, risk, success criteria | P3/boundary-review, P3/evolution, P3/service-split, P3/data-platform, P3/k8s, needs-review | planning |
-| Architect critical review: tenant isolation, OneID, event schema, engine/web split, tracing, tenant quota, service degradation, strangler migration | P0/data, P1/observability, P2/deps, P3/boundary-review, P3/identity-event-tenant, P3/service-split | planning plus confirmed prerequisites |
-| WeCom SCRM module design: module scope, data model, API, handlers, WeCom client, callbacks, frontend, plan, risks | P3/wecom | planning |
+| Multi datasource isolation: current problem, 3 DBs, routing, Flyway, cross-DB transactions, migration, monitoring, tenant visibility | P0/data, P2/capacity, P3/multi-datasource | covered by P3-04 decision package; physical split blocked by P0 data and reconciliation gates |
+| Target architecture overview: current problems, bounded contexts, modules, data source isolation, API gateway, observability, roadmap | P3/evolution, P3/service-split, P3/multi-datasource, P1/observability, P0/data | covered by P3-00, P3-01, P3-02, P3-04, and P3-09 decision packages |
+| WebFlux to MVC migration: problem, migration strategy, steps, risk, expected perf | P0/reactive, P3/webflux-mvc | covered by P3-05 runtime decision package; MVC migration deferred and current mismatch tracked by P0/reactive |
+| Production practice review: XXL-JOB, production stack, Redisson, Nacos, Knife4j, logs, Feign/Sentinel, Spring Boot Admin, ClickHouse | P2/deps, P1/release, P1/observability, P3/platform-components | covered by P3-07 decision package; only Redisson proof behind local interface accepted |
+| Data platform architecture: need, warehouse layers, CDC/Flink, OLAP, governance, API layer, integration, K8s, roadmap, risk | P3/data-platform, P2/compliance | covered by P3-03 thin-slice data-platform package; full rollout deferred |
+| Service architecture design: 12 services, communication, event bus, deployment, priority, module layout, build/start order | P3/service-split | covered by P3-00 and P3-02; immediate physical service split rejected in favor of modular-monolith boundaries |
+| K8s deployment plan: Helm, values, Deployment, HPA, Redis HA, MySQL, RocketMQ, CI/CD, observability, security, steps | P1/release, P1/observability, P0/resilience, P3/k8s | covered by P3-06 Helm and operating-model package; production rollout needs environment owner evidence |
+| Architecture evolution roadmap: phases, baseline, tasks, dependencies, resources, risk, success criteria | P3/boundary-review, P3/evolution, P3/service-split, P3/data-platform, P3/k8s, needs-review | covered by P3-00 through P3-09 with promotion gates; roadmap timing remains a product/team decision |
+| Architect critical review: tenant isolation, OneID, event schema, engine/web split, tracing, tenant quota, service degradation, strangler migration | P0/data, P1/observability, P2/deps, P3/boundary-review, P3/identity-event-tenant, P3/service-split | covered by P3-09 primitives plus P0/P1 prerequisites; implementation remains gated |
+| WeCom SCRM module design: module scope, data model, API, handlers, WeCom client, callbacks, frontend, plan, risks | P3/wecom | covered by P3-08 integration-boundary and first-slice package; implementation deferred |
 
 ## Unresolved Or Decision-Dependent
 

@@ -8,6 +8,8 @@ import http from './api'
 
 export type AudienceDataSourceType = 'TAGGER_API' | 'JDBC' | 'CDP_TAG' | 'CDP_PROFILE' | 'CDP_IDENTITY'
 
+export type AudienceSnapshotMode = 'STATIC_LOCKED' | 'DYNAMIC_REFRESH'
+
 export interface AudienceSourceField {
   name: string
   label: string
@@ -52,6 +54,9 @@ export interface AudienceDefinition {
 
   /** 计算策略。 */
   evaluationStrategy: 'ONLINE' | 'OFFLINE_BATCH' | 'HYBRID'
+
+  /** 默认发送人群快照模式。 */
+  defaultSnapshotMode?: AudienceSnapshotMode
 
   /** 定时策略 cron（按策略可选）。 */
   cronExpression?: string

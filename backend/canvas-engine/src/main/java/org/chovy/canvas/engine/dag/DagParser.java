@@ -1,6 +1,7 @@
 package org.chovy.canvas.engine.dag;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import lombok.Data;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -181,6 +182,7 @@ public class DagParser {
 
     /** graph_json 根对象。 */
     @Data
+    @JsonIgnoreProperties(ignoreUnknown = true)
     public static class CanvasGraph {
 
         /** 节点列表。 */
@@ -189,6 +191,7 @@ public class DagParser {
 
     /** 节点定义，与前端 graph_json 节点结构对齐。 */
     @Data
+    @JsonIgnoreProperties(ignoreUnknown = true)
     public static class CanvasNode {
 
         /** 节点 ID（前端生成的唯一标识）。 */

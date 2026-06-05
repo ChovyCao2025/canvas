@@ -2,11 +2,11 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Define ISV tiers, partner portal, review process, SDK samples, public submission, revenue sharing, support, and community governance.
+**Goal:** Produce evidence and a governance decision for ISV tiers, partner review, SDK samples, submissions, revenue sharing, support, and community governance.
 
-**Architecture:** Implement the capability as a thin vertical slice: failing tests first, then backend/domain contracts, then frontend service and route integration, then rollout documentation. Keep scope bounded to the spec and use additive migrations or feature flags for risky changes.
+**Architecture:** This is a P3 strategy gate, not a portal or marketplace build. The slice creates discovery, tier/review, and governance Markdown artifacts; no backend, frontend, or Flyway files are changed.
 
-**Tech Stack:** Java 21, Spring Boot WebFlux style controllers currently returning Mono, MyBatis, Flyway, Redis/RocketMQ where needed, React 18, Vite, TypeScript, Ant Design, Vitest, JUnit 5, Mockito.
+**Tech Stack:** Markdown, shell validation with `rg`, repository documentation review.
 
 ---
 
@@ -17,130 +17,198 @@
 
 ## File Structure
 
-**Backend**
-- `backend/canvas-engine/src/main/java/org/chovy/canvas/domain/ecosystemandpartnerprogram/EcosystemAndPartnerProgramService.java`
-- `backend/canvas-engine/src/main/java/org/chovy/canvas/web/EcosystemAndPartnerProgramController.java`
+**Evidence And Governance**
+- Create: `docs/product-evolution/evidence/p3-006-partner-program-discovery.md` - owners, partner segment, value proposition, demand evidence, and support model.
+- Create: `docs/product-evolution/evidence/p3-006-partner-tier-and-review-checklist.md` - tier criteria, security review, SDK sample, support, and publish criteria.
+- Create: `docs/product-evolution/governance/p3-006-partner-program-gate.md` - proceed/park/split decision, KPI, child spec, and revisit trigger.
 
-**Frontend**
-- `frontend/src/pages/ecosystem-and-partner-program/index.tsx`
-- `frontend/src/services/ecosystemandpartnerprogramApi.ts`
+**No Runtime Files**
+- No backend files.
+- No frontend files.
+- No Flyway migration. If approved, runtime storage starts at `backend/canvas-engine/src/main/resources/db/migration/V178__partner_program_registry.sql`.
 
-**Data And Config**
-- `backend/canvas-engine/src/main/resources/db/migration/V121__ecosystem_and_partner_program.sql`
-
-**Tests**
-- `backend/canvas-engine/src/test/java/org/chovy/canvas/strategy/EcosystemAndPartnerProgramTest.java`
-- `frontend/src/pages/ecosystem-and-partner-program/ecosystem-and-partner-program.test.tsx`
-
-### Task 1: Contract And Failing Tests
+### Task 1: Partner Program Discovery
 
 **Files:**
-- Create: `backend/canvas-engine/src/test/java/org/chovy/canvas/strategy/EcosystemAndPartnerProgramTest.java`
-- Create: `frontend/src/pages/ecosystem-and-partner-program/ecosystem-and-partner-program.test.tsx`
-- Read: `docs/product-evolution/specs/p3-006-ecosystem-and-partner-program.md`
+- Create: `docs/product-evolution/evidence/p3-006-partner-program-discovery.md`
 
-- [ ] **Step 1: Write backend contract tests**
+- [ ] **Step 1: Write discovery artifact**
 
-Create `backend/canvas-engine/src/test/java/org/chovy/canvas/strategy/EcosystemAndPartnerProgramTest.java` with tests for authorization, tenant scoping, and the main success path named after `ecosystem-and-partner-program`. Use existing controller or service tests in `backend/canvas-engine/src/test/java/org/chovy/canvas` as style references.
+Create `docs/product-evolution/evidence/p3-006-partner-program-discovery.md`:
 
-- [ ] **Step 2: Run backend contract tests and confirm red state**
+```markdown
+# P3-006 Partner Program Discovery
 
-Run: `cd backend && mvn -pl canvas-engine test -Dtest=EcosystemAndPartnerProgramTest`
+## Owners
 
-Expected: FAIL because the new route, service method, or behavior has not been implemented yet.
+- Ecosystem owner: Ecosystem Lead
+- Product owner: Marketing Canvas Product Lead
+- Security owner: Security Review Lead
+- Support owner: Partner Support Lead
+- Decision date: 2026-07-20
 
-- [ ] **Step 3: Write frontend workflow tests**
+## Target Partner Segment
 
-Create `frontend/src/pages/ecosystem-and-partner-program/ecosystem-and-partner-program.test.tsx` with Vitest coverage for loading, empty, success, permission, and server-error states for the first UI slice.
+- Segment: ISVs integrating campaign execution, data enrichment, or channel delivery.
+- Partner value proposition: faster access to tenant-approved canvas extension points.
+- Support model: named partner support queue with security review before publishing.
 
-- [ ] **Step 4: Run frontend workflow tests and confirm red state**
+## Evidence Register
 
-Run: `cd frontend && npm test -- ecosystem-and-partner-program.test.tsx`
+| Source | Source date | Owner | Confidence | Decision implication |
+|---|---:|---|---|---|
+| Integration request backlog | 2026-06-10 | Ecosystem Lead | High | Repeated requests justify review checklist discovery. |
+| SDK support tickets | 2026-06-12 | Partner Support Lead | Medium | Samples and test fixtures are required before public submission. |
+| Partner interview notes | 2026-06-18 | Product Lead | Medium | Revenue share should not be committed until demand is validated. |
 
-Expected: FAIL because the new page, component, service call, or state handling does not exist yet.
+## Discovery Conclusion
 
-### Task 2: Backend And Data Slice
+Recommended gate input: split partner review governance from public portal build. Portal work requires a child spec after security and support sign-off.
+```
 
-**Files:**
-- `backend/canvas-engine/src/main/java/org/chovy/canvas/domain/ecosystemandpartnerprogram/EcosystemAndPartnerProgramService.java`
-- `backend/canvas-engine/src/main/java/org/chovy/canvas/web/EcosystemAndPartnerProgramController.java`
-- `backend/canvas-engine/src/main/resources/db/migration/V121__ecosystem_and_partner_program.sql`
-- Test: `backend/canvas-engine/src/test/java/org/chovy/canvas/strategy/EcosystemAndPartnerProgramTest.java`
+- [ ] **Step 2: Verify discovery headings**
 
-- [ ] **Step 1: Add additive data structures when the spec requires storage**
+Run:
 
-If this plan has a Flyway file, create it exactly at the data path listed above. Use additive tables, indexes, and nullable columns so rollout can be disabled without rollback data loss.
+```bash
+rg -n "^## (Owners|Target Partner Segment|Evidence Register|Discovery Conclusion)$" docs/product-evolution/evidence/p3-006-partner-program-discovery.md
+```
 
-- [ ] **Step 2: Implement the domain service**
+Expected: finds all four headings.
 
-Implement the service behavior in the backend files listed above. Keep business rules in the domain service and keep controllers thin.
+- [ ] **Step 3: Commit discovery artifact**
 
-- [ ] **Step 3: Implement or extend the controller contract**
+Run:
 
-Expose only the endpoints needed by the first workflow. Return `R<T>` or existing project response types consistently with nearby controllers.
+```bash
+git add docs/product-evolution/evidence/p3-006-partner-program-discovery.md docs/product-evolution/plans/p3-006-ecosystem-and-partner-program-plan.md
+git commit -m "docs: add partner program discovery"
+```
 
-- [ ] **Step 4: Run focused backend tests**
+Expected: commit contains only the discovery artifact and this plan.
 
-Run: `cd backend && mvn -pl canvas-engine test -Dtest=EcosystemAndPartnerProgramTest`
-
-Expected: PASS for the new contract tests.
-
-### Task 3: Frontend Slice
-
-**Files:**
-- `frontend/src/pages/ecosystem-and-partner-program/index.tsx`
-- `frontend/src/services/ecosystemandpartnerprogramApi.ts`
-- Test: `frontend/src/pages/ecosystem-and-partner-program/ecosystem-and-partner-program.test.tsx`
-
-- [ ] **Step 1: Add the typed API wrapper**
-
-Implement the API wrapper in the service file listed above. Reuse `frontend/src/services/api.ts` and return typed request and response objects.
-
-- [ ] **Step 2: Add the route, page, panel, or component**
-
-Implement the first visible workflow in the frontend files listed above. Include loading, empty, error, permission, and success states.
-
-- [ ] **Step 3: Wire navigation only where needed**
-
-Add navigation entry points only if the feature needs a top-level route. Prefer contextual entry points for editor, analytics, or settings capabilities.
-
-- [ ] **Step 4: Run focused frontend tests**
-
-Run: `cd frontend && npm test -- ecosystem-and-partner-program.test.tsx`
-
-Expected: PASS for the new workflow tests.
-
-### Task 4: Integration Verification And Rollout Notes
+### Task 2: Partner Tier And Review Checklist
 
 **Files:**
-- Modify: `docs/product-evolution/specs/p3-006-ecosystem-and-partner-program.md`
-- Modify: `docs/product-evolution/plans/p3-006-ecosystem-and-partner-program-plan.md`
-- Read: `docs/product-evolution/todo/INDEX.md`
+- Create: `docs/product-evolution/evidence/p3-006-partner-tier-and-review-checklist.md`
 
-- [ ] **Step 1: Run backend regression slice**
+- [ ] **Step 1: Write tier and review checklist**
 
-Run: `cd backend && mvn -pl canvas-engine test`
+Create `docs/product-evolution/evidence/p3-006-partner-tier-and-review-checklist.md`:
 
-Expected: PASS for the canvas-engine module test suite.
+```markdown
+# P3-006 Partner Tier And Review Checklist
 
-- [ ] **Step 2: Run frontend regression slice**
+## Tier Model
 
-Run: `cd frontend && npm test -- --run`
+| Tier | Entry criteria | Review requirements | Support entitlement | Publish criteria |
+|---|---|---|---|---|
+| Registered | Signed partner contact and use case summary | Basic identity and owner review | Community support | Internal listing only |
+| Verified | Working integration demo and SDK sample | Security checklist and support owner approval | Partner support queue | Private tenant pilot |
+| Marketplace | Two successful pilots and support runbook | Security, legal, support, and product approval | Named support SLA | Public listing after governance gate |
 
-Expected: PASS for the Vitest suite.
+## Security Review
 
-- [ ] **Step 3: Run frontend build**
+- Require data classes touched by the integration.
+- Require authentication method and secret rotation plan.
+- Require rollback and incident contact.
 
-Run: `cd frontend && npm run build`
+## SDK Sample Requirements
 
-Expected: PASS with TypeScript and Vite build success.
+- Sample must include setup, tenant-scoped auth, smoke test, and rollback notes.
+- Sample must not include production secrets or real tenant data.
+```
 
-- [ ] **Step 4: Add rollout notes to the implementation PR**
+- [ ] **Step 2: Verify checklist headings**
 
-Document feature flag or route guard, migration order, tenant and role impact, manual verification steps, and rollback command or disable switch.
+Run:
 
-- [ ] **Step 5: Commit the implementation slice**
+```bash
+rg -n "^## (Tier Model|Security Review|SDK Sample Requirements)$" docs/product-evolution/evidence/p3-006-partner-tier-and-review-checklist.md
+```
 
-Run: `git add backend/canvas-engine/src frontend/src docs/product-evolution/specs docs/product-evolution/plans && git commit -m "feat: implement ecosystem-and-partner-program slice"`
+Expected: finds all three headings.
 
-Expected: commit contains only files required by this plan.
+- [ ] **Step 3: Commit checklist**
+
+Run:
+
+```bash
+git add docs/product-evolution/evidence/p3-006-partner-tier-and-review-checklist.md docs/product-evolution/plans/p3-006-ecosystem-and-partner-program-plan.md
+git commit -m "docs: add partner tier review checklist"
+```
+
+Expected: commit contains only the checklist and this plan.
+
+### Task 3: Governance Gate
+
+**Files:**
+- Create: `docs/product-evolution/governance/p3-006-partner-program-gate.md`
+
+- [ ] **Step 1: Write governance gate**
+
+Create `docs/product-evolution/governance/p3-006-partner-program-gate.md`:
+
+```markdown
+# P3-006 Partner Program Gate
+
+## Decision
+
+- Outcome: split
+- Decision owner: Ecosystem Lead
+- Decision date: 2026-07-20
+- First measurable KPI: complete three verified partner reviews with no unresolved security blockers.
+
+## Next Child Spec
+
+- Review governance child spec: `docs/product-evolution/specs/p3-006a-partner-review-governance.md`
+- Portal child spec: `docs/product-evolution/specs/p3-006b-partner-portal-submission.md`
+
+## Revisit Trigger
+
+If fewer than three partner-demand sources remain active by 2026-08-20, park portal work and keep only manual review governance.
+
+## Sign-Off
+
+| Role | Owner | Status |
+|---|---|---|
+| Ecosystem | Ecosystem Lead | Required |
+| Security | Security Review Lead | Required |
+| Support | Partner Support Lead | Required |
+```
+
+- [ ] **Step 2: Verify governance gate**
+
+Run:
+
+```bash
+rg -n "^- Outcome: (proceed|park|split)$|^## (Decision|Next Child Spec|Revisit Trigger|Sign-Off)$" docs/product-evolution/governance/p3-006-partner-program-gate.md
+```
+
+Expected: finds the split outcome and four headings.
+
+- [ ] **Step 3: Final validation**
+
+Run:
+
+```bash
+rg -n "^# P3-006" docs/product-evolution/evidence/p3-006-partner-program-discovery.md docs/product-evolution/evidence/p3-006-partner-tier-and-review-checklist.md docs/product-evolution/governance/p3-006-partner-program-gate.md
+git diff --check docs/product-evolution/specs/p3-006-ecosystem-and-partner-program.md docs/product-evolution/plans/p3-006-ecosystem-and-partner-program-plan.md
+```
+
+Expected: first command finds three document titles; `git diff --check` exits 0.
+
+- [ ] **Step 4: Commit governance gate**
+
+Run:
+
+```bash
+git add docs/product-evolution/evidence/p3-006-partner-program-discovery.md \
+  docs/product-evolution/evidence/p3-006-partner-tier-and-review-checklist.md \
+  docs/product-evolution/governance/p3-006-partner-program-gate.md \
+  docs/product-evolution/specs/p3-006-ecosystem-and-partner-program.md \
+  docs/product-evolution/plans/p3-006-ecosystem-and-partner-program-plan.md
+git commit -m "docs: add partner program strategy gate"
+```
+
+Expected: commit contains only P3-006 evidence, governance, spec, and plan files.

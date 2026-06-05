@@ -1,6 +1,7 @@
 package org.chovy.canvas.dal.dataobject;
 
 import com.baomidou.mybatisplus.annotation.IdType;
+import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
 import lombok.Data;
@@ -20,6 +21,10 @@ public class CdpUserTagHistoryDO {
     @TableId(type = IdType.AUTO)
     /** 标签变更历史主键 ID */
     private Long id;
+
+    @TableField("tenant_id")
+    /** 所属租户 ID */
+    private Long tenantId;
 
     /** CDP 内部统一用户 ID */
     private String userId;

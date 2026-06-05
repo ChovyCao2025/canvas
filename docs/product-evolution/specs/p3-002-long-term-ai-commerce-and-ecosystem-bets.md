@@ -7,69 +7,72 @@ Implementation plan: `../plans/p3-002-long-term-ai-commerce-and-ecosystem-bets-p
 
 ## Goal
 
-Preserve and sequence AI agents, AI-native operations, commercial expansion, industry expansion, globalization, privacy, and advanced architecture as validated bets.
+Convert broad AI commerce, AI-native operations, commercial expansion, industry expansion, globalization, privacy, and ecosystem bets into a ranked evidence backlog with explicit gates for later child specs.
 
 ## User And Business Value
 
-This keeps the strategy actionable by requiring discovery gates, MVP scope, and measurable exit criteria before engineering scale-up.
+This preserves long-range strategic options while preventing expensive AI or commercial implementation work from starting without demand evidence, approval boundaries, model-risk controls, and owners.
 
 ## In Scope
 
-- AI agent roadmap with human approval.
-- Commercial and industry expansion discovery.
-- Globalization and privacy readiness checkpoints.
-- Strategic dependency map.
+- Strategic bet inventory covering AI agents, AI-native operations, commerce expansion, industry packaging, globalization, privacy, and ecosystem plays.
+- Evidence scoring for demand, dependency readiness, model risk, compliance risk, commercial owner, and proof command.
+- Human-approval and governance rules for AI-driven actions.
+- Decision log that defines which bets can graduate into child specs and which remain discovery-only.
 
 ## Out Of Scope
 
-- Immediate full-scale implementation.
-- Commercial, legal, or architecture commitments without named owner and evidence.
+- Building AI agents, commerce automation, billing, globalization, privacy, or partner-program runtime features.
+- Model-provider integration, automated spend decisions, or customer-facing AI actions.
+- Flyway schema changes or production data collection.
 
 ## Functional Requirements
 
-1. The feature must expose the smallest useful operator or platform workflow described in the source item.
-2. The implementation must preserve tenant isolation, authorization, auditability, and rollback behavior for every new read or write path.
-3. New UI must use existing React, Ant Design, router, service, and test patterns unless a child spec justifies a new pattern.
-4. New backend behavior must use the existing Spring Boot, MyBatis, Flyway, controller, domain service, and test patterns.
-5. The implementation must include focused automated tests before code changes and a manual verification checklist for the core workflow.
+1. The strategy package must define bet records with key, owner, customer evidence, dependency status, model-risk status, approval boundary, proof command, rollback path, decision status, and child spec path.
+2. AI bets must include human approval requirements before any customer-facing or spend-affecting action can be proposed.
+3. Bets with missing demand evidence, model-risk review, commercial owner, or proof command must remain `Needs Evidence` or `Deferred`.
+4. The validator must fail if a bet marked `Accepted For Child Spec` lacks a child spec path, rollback path, proof command, or approval boundary.
+5. Rollout notes must confirm that this slice only creates Git-tracked strategy artifacts and does not ship runtime AI behavior.
 
 ## Technical Scope
 
-### Backend Touchpoints
+### Documentation Touchpoints
 
-- `backend/canvas-engine/src/main/java/org/chovy/canvas/domain`
-- `backend/canvas-engine/src/main/java/org/chovy/canvas/web`
+- `docs/product-evolution/discovery/p3-002-ai-commerce-bets/README.md`
+- `docs/product-evolution/discovery/p3-002-ai-commerce-bets/evidence.json`
+- `docs/product-evolution/discovery/p3-002-ai-commerce-bets/governance-policy.md`
+- `docs/product-evolution/discovery/p3-002-ai-commerce-bets/decision-log.md`
 
-### Frontend Touchpoints
+### Tooling Touchpoints
 
-- `frontend/src/pages`
-- `frontend/src/services`
+- `tools/strategy/ai-commerce-bets-evidence.mjs`
+- `tools/strategy/ai-commerce-bets-evidence.test.mjs`
 
 ### Data And Configuration Touchpoints
 
-- `backend/canvas-engine/src/main/resources/db/migration/V117__long_term_ai_commerce_and_ecosystem_bets.sql`
+- No Flyway migration is part of this slice. The work records discovery evidence in Markdown and JSON only; AI action, billing, or partner data models require separate child specs after evidence acceptance.
 
 ### Test Touchpoints
 
-- `backend/canvas-engine/src/test/java/org/chovy/canvas/strategy/LongTermAiCommerceAndEcosystemBetsTest.java`
-- `frontend/src/pages/long-term-ai-commerce-and-ecosystem-bets/long-term-ai-commerce-and-ecosystem-bets.test.tsx`
+- `tools/strategy/ai-commerce-bets-evidence.test.mjs`
 
 ## Dependencies
 
-- Requires explicit business or architecture owner.
-- Requires discovery evidence before build-out.
+- P2 platform workstreams and integration foundations should inform dependency readiness.
+- AI governance and privacy constraints must be reviewed before a bet can move beyond discovery.
+- Commercial and industry owners must be named before commercial or packaging bets can graduate.
 
 ## Risks And Controls
 
-- Scope creep: keep the first implementation to the workflow in this spec and move broader ideas to a follow-up spec.
-- Tenant or permission regression: add backend tests for tenant-scoped data and role checks before exposing UI.
-- UI complexity: use one page or one panel first, then expand only after the workflow is verified.
-- Data migration risk: make every migration additive and reversible by disabling the new route or feature flag.
+- Overbuilding strategic ideas: require ranked evidence and child-spec gates before implementation starts.
+- AI safety risk: require explicit human approval and rollback boundaries for every AI bet.
+- Compliance risk: keep globalization and privacy items in discovery until regulatory owners validate constraints.
+- Dependency inversion: block bets whose foundation work is not stable or whose proof command cannot run locally.
 
 ## Acceptance Criteria
 
-- The source item has a visible implemented workflow or a documented discovery exit if this is a P3 strategy item.
-- All changed backend endpoints reject unauthorized access and preserve tenant scoping.
-- All changed frontend routes handle loading, empty, error, and permission states.
-- Tests named in the plan pass in the local commands for backend and frontend slices.
-- The implementation includes rollout notes covering feature flag, migration, and rollback behavior.
+- The evidence validator tests pass and reject promoted bets that lack proof command, rollback, owner, approval boundary, or child spec path.
+- The evidence package includes AI agents, AI-native operations, commerce expansion, industry packaging, globalization, privacy, and ecosystem bets.
+- Each accepted bet has a named child spec path; unaccepted bets retain a non-implementation status.
+- Rollout notes state no migration, no runtime AI behavior, no customer-facing UI, and no billing or partner data changes.
+- The plan includes scoped `git add` and commit commands limited to the discovery docs, validator, and this spec/plan pair.

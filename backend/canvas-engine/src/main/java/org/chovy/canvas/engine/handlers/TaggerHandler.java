@@ -4,6 +4,7 @@ import org.chovy.canvas.common.MapFieldKeys;
 import org.chovy.canvas.common.enums.NodeType;
 import org.chovy.canvas.common.enums.TriggerType;
 import org.chovy.canvas.engine.audience.AudienceBitmapStore;
+import org.chovy.canvas.engine.audience.AudienceSnapshotService;
 import org.chovy.canvas.engine.audience.AudienceUserResolver;
 import org.chovy.canvas.engine.context.ExecutionContext;
 import org.chovy.canvas.engine.handler.NodeHandler;
@@ -19,6 +20,7 @@ import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
 
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
@@ -27,17 +29,22 @@ import java.util.UUID;
 @NodeHandlerType(NodeType.TAGGER)
 public class TaggerHandler implements NodeHandler {
 
+    private static final String AUDIENCE_SNAPSHOT_ID = "audienceSnapshotId";
+
     private final AudienceBitmapStore audienceBitmapStore;
     private final AudienceUserResolver audienceUserResolver;
     private final CanvasExecutionService executionService;
+    private final AudienceSnapshotService audienceSnapshotService;
 
     @Autowired
     public TaggerHandler(AudienceBitmapStore audienceBitmapStore,
                          AudienceUserResolver audienceUserResolver,
-                         @Lazy CanvasExecutionService executionService) {
+                         @Lazy CanvasExecutionService executionService,
+                         AudienceSnapshotService audienceSnapshotService) {
         this.audienceBitmapStore = audienceBitmapStore;
         this.audienceUserResolver = audienceUserResolver;
         this.executionService = executionService;
+        this.audienceSnapshotService = audienceSnapshotService;
     }
 
     @Override
@@ -72,14 +79,20 @@ public class TaggerHandler implements NodeHandler {
         if (isScheduledBatchContext(ctx)) {
             return fanOutAudienceUsers(config, ctx, audienceId);
         }
-        boolean hit = audienceBitmapStore.isMember(audienceId, ctx.getUserId());
+        Long snapshotId = snapshotId(config, ctx);
+        boolean hit = snapshotId == null
+                ? audienceBitmapStore.isMember(audienceId, ctx.getUserId())
+                : audienceSnapshotService.contains(snapshotId, ctx.getUserId());
         String nextNodeId = hit
                 ? (String) config.get(MapFieldKeys.HIT_NEXT_NODE_ID)
                 : (String) config.get(MapFieldKeys.MISS_NEXT_NODE_ID);
-        return Mono.just(NodeResult.ok(nextNodeId, Map.of(
-                MapFieldKeys.AUDIENCE_HIT, hit,
-                MapFieldKeys.AUDIENCE_ID, audienceId
-        )));
+        Map<String, Object> output = new LinkedHashMap<>();
+        output.put(MapFieldKeys.AUDIENCE_HIT, hit);
+        output.put(MapFieldKeys.AUDIENCE_ID, audienceId);
+        if (snapshotId != null) {
+            output.put(AUDIENCE_SNAPSHOT_ID, snapshotId);
+        }
+        return Mono.just(NodeResult.ok(nextNodeId, output));
     }
 
     private Mono<NodeResult> fanOutAudienceUsers(Map<String, Object> config, ExecutionContext ctx, Long audienceId) {
@@ -87,19 +100,19 @@ public class TaggerHandler implements NodeHandler {
         if (nodeId.isBlank()) {
             return Mono.just(NodeResult.fail("TAGGER[audience]: 批处理缺少节点 ID"));
         }
-        return Mono.fromCallable(() -> audienceUserResolver.resolve(audienceId))
+        Long snapshotId = snapshotId(config, ctx);
+        return Mono.fromCallable(() -> resolveFanOutUsers(audienceId, snapshotId))
                 .subscribeOn(Schedulers.boundedElastic())
                 .flatMap(userIds -> {
                     if (userIds.isEmpty()) {
-                        return Mono.just(NodeResult.ok(null, Map.of(
-                                MapFieldKeys.AUDIENCE_ID, audienceId,
-                                "fanoutCount", 0
-                        )));
+                        return Mono.just(NodeResult.ok(null, audienceOutput(audienceId, snapshotId, 0)));
                     }
-                    Map<String, Object> payload = Map.of(
-                            MapFieldKeys.AUDIENCE_ID, audienceId,
-                            "scheduledBatchExecutionId", ctx.getExecutionId()
-                    );
+                    Map<String, Object> payload = new LinkedHashMap<>();
+                    payload.put(MapFieldKeys.AUDIENCE_ID, audienceId);
+                    payload.put("scheduledBatchExecutionId", ctx.getExecutionId());
+                    if (snapshotId != null) {
+                        payload.put(AUDIENCE_SNAPSHOT_ID, snapshotId);
+                    }
                     return Flux.fromIterable(userIds)
                             .flatMap(userId -> executionService.trigger(
                                     ctx.getCanvasId(),
@@ -111,11 +124,36 @@ public class TaggerHandler implements NodeHandler {
                                     UUID.randomUUID().toString(),
                                     false
                             ), 32)
-                            .then(Mono.just(NodeResult.ok(null, Map.of(
-                                    MapFieldKeys.AUDIENCE_ID, audienceId,
-                                    "fanoutCount", userIds.size()
-                            ))));
+                            .then(Mono.just(NodeResult.ok(null, audienceOutput(audienceId, snapshotId, userIds.size()))));
                 });
+    }
+
+    private List<String> resolveFanOutUsers(Long audienceId, Long snapshotId) {
+        if (snapshotId != null) {
+            return audienceSnapshotService.users(snapshotId);
+        }
+        return audienceUserResolver.resolve(audienceId);
+    }
+
+    private Map<String, Object> audienceOutput(Long audienceId, Long snapshotId, int fanoutCount) {
+        Map<String, Object> output = new LinkedHashMap<>();
+        output.put(MapFieldKeys.AUDIENCE_ID, audienceId);
+        output.put("fanoutCount", fanoutCount);
+        if (snapshotId != null) {
+            output.put(AUDIENCE_SNAPSHOT_ID, snapshotId);
+        }
+        return output;
+    }
+
+    private Long snapshotId(Map<String, Object> config, ExecutionContext ctx) {
+        Object fromPayload = ctx == null || ctx.getTriggerPayload() == null
+                ? null
+                : ctx.getTriggerPayload().get(AUDIENCE_SNAPSHOT_ID);
+        Object raw = fromPayload != null ? fromPayload : config.get(AUDIENCE_SNAPSHOT_ID);
+        if (raw == null || String.valueOf(raw).isBlank()) {
+            return null;
+        }
+        return Long.parseLong(String.valueOf(raw));
     }
 
     private boolean isScheduledBatchContext(ExecutionContext ctx) {

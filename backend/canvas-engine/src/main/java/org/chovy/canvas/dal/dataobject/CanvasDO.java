@@ -18,6 +18,10 @@ public class CanvasDO {
     /** 画布主键 ID */
     private Long id;
 
+    /** 所属租户 ID */
+    @TableField("tenant_id")
+    private Long tenantId;
+
     /** 画布名称 */
     private String name;
 
@@ -42,6 +46,18 @@ public class CanvasDO {
     /** 来源官方模板 key，用于启动导入幂等判断 */
     private String sourceTemplateKey;
 
+    /** 平铺项目分组 key，用于列表过滤和轻量归类。 */
+    private String projectKey;
+
+    /** 平铺项目展示名。 */
+    private String projectName;
+
+    /** 平铺文件夹分组 key。 */
+    private String folderKey;
+
+    /** 平铺文件夹展示名。 */
+    private String folderName;
+
     // ── 执行约束（V3）────────────────────────────────────────────────
 
     /** 画布有效期开始时间，null 表示不限制 */
@@ -63,6 +79,18 @@ public class CanvasDO {
     /** 单用户两次执行之间的冷却时间（秒），null 表示不限制 */
     @TableField(updateStrategy = FieldStrategy.ALWAYS)
     private Integer cooldownSeconds;
+
+    /** 控制组比例，0~50；0 表示不开启控制组留存 */
+    private Integer controlGroupPercent;
+
+    /** 控制组分桶盐值；为空时使用默认盐值 */
+    private String controlGroupSalt;
+
+    /** 归因转化事件编码；为空时该画布不参与转化归因 */
+    private String conversionEventCode;
+
+    /** 末次触达归因窗口天数 */
+    private Integer attributionWindowDays;
 
     /**
      * 画布全局最大触发总次数（所有用户合计，生命周期内），null 表示不限制。

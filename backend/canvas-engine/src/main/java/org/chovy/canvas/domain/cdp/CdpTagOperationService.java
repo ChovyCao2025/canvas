@@ -3,6 +3,8 @@ package org.chovy.canvas.domain.cdp;
 import lombok.RequiredArgsConstructor;
 import org.chovy.canvas.dto.cdp.CdpBatchTagReq;
 import org.chovy.canvas.dto.cdp.CdpTagWriteReq;
+import org.chovy.canvas.infrastructure.concurrent.ManagedVirtualThreadExecutor;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.util.Arrays;
@@ -26,6 +28,12 @@ public class CdpTagOperationService {
     private final CdpTagOperationMapper operationMapper;
     /** CDP 标签服务。 */
     private final CdpTagService tagService;
+    private ManagedVirtualThreadExecutor backgroundExecutor = ManagedVirtualThreadExecutor.direct();
+
+    @Autowired(required = false)
+    void setBackgroundExecutor(ManagedVirtualThreadExecutor backgroundExecutor) {
+        this.backgroundExecutor = backgroundExecutor;
+    }
 
     /** 创建新记录，并执行必要的唯一性、格式和默认值处理。 */
     public CdpTagOperationDO create(CdpBatchTagReq req) {
@@ -44,8 +52,8 @@ public class CdpTagOperationService {
         op.setCreatedBy(req.operator());
         operationMapper.insert(op);
 
-        // 批量打标可能耗时较长，创建操作记录后交给虚拟线程逐用户执行并回写统计。
-        Thread.ofVirtual().start(() -> run(op, userIds, req));
+        // 批量打标可能耗时较长，创建操作记录后交给托管虚拟线程逐用户执行并回写统计。
+        backgroundExecutor.submit("cdp-tag-operation-" + op.getId(), () -> run(op, userIds, req));
         return op;
     }
 

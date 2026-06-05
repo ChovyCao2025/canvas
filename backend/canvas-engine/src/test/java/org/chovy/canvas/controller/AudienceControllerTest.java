@@ -1,8 +1,15 @@
 package org.chovy.canvas.web;
 
+import org.chovy.canvas.common.tenant.RoleNames;
+import org.chovy.canvas.common.tenant.TenantContext;
+import org.chovy.canvas.common.tenant.TenantContextResolver;
+import org.chovy.canvas.common.tenant.TenantScopeSupport;
+import org.chovy.canvas.dal.dataobject.AsyncTaskDO;
+import org.chovy.canvas.dal.dataobject.AudienceDefinitionDO;
 import org.chovy.canvas.dal.mapper.AudienceDefinitionMapper;
 import org.chovy.canvas.dal.mapper.AudienceStatMapper;
 import org.chovy.canvas.domain.notification.NotificationService;
+import org.chovy.canvas.domain.task.AsyncTaskCreateResult;
 import org.chovy.canvas.domain.task.AsyncTaskService;
 import org.chovy.canvas.dto.audience.AudiencePreviewReq;
 import org.chovy.canvas.dto.audience.AudienceSourceFieldDTO;
@@ -11,10 +18,13 @@ import org.chovy.canvas.engine.audience.AudienceComputeTaskRunner;
 import org.chovy.canvas.engine.audience.AudienceSchedulerService;
 import org.chovy.canvas.engine.audience.CdpAudienceSourceService;
 import org.junit.jupiter.api.Test;
+import reactor.core.publisher.Mono;
 
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.timeout;
 import static org.mockito.Mockito.verify;
@@ -30,16 +40,20 @@ class AudienceControllerTest {
 
     @Test
     void computePassesPerfRunContextToComputeService() {
+        AudienceDefinitionMapper definitionMapper = mock(AudienceDefinitionMapper.class);
+        when(definitionMapper.selectOne(any())).thenReturn(audience(1L, "perf"));
         AudienceBatchComputeService computeService = mock(AudienceBatchComputeService.class);
         AudienceController controller = new AudienceController(
-                mock(AudienceDefinitionMapper.class),
+                definitionMapper,
                 mock(AudienceStatMapper.class),
                 computeService,
                 mock(AudienceSchedulerService.class),
                 mock(AsyncTaskService.class),
                 mock(AudienceComputeTaskRunner.class),
                 mock(NotificationService.class),
-                mock(CdpAudienceSourceService.class)
+                mock(CdpAudienceSourceService.class),
+                tenantContextResolver(),
+                new TenantScopeSupport()
         );
         AudienceController.ComputeReq req = new AudienceController.ComputeReq();
         req.setPerfRunId("perf_20260523_001");
@@ -79,6 +93,36 @@ class AudienceControllerTest {
         assertThat(response.getData().sampleUserIds()).containsExactly("u1", "u2");
     }
 
+    @Test
+    void createNormalizesBlankDefaultSnapshotModeToStaticLocked() {
+        AudienceBatchComputeService computeService = mock(AudienceBatchComputeService.class);
+        when(computeService.create(any(AudienceDefinitionDO.class))).thenAnswer(invocation -> {
+            AudienceDefinitionDO definition = invocation.getArgument(0);
+            definition.setId(88L);
+            return definition;
+        });
+        AudienceDefinitionDO body = new AudienceDefinitionDO();
+        body.setName("高价值人群");
+        body.setDefaultSnapshotMode("");
+        AudienceController controller = testController(computeService);
+
+        var response = controller.create(body).block();
+
+        assertThat(response.getData().getDefaultSnapshotMode()).isEqualTo("STATIC_LOCKED");
+        verify(computeService).create(any(AudienceDefinitionDO.class));
+    }
+
+    @Test
+    void createRejectsInvalidDefaultSnapshotMode() {
+        AudienceDefinitionDO body = new AudienceDefinitionDO();
+        body.setName("高价值人群");
+        body.setDefaultSnapshotMode("FLOATING");
+        AudienceController controller = testController(mock(AudienceBatchComputeService.class));
+
+        assertThatThrownBy(() -> controller.create(body).block())
+                .hasMessageContaining("Unsupported audienceSnapshotMode");
+    }
+
     private AudienceController controller(CdpAudienceSourceService cdpAudienceSourceService) {
         return new AudienceController(
                 mock(AudienceDefinitionMapper.class),
@@ -88,7 +132,45 @@ class AudienceControllerTest {
                 mock(AsyncTaskService.class),
                 mock(AudienceComputeTaskRunner.class),
                 mock(NotificationService.class),
-                cdpAudienceSourceService
+                cdpAudienceSourceService,
+                tenantContextResolver(),
+                new TenantScopeSupport()
         );
+    }
+
+    private AudienceController testController(AudienceBatchComputeService computeService) {
+        AsyncTaskDO task = new AsyncTaskDO();
+        task.setTaskId("task-audience-1");
+        task.setStatus("QUEUED");
+        AsyncTaskService taskService = mock(AsyncTaskService.class);
+        when(taskService.createOrReuseRunning(any(), any(), any(), any(), any()))
+                .thenReturn(new AsyncTaskCreateResult(task, true));
+        return new AudienceController(
+                mock(AudienceDefinitionMapper.class),
+                mock(AudienceStatMapper.class),
+                computeService,
+                mock(AudienceSchedulerService.class),
+                taskService,
+                mock(AudienceComputeTaskRunner.class),
+                mock(NotificationService.class),
+                mock(CdpAudienceSourceService.class),
+                tenantContextResolver(),
+                new TenantScopeSupport()
+        );
+    }
+
+    private TenantContextResolver tenantContextResolver() {
+        TenantContextResolver resolver = mock(TenantContextResolver.class);
+        when(resolver.currentOrError()).thenReturn(Mono.just(new TenantContext(7L, RoleNames.TENANT_ADMIN, "admin")));
+        return resolver;
+    }
+
+    private AudienceDefinitionDO audience(Long id, String name) {
+        AudienceDefinitionDO definition = new AudienceDefinitionDO();
+        definition.setId(id);
+        definition.setTenantId(7L);
+        definition.setName(name);
+        definition.setEnabled(1);
+        return definition;
     }
 }

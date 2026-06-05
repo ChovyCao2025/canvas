@@ -47,15 +47,15 @@ public class NotificationWebSocketHandler implements WebSocketHandler {
         if (ticket == null || ticket.isBlank()) {
             return session.close(CloseStatus.POLICY_VIOLATION);
         }
-        return Mono.fromCallable(() -> ticketService.consumeTicket(ticket))
+        return Mono.fromCallable(() -> ticketService.consumeTicketSubject(ticket))
                 .subscribeOn(Schedulers.boundedElastic())
-                .flatMap(userId -> {
-                    if (userId == null || userId.isBlank()) {
+                .flatMap(subject -> {
+                    if (subject == null || subject.userId() == null || subject.userId().isBlank()) {
                         return session.close(CloseStatus.POLICY_VIOLATION);
                     }
                     // ticket 校验通过后先同步初始快照，再注册增量实时通道，避免首屏漏消息。
-                    return initialPayload(userId)
-                            .flatMap(payload -> realtimeService.register(userId, session, payload));
+                    return initialPayload(subject)
+                            .flatMap(payload -> realtimeService.register(subject.tenantId(), subject.userId(), session, payload));
                 })
                 .onErrorResume(e -> {
                     log.warn("[NOTIFICATION_WS] 建立连接失败 sessionId={}: {}",
@@ -72,17 +72,17 @@ public class NotificationWebSocketHandler implements WebSocketHandler {
      * @param userId userId 对应的业务主键或标识
      * @return 异步执行结果，订阅后产生节点结果或业务响应
      */
-    private Mono<NotificationRealtimePayload> initialPayload(String userId) {
+    private Mono<NotificationRealtimePayload> initialPayload(NotificationWebSocketTicketService.TicketSubject subject) {
         return Mono.fromCallable(() -> {
                     // MyBatis 查询是阻塞 IO，放到 boundedElastic 避免占用 WebFlux 事件循环。
                     var notifications = notificationService
-                            .list(userId, false, null, false, 1, INITIAL_SYNC_SIZE)
+                            .list(subject.tenantId(), subject.userId(), false, null, false, 1, INITIAL_SYNC_SIZE)
                             .stream()
                             .map(NotificationDTO::from)
                             .toList();
                     return NotificationRealtimePayload.sync(
                             notifications,
-                            notificationService.unreadCount(userId));
+                            notificationService.unreadCount(subject.userId(), subject.tenantId()));
                 })
                 .subscribeOn(Schedulers.boundedElastic());
     }

@@ -5,7 +5,7 @@
  */
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { Alert, Button, Card, Form, Input, InputNumber, Select, Space, Switch, Typography, message } from 'antd'
+import { Alert, Button, Card, Form, Input, InputNumber, Radio, Select, Space, Switch, Typography, message } from 'antd'
 import { QueryBuilder, type RuleGroupType } from 'react-querybuilder'
 import { QueryBuilderAntD } from '@react-querybuilder/antd'
 import { audienceApi, type AudienceDataSourceType, type AudienceDefinition, type AudiencePreviewResp, type AudienceSourceField } from '../../services/audienceApi'
@@ -13,6 +13,7 @@ import { dataSourceConfigApi, type DataSourceConfig, type DataSourceTableMeta } 
 import { tagDefinitionApi } from '../../services/api'
 import { useSystemOptions } from '../../hooks/useSystemOptions'
 import { isCdpAudienceSource, toQueryBuilderFields } from './cdpAudienceFields'
+import { normalizeAudienceSnapshotMode, snapshotModeLabel } from './audienceSnapshotMode'
 import 'react-querybuilder/dist/query-builder.css'
 
 /** 页面标题组件别名。 */
@@ -284,6 +285,7 @@ export default function AudienceEditPage() {
       form.setFieldsValue({
         ...current,
         enabled: current.enabled === 1,
+        defaultSnapshotMode: normalizeAudienceSnapshotMode(current.defaultSnapshotMode),
         taggerConfig: { seedTagCode: config.seedTagCode },
         jdbcConfig: config,
       } as any)
@@ -314,6 +316,7 @@ export default function AudienceEditPage() {
         dataSourceType: values.dataSourceType,
         dataSourceConfig: JSON.stringify(config ?? {}),
         evaluationStrategy: values.evaluationStrategy,
+        defaultSnapshotMode: normalizeAudienceSnapshotMode(values.defaultSnapshotMode),
         cronExpression: values.cronExpression,
         enabled: values.enabled ? 1 : 0,
       }
@@ -362,6 +365,7 @@ export default function AudienceEditPage() {
           engineType: 'AVIATOR',
           dataSourceType: 'TAGGER_API',
           evaluationStrategy: 'OFFLINE_BATCH',
+          defaultSnapshotMode: normalizeAudienceSnapshotMode(),
           enabled: true,
           taggerConfig: { seedTagCode: undefined },
           jdbcConfig: { userIdColumn: 'user_id' },
@@ -376,6 +380,14 @@ export default function AudienceEditPage() {
           </Form.Item>
           <Form.Item name="enabled" label="启用状态" valuePropName="checked">
             <Switch checkedChildren="启用" unCheckedChildren="禁用" />
+          </Form.Item>
+          <Form.Item name="defaultSnapshotMode" label="默认发送人群">
+            <Radio.Group
+              options={[
+                { label: snapshotModeLabel('STATIC_LOCKED'), value: 'STATIC_LOCKED' },
+                { label: snapshotModeLabel('DYNAMIC_REFRESH'), value: 'DYNAMIC_REFRESH' },
+              ]}
+            />
           </Form.Item>
         </Card>
 

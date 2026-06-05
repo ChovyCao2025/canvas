@@ -8,6 +8,12 @@
 
 **Tech Stack:** Java 21, Spring Boot WebFlux controllers, MyBatis-Plus, Flyway SQL, Reactor `Mono`, React 18, Ant Design, Axios, Vitest, JUnit 5, Mockito, AssertJ.
 
+## Implementation Status
+
+- Status: implemented and focused-verified on 2026-06-05.
+- Actual migration: `backend/canvas-engine/src/main/resources/db/migration/V250__operator_visibility_and_testability.sql`; `V95` and `V249` were already occupied in the migration sequence.
+- Commit status: not committed in this session because the worktree contains many unrelated and parallel product-evolution changes that need scope confirmation before staging.
+
 ---
 
 ## Spec Reference
@@ -25,7 +31,7 @@
 - Modify: `backend/canvas-engine/src/main/java/org/chovy/canvas/dal/dataobject/MarketingConsentDO.java`
 - Modify: `backend/canvas-engine/src/main/java/org/chovy/canvas/dal/dataobject/MarketingSuppressionDO.java`
 - Modify: `backend/canvas-engine/src/main/java/org/chovy/canvas/dal/dataobject/CustomerChannelDO.java`
-- Create: `backend/canvas-engine/src/main/resources/db/migration/V95__operator_visibility_and_testability.sql`
+- Create: `backend/canvas-engine/src/main/resources/db/migration/V250__operator_visibility_and_testability.sql`
 
 **Frontend**
 - Create: `frontend/src/services/operatorApi.ts`
@@ -49,7 +55,7 @@
 - Modify: `backend/canvas-engine/src/main/java/org/chovy/canvas/web/CanvasExecutionRequestManagementController.java`
 - Modify: `backend/canvas-engine/src/main/java/org/chovy/canvas/web/DlqController.java`
 
-- [ ] **Step 1: Write execution request controller tests**
+- [x] **Step 1: Write execution request controller tests**
 
 Create `CanvasExecutionRequestManagementControllerTest`.
 
@@ -95,13 +101,17 @@ class CanvasExecutionRequestManagementControllerTest {
 }
 ```
 
-- [ ] **Step 2: Run execution request tests and confirm red state**
+- [x] **Step 2: Run execution request tests and confirm red state**
 
-Run: `cd backend && mvn -pl canvas-engine test -Dtest=CanvasExecutionRequestManagementControllerTest`
+Run:
+
+```bash
+cd backend && mvn -pl canvas-engine test -Dtest=CanvasExecutionRequestManagementControllerTest
+```
 
 Expected: FAIL because `list` currently uses the requested `size` directly and the test file is new.
 
-- [ ] **Step 3: Clamp list pagination**
+- [x] **Step 3: Clamp list pagination**
 
 In `CanvasExecutionRequestManagementController`, add a list page-size helper and use it in `list`.
 
@@ -119,7 +129,7 @@ Page<CanvasExecutionRequestDO> result = mapper.selectPage(
         new Page<>(Math.max(1, page), normalizePageSize(size)), wrapper);
 ```
 
-- [ ] **Step 4: Clamp DLQ pagination**
+- [x] **Step 4: Clamp DLQ pagination**
 
 In `DlqController.list`, apply the same page-size rule before constructing `Page`.
 
@@ -129,9 +139,13 @@ int safeSize = Math.max(1, Math.min(size, 100));
 Page<CanvasExecutionDlqDO> p = new Page<>(safePage, safeSize);
 ```
 
-- [ ] **Step 5: Run execution request tests**
+- [x] **Step 5: Run execution request tests**
 
-Run: `cd backend && mvn -pl canvas-engine test -Dtest=CanvasExecutionRequestManagementControllerTest`
+Run:
+
+```bash
+cd backend && mvn -pl canvas-engine test -Dtest=CanvasExecutionRequestManagementControllerTest
+```
 
 Expected: PASS; list page size is capped at 100 and batch replay limit is capped at 500.
 
@@ -140,9 +154,9 @@ Expected: PASS; list page size is capped at 100 and batch replay limit is capped
 **Files:**
 - Create: `backend/canvas-engine/src/test/java/org/chovy/canvas/controller/MessageSendRecordControllerTest.java`
 - Create: `backend/canvas-engine/src/main/java/org/chovy/canvas/web/MessageSendRecordController.java`
-- Create: `backend/canvas-engine/src/main/resources/db/migration/V95__operator_visibility_and_testability.sql`
+- Create: `backend/canvas-engine/src/main/resources/db/migration/V250__operator_visibility_and_testability.sql`
 
-- [ ] **Step 1: Write send-record controller tests**
+- [x] **Step 1: Write send-record controller tests**
 
 Create `MessageSendRecordControllerTest`.
 
@@ -179,15 +193,19 @@ class MessageSendRecordControllerTest {
 }
 ```
 
-- [ ] **Step 2: Run send-record tests and confirm red state**
+- [x] **Step 2: Run send-record tests and confirm red state**
 
-Run: `cd backend && mvn -pl canvas-engine test -Dtest=MessageSendRecordControllerTest`
+Run:
+
+```bash
+cd backend && mvn -pl canvas-engine test -Dtest=MessageSendRecordControllerTest
+```
 
 Expected: FAIL because `MessageSendRecordController` does not exist.
 
-- [ ] **Step 3: Add send-record indexes**
+- [x] **Step 3: Add send-record indexes**
 
-Create `V95__operator_visibility_and_testability.sql`.
+Create `V250__operator_visibility_and_testability.sql`.
 
 ```sql
 ALTER TABLE message_send_record
@@ -196,7 +214,7 @@ ALTER TABLE message_send_record
   ADD INDEX idx_message_send_execution_created (execution_id, created_at);
 ```
 
-- [ ] **Step 4: Implement `MessageSendRecordController`**
+- [x] **Step 4: Implement `MessageSendRecordController`**
 
 Create `backend/canvas-engine/src/main/java/org/chovy/canvas/web/MessageSendRecordController.java`.
 
@@ -252,9 +270,13 @@ public class MessageSendRecordController {
 }
 ```
 
-- [ ] **Step 5: Run send-record tests**
+- [x] **Step 5: Run send-record tests**
 
-Run: `cd backend && mvn -pl canvas-engine test -Dtest=MessageSendRecordControllerTest,FlywayConfigTest`
+Run:
+
+```bash
+cd backend && mvn -pl canvas-engine test -Dtest=MessageSendRecordControllerTest,FlywayConfigTest
+```
 
 Expected: PASS; the controller filters records and the migration version is valid.
 
@@ -267,7 +289,7 @@ Expected: PASS; the controller filters records and the migration version is vali
 - Modify: `backend/canvas-engine/src/main/java/org/chovy/canvas/dal/dataobject/MarketingSuppressionDO.java`
 - Modify: `backend/canvas-engine/src/main/java/org/chovy/canvas/dal/dataobject/CustomerChannelDO.java`
 
-- [ ] **Step 1: Write policy admin tests**
+- [x] **Step 1: Write policy admin tests**
 
 Create `MarketingPolicyAdminControllerTest`.
 
@@ -307,17 +329,21 @@ class MarketingPolicyAdminControllerTest {
 }
 ```
 
-- [ ] **Step 2: Run policy tests and confirm red state**
+- [x] **Step 2: Run policy tests and confirm red state**
 
-Run: `cd backend && mvn -pl canvas-engine test -Dtest=MarketingPolicyAdminControllerTest`
+Run:
+
+```bash
+cd backend && mvn -pl canvas-engine test -Dtest=MarketingPolicyAdminControllerTest
+```
 
 Expected: FAIL because `MarketingPolicyAdminController` does not exist.
 
-- [ ] **Step 3: Add explicit update strategy for nullable policy fields**
+- [x] **Step 3: Add explicit update strategy for nullable policy fields**
 
 In `MarketingSuppressionDO`, mark `expiresAt` and `channel` with `@TableField(updateStrategy = FieldStrategy.ALWAYS)` so admins can clear an expiry or switch to all-channel suppression. In `CustomerChannelDO`, mark `address` and `metadata` with the same update strategy so admins can clear stale values.
 
-- [ ] **Step 4: Implement policy admin controller**
+- [x] **Step 4: Implement policy admin controller**
 
 Create `MarketingPolicyAdminController` under `/canvas/policies`.
 
@@ -352,9 +378,13 @@ public class MarketingPolicyAdminController {
 
 For each upsert, query by `userId + normalized channel`, update when a record exists, and insert otherwise. Use `normalize(channel)` returning upper-case and defaulting blank suppression channel to `ALL`.
 
-- [ ] **Step 5: Run policy tests**
+- [x] **Step 5: Run policy tests**
 
-Run: `cd backend && mvn -pl canvas-engine test -Dtest=MarketingPolicyAdminControllerTest`
+Run:
+
+```bash
+cd backend && mvn -pl canvas-engine test -Dtest=MarketingPolicyAdminControllerTest
+```
 
 Expected: PASS; policy state and admin upserts normalize channels and statuses.
 
@@ -366,7 +396,7 @@ Expected: PASS; policy state and admin upserts normalize channels and statuses.
 - Create: `frontend/src/pages/canvas-stats/operatorTables.test.ts`
 - Modify: `frontend/src/pages/canvas-stats/index.tsx`
 
-- [ ] **Step 1: Write table helper tests**
+- [x] **Step 1: Write table helper tests**
 
 Create `operatorTables.test.ts`.
 
@@ -391,13 +421,17 @@ describe('operator table helpers', () => {
 })
 ```
 
-- [ ] **Step 2: Run table tests and confirm red state**
+- [x] **Step 2: Run table tests and confirm red state**
 
-Run: `cd frontend && npm test -- operatorTables.test.ts`
+Run:
+
+```bash
+cd frontend && npm test -- operatorTables.test.ts
+```
 
 Expected: FAIL because `operatorTables.ts` does not exist.
 
-- [ ] **Step 3: Implement operator table helpers**
+- [x] **Step 3: Implement operator table helpers**
 
 Create `operatorTables.ts`.
 
@@ -416,7 +450,7 @@ export function buildOperatorTableQuery(filters: Record<string, unknown>) {
 }
 ```
 
-- [ ] **Step 4: Add typed operator API wrappers**
+- [x] **Step 4: Add typed operator API wrappers**
 
 Create `frontend/src/services/operatorApi.ts`.
 
@@ -460,13 +494,17 @@ export const operatorApi = {
 }
 ```
 
-- [ ] **Step 5: Wire stats page operator tab**
+- [x] **Step 5: Wire stats page operator tab**
 
 In `canvas-stats/index.tsx`, add an "运营排查" section below existing stats. Use `operatorApi.executionRequests` and `operatorApi.messageSendRecords` with canvasId defaulted from route params. Use `OPERATION_COLUMN` for replay/detail buttons and block CSV export when `canExportSynchronously(total)` is false.
 
-- [ ] **Step 6: Run table tests**
+- [x] **Step 6: Run table tests**
 
-Run: `cd frontend && npm test -- operatorTables.test.ts`
+Run:
+
+```bash
+cd frontend && npm test -- operatorTables.test.ts
+```
 
 Expected: PASS.
 
@@ -478,7 +516,7 @@ Expected: PASS.
 - Modify: `frontend/src/components/canvas/ExecutionTracePanel.tsx`
 - Modify: `frontend/src/pages/canvas-editor/index.tsx`
 
-- [ ] **Step 1: Write dry-run visualization tests**
+- [x] **Step 1: Write dry-run visualization tests**
 
 Create `dryRunVisualization.test.ts`.
 
@@ -502,13 +540,17 @@ describe('dryRunVisualization helpers', () => {
 })
 ```
 
-- [ ] **Step 2: Run dry-run helper tests and confirm red state**
+- [x] **Step 2: Run dry-run helper tests and confirm red state**
 
-Run: `cd frontend && npm test -- dryRunVisualization.test.ts`
+Run:
+
+```bash
+cd frontend && npm test -- dryRunVisualization.test.ts
+```
 
 Expected: FAIL because `dryRunVisualization.ts` does not exist.
 
-- [ ] **Step 3: Implement dry-run helpers**
+- [x] **Step 3: Implement dry-run helpers**
 
 Create `dryRunVisualization.ts`.
 
@@ -539,17 +581,21 @@ export function buildDryRunSummary(traces: Array<Pick<TraceLike, 'status'>>) {
 }
 ```
 
-- [ ] **Step 4: Use helpers in `ExecutionTracePanel`**
+- [x] **Step 4: Use helpers in `ExecutionTracePanel`**
 
 Replace inline color-map construction with `buildTraceColorMap(data)` and export the status colors from one place. Keep the visual colors unchanged.
 
-- [ ] **Step 5: Add dry-run summary copy after test run**
+- [x] **Step 5: Add dry-run summary copy after test run**
 
 In `canvas-editor/index.tsx`, when dry-run returns an `executionId`, show a message that points to the trace panel and includes the execution id prefix. If the result contains an inline `traces` array, use `buildDryRunSummary` to show `成功/失败/跳过` counts.
 
-- [ ] **Step 6: Run dry-run tests**
+- [x] **Step 6: Run dry-run tests**
 
-Run: `cd frontend && npm test -- dryRunVisualization.test.ts`
+Run:
+
+```bash
+cd frontend && npm test -- dryRunVisualization.test.ts
+```
 
 Expected: PASS.
 
@@ -559,25 +605,37 @@ Expected: PASS.
 - Modify: `docs/product-evolution/specs/p1-002-operator-visibility-and-testability.md`
 - Modify: `docs/product-evolution/plans/p1-002-operator-visibility-and-testability-plan.md`
 
-- [ ] **Step 1: Run focused backend tests**
+- [x] **Step 1: Run focused backend tests**
 
-Run: `cd backend && mvn -pl canvas-engine test -Dtest=CanvasExecutionRequestManagementControllerTest,MessageSendRecordControllerTest,MarketingPolicyAdminControllerTest`
+Run:
+
+```bash
+cd backend && mvn -pl canvas-engine test -Dtest=CanvasExecutionRequestManagementControllerTest,MessageSendRecordControllerTest,MarketingPolicyAdminControllerTest
+```
 
 Expected: PASS for the P1-002 backend contracts.
 
-- [ ] **Step 2: Run focused frontend tests**
+- [x] **Step 2: Run focused frontend tests**
 
-Run: `cd frontend && npm test -- dryRunVisualization.test.ts operatorTables.test.ts`
+Run:
+
+```bash
+cd frontend && npm test -- dryRunVisualization.test.ts operatorTables.test.ts
+```
 
 Expected: PASS for the P1-002 frontend helpers.
 
 - [ ] **Step 3: Run module regressions**
 
-Run: `cd backend && mvn -pl canvas-engine test && cd ../frontend && npm test && npm run build`
+Run:
+
+```bash
+cd backend && mvn -pl canvas-engine test && cd ../frontend && npm test && npm run build
+```
 
 Expected: PASS for backend tests, frontend tests, and production build.
 
-- [ ] **Step 4: Add rollout notes to the implementation PR**
+- [x] **Step 4: Add rollout notes to the implementation PR**
 
 Use this checklist in the PR body.
 
@@ -589,8 +647,38 @@ Rollout notes:
 - Dry-run visualization uses existing trace status colors: running yellow, success green, failed red, skipped gray.
 ```
 
+### Verification Evidence
+
+- Focused backend suite plus Flyway migration policy:
+
+```bash
+cd backend && mvn -pl canvas-engine test -Dtest=CanvasExecutionRequestManagementControllerTest,MessageSendRecordControllerTest,MarketingPolicyAdminControllerTest,FlywayMigrationPolicyTest,FlywayConfigTest
+```
+
+Result: 10 tests, 0 failures, 0 errors, 0 skipped.
+
+- Focused frontend helper suite:
+
+```bash
+cd frontend && npm test -- dryRunVisualization.test.ts operatorTables.test.ts
+```
+
+Result: 2 test files, 5 tests passed.
+
+- Frontend production build:
+
+```bash
+cd frontend && npm run build
+```
+
+Result: passed.
+
 - [ ] **Step 5: Commit the implementation slice**
 
-Run: `git add backend/canvas-engine/src frontend/src docs/product-evolution/specs/p1-002-operator-visibility-and-testability.md docs/product-evolution/plans/p1-002-operator-visibility-and-testability-plan.md && git commit -m "feat: expose operator visibility tools"`
+Run:
+
+```bash
+git add backend/canvas-engine/src frontend/src docs/product-evolution/specs/p1-002-operator-visibility-and-testability.md docs/product-evolution/plans/p1-002-operator-visibility-and-testability-plan.md && git commit -m "feat: expose operator visibility tools"
+```
 
 Expected: commit contains only P1-002 operator visibility changes.

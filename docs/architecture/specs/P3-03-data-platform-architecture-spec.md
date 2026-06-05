@@ -6,7 +6,7 @@ Coverage matrix: `docs/architecture/todo/coverage-matrix.md`
 
 ## Verification Status
 
-Planning material. Current repository evidence confirms data governance and capacity prerequisites, but a full data platform requires product analytics, compliance, and operations decisions.
+Implemented as a data-platform proof-of-concept definition and governance package. Full data platform rollout remains deferred; the selected thin slice is audience compute history. Evidence and contracts are in `docs/architecture/evidence/p3-03-data-platform.md`, `docs/architecture/data-platform-source-inventory.md`, `docs/architecture/data-platform-poc-plan.md`, and `docs/architecture/data-platform-contract-governance.md`.
 
 ## Source Documents
 

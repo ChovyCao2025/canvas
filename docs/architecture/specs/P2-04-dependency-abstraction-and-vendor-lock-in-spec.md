@@ -7,7 +7,10 @@ Coverage matrix: `docs/architecture/todo/coverage-matrix.md`
 
 ## Verification Status
 
-Confirmed as an architecture risk; replacement urgency requires product/ops decision.
+Confirmed and partially remediated in repo-controlled code. Message publishing, replay rate
+limiting, Groovy execution, reach delivery HTTP calls, and React Flow graph helper reuse now have
+local contracts or adapter boundaries. Remaining direct usages are documented as `leave direct`,
+`adapter only`, or future migration candidates in `docs/architecture/dependencies/`.
 
 ## Problems Covered
 
@@ -27,3 +30,13 @@ Confirmed as an architecture risk; replacement urgency requires product/ops deci
 - Distributed lock and rate limiter usage go through local interfaces.
 - Expression engine contract exists before Groovy alternatives are evaluated.
 - Dependency abstraction work has migration tests and does not create unused indirection.
+
+## Implementation Artifacts
+
+- `docs/architecture/dependencies/dependency-inventory.md`
+- `docs/architecture/dependencies/vendor-alternatives.md`
+- `backend/canvas-engine/src/main/java/org/chovy/canvas/infrastructure/mq/CanvasMessageBus.java`
+- `backend/canvas-engine/src/main/java/org/chovy/canvas/infrastructure/redis/DistributedRateLimiter.java`
+- `backend/canvas-engine/src/main/java/org/chovy/canvas/engine/expression/ExpressionEngine.java`
+- `backend/canvas-engine/src/main/java/org/chovy/canvas/infrastructure/http/ExternalHttpClient.java`
+- `frontend/src/pages/canvas-editor/reactFlowAdapter.ts`

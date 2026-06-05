@@ -10,6 +10,15 @@
 
 ---
 
+## Implementation Status
+
+- Status: implemented and focused-verified on 2026-06-05.
+- Backend preview service, DTOs, and `/canvas/{id}/message-preview` endpoint are present and verified.
+- Frontend helper, API client method, and selected `SEND_MESSAGE` editor modal entry are implemented.
+- Commit: not created in this session.
+
+---
+
 ## Spec Reference
 
 - `docs/product-evolution/specs/p1-003d-safe-message-preview.md`
@@ -34,7 +43,7 @@
 - Create: `backend/canvas-engine/src/main/java/org/chovy/canvas/dto/canvas/MessagePreviewResp.java`
 - Create: `backend/canvas-engine/src/main/java/org/chovy/canvas/domain/canvas/CanvasMessagePreviewService.java`
 
-- [ ] **Step 1: Write preview service tests**
+- [x] **Step 1: Write preview service tests**
 
 Create `CanvasMessagePreviewServiceTest.java`:
 
@@ -91,7 +100,7 @@ class CanvasMessagePreviewServiceTest {
 }
 ```
 
-- [ ] **Step 2: Run preview tests and confirm red state**
+- [x] **Step 2: Run preview tests and confirm red state**
 
 Run:
 
@@ -101,7 +110,7 @@ cd backend && mvn -pl canvas-engine test -Dtest=CanvasMessagePreviewServiceTest
 
 Expected: FAIL because preview DTOs and service do not exist.
 
-- [ ] **Step 3: Add DTO records**
+- [x] **Step 3: Add DTO records**
 
 Create `MessagePreviewReq.java`:
 
@@ -138,7 +147,7 @@ public record MessagePreviewResp(
 }
 ```
 
-- [ ] **Step 4: Implement preview service**
+- [x] **Step 4: Implement preview service**
 
 Create `CanvasMessagePreviewService.java`:
 
@@ -184,7 +193,7 @@ public class CanvasMessagePreviewService {
 
 Add private helpers `parseGraph`, `findNode`, `copyResolved`, `resolveVariables`, `resolveTemplate`, and `string`. `resolveTemplate` replaces `$key` tokens with values from the supplied context and returns the original value when a key is absent.
 
-- [ ] **Step 5: Run preview service tests**
+- [x] **Step 5: Run preview service tests**
 
 Run:
 
@@ -202,7 +211,7 @@ Expected: PASS.
 - Create: `frontend/src/pages/canvas-editor/messagePreview.ts`
 - Create: `frontend/src/pages/canvas-editor/messagePreview.test.ts`
 
-- [ ] **Step 1: Add controller endpoint**
+- [x] **Step 1: Add controller endpoint**
 
 Inject service:
 
@@ -225,7 +234,7 @@ public Mono<R<MessagePreviewResp>> previewMessage(
 }
 ```
 
-- [ ] **Step 2: Add frontend helper test**
+- [x] **Step 2: Add frontend helper test**
 
 Create `messagePreview.test.ts`:
 
@@ -252,7 +261,7 @@ describe('message preview payload', () => {
 })
 ```
 
-- [ ] **Step 3: Add frontend helper and API method**
+- [x] **Step 3: Add frontend helper and API method**
 
 Create `messagePreview.ts`:
 
@@ -296,7 +305,7 @@ previewMessage: (id: number, body: {
 }) => http.post<R<MessagePreviewResp>, R<MessagePreviewResp>>(`/canvas/${id}/message-preview`, body),
 ```
 
-- [ ] **Step 4: Run helper test**
+- [x] **Step 4: Run helper test**
 
 Run:
 
@@ -311,7 +320,7 @@ Expected: PASS.
 **Files:**
 - Modify: `frontend/src/pages/canvas-editor/index.tsx`
 
-- [ ] **Step 1: Add editor modal state**
+- [x] **Step 1: Add editor modal state**
 
 Add state near existing editor side-panel state:
 
@@ -322,7 +331,7 @@ const [messagePreviewContext, setMessagePreviewContext] = useState('{}')
 const [messagePreviewResult, setMessagePreviewResult] = useState<MessagePreviewResp | null>(null)
 ```
 
-- [ ] **Step 2: Add preview action**
+- [x] **Step 2: Add preview action**
 
 Add handler:
 
@@ -340,7 +349,7 @@ const handleMessagePreview = async () => {
 }
 ```
 
-- [ ] **Step 3: Render button and modal**
+- [x] **Step 3: Render button and modal**
 
 Render the action only for the selected message node:
 
@@ -371,7 +380,7 @@ Render modal near existing editor modals:
 </Modal>
 ```
 
-- [ ] **Step 4: Run focused verification**
+- [x] **Step 4: Run focused verification**
 
 Run:
 
@@ -381,6 +390,32 @@ cd frontend && npm test -- messagePreview.test.ts
 ```
 
 Expected: PASS.
+
+### Verification Evidence
+
+- Backend preview service and controller suite:
+
+```bash
+cd backend && mvn -pl canvas-engine test -Dtest=CanvasMessagePreviewServiceTest,CanvasControllerOperatorLoopTest
+```
+
+Result: 6 tests, 0 failures, 0 errors, 0 skipped.
+
+- Frontend message preview helper suite:
+
+```bash
+cd frontend && npm test -- messagePreview.test.ts
+```
+
+Result: 1 test file, 2 tests passed.
+
+- Frontend production build:
+
+```bash
+cd frontend && npm run build
+```
+
+Result: TypeScript and Vite build passed.
 
 ### Task 4: Commit This Slice
 

@@ -10,6 +10,8 @@ import lombok.Builder;
  */
 @Builder
 public record NotificationCreateCommand(
+        /** 所属租户 ID。 */
+        Long tenantId,
         /** 通知接收用户 ID。 */
         String userId,
         /** 通知分类，如 TASK、APPROVAL 或 SYSTEM。 */

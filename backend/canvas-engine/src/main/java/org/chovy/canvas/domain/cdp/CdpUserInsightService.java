@@ -41,8 +41,16 @@ public class CdpUserInsightService {
 
     /** 聚合用户画像、标签和画布参与记录，形成用户洞察详情。 */
     public CanvasUserDetailDTO getUserInsight(String userId) {
-        CdpUserProfileDO profile = userService.getRequiredProfile(userId);
-        List<CanvasExecutionDO> executions = executionMapper.selectList(new LambdaQueryWrapper<CanvasExecutionDO>()
+        return buildUserInsight(null, userService.getRequiredProfile(userId));
+    }
+
+    /** 聚合指定租户内用户画像、标签和画布参与记录，形成用户洞察详情。 */
+    public CanvasUserDetailDTO getUserInsight(Long tenantId, String userId) {
+        return buildUserInsight(tenantId, userService.getRequiredProfile(tenantId, userId));
+    }
+
+    private CanvasUserDetailDTO buildUserInsight(Long tenantId, CdpUserProfileDO profile) {
+        List<CanvasExecutionDO> executions = executionMapper.selectList(executionQuery(tenantId)
                 .eq(CanvasExecutionDO::getUserId, profile.getUserId())
                 .isNotNull(CanvasExecutionDO::getCanvasId)
                 .orderByDesc(CanvasExecutionDO::getCreatedAt));
@@ -54,7 +62,7 @@ public class CdpUserInsightService {
         Set<Long> canvasIds = byCanvas.keySet();
         Map<Long, CanvasDO> canvasMap = canvasIds.isEmpty()
                 ? Map.of()
-                : canvasMapper.selectList(new LambdaQueryWrapper<CanvasDO>().in(CanvasDO::getId, canvasIds))
+                : canvasMapper.selectList(canvasQuery(tenantId).in(CanvasDO::getId, canvasIds))
                 .stream()
                 .collect(Collectors.toMap(CanvasDO::getId, item -> item));
 
@@ -66,7 +74,7 @@ public class CdpUserInsightService {
         return new CanvasUserDetailDTO(
                 profile.getUserId(),
                 userService.toDetail(profile),
-                tagService.listCurrentTags(profile.getUserId()),
+                tagService.listCurrentTags(tenantId, profile.getUserId()),
                 canvasRows
         );
     }
@@ -115,5 +123,21 @@ public class CdpUserInsightService {
             return "RUNNING";
         }
         return status == null ? "-" : String.valueOf(status);
+    }
+
+    private LambdaQueryWrapper<CanvasExecutionDO> executionQuery(Long tenantId) {
+        LambdaQueryWrapper<CanvasExecutionDO> query = new LambdaQueryWrapper<>();
+        if (tenantId != null) {
+            query.eq(CanvasExecutionDO::getTenantId, tenantId);
+        }
+        return query;
+    }
+
+    private LambdaQueryWrapper<CanvasDO> canvasQuery(Long tenantId) {
+        LambdaQueryWrapper<CanvasDO> query = new LambdaQueryWrapper<>();
+        if (tenantId != null) {
+            query.eq(CanvasDO::getTenantId, tenantId);
+        }
+        return query;
     }
 }

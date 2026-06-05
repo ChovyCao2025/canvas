@@ -1,9 +1,8 @@
 package org.chovy.canvas.engine.handlers;
 
-import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import org.chovy.canvas.common.MapFieldKeys;
 import org.chovy.canvas.dal.dataobject.CustomerPointsLedgerDO;
-import org.chovy.canvas.dal.mapper.CustomerPointsLedgerMapper;
+import org.chovy.canvas.domain.cdp.CustomerPointsLedgerService;
 import org.chovy.canvas.engine.context.ExecutionContext;
 import org.chovy.canvas.engine.handler.NodeHandler;
 import org.chovy.canvas.engine.handler.NodeResult;
@@ -24,18 +23,18 @@ import java.util.Map;
  */
 @Component("pointsOperationHandler")
 public class PointsOperationHandler implements NodeHandler {
-    /** 积分流水访问器，用于幂等记录积分发放或扣减。 */
-    private final CustomerPointsLedgerMapper ledgerMapper;
+    /** 积分流水服务，用于隔离 handler 与持久层细节。 */
+    private final CustomerPointsLedgerService ledgerService;
 
     /**
      * 构造 PointsOperationHandler 实例，并根据入参初始化依赖、配置或内部状态。
      *
      * <p>执行过程中会根据节点配置和上下文决定成功、失败或下一跳路由。
      *
-     * @param ledgerMapper ledgerMapper 方法执行所需的业务参数
+     * @param ledgerService 积分流水服务
      */
-    public PointsOperationHandler(CustomerPointsLedgerMapper ledgerMapper) {
-        this.ledgerMapper = ledgerMapper;
+    public PointsOperationHandler(CustomerPointsLedgerService ledgerService) {
+        this.ledgerService = ledgerService;
     }
 
     /**
@@ -57,9 +56,7 @@ public class PointsOperationHandler implements NodeHandler {
     private NodeResult executeBlocking(Map<String, Object> config, ExecutionContext ctx) {
         String idempotencyKey = string(config, "idempotencyKey",
                 ctx.getExecutionId() + ":" + string(config, "__nodeId", "points"));
-        CustomerPointsLedgerDO existing = ledgerMapper.selectOne(new LambdaQueryWrapper<CustomerPointsLedgerDO>()
-                .eq(CustomerPointsLedgerDO::getIdempotencyKey, idempotencyKey)
-                .last("LIMIT 1"));
+        CustomerPointsLedgerDO existing = ledgerService.findByIdempotencyKey(idempotencyKey);
         if (existing != null) {
             // 命中幂等流水时直接返回原流水 ID，避免重复发放或扣减积分。
             return NodeResult.ok(string(config, "nextNodeId", null),
@@ -79,7 +76,7 @@ public class PointsOperationHandler implements NodeHandler {
         }
         ledger.setCreatedAt(LocalDateTime.now());
         try {
-            ledgerMapper.insert(ledger);
+            ledgerService.insert(ledger);
         } catch (DuplicateKeyException e) {
             return NodeResult.ok(string(config, "nextNodeId", null),
                     Map.of(MapFieldKeys.DUPLICATE, true, "idempotent", true));
@@ -102,6 +99,24 @@ public class PointsOperationHandler implements NodeHandler {
     @Override
     public boolean isBenefitNode() {
         return true;
+    }
+
+    @Override
+    public boolean requiresSideEffectIdempotency(Map<String, Object> config, ExecutionContext ctx) {
+        return true;
+    }
+
+    @Override
+    public String sideEffectOperationKey(Map<String, Object> config, ExecutionContext ctx) {
+        Object explicit = config.get("idempotencyKey");
+        if (explicit != null && !explicit.toString().isBlank()) {
+            return explicit.toString();
+        }
+        return ctx.getUserId()
+                + ":points:"
+                + string(config, "operation", "GRANT")
+                + ":"
+                + number(config.get("points"), 0);
     }
 
     /**

@@ -2,12 +2,15 @@ package org.chovy.canvas.engine.scheduler;
 
 import org.chovy.canvas.dal.dataobject.CanvasExecutionTraceDO;
 import org.chovy.canvas.dal.mapper.CanvasExecutionTraceMapper;
+import org.chovy.canvas.infrastructure.doris.DorisStreamLoader;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 
@@ -33,6 +36,38 @@ class TraceWriteBufferTest {
         ArgumentCaptor<List<CanvasExecutionTraceDO>> captor = ArgumentCaptor.forClass(List.class);
         verify(mapper).insertBatch(captor.capture());
         assertThat(captor.getValue()).hasSize(2);
+        assertThat(buffer.pendingCount()).isZero();
+    }
+
+    @Test
+    void flushDualWritesToDorisWhenLoaderIsConfigured() {
+        CanvasExecutionTraceMapper mapper = mock(CanvasExecutionTraceMapper.class);
+        DorisStreamLoader dorisStreamLoader = mock(DorisStreamLoader.class);
+        TraceWriteBuffer buffer = new TraceWriteBuffer(mapper, dorisStreamLoader);
+
+        buffer.offer(trace("exec-2", "node-1"));
+
+        buffer.flush();
+
+        ArgumentCaptor<List<CanvasExecutionTraceDO>> captor = ArgumentCaptor.forClass(List.class);
+        verify(mapper).insertBatch(captor.capture());
+        verify(dorisStreamLoader).load(captor.getValue());
+        assertThat(buffer.pendingCount()).isZero();
+    }
+
+    @Test
+    void dorisFailureDoesNotBlockMysqlFallbackOrDrain() {
+        CanvasExecutionTraceMapper mapper = mock(CanvasExecutionTraceMapper.class);
+        DorisStreamLoader dorisStreamLoader = mock(DorisStreamLoader.class);
+        doThrow(new IllegalStateException("doris unavailable")).when(dorisStreamLoader).load(anyList());
+        TraceWriteBuffer buffer = new TraceWriteBuffer(mapper, dorisStreamLoader);
+
+        buffer.offer(trace("exec-3", "node-1"));
+
+        buffer.flush();
+
+        verify(mapper).insertBatch(anyList());
+        verify(dorisStreamLoader).load(anyList());
         assertThat(buffer.pendingCount()).isZero();
     }
 

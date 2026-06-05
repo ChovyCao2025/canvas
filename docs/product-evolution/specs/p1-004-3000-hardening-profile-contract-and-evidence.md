@@ -5,15 +5,19 @@ Sequence: 004
 Source: `docs/optimization/3000-concurrency-hardening-checklist.md`
 Implementation plan: `../plans/p1-004-3000-hardening-profile-contract-and-evidence-plan.md`
 
+## Implementation Status
+
+Implemented and focused-verified on 2026-06-05. The hardening profile contract now validates protected lane borrow rules, required 3000 failure-mode profiles, profile-level gates/actions, and can write an evidence manifest for a run.
+
 ## Goal
 
 Make 3000-concurrency hardening profiles machine-readable, complete, and able to produce an evidence manifest for each run.
 
 ## Current Baseline
 
-- `tools/perf/3000-hardening-profiles.json` already has target concurrency `3000` and lane budgets `600/1800/300/300`.
-- `tools/perf/hardening-profile.mjs` validates lane totals and renders a threshold runner command.
-- It does not validate protected lane borrow rules, required failure-mode profile names, profile stop gates, rollback actions, degradation actions, or evidence manifest output.
+- `tools/perf/3000-hardening-profiles.json` has target concurrency `3000`, lane budgets `600/1800/300/300`, protected lanes, borrow rules, required profile names, and per-profile gates/actions.
+- `tools/perf/hardening-profile.mjs` validates lane totals, protected lane borrow rules, required profiles, and profile stop/rollback/degrade actions.
+- The CLI renders a threshold runner command and can write `evidence-manifest.json` for a hardening run.
 
 ## In Scope
 

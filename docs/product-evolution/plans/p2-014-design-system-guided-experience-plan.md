@@ -2,11 +2,11 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Create design tokens, consistent empty states, onboarding tours, content style rules, accessible form patterns, motion guidelines, and reduced-motion support.
+**Goal:** Build the first guided-experience slice: design tokens, consistent empty-state copy, product guide step helpers, accessible form option lookup, and reduced-motion support.
 
-**Architecture:** Implement the capability as a thin vertical slice: failing tests first, then backend/domain contracts, then frontend service and route integration, then rollout documentation. Keep scope bounded to the spec and use additive migrations or feature flags for risky changes.
+**Architecture:** Reuse existing `SystemOptionService` for content style and accessible form option categories, with no schema migration in this slice. Keep frontend design primitives small and testable: CSS tokens, an `EmptyState` component with exported copy helpers, and a `ProductGuide` component with exported guide-step helpers.
 
-**Tech Stack:** Java 21, Spring Boot WebFlux style controllers currently returning Mono, MyBatis, Flyway, Redis/RocketMQ where needed, React 18, Vite, TypeScript, Ant Design, Vitest, JUnit 5, Mockito.
+**Tech Stack:** Java 21, JUnit 5, Mockito, AssertJ, React 18, TypeScript, Ant Design, Vitest, CSS custom properties.
 
 ---
 
@@ -18,129 +18,425 @@
 ## File Structure
 
 **Backend**
-- `backend/canvas-engine/src/main/java/org/chovy/canvas/domain/meta/SystemOptionService.java`
+- Modify: `backend/canvas-engine/src/main/java/org/chovy/canvas/domain/meta/SystemOptionService.java` - add design-system option grouping from existing system-option storage.
+- Modify: `backend/canvas-engine/src/test/java/org/chovy/canvas/domain/meta/SystemOptionServiceTest.java`
 
 **Frontend**
-- `frontend/src/design/tokens.css`
-- `frontend/src/components/empty/EmptyState.tsx`
-- `frontend/src/components/guides/ProductGuide.tsx`
+- Create: `frontend/src/design/tokens.css` - CSS custom properties and reduced-motion defaults.
+- Create: `frontend/src/components/empty/EmptyState.tsx` - unified empty state component and copy helper.
+- Create: `frontend/src/components/empty/EmptyState.test.tsx`
+- Create: `frontend/src/components/guides/ProductGuide.tsx` - guided tour wrapper and guide-step helpers.
+- Create: `frontend/src/components/guides/ProductGuide.test.tsx`
 
 **Data And Config**
-- No direct files expected for this layer in the first slice.
+- No Flyway migration for this slice. Design tokens are static CSS, and content/form guidance reads existing `system_option` rows through `SystemOptionService`.
 
-**Tests**
-- `backend/canvas-engine/src/test/java/org/chovy/canvas/domain/meta/SystemOptionServiceTest.java`
-- `frontend/src/components/empty/EmptyState.test.tsx`
-- `frontend/src/components/guides/ProductGuide.test.tsx`
-
-### Task 1: Contract And Failing Tests
+### Task 1: Design-System System Options
 
 **Files:**
+- Modify: `backend/canvas-engine/src/main/java/org/chovy/canvas/domain/meta/SystemOptionService.java`
 - Modify: `backend/canvas-engine/src/test/java/org/chovy/canvas/domain/meta/SystemOptionServiceTest.java`
+
+- [ ] **Step 1: Write backend tests**
+
+Append these tests to `backend/canvas-engine/src/test/java/org/chovy/canvas/domain/meta/SystemOptionServiceTest.java`:
+
+```java
+@Test
+void designSystemOptionsReturnsContentStyleAndFormPatterns() {
+    SystemOptionMapper mapper = mock(SystemOptionMapper.class);
+    SystemOptionDO tone = new SystemOptionDO();
+    tone.setCategory("content_style_rule");
+    tone.setOptionKey("concise");
+    tone.setLabel("Concise");
+    SystemOptionDO form = new SystemOptionDO();
+    form.setCategory("accessible_form_pattern");
+    form.setOptionKey("required_hint");
+    form.setLabel("Required hint");
+    when(mapper.selectList(any())).thenReturn(List.of(tone), List.of(form));
+    SystemOptionService service = new SystemOptionService(mapper);
+
+    SystemOptionService.DesignSystemOptions options = service.designSystemOptions(8L);
+
+    assertThat(options.contentStyleRules()).extracting(StubOption::getKey).containsExactly("concise");
+    assertThat(options.accessibleFormPatterns()).extracting(StubOption::getKey).containsExactly("required_hint");
+}
+
+@Test
+void designSystemOptionsRequiresTenantForTenantScopedLookup() {
+    SystemOptionMapper mapper = mock(SystemOptionMapper.class);
+    SystemOptionService service = new SystemOptionService(mapper);
+
+    assertThatThrownBy(() -> service.designSystemOptions(null))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessageContaining("tenantId is required for design system options");
+}
+```
+
+- [ ] **Step 2: Run backend tests and confirm red state**
+
+Run:
+
+```bash
+cd backend && mvn -pl canvas-engine test -Dtest=SystemOptionServiceTest
+```
+
+Expected: FAIL because `designSystemOptions` and `DesignSystemOptions` do not exist.
+
+- [ ] **Step 3: Implement design-system option grouping**
+
+Add this record and method to `backend/canvas-engine/src/main/java/org/chovy/canvas/domain/meta/SystemOptionService.java`:
+
+```java
+public DesignSystemOptions designSystemOptions(Long tenantId) {
+    if (tenantId == null) {
+        throw new IllegalArgumentException("tenantId is required for design system options");
+    }
+    return new DesignSystemOptions(
+            activeOptions("content_style_rule", tenantId),
+            activeOptions("accessible_form_pattern", tenantId),
+            activeOptions("motion_guideline", tenantId));
+}
+
+public record DesignSystemOptions(
+        List<StubOption> contentStyleRules,
+        List<StubOption> accessibleFormPatterns,
+        List<StubOption> motionGuidelines) {}
+```
+
+- [ ] **Step 4: Run backend tests**
+
+Run:
+
+```bash
+cd backend && mvn -pl canvas-engine test -Dtest=SystemOptionServiceTest
+```
+
+Expected: PASS.
+
+### Task 2: Design Tokens And Empty State
+
+**Files:**
+- Create: `frontend/src/design/tokens.css`
+- Create: `frontend/src/components/empty/EmptyState.tsx`
 - Create: `frontend/src/components/empty/EmptyState.test.tsx`
-- Read: `docs/product-evolution/specs/p2-014-design-system-guided-experience.md`
 
-- [ ] **Step 1: Write backend contract tests**
+- [ ] **Step 1: Write empty-state tests**
 
-Create or extend `backend/canvas-engine/src/test/java/org/chovy/canvas/domain/meta/SystemOptionServiceTest.java` with tests for authorization, tenant scoping, and the main success path named after `design-system-guided-experience`. Use existing controller or service tests in `backend/canvas-engine/src/test/java/org/chovy/canvas` as style references.
+Create `frontend/src/components/empty/EmptyState.test.tsx`:
 
-- [ ] **Step 2: Run backend contract tests and confirm red state**
+```ts
+import { describe, expect, it } from 'vitest'
+import {
+  buildEmptyStateCopy,
+  getEmptyStateTone,
+  shouldReduceMotion,
+} from './EmptyState'
 
-Run: `cd backend && mvn -pl canvas-engine test -Dtest=SystemOptionServiceTest`
+describe('EmptyState design primitive', () => {
+  it('builds consistent copy for permission, empty, and error states', () => {
+    expect(buildEmptyStateCopy('NO_DATA')).toEqual({
+      title: 'No data yet',
+      description: 'Create or adjust filters to populate this view.',
+    })
+    expect(buildEmptyStateCopy('NO_PERMISSION')).toEqual({
+      title: 'Permission required',
+      description: 'Ask an administrator for access to this workflow.',
+    })
+    expect(buildEmptyStateCopy('ERROR')).toEqual({
+      title: 'Unable to load',
+      description: 'Retry after checking the current filters and connection.',
+    })
+  })
 
-Expected: FAIL because the new route, service method, or behavior has not been implemented yet.
+  it('maps empty-state kinds to stable visual tones', () => {
+    expect(getEmptyStateTone('NO_DATA')).toBe('neutral')
+    expect(getEmptyStateTone('NO_PERMISSION')).toBe('warning')
+    expect(getEmptyStateTone('ERROR')).toBe('danger')
+  })
 
-- [ ] **Step 3: Write frontend workflow tests**
+  it('honors reduced-motion preference', () => {
+    expect(shouldReduceMotion(true)).toBe(true)
+    expect(shouldReduceMotion(false)).toBe(false)
+  })
+})
+```
 
-Create or extend `frontend/src/components/empty/EmptyState.test.tsx` with Vitest coverage for loading, empty, success, permission, and server-error states for the first UI slice.
+- [ ] **Step 2: Run empty-state tests and confirm red state**
 
-- [ ] **Step 4: Run frontend workflow tests and confirm red state**
+Run:
 
-Run: `cd frontend && npm test -- EmptyState.test.tsx`
+```bash
+cd frontend && npm test -- EmptyState.test.tsx
+```
 
-Expected: FAIL because the new page, component, service call, or state handling does not exist yet.
+Expected: FAIL because `EmptyState.tsx` does not exist.
 
-### Task 2: Backend And Data Slice
+- [ ] **Step 3: Add design tokens**
+
+Create `frontend/src/design/tokens.css`:
+
+```css
+:root {
+  --canvas-color-surface: #ffffff;
+  --canvas-color-surface-muted: #f6f8fb;
+  --canvas-color-text: #1f2937;
+  --canvas-color-text-muted: #667085;
+  --canvas-color-border: #d0d5dd;
+  --canvas-color-focus: #1677ff;
+  --canvas-space-sm: 8px;
+  --canvas-space-md: 16px;
+  --canvas-space-lg: 24px;
+  --canvas-radius-card: 8px;
+  --canvas-motion-fast: 120ms;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --canvas-motion-fast: 0ms;
+  }
+}
+```
+
+- [ ] **Step 4: Implement empty-state component**
+
+Create `frontend/src/components/empty/EmptyState.tsx`:
+
+```tsx
+import { Empty, Button, type ButtonProps } from 'antd'
+import '../../design/tokens.css'
+
+export type EmptyStateKind = 'NO_DATA' | 'NO_PERMISSION' | 'ERROR'
+export type EmptyStateTone = 'neutral' | 'warning' | 'danger'
+
+export interface EmptyStateCopy {
+  title: string
+  description: string
+}
+
+export function buildEmptyStateCopy(kind: EmptyStateKind): EmptyStateCopy {
+  if (kind === 'NO_PERMISSION') {
+    return {
+      title: 'Permission required',
+      description: 'Ask an administrator for access to this workflow.',
+    }
+  }
+  if (kind === 'ERROR') {
+    return {
+      title: 'Unable to load',
+      description: 'Retry after checking the current filters and connection.',
+    }
+  }
+  return {
+    title: 'No data yet',
+    description: 'Create or adjust filters to populate this view.',
+  }
+}
+
+export function getEmptyStateTone(kind: EmptyStateKind): EmptyStateTone {
+  if (kind === 'NO_PERMISSION') return 'warning'
+  if (kind === 'ERROR') return 'danger'
+  return 'neutral'
+}
+
+export function shouldReduceMotion(prefersReducedMotion: boolean): boolean {
+  return prefersReducedMotion
+}
+
+export function EmptyState({ kind, action }: { kind: EmptyStateKind; action?: ButtonProps & { label: string } }) {
+  const copy = buildEmptyStateCopy(kind)
+  return (
+    <div data-tone={getEmptyStateTone(kind)} style={{ padding: 'var(--canvas-space-lg)' }}>
+      <Empty description={copy.description}>
+        <strong>{copy.title}</strong>
+        {action ? <Button {...action}>{action.label}</Button> : null}
+      </Empty>
+    </div>
+  )
+}
+```
+
+- [ ] **Step 5: Run empty-state tests**
+
+Run:
+
+```bash
+cd frontend && npm test -- EmptyState.test.tsx
+```
+
+Expected: PASS.
+
+### Task 3: Product Guide Primitive
 
 **Files:**
-- `backend/canvas-engine/src/main/java/org/chovy/canvas/domain/meta/SystemOptionService.java`
-- Test: `backend/canvas-engine/src/test/java/org/chovy/canvas/domain/meta/SystemOptionServiceTest.java`
+- Create: `frontend/src/components/guides/ProductGuide.tsx`
+- Create: `frontend/src/components/guides/ProductGuide.test.tsx`
 
-- [ ] **Step 1: Add additive data structures when the spec requires storage**
+- [ ] **Step 1: Write product-guide tests**
 
-If this plan has a Flyway file, create it exactly at the data path listed above. Use additive tables, indexes, and nullable columns so rollout can be disabled without rollback data loss.
+Create `frontend/src/components/guides/ProductGuide.test.tsx`:
 
-- [ ] **Step 2: Implement the domain service**
+```ts
+import { describe, expect, it } from 'vitest'
+import {
+  buildGuideProgressLabel,
+  getNextGuideStep,
+  normalizeGuideSteps,
+} from './ProductGuide'
 
-Implement the service behavior in the backend files listed above. Keep business rules in the domain service and keep controllers thin.
+describe('ProductGuide helpers', () => {
+  it('normalizes guide steps by order and removes disabled steps', () => {
+    expect(normalizeGuideSteps([
+      { key: 'finish', title: 'Finish', order: 3, enabled: true },
+      { key: 'skip', title: 'Skip', order: 2, enabled: false },
+      { key: 'start', title: 'Start', order: 1, enabled: true },
+    ])).toEqual([
+      { key: 'start', title: 'Start', order: 1, enabled: true },
+      { key: 'finish', title: 'Finish', order: 3, enabled: true },
+    ])
+  })
 
-- [ ] **Step 3: Implement or extend the controller contract**
+  it('builds progress labels', () => {
+    expect(buildGuideProgressLabel(0, 3)).toBe('Step 1 of 3')
+  })
 
-Expose only the endpoints needed by the first workflow. Return `R<T>` or existing project response types consistently with nearby controllers.
+  it('returns the next step or undefined at the end', () => {
+    const steps = normalizeGuideSteps([
+      { key: 'start', title: 'Start', order: 1, enabled: true },
+      { key: 'finish', title: 'Finish', order: 2, enabled: true },
+    ])
+    expect(getNextGuideStep(steps, 'start')?.key).toBe('finish')
+    expect(getNextGuideStep(steps, 'finish')).toBeUndefined()
+  })
+})
+```
 
-- [ ] **Step 4: Run focused backend tests**
+- [ ] **Step 2: Run product-guide tests and confirm red state**
 
-Run: `cd backend && mvn -pl canvas-engine test -Dtest=SystemOptionServiceTest`
+Run:
 
-Expected: PASS for the new contract tests.
+```bash
+cd frontend && npm test -- ProductGuide.test.tsx
+```
 
-### Task 3: Frontend Slice
+Expected: FAIL because `ProductGuide.tsx` does not exist.
 
-**Files:**
-- `frontend/src/design/tokens.css`
-- `frontend/src/components/empty/EmptyState.tsx`
-- `frontend/src/components/guides/ProductGuide.tsx`
-- Test: `frontend/src/components/empty/EmptyState.test.tsx`
+- [ ] **Step 3: Implement product guide component**
 
-- [ ] **Step 1: Add the typed API wrapper**
+Create `frontend/src/components/guides/ProductGuide.tsx`:
 
-Implement the API wrapper in the service file listed above. Reuse `frontend/src/services/api.ts` and return typed request and response objects.
+```tsx
+import { Tour, type TourProps } from 'antd'
 
-- [ ] **Step 2: Add the route, page, panel, or component**
+export interface ProductGuideStep {
+  key: string
+  title: string
+  order: number
+  enabled: boolean
+  description?: string
+}
 
-Implement the first visible workflow in the frontend files listed above. Include loading, empty, error, permission, and success states.
+export function normalizeGuideSteps(steps: ProductGuideStep[]): ProductGuideStep[] {
+  return steps
+    .filter((step) => step.enabled)
+    .sort((left, right) => left.order - right.order)
+}
 
-- [ ] **Step 3: Wire navigation only where needed**
+export function buildGuideProgressLabel(currentIndex: number, total: number): string {
+  return `Step ${currentIndex + 1} of ${total}`
+}
 
-Add navigation entry points only if the feature needs a top-level route. Prefer contextual entry points for editor, analytics, or settings capabilities.
+export function getNextGuideStep(steps: ProductGuideStep[], currentKey: string): ProductGuideStep | undefined {
+  const currentIndex = steps.findIndex((step) => step.key === currentKey)
+  return currentIndex >= 0 ? steps[currentIndex + 1] : undefined
+}
 
-- [ ] **Step 4: Run focused frontend tests**
+export function ProductGuide({ steps, open, onClose }: { steps: ProductGuideStep[]; open: boolean; onClose: () => void }) {
+  const normalized = normalizeGuideSteps(steps)
+  const tourSteps: TourProps['steps'] = normalized.map((step, index) => ({
+    title: step.title,
+    description: `${buildGuideProgressLabel(index, normalized.length)}. ${step.description || ''}`.trim(),
+  }))
+  return <Tour open={open} steps={tourSteps} onClose={onClose} />
+}
+```
 
-Run: `cd frontend && npm test -- EmptyState.test.tsx`
+- [ ] **Step 4: Run product-guide tests**
 
-Expected: PASS for the new workflow tests.
+Run:
 
-### Task 4: Integration Verification And Rollout Notes
+```bash
+cd frontend && npm test -- ProductGuide.test.tsx
+```
+
+Expected: PASS.
+
+### Task 4: Verification, Rollout Notes, And Commit
 
 **Files:**
 - Modify: `docs/product-evolution/specs/p2-014-design-system-guided-experience.md`
 - Modify: `docs/product-evolution/plans/p2-014-design-system-guided-experience-plan.md`
-- Read: `docs/product-evolution/todo/INDEX.md`
 
-- [ ] **Step 1: Run backend regression slice**
+- [ ] **Step 1: Run focused backend verification**
 
-Run: `cd backend && mvn -pl canvas-engine test`
+Run:
 
-Expected: PASS for the canvas-engine module test suite.
+```bash
+cd backend && mvn -pl canvas-engine test -Dtest=SystemOptionServiceTest
+```
 
-- [ ] **Step 2: Run frontend regression slice**
+Expected: PASS.
 
-Run: `cd frontend && npm test -- --run`
+- [ ] **Step 2: Run focused frontend verification**
 
-Expected: PASS for the Vitest suite.
+Run:
 
-- [ ] **Step 3: Run frontend build**
+```bash
+cd frontend && npm test -- EmptyState.test.tsx ProductGuide.test.tsx
+```
 
-Run: `cd frontend && npm run build`
+Expected: PASS.
 
-Expected: PASS with TypeScript and Vite build success.
+- [ ] **Step 3: Run broad regression gates**
+
+Run:
+
+```bash
+(cd backend && mvn -pl canvas-engine test)
+(cd frontend && npm test -- --run)
+(cd frontend && npm run build)
+```
+
+Expected: PASS for backend module tests, Vitest, and Vite build.
 
 - [ ] **Step 4: Add rollout notes to the implementation PR**
 
-Document feature flag or route guard, migration order, tenant and role impact, manual verification steps, and rollback command or disable switch.
+Use this text in the PR:
 
-- [ ] **Step 5: Commit the implementation slice**
+```markdown
+Rollout notes:
+- Feature flag: enable new empty-state and product-guide components per route after visual smoke checks.
+- Migration: no Flyway migration in this slice; design tokens are CSS and backend options use existing `system_option` storage.
+- Tenant and role impact: content style and form pattern options are read with tenant-scoped `SystemOptionService.activeOptions`.
+- Manual verification: open an empty list, a permission-denied workflow, and one guided tour with reduced-motion enabled at OS level.
+- Rollback: remove component imports or route-level flags; no data rollback is required.
+```
 
-Run: `git add backend/canvas-engine/src frontend/src docs/product-evolution/specs docs/product-evolution/plans && git commit -m "feat: implement design-system-guided-experience slice"`
+- [ ] **Step 5: Commit this slice**
 
-Expected: commit contains only files required by this plan.
+Run:
+
+```bash
+git add backend/canvas-engine/src/main/java/org/chovy/canvas/domain/meta/SystemOptionService.java \
+  backend/canvas-engine/src/test/java/org/chovy/canvas/domain/meta/SystemOptionServiceTest.java \
+  frontend/src/design/tokens.css \
+  frontend/src/components/empty/EmptyState.tsx \
+  frontend/src/components/empty/EmptyState.test.tsx \
+  frontend/src/components/guides/ProductGuide.tsx \
+  frontend/src/components/guides/ProductGuide.test.tsx \
+  docs/product-evolution/specs/p2-014-design-system-guided-experience.md \
+  docs/product-evolution/plans/p2-014-design-system-guided-experience-plan.md
+git commit -m "feat: add design system guided experience plan"
+```
+
+Expected: commit contains only P2-014 implementation files and matching spec/plan documentation.

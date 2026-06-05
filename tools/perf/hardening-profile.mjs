@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-import { readFileSync } from 'node:fs'
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 
@@ -21,6 +21,40 @@ function nonEmptyString(label, value) {
   return value
 }
 
+function requireStringArray(label, value) {
+  if (
+    !Array.isArray(value) ||
+    value.length === 0 ||
+    value.some((item) => typeof item !== 'string' || item.trim() === '')
+  ) {
+    throw new Error(`${label} must be a non-empty string array`)
+  }
+  return value
+}
+
+function validateProtectedLaneRules(config) {
+  const protectedLanes = requireStringArray('protectedLanes', config.protectedLanes)
+  for (const lane of ['HEAVY', 'RETRY']) {
+    const blocked = config.borrowRules?.[lane]?.cannotBorrowFrom
+    requireStringArray(`${lane}.cannotBorrowFrom`, blocked)
+    for (const protectedLane of protectedLanes) {
+      if (!blocked.includes(protectedLane)) {
+        throw new Error(`${lane} must not borrow protected lane ${protectedLane}`)
+      }
+    }
+  }
+}
+
+function validateRequiredProfiles(config) {
+  const requiredProfiles = requireStringArray('requiredProfiles', config.requiredProfiles)
+  const names = new Set(config.profiles.map((profile) => profile.name))
+  for (const name of requiredProfiles) {
+    if (!names.has(name)) {
+      throw new Error(`missing required profile ${name}`)
+    }
+  }
+}
+
 export function validateHardeningProfiles(config) {
   positiveInteger('targetConcurrency', config.targetConcurrency)
   positiveInteger('observationWindowSeconds', config.observationWindowSeconds)
@@ -37,6 +71,8 @@ export function validateHardeningProfiles(config) {
   if (laneTotal !== config.targetConcurrency) {
     throw new Error(`lane total ${laneTotal} must equal targetConcurrency ${config.targetConcurrency}`)
   }
+
+  validateProtectedLaneRules(config)
 
   if (!Array.isArray(config.stopGates) || config.stopGates.length === 0) {
     throw new Error('stopGates must contain at least one gate')
@@ -74,7 +110,12 @@ export function validateHardeningProfiles(config) {
     if (!Number.isInteger(profile.waitAfterRunMs) || profile.waitAfterRunMs < 0) {
       throw new Error(`${profile.name}.waitAfterRunMs must be a non-negative integer`)
     }
+    requireStringArray(`${profile.name}.stopGates`, profile.stopGates)
+    requireStringArray(`${profile.name}.rollbackActions`, profile.rollbackActions)
+    requireStringArray(`${profile.name}.degradeActions`, profile.degradeActions)
   }
+
+  validateRequiredProfiles(config)
 
   return config
 }
@@ -119,6 +160,36 @@ export function renderThresholdCommand(profile, options = {}) {
   return args.join(' \\\n  ')
 }
 
+export function buildEvidenceManifest(config, profile, options = {}) {
+  const now = options.now || new Date().toISOString()
+  const runIdPrefix = options.runIdPrefix || `perf_${profile.name}`
+
+  return {
+    schemaVersion: 1,
+    generatedAt: now,
+    runIdPrefix,
+    profileName: profile.name,
+    targetConcurrency: config.targetConcurrency,
+    observationWindowSeconds: config.observationWindowSeconds,
+    lanes: config.lanes,
+    protectedLanes: config.protectedLanes,
+    borrowRules: config.borrowRules,
+    stopGates: profile.stopGates,
+    rollbackActions: profile.rollbackActions,
+    degradeActions: profile.degradeActions,
+    command: renderThresholdCommand(profile, options),
+    metricSampleFiles: [
+      'redis-latency.json',
+      'mysql-pool.json',
+      'rocketmq-backlog.json',
+      'retry-backlog.json',
+      'dlq-count.json',
+      'trace-buffer.json',
+      'downstream-latency.json',
+    ],
+  }
+}
+
 export function loadProfileFile(filePath = DEFAULT_PROFILE_FILE) {
   return validateHardeningProfiles(JSON.parse(readFileSync(filePath, 'utf8')))
 }
@@ -130,6 +201,7 @@ function parseCliArgs(argv) {
     baseUrl: 'http://localhost:8080',
     outDir: 'tmp/perf-3000-hardening',
     runIdPrefix: '',
+    writeEvidence: false,
   }
 
   for (let index = 0; index < argv.length; index += 2) {
@@ -143,6 +215,7 @@ function parseCliArgs(argv) {
     else if (flag === '--base-url') args.baseUrl = value
     else if (flag === '--out-dir') args.outDir = value
     else if (flag === '--run-id-prefix') args.runIdPrefix = value
+    else if (flag === '--write-evidence') args.writeEvidence = value === 'true'
     else throw new Error(`unknown flag ${flag}`)
   }
 
@@ -153,5 +226,12 @@ if (import.meta.url === pathToFileURL(process.argv[1]).href) {
   const args = parseCliArgs(process.argv.slice(2))
   const config = loadProfileFile(args.profileFile)
   const profile = selectProfile(config, args.profile)
-  console.log(renderThresholdCommand(profile, args))
+  const command = renderThresholdCommand(profile, args)
+  if (args.writeEvidence) {
+    const manifest = buildEvidenceManifest(config, profile, args)
+    const runDir = path.join(args.outDir, args.runIdPrefix || `perf_${profile.name}`)
+    mkdirSync(runDir, { recursive: true })
+    writeFileSync(path.join(runDir, 'evidence-manifest.json'), JSON.stringify(manifest, null, 2))
+  }
+  console.log(command)
 }

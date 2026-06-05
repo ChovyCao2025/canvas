@@ -35,6 +35,6 @@ Flattened priority-prefixed specs are available in [../specs/](../specs/README.m
 | P2 | [dependency-abstraction-and-vendor-lock-in](p2/dependency-abstraction-and-vendor-lock-in/spec.md) | confirmed risk |
 | P2 | [compliance-data-governance](p2/compliance-data-governance/spec.md) | partially confirmed |
 | P2 | [frontend-accessibility-and-quality](p2/frontend-accessibility-and-quality/spec.md) | partially confirmed |
-| P3 | [platform-evolution](p3/platform-evolution/spec.md) | planning material |
+| P3 | [platform-evolution](p3/platform-evolution/spec.md) | split into focused P3 decision packages; implementation gated |
 
 See [verification-summary.md](verification-summary.md) for the evidence summary and stale findings.

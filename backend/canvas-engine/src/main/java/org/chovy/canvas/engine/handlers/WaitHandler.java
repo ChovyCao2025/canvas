@@ -264,7 +264,9 @@ public class WaitHandler implements NodeHandler {
      * @return 方法执行后的业务结果
      */
     private NodeResult success(Map<String, Object> config) {
-        return NodeResult.ok(string(config, MapFieldKeys.NEXT_NODE_ID, null), Map.of(MapFieldKeys.WAIT_STATUS, MapFieldKeys.COMPLETED));
+        String nextNodeId = string(config, MapFieldKeys.NEXT_NODE_ID,
+                string(config, MapFieldKeys.SUCCESS_NODE_ID, null));
+        return NodeResult.ok(nextNodeId, Map.of(MapFieldKeys.WAIT_STATUS, MapFieldKeys.COMPLETED));
     }
 
     /**

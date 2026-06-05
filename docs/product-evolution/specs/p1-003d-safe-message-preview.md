@@ -5,6 +5,10 @@ Sequence: 003D
 Source: `todo/p1/mautic-inspired-quick-adoptions.md`
 Implementation plan: `../plans/p1-003d-safe-message-preview-plan.md`
 
+## Implementation Status
+
+Implemented and focused-verified on 2026-06-05. Verification evidence is recorded in `../plans/p1-003d-safe-message-preview-plan.md`.
+
 ## Goal
 
 Let operators preview `SEND_MESSAGE` node content for a selected user/context without sending, enqueueing, or writing send records.

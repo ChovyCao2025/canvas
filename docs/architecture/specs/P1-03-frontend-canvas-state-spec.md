@@ -11,16 +11,16 @@ Confirmed, but old "no global state anywhere" is too broad.
 
 ## Problems
 
-- `frontend/src/pages/canvas-editor/index.tsx` is 2084 lines.
+- `frontend/src/pages/canvas-editor/index.tsx` was 2037 lines at the start of this implementation pass and is 1581 lines after extracting graph, selection, history, publish/test/canary/version-history workflows, settings components, publish validation, API adapters, and graph serialization helpers.
 - Canvas editor state is heavily local: many `useState`, `useEffect`, refs, casts, and workflow concerns live in one page.
 - `any` remains common in the canvas editor and service layer.
 - Some context providers exist, so the accurate issue is not "zero global state"; it is missing structured canvas-editor state boundaries.
 
 ## Evidence
 
-- `frontend/src/pages/canvas-editor/index.tsx` line count: 2084.
-- Canvas editor local state starts around `index.tsx:284` and continues through workflow modals, history, settings, test execution, canary, and graph state.
-- `frontend/src/services/api.ts` has many `any` definitions.
+- `frontend/src/pages/canvas-editor/index.tsx` current line count: 1581.
+- Canvas editor state boundaries now include `useCanvasGraphState`, `useCanvasSelectionState`, `useCanvasHistoryState`, `useCanvasPublishWorkflow`, `useCanvasTestRunWorkflow`, `useCanvasCanaryWorkflow`, `useCanvasVersionHistoryWorkflow`, `CanvasWorkflowModals`, `CanvasVersionHistoryDrawer`, and `CanvasEditorSettingsPanel`.
+- High-risk production `any` casts in canvas editor/API files are removed; remaining typed casts are React Flow `Node.data` and DOM target boundary casts documented in evidence.
 - Existing contexts: `AuthContext`, `NotificationContext`, `CanvasActionsContext`.
 
 ## Acceptance Criteria

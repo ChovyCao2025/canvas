@@ -205,6 +205,45 @@ cd backend && mvn -pl canvas-engine test -Dtest=RealtimeAudienceSchemaTest,Audie
 
 Expected: PASS.
 
+### Task 5: Commit This Slice
+
+**Files:**
+- Modify: `backend/canvas-engine/src/main/resources/db/migration/V101__realtime_audiences_overlap_snapshots.sql`
+- Modify: `backend/canvas-engine/src/main/java/org/chovy/canvas/domain/cdp/RealtimeAudienceService.java`
+- Modify: `backend/canvas-engine/src/main/java/org/chovy/canvas/domain/cdp/AudienceBitmapStore.java`
+- Modify: `backend/canvas-engine/src/main/java/org/chovy/canvas/web/RealtimeAudienceController.java`
+- Modify: `backend/canvas-engine/src/test/java/org/chovy/canvas/domain/cdp/RealtimeAudienceSchemaTest.java`
+- Modify: `backend/canvas-engine/src/test/java/org/chovy/canvas/domain/cdp/AudienceBitmapStoreSetOpsTest.java`
+- Modify: `backend/canvas-engine/src/test/java/org/chovy/canvas/domain/cdp/RealtimeAudienceServiceTest.java`
+- Modify: `frontend/src/pages/realtime-audiences/realtimeAudiencePresentation.ts`
+- Modify: `frontend/src/pages/realtime-audiences/realtimeAudiencePresentation.test.ts`
+- Modify: `frontend/src/services/cdpApi.ts`
+- Modify: `docs/product-evolution/specs/p1-006c-realtime-audiences-overlap-and-snapshots.md`
+- Modify: `docs/product-evolution/plans/p1-006c-realtime-audiences-overlap-and-snapshots-plan.md`
+
+- [ ] **Step 1: Commit realtime audience slice**
+
+Run:
+
+```bash
+git add \
+  backend/canvas-engine/src/main/resources/db/migration/V101__realtime_audiences_overlap_snapshots.sql \
+  backend/canvas-engine/src/main/java/org/chovy/canvas/domain/cdp/RealtimeAudienceService.java \
+  backend/canvas-engine/src/main/java/org/chovy/canvas/domain/cdp/AudienceBitmapStore.java \
+  backend/canvas-engine/src/main/java/org/chovy/canvas/web/RealtimeAudienceController.java \
+  backend/canvas-engine/src/test/java/org/chovy/canvas/domain/cdp/RealtimeAudienceSchemaTest.java \
+  backend/canvas-engine/src/test/java/org/chovy/canvas/domain/cdp/AudienceBitmapStoreSetOpsTest.java \
+  backend/canvas-engine/src/test/java/org/chovy/canvas/domain/cdp/RealtimeAudienceServiceTest.java \
+  frontend/src/pages/realtime-audiences/realtimeAudiencePresentation.ts \
+  frontend/src/pages/realtime-audiences/realtimeAudiencePresentation.test.ts \
+  frontend/src/services/cdpApi.ts \
+  docs/product-evolution/specs/p1-006c-realtime-audiences-overlap-and-snapshots.md \
+  docs/product-evolution/plans/p1-006c-realtime-audiences-overlap-and-snapshots-plan.md
+git commit -m "feat: add realtime audiences and snapshots"
+```
+
+Expected: commit contains only realtime audience schema, bitmap set operations, service/API, frontend helpers, tests, spec, and plan.
+
 ### Task 2: Realtime Membership Service
 
 **Files:**

@@ -23,8 +23,11 @@ import org.chovy.canvas.engine.lane.ExecutionLane;
 import org.chovy.canvas.engine.lane.ExecutionLaneAdmissionResult;
 import org.chovy.canvas.engine.lane.ExecutionLaneResolver;
 import org.chovy.canvas.engine.scheduler.DagEngine;
+import org.chovy.canvas.engine.trigger.CanvasExecutionConfigLoader;
 import org.chovy.canvas.engine.trigger.CanvasExecutionService;
+import org.chovy.canvas.engine.trigger.ExecutionLaneDispatcher;
 import org.chovy.canvas.engine.trigger.InFlightExecutionRegistry;
+import org.chovy.canvas.engine.trigger.TriggerAdmissionService;
 import org.chovy.canvas.engine.trigger.TriggerPreCheckService;
 import org.chovy.canvas.engine.trigger.TriggerPriorityConfig;
 import org.chovy.canvas.infrastructure.cache.CanvasConfigCache;
@@ -168,30 +171,40 @@ class WaitResumeServiceTest {
                 .thenReturn(Mono.just(Map.of("resumed", true)));
         when(executionMapper.update(any(CanvasExecutionDO.class), any())).thenReturn(1);
 
-        CanvasExecutionService executionService = new CanvasExecutionService(
+        CanvasExecutionConfigLoader configLoaderForExecution = new CanvasExecutionConfigLoader(
                 mock(CanvasMapper.class),
                 mock(CanvasVersionMapper.class),
-                executionMapper,
                 configCache,
+                canvasEntityCache,
                 mock(DagParser.class),
+                mock(MqTriggerHandler.class));
+        TriggerAdmissionService admissionService = new TriggerAdmissionService(
+                ctxStore,
+                preCheckService,
+                executionRegistry,
+                new TriggerPriorityConfig(),
+                new ExecutionLaneResolver(),
+                mock(RocketMQTemplate.class),
+                new ObjectMapper(),
+                executionMapper,
+                mock(CanvasExecutionDlqMapper.class),
+                new Snowflake(1, 1));
+        CanvasExecutionService executionService = new CanvasExecutionService(
+                executionMapper,
+                configLoaderForExecution,
                 ctxStore,
                 dagEngine,
                 preCheckService,
                 executionRegistry,
                 mock(CanvasExecutionStatsMapper.class),
-                canvasEntityCache,
-                mock(MqTriggerHandler.class),
-                mock(CanvasExecutionDlqMapper.class),
-                new TriggerPriorityConfig(),
-                new ExecutionLaneResolver(),
+                admissionService,
                 new ExecutionLaneProperties(),
-                mock(RocketMQTemplate.class),
+                new ExecutionLaneDispatcher(executionRegistry, ctxStore),
                 new ObjectMapper(),
                 cdpUserService,
                 mock(CanvasDisruptorService.class),
                 mock(StringRedisTemplate.class),
-                mock(RedisKeyUtil.class),
-                new Snowflake(1, 1));
+                mock(RedisKeyUtil.class));
         ReflectionTestUtils.setField(executionService, "ctxTtlSec", 86_400L);
         ReflectionTestUtils.setField(executionService, "globalTimeoutSec", 600L);
         ReflectionTestUtils.setField(executionService, "globalMaxConcurrency", 3_000);

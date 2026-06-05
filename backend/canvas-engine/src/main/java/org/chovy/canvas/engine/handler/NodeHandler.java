@@ -1,5 +1,6 @@
 package org.chovy.canvas.engine.handler;
 
+import org.chovy.canvas.common.MapFieldKeys;
 import org.chovy.canvas.engine.context.ExecutionContext;
 import reactor.core.publisher.Mono;
 import java.util.Map;
@@ -34,6 +35,29 @@ public interface NodeHandler {
 
     /** 是否触达类节点（用于统计/审计聚合，默认 false）。 */
     default boolean isReachNode()   { return false; }
+
+    /** 是否需要 DAG 调度层统一包裹副作用幂等保护。 */
+    default boolean requiresSideEffectIdempotency(Map<String, Object> config, ExecutionContext ctx) {
+        return false;
+    }
+
+    /** 构建同一 execution/node 内区分具体外部操作的稳定 key。 */
+    default String sideEffectOperationKey(Map<String, Object> config, ExecutionContext ctx) {
+        Object explicit = config == null ? null : config.get(MapFieldKeys.IDEMPOTENCY_KEY);
+        if (explicit != null && !explicit.toString().isBlank()) {
+            return explicit.toString();
+        }
+        String userId = ctx == null || ctx.getUserId() == null ? "" : ctx.getUserId();
+        return userId + ":default";
+    }
+
+    /** 命中已完成副作用时，用缓存输出构造等价的成功结果。 */
+    default NodeResult completedSideEffectResult(Map<String, Object> config,
+                                                 ExecutionContext ctx,
+                                                 Map<String, Object> cachedOutput) {
+        Object nextNodeId = config == null ? null : config.get(MapFieldKeys.NEXT_NODE_ID);
+        return NodeResult.ok(nextNodeId == null ? null : nextNodeId.toString(), cachedOutput);
+    }
 
     // 这两个标记方法是“分类标签”，不影响节点执行语义本身。
 }

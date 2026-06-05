@@ -22,6 +22,9 @@ public class AudienceDefinitionDO {
     /** 人群定义主键 ID */
     private Long id;
 
+    @TableField("tenant_id")
+    private Long tenantId;
+
     /** 人群名称。 */
     private String name;
 
@@ -42,6 +45,9 @@ public class AudienceDefinitionDO {
 
     /** 计算策略：ONLINE | OFFLINE_BATCH | HYBRID。 */
     private String evaluationStrategy;
+
+    /** TAGGER 人群节点默认发送模式：STATIC_LOCKED | DYNAMIC_REFRESH。 */
+    private String defaultSnapshotMode;
 
     /** 离线批量计算 cron（evaluationStrategy=OFFLINE_BATCH 时使用）。 */
     private String cronExpression;

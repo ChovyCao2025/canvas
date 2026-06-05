@@ -6,7 +6,7 @@ Coverage matrix: `docs/architecture/todo/coverage-matrix.md`
 
 ## Verification Status
 
-Planning material. The current codebase still has confirmed monolith boundary issues in P1, while service decomposition itself requires product, team, and operations decisions.
+Implemented as a bounded-context and extraction-gate decision package. Physical extraction is deferred; Reach / Notification boundary hardening is the first modular-monolith slice. Evidence and active decisions are in `docs/architecture/evidence/p3-02-service-decomposition.md`, `docs/architecture/domain-map.md`, `docs/architecture/domain-contract-inventory.md`, and `docs/architecture/adr/ADR-0007-first-extraction-candidate.md`.
 
 ## Source Documents
 

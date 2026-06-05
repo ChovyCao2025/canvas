@@ -105,11 +105,17 @@ public class NotificationRealtimeService implements NotificationRealtimePublishe
 
     /** 注册用户 WebSocket 会话，并把初始通知快照推送到该连接。 */
     public Mono<Void> register(String userId, WebSocketSession session, NotificationRealtimePayload initialPayload) {
+        return register(null, userId, session, initialPayload);
+    }
+
+    /** 注册指定租户内用户 WebSocket 会话，并把初始通知快照推送到该连接。 */
+    public Mono<Void> register(Long tenantId, String userId, WebSocketSession session, NotificationRealtimePayload initialPayload) {
         String sessionId = session.getId();
+        String sessionKey = sessionKey(tenantId, userId);
         Sinks.Many<String> sink = Sinks.many().unicast().onBackpressureBuffer();
-        if (!registerSession(userId, sessionId, sink)) {
-            log.warn("[NOTIFICATION_WS] 拒绝连接 userId={} sessionId={} activeUser={} activeTotal={}",
-                    userId, sessionId, activeSessionCount(userId), totalActiveSessionCount());
+        if (!registerSession(sessionKey, sessionId, sink)) {
+            log.warn("[NOTIFICATION_WS] 拒绝连接 tenantId={} userId={} sessionId={} activeUser={} activeTotal={}",
+                    tenantId, userId, sessionId, activeSessionCount(tenantId, userId), totalActiveSessionCount());
             return session.close(CloseStatus.POLICY_VIOLATION);
         }
         // 一个用户可同时存在多个浏览器会话，按 sessionId 独立维护推送通道。
@@ -122,14 +128,20 @@ public class NotificationRealtimeService implements NotificationRealtimePublishe
                     }
                 })
                 .then()
-                .doFinally(signal -> unregister(userId, sessionId));
+                .doFinally(signal -> unregister(sessionKey, sessionId));
         return Mono.when(output, input)
-                .doFinally(signal -> unregister(userId, sessionId));
+                .doFinally(signal -> unregister(sessionKey, sessionId));
     }
 
     /** 发布实时通知到本机会话和跨实例 Redis 通道。 */
     @Override
     public void publish(String eventType, String userId, NotificationDO notification, Long unreadCount) {
+        publish(eventType, notification == null ? null : notification.getTenantId(), userId, notification, unreadCount);
+    }
+
+    /** 发布指定租户内用户实时通知到本机会话和跨实例 Redis 通道。 */
+    @Override
+    public void publish(String eventType, Long tenantId, String userId, NotificationDO notification, Long unreadCount) {
         if (userId == null || userId.isBlank()) {
             return;
         }
@@ -137,7 +149,7 @@ public class NotificationRealtimeService implements NotificationRealtimePublishe
                 eventType,
                 notification == null ? null : NotificationDTO.from(notification),
                 unreadCount);
-        NotificationRealtimeEnvelope envelope = new NotificationRealtimeEnvelope(originId, userId, payload);
+        NotificationRealtimeEnvelope envelope = new NotificationRealtimeEnvelope(originId, tenantId, userId, payload);
         deliverLocal(envelope);
         try {
             // 先本机投递再广播 Redis，当前实例即使 Redis 短暂不可用也能收到实时通知。
@@ -149,7 +161,12 @@ public class NotificationRealtimeService implements NotificationRealtimePublishe
 
     /** 返回指定用户当前活跃 WebSocket 会话数。 */
     public int activeSessionCount(String userId) {
-        Map<String, Sinks.Many<String>> sessions = sessionsByUser.get(userId);
+        return activeSessionCount(null, userId);
+    }
+
+    /** 返回指定租户内用户当前活跃 WebSocket 会话数。 */
+    public int activeSessionCount(Long tenantId, String userId) {
+        Map<String, Sinks.Many<String>> sessions = sessionsByUser.get(sessionKey(tenantId, userId));
         return sessions == null ? 0 : sessions.size();
     }
 
@@ -161,13 +178,13 @@ public class NotificationRealtimeService implements NotificationRealtimePublishe
     }
 
     /** 在连接数上限内注册会话；检查和写入必须保持原子性。 */
-    private boolean registerSession(String userId, String sessionId, Sinks.Many<String> sink) {
+    private boolean registerSession(String sessionKey, String sessionId, Sinks.Many<String> sink) {
         synchronized (sessionsByUser) {
-            if (activeSessionCount(userId) >= maxSessionsPerUser
+            if (activeSessionCountByKey(sessionKey) >= maxSessionsPerUser
                     || totalActiveSessionCount() >= maxTotalSessions) {
                 return false;
             }
-            sessionsByUser.computeIfAbsent(userId, ignored -> new ConcurrentHashMap<>())
+            sessionsByUser.computeIfAbsent(sessionKey, ignored -> new ConcurrentHashMap<>())
                     .put(sessionId, sink);
             return true;
         }
@@ -189,7 +206,7 @@ public class NotificationRealtimeService implements NotificationRealtimePublishe
 
     /** 将通知投递到本机当前用户的全部活跃 WebSocket 会话。 */
     private void deliverLocal(NotificationRealtimeEnvelope envelope) {
-        Map<String, Sinks.Many<String>> sessions = sessionsByUser.get(envelope.userId());
+        Map<String, Sinks.Many<String>> sessions = sessionsByUser.get(sessionKey(envelope.tenantId(), envelope.userId()));
         if (sessions == null || sessions.isEmpty()) {
             return;
         }
@@ -210,9 +227,9 @@ public class NotificationRealtimeService implements NotificationRealtimePublishe
     }
 
     /** 注销 WebSocket 会话并在用户无会话时清理本地映射。 */
-    private void unregister(String userId, String sessionId) {
+    private void unregister(String sessionKey, String sessionId) {
         synchronized (sessionsByUser) {
-            Map<String, Sinks.Many<String>> sessions = sessionsByUser.get(userId);
+            Map<String, Sinks.Many<String>> sessions = sessionsByUser.get(sessionKey);
             if (sessions == null) {
                 return;
             }
@@ -221,8 +238,17 @@ public class NotificationRealtimeService implements NotificationRealtimePublishe
                 sink.tryEmitComplete();
             }
             if (sessions.isEmpty()) {
-                sessionsByUser.remove(userId);
+                sessionsByUser.remove(sessionKey);
             }
         }
+    }
+
+    private int activeSessionCountByKey(String sessionKey) {
+        Map<String, Sinks.Many<String>> sessions = sessionsByUser.get(sessionKey);
+        return sessions == null ? 0 : sessions.size();
+    }
+
+    private String sessionKey(Long tenantId, String userId) {
+        return (tenantId == null ? "global" : tenantId) + ":" + userId;
     }
 }

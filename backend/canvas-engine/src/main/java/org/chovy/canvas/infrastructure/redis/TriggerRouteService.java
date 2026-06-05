@@ -19,6 +19,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
 import java.util.Set;
+import java.util.concurrent.locks.LockSupport;
 import java.util.stream.Collectors;
 
 /**
@@ -100,11 +101,7 @@ public class TriggerRouteService {
     /** 批量替换 MQ 触发路由表。 */
     public void replaceMqRoutes(Map<String, Set<String>> routes) {
         // 先在内存中清洗快照，保证持锁期间只做 Redis IO，降低锁占用时间。
-        Map<String, Set<String>> snapshot = routes.entrySet().stream()
-                .filter(entry -> entry.getKey() != null && !entry.getKey().isBlank())
-                .map(entry -> Map.entry(entry.getKey(), sanitizeCanvasIds(entry.getValue())))
-                .filter(entry -> !entry.getValue().isEmpty())
-                .collect(Collectors.toUnmodifiableMap(Map.Entry::getKey, Map.Entry::getValue));
+        Map<String, Set<String>> snapshot = sanitizeRouteMap(routes);
         withRouteMutationLock(() -> {
             // ready 标记先删除，消费者会把“路由未就绪”视为可重试异常，避免读到半重建状态。
             markRouteRebuilding();
@@ -119,10 +116,41 @@ public class TriggerRouteService {
                     if (!oldKeys.isEmpty()) {
                         operations.delete((Collection<K>) oldKeys);
                     }
-                    snapshot.forEach((topicKey, canvasIds) ->
-                            operations.opsForSet().add(
-                                    (K) keys.triggerMq(topicKey),
-                                    (V[]) canvasIds.toArray(String[]::new)));
+                    snapshot.forEach((topicKey, canvasIds) -> operations.opsForSet().add(
+                            (K) keys.triggerMq(topicKey),
+                            (V[]) canvasIds.toArray(String[]::new)));
+                    return operations.exec();
+                }
+            });
+            markRouteReady();
+        });
+    }
+
+    /** 批量替换全部 Redis 触发路由表。 */
+    public void replaceAllTriggerRoutes(TriggerRouteSnapshot routes) {
+        TriggerRouteSnapshot snapshot = sanitizeSnapshot(routes);
+        withRouteMutationLock(() -> {
+            // 冷恢复先下线 ready 标记，MQ 消费端会重试而不是读取半重建路由。
+            markRouteRebuilding();
+            List<String> oldKeys = scanAllRouteKeys();
+
+            redis.execute(new SessionCallback<List<Object>>() {
+                @Override
+                @SuppressWarnings("unchecked")
+                public <K, V> List<Object> execute(RedisOperations<K, V> operations) {
+                    operations.multi();
+                    if (!oldKeys.isEmpty()) {
+                        operations.delete((Collection<K>) oldKeys);
+                    }
+                    snapshot.mqRoutes().forEach((topicKey, canvasIds) -> operations.opsForSet().add(
+                            (K) keys.triggerMq(topicKey),
+                            (V[]) canvasIds.toArray(String[]::new)));
+                    snapshot.behaviorRoutes().forEach((eventCode, canvasIds) -> operations.opsForSet().add(
+                            (K) keys.triggerBehavior(eventCode),
+                            (V[]) canvasIds.toArray(String[]::new)));
+                    snapshot.taggerRoutes().forEach((tagCodeKey, canvasIds) -> operations.opsForSet().add(
+                            (K) keys.triggerTagger(tagCodeKey),
+                            (V[]) canvasIds.toArray(String[]::new)));
                     return operations.exec();
                 }
             });
@@ -185,12 +213,11 @@ public class TriggerRouteService {
             if (acquired) {
                 break;
             }
-            try {
-                // 短暂轮询等待发布/初始化中的路由变更完成，避免直接放大并发冲突。
-                Thread.sleep(50);
-            } catch (InterruptedException e) {
+            // 短暂轮询等待发布/初始化中的路由变更完成，避免直接放大并发冲突。
+            LockSupport.parkNanos(Duration.ofMillis(50).toNanos());
+            if (Thread.currentThread().isInterrupted()) {
                 Thread.currentThread().interrupt();
-                throw new IllegalStateException("Interrupted while waiting for route mutation lock", e);
+                throw new IllegalStateException("Interrupted while waiting for route mutation lock");
             }
         }
         if (!acquired) {
@@ -216,18 +243,56 @@ public class TriggerRouteService {
 
     /** 使用 SCAN 查找当前命名空间下全部 MQ 路由 key。 */
     private List<String> scanMqRouteKeys() {
+        return scanRouteKeys(keys.triggerMqPattern());
+    }
+
+    /** 使用 SCAN 查找当前命名空间下全部 Redis 触发路由 key。 */
+    private List<String> scanAllRouteKeys() {
+        List<String> result = new ArrayList<>();
+        result.addAll(scanRouteKeys(keys.triggerMqPattern()));
+        result.addAll(scanRouteKeys(keys.triggerBehaviorPattern()));
+        result.addAll(scanRouteKeys(keys.triggerTaggerPattern()));
+        return result.stream().distinct().toList();
+    }
+
+    /** 使用 SCAN 查找当前命名空间下指定模式的路由 key。 */
+    private List<String> scanRouteKeys(String pattern) {
         ScanOptions options = ScanOptions.scanOptions()
-                .match(keys.triggerMqPattern())
+                .match(pattern)
                 .count(1000)
                 .build();
         List<String> result = new ArrayList<>(1000);
         try (Cursor<String> cursor = redis.scan(options)) {
             while (cursor.hasNext()) {
-                // 使用 SCAN 渐进遍历当前命名空间 MQ 路由 key，避免 KEYS 阻塞 Redis。
+                // 使用 SCAN 渐进遍历当前命名空间路由 key，避免 KEYS 阻塞 Redis。
                 result.add(cursor.next());
             }
         }
         return result;
+    }
+
+    /** 清洗全部路由快照。 */
+    private TriggerRouteSnapshot sanitizeSnapshot(TriggerRouteSnapshot routes) {
+        if (routes == null) {
+            return new TriggerRouteSnapshot(Map.of(), Map.of(), Map.of());
+        }
+        return new TriggerRouteSnapshot(
+                sanitizeRouteMap(routes.mqRoutes()),
+                sanitizeRouteMap(routes.behaviorRoutes()),
+                sanitizeRouteMap(routes.taggerRoutes())
+        );
+    }
+
+    /** 清洗单类路由快照。 */
+    private Map<String, Set<String>> sanitizeRouteMap(Map<String, Set<String>> routes) {
+        if (routes == null || routes.isEmpty()) {
+            return Map.of();
+        }
+        return routes.entrySet().stream()
+                .filter(entry -> entry.getKey() != null && !entry.getKey().isBlank())
+                .map(entry -> Map.entry(entry.getKey().trim(), sanitizeCanvasIds(entry.getValue())))
+                .filter(entry -> !entry.getValue().isEmpty())
+                .collect(Collectors.toUnmodifiableMap(Map.Entry::getKey, Map.Entry::getValue));
     }
 
     /** 过滤空值、空白值和非正整数，得到可写入 Redis 的画布 ID 集合。 */
@@ -249,6 +314,19 @@ public class TriggerRouteService {
             return Long.parseLong(value) > 0;
         } catch (NumberFormatException e) {
             return false;
+        }
+    }
+
+    /** 全量触发路由快照，用于 Redis 冷恢复和手动路由重建。 */
+    public record TriggerRouteSnapshot(
+            Map<String, Set<String>> mqRoutes,
+            Map<String, Set<String>> behaviorRoutes,
+            Map<String, Set<String>> taggerRoutes
+    ) {
+        public TriggerRouteSnapshot {
+            mqRoutes = mqRoutes == null ? Map.of() : Map.copyOf(mqRoutes);
+            behaviorRoutes = behaviorRoutes == null ? Map.of() : Map.copyOf(behaviorRoutes);
+            taggerRoutes = taggerRoutes == null ? Map.of() : Map.copyOf(taggerRoutes);
         }
     }
 }

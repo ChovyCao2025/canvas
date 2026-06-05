@@ -1,6 +1,7 @@
 package org.chovy.canvas.dal.dataobject;
 
 import com.baomidou.mybatisplus.annotation.FieldFill;
+import com.baomidou.mybatisplus.annotation.FieldStrategy;
 import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
@@ -22,10 +23,14 @@ public class MarketingSuppressionDO {
     /** 营销抑制记录主键 ID */
     private Long id;
 
+    @TableField("tenant_id")
+    private Long tenantId;
+
     /** 业务用户 ID */
     private String userId;
 
     /** 被抑制的渠道，如 SMS、EMAIL、PUSH、WECHAT */
+    @TableField(updateStrategy = FieldStrategy.ALWAYS)
     private String channel;
 
     /** 抑制原因，如退订、投诉、风控或静默策略 */
@@ -35,6 +40,7 @@ public class MarketingSuppressionDO {
     private Integer active;
 
     /** 抑制过期时间，null 表示长期抑制 */
+    @TableField(updateStrategy = FieldStrategy.ALWAYS)
     private LocalDateTime expiresAt;
 
     @TableField(fill = FieldFill.INSERT)

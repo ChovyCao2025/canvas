@@ -6,7 +6,7 @@ Coverage matrix: `docs/architecture/todo/coverage-matrix.md`
 
 ## Verification Status
 
-Planning material with confirmed prerequisites. Current data security and tenant isolation issues remain P0; physical datasource isolation is a later platform evolution.
+Implemented as datasource ownership, transaction-boundary, and migration planning artifacts. Physical datasource isolation remains blocked until tenant/data-security and reconciliation gates pass. Evidence and maps are in `docs/architecture/evidence/p3-04-multi-datasource-isolation.md`, `docs/architecture/datasource-ownership-map.md`, `docs/architecture/datasource-transaction-boundary-map.md`, and `docs/architecture/datasource-migration-plan.md`.
 
 ## Source Documents
 

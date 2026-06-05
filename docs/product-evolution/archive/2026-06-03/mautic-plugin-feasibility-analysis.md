@@ -153,4 +153,4 @@
 ## 六、附录：相关文档
 
 - [Canvas 官方插件候选清单](plugin-candidate-list.md)
-- [Canvas 插件体系技术设计](./plugin-technical-design.md)
+- [Canvas 插件体系技术设计](../../specs/p2-002-plugin-and-integration-foundations.md)

@@ -7,6 +7,7 @@ import org.chovy.canvas.dal.dataobject.CanvasExecutionRequestDO;
 import org.chovy.canvas.dal.mapper.CanvasExecutionRequestMapper;
 import org.chovy.canvas.engine.scheduler.CanvasMetrics;
 import org.chovy.canvas.engine.trigger.CanvasExecutionService;
+import org.chovy.canvas.infrastructure.reactor.TrackedReactiveTaskRegistry;
 import org.chovy.canvas.perf.PerfRunContext;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
@@ -49,6 +50,8 @@ public class CanvasExecutionRequestExecutor {
     private final long maxRetryDelayMs;
     /** RUNNING 请求心跳刷新间隔毫秒数。 */
     private final long heartbeatIntervalMs;
+    /** 跟踪执行请求心跳任务，确保执行结束或关闭时可释放。 */
+    private final TrackedReactiveTaskRegistry reactiveTaskRegistry;
 
     /**
      * 构造 CanvasExecutionRequestExecutor 实例，并根据入参初始化依赖、配置或内部状态。
@@ -62,7 +65,8 @@ public class CanvasExecutionRequestExecutor {
     public CanvasExecutionRequestExecutor(CanvasExecutionRequestMapper mapper,
                                           CanvasExecutionService executionService,
                                           ObjectMapper objectMapper) {
-        this(mapper, executionService, objectMapper, null, 5_000L, 5, 300L, 60_000L, 60_000L);
+        this(mapper, executionService, objectMapper, null, 5_000L, 5, 300L, 60_000L, 60_000L,
+                TrackedReactiveTaskRegistry.direct());
     }
 
     /**
@@ -83,7 +87,8 @@ public class CanvasExecutionRequestExecutor {
                                           long retryDelayMs,
                                           int maxAttempts,
                                           long runningStaleSeconds) {
-        this(mapper, executionService, objectMapper, null, retryDelayMs, maxAttempts, runningStaleSeconds, 60_000L, 60_000L);
+        this(mapper, executionService, objectMapper, null, retryDelayMs, maxAttempts, runningStaleSeconds,
+                60_000L, 60_000L, TrackedReactiveTaskRegistry.direct());
     }
 
     @Autowired
@@ -95,7 +100,8 @@ public class CanvasExecutionRequestExecutor {
                                           @Value("${canvas.execution-request.max-attempts:5}") int maxAttempts,
                                           @Value("${canvas.execution-request.running-stale-sec:300}") long runningStaleSeconds,
                                           @Value("${canvas.execution-request.max-retry-delay-ms:60000}") long maxRetryDelayMs,
-                                          @Value("${canvas.execution-request.heartbeat-interval-ms:60000}") long heartbeatIntervalMs) {
+                                          @Value("${canvas.execution-request.heartbeat-interval-ms:60000}") long heartbeatIntervalMs,
+                                          TrackedReactiveTaskRegistry reactiveTaskRegistry) {
         this.mapper = mapper;
         this.executionService = executionService;
         this.objectMapper = objectMapper;
@@ -105,6 +111,7 @@ public class CanvasExecutionRequestExecutor {
         this.runningStaleSeconds = runningStaleSeconds;
         this.maxRetryDelayMs = maxRetryDelayMs;
         this.heartbeatIntervalMs = heartbeatIntervalMs;
+        this.reactiveTaskRegistry = reactiveTaskRegistry;
     }
 
     /**
@@ -130,7 +137,7 @@ public class CanvasExecutionRequestExecutor {
                                           long runningStaleSeconds,
                                           long maxRetryDelayMs) {
         this(mapper, executionService, objectMapper, metrics, retryDelayMs, maxAttempts,
-                runningStaleSeconds, maxRetryDelayMs, 60_000L);
+                runningStaleSeconds, maxRetryDelayMs, 60_000L, TrackedReactiveTaskRegistry.direct());
     }
 
     /**
@@ -279,12 +286,15 @@ public class CanvasExecutionRequestExecutor {
     private Disposable startHeartbeat(String requestId, String runToken) {
         long intervalMs = Math.max(1L, heartbeatIntervalMs);
         // 心跳只负责刷新 RUNNING 时间戳，供调度器识别健康执行中的请求。
-        return Flux.interval(Duration.ofMillis(intervalMs))
-                .flatMap(ignored -> Mono.fromCallable(() ->
-                                mapper.touchRunning(requestId, LocalDateTime.now(), runToken))
-                        .subscribeOn(Schedulers.boundedElastic())
-                        .onErrorResume(e -> Mono.empty()))
-                .subscribe();
+        return reactiveTaskRegistry.submit(
+                "execution-request-heartbeat-" + requestId,
+                Flux.interval(Duration.ofMillis(intervalMs))
+                        .flatMap(ignored -> Mono.fromCallable(() ->
+                                        mapper.touchRunning(requestId, LocalDateTime.now(), runToken))
+                                .subscribeOn(Schedulers.boundedElastic())
+                                .onErrorResume(e -> Mono.empty())),
+                e -> {
+                });
     }
 
     /**

@@ -21,6 +21,10 @@ public class DataSourceConfigDO {
     /** 数据源配置主键 ID */
     private Long id;
 
+    @TableField("tenant_id")
+    /** 所属租户 ID。 */
+    private Long tenantId;
+
     /** 配置名称，供业务配置页下拉选择。 */
     private String name;
 

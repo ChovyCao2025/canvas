@@ -3,9 +3,10 @@ package org.chovy.canvas.engine.handlers;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import org.chovy.canvas.dal.dataobject.MqMessageDefinitionDO;
 import org.chovy.canvas.dal.mapper.MqMessageDefinitionMapper;
+import org.chovy.canvas.domain.meta.MqMessageDefinitionService;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -27,8 +28,12 @@ class MqTriggerHandlerTest {
     @Mock
     MqMessageDefinitionMapper mqMapper;
 
-    @InjectMocks
     MqTriggerHandler handler;
+
+    @BeforeEach
+    void setUp() {
+        handler = new MqTriggerHandler(new MqMessageDefinitionService(mqMapper));
+    }
 
     @Test
     void resolveTopic_from_messageCodeKey() {

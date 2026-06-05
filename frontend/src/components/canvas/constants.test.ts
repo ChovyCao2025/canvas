@@ -7,6 +7,10 @@ describe('canvas node display constants', () => {
     expect(DEFAULT_NAMES.DIRECT_CALL).toBe('API入口')
   })
 
+  it('labels AI_LLM as the AI smart node shown to users', () => {
+    expect(DEFAULT_NAMES.AI_LLM).toBe('AI 智能节点')
+  })
+
   it('uses only governed publishable entry nodes', () => {
     expect([...PUBLISH_TRIGGER_NODE_TYPES].sort()).toEqual([
       'DIRECT_CALL',
@@ -19,6 +23,7 @@ describe('canvas node display constants', () => {
   it('exposes only governed default node names', () => {
     expect(Object.keys(DEFAULT_NAMES).sort()).toEqual([
       'AGGREGATE',
+      'AI_LLM',
       'API_CALL',
       'COMMIT_ACTION',
       'DIRECT_CALL',
@@ -44,6 +49,7 @@ describe('canvas node display constants', () => {
   it('uses governed product categories', () => {
     expect(Object.keys(CATEGORY_COLORS).sort()).toEqual([
       '入口触发',
+      'AI智能',
       '动作执行',
       '基础控制',
       '数据与权益',

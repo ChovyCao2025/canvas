@@ -10,6 +10,15 @@
 
 ---
 
+## Implementation Status
+
+- Status: implemented and focused-verified on 2026-06-05.
+- Runtime TAGGER now uses `AudienceSnapshotService.users(snapshotId)` for scheduled static fan-out and `AudienceSnapshotService.contains(snapshotId, userId)` for realtime static membership.
+- Dynamic fan-out and realtime membership keep the existing `AudienceUserResolver` and `AudienceBitmapStore` behavior when no `audienceSnapshotId` is present.
+- Commit: not created in this session.
+
+---
+
 ## Spec Reference
 
 - `docs/product-evolution/specs/p1-003c-tagger-audience-runtime-snapshot-branching.md`
@@ -27,7 +36,7 @@
 - Modify: `backend/canvas-engine/src/main/java/org/chovy/canvas/engine/audience/AudienceSnapshotService.java`
 - Modify: `backend/canvas-engine/src/test/java/org/chovy/canvas/domain/audience/AudienceSnapshotServiceTest.java`
 
-- [ ] **Step 1: Add snapshot read tests**
+- [x] **Step 1: Add snapshot read tests**
 
 Add to `AudienceSnapshotServiceTest`:
 
@@ -58,7 +67,7 @@ void usersRejectsMissingSnapshot() {
 }
 ```
 
-- [ ] **Step 2: Run tests and confirm red state**
+- [x] **Step 2: Run tests and confirm red state**
 
 Run:
 
@@ -68,7 +77,7 @@ cd backend && mvn -pl canvas-engine test -Dtest=AudienceSnapshotServiceTest
 
 Expected: FAIL because `users` and `contains` are missing.
 
-- [ ] **Step 3: Implement read methods**
+- [x] **Step 3: Implement read methods**
 
 Add to `AudienceSnapshotService`:
 
@@ -90,7 +99,7 @@ public boolean contains(Long snapshotId, String userId) {
 }
 ```
 
-- [ ] **Step 4: Run snapshot service tests**
+- [x] **Step 4: Run snapshot service tests**
 
 Run:
 
@@ -106,7 +115,7 @@ Expected: PASS.
 - Modify: `backend/canvas-engine/src/test/java/org/chovy/canvas/engine/handlers/TaggerHandlerTest.java`
 - Modify: `backend/canvas-engine/src/main/java/org/chovy/canvas/engine/handlers/TaggerHandler.java`
 
-- [ ] **Step 1: Add TAGGER runtime tests**
+- [x] **Step 1: Add TAGGER runtime tests**
 
 Add to `TaggerHandlerTest`:
 
@@ -200,7 +209,7 @@ private ExecutionContext scheduledBatchContext() {
 }
 ```
 
-- [ ] **Step 2: Run TAGGER tests and confirm red state**
+- [x] **Step 2: Run TAGGER tests and confirm red state**
 
 Run:
 
@@ -210,7 +219,7 @@ cd backend && mvn -pl canvas-engine test -Dtest=TaggerHandlerTest
 
 Expected: FAIL because `TaggerHandler` does not accept `AudienceSnapshotService`.
 
-- [ ] **Step 3: Inject snapshot service**
+- [x] **Step 3: Inject snapshot service**
 
 Modify the constructor:
 
@@ -229,7 +238,7 @@ public TaggerHandler(AudienceBitmapStore audienceBitmapStore,
 }
 ```
 
-- [ ] **Step 4: Add snapshot helpers**
+- [x] **Step 4: Add snapshot helpers**
 
 Add private helpers:
 
@@ -254,7 +263,7 @@ private List<String> resolveFanOutUsers(Map<String, Object> config, ExecutionCon
 }
 ```
 
-- [ ] **Step 5: Branch membership and fan-out payload**
+- [x] **Step 5: Branch membership and fan-out payload**
 
 In non-batch audience mode:
 
@@ -287,7 +296,7 @@ if (snapshotId != null) {
 }
 ```
 
-- [ ] **Step 6: Run TAGGER tests**
+- [x] **Step 6: Run TAGGER tests**
 
 Run:
 
@@ -303,7 +312,7 @@ Expected: PASS.
 - Read: `docs/product-evolution/specs/p1-003c-tagger-audience-runtime-snapshot-branching.md`
 - Read: `docs/product-evolution/plans/p1-003c-tagger-audience-runtime-snapshot-branching-plan.md`
 
-- [ ] **Step 1: Run focused backend suite**
+- [x] **Step 1: Run focused backend suite**
 
 Run:
 
@@ -312,6 +321,24 @@ cd backend && mvn -pl canvas-engine test -Dtest=AudienceSnapshotServiceTest,Tagg
 ```
 
 Expected: PASS.
+
+### Verification Evidence
+
+- P1-003C focused suite:
+
+```bash
+cd backend && mvn -pl canvas-engine test -Dtest=AudienceSnapshotServiceTest,TaggerHandlerTest
+```
+
+Result: 14 tests, 0 failures, 0 errors, 0 skipped.
+
+- P1-003B/P1-003C combined snapshot suite:
+
+```bash
+cd backend && mvn -pl canvas-engine test -Dtest=AudienceSnapshotServiceTest,CanvasPublishAudienceSnapshotTest,TaggerHandlerTest
+```
+
+Result: 15 tests, 0 failures, 0 errors, 0 skipped.
 
 - [ ] **Step 2: Commit this slice**
 

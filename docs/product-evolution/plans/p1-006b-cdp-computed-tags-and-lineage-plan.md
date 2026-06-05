@@ -130,6 +130,45 @@ cd backend && mvn -pl canvas-engine test -Dtest=ComputedTagSchemaTest
 
 Expected: PASS.
 
+### Task 5: Commit This Slice
+
+**Files:**
+- Modify: `backend/canvas-engine/src/main/resources/db/migration/V100__cdp_computed_tags_and_lineage.sql`
+- Modify: `backend/canvas-engine/src/main/java/org/chovy/canvas/domain/cdp/ComputedTagService.java`
+- Modify: `backend/canvas-engine/src/main/java/org/chovy/canvas/domain/cdp/ComputedTagLineageService.java`
+- Modify: `backend/canvas-engine/src/main/java/org/chovy/canvas/web/CdpComputedTagController.java`
+- Modify: `backend/canvas-engine/src/test/java/org/chovy/canvas/domain/cdp/ComputedTagSchemaTest.java`
+- Modify: `backend/canvas-engine/src/test/java/org/chovy/canvas/domain/cdp/ComputedTagServiceTest.java`
+- Modify: `backend/canvas-engine/src/test/java/org/chovy/canvas/domain/cdp/ComputedTagLineageServiceTest.java`
+- Modify: `frontend/src/pages/cdp-computed-tags/computedTagPresentation.ts`
+- Modify: `frontend/src/pages/cdp-computed-tags/computedTagPresentation.test.ts`
+- Modify: `frontend/src/services/cdpApi.ts`
+- Modify: `docs/product-evolution/specs/p1-006b-cdp-computed-tags-and-lineage.md`
+- Modify: `docs/product-evolution/plans/p1-006b-cdp-computed-tags-and-lineage-plan.md`
+
+- [ ] **Step 1: Commit computed tag and lineage slice**
+
+Run:
+
+```bash
+git add \
+  backend/canvas-engine/src/main/resources/db/migration/V100__cdp_computed_tags_and_lineage.sql \
+  backend/canvas-engine/src/main/java/org/chovy/canvas/domain/cdp/ComputedTagService.java \
+  backend/canvas-engine/src/main/java/org/chovy/canvas/domain/cdp/ComputedTagLineageService.java \
+  backend/canvas-engine/src/main/java/org/chovy/canvas/web/CdpComputedTagController.java \
+  backend/canvas-engine/src/test/java/org/chovy/canvas/domain/cdp/ComputedTagSchemaTest.java \
+  backend/canvas-engine/src/test/java/org/chovy/canvas/domain/cdp/ComputedTagServiceTest.java \
+  backend/canvas-engine/src/test/java/org/chovy/canvas/domain/cdp/ComputedTagLineageServiceTest.java \
+  frontend/src/pages/cdp-computed-tags/computedTagPresentation.ts \
+  frontend/src/pages/cdp-computed-tags/computedTagPresentation.test.ts \
+  frontend/src/services/cdpApi.ts \
+  docs/product-evolution/specs/p1-006b-cdp-computed-tags-and-lineage.md \
+  docs/product-evolution/plans/p1-006b-cdp-computed-tags-and-lineage-plan.md
+git commit -m "feat: add cdp computed tags and lineage"
+```
+
+Expected: commit contains only computed tag schema, lineage checks, service/API, frontend helpers, tests, spec, and plan.
+
 ### Task 2: Computed Tag Service
 
 **Files:**

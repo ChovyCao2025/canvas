@@ -4,6 +4,7 @@
  * 维护说明：新增通知分类、严重等级或归档状态时，应补充对应展示断言。
  */
 import { describe, expect, it } from 'vitest'
+import { findAccessibilityIssues } from '../../test/accessibilityChecks'
 import {
   getNotificationActionLabel,
   getNotificationCategoryLabel,
@@ -51,5 +52,14 @@ describe('notificationPresentation', () => {
       title: 'archived',
       archivedAt: '2026-05-23T10:00:00',
     })).toBe('已归档')
+  })
+
+  it('keeps notification controls named and keyboard reachable', () => {
+    expect(findAccessibilityIssues([
+      { id: 'notification-bell', role: 'button', name: '打开消息中心', focusable: true },
+      { id: 'notification-filter', role: 'tablist', name: '通知分类筛选', focusable: true },
+      { id: 'notification-row', role: 'button', name: '查看通知 任务完成', focusable: true },
+      { id: 'notification-archive', role: 'button', name: '归档通知 任务完成', focusable: true },
+    ])).toEqual([])
   })
 })

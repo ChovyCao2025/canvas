@@ -8,6 +8,11 @@
 
 **Tech Stack:** Java 21, Spring Boot WebFlux security, MyBatis-Plus, Flyway SQL, Redis-backed `MarketingPolicyService`, Reactor `Mono`, JUnit 5, Mockito, AssertJ.
 
+## Implementation Status
+
+- Status: implemented and verified on 2026-06-05.
+- Commit: not created in this session because the worktree contains many unrelated and parallel product-evolution changes.
+
 ---
 
 ## Spec Reference
@@ -43,7 +48,7 @@
 - Modify: `backend/canvas-engine/src/main/java/org/chovy/canvas/dal/dataobject/MarketingConsentDO.java`
 - Modify: `backend/canvas-engine/src/main/java/org/chovy/canvas/dal/dataobject/MarketingSuppressionDO.java`
 - Modify: `backend/canvas-engine/src/main/java/org/chovy/canvas/dal/dataobject/MessageSendRecordDO.java`
-- Create: `backend/canvas-engine/src/main/resources/db/migration/V91__production_safety_and_compliance.sql`
+- Create: `backend/canvas-engine/src/main/resources/db/migration/V185__production_safety_and_compliance.sql`
 - Test: `backend/canvas-engine/src/test/java/org/chovy/canvas/common/tenant/TenantContextResolverTest.java`
 - Test: `backend/canvas-engine/src/test/java/org/chovy/canvas/common/tenant/TenantScopeSupportTest.java`
 - Test: `backend/canvas-engine/src/test/java/org/chovy/canvas/domain/canvas/CanvasServiceTenantScopeTest.java`
@@ -64,7 +69,7 @@
 - Modify: `backend/canvas-engine/src/main/java/org/chovy/canvas/config/SecurityConfig.java`
 - Create: `backend/canvas-engine/src/main/java/org/chovy/canvas/config/InternalApiAuthFilter.java`
 
-- [ ] **Step 1: Extend route-role tests**
+- [x] **Step 1: Extend route-role tests**
 
 Add these assertions to `SecurityConfigRoleTest`.
 
@@ -85,7 +90,7 @@ void internalOpenApiRoutesStayExplicitlyEnumerated() {
 }
 ```
 
-- [ ] **Step 2: Write internal token filter tests**
+- [x] **Step 2: Write internal token filter tests**
 
 Create `InternalApiAuthFilterTest` with this behavior contract.
 
@@ -120,13 +125,17 @@ void allowsConfiguredInternalRouteWhenTokenMatches() {
 }
 ```
 
-- [ ] **Step 3: Run security tests and confirm red state**
+- [x] **Step 3: Run security tests and confirm red state**
 
-Run: `cd backend && mvn -pl canvas-engine test -Dtest=SecurityConfigRoleTest,InternalApiAuthFilterTest`
+Run:
+
+```bash
+cd backend && mvn -pl canvas-engine test -Dtest=SecurityConfigRoleTest,InternalApiAuthFilterTest
+```
 
 Expected: FAIL because `OPS_ROUTE_ROLES`, `INTERNAL_OPEN_API_ROUTES`, and `InternalApiAuthFilter` do not exist yet.
 
-- [ ] **Step 4: Implement route constants and filter wiring**
+- [x] **Step 4: Implement route constants and filter wiring**
 
 In `SecurityConfig`, add constants and accept the new filter in `securityWebFilterChain`.
 
@@ -153,9 +162,13 @@ Change the security chain so `/ops/**` is role-gated and the internal filter run
 
 Create `InternalApiAuthFilter` as a `WebFilter` with constructor parameter `@Value("${canvas.internal-api.token:}") String token`. Its matching rule is POST plus one of the three configured paths. If the configured token is blank, it allows the request for local and dev compatibility. If configured, it compares `X-Canvas-Internal-Token` with `MessageDigest.isEqual`.
 
-- [ ] **Step 5: Run security tests and confirm green state**
+- [x] **Step 5: Run security tests and confirm green state**
 
-Run: `cd backend && mvn -pl canvas-engine test -Dtest=SecurityConfigRoleTest,InternalApiAuthFilterTest`
+Run:
+
+```bash
+cd backend && mvn -pl canvas-engine test -Dtest=SecurityConfigRoleTest,InternalApiAuthFilterTest
+```
 
 Expected: PASS; `/ops/**` is no longer in a permit-all rule and internal execution routes have a production token gate.
 
@@ -165,11 +178,11 @@ Expected: PASS; `/ops/**` is no longer in a permit-all rule and internal executi
 - Modify: `backend/canvas-engine/src/main/java/org/chovy/canvas/common/tenant/TenantContextResolver.java`
 - Create: `backend/canvas-engine/src/main/java/org/chovy/canvas/common/tenant/TenantScopeSupport.java`
 - Modify: tenant-owned data objects listed in File Structure
-- Create: `backend/canvas-engine/src/main/resources/db/migration/V91__production_safety_and_compliance.sql`
+- Create: `backend/canvas-engine/src/main/resources/db/migration/V185__production_safety_and_compliance.sql`
 - Test: `backend/canvas-engine/src/test/java/org/chovy/canvas/common/tenant/TenantContextResolverTest.java`
 - Test: `backend/canvas-engine/src/test/java/org/chovy/canvas/common/tenant/TenantScopeSupportTest.java`
 
-- [ ] **Step 1: Write resolver and helper tests**
+- [x] **Step 1: Write resolver and helper tests**
 
 Add this test to `TenantContextResolverTest`.
 
@@ -207,13 +220,17 @@ void tenantFilterIsSkippedForLegacyAdminWithoutTenant() {
 }
 ```
 
-- [ ] **Step 2: Run tenant tests and confirm red state**
+- [x] **Step 2: Run tenant tests and confirm red state**
 
-Run: `cd backend && mvn -pl canvas-engine test -Dtest=TenantContextResolverTest,TenantScopeSupportTest`
+Run:
+
+```bash
+cd backend && mvn -pl canvas-engine test -Dtest=TenantContextResolverTest,TenantScopeSupportTest
+```
 
 Expected: FAIL because `currentOrError`, `TenantScopeSupport`, and several `tenantId` getters do not exist.
 
-- [ ] **Step 3: Add tenant fields to data objects**
+- [x] **Step 3: Add tenant fields to data objects**
 
 For each tenant-owned data object listed in File Structure, add this field directly after the `id` field. Use `@TableField("tenant_id")` because the database column is snake case.
 
@@ -222,7 +239,7 @@ For each tenant-owned data object listed in File Structure, add this field direc
 private Long tenantId;
 ```
 
-- [ ] **Step 4: Add resolver and helper implementation**
+- [x] **Step 4: Add resolver and helper implementation**
 
 Add this method to `TenantContextResolver`.
 
@@ -253,42 +270,46 @@ public class TenantScopeSupport {
 }
 ```
 
-- [ ] **Step 5: Add additive tenant migration**
+- [x] **Step 5: Add additive tenant migration**
 
-Create `V91__production_safety_and_compliance.sql`.
+Create `V185__production_safety_and_compliance.sql`.
+
+Use the repository's existing `information_schema` guarded migration style so replays and partially upgraded databases do not fail when a column or index already exists. The migration must:
+
+- Add nullable `tenant_id` columns to `audience_definition`, `notification`, `customer_profile`, `customer_channel`, `marketing_consent`, `marketing_suppression`, and `message_send_record` only when missing.
+- Backfill those columns from the default tenant, except `message_send_record`, which first backfills from parent `canvas.tenant_id`.
+- Replace legacy user-only unique indexes on `customer_profile`, `customer_channel`, and `marketing_consent` with tenant-scoped unique indexes when the old indexes exist.
+- Add tenant-scoped read indexes for audience, notification, suppression, and send-record queries when missing.
+
+Representative guarded statement:
 
 ```sql
-ALTER TABLE audience_definition ADD COLUMN tenant_id BIGINT NULL AFTER id;
-ALTER TABLE notification ADD COLUMN tenant_id BIGINT NULL AFTER id;
-ALTER TABLE customer_profile ADD COLUMN tenant_id BIGINT NULL AFTER id;
-ALTER TABLE customer_channel ADD COLUMN tenant_id BIGINT NULL AFTER id;
-ALTER TABLE marketing_consent ADD COLUMN tenant_id BIGINT NULL AFTER id;
-ALTER TABLE marketing_suppression ADD COLUMN tenant_id BIGINT NULL AFTER id;
-ALTER TABLE message_send_record ADD COLUMN tenant_id BIGINT NULL AFTER id;
-
-UPDATE audience_definition SET tenant_id = (SELECT id FROM tenant WHERE tenant_key = 'default') WHERE tenant_id IS NULL;
-UPDATE notification SET tenant_id = (SELECT id FROM tenant WHERE tenant_key = 'default') WHERE tenant_id IS NULL;
-UPDATE customer_profile SET tenant_id = (SELECT id FROM tenant WHERE tenant_key = 'default') WHERE tenant_id IS NULL;
-UPDATE customer_channel SET tenant_id = (SELECT id FROM tenant WHERE tenant_key = 'default') WHERE tenant_id IS NULL;
-UPDATE marketing_consent SET tenant_id = (SELECT id FROM tenant WHERE tenant_key = 'default') WHERE tenant_id IS NULL;
-UPDATE marketing_suppression SET tenant_id = (SELECT id FROM tenant WHERE tenant_key = 'default') WHERE tenant_id IS NULL;
-UPDATE message_send_record r JOIN canvas c ON c.id = r.canvas_id SET r.tenant_id = c.tenant_id WHERE r.tenant_id IS NULL;
-UPDATE message_send_record SET tenant_id = (SELECT id FROM tenant WHERE tenant_key = 'default') WHERE tenant_id IS NULL;
-
-ALTER TABLE audience_definition ADD KEY idx_audience_tenant_enabled (tenant_id, enabled, updated_at);
-ALTER TABLE notification ADD KEY idx_notification_tenant_user_status (tenant_id, user_id, status, created_at);
-ALTER TABLE customer_profile ADD UNIQUE KEY uk_customer_profile_tenant_user (tenant_id, user_id);
-ALTER TABLE customer_channel ADD UNIQUE KEY uk_customer_channel_tenant_user_channel (tenant_id, user_id, channel);
-ALTER TABLE marketing_consent ADD UNIQUE KEY uk_marketing_consent_tenant_user_channel (tenant_id, user_id, channel);
-ALTER TABLE marketing_suppression ADD KEY idx_suppression_tenant_user_channel (tenant_id, user_id, channel, active);
-ALTER TABLE message_send_record ADD KEY idx_message_send_tenant_canvas_created (tenant_id, canvas_id, created_at);
+SET @audience_tenant_exists := (
+    SELECT COUNT(*)
+    FROM information_schema.columns
+    WHERE table_schema = DATABASE()
+      AND table_name = 'audience_definition'
+      AND column_name = 'tenant_id'
+);
+SET @audience_tenant_sql := IF(
+    @audience_tenant_exists = 0,
+    "ALTER TABLE audience_definition ADD COLUMN tenant_id BIGINT NULL AFTER id",
+    "SELECT 1"
+);
+PREPARE audience_tenant_stmt FROM @audience_tenant_sql;
+EXECUTE audience_tenant_stmt;
+DEALLOCATE PREPARE audience_tenant_stmt;
 ```
 
-- [ ] **Step 6: Run tenant tests and Flyway smoke test**
+- [x] **Step 6: Run tenant tests and Flyway smoke test**
 
-Run: `cd backend && mvn -pl canvas-engine test -Dtest=TenantContextResolverTest,TenantScopeSupportTest,FlywayConfigTest`
+Run:
 
-Expected: PASS; the migration name is unique after existing `V90__register_commit_action_node.sql`.
+```bash
+cd backend && mvn -pl canvas-engine test -Dtest=TenantContextResolverTest,TenantScopeSupportTest,FlywayConfigTest
+```
+
+Expected: PASS; the migration name is unique after existing `V184__product_led_growth_evidence.sql`.
 
 ### Task 3: Apply Tenant Scope To High-Risk Surfaces
 
@@ -301,7 +322,7 @@ Expected: PASS; the migration name is unique after existing `V90__register_commi
 - Modify: `backend/canvas-engine/src/main/java/org/chovy/canvas/web/CdpUserController.java`
 - Test: `backend/canvas-engine/src/test/java/org/chovy/canvas/domain/canvas/CanvasServiceTenantScopeTest.java`
 
-- [ ] **Step 1: Write canvas tenant scope service tests**
+- [x] **Step 1: Write canvas tenant scope service tests**
 
 Create `CanvasServiceTenantScopeTest` with Mockito field injection so the test stays aligned with the existing `@RequiredArgsConstructor` dependencies.
 
@@ -339,13 +360,17 @@ void listAddsTenantFilterForTenantAdmin() {
 }
 ```
 
-- [ ] **Step 2: Run scope tests and confirm red state**
+- [x] **Step 2: Run scope tests and confirm red state**
 
-Run: `cd backend && mvn -pl canvas-engine test -Dtest=CanvasServiceTenantScopeTest`
+Run:
+
+```bash
+cd backend && mvn -pl canvas-engine test -Dtest=CanvasServiceTenantScopeTest
+```
 
 Expected: FAIL because `CanvasService.list` does not yet accept `TenantContext` and controller methods do not pass it.
 
-- [ ] **Step 3: Thread tenant context through controller methods**
+- [x] **Step 3: Thread tenant context through controller methods**
 
 For WebFlux controllers, resolve tenant before entering blocking mapper work. Use this pattern in `CanvasStatsController`, execution request management, audience, notification, and CDP user endpoints.
 
@@ -358,7 +383,7 @@ return tenantContextResolver.currentOrError().flatMap(tenant ->
 
 For `CanvasController`, keep the public method signature stable and call the new `CanvasService` overloads with `TenantContext`.
 
-- [ ] **Step 4: Apply `TenantScopeSupport` to query wrappers**
+- [x] **Step 4: Apply `TenantScopeSupport` to query wrappers**
 
 When a query reads tenant-owned tables, apply the helper before mapper execution.
 
@@ -369,9 +394,13 @@ tenantScopeSupport.applyTenantFilter(q, CanvasDO::getTenantId, tenant);
 
 For detail reads such as canvas stats, read the parent canvas with tenant filter first. Return an empty result or `R.fail("画布不存在")` when the canvas is outside the tenant.
 
-- [ ] **Step 5: Run high-risk controller and service tests**
+- [x] **Step 5: Run high-risk controller and service tests**
 
-Run: `cd backend && mvn -pl canvas-engine test -Dtest=CanvasServiceTenantScopeTest,CanvasStatsControllerTest,CanvasExecutionRequestManagementControllerTest,AudienceControllerTest,NotificationControllerTest,CdpUserControllerTest`
+Run:
+
+```bash
+cd backend && mvn -pl canvas-engine test -Dtest=CanvasServiceTenantScopeTest,CanvasStatsControllerTest,CanvasExecutionRequestManagementControllerTest,AudienceControllerTest,NotificationControllerTest,CdpUserControllerTest
+```
 
 Expected: PASS; captured wrappers include `tenant_id` for tenant users and omit it only for legacy `ADMIN` with null tenant.
 
@@ -383,7 +412,7 @@ Expected: PASS; captured wrappers include `tenant_id` for tenant users and omit 
 - Test: `backend/canvas-engine/src/test/java/org/chovy/canvas/engine/delivery/ReachDeliveryServicePolicyTest.java`
 - Test: `backend/canvas-engine/src/test/java/org/chovy/canvas/engine/handlers/SendMessageHandlerTest.java`
 
-- [ ] **Step 1: Write policy-blocked delivery tests**
+- [x] **Step 1: Write policy-blocked delivery tests**
 
 Create `ReachDeliveryServicePolicyTest` with three focused assertions.
 
@@ -437,13 +466,17 @@ void allowedPolicyCallsReachPlatform() {
 }
 ```
 
-- [ ] **Step 2: Run delivery tests and confirm red state**
+- [x] **Step 2: Run delivery tests and confirm red state**
 
-Run: `cd backend && mvn -pl canvas-engine test -Dtest=ReachDeliveryServicePolicyTest,SendMessageHandlerTest`
+Run:
+
+```bash
+cd backend && mvn -pl canvas-engine test -Dtest=ReachDeliveryServicePolicyTest,SendMessageHandlerTest
+```
 
 Expected: FAIL because `ReachDeliveryService` does not receive `MarketingPolicyService`, `DeliveryRequest` has no policy options, and blocked sends are not marked `SKIPPED`.
 
-- [ ] **Step 3: Extend send handler request construction**
+- [x] **Step 3: Extend send handler request construction**
 
 In `AbstractSendMessageHandler`, read policy configuration from node config and pass it to a new `ReachDeliveryService.PolicyOptions` record.
 
@@ -460,7 +493,7 @@ ReachDeliveryService.PolicyOptions policy = new ReachDeliveryService.PolicyOptio
 
 Add `bool` and `integer` helpers next to the existing `string` helper.
 
-- [ ] **Step 4: Enforce policy before external delivery**
+- [x] **Step 4: Enforce policy before external delivery**
 
 In `ReachDeliveryService.send`, keep the existing duplicate check first. For new records, evaluate policy before `callReachPlatform`.
 
@@ -476,7 +509,7 @@ return callReachPlatform(request)
 
 `evaluatePolicy` must call `consentAllowed`, `suppressionAllowed`, `channelAvailable`, `quietHoursAllowed`, and `consumeFrequency` in that order, stopping at the first blocked decision.
 
-- [ ] **Step 5: Persist skipped records**
+- [x] **Step 5: Persist skipped records**
 
 Add `markSkipped` in `ReachDeliveryService`.
 
@@ -490,9 +523,13 @@ private DeliveryResult markSkipped(MessageSendRecordDO record, PolicyDecision de
 }
 ```
 
-- [ ] **Step 6: Run delivery tests and confirm green state**
+- [x] **Step 6: Run delivery tests and confirm green state**
 
-Run: `cd backend && mvn -pl canvas-engine test -Dtest=ReachDeliveryServicePolicyTest,SendMessageHandlerTest`
+Run:
+
+```bash
+cd backend && mvn -pl canvas-engine test -Dtest=ReachDeliveryServicePolicyTest,SendMessageHandlerTest
+```
 
 Expected: PASS; policy-blocked requests do not reach `/send`, duplicate records do not consume counters again, and existing send handler output still includes `sendStatus`.
 
@@ -502,7 +539,7 @@ Expected: PASS; policy-blocked requests do not reach `/send`, duplicate records 
 - Test: `backend/canvas-engine/src/test/java/org/chovy/canvas/common/enums/NodeTypeGovernanceTest.java`
 - Read: `backend/canvas-engine/src/main/resources/db/migration/V90__register_commit_action_node.sql`
 
-- [ ] **Step 1: Add catalog exclusion assertions**
+- [x] **Step 1: Add catalog exclusion assertions**
 
 Extend `NodeTypeGovernanceTest`.
 
@@ -517,9 +554,13 @@ void futureStubNodesAreNotGenerallyAvailable() throws Exception {
 }
 ```
 
-- [ ] **Step 2: Run governance tests**
+- [x] **Step 2: Run governance tests**
 
-Run: `cd backend && mvn -pl canvas-engine test -Dtest=NodeTypeGovernanceTest`
+Run:
+
+```bash
+cd backend && mvn -pl canvas-engine test -Dtest=NodeTypeGovernanceTest
+```
 
 Expected: PASS; future or stub-like node types stay out of the generally available registry until their dedicated specs implement them.
 
@@ -530,19 +571,27 @@ Expected: PASS; future or stub-like node types stay out of the generally availab
 - Modify: `docs/product-evolution/plans/p0-001-production-safety-and-compliance-plan.md`
 - Read: `docs/product-evolution/IMPLEMENTATION_ORDER.md`
 
-- [ ] **Step 1: Run focused backend suite**
+- [x] **Step 1: Run focused backend suite**
 
-Run: `cd backend && mvn -pl canvas-engine test -Dtest=SecurityConfigRoleTest,InternalApiAuthFilterTest,TenantContextResolverTest,TenantScopeSupportTest,CanvasServiceTenantScopeTest,ReachDeliveryServicePolicyTest,NodeTypeGovernanceTest`
+Run:
+
+```bash
+cd backend && mvn -pl canvas-engine test -Dtest=SecurityConfigRoleTest,InternalApiAuthFilterTest,TenantContextResolverTest,TenantScopeSupportTest,CanvasServiceTenantScopeTest,ReachDeliveryServicePolicyTest,NodeTypeGovernanceTest
+```
 
 Expected: PASS for all production-safety tests.
 
-- [ ] **Step 2: Run canvas-engine regression tests**
+- [x] **Step 2: Run canvas-engine regression tests**
 
-Run: `cd backend && mvn -pl canvas-engine test`
+Run:
+
+```bash
+cd backend && mvn -pl canvas-engine test
+```
 
 Expected: PASS for the module test suite.
 
-- [ ] **Step 3: Add rollout notes to the implementation PR**
+- [x] **Step 3: Add rollout notes to the implementation PR**
 
 Use this exact checklist in the PR body.
 
@@ -551,12 +600,58 @@ Rollout notes:
 - `canvas.internal-api.token` remains blank in local/dev.
 - Staging callers send `X-Canvas-Internal-Token` before the staging property is set.
 - Production property is set after staging callers pass.
-- Tenant migration `V91__production_safety_and_compliance.sql` is additive and backfills default tenant values.
+- Tenant migration `V185__production_safety_and_compliance.sql` is additive and backfills default tenant values.
 - Rollback switch: clear `canvas.internal-api.token` and revert the application deploy; additive tenant columns remain in place.
 ```
 
+### Verification Evidence
+
+- Focused tenant and Flyway suite:
+
+```bash
+cd backend && mvn -pl canvas-engine test -Dtest=TenantContextResolverTest,TenantScopeSupportTest,FlywayConfigTest
+```
+
+Result: 7 tests, 0 failures, 0 errors, 0 skipped.
+
+- High-risk controller and service tenant-scope suite:
+
+```bash
+cd backend && mvn -pl canvas-engine test -Dtest=CanvasServiceTenantScopeTest,CanvasStatsControllerTest,CanvasExecutionRequestManagementControllerTest,AudienceControllerTest,NotificationControllerTest,CdpUserControllerTest
+```
+
+Result: 22 tests, 0 failures, 0 errors, 0 skipped.
+
+- Delivery policy suite:
+
+```bash
+cd backend && mvn -pl canvas-engine test -Dtest=ReachDeliveryServicePolicyTest,SendMessageHandlerTest
+```
+
+Result: 4 tests, 0 failures, 0 errors, 0 skipped.
+
+- Focused production-safety suite:
+
+```bash
+cd backend && mvn -pl canvas-engine clean test -Dtest=SecurityConfigRoleTest,InternalApiAuthFilterTest,TenantContextResolverTest,TenantScopeSupportTest,CanvasServiceTenantScopeTest,ReachDeliveryServicePolicyTest,NodeTypeGovernanceTest
+```
+
+Result: 21 tests, 0 failures, 0 errors, 0 skipped.
+
+- Backend module regression:
+
+```bash
+cd backend && mvn -pl canvas-engine test
+```
+
+Result: 1402 tests, 0 failures, 0 errors, 1 skipped.
+
 - [ ] **Step 4: Commit the implementation slice**
 
-Run: `git add backend/canvas-engine/src docs/product-evolution/specs/p0-001-production-safety-and-compliance.md docs/product-evolution/plans/p0-001-production-safety-and-compliance-plan.md && git commit -m "feat: harden production safety controls"`
+Run:
+
+```bash
+git add backend/canvas-engine/src docs/product-evolution/specs/p0-001-production-safety-and-compliance.md docs/product-evolution/plans/p0-001-production-safety-and-compliance-plan.md && git commit -m "feat: harden production safety controls"
+```
 
 Expected: commit contains route security, tenant-scope, delivery-policy, and node-governance changes for this spec.

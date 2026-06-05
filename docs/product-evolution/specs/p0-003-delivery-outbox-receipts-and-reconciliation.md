@@ -5,6 +5,10 @@ Sequence: 003
 Source: `docs/optimization/production-design-gaps.md`, `docs/optimization/todo/marketing_platform_gap_analysis.md`, `docs/optimization/bmad-product-review-2026-05.md`
 Implementation plan: `../plans/p0-003-delivery-outbox-receipts-and-reconciliation-plan.md`
 
+## Implementation Status
+
+Implemented and verified on 2026-06-05. Verification evidence is recorded in `../plans/p0-003-delivery-outbox-receipts-and-reconciliation-plan.md`.
+
 ## Goal
 
 Make channel delivery crash-safe, retryable, observable, and reconcilable instead of coupling DAG execution directly to downstream channel latency.
@@ -62,7 +66,7 @@ Operators can trust that a message is either delivered, retrying, reconciled, or
 
 ### Data And Configuration Touchpoints
 
-- `backend/canvas-engine/src/main/resources/db/migration/V92__delivery_outbox_receipts.sql`
+- `backend/canvas-engine/src/main/resources/db/migration/V94__delivery_outbox_receipts.sql`
 - `backend/canvas-engine/src/main/resources/application.yml`
 
 ### Test Touchpoints

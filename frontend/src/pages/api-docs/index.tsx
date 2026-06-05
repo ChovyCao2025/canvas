@@ -26,6 +26,12 @@ const methodColors: Record<ApiDocEndpoint['method'], string> = {
   DELETE: 'red',
 }
 
+const authLabels: Record<ApiDocEndpoint['auth'], { color: string, text: string }> = {
+  bearer: { color: 'geekblue', text: 'Bearer Auth' },
+  hmac: { color: 'purple', text: 'HMAC Auth' },
+  none: { color: 'default', text: 'No Auth' },
+}
+
 /** 参数表列定义，独立出来避免每个接口卡片重复创建渲染规则。 */
 const paramColumns: ColumnsType<ApiDocParam> = [
   {
@@ -75,7 +81,7 @@ function CodeExample({ title, value }: { title: string; value: unknown }) {
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginBottom: 8 }}>
         <Text strong>{title}</Text>
         <Tooltip title="复制代码">
-          <Button size="small" type="text" icon={<CopyOutlined />} onClick={copyCode} />
+          <Button size="small" type="text" aria-label={`复制${title}`} icon={<CopyOutlined />} onClick={copyCode} />
         </Tooltip>
       </div>
       <pre style={{
@@ -114,8 +120,8 @@ function EndpointCard({ endpoint }: { endpoint: ApiDocEndpoint }) {
             </Text>
           </Space>
           <Space size={8} wrap>
-            <Tag color={endpoint.auth === 'bearer' ? 'geekblue' : 'default'}>
-              {endpoint.auth === 'bearer' ? 'Bearer Auth' : 'No Auth'}
+            <Tag color={authLabels[endpoint.auth].color}>
+              {authLabels[endpoint.auth].text}
             </Tag>
             {endpoint.internal ? <Tag color="gold">内部管理</Tag> : null}
           </Space>
@@ -143,6 +149,15 @@ function EndpointCard({ endpoint }: { endpoint: ApiDocEndpoint }) {
 
         {endpoint.requestExample !== undefined ? (
           <CodeExample title="Request Example" value={endpoint.requestExample} />
+        ) : null}
+        {endpoint.responses && endpoint.responses.length > 0 ? (
+          <Space size={8} wrap>
+            {endpoint.responses.map(response => (
+              <Tag key={`${endpoint.id}-${response.status}`}>
+                {response.status} {response.desc}
+              </Tag>
+            ))}
+          </Space>
         ) : null}
         <CodeExample title="Response Example" value={endpoint.responseExample} />
       </Space>
@@ -287,6 +302,7 @@ export default function ApiDocsPage() {
             <Space direction="vertical" size={16} style={{ width: '100%' }}>
               <Input
                 allowClear
+                aria-label="搜索接口"
                 prefix={<SearchOutlined />}
                 placeholder="搜索标题、路径、方法或分类"
                 value={keyword}
@@ -303,7 +319,12 @@ export default function ApiDocsPage() {
                     </Text>
                   </div>
                 </div>
-                <Switch checked={showInternal} onChange={setShowInternal} disabled={disabled} />
+                <Switch
+                  aria-label="展示内部接口"
+                  checked={showInternal}
+                  onChange={setShowInternal}
+                  disabled={disabled}
+                />
               </div>
 
               <div>
@@ -312,6 +333,7 @@ export default function ApiDocsPage() {
                   <Button
                     block
                     type={!selectedCategory ? 'primary' : 'default'}
+                    aria-label="筛选接口分类 全部 API"
                     onClick={() => setCategory(undefined)}
                     disabled={disabled}
                     style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
@@ -324,6 +346,7 @@ export default function ApiDocsPage() {
                       key={summary.key}
                       block
                       type={selectedCategory === summary.key ? 'primary' : 'default'}
+                      aria-label={`筛选接口分类 ${summary.title}`}
                       onClick={() => setCategory(summary.key)}
                       disabled={disabled}
                       style={{

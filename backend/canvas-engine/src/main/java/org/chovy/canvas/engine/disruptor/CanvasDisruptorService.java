@@ -20,6 +20,7 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
+import java.util.concurrent.locks.LockSupport;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -328,9 +329,8 @@ public class CanvasDisruptorService {
     private void waitForInFlight(Duration timeout) {
         long deadline = System.nanoTime() + timeout.toNanos();
         while (inFlight.get() > 0 && System.nanoTime() < deadline) {
-            try {
-                Thread.sleep(10);
-            } catch (InterruptedException e) {
+            LockSupport.parkNanos(Duration.ofMillis(10).toNanos());
+            if (Thread.currentThread().isInterrupted()) {
                 Thread.currentThread().interrupt();
                 break;
             }

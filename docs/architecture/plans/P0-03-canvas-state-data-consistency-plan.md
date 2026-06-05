@@ -1,12 +1,14 @@
-# Canvas State And Data Consistency Implementation Plan
+# Canvas State And Data Consistency Integration Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Execute the architecture remediation package described in `../specs/P0-03-canvas-state-data-consistency-spec.md`.
+**Goal:** Enforce and verify the P0-03 canvas state/data consistency implementation in the main worktree.
 
-**Architecture:** Start from the archived evidence and current repository verification, add failing tests around the confirmed behavior, then implement the smallest scoped changes that satisfy the package acceptance criteria. Keep unrelated refactors out of the package unless a test proves the boundary must change.
+**Architecture:** The implementation is scoped to the P0-03 state-machine, runtime-policy, cleanup-safety, and Redis/DB reconciliation slices in `main`. It centralizes canvas lifecycle rules in `CanvasStateTransitionPolicy`, guards mutating services at the domain boundary, preserves runtime-referenced versions during cleanup, and adds explicit route/quota repair paths.
 
-**Tech Stack:** Java 21, Spring Boot 3.2, WebFlux, MyBatis-Plus, Reactor, Redis, RocketMQ, React 18, TypeScript, Vite, Vitest, JUnit 5.
+**Tech Stack:** Java 21, Spring Boot 3.2, WebFlux, MyBatis-Plus, Reactor, Redis, RocketMQ, JUnit 5, AssertJ, Mockito.
+
+**Current Status:** Implemented and verified in `main` on 2026-06-04. Focused P0-03 verification and full `canvas-engine` tests both pass.
 
 ---
 
@@ -15,203 +17,156 @@
 - Spec: `../specs/P0-03-canvas-state-data-consistency-spec.md`
 - Source package: `../todo/p0/canvas-state-data-consistency/`
 - Coverage matrix: `../todo/coverage-matrix.md`
+- Evidence: `../evidence/P0-03-canvas-state-data-consistency.md`
 
 ## File Structure
 
-- Read: `../specs/P0-03-canvas-state-data-consistency-spec.md`
-- Read: `../todo/coverage-matrix.md`
-- Read: `../todo/p0/canvas-state-data-consistency/plan.md`
-- Modify: repository files named in the spec evidence for this package
-- Test: focused tests created beside the affected backend or frontend code before implementation
+**Production files changed:**
+- Create: `backend/canvas-engine/src/main/java/org/chovy/canvas/domain/canvas/CanvasStateTransitionPolicy.java`
+- Modify: `backend/canvas-engine/src/main/java/org/chovy/canvas/domain/canvas/CanvasService.java`
+- Modify: `backend/canvas-engine/src/main/java/org/chovy/canvas/domain/canvas/CanvasOpsService.java`
+- Modify: `backend/canvas-engine/src/main/java/org/chovy/canvas/domain/canvas/CanvasTransactionService.java`
+- Modify: `backend/canvas-engine/src/main/java/org/chovy/canvas/domain/canvas/CanvasVersionCleanupJob.java`
+- Modify: `backend/canvas-engine/src/main/java/org/chovy/canvas/engine/trigger/TriggerPreCheckService.java`
+- Modify: `backend/canvas-engine/src/main/java/org/chovy/canvas/infrastructure/redis/MqRouteRefreshService.java`
 
-### Task 1: Define allowed canvas state transitions
+**Focused tests changed:**
+- Create: `backend/canvas-engine/src/test/java/org/chovy/canvas/domain/canvas/CanvasStateTransitionPolicyTest.java`
+- Create: `backend/canvas-engine/src/test/java/org/chovy/canvas/domain/canvas/CanvasTransactionServiceStateTest.java`
+- Create: `backend/canvas-engine/src/test/java/org/chovy/canvas/domain/canvas/CanvasServiceDraftUpdateStateTest.java`
+- Create: `backend/canvas-engine/src/test/java/org/chovy/canvas/domain/canvas/CanvasOpsServiceStateTest.java`
+- Create: `backend/canvas-engine/src/test/java/org/chovy/canvas/domain/canvas/CanvasVersionCleanupJobTest.java`
+- Create: `backend/canvas-engine/src/test/java/org/chovy/canvas/engine/trigger/TriggerPreCheckServiceQuotaReconciliationTest.java`
+- Modify: `backend/canvas-engine/src/test/java/org/chovy/canvas/infra/redis/MqRouteRefreshServiceTest.java`
 
-**Files:**
-- Read: `../specs/P0-03-canvas-state-data-consistency-spec.md`
-- Read: `../todo/coverage-matrix.md`
-- Modify: repository files named in this package spec evidence
-- Test: focused tests created beside the affected code
+**Documentation files:**
+- Modify: `docs/architecture/specs/P0-03-canvas-state-data-consistency-spec.md`
+- Modify: `docs/architecture/plans/P0-03-canvas-state-data-consistency-plan.md`
 
-Existing package notes:
-   - DRAFT -> PUBLISHED
-   - PUBLISHED -> OFFLINE / KILLED / ARCHIVED
-   - OFFLINE -> PUBLISHED only if explicitly supported
-   - KILLED -> terminal
+No Flyway migration is part of this integration slice.
 
-- [ ] **Step 1: Lock the failing behavior**
-
-Read `../specs/P0-03-canvas-state-data-consistency-spec.md` and write the smallest failing test or documentation check that demonstrates this task gap before changing implementation files.
-
-- [ ] **Step 2: Run the focused check before implementation**
-
-Run the narrowest backend, frontend, or documentation command that exercises the new check. Expected result before implementation: the new check fails or the documentation diff shows the missing section.
-
-- [ ] **Step 3: Implement the scoped change**
-
-Change only the files required by this task and keep the behavior aligned with the acceptance criteria in `../specs/P0-03-canvas-state-data-consistency-spec.md`.
-
-- [ ] **Step 4: Verify the task**
-
-Run the same focused command again. Expected result after implementation: pass, or documentation check exits 0.
-
-- [ ] **Step 5: Review the scoped diff**
-
-Run `git diff -- .` and verify the diff only touches files justified by this task and the package spec.
-
-### Task 2: Centralize transition checks
+### Task 1: Verify Implementation Evidence
 
 **Files:**
-- Read: `../specs/P0-03-canvas-state-data-consistency-spec.md`
-- Read: `../todo/coverage-matrix.md`
-- Modify: repository files named in this package spec evidence
-- Test: focused tests created beside the affected code
+- Read: `backend/canvas-engine/src/main/java/org/chovy/canvas/domain/canvas/CanvasStateTransitionPolicy.java`
+- Read: `backend/canvas-engine/src/test/java/org/chovy/canvas/domain/canvas/CanvasStateTransitionPolicyTest.java`
+- Read: `backend/canvas-engine/src/test/java/org/chovy/canvas/domain/canvas/CanvasTransactionServiceStateTest.java`
+- Read: `backend/canvas-engine/src/test/java/org/chovy/canvas/domain/canvas/CanvasServiceDraftUpdateStateTest.java`
+- Read: `backend/canvas-engine/src/test/java/org/chovy/canvas/domain/canvas/CanvasOpsServiceStateTest.java`
+- Read: `backend/canvas-engine/src/test/java/org/chovy/canvas/domain/canvas/CanvasVersionCleanupJobTest.java`
+- Read: `backend/canvas-engine/src/test/java/org/chovy/canvas/engine/trigger/TriggerPreCheckServiceQuotaReconciliationTest.java`
+- Read: `backend/canvas-engine/src/test/java/org/chovy/canvas/infra/redis/MqRouteRefreshServiceTest.java`
 
-Existing package notes:
-   - Add a state transition service or validator used by publish/offline/kill/archive/clone/update.
+- [x] **Step 1: Confirm `main` contains the P0-03 implementation**
 
-- [ ] **Step 1: Lock the failing behavior**
+Run:
 
-Read `../specs/P0-03-canvas-state-data-consistency-spec.md` and write the smallest failing test or documentation check that demonstrates this task gap before changing implementation files.
+```bash
+rg -n "class CanvasStateTransitionPolicy|rebuildTriggerRoutes|reconcileInactiveCanvasQuotas" \
+  backend/canvas-engine/src/main/java \
+  backend/canvas-engine/src/test/java
+```
 
-- [ ] **Step 2: Run the focused check before implementation**
+Expected: output includes `CanvasStateTransitionPolicy.java`, `MqRouteRefreshService.rebuildTriggerRoutes`, and `TriggerPreCheckService.reconcileInactiveCanvasQuotas`.
 
-Run the narrowest backend, frontend, or documentation command that exercises the new check. Expected result before implementation: the new check fails or the documentation diff shows the missing section.
+- [x] **Step 2: Run focused P0-03 verification**
 
-- [ ] **Step 3: Implement the scoped change**
+Run:
 
-Change only the files required by this task and keep the behavior aligned with the acceptance criteria in `../specs/P0-03-canvas-state-data-consistency-spec.md`.
+```bash
+cd backend && mvn -pl canvas-engine -Dtest=CanvasStateTransitionPolicyTest,CanvasTransactionServiceStateTest,CanvasServiceDraftUpdateStateTest,CanvasOpsServiceStateTest,CanvasVersionCleanupJobTest,TriggerPreCheckServiceQuotaReconciliationTest,MqRouteRefreshServiceTest test
+```
 
-- [ ] **Step 4: Verify the task**
+Result: PASS, 18 tests, 0 failures, 0 errors, 0 skipped.
 
-Run the same focused command again. Expected result after implementation: pass, or documentation check exits 0.
-
-- [ ] **Step 5: Review the scoped diff**
-
-Run `git diff -- .` and verify the diff only touches files justified by this task and the package spec.
-
-### Task 3: Split mutable draft fields from runtime policy
-
-**Files:**
-- Read: `../specs/P0-03-canvas-state-data-consistency-spec.md`
-- Read: `../todo/coverage-matrix.md`
-- Modify: repository files named in this package spec evidence
-- Test: focused tests created beside the affected code
-
-Existing package notes:
-   - Prevent published canvas runtime limits from being edited in place.
-   - Store runtime policy on published version or require republish.
-
-- [ ] **Step 1: Lock the failing behavior**
-
-Read `../specs/P0-03-canvas-state-data-consistency-spec.md` and write the smallest failing test or documentation check that demonstrates this task gap before changing implementation files.
-
-- [ ] **Step 2: Run the focused check before implementation**
-
-Run the narrowest backend, frontend, or documentation command that exercises the new check. Expected result before implementation: the new check fails or the documentation diff shows the missing section.
-
-- [ ] **Step 3: Implement the scoped change**
-
-Change only the files required by this task and keep the behavior aligned with the acceptance criteria in `../specs/P0-03-canvas-state-data-consistency-spec.md`.
-
-- [ ] **Step 4: Verify the task**
-
-Run the same focused command again. Expected result after implementation: pass, or documentation check exits 0.
-
-- [ ] **Step 5: Review the scoped diff**
-
-Run `git diff -- .` and verify the diff only touches files justified by this task and the package spec.
-
-### Task 4: Guard version cleanup
+### Task 2: Integrate The State Machine And Lifecycle Guards
 
 **Files:**
-- Read: `../specs/P0-03-canvas-state-data-consistency-spec.md`
-- Read: `../todo/coverage-matrix.md`
-- Modify: repository files named in this package spec evidence
-- Test: focused tests created beside the affected code
+- Create: `backend/canvas-engine/src/main/java/org/chovy/canvas/domain/canvas/CanvasStateTransitionPolicy.java`
+- Modify: `backend/canvas-engine/src/main/java/org/chovy/canvas/domain/canvas/CanvasService.java`
+- Modify: `backend/canvas-engine/src/main/java/org/chovy/canvas/domain/canvas/CanvasOpsService.java`
+- Modify: `backend/canvas-engine/src/main/java/org/chovy/canvas/domain/canvas/CanvasTransactionService.java`
+- Create: `backend/canvas-engine/src/test/java/org/chovy/canvas/domain/canvas/CanvasStateTransitionPolicyTest.java`
+- Create: `backend/canvas-engine/src/test/java/org/chovy/canvas/domain/canvas/CanvasTransactionServiceStateTest.java`
+- Create: `backend/canvas-engine/src/test/java/org/chovy/canvas/domain/canvas/CanvasServiceDraftUpdateStateTest.java`
+- Create: `backend/canvas-engine/src/test/java/org/chovy/canvas/domain/canvas/CanvasOpsServiceStateTest.java`
 
-Existing package notes:
-   - Do not clear `graphJson` for versions referenced by running executions, waits, rollbacks, or audit requirements.
+- [x] **Step 1: Implement lifecycle guards**
 
-- [ ] **Step 1: Lock the failing behavior**
+Result: `CanvasStateTransitionPolicy` was added and wired into `CanvasService`, `CanvasOpsService`, and `CanvasTransactionService`.
 
-Read `../specs/P0-03-canvas-state-data-consistency-spec.md` and write the smallest failing test or documentation check that demonstrates this task gap before changing implementation files.
+- [x] **Step 2: Run lifecycle-focused tests**
 
-- [ ] **Step 2: Run the focused check before implementation**
+Run:
 
-Run the narrowest backend, frontend, or documentation command that exercises the new check. Expected result before implementation: the new check fails or the documentation diff shows the missing section.
+```bash
+cd backend && mvn -pl canvas-engine -Dtest=CanvasStateTransitionPolicyTest,CanvasTransactionServiceStateTest,CanvasServiceDraftUpdateStateTest,CanvasOpsServiceStateTest test
+```
 
-- [ ] **Step 3: Implement the scoped change**
+Result: PASS, proving terminal KILLED state, publish/offline/archive guards, and published runtime-policy immutability are enforced.
 
-Change only the files required by this task and keep the behavior aligned with the acceptance criteria in `../specs/P0-03-canvas-state-data-consistency-spec.md`.
-
-- [ ] **Step 4: Verify the task**
-
-Run the same focused command again. Expected result after implementation: pass, or documentation check exits 0.
-
-- [ ] **Step 5: Review the scoped diff**
-
-Run `git diff -- .` and verify the diff only touches files justified by this task and the package spec.
-
-### Task 5: Add repair/reconciliation jobs
+### Task 3: Integrate Cleanup Safety And Redis/DB Reconciliation
 
 **Files:**
-- Read: `../specs/P0-03-canvas-state-data-consistency-spec.md`
-- Read: `../todo/coverage-matrix.md`
-- Modify: repository files named in this package spec evidence
-- Test: focused tests created beside the affected code
+- Modify: `backend/canvas-engine/src/main/java/org/chovy/canvas/domain/canvas/CanvasVersionCleanupJob.java`
+- Modify: `backend/canvas-engine/src/main/java/org/chovy/canvas/engine/trigger/TriggerPreCheckService.java`
+- Modify: `backend/canvas-engine/src/main/java/org/chovy/canvas/infrastructure/redis/MqRouteRefreshService.java`
+- Create: `backend/canvas-engine/src/test/java/org/chovy/canvas/domain/canvas/CanvasVersionCleanupJobTest.java`
+- Create: `backend/canvas-engine/src/test/java/org/chovy/canvas/engine/trigger/TriggerPreCheckServiceQuotaReconciliationTest.java`
+- Modify: `backend/canvas-engine/src/test/java/org/chovy/canvas/infra/redis/MqRouteRefreshServiceTest.java`
 
-Existing package notes:
-   - Rebuild trigger routes from published versions.
-   - Clean stale quota keys safely.
+- [x] **Step 1: Implement cleanup and reconciliation safeguards**
 
-- [ ] **Step 1: Lock the failing behavior**
+Result: `CanvasVersionCleanupJob` preserves runtime references, `TriggerPreCheckService` exposes quota reconciliation, and `MqRouteRefreshService` rebuilds all trigger routes.
 
-Read `../specs/P0-03-canvas-state-data-consistency-spec.md` and write the smallest failing test or documentation check that demonstrates this task gap before changing implementation files.
+- [x] **Step 2: Run cleanup and reconciliation tests**
 
-- [ ] **Step 2: Run the focused check before implementation**
+Run:
 
-Run the narrowest backend, frontend, or documentation command that exercises the new check. Expected result before implementation: the new check fails or the documentation diff shows the missing section.
+```bash
+cd backend && mvn -pl canvas-engine -Dtest=CanvasVersionCleanupJobTest,TriggerPreCheckServiceQuotaReconciliationTest,MqRouteRefreshServiceTest test
+```
 
-- [ ] **Step 3: Implement the scoped change**
+Result: PASS, proving cleanup preserves runtime-referenced versions and Redis route/quota repair paths are available.
 
-Change only the files required by this task and keep the behavior aligned with the acceptance criteria in `../specs/P0-03-canvas-state-data-consistency-spec.md`.
-
-- [ ] **Step 4: Verify the task**
-
-Run the same focused command again. Expected result after implementation: pass, or documentation check exits 0.
-
-- [ ] **Step 5: Review the scoped diff**
-
-Run `git diff -- .` and verify the diff only touches files justified by this task and the package spec.
-
-### Task 6: Test transition matrix, cleanup safety, and Redis/DB reconciliation behavior
+### Task 4: Full P0-03 Verification And Documentation Update
 
 **Files:**
-- Read: `../specs/P0-03-canvas-state-data-consistency-spec.md`
-- Read: `../todo/coverage-matrix.md`
-- Modify: repository files named in this package spec evidence
-- Test: focused tests created beside the affected code
+- Modify: `docs/architecture/specs/P0-03-canvas-state-data-consistency-spec.md`
+- Modify: `docs/architecture/plans/P0-03-canvas-state-data-consistency-plan.md`
 
-Existing package notes:
-- Source task has no additional notes beyond its title.
+- [x] **Step 1: Run the full focused P0-03 command from the backend directory**
 
-- [ ] **Step 1: Lock the failing behavior**
+Run:
 
-Read `../specs/P0-03-canvas-state-data-consistency-spec.md` and write the smallest failing test or documentation check that demonstrates this task gap before changing implementation files.
+```bash
+cd backend && mvn -pl canvas-engine -Dtest=CanvasStateTransitionPolicyTest,CanvasTransactionServiceStateTest,CanvasServiceDraftUpdateStateTest,CanvasOpsServiceStateTest,CanvasVersionCleanupJobTest,TriggerPreCheckServiceQuotaReconciliationTest,MqRouteRefreshServiceTest test
+```
 
-- [ ] **Step 2: Run the focused check before implementation**
+Result: PASS, 18 tests, 0 failures, 0 errors, 0 skipped.
 
-Run the narrowest backend, frontend, or documentation command that exercises the new check. Expected result before implementation: the new check fails or the documentation diff shows the missing section.
+- [x] **Step 2: Confirm `main` now contains the implementation evidence**
 
-- [ ] **Step 3: Implement the scoped change**
+Run:
 
-Change only the files required by this task and keep the behavior aligned with the acceptance criteria in `../specs/P0-03-canvas-state-data-consistency-spec.md`.
+```bash
+rg -n "class CanvasStateTransitionPolicy|rebuildTriggerRoutes|reconcileInactiveCanvasQuotas" \
+  backend/canvas-engine/src/main/java \
+  backend/canvas-engine/src/test/java
+```
 
-- [ ] **Step 4: Verify the task**
+Expected: output includes `CanvasStateTransitionPolicy.java`, `MqRouteRefreshService.rebuildTriggerRoutes`, and `TriggerPreCheckService.reconcileInactiveCanvasQuotas` in the main worktree.
 
-Run the same focused command again. Expected result after implementation: pass, or documentation check exits 0.
+- [x] **Step 3: Update verification status after tests pass**
 
-- [ ] **Step 5: Review the scoped diff**
+Result: `docs/architecture/specs/P0-03-canvas-state-data-consistency-spec.md` now records implemented-in-main status and verification results.
 
-Run `git diff -- .` and verify the diff only touches files justified by this task and the package spec.
+- [x] **Step 4: Run full canvas-engine verification**
 
+Run:
+
+```bash
+cd backend && mvn -pl canvas-engine test
+```
+
+Result: PASS, 466 tests, 0 failures, 0 errors, 0 skipped.

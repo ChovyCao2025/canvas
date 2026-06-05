@@ -114,13 +114,16 @@ export default function HoverEdge({
           完全绕开 SVG ↔ HTML 跨层 hover 问题。
         */}
         {selected && (
-          <div
+          <button
+            type="button"
             className="nopan nodrag"
+            aria-label={`删除连线${sourceHandleId ? ` ${sourceHandleId}` : ''}`}
             style={{
               position: 'absolute',
               transform: `translate(-50%,-50%) translate(${labelX}px,${deleteOffsetY}px)`,
               pointerEvents: 'all',
               background: 'rgba(28,28,28,0.88)',
+              border: 'none',
               borderRadius: 7,
               padding: '4px 10px',
               boxShadow: '0 2px 8px rgba(0,0,0,.28)',
@@ -134,7 +137,7 @@ export default function HoverEdge({
           >
             <DeleteOutlined style={{ fontSize: 11, color: '#ff7875' }} />
             <span style={{ fontSize: 11, color: '#d9d9d9', userSelect: 'none' }}>删除连线</span>
-          </div>
+          </button>
         )}
       </EdgeLabelRenderer>
     </>

@@ -6,7 +6,7 @@ Coverage matrix: `docs/architecture/todo/coverage-matrix.md`
 
 ## Verification Status
 
-Planning material. Current release/deployment governance remains P1; Kubernetes platformization is P3 until production topology, ownership, and SLOs are clear.
+Implemented as a Kubernetes operating-model and Helm scaffold package. Production rollout still requires environment owner signoff and real rollout evidence. Evidence and assets are in `docs/architecture/evidence/p3-06-k8s-platform.md`, `docs/architecture/k8s-operating-model.md`, `docs/architecture/runbooks/k8s-rollout-rollback.md`, and `deploy/helm/canvas/`.
 
 ## Source Documents
 

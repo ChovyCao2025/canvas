@@ -1,0 +1,23 @@
+CREATE TABLE IF NOT EXISTS bi_delivery_log (
+  id BIGINT AUTO_INCREMENT PRIMARY KEY,
+  tenant_id BIGINT NOT NULL DEFAULT 0,
+  workspace_id BIGINT NOT NULL,
+  job_type VARCHAR(32) NOT NULL,
+  job_id BIGINT NOT NULL,
+  job_key VARCHAR(128) NOT NULL,
+  resource_type VARCHAR(64) NULL,
+  resource_id BIGINT NULL,
+  channel VARCHAR(64) NOT NULL,
+  receiver_json JSON NULL,
+  payload_json JSON NOT NULL,
+  metric_value DECIMAL(24, 6) NULL,
+  status VARCHAR(32) NOT NULL,
+  message VARCHAR(1000) NULL,
+  error_message VARCHAR(1000) NULL,
+  triggered_by VARCHAR(128) NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  INDEX idx_bi_delivery_log_job (tenant_id, job_type, job_id, created_at),
+  INDEX idx_bi_delivery_log_status (tenant_id, status, created_at),
+  INDEX idx_bi_delivery_log_channel (tenant_id, channel, created_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

@@ -1,13 +1,12 @@
 package org.chovy.canvas.engine.scheduler;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import jakarta.annotation.PreDestroy;
 import org.chovy.canvas.common.DataMaskingUtil;
 import org.chovy.canvas.common.MapFieldKeys;
 import org.chovy.canvas.common.enums.ExecutionStatus;
 import org.chovy.canvas.common.enums.NodeType;
 import org.chovy.canvas.common.enums.TriggerType;
-import org.chovy.canvas.dal.dataobject.CanvasExecutionDlqDO;
-import org.chovy.canvas.dal.mapper.CanvasExecutionDlqMapper;
 import org.chovy.canvas.dal.dataobject.CanvasExecutionTraceDO;
 import org.chovy.canvas.engine.context.ExecutionContext;
 import org.chovy.canvas.engine.context.NodeGate;
@@ -17,11 +16,14 @@ import org.chovy.canvas.engine.dag.DagParser;
 import org.chovy.canvas.engine.handler.HandlerRegistry;
 import org.chovy.canvas.engine.handler.NodeOutcome;
 import org.chovy.canvas.engine.handler.NodeHandler;
-import org.chovy.canvas.engine.handler.NodeRouteResolver;
 import org.chovy.canvas.engine.handler.NodeResult;
 import org.chovy.canvas.engine.handlers.HubHandler;
+import org.chovy.canvas.engine.idempotency.NodeSideEffectIdempotencyService;
+import org.chovy.canvas.engine.trace.ExecutionTraceContext;
+import org.chovy.canvas.infrastructure.reactor.TrackedReactiveTaskRegistry;
 import org.chovy.canvas.infrastructure.redis.ContextPersistenceService;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Component;
@@ -34,7 +36,6 @@ import reactor.util.retry.Retry;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.*;
-import java.util.stream.Collectors;
 
 /**
  * DAG 执行调度器（精确实现设计文档第七章）。
@@ -88,8 +89,14 @@ public class DagEngine {
     private final HandlerRegistry handlerRegistry;
     /** 执行轨迹异步写入缓冲区。 */
     private final TraceWriteBuffer traceBuffer;
-    /** 画布执行死信 Mapper。 */
-    private final CanvasExecutionDlqMapper dlqMapper;
+    /** 画布执行死信写入器。 */
+    private final ExecutionDlqWriter dlqWriter;
+    /** 节点执行结果路由器。 */
+    private final NodeResultRouter nodeResultRouter;
+    /** 节点执行门控协调器。 */
+    private final NodeGateCoordinator nodeGateCoordinator;
+    /** 特殊等待节点超时调度协调器。 */
+    private final NodeTimeoutCoordinator nodeTimeoutCoordinator;
     /** 节点熔断器注册表。 */
     private final CircuitBreakerRegistry cbRegistry;
     /** 画布执行指标埋点器。 */
@@ -101,6 +108,14 @@ public class DagEngine {
     // @Lazy 避免与 CanvasExecutionService → DagEngine 的循环依赖
     /** 画布执行服务，用于超时恢复等内部触发。 */
     private final org.chovy.canvas.engine.trigger.CanvasExecutionService executionService;
+    /** 特殊节点等待超时调度器。 */
+    private final Scheduler specialNodeTimeoutScheduler;
+    /** 当前 DagEngine 是否拥有特殊节点超时调度器的关闭权。 */
+    private final boolean ownsSpecialNodeTimeoutScheduler;
+    /** 跟踪特殊节点超时和续跑任务，避免引擎内部 fire-and-forget 失去生命周期管理。 */
+    private final TrackedReactiveTaskRegistry reactiveTaskRegistry;
+    /** 节点副作用幂等服务；测试构造器可为空，生产由 Spring 可选注入。 */
+    private NodeSideEffectIdempotencyService sideEffectIdempotencyService;
 
     /**
      * 构造 DagEngine 实例，并根据入参初始化依赖、配置或内部状态。
@@ -109,30 +124,189 @@ public class DagEngine {
      *
      * @param handlerRegistry handlerRegistry 方法执行所需的业务参数
      * @param traceBuffer traceBuffer 方法执行所需的业务参数
-     * @param dlqMapper dlqMapper 方法执行所需的业务参数
      * @param cbRegistry cbRegistry 方法执行所需的业务参数
      * @param metrics metrics 方法执行所需的业务参数
      * @param objectMapper objectMapper 方法执行所需的业务参数
      * @param ctxStore ctxStore 方法执行所需的业务参数
      * @param executionService executionService 方法执行所需的业务参数
      */
+    @Autowired
     public DagEngine(HandlerRegistry handlerRegistry,
                      TraceWriteBuffer traceBuffer,
-                     CanvasExecutionDlqMapper dlqMapper,
                      CircuitBreakerRegistry cbRegistry,
                      CanvasMetrics metrics,
                      ObjectMapper objectMapper,
                      ContextPersistenceService ctxStore,
-                     @Lazy org.chovy.canvas.engine.trigger.CanvasExecutionService executionService) {
+                     @Lazy org.chovy.canvas.engine.trigger.CanvasExecutionService executionService,
+                     TrackedReactiveTaskRegistry reactiveTaskRegistry,
+                     ExecutionDlqWriter dlqWriter,
+                     NodeResultRouter nodeResultRouter,
+                     NodeGateCoordinator nodeGateCoordinator,
+                     NodeTimeoutCoordinator nodeTimeoutCoordinator) {
+        this(handlerRegistry, traceBuffer, cbRegistry, metrics, objectMapper, ctxStore,
+                executionService, newSpecialNodeTimeoutScheduler(), true, reactiveTaskRegistry, dlqWriter,
+                nodeResultRouter, nodeGateCoordinator, nodeTimeoutCoordinator);
+    }
+
+    DagEngine(HandlerRegistry handlerRegistry,
+              TraceWriteBuffer traceBuffer,
+              CircuitBreakerRegistry cbRegistry,
+              CanvasMetrics metrics,
+              ObjectMapper objectMapper,
+              ContextPersistenceService ctxStore,
+              @Lazy org.chovy.canvas.engine.trigger.CanvasExecutionService executionService,
+              ExecutionDlqWriter dlqWriter) {
+        this(handlerRegistry, traceBuffer, cbRegistry, metrics, objectMapper, ctxStore,
+                executionService, dlqWriter, new NodeResultRouter(), new NodeGateCoordinator(),
+                new NodeTimeoutCoordinator());
+    }
+
+    DagEngine(HandlerRegistry handlerRegistry,
+              TraceWriteBuffer traceBuffer,
+              CircuitBreakerRegistry cbRegistry,
+              CanvasMetrics metrics,
+              ObjectMapper objectMapper,
+              ContextPersistenceService ctxStore,
+              @Lazy org.chovy.canvas.engine.trigger.CanvasExecutionService executionService,
+              ExecutionDlqWriter dlqWriter,
+              NodeResultRouter nodeResultRouter) {
+        this(handlerRegistry, traceBuffer, cbRegistry, metrics, objectMapper, ctxStore,
+                executionService, dlqWriter, nodeResultRouter, new NodeGateCoordinator(),
+                new NodeTimeoutCoordinator());
+    }
+
+    DagEngine(HandlerRegistry handlerRegistry,
+              TraceWriteBuffer traceBuffer,
+              CircuitBreakerRegistry cbRegistry,
+              CanvasMetrics metrics,
+              ObjectMapper objectMapper,
+              ContextPersistenceService ctxStore,
+              @Lazy org.chovy.canvas.engine.trigger.CanvasExecutionService executionService,
+              ExecutionDlqWriter dlqWriter,
+              NodeResultRouter nodeResultRouter,
+              NodeGateCoordinator nodeGateCoordinator) {
+        this(handlerRegistry, traceBuffer, cbRegistry, metrics, objectMapper, ctxStore,
+                executionService, dlqWriter, nodeResultRouter, nodeGateCoordinator,
+                new NodeTimeoutCoordinator());
+    }
+
+    DagEngine(HandlerRegistry handlerRegistry,
+              TraceWriteBuffer traceBuffer,
+              CircuitBreakerRegistry cbRegistry,
+              CanvasMetrics metrics,
+              ObjectMapper objectMapper,
+              ContextPersistenceService ctxStore,
+              @Lazy org.chovy.canvas.engine.trigger.CanvasExecutionService executionService,
+              ExecutionDlqWriter dlqWriter,
+              NodeResultRouter nodeResultRouter,
+              NodeGateCoordinator nodeGateCoordinator,
+              NodeTimeoutCoordinator nodeTimeoutCoordinator) {
+        this(handlerRegistry, traceBuffer, cbRegistry, metrics, objectMapper, ctxStore,
+                executionService, Schedulers.parallel(), false, TrackedReactiveTaskRegistry.direct(), dlqWriter,
+                nodeResultRouter, nodeGateCoordinator, nodeTimeoutCoordinator);
+    }
+
+    DagEngine(HandlerRegistry handlerRegistry,
+              TraceWriteBuffer traceBuffer,
+              CircuitBreakerRegistry cbRegistry,
+              CanvasMetrics metrics,
+              ObjectMapper objectMapper,
+              ContextPersistenceService ctxStore,
+              @Lazy org.chovy.canvas.engine.trigger.CanvasExecutionService executionService,
+              Scheduler specialNodeTimeoutScheduler,
+              boolean ownsSpecialNodeTimeoutScheduler,
+              ExecutionDlqWriter dlqWriter) {
+        this(handlerRegistry, traceBuffer, cbRegistry, metrics, objectMapper, ctxStore,
+                executionService, specialNodeTimeoutScheduler, ownsSpecialNodeTimeoutScheduler,
+                dlqWriter, new NodeResultRouter(), new NodeGateCoordinator(), new NodeTimeoutCoordinator());
+    }
+
+    DagEngine(HandlerRegistry handlerRegistry,
+              TraceWriteBuffer traceBuffer,
+              CircuitBreakerRegistry cbRegistry,
+              CanvasMetrics metrics,
+              ObjectMapper objectMapper,
+              ContextPersistenceService ctxStore,
+              @Lazy org.chovy.canvas.engine.trigger.CanvasExecutionService executionService,
+              Scheduler specialNodeTimeoutScheduler,
+              boolean ownsSpecialNodeTimeoutScheduler,
+              ExecutionDlqWriter dlqWriter,
+              NodeResultRouter nodeResultRouter) {
+        this(handlerRegistry, traceBuffer, cbRegistry, metrics, objectMapper, ctxStore,
+                executionService, specialNodeTimeoutScheduler, ownsSpecialNodeTimeoutScheduler,
+                dlqWriter, nodeResultRouter, new NodeGateCoordinator(), new NodeTimeoutCoordinator());
+    }
+
+    DagEngine(HandlerRegistry handlerRegistry,
+              TraceWriteBuffer traceBuffer,
+              CircuitBreakerRegistry cbRegistry,
+              CanvasMetrics metrics,
+              ObjectMapper objectMapper,
+              ContextPersistenceService ctxStore,
+              @Lazy org.chovy.canvas.engine.trigger.CanvasExecutionService executionService,
+              Scheduler specialNodeTimeoutScheduler,
+              boolean ownsSpecialNodeTimeoutScheduler,
+              ExecutionDlqWriter dlqWriter,
+              NodeResultRouter nodeResultRouter,
+              NodeGateCoordinator nodeGateCoordinator) {
+        this(handlerRegistry, traceBuffer, cbRegistry, metrics, objectMapper, ctxStore,
+                executionService, specialNodeTimeoutScheduler, ownsSpecialNodeTimeoutScheduler,
+                dlqWriter, nodeResultRouter, nodeGateCoordinator, new NodeTimeoutCoordinator());
+    }
+
+    DagEngine(HandlerRegistry handlerRegistry,
+              TraceWriteBuffer traceBuffer,
+              CircuitBreakerRegistry cbRegistry,
+              CanvasMetrics metrics,
+              ObjectMapper objectMapper,
+              ContextPersistenceService ctxStore,
+              @Lazy org.chovy.canvas.engine.trigger.CanvasExecutionService executionService,
+              Scheduler specialNodeTimeoutScheduler,
+              boolean ownsSpecialNodeTimeoutScheduler,
+              ExecutionDlqWriter dlqWriter,
+              NodeResultRouter nodeResultRouter,
+              NodeGateCoordinator nodeGateCoordinator,
+              NodeTimeoutCoordinator nodeTimeoutCoordinator) {
+        this(handlerRegistry, traceBuffer, cbRegistry, metrics, objectMapper, ctxStore,
+                executionService, specialNodeTimeoutScheduler, ownsSpecialNodeTimeoutScheduler,
+                TrackedReactiveTaskRegistry.direct(), dlqWriter, nodeResultRouter, nodeGateCoordinator,
+                nodeTimeoutCoordinator);
+    }
+
+    DagEngine(HandlerRegistry handlerRegistry,
+              TraceWriteBuffer traceBuffer,
+              CircuitBreakerRegistry cbRegistry,
+              CanvasMetrics metrics,
+              ObjectMapper objectMapper,
+              ContextPersistenceService ctxStore,
+              @Lazy org.chovy.canvas.engine.trigger.CanvasExecutionService executionService,
+              Scheduler specialNodeTimeoutScheduler,
+              boolean ownsSpecialNodeTimeoutScheduler,
+              TrackedReactiveTaskRegistry reactiveTaskRegistry,
+              ExecutionDlqWriter dlqWriter,
+              NodeResultRouter nodeResultRouter,
+              NodeGateCoordinator nodeGateCoordinator,
+              NodeTimeoutCoordinator nodeTimeoutCoordinator) {
         this.handlerRegistry = handlerRegistry;
         // traceMapper 保留供 writeSkippedNodes 直接写入；批量写走 traceBuffer
         this.traceBuffer = traceBuffer;
-        this.dlqMapper = dlqMapper;
+        this.dlqWriter = dlqWriter;
+        this.nodeResultRouter = nodeResultRouter;
+        this.nodeGateCoordinator = nodeGateCoordinator;
+        this.nodeTimeoutCoordinator = nodeTimeoutCoordinator;
         this.cbRegistry = cbRegistry;
         this.metrics = metrics;
         this.objectMapper = objectMapper;
         this.ctxStore = ctxStore;
         this.executionService = executionService;
+        this.specialNodeTimeoutScheduler = specialNodeTimeoutScheduler;
+        this.ownsSpecialNodeTimeoutScheduler = ownsSpecialNodeTimeoutScheduler;
+        this.reactiveTaskRegistry = reactiveTaskRegistry;
+    }
+
+    @Autowired(required = false)
+    void setSideEffectIdempotencyService(NodeSideEffectIdempotencyService sideEffectIdempotencyService) {
+        this.sideEffectIdempotencyService = sideEffectIdempotencyService;
     }
 
     /** 节点执行最大重试次数。 */
@@ -153,8 +327,17 @@ public class DagEngine {
      * <p>Mono.delay 需要支持 time-based scheduling 的 Scheduler；
      * fromExecutorService 包装虚拟线程池不具备定时能力。
      */
-    private static final Scheduler SPECIAL_NODE_TIMEOUT_SCHEDULER =
-            Schedulers.newBoundedElastic(16, 10_000, "canvas-special-node-timeout", 60, true);
+    private static Scheduler newSpecialNodeTimeoutScheduler() {
+        return Schedulers.newBoundedElastic(16, 10_000, "canvas-special-node-timeout", 60, true);
+    }
+
+    /** 关闭特殊节点等待超时调度器，避免应用停止后保留后台调度线程。 */
+    @PreDestroy
+    void shutdownSpecialNodeTimeoutScheduler() {
+        if (ownsSpecialNodeTimeoutScheduler) {
+            specialNodeTimeoutScheduler.dispose();
+        }
+    }
 
     // ══════════════════════════════════════════════════════════════
     // 公开入口
@@ -210,6 +393,7 @@ public class DagEngine {
 
             boolean needsNodeId = NodeType.API_CALL.equals(node.getType())
                     || NodeType.WAIT.equals(node.getType())
+                    || NodeType.USER_INPUT.equals(node.getType())
                     || NodeType.SEND_MESSAGE.equals(node.getType())
                     || NodeType.COMMIT_ACTION.equals(node.getType())
                     || NodeType.TAGGER.equals(node.getType());
@@ -256,9 +440,8 @@ public class DagEngine {
             // 阶段 4：CAS 抢占 nodeGate 门控锁
             // ──────────────────────────────────────────────────────
             NodeGate nodeGate = ctx.getGate(nodeId);
-            if (!nodeGate.executing.compareAndSet(false, true)) {
+            if (!nodeGateCoordinator.tryAcquireOrSignalRepeat(nodeGate)) {
                 // 抢锁失败：set(true) 向持锁协程发送 repeat 信号
-                nodeGate.repeatPending.set(true);
                 log.debug("[ENGINE] CAS 失败，发出 repeat 信号 nodeId={}", nodeId);
                 return Mono.just(Map.of());
             }
@@ -293,7 +476,7 @@ public class DagEngine {
                         // ── 阶段 6：写输出，设状态，触发下游 ──────────
                         if (handler.isBenefitNode()) ctx.setBenefitGranted(true);
                         if (handler.isReachNode()) ctx.setUserReached(true);
-                        if (result.output() != null && !result.output().isEmpty()) {
+                        if (shouldCommitOutput(result)) {
                             ctx.putNodeOutput(nodeId, result.output());
                         }
 
@@ -312,7 +495,7 @@ public class DagEngine {
                         return triggerDownstream(graph, result, nodeId, node.getType(), ctx, depth);
                     })
                     .onErrorResume(e -> {
-                        nodeGate.executing.set(false); // 释放异常锁
+                        nodeGateCoordinator.release(nodeGate); // 释放异常锁
                         ctx.setNodeStatus(nodeId, NodeStatus.FAILED);
                         log.error("[ENGINE] 节点异常 nodeId={}: {}", nodeId, e.getMessage());
                         if (ctx.isBenefitGranted() || ctx.isUserReached()) {
@@ -413,7 +596,11 @@ public class DagEngine {
                     } catch (CircuitBreakerRegistry.CircuitBreakerOpenException e) {
                         return Mono.just(NodeResult.fail(e.getMessage()));
                     }
-                    return handler.executeAsync(config, ctx); // ← handler 真正在这里被调用
+                    ExecutionTraceContext traceContext = ExecutionTraceContext.from(ctx, nodeId);
+                    try (ExecutionTraceContext.Scope ignored = traceContext.open()) {
+                        return traceContext.scope(executeWithSideEffectIdempotency(
+                                handler, config, ctx, nodeId, nodeType)); // ← handler 真正在这里被调用
+                    }
                 })
                 .doOnNext(r -> {
                     if (r.success()) cb.recordSuccess();
@@ -439,7 +626,7 @@ public class DagEngine {
                         }));
 
         Mono<NodeResult> withRetry = retried.onErrorResume(e -> {
-            writeDlq(ctx, nodeId, nodeType, e);
+            dlqWriter.write(ctx, nodeId, nodeType, e, maxRetry);
             return Mono.just(NodeResult.fail("已写入DLQ: " + e.getMessage()));
         });
 
@@ -457,31 +644,72 @@ public class DagEngine {
             if (!result.success()) {
                 // 失败时由此处统一释放锁，调用方 flatMap 不再重复释放，
                 // 消除 repeat+failure 路径中 doFinally 与调用方双重释放的竞态窗口。
-                nodeGate.executing.set(false);
+                nodeGateCoordinator.release(nodeGate);
                 return Mono.just(result);
             }
 
             // 先读并清除 repeatPending，再释放 executing 锁。
             // 顺序关键：必须在释放锁之前读信号，否则新协程抢锁后才来的请求会被遗漏。
             // （详见 executeHandlerWithRepeat JavaDoc 中的 Case 3 分析）
-            boolean needsRepeat = nodeGate.repeatPending.getAndSet(false); // ← 读信号
-            nodeGate.executing.set(false); // 释放锁
-            // 二次补检：捕获在 getAndSet→set(false) 窗口期内到达并设置 repeatPending 的信号。
-            // 窗口期内 CAS 必然失败（锁仍被持有），对方已写入 repeatPending=true；
-            // 释放锁后立即再读一次可以收住该信号，将窗口从"单次读→释放"缩小到"释放→二次读"。
-            needsRepeat |= nodeGate.repeatPending.getAndSet(false);
+            boolean needsRepeat = nodeGateCoordinator.releaseAndConsumeRepeat(nodeGate);
 
-            if (needsRepeat && nodeGate.executing.compareAndSet(false, true)) {
+            if (needsRepeat && nodeGateCoordinator.tryAcquireForRepeat(nodeGate)) {
                 // 重新持锁后返回 withRetry.doFinally(__)：
                 //   flatMap 订阅它 → handler 第二次执行（repeat）
                 //   doFinally → repeat 结束后释放锁（不管成功/失败/取消）
                 log.debug("[ENGINE] repeat nodeId={}", nodeId);
-                return withRetry.doFinally(__ -> nodeGate.executing.set(false));
+                return withRetry.doFinally(__ -> nodeGateCoordinator.release(nodeGate));
             }
 
             // needsRepeat=false，或 CAS 失败（另一协程已接管）：不 repeat
             return Mono.just(result);
         });
+    }
+
+    private Mono<NodeResult> executeWithSideEffectIdempotency(NodeHandler handler,
+                                                             Map<String, Object> config,
+                                                             ExecutionContext ctx,
+                                                             String nodeId,
+                                                             String nodeType) {
+        if (sideEffectIdempotencyService == null
+                || !handler.requiresSideEffectIdempotency(config, ctx)) {
+            return handler.executeAsync(config, ctx);
+        }
+
+        NodeSideEffectIdempotencyService.ReserveResult reservation;
+        try {
+            reservation = sideEffectIdempotencyService.reserve(
+                    ctx, nodeId, nodeType, handler.sideEffectOperationKey(config, ctx));
+        } catch (Exception e) {
+            log.error("[ENGINE] 副作用幂等预留失败 nodeId={} type={}: {}", nodeId, nodeType, e.getMessage(), e);
+            return Mono.just(NodeResult.fail("SIDE_EFFECT_IDEMPOTENCY: " + e.getMessage()));
+        }
+
+        if (reservation.completed()) {
+            log.debug("[ENGINE] 副作用幂等命中缓存 nodeId={} type={}", nodeId, nodeType);
+            return Mono.just(handler.completedSideEffectResult(config, ctx, reservation.cachedOutput()));
+        }
+        if (reservation.exhausted()) {
+            return Mono.just(NodeResult.fail("SIDE_EFFECT_IDEMPOTENCY_EXHAUSTED: max attempts reached"));
+        }
+
+        Long recordId = reservation.record() == null ? null : reservation.record().getId();
+        return handler.executeAsync(config, ctx)
+                .doOnNext(result -> {
+                    if (recordId == null) {
+                        return;
+                    }
+                    if (result.success() && !result.pending()) {
+                        sideEffectIdempotencyService.complete(recordId, result.output());
+                    } else if (!result.success()) {
+                        sideEffectIdempotencyService.fail(recordId, result.errorMessage());
+                    }
+                })
+                .doOnError(e -> {
+                    if (recordId != null) {
+                        sideEffectIdempotencyService.fail(recordId, e.getMessage());
+                    }
+                });
     }
 
     /**
@@ -515,39 +743,6 @@ public class DagEngine {
             return Mono.just(Map.of());
         }
         return null;
-    }
-
-    /**
-     * 写入死信队列（13.3节）
-     */
-    private void writeDlq(ExecutionContext ctx, String nodeId, String nodeType, Throwable cause) {
-        metrics.recordDlq(nodeType);
-        try {
-            String msg = cause.getMessage() != null ? cause.getMessage() : "unknown";
-            CanvasExecutionDlqDO dlq = CanvasExecutionDlqDO.builder()
-                    .executionId(ctx.getExecutionId())
-                    .canvasId(ctx.getCanvasId())
-                    .userId(ctx.getUserId())
-                    .perfRunId(ctx.getPerfRunId())
-                    .failedNodeId(nodeId)
-                    .failedNodeType(nodeType)
-                    .errorMsg(msg.substring(0, Math.min(500, msg.length())))
-                    .retryCount(maxRetry)
-                    .triggerPayload(objectMapper.writeValueAsString(ctx.getTriggerPayload()))
-                    // 保存原始触发信息，供 DLQ 重放使用（修复：replay 不再写死 DIRECT_CALL）
-                    .triggerType(ctx.getTriggerType())
-                    .triggerNodeType(ctx.getTriggerNodeType())
-                    .matchKey(ctx.getMatchKey())
-                    .failedAt(LocalDateTime.now())
-                    .build();
-            // DLQ 写入放到 boundedElastic，避免阻塞 Reactor 主执行链路。
-            Mono.fromRunnable(() -> dlqMapper.insert(dlq))
-                    .subscribeOn(Schedulers.boundedElastic())
-                    .subscribe(null, (Throwable e) -> log.error("[DLQ] 写入失败: {}", e.getMessage()));
-            log.warn("[DLQ] executionId={} nodeId={} reason={}", ctx.getExecutionId(), nodeId, msg);
-        } catch (Exception e) {
-            log.error("[DLQ] 序列化失败: {}", e.getMessage());
-        }
     }
 
     /** 特殊等待节点的全局超时秒数兜底。 */
@@ -621,21 +816,23 @@ public class DagEngine {
         // ──────────────────────────────────────────────────────────
         if (!HubHandler.allUpstreamDone(upstreamIds, ctx)) {
             ctx.setNodeStatusIfNotDone(nodeId, NodeStatus.WAITING);  // 设 WAITING 供 isPaused 检测
-            if (ctx.getScheduledHubTimeouts().add(nodeId)) {
-                ctx.getHubStartTimes().putIfAbsent(nodeId, System.currentTimeMillis());
-                int timeoutSec = HubHandler.getTimeoutSeconds(config);
-
-                // 延迟任务：超时后若 Hub 仍未完成则标记 FAILED，持久化 ctx，触发执行恢复
-                Mono.delay(Duration.ofSeconds(timeoutSec), SPECIAL_NODE_TIMEOUT_SCHEDULER)
-                        .subscribe(__ -> handleSpecialNodeTimeout(graph, nodeId, node, config, ctx, depth,
-                                "HUB", timeoutSec));
-
+            int timeoutSec = HubHandler.getTimeoutSeconds(config);
+            boolean scheduled = nodeTimeoutCoordinator.scheduleOnce(
+                    ctx,
+                    nodeId,
+                    nodeId,
+                    "dag-hub-timeout-" + ctx.getExecutionId() + "-" + nodeId,
+                    timeoutSec,
+                    specialNodeTimeoutScheduler,
+                    reactiveTaskRegistry,
+                    () -> handleSpecialNodeTimeout(graph, nodeId, node, config, ctx, depth,
+                            "HUB", timeoutSec),
+                    e -> log.error("[HUB] 超时定时器失败 nodeId={}: {}", nodeId, e.getMessage()));
+            if (scheduled) {
                 log.debug("[HUB] 启动超时定时器 {}s nodeId={}", timeoutSec, nodeId);
             } else {
                 // 已调度过定时器，检查是否已超时
-                long start = ctx.getHubStartTimes().getOrDefault(nodeId, System.currentTimeMillis());
-                int timeout = HubHandler.getTimeoutSeconds(config);
-                if (System.currentTimeMillis() - start > (long) timeout * 1000) {
+                if (nodeTimeoutCoordinator.hasElapsed(ctx, nodeId, timeoutSec)) {
                     ctx.setNodeStatusIfNotDone(nodeId, NodeStatus.FAILED);
                     return Mono.error(new RuntimeException("HUB 等待超时 nodeId=" + nodeId));
                 }
@@ -673,13 +870,19 @@ public class DagEngine {
             // 并发安全性同 handleHub：无锁，竞态下超时定时器是必要兜底。
             ctx.setNodeStatusIfNotDone(nodeId, NodeStatus.WAITING);
             String timerKey = "ag:" + nodeId;
-            if (ctx.getScheduledHubTimeouts().add(timerKey)) {
-                ctx.getHubStartTimes().putIfAbsent(timerKey, System.currentTimeMillis());
-                int timeoutSec = config.get("timeout") instanceof Number n ? n.intValue() : (int) globalTimeout;
-
-                Mono.delay(Duration.ofSeconds(timeoutSec), SPECIAL_NODE_TIMEOUT_SCHEDULER)
-                        .subscribe(__ -> handleSpecialNodeTimeout(graph, nodeId, node, config, ctx, depth,
-                                "AGGREGATE", timeoutSec));
+            int timeoutSec = config.get("timeout") instanceof Number n ? n.intValue() : (int) globalTimeout;
+            boolean scheduled = nodeTimeoutCoordinator.scheduleOnce(
+                    ctx,
+                    timerKey,
+                    timerKey,
+                    "dag-aggregate-timeout-" + ctx.getExecutionId() + "-" + nodeId,
+                    timeoutSec,
+                    specialNodeTimeoutScheduler,
+                    reactiveTaskRegistry,
+                    () -> handleSpecialNodeTimeout(graph, nodeId, node, config, ctx, depth,
+                            "AGGREGATE", timeoutSec),
+                    e -> log.error("[AGGREGATE] 超时定时器失败 nodeId={}: {}", nodeId, e.getMessage()));
+            if (scheduled) {
                 log.debug("[AGGREGATE] 启动超时定时器 {}s nodeId={}", timeoutSec, nodeId);
             }
             return Mono.just(Map.of());
@@ -705,11 +908,18 @@ public class DagEngine {
                                                   ExecutionContext ctx,
                                                   int depth) {
         String timerKey = "th:" + nodeId;
-        if (!ctx.getScheduledHubTimeouts().add(timerKey)) return;
         int timeoutSec = config.get("timeout") instanceof Number n ? n.intValue() : (int) globalTimeout;
-        Mono.delay(Duration.ofSeconds(timeoutSec), SPECIAL_NODE_TIMEOUT_SCHEDULER)
-                .subscribe(__ -> handleSpecialNodeTimeout(graph, nodeId, node, config, ctx, depth,
-                        "THRESHOLD", timeoutSec));
+        nodeTimeoutCoordinator.scheduleOnce(
+                ctx,
+                timerKey,
+                timerKey,
+                "dag-threshold-timeout-" + ctx.getExecutionId() + "-" + nodeId,
+                timeoutSec,
+                specialNodeTimeoutScheduler,
+                reactiveTaskRegistry,
+                () -> handleSpecialNodeTimeout(graph, nodeId, node, config, ctx, depth,
+                        "THRESHOLD", timeoutSec),
+                e -> log.error("[THRESHOLD] 超时定时器失败 nodeId={}: {}", nodeId, e.getMessage()));
     }
 
     private void handleSpecialNodeTimeout(DagGraph graph,
@@ -737,27 +947,29 @@ public class DagEngine {
 
         if (targetNodeId == null || targetNodeId.isBlank()) {
             ctxStore.delete(ctx.getCanvasId(), ctx.getUserId());
-            executionService.completePausedExecution(ctx, ExecutionStatus.FAILED.getCode(), timeoutOutput)
-                    .subscribe(null,
-                            e -> log.error("[{}] 超时终态落库失败 nodeId={}: {}", label, nodeId, e.getMessage()));
+            reactiveTaskRegistry.submit(
+                    "dag-timeout-complete-" + ctx.getExecutionId() + "-" + nodeId,
+                    executionService.completePausedExecution(ctx, ExecutionStatus.FAILED.getCode(), timeoutOutput),
+                    e -> log.error("[{}] 超时终态落库失败 nodeId={}: {}", label, nodeId, e.getMessage()));
             return;
         }
 
         ctxStore.save(ctx);
-        executeNode(graph, targetNodeId, ctx, depth + 1)
-                .defaultIfEmpty(Map.of())
-                .flatMap(result -> completeSpecialTimeoutContinuation(graph, ctx, result))
-                .onErrorResume(e -> {
-                    Map<String, Object> error = Map.of(
-                            MapFieldKeys.ERROR, e.getMessage(),
-                            MapFieldKeys.NODE_ID, nodeId,
-                            MapFieldKeys.OUTCOME, NodeOutcome.TIMEOUT.name());
-                    ctxStore.delete(ctx.getCanvasId(), ctx.getUserId());
-                    return executionService.completePausedExecution(ctx,
-                            ExecutionStatus.FAILED.getCode(), error);
-                })
-                .subscribe(null,
-                        e -> log.error("[{}] 超时分支执行失败 nodeId={}: {}", label, nodeId, e.getMessage()));
+        reactiveTaskRegistry.submit(
+                "dag-timeout-continuation-" + ctx.getExecutionId() + "-" + nodeId,
+                executeNode(graph, targetNodeId, ctx, depth + 1)
+                        .defaultIfEmpty(Map.of())
+                        .flatMap(result -> completeSpecialTimeoutContinuation(graph, ctx, result))
+                        .onErrorResume(e -> {
+                            Map<String, Object> error = Map.of(
+                                    MapFieldKeys.ERROR, e.getMessage(),
+                                    MapFieldKeys.NODE_ID, nodeId,
+                                    MapFieldKeys.OUTCOME, NodeOutcome.TIMEOUT.name());
+                            ctxStore.delete(ctx.getCanvasId(), ctx.getUserId());
+                            return executionService.completePausedExecution(ctx,
+                                    ExecutionStatus.FAILED.getCode(), error);
+                        }),
+                e -> log.error("[{}] 超时分支执行失败 nodeId={}: {}", label, nodeId, e.getMessage()));
     }
 
     private Mono<Void> completeSpecialTimeoutContinuation(
@@ -806,8 +1018,7 @@ public class DagEngine {
 
         // 阶段 4：CAS
         NodeGate nodeGate = ctx.getGate(nodeId);
-        if (!nodeGate.executing.compareAndSet(false, true)) {
-            nodeGate.repeatPending.set(true);
+        if (!nodeGateCoordinator.tryAcquireOrSignalRepeat(nodeGate)) {
             return Mono.just(Map.of());
         }
 
@@ -832,7 +1043,7 @@ public class DagEngine {
                     // executeHandlerWithRepeat 对 success=true 的结果会走 repeat 检查，
                     // 检查完后已执行 nodeGate.executing.set(false) 释放锁，此处不需再操作。
                     if (result.pending()) {
-                        if (result.output() != null && !result.output().isEmpty()) {
+                        if (shouldCommitOutput(result)) {
                             ctx.putNodeOutput(nodeId, result.output());
                         }
                         NodeStatus status = statusForOutcome(result.outcome());
@@ -846,7 +1057,7 @@ public class DagEngine {
                     // 同路径B，锁已在 executeHandlerWithRepeat 中释放。
                     if (handler.isBenefitNode()) ctx.setBenefitGranted(true);
                     if (handler.isReachNode()) ctx.setUserReached(true);
-                    if (result.output() != null && !result.output().isEmpty()) {
+                    if (shouldCommitOutput(result)) {
                         ctx.putNodeOutput(nodeId, result.output());
                     }
                     NodeStatus status = statusForOutcome(result.outcome());
@@ -859,7 +1070,7 @@ public class DagEngine {
                 })
                 .onErrorResume(e -> {
                     // 异常时锁可能仍被持有（handler 内部抛出），在此统一释放
-                    nodeGate.executing.set(false);
+                    nodeGateCoordinator.release(nodeGate);
                     ctx.setNodeStatus(nodeId, NodeStatus.FAILED);
                     if (ctx.isBenefitGranted() || ctx.isUserReached()) {
                         return Mono.just(Map.of());
@@ -874,10 +1085,10 @@ public class DagEngine {
                                                         int depth) {
         // 立即标记未走的分支入口为 SKIPPED（设计文档 7.7节两阶段写入 - 阶段一）
         // 目的：让汇聚节点在执行中即时检测到上游 SKIPPED，而不是等到执行结束
-        markNonTakenBranchesSkipped(graph, sourceNodeId, sourceType, result, ctx);
+        nodeResultRouter.markNonTakenBranchesSkipped(graph, sourceNodeId, sourceType, result, ctx);
 
         // 收集所有下游并行触发
-        List<String> nextIds = collectNextIds(result);
+        List<String> nextIds = nodeResultRouter.nextNodeIds(result);
         if (nextIds.isEmpty()) {
             // 叶子节点直接返回自身输出，作为本次 DAG 执行响应的一部分。
             return Mono.just(result.output() != null ? result.output() : Map.of());
@@ -899,13 +1110,7 @@ public class DagEngine {
                                                                      ExecutionContext ctx,
                                                                      int depth,
                                                                      String errorMessage) {
-        List<String> nextIds = graph.downstream(sourceNodeId).stream()
-                .filter(nextId -> {
-                    DagParser.CanvasNode nextNode = graph.getNode(nextId);
-                    return nextNode != null && isFailureAwareConvergenceNode(nextNode.getType());
-                })
-                .distinct()
-                .toList();
+        List<String> nextIds = nodeResultRouter.failureAwareDownstream(graph, sourceNodeId);
 
         if (nextIds.isEmpty()) {
             return Mono.error(new RuntimeException("节点 " + sourceNodeId + " 失败: " + errorMessage));
@@ -916,15 +1121,6 @@ public class DagEngine {
         return Flux.fromIterable(nextIds)
                 .flatMap(nextId -> executeNode(graph, nextId, ctx, depth + 1))
                 .last(Map.of());
-    }
-
-    /**
-     * 失败信号可继续传递的汇聚节点类型。
-     */
-    private boolean isFailureAwareConvergenceNode(String nodeType) {
-        return NodeType.HUB.equals(nodeType)
-                || NodeType.AGGREGATE.equals(nodeType)
-                || NodeType.THRESHOLD.equals(nodeType);
     }
 
     /**
@@ -970,6 +1166,7 @@ public class DagEngine {
             if (ctx.setNodeStatusIfAbsent(nodeId, NodeStatus.SKIPPED)) {
                 // 只为从未进入状态机的节点补 SKIPPED，避免覆盖已执行/等待/失败节点。
                 skippedTraces.add(CanvasExecutionTraceDO.builder()
+                        .tenantId(ctx.getTenantId())
                         .executionId(ctx.getExecutionId())
                         .nodeId(nodeId)
                         .nodeType(node.getType())
@@ -1022,6 +1219,7 @@ public class DagEngine {
 
     private void writeTraceStart(ExecutionContext ctx, DagParser.CanvasNode node) {
         CanvasExecutionTraceDO trace = CanvasExecutionTraceDO.builder()
+                .tenantId(ctx.getTenantId())
                 .executionId(ctx.getExecutionId())
                 .nodeId(node.getId())
                 .nodeType(node.getType())
@@ -1048,6 +1246,7 @@ public class DagEngine {
         }
 
         CanvasExecutionTraceDO trace = CanvasExecutionTraceDO.builder()
+                .tenantId(ctx.getTenantId())
                 .executionId(ctx.getExecutionId())
                 .nodeId(node.getId())
                 .nodeType(node.getType())
@@ -1074,26 +1273,9 @@ public class DagEngine {
         writeTraceEnd(ctx, node, result, 0);
     }
 
-    /**
-     * 执行 collect Next Ids 对应的业务逻辑。
-     *
-     * <p>方法会结合入参、当前对象状态和依赖组件完成处理，调用方需关注返回值以及可能产生的状态变更。
-     *
-     * @param result result 方法执行所需的业务参数
-     * @return 查询、转换或计算得到的结果集合
-     */
     // ══════════════════════════════════════════════════════════════
     // 工具方法
     // ══════════════════════════════════════════════════════════════
-
-    /**
-     * 从 NodeResult 收集所有下游节点 ID（排除 null）
-     */
-    private List<String> collectNextIds(NodeResult result) {
-        return NodeRouteResolver.resolveTargets(result).stream()
-                .distinct()
-                .collect(Collectors.toList());
-    }
 
     /**
      * 执行 status For Outcome 对应的业务逻辑。
@@ -1113,6 +1295,16 @@ public class DagEngine {
             case PENDING -> NodeStatus.WAITING;
             case SUCCESS -> NodeStatus.SUCCESS;
         };
+    }
+
+    private boolean shouldCommitOutput(NodeResult result) {
+        if (result == null || result.output() == null || result.output().isEmpty()) {
+            return false;
+        }
+        if (!result.success() || result.pending()) {
+            return false;
+        }
+        return result.outcome() == null || result.outcome() == NodeOutcome.SUCCESS;
     }
 
     /**
@@ -1251,77 +1443,4 @@ public class DagEngine {
         }
     }
 
-    /**
-     * 立即标记未走分支的入口节点为 SKIPPED（设计文档 7.7节 阶段一写入）。
-     * 覆盖场景：
-     * IF_CONDITION  → 标记未走的 success/fail 分支入口
-     */
-    @SuppressWarnings("unchecked")
-    private void markNonTakenBranchesSkipped(DagGraph graph, String sourceNodeId,
-                                             String sourceType, NodeResult result,
-                                             ExecutionContext ctx) {
-        DagParser.CanvasNode node = graph.getNode(sourceNodeId);
-        if (node == null || node.getConfig() == null) return;
-        Map<String, Object> cfg = node.getConfig();
-
-        if (NodeType.IF_CONDITION.equals(sourceType)) {
-            // result 中只有被走的那条（另一条是 null）
-            // 通过 config 找到"另一条"并标记 SKIPPED
-            String successId = (String) cfg.get(MapFieldKeys.SUCCESS_NODE_ID);
-            String failId = (String) cfg.get(MapFieldKeys.FAIL_NODE_ID);
-            String takenId = result.successNodeId() != null ? result.successNodeId()
-                    : result.failNodeId();
-            String skippedId = takenId != null && takenId.equals(successId) ? failId : successId;
-            markSkippedPath(graph, skippedId, ctx);
-
-        }
-    }
-
-    /**
-     * 写入或记录 mark Skipped Path 相关的业务数据。
-     *
-     * <p>方法会结合入参、当前对象状态和依赖组件完成处理，调用方需关注返回值以及可能产生的状态变更。
-     *
-     * @param graph graph 方法执行所需的业务参数
-     * @param nodeId nodeId 对应的业务主键或标识
-     * @param ctx 执行上下文，提供当前画布、用户和节点运行态数据
-     */
-    private void markSkippedPath(DagGraph graph, String nodeId, ExecutionContext ctx) {
-        if (nodeId == null || nodeId.isBlank()) {
-            return;
-        }
-        Deque<String> queue = new ArrayDeque<>();
-        Set<String> visited = new HashSet<>();
-        queue.add(nodeId);
-        while (!queue.isEmpty()) {
-            String current = queue.removeFirst();
-            if (!visited.add(current)) {
-                continue;
-            }
-            if (ctx.setNodeStatusIfNotDone(current, NodeStatus.SKIPPED)) {
-                log.debug("[ENGINE] 立即标记 SKIPPED nodeId={}", current);
-            }
-            for (String downstream : graph.downstream(current)) {
-                if (allUpstreamSkipped(graph, downstream, ctx)) {
-                    queue.addLast(downstream);
-                }
-            }
-        }
-    }
-
-    /**
-     * 执行 all Upstream Skipped 对应的业务逻辑。
-     *
-     * <p>方法会结合入参、当前对象状态和依赖组件完成处理，调用方需关注返回值以及可能产生的状态变更。
-     *
-     * @param graph graph 方法执行所需的业务参数
-     * @param nodeId nodeId 对应的业务主键或标识
-     * @param ctx 执行上下文，提供当前画布、用户和节点运行态数据
-     * @return 判断结果，true 表示校验通过或条件成立
-     */
-    private boolean allUpstreamSkipped(DagGraph graph, String nodeId, ExecutionContext ctx) {
-        List<String> upstreamIds = graph.upstream(nodeId);
-        return !upstreamIds.isEmpty()
-                && upstreamIds.stream().allMatch(upstream -> ctx.getNodeStatus(upstream) == NodeStatus.SKIPPED);
-    }
 }

@@ -74,7 +74,14 @@ class CdpAudienceSourceServiceTest {
         var fields = service.listSourceFields("CDP_PROFILE");
 
         assertThat(fields).extracting(AudienceSourceFieldDTO::name)
-                .contains("displayName", "status", "city", "level");
+                .contains("displayName", "status", "city", "level",
+                        "churn_probability", "churn_risk_band", "best_send_hour");
+        assertThat(fields).filteredOn(field -> "churn_probability".equals(field.name()))
+                .extracting(AudienceSourceFieldDTO::valueType)
+                .containsExactly("NUMBER");
+        assertThat(fields).filteredOn(field -> "best_send_hour".equals(field.name()))
+                .extracting(AudienceSourceFieldDTO::valueType)
+                .containsExactly("NUMBER");
     }
 
     @Test
@@ -222,6 +229,27 @@ class CdpAudienceSourceServiceTest {
 
         assertThat(service.resolveUserIds("CDP_PROFILE", ruleJson))
                 .containsExactly("u2");
+    }
+
+    @Test
+    void resolveUserIdsByCdpProfileCanUsePredictionFields() {
+        when(profileMapper.selectList(any(Wrapper.class))).thenReturn(List.of(
+                profile("u1", "{\"churn_probability\":0.81,\"churn_risk_band\":\"HIGH\",\"best_send_hour\":20}"),
+                profile("u2", "{\"churn_probability\":0.35,\"churn_risk_band\":\"LOW\",\"best_send_hour\":9}")
+        ));
+
+        String ruleJson = """
+                {
+                  "logic":"AND",
+                  "conditions":[
+                    {"field":"churn_probability","op":">","value":0.7},
+                    {"field":"best_send_hour","op":"=","value":20}
+                  ]
+                }
+                """;
+
+        assertThat(service.resolveUserIds("CDP_PROFILE", ruleJson))
+                .containsExactly("u1");
     }
 
     @Test

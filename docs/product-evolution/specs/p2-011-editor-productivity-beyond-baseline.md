@@ -47,7 +47,7 @@ This converts a filtered opportunity into a bounded medium-term implementation c
 
 ### Data And Configuration Touchpoints
 
-- No direct files expected for this layer in the first slice.
+- `backend/canvas-engine/src/main/resources/db/migration/V170__editor_productivity_user_state.sql`
 
 ### Test Touchpoints
 

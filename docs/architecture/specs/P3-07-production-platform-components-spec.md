@@ -6,7 +6,7 @@ Coverage matrix: `docs/architecture/todo/coverage-matrix.md`
 
 ## Verification Status
 
-Planning material. Some component risks are already covered by P1 release/observability and P2 dependency abstraction; this spec tracks larger platform component choices.
+Implemented as a component decision package. Redisson is accepted only for a proof-of-value behind a local coordination interface; other platform components are deferred or rejected for first proof. Evidence and decisions are in `docs/architecture/evidence/p3-07-platform-components.md`, `docs/architecture/platform-component-decision-matrix.md`, `docs/architecture/adr/platform-component-first-pov.md`, and `docs/architecture/platform-component-abstraction-plan.md`.
 
 ## Source Documents
 

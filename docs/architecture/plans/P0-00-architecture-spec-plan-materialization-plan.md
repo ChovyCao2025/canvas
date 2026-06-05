@@ -2,83 +2,17 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Materialize every active architecture todo package into priority-prefixed spec and plan files under `docs/architecture/specs/` and `docs/architecture/plans/`.
+**Goal:** Materialize the reviewed architecture work into priority-prefixed spec and plan files under `docs/architecture/specs/` and `docs/architecture/plans/`, with stable indexes and coverage-matrix traceability.
 
-**Architecture:** Treat `docs/architecture/todo/` as the source of truth and create flat, scan-friendly files grouped by document type. The new files keep source links back to the todo package and coverage matrix, while `todo/` remains the priority queue and traceability root. Verification is scriptable: every todo package must have exactly one matching spec and plan file with a priority prefix.
+**Architecture:** `docs/architecture/todo/` remains the active work queue and traceability root. `docs/architecture/specs/` and `docs/architecture/plans/` are flattened handoff views. The current set contains 18 source todo packages plus 9 expanded P3 architecture evolution/boundary packages, for 27 package specs and 27 package plans. This P0-00 plan is the materialization closure plan, and `P3-00-architecture-boundary-code-verification.md` is a supporting verification sidecar rather than a package spec.
 
-**Tech Stack:** Markdown, zsh, `find`, `rg`, `git diff`.
+**Tech Stack:** Markdown, zsh, `find`, `rg`, `git status`.
+
+**Current Status:** Completed and verified on 2026-06-04.
 
 ---
 
-## File Structure
-
-- Create: `docs/architecture/specs/README.md`
-- Create: `docs/architecture/plans/README.md`
-- Create: `docs/architecture/specs/P0-01-security-hardening-spec.md`
-- Create: `docs/architecture/plans/P0-01-security-hardening-plan.md`
-- Create: `docs/architecture/specs/P0-02-reactive-threading-and-transactions-spec.md`
-- Create: `docs/architecture/plans/P0-02-reactive-threading-and-transactions-plan.md`
-- Create: `docs/architecture/specs/P0-03-canvas-state-data-consistency-spec.md`
-- Create: `docs/architecture/plans/P0-03-canvas-state-data-consistency-plan.md`
-- Create: `docs/architecture/specs/P0-04-execution-concurrency-safety-spec.md`
-- Create: `docs/architecture/plans/P0-04-execution-concurrency-safety-plan.md`
-- Create: `docs/architecture/specs/P0-05-production-resilience-and-dr-spec.md`
-- Create: `docs/architecture/plans/P0-05-production-resilience-and-dr-plan.md`
-- Create: `docs/architecture/specs/P0-06-data-security-and-tenant-isolation-spec.md`
-- Create: `docs/architecture/plans/P0-06-data-security-and-tenant-isolation-plan.md`
-- Create: `docs/architecture/specs/P1-01-dag-engine-and-handler-boundaries-spec.md`
-- Create: `docs/architecture/plans/P1-01-dag-engine-and-handler-boundaries-plan.md`
-- Create: `docs/architecture/specs/P1-02-api-contract-and-validation-spec.md`
-- Create: `docs/architecture/plans/P1-02-api-contract-and-validation-plan.md`
-- Create: `docs/architecture/specs/P1-03-frontend-canvas-state-spec.md`
-- Create: `docs/architecture/plans/P1-03-frontend-canvas-state-plan.md`
-- Create: `docs/architecture/specs/P1-04-observability-and-ops-spec.md`
-- Create: `docs/architecture/plans/P1-04-observability-and-ops-plan.md`
-- Create: `docs/architecture/specs/P1-05-release-deployment-governance-spec.md`
-- Create: `docs/architecture/plans/P1-05-release-deployment-governance-plan.md`
-- Create: `docs/architecture/specs/P2-01-testing-foundation-spec.md`
-- Create: `docs/architecture/plans/P2-01-testing-foundation-plan.md`
-- Create: `docs/architecture/specs/P2-02-cost-capacity-and-retention-spec.md`
-- Create: `docs/architecture/plans/P2-02-cost-capacity-and-retention-plan.md`
-- Create: `docs/architecture/specs/P2-03-documentation-adr-and-runbooks-spec.md`
-- Create: `docs/architecture/plans/P2-03-documentation-adr-and-runbooks-plan.md`
-- Create: `docs/architecture/specs/P2-04-dependency-abstraction-and-vendor-lock-in-spec.md`
-- Create: `docs/architecture/plans/P2-04-dependency-abstraction-and-vendor-lock-in-plan.md`
-- Create: `docs/architecture/specs/P2-05-compliance-data-governance-spec.md`
-- Create: `docs/architecture/plans/P2-05-compliance-data-governance-plan.md`
-- Create: `docs/architecture/specs/P2-06-frontend-accessibility-and-quality-spec.md`
-- Create: `docs/architecture/plans/P2-06-frontend-accessibility-and-quality-plan.md`
-- Create: `docs/architecture/specs/P3-01-platform-evolution-spec.md`
-- Create: `docs/architecture/plans/P3-01-platform-evolution-plan.md`
-- Create: `docs/architecture/specs/P3-02-service-decomposition-and-domain-boundaries-spec.md`
-- Create: `docs/architecture/plans/P3-02-service-decomposition-and-domain-boundaries-plan.md`
-- Create: `docs/architecture/specs/P3-03-data-platform-architecture-spec.md`
-- Create: `docs/architecture/plans/P3-03-data-platform-architecture-plan.md`
-- Create: `docs/architecture/specs/P3-04-multi-datasource-isolation-spec.md`
-- Create: `docs/architecture/plans/P3-04-multi-datasource-isolation-plan.md`
-- Create: `docs/architecture/specs/P3-05-webflux-to-mvc-migration-spec.md`
-- Create: `docs/architecture/plans/P3-05-webflux-to-mvc-migration-plan.md`
-- Create: `docs/architecture/specs/P3-06-k8s-deployment-platform-spec.md`
-- Create: `docs/architecture/plans/P3-06-k8s-deployment-platform-plan.md`
-- Create: `docs/architecture/specs/P3-07-production-platform-components-spec.md`
-- Create: `docs/architecture/plans/P3-07-production-platform-components-plan.md`
-- Create: `docs/architecture/specs/P3-08-wecom-scrm-module-spec.md`
-- Create: `docs/architecture/plans/P3-08-wecom-scrm-module-plan.md`
-- Create: `docs/architecture/specs/P3-09-identity-event-and-tenant-platform-spec.md`
-- Create: `docs/architecture/plans/P3-09-identity-event-and-tenant-platform-plan.md`
-- Modify: `docs/architecture/index.md`
-- Modify: `docs/architecture/todo/README.md`
-- Modify: `docs/architecture/todo/coverage-matrix.md`
-
-### Task 1: Create The Materialized Specs
-
-**Files:**
-- Read: `docs/architecture/todo/*/*/spec.md`
-- Create: `docs/architecture/specs/*.md`
-
-- [ ] **Step 1: Define the canonical package order**
-
-Use this exact package map:
+## Materialized Package Order
 
 ```text
 P0-01 security-hardening
@@ -98,6 +32,7 @@ P2-03 documentation-adr-and-runbooks
 P2-04 dependency-abstraction-and-vendor-lock-in
 P2-05 compliance-data-governance
 P2-06 frontend-accessibility-and-quality
+P3-00 architecture-boundary-review
 P3-01 platform-evolution
 P3-02 service-decomposition-and-domain-boundaries
 P3-03 data-platform-architecture
@@ -109,201 +44,185 @@ P3-08 wecom-scrm-module
 P3-09 identity-event-and-tenant-platform
 ```
 
-- [ ] **Step 2: Copy each package spec into the specs folder**
+## File Structure
 
-Run:
+- Specs index: `docs/architecture/specs/README.md`
+- Plans index: `docs/architecture/plans/README.md`
+- Architecture entry point: `docs/architecture/index.md`
+- Todo source index: `docs/architecture/todo/README.md`
+- Coverage matrix: `docs/architecture/todo/coverage-matrix.md`
+- Package specs: `docs/architecture/specs/P*-*-spec.md`
+- Package plans: `docs/architecture/plans/P*-*-plan.md`
+- Supporting sidecar: `docs/architecture/specs/P3-00-architecture-boundary-code-verification.md`
 
-```bash
-find docs/architecture/todo -mindepth 3 -maxdepth 3 -name spec.md | wc -l
-```
-
-Expected: `26`.
-
-- [ ] **Step 3: Add source metadata to each materialized spec**
-
-Each generated spec must start with the existing title followed by:
-
-```markdown
-Source package: `docs/architecture/todo/p0/security-hardening/`
-
-Coverage matrix: `docs/architecture/todo/coverage-matrix.md`
-```
-
-For other packages, use the equivalent priority and slug path from the canonical package order.
-
-- [ ] **Step 4: Verify spec count**
-
-Run:
-
-```bash
-find docs/architecture/specs -maxdepth 1 -name 'P*-*-spec.md' | wc -l
-```
-
-Expected: `26`.
-
-### Task 2: Create The Materialized Plans
+## Task 1: Materialize Specs
 
 **Files:**
-- Read: `docs/architecture/todo/*/*/plan.md`
-- Create: `docs/architecture/plans/P*-*-plan.md`
+- Source: `docs/architecture/todo/*/*/spec.md`
+- Destination: `docs/architecture/specs/P*-*-spec.md`
+- Supporting: `docs/architecture/todo/coverage-matrix.md`
 
-- [ ] **Step 1: Generate a skill-compliant header for each package plan**
+- [x] Define the canonical materialized package order.
+- [x] Materialize package specs into `docs/architecture/specs/`.
+- [x] Add `Source package:` and `Coverage matrix:` metadata to every package spec.
+- [x] Verify package spec count.
 
-Each package plan must start with:
-
-```markdown
-# Security Hardening Implementation Plan
-
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
-
-**Goal:** Execute the architecture remediation package described in `../specs/P0-01-security-hardening-spec.md`.
-
-**Architecture:** Start from the archived evidence and current repository verification, add failing tests around the confirmed behavior, then implement the smallest scoped changes that satisfy the package acceptance criteria. Keep unrelated refactors out of the package unless a test proves the boundary must change.
-
-**Tech Stack:** Java 21, Spring Boot 3.2, WebFlux, MyBatis-Plus, Reactor, Redis, RocketMQ, React 18, TypeScript, Vite, Vitest, JUnit 5.
-
----
-```
-
-For other packages, replace the title and spec filename with the matching package title and priority-prefixed spec file from the canonical package order.
-
-- [ ] **Step 2: Preserve original package plan items as implementation tasks**
-
-For each numbered line from the source plan, create a task with this structure:
-
-```markdown
-### Task 1: Split local defaults from production requirements
-
-**Files:**
-- Read: `../specs/P0-01-security-hardening-spec.md`
-- Read: `../todo/coverage-matrix.md`
-- Modify: repository files listed by the spec evidence for this package
-- Test: package-specific tests added before implementation
-
-- [ ] **Step 1: Lock the failing behavior**
-
-Read the matching spec evidence and write the smallest failing test that demonstrates this task's current gap. If the task is documentation-only, write the exact documentation section before editing implementation files.
-
-- [ ] **Step 2: Run the focused test or documentation check**
-
-Run the narrowest command that exercises the new test or generated document. Expected result before implementation: failing test, changed documentation diff, or a documented repository evidence mismatch.
-
-- [ ] **Step 3: Implement the scoped change**
-
-Change only files needed for this task and keep package boundaries aligned with the matching spec acceptance criteria.
-
-- [ ] **Step 4: Verify the task**
-
-Run the focused command again. Expected result after implementation: pass, or documentation check exits 0.
-
-- [ ] **Step 5: Review diff**
-
-Run `git diff -- .` and verify the diff only touches files in this task scope.
-```
-
-For other packages, keep the same structure and replace the example task title and spec file with the current source plan item.
-
-- [ ] **Step 3: Verify plan count**
-
-Run:
+Verification:
 
 ```bash
-find docs/architecture/plans -maxdepth 1 -name 'P*-*-plan.md' | wc -l
+find docs/architecture/specs -maxdepth 1 -name 'P*-*-spec.md' | wc -l | tr -d ' '
 ```
 
-Expected: `27` because this materialization plan is also priority-prefixed.
+Result: `27`.
 
-### Task 3: Add Folder Indexes
-
-**Files:**
-- Create: `docs/architecture/specs/README.md`
-- Create: `docs/architecture/plans/README.md`
-
-- [ ] **Step 1: Write `specs/README.md`**
-
-The file must list all 26 spec files in priority order and link to the matching plan file.
-
-- [ ] **Step 2: Write `plans/README.md`**
-
-The file must list this materialization plan plus all 26 package plan files in priority order and link to the matching spec file.
-
-- [ ] **Step 3: Verify index links**
-
-Run:
+Metadata check:
 
 ```bash
-rg -n "P0-01-security-hardening|P3-09-identity-event-and-tenant-platform" docs/architecture/specs/README.md docs/architecture/plans/README.md
+missing=0
+for f in docs/architecture/specs/P*-*-spec.md; do
+  rg -q '^Source package:' "$f" || { echo "missing source $f"; missing=1; }
+  rg -q '^Coverage matrix:' "$f" || { echo "missing coverage $f"; missing=1; }
+done
+exit $missing
 ```
 
-Expected: both files contain the first and last package links.
+Result: exit code `0`.
 
-### Task 4: Update Architecture Entry Points
+## Task 2: Materialize Plans
 
 **Files:**
-- Modify: `docs/architecture/index.md`
-- Modify: `docs/architecture/todo/README.md`
-- Modify: `docs/architecture/todo/coverage-matrix.md`
+- Source: `docs/architecture/todo/*/*/plan.md`
+- Destination: `docs/architecture/plans/P*-*-plan.md`
 
-- [ ] **Step 1: Update the top-level architecture index**
+- [x] Generate a skill-compliant header for each package plan.
+- [x] Preserve package implementation tasks and verification commands.
+- [x] Verify package plan count and total plan count.
 
-Add links to `specs/README.md` and `plans/README.md` next to the existing `todo/` and `archive/` links.
-
-- [ ] **Step 2: Update the todo README**
-
-Add a note that flattened spec and plan files are available under `../specs/` and `../plans/`.
-
-- [ ] **Step 3: Update coverage matrix package legend**
-
-For each package legend entry, include both the source todo package and the materialized spec/plan filenames.
-
-- [ ] **Step 4: Verify old path references**
-
-Run:
+Verification:
 
 ```bash
-rg -n "docs/architecture/(architecture-|remediation/|evolution/|backend-architecture|frontend-architecture|security-considerations|testing-strategy|deployment-guide|database-schema|tech-stack|coding-standards|api-spec-summary|brownfield-architecture|production-deployment)" docs/architecture/specs docs/architecture/plans docs/architecture/todo docs/architecture/index.md
+find docs/architecture/plans -maxdepth 1 -name 'P*-*-plan.md' ! -name 'P0-00-*' | wc -l | tr -d ' '
+find docs/architecture/plans -maxdepth 1 -name 'P*-*-plan.md' | wc -l | tr -d ' '
 ```
 
-Expected: no output.
+Result: `27` package plans, `28` total plans including this P0-00 closure plan.
 
-### Task 5: Final Verification
+Header check:
+
+```bash
+missing=0
+for f in docs/architecture/plans/P*-*-plan.md; do
+  rg -q 'REQUIRED SUB-SKILL' "$f" || { echo "missing skill header $f"; missing=1; }
+done
+exit $missing
+```
+
+Result: exit code `0`.
+
+## Task 3: Add Folder Indexes
 
 **Files:**
-- Read: `docs/architecture/specs/`
-- Read: `docs/architecture/plans/`
-- Read: `docs/architecture/index.md`
-- Read: `docs/architecture/todo/README.md`
-- Read: `docs/architecture/todo/coverage-matrix.md`
+- `docs/architecture/specs/README.md`
+- `docs/architecture/plans/README.md`
 
-- [ ] **Step 1: Verify package parity**
+- [x] Write `specs/README.md` with all 27 package specs in priority order.
+- [x] Write `plans/README.md` with this materialization plan plus all 27 package plans in priority order.
+- [x] Verify index links include the first and last materialized packages.
 
-Run:
+Verification:
 
 ```bash
-spec_count=$(find docs/architecture/specs -maxdepth 1 -name 'P*-*-spec.md' | wc -l | tr -d ' ')
-plan_count=$(find docs/architecture/plans -maxdepth 1 -name 'P*-*-plan.md' ! -name 'P0-00-*' | wc -l | tr -d ' ')
-test "$spec_count" = 26 && test "$plan_count" = 26
+rg -n "P0-01-security-hardening|P3-09-identity-event-and-tenant-platform" \
+  docs/architecture/specs/README.md docs/architecture/plans/README.md
 ```
 
-Expected: exit code `0`.
+Result: both README files contain the first and last package links.
 
-- [ ] **Step 2: Verify no unresolved marker strings**
+## Task 4: Update Architecture Entry Points
 
-Run:
+**Files:**
+- `docs/architecture/index.md`
+- `docs/architecture/todo/README.md`
+- `docs/architecture/todo/coverage-matrix.md`
+
+- [x] Update the top-level architecture index with `todo/`, `specs/`, `plans/`, and `archive/` links.
+- [x] Update the todo README with flattened spec/plan locations.
+- [x] Update the coverage matrix package legend with materialized spec and plan filenames.
+- [x] Verify old unarchived architecture path references are absent from architecture working docs.
+
+Verification:
+
+```bash
+rg -n "docs/architecture/(architecture-|remediation/|evolution/|backend-architecture|frontend-architecture|security-considerations|testing-strategy|deployment-guide|database-schema|tech-stack|coding-standards|api-spec-summary|brownfield-architecture|production-deployment)" \
+  docs/architecture/specs docs/architecture/plans docs/architecture/todo docs/architecture/index.md
+```
+
+Result: no output.
+
+## Task 5: Final Verification
+
+**Files:**
+- `docs/architecture/specs/`
+- `docs/architecture/plans/`
+- `docs/architecture/index.md`
+- `docs/architecture/todo/README.md`
+- `docs/architecture/todo/coverage-matrix.md`
+
+- [x] Verify every package spec has exactly one matching package plan.
+- [x] Verify every package plan, excluding this P0-00 closure plan, has a matching package spec.
+- [x] Verify every package spec appears in the folder indexes or coverage matrix.
+- [x] Verify generated files are visible to git.
+- [x] Record accepted marker-scan exceptions.
+
+Parity check:
+
+```bash
+for f in docs/architecture/specs/P*-*-spec.md; do
+  b=$(basename "$f" -spec.md)
+  p="docs/architecture/plans/${b}-plan.md"
+  test -f "$p" || echo "missing plan for $f"
+done
+
+for f in docs/architecture/plans/P*-*-plan.md; do
+  case "$(basename "$f")" in P0-00-*) continue;; esac
+  b=$(basename "$f" -plan.md)
+  s="docs/architecture/specs/${b}-spec.md"
+  test -f "$s" || echo "missing spec for $f"
+done
+```
+
+Result: no output.
+
+Index coverage check:
+
+```bash
+for f in docs/architecture/specs/P*-*-spec.md; do
+  base=$(basename "$f")
+  rg -q "$base" docs/architecture/specs/README.md docs/architecture/plans/README.md docs/architecture/todo/coverage-matrix.md \
+    || echo "missing index coverage for $base"
+done
+```
+
+Result: no output.
+
+Marker scan:
 
 ```bash
 marker_pattern='T''BD|TO''DO|FIX''ME|待''定|待''补|place''holder'
 rg -n "$marker_pattern" docs/architecture/specs docs/architecture/plans docs/architecture/index.md docs/architecture/todo/README.md docs/architecture/todo/coverage-matrix.md
 ```
 
-Expected: no output.
+Accepted results:
 
-- [ ] **Step 3: Verify all generated files are visible to git**
+- `docs/architecture/plans/P1-03-frontend-canvas-state-plan.md`: `insert placeholder` is a real frontend canvas state term.
+- `docs/architecture/plans/P2-03-documentation-adr-and-runbooks-plan.md`: `dashboard link placeholder` is an explicit runbook template field to be filled by the implementing team.
 
-Run:
+Git visibility check:
 
 ```bash
 git status --short docs/architecture/specs docs/architecture/plans docs/architecture/index.md docs/architecture/todo/README.md docs/architecture/todo/coverage-matrix.md
 ```
 
-Expected: generated spec and plan files appear as untracked or modified files; no unrelated files are changed by this task.
+Result: generated architecture spec/plan/index files are visible as modified or untracked files in the current worktree.
+
+No commit was created in this step because the current task is implementation and verification; version-control commit timing is left to the repository owner.

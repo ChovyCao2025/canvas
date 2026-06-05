@@ -2,11 +2,11 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Package industry templates, nodes, metrics, and compliance profiles for selected verticals.
+**Goal:** Produce evidence and a governance decision for vertical templates, nodes, metrics, compliance profiles, and industry packaging.
 
-**Architecture:** Implement the capability as a thin vertical slice: failing tests first, then backend/domain contracts, then frontend service and route integration, then rollout documentation. Keep scope bounded to the spec and use additive migrations or feature flags for risky changes.
+**Architecture:** This is a P3 strategy gate, not a vertical package build. The slice creates discovery, scorecard, and governance Markdown artifacts; no backend, frontend, template, node, dashboard, or Flyway files are changed.
 
-**Tech Stack:** Java 21, Spring Boot WebFlux style controllers currently returning Mono, MyBatis, Flyway, Redis/RocketMQ where needed, React 18, Vite, TypeScript, Ant Design, Vitest, JUnit 5, Mockito.
+**Tech Stack:** Markdown, shell validation with `rg`, repository documentation review.
 
 ---
 
@@ -17,130 +17,207 @@
 
 ## File Structure
 
-**Backend**
-- `backend/canvas-engine/src/main/java/org/chovy/canvas/domain/industrypackaging/IndustryPackagingService.java`
-- `backend/canvas-engine/src/main/java/org/chovy/canvas/web/IndustryPackagingController.java`
+**Evidence And Governance**
+- Create: `docs/product-evolution/evidence/p3-008-industry-packaging-discovery.md` - owners, candidate verticals, buyer/user profile, evidence, and launch constraints.
+- Create: `docs/product-evolution/evidence/p3-008-vertical-selection-scorecard.md` - demand, repeatability, compliance, template coverage, sales/support readiness, and decision implication.
+- Create: `docs/product-evolution/governance/p3-008-industry-packaging-gate.md` - proceed/park/split decision, KPI, child spec, and revisit trigger.
 
-**Frontend**
-- `frontend/src/pages/industry-packaging/index.tsx`
-- `frontend/src/services/industrypackagingApi.ts`
+**No Runtime Files**
+- No backend files.
+- No frontend files.
+- No Flyway migration. If approved, runtime storage starts at `backend/canvas-engine/src/main/resources/db/migration/V180__industry_packaging_registry.sql`.
 
-**Data And Config**
-- `backend/canvas-engine/src/main/resources/db/migration/V123__industry_packaging.sql`
-
-**Tests**
-- `backend/canvas-engine/src/test/java/org/chovy/canvas/strategy/IndustryPackagingTest.java`
-- `frontend/src/pages/industry-packaging/industry-packaging.test.tsx`
-
-### Task 1: Contract And Failing Tests
+### Task 1: Industry Packaging Discovery
 
 **Files:**
-- Create: `backend/canvas-engine/src/test/java/org/chovy/canvas/strategy/IndustryPackagingTest.java`
-- Create: `frontend/src/pages/industry-packaging/industry-packaging.test.tsx`
-- Read: `docs/product-evolution/specs/p3-008-industry-packaging.md`
+- Create: `docs/product-evolution/evidence/p3-008-industry-packaging-discovery.md`
 
-- [ ] **Step 1: Write backend contract tests**
+- [ ] **Step 1: Write discovery artifact**
 
-Create `backend/canvas-engine/src/test/java/org/chovy/canvas/strategy/IndustryPackagingTest.java` with tests for authorization, tenant scoping, and the main success path named after `industry-packaging`. Use existing controller or service tests in `backend/canvas-engine/src/test/java/org/chovy/canvas` as style references.
+Create `docs/product-evolution/evidence/p3-008-industry-packaging-discovery.md`:
 
-- [ ] **Step 2: Run backend contract tests and confirm red state**
+```markdown
+# P3-008 Industry Packaging Discovery
 
-Run: `cd backend && mvn -pl canvas-engine test -Dtest=IndustryPackagingTest`
+## Owners
 
-Expected: FAIL because the new route, service method, or behavior has not been implemented yet.
+- Vertical owner: Industry Packaging Lead
+- Product owner: Marketing Canvas Product Lead
+- Compliance owner: Compliance Lead
+- Sales owner: Sales Enablement Lead
+- Support owner: Support Operations Lead
+- Decision date: 2026-07-30
 
-- [ ] **Step 3: Write frontend workflow tests**
+## Candidate Verticals
 
-Create `frontend/src/pages/industry-packaging/industry-packaging.test.tsx` with Vitest coverage for loading, empty, success, permission, and server-error states for the first UI slice.
+- Retail lifecycle marketing
+- Financial services retention
+- Education enrollment engagement
 
-- [ ] **Step 4: Run frontend workflow tests and confirm red state**
+## Buyer And User Profile
 
-Run: `cd frontend && npm test -- industry-packaging.test.tsx`
+- Buyer: VP Marketing or Digital Operations
+- User: lifecycle campaign operator
+- Implementation owner: solution consultant
 
-Expected: FAIL because the new page, component, service call, or state handling does not exist yet.
+## Evidence Sources
 
-### Task 2: Backend And Data Slice
+| Source | Source date | Owner | Confidence | Decision implication |
+|---|---:|---|---|---|
+| Sales opportunity notes | 2026-06-12 | Sales Enablement Lead | Medium | Retail has repeated template demand. |
+| Implementation notes | 2026-06-15 | Solution Consulting Lead | Medium | Financial services needs compliance claim review before packaging. |
+| Template usage analytics | 2026-06-18 | Product Analytics Lead | High | Existing retail templates have highest reuse. |
 
-**Files:**
-- `backend/canvas-engine/src/main/java/org/chovy/canvas/domain/industrypackaging/IndustryPackagingService.java`
-- `backend/canvas-engine/src/main/java/org/chovy/canvas/web/IndustryPackagingController.java`
-- `backend/canvas-engine/src/main/resources/db/migration/V123__industry_packaging.sql`
-- Test: `backend/canvas-engine/src/test/java/org/chovy/canvas/strategy/IndustryPackagingTest.java`
+## Launch Constraints
 
-- [ ] **Step 1: Add additive data structures when the spec requires storage**
+- Every compliance claim requires Compliance Lead approval.
+- Templates need a maintenance owner before publication.
+- Support must confirm runbook coverage for each vertical.
+```
 
-If this plan has a Flyway file, create it exactly at the data path listed above. Use additive tables, indexes, and nullable columns so rollout can be disabled without rollback data loss.
+- [ ] **Step 2: Verify discovery headings**
 
-- [ ] **Step 2: Implement the domain service**
+Run:
 
-Implement the service behavior in the backend files listed above. Keep business rules in the domain service and keep controllers thin.
+```bash
+rg -n "^## (Owners|Candidate Verticals|Buyer And User Profile|Evidence Sources|Launch Constraints)$" docs/product-evolution/evidence/p3-008-industry-packaging-discovery.md
+```
 
-- [ ] **Step 3: Implement or extend the controller contract**
+Expected: finds all five headings.
 
-Expose only the endpoints needed by the first workflow. Return `R<T>` or existing project response types consistently with nearby controllers.
+- [ ] **Step 3: Commit discovery artifact**
 
-- [ ] **Step 4: Run focused backend tests**
+Run:
 
-Run: `cd backend && mvn -pl canvas-engine test -Dtest=IndustryPackagingTest`
+```bash
+git add docs/product-evolution/evidence/p3-008-industry-packaging-discovery.md docs/product-evolution/plans/p3-008-industry-packaging-plan.md
+git commit -m "docs: add industry packaging discovery"
+```
 
-Expected: PASS for the new contract tests.
+Expected: commit contains only the discovery artifact and this plan.
 
-### Task 3: Frontend Slice
-
-**Files:**
-- `frontend/src/pages/industry-packaging/index.tsx`
-- `frontend/src/services/industrypackagingApi.ts`
-- Test: `frontend/src/pages/industry-packaging/industry-packaging.test.tsx`
-
-- [ ] **Step 1: Add the typed API wrapper**
-
-Implement the API wrapper in the service file listed above. Reuse `frontend/src/services/api.ts` and return typed request and response objects.
-
-- [ ] **Step 2: Add the route, page, panel, or component**
-
-Implement the first visible workflow in the frontend files listed above. Include loading, empty, error, permission, and success states.
-
-- [ ] **Step 3: Wire navigation only where needed**
-
-Add navigation entry points only if the feature needs a top-level route. Prefer contextual entry points for editor, analytics, or settings capabilities.
-
-- [ ] **Step 4: Run focused frontend tests**
-
-Run: `cd frontend && npm test -- industry-packaging.test.tsx`
-
-Expected: PASS for the new workflow tests.
-
-### Task 4: Integration Verification And Rollout Notes
+### Task 2: Vertical Selection Scorecard
 
 **Files:**
-- Modify: `docs/product-evolution/specs/p3-008-industry-packaging.md`
-- Modify: `docs/product-evolution/plans/p3-008-industry-packaging-plan.md`
-- Read: `docs/product-evolution/todo/INDEX.md`
+- Create: `docs/product-evolution/evidence/p3-008-vertical-selection-scorecard.md`
 
-- [ ] **Step 1: Run backend regression slice**
+- [ ] **Step 1: Write scorecard**
 
-Run: `cd backend && mvn -pl canvas-engine test`
+Create `docs/product-evolution/evidence/p3-008-vertical-selection-scorecard.md`:
 
-Expected: PASS for the canvas-engine module test suite.
+```markdown
+# P3-008 Vertical Selection Scorecard
 
-- [ ] **Step 2: Run frontend regression slice**
+## Scorecard
 
-Run: `cd frontend && npm test -- --run`
+| Vertical | Evidence source | Demand score | Repeatability score | Compliance risk | Existing template coverage | Sales/support readiness | Decision implication |
+|---|---|---:|---:|---|---|---|---|
+| Retail lifecycle marketing | Template usage analytics | 5 | 4 | Low | High | Medium | Best first package candidate. |
+| Financial services retention | Implementation notes | 4 | 3 | High | Medium | Low | Needs compliance child spec before packaging. |
+| Education enrollment engagement | Sales opportunity notes | 3 | 3 | Medium | Low | Medium | Park until more evidence exists. |
 
-Expected: PASS for the Vitest suite.
+## Packaging Governance Brief
 
-- [ ] **Step 3: Run frontend build**
+- Content owner: Industry Packaging Lead
+- Review cadence: monthly while package is active
+- Approval rule: product, compliance, sales, and support owners must sign off
+- Allowed claims: workflow fit, template contents, implementation prerequisites
+- Blocked claims: legal compliance guarantees, revenue uplift guarantees, automated approval claims
+- Maintenance trigger: template failure, compliance rule change, or support escalation trend
+```
 
-Run: `cd frontend && npm run build`
+- [ ] **Step 2: Verify scorecard headings**
 
-Expected: PASS with TypeScript and Vite build success.
+Run:
 
-- [ ] **Step 4: Add rollout notes to the implementation PR**
+```bash
+rg -n "^## (Scorecard|Packaging Governance Brief)$" docs/product-evolution/evidence/p3-008-vertical-selection-scorecard.md
+```
 
-Document feature flag or route guard, migration order, tenant and role impact, manual verification steps, and rollback command or disable switch.
+Expected: finds both headings.
 
-- [ ] **Step 5: Commit the implementation slice**
+- [ ] **Step 3: Commit scorecard**
 
-Run: `git add backend/canvas-engine/src frontend/src docs/product-evolution/specs docs/product-evolution/plans && git commit -m "feat: implement industry-packaging slice"`
+Run:
 
-Expected: commit contains only files required by this plan.
+```bash
+git add docs/product-evolution/evidence/p3-008-vertical-selection-scorecard.md docs/product-evolution/plans/p3-008-industry-packaging-plan.md
+git commit -m "docs: add industry packaging scorecard"
+```
+
+Expected: commit contains only the scorecard and this plan.
+
+### Task 3: Governance Gate
+
+**Files:**
+- Create: `docs/product-evolution/governance/p3-008-industry-packaging-gate.md`
+
+- [ ] **Step 1: Write governance gate**
+
+Create `docs/product-evolution/governance/p3-008-industry-packaging-gate.md`:
+
+```markdown
+# P3-008 Industry Packaging Gate
+
+## Decision
+
+- Outcome: split
+- Decision owner: Industry Packaging Lead
+- Decision date: 2026-07-30
+- First measurable KPI: create one retail package proposal with three reusable templates and support runbook approval.
+
+## Next Child Spec
+
+- Retail package child spec: `docs/product-evolution/specs/p3-008a-retail-lifecycle-package.md`
+- Compliance review child spec: `docs/product-evolution/specs/p3-008b-vertical-compliance-claims-review.md`
+
+## Revisit Trigger
+
+If retail package evidence cannot produce three reusable templates by 2026-08-30, park industry packaging and keep template improvements generic.
+
+## Sign-Off
+
+| Role | Owner | Status |
+|---|---|---|
+| Vertical | Industry Packaging Lead | Required |
+| Product | Marketing Canvas Product Lead | Required |
+| Compliance | Compliance Lead | Required |
+| Sales | Sales Enablement Lead | Required |
+| Support | Support Operations Lead | Required |
+```
+
+- [ ] **Step 2: Verify governance gate**
+
+Run:
+
+```bash
+rg -n "^- Outcome: (proceed|park|split)$|^## (Decision|Next Child Spec|Revisit Trigger|Sign-Off)$" docs/product-evolution/governance/p3-008-industry-packaging-gate.md
+```
+
+Expected: finds the split outcome and four headings.
+
+- [ ] **Step 3: Final validation**
+
+Run:
+
+```bash
+rg -n "^# P3-008" docs/product-evolution/evidence/p3-008-industry-packaging-discovery.md docs/product-evolution/evidence/p3-008-vertical-selection-scorecard.md docs/product-evolution/governance/p3-008-industry-packaging-gate.md
+git diff --check docs/product-evolution/specs/p3-008-industry-packaging.md docs/product-evolution/plans/p3-008-industry-packaging-plan.md
+```
+
+Expected: first command finds three document titles; `git diff --check` exits 0.
+
+- [ ] **Step 4: Commit governance gate**
+
+Run:
+
+```bash
+git add docs/product-evolution/evidence/p3-008-industry-packaging-discovery.md \
+  docs/product-evolution/evidence/p3-008-vertical-selection-scorecard.md \
+  docs/product-evolution/governance/p3-008-industry-packaging-gate.md \
+  docs/product-evolution/specs/p3-008-industry-packaging.md \
+  docs/product-evolution/plans/p3-008-industry-packaging-plan.md
+git commit -m "docs: add industry packaging strategy gate"
+```
+
+Expected: commit contains only P3-008 evidence, governance, spec, and plan files.

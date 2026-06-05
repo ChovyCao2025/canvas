@@ -5,6 +5,8 @@ import org.chovy.canvas.common.MapFieldKeys;
 import org.chovy.canvas.common.R;
 import org.chovy.canvas.common.tenant.TenantContext;
 import org.chovy.canvas.common.tenant.TenantContextResolver;
+import org.chovy.canvas.domain.ai.AiPromptTemplateService;
+import org.chovy.canvas.domain.ai.AiProviderModelRegistryService;
 import org.chovy.canvas.domain.meta.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -64,6 +66,8 @@ public class MetaController {
     /** AB 实验分组服务，用于查询实验分组选项。 */
     private final AbExperimentGroupService abExperimentGroupService;
     private final TenantContextResolver tenantContextResolver;
+    private final AiProviderModelRegistryService aiProviderModelRegistryService;
+    private final AiPromptTemplateService aiPromptTemplateService;
     /** 统一 HTTP 客户端构建器，继承全局超时、连接池和响应大小限制。 */
     private final WebClient.Builder webClientBuilder;
 
@@ -159,6 +163,48 @@ public class MetaController {
         return currentTenant()
                 .flatMap(context -> Mono.fromCallable(() -> systemOptionService.activeOptions(
                                 "mq_topic_legacy", context.tenantId()))
+                        .subscribeOn(Schedulers.boundedElastic())
+                        .map(R::ok));
+    }
+
+    @GetMapping("/ai-providers")
+    public Mono<R<List<StubOption>>> getAiProviders() {
+        return currentTenant()
+                .flatMap(context -> Mono.fromCallable(() -> aiProviderModelRegistryService
+                                .listProviders(context.tenantId())
+                                .stream()
+                                .filter(AiProviderModelRegistryService.ProviderView::enabled)
+                                .map(provider -> new StubOption(
+                                        String.valueOf(provider.id()),
+                                        provider.displayName() + " (" + provider.providerKey() + ")"))
+                                .toList())
+                        .subscribeOn(Schedulers.boundedElastic())
+                        .map(R::ok));
+    }
+
+    @GetMapping("/ai-templates")
+    public Mono<R<List<StubOption>>> getAiTemplates() {
+        return currentTenant()
+                .flatMap(context -> Mono.fromCallable(() -> aiPromptTemplateService
+                                .listTemplates(context.tenantId())
+                                .stream()
+                                .map(template -> new StubOption(
+                                        String.valueOf(template.id()),
+                                        template.name() + " (" + template.category() + ")"))
+                                .toList())
+                        .subscribeOn(Schedulers.boundedElastic())
+                        .map(R::ok));
+    }
+
+    @GetMapping("/ai-models")
+    public Mono<R<List<StubOption>>> getAiModels(@RequestParam(required = false) Long providerId) {
+        return currentTenant()
+                .flatMap(context -> Mono.fromCallable(() -> aiProviderModelRegistryService
+                                .listModels(context.tenantId(), providerId)
+                                .stream()
+                                .filter(AiProviderModelRegistryService.ModelView::enabled)
+                                .map(model -> new StubOption(model.modelKey(), model.displayName()))
+                                .toList())
                         .subscribeOn(Schedulers.boundedElastic())
                         .map(R::ok));
     }

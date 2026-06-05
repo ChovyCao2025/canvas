@@ -44,6 +44,14 @@ class TenantContextResolverTest {
                 .verifyComplete();
     }
 
+    @Test
+    void currentOrErrorRejectsMissingTenantContext() {
+        StepVerifier.create(resolver.currentOrError())
+                .expectErrorMatches(error -> error instanceof SecurityException
+                        && error.getMessage().equals("AUTH_003: missing tenant context"))
+                .verify();
+    }
+
     private Claims claims(String tenantId) {
         return Jwts.claims()
                 .add("tenantId", tenantId)

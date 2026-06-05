@@ -1,0 +1,20 @@
+CREATE TABLE IF NOT EXISTS cdp_warehouse_e2e_certification_run (
+  id BIGINT NOT NULL AUTO_INCREMENT,
+  tenant_id BIGINT NOT NULL,
+  status VARCHAR(16) NOT NULL,
+  mode VARCHAR(16) NOT NULL,
+  require_physical TINYINT NOT NULL DEFAULT 1,
+  window_start DATETIME NULL,
+  window_end DATETIME NULL,
+  contract_keys_json TEXT NULL,
+  evidence_json TEXT NULL,
+  production_readiness_json MEDIUMTEXT NULL,
+  live_table_inspection_json MEDIUMTEXT NULL,
+  requested_by VARCHAR(128) NULL,
+  error_message VARCHAR(1000) NULL,
+  started_at DATETIME NOT NULL,
+  finished_at DATETIME NOT NULL,
+  PRIMARY KEY (id),
+  INDEX idx_cdp_warehouse_e2e_cert_tenant_status (tenant_id, status, finished_at),
+  INDEX idx_cdp_warehouse_e2e_cert_created (tenant_id, finished_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='CDP warehouse physical E2E certification run history';

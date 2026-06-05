@@ -5,6 +5,10 @@ Sequence: 003
 Source: `todo/p1/mautic-inspired-quick-adoptions.md`
 Implementation plan: `../plans/p1-003-audience-snapshot-mode-and-defaults-plan.md`
 
+## Implementation Status
+
+Implemented and focused-verified on 2026-06-05. Verification evidence is recorded in `../plans/p1-003-audience-snapshot-mode-and-defaults-plan.md`.
+
 ## Goal
 
 Add explicit audience send-mode defaults so every `TAGGER(mode=audience)` node can choose stable publish-time membership or refreshed run-time membership.
@@ -40,7 +44,7 @@ Add explicit audience send-mode defaults so every `TAGGER(mode=audience)` node c
 
 ## Technical Scope
 
-- `backend/canvas-engine/src/main/resources/db/migration/V96__audience_snapshot_mode_and_defaults.sql`
+- `backend/canvas-engine/src/main/resources/db/migration/V252__audience_snapshot_mode_and_defaults.sql`
 - `backend/canvas-engine/src/main/java/org/chovy/canvas/common/enums/AudienceSnapshotMode.java`
 - `backend/canvas-engine/src/main/java/org/chovy/canvas/dal/dataobject/AudienceDefinitionDO.java`
 - `backend/canvas-engine/src/main/java/org/chovy/canvas/dal/dataobject/AudienceSnapshotDO.java`

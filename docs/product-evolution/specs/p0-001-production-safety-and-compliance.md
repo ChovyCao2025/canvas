@@ -5,6 +5,10 @@ Sequence: 001
 Source: `todo/p0/production-safety-and-compliance-stopgaps.md`
 Implementation plan: `../plans/p0-001-production-safety-and-compliance-plan.md`
 
+## Implementation Status
+
+Implemented and verified on 2026-06-05. Verification evidence is recorded in `../plans/p0-001-production-safety-and-compliance-plan.md`.
+
 ## Goal
 
 Make backend production access safe before growth work by closing unauthenticated operational routes, missing tenant model fields, and unguarded marketing send paths.
@@ -69,7 +73,7 @@ AI node productization is implemented by `p2-019-ai-llm-node-productionization`.
 
 ### Data And Configuration Touchpoints
 
-- `backend/canvas-engine/src/main/resources/db/migration/V91__production_safety_and_compliance.sql`
+- `backend/canvas-engine/src/main/resources/db/migration/V185__production_safety_and_compliance.sql`
 - `backend/canvas-engine/src/main/resources/application.yml`
 
 ### Test Touchpoints
@@ -90,7 +94,7 @@ AI node productization is implemented by `p2-019-ai-llm-node-productionization`.
 
 ## Risks And Controls
 
-- Tenant filtering can hide data if backfill is incomplete. `V91__production_safety_and_compliance.sql` must backfill nullable tenant columns from canvas or the default tenant before adding indexes.
+- Tenant filtering can hide data if backfill is incomplete. `V185__production_safety_and_compliance.sql` must backfill nullable tenant columns from canvas or the default tenant before adding indexes.
 - Internal-token enforcement can break upstream systems. Roll out with `canvas.internal-api.token` unset in local/dev, set in staging, then set in production after callers send the header.
 - Policy checks can increase latency. Keep database checks in `MarketingPolicyService`, keep Redis frequency checks bounded, and reuse existing indexes from `V60__marketing_policy_tables.sql` plus new tenant indexes.
 - A skipped send could be interpreted as provider failure. Use `STATUS_SKIPPED` and reason codes so reporting separates policy blocks from provider errors.

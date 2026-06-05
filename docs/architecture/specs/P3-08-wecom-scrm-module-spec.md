@@ -6,7 +6,7 @@ Coverage matrix: `docs/architecture/todo/coverage-matrix.md`
 
 ## Verification Status
 
-Planning material. Product priority, WeCom tenant configuration, compliance, and operations readiness must be confirmed before implementation.
+Implemented as a WeCom integration slice and boundary package. Implementation is deferred until product, compliance, security, operations, Integration ownership, and sandbox secret handling are confirmed. Evidence and plans are in `docs/architecture/evidence/p3-08-wecom-scrm.md`, `docs/architecture/wecom-scrm-implementation-slice.md`, `docs/architecture/wecom-scrm-integration-boundary.md`, and `docs/architecture/wecom-scrm-test-plan.md`.
 
 ## Source Documents
 

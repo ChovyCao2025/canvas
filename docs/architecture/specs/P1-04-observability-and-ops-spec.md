@@ -7,7 +7,7 @@ Coverage matrix: `docs/architecture/todo/coverage-matrix.md`
 
 ## Verification Status
 
-Confirmed.
+Implemented and verified on 2026-06-04.
 
 ## Problems
 
@@ -31,3 +31,14 @@ Confirmed.
 - Cross-layer tracing exists for trigger -> execution -> handler -> external call.
 - Prometheus rules and dashboards exist as committed deployable assets.
 - Operational runbooks cover cache invalidation, route rebuild, DLQ handling, and shutdown/drain.
+
+## Implementation Evidence
+
+- Correlation/filter code: `backend/canvas-engine/src/main/java/org/chovy/canvas/config/CorrelationIdWebFilter.java`
+- Execution MDC scope: `backend/canvas-engine/src/main/java/org/chovy/canvas/engine/trace/ExecutionTraceContext.java`
+- Async MDC helper: `backend/canvas-engine/src/main/java/org/chovy/canvas/infrastructure/observability/MdcTaskDecorator.java`
+- Runtime metrics: `backend/canvas-engine/src/main/java/org/chovy/canvas/config/CanvasRuntimeMetrics.java`
+- Alert rules: `deploy/observability/prometheus/canvas-alert-rules.yml`
+- Dashboard: `deploy/observability/grafana/canvas-runtime-dashboard.json`
+- Runbooks: `docs/architecture/runbooks/`
+- Verification record: `docs/architecture/evidence/P1-04-observability-and-ops.md`

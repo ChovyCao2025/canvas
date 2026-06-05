@@ -4,6 +4,7 @@
  * 维护说明：新增 API 文档条目时，这些测试能防止分类遗漏和 endpoint id 冲突。
  */
 import { describe, expect, it } from 'vitest'
+import { findAccessibilityIssues } from '../../test/accessibilityChecks'
 
 import {
   API_DOC_CATEGORIES,
@@ -105,5 +106,14 @@ describe('api docs data helpers', () => {
 
   it('builds stable endpoint IDs', () => {
     expect(endpointId('GET', '/canvas/{id}/versions/{versionId}')).toBe('get-canvas-id-versions-versionId')
+  })
+
+  it('keeps API docs controls named for keyboard and screen-reader users', () => {
+    expect(findAccessibilityIssues([
+      { id: 'api-docs-search', role: 'searchbox', name: '搜索接口', focusable: true },
+      { id: 'api-docs-internal-switch', role: 'switch', name: '展示内部接口', focusable: true },
+      { id: 'api-docs-category-filter', role: 'button', name: '筛选接口分类', focusable: true },
+      { id: 'api-docs-copy-code', role: 'button', name: '复制代码', focusable: true },
+    ])).toEqual([])
   })
 })

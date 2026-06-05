@@ -26,4 +26,21 @@ class CanvasExecutionDlqSchemaTest {
                 .contains("`trigger_node_type`")
                 .contains("`match_key`");
     }
+
+    @Test
+    void retentionMigrationRegistersExecutionTablesAndCleanupLedger() throws Exception {
+        ClassPathResource migration = new ClassPathResource("db/migration/V239__execution_retention_policy.sql");
+
+        String sql = migration.getContentAsString(StandardCharsets.UTF_8);
+
+        assertThat(sql)
+                .contains("CREATE TABLE IF NOT EXISTS execution_retention_policy")
+                .contains("CREATE TABLE IF NOT EXISTS execution_retention_run")
+                .contains("CREATE TABLE IF NOT EXISTS execution_retention_archive_manifest")
+                .contains("uk_execution_retention_policy_table")
+                .contains("idx_execution_retention_run_table_cutoff")
+                .contains("canvas_execution_trace', 30, 'ARCHIVE_THEN_DELETE'")
+                .contains("canvas_execution_dlq', 90, 'DELETE_AFTER_RESOLUTION'")
+                .contains("canvas_execution_stats', 730, 'KEEP_AGGREGATE'");
+    }
 }

@@ -1,0 +1,144 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: canvas-engine
+  namespace: canvas
+  labels:
+    app.kubernetes.io/name: canvas-engine
+    app.kubernetes.io/part-of: marketing-canvas
+spec:
+  replicas: 3
+  revisionHistoryLimit: 10
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: canvas-engine
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: canvas-engine
+        app.kubernetes.io/part-of: marketing-canvas
+    spec:
+      serviceAccountName: canvas-engine
+      terminationGracePeriodSeconds: 60
+      containers:
+        - name: canvas-engine
+          image: ${CANVAS_IMAGE}
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 8080
+          env:
+            - name: SPRING_PROFILES_ACTIVE
+              value: prod
+            - name: JAVA_OPTS
+              value: >-
+                -XX:+UseZGC
+                -XX:+ZGenerational
+                -XX:MaxRAMPercentage=70
+                -Djava.security.egd=file:/dev/./urandom
+            - name: SPRING_DATASOURCE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: canvas-engine-prod
+                  key: spring-datasource-url
+            - name: SPRING_DATASOURCE_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: canvas-engine-prod
+                  key: spring-datasource-username
+            - name: SPRING_DATASOURCE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: canvas-engine-prod
+                  key: spring-datasource-password
+            - name: SPRING_DATA_REDIS_HOST
+              valueFrom:
+                configMapKeyRef:
+                  name: canvas-engine-prod
+                  key: spring-data-redis-host
+            - name: SPRING_DATA_REDIS_PORT
+              valueFrom:
+                configMapKeyRef:
+                  name: canvas-engine-prod
+                  key: spring-data-redis-port
+            - name: SPRING_DATA_REDIS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: canvas-engine-prod
+                  key: spring-data-redis-password
+            - name: CANVAS_CORS_ALLOWED_ORIGINS
+              valueFrom:
+                configMapKeyRef:
+                  name: canvas-engine-prod
+                  key: canvas-cors-allowed-origins
+            - name: CANVAS_EVENT_REPORT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: canvas-engine-prod
+                  key: canvas-event-report-secret
+            - name: CANVAS_INTERNAL_API_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: canvas-engine-prod
+                  key: canvas-internal-api-token
+            - name: CANVAS_PUBLIC_TRIGGER_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: canvas-engine-prod
+                  key: canvas-public-trigger-secret
+            - name: CANVAS_JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: canvas-engine-prod
+                  key: canvas-jwt-secret
+            - name: CANVAS_SECRET_CIPHER_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: canvas-engine-prod
+                  key: canvas-secret-cipher-key
+            - name: ROCKETMQ_NAME_SERVER
+              valueFrom:
+                configMapKeyRef:
+                  name: canvas-engine-prod
+                  key: rocketmq-name-server
+          readinessProbe:
+            httpGet:
+              path: /actuator/health
+              port: http
+            initialDelaySeconds: 20
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 3
+          livenessProbe:
+            httpGet:
+              path: /actuator/health
+              port: http
+            initialDelaySeconds: 60
+            periodSeconds: 20
+            timeoutSeconds: 5
+            failureThreshold: 3
+          startupProbe:
+            httpGet:
+              path: /actuator/health
+              port: http
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 18
+          resources:
+            requests:
+              cpu: "1"
+              memory: 2Gi
+            limits:
+              cpu: "4"
+              memory: 6Gi
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: false
+            capabilities:
+              drop:
+                - ALL

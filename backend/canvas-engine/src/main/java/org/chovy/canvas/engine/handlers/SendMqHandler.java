@@ -1,18 +1,15 @@
 package org.chovy.canvas.engine.handlers;
 
-import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.apache.rocketmq.client.producer.SendResult;
-import org.apache.rocketmq.client.producer.SendStatus;
-import org.apache.rocketmq.spring.core.RocketMQTemplate;
 import org.chovy.canvas.common.MapFieldKeys;
 import org.chovy.canvas.dal.dataobject.MqMessageDefinitionDO;
-import org.chovy.canvas.dal.mapper.MqMessageDefinitionMapper;
+import org.chovy.canvas.domain.meta.MqMessageDefinitionService;
 import org.chovy.canvas.engine.context.ExecutionContext;
 import org.chovy.canvas.engine.handler.NodeHandler;
 import org.chovy.canvas.engine.handler.NodeHandlerType;
 import org.chovy.canvas.engine.handler.NodeResult;
+import org.chovy.canvas.infrastructure.mq.CanvasMessageBus;
 import org.chovy.canvas.infrastructure.mq.MqTriggerMessage;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
@@ -33,11 +30,11 @@ import java.util.Map;
 @NodeHandlerType("SEND_MQ")
 public class SendMqHandler implements NodeHandler {
 
-    /** RocketMQ 发送模板，用于投递画布触发消息。 */
-    private final RocketMQTemplate rocketMQTemplate;
+    /** 画布消息总线，用于投递画布触发消息。 */
+    private final CanvasMessageBus messageBus;
 
-    /** MQ 消息定义访问器，用于按消息编码查找启用定义。 */
-    private final MqMessageDefinitionMapper mqMapper;
+    /** MQ 消息定义服务，用于隔离 handler 与持久层细节。 */
+    private final MqMessageDefinitionService mqMessageDefinitionService;
 
     /** RocketMQ 画布触发消息 Topic。 */
     @Value("${canvas.mq.topic:CANVAS_MQ_TRIGGER}")
@@ -64,10 +61,8 @@ public class SendMqHandler implements NodeHandler {
 
         return Mono.fromCallable(() -> {
                     // 消息编码先解析为启用的消息定义，再用定义中的 topic 作为 RocketMQ tag。
-                    MqMessageDefinitionDO def = mqMapper.selectOne(
-                            new LambdaQueryWrapper<MqMessageDefinitionDO>()
-                                    .eq(MqMessageDefinitionDO::getMessageCode, messageCodeKey)
-                                    .eq(MqMessageDefinitionDO::getEnabled, 1));
+                    MqMessageDefinitionDO def =
+                            mqMessageDefinitionService.findEnabledByMessageCode(messageCodeKey);
                     if (def == null) {
                         return NodeResult.fail("SEND_MQ: 找不到消息定义 messageCode=" + messageCodeKey);
                     }
@@ -77,16 +72,12 @@ public class SendMqHandler implements NodeHandler {
 
                     Map<String, Object> payload = buildPayload(config, ctx);
                     MqTriggerMessage message = new MqTriggerMessage(ctx.getUserId(), messageCodeKey, payload);
-                    String destination = mqTopic + ":" + def.getTopic().trim();
+                    String tag = def.getTopic().trim();
 
                     // 使用 userId 做 orderly sharding key，保证同一用户消息顺序。
-                    SendResult sendResult = rocketMQTemplate.syncSendOrderly(destination, message, ctx.getUserId());
-                    if (sendResult == null || sendResult.getSendStatus() != SendStatus.SEND_OK) {
-                        SendStatus status = sendResult != null ? sendResult.getSendStatus() : null;
-                        throw new IllegalStateException("RocketMQ send status=" + status);
-                    }
+                    messageBus.publishOrderly(mqTopic, tag, message, ctx.getUserId());
 
-                    log.info("[SEND_MQ] 发送成功 destination={} userId={}", destination, ctx.getUserId());
+                    log.info("[SEND_MQ] 发送成功 destination={}:{} userId={}", mqTopic, tag, ctx.getUserId());
                     return NodeResult.ok(nextNodeId, Map.of(MapFieldKeys.MQ_SENT, true));
                 })
                 .subscribeOn(Schedulers.boundedElastic())
@@ -94,6 +85,21 @@ public class SendMqHandler implements NodeHandler {
                     log.error("[SEND_MQ] 发送失败 messageCode={}: {}", messageCodeKey, e.getMessage(), e);
                     return Mono.just(NodeResult.fail("SEND_MQ: 消息发送失败: " + e.getMessage()));
                 });
+    }
+
+    @Override
+    public boolean requiresSideEffectIdempotency(Map<String, Object> config, ExecutionContext ctx) {
+        return true;
+    }
+
+    @Override
+    public String sideEffectOperationKey(Map<String, Object> config, ExecutionContext ctx) {
+        Object explicit = config.get(MapFieldKeys.IDEMPOTENCY_KEY);
+        if (explicit != null && !explicit.toString().isBlank()) {
+            return explicit.toString();
+        }
+        Object messageCodeKey = config.get("messageCodeKey");
+        return ctx.getUserId() + ":send-mq:" + (messageCodeKey == null ? "" : messageCodeKey);
     }
 
     /**

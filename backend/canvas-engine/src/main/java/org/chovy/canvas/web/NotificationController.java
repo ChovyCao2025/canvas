@@ -4,6 +4,9 @@ import io.jsonwebtoken.Claims;
 import lombok.RequiredArgsConstructor;
 import org.chovy.canvas.common.MapFieldKeys;
 import org.chovy.canvas.common.R;
+import org.chovy.canvas.common.tenant.RoleNames;
+import org.chovy.canvas.common.tenant.TenantContext;
+import org.chovy.canvas.common.tenant.TenantContextResolver;
 import org.chovy.canvas.domain.notification.NotificationService;
 import org.chovy.canvas.domain.notification.NotificationWebSocketTicketService;
 import org.chovy.canvas.dto.notification.NotificationDTO;
@@ -37,6 +40,8 @@ public class NotificationController {
     private final NotificationService notificationService;
     /** WebSocket 票据服务，用于签发通知连接票据。 */
     private final NotificationWebSocketTicketService ticketService;
+    /** 租户上下文解析器，用于隔离通知查询和状态更新。 */
+    private final TenantContextResolver tenantContextResolver;
 
     @GetMapping
     public Mono<R<List<NotificationDTO>>> list(
@@ -48,9 +53,16 @@ public class NotificationController {
     ) {
         int safePage = Math.max(1, page);
         int safeSize = clamp(size, 1, 100);
-        return currentUser().flatMap(userId ->
+        return currentUser().zipWith(tenantContextResolver.currentOrError()).flatMap(tuple ->
                 // 通知查询依赖阻塞存储，切到 boundedElastic 后保持 WebFlux 事件线程轻量。
-                Mono.fromCallable(() -> notificationService.list(userId, unreadOnly, category, archived, safePage, safeSize)
+                Mono.fromCallable(() -> notificationService.list(
+                                        tenantId(tuple.getT2()),
+                                        tuple.getT1(),
+                                        unreadOnly,
+                                        category,
+                                        archived,
+                                        safePage,
+                                        safeSize)
                                 .stream()
                                 .map(NotificationDTO::from)
                                 .toList())
@@ -67,8 +79,10 @@ public class NotificationController {
      */
     @GetMapping("/unread-count")
     public Mono<R<Map<String, Long>>> unreadCount() {
-        return currentUser().flatMap(userId ->
-                Mono.fromCallable(() -> R.ok(Map.of(MapFieldKeys.COUNT, notificationService.unreadCount(userId))))
+        return currentUser().zipWith(tenantContextResolver.currentOrError()).flatMap(tuple ->
+                Mono.fromCallable(() -> R.ok(Map.of(
+                                MapFieldKeys.COUNT,
+                                notificationService.unreadCount(tuple.getT1(), tenantId(tuple.getT2())))))
                         .subscribeOn(Schedulers.boundedElastic()));
     }
 
@@ -82,8 +96,9 @@ public class NotificationController {
      */
     @PutMapping("/{notificationId}/read")
     public Mono<R<Void>> markRead(@PathVariable String notificationId) {
-        return currentUser().flatMap(userId ->
-                Mono.<Void>fromRunnable(() -> notificationService.markRead(userId, notificationId))
+        return currentUser().zipWith(tenantContextResolver.currentOrError()).flatMap(tuple ->
+                Mono.<Void>fromRunnable(() -> notificationService.markRead(
+                                tuple.getT1(), notificationId, tenantId(tuple.getT2())))
                         .subscribeOn(Schedulers.boundedElastic())
                         .thenReturn(R.<Void>ok()));
     }
@@ -97,8 +112,8 @@ public class NotificationController {
      */
     @PutMapping("/read-all")
     public Mono<R<Void>> markAllRead() {
-        return currentUser().flatMap(userId ->
-                Mono.<Void>fromRunnable(() -> notificationService.markAllRead(userId))
+        return currentUser().zipWith(tenantContextResolver.currentOrError()).flatMap(tuple ->
+                Mono.<Void>fromRunnable(() -> notificationService.markAllRead(tuple.getT1(), tenantId(tuple.getT2())))
                         .subscribeOn(Schedulers.boundedElastic())
                         .thenReturn(R.<Void>ok()));
     }
@@ -113,8 +128,9 @@ public class NotificationController {
      */
     @PutMapping("/{notificationId}/archive")
     public Mono<R<Void>> archive(@PathVariable String notificationId) {
-        return currentUser().flatMap(userId ->
-                Mono.<Void>fromRunnable(() -> notificationService.archive(userId, notificationId))
+        return currentUser().zipWith(tenantContextResolver.currentOrError()).flatMap(tuple ->
+                Mono.<Void>fromRunnable(() -> notificationService.archive(
+                                tuple.getT1(), notificationId, tenantId(tuple.getT2())))
                         .subscribeOn(Schedulers.boundedElastic())
                         .thenReturn(R.<Void>ok()));
     }
@@ -128,9 +144,9 @@ public class NotificationController {
      */
     @PostMapping("/ws-ticket")
     public Mono<R<NotificationWebSocketTicketDTO>> createWsTicket() {
-        return currentUser().flatMap(userId ->
+        return currentUser().zipWith(tenantContextResolver.currentOrError()).flatMap(tuple ->
                 // WebSocket 握手走公开路由，连接前必须先生成短 TTL 一次性票据。
-                Mono.fromCallable(() -> ticketService.createTicket(userId))
+                Mono.fromCallable(() -> ticketService.createTicket(tenantId(tuple.getT2()), tuple.getT1()))
                         .subscribeOn(Schedulers.boundedElastic())
                         .map(ticket -> R.ok(new NotificationWebSocketTicketDTO(
                                 ticket,
@@ -178,5 +194,15 @@ public class NotificationController {
      */
     private String defaultIfBlank(String value, String fallback) {
         return value == null || value.isBlank() ? fallback : value;
+    }
+
+    private Long tenantId(TenantContext context) {
+        if (context.tenantId() == null && RoleNames.ADMIN.equals(context.role())) {
+            return null;
+        }
+        if (context.tenantId() == null) {
+            throw new SecurityException("AUTH_003: missing tenant context");
+        }
+        return context.tenantId();
     }
 }

@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { estimateCapacity, parseCapacityArgs } from './capacity-report.mjs'
+import { estimateCapacity, evaluateHardeningGates, parseCapacityArgs } from './capacity-report.mjs'
 
 test('estimateCapacity picks the minimum bottleneck and applies safety factor', () => {
   const result = estimateCapacity({
@@ -137,4 +137,71 @@ test('parseCapacityArgs rejects unknown flags', () => {
     '--local-stable-qps', '1200',
     '--unknown', '1',
   ]), /Unknown flag: --unknown/)
+})
+
+test('evaluateHardeningGates passes healthy hardening samples', () => {
+  const result = evaluateHardeningGates({
+    redisP95Ms: 8,
+    redisP99Ms: 20,
+    mysqlActiveConnections: 40,
+    mysqlMaxConnections: 100,
+    mysqlSlowSqlMs: 200,
+    normalMqBacklogGrowing: false,
+    disruptorOverflowConsecutiveSamples: 0,
+    retryBacklogGrowingAfterRecovery: false,
+    dlqGrowingAfterRecovery: false,
+    lightP95Ms: 500,
+    standardP95Ms: 700,
+  })
+
+  assert.equal(result.verdict, 'PASS')
+  assert.deepEqual(result.stopGates, [])
+})
+
+test('evaluateHardeningGates reports redis and mysql stop gates in stable order', () => {
+  const result = evaluateHardeningGates({
+    redisP95Ms: 25,
+    redisP99Ms: 55,
+    mysqlActiveConnections: 90,
+    mysqlMaxConnections: 100,
+    mysqlSlowSqlMs: 1200,
+    normalMqBacklogGrowing: false,
+    disruptorOverflowConsecutiveSamples: 0,
+    retryBacklogGrowingAfterRecovery: false,
+    dlqGrowingAfterRecovery: false,
+    lightP95Ms: 500,
+    standardP95Ms: 700,
+  })
+
+  assert.equal(result.verdict, 'STOP')
+  assert.deepEqual(result.stopGates, [
+    'REDIS_REGISTRY_LATENCY_SUSTAINED',
+    'MYSQL_POOL_SATURATION',
+    'MYSQL_SLOW_SQL',
+  ])
+})
+
+test('evaluateHardeningGates reports queue, retry, dlq, and protected lane stop gates', () => {
+  const result = evaluateHardeningGates({
+    redisP95Ms: 8,
+    redisP99Ms: 20,
+    mysqlActiveConnections: 40,
+    mysqlMaxConnections: 100,
+    mysqlSlowSqlMs: 200,
+    normalMqBacklogGrowing: true,
+    disruptorOverflowConsecutiveSamples: 2,
+    retryBacklogGrowingAfterRecovery: true,
+    dlqGrowingAfterRecovery: true,
+    lightP95Ms: 1100,
+    standardP95Ms: 700,
+  })
+
+  assert.equal(result.verdict, 'STOP')
+  assert.deepEqual(result.stopGates, [
+    'NORMAL_MQ_BACKLOG_STARVED_BY_RETRY',
+    'DISRUPTOR_OVERFLOW_GROWING',
+    'RETRY_BACKLOG_GROWING_AFTER_RECOVERY',
+    'DLQ_GROWING_AFTER_RECOVERY',
+    'PROTECTED_LANE_LATENCY_VIOLATION',
+  ])
 })

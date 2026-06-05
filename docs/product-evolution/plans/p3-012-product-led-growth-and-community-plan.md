@@ -1,12 +1,12 @@
-# Product Led Growth And Community Implementation Plan
+# Product Led Growth And Community Evidence Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Define trial journey, activation milestones, proficiency levels, referral, public examples, case studies, community templates, and customer story loops.
+**Goal:** Add a product-led growth and community evidence gate so trial journeys, activation milestones, proficiency levels, referrals, public examples, case studies, community templates, and customer story loops cannot proceed without metric, consent, risk, proof, and rollback evidence.
 
-**Architecture:** Implement the capability as a thin vertical slice: failing tests first, then backend/domain contracts, then frontend service and route integration, then rollout documentation. Keep scope bounded to the spec and use additive migrations or feature flags for risky changes.
+**Architecture:** Implement an additive evidence registry and domain service. This slice records growth governance decisions only; it does not launch onboarding, referral, public gallery, community publishing, customer-story, or template workflows.
 
-**Tech Stack:** Java 21, Spring Boot WebFlux style controllers currently returning Mono, MyBatis, Flyway, Redis/RocketMQ where needed, React 18, Vite, TypeScript, Ant Design, Vitest, JUnit 5, Mockito.
+**Tech Stack:** Java 21, Spring Boot project layout, Flyway, JUnit 5, AssertJ, Mockito.
 
 ---
 
@@ -18,129 +18,334 @@
 ## File Structure
 
 **Backend**
-- `backend/canvas-engine/src/main/java/org/chovy/canvas/domain/productledgrowthandcommunity/ProductLedGrowthAndCommunityService.java`
-- `backend/canvas-engine/src/main/java/org/chovy/canvas/web/ProductLedGrowthAndCommunityController.java`
-
-**Frontend**
-- `frontend/src/pages/product-led-growth-and-community/index.tsx`
-- `frontend/src/services/productledgrowthandcommunityApi.ts`
-
-**Data And Config**
-- `backend/canvas-engine/src/main/resources/db/migration/V127__product_led_growth_and_community.sql`
+- Create: `backend/canvas-engine/src/main/resources/db/migration/V184__product_led_growth_evidence.sql`
+- Create: `backend/canvas-engine/src/main/java/org/chovy/canvas/strategy/growth/ProductLedGrowthEvidenceService.java`
 
 **Tests**
-- `backend/canvas-engine/src/test/java/org/chovy/canvas/strategy/ProductLedGrowthAndCommunityTest.java`
-- `frontend/src/pages/product-led-growth-and-community/product-led-growth-and-community.test.tsx`
+- Create: `backend/canvas-engine/src/test/java/org/chovy/canvas/strategy/growth/ProductLedGrowthEvidenceServiceTest.java`
 
-### Task 1: Contract And Failing Tests
+**Documentation**
+- Modify: `docs/product-evolution/specs/p3-012-product-led-growth-and-community.md`
+- Modify: `docs/product-evolution/plans/p3-012-product-led-growth-and-community-plan.md`
 
-**Files:**
-- Create: `backend/canvas-engine/src/test/java/org/chovy/canvas/strategy/ProductLedGrowthAndCommunityTest.java`
-- Create: `frontend/src/pages/product-led-growth-and-community/product-led-growth-and-community.test.tsx`
-- Read: `docs/product-evolution/specs/p3-012-product-led-growth-and-community.md`
+**No Frontend**
+- No frontend files are part of this slice because growth and community surfaces require accepted activation, consent, and risk evidence first.
 
-- [ ] **Step 1: Write backend contract tests**
-
-Create `backend/canvas-engine/src/test/java/org/chovy/canvas/strategy/ProductLedGrowthAndCommunityTest.java` with tests for authorization, tenant scoping, and the main success path named after `product-led-growth-and-community`. Use existing controller or service tests in `backend/canvas-engine/src/test/java/org/chovy/canvas` as style references.
-
-- [ ] **Step 2: Run backend contract tests and confirm red state**
-
-Run: `cd backend && mvn -pl canvas-engine test -Dtest=ProductLedGrowthAndCommunityTest`
-
-Expected: FAIL because the new route, service method, or behavior has not been implemented yet.
-
-- [ ] **Step 3: Write frontend workflow tests**
-
-Create `frontend/src/pages/product-led-growth-and-community/product-led-growth-and-community.test.tsx` with Vitest coverage for loading, empty, success, permission, and server-error states for the first UI slice.
-
-- [ ] **Step 4: Run frontend workflow tests and confirm red state**
-
-Run: `cd frontend && npm test -- product-led-growth-and-community.test.tsx`
-
-Expected: FAIL because the new page, component, service call, or state handling does not exist yet.
-
-### Task 2: Backend And Data Slice
+### Task 1: Evidence Contract Tests
 
 **Files:**
-- `backend/canvas-engine/src/main/java/org/chovy/canvas/domain/productledgrowthandcommunity/ProductLedGrowthAndCommunityService.java`
-- `backend/canvas-engine/src/main/java/org/chovy/canvas/web/ProductLedGrowthAndCommunityController.java`
-- `backend/canvas-engine/src/main/resources/db/migration/V127__product_led_growth_and_community.sql`
-- Test: `backend/canvas-engine/src/test/java/org/chovy/canvas/strategy/ProductLedGrowthAndCommunityTest.java`
+- Create: `backend/canvas-engine/src/test/java/org/chovy/canvas/strategy/growth/ProductLedGrowthEvidenceServiceTest.java`
 
-- [ ] **Step 1: Add additive data structures when the spec requires storage**
+- [ ] **Step 1: Write migration and service tests**
 
-If this plan has a Flyway file, create it exactly at the data path listed above. Use additive tables, indexes, and nullable columns so rollout can be disabled without rollback data loss.
+Create `ProductLedGrowthEvidenceServiceTest`:
 
-- [ ] **Step 2: Implement the domain service**
+```java
+package org.chovy.canvas.strategy.growth;
 
-Implement the service behavior in the backend files listed above. Keep business rules in the domain service and keep controllers thin.
+import org.junit.jupiter.api.Test;
 
-- [ ] **Step 3: Implement or extend the controller contract**
+import java.nio.file.Files;
+import java.nio.file.Path;
 
-Expose only the endpoints needed by the first workflow. Return `R<T>` or existing project response types consistently with nearby controllers.
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 
-- [ ] **Step 4: Run focused backend tests**
+class ProductLedGrowthEvidenceServiceTest {
 
-Run: `cd backend && mvn -pl canvas-engine test -Dtest=ProductLedGrowthAndCommunityTest`
+    @Test
+    void migrationCreatesProductLedGrowthEvidenceGate() throws Exception {
+        String sql = Files.readString(Path.of(
+                "src/main/resources/db/migration/V184__product_led_growth_evidence.sql"));
 
-Expected: PASS for the new contract tests.
+        assertThat(sql)
+                .contains("CREATE TABLE IF NOT EXISTS product_led_growth_evidence")
+                .contains("opportunity_key VARCHAR(128) NOT NULL")
+                .contains("funnel_stage VARCHAR(64) NOT NULL")
+                .contains("activation_metric VARCHAR(255) NOT NULL")
+                .contains("consent_requirement TEXT NOT NULL")
+                .contains("content_risk_notes TEXT NOT NULL")
+                .contains("proof_command VARCHAR(1000) NOT NULL")
+                .contains("rollback_note VARCHAR(1000) NOT NULL")
+                .contains("decision_status VARCHAR(32) NOT NULL");
+    }
 
-### Task 3: Frontend Slice
+    @Test
+    void registerRejectsMissingMetricConsentRiskOrRollback() {
+        ProductLedGrowthEvidenceService.EvidenceRepository repository = mock(ProductLedGrowthEvidenceService.EvidenceRepository.class);
+        ProductLedGrowthEvidenceService service = new ProductLedGrowthEvidenceService(repository);
+
+        assertThatThrownBy(() -> service.register(new ProductLedGrowthEvidenceService.EvidenceRequest(
+                "public-template-gallery", "growth-1", "activation", "marketing operator",
+                "", "explicit publisher consent", "public content review",
+                "increase activated workspaces", "npm test", "hide gallery route")))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("activation metric is required");
+
+        assertThatThrownBy(() -> service.register(new ProductLedGrowthEvidenceService.EvidenceRequest(
+                "customer-story-loop", "growth-1", "expansion", "customer success",
+                "case study opt-in rate", "", "public content review",
+                "increase qualified references", "npm test", "hide story route")))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("consent requirement is required");
+    }
+
+    @Test
+    void registerStoresBlockedDecisionUntilGrowthReview() {
+        ProductLedGrowthEvidenceService.EvidenceRepository repository = mock(ProductLedGrowthEvidenceService.EvidenceRepository.class);
+        ProductLedGrowthEvidenceService service = new ProductLedGrowthEvidenceService(repository);
+
+        service.register(new ProductLedGrowthEvidenceService.EvidenceRequest(
+                "referral-invite", "growth-1", "activation", "workspace admin",
+                "invited workspace activation rate", "recipient consent and anti-spam review",
+                "low risk with rate limits", "increase activated referred workspaces",
+                "cd frontend && npm test -- --run", "disable product_led_growth.registry.enabled"));
+
+        verify(repository).insert(argThat(record ->
+                record.opportunityKey().equals("referral-invite")
+                        && record.decisionStatus().equals("BLOCKED_PENDING_REVIEW")
+                        && record.activationMetric().contains("activation rate")));
+    }
+}
+```
+
+- [ ] **Step 2: Run tests and confirm red state**
+
+Run:
+
+```bash
+cd backend && mvn -pl canvas-engine test -Dtest=ProductLedGrowthEvidenceServiceTest
+```
+
+Expected: FAIL because the migration and service do not exist.
+
+### Task 2: Migration And Service
 
 **Files:**
-- `frontend/src/pages/product-led-growth-and-community/index.tsx`
-- `frontend/src/services/productledgrowthandcommunityApi.ts`
-- Test: `frontend/src/pages/product-led-growth-and-community/product-led-growth-and-community.test.tsx`
+- Create: `backend/canvas-engine/src/main/resources/db/migration/V184__product_led_growth_evidence.sql`
+- Create: `backend/canvas-engine/src/main/java/org/chovy/canvas/strategy/growth/ProductLedGrowthEvidenceService.java`
+- Test: `backend/canvas-engine/src/test/java/org/chovy/canvas/strategy/growth/ProductLedGrowthEvidenceServiceTest.java`
 
-- [ ] **Step 1: Add the typed API wrapper**
+- [ ] **Step 1: Add the additive migration**
 
-Implement the API wrapper in the service file listed above. Reuse `frontend/src/services/api.ts` and return typed request and response objects.
+Create `V184__product_led_growth_evidence.sql`:
 
-- [ ] **Step 2: Add the route, page, panel, or component**
+```sql
+CREATE TABLE IF NOT EXISTS product_led_growth_evidence (
+  id BIGINT AUTO_INCREMENT PRIMARY KEY,
+  opportunity_key VARCHAR(128) NOT NULL,
+  owner_id VARCHAR(128) NOT NULL,
+  funnel_stage VARCHAR(64) NOT NULL,
+  target_persona VARCHAR(128) NOT NULL,
+  activation_metric VARCHAR(255) NOT NULL,
+  consent_requirement TEXT NOT NULL,
+  content_risk_notes TEXT NOT NULL,
+  experiment_hypothesis TEXT NOT NULL,
+  proof_command VARCHAR(1000) NOT NULL,
+  rollback_note VARCHAR(1000) NOT NULL,
+  decision_status VARCHAR(32) NOT NULL DEFAULT 'BLOCKED_PENDING_REVIEW',
+  reviewed_by VARCHAR(128) NULL,
+  reviewed_at DATETIME NULL,
+  child_spec VARCHAR(255) NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_plg_evidence_opportunity_status (opportunity_key, decision_status),
+  INDEX idx_plg_evidence_funnel_stage (funnel_stage, created_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+```
 
-Implement the first visible workflow in the frontend files listed above. Include loading, empty, error, permission, and success states.
+- [ ] **Step 2: Implement the evidence gate**
 
-- [ ] **Step 3: Wire navigation only where needed**
+Create `ProductLedGrowthEvidenceService`:
 
-Add navigation entry points only if the feature needs a top-level route. Prefer contextual entry points for editor, analytics, or settings capabilities.
+```java
+package org.chovy.canvas.strategy.growth;
 
-- [ ] **Step 4: Run focused frontend tests**
+public class ProductLedGrowthEvidenceService {
 
-Run: `cd frontend && npm test -- product-led-growth-and-community.test.tsx`
+    private final EvidenceRepository repository;
 
-Expected: PASS for the new workflow tests.
+    public ProductLedGrowthEvidenceService(EvidenceRepository repository) {
+        this.repository = repository;
+    }
 
-### Task 4: Integration Verification And Rollout Notes
+    public EvidenceRecord register(EvidenceRequest request) {
+        requireText(request.opportunityKey(), "opportunity key is required");
+        requireText(request.ownerId(), "owner is required");
+        requireText(request.funnelStage(), "funnel stage is required");
+        requireText(request.targetPersona(), "target persona is required");
+        requireText(request.activationMetric(), "activation metric is required");
+        requireText(request.consentRequirement(), "consent requirement is required");
+        requireText(request.contentRiskNotes(), "content risk notes are required");
+        requireText(request.experimentHypothesis(), "experiment hypothesis is required");
+        requireText(request.proofCommand(), "proof command is required");
+        requireText(request.rollbackNote(), "rollback note is required");
+
+        EvidenceRecord record = new EvidenceRecord(
+                request.opportunityKey(), request.ownerId(), request.funnelStage(),
+                request.targetPersona(), request.activationMetric(), request.consentRequirement(),
+                request.contentRiskNotes(), request.experimentHypothesis(), request.proofCommand(),
+                request.rollbackNote(), "BLOCKED_PENDING_REVIEW");
+        repository.insert(record);
+        return record;
+    }
+
+    public void approve(String opportunityKey, String reviewerId, String childSpec) {
+        requireText(opportunityKey, "opportunity key is required");
+        requireText(reviewerId, "reviewer is required");
+        requireText(childSpec, "child spec is required");
+        repository.approve(opportunityKey, reviewerId, childSpec);
+    }
+
+    private static void requireText(String value, String message) {
+        if (value == null || value.isBlank()) {
+            throw new IllegalArgumentException(message);
+        }
+    }
+
+    public record EvidenceRequest(
+            String opportunityKey,
+            String ownerId,
+            String funnelStage,
+            String targetPersona,
+            String activationMetric,
+            String consentRequirement,
+            String contentRiskNotes,
+            String experimentHypothesis,
+            String proofCommand,
+            String rollbackNote) {}
+
+    public record EvidenceRecord(
+            String opportunityKey,
+            String ownerId,
+            String funnelStage,
+            String targetPersona,
+            String activationMetric,
+            String consentRequirement,
+            String contentRiskNotes,
+            String experimentHypothesis,
+            String proofCommand,
+            String rollbackNote,
+            String decisionStatus) {}
+
+    public interface EvidenceRepository {
+        void insert(EvidenceRecord record);
+        void approve(String opportunityKey, String reviewerId, String childSpec);
+    }
+}
+```
+
+- [ ] **Step 3: Run focused tests**
+
+Run:
+
+```bash
+cd backend && mvn -pl canvas-engine test -Dtest=ProductLedGrowthEvidenceServiceTest
+```
+
+Expected: PASS for migration shape and service gate behavior.
+
+### Task 3: Experiment Approval Gate
+
+**Files:**
+- Modify: `backend/canvas-engine/src/main/java/org/chovy/canvas/strategy/growth/ProductLedGrowthEvidenceService.java`
+- Modify: `backend/canvas-engine/src/test/java/org/chovy/canvas/strategy/growth/ProductLedGrowthEvidenceServiceTest.java`
+
+- [ ] **Step 1: Add approval test**
+
+Add this test:
+
+```java
+@Test
+void approvalRequiresReviewerAndChildSpec() {
+    ProductLedGrowthEvidenceService.EvidenceRepository repository = mock(ProductLedGrowthEvidenceService.EvidenceRepository.class);
+    ProductLedGrowthEvidenceService service = new ProductLedGrowthEvidenceService(repository);
+
+    assertThatThrownBy(() -> service.approve("referral-invite", "", "docs/product-evolution/specs/p3-012a-referral-invite.md"))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessageContaining("reviewer is required");
+
+    assertThatThrownBy(() -> service.approve("referral-invite", "growth-lead-1", ""))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessageContaining("child spec is required");
+
+    service.approve("referral-invite", "growth-lead-1", "docs/product-evolution/specs/p3-012a-referral-invite.md");
+
+    verify(repository).approve("referral-invite", "growth-lead-1", "docs/product-evolution/specs/p3-012a-referral-invite.md");
+}
+```
+
+- [ ] **Step 2: Implement approval method**
+
+Add this method to `ProductLedGrowthEvidenceService` and add the matching method to `EvidenceRepository`:
+
+```java
+public void approve(String opportunityKey, String reviewerId, String childSpec) {
+    requireText(opportunityKey, "opportunity key is required");
+    requireText(reviewerId, "reviewer is required");
+    requireText(childSpec, "child spec is required");
+    repository.approve(opportunityKey, reviewerId, childSpec);
+}
+
+public interface EvidenceRepository {
+    void insert(EvidenceRecord record);
+    void approve(String opportunityKey, String reviewerId, String childSpec);
+}
+```
+
+- [ ] **Step 3: Run focused tests**
+
+Run:
+
+```bash
+cd backend && mvn -pl canvas-engine test -Dtest=ProductLedGrowthEvidenceServiceTest
+```
+
+Expected: PASS with registration and approval gate coverage.
+
+### Task 4: Verification, Rollout Notes, And Commit
 
 **Files:**
 - Modify: `docs/product-evolution/specs/p3-012-product-led-growth-and-community.md`
 - Modify: `docs/product-evolution/plans/p3-012-product-led-growth-and-community-plan.md`
-- Read: `docs/product-evolution/todo/INDEX.md`
 
-- [ ] **Step 1: Run backend regression slice**
+- [ ] **Step 1: Run focused verification**
 
-Run: `cd backend && mvn -pl canvas-engine test`
+Run:
 
-Expected: PASS for the canvas-engine module test suite.
+```bash
+cd backend && mvn -pl canvas-engine test -Dtest=ProductLedGrowthEvidenceServiceTest
+```
 
-- [ ] **Step 2: Run frontend regression slice**
+Expected: PASS.
 
-Run: `cd frontend && npm test -- --run`
+- [ ] **Step 2: Run migration naming check**
 
-Expected: PASS for the Vitest suite.
+Run:
 
-- [ ] **Step 3: Run frontend build**
+```bash
+test -f backend/canvas-engine/src/main/resources/db/migration/V184__product_led_growth_evidence.sql
+```
 
-Run: `cd frontend && npm run build`
+Expected: command exits 0.
 
-Expected: PASS with TypeScript and Vite build success.
+- [ ] **Step 3: Rollout notes**
 
-- [ ] **Step 4: Add rollout notes to the implementation PR**
+Rollout: run `V184__product_led_growth_evidence.sql`, then allow growth owners to register opportunity evidence. Keep public, referral, case-study, and community workflows unavailable until reviewed child specs exist. Rollback: disable evidence registration or hide the admin entry point; no runtime growth workflow depends on this additive table.
 
-Document feature flag or route guard, migration order, tenant and role impact, manual verification steps, and rollback command or disable switch.
+- [ ] **Step 4: Commit the scoped slice**
 
-- [ ] **Step 5: Commit the implementation slice**
+Run:
 
-Run: `git add backend/canvas-engine/src frontend/src docs/product-evolution/specs docs/product-evolution/plans && git commit -m "feat: implement product-led-growth-and-community slice"`
+```bash
+git add backend/canvas-engine/src/main/resources/db/migration/V184__product_led_growth_evidence.sql \
+  backend/canvas-engine/src/main/java/org/chovy/canvas/strategy/growth/ProductLedGrowthEvidenceService.java \
+  backend/canvas-engine/src/test/java/org/chovy/canvas/strategy/growth/ProductLedGrowthEvidenceServiceTest.java \
+  docs/product-evolution/specs/p3-012-product-led-growth-and-community.md \
+  docs/product-evolution/plans/p3-012-product-led-growth-and-community-plan.md
+git commit -m "docs: add product led growth evidence gate"
+```
 
-Expected: commit contains only files required by this plan.
+Expected: commit contains only the PLG evidence migration, service, test, spec, and plan.

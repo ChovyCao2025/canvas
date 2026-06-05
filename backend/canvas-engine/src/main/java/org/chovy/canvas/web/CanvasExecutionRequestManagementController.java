@@ -7,12 +7,15 @@ import lombok.extern.slf4j.Slf4j;
 import org.chovy.canvas.common.MapFieldKeys;
 import org.chovy.canvas.common.PageResult;
 import org.chovy.canvas.common.R;
+import org.chovy.canvas.common.tenant.TenantContext;
+import org.chovy.canvas.common.tenant.TenantContextResolver;
 import org.chovy.canvas.dal.dataobject.CanvasExecutionRequestDO;
 import org.chovy.canvas.dal.mapper.CanvasExecutionRequestMapper;
 import org.chovy.canvas.engine.disruptor.CanvasDisruptorService;
 import org.chovy.canvas.engine.request.CanvasExecutionReplayRateLimiter;
 import org.chovy.canvas.engine.request.CanvasExecutionRequestStatus;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.context.ReactiveSecurityContextHolder;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -27,6 +30,7 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 
 /**
@@ -56,6 +60,8 @@ public class CanvasExecutionRequestManagementController {
     private final CanvasDisruptorService disruptorService;
     /** 重放限流器，用于限制批量重放速率。 */
     private final CanvasExecutionReplayRateLimiter replayRateLimiter;
+    /** 租户上下文解析器，用于执行请求管理查询和重放隔离。 */
+    private final TenantContextResolver tenantContextResolver;
 
     /**
      * 构造 CanvasExecutionRequestManagementController 实例，并根据入参初始化依赖、配置或内部状态。
@@ -67,7 +73,7 @@ public class CanvasExecutionRequestManagementController {
      */
     public CanvasExecutionRequestManagementController(CanvasExecutionRequestMapper mapper,
                                                       CanvasDisruptorService disruptorService) {
-        this(mapper, disruptorService, new CanvasExecutionReplayRateLimiter(0, 0));
+        this(mapper, disruptorService, new CanvasExecutionReplayRateLimiter(0, 0), null);
     }
 
     /**
@@ -82,10 +88,18 @@ public class CanvasExecutionRequestManagementController {
     @Autowired
     public CanvasExecutionRequestManagementController(CanvasExecutionRequestMapper mapper,
                                                       CanvasDisruptorService disruptorService,
-                                                      CanvasExecutionReplayRateLimiter replayRateLimiter) {
+                                                      CanvasExecutionReplayRateLimiter replayRateLimiter,
+                                                      TenantContextResolver tenantContextResolver) {
         this.mapper = mapper;
         this.disruptorService = disruptorService;
         this.replayRateLimiter = replayRateLimiter;
+        this.tenantContextResolver = tenantContextResolver;
+    }
+
+    public CanvasExecutionRequestManagementController(CanvasExecutionRequestMapper mapper,
+                                                      CanvasDisruptorService disruptorService,
+                                                      CanvasExecutionReplayRateLimiter replayRateLimiter) {
+        this(mapper, disruptorService, replayRateLimiter, null);
     }
 
     @GetMapping
@@ -96,7 +110,7 @@ public class CanvasExecutionRequestManagementController {
             @RequestParam(required = false) String sourceMsgId,
             @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "20") int size) {
-        return Mono.fromCallable(() -> {
+        return currentTenant().flatMap(context -> Mono.fromCallable(() -> {
             // 管理查询按可选条件动态拼装，所有数据库访问都在 boundedElastic 执行。
             LambdaQueryWrapper<CanvasExecutionRequestDO> wrapper = new LambdaQueryWrapper<CanvasExecutionRequestDO>()
                     .eq(canvasId != null, CanvasExecutionRequestDO::getCanvasId, canvasId)
@@ -105,16 +119,18 @@ public class CanvasExecutionRequestManagementController {
                     .eq(sourceMsgId != null && !sourceMsgId.isBlank(),
                             CanvasExecutionRequestDO::getSourceMsgId, sourceMsgId)
                     .orderByDesc(CanvasExecutionRequestDO::getUpdatedAt);
-            Page<CanvasExecutionRequestDO> result = mapper.selectPage(new Page<>(page, size), wrapper);
+            applyTenantFilter(wrapper, context);
+            Page<CanvasExecutionRequestDO> result =
+                    mapper.selectPage(new Page<>(Math.max(1, page), normalizePageSize(size)), wrapper);
             return R.ok(PageResult.of(result.getTotal(), result.getRecords()));
-        }).subscribeOn(Schedulers.boundedElastic());
+        }).subscribeOn(Schedulers.boundedElastic()));
     }
 
     @PostMapping("/{id}/replay")
     public Mono<R<Map<String, Object>>> replay(@PathVariable String id,
                                                @RequestParam(required = false) String reason,
                                                @RequestParam(defaultValue = "false") boolean force) {
-        return currentUsername().flatMap(operator -> Mono.fromCallable(() -> {
+        return currentTenant().flatMap(context -> currentUsername().flatMap(operator -> Mono.fromCallable(() -> {
                     // 重放入口先做操作人维度限流，避免管理端误操作瞬时压垮执行队列。
                     requireReplayRateLimit(replayRateLimiter.tryAcquireSingleReplay(operator),
                             "执行请求单条重放过于频繁，请稍后再试");
@@ -122,6 +138,7 @@ public class CanvasExecutionRequestManagementController {
                     if (request == null) {
                         throw new IllegalArgumentException("执行请求不存在: " + id);
                     }
+                    requireTenantAccess(request, context);
                     requireReplayable(request.getStatus(), force);
                     int updated = mapper.markPendingForReplay(
                             id,
@@ -141,7 +158,7 @@ public class CanvasExecutionRequestManagementController {
                     );
                 })
                 .subscribeOn(Schedulers.boundedElastic())
-                .map(R::ok));
+                .map(R::ok)));
     }
 
     @PostMapping("/replay")
@@ -154,7 +171,7 @@ public class CanvasExecutionRequestManagementController {
             @RequestParam(required = false) String reason,
             @RequestParam(defaultValue = "false") boolean force) {
         int normalizedLimit = normalizeLimit(limit);
-        return currentUsername().flatMap(operator -> Mono.fromCallable(() -> {
+        return currentTenant().flatMap(context -> currentUsername().flatMap(operator -> Mono.fromCallable(() -> {
                     // 批量重放的限流令牌按本次归一化 limit 消耗，和实际最大处理量保持一致。
                     requireReplayRateLimit(replayRateLimiter.tryAcquireBatchReplay(operator, normalizedLimit),
                             "执行请求批量重放过于频繁，请稍后再试");
@@ -165,6 +182,7 @@ public class CanvasExecutionRequestManagementController {
                                     CanvasExecutionRequestDO::getSourceMsgId, sourceMsgId)
                             .orderByAsc(CanvasExecutionRequestDO::getUpdatedAt)
                             .last("LIMIT " + normalizedLimit);
+                    applyTenantFilter(wrapper, context);
                     applyReplayStatusFilter(wrapper, status, force);
 
                     List<CanvasExecutionRequestDO> requests = mapper.selectList(wrapper);
@@ -191,7 +209,7 @@ public class CanvasExecutionRequestManagementController {
                     );
                 })
                 .subscribeOn(Schedulers.boundedElastic())
-                .map(R::ok));
+                .map(R::ok)));
     }
 
     /**
@@ -286,6 +304,13 @@ public class CanvasExecutionRequestManagementController {
         return Math.min(limit, MAX_BATCH_LIMIT);
     }
 
+    private int normalizePageSize(int size) {
+        if (size <= 0) {
+            return 20;
+        }
+        return Math.min(size, 100);
+    }
+
     /**
      * 执行 normalize 对应的业务逻辑。
      *
@@ -313,5 +338,32 @@ public class CanvasExecutionRequestManagementController {
                 // 操作人写入 replay metadata，便于审计谁触发了重放。
                 .map(c -> c.get("username", String.class))
                 .defaultIfEmpty("system");
+    }
+
+    private Mono<TenantContext> currentTenant() {
+        if (tenantContextResolver == null) {
+            return Mono.just(new TenantContext(null, null, null));
+        }
+        return tenantContextResolver.current()
+                .defaultIfEmpty(new TenantContext(null, null, null));
+    }
+
+    private void applyTenantFilter(LambdaQueryWrapper<CanvasExecutionRequestDO> wrapper, TenantContext context) {
+        if (!isSuperAdmin(context) && context != null && context.tenantId() != null) {
+            wrapper.eq(CanvasExecutionRequestDO::getTenantId, context.tenantId());
+        }
+    }
+
+    private void requireTenantAccess(CanvasExecutionRequestDO request, TenantContext context) {
+        if (isSuperAdmin(context) || context == null || context.tenantId() == null) {
+            return;
+        }
+        if (!Objects.equals(request.getTenantId(), context.tenantId())) {
+            throw new AccessDeniedException("跨租户执行请求访问被拒绝");
+        }
+    }
+
+    private boolean isSuperAdmin(TenantContext context) {
+        return context != null && context.isSuperAdmin();
     }
 }

@@ -2,9 +2,10 @@ package org.chovy.canvas.engine.scheduler;
 
 import org.chovy.canvas.dal.dataobject.CanvasExecutionTraceDO;
 import org.chovy.canvas.dal.mapper.CanvasExecutionTraceMapper;
+import org.chovy.canvas.infrastructure.doris.DorisStreamLoader;
 import jakarta.annotation.PreDestroy;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
@@ -23,7 +24,6 @@ import java.util.concurrent.atomic.AtomicInteger;
  */
 @Slf4j
 @Component
-@RequiredArgsConstructor
 public class TraceWriteBuffer {
 
     /** 单批轨迹刷盘条数。 */
@@ -38,8 +38,20 @@ public class TraceWriteBuffer {
             new ConcurrentLinkedQueue<>();
     /** 执行轨迹 Mapper。 */
     private final CanvasExecutionTraceMapper traceMapper;
+    /** Doris Stream Load 写入器；迁移期与 MySQL 双写，禁用时为空操作。 */
+    private final DorisStreamLoader dorisStreamLoader;
     /** 当前待刷盘轨迹数量。 */
     private final AtomicInteger pending = new AtomicInteger(0);
+
+    public TraceWriteBuffer(CanvasExecutionTraceMapper traceMapper) {
+        this(traceMapper, null);
+    }
+
+    @Autowired
+    public TraceWriteBuffer(CanvasExecutionTraceMapper traceMapper, DorisStreamLoader dorisStreamLoader) {
+        this.traceMapper = traceMapper;
+        this.dorisStreamLoader = dorisStreamLoader;
+    }
 
     /** 非阻塞入队（主执行链路调用，不等待） */
     public void offer(CanvasExecutionTraceDO trace) {
@@ -117,12 +129,24 @@ public class TraceWriteBuffer {
      * @param batch batch 方法执行所需的业务参数
      */
     private void writeBatch(List<CanvasExecutionTraceDO> batch) {
+        if (batch == null || batch.isEmpty()) {
+            return;
+        }
         try {
             traceMapper.insertBatch(batch);
-            log.debug("[TRACE_BUFFER] 批量写入 {} 条", batch.size());
+            log.debug("[TRACE_BUFFER] MySQL 批量写入 {} 条", batch.size());
         } catch (Exception e) {
             // trace 是旁路审计数据，写失败只记录日志，不反向影响节点执行结果。
-            log.error("[TRACE_BUFFER] 批量写入失败: {}", e.getMessage());
+            log.error("[TRACE_BUFFER] MySQL 批量写入失败: {}", e.getMessage());
+        }
+
+        try {
+            if (dorisStreamLoader != null) {
+                dorisStreamLoader.load(batch);
+            }
+        } catch (Exception e) {
+            // Doris 是迁移期 OLAP 旁路，失败不能反向影响主链路或 MySQL fallback。
+            log.warn("[TRACE_BUFFER] Doris Stream Load 失败: {}", e.getMessage());
         }
     }
 

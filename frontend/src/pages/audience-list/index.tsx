@@ -15,6 +15,7 @@ import {
   getNextAudiencePollDelay,
   hasRunningAudienceTasks,
 } from './audienceTaskPresentation'
+import { snapshotModeLabel } from '../audience-edit/audienceSnapshotMode'
 
 /** 页面标题组件别名。 */
 const { Title } = Typography
@@ -225,6 +226,11 @@ export default function AudienceListPage() {
   const columns: ColumnsType<AudienceDefinition> = [
     { title: '名称', dataIndex: 'name' },
     { title: '计算策略', dataIndex: 'evaluationStrategy', width: 120 },
+    {
+      title: '默认发送人群',
+      width: 140,
+      render: (_, record) => <Tag>{snapshotModeLabel(record.defaultSnapshotMode)}</Tag>,
+    },
     {
       title: '状态',
       width: 120,

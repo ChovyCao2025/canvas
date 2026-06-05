@@ -51,7 +51,7 @@ Teams can coordinate editing, personalize work surfaces, and analyze outcomes wi
 
 ### Data And Configuration Touchpoints
 
-- `backend/canvas-engine/src/main/resources/db/migration/V100__collaboration_personalization_reporting.sql`
+- `backend/canvas-engine/src/main/resources/db/migration/V160__collaboration_personalization_reporting.sql`
 
 ### Test Touchpoints
 

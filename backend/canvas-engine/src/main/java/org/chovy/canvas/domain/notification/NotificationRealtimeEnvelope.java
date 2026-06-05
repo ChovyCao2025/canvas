@@ -11,6 +11,8 @@ import org.chovy.canvas.dto.notification.NotificationRealtimePayload;
 public record NotificationRealtimeEnvelope(
         /** 发布通知的服务实例标识，用于避免本实例重复消费。 */
         String originId,
+        /** 所属租户 ID，null 表示旧版全局通道。 */
+        Long tenantId,
         /** 实时通知目标用户 ID。 */
         String userId,
         /** WebSocket 推送的实时通知载荷。 */

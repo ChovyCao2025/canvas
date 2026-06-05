@@ -31,6 +31,42 @@ class SecurityConfigRouteTest {
         assertThat(exchange.getResponse().getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
     }
 
+    @Test
+    void biEmbedTicketVerifyAllowsAnonymousRender() {
+        MockServerWebExchange exchange = MockServerWebExchange.from(
+                MockServerHttpRequest.method(HttpMethod.POST, "/canvas/bi/embed-tickets/verify").build());
+        WebFilterChainProxy security = securityProxy();
+
+        StepVerifier.create(security.filter(exchange, ignored -> Mono.empty()))
+                .verifyComplete();
+
+        assertThat(exchange.getResponse().getStatusCode()).isNull();
+    }
+
+    @Test
+    void biEmbedTicketCreationRequiresAuthentication() {
+        MockServerWebExchange exchange = MockServerWebExchange.from(
+                MockServerHttpRequest.method(HttpMethod.POST, "/canvas/bi/embed-tickets").build());
+        WebFilterChainProxy security = securityProxy();
+
+        StepVerifier.create(security.filter(exchange, ignored -> Mono.empty()))
+                .verifyComplete();
+
+        assertThat(exchange.getResponse().getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
+    }
+
+    @Test
+    void publicMarketingFormSubmitAllowsAnonymousLeadCapture() {
+        MockServerWebExchange exchange = MockServerWebExchange.from(
+                MockServerHttpRequest.method(HttpMethod.POST, "/public/marketing-forms/signup/submit").build());
+        WebFilterChainProxy security = securityProxy();
+
+        StepVerifier.create(security.filter(exchange, ignored -> Mono.empty()))
+                .verifyComplete();
+
+        assertThat(exchange.getResponse().getStatusCode()).isNull();
+    }
+
     private WebFilterChainProxy securityProxy() {
         JwtAuthFilter jwtAuthFilter = mock(JwtAuthFilter.class);
         when(jwtAuthFilter.filter(any(), any()))
@@ -39,7 +75,7 @@ class SecurityConfigRouteTest {
                     return chain.filter(invocation.getArgument(0));
                 });
         SecurityWebFilterChain chain = new SecurityConfig()
-                .securityWebFilterChain(ServerHttpSecurity.http(), jwtAuthFilter);
+                .securityWebFilterChain(ServerHttpSecurity.http(), jwtAuthFilter, new InternalApiAuthFilter(""));
         return new WebFilterChainProxy(chain);
     }
 }

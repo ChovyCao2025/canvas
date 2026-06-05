@@ -2,6 +2,7 @@ package org.chovy.canvas.engine.trigger;
 
 import org.chovy.canvas.engine.lane.ExecutionLane;
 import org.chovy.canvas.engine.lane.ExecutionLaneAdmissionResult;
+import org.chovy.canvas.engine.scheduler.CanvasMetrics;
 import org.chovy.canvas.infrastructure.redis.RedisKeyUtil;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -19,6 +20,7 @@ import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -27,6 +29,7 @@ class InFlightExecutionRegistryLaneTest {
     @Mock StringRedisTemplate redis;
     @Mock RedisKeyUtil keys;
     @Mock ZSetOperations<String, String> zSetOps;
+    @Mock CanvasMetrics metrics;
 
     @BeforeEach
     void setUp() {
@@ -68,8 +71,38 @@ class InFlightExecutionRegistryLaneTest {
         assertThat(registry.laneActiveCount(ExecutionLane.HEAVY)).isEqualTo(300);
     }
 
+    @Test
+    void redisFailureRecordsRegistryUnavailableMetric() {
+        InFlightExecutionRegistry registry = registry();
+        when(redis.execute(any(RedisScript.class), anyList(),
+                anyString(), anyString(), anyString(), anyString(), anyString(), anyString()))
+                .thenThrow(new IllegalStateException("redis down"));
+
+        ExecutionLaneAdmissionResult result = registry.tryAcquire(
+                10L, "exec-1", ExecutionLane.LIGHT, 3000, 600, 3000);
+
+        assertThat(result.allowed()).isFalse();
+        assertThat(result.reason()).isEqualTo(ExecutionLaneAdmissionResult.Reason.REGISTRY_UNAVAILABLE);
+        verify(metrics).recordExecutionRegistryAdmission("LIGHT", "REGISTRY_UNAVAILABLE");
+    }
+
+    @Test
+    void successfulAcquireRecordsLaneActiveGauge() {
+        InFlightExecutionRegistry registry = registry();
+        when(redis.execute(any(RedisScript.class), anyList(),
+                anyString(), anyString(), anyString(), anyString(), anyString(), anyString()))
+                .thenReturn(1L);
+
+        ExecutionLaneAdmissionResult result = registry.tryAcquire(
+                10L, "exec-1", ExecutionLane.HEAVY, 3000, 300, 3000);
+
+        assertThat(result.allowed()).isTrue();
+        verify(metrics).recordExecutionRegistryAdmission("HEAVY", "NONE");
+        verify(metrics).setExecutionLaneActive("HEAVY", 1L);
+    }
+
     private InFlightExecutionRegistry registry() {
-        InFlightExecutionRegistry registry = new InFlightExecutionRegistry(redis, keys);
+        InFlightExecutionRegistry registry = new InFlightExecutionRegistry(redis, keys, metrics);
         ReflectionTestUtils.setField(registry, "globalTimeoutSec", 600L);
         return registry;
     }

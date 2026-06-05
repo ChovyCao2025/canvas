@@ -7,22 +7,25 @@ Coverage matrix: `docs/architecture/todo/coverage-matrix.md`
 
 ## Verification Status
 
-Confirmed.
+Implemented and verified for the first runtime batch.
 
 ## Problems
 
 - The app is WebFlux/reactive (`spring.main.web-application-type: reactive`) while much of the data layer is blocking MyBatis/JDBC.
-- Repository scan found `.block()`, fire-and-forget `.subscribe()`, `Thread.sleep()`, and many `@Transactional` usages in runtime paths.
-- Some blocking work is correctly wrapped in `Schedulers.boundedElastic()`, but several direct blocking calls remain.
-- `@Transactional` boundaries are synchronous and do not cover asynchronous side effects such as Redis, scheduler registration, MQ publishing, or fire-and-forget work.
+- Original repository scan found `.block()`, fire-and-forget `.subscribe()`, `Thread.sleep()`, and many `@Transactional` usages in runtime paths.
+- The first runtime batch now has no direct `.block()`, `.subscribe()`, or `Thread.sleep()` in the target files; blocking waits and background Reactor tasks are centralized through `BlockingWorkScheduler` and `TrackedReactiveTaskRegistry`.
+- Remaining `.subscribe()` hits are lifecycle subscriptions or locally tracked infrastructure bridges and are classified in evidence.
+- `@Transactional` boundaries are synchronous; lifecycle operations use DB-only transaction methods followed by repairable external side effects rather than a durable outbox.
 
 ## Evidence
 
 - `application.yml:5`
-- `.block()` examples: `TagImportSourceService.java:143`, `CanvasSchedulerService.java:424`, `AudienceBatchComputeService.java:250`, `AudienceEvaluationContextFetcher.java:51`
-- `Thread.sleep()` examples: `TriggerRouteService.java:190`, `CanvasRouteInitializer.java:76`, `AudienceComputeTaskRunner.java:216`
+- Evidence inventory: `docs/architecture/evidence/P0-02-reactive-threading-inventory.md`
+- Converted `.block()` examples: `TagImportSourceService`, `CanvasSchedulerService`, `AudienceBatchComputeService`, `AudienceEvaluationContextFetcher`
+- Converted `Thread.sleep()` examples: `TriggerRouteService`, `CanvasRouteInitializer`, `AudienceComputeTaskRunner`, `CanvasDisruptorService`
+- Converted fire-and-forget examples: `CanvasSchedulerService`, `DagEngine`, `WaitResumeService`, `CanvasExecutionRequestExecutor`
 - `@Transactional` examples: `CanvasService.java`, `CanvasTransactionService.java`, `CanvasOpsService.java`, `CdpTagService.java`, `TagImportService.java`
-- Existing comments acknowledge DB/Redis inconsistency risk in `CanvasService.java:188-195` and `CanvasTransactionService.java:40-42`.
+- Existing comments acknowledge DB/Redis inconsistency risk and the current DB-only transaction split in `CanvasService` and `CanvasTransactionService`.
 
 ## Acceptance Criteria
 

@@ -10,6 +10,15 @@
 
 ---
 
+## Implementation Status
+
+- Status: implemented and focused-verified on 2026-06-05.
+- Actual implementation keeps `CanvasTransactionService.publishDb` unchanged because it already accepts publish graph JSON. `CanvasService.publish` performs the audience snapshot binding after draft graph validation and before `publishDb`, so the draft graph remains untouched.
+- Note: snapshot rows currently receive the draft version id passed from `CanvasService.publish`; the existing transaction creates the immutable published version id internally after this binding point. A stricter published-version-id binding would require a follow-up transaction refactor.
+- Commit: not created in this session.
+
+---
+
 ## Spec Reference
 
 - `docs/product-evolution/specs/p1-003b-publish-time-audience-snapshot-locking.md`
@@ -21,7 +30,7 @@
 - Create: `backend/canvas-engine/src/test/java/org/chovy/canvas/domain/audience/AudienceSnapshotServiceTest.java`
 - Create: `backend/canvas-engine/src/test/java/org/chovy/canvas/domain/canvas/CanvasPublishAudienceSnapshotTest.java`
 - Modify: `backend/canvas-engine/src/main/java/org/chovy/canvas/domain/canvas/CanvasService.java`
-- Modify: `backend/canvas-engine/src/main/java/org/chovy/canvas/domain/canvas/CanvasTransactionService.java`
+- Read/no production change: `backend/canvas-engine/src/main/java/org/chovy/canvas/domain/canvas/CanvasTransactionService.java`
 
 ### Task 1: Snapshot Service Contract
 
@@ -29,7 +38,7 @@
 - Create: `backend/canvas-engine/src/test/java/org/chovy/canvas/domain/audience/AudienceSnapshotServiceTest.java`
 - Create: `backend/canvas-engine/src/main/java/org/chovy/canvas/engine/audience/AudienceSnapshotService.java`
 
-- [ ] **Step 1: Write snapshot service tests**
+- [x] **Step 1: Write snapshot service tests**
 
 Create `AudienceSnapshotServiceTest.java`:
 
@@ -106,7 +115,7 @@ class AudienceSnapshotServiceTest {
 }
 ```
 
-- [ ] **Step 2: Run service tests and confirm red state**
+- [x] **Step 2: Run service tests and confirm red state**
 
 Run:
 
@@ -116,7 +125,7 @@ cd backend && mvn -pl canvas-engine test -Dtest=AudienceSnapshotServiceTest
 
 Expected: FAIL because `AudienceSnapshotService` does not exist.
 
-- [ ] **Step 3: Implement snapshot service persistence**
+- [x] **Step 3: Implement snapshot service persistence**
 
 Create `AudienceSnapshotService.java` with constructor injection for resolver, mappers, object mapper, and `maxSnapshotUsers`:
 
@@ -174,7 +183,7 @@ public class AudienceSnapshotService {
 
 Add a private `writeJson(Object value)` helper that wraps `objectMapper.writeValueAsString(value)` and throws `IllegalStateException("Audience snapshot serialization failed", e)`.
 
-- [ ] **Step 4: Run service tests**
+- [x] **Step 4: Run service tests**
 
 Run:
 
@@ -192,7 +201,7 @@ Expected: PASS.
 - Modify: `backend/canvas-engine/src/main/java/org/chovy/canvas/domain/canvas/CanvasService.java`
 - Modify: `backend/canvas-engine/src/main/java/org/chovy/canvas/domain/canvas/CanvasTransactionService.java`
 
-- [ ] **Step 1: Write graph binding tests**
+- [x] **Step 1: Write graph binding tests**
 
 Add tests to `AudienceSnapshotServiceTest`:
 
@@ -220,7 +229,7 @@ void bindGraphLocksStaticNodesAndRemovesDynamicStaleSnapshotIds() {
 }
 ```
 
-- [ ] **Step 2: Run graph binding test and confirm red state**
+- [x] **Step 2: Run graph binding test and confirm red state**
 
 Run:
 
@@ -230,7 +239,7 @@ cd backend && mvn -pl canvas-engine test -Dtest=AudienceSnapshotServiceTest
 
 Expected: FAIL because `bindAudienceSnapshotsForPublish` does not exist.
 
-- [ ] **Step 3: Implement graph binding**
+- [x] **Step 3: Implement graph binding**
 
 Add to `AudienceSnapshotService`:
 
@@ -284,7 +293,7 @@ private AudienceSnapshotMode resolveNodeMode(Map<String, Object> config, Long au
 }
 ```
 
-- [ ] **Step 4: Wire publish path**
+- [x] **Step 4: Wire publish path**
 
 In `CanvasService`, inject `AudienceSnapshotService` and transform draft graph JSON immediately before the publish transaction:
 
@@ -300,7 +309,7 @@ CanvasVersionDO version = canvasTransactionService.publishDb(id, graphJsonForPub
 
 Keep the existing draft version unchanged; only pass `graphJsonForPublish` into the published version creation.
 
-- [ ] **Step 5: Add publish integration assertion**
+- [x] **Step 5: Add publish integration assertion**
 
 Create `CanvasPublishAudienceSnapshotTest.java` with a mocked `CanvasTransactionService` that captures the graph passed to `publishDb`:
 
@@ -323,7 +332,7 @@ void publishUsesBoundGraphWithoutWritingDraftGraph() {
 
 Use the existing `CanvasService` test construction pattern in this repository for mappers and parser dependencies.
 
-- [ ] **Step 6: Run publish snapshot tests**
+- [x] **Step 6: Run publish snapshot tests**
 
 Run:
 
@@ -339,7 +348,7 @@ Expected: PASS.
 - Read: `docs/product-evolution/specs/p1-003b-publish-time-audience-snapshot-locking.md`
 - Read: `docs/product-evolution/plans/p1-003b-publish-time-audience-snapshot-locking-plan.md`
 
-- [ ] **Step 1: Run focused backend tests**
+- [x] **Step 1: Run focused backend tests**
 
 Run:
 
@@ -348,6 +357,32 @@ cd backend && mvn -pl canvas-engine test -Dtest=AudienceSnapshotServiceTest,Canv
 ```
 
 Expected: PASS.
+
+### Verification Evidence
+
+- P1-003B focused suite:
+
+```bash
+cd backend && mvn -pl canvas-engine test -Dtest=AudienceSnapshotServiceTest,CanvasPublishAudienceSnapshotTest
+```
+
+Result: 6 tests, 0 failures, 0 errors, 0 skipped.
+
+- Publish-path regression suite, run because `CanvasService.publish` was modified:
+
+```bash
+cd backend && mvn -pl canvas-engine test -Dtest=AudienceSnapshotServiceTest,CanvasPublishAudienceSnapshotTest,CanvasValidationRuntimeGuardTest,CanvasTransactionSideEffectTest,CanvasServiceDraftUpdateStateTest
+```
+
+Result: 18 tests, 0 failures, 0 errors, 0 skipped.
+
+- BI compile blocker compatibility suite, run because Maven test compilation surfaced stale BI test fixtures while verifying P1-003B:
+
+```bash
+cd backend && mvn -pl canvas-engine test -Dtest=BiSelfServiceExportServiceTest,BiSelfServiceControllerTest
+```
+
+Result: 9 tests, 0 failures, 0 errors, 0 skipped.
 
 - [ ] **Step 2: Commit this slice**
 

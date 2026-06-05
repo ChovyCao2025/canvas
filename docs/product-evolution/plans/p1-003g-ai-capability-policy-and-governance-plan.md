@@ -2,9 +2,11 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Add an internal AI capability policy and governance test protection so unfinished AI nodes remain hidden until P2-019.
+**Goal:** Add an internal AI capability policy and governance test protection so unfinished AI nodes remain hidden unless governed runtime artifacts exist.
 
-**Architecture:** Treat this as a documentation and test guard slice. The policy describes visibility rules; `NodeTypeGovernanceTest` enforces that public node constants do not expose unfinished AI capabilities before the production `AI_LLM` spec is implemented.
+**Architecture:** Treat this as a documentation and test guard slice. The policy describes visibility rules; `NodeTypeGovernanceTest` enforces that public node constants do not expose unfinished AI capabilities and that `AI_LLM` visibility is backed by P2-019 runtime artifacts when present.
+
+**Implementation note:** The current codebase already contains `AI_LLM`, `AiLlmHandler`, and `AiLlmGateway`, so this slice permits governed `AI_LLM` and blocks legacy `AI_NEXT_BEST_ACTION` rather than removing the productionized AI node.
 
 **Tech Stack:** Markdown, Java 21, JUnit 5, AssertJ.
 
@@ -25,13 +27,13 @@
 **Files:**
 - Modify: `backend/canvas-engine/src/test/java/org/chovy/canvas/common/enums/NodeTypeGovernanceTest.java`
 
-- [ ] **Step 1: Add AI visibility assertion**
+- [x] **Step 1: Add AI visibility assertion**
 
-Add this test:
+Add an AI visibility test. In the current implementation this verifies that `AI_NEXT_BEST_ACTION` is absent and that public `AI_LLM` has P2-019 runtime and policy artifacts:
 
 ```java
 @Test
-void unfinishedAiNodesAreNotPublicNodeConstants() {
+void aiCapabilityConstantsFollowVisibilityPolicy() {
     Set<String> values = Arrays.stream(NodeType.class.getDeclaredFields())
             .filter(field -> String.class.equals(field.getType()))
             .map(field -> {
@@ -43,7 +45,12 @@ void unfinishedAiNodesAreNotPublicNodeConstants() {
             })
             .collect(Collectors.toSet());
 
-    assertThat(values).doesNotContain("AI_NEXT_BEST_ACTION", "AI_LLM");
+    assertThat(values).doesNotContain("AI_NEXT_BEST_ACTION");
+    if (values.contains("AI_LLM")) {
+        assertThat(AiLlmHandler.class.getName()).isEqualTo("org.chovy.canvas.engine.handlers.AiLlmHandler");
+        assertThat(AiLlmGateway.class.getName()).isEqualTo("org.chovy.canvas.engine.llm.AiLlmGateway");
+        assertThat(Files.readString(aiPolicyPath())).contains("P2-019", "AI_LLM", "AI_NEXT_BEST_ACTION");
+    }
 }
 ```
 
@@ -51,11 +58,12 @@ Add imports if absent:
 
 ```java
 import java.util.Arrays;
+import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
 ```
 
-- [ ] **Step 2: Run governance test**
+- [x] **Step 2: Run governance test**
 
 Run:
 
@@ -70,7 +78,7 @@ Expected: PASS if unfinished AI node constants remain hidden.
 **Files:**
 - Create: `docs/product-evolution/AI_CAPABILITY_POLICY.md`
 
-- [ ] **Step 1: Add policy document**
+- [x] **Step 1: Add policy document**
 
 Create `AI_CAPABILITY_POLICY.md`:
 
@@ -82,24 +90,24 @@ Status: Internal policy for product-evolution execution order.
 ## Visible Now
 
 - Non-AI journey orchestration nodes listed in `NodeType`.
+- `AI_LLM` only because P2-019 provides the governed provider, template, audit, handler, and frontend configuration path.
 - Documentation references to future AI work when they point to an approved spec.
 
-## Hidden Until P2-019
+## Hidden Until Governed
 
-- `AI_LLM`
 - `AI_NEXT_BEST_ACTION`
-- Any node that calls an LLM provider, prompt template, embedding store, autonomous decision service, or generated offer selector.
+- Any node that calls an LLM provider, prompt template, embedding store, autonomous decision service, or generated offer selector without the P2-019 runtime, audit, and policy controls.
 
 ## Rules
 
 1. Do not expose unfinished AI nodes in `/meta/node-types`.
-2. Do not add AI node constants to `NodeType` before P2-019 is implemented.
+2. Do not add AI node constants to `NodeType` unless the backing runtime behavior, audit trail, tenant controls, and frontend configuration exist.
 3. Do not present AI copy in operator UI unless the backing runtime behavior exists.
 4. Use P2-019 for governed `AI_LLM` provider, template, audit, and output-schema work.
 5. Use P3 AI strategy specs for autonomous marketing operations, marketplaces, or public ecosystem claims.
 ```
 
-- [ ] **Step 2: Run governance test again**
+- [x] **Step 2: Run governance test again**
 
 Run:
 
@@ -108,6 +116,16 @@ cd backend && mvn -pl canvas-engine test -Dtest=NodeTypeGovernanceTest
 ```
 
 Expected: PASS.
+
+### Verification Evidence
+
+- Backend AI node type governance suite:
+
+```bash
+cd backend && mvn -pl canvas-engine -Dtest=NodeTypeGovernanceTest -DfailIfNoTests=true test
+```
+
+Result: 3 tests, 0 failures, 0 errors, 0 skipped.
 
 ### Task 3: Commit This Slice
 

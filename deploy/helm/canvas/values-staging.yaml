@@ -1,0 +1,33 @@
+backend:
+  replicaCount: 2
+  image:
+    tag: staging
+  resources:
+    requests:
+      cpu: 500m
+      memory: 1Gi
+    limits:
+      cpu: "2"
+      memory: 3Gi
+  config:
+    springDataRedisHost: redis-staging.example.internal
+    springDataRedisPort: "6379"
+    rocketmqNameServer: rocketmq-staging.example.internal:9876
+    canvasCorsAllowedOrigins: https://canvas-staging.example.com
+    canvasFrontendApiBaseUrl: https://canvas-staging.example.com
+  autoscaling:
+    minReplicas: 2
+    maxReplicas: 6
+
+frontend:
+  replicaCount: 2
+  image:
+    tag: staging
+  autoscaling:
+    minReplicas: 2
+    maxReplicas: 4
+
+ingress:
+  host: canvas-staging.example.com
+  tls:
+    secretName: canvas-staging-tls

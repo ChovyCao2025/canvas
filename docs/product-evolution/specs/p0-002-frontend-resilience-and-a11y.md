@@ -5,6 +5,10 @@ Sequence: 002
 Source: `todo/p0/frontend-resilience-and-a11y-stopgaps.md`
 Implementation plan: `../plans/p0-002-frontend-resilience-and-a11y-plan.md`
 
+## Implementation Status
+
+Implemented and verified on 2026-06-05. Verification evidence is recorded in `../plans/p0-002-frontend-resilience-and-a11y-plan.md`.
+
 ## Goal
 
 Prevent white screens, dead routes, silent request failures, and baseline accessibility failures in the React app shell.

@@ -18,7 +18,7 @@ Core handlers, channel adapters, data exporters, and rule/template packs can evo
 - Plugin extension points for node handlers, channel adapters, data exporters, and rule/template packs.
 - Plugin metadata, lifecycle, configuration schema, enable/disable, and compatibility checks.
 - Internal or built-in plugin packaging before third-party hot loading.
-- Official plugin pilots for WeCom, data export, batch operation, and AI Gateway adapter.
+- Official plugin pilots for WeCom, data export, batch operation, AI Gateway adapter, and the form collect node handler.
 - API key and webhook foundations for integration partners.
 
 ## Out Of Scope
@@ -50,7 +50,7 @@ Core handlers, channel adapters, data exporters, and rule/template packs can evo
 
 ### Data And Configuration Touchpoints
 
-- `backend/canvas-engine/src/main/resources/db/migration/V101__plugin_integration_foundations.sql`
+- `backend/canvas-engine/src/main/resources/db/migration/V161__plugin_integration_foundations.sql`
 
 ### Test Touchpoints
 

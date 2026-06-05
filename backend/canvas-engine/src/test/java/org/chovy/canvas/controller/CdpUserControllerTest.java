@@ -1,5 +1,8 @@
 package org.chovy.canvas.web;
 
+import org.chovy.canvas.common.tenant.RoleNames;
+import org.chovy.canvas.common.tenant.TenantContext;
+import org.chovy.canvas.common.tenant.TenantContextResolver;
 import org.chovy.canvas.domain.cdp.CdpTagService;
 import org.chovy.canvas.domain.cdp.CdpUserDirectoryService;
 import org.chovy.canvas.domain.cdp.CdpUserInsightService;
@@ -10,6 +13,7 @@ import org.chovy.canvas.dto.cdp.CdpUserDetailDTO;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
+import reactor.core.publisher.Mono;
 
 import java.util.List;
 
@@ -29,6 +33,7 @@ class CdpUserControllerTest {
     private CdpTagService tagService;
     private CdpUserDirectoryService directoryService;
     private CdpUserInsightService insightService;
+    private TenantContextResolver tenantContextResolver;
     private CdpUserController controller;
 
     @BeforeEach
@@ -37,14 +42,17 @@ class CdpUserControllerTest {
         tagService = Mockito.mock(CdpTagService.class);
         directoryService = Mockito.mock(CdpUserDirectoryService.class);
         insightService = Mockito.mock(CdpUserInsightService.class);
-        controller = new CdpUserController(directoryService, insightService, userService, tagService);
+        tenantContextResolver = Mockito.mock(TenantContextResolver.class);
+        when(tenantContextResolver.currentOrError())
+                .thenReturn(Mono.just(new TenantContext(7L, RoleNames.TENANT_ADMIN, "admin")));
+        controller = new CdpUserController(directoryService, insightService, userService, tagService, tenantContextResolver);
     }
 
     @Test
     void getReturnsUserDetail() {
         CdpUserProfileDO profile = new CdpUserProfileDO();
         profile.setUserId("u1");
-        when(userService.getRequiredProfile("u1")).thenReturn(profile);
+        when(userService.getRequiredProfile(7L, "u1")).thenReturn(profile);
         when(userService.toDetail(profile)).thenReturn(new CdpUserDetailDTO("u1", "u1", null, null,
                 "ACTIVE", null, null, null));
 
@@ -58,12 +66,12 @@ class CdpUserControllerTest {
 
         controller.addTag("u1", req).block();
 
-        verify(tagService).setTag("u1", req);
+        verify(tagService).setTag(7L, "u1", req);
     }
 
     @Test
     void listTagsReturnsCurrentTags() {
-        when(tagService.listCurrentTags("u1")).thenReturn(List.of());
+        when(tagService.listCurrentTags(7L, "u1")).thenReturn(List.of());
 
         assertThat(controller.listTags("u1").block().getData()).isEmpty();
     }

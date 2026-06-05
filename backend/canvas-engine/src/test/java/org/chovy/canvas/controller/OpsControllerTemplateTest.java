@@ -10,6 +10,7 @@ import org.chovy.canvas.dal.mapper.CanvasVersionMapper;
 import org.chovy.canvas.common.enums.CanvasStatusEnum;
 import org.chovy.canvas.common.enums.VersionStatus;
 import org.chovy.canvas.infrastructure.cache.CanvasConfigCache;
+import org.chovy.canvas.infrastructure.redis.TriggerRouteRecoveryService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -36,6 +37,7 @@ class OpsControllerTemplateTest {
     @Mock CanvasVersionMapper canvasVersionMapper;
     @Mock CanvasManualApprovalMapper approvalMapper;
     @Mock CanvasConfigCache configCache;
+    @Mock TriggerRouteRecoveryService routeRecoveryService;
 
     @Test
     void createFromTemplateCreatesDraftVersionWithTemplateGraph() {
@@ -53,7 +55,7 @@ class OpsControllerTemplateTest {
         }).when(canvasMapper).insert(any(CanvasDO.class));
 
         OpsController controller = new OpsController(
-                templateMapper, canvasMapper, canvasVersionMapper, approvalMapper, configCache);
+                templateMapper, canvasMapper, canvasVersionMapper, approvalMapper, configCache, routeRecoveryService);
         OpsController.FromTemplateReq req = new OpsController.FromTemplateReq();
         req.setName("我的新客发券流程");
 
@@ -75,5 +77,21 @@ class OpsControllerTemplateTest {
 
         assertThat(template.getUseCount()).isEqualTo(4);
         verify(templateMapper).updateById(template);
+    }
+
+    @Test
+    void listTemplatesFiltersEnabledTemplatesByCategoryAndOrdersByUseCount() {
+        OpsController controller = new OpsController(
+                templateMapper, canvasMapper, canvasVersionMapper, approvalMapper, configCache, routeRecoveryService);
+
+        controller.listTemplates("retention").block();
+
+        ArgumentCaptor<com.baomidou.mybatisplus.core.conditions.query.QueryWrapper<CanvasTemplateDO>> captor =
+                ArgumentCaptor.forClass(com.baomidou.mybatisplus.core.conditions.query.QueryWrapper.class);
+        verify(templateMapper).selectList(captor.capture());
+        String expression = captor.getValue().getCustomSqlSegment();
+        assertThat(expression).contains("category");
+        assertThat(expression).contains("enabled");
+        assertThat(expression).contains("use_count");
     }
 }

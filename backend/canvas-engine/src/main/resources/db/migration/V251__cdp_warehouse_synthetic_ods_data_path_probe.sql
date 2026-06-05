@@ -1,0 +1,22 @@
+CREATE TABLE IF NOT EXISTS cdp_warehouse_synthetic_data_path_probe_run (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    tenant_id BIGINT NOT NULL DEFAULT 0,
+    probe_key VARCHAR(128) NOT NULL,
+    message_id VARCHAR(128) NOT NULL,
+    event_code VARCHAR(128) NOT NULL,
+    user_id VARCHAR(128) NOT NULL,
+    strict_mode TINYINT(1) NOT NULL DEFAULT 1,
+    status VARCHAR(32) NOT NULL DEFAULT 'RUNNING',
+    sink_status VARCHAR(32) DEFAULT NULL,
+    ods_status VARCHAR(32) DEFAULT NULL,
+    ods_row_count BIGINT NOT NULL DEFAULT 0,
+    started_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    finished_at DATETIME DEFAULT NULL,
+    error_message VARCHAR(1000) DEFAULT NULL,
+    evidence_json JSON DEFAULT NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY uk_cdp_warehouse_synthetic_probe_message (tenant_id, message_id),
+    INDEX idx_cdp_warehouse_synthetic_probe_status (tenant_id, status, started_at),
+    INDEX idx_cdp_warehouse_synthetic_probe_key (tenant_id, probe_key, started_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='CDP warehouse synthetic ODS data-path proof runs';

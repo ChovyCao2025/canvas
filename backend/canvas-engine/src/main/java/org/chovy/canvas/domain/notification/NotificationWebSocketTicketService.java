@@ -34,8 +34,13 @@ public class NotificationWebSocketTicketService {
 
     /** 创建一次性 WebSocket 认证票据。 */
     public String createTicket(String userId) {
+        return createTicket(null, userId);
+    }
+
+    /** 创建绑定租户和用户的一次性 WebSocket 认证票据。 */
+    public String createTicket(Long tenantId, String userId) {
         String ticket = "ntf_ws_" + UUID.randomUUID().toString().replace("-", "");
-        redis.opsForValue().set(keys.notificationWsTicket(ticket), userId, TICKET_TTL);
+        redis.opsForValue().set(keys.notificationWsTicket(ticket), encode(tenantId, userId), TICKET_TTL);
         return ticket;
     }
 
@@ -45,5 +50,37 @@ public class NotificationWebSocketTicketService {
             return null;
         }
         return redis.opsForValue().getAndDelete(keys.notificationWsTicket(ticket));
+    }
+
+    /** 消费一次性 WebSocket 票据并返回绑定的租户和用户。 */
+    public TicketSubject consumeTicketSubject(String ticket) {
+        return decode(consumeTicket(ticket));
+    }
+
+    private String encode(Long tenantId, String userId) {
+        if (tenantId == null) {
+            return userId;
+        }
+        return tenantId + "|" + userId;
+    }
+
+    private TicketSubject decode(String raw) {
+        if (raw == null || raw.isBlank()) {
+            return null;
+        }
+        int separator = raw.indexOf('|');
+        if (separator < 0) {
+            return new TicketSubject(null, raw);
+        }
+        String tenantPart = raw.substring(0, separator);
+        String userId = raw.substring(separator + 1);
+        Long tenantId = null;
+        if (!tenantPart.isBlank()) {
+            tenantId = Long.valueOf(tenantPart);
+        }
+        return new TicketSubject(tenantId, userId);
+    }
+
+    public record TicketSubject(Long tenantId, String userId) {
     }
 }

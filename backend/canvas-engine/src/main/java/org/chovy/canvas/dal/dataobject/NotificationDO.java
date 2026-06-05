@@ -22,6 +22,9 @@ public class NotificationDO {
     /** 通知表自增主键 ID */
     private Long id;
 
+    @TableField("tenant_id")
+    private Long tenantId;
+
     /** 对外通知 ID，用于前端、WebSocket 和接口查询 */
     private String notificationId;
 

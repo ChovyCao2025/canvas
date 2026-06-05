@@ -6,12 +6,16 @@ import lombok.extern.slf4j.Slf4j;
 import org.chovy.canvas.common.MapFieldKeys;
 import org.chovy.canvas.dal.dataobject.MessageSendRecordDO;
 import org.chovy.canvas.dal.mapper.MessageSendRecordMapper;
-import org.springframework.beans.factory.annotation.Value;
+import org.chovy.canvas.engine.policy.MarketingPolicyService;
+import org.chovy.canvas.engine.policy.MarketingPolicyService.PolicyDecision;
+import org.chovy.canvas.infrastructure.http.ExternalHttpClient;
+import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
-import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
 
+import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -30,29 +34,77 @@ public class ReachDeliveryService {
     private final MessageSendRecordMapper recordMapper;
     /** Jackson ObjectMapper，用于 JSON 序列化和反序列化。 */
     private final ObjectMapper objectMapper;
-    /** WebClient 客户端。 */
-    private final WebClient webClient;
+    /** 外部 HTTP 调用边界。 */
+    private final ExternalHttpClient externalHttpClient;
+    /** Crash-safe outbox boundary. Null only for legacy/unit-test construction. */
+    private final DeliveryOutboxService outboxService;
+    /** Marketing policy boundary. Null only for legacy/unit-test construction. */
+    private final MarketingPolicyService policyService;
+
+    /** 初始化触达投递依赖，并按配置创建外部触达平台客户端。 */
+    @Autowired
+    public ReachDeliveryService(
+            MessageSendRecordMapper recordMapper,
+            ObjectMapper objectMapper,
+            ExternalHttpClient externalHttpClient,
+            ObjectProvider<DeliveryOutboxService> outboxServiceProvider,
+            ObjectProvider<MarketingPolicyService> policyServiceProvider
+    ) {
+        this.recordMapper = recordMapper;
+        this.objectMapper = objectMapper;
+        this.externalHttpClient = externalHttpClient;
+        this.outboxService = outboxServiceProvider == null ? null : outboxServiceProvider.getIfAvailable();
+        this.policyService = policyServiceProvider == null ? null : policyServiceProvider.getIfAvailable();
+    }
 
     /** 初始化触达投递依赖，并按配置创建外部触达平台客户端。 */
     public ReachDeliveryService(
             MessageSendRecordMapper recordMapper,
             ObjectMapper objectMapper,
-            WebClient.Builder webClientBuilder,
-            @Value("${canvas.integration.reach-platform-url}") String reachPlatformUrl
+            ExternalHttpClient externalHttpClient
+    ) {
+        this(recordMapper, objectMapper, externalHttpClient, null, null);
+    }
+
+    /** 初始化触达投递依赖，并显式传入策略服务，便于 focused tests 覆盖直发路径。 */
+    public ReachDeliveryService(
+            MessageSendRecordMapper recordMapper,
+            ObjectMapper objectMapper,
+            ExternalHttpClient externalHttpClient,
+            MarketingPolicyService policyService
     ) {
         this.recordMapper = recordMapper;
         this.objectMapper = objectMapper;
-        this.webClient = webClientBuilder.clone().baseUrl(reachPlatformUrl).build();
+        this.externalHttpClient = externalHttpClient;
+        this.outboxService = null;
+        this.policyService = policyService;
     }
 
     /** 执行触达投递并写入发送记录。 */
     public Mono<DeliveryResult> send(DeliveryRequest request) {
+        if (outboxService != null) {
+            return Mono.fromCallable(() -> outboxService.enqueue(request))
+                    .subscribeOn(Schedulers.boundedElastic())
+                    .map(outbox -> new DeliveryResult(
+                            true,
+                            outbox.isDuplicate(),
+                            outbox.getMessageSendRecordId(),
+                            outbox.getProviderMessageId(),
+                            null
+                    ));
+        }
+        return sendDirect(request);
+    }
+
+    /** Legacy direct-send path retained for tests and explicit construction without an outbox bean. */
+    Mono<DeliveryResult> sendDirect(DeliveryRequest request) {
         return Mono.fromCallable(() -> prepareRecord(request))
                 .subscribeOn(Schedulers.boundedElastic())
                 .flatMap(prepared -> {
                     if (prepared.duplicate()) {
                         // 命中幂等键时直接返回已有流水状态，避免重复调用外部渠道造成二次触达。
-                        boolean sent = !MessageSendRecordDO.STATUS_FAILED.equals(prepared.record().getStatus());
+                        boolean sent = MessageSendRecordDO.STATUS_SENT.equals(prepared.record().getStatus())
+                                || MessageSendRecordDO.STATUS_PENDING.equals(prepared.record().getStatus());
                         return Mono.just(new DeliveryResult(
                                 sent,
                                 true,
@@ -61,7 +113,11 @@ public class ReachDeliveryService {
                                 prepared.record().getErrorMessage()
                         ));
                     }
-                    return callReachPlatform(request)
+                    PolicyDecision decision = evaluatePolicy(request);
+                    if (!decision.allowed()) {
+                        return Mono.just(markSkipped(prepared.record(), decision));
+                    }
+                    return callReachPlatform(request.payload())
                             .flatMap(response -> markSent(prepared.record(), response))
                             .onErrorResume(e -> markFailed(prepared.record(), e));
                 });
@@ -78,6 +134,7 @@ public class ReachDeliveryService {
 
         // 先落 PENDING 流水再调用外部平台，失败时仍能回写错误并保留审计轨迹。
         MessageSendRecordDO record = new MessageSendRecordDO();
+        record.setTenantId(request.tenantId());
         record.setExecutionId(request.executionId());
         record.setCanvasId(request.canvasId());
         record.setUserId(request.userId());
@@ -95,14 +152,14 @@ public class ReachDeliveryService {
 
     /** 调用外部触达平台发送消息并返回渠道响应。 */
     @SuppressWarnings("unchecked")
-    private Mono<Map<String, Object>> callReachPlatform(DeliveryRequest request) {
-        return webClient.post()
-                .uri("/send")
-                // 渠道、模板、变量和幂等键统一放入 payload，具体渠道差异由触达平台适配。
-                .bodyValue(request.payload())
-                .retrieve()
-                .bodyToMono(Map.class)
-                .map(map -> (Map<String, Object>) map);
+    public Mono<Map<String, Object>> dispatchToProvider(DeliveryOutboxDO outbox) {
+        Map<String, Object> payload = outboxService == null ? Map.of() : outboxService.payloadAsMap(outbox);
+        return callReachPlatform(payload);
+    }
+
+    private Mono<Map<String, Object>> callReachPlatform(Map<String, Object> payload) {
+        // 渠道、模板、变量和幂等键统一放入 payload，具体渠道差异由触达平台适配。
+        return externalHttpClient.postJson(ExternalHttpClient.REACH_PLATFORM, "/send", payload);
     }
 
     /** 将发送记录标记为成功并保存外部渠道消息 ID。 */
@@ -136,7 +193,88 @@ public class ReachDeliveryService {
                 .subscribeOn(Schedulers.boundedElastic());
     }
 
+    private PolicyDecision evaluatePolicy(DeliveryRequest request) {
+        if (policyService == null || request.policyOptions() == null) {
+            return PolicyDecision.allow();
+        }
+        PolicyOptions policy = request.policyOptions();
+        PolicyDecision decision = policyService.consentAllowed(
+                request.userId(), request.channel(), policy.requireExplicitConsent());
+        if (!decision.allowed()) return decision;
+
+        decision = policyService.suppressionAllowed(request.userId(), request.channel());
+        if (!decision.allowed()) return decision;
+
+        decision = policyService.channelAvailable(request.userId(), request.channel());
+        if (!decision.allowed()) return decision;
+
+        decision = policyService.quietHoursAllowed(
+                request.userId(), policy.quietStart(), policy.quietEnd(), policy.quietTimezone());
+        if (!decision.allowed()) return decision;
+
+        return policyService.consumeFrequency(
+                request.userId(),
+                request.canvasId(),
+                request.nodeId(),
+                policy.frequencyScope(),
+                request.channel(),
+                policy.frequencyMax(),
+                Duration.ofSeconds(policy.frequencyWindowSeconds()));
+    }
+
+    private DeliveryResult markSkipped(MessageSendRecordDO record, PolicyDecision decision) {
+        String reason = decision.reasonCode() + ": " + decision.reasonMessage();
+        record.setStatus(MessageSendRecordDO.STATUS_SKIPPED);
+        record.setErrorMessage(reason.substring(0, Math.min(500, reason.length())));
+        record.setUpdatedAt(LocalDateTime.now());
+        recordMapper.updateById(record);
+        return new DeliveryResult(false, false, record.getId(), null, record.getErrorMessage());
+    }
+
     /** 构造标准化触达投递请求。 */
+    public DeliveryRequest request(
+            Long tenantId,
+            String executionId,
+            Long canvasId,
+            String userId,
+            String nodeId,
+            String channel,
+            String templateId,
+            Map<String, Object> content,
+            Map<String, Object> variables,
+            String idempotencyKey
+    ) {
+        return request(tenantId, executionId, canvasId, userId, nodeId, channel, templateId,
+                content, variables, idempotencyKey, PolicyOptions.defaults());
+    }
+
+    /** 构造标准化触达投递请求。 */
+    public DeliveryRequest request(
+            Long tenantId,
+            String executionId,
+            Long canvasId,
+            String userId,
+            String nodeId,
+            String channel,
+            String templateId,
+            Map<String, Object> content,
+            Map<String, Object> variables,
+            String idempotencyKey,
+            PolicyOptions policyOptions
+    ) {
+        Map<String, Object> payload = new LinkedHashMap<>();
+        // LinkedHashMap 让序列化后的请求字段顺序稳定，便于日志比对和问题排查。
+        payload.put(MapFieldKeys.CHANNEL, channel);
+        payload.put(MapFieldKeys.TEMPLATE_ID, templateId);
+        payload.put(MapFieldKeys.USER_ID, userId);
+        payload.put(MapFieldKeys.CONTENT, content == null ? Map.of() : content);
+        payload.put(MapFieldKeys.VARIABLES, variables == null ? Map.of() : variables);
+        payload.put(MapFieldKeys.IDEMPOTENCY_KEY, idempotencyKey);
+        payload.put("provider", "REACH");
+        return new DeliveryRequest(tenantId, executionId, canvasId, userId, nodeId, channel, "REACH",
+                templateId, payload, idempotencyKey, policyOptions);
+    }
+
     public DeliveryRequest request(
             String executionId,
             Long canvasId,
@@ -148,15 +286,8 @@ public class ReachDeliveryService {
             Map<String, Object> variables,
             String idempotencyKey
     ) {
-        Map<String, Object> payload = new LinkedHashMap<>();
-        // LinkedHashMap 让序列化后的请求字段顺序稳定，便于日志比对和问题排查。
-        payload.put(MapFieldKeys.CHANNEL, channel);
-        payload.put(MapFieldKeys.TEMPLATE_ID, templateId);
-        payload.put(MapFieldKeys.USER_ID, userId);
-        payload.put(MapFieldKeys.CONTENT, content == null ? Map.of() : content);
-        payload.put(MapFieldKeys.VARIABLES, variables == null ? Map.of() : variables);
-        payload.put(MapFieldKeys.IDEMPOTENCY_KEY, idempotencyKey);
-        return new DeliveryRequest(executionId, canvasId, userId, nodeId, channel, templateId, payload, idempotencyKey);
+        return request(null, executionId, canvasId, userId, nodeId, channel, templateId,
+                content, variables, idempotencyKey);
     }
 
     /** 将触达请求载荷序列化为发送记录中的 JSON 文本。 */
@@ -179,6 +310,8 @@ public class ReachDeliveryService {
 
     /** 标准化触达投递请求，封装节点执行产生的渠道、模板、变量和幂等键。 */
     public record DeliveryRequest(
+            /* 租户 ID。 */
+            Long tenantId,
             /* 画布执行实例 ID。 */
             String executionId,
             /* 画布 ID。 */
@@ -189,13 +322,32 @@ public class ReachDeliveryService {
             String nodeId,
             /* 触达渠道。 */
             String channel,
+            /* 触达平台或渠道供应商。 */
+            String provider,
             /* 渠道模板 ID。 */
             String templateId,
             /* 发送给触达平台的标准化载荷。 */
             Map<String, Object> payload,
             /* 幂等键，用于避免重复触达。 */
-            String idempotencyKey
+            String idempotencyKey,
+            /* 触达前营销策略选项。 */
+            PolicyOptions policyOptions
     ) {
+    }
+
+    /** 触达前营销策略选项。 */
+    public record PolicyOptions(
+            boolean requireExplicitConsent,
+            String quietStart,
+            String quietEnd,
+            String quietTimezone,
+            String frequencyScope,
+            int frequencyMax,
+            int frequencyWindowSeconds
+    ) {
+        public static PolicyOptions defaults() {
+            return new PolicyOptions(true, "22:00", "08:00", "USER_LOCAL", "JOURNEY", 1, 86400);
+        }
     }
 
     /** 触达投递结果，返回是否发送、是否命中幂等、记录 ID 和外部渠道回执。 */

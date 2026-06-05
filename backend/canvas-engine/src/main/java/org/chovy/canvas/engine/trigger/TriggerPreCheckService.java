@@ -3,14 +3,19 @@ package org.chovy.canvas.engine.trigger;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.chovy.canvas.common.enums.CanvasStatusEnum;
 import org.chovy.canvas.dal.dataobject.CanvasDO;
 import org.chovy.canvas.dal.mapper.CanvasMapper;
 import org.chovy.canvas.dal.dataobject.CanvasUserQuotaDO;
 import org.chovy.canvas.dal.mapper.CanvasUserQuotaMapper;
+import org.chovy.canvas.domain.canvas.CanvasControlGroupService;
+import org.chovy.canvas.infrastructure.concurrent.ManagedVirtualThreadExecutor;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.core.Cursor;
 import org.springframework.data.redis.core.ScanOptions;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.script.RedisScript;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
 import java.time.Duration;
@@ -56,6 +61,18 @@ public class TriggerPreCheckService {
     private final CanvasUserQuotaMapper quotaMapper;
     /** 阻塞式 Redis 模板，用于锁、去重、票据或跨实例通知。 */
     private final StringRedisTemplate redis;
+    private ManagedVirtualThreadExecutor backgroundExecutor = ManagedVirtualThreadExecutor.direct();
+    private CanvasControlGroupService controlGroupService;
+
+    @Autowired(required = false)
+    void setBackgroundExecutor(ManagedVirtualThreadExecutor backgroundExecutor) {
+        this.backgroundExecutor = backgroundExecutor;
+    }
+
+    @Autowired(required = false)
+    void setControlGroupService(CanvasControlGroupService controlGroupService) {
+        this.controlGroupService = controlGroupService;
+    }
 
     /** 画布全局触发次数 Redis key 模板。 */
     private static final String GLOBAL_COUNT_KEY = "canvas:global_count:";
@@ -100,6 +117,11 @@ public class TriggerPreCheckService {
         }
         if (canvas.getValidEnd() != null && now.isAfter(canvas.getValidEnd())) {
             throw new TriggerRejectedException("QUOTA_006", "活动已结束");
+        }
+
+        if (controlGroupService != null && controlGroupService.isHeldOut(canvas, userId)) {
+            controlGroupService.recordHoldout(canvasId, userId, null, "CONTROL_GROUP");
+            throw new TriggerRejectedException("CONTROL_001", "control group holdout");
         }
 
         // 3. 冷却期软检查：读 DB 最新记录（异步写，可能有滞后）
@@ -256,13 +278,49 @@ public class TriggerPreCheckService {
      * 2. 运营后台统计看板（无需强一致）。
      */
     private void updateQuotaAsync(Long canvasId, String userId) {
-        Thread.ofVirtual().start(() -> {
+        backgroundExecutor.submit("quota-usage-update-" + canvasId, () -> {
             try {
                 quotaMapper.upsertUsage(canvasId, userId, LocalDate.now(), LocalDateTime.now());
             } catch (Exception e) {
                 log.warn("[QUOTA] 用量更新失败: {}", e.getMessage());
             }
         });
+    }
+
+    /** 定期修复非发布画布残留的永久配额 Redis key。 */
+    @Scheduled(cron = "${canvas.quota.reconcile-cron:0 30 3 * * *}")
+    public void reconcileInactiveCanvasQuotasJob() {
+        int count = reconcileInactiveCanvasQuotas();
+        log.info("[QUOTA] inactive canvas quota reconciliation completed canvases={}", count);
+    }
+
+    /**
+     * 清理所有非发布画布的永久配额 key。
+     *
+     * <p>该方法是幂等 repair 入口，用于修复 offline/kill/archive 外部清理失败后遗留的
+     * {@code canvas:global_count:*} 与 {@code canvas:quota:total:*} key。
+     */
+    public int reconcileInactiveCanvasQuotas() {
+        List<CanvasDO> inactive = canvasMapper.selectList(
+                new LambdaQueryWrapper<CanvasDO>()
+                        .ne(CanvasDO::getStatus, CanvasStatusEnum.PUBLISHED.getCode()));
+        if (inactive == null || inactive.isEmpty()) {
+            return 0;
+        }
+        int count = 0;
+        for (CanvasDO canvas : inactive) {
+            if (canvas.getId() == null) {
+                continue;
+            }
+            try {
+                cleanupCanvasQuotas(canvas.getId());
+                count++;
+            } catch (Exception e) {
+                log.error("[QUOTA] inactive canvas quota reconciliation failed canvasId={}: {}",
+                        canvas.getId(), e.getMessage());
+            }
+        }
+        return count;
     }
 
     /**
@@ -291,7 +349,7 @@ public class TriggerPreCheckService {
         log.info("[QUOTA] 已删除全局触发计数 canvasId={}", canvasId);
 
         // 2. 异步 SCAN + DEL 用户总触发量（可能是海量 key，不阻塞调用方）
-        Thread.ofVirtual().start(() -> {
+        backgroundExecutor.submit("quota-cleanup-" + canvasId, () -> {
             String pattern = QUOTA_KEY + "total:" + canvasId + ":*";
             ScanOptions options = ScanOptions.scanOptions().match(pattern).count(500).build();
             int deleted = 0;

@@ -11,10 +11,15 @@ import {
   UserOutlined, MenuFoldOutlined, MenuUnfoldOutlined,
   RocketOutlined, HomeOutlined, TagsOutlined, NotificationOutlined, ThunderboltOutlined,
   BookOutlined,
+  BarChartOutlined,
   DatabaseOutlined,
   IdcardOutlined,
   BankOutlined,
   EyeOutlined,
+  SendOutlined,
+  DashboardOutlined,
+  SafetyCertificateOutlined,
+  FormOutlined,
 } from '@ant-design/icons'
 import { Outlet, useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
@@ -73,6 +78,14 @@ export default function AppLayout() {
     if (location.pathname.startsWith('/system-options')) return 'system-options'
     if (location.pathname.startsWith('/admin/tenants'))  return 'admin-tenants'
     if (location.pathname.startsWith('/admin/users'))    return 'admin-users'
+    if (location.pathname.startsWith('/test-users'))     return 'test-users'
+    if (location.pathname.startsWith('/message-deliveries')) return 'message-deliveries'
+    if (location.pathname.startsWith('/mautic-insights')) return 'mautic-insights'
+    if (location.pathname.startsWith('/marketing-preferences')) return 'marketing-preferences'
+    if (location.pathname.startsWith('/marketing-forms')) return 'marketing-forms'
+    if (location.pathname.startsWith('/ops')) return 'ops'
+    if (location.pathname.startsWith('/bi')) return 'bi'
+    if (location.pathname.startsWith('/ai-predictions')) return 'ai-predictions'
     if (location.pathname.startsWith('/cdp/users'))      return 'cdp-users'
     return 'canvas'
   })()
@@ -80,7 +93,10 @@ export default function AppLayout() {
   /** 根据当前菜单高亮项计算需要展开的父级菜单。 */
   const getDesiredOpenKeys = () => {
     if (selectedKey === 'home') return []
-    if (selectedKey === 'cdp-users') return ['insight']
+    if (selectedKey === 'ops') return ['operations']
+    if (selectedKey === 'bi') return ['analytics']
+    if (['cdp-users', 'ai-predictions'].includes(selectedKey)) return ['insight']
+    if (['test-users', 'message-deliveries', 'mautic-insights', 'marketing-preferences', 'marketing-forms'].includes(selectedKey)) return ['marketing']
     if (selectedKey === 'api-docs') return ['developer']
     if (['audiences', 'tag-config', 'identity-types', 'tag-import', 'ab-experiments'].includes(selectedKey)) return ['data']
     if (['api-config', 'data-source-config', 'mq-config', 'event-config'].includes(selectedKey)) return ['integration']
@@ -112,6 +128,61 @@ export default function AppLayout() {
           label: '旅程管理',
           onClick: () => navigate('/canvas'),
         },
+        {
+          key: 'mautic-insights',
+          icon: <EyeOutlined />,
+          label: '解释台',
+          onClick: () => navigate('/mautic-insights'),
+        },
+        {
+          key: 'marketing-preferences',
+          icon: <SafetyCertificateOutlined />,
+          label: '偏好中心',
+          onClick: () => navigate('/marketing-preferences'),
+        },
+        {
+          key: 'marketing-forms',
+          icon: <FormOutlined />,
+          label: '表单中心',
+          onClick: () => navigate('/marketing-forms'),
+        },
+        ...(isAdmin ? [{
+          key: 'test-users',
+          icon: <TeamOutlined />,
+          label: '测试用户',
+          onClick: () => navigate('/test-users'),
+        }, {
+          key: 'message-deliveries',
+          icon: <SendOutlined />,
+          label: '投递监控',
+          onClick: () => navigate('/message-deliveries'),
+        }] : []),
+      ],
+    },
+    {
+      key: 'analytics',
+      icon: <BarChartOutlined />,
+      label: '数据分析',
+      children: [
+        {
+          key: 'bi',
+          icon: <BarChartOutlined />,
+          label: 'BI 工作台',
+          onClick: () => navigate('/bi'),
+        },
+      ],
+    },
+    {
+      key: 'operations',
+      icon: <DashboardOutlined />,
+      label: '运营值班',
+      children: [
+        {
+          key: 'ops',
+          icon: <DashboardOutlined />,
+          label: '运维控制台',
+          onClick: () => navigate('/ops'),
+        },
       ],
     },
     {
@@ -125,6 +196,12 @@ export default function AppLayout() {
           label: '用户中心',
           onClick: () => navigate('/cdp/users'),
         },
+        ...(isAdmin ? [{
+          key: 'ai-predictions',
+          icon: <ThunderboltOutlined />,
+          label: '流失预测',
+          onClick: () => navigate('/ai-predictions'),
+        }] : []),
       ],
     },
     ...(isAdmin ? [{
@@ -250,6 +327,25 @@ export default function AppLayout() {
   return (
     <Layout style={{ minHeight: '100vh' }}>
       <style>{siderChildrenStyle}</style>
+      <a
+        href="#main-content"
+        className="skip-link"
+        style={{
+          position: 'fixed',
+          top: 8,
+          left: 8,
+          zIndex: 1000,
+          padding: '8px 12px',
+          borderRadius: 6,
+          background: '#ffffff',
+          color: '#111827',
+          transform: 'translateY(-150%)',
+        }}
+        onFocus={event => { event.currentTarget.style.transform = 'translateY(0)' }}
+        onBlur={event => { event.currentTarget.style.transform = 'translateY(-150%)' }}
+      >
+        跳到主要内容
+      </a>
       <Sider
         className="app-sider"
         collapsible
@@ -318,7 +414,7 @@ export default function AppLayout() {
         </div>
 
         {/* 菜单 */}
-        <div style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden', paddingTop: 8 }}>
+        <div role="navigation" aria-label="主导航" style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden', paddingTop: 8 }}>
           <Menu
             mode="inline"
             selectedKeys={[selectedKey]}
@@ -380,7 +476,7 @@ export default function AppLayout() {
         background: '#f5f6fa',
         minHeight: '100vh',
       }}>
-        <Content style={{ padding: 24, minHeight: '100vh' }}>
+        <Content id="main-content" role="main" tabIndex={-1} style={{ padding: 24, minHeight: '100vh' }}>
           <Outlet />
         </Content>
       </Layout>

@@ -1,0 +1,115 @@
+nameOverride: ""
+fullnameOverride: ""
+namespace: canvas
+
+global:
+  partOf: marketing-canvas
+  imagePullSecrets: []
+
+backend:
+  enabled: true
+  name: canvas-engine
+  replicaCount: 2
+  image:
+    repository: registry.example.com/marketing-canvas/canvas-engine
+    tag: latest
+    pullPolicy: IfNotPresent
+  serviceAccountName: canvas-engine
+  containerPort: 8080
+  service:
+    type: ClusterIP
+    port: 8080
+  strategy:
+    maxSurge: 1
+    maxUnavailable: 0
+  javaOpts: >-
+    -XX:+UseZGC
+    -XX:+ZGenerational
+    -XX:MaxRAMPercentage=70
+    -Djava.security.egd=file:/dev/./urandom
+  profile: prod
+  probes:
+    readinessPath: /actuator/health
+    livenessPath: /actuator/health
+    startupPath: /actuator/health
+    readinessInitialDelaySeconds: 20
+    livenessInitialDelaySeconds: 60
+    startupFailureThreshold: 18
+  resources:
+    requests:
+      cpu: 500m
+      memory: 1Gi
+    limits:
+      cpu: "2"
+      memory: 3Gi
+  config:
+    springDataRedisHost: redis.example.internal
+    springDataRedisPort: "6379"
+    rocketmqNameServer: rocketmq.example.internal:9876
+    canvasCorsAllowedOrigins: https://canvas-staging.example.com
+    canvasFrontendApiBaseUrl: https://canvas-staging.example.com
+    springDatasourceHikariMaximumPoolSize: "33"
+    springDatasourceHikariMinimumIdle: "8"
+  secretName: canvas-engine-runtime
+  secretKeys:
+    springDatasourceUrl: spring-datasource-url
+    springDatasourceUsername: spring-datasource-username
+    springDatasourcePassword: spring-datasource-password
+    springDataRedisPassword: spring-data-redis-password
+    canvasEventReportSecret: canvas-event-report-secret
+    canvasInternalApiToken: canvas-internal-api-token
+    canvasPublicTriggerSecret: canvas-public-trigger-secret
+    canvasJwtSecret: canvas-jwt-secret
+    canvasSecretCipherKey: canvas-secret-cipher-key
+  autoscaling:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 6
+    targetCPUUtilizationPercentage: 65
+    targetMemoryUtilizationPercentage: 75
+
+frontend:
+  enabled: true
+  name: canvas-frontend
+  replicaCount: 2
+  image:
+    repository: registry.example.com/marketing-canvas/canvas-frontend
+    tag: latest
+    pullPolicy: IfNotPresent
+  serviceAccountName: canvas-frontend
+  containerPort: 8080
+  service:
+    type: ClusterIP
+    port: 8080
+  apiUpstream: ""
+  probes:
+    readinessPath: /
+    livenessPath: /
+    readinessInitialDelaySeconds: 10
+    livenessInitialDelaySeconds: 30
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+  autoscaling:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 4
+    targetCPUUtilizationPercentage: 70
+
+ingress:
+  enabled: true
+  className: nginx
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-body-size: 20m
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "600"
+  host: canvas-staging.example.com
+  tls:
+    enabled: true
+    secretName: canvas-staging-tls
+
+secrets:
+  createStub: false

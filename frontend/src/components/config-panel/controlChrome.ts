@@ -9,6 +9,7 @@ import type { CSSProperties } from 'react'
 export function getControlChrome(): CSSProperties {
   return {
     height: 40,
+    minHeight: 40,
     borderRadius: 8,
     paddingInline: 10,
     border: '1px solid #d9e1ec',
@@ -21,6 +22,7 @@ export function getControlChrome(): CSSProperties {
 export function getInlineControlChrome(): CSSProperties {
   return {
     height: 32,
+    minHeight: 32,
     borderRadius: 7,
     paddingInline: 8,
     border: '1px solid #d9e1ec',

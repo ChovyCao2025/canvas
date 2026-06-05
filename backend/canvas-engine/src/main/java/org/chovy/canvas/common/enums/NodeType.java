@@ -26,6 +26,7 @@ public final class NodeType {
 
     // 等待与汇聚
     public static final String WAIT = "WAIT";
+    public static final String USER_INPUT = "USER_INPUT";
     public static final String HUB = "HUB";
     public static final String AGGREGATE = "AGGREGATE";
     public static final String THRESHOLD = "THRESHOLD";
@@ -37,6 +38,9 @@ public final class NodeType {
 
     // 消息触达
     public static final String SEND_MESSAGE = "SEND_MESSAGE";
+
+    // AI 智能
+    public static final String AI_LLM = "AI_LLM";
 
     // 数据与权益
     public static final String TAGGER = "TAGGER";

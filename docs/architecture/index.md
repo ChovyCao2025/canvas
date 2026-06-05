@@ -16,7 +16,7 @@ Use `todo/` as the traceability queue, `specs/` for package requirements, and `p
 | [P0](todo/p0/) | security, correctness, production availability, concurrency, and data isolation |
 | [P1](todo/p1/) | API contracts, DAG boundaries, frontend editor state, observability and ops |
 | [P2](todo/p2/) | testing foundation, capacity/cost, documentation, dependency abstraction, compliance, and frontend quality |
-| [P3](todo/p3/) | platform evolution planning |
+| [P3](todo/p3/) | platform evolution decision packages and promotion gates |
 | [needs-review](todo/needs-review/) | stale, duplicate, or decision-dependent findings |
 
 ## Current Packages
@@ -45,7 +45,8 @@ P2:
 - [Frontend accessibility and quality](todo/p2/frontend-accessibility-and-quality/spec.md)
 
 P3:
-- [Platform evolution](todo/p3/platform-evolution/spec.md)
+- [Platform evolution source queue](todo/p3/platform-evolution/spec.md)
+- [Platform evolution promotion checklist](platform-evolution-promotion-checklist.md)
 - [P3-00 Architecture boundary review](specs/P3-00-architecture-boundary-review-spec.md)
 - [P3-01 Platform evolution overview](specs/P3-01-platform-evolution-spec.md)
 - [P3-02 Service decomposition and domain boundaries](specs/P3-02-service-decomposition-and-domain-boundaries-spec.md)

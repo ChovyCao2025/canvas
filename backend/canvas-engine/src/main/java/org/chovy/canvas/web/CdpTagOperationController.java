@@ -1,5 +1,6 @@
 package org.chovy.canvas.web;
 
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.chovy.canvas.common.R;
 import org.chovy.canvas.dal.dataobject.CdpTagOperationDO;
@@ -11,6 +12,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.validation.annotation.Validated;
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
 import java.util.List;
@@ -24,6 +26,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/cdp/tag-operations")
 @RequiredArgsConstructor
+@Validated
 public class CdpTagOperationController {
 
     /** CDP 标签操作服务，用于写入和查询标签变更记录。 */
@@ -38,7 +41,7 @@ public class CdpTagOperationController {
      * @return 异步执行结果，订阅后产生节点结果或业务响应
      */
     @PostMapping
-    public Mono<R<CdpTagOperationDO>> create(@RequestBody CdpBatchTagReq req) {
+    public Mono<R<CdpTagOperationDO>> create(@Valid @RequestBody CdpBatchTagReq req) {
         return Mono.fromCallable(() -> R.ok(service.create(req)))
                 .subscribeOn(Schedulers.boundedElastic());
     }

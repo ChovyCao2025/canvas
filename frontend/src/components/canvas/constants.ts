@@ -8,6 +8,7 @@ export const CATEGORY_COLORS: Record<string, string> = {
   '等待与汇聚': '#4f46e5',
   '动作执行': '#0891b2',
   '消息触达': '#f59e0b',
+  'AI智能': '#7c3aed',
   '数据与权益': '#ef4444',
   '流程复用': '#64748b',
 }
@@ -20,6 +21,7 @@ export const CATEGORY_SOLID: Record<string, string> = {
   '等待与汇聚': '#4f46e5',
   '动作执行': '#0891b2',
   '消息触达': '#f59e0b',
+  'AI智能': '#7c3aed',
   '数据与权益': '#ef4444',
   '流程复用': '#64748b',
 }
@@ -53,6 +55,7 @@ export const DEFAULT_NAMES: Record<string, string> = {
   SEND_MQ: '发送MQ',
   GROOVY: 'Groovy脚本',
   SEND_MESSAGE: '发送消息',
+  AI_LLM: 'AI 智能节点',
   TAGGER: 'Tagger 标签',
   COMMIT_ACTION: '提交动作',
   SUB_FLOW_REF: '子流程引用',

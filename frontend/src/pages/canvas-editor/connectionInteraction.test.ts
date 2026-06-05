@@ -7,6 +7,10 @@ import { describe, expect, it } from 'vitest'
 import type { Edge, Node } from '@xyflow/react'
 import type { CanvasNodeData } from '../../types/canvas'
 import { CANVAS_CONNECTION_RADIUS, canCreateCanvasConnection } from './connectionInteraction'
+import {
+  CANVAS_CONNECTION_RADIUS as ADAPTER_CONNECTION_RADIUS,
+  canCreateCanvasConnection as canCreateCanvasConnectionViaAdapter,
+} from './reactFlowAdapter'
 
 describe('canvas connection interaction', () => {
   it('uses a larger connection radius than the React Flow default', () => {
@@ -47,6 +51,21 @@ describe('canvas connection interaction', () => {
       target: 'api_b',
       targetHandle: 'input',
     }, nodes, edges)).toBe(true)
+  })
+
+  it('exposes connection policy through the React Flow adapter boundary', () => {
+    const nodes: Node<CanvasNodeData>[] = [
+      node('start', 'START'),
+      node('trigger', 'EVENT_TRIGGER'),
+    ]
+
+    expect(ADAPTER_CONNECTION_RADIUS).toBe(CANVAS_CONNECTION_RADIUS)
+    expect(canCreateCanvasConnectionViaAdapter({
+      source: 'start',
+      sourceHandle: 'default',
+      target: 'trigger',
+      targetHandle: 'input',
+    }, nodes, [])).toBe(true)
   })
 })
 

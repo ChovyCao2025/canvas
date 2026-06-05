@@ -165,6 +165,22 @@ export interface CanvasUserRow {
   tags: CdpUserTag[]
 }
 
+/** 用户在画布中的单次执行记录。 */
+export interface CanvasExecutionRow {
+  id: string
+  tenantId?: number | null
+  canvasId: number
+  versionId?: number | null
+  userId: string
+  perfRunId?: string | null
+  triggerType?: string | null
+  status: number
+  result?: string | null
+  lastDedupKey?: string | null
+  createdAt?: string | null
+  updatedAt?: string | null
+}
+
 /** 单用户写标签请求体。 */
 export interface TagWritePayload {
   /** 标签编码。 */
@@ -308,5 +324,5 @@ export const cdpApi = {
 
   /** 查询某个用户在某个画布下的执行明细。 */
   listCanvasUserExecutions: (canvasId: number, userId: string) =>
-    http.get<R<any[]>, R<any[]>>(`/canvas/${canvasId}/users/${encodeURIComponent(userId)}/executions`),
+    http.get<R<CanvasExecutionRow[]>, R<CanvasExecutionRow[]>>(`/canvas/${canvasId}/users/${encodeURIComponent(userId)}/executions`),
 }

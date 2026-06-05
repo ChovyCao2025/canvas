@@ -6,6 +6,7 @@
 import { Navigate, Outlet } from 'react-router-dom'
 import { Spin } from 'antd'
 import { useAuth } from '../context/AuthContext'
+import ForbiddenPage from '../components/errors/ForbiddenPage'
 
 /**
  * 认证守卫：
@@ -43,7 +44,7 @@ export function RequireAdmin() {
   // 未登录优先走登录页；已登录但非管理员才给 403 文案
   // 这样可以明确区分“未登录”和“无权限”两类状态。
   if (!user) return <Navigate to="/login" replace />
-  if (!isAdmin) return <div style={{ padding: 24 }}>无权限（需要管理员角色）</div>
+  if (!isAdmin) return <ForbiddenPage />
   return <Outlet />
 }
 
@@ -51,6 +52,6 @@ export function RequireSuperAdmin() {
   const { user, loading, isSuperAdmin } = useAuth()
   if (loading) return <Spin fullscreen />
   if (!user) return <Navigate to="/login" replace />
-  if (!isSuperAdmin) return <div style={{ padding: 24 }}>无权限（需要超级管理员角色）</div>
+  if (!isSuperAdmin) return <ForbiddenPage />
   return <Outlet />
 }

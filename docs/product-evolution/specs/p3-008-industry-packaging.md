@@ -7,69 +7,75 @@ Implementation plan: `../plans/p3-008-industry-packaging-plan.md`
 
 ## Goal
 
-Package industry templates, nodes, metrics, and compliance profiles for selected verticals.
+Convert industry templates, nodes, metrics, and compliance profiles for selected verticals into an evidence-backed packaging decision.
 
 ## User And Business Value
 
-This keeps the strategy actionable by requiring discovery gates, MVP scope, and measurable exit criteria before engineering scale-up.
+This keeps vertical packaging actionable by requiring vertical-selection evidence, reusable template criteria, compliance ownership, and measurable go-to-market readiness before product build-out.
 
 ## In Scope
 
-- First vertical selection.
-- Industry template pack.
-- Industry metrics and compliance profile.
-- Content governance.
+- Industry packaging discovery brief covering candidate verticals, buyer/user profile, implementation owner, and launch constraints.
+- Vertical selection scorecard covering demand, repeatability, compliance complexity, existing template coverage, and sales/support readiness.
+- Packaging governance brief for templates, nodes, metrics, compliance claims, content review, and maintenance owner.
+- Governance gate that records whether the strategy exits as proceed, park, or split into child implementation specs.
 
 ## Out Of Scope
 
-- Immediate full-scale implementation.
-- Commercial, legal, or architecture commitments without named owner and evidence.
+- Building industry template packs, nodes, metric dashboards, compliance profiles, marketplace listings, or vertical onboarding UI.
+- Adding runtime backend endpoints, frontend routes, or tenant data tables before the governance gate approves a child implementation spec.
+- Compliance, legal, sales, or support commitments without named owner and cited evidence.
 
 ## Functional Requirements
 
-1. The feature must expose the smallest useful operator or platform workflow described in the source item.
-2. The implementation must preserve tenant isolation, authorization, auditability, and rollback behavior for every new read or write path.
-3. New UI must use existing React, Ant Design, router, service, and test patterns unless a child spec justifies a new pattern.
-4. New backend behavior must use the existing Spring Boot, MyBatis, Flyway, controller, domain service, and test patterns.
-5. The implementation must include focused automated tests before code changes and a manual verification checklist for the core workflow.
+1. The discovery artifact must name the vertical owner, product owner, compliance owner, support owner, candidate verticals, and decision date.
+2. The vertical scorecard must include at least three candidate verticals with evidence source, demand score, repeatability score, compliance risk, and decision implication.
+3. The packaging governance brief must define content owner, review cadence, approval rule, allowed claims, blocked claims, and maintenance trigger.
+4. The governance gate must choose exactly one outcome: `proceed`, `park`, or `split`.
+5. A `proceed` or `split` outcome must name the next child spec path and the first measurable KPI; a `park` outcome must name the revisit trigger.
 
 ## Technical Scope
 
 ### Backend Touchpoints
 
-- `backend/canvas-engine/src/main/java/org/chovy/canvas/domain`
-- `backend/canvas-engine/src/main/java/org/chovy/canvas/web`
+- No backend runtime files in this P3 strategy slice.
 
 ### Frontend Touchpoints
 
-- `frontend/src/pages`
-- `frontend/src/services`
+- No frontend runtime files in this P3 strategy slice.
 
 ### Data And Configuration Touchpoints
 
-- `backend/canvas-engine/src/main/resources/db/migration/V123__industry_packaging.sql`
+- No Flyway migration in this slice. The work creates discovery and governance documents only; industry-packaging runtime storage must be introduced by a later child implementation spec if the gate outcome is `proceed` or `split`.
+- Future runtime storage, if approved, should start at `backend/canvas-engine/src/main/resources/db/migration/V180__industry_packaging_registry.sql`.
+
+### Evidence And Governance Touchpoints
+
+- `docs/product-evolution/evidence/p3-008-industry-packaging-discovery.md`
+- `docs/product-evolution/evidence/p3-008-vertical-selection-scorecard.md`
+- `docs/product-evolution/governance/p3-008-industry-packaging-gate.md`
 
 ### Test Touchpoints
 
-- `backend/canvas-engine/src/test/java/org/chovy/canvas/strategy/IndustryPackagingTest.java`
-- `frontend/src/pages/industry-packaging/industry-packaging.test.tsx`
+- Markdown validation commands in the implementation plan.
+- Scope scan verifies the spec and plan stay execution-ready.
 
 ## Dependencies
 
-- Requires explicit business or architecture owner.
-- Requires discovery evidence before build-out.
+- Requires named Vertical, Product, Compliance, Sales, and Support owners.
+- Requires evidence from sales opportunities, customer interviews, implementation notes, support history, or template usage.
+- Requires agreement that P3 strategy output can be a documented stop or split decision, not a product build.
 
 ## Risks And Controls
 
-- Scope creep: keep the first implementation to the workflow in this spec and move broader ideas to a follow-up spec.
-- Tenant or permission regression: add backend tests for tenant-scoped data and role checks before exposing UI.
-- UI complexity: use one page or one panel first, then expand only after the workflow is verified.
-- Data migration risk: make every migration additive and reversible by disabling the new route or feature flag.
+- Weak vertical demand: require evidence source and decision implication for each candidate vertical.
+- Compliance overclaim: define allowed and blocked claims before any package is approved.
+- Maintenance burden: require owner and trigger for template and metric updates.
+- Scope creep: keep this slice limited to decision artifacts and create child specs for approved runtime work.
 
 ## Acceptance Criteria
 
-- The source item has a visible implemented workflow or a documented discovery exit if this is a P3 strategy item.
-- All changed backend endpoints reject unauthorized access and preserve tenant scoping.
-- All changed frontend routes handle loading, empty, error, and permission states.
-- Tests named in the plan pass in the local commands for backend and frontend slices.
-- The implementation includes rollout notes covering feature flag, migration, and rollback behavior.
+- The discovery brief, vertical selection scorecard, and governance gate documents exist with the sections defined in the plan.
+- The plan validation commands pass and show the expected section headers.
+- The governance gate records `proceed`, `park`, or `split` with owner, date, KPI, and next action.
+- No backend, frontend, Flyway migration, index, or audit file is required for this strategy slice.

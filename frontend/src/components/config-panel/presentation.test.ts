@@ -5,7 +5,7 @@
  */
 import { describe, expect, it } from 'vitest'
 import type { CanvasNodeData } from '../../types/canvas'
-import { buildConfigPanelPresentation, resolveContextValueListFieldKey } from './presentation'
+import { buildConfigPanelPresentation, resolveConnectorWarning, resolveContextValueListFieldKey } from './presentation'
 
 /** 构造 TAGGER 节点默认样本，测试用例按需覆盖字段。 */
 const taggerNode = (overrides: Partial<CanvasNodeData> = {}): CanvasNodeData => ({
@@ -33,6 +33,20 @@ describe('buildConfigPanelPresentation', () => {
     expect(resolveContextValueListFieldKey('bizData')).toBe('bizData')
   })
 
+  it('returns connector warnings for non-real send message channels', () => {
+    expect(resolveConnectorWarning({
+      nodeType: 'SEND_MESSAGE',
+      bizConfig: { channel: 'SMS', provider: 'ALIYUN' },
+      connectorMode: 'DISABLED',
+    })).toBe('SMS/ALIYUN is disabled')
+
+    expect(resolveConnectorWarning({
+      nodeType: 'SEND_MESSAGE',
+      bizConfig: { channel: 'SMS', provider: 'ALIYUN' },
+      connectorMode: 'REAL',
+    })).toBeNull()
+  })
+
   it('groups visible schema fields by editing intent', () => {
     const model = buildConfigPanelPresentation({
       nodeData: {
@@ -46,7 +60,9 @@ describe('buildConfigPanelPresentation', () => {
       fields: [
         { key: 'apiKey', label: '接口', type: 'select' },
         { key: 'rules', label: '条件', type: 'condition-rule-list' },
+        { key: 'eventFilters', label: '事件过滤', type: 'condition-builder' },
         { key: 'inputParams', label: '请求参数', type: 'api-input-params' },
+        { key: 'jsonPathMappings', label: '字段映射', type: 'json-path-mapping-list' },
         { key: 'eventAttrs', label: '事件属性', type: 'event-attr-preview' },
       ],
       getNodeName: () => null,
@@ -54,9 +70,40 @@ describe('buildConfigPanelPresentation', () => {
 
     expect(model.fieldGroups).toEqual([
       { key: 'basic', title: '基础配置', fields: [{ key: 'apiKey', label: '接口', type: 'select' }] },
-      { key: 'rules', title: '条件规则', summary: '1 项', fields: [{ key: 'rules', label: '条件', type: 'condition-rule-list' }] },
-      { key: 'mapping', title: '参数映射', summary: '1 项', fields: [{ key: 'inputParams', label: '请求参数', type: 'api-input-params' }] },
+      { key: 'rules', title: '条件规则', summary: '2 项', fields: [
+        { key: 'rules', label: '条件', type: 'condition-rule-list' },
+        { key: 'eventFilters', label: '事件过滤', type: 'condition-builder' },
+      ] },
+      { key: 'mapping', title: '参数映射', summary: '2 项', fields: [
+        { key: 'inputParams', label: '请求参数', type: 'api-input-params' },
+        { key: 'jsonPathMappings', label: '字段映射', type: 'json-path-mapping-list' },
+      ] },
       { key: 'preview', title: '预览信息', summary: '1 项', fields: [{ key: 'eventAttrs', label: '事件属性', type: 'event-attr-preview' }] },
+    ])
+  })
+
+  it('groups user input form schema as mapping configuration', () => {
+    const model = buildConfigPanelPresentation({
+      nodeData: {
+        nodeType: 'USER_INPUT',
+        name: '收集用户信息',
+        category: '等待与汇聚',
+        bizConfig: {},
+      },
+      formValues: {},
+      displayValues: {},
+      fields: [
+        { key: 'formSchema', label: '表单字段', type: 'user-input-field-list' },
+        { key: 'maxWait', label: '最长等待', type: 'duration' },
+      ],
+      getNodeName: () => null,
+    })
+
+    expect(model.fieldGroups).toEqual([
+      { key: 'basic', title: '基础配置', fields: [{ key: 'maxWait', label: '最长等待', type: 'duration' }] },
+      { key: 'mapping', title: '参数映射', summary: '1 项', fields: [
+        { key: 'formSchema', label: '表单字段', type: 'user-input-field-list' },
+      ] },
     ])
   })
 

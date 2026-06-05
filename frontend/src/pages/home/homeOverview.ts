@@ -75,6 +75,23 @@ export interface KpiCard {
   color: string
 }
 
+export interface HomeRiskSummary {
+  healthy: boolean
+  title: string
+  message: string
+  severity: string
+  actionLabel: string
+  targetCanvasId: number | null
+  failedExecutions: string
+  successRate: string
+  pendingCount: number
+}
+
+export interface AttentionAction {
+  label: string
+  destination: 'edit' | 'stats'
+}
+
 /** 首页支持的统计范围选项。 */
 export const HOME_RANGE_OPTIONS = [
   { label: '今日', value: 1 },
@@ -144,6 +161,74 @@ export function getAttentionPresentation(severity: string) {
   if (severity === 'warning') return { color: 'orange', label: '关注' }
   if (severity === 'error') return { color: 'red', label: '异常' }
   return { color: 'blue', label: '提示' }
+}
+
+export function getAttentionAction(type: string): AttentionAction {
+  if (type === 'NO_RECENT_EXECUTIONS') {
+    return { label: '编辑', destination: 'edit' }
+  }
+  if (type === 'HIGH_FAILURE_RATE') {
+    return { label: '处理', destination: 'stats' }
+  }
+  return { label: '查看', destination: 'stats' }
+}
+
+export function sortAttentionItems(items: HomeAttentionItem[]): HomeAttentionItem[] {
+  const severityRank: Record<string, number> = { error: 0, warning: 1, info: 2 }
+  return items
+    .map((item, index) => ({ item, index }))
+    .sort((a, b) => {
+      const rankA = severityRank[a.item.severity] ?? 3
+      const rankB = severityRank[b.item.severity] ?? 3
+      return rankA === rankB ? a.index - b.index : rankA - rankB
+    })
+    .map(entry => entry.item)
+}
+
+export function buildRiskSummary(overview: HomeOverview): HomeRiskSummary {
+  const pending = overview.attentionItems.filter(item => item.severity !== 'info')
+  const primary = sortAttentionItems(overview.attentionItems)[0]
+  if (!primary) {
+    return {
+      healthy: true,
+      title: '当前暂无高优先级异常',
+      message: '近 7 天旅程运行稳定，可继续关注触达趋势和 Top 旅程表现',
+      severity: 'success',
+      actionLabel: '查看趋势',
+      targetCanvasId: null,
+      failedExecutions: formatNumber(overview.summary.failedExecutions),
+      successRate: overview.summary.successRate || '0%',
+      pendingCount: 0,
+    }
+  }
+  const action = getAttentionAction(primary.type)
+  return {
+    healthy: false,
+    title: primary.name,
+    message: primary.message,
+    severity: primary.severity,
+    actionLabel: action.label,
+    targetCanvasId: primary.canvasId,
+    failedExecutions: formatNumber(overview.summary.failedExecutions),
+    successRate: overview.summary.successRate || '0%',
+    pendingCount: pending.length,
+  }
+}
+
+export function filterHomeOverview(overview: HomeOverview, keyword: string): HomeOverview {
+  const normalized = keyword.trim().toLowerCase()
+  if (!normalized) {
+    return overview
+  }
+  const matches = (values: Array<string | number | undefined>) =>
+    values.some(value => String(value ?? '').toLowerCase().includes(normalized))
+  return {
+    ...overview,
+    topCanvases: overview.topCanvases.filter(canvas =>
+      matches([canvas.name, canvas.canvasId, canvas.successRate])),
+    attentionItems: overview.attentionItems.filter(item =>
+      matches([item.name, item.message, item.type, item.severity, item.canvasId])),
+  }
 }
 
 /** 数字统一格式化为本地千分位，空值按 0 处理。 */

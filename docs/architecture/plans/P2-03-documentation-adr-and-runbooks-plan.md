@@ -2,11 +2,11 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Execute the architecture remediation package described in `../specs/P2-03-documentation-adr-and-runbooks-spec.md`.
+**Goal:** Replace broad archived review material with active ADRs, handler guidance, Redis key catalog, OpenAPI generation checks, and runbooks that operators and implementers can execute.
 
-**Architecture:** Start from the archived evidence and current repository verification, add failing tests around the confirmed behavior, then implement the smallest scoped changes that satisfy the package acceptance criteria. Keep unrelated refactors out of the package unless a test proves the boundary must change.
+**Architecture:** Keep archived files under `docs/architecture/archive` as evidence. New active docs live under `docs/architecture/adr`, `docs/architecture/guides`, `docs/architecture/reference`, and `docs/architecture/runbooks`. Documentation checks use `rg`, backend OpenAPI tests, and frontend API-doc tests.
 
-**Tech Stack:** Java 21, Spring Boot 3.2, WebFlux, MyBatis-Plus, Reactor, Redis, RocketMQ, React 18, TypeScript, Vite, Vitest, JUnit 5.
+**Tech Stack:** Markdown, Java 21, Springdoc OpenAPI WebFlux, Spring Boot Actuator, Redis key helpers, JUnit 5, TypeScript, Vitest.
 
 ---
 
@@ -18,195 +18,192 @@
 
 ## File Structure
 
-- Read: `../specs/P2-03-documentation-adr-and-runbooks-spec.md`
-- Read: `../todo/coverage-matrix.md`
-- Read: `../todo/p2/documentation-adr-and-runbooks/plan.md`
-- Modify: repository files named in the spec evidence for this package
-- Test: focused tests created beside the affected backend or frontend code before implementation
+- Read: `docs/architecture/specs/P2-03-documentation-adr-and-runbooks-spec.md`
+- Read: `docs/architecture/todo/p2/documentation-adr-and-runbooks/plan.md`
+- Read: `docs/architecture/archive/evolution/production-practice-review.md`
+- Read: `docs/architecture/archive/reviews/architect-checklist-report.md`
+- Read: `backend/canvas-engine/src/main/java/org/chovy/canvas/infrastructure/redis/RedisKeyUtil.java`
+- Read: `backend/canvas-engine/src/main/java/org/chovy/canvas/engine/dag/DagParser.java`
+- Read: `backend/canvas-engine/src/main/java/org/chovy/canvas/engine/handler/NodeHandler.java`
+- Read: `backend/canvas-engine/src/main/java/org/chovy/canvas/web/CanvasController.java`
+- Create: `docs/architecture/adr/ADR-0000-template.md`
+- Create: `docs/architecture/adr/ADR-0001-web-runtime-model.md`
+- Create: `docs/architecture/adr/ADR-0002-node-handler-model.md`
+- Create: `docs/architecture/adr/ADR-0003-groovy-expression-engine.md`
+- Create: `docs/architecture/adr/ADR-0004-redis-rocketmq-mysql-choices.md`
+- Create: `docs/architecture/adr/ADR-0005-data-isolation-model.md`
+- Create: `docs/architecture/guides/node-handler-development.md`
+- Create: `docs/architecture/reference/redis-key-catalog.md`
+- Create: `docs/architecture/runbooks/dag-execution-flow.md`
+- Create: `docs/architecture/runbooks/failure-triage.md`
+- Create: `docs/architecture/runbooks/dlq-replay.md`
+- Create: `docs/architecture/runbooks/route-rebuild.md`
+- Create: `docs/architecture/runbooks/cache-invalidation.md`
+- Create: `docs/architecture/runbooks/deploy-rollback.md`
+- Test: `frontend/src/pages/api-docs/apiDocs.test.ts`
+- Test: `frontend/src/pages/api-docs/openApiDocs.test.ts`
 
 ### Task 1: Create ADR template and initial ADR list
 
 **Files:**
-- Read: `../specs/P2-03-documentation-adr-and-runbooks-spec.md`
-- Read: `../todo/coverage-matrix.md`
-- Modify: repository files named in this package spec evidence
-- Test: focused tests created beside the affected code
+- Create: `docs/architecture/adr/ADR-0000-template.md`
+- Create: `docs/architecture/adr/ADR-0001-web-runtime-model.md`
+- Create: `docs/architecture/adr/ADR-0002-node-handler-model.md`
+- Create: `docs/architecture/adr/ADR-0003-groovy-expression-engine.md`
+- Create: `docs/architecture/adr/ADR-0004-redis-rocketmq-mysql-choices.md`
+- Create: `docs/architecture/adr/ADR-0005-data-isolation-model.md`
+- Read: `docs/architecture/specs/P3-00-architecture-boundary-review-spec.md`
 
-Existing package notes:
-- Source task has no additional notes beyond its title.
+- [x] Create an ADR template with status, context, decision, alternatives, consequences, rollback trigger, and owner.
+- [x] Create initial ADRs for WebFlux/MVC, NodeHandler model, Groovy, Redis/RocketMQ/MySQL, and data isolation.
+- [x] Link ADRs to the P0/P1/P3 specs that control the decision.
 
-- [ ] **Step 1: Lock the failing behavior**
+**Run:**
+```bash
+test -f docs/architecture/adr/ADR-0000-template.md
+rg "Status|Context|Decision|Alternatives|Consequences|Rollback Trigger|Owner" docs/architecture/adr/ADR-0000-template.md
+rg "WebFlux|NodeHandler|Groovy|RocketMQ|data isolation" docs/architecture/adr
+```
 
-Read `../specs/P2-03-documentation-adr-and-runbooks-spec.md` and write the smallest failing test or documentation check that demonstrates this task gap before changing implementation files.
-
-- [ ] **Step 2: Run the focused check before implementation**
-
-Run the narrowest backend, frontend, or documentation command that exercises the new check. Expected result before implementation: the new check fails or the documentation diff shows the missing section.
-
-- [ ] **Step 3: Implement the scoped change**
-
-Change only the files required by this task and keep the behavior aligned with the acceptance criteria in `../specs/P2-03-documentation-adr-and-runbooks-spec.md`.
-
-- [ ] **Step 4: Verify the task**
-
-Run the same focused command again. Expected result after implementation: pass, or documentation check exits 0.
-
-- [ ] **Step 5: Review the scoped diff**
-
-Run `git diff -- .` and verify the diff only touches files justified by this task and the package spec.
+**Expected:** The ADR directory exists, the template has all required sections, and the five initial ADRs cite controlling specs.
 
 ### Task 2: Write DAG execution flow and Handler development guide
 
 **Files:**
-- Read: `../specs/P2-03-documentation-adr-and-runbooks-spec.md`
-- Read: `../todo/coverage-matrix.md`
-- Modify: repository files named in this package spec evidence
-- Test: focused tests created beside the affected code
+- Create: `docs/architecture/guides/node-handler-development.md`
+- Create: `docs/architecture/runbooks/dag-execution-flow.md`
+- Read: `backend/canvas-engine/src/main/java/org/chovy/canvas/engine/dag/DagParser.java`
+- Read: `backend/canvas-engine/src/main/java/org/chovy/canvas/engine/handler/NodeHandler.java`
+- Read: `backend/canvas-engine/src/main/java/org/chovy/canvas/engine/handlers/StartHandler.java`
+- Read: `backend/canvas-engine/src/main/java/org/chovy/canvas/engine/handlers/WaitHandler.java`
+- Read: `backend/canvas-engine/src/main/java/org/chovy/canvas/engine/trigger/CanvasExecutionService.java`
 
-Existing package notes:
-- Source task has no additional notes beyond its title.
+- [x] Document the execution path from trigger admission through DAG parsing, handler dispatch, wait/resume, trace writes, and completion.
+- [x] Document NodeHandler registration with `@NodeHandlerType`, supported input/output contracts, blocking-call rules, trace expectations, and mapper access restrictions.
+- [x] Include a checklist for adding a new handler with the exact test classes to update.
 
-- [ ] **Step 1: Lock the failing behavior**
+**Run:**
+```bash
+test -f docs/architecture/guides/node-handler-development.md
+test -f docs/architecture/runbooks/dag-execution-flow.md
+rg "DagParser|NodeHandler|@NodeHandlerType|wait/resume|trace|mapper access" docs/architecture/guides/node-handler-development.md docs/architecture/runbooks/dag-execution-flow.md
+cd backend && mvn test -pl canvas-engine -Dtest=StartHandlerTest,WaitHandlerTest,NodeRouteResolverTest
+```
 
-Read `../specs/P2-03-documentation-adr-and-runbooks-spec.md` and write the smallest failing test or documentation check that demonstrates this task gap before changing implementation files.
+**Expected:** Guide and flow docs name the concrete engine classes and focused handler tests pass.
 
-- [ ] **Step 2: Run the focused check before implementation**
-
-Run the narrowest backend, frontend, or documentation command that exercises the new check. Expected result before implementation: the new check fails or the documentation diff shows the missing section.
-
-- [ ] **Step 3: Implement the scoped change**
-
-Change only the files required by this task and keep the behavior aligned with the acceptance criteria in `../specs/P2-03-documentation-adr-and-runbooks-spec.md`.
-
-- [ ] **Step 4: Verify the task**
-
-Run the same focused command again. Expected result after implementation: pass, or documentation check exits 0.
-
-- [ ] **Step 5: Review the scoped diff**
-
-Run `git diff -- .` and verify the diff only touches files justified by this task and the package spec.
-
-### Task 3: Generate Redis key catalog from `RedisKeyUtil` and related services
+### Task 3: Generate Redis key catalog from RedisKeyUtil and related services
 
 **Files:**
-- Read: `../specs/P2-03-documentation-adr-and-runbooks-spec.md`
-- Read: `../todo/coverage-matrix.md`
-- Modify: repository files named in this package spec evidence
-- Test: focused tests created beside the affected code
+- Create: `docs/architecture/reference/redis-key-catalog.md`
+- Read: `backend/canvas-engine/src/main/java/org/chovy/canvas/infrastructure/redis/RedisKeyUtil.java`
+- Read: `backend/canvas-engine/src/main/java/org/chovy/canvas/infrastructure/redis/ContextPersistenceService.java`
+- Read: `backend/canvas-engine/src/main/java/org/chovy/canvas/infrastructure/redis/TriggerRouteService.java`
+- Read: `backend/canvas-engine/src/main/java/org/chovy/canvas/infrastructure/cache/CanvasEntityCache.java`
 
-Existing package notes:
-- Source task has no additional notes beyond its title.
+- [x] Catalog each key prefix, owner service, TTL, payload shape, invalidation path, and operational risk.
+- [x] Include Redis context, trigger route, entity cache, quota, lock, and kill-switch key families.
+- [x] Link each key family to its cleanup or retention rule in `docs/architecture/capacity/retention-policy.md` when that file exists.
 
-- [ ] **Step 1: Lock the failing behavior**
+**Run:**
+```bash
+test -f docs/architecture/reference/redis-key-catalog.md
+rg "prefix|owner service|TTL|payload|invalidation|ContextPersistenceService|TriggerRouteService" docs/architecture/reference/redis-key-catalog.md
+cd backend && mvn test -pl canvas-engine -Dtest=CanvasEntityCacheTest,CacheConfigTest
+```
 
-Read `../specs/P2-03-documentation-adr-and-runbooks-spec.md` and write the smallest failing test or documentation check that demonstrates this task gap before changing implementation files.
-
-- [ ] **Step 2: Run the focused check before implementation**
-
-Run the narrowest backend, frontend, or documentation command that exercises the new check. Expected result before implementation: the new check fails or the documentation diff shows the missing section.
-
-- [ ] **Step 3: Implement the scoped change**
-
-Change only the files required by this task and keep the behavior aligned with the acceptance criteria in `../specs/P2-03-documentation-adr-and-runbooks-spec.md`.
-
-- [ ] **Step 4: Verify the task**
-
-Run the same focused command again. Expected result after implementation: pass, or documentation check exits 0.
-
-- [ ] **Step 5: Review the scoped diff**
-
-Run `git diff -- .` and verify the diff only touches files justified by this task and the package spec.
+**Expected:** Redis catalog traces every key family to an owner and cleanup rule; cache-focused backend tests pass.
 
 ### Task 4: Write operational runbooks for DLQ, route rebuild, cache invalidation, deploy, rollback, and incident triage
 
 **Files:**
-- Read: `../specs/P2-03-documentation-adr-and-runbooks-spec.md`
-- Read: `../todo/coverage-matrix.md`
-- Modify: repository files named in this package spec evidence
-- Test: focused tests created beside the affected code
+- Create: `docs/architecture/runbooks/failure-triage.md`
+- Create: `docs/architecture/runbooks/dlq-replay.md`
+- Create: `docs/architecture/runbooks/route-rebuild.md`
+- Create: `docs/architecture/runbooks/cache-invalidation.md`
+- Create: `docs/architecture/runbooks/deploy-rollback.md`
+- Read: `backend/canvas-engine/src/main/java/org/chovy/canvas/web/DlqController.java`
+- Read: `backend/canvas-engine/src/main/java/org/chovy/canvas/web/OpsController.java`
+- Read: `backend/canvas-engine/src/main/java/org/chovy/canvas/infrastructure/redis/CanvasRouteInitializer.java`
+- Read: `backend/canvas-engine/src/main/java/org/chovy/canvas/infrastructure/cache/RocketMqCacheInvalidationPublisher.java`
 
-Existing package notes:
-- Source task has no additional notes beyond its title.
+- [x] Each runbook must include symptom, severity, dashboard link placeholder, diagnostic commands, remediation commands, rollback commands, and evidence to capture.
+- [x] DLQ runbook must name `DlqController`, retry limits, and replay verification.
+- [x] Route/cache runbooks must name route rebuild and cache invalidation services.
 
-- [ ] **Step 1: Lock the failing behavior**
+**Run:**
+```bash
+test -f docs/architecture/runbooks/failure-triage.md
+test -f docs/architecture/runbooks/dlq-replay.md
+test -f docs/architecture/runbooks/route-rebuild.md
+test -f docs/architecture/runbooks/cache-invalidation.md
+test -f docs/architecture/runbooks/deploy-rollback.md
+rg "symptom|severity|diagnostic commands|remediation commands|rollback commands|evidence" docs/architecture/runbooks
+cd backend && mvn test -pl canvas-engine -Dtest=OpsControllerTemplateTest,CanvasExecutionDlqSchemaTest
+```
 
-Read `../specs/P2-03-documentation-adr-and-runbooks-spec.md` and write the smallest failing test or documentation check that demonstrates this task gap before changing implementation files.
+**Expected:** Runbooks are command-oriented and backend ops/DLQ tests pass.
 
-- [ ] **Step 2: Run the focused check before implementation**
-
-Run the narrowest backend, frontend, or documentation command that exercises the new check. Expected result before implementation: the new check fails or the documentation diff shows the missing section.
-
-- [ ] **Step 3: Implement the scoped change**
-
-Change only the files required by this task and keep the behavior aligned with the acceptance criteria in `../specs/P2-03-documentation-adr-and-runbooks-spec.md`.
-
-- [ ] **Step 4: Verify the task**
-
-Run the same focused command again. Expected result after implementation: pass, or documentation check exits 0.
-
-- [ ] **Step 5: Review the scoped diff**
-
-Run `git diff -- .` and verify the diff only touches files justified by this task and the package spec.
-
-### Task 5: Add OpenAPI annotation/spec work to API contract implementation
+### Task 5: Add OpenAPI annotation and spec work to API contract implementation
 
 **Files:**
-- Read: `../specs/P2-03-documentation-adr-and-runbooks-spec.md`
-- Read: `../todo/coverage-matrix.md`
-- Modify: repository files named in this package spec evidence
-- Test: focused tests created beside the affected code
+- Modify: `backend/canvas-engine/src/main/java/org/chovy/canvas/web/CanvasController.java`
+- Modify: `backend/canvas-engine/src/main/java/org/chovy/canvas/web/ExecutionController.java`
+- Modify: `backend/canvas-engine/src/main/java/org/chovy/canvas/web/AudienceController.java`
+- Modify: `frontend/src/pages/api-docs/openApiDocs.ts`
+- Modify: `frontend/src/pages/api-docs/apiDocs.ts`
+- Test: `frontend/src/pages/api-docs/apiDocs.test.ts`
+- Test: `frontend/src/pages/api-docs/openApiDocs.test.ts`
 
-Existing package notes:
-- Source task has no additional notes beyond its title.
+- [x] Add OpenAPI tags, operation names, request schemas, response schemas, and auth notes for core Canvas, Execution, and Audience routes.
+- [x] Ensure frontend API docs merge generated OpenAPI with local overrides without losing route metadata.
+- [x] Add tests that fail when a documented route loses method, path, auth, or response metadata.
 
-- [ ] **Step 1: Lock the failing behavior**
+**Run:**
+```bash
+cd backend && mvn test -pl canvas-engine -Dtest=CanvasStatsControllerTest,ExecutionControllerTest,AudienceControllerTest
+cd frontend && npm test -- api-docs
+```
 
-Read `../specs/P2-03-documentation-adr-and-runbooks-spec.md` and write the smallest failing test or documentation check that demonstrates this task gap before changing implementation files.
-
-- [ ] **Step 2: Run the focused check before implementation**
-
-Run the narrowest backend, frontend, or documentation command that exercises the new check. Expected result before implementation: the new check fails or the documentation diff shows the missing section.
-
-- [ ] **Step 3: Implement the scoped change**
-
-Change only the files required by this task and keep the behavior aligned with the acceptance criteria in `../specs/P2-03-documentation-adr-and-runbooks-spec.md`.
-
-- [ ] **Step 4: Verify the task**
-
-Run the same focused command again. Expected result after implementation: pass, or documentation check exits 0.
-
-- [ ] **Step 5: Review the scoped diff**
-
-Run `git diff -- .` and verify the diff only touches files justified by this task and the package spec.
+**Expected:** Backend controller tests and frontend API-doc tests pass with OpenAPI metadata preserved.
 
 ### Task 6: Keep archive docs as historical evidence, not active specs
 
 **Files:**
-- Read: `../specs/P2-03-documentation-adr-and-runbooks-spec.md`
-- Read: `../todo/coverage-matrix.md`
-- Modify: repository files named in this package spec evidence
-- Test: focused tests created beside the affected code
+- Modify: `docs/architecture/specs/README.md`
+- Modify: `docs/architecture/plans/README.md`
+- Read: `docs/architecture/archive/reviews/architect-checklist-report.md`
+- Read: `docs/architecture/archive/evolution/production-practice-review.md`
 
-Existing package notes:
-- Source task has no additional notes beyond its title.
+- [x] Add a short policy that active decisions live in specs, plans, ADRs, guides, reference docs, and runbooks.
+- [x] State that archived reviews are source evidence and must be cited by active docs before implementation.
+- [x] Link the policy from both specs and plans README files.
 
-- [ ] **Step 1: Lock the failing behavior**
+**Run:**
+```bash
+rg "archive|historical evidence|active decisions|ADRs|runbooks" docs/architecture/specs/README.md docs/architecture/plans/README.md
+```
 
-Read `../specs/P2-03-documentation-adr-and-runbooks-spec.md` and write the smallest failing test or documentation check that demonstrates this task gap before changing implementation files.
+**Expected:** Specs and plans README files explain how archived docs feed active architecture decisions.
 
-- [ ] **Step 2: Run the focused check before implementation**
+### Task 7: Handoff scoped documentation, ADR, and runbook changes
 
-Run the narrowest backend, frontend, or documentation command that exercises the new check. Expected result before implementation: the new check fails or the documentation diff shows the missing section.
+**Files:**
+- Modify: `docs/architecture/plans/P2-03-documentation-adr-and-runbooks-plan.md`
+- Modify: `docs/architecture/specs/README.md`
+- Modify: `docs/architecture/plans/README.md`
+- Create: `docs/architecture/adr/`
+- Create: `docs/architecture/guides/node-handler-development.md`
+- Create: `docs/architecture/reference/redis-key-catalog.md`
+- Create: `docs/architecture/runbooks/`
 
-- [ ] **Step 3: Implement the scoped change**
+- [x] Review only docs and tests named in this plan.
+- [x] Record evidence for active docs, ADRs, runbooks, OpenAPI changes, and tests.
+- [x] Leave staging and commit to the user-controlled handoff because the current worktree contains unrelated active changes.
 
-Change only the files required by this task and keep the behavior aligned with the acceptance criteria in `../specs/P2-03-documentation-adr-and-runbooks-spec.md`.
+**Run:**
+```bash
+git diff -- docs/architecture/plans/P2-03-documentation-adr-and-runbooks-plan.md docs/architecture/specs/P2-03-documentation-adr-and-runbooks-spec.md docs/architecture/specs/README.md docs/architecture/plans/README.md docs/architecture/evidence/P2-03-documentation-adr-and-runbooks.md docs/architecture/adr docs/architecture/guides docs/architecture/reference docs/architecture/runbooks backend/canvas-engine/src/main/java/org/chovy/canvas/config/OpenApiSecurityConfig.java backend/canvas-engine/src/main/java/org/chovy/canvas/web frontend/src/pages/api-docs backend/canvas-engine/src/test/java/org/chovy/canvas/domain/analytics/AudienceMaterializationScheduleServiceTest.java
+```
 
-- [ ] **Step 4: Verify the task**
-
-Run the same focused command again. Expected result after implementation: pass, or documentation check exits 0.
-
-- [ ] **Step 5: Review the scoped diff**
-
-Run `git diff -- .` and verify the diff only touches files justified by this task and the package spec.
-
+**Expected:** The handoff contains active architecture documentation, OpenAPI metadata changes, related tests, and evidence scoped to this package; no commit is created automatically.

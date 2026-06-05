@@ -53,16 +53,17 @@ class NotificationWebSocketHandlerTest {
         NotificationDO notification = new NotificationDO();
         notification.setNotificationId("ntf_1");
         notification.setType("TASK_SUCCEEDED");
-        when(ticketService.consumeTicket("ntf_ws_1")).thenReturn("alice");
-        when(notificationService.list("alice", false, null, false, 1, 20)).thenReturn(List.of(notification));
-        when(notificationService.unreadCount("alice")).thenReturn(3L);
-        when(realtimeService.register(eq("alice"), eq(session), any(NotificationRealtimePayload.class)))
+        when(ticketService.consumeTicketSubject("ntf_ws_1"))
+                .thenReturn(new NotificationWebSocketTicketService.TicketSubject(7L, "alice"));
+        when(notificationService.list(7L, "alice", false, null, false, 1, 20)).thenReturn(List.of(notification));
+        when(notificationService.unreadCount("alice", 7L)).thenReturn(3L);
+        when(realtimeService.register(eq(7L), eq("alice"), eq(session), any(NotificationRealtimePayload.class)))
                 .thenReturn(Mono.empty());
 
         StepVerifier.create(handler.handle(session)).verifyComplete();
 
-        verify(ticketService).consumeTicket("ntf_ws_1");
-        verify(realtimeService).register(eq("alice"), eq(session), any(NotificationRealtimePayload.class));
+        verify(ticketService).consumeTicketSubject("ntf_ws_1");
+        verify(realtimeService).register(eq(7L), eq("alice"), eq(session), any(NotificationRealtimePayload.class));
     }
 
     private WebSocketSession session(String uri) {

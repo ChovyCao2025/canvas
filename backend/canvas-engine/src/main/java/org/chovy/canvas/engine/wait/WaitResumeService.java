@@ -9,6 +9,7 @@ import org.chovy.canvas.common.enums.NodeType;
 import org.chovy.canvas.common.enums.TriggerType;
 import org.chovy.canvas.dal.dataobject.CanvasWaitSubscriptionDO;
 import org.chovy.canvas.engine.trigger.CanvasExecutionService;
+import org.chovy.canvas.infrastructure.reactor.TrackedReactiveTaskRegistry;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
@@ -54,6 +55,14 @@ public class WaitResumeService {
     private final CanvasExecutionService executionService;
     /** Jackson ObjectMapper，用于 JSON 序列化和反序列化。 */
     private final ObjectMapper objectMapper;
+    /** 跟踪恢复触发的 fire-and-forget 执行，支持关闭时释放。 */
+    private final TrackedReactiveTaskRegistry reactiveTaskRegistry;
+
+    WaitResumeService(WaitSubscriptionService waitSubscriptionService,
+                      CanvasExecutionService executionService,
+                      ObjectMapper objectMapper) {
+        this(waitSubscriptionService, executionService, objectMapper, TrackedReactiveTaskRegistry.direct());
+    }
 
     /**
      * 事件驱动恢复：查找该用户在该 eventCode 下所有 ACTIVE 等待，逐一恢复。
@@ -105,7 +114,7 @@ public class WaitResumeService {
      * <ol>
      *   <li>组装 resumePayload（包含原快照 + 事件属性 + 恢复状态标记）；</li>
      *   <li>{@code completeWait}：{@code UPDATE ... WHERE status='ACTIVE'} CAS，失败则跳过；</li>
-     *   <li>{@code trigger}：异步触发引擎，.subscribe() 是 fire-and-forget，不等待执行完成。</li>
+     *   <li>{@code trigger}：异步触发引擎，通过 {@link TrackedReactiveTaskRegistry} 跟踪后台执行。</li>
      * </ol>
      *
      * @return 是否成功触发恢复（CAS 成功）
@@ -262,19 +271,20 @@ public class WaitResumeService {
         String triggerType = expired ? TriggerType.WAIT_TIMEOUT : TriggerType.WAIT_RESUME;
         String msgId = wait.getExecutionId() + ":wait:" + wait.getId() + ":" + status;
 
-        executionService.trigger(
-                        wait.getCanvasId(),
-                        wait.getUserId(),
-                        triggerType,
-                        nodeType,
-                        wait.getNodeId(),
-                        payload,
-                        msgId,
-                        false)  // dryRun=false；内部恢复触发会在 CanvasExecutionService 中跳过冷却期和配额扣减。
-                .subscribe(
-                        ignored -> log.info("[WAIT] 恢复执行 waitId={} status={}", wait.getId(), status),
-                        e -> log.error("[WAIT] 恢复执行失败 waitId={}: {}", wait.getId(), e.getMessage())
-                );
+        reactiveTaskRegistry.submit(
+                "wait-resume-" + wait.getId() + "-" + status,
+                executionService.trigger(
+                                wait.getCanvasId(),
+                                wait.getUserId(),
+                                triggerType,
+                                nodeType,
+                                wait.getNodeId(),
+                                payload,
+                                msgId,
+                                false)  // dryRun=false；内部恢复触发会在 CanvasExecutionService 中跳过冷却期和配额扣减。
+                        .doOnNext(ignored -> log.info("[WAIT] 恢复执行 waitId={} status={}", wait.getId(), status))
+                        .then(),
+                e -> log.error("[WAIT] 恢复执行失败 waitId={}: {}", wait.getId(), e.getMessage()));
     }
 
     /** 将恢复载荷序列化为等待订阅表中的 JSON 文本。 */

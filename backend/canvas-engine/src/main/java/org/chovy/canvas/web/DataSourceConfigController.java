@@ -2,14 +2,21 @@ package org.chovy.canvas.web;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
-import lombok.RequiredArgsConstructor;
+import jakarta.validation.Valid;
 import org.chovy.canvas.common.PageResult;
 import org.chovy.canvas.common.R;
+import org.chovy.canvas.common.tenant.TenantContext;
+import org.chovy.canvas.common.tenant.TenantContextResolver;
 import org.chovy.canvas.dal.dataobject.DataSourceConfigDO;
 import org.chovy.canvas.dal.mapper.DataSourceConfigMapper;
+import org.chovy.canvas.domain.compliance.AuditEventService;
 import org.chovy.canvas.domain.datasource.DataSourceTableMeta;
+import org.chovy.canvas.dto.datasource.DataSourceConfigReq;
 import org.chovy.canvas.security.SecretCipher;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.jdbc.DataSourceBuilder;
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -27,7 +34,10 @@ import java.sql.Connection;
 import java.sql.DatabaseMetaData;
 import java.sql.ResultSet;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
 
 /**
  * 数据源配置 HTTP 控制器，根路由为 {@code /canvas/data-sources}。
@@ -37,24 +47,49 @@ import java.util.List;
  */
 @RestController
 @RequestMapping("/canvas/data-sources")
-@RequiredArgsConstructor
+@Validated
 public class DataSourceConfigController {
 
     /** 数据源配置 Mapper，用于读写数据源配置。 */
     private final DataSourceConfigMapper dataSourceConfigMapper;
     /** 敏感字段加解密工具。 */
     private final SecretCipher secretCipher;
+    /** 租户上下文解析器，用于数据源配置隔离。 */
+    private final TenantContextResolver tenantContextResolver;
+    /** 合规审计服务，可选注入以兼容轻量单元测试。 */
+    private AuditEventService auditEventService;
+
+    public DataSourceConfigController(DataSourceConfigMapper dataSourceConfigMapper,
+                                      SecretCipher secretCipher) {
+        this(dataSourceConfigMapper, secretCipher, null);
+    }
+
+    @Autowired
+    public DataSourceConfigController(DataSourceConfigMapper dataSourceConfigMapper,
+                                      SecretCipher secretCipher,
+                                      TenantContextResolver tenantContextResolver) {
+        this.dataSourceConfigMapper = dataSourceConfigMapper;
+        this.secretCipher = secretCipher;
+        this.tenantContextResolver = tenantContextResolver;
+    }
+
+    @Autowired(required = false)
+    public void setAuditEventService(AuditEventService auditEventService) {
+        this.auditEventService = auditEventService;
+    }
 
     @GetMapping
     public Mono<R<PageResult<DataSourceConfigDO>>> list(
             @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "20") int size,
             @RequestParam(required = false) String type,
-            @RequestParam(required = false) Integer enabled
+            @RequestParam(required = false) Integer enabled,
+            @RequestParam(required = false) Long tenantId
     ) {
-        return Mono.fromCallable(() -> {
+        return currentTenant().flatMap(context -> Mono.fromCallable(() -> {
             LambdaQueryWrapper<DataSourceConfigDO> wrapper = new LambdaQueryWrapper<DataSourceConfigDO>()
                     .orderByDesc(DataSourceConfigDO::getId);
+            applyTenantFilter(wrapper, context, tenantId);
             if (type != null && !type.isBlank()) {
                 wrapper.eq(DataSourceConfigDO::getType, type);
             }
@@ -63,7 +98,7 @@ public class DataSourceConfigController {
             }
             Page<DataSourceConfigDO> result = dataSourceConfigMapper.selectPage(new Page<>(page, size), wrapper);
             return R.ok(PageResult.of(result.getTotal(), result.getRecords()));
-        }).subscribeOn(Schedulers.boundedElastic());
+        }).subscribeOn(Schedulers.boundedElastic()));
     }
 
     /**
@@ -77,8 +112,9 @@ public class DataSourceConfigController {
     @GetMapping("/{id}/tables")
     public Mono<R<List<DataSourceTableMeta>>> listTables(@PathVariable Long id) {
         // JDBC 元数据读取会建立真实数据库连接，必须放在线程池中执行。
-        return Mono.fromCallable(() -> R.ok(readJdbcTables(id)))
-                .subscribeOn(Schedulers.boundedElastic());
+        return currentTenant().flatMap(context ->
+                Mono.fromCallable(() -> R.ok(readJdbcTables(id, context)))
+                        .subscribeOn(Schedulers.boundedElastic()));
     }
 
     /**
@@ -90,13 +126,16 @@ public class DataSourceConfigController {
      * @return 异步执行结果，订阅后产生节点结果或业务响应
      */
     @PostMapping
-    public Mono<R<DataSourceConfigDO>> create(@RequestBody DataSourceConfigDO body) {
-        return Mono.fromCallable(() -> {
+    public Mono<R<DataSourceConfigDO>> create(@Valid @RequestBody DataSourceConfigReq req) {
+        return currentTenant().flatMap(context -> Mono.fromCallable(() -> {
+            DataSourceConfigDO body = req.toDataObject();
+            applyWriteTenant(body, context, null);
             normalize(body);
             encryptPassword(body);
             dataSourceConfigMapper.insert(body);
+            recordDataSourceAudit(context, "data-source credential create", body);
             return R.ok(body);
-        }).subscribeOn(Schedulers.boundedElastic());
+        }).subscribeOn(Schedulers.boundedElastic()));
     }
 
     /**
@@ -109,14 +148,18 @@ public class DataSourceConfigController {
      * @return 异步执行结果，订阅后产生节点结果或业务响应
      */
     @PutMapping("/{id}")
-    public Mono<R<Void>> update(@PathVariable Long id, @RequestBody DataSourceConfigDO body) {
-        return Mono.fromCallable(() -> {
+    public Mono<R<Void>> update(@PathVariable Long id, @Valid @RequestBody DataSourceConfigReq req) {
+        return currentTenant().flatMap(context -> Mono.fromCallable(() -> {
+            DataSourceConfigDO existing = requireDataSourceAccess(id, context);
+            DataSourceConfigDO body = req.toDataObject();
             body.setId(id);
+            applyWriteTenant(body, context, existing);
             normalize(body);
             encryptPassword(body);
             dataSourceConfigMapper.updateById(body);
+            recordDataSourceAudit(context, "data-source credential update", body);
             return R.<Void>ok();
-        }).subscribeOn(Schedulers.boundedElastic());
+        }).subscribeOn(Schedulers.boundedElastic()));
     }
 
     /**
@@ -129,10 +172,12 @@ public class DataSourceConfigController {
      */
     @DeleteMapping("/{id}")
     public Mono<R<Void>> delete(@PathVariable Long id) {
-        return Mono.fromCallable(() -> {
+        return currentTenant().flatMap(context -> Mono.fromCallable(() -> {
+            DataSourceConfigDO existing = requireDataSourceAccess(id, context);
             dataSourceConfigMapper.deleteById(id);
+            recordDataSourceAudit(context, "data-source credential delete", existing);
             return R.<Void>ok();
-        }).subscribeOn(Schedulers.boundedElastic());
+        }).subscribeOn(Schedulers.boundedElastic()));
     }
 
     /**
@@ -189,11 +234,8 @@ public class DataSourceConfigController {
      * @param id id 对应的业务主键或标识
      * @return 查询、转换或计算得到的结果集合
      */
-    private List<DataSourceTableMeta> readJdbcTables(Long id) throws Exception {
-        DataSourceConfigDO config = dataSourceConfigMapper.selectById(id);
-        if (config == null) {
-            throw new IllegalArgumentException("Data source not found: " + id);
-        }
+    private List<DataSourceTableMeta> readJdbcTables(Long id, TenantContext context) throws Exception {
+        DataSourceConfigDO config = requireDataSourceAccess(id, context);
         if (config.getEnabled() == null || config.getEnabled() == 0) {
             throw new IllegalArgumentException("Data source disabled: " + id);
         }
@@ -241,5 +283,79 @@ public class DataSourceConfigController {
             }
         }
         return columns;
+    }
+
+    private Mono<TenantContext> currentTenant() {
+        if (tenantContextResolver == null) {
+            return Mono.just(new TenantContext(null, null, null));
+        }
+        return tenantContextResolver.current()
+                .defaultIfEmpty(new TenantContext(null, null, null));
+    }
+
+    private void applyTenantFilter(LambdaQueryWrapper<DataSourceConfigDO> wrapper,
+                                   TenantContext context,
+                                   Long requestedTenantId) {
+        if (context == null || context.tenantId() == null) {
+            if (requestedTenantId != null) {
+                wrapper.eq(DataSourceConfigDO::getTenantId, requestedTenantId);
+            }
+            return;
+        }
+        if (context.isSuperAdmin()) {
+            wrapper.eq(requestedTenantId != null, DataSourceConfigDO::getTenantId, requestedTenantId);
+        } else {
+            wrapper.eq(DataSourceConfigDO::getTenantId, context.tenantId());
+        }
+    }
+
+    private void applyWriteTenant(DataSourceConfigDO body, TenantContext context, DataSourceConfigDO existing) {
+        if (existing != null && (!isSuperAdmin(context) || body.getTenantId() == null)) {
+            body.setTenantId(existing.getTenantId());
+            return;
+        }
+        if (context != null && context.tenantId() != null && (!context.isSuperAdmin() || body.getTenantId() == null)) {
+            body.setTenantId(context.tenantId());
+        }
+    }
+
+    private DataSourceConfigDO requireDataSourceAccess(Long id, TenantContext context) {
+        DataSourceConfigDO config = dataSourceConfigMapper.selectById(id);
+        if (config == null) {
+            throw new IllegalArgumentException("Data source not found: " + id);
+        }
+        if (!isSuperAdmin(context)
+                && context != null
+                && context.tenantId() != null
+                && !Objects.equals(config.getTenantId(), context.tenantId())) {
+            throw new AccessDeniedException("跨租户数据源访问被拒绝");
+        }
+        return config;
+    }
+
+    private boolean isSuperAdmin(TenantContext context) {
+        return context != null && context.isSuperAdmin();
+    }
+
+    private void recordDataSourceAudit(TenantContext context, String operation, DataSourceConfigDO config) {
+        if (auditEventService == null || config == null) {
+            return;
+        }
+        Map<String, Object> metadata = new LinkedHashMap<>();
+        metadata.put("name", config.getName());
+        metadata.put("type", config.getType());
+        metadata.put("url", config.getUrl());
+        metadata.put("username", config.getUsername());
+        metadata.put("enabled", config.getEnabled());
+        metadata.put("passwordPresent", config.getPassword() != null && !config.getPassword().isBlank());
+        auditEventService.record(AuditEventService.AuditEventCommand.builder()
+                .tenantId(config.getTenantId() == null ? (context == null ? null : context.tenantId()) : config.getTenantId())
+                .actor(context == null || context.username() == null ? "system" : context.username())
+                .actorRole(context == null ? null : context.role())
+                .operation(operation)
+                .targetType("data-source")
+                .targetId(config.getId() == null ? "0" : String.valueOf(config.getId()))
+                .metadata(metadata)
+                .build());
     }
 }

@@ -21,6 +21,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
+import java.util.concurrent.locks.LockSupport;
 
 /**
  * 服务重启后触发路由表全量重建（设计文档第 6.4 节）。
@@ -73,7 +74,11 @@ public class CanvasRouteInitializer {
             // 另一实例正在重建，等待 2s 后不再重建（它会完成）
             log.info("[ROUTE_INIT] 另一实例正在重建路由表，本实例跳过");
             // 等待窗口给持锁实例完成 ready 标记；本实例不抢重建，减少启动风暴下的重复写。
-            try { Thread.sleep(2000); } catch (InterruptedException ignored) {}
+            LockSupport.parkNanos(Duration.ofSeconds(2).toNanos());
+            if (Thread.currentThread().isInterrupted()) {
+                Thread.currentThread().interrupt();
+                log.warn("[ROUTE_INIT] 等待其他实例重建路由时被中断");
+            }
             return;
         }
 

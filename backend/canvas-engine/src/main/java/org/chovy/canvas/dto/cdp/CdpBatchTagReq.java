@@ -1,5 +1,9 @@
 package org.chovy.canvas.dto.cdp;
 
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotEmpty;
+import jakarta.validation.constraints.Size;
+
 import java.util.List;
 
 /**
@@ -10,15 +14,24 @@ import java.util.List;
  */
 public record CdpBatchTagReq(
         /** 批量操作类型，如 BATCH_SET 或 BATCH_REMOVE。 */
+        @NotBlank
+        @Size(max = 32)
         String operationType,
         /** 被操作的标签编码，对应 tag_definition.tag_code。 */
+        @NotBlank
+        @Size(max = 128)
         String tagCode,
         /** 本次批量写入的标签值，删除操作可为空。 */
+        @Size(max = 512)
         String tagValue,
         /** 本次操作涉及的 CDP 用户 ID 列表。 */
-        List<String> userIds,
+        @NotEmpty
+        @Size(max = 10_000)
+        List<@NotBlank @Size(max = 128) String> userIds,
         /** 操作原因或备注，会写入标签变更历史。 */
+        @Size(max = 512)
         String reason,
         /** 操作人标识。 */
+        @Size(max = 128)
         String operator
 ) {}

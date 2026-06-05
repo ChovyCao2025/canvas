@@ -23,9 +23,11 @@ import java.util.List;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 class ExecutionControllerTest {
@@ -118,6 +120,31 @@ class ExecutionControllerTest {
                 eq(20L), eq("signed-user"), eq("BEHAVIOR"),
                 eq(NodeType.EVENT_TRIGGER), eq("LOGIN"),
                 eq(Map.of("channel", "web")), eq("evt-1"));
+    }
+
+    @Test
+    void behaviorTriggerRejectsSignedInvalidBodyBeforePublishing() throws Exception {
+        CanvasExecutionService executionService = mock(CanvasExecutionService.class);
+        CanvasDisruptorService disruptorService = mock(CanvasDisruptorService.class);
+        ExecutionController controller = new ExecutionController(
+                executionService,
+                disruptorService,
+                new PublicTriggerAuthService(PUBLIC_TRIGGER_SECRET, CLOCK),
+                new ObjectMapper());
+        String body = """
+                {"canvasId":20,"userId":"signed-user","eventCode":"LOGIN","behaviorData":{"channel":"web"}}
+                """;
+        String timestamp = String.valueOf(CLOCK.millis());
+        MockServerHttpRequest request = MockServerHttpRequest.post("/canvas/trigger/behavior")
+                .header(EventReportAuthService.TIMESTAMP_HEADER, timestamp)
+                .header(EventReportAuthService.SIGNATURE_HEADER, hmac(timestamp + "\n" + body))
+                .body(body);
+
+        assertThatThrownBy(() -> controller.behaviorTrigger(request, Mono.just(body)).block())
+                .isInstanceOf(org.springframework.web.server.ResponseStatusException.class)
+                .hasMessageContaining("400")
+                .hasMessageContaining("eventId");
+        verifyNoInteractions(executionService, disruptorService);
     }
 
     private static String hmac(String canonical) throws Exception {

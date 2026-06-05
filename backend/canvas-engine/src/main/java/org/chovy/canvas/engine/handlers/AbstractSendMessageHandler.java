@@ -1,5 +1,6 @@
 package org.chovy.canvas.engine.handlers;
 
+import org.chovy.canvas.common.MapFieldKeys;
 import org.chovy.canvas.engine.context.ExecutionContext;
 import org.chovy.canvas.engine.delivery.ReachDeliveryService;
 import org.chovy.canvas.engine.handler.NodeHandler;
@@ -62,9 +63,18 @@ abstract class AbstractSendMessageHandler implements NodeHandler {
         String failNodeId = string(config, "failNodeId", null);
         String idempotencyKey = string(config, "idempotencyKey",
                 ctx.getExecutionId() + ":" + nodeId + ":" + channel);
+        ReachDeliveryService.PolicyOptions policy = new ReachDeliveryService.PolicyOptions(
+                bool(config, "requireExplicitConsent", true),
+                string(config, "quietStart", "22:00"),
+                string(config, "quietEnd", "08:00"),
+                string(config, "quietTimezone", "USER_LOCAL"),
+                string(config, "frequencyScope", "JOURNEY"),
+                integer(config, "frequencyMax", 1),
+                integer(config, "frequencyWindowSeconds", 86400));
 
         // 发送请求里固定带执行、画布、用户、节点和渠道信息，便于触达记录做幂等与审计。
         ReachDeliveryService.DeliveryRequest request = deliveryService.request(
+                ctx.getTenantId(),
                 ctx.getExecutionId(),
                 ctx.getCanvasId(),
                 ctx.getUserId(),
@@ -73,7 +83,8 @@ abstract class AbstractSendMessageHandler implements NodeHandler {
                 templateId,
                 content(config),
                 variables(config, ctx),
-                idempotencyKey
+                idempotencyKey,
+                policy
         );
 
         return deliveryService.send(request)
@@ -100,6 +111,29 @@ abstract class AbstractSendMessageHandler implements NodeHandler {
     @Override
     public boolean isReachNode() {
         return true;
+    }
+
+    @Override
+    public boolean requiresSideEffectIdempotency(Map<String, Object> config, ExecutionContext ctx) {
+        return true;
+    }
+
+    @Override
+    public String sideEffectOperationKey(Map<String, Object> config, ExecutionContext ctx) {
+        String explicit = string(config, MapFieldKeys.IDEMPOTENCY_KEY, null);
+        if (explicit != null && !explicit.isBlank()) {
+            return explicit;
+        }
+        String templateId = string(config, "templateId", string(config, "template_id", ""));
+        return ctx.getUserId() + ":reach:" + channel(config) + ":" + templateId;
+    }
+
+    @Override
+    public NodeResult completedSideEffectResult(Map<String, Object> config,
+                                                ExecutionContext ctx,
+                                                Map<String, Object> cachedOutput) {
+        String successNodeId = string(config, "successNodeId", string(config, "nextNodeId", null));
+        return NodeResult.routed("success", successNodeId, cachedOutput);
     }
 
     /**
@@ -177,7 +211,9 @@ abstract class AbstractSendMessageHandler implements NodeHandler {
     private Map<String, Object> output(ReachDeliveryService.DeliveryResult result) {
         Map<String, Object> output = new LinkedHashMap<>();
         output.put("sendRecordId", result.recordId());
-        output.put("sendStatus", result.sent() ? "SENT" : "FAILED");
+        output.put("sendStatus", result.sent()
+                ? (result.externalMessageId() == null ? "SUBMITTED" : "SENT")
+                : "FAILED");
         output.put("duplicate", result.duplicate());
         if (result.externalMessageId() != null) {
             output.put("externalMessageId", result.externalMessageId());
@@ -216,5 +252,31 @@ abstract class AbstractSendMessageHandler implements NodeHandler {
     private String string(Map<String, Object> config, String key, String fallback) {
         Object value = config.get(key);
         return value == null ? fallback : value.toString();
+    }
+
+    private boolean bool(Map<String, Object> config, String key, boolean fallback) {
+        Object value = config.get(key);
+        if (value == null) {
+            return fallback;
+        }
+        if (value instanceof Boolean bool) {
+            return bool;
+        }
+        return Boolean.parseBoolean(value.toString());
+    }
+
+    private int integer(Map<String, Object> config, String key, int fallback) {
+        Object value = config.get(key);
+        if (value == null) {
+            return fallback;
+        }
+        if (value instanceof Number number) {
+            return number.intValue();
+        }
+        try {
+            return Integer.parseInt(value.toString());
+        } catch (NumberFormatException ignored) {
+            return fallback;
+        }
     }
 }

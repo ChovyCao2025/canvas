@@ -7,69 +7,69 @@ Implementation plan: `../plans/p3-009-globalization-and-regional-expansion-plan.
 
 ## Goal
 
-Add i18n, locale-aware copy, timezone modes, currency, regional channels, local compliance, and cross-border deployment options when market entry is confirmed.
+Create an executable discovery and governance slice for globalization and regional expansion so market-entry work is backed by evidence before localization, regional channel, compliance, currency, timezone, or deployment implementation begins.
 
 ## User And Business Value
 
-This keeps the strategy actionable by requiring discovery gates, MVP scope, and measurable exit criteria before engineering scale-up.
+This lets product, legal, solutions, and architecture teams compare regions using the same evidence standard: customer demand, regulatory constraints, channel feasibility, data residency needs, rollout cost, and exit criteria.
 
 ## In Scope
 
-- Locale and translation workflow.
-- Timezone and currency support.
-- Regional compliance and channel matrix.
-- Regional deployment gate.
+- Region readiness evidence registry.
+- Governance service that blocks implementation until required evidence is present.
+- Additive Flyway table for region readiness decisions.
+- Review states for discovery, pilot approval, rejection, and conversion into child specs.
+- Manual rollout and rollback notes for the discovery registry.
 
 ## Out Of Scope
 
-- Immediate full-scale implementation.
-- Commercial, legal, or architecture commitments without named owner and evidence.
+- Building i18n, translation management, currency formatting, timezone scheduling, regional channels, local legal automation, or multi-region runtime deployment.
+- Committing to a market, vendor, hosting region, legal interpretation, or commercial launch without a named owner and accepted evidence.
+- Editing product-evolution indexes or `EXECUTABLE_PLAN_AUDIT.md`.
 
 ## Functional Requirements
 
-1. The feature must expose the smallest useful operator or platform workflow described in the source item.
-2. The implementation must preserve tenant isolation, authorization, auditability, and rollback behavior for every new read or write path.
-3. New UI must use existing React, Ant Design, router, service, and test patterns unless a child spec justifies a new pattern.
-4. New backend behavior must use the existing Spring Boot, MyBatis, Flyway, controller, domain service, and test patterns.
-5. The implementation must include focused automated tests before code changes and a manual verification checklist for the core workflow.
+1. A region readiness record must include `region_code`, owner, demand evidence, locale and currency notes, timezone impact, channel availability, compliance notes, data residency notes, rollout hypothesis, rollback note, proof command, and decision status.
+2. The first implementation must keep every region in `BLOCKED_PENDING_REVIEW` until demand, compliance, residency, rollout, rollback, and proof-command fields are nonblank.
+3. A region may move to `APPROVED_FOR_CHILD_SPEC` only when the latest record has reviewer identity and accepted evidence.
+4. The service must reject unsupported decision transitions and records without tenant or owner context.
+5. No runtime globalization behavior may be enabled by this slice; child specs must implement each approved region capability.
 
 ## Technical Scope
 
 ### Backend Touchpoints
 
-- `backend/canvas-engine/src/main/java/org/chovy/canvas/domain`
-- `backend/canvas-engine/src/main/java/org/chovy/canvas/web`
+- `backend/canvas-engine/src/main/java/org/chovy/canvas/strategy/globalization/RegionalExpansionEvidenceService.java`
+- `backend/canvas-engine/src/main/resources/db/migration/V181__regional_expansion_evidence.sql`
 
 ### Frontend Touchpoints
 
-- `frontend/src/pages`
-- `frontend/src/services`
+- None for this discovery slice. A visible UI is deferred until a child spec defines the operator workflow; governance is validated through service tests and SQL evidence.
 
 ### Data And Configuration Touchpoints
 
-- `backend/canvas-engine/src/main/resources/db/migration/V124__globalization_and_regional_expansion.sql`
+- `backend/canvas-engine/src/main/resources/db/migration/V181__regional_expansion_evidence.sql`
 
 ### Test Touchpoints
 
-- `backend/canvas-engine/src/test/java/org/chovy/canvas/strategy/GlobalizationAndRegionalExpansionTest.java`
-- `frontend/src/pages/globalization-and-regional-expansion/globalization-and-regional-expansion.test.tsx`
+- `backend/canvas-engine/src/test/java/org/chovy/canvas/strategy/globalization/RegionalExpansionEvidenceServiceTest.java`
 
 ## Dependencies
 
-- Requires explicit business or architecture owner.
-- Requires discovery evidence before build-out.
+- Business owner for each candidate region.
+- Legal or compliance owner for local regulation evidence.
+- Architecture owner for data residency and deployment impact evidence.
 
 ## Risks And Controls
 
-- Scope creep: keep the first implementation to the workflow in this spec and move broader ideas to a follow-up spec.
-- Tenant or permission regression: add backend tests for tenant-scoped data and role checks before exposing UI.
-- UI complexity: use one page or one panel first, then expand only after the workflow is verified.
-- Data migration risk: make every migration additive and reversible by disabling the new route or feature flag.
+- Strategy scope creep: keep this slice to evidence capture and approval gates.
+- False market commitment: every unreviewed record remains `BLOCKED_PENDING_REVIEW`.
+- Data migration risk: `V181__regional_expansion_evidence.sql` is additive and can be rolled back operationally by hiding the registry writer.
+- Stale evidence: decision records must store reviewer, reviewed time, and proof command output summary.
 
 ## Acceptance Criteria
 
-- The source item has a visible implemented workflow or a documented discovery exit if this is a P3 strategy item.
-- All changed backend endpoints reject unauthorized access and preserve tenant scoping.
-- All changed frontend routes handle loading, empty, error, and permission states.
-- Tests named in the plan pass in the local commands for backend and frontend slices.
-- The implementation includes rollout notes covering feature flag, migration, and rollback behavior.
+- `V181__regional_expansion_evidence.sql` creates an additive region evidence table with proof, rollback, reviewer, and status fields.
+- Service tests prove missing evidence is rejected and child-spec approval remains blocked until review.
+- The plan includes red-green TDD steps, concrete commands with expected outputs, rollout notes, and scoped git add and commit commands.
+- The slice produces governance evidence only; no regional runtime feature is shipped.

@@ -1,0 +1,10 @@
+package org.chovy.canvas.dto.canvas;
+
+public record ProjectFolderMetadataReq(
+        String projectKey,
+        String projectName,
+        String folderKey,
+        String folderName,
+        String operator
+) {
+}

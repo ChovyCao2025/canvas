@@ -46,8 +46,15 @@ public class NotificationService {
     /** 为异步任务创建通知。 */
     public NotificationDO createForTask(
             String userId, String type, String title, String content, String targetUrl, String taskId) {
+        return createForTask(null, userId, type, title, content, targetUrl, taskId);
+    }
+
+    /** 为指定租户内的异步任务创建通知。 */
+    public NotificationDO createForTask(
+            Long tenantId, String userId, String type, String title, String content, String targetUrl, String taskId) {
         String severity = "TASK_FAILED".equals(type) ? "ERROR" : "SUCCESS";
         return create(NotificationCreateCommand.builder()
+                .tenantId(tenantId)
                 .userId(userId)
                 .category("TASK")
                 .severity(severity)
@@ -67,6 +74,7 @@ public class NotificationService {
     /** 创建新记录，并执行必要的唯一性、格式和默认值处理。 */
     public NotificationDO create(NotificationCreateCommand command) {
         NotificationDO notification = new NotificationDO();
+        notification.setTenantId(command.tenantId());
         notification.setNotificationId(newNotificationId());
         notification.setUserId(requireText(command.userId(), "userId"));
         notification.setType(requireText(command.type(), "type"));
@@ -96,9 +104,10 @@ public class NotificationService {
         // 持久化成功后再推送实时消息，确保前端收到通知时列表接口也能查到。
         realtimePublisher.publish(
                 "NOTIFICATION_CREATED",
+                notification.getTenantId(),
                 notification.getUserId(),
                 notification,
-                unreadCount(notification.getUserId()));
+                unreadCount(notification.getUserId(), notification.getTenantId()));
         return notification;
     }
 
@@ -110,7 +119,13 @@ public class NotificationService {
     /** 按条件查询列表数据。 */
     public List<NotificationDO> list(
             String userId, boolean unreadOnly, String category, boolean archived, int page, int size) {
-        return mapper.selectPage(new Page<>(page, size), baseUserQuery(userId, unreadOnly, archived)
+        return list(null, userId, unreadOnly, category, archived, page, size);
+    }
+
+    /** 按租户和条件查询列表数据。 */
+    public List<NotificationDO> list(
+            Long tenantId, String userId, boolean unreadOnly, String category, boolean archived, int page, int size) {
+        return mapper.selectPage(new Page<>(page, size), baseUserQuery(tenantId, userId, unreadOnly, archived)
                         .eq(hasText(category), NotificationDO::getCategory, category)
                         .orderByDesc(NotificationDO::getCreatedAt))
                 .getRecords();
@@ -118,54 +133,78 @@ public class NotificationService {
 
     /** 统计用户未读通知数量。 */
     public long unreadCount(String userId) {
-        Long count = mapper.selectCount(baseUserQuery(userId, true, false));
+        return unreadCount(userId, null);
+    }
+
+    /** 统计指定租户内用户未读通知数量。 */
+    public long unreadCount(String userId, Long tenantId) {
+        Long count = mapper.selectCount(baseUserQuery(tenantId, userId, true, false));
         return count == null ? 0L : count;
     }
 
     /** 将单条通知标记为已读。 */
     public void markRead(String userId, String notificationId) {
+        markRead(userId, notificationId, null);
+    }
+
+    /** 将指定租户内单条通知标记为已读。 */
+    public void markRead(String userId, String notificationId, Long tenantId) {
         NotificationDO update = new NotificationDO();
         update.setReadAt(LocalDateTime.now());
         update.setStatus("READ");
-        mapper.update(update, new LambdaUpdateWrapper<NotificationDO>()
+        mapper.update(update, userUpdate(tenantId)
                 .eq(NotificationDO::getUserId, userId)
                 .eq(NotificationDO::getNotificationId, notificationId)
                 .isNull(NotificationDO::getArchivedAt)
                 .isNull(NotificationDO::getReadAt));
         // 更新类通知只广播未读数，具体列表由前端按需重新拉取。
-        realtimePublisher.publish("NOTIFICATION_UPDATED", userId, null, unreadCount(userId));
+        realtimePublisher.publish("NOTIFICATION_UPDATED", tenantId, userId, null, unreadCount(userId, tenantId));
     }
 
     /** 将用户所有通知标记为已读。 */
     public void markAllRead(String userId) {
+        markAllRead(userId, null);
+    }
+
+    /** 将指定租户内用户所有通知标记为已读。 */
+    public void markAllRead(String userId, Long tenantId) {
         NotificationDO update = new NotificationDO();
         update.setReadAt(LocalDateTime.now());
         update.setStatus("READ");
-        mapper.update(update, new LambdaUpdateWrapper<NotificationDO>()
+        mapper.update(update, userUpdate(tenantId)
                 .eq(NotificationDO::getUserId, userId)
                 .isNull(NotificationDO::getArchivedAt)
                 .isNull(NotificationDO::getReadAt));
         // 批量已读后推送最新未读数，避免多条单独消息刷屏。
-        realtimePublisher.publish("NOTIFICATION_UPDATED", userId, null, unreadCount(userId));
+        realtimePublisher.publish("NOTIFICATION_UPDATED", tenantId, userId, null, unreadCount(userId, tenantId));
     }
 
     /** 归档单条通知。 */
     public void archive(String userId, String notificationId) {
+        archive(userId, notificationId, null);
+    }
+
+    /** 归档指定租户内单条通知。 */
+    public void archive(String userId, String notificationId, Long tenantId) {
         NotificationDO update = new NotificationDO();
         update.setArchivedAt(LocalDateTime.now());
         update.setStatus("ARCHIVED");
-        mapper.update(update, new LambdaUpdateWrapper<NotificationDO>()
+        mapper.update(update, userUpdate(tenantId)
                 .eq(NotificationDO::getUserId, userId)
                 .eq(NotificationDO::getNotificationId, notificationId)
                 .isNull(NotificationDO::getArchivedAt));
         // 归档会改变未读口径，实时事件用于刷新角标和列表。
-        realtimePublisher.publish("NOTIFICATION_UPDATED", userId, null, unreadCount(userId));
+        realtimePublisher.publish("NOTIFICATION_UPDATED", tenantId, userId, null, unreadCount(userId, tenantId));
     }
 
     /** 构建用户通知基础查询条件，统一处理归档和未读过滤。 */
-    private LambdaQueryWrapper<NotificationDO> baseUserQuery(String userId, boolean unreadOnly, boolean archived) {
+    private LambdaQueryWrapper<NotificationDO> baseUserQuery(
+            Long tenantId, String userId, boolean unreadOnly, boolean archived) {
         LambdaQueryWrapper<NotificationDO> query = new LambdaQueryWrapper<NotificationDO>()
                 .eq(NotificationDO::getUserId, userId);
+        if (tenantId != null) {
+            query.eq(NotificationDO::getTenantId, tenantId);
+        }
         if (archived) {
             query.isNotNull(NotificationDO::getArchivedAt);
         } else {
@@ -186,6 +225,7 @@ public class NotificationService {
     private NotificationDO findExisting(NotificationDO notification) {
         if (hasText(notification.getDedupKey())) {
             NotificationDO existing = mapper.selectOne(new LambdaQueryWrapper<NotificationDO>()
+                    .eq(notification.getTenantId() != null, NotificationDO::getTenantId, notification.getTenantId())
                     .eq(NotificationDO::getUserId, notification.getUserId())
                     .eq(NotificationDO::getDedupKey, notification.getDedupKey())
                     .last("LIMIT 1"));
@@ -197,6 +237,7 @@ public class NotificationService {
             return null;
         }
         return mapper.selectOne(new LambdaQueryWrapper<NotificationDO>()
+                .eq(notification.getTenantId() != null, NotificationDO::getTenantId, notification.getTenantId())
                 .eq(NotificationDO::getUserId, notification.getUserId())
                 .eq(NotificationDO::getType, notification.getType())
                 .eq(NotificationDO::getTaskId, notification.getTaskId())
@@ -227,5 +268,13 @@ public class NotificationService {
     /** 判断字符串是否包含非空白字符。 */
     private boolean hasText(String value) {
         return value != null && !value.isBlank();
+    }
+
+    private LambdaUpdateWrapper<NotificationDO> userUpdate(Long tenantId) {
+        LambdaUpdateWrapper<NotificationDO> wrapper = new LambdaUpdateWrapper<>();
+        if (tenantId != null) {
+            wrapper.eq(NotificationDO::getTenantId, tenantId);
+        }
+        return wrapper;
     }
 }

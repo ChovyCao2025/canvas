@@ -31,6 +31,11 @@ public class SysUserService {
             RoleNames.TENANT_ADMIN,
             RoleNames.OPERATOR);
 
+    /** Platform administrator roles are only visible/manageable by platform administrators. */
+    private static final Set<String> PLATFORM_ADMIN_ROLES = Set.of(
+            RoleNames.ADMIN,
+            RoleNames.SUPER_ADMIN);
+
     /** 系统用户 Mapper，用于认证和后台用户管理。 */
     private final SysUserMapper sysUserMapper;
     /** BCrypt 密码编码器，用于密码加密和校验。 */
@@ -67,7 +72,9 @@ public class SysUserService {
         }
         Long tenantId = requireContextTenantId(operator);
         return sysUserMapper.selectList(
-                new LambdaQueryWrapper<SysUserDO>().eq(SysUserDO::getTenantId, tenantId));
+                new com.baomidou.mybatisplus.core.conditions.query.QueryWrapper<SysUserDO>()
+                        .eq("tenant_id", tenantId)
+                        .notIn("role", PLATFORM_ADMIN_ROLES));
     }
 
     /** 创建新记录，并执行必要的唯一性、格式和默认值处理。 */
@@ -103,10 +110,11 @@ public class SysUserService {
     public void update(Long id, String displayName, String rawPassword, String role, TenantContext operator) {
         SysUserDO user = sysUserMapper.selectById(id);
         if (user == null) throw new IllegalArgumentException("用户不存在: " + id);
-        requireManagePermission(operator, user.getTenantId(), role);
+        String normalizedRole = role == null ? null : requireRole(role);
+        requireManagePermission(operator, user.getTenantId(), user.getRole(), normalizedRole);
         if (displayName != null) user.setDisplayName(displayName);
         if (rawPassword != null && !rawPassword.isBlank()) user.setPassword(encoder.encode(rawPassword));
-        if (role != null) user.setRole(requireRole(role));
+        if (normalizedRole != null) user.setRole(normalizedRole);
         sysUserMapper.updateById(user);
     }
 
@@ -114,7 +122,7 @@ public class SysUserService {
     public void disable(Long id, TenantContext operator) {
         SysUserDO user = sysUserMapper.selectById(id);
         if (user == null) throw new IllegalArgumentException("用户不存在: " + id);
-        requireManagePermission(operator, user.getTenantId(), null);
+        requireManagePermission(operator, user.getTenantId(), user.getRole(), null);
         user.setEnabled(0);
         sysUserMapper.updateById(user);
     }
@@ -173,7 +181,7 @@ public class SysUserService {
         if (operator.isSuperAdmin()) {
             return;
         }
-        if (RoleNames.SUPER_ADMIN.equals(targetRole)) {
+        if (isPlatformAdminRole(targetRole)) {
             throw new AccessDeniedException("TENANT_ADMIN 不能创建 SUPER_ADMIN 用户");
         }
         Long operatorTenantId = requireContextTenantId(operator);
@@ -182,17 +190,28 @@ public class SysUserService {
         }
     }
 
-    private void requireManagePermission(TenantContext operator, Long targetTenantId, String targetRole) {
+    private void requireManagePermission(
+            TenantContext operator,
+            Long targetTenantId,
+            String currentTargetRole,
+            String requestedTargetRole) {
         requireUserAdmin(operator);
         if (operator.isSuperAdmin()) {
             return;
         }
-        if (targetRole != null && RoleNames.SUPER_ADMIN.equals(requireRole(targetRole))) {
+        if (isPlatformAdminRole(currentTargetRole)) {
+            throw new AccessDeniedException("TENANT_ADMIN 不能管理 SUPER_ADMIN 用户");
+        }
+        if (isPlatformAdminRole(requestedTargetRole)) {
             throw new AccessDeniedException("TENANT_ADMIN 不能授予 SUPER_ADMIN 角色");
         }
         Long operatorTenantId = requireContextTenantId(operator);
         if (!operatorTenantId.equals(targetTenantId)) {
             throw new AccessDeniedException("TENANT_ADMIN 只能管理当前租户用户");
         }
+    }
+
+    private boolean isPlatformAdminRole(String role) {
+        return role != null && PLATFORM_ADMIN_ROLES.contains(role.trim().toUpperCase(Locale.ROOT));
     }
 }

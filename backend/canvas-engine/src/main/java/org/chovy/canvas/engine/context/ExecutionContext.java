@@ -1,5 +1,6 @@
 package org.chovy.canvas.engine.context;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import lombok.Getter;
 import lombok.Setter;
@@ -24,6 +25,9 @@ public class ExecutionContext {
 
     /** 画布 ID。 */
     private Long canvasId;
+
+    /** 所属租户 ID。 */
+    private Long tenantId;
 
     /** 执行时锁定的版本 ID。 */
     private Long versionId;
@@ -51,6 +55,18 @@ public class ExecutionContext {
 
     /** 扁平化快速查找 Map，O(1)。由 putNodeOutput 维护 */
     private final Map<String, Object> flatContext = new ConcurrentHashMap<>();
+
+    /** 节点输出写入锁，保证分组输出、扁平索引和大小估算保持同一快照。 */
+    @JsonIgnore
+    private final Object outputLock = new Object();
+
+    /** 扁平索引 key 的当前所有者节点，处理并发分支同名字段覆盖。 */
+    @JsonIgnore
+    private final Map<String, String> flatKeyOwners = new ConcurrentHashMap<>();
+
+    /** 每个节点写入过的扁平索引 key，用于覆盖节点输出时清理旧字段。 */
+    @JsonIgnore
+    private final Map<String, Set<String>> nodeFlatKeys = new ConcurrentHashMap<>();
 
     /** 各节点执行状态（需持久化，多阶段恢复和汇聚判断依赖此状态） */
     private Map<String, NodeStatus> nodeStatuses = new ConcurrentHashMap<>();
@@ -100,10 +116,17 @@ public class ExecutionContext {
     @JsonIgnore
     private final AtomicInteger approxSizeBytes = new AtomicInteger(0);
 
-    /** 上下文估算大小上限，超过后由调用方判断是否中止。 */
-    private static final int MAX_SIZE_BYTES  = 1024 * 1024; // 1MB（设计文档 13.7节）
-    /** 上下文估算大小预警阈值。 */
-    private static final int WARN_SIZE_BYTES = 512 * 1024; // 512KB 预警
+    private static final ObjectMapper SIZE_OBJECT_MAPPER = new ObjectMapper();
+    private static final int DEFAULT_MAX_SIZE_BYTES  = 1024 * 1024;
+    private static final int DEFAULT_WARN_SIZE_BYTES = 512 * 1024;
+
+    /** 上下文硬上限，超过后拒绝写入。 */
+    @JsonIgnore
+    private int maxSizeBytes = DEFAULT_MAX_SIZE_BYTES;
+
+    /** 上下文预警阈值。 */
+    @JsonIgnore
+    private int warnSizeBytes = DEFAULT_WARN_SIZE_BYTES;
 
     // ── 写入节点输出 ────────────────────────────────────────────
 
@@ -133,28 +156,121 @@ public class ExecutionContext {
      * @param output output 方法执行所需的业务参数
      */
     public void putNodeOutput(String nodeId, Map<String, Object> output) {
-        // nodeOutputs 保留按节点分组的完整快照，flatContext 提供跨节点字段的快速读取。
-        nodeOutputs.put(nodeId, output);
-        flatContext.putAll(output);
+        Objects.requireNonNull(nodeId, "nodeId must not be null");
+        Map<String, Object> snapshot = immutableOutputSnapshot(output);
 
-        // 大小监控：累加估算字节数（设计文档 13.7节）
-        // 使用轻量累加而非每次 JSON 序列化，避免 O(n) 开销
-        output.forEach((k, v) ->
-            approxSizeBytes.addAndGet(k.length() + (v != null ? v.toString().length() : 4)));
+        synchronized (outputLock) {
+            int candidateSize = candidateNodeOutputSizeLocked(nodeId, snapshot);
+            if (candidateSize > maxSizeBytes) {
+                throw new IllegalStateException("execution context exceeds max bytes: "
+                        + candidateSize + " > " + maxSizeBytes);
+            }
+            clearOwnedFlatKeys(nodeId);
+            nodeOutputs.put(nodeId, snapshot);
+            Set<String> writtenFlatKeys = new HashSet<>();
+            snapshot.forEach((k, v) -> {
+                if (v == null) {
+                    return;
+                }
+                putOwnedFlatKey(nodeId, k, v, writtenFlatKeys);
+                putOwnedFlatKey(nodeId, qualifiedOutputKey(nodeId, k), v, writtenFlatKeys);
+            });
+            if (writtenFlatKeys.isEmpty()) {
+                nodeFlatKeys.remove(nodeId);
+            } else {
+                nodeFlatKeys.put(nodeId, writtenFlatKeys);
+            }
+            approxSizeBytes.set(candidateSize);
+        }
 
-        if (approxSizeBytes.get() > MAX_SIZE_BYTES) {
-            // 不截断（截断可能破坏防资损逻辑），仅记录 WARN
-            // 调用方可通过检查 isOversized() 决定是否中止
-        } else if (approxSizeBytes.get() > WARN_SIZE_BYTES) {
+        if (approxSizeBytes.get() > warnSizeBytes) {
             // 超过 512KB 提前预警，便于排查超大字段
         }
     }
 
+    private Map<String, Object> immutableOutputSnapshot(Map<String, Object> output) {
+        if (output == null || output.isEmpty()) {
+            return Map.of();
+        }
+        Map<String, Object> snapshot = new LinkedHashMap<>();
+        output.forEach((key, value) -> {
+            if (key != null) {
+                snapshot.put(key, value);
+            }
+        });
+        return Collections.unmodifiableMap(snapshot);
+    }
+
+    private void clearOwnedFlatKeys(String nodeId) {
+        Set<String> previousKeys = nodeFlatKeys.remove(nodeId);
+        if (previousKeys == null || previousKeys.isEmpty()) {
+            return;
+        }
+        for (String flatKey : previousKeys) {
+            if (nodeId.equals(flatKeyOwners.get(flatKey))) {
+                flatContext.remove(flatKey);
+                flatKeyOwners.remove(flatKey);
+            }
+        }
+    }
+
+    private void putOwnedFlatKey(String nodeId, String key, Object value, Set<String> writtenFlatKeys) {
+        flatContext.put(key, value);
+        flatKeyOwners.put(key, nodeId);
+        writtenFlatKeys.add(key);
+    }
+
+    private String qualifiedOutputKey(String nodeId, String fieldKey) {
+        return nodeId + "." + fieldKey;
+    }
+
+    private int candidateNodeOutputSizeLocked(String nodeId, Map<String, Object> output) {
+        Map<String, Map<String, Object>> candidate = new LinkedHashMap<>(nodeOutputs);
+        candidate.put(nodeId, output);
+        return serializedNodeOutputSize(candidate);
+    }
+
+    private int currentNodeOutputSizeLocked() {
+        return serializedNodeOutputSize(nodeOutputs);
+    }
+
+    private int serializedNodeOutputSize(Map<String, Map<String, Object>> outputs) {
+        try {
+            return SIZE_OBJECT_MAPPER.writeValueAsBytes(outputs).length;
+        } catch (Exception ignored) {
+            return estimatedNodeOutputSize(outputs);
+        }
+    }
+
+    private int estimatedNodeOutputSize(Map<String, Map<String, Object>> outputs) {
+        long total = 0;
+        for (Map<String, Object> output : outputs.values()) {
+            for (Map.Entry<String, Object> entry : output.entrySet()) {
+                total += entry.getKey().length()
+                        + (entry.getValue() != null ? entry.getValue().toString().length() : 4);
+                if (total > Integer.MAX_VALUE) {
+                    return Integer.MAX_VALUE;
+                }
+            }
+        }
+        return (int) total;
+    }
+
     /** 是否超过 1MB 上限 */
-    public boolean isOversized() { return approxSizeBytes.get() > MAX_SIZE_BYTES; }
+    public boolean isOversized() { return approxSizeBytes.get() > maxSizeBytes; }
+
+    public boolean isNearSizeLimit() { return approxSizeBytes.get() > warnSizeBytes; }
 
     /** 获取估算大小（字节） */
     public int getApproxSizeBytes() { return approxSizeBytes.get(); }
+
+    public int calculateSerializedContextSize() {
+        synchronized (outputLock) {
+            int size = currentNodeOutputSizeLocked();
+            approxSizeBytes.set(size);
+            return size;
+        }
+    }
 
     /**
      * 查询或读取 get Context Value 相关的业务数据。
@@ -169,7 +285,40 @@ public class ExecutionContext {
     public Object getContextValue(String fieldKey) {
         Object val = flatContext.get(fieldKey);
         // 节点输出优先于触发载荷，允许下游节点读取上游加工后的同名字段。
-        return val != null ? val : triggerPayload.get(fieldKey);
+        if (val != null) {
+            return val;
+        }
+        Object nested = legacyNestedContextValue(fieldKey);
+        return nested != null ? nested : triggerPayload.get(fieldKey);
+    }
+
+    public void setContextValue(String fieldKey, Object value) {
+        Objects.requireNonNull(fieldKey, "fieldKey must not be null");
+        if (value == null) {
+            flatContext.remove(fieldKey);
+            flatKeyOwners.remove(fieldKey);
+            return;
+        }
+        flatContext.put(fieldKey, value);
+        flatKeyOwners.put(fieldKey, "__manual__");
+    }
+
+    private Object legacyNestedContextValue(String fieldKey) {
+        if (fieldKey == null || fieldKey.isBlank()) {
+            return null;
+        }
+        int dot = fieldKey.indexOf('.');
+        if (dot > 0 && dot < fieldKey.length() - 1) {
+            Map<String, Object> output = nodeOutputs.get(fieldKey.substring(0, dot));
+            return output == null ? null : output.get(fieldKey.substring(dot + 1));
+        }
+        for (Map<String, Object> output : nodeOutputs.values()) {
+            Object value = output.get(fieldKey);
+            if (value != null) {
+                return value;
+            }
+        }
+        return null;
     }
 
     /**

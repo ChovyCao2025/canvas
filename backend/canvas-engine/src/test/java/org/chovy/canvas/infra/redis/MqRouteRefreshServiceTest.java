@@ -30,7 +30,8 @@ import static org.mockito.Mockito.when;
 class MqRouteRefreshServiceTest {
 
     @Test
-    void rebuildMqRoutesReplacesMqRoutesInOneBatchAfterParsingPublishedCanvases() {
+    @SuppressWarnings("unchecked")
+    void rebuildTriggerRoutesReplacesAllTriggerRoutesInOneBatchAfterParsingPublishedCanvases() {
         CanvasMapper canvasMapper = mock(CanvasMapper.class);
         CanvasVersionMapper versionMapper = mock(CanvasVersionMapper.class);
         DagParser dagParser = mock(DagParser.class);
@@ -48,25 +49,36 @@ class MqRouteRefreshServiceTest {
         version.setGraphJson("{\"nodes\":[]}");
         when(versionMapper.selectBatchIds(List.of(100L))).thenReturn(List.of(version));
 
-        DagParser.CanvasNode node = new DagParser.CanvasNode();
-        node.setId("mq-1");
-        node.setType(NodeType.MQ_TRIGGER);
-        node.setConfig(Map.of("messageCodeKey", "order_paid"));
+        DagParser.CanvasNode mqNode = new DagParser.CanvasNode();
+        mqNode.setId("mq-1");
+        mqNode.setType(NodeType.MQ_TRIGGER);
+        mqNode.setConfig(Map.of("messageCodeKey", "order_paid"));
+        DagParser.CanvasNode eventNode = new DagParser.CanvasNode();
+        eventNode.setId("event-1");
+        eventNode.setType(NodeType.EVENT_TRIGGER);
+        eventNode.setConfig(Map.of("eventCode", "ORDER_PAID"));
+        DagParser.CanvasNode taggerNode = new DagParser.CanvasNode();
+        taggerNode.setId("tagger-1");
+        taggerNode.setType(NodeType.TAGGER);
+        taggerNode.setConfig(Map.of("mode", "realtime", "tagCodeKey", "vip_level"));
         DagGraph graph = new DagGraph(
-                Map.of("mq-1", node),
-                Map.of("mq-1", List.of()),
-                Map.of("mq-1", List.of()),
-                Map.of("mq-1", 0));
+                Map.of("mq-1", mqNode, "event-1", eventNode, "tagger-1", taggerNode),
+                Map.of("mq-1", List.of(), "event-1", List.of(), "tagger-1", List.of()),
+                Map.of("mq-1", List.of(), "event-1", List.of(), "tagger-1", List.of()),
+                Map.of("mq-1", 0, "event-1", 0, "tagger-1", 0));
         when(dagParser.parse("{\"nodes\":[]}")).thenReturn(graph);
         when(mqTriggerHandler.resolveTopic(Map.of("messageCodeKey", "order_paid"))).thenReturn("order.paid");
 
         MqRouteRefreshService service = new MqRouteRefreshService(
                 canvasMapper, versionMapper, dagParser, routeService, mqTriggerHandler);
 
-        service.rebuildMqRoutes();
+        service.rebuildTriggerRoutes();
 
-        ArgumentCaptor<Map<String, Set<String>>> routes = ArgumentCaptor.forClass(Map.class);
-        org.mockito.Mockito.verify(routeService).replaceMqRoutes(routes.capture());
-        assertThat(routes.getValue()).containsEntry("order.paid", Set.of("10"));
+        ArgumentCaptor<TriggerRouteService.TriggerRouteSnapshot> snapshot =
+                ArgumentCaptor.forClass(TriggerRouteService.TriggerRouteSnapshot.class);
+        org.mockito.Mockito.verify(routeService).replaceAllTriggerRoutes(snapshot.capture());
+        assertThat(snapshot.getValue().mqRoutes()).containsEntry("order.paid", Set.of("10"));
+        assertThat(snapshot.getValue().behaviorRoutes()).containsEntry("ORDER_PAID", Set.of("10"));
+        assertThat(snapshot.getValue().taggerRoutes()).containsEntry("vip_level", Set.of("10"));
     }
 }

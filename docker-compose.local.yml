@@ -85,8 +85,42 @@ services:
     ports:
       - "8081:8082"
 
+  # Doris 2.0 OLAP：执行轨迹与报表聚合的本地验证环境。
+  doris-fe:
+    image: apache/doris:2.0.3-fe
+    container_name: canvas-doris-fe
+    hostname: doris-fe
+    environment:
+      - FE_SERVERS=fe1:doris-fe:9010
+      - FE_ID=1
+    ports:
+      - "8030:8030"
+      - "9010:9010"
+      - "9030:9030"
+    volumes:
+      - canvas-doris-fe-meta:/opt/apache-doris/fe/doris-meta
+      - ./infrastructure/doris:/docker-entrypoint-initdb.d:ro
+
+  doris-be:
+    image: apache/doris:2.0.3-be
+    container_name: canvas-doris-be
+    hostname: doris-be
+    environment:
+      - FE_SERVERS=fe1:doris-fe:9010
+      - BE_ADDR=doris-be:9050
+    depends_on:
+      - doris-fe
+    ports:
+      - "8040:8040"
+      - "9050:9050"
+      - "9060:9060"
+    volumes:
+      - canvas-doris-be-storage:/opt/apache-doris/be/storage
+
 volumes:
   canvas-mysql-data:
   canvas-redis-data:
   canvas-rocketmq-logs:
   canvas-rocketmq-store:
+  canvas-doris-fe-meta:
+  canvas-doris-be-storage:

@@ -9,6 +9,7 @@ import org.chovy.canvas.common.enums.TriggerType;
 import org.chovy.canvas.dal.dataobject.EventDefinitionDO;
 import org.chovy.canvas.dal.dataobject.EventLogDO;
 import org.chovy.canvas.dal.mapper.EventLogMapper;
+import org.chovy.canvas.domain.canvas.CanvasAttributionService;
 import org.chovy.canvas.domain.meta.EventDefinitionCacheService;
 import org.chovy.canvas.dto.EventReportReq;
 import org.chovy.canvas.engine.trigger.CanvasExecutionService;
@@ -17,6 +18,7 @@ import org.chovy.canvas.infrastructure.redis.RedisKeyUtil;
 import org.chovy.canvas.infrastructure.redis.TriggerRouteService;
 import org.chovy.canvas.perf.PerfRunContext;
 import org.chovy.canvas.service.EventDefinitionService;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
@@ -56,6 +58,12 @@ public class EventDefinitionServiceImpl implements EventDefinitionService {
     private final StringRedisTemplate redis;
     /** Redis key 工具，集中生成执行相关 key。 */
     private final RedisKeyUtil redisKeys;
+    private CanvasAttributionService canvasAttributionService;
+
+    @Autowired(required = false)
+    void setCanvasAttributionService(CanvasAttributionService canvasAttributionService) {
+        this.canvasAttributionService = canvasAttributionService;
+    }
 
     /**
      * 事件上报主流程，分四步：
@@ -89,9 +97,22 @@ public class EventDefinitionServiceImpl implements EventDefinitionService {
 
         // 步骤3：写 event_log
         EventLogDO eventLog = writeEventLog(req, payload, canvasIds);
+        attributeConversion(eventLog);
 
         // 步骤4：恢复 WAIT 节点，并组装返回 Map
         return resumeWaitsAndBuildResult(req, payload, eventId, eventLog, canvasIds);
+    }
+
+    private void attributeConversion(EventLogDO eventLog) {
+        if (canvasAttributionService == null) {
+            return;
+        }
+        try {
+            canvasAttributionService.attribute(eventLog);
+        } catch (Exception e) {
+            log.warn("[EVENT] conversion attribution skipped eventLogId={} reason={}",
+                    eventLog.getId(), e.getMessage());
+        }
     }
 
     /**

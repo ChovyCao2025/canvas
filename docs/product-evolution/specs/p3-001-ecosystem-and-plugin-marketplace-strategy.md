@@ -7,69 +7,72 @@ Implementation plan: `../plans/p3-001-ecosystem-and-plugin-marketplace-strategy-
 
 ## Goal
 
-Define public plugin governance, SDKs, marketplace rules, and partner support after internal plugin foundations are stable.
+Convert the public plugin marketplace idea into an evidence-backed governance package that can decide whether a later child spec should build submission, review, publishing, and partner-support workflows.
 
 ## User And Business Value
 
-This keeps the strategy actionable by requiring discovery gates, MVP scope, and measurable exit criteria before engineering scale-up.
+This protects the platform from committing to public plugin distribution before internal plugin foundations, security review, partner support, and commercial ownership are proven.
 
 ## In Scope
 
-- Plugin submission and review policy.
-- Marketplace governance and support model.
-- SDK, sample plugin, and sandbox documentation.
-- Commercial and security launch gates.
+- Marketplace candidate evidence for plugin submission, review, publishing, pricing, support, and takedown.
+- Governance policy for SDK compatibility, security review, tenant safety, support ownership, and launch gates.
+- Decision log that separates `Accepted For Child Spec`, `Needs Evidence`, `Deferred`, and `Rejected` marketplace capabilities.
+- Validator script and tests that prevent promotion without evidence, owner, rollback, and proof command.
 
 ## Out Of Scope
 
-- Immediate full-scale implementation.
-- Commercial, legal, or architecture commitments without named owner and evidence.
+- Runtime marketplace implementation, plugin upload APIs, public storefront UI, billing integration, or partner portal build-out.
+- Legal, commercial, or security commitments without named owners and linked evidence.
+- Flyway schema changes or application data persistence.
 
 ## Functional Requirements
 
-1. The feature must expose the smallest useful operator or platform workflow described in the source item.
-2. The implementation must preserve tenant isolation, authorization, auditability, and rollback behavior for every new read or write path.
-3. New UI must use existing React, Ant Design, router, service, and test patterns unless a child spec justifies a new pattern.
-4. New backend behavior must use the existing Spring Boot, MyBatis, Flyway, controller, domain service, and test patterns.
-5. The implementation must include focused automated tests before code changes and a manual verification checklist for the core workflow.
+1. The strategy package must list concrete marketplace capabilities and assign each one a decision status, owner, evidence link, proof command, launch gate, and rollback path.
+2. No capability can be marked `Accepted For Child Spec` unless internal plugin foundations are listed as a dependency and the evidence file includes a passing proof command.
+3. Security and support gates must cover package signing, tenant isolation, permission review, vulnerability response, support escalation, and plugin takedown.
+4. The validator must fail the package when required evidence fields are missing or when a capability is promoted without a child spec path.
+5. The rollout notes must state that this slice creates Git-tracked discovery artifacts only and does not expose runtime endpoints or UI.
 
 ## Technical Scope
 
-### Backend Touchpoints
+### Documentation Touchpoints
 
-- `backend/canvas-engine/src/main/java/org/chovy/canvas/domain`
-- `backend/canvas-engine/src/main/java/org/chovy/canvas/web`
+- `docs/product-evolution/discovery/p3-001-plugin-marketplace/README.md`
+- `docs/product-evolution/discovery/p3-001-plugin-marketplace/evidence.json`
+- `docs/product-evolution/discovery/p3-001-plugin-marketplace/governance-policy.md`
+- `docs/product-evolution/discovery/p3-001-plugin-marketplace/decision-log.md`
 
-### Frontend Touchpoints
+### Tooling Touchpoints
 
-- `frontend/src/pages`
-- `frontend/src/services`
+- `tools/strategy/plugin-marketplace-evidence.mjs`
+- `tools/strategy/plugin-marketplace-evidence.test.mjs`
 
 ### Data And Configuration Touchpoints
 
-- `backend/canvas-engine/src/main/resources/db/migration/V116__ecosystem_and_plugin_marketplace_strategy.sql`
+- No Flyway migration is part of this slice. The work writes versioned Markdown and JSON evidence only; runtime marketplace tables would be designed in a later child spec after this package reaches `Accepted For Child Spec`.
 
 ### Test Touchpoints
 
-- `backend/canvas-engine/src/test/java/org/chovy/canvas/strategy/EcosystemAndPluginMarketplaceStrategyTest.java`
-- `frontend/src/pages/ecosystem-and-plugin-marketplace-strategy/ecosystem-and-plugin-marketplace-strategy.test.tsx`
+- `tools/strategy/plugin-marketplace-evidence.test.mjs`
 
 ## Dependencies
 
-- Requires explicit business or architecture owner.
-- Requires discovery evidence before build-out.
+- P2 plugin and integration foundations must be stable before any marketplace implementation child spec starts.
+- Security, support, and commercial owners must be named in the discovery evidence before launch gates can pass.
+- Public marketplace claims must be checked against current partner, legal, and security constraints during execution.
 
 ## Risks And Controls
 
-- Scope creep: keep the first implementation to the workflow in this spec and move broader ideas to a follow-up spec.
-- Tenant or permission regression: add backend tests for tenant-scoped data and role checks before exposing UI.
-- UI complexity: use one page or one panel first, then expand only after the workflow is verified.
-- Data migration risk: make every migration additive and reversible by disabling the new route or feature flag.
+- Scope creep: keep this slice to evidence, governance, and decision gates; open a child spec for the first runtime workflow after acceptance.
+- Unsupported plugin risk: require support escalation and takedown rules before publishing is accepted.
+- Tenant safety regression: require security review and permission-boundary evidence before any upload or install API is designed.
+- Premature revenue commitment: keep commercial policy as a gate until pricing and partner terms have explicit owners.
 
 ## Acceptance Criteria
 
-- The source item has a visible implemented workflow or a documented discovery exit if this is a P3 strategy item.
-- All changed backend endpoints reject unauthorized access and preserve tenant scoping.
-- All changed frontend routes handle loading, empty, error, and permission states.
-- Tests named in the plan pass in the local commands for backend and frontend slices.
-- The implementation includes rollout notes covering feature flag, migration, and rollback behavior.
+- The evidence validator tests pass and fail on missing owner, proof command, launch gate, rollback, or child spec path.
+- The evidence package contains capability rows for submission, review, publishing, SDK compatibility, security review, commercial terms, support, and takedown.
+- The decision log leaves unproven capabilities in `Needs Evidence`, `Deferred`, or `Rejected` rather than implying implementation approval.
+- Rollout notes explicitly say no migration, no runtime route, and no UI are shipped by this slice.
+- The plan includes scoped `git add` and commit commands limited to the discovery docs, validator, and this spec/plan pair.

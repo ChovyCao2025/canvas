@@ -130,6 +130,31 @@ templates:
 
 ## 四、运营工具插件
 
+### 4.0 Form Collect Node Handler 插件
+
+**现状：**
+- P1-012 已实现独立的公开表单定义、提交记录、CDP 线索归并、渠道与同意写入。
+- 旅程节点侧仍需要一个可复用的表单收集节点，把公开表单能力嵌入画布编排。
+
+**插件化价值：**
+- 将表单字段 Schema、公开提交、提交后触发事件抽成节点处理器。
+- 让行业包或模板包复用同一套表单能力，而不是为每个场景重新做表单节点。
+- 与 P2-002 的 `NODE_HANDLER` extension point 对齐。
+
+**配置 Schema：**
+```json
+{
+  "formPublicKey": "signup",
+  "fieldSchema": "json",
+  "publicSubmit": true,
+  "triggerEventCode": "form_signup"
+}
+```
+
+**优先级：P1**
+
+---
+
 ### 4.1 Batch Operation Engine 插件
 
 **现状：** 现有 `PointsOperationHandler`，但无通用批量能力
@@ -270,4 +295,4 @@ templates:
 ## 九、相关文档
 
 - [Mautic 插件体系可行性分析](mautic-plugin-feasibility-analysis.md)
-- [Canvas 插件体系技术设计](./plugin-technical-design.md)
+- [Canvas 插件体系技术设计](../../plans/p2-002-plugin-and-integration-foundations-plan.md)

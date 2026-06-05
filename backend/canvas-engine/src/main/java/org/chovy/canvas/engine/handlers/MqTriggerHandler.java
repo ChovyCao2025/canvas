@@ -1,13 +1,10 @@
 package org.chovy.canvas.engine.handlers;
 
-import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import org.chovy.canvas.common.MapFieldKeys;
-import org.chovy.canvas.dal.dataobject.MqMessageDefinitionDO;
-import org.chovy.canvas.dal.mapper.MqMessageDefinitionMapper;
+import org.chovy.canvas.domain.meta.MqMessageDefinitionService;
 import org.chovy.canvas.engine.context.ExecutionContext;
 import org.chovy.canvas.engine.handler.NodeHandler;
 import org.chovy.canvas.engine.handler.NodeHandlerType;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import org.chovy.canvas.engine.handler.NodeResult;
 import reactor.core.publisher.Mono;
@@ -23,9 +20,12 @@ import java.util.Map;
 @NodeHandlerType("MQ_TRIGGER")
 public class MqTriggerHandler implements NodeHandler {
 
-    /** MQ 消息定义访问器，用于按 messageCode 解析实际订阅 topic。 */
-    @Autowired(required = false)
-    private MqMessageDefinitionMapper mqMessageDefinitionMapper;
+    /** MQ 消息定义服务，用于按 messageCode 解析实际订阅 topic。 */
+    private final MqMessageDefinitionService mqMessageDefinitionService;
+
+    public MqTriggerHandler(MqMessageDefinitionService mqMessageDefinitionService) {
+        this.mqMessageDefinitionService = mqMessageDefinitionService;
+    }
 
     /**
      * 执行当前节点或服务的核心处理流程。
@@ -65,16 +65,6 @@ public class MqTriggerHandler implements NodeHandler {
      * Tries messageCodeKey first (new format after V29), falls back to topicKey (legacy).
      */
     public String resolveTopic(Map<String, Object> config) {
-        String messageCode = (String) config.get(MapFieldKeys.MESSAGE_CODE_KEY);
-        if (messageCode != null && mqMessageDefinitionMapper != null) {
-            // 新版配置通过 messageCodeKey 查定义，实际订阅 topic 以定义表为准。
-            MqMessageDefinitionDO def = mqMessageDefinitionMapper.selectOne(
-                new LambdaQueryWrapper<MqMessageDefinitionDO>()
-                    .eq(MqMessageDefinitionDO::getMessageCode, messageCode)
-                    .eq(MqMessageDefinitionDO::getEnabled, 1));
-            if (def != null) return def.getTopic();
-        }
-        // Backward-compat: old canvases store topicKey directly
-        return (String) config.getOrDefault(MapFieldKeys.TOPIC_KEY, "");
+        return mqMessageDefinitionService.resolveTopic(config);
     }
 }

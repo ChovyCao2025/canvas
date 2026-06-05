@@ -1,6 +1,7 @@
 package org.chovy.canvas.engine.trigger;
 
 import org.chovy.canvas.engine.lane.ExecutionLane;
+import org.chovy.canvas.engine.scheduler.CanvasMetrics;
 import org.chovy.canvas.infrastructure.redis.RedisKeyUtil;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -29,12 +30,13 @@ class InFlightExecutionRegistryConcurrencyTest {
 
     @Mock StringRedisTemplate redis;
     @Mock RedisKeyUtil keys;
+    @Mock CanvasMetrics metrics;
 
     private InFlightExecutionRegistry registry;
 
     @BeforeEach
     void setUp() {
-        registry = new InFlightExecutionRegistry(redis, keys);
+        registry = new InFlightExecutionRegistry(redis, keys, metrics);
         ReflectionTestUtils.setField(registry, "globalTimeoutSec", 600L);
         when(keys.inflightCanvas(1L)).thenReturn("canvas:inflight:1");
         when(keys.inflightLane(ExecutionLane.STANDARD)).thenReturn("canvas:inflight:lane:standard");

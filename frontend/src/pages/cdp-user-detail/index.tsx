@@ -4,11 +4,13 @@
  * 维护说明：页面也支持手动给用户增删标签，用于运营侧临时修正。
  */
 import { useEffect, useState } from 'react'
-import { Button, Card, Drawer, Form, Input, Modal, Popconfirm, Space, Table, Tag, Typography, message } from 'antd'
+import { Button, Card, Drawer, Form, Input, Modal, Popconfirm, Select, Space, Table, Tag, Typography, message } from 'antd'
 import { ArrowLeftOutlined, PlusOutlined } from '@ant-design/icons'
 import { useNavigate, useParams } from 'react-router-dom'
 import { cdpApi, type CdpUserCanvasSummary, type CdpUserDetail, type CdpUserTag, type CdpUserTagHistory } from '../../services/cdpApi'
+import { contactabilityApi, type ContactabilityReport } from '../../services/contactabilityApi'
 import { buildTagWritePayload, formatDateTime, formatExecutionStatus, tagColor } from '../cdp-users/cdpPresentation'
+import { contactabilityCheckView, contactabilityStatusView } from './contactabilityPresentation'
 
 /** 详情页标题和辅助文本组件别名。 */
 const { Title, Text } = Typography
@@ -23,6 +25,9 @@ export default function CdpUserDetailPage() {
   const [canvasRows, setCanvasRows] = useState<CdpUserCanvasSummary[]>([])
   const [selectedCanvas, setSelectedCanvas] = useState<CdpUserCanvasSummary | null>(null)
   const [canvasExecutions, setCanvasExecutions] = useState<any[]>([])
+  const [contactabilityChannel, setContactabilityChannel] = useState('SMS')
+  const [contactability, setContactability] = useState<ContactabilityReport | null>(null)
+  const [contactabilityLoading, setContactabilityLoading] = useState(false)
   const [modalOpen, setModalOpen] = useState(false)
   const [form] = Form.useForm()
 
@@ -38,7 +43,23 @@ export default function CdpUserDetailPage() {
     setHistory(h.data ?? [])
   }
 
-  useEffect(() => { if (userId) load() }, [userId])
+  /** 加载当前用户在指定渠道的触达策略解释，不消耗频控额度。 */
+  const loadContactability = async (channel = contactabilityChannel) => {
+    if (!userId) return
+    setContactabilityLoading(true)
+    try {
+      const res = await contactabilityApi.explain({ userId, channel })
+      setContactability(res.data)
+    } finally {
+      setContactabilityLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    if (!userId) return
+    load()
+    loadContactability(contactabilityChannel)
+  }, [userId])
 
   /** 手动写入单个标签，成功后刷新画像和历史。 */
   const saveTag = async () => {
@@ -64,6 +85,14 @@ export default function CdpUserDetailPage() {
     setCanvasExecutions(res.data ?? [])
   }
 
+  /** 切换预检渠道并立即刷新解释结果。 */
+  const changeContactabilityChannel = (channel: string) => {
+    setContactabilityChannel(channel)
+    loadContactability(channel)
+  }
+
+  const contactabilityStatus = contactability ? contactabilityStatusView(contactability) : null
+
   return (
     <div>
       {/* 返回导航和页面标题。 */}
@@ -81,6 +110,48 @@ export default function CdpUserDetailPage() {
           <Text type="secondary">手机号: {detail?.phone || '-'}</Text>
           <Text type="secondary">邮箱: {detail?.email || '-'}</Text>
         </Space>
+      </Card>
+
+      <Card
+        title="触达可达性"
+        extra={(
+          <Space>
+            <Select
+              size="small"
+              value={contactabilityChannel}
+              onChange={changeContactabilityChannel}
+              style={{ width: 96 }}
+              options={[
+                { value: 'SMS', label: 'SMS' },
+                { value: 'EMAIL', label: 'Email' },
+                { value: 'PUSH', label: 'Push' },
+                { value: 'WECHAT', label: '微信' },
+              ]}
+            />
+            <Button size="small" loading={contactabilityLoading} onClick={() => loadContactability()}>
+              刷新
+            </Button>
+          </Space>
+        )}
+        style={{ marginBottom: 16 }}
+      >
+        {contactabilityStatus ? (
+          <Space direction="vertical" size={8}>
+            <Tag color={contactabilityStatus.color}>{contactabilityStatus.label}</Tag>
+            <Space wrap>
+              {contactability?.checks.map(check => {
+                const view = contactabilityCheckView(check)
+                return (
+                  <Tag key={check.checkKey} color={view.color}>
+                    {view.label}: {view.text}
+                  </Tag>
+                )
+              })}
+            </Space>
+          </Space>
+        ) : (
+          <Text type="secondary">{contactabilityLoading ? '加载中' : '-'}</Text>
+        )}
       </Card>
 
       {/* 当前标签支持点击删除，适合运营临时修正用户画像。 */}

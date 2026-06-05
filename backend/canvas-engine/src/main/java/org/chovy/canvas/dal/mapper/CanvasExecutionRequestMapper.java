@@ -32,11 +32,11 @@ public interface CanvasExecutionRequestMapper extends BaseMapper<CanvasExecution
      */
     @Insert("""
             INSERT IGNORE INTO canvas_execution_request
-            (id, canvas_id, user_id, perf_run_id, trigger_type, trigger_node_type, match_key,
+            (id, tenant_id, canvas_id, user_id, perf_run_id, trigger_type, trigger_node_type, match_key,
              payload_json, source_msg_id, status, attempt_count, next_retry_at,
              last_error, result_json, created_at, updated_at)
             VALUES
-            (#{id}, #{canvasId}, #{userId}, #{perfRunId}, #{triggerType}, #{triggerNodeType}, #{matchKey},
+            (#{id}, #{tenantId}, #{canvasId}, #{userId}, #{perfRunId}, #{triggerType}, #{triggerNodeType}, #{matchKey},
              #{payloadJson}, #{sourceMsgId}, #{status}, #{attemptCount}, #{nextRetryAt},
              #{lastError}, #{resultJson}, NOW(), NOW())
             """)
@@ -134,6 +134,22 @@ public interface CanvasExecutionRequestMapper extends BaseMapper<CanvasExecution
 
     @Update("""
             UPDATE canvas_execution_request
+            SET status = 'FAILED',
+                last_error = 'FORCE_CANCELLED',
+                result_json = '{"error":"FORCE_CANCELLED"}',
+                next_retry_at = NULL,
+                run_token = NULL,
+                updated_at = #{now}
+            WHERE canvas_id = #{canvasId}
+              AND tenant_id = #{tenantId}
+              AND status IN ('PENDING', 'RETRY', 'RUNNING')
+            """)
+    int markForceCancelledByCanvasAndTenant(@Param("canvasId") Long canvasId,
+                                            @Param("tenantId") Long tenantId,
+                                            @Param("now") LocalDateTime now);
+
+    @Update("""
+            UPDATE canvas_execution_request
             SET status = 'PENDING',
                 attempt_count = 0,
                 next_retry_at = NULL,
@@ -186,7 +202,7 @@ public interface CanvasExecutionRequestMapper extends BaseMapper<CanvasExecution
                            @Param("staleBefore") LocalDateTime staleBefore);
 
     @Select("""
-            SELECT id, canvas_id, trigger_type
+            SELECT id, tenant_id, canvas_id, trigger_type
             FROM canvas_execution_request
             WHERE (
                     status IN ('PENDING', 'RETRY')

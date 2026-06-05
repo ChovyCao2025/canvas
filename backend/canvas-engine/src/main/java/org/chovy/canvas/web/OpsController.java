@@ -1,18 +1,27 @@
 package org.chovy.canvas.web;
 
 import org.chovy.canvas.common.R;
+import org.chovy.canvas.common.tenant.RoleNames;
+import org.chovy.canvas.common.tenant.TenantContext;
+import org.chovy.canvas.common.tenant.TenantContextResolver;
 import org.chovy.canvas.domain.canvas.*;
 import org.chovy.canvas.common.enums.ApprovalStatus;
 import org.chovy.canvas.common.enums.CanvasStatusEnum;
 import org.chovy.canvas.common.enums.VersionStatus;
+import org.chovy.canvas.domain.notification.NotificationEventService;
+import org.chovy.canvas.domain.ops.OpsAuditEventService;
 import org.chovy.canvas.infrastructure.cache.CanvasConfigCache;
+import org.chovy.canvas.infrastructure.redis.TriggerRouteRecoveryService;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import lombok.Data;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.web.bind.annotation.*;
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
 
+import java.util.Map;
 import java.util.List;
 import org.chovy.canvas.dal.dataobject.CanvasDO;
 import org.chovy.canvas.dal.dataobject.CanvasManualApprovalDO;
@@ -40,6 +49,28 @@ public class OpsController {
     private final CanvasManualApprovalMapper approvalMapper;
     /** 画布配置缓存，用于刷新画布配置缓存。 */
     private final CanvasConfigCache configCache;
+    /** Redis 路由和本机调度恢复服务。 */
+    private final TriggerRouteRecoveryService routeRecoveryService;
+    /** 当前登录租户上下文解析器。 */
+    private final TenantContextResolver tenantContextResolver;
+    /** 画布生命周期服务。 */
+    private final CanvasService canvasService;
+    /** 画布运营控制服务。 */
+    private final CanvasOpsService canvasOpsService;
+    /** 运维审计事件服务。 */
+    private final OpsAuditEventService opsAuditEventService;
+    /** 通知事件服务。 */
+    private final NotificationEventService notificationEventService;
+
+    public OpsController(CanvasTemplateMapper templateMapper,
+                         CanvasMapper canvasMapper,
+                         CanvasVersionMapper canvasVersionMapper,
+                         CanvasManualApprovalMapper approvalMapper,
+                         CanvasConfigCache configCache,
+                         TriggerRouteRecoveryService routeRecoveryService) {
+        this(templateMapper, canvasMapper, canvasVersionMapper, approvalMapper, configCache,
+                routeRecoveryService, null, null, null, null, null);
+    }
 
     /**
      * 处理 invalidate Cache 对应的 HTTP 接口请求。
@@ -72,6 +103,69 @@ public class OpsController {
         }).subscribeOn(Schedulers.boundedElastic());
     }
 
+    /** 从已发布画布版本重建 Redis 触发路由和本机定时调度注册。 */
+    @PostMapping("/ops/recovery/runtime-state/rebuild")
+    public Mono<R<TriggerRouteRecoveryService.RecoveryReport>> rebuildRuntimeState() {
+        return Mono.fromCallable(() -> R.ok(routeRecoveryService.rebuildRuntimeState()))
+                .subscribeOn(Schedulers.boundedElastic());
+    }
+
+    @GetMapping("/ops/runtime/status")
+    public Mono<R<RuntimeStatus>> runtimeStatus() {
+        return requiredTenantContext().map(context -> R.ok(new RuntimeStatus(
+                "UP",
+                context.role(),
+                context.tenantId(),
+                context.username())));
+    }
+
+    @GetMapping("/ops/audit-events")
+    public Mono<R<List<OpsAuditEventService.OpsAuditEvent>>> auditEvents(
+            @RequestParam(defaultValue = "50") int limit) {
+        return requiredTenantContext().map(context -> R.ok(
+                requiredAuditService().recent(context.isSuperAdmin() ? null : context.tenantId(), limit)));
+    }
+
+    @PostMapping("/ops/canvas/{id}/pause")
+    public Mono<R<Map<String, Object>>> pauseCanvas(
+            @PathVariable Long id,
+            @RequestBody EmergencyActionReq req) {
+        return emergencyAction(id, "PAUSE", req,
+                (context, canvas) -> requiredCanvasService().offline(id, operator(context)));
+    }
+
+    @PostMapping("/ops/canvas/{id}/offline")
+    public Mono<R<Map<String, Object>>> offlineCanvas(
+            @PathVariable Long id,
+            @RequestBody EmergencyActionReq req) {
+        return emergencyAction(id, "OFFLINE", req,
+                (context, canvas) -> requiredCanvasService().offline(id, operator(context)));
+    }
+
+    @PostMapping("/ops/canvas/{id}/resume")
+    public Mono<R<Map<String, Object>>> resumeCanvas(
+            @PathVariable Long id,
+            @RequestBody EmergencyActionReq req) {
+        return emergencyAction(id, "RESUME", req,
+                (context, canvas) -> requiredCanvasService().publish(id, operator(context)));
+    }
+
+    @PostMapping("/ops/canvas/{id}/kill")
+    public Mono<R<Map<String, Object>>> killCanvas(
+            @PathVariable Long id,
+            @RequestBody EmergencyActionReq req) {
+        return emergencyAction(id, "KILL", req,
+                (context, canvas) -> requiredCanvasOpsService().kill(id, defaultIfBlank(req.getMode(), "GRACEFUL")));
+    }
+
+    @PostMapping("/ops/canvas/{id}/rollback")
+    public Mono<R<Map<String, Object>>> rollbackCanvas(
+            @PathVariable Long id,
+            @RequestBody EmergencyActionReq req) {
+        return emergencyAction(id, "ROLLBACK", req,
+                (context, canvas) -> requiredCanvasOpsService().rollback(id));
+    }
+
     // ── 画布模板（23.1节） ─────────────────────────────────────────
 
     /**
@@ -84,9 +178,12 @@ public class OpsController {
     public Mono<R<List<CanvasTemplateDO>>> listTemplates(
             @RequestParam(required = false) String category) {
         return Mono.fromCallable(() -> {
-            LambdaQueryWrapper<CanvasTemplateDO> q = new LambdaQueryWrapper<CanvasTemplateDO>()
-                    .orderByDesc(CanvasTemplateDO::getUseCount);
-            if (category != null) q.eq(CanvasTemplateDO::getCategory, category);
+            QueryWrapper<CanvasTemplateDO> q = new QueryWrapper<CanvasTemplateDO>()
+                    .eq("enabled", 1)
+                    .orderByDesc("use_count");
+            if (category != null && !category.isBlank()) {
+                q.eq("category", category);
+            }
             return templateMapper.selectList(q);
         }).subscribeOn(Schedulers.boundedElastic()).map(R::ok);
     }
@@ -117,6 +214,7 @@ public class OpsController {
                             .orderByDesc(CanvasVersionDO::getVersion).last("LIMIT 1"));
             tpl.setGraphJson(draft != null ? draft.getGraphJson() : "{\"nodes\":[]}");
             tpl.setIsOfficial(0);
+            tpl.setEnabled(1);
             tpl.setUseCount(0);
             tpl.setCreatedBy("current_user");
             templateMapper.insert(tpl);
@@ -156,7 +254,7 @@ public class OpsController {
             canvasVersionMapper.insert(version);
 
             // 更新模板使用次数
-            tpl.setUseCount(tpl.getUseCount() + 1);
+            tpl.setUseCount(tpl.getUseCount() == null ? 1 : tpl.getUseCount() + 1);
             templateMapper.updateById(tpl);
 
             return canvas;
@@ -207,5 +305,107 @@ public class OpsController {
 
         /** 新建画布名称（可选，不传则使用模板名 + 副本后缀）。 */
         private String name;
+    }
+
+    @Data
+    public static class EmergencyActionReq {
+        private String reason;
+        private String mode;
+    }
+
+    public record RuntimeStatus(
+            String status,
+            String role,
+            Long tenantId,
+            String username) {
+    }
+
+    @FunctionalInterface
+    private interface EmergencyOperation {
+        void execute(TenantContext context, CanvasDO canvas);
+    }
+
+    private Mono<R<Map<String, Object>>> emergencyAction(
+            Long canvasId,
+            String action,
+            EmergencyActionReq req,
+            EmergencyOperation operation) {
+        return requiredTenantContext()
+                .flatMap(context -> Mono.fromCallable(() -> {
+                    requireEmergencyPermission(context);
+                    String reason = requireReason(req);
+                    CanvasDO canvas = requiredCanvasService().requireTenantAccess(
+                            canvasId,
+                            context.isSuperAdmin() ? null : context.tenantId(),
+                            context.isSuperAdmin());
+                    operation.execute(context, canvas);
+                    OpsAuditEventService.OpsAuditEvent audit = requiredAuditService().record(
+                            canvas.getTenantId(),
+                            action,
+                            canvasId,
+                            operator(context),
+                            context.role(),
+                            reason);
+                    if (notificationEventService != null) {
+                        notificationEventService.emergencyActionCompleted(action, canvasId, operator(context), reason);
+                    }
+                    Map<String, Object> result = Map.of(
+                            "action", action,
+                            "canvasId", canvasId,
+                            "auditId", audit.id());
+                    return R.ok(result);
+                }).subscribeOn(Schedulers.boundedElastic()));
+    }
+
+    private Mono<TenantContext> requiredTenantContext() {
+        if (tenantContextResolver == null) {
+            return Mono.error(new SecurityException("AUTH_003: missing tenant context"));
+        }
+        return tenantContextResolver.currentOrError();
+    }
+
+    private void requireEmergencyPermission(TenantContext context) {
+        if (context == null || (!context.isSuperAdmin() && !context.isTenantAdmin())) {
+            throw new AccessDeniedException("无权限执行运维应急动作");
+        }
+    }
+
+    private String requireReason(EmergencyActionReq req) {
+        String reason = req == null ? null : req.getReason();
+        if (reason == null || reason.isBlank()) {
+            throw new IllegalArgumentException("reason is required");
+        }
+        return reason.trim();
+    }
+
+    private String operator(TenantContext context) {
+        return context != null && context.username() != null && !context.username().isBlank()
+                ? context.username()
+                : "operator";
+    }
+
+    private String defaultIfBlank(String value, String fallback) {
+        return value == null || value.isBlank() ? fallback : value.trim();
+    }
+
+    private CanvasService requiredCanvasService() {
+        if (canvasService == null) {
+            throw new IllegalStateException("canvasService is not configured");
+        }
+        return canvasService;
+    }
+
+    private CanvasOpsService requiredCanvasOpsService() {
+        if (canvasOpsService == null) {
+            throw new IllegalStateException("canvasOpsService is not configured");
+        }
+        return canvasOpsService;
+    }
+
+    private OpsAuditEventService requiredAuditService() {
+        if (opsAuditEventService == null) {
+            throw new IllegalStateException("opsAuditEventService is not configured");
+        }
+        return opsAuditEventService;
     }
 }

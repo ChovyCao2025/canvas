@@ -7,24 +7,67 @@ Coverage matrix: `docs/architecture/todo/coverage-matrix.md`
 
 ## Verification Status
 
-Confirmed.
+Implemented for the P0-06 focused backend scope, with focused verification passing for datasource credential handling, demo credential cleanup, core and runtime tenant field mapping, canvas/data-source/execution-request tenant propagation, and cross-tenant read/mutation rejection on the implemented management surfaces.
 
-## Problems
+Verification evidence:
 
-- `data_source_config.password` is stored as a plain `VARCHAR`.
-- Migration seed/demo data contains `root/root` JDBC credentials.
-- V78 added `tenant_id` as nullable to several core tables.
-- Core DO classes such as `CanvasDO` do not expose `tenantId`, so tenant filtering cannot be consistently enforced by ORM-level wrappers.
-- Several services use ad hoc tenant filtering, which leaves gaps for future queries and mutations.
+- `CoreTenantFieldMappingTest`
+- `DemoDatasourceCredentialMigrationTest`
+- `CanvasTenantIsolationTest`
+- `CanvasOpsServiceTenantTest`
+- `CoreTenantNotNullMigrationTest`
+- `DataSourceConfigDOTest`
+- `DataSourceConfigControllerTest`
+- `CanvasExecutionRequestManagementControllerTest`
+- `CanvasExecutionRequestServiceTest`
+- `CanvasExecutionRequestServiceIdempotencyTest`
+- `SecretCipherTest`
+- `JdbcConfigResolverTest`
+- `CanvasExecutionServiceResumeTest`
+- `ExecutionContextConcurrencyTest`
+- Command: `JAVA_HOME=/Users/photonpay/Library/Java/JavaVirtualMachines/ms-21.0.11/Contents/Home PATH=/Users/photonpay/Library/Java/JavaVirtualMachines/ms-21.0.11/Contents/Home/bin:$PATH mvn -pl canvas-engine -Dtest=DataSourceConfigControllerTest,CanvasExecutionRequestManagementControllerTest,CanvasExecutionRequestServiceTest,CanvasExecutionRequestServiceIdempotencyTest,CoreTenantFieldMappingTest,CoreTenantNotNullMigrationTest,DemoDatasourceCredentialMigrationTest,DataSourceConfigDOTest,SecretCipherTest,JdbcConfigResolverTest,CanvasTenantIsolationTest,CanvasOpsServiceTenantTest,CanvasExecutionServiceResumeTest,ExecutionContextConcurrencyTest test`
+- Module command: `JAVA_HOME=/Users/photonpay/Library/Java/JavaVirtualMachines/ms-21.0.11/Contents/Home PATH=/Users/photonpay/Library/Java/JavaVirtualMachines/ms-21.0.11/Contents/Home/bin:$PATH mvn -pl canvas-engine test`
+
+## Resolved Problems
+
+- Datasource API paths encrypt stored passwords through `SecretCipher`, hide passwords from API JSON, and decrypt only through `JdbcConfigResolver`.
+- `V91__sanitize_demo_datasource_credentials.sql` rewrites historical local demo `root/root` datasource rows to explicit local sample credentials.
+- `V92__enforce_core_tenant_not_null.sql` backfills and enforces NOT NULL tenant columns on core user/canvas/execution tables.
+- `V93__tenant_scope_datasources_and_execution_requests.sql` adds, backfills, indexes, and enforces NOT NULL tenant columns on `data_source_config` and `canvas_execution_request`.
+- `CanvasDO`, `CanvasVersionDO`, `CanvasExecutionDO`, `CanvasExecutionTraceDO`, `CanvasExecutionRequestDO`, and `DataSourceConfigDO` now expose `tenantId` mapped to `tenant_id`.
+- Canvas create/list paths carry tenant identity from `TenantContextResolver`; tenant-scoped lists add a tenant predicate.
+- Canvas get/update/publish/offline/archive/version/kill/canary/rollback/clone/diff/safe-update paths enforce tenant access before reading or mutating tenant-owned canvases.
+- Canvas draft/published versions, cloned canvases, canary versions, execution records, execution traces, and persisted execution requests inherit tenant identity from the canvas/execution context.
+- Datasource config list/create/update/delete/table-introspection paths enforce tenant ownership and keep SUPER_ADMIN cross-tenant access explicit.
+- Execution-request management list and replay paths enforce tenant ownership, preventing one tenant from inspecting or replaying another tenant's queued work.
+
+## Remaining Problems
+
+- Credential key rotation remains open; current encrypted datasource values rely on the configured active key.
+- Tenant filtering is implemented explicitly on the covered service/controller surfaces; a shared row-policy interceptor is still needed to reduce future ad hoc query risk.
+- `system_option.tenant_id` intentionally remains nullable until global versus tenant-scoped option semantics are separated.
+- Audience/CDP definition tables are still legacy global models and need a dedicated tenant model before full multi-tenant CDP rollout.
 
 ## Evidence
 
-- `V71__data_source_config.sql:7`
-- `V41__audience_demo_data.sql` and `V43__audience_demo_repoint_to_canvas_demo.sql` demo JDBC credentials.
-- `DataSourceConfigDO.java:36`
-- `V78__saas_foundation.sql:26-58`
-- `CanvasDO.java:1-95` has no `tenantId` field despite `canvas.tenant_id`.
-- `TenantService.java` uses manual `tenant_id` query wrappers.
+- `backend/canvas-engine/src/main/java/org/chovy/canvas/security/SecretCipher.java`
+- `backend/canvas-engine/src/main/java/org/chovy/canvas/engine/audience/JdbcConfigResolver.java`
+- `backend/canvas-engine/src/main/resources/db/migration/V91__sanitize_demo_datasource_credentials.sql`
+- `backend/canvas-engine/src/main/resources/db/migration/V92__enforce_core_tenant_not_null.sql`
+- `backend/canvas-engine/src/main/resources/db/migration/V93__tenant_scope_datasources_and_execution_requests.sql`
+- `backend/canvas-engine/src/main/java/org/chovy/canvas/dal/dataobject/CanvasDO.java`
+- `backend/canvas-engine/src/main/java/org/chovy/canvas/dal/dataobject/CanvasVersionDO.java`
+- `backend/canvas-engine/src/main/java/org/chovy/canvas/dal/dataobject/CanvasExecutionDO.java`
+- `backend/canvas-engine/src/main/java/org/chovy/canvas/dal/dataobject/CanvasExecutionTraceDO.java`
+- `backend/canvas-engine/src/main/java/org/chovy/canvas/dal/dataobject/CanvasExecutionRequestDO.java`
+- `backend/canvas-engine/src/main/java/org/chovy/canvas/dal/dataobject/DataSourceConfigDO.java`
+- `backend/canvas-engine/src/main/java/org/chovy/canvas/web/CanvasController.java`
+- `backend/canvas-engine/src/main/java/org/chovy/canvas/web/DataSourceConfigController.java`
+- `backend/canvas-engine/src/main/java/org/chovy/canvas/web/CanvasExecutionRequestManagementController.java`
+- `backend/canvas-engine/src/main/java/org/chovy/canvas/domain/canvas/CanvasService.java`
+- `backend/canvas-engine/src/main/java/org/chovy/canvas/domain/canvas/CanvasOpsService.java`
+- `backend/canvas-engine/src/main/java/org/chovy/canvas/domain/canvas/CanvasTransactionService.java`
+- `docs/architecture/evidence/P0-06-data-security-and-tenant-isolation.md`
 
 ## Acceptance Criteria
 

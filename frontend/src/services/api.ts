@@ -8,16 +8,17 @@ import type {
   R, PageResult,
   Canvas, CanvasDetail, CanvasVersion,
   NodeTypeRegistry, ContextField, StubOption, AbExperimentGroup,
-  IdentityType, TagValueDefinition, TagImportBatch, TagImportError,
+  IdentityType, TagDefinition, TagValueDefinition, TagImportBatch, TagImportError,
   TagImportResult, TagImportRow, TagImportSource,
 } from '../types'
 import type { HomeOverview } from '../pages/home/homeOverview'
+import { classifyApiError } from './apiError'
 
 /**
  * 统一 HTTP 客户端。
  * 约定：后端统一返回 R<T> 包装，调用方直接拿到解包后的对象。
  */
-export const http = axios.create({ baseURL: '/' })
+export const http = axios.create({ baseURL: '/', timeout: 15000 })
 
 /** 后端业务错误；HTTP 200 但 R.code 非 0 时抛出。 */
 export class ApiBusinessError extends Error {
@@ -25,6 +26,8 @@ export class ApiBusinessError extends Error {
     public readonly code: number,
     message?: string,
     public readonly data?: unknown,
+    public readonly errorCode?: string,
+    public readonly traceId?: string,
   ) {
     super(message || `API business error: ${code}`)
     this.name = 'ApiBusinessError'
@@ -46,21 +49,36 @@ http.interceptors.response.use(
   (res) => {
     const payload = res.data
     if (payload && typeof payload === 'object' && 'code' in payload) {
-      const wrapped = payload as { code?: unknown; message?: string; data?: unknown }
+      const wrapped = payload as {
+        code?: unknown
+        errorCode?: unknown
+        message?: string
+        data?: unknown
+        traceId?: unknown
+      }
       if (wrapped.code !== 0) {
-        return Promise.reject(new ApiBusinessError(Number(wrapped.code), wrapped.message, wrapped.data))
+        return Promise.reject(new ApiBusinessError(
+          Number(wrapped.code),
+          wrapped.message,
+          wrapped.data,
+          typeof wrapped.errorCode === 'string' ? wrapped.errorCode : undefined,
+          typeof wrapped.traceId === 'string' ? wrapped.traceId : undefined,
+        ))
       }
     }
     return payload
   },
   (err) => {
-    if (err.response?.status === 401) {
-      // token 失效后强制回到登录页，避免页面在无权限状态下继续操作
-      localStorage.removeItem('canvas_token')
-      localStorage.removeItem('canvas_user')
-      window.location.href = '/login'
+    const classified = classifyApiError(err)
+    if (classified.kind === 'unauthorized') {
+      globalThis.localStorage?.removeItem('canvas_token')
+      globalThis.localStorage?.removeItem('canvas_user')
+      const event = typeof CustomEvent === 'function'
+        ? new CustomEvent('canvas:unauthorized', { detail: { intendedPath: globalThis.location?.pathname } })
+        : new Event('canvas:unauthorized')
+      globalThis.dispatchEvent?.(event)
     }
-    return Promise.reject(err)
+    return Promise.reject(classified)
   },
 )
 
@@ -212,6 +230,18 @@ interface CanvasCreateReq {
 
   /** 初始化图结构。 */
   graphJson?: string
+
+  /** 平铺项目分组 key。 */
+  projectKey?: string | null
+
+  /** 平铺项目展示名。 */
+  projectName?: string | null
+
+  /** 平铺文件夹分组 key。 */
+  folderKey?: string | null
+
+  /** 平铺文件夹展示名。 */
+  folderName?: string | null
 }
 
 /** 更新画布请求体（草稿保存 + 设置更新共用）。 */
@@ -234,6 +264,18 @@ interface CanvasUpdateReq {
   /** cron 表达式（非定时时传 null）。 */
   cronExpression?: string | null
 
+  /** 平铺项目分组 key。 */
+  projectKey?: string | null
+
+  /** 平铺项目展示名。 */
+  projectName?: string | null
+
+  /** 平铺文件夹分组 key。 */
+  folderKey?: string | null
+
+  /** 平铺文件夹展示名。 */
+  folderName?: string | null
+
   /** 生效开始时间。 */
   validStart?: string | null
 
@@ -251,6 +293,18 @@ interface CanvasUpdateReq {
 
   /** 冷却秒数。 */
   cooldownSeconds?: number | null
+
+  /** 控制组比例，0-50。 */
+  controlGroupPercent?: number | null
+
+  /** 控制组分桶盐值。 */
+  controlGroupSalt?: string | null
+
+  /** 转化事件编码。 */
+  conversionEventCode?: string | null
+
+  /** 归因窗口天数。 */
+  attributionWindowDays?: number | null
 }
 
 /** 画布列表查询参数。 */
@@ -266,6 +320,77 @@ interface CanvasListQuery {
 
   /** 名称模糊查询。 */
   name?: string
+
+  /** 平铺项目分组 key。 */
+  projectKey?: string
+
+  /** 平铺文件夹分组 key。 */
+  folderKey?: string
+}
+
+/** 画布版本列表响应；兼容旧数组形态和当前分页形态。 */
+export type CanvasVersionsPayload = CanvasVersion[] | PageResult<CanvasVersion>
+
+/** 画布模板列表项。 */
+export interface CanvasTemplate {
+  id: number
+  name: string
+  description?: string
+  category?: string
+  useCount: number
+}
+
+export interface PrePublishCheckItem {
+  code: string
+  severity: 'ERROR' | 'WARNING'
+  message: string
+}
+
+export interface PrePublishCheckResult {
+  blocking: boolean
+  items: PrePublishCheckItem[]
+}
+
+export interface AttributionSummary {
+  conversions: number
+  conversionAmount: number
+  attributedSends: number
+  model: string
+}
+
+/** dry-run 返回载荷；后端会至少在成功/失败路径返回 executionId。 */
+export interface CanvasDryRunResult extends Record<string, unknown> {
+  executionId?: string
+  error?: string
+}
+
+export interface MessagePreviewReq {
+  canvasId: number
+  nodeId: string
+  userId: string
+  graphJson: string
+  context: Record<string, unknown>
+}
+
+export interface MessagePreviewResp {
+  channel: string
+  templateId?: string
+  content: Record<string, unknown>
+  variables: Record<string, unknown>
+  warnings: string[]
+}
+
+export interface CanvasExportPackage {
+  packageVersion: number
+  exportedAt: string
+  source: Record<string, unknown>
+  canvas: Record<string, unknown>
+  graph: Record<string, unknown>
+}
+
+export interface CanvasImportResp {
+  canvas: Canvas
+  draftVersionId: number
 }
 
 /** 画布草稿、发布、版本、灰度和执行调试接口集合。 */
@@ -285,14 +410,25 @@ export const canvasApi = {
   publish: (id: number) =>
     http.post<R<CanvasVersion>, R<CanvasVersion>>(`/canvas/${id}/publish`),
 
+  prePublishChecks: (id: number) =>
+    http.get<R<PrePublishCheckResult>, R<PrePublishCheckResult>>(`/canvas/${id}/pre-publish-checks`),
+
   offline: (id: number) =>
     http.post<R<void>, R<void>>(`/canvas/${id}/offline`),
 
   getVersions: (id: number) =>
-    http.get<R<CanvasVersion[]>, R<CanvasVersion[]>>(`/canvas/${id}/versions`),
+    http.get<R<CanvasVersionsPayload>, R<CanvasVersionsPayload>>(`/canvas/${id}/versions`),
 
   clone: (id: number) =>
     http.post<R<Canvas>, R<Canvas>>(`/canvas/${id}/clone`),
+
+  listTemplates: (category?: string) =>
+    http.get<R<CanvasTemplate[]>, R<CanvasTemplate[]>>('/canvas/templates', {
+      params: category ? { category } : undefined,
+    }),
+
+  createFromTemplate: (templateId: number, name?: string) =>
+    http.post<R<Canvas>, R<Canvas>>(`/canvas/from-template/${templateId}`, name ? { name } : {}),
 
   kill: (id: number, mode = 'GRACEFUL') =>
     http.post<R<void>, R<void>>(`/canvas/${id}/kill?mode=${mode}`),
@@ -315,6 +451,15 @@ export const canvasApi = {
   revert: (id: number, versionId: number) =>
     http.post<R<void>, R<void>>(`/canvas/${id}/revert/${versionId}`),
 
+  diffVersions: (id: number, v1: number, v2: number) =>
+    http.get<R<Record<string, unknown>>, R<Record<string, unknown>>>(`/canvas/${id}/versions/${v1}/diff/${v2}`),
+
+  receipts: (id: number) =>
+    http.get<R<Record<string, number>>, R<Record<string, number>>>(`/canvas/${id}/receipts`),
+
+  attributionSummary: (id: number) =>
+    http.get<R<AttributionSummary>, R<AttributionSummary>>(`/canvas/${id}/attribution-summary`),
+
   triggerDirect: (id: number, userId: string, payload: Record<string, unknown>) =>
     http.post<R<Record<string, unknown>>, R<Record<string, unknown>>>(
       `/canvas/execute/direct/${id}`,
@@ -323,10 +468,19 @@ export const canvasApi = {
 
   // dry-run 允许前端带 graphJson，便于“未保存草稿”场景下做即时调试
   dryRun: (id: number, userId: string, payload: Record<string, unknown>, graphJson?: string) =>
-    http.post<R<Record<string, unknown>>, R<Record<string, unknown>>>(
+    http.post<R<CanvasDryRunResult>, R<CanvasDryRunResult>>(
       `/canvas/execute/dry-run/${id}`,
       { userId, inputParams: payload, graphJson },
     ),
+
+  previewMessage: (id: number, body: MessagePreviewReq) =>
+    http.post<R<MessagePreviewResp>, R<MessagePreviewResp>>(`/canvas/${id}/message-preview`, body),
+
+  exportCanvas: (id: number, versionId: number) =>
+    http.get<R<CanvasExportPackage>, R<CanvasExportPackage>>(`/canvas/${id}/export`, { params: { versionId } }),
+
+  importCanvas: (body: { packageJson: string }) =>
+    http.post<R<CanvasImportResp>, R<CanvasImportResp>>('/canvas/import', body),
 }
 
 /** 首页运营概览接口。 */
@@ -385,12 +539,35 @@ export const metaApi = {
 
 // ── API 定义管理 ─────────────────────────────────────────────
 
+export interface ApiDefinition {
+  id: number
+  name: string
+  apiKey: string
+  url: string
+  method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE' | string
+  bizLine?: string
+  requestSchema?: string
+  responseSchema?: string
+  includeContextPayload?: 0 | 1
+  receiptEnabled?: 0 | 1
+  receiptExpireMinutes?: number
+  receiptStatuses?: string
+  description?: string
+  rateLimitPerSec?: number | null
+  enabled: 0 | 1
+  createdBy?: string
+  createdAt?: string
+  updatedAt?: string
+}
+
+type ApiDefinitionPayload = Partial<Omit<ApiDefinition, 'id' | 'createdAt' | 'updatedAt'>>
+
 export const apiDefinitionApi = {
   list: (params?: { page?: number; size?: number; enabled?: number }) =>
-    http.get<R<PageResult<any>>, R<PageResult<any>>>('/canvas/api-definitions', { params }),
-  create: (body: any) =>
-    http.post<R<any>, R<any>>('/canvas/api-definitions', body),
-  update: (id: number, body: any) =>
+    http.get<R<PageResult<ApiDefinition>>, R<PageResult<ApiDefinition>>>('/canvas/api-definitions', { params }),
+  create: (body: ApiDefinitionPayload) =>
+    http.post<R<ApiDefinition>, R<ApiDefinition>>('/canvas/api-definitions', body),
+  update: (id: number, body: ApiDefinitionPayload) =>
     http.put<R<void>, R<void>>(`/canvas/api-definitions/${id}`, body),
   delete: (id: number) =>
     http.delete<R<void>, R<void>>(`/canvas/api-definitions/${id}`),
@@ -398,12 +575,25 @@ export const apiDefinitionApi = {
 
 // ── AB 实验管理 ──────────────────────────────────────────────
 
+export interface AbExperiment {
+  id: number
+  name: string
+  experimentKey: string
+  description?: string
+  enabled: 0 | 1
+  createdBy?: string
+  createdAt?: string
+  updatedAt?: string
+}
+
+type AbExperimentPayload = Partial<Omit<AbExperiment, 'id' | 'createdAt' | 'updatedAt'>>
+
 export const abExperimentApi = {
   list: (params?: { page?: number; size?: number; enabled?: number }) =>
-    http.get<R<PageResult<any>>, R<PageResult<any>>>('/canvas/ab-experiments', { params }),
-  create: (body: any) =>
-    http.post<R<any>, R<any>>('/canvas/ab-experiments', body),
-  update: (id: number, body: any) =>
+    http.get<R<PageResult<AbExperiment>>, R<PageResult<AbExperiment>>>('/canvas/ab-experiments', { params }),
+  create: (body: AbExperimentPayload) =>
+    http.post<R<AbExperiment>, R<AbExperiment>>('/canvas/ab-experiments', body),
+  update: (id: number, body: AbExperimentPayload) =>
     http.put<R<void>, R<void>>(`/canvas/ab-experiments/${id}`, body),
   delete: (id: number) =>
     http.delete<R<void>, R<void>>(`/canvas/ab-experiments/${id}`),
@@ -422,10 +612,10 @@ export const abExperimentApi = {
 /** 标签定义管理接口集合。 */
 export const tagDefinitionApi = {
   list: (params?: { page?: number; size?: number; tagType?: string; enabled?: number }) =>
-    http.get<R<PageResult<any>>, R<PageResult<any>>>('/canvas/tag-definitions', { params }),
-  create: (body: any) =>
-    http.post<R<any>, R<any>>('/canvas/tag-definitions', body),
-  update: (id: number, body: any) =>
+    http.get<R<PageResult<TagDefinition>>, R<PageResult<TagDefinition>>>('/canvas/tag-definitions', { params }),
+  create: (body: Partial<TagDefinition>) =>
+    http.post<R<TagDefinition>, R<TagDefinition>>('/canvas/tag-definitions', body),
+  update: (id: number, body: Partial<TagDefinition>) =>
     http.put<R<void>, R<void>>(`/canvas/tag-definitions/${id}`, body),
   delete: (id: number) =>
     http.delete<R<void>, R<void>>(`/canvas/tag-definitions/${id}`),

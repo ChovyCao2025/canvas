@@ -5,16 +5,19 @@ Sequence: 004C
 Source: `docs/optimization/3000-concurrency-hardening-checklist.md`
 Implementation plan: `../plans/p1-004c-execution-lane-metrics-and-registry-guards-plan.md`
 
+## Implementation Status
+
+Implemented and focused-verified on 2026-06-05. Registry admission now records outcome, Redis latency, and lane active metrics; retry backlog and lane routing matrix coverage are in place, and `application.yml` retains the explicit 3000 lane budgets.
+
 ## Goal
 
 Instrument runtime admission and lane behavior so the 3000 hardening gate can observe registry availability, lane active counts, retry backlog, and protected lane routing.
 
 ## Current Baseline
 
-- `InFlightExecutionRegistry` performs Redis ZSET admission and already rejects conservatively on Redis failure.
-- `ExecutionLaneResolver` maps work into LIGHT, STANDARD, HEAVY, and RETRY lanes.
-- `CanvasExecutionRequestBacklogMetrics` exposes request backlog counts.
-- Test coverage is not exhaustive for protected lane routing and registry metrics.
+- `InFlightExecutionRegistry` performs Redis ZSET admission, rejects conservatively on Redis failure, and records registry admission, latency, and lane active metrics.
+- `ExecutionLaneResolver` maps work into LIGHT, STANDARD, HEAVY, and RETRY lanes with matrix coverage for protected-lane and retry precedence behavior.
+- `CanvasExecutionRequestBacklogMetrics` exposes request backlog counts, including retry backlog pressure coverage.
 
 ## In Scope
 

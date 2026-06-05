@@ -3,44 +3,40 @@
  *
  * 维护说明：文件较大是因为它连接 React Flow、后端草稿和右侧配置面板；新增逻辑应优先抽纯函数。
  */
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import {
   ReactFlow, ReactFlowProvider,
-  useNodesState, useEdgesState,
   useReactFlow, Background, Controls, MiniMap,
-  type Connection, type Node, type Edge, type NodeChange, type EdgeChange, type XYPosition, type OnNodeDrag,
+  type Connection, type Node, type Edge, type NodeChange, type EdgeChange, type XYPosition, type OnNodeDrag, type IsValidConnection,
 } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
 import './settingsPanel.css'
 import dagre from '@dagrejs/dagre'
-import { Button, DatePicker, Divider, Drawer, Form, Input, InputNumber, message, Modal, Radio, Slider, Space, Spin, Tag, Tooltip } from 'antd'
+import { Button, Divider, Form, Input, message, Modal, Space, Spin, Tag, Tooltip } from 'antd'
 import {
-  ArrowLeftOutlined, CaretRightOutlined, CloudUploadOutlined, DownOutlined, SaveOutlined, ApartmentOutlined, UndoOutlined, RedoOutlined, SyncOutlined, DeleteOutlined, QuestionCircleOutlined, HistoryOutlined, SettingOutlined, ExperimentOutlined, CheckOutlined, CloseOutlined,
+  ArrowLeftOutlined, CaretRightOutlined, CloudUploadOutlined, SaveOutlined, ApartmentOutlined, UndoOutlined, RedoOutlined, SyncOutlined, DeleteOutlined, QuestionCircleOutlined, HistoryOutlined, SettingOutlined, ExperimentOutlined, CheckOutlined, CloseOutlined, EyeOutlined,
 } from '@ant-design/icons'
 import dayjs from 'dayjs'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import type { BackendNode, BizConfig, CanvasNodeData } from '../../types/canvas'
-import { canvasApi, metaApi } from '../../services/api'
+import { canvasApi, metaApi, type MessagePreviewResp } from '../../services/api'
 import type { CanvasDetail, NodeTypeRegistry } from '../../types'
 import CanvasNodeCmp from '../../components/canvas/CanvasNode'
 import BranchPlaceholderNode, { type PlaceholderData, PLACEHOLDER_W as PH_W, PLACEHOLDER_H as PH_H } from '../../components/canvas/BranchPlaceholderNode'
-import { useBranchPlaceholders } from '../../hooks/useBranchPlaceholders'
 import { useSystemOptions } from '../../hooks/useSystemOptions'
 import NodePanel from '../../components/node-panel'
 import ConfigPanel from '../../components/config-panel'
 import ExecutionTracePanel from '../../components/canvas/ExecutionTracePanel'
 import {
-  PUBLISH_TRIGGER_NODE_TYPES, TRIGGER_TYPES, TERMINAL_TYPES,
+  TRIGGER_TYPES, TERMINAL_TYPES,
 } from '../../components/canvas/constants'
 
 import HoverEdge from '../../components/canvas/HoverEdge'
 import { getOutletHandles } from '../../components/canvas/outletSchema'
-import CronBuilder from '../../components/config-panel/CronBuilder'
 import { CanvasActionsContext } from '../../context/CanvasActionsContext'
 import { useAuth } from '../../context/AuthContext'
 import { getCanvasGraphReloadKey } from './graphReloadKey'
 import { hydrateBackendNodeOutletSchemas } from './graphHydration'
-import { CANVAS_CONNECTION_RADIUS, canCreateCanvasConnection } from './connectionInteraction'
 import {
   clearCanvasLocalDraft,
   isLocalDraftDifferentFromServer,
@@ -50,23 +46,39 @@ import {
 import { buildCanvasNameUpdate, getCanvasNameStatusGap, shouldShowCanvasNameActions } from './canvasNameUpdate'
 import { clearCanvasEditorAutosave, scheduleCanvasEditorAutosave } from './canvasEditorAutosave'
 import { cleanCanvasBizConfigRefs, cloneCanvasNodeBizConfigForPaste } from './canvasEditorClipboard'
+import { bindBeforeUnloadGuard, shouldWarnBeforeUnload } from './unsavedChangeGuard'
+import { useCanvasHistoryState } from './useCanvasHistoryState'
+import {
+  CANVAS_CONNECTION_RADIUS,
+  buildSaveGraphJson,
+  canCreateCanvasConnection,
+  isPlaceholderFlowNode,
+  realCanvasNodes,
+  sameSaveSnapshot,
+} from './reactFlowAdapter'
+import {
+  editorApiErrorMessage,
+  isApiConflict,
+} from './workflowApiAdapters'
 import {
   type CanvasTriggerType,
-  getExecutionLimitsSummary,
-  getTriggerTypeSummary,
   type CanvasSettingsLike,
   shouldExpandExecutionLimits,
 } from './settingsPresentation'
 import { applyInsertIntoEdge, buildConfigDefaultsFromSchema, buildNodeExpansion, buildPlaceholderEdge } from './insertNode'
 import { appendDirectCallBranch, clearEdgeRef, deriveEdges, mergeOutletEdge, patchBizConfig } from './outletRouting'
-
-/** 日期范围选择器别名，用于有效期配置抽屉。 */
-const { RangePicker } = DatePicker
-/** 触发类型帮助文案，展示在设置抽屉的说明 tooltip 中。 */
-const TRIGGER_TYPE_HELP: Record<string, string> = {
-  REALTIME: '用户满足条件后立即进入当前画布。',
-  SCHEDULED: '按固定周期统一执行，适合批处理场景。',
-}
+import CanvasWorkflowModals from './CanvasWorkflowModals'
+import CanvasVersionHistoryDrawer from './CanvasVersionHistoryDrawer'
+import CanvasEditorSettingsPanel from './CanvasEditorSettingsPanel'
+import CanvasEditorErrorBoundary from './CanvasEditorErrorBoundary'
+import { CANVAS_EDITOR_LAYOUT, getCanvasEditorRegionProps } from './editorLayout'
+import { useCanvasTestRunWorkflow } from './useCanvasTestRunWorkflow'
+import { useCanvasCanaryWorkflow } from './useCanvasCanaryWorkflow'
+import { useCanvasVersionHistoryWorkflow } from './useCanvasVersionHistoryWorkflow'
+import { useCanvasPublishWorkflow } from './useCanvasPublishWorkflow'
+import { useCanvasSelectionState } from './useCanvasSelectionState'
+import { useCanvasGraphState } from './useCanvasGraphState'
+import { buildMessagePreviewPayload } from './messagePreview'
 
 /** 后端可能返回空值或历史值，这里统一收敛成编辑器支持的触发类型。 */
 function normalizeCanvasTriggerType(triggerType?: string): CanvasTriggerType {
@@ -107,26 +119,15 @@ function normalizeCanvasSettingsFromDetail(detail: CanvasDetail): CanvasSettings
     perUserDailyLimit: detail.canvas.perUserDailyLimit,
     perUserTotalLimit: detail.canvas.perUserTotalLimit,
     cooldownSeconds: detail.canvas.cooldownSeconds,
+    controlGroupPercent: detail.canvas.controlGroupPercent,
+    controlGroupSalt: detail.canvas.controlGroupSalt,
+    conversionEventCode: detail.canvas.conversionEventCode,
+    attributionWindowDays: detail.canvas.attributionWindowDays,
+    projectKey: detail.canvas.projectKey,
+    projectName: detail.canvas.projectName,
+    folderKey: detail.canvas.folderKey,
+    folderName: detail.canvas.folderName,
   }
-}
-
-/** 将 React Flow 节点转换成后端 graph_json 中保存的节点结构。 */
-function buildBackendNodesFromFlowNodes(nodes: Node[]): BackendNode[] {
-  return nodes
-    .filter(node => !(node.data as any)?._placeholder)
-    .map(node => {
-      const data = node.data as CanvasNodeData
-      return {
-        id: node.id,
-        type: data.nodeType,
-        name: data.name,
-        category: data.category,
-        x: Math.round(node.position.x),
-        y: Math.round(node.position.y),
-        config: data.bizConfig,
-        outletSchema: data.outletSchema,
-      }
-    })
 }
 
 /** 一次保存所需的完整快照，用于自动保存期间避免读取过期闭包状态。 */
@@ -137,40 +138,7 @@ interface SaveSnapshot {
   description?: string
 }
 
-/** 构造后端保存用 graphJson；边关系已写入节点 bizConfig。 */
-function buildSaveGraphJson(nodes: Node[]): string {
-  return JSON.stringify({ nodes: buildBackendNodesFromFlowNodes(nodes) })
-}
-
-/** 比较两次保存快照，决定当前保存过程中是否又产生了新改动。 */
-function sameSaveSnapshot(a: {
-  graphJson: string
-  canvasName: string
-  canvasSettings: CanvasSettingsLike
-  description?: string
-}, b: {
-  graphJson: string
-  canvasName: string
-  canvasSettings: CanvasSettingsLike
-  description?: string
-}): boolean {
-  return a.graphJson === b.graphJson
-    && a.canvasName === b.canvasName
-    && JSON.stringify(a.canvasSettings) === JSON.stringify(b.canvasSettings)
-    && a.description === b.description
-}
-
 // ── 撤销/重做历史 ─────────────────────────────────────────────
-
-/** 画布历史快照，保存节点、边和操作名称。 */
-interface Snapshot { nodes: Node<CanvasNodeData>[]; edges: Edge[]; actionName: string }
-
-/** 节点拖入画布时的插入语境：插入边、吸附占位分支或空白创建。 */
-type InsertContext =
-  | { kind: 'edge'; edgeId: string }
-  | { kind: 'placeholder'; sourceId: string; handleId: string }
-  | { kind: 'blank' }
-  | null
 
 /** 按 sourceHandle 生成下游边 ID，确保分支边与默认边不会冲突。 */
 function downstreamEdgeId(sourceId: string, targetId: string, sourceHandle: string): string {
@@ -240,44 +208,6 @@ function splitSelectedEdge(edge: Edge, entryNodeId: string, exitNodeId = entryNo
   }
 }
 
-/** 画布编辑器局部撤销/重做 Hook，保存最近操作的节点和边快照。 */
-function useHistory(nodes: Node<CanvasNodeData>[], edges: Edge[]) {
-  const [history, setHistory] = useState<Snapshot[]>([])
-  const [future,  setFuture]  = useState<Snapshot[]>([])
-  const { setNodes, setEdges } = useReactFlow()
-
-  /** 写入一份历史快照，并清空重做栈。 */
-  const snapshot = useCallback((actionName = '操作') => {
-    setHistory(h => [...h.slice(-49), { nodes: [...nodes], edges: [...edges], actionName }])
-    setFuture([])
-  }, [nodes, edges])
-
-  /** 回退到上一份历史快照，并把当前状态放入重做栈。 */
-  const undo = useCallback(() => {
-    if (!history.length) return
-    const prev = history[history.length - 1]
-    setFuture(f => [{ nodes, edges, actionName: prev.actionName }, ...f])
-    setHistory(h => h.slice(0, -1))
-    setNodes(prev.nodes)
-    setEdges(prev.edges)
-  }, [history, nodes, edges, setNodes, setEdges])
-
-  /** 从重做栈恢复下一份快照。 */
-  const redo = useCallback(() => {
-    if (!future.length) return
-    const next = future[0]
-    setHistory(h => [...h, { nodes, edges, actionName: next.actionName }])
-    setFuture(f => f.slice(1))
-    setNodes(next.nodes)
-    setEdges(next.edges)
-  }, [future, nodes, edges, setNodes, setEdges])
-
-  const undoLabel = history.length ? `撤销：${history[history.length - 1].actionName}` : '没有可撤销的操作'
-  const redoLabel = future.length  ? `重做：${future[0].actionName}` : '没有可重做的操作'
-
-  return { snapshot, undo, redo, canUndo: history.length > 0, canRedo: future.length > 0, undoLabel, redoLabel }
-}
-
 // ── 工具栏样式常量 ───────────────────────────────────────────────
 const iconBtnStyle: React.CSSProperties = {
   borderRadius: 8, color: '#595959', width: 28, height: 28,
@@ -307,18 +237,19 @@ function EditorInner({ detail, onStatusChange, onCanvasNameChange }: {
   const { raw: weekdayRows } = useSystemOptions('weekday')
   const weekdayOptions = weekdayRows.map(option => ({ label: option.label, value: Number(option.key) }))
 
-  const [nodes, setNodes, onNodesChange] = useNodesState<Node>([])
-  const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([])
-
-  // 真实节点和占位节点分层管理：占位节点只用于交互提示，不参与保存。
-  const [draggingNodeId, setDraggingNodeId] = useState<string | null>(null)
-  const realNodes = nodes.filter(n => !(n.data as any)?._placeholder) as Node<CanvasNodeData>[]
-  const { nodes: phNodes, edges: phEdges } = useBranchPlaceholders(realNodes, edges, draggingNodeId)
-  const placeholders  = phNodes
-  /** 实际渲染节点 = 真实业务节点 + 派生占位节点。 */
-  const displayNodes  = useMemo(() => [...realNodes, ...phNodes],  [realNodes, phNodes])
-  /** 实际渲染边 = 真实连线 + 占位虚线边。 */
-  const displayEdges  = useMemo(() => [...edges,     ...phEdges],  [edges,     phEdges])
+  const {
+    nodes,
+    setNodes,
+    onNodesChange,
+    edges,
+    setEdges,
+    onEdgesChange,
+    setDraggingNodeId,
+    realNodes,
+    placeholders,
+    displayNodes,
+    displayEdges,
+  } = useCanvasGraphState()
 
   const [canvasName, setCanvasName] = useState(detail.canvas.name)
   // 画布级设置独立于节点配置，保存时和 graphJson 一起提交。
@@ -331,28 +262,28 @@ function EditorInner({ detail, onStatusChange, onCanvasNameChange }: {
     perUserDailyLimit: detail.canvas.perUserDailyLimit,
     perUserTotalLimit: detail.canvas.perUserTotalLimit,
     cooldownSeconds: detail.canvas.cooldownSeconds,
+    controlGroupPercent: detail.canvas.controlGroupPercent,
+    controlGroupSalt: detail.canvas.controlGroupSalt,
+    conversionEventCode: detail.canvas.conversionEventCode,
+    attributionWindowDays: detail.canvas.attributionWindowDays,
+    projectKey: detail.canvas.projectKey,
+    projectName: detail.canvas.projectName,
+    folderKey: detail.canvas.folderKey,
+    folderName: detail.canvas.folderName,
   })
-  const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null)
-  const [insertContext, setInsertContext] = useState<InsertContext>(null)
   const [saving, setSaving]         = useState(false)
   const [isDirty, setIsDirty]       = useState(false)
   const [isEditingCanvasName, setIsEditingCanvasName] = useState(false)
-  const [clipboard, setClipboard]   = useState<Node<CanvasNodeData>[]>([])
   const [, setTraceColorMap] = useState<Record<string, string>>({})
-  const [testModalOpen, setTestModalOpen] = useState(false)
-  const [testUserId,    setTestUserId]    = useState('user_test_001')
-  const [testPayload,   setTestPayload]   = useState('{}')
-  const [testRunning,   setTestRunning]   = useState(false)
-  const [canaryModalOpen, setCanaryModalOpen] = useState(false)
-  const [canaryPercent, setCanaryPercent] = useState(20)
-  // 版本历史抽屉状态。
-  const [historyOpen,    setHistoryOpen]    = useState(false)
-  const [versionList,    setVersionList]    = useState<import('../../types').CanvasVersion[]>([])
-  const [historyLoading, setHistoryLoading] = useState(false)
   // 画布设置弹窗状态。
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [limitsExpanded, setLimitsExpanded] = useState(false)
   const [settingsForm] = Form.useForm()
+  const [messagePreviewOpen, setMessagePreviewOpen] = useState(false)
+  const [messagePreviewUserId, setMessagePreviewUserId] = useState('user_test_001')
+  const [messagePreviewContext, setMessagePreviewContext] = useState('{}')
+  const [messagePreviewResult, setMessagePreviewResult] = useState<MessagePreviewResp | null>(null)
+  const [messagePreviewLoading, setMessagePreviewLoading] = useState(false)
   const editVersion   = useRef(detail.canvas.editVersion ?? 0)
   const autoSaveTimer = useRef<ReturnType<typeof setTimeout>>()
   const savedCanvasName = useRef(detail.canvas.name)
@@ -364,37 +295,47 @@ function EditorInner({ detail, onStatusChange, onCanvasNameChange }: {
     canvasSettings: normalizeCanvasSettingsFromDetail(detail),
     description: detail.canvas.description,
   })
-  const limitsSectionId = 'canvas-settings-execution-limits'
-  const watchedTriggerType = Form.useWatch('triggerType', settingsForm)
-  const watchedCronExpression = Form.useWatch('cronExpression', settingsForm)
-  const watchedValidRange = Form.useWatch('validRange', settingsForm) as [dayjs.Dayjs | null | undefined, dayjs.Dayjs | null | undefined] | undefined
-  const watchedMaxTotalExecutions = Form.useWatch('maxTotalExecutions', settingsForm)
-  const watchedPerUserDailyLimit = Form.useWatch('perUserDailyLimit', settingsForm)
-  const watchedPerUserTotalLimit = Form.useWatch('perUserTotalLimit', settingsForm)
-  const watchedCooldownSeconds = Form.useWatch('cooldownSeconds', settingsForm)
-  const normalizedTriggerType = normalizeCanvasTriggerType(watchedTriggerType)
-
-  // 设置弹窗中的实时表单值，用于底部摘要和“执行限制”折叠态展示。
-  const liveSettings = useMemo<CanvasSettingsLike>(() => ({
-    triggerType: normalizedTriggerType,
-    cronExpression: watchedCronExpression ?? '',
-    validStart: watchedValidRange?.[0]?.format('YYYY-MM-DDTHH:mm:ss') ?? undefined,
-    validEnd: watchedValidRange?.[1]?.format('YYYY-MM-DDTHH:mm:ss') ?? undefined,
-    maxTotalExecutions: watchedMaxTotalExecutions ?? undefined,
-    perUserDailyLimit: watchedPerUserDailyLimit ?? undefined,
-    perUserTotalLimit: watchedPerUserTotalLimit ?? undefined,
-    cooldownSeconds: watchedCooldownSeconds ?? undefined,
-  }), [
-    watchedCooldownSeconds,
-    watchedCronExpression,
-    watchedMaxTotalExecutions,
-    normalizedTriggerType,
-    watchedPerUserDailyLimit,
-    watchedPerUserTotalLimit,
-    watchedValidRange,
-  ])
-
-  const { snapshot, undo, redo, canUndo, canRedo, undoLabel, redoLabel } = useHistory(nodes as Node<CanvasNodeData>[], edges)
+  const { snapshot, undo, redo, canUndo, canRedo, undoLabel, redoLabel } = useCanvasHistoryState(nodes as Node<CanvasNodeData>[], edges)
+  const {
+    selectedNodeId,
+    setSelectedNodeId,
+    insertContext,
+    setInsertContext,
+    clipboard,
+    setClipboard,
+  } = useCanvasSelectionState()
+  const {
+    testModalOpen,
+    setTestModalOpen,
+    testUserId,
+    setTestUserId,
+    testPayload,
+    setTestPayload,
+    testRunning,
+    handleRunTest,
+  } = useCanvasTestRunWorkflow({ canvasId, getNodes })
+  const {
+    canaryModalOpen,
+    setCanaryModalOpen,
+    canaryPercent,
+    setCanaryPercent,
+    handleStartCanary,
+    handlePromoteCanary,
+    handleRollbackCanary,
+  } = useCanvasCanaryWorkflow({
+    canvasId,
+    existingCanaryVersionId: detail.canvas.canaryVersionId,
+    existingCanaryPercent: detail.canvas.canaryPercent,
+  })
+  const {
+    historyOpen,
+    setHistoryOpen,
+    versionList,
+    historyLoading,
+    openHistory,
+    handleRevert,
+    handleDiff,
+  } = useCanvasVersionHistoryWorkflow({ canvasId })
   const graphReloadKey = getCanvasGraphReloadKey(detail)
   const showCanvasNameActions = shouldShowCanvasNameActions(isEditingCanvasName)
   const statusTagGap = getCanvasNameStatusGap(isEditingCanvasName && !readonly)
@@ -436,6 +377,10 @@ function EditorInner({ detail, onStatusChange, onCanvasNameChange }: {
     autoSaveTimer.current = scheduleCanvasEditorAutosave(isDirty, handleSave, autoSaveTimer.current)
     return () => clearCanvasEditorAutosave(autoSaveTimer.current)
   })
+
+  useEffect(() => {
+    return bindBeforeUnloadGuard(() => shouldWarnBeforeUnload({ isDirty, readonly }))
+  }, [isDirty, readonly])
 
   /** 把当前内存中的未保存内容写入 localStorage，防刷新丢失。 */
   const persistLocalDraft = useCallback((overrides?: {
@@ -697,7 +642,7 @@ function EditorInner({ detail, onStatusChange, onCanvasNameChange }: {
       outletSchema,
     })
 
-    setNodes(prev => [...prev.filter(n => !(n.data as any)?._placeholder), ...expansion.nodes])
+    setNodes(prev => [...realCanvasNodes(prev), ...expansion.nodes])
 
     if (resolvedContext.kind === 'edge' && selectedEdge) {
       // 插入边：旧边拆成 source -> 新节点入口，以及新节点出口 -> 原 target。
@@ -773,7 +718,7 @@ function EditorInner({ detail, onStatusChange, onCanvasNameChange }: {
     setDraggingNodeId(null)
     if (readonly) return
     const d = draggedNode.data as CanvasNodeData
-    if ((d as any)?._placeholder) return
+    if (isPlaceholderFlowNode(draggedNode as Node)) return
 
     const nodeX = draggedNode.position.x
     const nodeY = draggedNode.position.y
@@ -910,99 +855,16 @@ function EditorInner({ detail, onStatusChange, onCanvasNameChange }: {
   }, [edges, onEdgesChange, setNodes, snapshot])
 
   // 连线规则
-  const isValidConnection = useCallback((conn: Connection) => {
-    return canCreateCanvasConnection(conn, getNodes() as Node<CanvasNodeData>[], getEdges())
+  const isValidConnection = useCallback<IsValidConnection>((conn) => {
+    return canCreateCanvasConnection({
+      source: conn.source,
+      target: conn.target,
+      sourceHandle: conn.sourceHandle ?? null,
+      targetHandle: conn.targetHandle ?? null,
+    }, getNodes() as Node<CanvasNodeData>[], getEdges())
   }, [getNodes, getEdges])
 
   // 保存
-  /** 发布前本地校验（减少不必要的服务端请求）*/
-  const validateBeforePublish = useCallback((rfNodes: Node<CanvasNodeData>[]): string[] => {
-    const errors: string[] = []
-    // START 之后必须连接一个触发器节点（事件/MQ/定时/API入口/受众）
-    const hasTrigger = rfNodes.some(n => PUBLISH_TRIGGER_NODE_TYPES.has(n.data.nodeType))
-    if (!hasTrigger) errors.push('画布必须包含至少一个触发器节点（事件触发 / MQ 触发 / 定时触发 / API入口 / 受众）')
-
-    rfNodes.forEach(n => {
-      const d = n.data as CanvasNodeData
-      const cfg = d.bizConfig
-      switch (d.nodeType) {
-        case 'EVENT_TRIGGER':
-          if (!cfg.eventCode) errors.push(`节点「${d.name}」必须选择触发事件`)
-          break
-        case 'MQ_TRIGGER':
-          if (!cfg.topicKey) errors.push(`节点「${d.name}」必须选择消息主题`)
-          break
-        case 'SCHEDULED_TRIGGER':
-          if (!cfg.scheduleType) {
-            errors.push(`节点「${d.name}」必须选择触发类型`)
-          } else if (cfg.scheduleType === 'CRON' && !cfg.cronExpression) {
-            errors.push(`节点「${d.name}」必须配置 Cron 表达式`)
-          } else if (cfg.scheduleType === 'ONCE' && !cfg.triggerTime) {
-            errors.push(`节点「${d.name}」必须配置触发时间`)
-          }
-          if (!cfg.nextNodeId) {
-            errors.push(`节点「${d.name}」必须连接人群筛选节点`)
-          } else {
-            const nextNode = rfNodes.find(candidate => candidate.id === cfg.nextNodeId)
-            const nextData = nextNode?.data as CanvasNodeData | undefined
-            if (nextData?.nodeType !== 'TAGGER' || nextData.bizConfig?.mode !== 'audience') {
-              errors.push(`节点「${d.name}」只负责定时，下游必须先连接「Tagger 标签」并选择人群筛选`)
-            }
-          }
-          break
-        case 'THRESHOLD': {
-          if (!cfg.thresholdMode) { errors.push(`节点「${d.name}」必须配置触发条件`); break }
-          const needsN = cfg.thresholdMode === 'min_success' || cfg.thresholdMode === 'min_done'
-          if (needsN && !cfg.threshold) errors.push(`节点「${d.name}」必须填写阈值 N`)
-          if (!cfg.successNodeId) errors.push(`节点「${d.name}」未配置"达到阈值"分支（连线到 success handle）`)
-          if (!cfg.failNodeId)    errors.push(`节点「${d.name}」未配置"未达阈值"分支（连线到 fail handle）`)
-          break
-        }
-        case 'AGGREGATE': {
-          if (!cfg.evaluateMode) { errors.push(`节点「${d.name}」必须配置评估方式`); break }
-          if (cfg.evaluateMode === 'count'  && !cfg.minCount)        errors.push(`节点「${d.name}」必须填写最少成功数`)
-          if (cfg.evaluateMode === 'rate'   && cfg.minRate == null)  errors.push(`节点「${d.name}」必须填写最低成功率`)
-          if (cfg.evaluateMode === 'script' && !cfg.evaluateScript)  errors.push(`节点「${d.name}」必须填写评估脚本`)
-          if (!cfg.successNodeId) errors.push(`节点「${d.name}」未配置"条件满足"分支（连线到 success handle）`)
-          if (!cfg.failNodeId)    errors.push(`节点「${d.name}」未配置"条件不满足"分支（连线到 fail handle）`)
-          break
-        }
-        case 'IF_CONDITION':
-          if (!cfg.successNodeId) errors.push(`节点「${d.name}」未配置成功分支（连线到 success handle）`)
-          if (!cfg.failNodeId)    errors.push(`节点「${d.name}」未配置失败分支（连线到 fail handle）`)
-          break
-        case 'SPLIT': {
-          const branches = cfg.branches as any[] | undefined
-          if (!branches?.length) {
-            errors.push(`节点「${d.name}」至少需要配置一个分支`)
-            break
-          }
-          branches.forEach((branch, index) => {
-            if (!branch.nextNodeId) errors.push(`节点「${d.name}」第 ${index + 1} 个分支未连线`)
-            if (branch.weight == null) errors.push(`节点「${d.name}」第 ${index + 1} 个分支必须配置权重`)
-          })
-          break
-        }
-        case 'GROOVY':
-          if (!cfg.code) errors.push(`节点「${d.name}」Groovy 脚本不能为空`)
-          break
-        case 'SEND_MESSAGE':
-          if (!cfg.channel) errors.push(`节点「${d.name}」必须选择消息渠道`)
-          break
-        case 'COMMIT_ACTION':
-          if (!cfg.actionType) {
-            errors.push(`节点「${d.name}」必须选择动作类型`)
-          } else if (cfg.actionType === 'ISSUE_COUPON' && !cfg.couponTypeKey) {
-            errors.push(`节点「${d.name}」选择发券动作时必须选择券类型`)
-          } else if (cfg.actionType === 'POINTS' && cfg.points == null) {
-            errors.push(`节点「${d.name}」选择积分动作时必须配置积分`)
-          }
-          break
-      }
-    })
-    return errors
-  }, [])
-
   /** 保存草稿；并发保存会复用同一个 Promise，避免重复提交同一 editVersion。 */
   const handleSave = useCallback(async (silent = false) => {
     if (savingPromiseRef.current) {
@@ -1043,6 +905,14 @@ function EditorInner({ detail, onStatusChange, onCanvasNameChange }: {
           perUserDailyLimit: snapshot.canvasSettings.perUserDailyLimit ?? null,
           perUserTotalLimit: snapshot.canvasSettings.perUserTotalLimit ?? null,
           cooldownSeconds: snapshot.canvasSettings.cooldownSeconds ?? null,
+          controlGroupPercent: snapshot.canvasSettings.controlGroupPercent ?? null,
+          controlGroupSalt: snapshot.canvasSettings.controlGroupSalt ?? null,
+          conversionEventCode: snapshot.canvasSettings.conversionEventCode ?? null,
+          attributionWindowDays: snapshot.canvasSettings.attributionWindowDays ?? null,
+          projectKey: snapshot.canvasSettings.projectKey ?? null,
+          projectName: snapshot.canvasSettings.projectName ?? null,
+          folderKey: snapshot.canvasSettings.folderKey ?? null,
+          folderName: snapshot.canvasSettings.folderName ?? null,
         })
         savedAny = true
         editVersion.current += 1
@@ -1070,8 +940,8 @@ function EditorInner({ detail, onStatusChange, onCanvasNameChange }: {
     try {
       const saved = await savePromise
       if (saved && !silent) message.success('保存成功')
-    } catch (err: any) {
-      if (err?.response?.status === 409) {
+    } catch (err) {
+      if (isApiConflict(err)) {
         Modal.confirm({
           title: '画布已被他人修改',
           content: '当前画布已有新版本，刷新后你的未保存内容将丢失。是否立即刷新？',
@@ -1114,14 +984,22 @@ function EditorInner({ detail, onStatusChange, onCanvasNameChange }: {
         perUserDailyLimit: canvasSettings.perUserDailyLimit ?? null,
         perUserTotalLimit: canvasSettings.perUserTotalLimit ?? null,
         cooldownSeconds: canvasSettings.cooldownSeconds ?? null,
+        controlGroupPercent: canvasSettings.controlGroupPercent ?? null,
+        controlGroupSalt: canvasSettings.controlGroupSalt ?? null,
+        conversionEventCode: canvasSettings.conversionEventCode ?? null,
+        attributionWindowDays: canvasSettings.attributionWindowDays ?? null,
+        projectKey: canvasSettings.projectKey ?? null,
+        projectName: canvasSettings.projectName ?? null,
+        folderKey: canvasSettings.folderKey ?? null,
+        folderName: canvasSettings.folderName ?? null,
       })
       savedCanvasName.current = update.name
       setCanvasName(update.name)
       setIsEditingCanvasName(false)
       onCanvasNameChange(update.name)
       message.success('名称已保存')
-    } catch (e: any) {
-      message.error(e?.response?.data?.message ?? '名称保存失败')
+    } catch (e) {
+      message.error(editorApiErrorMessage(e, '名称保存失败'))
       setCanvasName(savedCanvasName.current)
     }
   }, [canvasId, canvasName, canvasSettings, detail.canvas.description, onCanvasNameChange])
@@ -1149,83 +1027,12 @@ function EditorInner({ detail, onStatusChange, onCanvasNameChange }: {
     })
   }, [canvasName, handleSaveCanvasName])
 
-  /** 发布（或重新发布）：先保存草稿，再创建新版本上线 */
-  const handlePublish = useCallback(async () => {
-    const errors = validateBeforePublish(getNodes().filter(n => !(n.data as any)?._placeholder) as Node<CanvasNodeData>[])
-    if (errors.length > 0) { message.error({ content: errors.join('\n'), duration: 5 }); return }
-    try {
-      await handleSave(true)
-      await canvasApi.publish(canvasId)
-      message.success('发布成功，已上线')
-      onStatusChange(1)
-    } catch (e: any) {
-      message.error(e?.response?.data?.message ?? '发布失败')
-    }
-  }, [canvasId, getNodes, handleSave, validateBeforePublish])
-
-  /** 创建或覆盖灰度版本，灰度比例由弹窗内 slider 控制。 */
-  const handleStartCanary = async () => {
-    try {
-      const hasExisting = !!detail.canvas.canaryVersionId
-      if (hasExisting) {
-        const confirmed = await new Promise<boolean>(resolve =>
-          Modal.confirm({
-            title: '覆盖灰度版本',
-            content: `当前已有灰度版本（${detail.canvas.canaryPercent}%），确认覆盖？`,
-            okText: '确认覆盖',
-            okButtonProps: { danger: true },
-            cancelText: '取消',
-            onOk: () => resolve(true),
-            onCancel: () => resolve(false),
-          })
-        )
-        if (!confirmed) return
-      }
-      await canvasApi.canary(canvasId, canaryPercent)
-      message.success(`灰度发布成功，${canaryPercent}% 用户将收到新版本`)
-      setCanaryModalOpen(false)
-      window.location.reload()
-    } catch {
-      message.error('灰度发布失败，请稍后重试')
-    }
-  }
-
-  /** 将当前灰度版本提升为正式版本。 */
-  const handlePromoteCanary = () => {
-    Modal.confirm({
-      title: '晋升灰度为全量',
-      content: '灰度版本将成为正式版本，所有用户切换到新版本。确认晋升？',
-      okText: '确认晋升',
-      onOk: async () => {
-        try {
-          await canvasApi.promoteCanary(canvasId)
-          message.success('已晋升为全量版本')
-          window.location.reload()
-        } catch {
-          message.error('晋升灰度失败，请稍后重试')
-        }
-      },
-    })
-  }
-
-  /** 丢弃当前灰度版本，流量恢复到正式版本。 */
-  const handleRollbackCanary = () => {
-    Modal.confirm({
-      title: '回滚灰度',
-      content: '灰度版本将被丢弃，所有用户恢复到正式版本。确认回滚？',
-      okType: 'danger',
-      okText: '确认回滚',
-      onOk: async () => {
-        try {
-          await canvasApi.rollbackCanary(canvasId)
-          message.warning('灰度已回滚')
-          window.location.reload()
-        } catch {
-          message.error('回滚灰度失败，请稍后重试')
-        }
-      },
-    })
-  }
+  const handlePublish = useCanvasPublishWorkflow({
+    canvasId,
+    getNodes,
+    saveDraft: handleSave,
+    onStatusChange,
+  })
 
   // 整理布局
   const onLayout = useCallback(() => {
@@ -1234,32 +1041,6 @@ function EditorInner({ detail, onStatusChange, onCanvasNameChange }: {
     setNodes([...layouted])
     setIsDirty(true)
   }, [snapshot, getNodes, getEdges, setNodes])
-
-  // 版本历史（EF-7）
-  /** 打开版本历史抽屉并加载版本列表。 */
-  const openHistory = async () => {
-    setHistoryOpen(true)
-    setHistoryLoading(true)
-    try {
-      const res = await canvasApi.getVersions(canvasId)
-      setVersionList((res.data as any)?.list ?? res.data ?? [])
-    } finally {
-      setHistoryLoading(false)
-    }
-  }
-  /** 将指定历史版本内容覆盖当前草稿。 */
-  const handleRevert = (versionId: number) => {
-    Modal.confirm({
-      title: '回退到此版本',
-      content: '将以该版本内容覆盖当前草稿，不影响线上版本。确认继续？',
-      okText: '确认回退', okType: 'danger', cancelText: '取消',
-      onOk: async () => {
-        await canvasApi.revert(canvasId, versionId)
-        message.success('已回退到选定版本，即将刷新画布')
-        setTimeout(() => window.location.reload(), 800)
-      },
-    })
-  }
 
   // 画布设置（EF-8）
   /** 打开画布设置弹窗，并把当前设置回填为表单值。 */
@@ -1273,6 +1054,14 @@ function EditorInner({ detail, onStatusChange, onCanvasNameChange }: {
       perUserDailyLimit: canvasSettings.perUserDailyLimit,
       perUserTotalLimit: canvasSettings.perUserTotalLimit,
       cooldownSeconds: canvasSettings.cooldownSeconds,
+      controlGroupPercent: canvasSettings.controlGroupPercent,
+      controlGroupSalt: canvasSettings.controlGroupSalt,
+      conversionEventCode: canvasSettings.conversionEventCode,
+      attributionWindowDays: canvasSettings.attributionWindowDays,
+      projectKey: canvasSettings.projectKey,
+      projectName: canvasSettings.projectName,
+      folderKey: canvasSettings.folderKey,
+      folderName: canvasSettings.folderName,
     }
     const validStart = nextSettings.validStart ? dayjs(nextSettings.validStart) : null
     const validEnd = nextSettings.validEnd ? dayjs(nextSettings.validEnd) : null
@@ -1284,6 +1073,14 @@ function EditorInner({ detail, onStatusChange, onCanvasNameChange }: {
       perUserDailyLimit:  nextSettings.perUserDailyLimit ?? undefined,
       perUserTotalLimit:  nextSettings.perUserTotalLimit ?? undefined,
       cooldownSeconds:    nextSettings.cooldownSeconds ?? undefined,
+      controlGroupPercent: nextSettings.controlGroupPercent ?? undefined,
+      controlGroupSalt:    nextSettings.controlGroupSalt ?? undefined,
+      conversionEventCode: nextSettings.conversionEventCode ?? undefined,
+      attributionWindowDays: nextSettings.attributionWindowDays ?? undefined,
+      projectKey:          nextSettings.projectKey ?? undefined,
+      projectName:         nextSettings.projectName ?? undefined,
+      folderKey:           nextSettings.folderKey ?? undefined,
+      folderName:          nextSettings.folderName ?? undefined,
     })
     setLimitsExpanded(shouldExpandExecutionLimits(nextSettings))
     setSettingsOpen(true)
@@ -1303,6 +1100,14 @@ function EditorInner({ detail, onStatusChange, onCanvasNameChange }: {
       perUserDailyLimit: vals.perUserDailyLimit ?? null,
       perUserTotalLimit: vals.perUserTotalLimit ?? null,
       cooldownSeconds: vals.cooldownSeconds ?? null,
+      controlGroupPercent: vals.controlGroupPercent ?? null,
+      controlGroupSalt: vals.controlGroupSalt || null,
+      conversionEventCode: vals.conversionEventCode || null,
+      attributionWindowDays: vals.attributionWindowDays ?? null,
+      projectKey: vals.projectKey || null,
+      projectName: vals.projectName || null,
+      folderKey: vals.folderKey || null,
+      folderName: vals.folderName || null,
     }
     await canvasApi.update(canvasId, payload)
     setCanvasSettings({
@@ -1314,6 +1119,14 @@ function EditorInner({ detail, onStatusChange, onCanvasNameChange }: {
       perUserDailyLimit: payload.perUserDailyLimit ?? undefined,
       perUserTotalLimit: payload.perUserTotalLimit ?? undefined,
       cooldownSeconds: payload.cooldownSeconds ?? undefined,
+      controlGroupPercent: payload.controlGroupPercent ?? undefined,
+      controlGroupSalt: payload.controlGroupSalt ?? undefined,
+      conversionEventCode: payload.conversionEventCode ?? undefined,
+      attributionWindowDays: payload.attributionWindowDays ?? undefined,
+      projectKey: payload.projectKey ?? undefined,
+      projectName: payload.projectName ?? undefined,
+      folderKey: payload.folderKey ?? undefined,
+      folderName: payload.folderName ?? undefined,
     })
     message.success('设置已保存')
     setSettingsOpen(false)
@@ -1333,6 +1146,7 @@ function EditorInner({ detail, onStatusChange, onCanvasNameChange }: {
   const selectedData = selectedNodeId
     ? (nodes.find(n => n.id === selectedNodeId)?.data as CanvasNodeData ?? null)
     : null
+  const selectedNodeIsMessage = selectedData?.nodeType === 'SEND_MESSAGE'
 
   const status = detail.canvas.status
 
@@ -1360,6 +1174,31 @@ function EditorInner({ detail, onStatusChange, onCanvasNameChange }: {
     setEdges(prev => prev.filter(e => !ids.has(e.source) && !ids.has(e.target)))
     if (selectedNodeId === nodeId) setSelectedNodeId(null)
     setIsDirty(true)
+  }
+
+  const openMessagePreview = () => {
+    setMessagePreviewResult(null)
+    setMessagePreviewOpen(true)
+  }
+
+  const handleMessagePreview = async () => {
+    if (!selectedNodeId) return
+    setMessagePreviewLoading(true)
+    try {
+      const res = await canvasApi.previewMessage(canvasId, buildMessagePreviewPayload({
+        canvasId,
+        nodeId: selectedNodeId,
+        userId: messagePreviewUserId,
+        graphJson: buildSaveGraphJson(nodes),
+        contextJson: messagePreviewContext,
+      }))
+      setMessagePreviewResult(res.data)
+      message.success('预览已生成')
+    } catch (e) {
+      message.error(editorApiErrorMessage(e, '消息预览失败'))
+    } finally {
+      setMessagePreviewLoading(false)
+    }
   }
 
   /** 由节点悬浮工具条触发的复制动作，不复制原节点连线关系。 */
@@ -1418,12 +1257,12 @@ function EditorInner({ detail, onStatusChange, onCanvasNameChange }: {
         })
       },
     }}>
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100vh' }}>
+    <div className="canvas-editor-shell" style={{ display: 'flex', flexDirection: 'column', height: '100vh' }}>
 
       {/* 顶部工具栏 */}
       <div style={{
         display: 'flex', alignItems: 'center', gap: 8,
-        padding: '0 16px', height: 56,
+        padding: '0 16px', height: CANVAS_EDITOR_LAYOUT.toolbarHeight,
         background: '#fff',
         borderBottom: '1px solid #f0f0f0',
         boxShadow: '0 1px 4px rgba(0,0,0,.06)',
@@ -1587,16 +1426,23 @@ function EditorInner({ detail, onStatusChange, onCanvasNameChange }: {
           <div style={divStyle} />
 
           {/* 中：状态工具 */}
-          <ExecutionTracePanel
+          <CanvasEditorErrorBoundary
+            sectionName="执行轨迹"
             canvasId={canvasId}
-            onTraceLoaded={colorMap => {
-              setTraceColorMap(colorMap)
-              setNodes(prev => prev.map(n => ({
-                ...n,
-                data: { ...n.data as CanvasNodeData, traceColor: colorMap[n.id] }
-              })))
-            }}
-          />
+            graphReloadKey={graphReloadKey}
+            selectedNodeId={selectedNodeId}
+          >
+            <ExecutionTracePanel
+              canvasId={canvasId}
+              onTraceLoaded={colorMap => {
+                setTraceColorMap(colorMap)
+                setNodes(prev => prev.map(n => ({
+                  ...n,
+                  data: { ...n.data as CanvasNodeData, traceColor: colorMap[n.id] }
+                })))
+              }}
+            />
+          </CanvasEditorErrorBoundary>
           <Button size="small" onClick={() => navigate(`/canvas/${canvasId}/users`)}>
             用户
           </Button>
@@ -1627,6 +1473,14 @@ function EditorInner({ detail, onStatusChange, onCanvasNameChange }: {
             }}>
             测试运行
           </Button>
+          )}
+
+          {!readonly && selectedNodeIsMessage && (
+            <Tooltip title="预览选中消息">
+              <Button size="small" icon={<EyeOutlined />} onClick={openMessagePreview}>
+                消息预览
+              </Button>
+            </Tooltip>
           )}
 
           {!readonly && (status === 1 && detail.canvas.canaryVersionId ? (
@@ -1703,293 +1557,167 @@ function EditorInner({ detail, onStatusChange, onCanvasNameChange }: {
         </div>
       </div>
 
-      {/* 测试运行弹窗 */}
-          <Modal
-            title="测试运行"
-            open={testModalOpen}
-            confirmLoading={testRunning}
-            okText="运行"
-            cancelText="取消"
-            onCancel={() => setTestModalOpen(false)}
-            onOk={async () => {
-              let payload: Record<string, unknown> = {}
-              try { payload = JSON.parse(testPayload) } catch {
-                message.error('Payload 不是合法 JSON'); return
-              }
-              setTestRunning(true)
-              try {
-                // 直接传当前画布内存状态，不依赖 DB draft
-                const currentGraphJson = JSON.stringify({
-                  nodes: getNodes().map(n => {
-                    const d = n.data as CanvasNodeData
-                    return { id: n.id, type: d.nodeType, name: d.name, category: d.category,
-                             x: Math.round(n.position.x), y: Math.round(n.position.y), config: d.bizConfig, bizConfig: d.bizConfig, outletSchema: d.outletSchema }
-                  })
-                })
-                const res = await canvasApi.dryRun(canvasId, testUserId, payload, currentGraphJson)
-                const execId = (res.data as any)?.executionId
-                message.success(`运行完成${execId ? `，执行ID: ${execId.slice(0,8)}…` : ''}，可在「轨迹」面板查看结果`)
-                setTestModalOpen(false)
-              } catch (e: any) {
-                message.error(e?.response?.data?.message ?? '触发失败')
-              } finally {
-                setTestRunning(false)
-              }
-            }}
-          >
-            <Space direction="vertical" style={{ width: '100%' }}>
-              <div>
-                <div style={{ marginBottom: 4, fontSize: 12, color: '#666' }}>用户 ID</div>
-                <Input value={testUserId} onChange={e => setTestUserId(e.target.value)} />
-              </div>
-              <div>
-                <div style={{ marginBottom: 4, fontSize: 12, color: '#666' }}>Payload（JSON）</div>
-                <Input.TextArea
-                  rows={4}
-                  value={testPayload}
-                  onChange={e => setTestPayload(e.target.value)}
-                  style={{ fontFamily: 'monospace' }}
-                />
-              </div>
-            </Space>
-          </Modal>
+      <CanvasWorkflowModals
+        testModalOpen={testModalOpen}
+        testRunning={testRunning}
+        testUserId={testUserId}
+        testPayload={testPayload}
+        onCancelTest={() => setTestModalOpen(false)}
+        onRunTest={handleRunTest}
+        onTestUserIdChange={setTestUserId}
+        onTestPayloadChange={setTestPayload}
+        canaryModalOpen={canaryModalOpen}
+        canaryPercent={canaryPercent}
+        onCancelCanary={() => setCanaryModalOpen(false)}
+        onStartCanary={handleStartCanary}
+        onCanaryPercentChange={setCanaryPercent}
+      />
 
       <Modal
-        title="灰度发布"
-        open={canaryModalOpen}
-        onOk={handleStartCanary}
-        onCancel={() => setCanaryModalOpen(false)}
-        okText="确认灰度发布"
-        width={460}
+        title="消息预览"
+        open={messagePreviewOpen}
+        okText="生成预览"
+        cancelText="关闭"
+        confirmLoading={messagePreviewLoading}
+        onOk={handleMessagePreview}
+        onCancel={() => setMessagePreviewOpen(false)}
+        width={640}
       >
-        <div style={{ padding: '8px 0' }}>
-          <div style={{ marginBottom: 8, fontWeight: 500 }}>
-            灰度比例：<span style={{ color: '#1890ff', fontSize: 18 }}>{canaryPercent}%</span>
-          </div>
-          <Slider
-            min={1}
-            max={99}
-            value={canaryPercent}
-            onChange={setCanaryPercent}
-            marks={{ 1: '1%', 10: '10%', 30: '30%', 50: '50%', 99: '99%' }}
-            style={{ marginBottom: 24 }}
+        <Space direction="vertical" size={12} style={{ width: '100%' }}>
+          <Input
+            value={messagePreviewUserId}
+            onChange={event => setMessagePreviewUserId(event.target.value)}
+            placeholder="userId"
           />
-          <div style={{ color: '#8c8c8c', fontSize: 12, lineHeight: '20px' }}>
-            <div>· {canaryPercent}% 的用户将收到新版本画布</div>
-            <div>· 用户分配基于 hash，同一用户始终命中同一版本</div>
-            <div>· 灰度期间可随时晋升全量或回滚</div>
-          </div>
-        </div>
+          <Input.TextArea
+            value={messagePreviewContext}
+            onChange={event => setMessagePreviewContext(event.target.value)}
+            rows={6}
+            spellCheck={false}
+          />
+          {messagePreviewResult && (
+            <>
+              <Space size={8}>
+                <Tag color="blue">{messagePreviewResult.channel}</Tag>
+                {messagePreviewResult.templateId && <Tag>{messagePreviewResult.templateId}</Tag>}
+                {messagePreviewResult.warnings.map(item => <Tag key={item} color="orange">{item}</Tag>)}
+              </Space>
+              <Input.TextArea
+                value={JSON.stringify({
+                  content: messagePreviewResult.content,
+                  variables: messagePreviewResult.variables,
+                }, null, 2)}
+                rows={10}
+                readOnly
+                spellCheck={false}
+              />
+            </>
+          )}
+        </Space>
       </Modal>
 
       {/* 三栏主体 */}
-      <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
+      <div className="canvas-editor-main" style={{ display: 'flex', flex: 1, minHeight: 0, overflow: 'hidden' }}>
 
         {/* 左侧节点面板 */}
-        <div style={{
-          width: 320, borderRight: '1px solid #f0f0f0',
-          background: '#fafafa', flexShrink: 0,
-        }}>
-          <NodePanel onDragStart={() => {}} />
+        <div {...getCanvasEditorRegionProps('nodeLibrary')}>
+          <CanvasEditorErrorBoundary
+            sectionName="节点库"
+            canvasId={canvasId}
+            graphReloadKey={graphReloadKey}
+            selectedNodeId={selectedNodeId}
+          >
+            <NodePanel onDragStart={() => {}} />
+          </CanvasEditorErrorBoundary>
         </div>
 
         {/* 画布 */}
-        <div style={{ flex: 1 }} onDrop={onDrop} onDragOver={onDragOver}>
-          <ReactFlow
-            nodes={displayNodes}
-            edges={displayEdges}
-            nodeTypes={nodeTypes}
-            edgeTypes={edgeTypes}
-            proOptions={{ hideAttribution: true }}
-            nodesDraggable={!readonly}
-            nodesConnectable={!readonly}
-            elementsSelectable={!readonly}
-            onNodesChange={onNodesChangeWrapped}
-            onEdgesChange={onEdgesChangeWrapped}
-            onConnect={onConnect}
-            isValidConnection={isValidConnection as any}
-            connectionRadius={CANVAS_CONNECTION_RADIUS}
-            onNodeClick={(_, node) => {
-              setSelectedNodeId(node.id)
-              setInsertContext(null)
-            }}
-            onPaneClick={() => {
-              setSelectedNodeId(null)
-              setInsertContext(null)
-            }}
-            onNodeDrag={(_, node) => setDraggingNodeId(node.id)}
-            onNodeDragStop={onNodeDragStop}
-            fitView
-            deleteKeyCode={['Delete', 'Backspace']}
+        <div {...getCanvasEditorRegionProps('graphCanvas')} onDrop={onDrop} onDragOver={onDragOver}>
+          <CanvasEditorErrorBoundary
+            sectionName="画布区"
+            canvasId={canvasId}
+            graphReloadKey={graphReloadKey}
+            selectedNodeId={selectedNodeId}
           >
-            <Background />
-            <Controls />
-            <MiniMap
-              zoomable
-              pannable
-              onNodeClick={(_evt, node) => {
-                fitView({ nodes: [{ id: node.id }], duration: 300, padding: 0.5 })
+            <ReactFlow
+              nodes={displayNodes}
+              edges={displayEdges}
+              nodeTypes={nodeTypes}
+              edgeTypes={edgeTypes}
+              proOptions={{ hideAttribution: true }}
+              nodesDraggable={!readonly}
+              nodesConnectable={!readonly}
+              elementsSelectable={!readonly}
+              onNodesChange={onNodesChangeWrapped}
+              onEdgesChange={onEdgesChangeWrapped}
+              onConnect={onConnect}
+              isValidConnection={isValidConnection}
+              connectionRadius={CANVAS_CONNECTION_RADIUS}
+              onNodeClick={(_, node) => {
+                setSelectedNodeId(node.id)
+                setInsertContext(null)
               }}
-            />
-          </ReactFlow>
+              onPaneClick={() => {
+                setSelectedNodeId(null)
+                setInsertContext(null)
+              }}
+              onNodeDrag={(_, node) => setDraggingNodeId(node.id)}
+              onNodeDragStop={onNodeDragStop}
+              fitView
+              deleteKeyCode={['Delete', 'Backspace']}
+            >
+              <Background />
+              <Controls />
+              <MiniMap
+                zoomable
+                pannable
+                onNodeClick={(_evt, node) => {
+                  fitView({ nodes: [{ id: node.id }], duration: 300, padding: 0.5 })
+                }}
+              />
+            </ReactFlow>
+          </CanvasEditorErrorBoundary>
         </div>
 
         {/* 右侧配置面板 */}
-        <div style={{
-          width: 280, borderLeft: '1px solid #f0f0f0',
-          background: '#fff', flexShrink: 0, overflow: 'auto',
-        }}>
-          <ConfigPanel
-            nodeId={selectedNodeId}
-            nodeData={selectedData}
-            onChange={onNodeDataChange}
-            nodes={realNodes}
-            readonly={readonly}
-          />
+        <div {...getCanvasEditorRegionProps('inspector')}>
+          <CanvasEditorErrorBoundary
+            sectionName="配置面板"
+            canvasId={canvasId}
+            graphReloadKey={graphReloadKey}
+            selectedNodeId={selectedNodeId}
+          >
+            <ConfigPanel
+              nodeId={selectedNodeId}
+              nodeData={selectedData}
+              onChange={onNodeDataChange}
+              nodes={realNodes}
+              readonly={readonly}
+            />
+          </CanvasEditorErrorBoundary>
         </div>
       </div>
 
-      {/* 版本历史 Drawer（EF-7） */}
-      <Drawer title="版本历史" placement="right" width={320}
-        open={historyOpen} onClose={() => setHistoryOpen(false)}>
-        <Spin spinning={historyLoading}>
-          {versionList.map((v, idx) => {
-            const isCurrent = idx === 0
-            return (
-              <div key={v.id} style={{
-                padding: '12px 0', borderBottom: '1px solid #f0f0f0',
-                borderLeft: isCurrent ? '3px solid #1677ff' : '3px solid #d9d9d9',
-                paddingLeft: 12, marginBottom: 4,
-                background: isCurrent ? '#f0f5ff' : 'transparent',
-              }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span style={{ fontWeight: 600, color: isCurrent ? '#1677ff' : '#262626' }}>
-                    V{v.version}{isCurrent ? '（当前草稿）' : ''}
-                  </span>
-                  <Tag color={(v.status as number) === 1 ? 'green' : (v.status as number) === 2 ? 'default' : 'blue'}>
-                    {(v.status as number) === 1 ? '已发布' : (v.status as number) === 2 ? '已下线' : '草稿'}
-                  </Tag>
-                </div>
-                <div style={{ fontSize: 12, color: '#8c8c8c', marginTop: 4 }}>
-                  {v.createdAt ? new Date(v.createdAt as string).toLocaleString('zh-CN') : ''} · {v.createdBy}
-                </div>
-                {!isCurrent && (
-                  <Button size="small" type="link" style={{ paddingLeft: 0, marginTop: 6 }}
-                    onClick={() => handleRevert(v.id)}>
-                    回退到此版本
-                  </Button>
-                )}
-              </div>
-            )
-          })}
-          {versionList.length === 0 && !historyLoading && (
-            <div style={{ textAlign: 'center', color: '#8c8c8c', marginTop: 40 }}>暂无版本记录</div>
-          )}
-        </Spin>
-        <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, padding: '12px 16px',
-                     borderTop: '1px solid #f0f0f0', background: '#fafafa', fontSize: 12, color: '#aaa' }}>
-          ⓘ 回退将覆盖当前草稿，不影响已发布的线上版本
-        </div>
-      </Drawer>
+      <CanvasVersionHistoryDrawer
+        open={historyOpen}
+        loading={historyLoading}
+        versions={versionList}
+        onClose={() => setHistoryOpen(false)}
+        onRevert={handleRevert}
+        onDiff={handleDiff}
+      />
 
-      {/* 触发方式设置 Modal（EF-8） */}
-      <Modal title="画布设置" open={settingsOpen}
-        onOk={saveSettings} onCancel={() => setSettingsOpen(false)}
-        okText="保存" cancelText="取消" width={560}>
-        <Form form={settingsForm} layout="vertical" className="canvas-settings-form">
-          <section className="canvas-settings-card">
-            <div className="canvas-settings-section-header">
-              <div>
-                <div className="canvas-settings-section-title">触发方式</div>
-                <div className="canvas-settings-section-help">决定旅程是实时进入，还是按计划批量执行。</div>
-              </div>
-              <span className="canvas-settings-summary-tag">
-                {getTriggerTypeSummary(liveSettings.triggerType)}
-              </span>
-            </div>
-            <Form.Item name="triggerType" initialValue="REALTIME" className="canvas-settings-trigger-group">
-              <Radio.Group className="canvas-settings-trigger-options">
-                {triggerTypeOptions.map(option => (
-                  <Radio key={option.value} value={option.value} className="canvas-settings-trigger-option">
-                    <span className="canvas-settings-trigger-option-title">{option.label}</span>
-                    <span className="canvas-settings-trigger-option-help">
-                      {TRIGGER_TYPE_HELP[option.value] ?? option.value}
-                    </span>
-                  </Radio>
-                ))}
-              </Radio.Group>
-            </Form.Item>
-            {liveSettings.triggerType === 'SCHEDULED' ? (
-              <div className="canvas-settings-inline-panel">
-                <div className="canvas-settings-inline-title">执行计划</div>
-                <Form.Item
-                  name="cronExpression"
-                  rules={[{ required: true, message: '请配置触发时间' }]}
-                  style={{ marginBottom: 0 }}
-                >
-                  <CronBuilder
-                    onChange={cron => settingsForm.setFieldValue('cronExpression', cron)}
-                    frequencyOptions={cronFrequencyOptions}
-                    weekdayOptions={weekdayOptions}
-                  />
-                </Form.Item>
-              </div>
-            ) : null}
-          </section>
-
-          <section className="canvas-settings-card">
-            <button
-              type="button"
-              className="canvas-settings-collapse"
-              onClick={() => setLimitsExpanded(prev => !prev)}
-              aria-expanded={limitsExpanded}
-              aria-controls={limitsSectionId}
-            >
-              <div className="canvas-settings-collapse-copy">
-                <div className="canvas-settings-section-title">执行限制</div>
-                <div className="canvas-settings-section-help">留空表示不限制，可按需控制有效期、频次和总量。</div>
-              </div>
-              <div className="canvas-settings-collapse-actions">
-                <span className="canvas-settings-summary-tag">
-                  {getExecutionLimitsSummary(liveSettings)}
-                </span>
-                {limitsExpanded ? <DownOutlined /> : <CaretRightOutlined />}
-              </div>
-            </button>
-            <div
-              id={limitsSectionId}
-              className="canvas-settings-limits-content"
-              hidden={!limitsExpanded}
-            >
-                <div className="canvas-settings-tip">
-                  限制仅影响执行窗口与配额，不会改变现有触发逻辑。
-                </div>
-                <Form.Item label="有效期" name="validRange">
-                  <RangePicker
-                    showTime
-                    format="YYYY-MM-DD HH:mm"
-                    placeholder={['开始时间', '结束时间']}
-                    style={{ width: '100%' }}
-                  />
-                </Form.Item>
-                <div className="canvas-settings-grid">
-                  <Form.Item label="总执行次数上限" name="maxTotalExecutions">
-                    <InputNumber min={1} style={{ width: '100%' }} placeholder="不限制" />
-                  </Form.Item>
-                  <Form.Item label="用户每日上限" name="perUserDailyLimit">
-                    <InputNumber min={1} style={{ width: '100%' }} placeholder="不限制" />
-                  </Form.Item>
-                  <Form.Item label="用户总上限" name="perUserTotalLimit">
-                    <InputNumber min={1} style={{ width: '100%' }} placeholder="不限制" />
-                  </Form.Item>
-                  <Form.Item label="冷却秒数" name="cooldownSeconds">
-                    <InputNumber min={0} style={{ width: '100%' }} placeholder="不限制" />
-                  </Form.Item>
-                </div>
-              </div>
-          </section>
-        </Form>
-      </Modal>
+      <CanvasEditorSettingsPanel
+        open={settingsOpen}
+        form={settingsForm}
+        onSave={saveSettings}
+        onCancel={() => setSettingsOpen(false)}
+        triggerTypeOptions={triggerTypeOptions}
+        cronFrequencyOptions={cronFrequencyOptions}
+        weekdayOptions={weekdayOptions}
+        limitsExpanded={limitsExpanded}
+        onToggleLimits={() => setLimitsExpanded(prev => !prev)}
+      />
 
     </div>
     </CanvasActionsContext.Provider>

@@ -4,6 +4,7 @@ import org.chovy.canvas.common.MapFieldKeys;
 import org.chovy.canvas.common.enums.NodeType;
 import org.chovy.canvas.engine.dag.DagGraph;
 import org.chovy.canvas.engine.dag.DagParser;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
@@ -25,6 +26,15 @@ public class CanvasRuleGraphValidator {
     private final RuleParser ruleParser;
     private final RuleValidator ruleValidator;
 
+    @Value("${canvas.validation.max-node-count:1000}")
+    private int maxNodeCount = 1000;
+
+    @Value("${canvas.validation.max-goto-jumps:100}")
+    private int maxGotoJumps = 100;
+
+    @Value("${canvas.validation.max-loop-iterations:1000}")
+    private int maxLoopIterations = 1000;
+
     public CanvasRuleGraphValidator(RuleParser ruleParser, RuleValidator ruleValidator) {
         this.ruleParser = ruleParser;
         this.ruleValidator = ruleValidator;
@@ -32,16 +42,24 @@ public class CanvasRuleGraphValidator {
 
     public void validateOrThrow(DagGraph graph) {
         List<String> errors = new ArrayList<>();
+        validateGraphLimits(graph, errors);
         for (Map.Entry<String, DagParser.CanvasNode> entry : graph.getNodeMap().entrySet()) {
             String nodeId = entry.getKey();
             DagParser.CanvasNode node = entry.getValue();
             Map<String, Object> config = mergedConfig(node);
             validateNodeRules(nodeId, node, config, errors);
+            validateRuntimeGuards(nodeId, node, config, errors);
             validateTopology(nodeId, node, graph, errors);
             validateScheduledTriggerTopology(nodeId, node, graph, errors);
         }
         if (!errors.isEmpty()) {
             throw new RuleValidationException("发布校验失败：\n" + String.join("\n", errors));
+        }
+    }
+
+    private void validateGraphLimits(DagGraph graph, List<String> errors) {
+        if (graph.getNodeMap().size() > maxNodeCount) {
+            errors.add("节点数量 " + graph.getNodeMap().size() + " 超过最大限制 " + maxNodeCount);
         }
     }
 
@@ -83,6 +101,30 @@ public class CanvasRuleGraphValidator {
         errors.add(nodeId + ": 多分支汇入副作用/普通节点必须先经过汇聚节点");
     }
 
+    private void validateRuntimeGuards(String nodeId,
+                                       DagParser.CanvasNode node,
+                                       Map<String, Object> config,
+                                       List<String> errors) {
+        String type = node.getType();
+        if ("GOTO".equalsIgnoreCase(type)) {
+            Integer maxJumps = integerValue(config.get("maxJumps"));
+            if (maxJumps == null || maxJumps <= 0) {
+                errors.add(nodeId + ": goto maxJumps 必须配置为正整数");
+            } else if (maxJumps > maxGotoJumps) {
+                errors.add(nodeId + ": goto maxJumps " + maxJumps + " 超过最大限制 " + maxGotoJumps);
+            }
+        }
+        if ("LOOP".equalsIgnoreCase(type)) {
+            Integer maxIterations = integerValue(config.get("maxIterations"));
+            if (maxIterations == null || maxIterations <= 0) {
+                errors.add(nodeId + ": loop maxIterations 必须配置为正整数");
+            } else if (maxIterations > maxLoopIterations) {
+                errors.add(nodeId + ": loop maxIterations " + maxIterations
+                        + " 超过最大限制 " + maxLoopIterations);
+            }
+        }
+    }
+
     private void validateScheduledTriggerTopology(String nodeId,
                                                   DagParser.CanvasNode node,
                                                   DagGraph graph,
@@ -121,5 +163,31 @@ public class CanvasRuleGraphValidator {
             config.putAll(node.getConfig());
         }
         return config;
+    }
+
+    private Integer integerValue(Object value) {
+        if (value instanceof Number number) {
+            return number.intValue();
+        }
+        if (value instanceof String text && !text.isBlank()) {
+            try {
+                return Integer.parseInt(text.trim());
+            } catch (NumberFormatException ignored) {
+                return null;
+            }
+        }
+        return null;
+    }
+
+    public void setMaxNodeCountForTests(int maxNodeCount) {
+        this.maxNodeCount = maxNodeCount;
+    }
+
+    public void setMaxGotoJumpsForTests(int maxGotoJumps) {
+        this.maxGotoJumps = maxGotoJumps;
+    }
+
+    public void setMaxLoopIterationsForTests(int maxLoopIterations) {
+        this.maxLoopIterations = maxLoopIterations;
     }
 }

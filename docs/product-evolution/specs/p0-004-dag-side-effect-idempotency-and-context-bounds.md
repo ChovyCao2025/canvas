@@ -5,6 +5,10 @@ Sequence: 004
 Source: `docs/optimization/production-design-gaps.md`, `docs/optimization/bmad-product-review-2026-05.md`, `docs/optimization/todo/plan-review-findings.md`
 Implementation plan: `../plans/p0-004-dag-side-effect-idempotency-and-context-bounds-plan.md`
 
+## Implementation Status
+
+Implemented and verified on 2026-06-05. Verification evidence is recorded in `../plans/p0-004-dag-side-effect-idempotency-and-context-bounds-plan.md`.
+
 ## Goal
 
 Prevent retries, resumes, loops, and oversized context from creating duplicate side effects, inconsistent node outputs, or unbounded runtime resource use.
@@ -66,7 +70,7 @@ Marketing actions such as coupons, points, messages, API calls, and MQ outputs c
 - `backend/canvas-engine/src/test/java/org/chovy/canvas/engine/scheduler/DagEngineContextCommitTest.java`
 - `backend/canvas-engine/src/test/java/org/chovy/canvas/engine/context/ExecutionContextBoundsTest.java`
 - `backend/canvas-engine/src/test/java/org/chovy/canvas/domain/canvas/CanvasValidationRuntimeGuardTest.java`
-- `backend/canvas-engine/src/test/java/org/chovy/canvas/engine/wait/WaitResumeQuotaBypassTest.java`
+- `backend/canvas-engine/src/test/java/org/chovy/canvas/engine/trigger/WaitResumeQuotaBypassTest.java`
 
 ## Dependencies
 

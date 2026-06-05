@@ -6,53 +6,57 @@
 
 ## 一、核心设计文档
 
-- [marketing-canvas-design.md](architecture/marketing-canvas-design.md) — 营销画布核心技术设计文档（251KB，最完整的系统设计说明）
-- [tech-selection-whitepaper.md](product-evolution/tech-selection-whitepaper.md) — 技术选型白皮书（134KB，中间件/框架对比与决策依据）
+- [marketing-canvas-design.md](marketing-canvas-design.md) — 营销画布核心技术设计文档（最完整的系统设计说明）
+- [tech-selection-whitepaper.md](product-evolution/archive/2026-06-03/tech-selection-whitepaper.md) — 技术选型白皮书（中间件/框架对比与决策依据）
 
 ## 二、架构文档
 
 ### 基础架构
 - [architecture/index.md](architecture/index.md) — 架构文档目录索引
-- [architecture/backend-architecture.md](architecture/backend-architecture.md) — 后端架构：单体 WebFlux + MyBatis-Plus + Disruptor
-- [architecture/frontend-architecture.md](architecture/frontend-architecture.md) — 前端架构：React 18 + Vite + React Flow 画布编辑器
-- [architecture/database-schema.md](architecture/database-schema.md) — 数据库 Schema：MySQL 8.0 + 89 个 Flyway 迁移
-- [architecture/tech-stack.md](architecture/tech-stack.md) — 技术栈全览与版本约束
-- [architecture/api-spec-summary.md](architecture/api-spec-summary.md) — API 规范摘要：29 个 Controller，173 个端点
-- [architecture/deployment-guide.md](architecture/deployment-guide.md) — 部署指南：本地开发 + Docker Compose
-- [architecture/security-considerations.md](architecture/security-considerations.md) — 安全考量：3 个 CRITICAL 级别缺口
-- [architecture/testing-strategy.md](architecture/testing-strategy.md) — 测试策略：后端 112 文件，前端 30 文件
-- [architecture/coding-standards.md](architecture/coding-standards.md) — 编码规范：Java + TypeScript 命名约定
+- [architecture/specs/README.md](architecture/specs/README.md) — 已审核并按优先级展开的架构 specs
+- [architecture/plans/README.md](architecture/plans/README.md) — 与 specs 配对的架构实施 plans
+- [architecture/todo/coverage-matrix.md](architecture/todo/coverage-matrix.md) — 历史来源到当前包的覆盖矩阵
+- [architecture/archive/reference/backend-architecture.md](architecture/archive/reference/backend-architecture.md) — 后端架构历史参考：单体 WebFlux + MyBatis-Plus + Disruptor
+- [architecture/archive/reference/frontend-architecture.md](architecture/archive/reference/frontend-architecture.md) — 前端架构历史参考：React 18 + Vite + React Flow 画布编辑器
+- [architecture/archive/reference/database-schema.md](architecture/archive/reference/database-schema.md) — 数据库 Schema 历史参考
+- [architecture/archive/reference/tech-stack.md](architecture/archive/reference/tech-stack.md) — 技术栈全览与版本约束
+- [architecture/archive/reference/api-spec-summary.md](architecture/archive/reference/api-spec-summary.md) — API 规范摘要
+- [architecture/archive/reference/deployment-guide.md](architecture/archive/reference/deployment-guide.md) — 部署指南：本地开发 + Docker Compose
+- [architecture/archive/reference/security-considerations.md](architecture/archive/reference/security-considerations.md) — 安全考量历史参考
+- [architecture/archive/reference/testing-strategy.md](architecture/archive/reference/testing-strategy.md) — 测试策略历史参考
+- [architecture/archive/reference/coding-standards.md](architecture/archive/reference/coding-standards.md) — 编码规范历史参考
 
 ### 架构审查与评估
-- [architecture/architecture-deep-review-2026-05.md](architecture/architecture-deep-review-2026-05.md) — 架构深度审查（48KB）：代码实证 + 数据实证 + 前端/基础设施补充
-- [architecture/architecture-supplement-review-2026-05.md](architecture/architecture-supplement-review-2026-05.md) — 架构评审补充：10 个未覆盖维度
-- [architecture/architecture-constraints-risks-2026-06-02.md](architecture/architecture-constraints-risks-2026-06-02.md) — 架构约束与风险评估
-- [architecture/architect-checklist-report.md](architecture/architect-checklist-report.md) — 架构师检查清单综合验证报告
-- [architecture/brownfield-architecture.md](architecture/brownfield-architecture.md) — 棕地架构增强文档：基于现有代码库的系统性蓝图
-- [architecture/production-deployment-checklist-2026-06-02.md](architecture/production-deployment-checklist-2026-06-02.md) — 生产部署检查清单
+- [architecture/archive/reviews/architecture-deep-review-2026-05.md](architecture/archive/reviews/architecture-deep-review-2026-05.md) — 架构深度审查历史材料
+- [architecture/archive/reviews/architecture-supplement-review-2026-05.md](architecture/archive/reviews/architecture-supplement-review-2026-05.md) — 架构评审补充历史材料
+- [architecture/archive/reviews/architecture-constraints-risks-2026-06-02.md](architecture/archive/reviews/architecture-constraints-risks-2026-06-02.md) — 架构约束与风险评估历史材料
+- [architecture/archive/reviews/architect-checklist-report.md](architecture/archive/reviews/architect-checklist-report.md) — 架构师检查清单综合验证历史材料
+- [architecture/archive/reviews/brownfield-architecture.md](architecture/archive/reviews/brownfield-architecture.md) — 棕地架构增强历史材料
+- [architecture/archive/reviews/production-deployment-checklist-2026-06-02.md](architecture/archive/reviews/production-deployment-checklist-2026-06-02.md) — 生产部署检查清单历史材料
 
 ### 架构演进方案
-- [architecture/evolution/target-architecture-overview.md](architecture/evolution/target-architecture-overview.md) — 目标架构总览：单体 → 模块化私域运营中台
-- [architecture/evolution/service-architecture-design.md](architecture/evolution/service-architecture-design.md) — 服务划分方案：哪些拆独立服务、服务间通信
-- [architecture/evolution/architecture-evolution-roadmap.md](architecture/evolution/architecture-evolution-roadmap.md) — 架构演进路线图：4 阶段 12 个月
-- [architecture/evolution/multi-datasource-isolation.md](architecture/evolution/multi-datasource-isolation.md) — 多数据源隔离方案：65 表 → 3 库
-- [architecture/evolution/webflux-to-mvc-migration.md](architecture/evolution/webflux-to-mvc-migration.md) — WebFlux → Spring MVC + Virtual Threads 迁移方案
-- [architecture/evolution/data-platform-architecture.md](architecture/evolution/data-platform-architecture.md) — 数据中台架构方案
-- [architecture/evolution/wecom-scrm-module-design.md](architecture/evolution/wecom-scrm-module-design.md) — 企微 SCRM 模块详细设计
-- [architecture/evolution/k8s-deployment-plan.md](architecture/evolution/k8s-deployment-plan.md) — K8s 部署方案
-- [architecture/evolution/production-practice-review.md](architecture/evolution/production-practice-review.md) — 生产实践补审：技术选型与开源组件对标
-- [architecture/evolution/architect-critical-review.md](architecture/evolution/architect-critical-review.md) — 架构师审查：8 个上线前必须解决的关键缺失
+- [architecture/specs/P3-00-architecture-boundary-review-spec.md](architecture/specs/P3-00-architecture-boundary-review-spec.md) — 架构边界评审与服务拆分准入判断
+- [architecture/specs/P3-01-platform-evolution-spec.md](architecture/specs/P3-01-platform-evolution-spec.md) — 平台演进总入口与推广门禁
+- [architecture/specs/P3-02-service-decomposition-and-domain-boundaries-spec.md](architecture/specs/P3-02-service-decomposition-and-domain-boundaries-spec.md) — 服务划分与领域边界决策包
+- [architecture/specs/P3-03-data-platform-architecture-spec.md](architecture/specs/P3-03-data-platform-architecture-spec.md) — 数据中台薄切片决策包
+- [architecture/specs/P3-04-multi-datasource-isolation-spec.md](architecture/specs/P3-04-multi-datasource-isolation-spec.md) — 多数据源隔离决策包
+- [architecture/specs/P3-05-webflux-to-mvc-migration-spec.md](architecture/specs/P3-05-webflux-to-mvc-migration-spec.md) — WebFlux/MVC 运行时决策包
+- [architecture/specs/P3-06-k8s-deployment-platform-spec.md](architecture/specs/P3-06-k8s-deployment-platform-spec.md) — K8s 部署平台决策包
+- [architecture/specs/P3-07-production-platform-components-spec.md](architecture/specs/P3-07-production-platform-components-spec.md) — 生产平台组件决策包
+- [architecture/specs/P3-08-wecom-scrm-module-spec.md](architecture/specs/P3-08-wecom-scrm-module-spec.md) — 企微 SCRM 集成边界决策包
+- [architecture/specs/P3-09-identity-event-and-tenant-platform-spec.md](architecture/specs/P3-09-identity-event-and-tenant-platform-spec.md) — 身份、事件与租户平台原语决策包
+- [architecture/archive/evolution/](architecture/archive/evolution/) — 已处理的架构演进历史材料
 
 ### 架构整改方案
-- [architecture/architecture-remediation-plan-2026-05.md](architecture/architecture-remediation-plan-2026-05.md) — 架构问题整改总索引（已拆分为 7 个分册）
-- [architecture/remediation/README.md](architecture/remediation/README.md) — 整改方案总览：35 类问题、430+ 项缺陷
-- [architecture/remediation/part1-structure.md](architecture/remediation/part1-structure.md) — 整改一：单体巨石无服务边界
-- [architecture/remediation/part2-security-concurrency.md](architecture/remediation/part2-security-concurrency.md) — 整改二：安全与并发（31 项）
-- [architecture/remediation/part3-frontend.md](architecture/remediation/part3-frontend.md) — 整改三：前端架构（23 项）
-- [architecture/remediation/part4-ops.md](architecture/remediation/part4-ops.md) — 整改四：运维与基础设施（19 项）
-- [architecture/remediation/part5-engine-deep.md](architecture/remediation/part5-engine-deep.md) — 整改五：深度结构设计（4 大维度）
-- [architecture/remediation/part6-logic-testing.md](architecture/remediation/part6-logic-testing.md) — 整改六：业务逻辑正确性 + 测试
-- [architecture/remediation/part7-resilience.md](architecture/remediation/part7-resilience.md) — 整改七：韧性/容错/可观测性
+- [architecture/archive/remediation/architecture-remediation-plan-2026-05.md](architecture/archive/remediation/architecture-remediation-plan-2026-05.md) — 架构问题整改总索引历史材料
+- [architecture/archive/remediation/README.md](architecture/archive/remediation/README.md) — 整改方案总览历史材料
+- [architecture/archive/remediation/part1-structure.md](architecture/archive/remediation/part1-structure.md) — 整改一历史材料：单体巨石无服务边界
+- [architecture/archive/remediation/part2-security-concurrency.md](architecture/archive/remediation/part2-security-concurrency.md) — 整改二历史材料：安全与并发
+- [architecture/archive/remediation/part3-frontend.md](architecture/archive/remediation/part3-frontend.md) — 整改三历史材料：前端架构
+- [architecture/archive/remediation/part4-ops.md](architecture/archive/remediation/part4-ops.md) — 整改四历史材料：运维与基础设施
+- [architecture/archive/remediation/part5-engine-deep.md](architecture/archive/remediation/part5-engine-deep.md) — 整改五历史材料：深度结构设计
+- [architecture/archive/remediation/part6-logic-testing.md](architecture/archive/remediation/part6-logic-testing.md) — 整改六历史材料：业务逻辑正确性 + 测试
+- [architecture/archive/remediation/part7-resilience.md](architecture/archive/remediation/part7-resilience.md) — 整改七历史材料：韧性/容错/可观测性
 
 ## 三、产品演进
 
@@ -110,11 +114,11 @@
 - [code-review/infrastructure-security-scan-2026-06-02.md](code-review/infrastructure-security-scan-2026-06-02.md) — 基础设施与部署安全分析
 - [code-review/main-branch-review.md](code-review/main-branch-review.md) — main 分支代码审查（2026-06-02）
 - [code-review/brownfield-service-workflow.md](code-review/brownfield-service-workflow.md) — 棕地服务增强工作流执行报告
-- [optimization/bmad-product-review-2026-05.md](optimization/bmad-product-review-2026-05.md) — BMAD 产品设计合理性审查：PM Checklist + 竞品 + UI/UX
+- [optimization/bmad-product-review-2026-05.md](optimization/archive/bmad-product-review-2026-05.md) — BMAD 产品设计合理性审查：PM Checklist + 竞品 + UI/UX
 
 ## 五、优化清单
 
-- [optimization/optimization_list_v7.md](optimization/optimization_list_v7.md) — 当前活跃优化清单（疲劳度控制等）
+- [optimization/optimization_list_v7.md](optimization/archive/optimization_list_v7.md) — 当前活跃优化清单（疲劳度控制等）
 - [optimization/archive/optimization_list_v1.md](optimization/archive/optimization_list_v1.md) — 优化清单 v1（画布撤销/事件配置）
 - [optimization/archive/optimization_list_v2.md](optimization/archive/optimization_list_v2.md) — 优化清单 v2（事件配置概念）
 - [optimization/archive/optimization_list_v3.md](optimization/archive/optimization_list_v3.md) — 优化清单 v3（标签配置化）
@@ -184,19 +188,19 @@
 
 | 你想了解... | 先看这些文件 |
 |------------|-------------|
-| 系统整体设计 | `architecture/marketing-canvas-design.md` |
-| 技术选型理由 | `product-evolution/tech-selection-whitepaper.md` |
-| 当前架构问题 | `architecture/architecture-deep-review-2026-05.md` |
-| 架构如何演进 | `architecture/evolution/target-architecture-overview.md` |
+| 系统整体设计 | `marketing-canvas-design.md` |
+| 技术选型理由 | `product-evolution/archive/2026-06-03/tech-selection-whitepaper.md` |
+| 当前架构问题 | `architecture/specs/README.md` + `architecture/todo/coverage-matrix.md` |
+| 架构如何演进 | `architecture/specs/P3-01-platform-evolution-spec.md` + `architecture/platform-evolution-promotion-checklist.md` |
 | 代码质量问题 | `code-review/deep-code-audit-all-rounds-summary.md` |
 | 安全漏洞 | `code-review/deep-code-audit-round9.md` + `round10.md` |
 | 产品战略方向 | `product-evolution/product-strategy-dual-track-2026-05-31.md` |
 | 产品功能缺什么 | `optimization/todo/marketing_platform_gap_analysis.md` |
 | 竞品对比 | `optimization/todo/competitor-analysis-report.md` |
 | 并发/性能 | `optimization/archive/2000并发目标专项-plan.md` |
-| 部署上线 | `architecture/production-deployment-checklist-2026-06-02.md` |
+| 部署上线 | `architecture/specs/P1-05-release-deployment-governance-spec.md` + `architecture/specs/P3-06-k8s-deployment-platform-spec.md` |
 | 生产环境差距 | `product-evolution/production-design-gaps.md` |
-| 实施方案 | `optimization/todo/plans/` 目录 |
-| 前端架构 | `architecture/frontend-architecture.md` |
-| 后端架构 | `architecture/backend-architecture.md` |
-| 数据库设计 | `architecture/database-schema.md` |
+| 实施方案 | `architecture/plans/README.md` + `optimization/todo/plans/` 目录 |
+| 前端架构 | `architecture/specs/P1-03-frontend-canvas-state-spec.md` + `architecture/archive/reference/frontend-architecture.md` |
+| 后端架构 | `architecture/specs/P1-01-dag-engine-and-handler-boundaries-spec.md` + `architecture/archive/reference/backend-architecture.md` |
+| 数据库设计 | `architecture/specs/P0-06-data-security-and-tenant-isolation-spec.md` + `architecture/archive/reference/database-schema.md` |

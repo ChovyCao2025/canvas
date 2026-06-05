@@ -3,6 +3,8 @@ spring:
     name: canvas-engine
   main:
     web-application-type: reactive
+  lifecycle:
+    timeout-per-shutdown-phase: 30s
   datasource:
     url: jdbc:mysql://localhost:3306/canvas_db?useUnicode=true&characterEncoding=utf8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true
     username: root
@@ -44,15 +46,25 @@ mybatis-plus:
 
 server:
   port: 8080
+  shutdown: graceful
 
 canvas:
   examples:
     enabled: ${CANVAS_EXAMPLES_ENABLED:true}
+  ai:
+    prediction:
+      enabled: ${CANVAS_AI_PREDICTION_ENABLED:false}
+      batch-size: ${CANVAS_AI_PREDICTION_BATCH_SIZE:500}
+      default-best-send-hour: ${CANVAS_AI_PREDICTION_DEFAULT_BEST_SEND_HOUR:20}
+      sparse-history-min-events: ${CANVAS_AI_PREDICTION_SPARSE_HISTORY_MIN_EVENTS:3}
+      model-version: ${CANVAS_AI_PREDICTION_MODEL_VERSION:baseline_v1}
   jwt:
     secret: ${CANVAS_JWT_SECRET:}
     expiry-hours: 24
   events:
     report-secret: ${CANVAS_EVENT_REPORT_SECRET:canvas-event-report-secret-2026!!}
+  internal-api:
+    token: ${CANVAS_INTERNAL_API_TOKEN:}
   public-trigger:
     secret: ${CANVAS_PUBLIC_TRIGGER_SECRET:${CANVAS_EVENT_REPORT_SECRET:canvas-event-report-secret-2026!!}}
   secret-cipher:
@@ -64,8 +76,22 @@ canvas:
     allow-credentials: true
   redis:
     key-prefix: canvas  # key 命名空间前缀（设计文档 25.3.1节），多环境共用 Redis 时修改
+  doris:
+    enabled: ${CANVAS_DORIS_ENABLED:false}
+    jdbc-url: ${CANVAS_DORIS_JDBC_URL:jdbc:mysql://localhost:9030/canvas_dws?useUnicode=true&characterEncoding=utf8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true}
+    username: ${CANVAS_DORIS_USERNAME:root}
+    password: ${CANVAS_DORIS_PASSWORD:}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    stream-load-url: ${CANVAS_DORIS_STREAM_LOAD_URL:http://localhost:8040/api/canvas_ods/canvas_execution_trace/_stream_load}
+    stream-load-timeout-ms: ${CANVAS_DORIS_STREAM_LOAD_TIMEOUT_MS:3000}
+    pool:
+      size: ${CANVAS_DORIS_POOL_SIZE:10}
   version:
     max-keep-count: 10  # 每个画布保留最近 N 个已发布版本（设计文档 17.2节）
+  validation:
+    max-node-count: ${CANVAS_VALIDATION_MAX_NODE_COUNT:1000}
+    max-goto-jumps: ${CANVAS_VALIDATION_MAX_GOTO_JUMPS:100}
+    max-loop-iterations: ${CANVAS_VALIDATION_MAX_LOOP_ITERATIONS:1000}
   # Disruptor 无锁分发层（12.8节）
   disruptor:
     ring-buffer-size: 65536   # 必须是 2 的幂，2^16 ≈ 16MB
@@ -73,6 +99,7 @@ canvas:
   # 执行引擎
   execution:
     global-timeout-sec: 600
+    shutdown-drain-timeout-ms: 10000
     context-ttl-sec: 86400
     max-concurrency: 3000
     max-retry: 3
@@ -99,6 +126,9 @@ canvas:
     retry:
       max-concurrency: 300
       queue-limit: 3000
+  background-tasks:
+    max-in-flight: 1000
+    shutdown-timeout-ms: 5000
   execution-request:
     dispatch-batch-size: 200
     dispatch-fixed-delay-ms: 1000
@@ -120,6 +150,20 @@ canvas:
     websocket:
       max-sessions-per-user: ${CANVAS_NOTIFICATION_WS_MAX_SESSIONS_PER_USER:5}
       max-total-sessions: ${CANVAS_NOTIFICATION_WS_MAX_TOTAL_SESSIONS:1000}
+  delivery:
+    outbox:
+      topic: ${CANVAS_DELIVERY_OUTBOX_TOPIC:CANVAS_DELIVERY}
+      mq-publish-enabled: ${CANVAS_DELIVERY_OUTBOX_MQ_PUBLISH_ENABLED:false}
+      max-attempts: ${CANVAS_DELIVERY_OUTBOX_MAX_ATTEMPTS:3}
+      retry-base-delay-ms: ${CANVAS_DELIVERY_OUTBOX_RETRY_BASE_DELAY_MS:1000}
+      retry-max-delay-ms: ${CANVAS_DELIVERY_OUTBOX_RETRY_MAX_DELAY_MS:60000}
+      stale-seconds: ${CANVAS_DELIVERY_OUTBOX_STALE_SECONDS:300}
+      reconciliation:
+        enabled: ${CANVAS_DELIVERY_OUTBOX_RECONCILIATION_ENABLED:false}
+        limit: ${CANVAS_DELIVERY_OUTBOX_RECONCILIATION_LIMIT:100}
+        fixed-delay-ms: ${CANVAS_DELIVERY_OUTBOX_RECONCILIATION_FIXED_DELAY_MS:60000}
+    receipt:
+      secret: ${CANVAS_DELIVERY_RECEIPT_SECRET:}
   scheduler:
     jitter-max-ms: 300000
     trigger-concurrency: 100

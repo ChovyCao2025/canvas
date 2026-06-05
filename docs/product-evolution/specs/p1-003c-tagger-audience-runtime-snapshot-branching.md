@@ -5,6 +5,10 @@ Sequence: 003C
 Source: `todo/p1/mautic-inspired-quick-adoptions.md`
 Implementation plan: `../plans/p1-003c-tagger-audience-runtime-snapshot-branching-plan.md`
 
+## Implementation Status
+
+Implemented and focused-verified on 2026-06-05. Verification evidence is recorded in `../plans/p1-003c-tagger-audience-runtime-snapshot-branching-plan.md`.
+
 ## Goal
 
 Make `TAGGER(mode=audience)` runtime execution honor locked snapshot membership when `audienceSnapshotId` is present and current audience membership otherwise.

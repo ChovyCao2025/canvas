@@ -93,4 +93,19 @@ public class CouponHandler implements NodeHandler {
         // 供统计侧识别“权益发放”节点
         return true;
     }
+
+    @Override
+    public boolean requiresSideEffectIdempotency(Map<String, Object> config, ExecutionContext ctx) {
+        return true;
+    }
+
+    @Override
+    public String sideEffectOperationKey(Map<String, Object> config, ExecutionContext ctx) {
+        Object explicit = config.get(MapFieldKeys.IDEMPOTENCY_KEY);
+        if (explicit != null && !explicit.toString().isBlank()) {
+            return explicit.toString();
+        }
+        String couponTypeKey = String.valueOf(config.getOrDefault(MapFieldKeys.COUPON_TYPE_KEY, ""));
+        return ctx.getUserId() + ":coupon:" + couponTypeKey;
+    }
 }

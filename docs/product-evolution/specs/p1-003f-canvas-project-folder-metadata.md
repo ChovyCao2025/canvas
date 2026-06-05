@@ -5,6 +5,10 @@ Sequence: 003F
 Source: `todo/p1/mautic-inspired-quick-adoptions.md`
 Implementation plan: `../plans/p1-003f-canvas-project-folder-metadata-plan.md`
 
+## Implementation Status
+
+Implemented and focused-verified on 2026-06-05. Actual migration: `backend/canvas-engine/src/main/resources/db/migration/V259__canvas_project_folder_metadata.sql`, because earlier migration versions are already occupied in the current sequence. Verification evidence is recorded in `../plans/p1-003f-canvas-project-folder-metadata-plan.md`.
+
 ## Goal
 
 Add flat project/folder metadata and list filters so operators can scan a growing canvas list without a full campaign hierarchy.
@@ -38,7 +42,7 @@ Add flat project/folder metadata and list filters so operators can scan a growin
 
 ## Technical Scope
 
-- `backend/canvas-engine/src/main/resources/db/migration/V96_1__canvas_project_folder_metadata.sql`
+- `backend/canvas-engine/src/main/resources/db/migration/V259__canvas_project_folder_metadata.sql`
 - `backend/canvas-engine/src/main/java/org/chovy/canvas/dal/dataobject/CanvasDO.java`
 - `backend/canvas-engine/src/main/java/org/chovy/canvas/dto/CanvasCreateReq.java`
 - `backend/canvas-engine/src/main/java/org/chovy/canvas/dto/CanvasUpdateReq.java`

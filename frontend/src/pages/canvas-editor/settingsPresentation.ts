@@ -33,6 +33,30 @@ export interface CanvasSettingsLike {
 
   /** 单用户冷却秒数。 */
   cooldownSeconds?: number
+
+  /** 控制组比例，0-50。 */
+  controlGroupPercent?: number
+
+  /** 控制组分桶盐值。 */
+  controlGroupSalt?: string
+
+  /** 转化事件编码。 */
+  conversionEventCode?: string
+
+  /** 归因窗口天数。 */
+  attributionWindowDays?: number
+
+  /** 平铺项目分组 key。 */
+  projectKey?: string
+
+  /** 平铺项目展示名。 */
+  projectName?: string
+
+  /** 平铺文件夹分组 key。 */
+  folderKey?: string
+
+  /** 平铺文件夹展示名。 */
+  folderName?: string
 }
 
 /** 触发类型转可读摘要文案。 */
@@ -72,6 +96,14 @@ export function countExecutionLimitFields(settings: CanvasSettingsLike): number 
   }
 
   if (settings.cooldownSeconds != null) {
+    count += 1
+  }
+
+  if (settings.controlGroupPercent != null && settings.controlGroupPercent > 0) {
+    count += 1
+  }
+
+  if (settings.conversionEventCode) {
     count += 1
   }
 

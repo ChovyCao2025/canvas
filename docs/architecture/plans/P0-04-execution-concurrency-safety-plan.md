@@ -1,12 +1,14 @@
-# Execution Concurrency Safety Implementation Plan
+# Execution Concurrency Safety Verification Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Execute the architecture remediation package described in `../specs/P0-04-execution-concurrency-safety-spec.md`.
+**Goal:** Close the execution concurrency package by preserving the implemented fixes, rerunning focused race tests, and recording full-suite verification evidence for circuit breaker state, execution context snapshots, scheduler lifecycle, and managed virtual-thread work.
 
-**Architecture:** Start from the archived evidence and current repository verification, add failing tests around the confirmed behavior, then implement the smallest scoped changes that satisfy the package acceptance criteria. Keep unrelated refactors out of the package unless a test proves the boundary must change.
+**Architecture:** The implementation is present in `main` per `../specs/P0-04-execution-concurrency-safety-spec.md`. Verification covers atomic circuit-breaker snapshots, serialized execution-context output ownership, scheduler close/register/add races, and bounded managed virtual-thread execution.
 
-**Tech Stack:** Java 21, Spring Boot 3.2, WebFlux, MyBatis-Plus, Reactor, Redis, RocketMQ, React 18, TypeScript, Vite, Vitest, JUnit 5.
+**Tech Stack:** Java 21, Spring Boot WebFlux, JUnit 5, AssertJ, virtual threads, `AtomicReference`, `AtomicBoolean`, Maven.
+
+**Implementation Status:** Implemented and verified in `main` on 2026-06-04. Focused concurrency verification and full `canvas-engine` tests both pass.
 
 ---
 
@@ -15,202 +17,98 @@
 - Spec: `../specs/P0-04-execution-concurrency-safety-spec.md`
 - Source package: `../todo/p0/execution-concurrency-safety/`
 - Coverage matrix: `../todo/coverage-matrix.md`
+- Evidence: `../evidence/P0-04-execution-concurrency-safety.md`
 
 ## File Structure
 
-- Read: `../specs/P0-04-execution-concurrency-safety-spec.md`
-- Read: `../todo/coverage-matrix.md`
-- Read: `../todo/p0/execution-concurrency-safety/plan.md`
-- Modify: repository files named in the spec evidence for this package
-- Test: focused tests created beside the affected backend or frontend code before implementation
+- Circuit breaker: `backend/canvas-engine/src/main/java/org/chovy/canvas/engine/scheduler/CircuitBreakerRegistry.java`
+- Execution context: `backend/canvas-engine/src/main/java/org/chovy/canvas/engine/context/ExecutionContext.java`
+- Scheduler lifecycle: `backend/canvas-engine/src/main/java/org/chovy/canvas/engine/trigger/CanvasSchedulerService.java`
+- Managed executor: `backend/canvas-engine/src/main/java/org/chovy/canvas/infrastructure/concurrent/ManagedVirtualThreadExecutor.java`
+- Managed executor users: `backend/canvas-engine/src/main/java/org/chovy/canvas/domain/canvas/CanvasService.java`
+- Managed executor users: `backend/canvas-engine/src/main/java/org/chovy/canvas/engine/trigger/TriggerPreCheckService.java`
+- Managed executor users: `backend/canvas-engine/src/main/java/org/chovy/canvas/engine/trigger/CanvasExecutionService.java`
+- Managed executor users: `backend/canvas-engine/src/main/java/org/chovy/canvas/engine/audience/AudienceComputeTaskRunner.java`
+- Managed executor users: `backend/canvas-engine/src/main/java/org/chovy/canvas/web/AudienceController.java`
+- Managed executor users: `backend/canvas-engine/src/main/java/org/chovy/canvas/engine/handlers/GroovyHandler.java`
+- Evidence: `docs/architecture/evidence/P0-04-execution-concurrency-safety.md`
 
-### Task 1: Add failing concurrency tests first
-
-**Files:**
-- Read: `../specs/P0-04-execution-concurrency-safety-spec.md`
-- Read: `../todo/coverage-matrix.md`
-- Modify: repository files named in this package spec evidence
-- Test: focused tests created beside the affected code
-
-Existing package notes:
-   - Circuit breaker CLOSED/OPEN/HALF_OPEN races.
-   - Scheduler close/register/add races.
-   - ExecutionContext parallel branch output collisions.
-
-- [ ] **Step 1: Lock the failing behavior**
-
-Read `../specs/P0-04-execution-concurrency-safety-spec.md` and write the smallest failing test or documentation check that demonstrates this task gap before changing implementation files.
-
-- [ ] **Step 2: Run the focused check before implementation**
-
-Run the narrowest backend, frontend, or documentation command that exercises the new check. Expected result before implementation: the new check fails or the documentation diff shows the missing section.
-
-- [ ] **Step 3: Implement the scoped change**
-
-Change only the files required by this task and keep the behavior aligned with the acceptance criteria in `../specs/P0-04-execution-concurrency-safety-spec.md`.
-
-- [ ] **Step 4: Verify the task**
-
-Run the same focused command again. Expected result after implementation: pass, or documentation check exits 0.
-
-- [ ] **Step 5: Review the scoped diff**
-
-Run `git diff -- .` and verify the diff only touches files justified by this task and the package spec.
-
-### Task 2: Refactor circuit breaker state
+## Task 1: Verify Circuit Breaker Atomic Transitions
 
 **Files:**
-- Read: `../specs/P0-04-execution-concurrency-safety-spec.md`
-- Read: `../todo/coverage-matrix.md`
-- Modify: repository files named in this package spec evidence
-- Test: focused tests created beside the affected code
+- Production: `backend/canvas-engine/src/main/java/org/chovy/canvas/engine/scheduler/CircuitBreakerRegistry.java`
+- Test: `backend/canvas-engine/src/test/java/org/chovy/canvas/engine/scheduler/CircuitBreakerRegistryTest.java`
+- Docs: `docs/architecture/evidence/P0-04-execution-concurrency-safety.md`
 
-Existing package notes:
-   - Use an immutable state record inside `AtomicReference`.
-   - Apply CAS loops for all transitions.
+- [x] Re-run the closed/open/half-open concurrent success and failure tests.
+- [x] Record the test command, Java version, and pass/fail result in the evidence file.
+- [x] Confirm state, failure count, half-open attempts, and opened timestamp move as one immutable snapshot.
 
-- [ ] **Step 1: Lock the failing behavior**
+Result: included in the focused P0-04 command. `CircuitBreakerRegistryTest` passed 5 tests.
 
-Read `../specs/P0-04-execution-concurrency-safety-spec.md` and write the smallest failing test or documentation check that demonstrates this task gap before changing implementation files.
-
-- [ ] **Step 2: Run the focused check before implementation**
-
-Run the narrowest backend, frontend, or documentation command that exercises the new check. Expected result before implementation: the new check fails or the documentation diff shows the missing section.
-
-- [ ] **Step 3: Implement the scoped change**
-
-Change only the files required by this task and keep the behavior aligned with the acceptance criteria in `../specs/P0-04-execution-concurrency-safety-spec.md`.
-
-- [ ] **Step 4: Verify the task**
-
-Run the same focused command again. Expected result after implementation: pass, or documentation check exits 0.
-
-- [ ] **Step 5: Review the scoped diff**
-
-Run `git diff -- .` and verify the diff only touches files justified by this task and the package spec.
-
-### Task 3: Clarify ExecutionContext ownership
+## Task 2: Verify Execution Context Output Ownership
 
 **Files:**
-- Read: `../specs/P0-04-execution-concurrency-safety-spec.md`
-- Read: `../todo/coverage-matrix.md`
-- Modify: repository files named in this package spec evidence
-- Test: focused tests created beside the affected code
+- Production: `backend/canvas-engine/src/main/java/org/chovy/canvas/engine/context/ExecutionContext.java`
+- Test: `backend/canvas-engine/src/test/java/org/chovy/canvas/engine/context/ExecutionContextConcurrencyTest.java`
+- Docs: `docs/architecture/evidence/P0-04-execution-concurrency-safety.md`
 
-Existing package notes:
-   - Either serialize writes through the scheduler or introduce atomic per-node output snapshots and collision-safe flattening.
+- [x] Re-run parallel branch output collision tests.
+- [x] Confirm grouped output, flat output, size counters, and stale flat-key cleanup are serialized together.
+- [x] Record whether node-qualified flat keys remain stable under concurrent writers.
 
-- [ ] **Step 1: Lock the failing behavior**
+Result: included in the focused P0-04 command. `ExecutionContextConcurrencyTest` passed 25 tests.
 
-Read `../specs/P0-04-execution-concurrency-safety-spec.md` and write the smallest failing test or documentation check that demonstrates this task gap before changing implementation files.
-
-- [ ] **Step 2: Run the focused check before implementation**
-
-Run the narrowest backend, frontend, or documentation command that exercises the new check. Expected result before implementation: the new check fails or the documentation diff shows the missing section.
-
-- [ ] **Step 3: Implement the scoped change**
-
-Change only the files required by this task and keep the behavior aligned with the acceptance criteria in `../specs/P0-04-execution-concurrency-safety-spec.md`.
-
-- [ ] **Step 4: Verify the task**
-
-Run the same focused command again. Expected result after implementation: pass, or documentation check exits 0.
-
-- [ ] **Step 5: Review the scoped diff**
-
-Run `git diff -- .` and verify the diff only touches files justified by this task and the package spec.
-
-### Task 4: Harden scheduler lifecycle
+## Task 3: Verify Scheduler Lifecycle Races
 
 **Files:**
-- Read: `../specs/P0-04-execution-concurrency-safety-spec.md`
-- Read: `../todo/coverage-matrix.md`
-- Modify: repository files named in this package spec evidence
-- Test: focused tests created beside the affected code
+- Production: `backend/canvas-engine/src/main/java/org/chovy/canvas/engine/trigger/CanvasSchedulerService.java`
+- Test: `backend/canvas-engine/src/test/java/org/chovy/canvas/engine/trigger/CanvasSchedulerServiceTest.java`
+- Docs: `docs/architecture/evidence/P0-04-execution-concurrency-safety.md`
 
-Existing package notes:
-   - Make lifecycle state atomic/volatile as appropriate.
-   - Ensure close prevents all new registrations and disposes pending tasks deterministically.
+- [x] Re-run close/register/add race coverage.
+- [x] Confirm `close()` rejects new pending jitter groups while terminating existing groups deterministically.
+- [x] Record the behavior for register-after-close and add-after-close attempts.
 
-- [ ] **Step 1: Lock the failing behavior**
+Result: included in the focused P0-04 command. `CanvasSchedulerServiceTest` passed 6 tests.
 
-Read `../specs/P0-04-execution-concurrency-safety-spec.md` and write the smallest failing test or documentation check that demonstrates this task gap before changing implementation files.
-
-- [ ] **Step 2: Run the focused check before implementation**
-
-Run the narrowest backend, frontend, or documentation command that exercises the new check. Expected result before implementation: the new check fails or the documentation diff shows the missing section.
-
-- [ ] **Step 3: Implement the scoped change**
-
-Change only the files required by this task and keep the behavior aligned with the acceptance criteria in `../specs/P0-04-execution-concurrency-safety-spec.md`.
-
-- [ ] **Step 4: Verify the task**
-
-Run the same focused command again. Expected result after implementation: pass, or documentation check exits 0.
-
-- [ ] **Step 5: Review the scoped diff**
-
-Run `git diff -- .` and verify the diff only touches files justified by this task and the package spec.
-
-### Task 5: Replace raw virtual-thread starts with a managed executor
+## Task 4: Verify Managed Virtual-Thread Execution
 
 **Files:**
-- Read: `../specs/P0-04-execution-concurrency-safety-spec.md`
-- Read: `../todo/coverage-matrix.md`
-- Modify: repository files named in this package spec evidence
-- Test: focused tests created beside the affected code
+- Production: `backend/canvas-engine/src/main/java/org/chovy/canvas/infrastructure/concurrent/ManagedVirtualThreadExecutor.java`
+- Production users: `CanvasService`, `TriggerPreCheckService`, `CanvasExecutionService`, `AudienceComputeTaskRunner`, `AudienceController`, `GroovyHandler`
+- Tests: `ManagedVirtualThreadExecutorTest`, `AudienceComputeTaskRunnerTest`, `AudienceControllerTest`, `AudienceControllerTaskTest`
+- Docs: `docs/architecture/evidence/P0-04-execution-concurrency-safety.md`
 
-Existing package notes:
-   - Add shutdown and task tracking.
+- [x] Re-run managed executor tests for bounded in-flight work, shutdown rejection, and drain behavior.
+- [x] Re-run audience and Groovy-adjacent tests that exercise executor users.
+- [x] Search for raw `Thread.ofVirtual().start` usage and record the result.
 
-- [ ] **Step 1: Lock the failing behavior**
+Result: focused managed-executor and caller tests passed. Raw virtual-thread start scan returned no matches in `backend/canvas-engine/src/main/java`.
 
-Read `../specs/P0-04-execution-concurrency-safety-spec.md` and write the smallest failing test or documentation check that demonstrates this task gap before changing implementation files.
-
-- [ ] **Step 2: Run the focused check before implementation**
-
-Run the narrowest backend, frontend, or documentation command that exercises the new check. Expected result before implementation: the new check fails or the documentation diff shows the missing section.
-
-- [ ] **Step 3: Implement the scoped change**
-
-Change only the files required by this task and keep the behavior aligned with the acceptance criteria in `../specs/P0-04-execution-concurrency-safety-spec.md`.
-
-- [ ] **Step 4: Verify the task**
-
-Run the same focused command again. Expected result after implementation: pass, or documentation check exits 0.
-
-- [ ] **Step 5: Review the scoped diff**
-
-Run `git diff -- .` and verify the diff only touches files justified by this task and the package spec.
-
-### Task 6: Run unit tests plus stress-style repeated race tests
+## Task 5: Validate The Concurrency Package
 
 **Files:**
-- Read: `../specs/P0-04-execution-concurrency-safety-spec.md`
-- Read: `../todo/coverage-matrix.md`
-- Modify: repository files named in this package spec evidence
-- Test: focused tests created beside the affected code
+- Docs: `docs/architecture/evidence/P0-04-execution-concurrency-safety.md`
+- Plan: `docs/architecture/plans/P0-04-execution-concurrency-safety-plan.md`
+- Spec: `docs/architecture/specs/P0-04-execution-concurrency-safety-spec.md`
 
-Existing package notes:
-- Source task has no additional notes beyond its title.
+- [x] Run the full focused concurrency command from the spec.
+- [x] Run the backend module test suite after the focused command passes.
+- [x] Update the spec and evidence with exact verification results.
 
-- [ ] **Step 1: Lock the failing behavior**
+Focused command:
 
-Read `../specs/P0-04-execution-concurrency-safety-spec.md` and write the smallest failing test or documentation check that demonstrates this task gap before changing implementation files.
+```bash
+cd backend && JAVA_HOME=/Users/photonpay/Library/Java/JavaVirtualMachines/ms-21.0.11/Contents/Home PATH=/Users/photonpay/Library/Java/JavaVirtualMachines/ms-21.0.11/Contents/Home/bin:$PATH mvn -pl canvas-engine -Dtest=ManagedVirtualThreadExecutorTest,CircuitBreakerRegistryTest,ExecutionContextConcurrencyTest,CanvasSchedulerServiceTest,AudienceComputeTaskRunnerTest,CdpTagOperationServiceRetryTest,AudienceControllerTest,AudienceControllerTaskTest test
+```
 
-- [ ] **Step 2: Run the focused check before implementation**
+Focused result: PASS, 59 tests, 0 failures, 0 errors, 0 skipped.
 
-Run the narrowest backend, frontend, or documentation command that exercises the new check. Expected result before implementation: the new check fails or the documentation diff shows the missing section.
+Full backend command:
 
-- [ ] **Step 3: Implement the scoped change**
+```bash
+cd backend && JAVA_HOME=/Users/photonpay/Library/Java/JavaVirtualMachines/ms-21.0.11/Contents/Home PATH=/Users/photonpay/Library/Java/JavaVirtualMachines/ms-21.0.11/Contents/Home/bin:$PATH mvn -pl canvas-engine test
+```
 
-Change only the files required by this task and keep the behavior aligned with the acceptance criteria in `../specs/P0-04-execution-concurrency-safety-spec.md`.
-
-- [ ] **Step 4: Verify the task**
-
-Run the same focused command again. Expected result after implementation: pass, or documentation check exits 0.
-
-- [ ] **Step 5: Review the scoped diff**
-
-Run `git diff -- .` and verify the diff only touches files justified by this task and the package spec.
-
+Full result: PASS, 491 tests, 0 failures, 0 errors, 0 skipped.

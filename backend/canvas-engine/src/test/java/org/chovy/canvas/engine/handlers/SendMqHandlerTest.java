@@ -1,12 +1,10 @@
 package org.chovy.canvas.engine.handlers;
 
-import org.apache.rocketmq.spring.core.RocketMQTemplate;
-import org.apache.rocketmq.client.producer.SendResult;
-import org.apache.rocketmq.client.producer.SendStatus;
 import org.chovy.canvas.dal.dataobject.MqMessageDefinitionDO;
-import org.chovy.canvas.dal.mapper.MqMessageDefinitionMapper;
+import org.chovy.canvas.domain.meta.MqMessageDefinitionService;
 import org.chovy.canvas.engine.context.ExecutionContext;
 import org.chovy.canvas.engine.handler.NodeResult;
+import org.chovy.canvas.infrastructure.mq.CanvasMessageBus;
 import org.chovy.canvas.infrastructure.mq.MqTriggerMessage;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -22,6 +20,7 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -33,16 +32,16 @@ import static org.mockito.Mockito.when;
  */
 class SendMqHandlerTest {
 
-    private RocketMQTemplate rocketMQTemplate;
-    private MqMessageDefinitionMapper mqMapper;
+    private CanvasMessageBus messageBus;
+    private MqMessageDefinitionService mqMessageDefinitionService;
     private SendMqHandler handler;
     private ExecutionContext context;
 
     @BeforeEach
     void setUp() {
-        rocketMQTemplate = mock(RocketMQTemplate.class);
-        mqMapper = mock(MqMessageDefinitionMapper.class);
-        handler = new SendMqHandler(rocketMQTemplate, mqMapper);
+        messageBus = mock(CanvasMessageBus.class);
+        mqMessageDefinitionService = mock(MqMessageDefinitionService.class);
+        handler = new SendMqHandler(messageBus, mqMessageDefinitionService);
         ReflectionTestUtils.setField(handler, "mqTopic", "CANVAS_MQ_TRIGGER");
 
         context = new ExecutionContext();
@@ -56,19 +55,19 @@ class SendMqHandlerTest {
 
         assertThat(result.success()).isFalse();
         assertThat(result.errorMessage()).isEqualTo("SEND_MQ: messageCodeKey 未配置");
-        verify(mqMapper, never()).selectOne(any());
-        verify(rocketMQTemplate, never()).syncSendOrderly(anyString(), any(Object.class), anyString());
+        verify(mqMessageDefinitionService, never()).findEnabledByMessageCode(anyString());
+        verify(messageBus, never()).publishOrderly(anyString(), anyString(), any(Object.class), anyString());
     }
 
     @Test
     void executeAsyncFailsWhenEnabledMessageDefinitionDoesNotExist() {
-        when(mqMapper.selectOne(any())).thenReturn(null);
+        when(mqMessageDefinitionService.findEnabledByMessageCode("order_paid")).thenReturn(null);
 
         NodeResult result = handler.executeAsync(Map.of("messageCodeKey", "order_paid"), context).block();
 
         assertThat(result.success()).isFalse();
         assertThat(result.errorMessage()).isEqualTo("SEND_MQ: 找不到消息定义 messageCode=order_paid");
-        verify(rocketMQTemplate, never()).syncSendOrderly(anyString(), any(Object.class), anyString());
+        verify(messageBus, never()).publishOrderly(anyString(), anyString(), any(Object.class), anyString());
     }
 
     @Test
@@ -77,9 +76,7 @@ class SendMqHandlerTest {
         definition.setMessageCode("order_paid");
         definition.setTopic("order.paid");
         definition.setEnabled(1);
-        when(mqMapper.selectOne(any())).thenReturn(definition);
-        when(rocketMQTemplate.syncSendOrderly(anyString(), any(Object.class), anyString()))
-                .thenReturn(sendResult(SendStatus.SEND_OK));
+        when(mqMessageDefinitionService.findEnabledByMessageCode("order_paid")).thenReturn(definition);
 
         Map<String, Object> config = Map.of(
                 "messageCodeKey", "order_paid",
@@ -98,8 +95,9 @@ class SendMqHandlerTest {
         assertThat(result.output()).containsEntry("mqSent", true);
 
         ArgumentCaptor<MqTriggerMessage> messageCaptor = ArgumentCaptor.forClass(MqTriggerMessage.class);
-        verify(rocketMQTemplate).syncSendOrderly(
-                eq("CANVAS_MQ_TRIGGER:order.paid"),
+        verify(messageBus).publishOrderly(
+                eq("CANVAS_MQ_TRIGGER"),
+                eq("order.paid"),
                 messageCaptor.capture(),
                 eq("user-7"));
 
@@ -116,9 +114,9 @@ class SendMqHandlerTest {
         MqMessageDefinitionDO definition = new MqMessageDefinitionDO();
         definition.setTopic("order.paid");
         definition.setEnabled(1);
-        when(mqMapper.selectOne(any())).thenReturn(definition);
-        when(rocketMQTemplate.syncSendOrderly(anyString(), any(Object.class), anyString()))
-                .thenThrow(new RuntimeException("broker down"));
+        when(mqMessageDefinitionService.findEnabledByMessageCode("order_paid")).thenReturn(definition);
+        doThrow(new RuntimeException("broker down"))
+                .when(messageBus).publishOrderly(anyString(), anyString(), any(Object.class), anyString());
 
         NodeResult result = handler.executeAsync(Map.of("messageCodeKey", "order_paid"), context).block();
 
@@ -129,9 +127,7 @@ class SendMqHandlerTest {
     @Test
     void executeAsyncBuildsPayloadFromUiInputParamsShape() {
         MqMessageDefinitionDO definition = enabledDefinition("order.paid");
-        when(mqMapper.selectOne(any())).thenReturn(definition);
-        when(rocketMQTemplate.syncSendOrderly(anyString(), any(Object.class), anyString()))
-                .thenReturn(sendResult(SendStatus.SEND_OK));
+        when(mqMessageDefinitionService.findEnabledByMessageCode("order_paid")).thenReturn(definition);
 
         Map<String, Object> config = Map.of(
                 "messageCodeKey", "order_paid",
@@ -147,8 +143,9 @@ class SendMqHandlerTest {
         assertThat(result.success()).isTrue();
 
         ArgumentCaptor<MqTriggerMessage> messageCaptor = ArgumentCaptor.forClass(MqTriggerMessage.class);
-        verify(rocketMQTemplate).syncSendOrderly(
-                eq("CANVAS_MQ_TRIGGER:order.paid"),
+        verify(messageBus).publishOrderly(
+                eq("CANVAS_MQ_TRIGGER"),
+                eq("order.paid"),
                 messageCaptor.capture(),
                 eq("user-7"));
         assertThat(messageCaptor.getValue().getPayload())
@@ -160,9 +157,7 @@ class SendMqHandlerTest {
     @Test
     void executeAsyncBuildsPayloadFromMapShapedParams() {
         MqMessageDefinitionDO definition = enabledDefinition("order.paid");
-        when(mqMapper.selectOne(any())).thenReturn(definition);
-        when(rocketMQTemplate.syncSendOrderly(anyString(), any(Object.class), anyString()))
-                .thenReturn(sendResult(SendStatus.SEND_OK));
+        when(mqMessageDefinitionService.findEnabledByMessageCode("order_paid")).thenReturn(definition);
 
         NodeResult result = handler.executeAsync(Map.of(
                 "messageCodeKey", "order_paid",
@@ -172,8 +167,9 @@ class SendMqHandlerTest {
         assertThat(result.success()).isTrue();
 
         ArgumentCaptor<MqTriggerMessage> messageCaptor = ArgumentCaptor.forClass(MqTriggerMessage.class);
-        verify(rocketMQTemplate).syncSendOrderly(
-                eq("CANVAS_MQ_TRIGGER:order.paid"),
+        verify(messageBus).publishOrderly(
+                eq("CANVAS_MQ_TRIGGER"),
+                eq("order.paid"),
                 messageCaptor.capture(),
                 eq("user-7"));
         assertThat(messageCaptor.getValue().getPayload()).containsEntry("orderId", "O-1");
@@ -182,9 +178,9 @@ class SendMqHandlerTest {
     @Test
     void executeAsyncFailsWhenRocketMqReturnsNonOkStatus() {
         MqMessageDefinitionDO definition = enabledDefinition("order.paid");
-        when(mqMapper.selectOne(any())).thenReturn(definition);
-        when(rocketMQTemplate.syncSendOrderly(anyString(), any(Object.class), anyString()))
-                .thenReturn(sendResult(SendStatus.FLUSH_DISK_TIMEOUT));
+        when(mqMessageDefinitionService.findEnabledByMessageCode("order_paid")).thenReturn(definition);
+        doThrow(new IllegalStateException("RocketMQ send status=FLUSH_DISK_TIMEOUT"))
+                .when(messageBus).publishOrderly(anyString(), anyString(), any(Object.class), anyString());
 
         NodeResult result = handler.executeAsync(Map.of("messageCodeKey", "order_paid"), context).block();
 
@@ -195,13 +191,13 @@ class SendMqHandlerTest {
     @Test
     void executeAsyncFailsWhenMessageDefinitionTopicIsBlank() {
         MqMessageDefinitionDO definition = enabledDefinition(" ");
-        when(mqMapper.selectOne(any())).thenReturn(definition);
+        when(mqMessageDefinitionService.findEnabledByMessageCode("order_paid")).thenReturn(definition);
 
         NodeResult result = handler.executeAsync(Map.of("messageCodeKey", " order_paid "), context).block();
 
         assertThat(result.success()).isFalse();
         assertThat(result.errorMessage()).isEqualTo("SEND_MQ: 消息定义 topic 未配置 messageCode=order_paid");
-        verify(rocketMQTemplate, never()).syncSendOrderly(anyString(), any(Object.class), anyString());
+        verify(messageBus, never()).publishOrderly(anyString(), anyString(), any(Object.class), anyString());
     }
 
     private static MqMessageDefinitionDO enabledDefinition(String topic) {
@@ -210,11 +206,5 @@ class SendMqHandlerTest {
         definition.setTopic(topic);
         definition.setEnabled(1);
         return definition;
-    }
-
-    private static SendResult sendResult(SendStatus status) {
-        SendResult result = new SendResult();
-        result.setSendStatus(status);
-        return result;
     }
 }

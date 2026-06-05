@@ -14,6 +14,9 @@ public class R<T> {
     /** 响应消息。 */
     private String message;
 
+    /** 稳定错误码，成功响应为空。 */
+    private String errorCode;
+
     /** 响应数据。 */
     private T data;
 
@@ -49,9 +52,23 @@ public class R<T> {
         return r;
     }
 
+    /** 失败响应（含稳定错误码和业务状态码）。 */
+    public static <T> R<T> fail(String errorCode, int code, String message) {
+        R<T> r = fail(code, message);
+        r.errorCode = errorCode;
+        return r;
+    }
+
     /** 失败响应（含业务状态码和 traceId）。 */
     public static <T> R<T> fail(int code, String message, String traceId) {
         R<T> r = fail(code, message);
+        r.traceId = traceId;
+        return r;
+    }
+
+    /** 失败响应（含稳定错误码、业务状态码和 traceId）。 */
+    public static <T> R<T> fail(String errorCode, int code, String message, String traceId) {
+        R<T> r = fail(errorCode, code, message);
         r.traceId = traceId;
         return r;
     }

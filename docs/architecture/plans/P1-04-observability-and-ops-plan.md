@@ -2,11 +2,11 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Execute the architecture remediation package described in `../specs/P1-04-observability-and-ops-spec.md`.
+**Goal:** Add request/execution correlation, trace propagation, deployable Prometheus assets, and operational runbooks for canvas runtime operations.
 
-**Architecture:** Start from the archived evidence and current repository verification, add failing tests around the confirmed behavior, then implement the smallest scoped changes that satisfy the package acceptance criteria. Keep unrelated refactors out of the package unless a test proves the boundary must change.
+**Architecture:** Put correlation ID handling at the WebFlux filter boundary, carry it through execution services and async workers with MDC-aware helpers, then commit dashboards, alert rules, and runbooks as deployable artifacts. Prefer Micrometer/actuator metrics already exposed by Spring Boot and add internal trace records only where cross-layer execution behavior is not otherwise observable.
 
-**Tech Stack:** Java 21, Spring Boot 3.2, WebFlux, MyBatis-Plus, Reactor, Redis, RocketMQ, React 18, TypeScript, Vite, Vitest, JUnit 5.
+**Tech Stack:** Java 21, Spring Boot WebFlux, Reactor, SLF4J MDC, Micrometer, Actuator Prometheus, Redis/RocketMQ operational runbooks, JUnit 5, AssertJ, Maven.
 
 ---
 
@@ -18,195 +18,137 @@
 
 ## File Structure
 
-- Read: `../specs/P1-04-observability-and-ops-spec.md`
-- Read: `../todo/coverage-matrix.md`
-- Read: `../todo/p1/observability-and-ops/plan.md`
-- Modify: repository files named in the spec evidence for this package
-- Test: focused tests created beside the affected backend or frontend code before implementation
+- Filter: `backend/canvas-engine/src/main/java/org/chovy/canvas/config/CorrelationIdWebFilter.java`
+- Response model: `backend/canvas-engine/src/main/java/org/chovy/canvas/common/R.java`
+- Error handling: `backend/canvas-engine/src/main/java/org/chovy/canvas/config/GlobalExceptionHandler.java`
+- Execution tracing: `backend/canvas-engine/src/main/java/org/chovy/canvas/engine/trace/ExecutionTraceContext.java`
+- Async MDC helper: `backend/canvas-engine/src/main/java/org/chovy/canvas/infrastructure/observability/MdcTaskDecorator.java`
+- Metrics: `backend/canvas-engine/src/main/java/org/chovy/canvas/config/CanvasRuntimeMetrics.java`
+- Tests: `backend/canvas-engine/src/test/java/org/chovy/canvas/config/CorrelationIdWebFilterTest.java`
+- Tests: `backend/canvas-engine/src/test/java/org/chovy/canvas/config/GlobalExceptionHandlerTraceTest.java`
+- Tests: `backend/canvas-engine/src/test/java/org/chovy/canvas/engine/trace/ExecutionTraceContextTest.java`
+- Tests: `backend/canvas-engine/src/test/java/org/chovy/canvas/infrastructure/observability/MdcTaskDecoratorTest.java`
+- Tests: `backend/canvas-engine/src/test/java/org/chovy/canvas/config/CanvasRuntimeMetricsTest.java`
+- Ops asset: `deploy/observability/prometheus/canvas-alert-rules.yml`
+- Ops asset: `deploy/observability/grafana/canvas-runtime-dashboard.json`
+- Runbook: `docs/architecture/runbooks/dlq-handling.md`
+- Runbook: `docs/architecture/runbooks/route-rebuild.md`
+- Runbook: `docs/architecture/runbooks/cache-invalidation.md`
+- Runbook: `docs/architecture/runbooks/shutdown-drain.md`
+- Evidence: `docs/architecture/evidence/P1-04-observability-and-ops.md`
 
-### Task 1: Add request/execution correlation ID propagation
-
-**Files:**
-- Read: `../specs/P1-04-observability-and-ops-spec.md`
-- Read: `../todo/coverage-matrix.md`
-- Modify: repository files named in this package spec evidence
-- Test: focused tests created beside the affected code
-
-Existing package notes:
-- Source task has no additional notes beyond its title.
-
-- [ ] **Step 1: Lock the failing behavior**
-
-Read `../specs/P1-04-observability-and-ops-spec.md` and write the smallest failing test or documentation check that demonstrates this task gap before changing implementation files.
-
-- [ ] **Step 2: Run the focused check before implementation**
-
-Run the narrowest backend, frontend, or documentation command that exercises the new check. Expected result before implementation: the new check fails or the documentation diff shows the missing section.
-
-- [ ] **Step 3: Implement the scoped change**
-
-Change only the files required by this task and keep the behavior aligned with the acceptance criteria in `../specs/P1-04-observability-and-ops-spec.md`.
-
-- [ ] **Step 4: Verify the task**
-
-Run the same focused command again. Expected result after implementation: pass, or documentation check exits 0.
-
-- [ ] **Step 5: Review the scoped diff**
-
-Run `git diff -- .` and verify the diff only touches files justified by this task and the package spec.
-
-### Task 2: Populate MDC consistently across boundedElastic and async execution paths
+### Task 1: Add request and execution correlation ID propagation
 
 **Files:**
-- Read: `../specs/P1-04-observability-and-ops-spec.md`
-- Read: `../todo/coverage-matrix.md`
-- Modify: repository files named in this package spec evidence
-- Test: focused tests created beside the affected code
+- Production: `backend/canvas-engine/src/main/java/org/chovy/canvas/config/CorrelationIdWebFilter.java`
+- Production: `backend/canvas-engine/src/main/java/org/chovy/canvas/common/R.java`
+- Production: `backend/canvas-engine/src/main/java/org/chovy/canvas/config/GlobalExceptionHandler.java`
+- Test: `backend/canvas-engine/src/test/java/org/chovy/canvas/config/CorrelationIdWebFilterTest.java`
+- Test: `backend/canvas-engine/src/test/java/org/chovy/canvas/config/GlobalExceptionHandlerTraceTest.java`
+- Evidence: `docs/architecture/evidence/P1-04-observability-and-ops.md`
 
-Existing package notes:
-- Source task has no additional notes beyond its title.
+- [x] Create `CorrelationIdWebFilter` that reads `X-Correlation-Id`, generates one when absent, stores it in Reactor context and MDC, and writes it back to the response header.
+- [x] Add a public `traceId` or `correlationId` field to the shared error response path without changing success payload semantics.
+- [x] Add tests proving incoming IDs are preserved, missing IDs are generated, and generic error responses include the public correlation ID without leaking exception messages.
 
-- [ ] **Step 1: Lock the failing behavior**
+Run:
 
-Read `../specs/P1-04-observability-and-ops-spec.md` and write the smallest failing test or documentation check that demonstrates this task gap before changing implementation files.
+```bash
+cd backend && mvn -pl canvas-engine -Dtest=CorrelationIdWebFilterTest,GlobalExceptionHandlerTraceTest test
+# Do not stage or commit in this session unless the user explicitly asks.
+```
 
-- [ ] **Step 2: Run the focused check before implementation**
+Expected: filter and error tests pass; logs and client errors have a stable correlation ID.
 
-Run the narrowest backend, frontend, or documentation command that exercises the new check. Expected result before implementation: the new check fails or the documentation diff shows the missing section.
-
-- [ ] **Step 3: Implement the scoped change**
-
-Change only the files required by this task and keep the behavior aligned with the acceptance criteria in `../specs/P1-04-observability-and-ops-spec.md`.
-
-- [ ] **Step 4: Verify the task**
-
-Run the same focused command again. Expected result after implementation: pass, or documentation check exits 0.
-
-- [ ] **Step 5: Review the scoped diff**
-
-Run `git diff -- .` and verify the diff only touches files justified by this task and the package spec.
-
-### Task 3: Decide tracing implementation: Micrometer Tracing with Brave/OTel or a simpler internal trace table first
+### Task 2: Preserve MDC across async and execution paths
 
 **Files:**
-- Read: `../specs/P1-04-observability-and-ops-spec.md`
-- Read: `../todo/coverage-matrix.md`
-- Modify: repository files named in this package spec evidence
-- Test: focused tests created beside the affected code
+- Production: `backend/canvas-engine/src/main/java/org/chovy/canvas/infrastructure/observability/MdcTaskDecorator.java`
+- Production: `backend/canvas-engine/src/main/java/org/chovy/canvas/engine/trace/ExecutionTraceContext.java`
+- Production: `backend/canvas-engine/src/main/java/org/chovy/canvas/engine/trigger/CanvasExecutionService.java`
+- Production: `backend/canvas-engine/src/main/java/org/chovy/canvas/engine/handlers/GroovyHandler.java`
+- Test: `backend/canvas-engine/src/test/java/org/chovy/canvas/infrastructure/observability/MdcTaskDecoratorTest.java`
+- Test: `backend/canvas-engine/src/test/java/org/chovy/canvas/engine/trace/ExecutionTraceContextTest.java`
 
-Existing package notes:
-- Source task has no additional notes beyond its title.
+- [x] Create an MDC task decorator/helper that captures the current MDC map and restores it around bounded async tasks.
+- [x] Add execution trace context fields for `executionId`, `canvasId`, `nodeId`, and `correlationId`.
+- [x] Apply the helper to execution and handler async boundaries named in the spec evidence.
 
-- [ ] **Step 1: Lock the failing behavior**
+Run:
 
-Read `../specs/P1-04-observability-and-ops-spec.md` and write the smallest failing test or documentation check that demonstrates this task gap before changing implementation files.
+```bash
+cd backend && mvn -pl canvas-engine -Dtest=MdcTaskDecoratorTest,ExecutionTraceContextTest test
+# Do not stage or commit in this session unless the user explicitly asks.
+```
 
-- [ ] **Step 2: Run the focused check before implementation**
+Expected: async tests prove MDC values survive worker boundaries and are cleared after task completion.
 
-Run the narrowest backend, frontend, or documentation command that exercises the new check. Expected result before implementation: the new check fails or the documentation diff shows the missing section.
-
-- [ ] **Step 3: Implement the scoped change**
-
-Change only the files required by this task and keep the behavior aligned with the acceptance criteria in `../specs/P1-04-observability-and-ops-spec.md`.
-
-- [ ] **Step 4: Verify the task**
-
-Run the same focused command again. Expected result after implementation: pass, or documentation check exits 0.
-
-- [ ] **Step 5: Review the scoped diff**
-
-Run `git diff -- .` and verify the diff only touches files justified by this task and the package spec.
-
-### Task 4: Add deployable Prometheus alert rules and dashboard JSON/YAML
+### Task 3: Add runtime metrics, alert rules, and dashboard assets
 
 **Files:**
-- Read: `../specs/P1-04-observability-and-ops-spec.md`
-- Read: `../todo/coverage-matrix.md`
-- Modify: repository files named in this package spec evidence
-- Test: focused tests created beside the affected code
+- Production: `backend/canvas-engine/src/main/java/org/chovy/canvas/config/CanvasRuntimeMetrics.java`
+- Production: `backend/canvas-engine/src/main/java/org/chovy/canvas/engine/trigger/CanvasExecutionService.java`
+- Production: `backend/canvas-engine/src/main/java/org/chovy/canvas/infrastructure/redis/MqRouteRefreshService.java`
+- Test: `backend/canvas-engine/src/test/java/org/chovy/canvas/config/CanvasRuntimeMetricsTest.java`
+- Ops asset: `deploy/observability/prometheus/canvas-alert-rules.yml`
+- Ops asset: `deploy/observability/grafana/canvas-runtime-dashboard.json`
 
-Existing package notes:
-- Source task has no additional notes beyond its title.
+- [x] Register Micrometer gauges/counters for execution failures, DLQ backlog, route rebuild failures, cache invalidation failures, Hikari, Redis, MQ, lane pressure, and disruptor pressure.
+- [x] Create Prometheus alert rules for sustained execution failure rate, DLQ backlog, route rebuild failure, Redis/MQ unavailable, and graceful shutdown drain timeout.
+- [x] Create a Grafana dashboard JSON that references the alert metrics and actuator Prometheus names.
 
-- [ ] **Step 1: Lock the failing behavior**
+Run:
 
-Read `../specs/P1-04-observability-and-ops-spec.md` and write the smallest failing test or documentation check that demonstrates this task gap before changing implementation files.
+```bash
+cd backend && mvn -pl canvas-engine -Dtest=CanvasRuntimeMetricsTest test
+test -f deploy/observability/prometheus/canvas-alert-rules.yml
+test -f deploy/observability/grafana/canvas-runtime-dashboard.json
+rg -n "CanvasExecutionFailureRate|CanvasDlqBacklog|route_rebuild|cache_invalidation|shutdown_drain" deploy/observability
+# Do not stage or commit in this session unless the user explicitly asks.
+```
 
-- [ ] **Step 2: Run the focused check before implementation**
+Expected: metrics tests pass, alert/dashboard files exist, and the named operational signals are present in deployable assets.
 
-Run the narrowest backend, frontend, or documentation command that exercises the new check. Expected result before implementation: the new check fails or the documentation diff shows the missing section.
-
-- [ ] **Step 3: Implement the scoped change**
-
-Change only the files required by this task and keep the behavior aligned with the acceptance criteria in `../specs/P1-04-observability-and-ops-spec.md`.
-
-- [ ] **Step 4: Verify the task**
-
-Run the same focused command again. Expected result after implementation: pass, or documentation check exits 0.
-
-- [ ] **Step 5: Review the scoped diff**
-
-Run `git diff -- .` and verify the diff only touches files justified by this task and the package spec.
-
-### Task 5: Add runbooks for DLQ, route rebuild, cache invalidation, and shutdown
+### Task 4: Add operational runbooks
 
 **Files:**
-- Read: `../specs/P1-04-observability-and-ops-spec.md`
-- Read: `../todo/coverage-matrix.md`
-- Modify: repository files named in this package spec evidence
-- Test: focused tests created beside the affected code
+- Runbook: `docs/architecture/runbooks/dlq-handling.md`
+- Runbook: `docs/architecture/runbooks/route-rebuild.md`
+- Runbook: `docs/architecture/runbooks/cache-invalidation.md`
+- Runbook: `docs/architecture/runbooks/shutdown-drain.md`
+- Evidence: `docs/architecture/evidence/P1-04-observability-and-ops.md`
 
-Existing package notes:
-- Source task has no additional notes beyond its title.
+- [x] Write DLQ handling steps with diagnosis command, replay command, rollback/stop condition, owner, and evidence capture path.
+- [x] Write route rebuild and cache invalidation runbooks with exact ops endpoint or CLI command, auth requirement, verification command, and rollback note.
+- [x] Write shutdown/drain runbook with pre-drain checks, active execution checks, timeout policy, and post-drain validation.
 
-- [ ] **Step 1: Lock the failing behavior**
+Run:
 
-Read `../specs/P1-04-observability-and-ops-spec.md` and write the smallest failing test or documentation check that demonstrates this task gap before changing implementation files.
+```bash
+rg -n "Owner|Command|Verify|Rollback|Evidence" docs/architecture/runbooks/dlq-handling.md docs/architecture/runbooks/route-rebuild.md docs/architecture/runbooks/cache-invalidation.md docs/architecture/runbooks/shutdown-drain.md
+# Do not stage or commit in this session unless the user explicitly asks.
+```
 
-- [ ] **Step 2: Run the focused check before implementation**
+Expected: each runbook includes owner, command, verification, rollback, and evidence sections.
 
-Run the narrowest backend, frontend, or documentation command that exercises the new check. Expected result before implementation: the new check fails or the documentation diff shows the missing section.
-
-- [ ] **Step 3: Implement the scoped change**
-
-Change only the files required by this task and keep the behavior aligned with the acceptance criteria in `../specs/P1-04-observability-and-ops-spec.md`.
-
-- [ ] **Step 4: Verify the task**
-
-Run the same focused command again. Expected result after implementation: pass, or documentation check exits 0.
-
-- [ ] **Step 5: Review the scoped diff**
-
-Run `git diff -- .` and verify the diff only touches files justified by this task and the package spec.
-
-### Task 6: Validate by running the app locally and checking logs plus `/actuator/prometheus`
+### Task 5: Validate observability package end to end
 
 **Files:**
-- Read: `../specs/P1-04-observability-and-ops-spec.md`
-- Read: `../todo/coverage-matrix.md`
-- Modify: repository files named in this package spec evidence
-- Test: focused tests created beside the affected code
+- Evidence: `docs/architecture/evidence/P1-04-observability-and-ops.md`
+- Plan: `docs/architecture/plans/P1-04-observability-and-ops-plan.md`
+- Spec: `docs/architecture/specs/P1-04-observability-and-ops-spec.md`
 
-Existing package notes:
-- Source task has no additional notes beyond its title.
+- [x] Run focused observability tests.
+- [x] Confirm actuator Prometheus remains enabled and alert/dashboard assets are discoverable.
+- [x] Record test output, dashboard paths, runbook paths, and remaining tracing decisions in the evidence file.
 
-- [ ] **Step 1: Lock the failing behavior**
+Run:
 
-Read `../specs/P1-04-observability-and-ops-spec.md` and write the smallest failing test or documentation check that demonstrates this task gap before changing implementation files.
+```bash
+cd backend && mvn -pl canvas-engine -Dtest=CorrelationIdWebFilterTest,GlobalExceptionHandlerTraceTest,MdcTaskDecoratorTest,ExecutionTraceContextTest,CanvasRuntimeMetricsTest test
+rg -n "prometheus|metrics|health" backend/canvas-engine/src/main/resources/application.yml
+rg -n "P1-04|correlation|dashboard|runbook|remaining" docs/architecture/evidence/P1-04-observability-and-ops.md
+# Do not stage or commit in this session unless the user explicitly asks.
+```
 
-- [ ] **Step 2: Run the focused check before implementation**
-
-Run the narrowest backend, frontend, or documentation command that exercises the new check. Expected result before implementation: the new check fails or the documentation diff shows the missing section.
-
-- [ ] **Step 3: Implement the scoped change**
-
-Change only the files required by this task and keep the behavior aligned with the acceptance criteria in `../specs/P1-04-observability-and-ops-spec.md`.
-
-- [ ] **Step 4: Verify the task**
-
-Run the same focused command again. Expected result after implementation: pass, or documentation check exits 0.
-
-- [ ] **Step 5: Review the scoped diff**
-
-Run `git diff -- .` and verify the diff only touches files justified by this task and the package spec.
-
+Expected: focused backend tests pass, Prometheus/metrics exposure is still configured, and evidence records deployed assets plus any deferred tracing decision.

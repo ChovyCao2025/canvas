@@ -4,16 +4,25 @@
  * 维护说明：统计数据从多个接口并行加载，页面负责聚合展示和空态降级。
  */
 import { useEffect, useState, useCallback } from 'react'
-import { Card, Col, Row, Table, Typography, Spin, Button, DatePicker, Space, Tag } from 'antd'
-import { ArrowLeftOutlined, DownOutlined, UpOutlined, CalendarOutlined, TeamOutlined, CheckCircleOutlined, CloseCircleOutlined, ThunderboltOutlined, PauseCircleOutlined } from '@ant-design/icons'
+import { Card, Col, Row, Table, Typography, Spin, Button, DatePicker, Space, Tag, Modal, message } from 'antd'
+import { ArrowLeftOutlined, DownOutlined, UpOutlined, CalendarOutlined, TeamOutlined, CheckCircleOutlined, CloseCircleOutlined, ThunderboltOutlined, PauseCircleOutlined, BarChartOutlined, DownloadOutlined, ReloadOutlined } from '@ant-design/icons'
 import { useNavigate, useParams } from 'react-router-dom'
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
 } from 'recharts'
 import type { ColumnsType } from 'antd/es/table'
 import dayjs, { type Dayjs } from 'dayjs'
-import http from '../../services/api'
+import http, { canvasApi } from '../../services/api'
 import type { R } from '../../types'
+import { operatorApi, type ExecutionRequestRow, type MessageSendRecordRow } from '../../services/operatorApi'
+import { canvasBiEntrypoint } from '../bi/biWorkbench'
+import {
+  buildAttributionKpis,
+  buildReceiptStatusRows,
+  type AttributionKpi,
+  type ReceiptStatusRow,
+} from './effectClosure'
+import { buildOperatorTableQuery, canExportSynchronously, OPERATION_COLUMN } from './operatorTables'
 
 /** 统计页标题和辅助文本组件别名。 */
 const { Title, Text } = Typography
@@ -126,6 +135,33 @@ const PRESETS: { label: string; value: [Dayjs, Dayjs] }[] = [
   { label:'最近1年',   value:[dayjs().subtract(364,'day'), dayjs()] },
 ]
 
+function escapeCsvValue(value: unknown) {
+  const text = value == null ? '' : String(value)
+  return `"${text.replace(/"/g, '""')}"`
+}
+
+function downloadRowsCsv(fileName: string, rows: Record<string, unknown>[]) {
+  if (rows.length === 0) {
+    message.info('暂无可导出数据')
+    return
+  }
+
+  const headers = Object.keys(rows[0])
+  const csv = [
+    headers.map(escapeCsvValue).join(','),
+    ...rows.map(row => headers.map(header => escapeCsvValue(row[header])).join(',')),
+  ].join('\n')
+  const blob = new Blob([`\ufeff${csv}`], { type: 'text/csv;charset=utf-8' })
+  const url = URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.href = url
+  link.download = fileName
+  document.body.appendChild(link)
+  link.click()
+  link.remove()
+  URL.revokeObjectURL(url)
+}
+
 /**
  * 画布统计页：
  * 1) 查询统计总览；
@@ -142,6 +178,13 @@ export default function CanvasStatsPage() {
   const [prevStats, setPrev] = useState<StatsData | null>(null)
   const [funnel, setFunnel] = useState<FunnelRow[]>([])
   const [trend, setTrend] = useState<TrendPoint[]>([])
+  const [receiptRows, setReceiptRows] = useState<ReceiptStatusRow[]>([])
+  const [attributionKpis, setAttributionKpis] = useState<AttributionKpi[]>([])
+  const [executionRequestRows, setExecutionRequestRows] = useState<ExecutionRequestRow[]>([])
+  const [executionRequestTotal, setExecutionRequestTotal] = useState(0)
+  const [sendRecordRows, setSendRecordRows] = useState<MessageSendRecordRow[]>([])
+  const [sendRecordTotal, setSendRecordTotal] = useState(0)
+  const [operatorLoading, setOperatorLoading] = useState(false)
   const [loading, setLoading] = useState(true)
   const [expanded, setExpanded] = useState(false)
 
@@ -160,12 +203,52 @@ export default function CanvasStatsPage() {
       http.get<R<StatsData>,R<StatsData>>(`/canvas/${id}/stats?since=${prevSince}&until=${prevUntil}`),
       http.get<R<FunnelRow[]>,R<FunnelRow[]>>(`/canvas/${id}/funnel`),
       http.get<R<TrendPoint[]>,R<TrendPoint[]>>(`/canvas/${id}/trend?since=${since}&until=${until}`),
-    ]).then(([s,ps,f,t]) => {
+      canvasApi.receipts(Number(id)),
+      canvasApi.attributionSummary(Number(id)),
+    ]).then(([s,ps,f,t,receipts,attribution]) => {
       setStats(s.data); setPrev(ps.data); setFunnel(f.data); setTrend(t.data)
+      setReceiptRows(buildReceiptStatusRows(receipts.data ?? {}))
+      setAttributionKpis(buildAttributionKpis(attribution.data))
     }).finally(() => setLoading(false))
   }, [id, range])
 
   useEffect(() => { load() }, [load])
+
+  const loadOperatorTables = useCallback(() => {
+    if (!id) return
+    setOperatorLoading(true)
+    const params = buildOperatorTableQuery({ canvasId: Number(id), page: 1, size: 20 })
+    Promise.all([
+      operatorApi.executionRequests(params),
+      operatorApi.messageSendRecords(params),
+    ]).then(([requests, records]) => {
+      setExecutionRequestRows(requests.data?.list ?? [])
+      setExecutionRequestTotal(requests.data?.total ?? 0)
+      setSendRecordRows(records.data?.list ?? [])
+      setSendRecordTotal(records.data?.total ?? 0)
+    }).catch(() => {
+      message.error('运营排查数据加载失败')
+    }).finally(() => setOperatorLoading(false))
+  }, [id])
+
+  useEffect(() => { loadOperatorTables() }, [loadOperatorTables])
+
+  const replayExecutionRequest = useCallback((row: ExecutionRequestRow) => {
+    operatorApi.replayExecutionRequest(row.id, 'operator-table-replay')
+      .then(() => {
+        message.success('已提交重放')
+        loadOperatorTables()
+      })
+      .catch(() => message.error('重放失败'))
+  }, [loadOperatorTables])
+
+  const exportOperatorRows = useCallback((fileName: string, total: number, rows: Record<string, unknown>[]) => {
+    if (!canExportSynchronously(total)) {
+      message.warning('当前结果超过 5000 行，请缩小筛选范围后导出')
+      return
+    }
+    downloadRowsCsv(fileName, rows)
+  }, [])
 
   // 默认只展示关键节点，展开后展示完整漏斗
   const displayFunnel = expanded ? funnel : funnel.filter(r => KEY_NODE_TYPES.has(r.nodeType))
@@ -188,6 +271,71 @@ export default function CanvasStatsPage() {
       render:(v:number) => v != null ? v.toFixed(2) : '-' },
   ]
 
+  const receiptColumns: ColumnsType<ReceiptStatusRow> = [
+    { title:'状态', dataIndex:'label' },
+    { title:'数量', dataIndex:'count', width:96, align:'right',
+      render:(value:number) => value.toLocaleString() },
+  ]
+
+  const executionRequestColumns: ColumnsType<ExecutionRequestRow> = [
+    { title:'请求 ID', dataIndex:'id', width:160, ellipsis:true },
+    { title:'用户', dataIndex:'userId', width:140, ellipsis:true },
+    { title:'状态', dataIndex:'status', width:96,
+      render:(value:string) => <Tag color={value === 'FAILED' ? 'red' : value === 'RETRY' ? 'orange' : 'blue'}>{value}</Tag> },
+    { title:'尝试', dataIndex:'attemptCount', width:72, align:'right',
+      render:(value?:number) => value ?? '-' },
+    { title:'错误', dataIndex:'lastError', ellipsis:true,
+      render:(value?:string) => value || '-' },
+    { title:'更新时间', dataIndex:'updatedAt', width:168,
+      render:(value?:string) => value || '-' },
+    { ...OPERATION_COLUMN, title:'操作',
+      render:(_:unknown, row) => (
+        <Button
+          type="link"
+          size="small"
+          disabled={!['FAILED', 'RETRY'].includes(row.status)}
+          onClick={() => replayExecutionRequest(row)}
+        >
+          重放
+        </Button>
+      ) },
+  ]
+
+  const sendRecordColumns: ColumnsType<MessageSendRecordRow> = [
+    { title:'记录 ID', dataIndex:'id', width:96 },
+    { title:'用户', dataIndex:'userId', width:140, ellipsis:true },
+    { title:'渠道', dataIndex:'channel', width:88 },
+    { title:'状态', dataIndex:'status', width:96,
+      render:(value:string) => <Tag color={value === 'FAILED' ? 'red' : value === 'SENT' ? 'green' : 'default'}>{value}</Tag> },
+    { title:'外部消息 ID', dataIndex:'externalMessageId', width:160, ellipsis:true,
+      render:(value?:string) => value || '-' },
+    { title:'错误', dataIndex:'errorMessage', ellipsis:true,
+      render:(value?:string) => value || '-' },
+    { title:'创建时间', dataIndex:'createdAt', width:168,
+      render:(value?:string) => value || '-' },
+    { ...OPERATION_COLUMN, title:'操作',
+      render:(_:unknown, row) => (
+        <Button
+          type="link"
+          size="small"
+          onClick={() => operatorApi.messageSendRecord(row.id).then(res => {
+            const record = res.data
+            Modal.info({
+              title: `发送记录 ${record.id}`,
+              width: 720,
+              content: (
+                <pre style={{ maxHeight: 420, overflow: 'auto', whiteSpace: 'pre-wrap', margin: 0 }}>
+                  {JSON.stringify(record, null, 2)}
+                </pre>
+              ),
+            })
+          }).catch(() => message.error('加载发送记录失败'))}
+        >
+          详情
+        </Button>
+      ) },
+  ]
+
   if (loading) return <Spin size="large" style={{ display:'block', margin:'80px auto' }} />
 
   return (
@@ -200,6 +348,9 @@ export default function CanvasStatsPage() {
           <Title level={4} style={{ margin:0 }}>活动效果看板</Title>
         </Space>
         <Space>
+          <Button icon={<BarChartOutlined />} type="primary" onClick={() => id && navigate(canvasBiEntrypoint(id))}>
+            BI 分析
+          </Button>
           <Button onClick={() => navigate(`/canvas/${id}/users`)}>用户明细</Button>
           <RangePicker
             value={range}
@@ -285,6 +436,109 @@ export default function CanvasStatsPage() {
             </AreaChart>
           </ResponsiveContainer>
         )}
+      </Card>
+
+      <Row gutter={[14,14]} style={{ marginBottom:20 }}>
+        <Col xs={24} lg={10}>
+          <Card
+            title={<span style={{ fontWeight:600 }}>投递状态</span>}
+            style={{ height:'100%', borderRadius:12, border:'1px solid #e2e8f0', boxShadow:'0 1px 6px rgba(0,0,0,.05)' }}
+          >
+            {receiptRows.length === 0 ? (
+              <div style={{ textAlign:'center', padding:'24px 0', color:'#94a3b8' }}>暂无投递数据</div>
+            ) : (
+              <Table
+                rowKey="status"
+                dataSource={receiptRows}
+                columns={receiptColumns}
+                size="small"
+                pagination={false}
+              />
+            )}
+          </Card>
+        </Col>
+        <Col xs={24} lg={14}>
+          <Card
+            title={<span style={{ fontWeight:600 }}>转化归因</span>}
+            style={{ height:'100%', borderRadius:12, border:'1px solid #e2e8f0', boxShadow:'0 1px 6px rgba(0,0,0,.05)' }}
+          >
+            <Row gutter={[12,12]}>
+              {attributionKpis.map(item => (
+                <Col xs={12} md={6} key={item.label}>
+                  <div style={{ padding:'12px 14px', border:'1px solid #e2e8f0', borderRadius:8, background:'#f8fafc' }}>
+                    <div style={{ fontSize:12, color:'#64748b', marginBottom:8 }}>{item.label}</div>
+                    <div style={{ fontSize:20, fontWeight:700, color:'#0f172a', lineHeight:1.2 }}>{item.value}</div>
+                  </div>
+                </Col>
+              ))}
+            </Row>
+          </Card>
+        </Col>
+      </Row>
+
+      <Card
+        title={<span style={{ fontWeight:600 }}>运营排查</span>}
+        extra={<Button size="small" icon={<ReloadOutlined />} loading={operatorLoading} onClick={loadOperatorTables}>刷新</Button>}
+        style={{ marginBottom:20, borderRadius:12, border:'1px solid #e2e8f0', boxShadow:'0 1px 6px rgba(0,0,0,.05)' }}
+      >
+        <Row gutter={[16,16]}>
+          <Col xs={24} xl={12}>
+            <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:10 }}>
+              <Text strong>执行请求</Text>
+              <Space size={8}>
+                <Text type="secondary" style={{ fontSize:12 }}>{executionRequestTotal.toLocaleString()} 条</Text>
+                <Button
+                  size="small"
+                  icon={<DownloadOutlined />}
+                  onClick={() => exportOperatorRows(
+                    `canvas-${id}-execution-requests.csv`,
+                    executionRequestTotal,
+                    executionRequestRows as unknown as Record<string, unknown>[],
+                  )}
+                >
+                  导出
+                </Button>
+              </Space>
+            </div>
+            <Table
+              rowKey="id"
+              dataSource={executionRequestRows}
+              columns={executionRequestColumns}
+              size="small"
+              pagination={false}
+              loading={operatorLoading}
+              scroll={{ x: 860 }}
+            />
+          </Col>
+          <Col xs={24} xl={12}>
+            <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:10 }}>
+              <Text strong>发送记录</Text>
+              <Space size={8}>
+                <Text type="secondary" style={{ fontSize:12 }}>{sendRecordTotal.toLocaleString()} 条</Text>
+                <Button
+                  size="small"
+                  icon={<DownloadOutlined />}
+                  onClick={() => exportOperatorRows(
+                    `canvas-${id}-message-send-records.csv`,
+                    sendRecordTotal,
+                    sendRecordRows as unknown as Record<string, unknown>[],
+                  )}
+                >
+                  导出
+                </Button>
+              </Space>
+            </div>
+            <Table
+              rowKey="id"
+              dataSource={sendRecordRows}
+              columns={sendRecordColumns}
+              size="small"
+              pagination={false}
+              loading={operatorLoading}
+              scroll={{ x: 920 }}
+            />
+          </Col>
+        </Row>
       </Card>
 
       {/* ── 节点漏斗 ── */}

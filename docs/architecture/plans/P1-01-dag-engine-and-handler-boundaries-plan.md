@@ -2,11 +2,13 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Execute the architecture remediation package described in `../specs/P1-01-dag-engine-and-handler-boundaries-spec.md`.
+**Goal:** Split DAG execution and trigger admission responsibilities into independently testable components, and move mapper-heavy handler behavior behind domain service contracts without changing node semantics.
 
-**Architecture:** Start from the archived evidence and current repository verification, add failing tests around the confirmed behavior, then implement the smallest scoped changes that satisfy the package acceptance criteria. Keep unrelated refactors out of the package unless a test proves the boundary must change.
+**Architecture:** Start with characterization tests around current execution behavior. Extract one responsibility at a time from `DagEngine` and `CanvasExecutionService`, preserve `NodeHandler` as the node semantics boundary, and replace direct mapper injection in handlers with domain services or repositories after each test group is stable.
 
-**Tech Stack:** Java 21, Spring Boot 3.2, WebFlux, MyBatis-Plus, Reactor, Redis, RocketMQ, React 18, TypeScript, Vite, Vitest, JUnit 5.
+**Tech Stack:** Java 21, Spring Boot WebFlux, Reactor, MyBatis-Plus, JUnit 5, AssertJ, Maven.
+
+**Current Status:** Implemented and verified on 2026-06-04. Tasks 1-5 are complete; remaining architecture work continues in the other P1/P2/P3 plans.
 
 ---
 
@@ -18,198 +20,220 @@
 
 ## File Structure
 
-- Read: `../specs/P1-01-dag-engine-and-handler-boundaries-spec.md`
-- Read: `../todo/coverage-matrix.md`
-- Read: `../todo/p1/dag-engine-and-handler-boundaries/plan.md`
-- Modify: repository files named in the spec evidence for this package
-- Test: focused tests created beside the affected backend or frontend code before implementation
+- Engine: `backend/canvas-engine/src/main/java/org/chovy/canvas/engine/scheduler/DagEngine.java`
+- Trigger orchestration: `backend/canvas-engine/src/main/java/org/chovy/canvas/engine/trigger/CanvasExecutionService.java`
+- Handler API: `backend/canvas-engine/src/main/java/org/chovy/canvas/engine/handler/NodeHandler.java`
+- Handler API: `backend/canvas-engine/src/main/java/org/chovy/canvas/engine/handler/NodeOutcome.java`
+- Handler API: `backend/canvas-engine/src/main/java/org/chovy/canvas/engine/handler/NodeResult.java`
+- Extracted engine component: `backend/canvas-engine/src/main/java/org/chovy/canvas/engine/scheduler/NodeGateCoordinator.java`
+- Extracted engine component: `backend/canvas-engine/src/main/java/org/chovy/canvas/engine/scheduler/NodeTimeoutCoordinator.java`
+- Extracted engine component: `backend/canvas-engine/src/main/java/org/chovy/canvas/engine/scheduler/NodeResultRouter.java`
+- Extracted engine component: `backend/canvas-engine/src/main/java/org/chovy/canvas/engine/scheduler/ExecutionDlqWriter.java`
+- Extracted trigger component: `backend/canvas-engine/src/main/java/org/chovy/canvas/engine/trigger/TriggerAdmissionService.java`
+- Extracted trigger component: `backend/canvas-engine/src/main/java/org/chovy/canvas/engine/trigger/CanvasExecutionConfigLoader.java`
+- Extracted trigger component: `backend/canvas-engine/src/main/java/org/chovy/canvas/engine/trigger/ExecutionLaneDispatcher.java`
+- Mapper-heavy handler: `backend/canvas-engine/src/main/java/org/chovy/canvas/engine/handlers/SubFlowRefHandler.java`
+- Mapper-heavy handler: `backend/canvas-engine/src/main/java/org/chovy/canvas/engine/handlers/PointsOperationHandler.java`
+- Mapper-heavy handler: `backend/canvas-engine/src/main/java/org/chovy/canvas/engine/handlers/SendMqHandler.java`
+- Mapper-heavy handler: `backend/canvas-engine/src/main/java/org/chovy/canvas/engine/handlers/MqTriggerHandler.java`
+- Domain service boundary: `backend/canvas-engine/src/main/java/org/chovy/canvas/domain/canvas/SubFlowLookupService.java`
+- Domain service boundary: `backend/canvas-engine/src/main/java/org/chovy/canvas/domain/canvas/ConnectedContentGateway.java`
+- Domain service boundary: `backend/canvas-engine/src/main/java/org/chovy/canvas/domain/canvas/ConnectedContentGatewayService.java`
+- Domain service boundary: `backend/canvas-engine/src/main/java/org/chovy/canvas/domain/cdp/CustomerPointsLedgerService.java`
+- Domain service boundary: `backend/canvas-engine/src/main/java/org/chovy/canvas/domain/meta/MqMessageDefinitionService.java`
+- Tests: `backend/canvas-engine/src/test/java/org/chovy/canvas/engine/scheduler/DagEngineCommitActionTest.java`
+- Tests: `backend/canvas-engine/src/test/java/org/chovy/canvas/engine/scheduler/DagEngineDepthTest.java`
+- Tests: `backend/canvas-engine/src/test/java/org/chovy/canvas/engine/scheduler/DagEnginePendingTest.java`
+- Tests: `backend/canvas-engine/src/test/java/org/chovy/canvas/engine/trigger/CanvasExecutionServiceResumeTest.java`
+- Tests: `backend/canvas-engine/src/test/java/org/chovy/canvas/engine/handlers/SubFlowRefHandlerTest.java`
+- Tests: `backend/canvas-engine/src/test/java/org/chovy/canvas/engine/handlers/PointsOperationHandlerTest.java`
+- Tests: `backend/canvas-engine/src/test/java/org/chovy/canvas/engine/handlers/SendMqHandlerTest.java`
+- Tests: `backend/canvas-engine/src/test/java/org/chovy/canvas/engine/handlers/ConnectedContentHandlerTest.java`
+- Tests: `backend/canvas-engine/src/test/java/org/chovy/canvas/domain/canvas/ConnectedContentGatewayServiceTest.java`
+- Evidence: `docs/architecture/evidence/P1-01-dag-engine-boundaries.md`
 
 ### Task 1: Add characterization tests for key execution paths
 
 **Files:**
-- Read: `../specs/P1-01-dag-engine-and-handler-boundaries-spec.md`
-- Read: `../todo/coverage-matrix.md`
-- Modify: repository files named in this package spec evidence
-- Test: focused tests created beside the affected code
+- Production: `backend/canvas-engine/src/main/java/org/chovy/canvas/engine/scheduler/DagEngine.java`
+- Production: `backend/canvas-engine/src/main/java/org/chovy/canvas/engine/trigger/CanvasExecutionService.java`
+- Test: `backend/canvas-engine/src/test/java/org/chovy/canvas/engine/scheduler/DagEngineCommitActionTest.java`
+- Test: `backend/canvas-engine/src/test/java/org/chovy/canvas/engine/scheduler/DagEngineDepthTest.java`
+- Test: `backend/canvas-engine/src/test/java/org/chovy/canvas/engine/scheduler/DagEnginePendingTest.java`
+- Test: `backend/canvas-engine/src/test/java/org/chovy/canvas/engine/trigger/CanvasExecutionServiceResumeTest.java`
+- Docs: `docs/architecture/evidence/P1-01-dag-engine-boundaries.md`
 
-Existing package notes:
-- Source task has no additional notes beyond its title.
+- [x] Capture current behavior for start/end, condition routing, wait/resume, commit action, DLQ write, timeout, and lane admission.
+- [x] Record current `DagEngine` and `CanvasExecutionService` responsibilities in the evidence file.
+- [x] Keep characterization assertions stable before extraction work begins.
 
-- [ ] **Step 1: Lock the failing behavior**
+Run:
 
-Read `../specs/P1-01-dag-engine-and-handler-boundaries-spec.md` and write the smallest failing test or documentation check that demonstrates this task gap before changing implementation files.
+```bash
+cd backend && mvn -pl canvas-engine -Dtest=DagEngineCommitActionTest,DagEngineDepthTest,DagEnginePendingTest,CanvasExecutionServiceResumeTest test
+wc -l backend/canvas-engine/src/main/java/org/chovy/canvas/engine/scheduler/DagEngine.java backend/canvas-engine/src/main/java/org/chovy/canvas/engine/trigger/CanvasExecutionService.java
+# Do not stage or commit in this session unless the user explicitly asks.
+```
 
-- [ ] **Step 2: Run the focused check before implementation**
+Expected: tests pass against current behavior and evidence lists the responsibilities that will move.
 
-Run the narrowest backend, frontend, or documentation command that exercises the new check. Expected result before implementation: the new check fails or the documentation diff shows the missing section.
+Result on 2026-06-04:
 
-- [ ] **Step 3: Implement the scoped change**
-
-Change only the files required by this task and keep the behavior aligned with the acceptance criteria in `../specs/P1-01-dag-engine-and-handler-boundaries-spec.md`.
-
-- [ ] **Step 4: Verify the task**
-
-Run the same focused command again. Expected result after implementation: pass, or documentation check exits 0.
-
-- [ ] **Step 5: Review the scoped diff**
-
-Run `git diff -- .` and verify the diff only touches files justified by this task and the package spec.
+- Characterization coverage is present across `DagEngineCommitActionTest`, `DagEngineDepthTest`, `DagEnginePendingTest`, `DagEngineLifecycleTest`, `CanvasExecutionServiceResumeTest`, `WaitResumeServiceTest`, `ExecutionDlqWriterTest`, `NodeTimeoutCoordinatorTest`, `ExecutionLaneDispatcherTest`, and `TriggerAdmissionServiceTest`.
+- Evidence records the responsibilities moved from `DagEngine` and `CanvasExecutionService`.
+- P1-01 focused validation passed after extraction with 72 tests, 0 failures, 0 errors, 0 skipped.
 
 ### Task 2: Extract small components from `DagEngine`
 
 **Files:**
-- Read: `../specs/P1-01-dag-engine-and-handler-boundaries-spec.md`
-- Read: `../todo/coverage-matrix.md`
-- Modify: repository files named in this package spec evidence
-- Test: focused tests created beside the affected code
+- Production: `backend/canvas-engine/src/main/java/org/chovy/canvas/engine/scheduler/DagEngine.java`
+- Production: `backend/canvas-engine/src/main/java/org/chovy/canvas/engine/scheduler/NodeGateCoordinator.java`
+- Production: `backend/canvas-engine/src/main/java/org/chovy/canvas/engine/scheduler/NodeTimeoutCoordinator.java`
+- Production: `backend/canvas-engine/src/main/java/org/chovy/canvas/engine/scheduler/NodeResultRouter.java`
+- Production: `backend/canvas-engine/src/main/java/org/chovy/canvas/engine/scheduler/ExecutionDlqWriter.java`
+- Test: `backend/canvas-engine/src/test/java/org/chovy/canvas/engine/scheduler/NodeGateCoordinatorTest.java`
+- Test: `backend/canvas-engine/src/test/java/org/chovy/canvas/engine/scheduler/NodeTimeoutCoordinatorTest.java`
+- Test: `backend/canvas-engine/src/test/java/org/chovy/canvas/engine/scheduler/NodeResultRouterTest.java`
+- Test: `backend/canvas-engine/src/test/java/org/chovy/canvas/engine/scheduler/ExecutionDlqWriterTest.java`
 
-Existing package notes:
-   - Gate manager.
-   - Timeout manager.
-   - Result router.
-   - DLQ writer.
+- [x] Move gate coordination into `NodeGateCoordinator`.
+- [x] Move timeout scheduling and cancellation into `NodeTimeoutCoordinator`.
+- [x] Move node result routing into `NodeResultRouter`.
+- [x] Move DLQ persistence and serialization into `ExecutionDlqWriter`.
 
-- [ ] **Step 1: Lock the failing behavior**
+Run:
 
-Read `../specs/P1-01-dag-engine-and-handler-boundaries-spec.md` and write the smallest failing test or documentation check that demonstrates this task gap before changing implementation files.
+```bash
+cd backend && mvn -pl canvas-engine -Dtest=NodeGateCoordinatorTest,NodeTimeoutCoordinatorTest,NodeResultRouterTest,ExecutionDlqWriterTest,DagEngineCommitActionTest,DagEngineDepthTest,DagEnginePendingTest test
+# Do not stage or commit in this session unless the user explicitly asks.
+```
 
-- [ ] **Step 2: Run the focused check before implementation**
+Expected: extracted component tests and existing DAG characterization tests pass; `DagEngine` delegates to the new components without behavior drift.
 
-Run the narrowest backend, frontend, or documentation command that exercises the new check. Expected result before implementation: the new check fails or the documentation diff shows the missing section.
+Result on 2026-06-04:
 
-- [ ] **Step 3: Implement the scoped change**
+- Added `NodeGateCoordinator`, `NodeTimeoutCoordinator`, `NodeResultRouter`, and `ExecutionDlqWriter`.
+- Added `NodeGateCoordinatorTest`, `NodeTimeoutCoordinatorTest`, `NodeResultRouterTest`, and `ExecutionDlqWriterTest`.
+- Updated `DagEngine` to delegate gate coordination, special-node timeout scheduling, result routing, and DLQ persistence/serialization.
+- Focused command passed: `cd backend && mvn -pl canvas-engine -Dtest=NodeGateCoordinatorTest,NodeTimeoutCoordinatorTest,NodeResultRouterTest,ExecutionDlqWriterTest,DagEngineLifecycleTest,DagEngineCommitActionTest,DagEngineDepthTest,DagEnginePendingTest,CanvasExecutionServiceResumeTest test`
+- Focused result: 26 tests, 0 failures, 0 errors, 0 skipped.
+- `DagEngine.java` line count after extraction: 1386 lines.
+- `DagEngine.java` no longer imports `CanvasExecutionDlqMapper` or `CanvasExecutionDlqDO`; those imports are isolated in `ExecutionDlqWriter`.
 
-Change only the files required by this task and keep the behavior aligned with the acceptance criteria in `../specs/P1-01-dag-engine-and-handler-boundaries-spec.md`.
-
-- [ ] **Step 4: Verify the task**
-
-Run the same focused command again. Expected result after implementation: pass, or documentation check exits 0.
-
-- [ ] **Step 5: Review the scoped diff**
-
-Run `git diff -- .` and verify the diff only touches files justified by this task and the package spec.
-
-### Task 3: Extract trigger/admission pieces from `CanvasExecutionService`
+### Task 3: Extract trigger and admission pieces from `CanvasExecutionService`
 
 **Files:**
-- Read: `../specs/P1-01-dag-engine-and-handler-boundaries-spec.md`
-- Read: `../todo/coverage-matrix.md`
-- Modify: repository files named in this package spec evidence
-- Test: focused tests created beside the affected code
+- Production: `backend/canvas-engine/src/main/java/org/chovy/canvas/engine/trigger/CanvasExecutionService.java`
+- Production: `backend/canvas-engine/src/main/java/org/chovy/canvas/engine/trigger/TriggerAdmissionService.java`
+- Production: `backend/canvas-engine/src/main/java/org/chovy/canvas/engine/trigger/CanvasExecutionConfigLoader.java`
+- Production: `backend/canvas-engine/src/main/java/org/chovy/canvas/engine/trigger/ExecutionLaneDispatcher.java`
+- Production: `backend/canvas-engine/src/main/java/org/chovy/canvas/engine/request/CanvasExecutionRequestDispatcher.java`
+- Test: `backend/canvas-engine/src/test/java/org/chovy/canvas/engine/trigger/TriggerAdmissionServiceTest.java`
+- Test: `backend/canvas-engine/src/test/java/org/chovy/canvas/engine/trigger/CanvasExecutionConfigLoaderTest.java`
+- Test: `backend/canvas-engine/src/test/java/org/chovy/canvas/engine/trigger/ExecutionLaneDispatcherTest.java`
+- Test: `backend/canvas-engine/src/test/java/org/chovy/canvas/engine/trigger/CanvasExecutionServiceResumeTest.java`
 
-Existing package notes:
-- Source task has no additional notes beyond its title.
+- [x] Move trigger pre-check, dedup, priority admission, missing-context marking, and overflow retry decisions into `TriggerAdmissionService`; keep shutdown lifecycle guard in dedicated `ExecutionLifecycleGate`.
+- [x] Move canvas/version/config loading into `CanvasExecutionConfigLoader`.
+- [x] Move lane dispatch and request fallback branching into `ExecutionLaneDispatcher`.
 
-- [ ] **Step 1: Lock the failing behavior**
+Run:
 
-Read `../specs/P1-01-dag-engine-and-handler-boundaries-spec.md` and write the smallest failing test or documentation check that demonstrates this task gap before changing implementation files.
+```bash
+cd backend && mvn -pl canvas-engine -Dtest=TriggerAdmissionServiceTest,CanvasExecutionConfigLoaderTest,ExecutionLaneDispatcherTest,CanvasExecutionServiceResumeTest test
+# Do not stage or commit in this session unless the user explicitly asks.
+```
 
-- [ ] **Step 2: Run the focused check before implementation**
+Expected: trigger service tests pass and `CanvasExecutionService` retains orchestration while delegated services own admission, config loading, and lane dispatch decisions.
 
-Run the narrowest backend, frontend, or documentation command that exercises the new check. Expected result before implementation: the new check fails or the documentation diff shows the missing section.
+Result on 2026-06-04:
 
-- [ ] **Step 3: Implement the scoped change**
-
-Change only the files required by this task and keep the behavior aligned with the acceptance criteria in `../specs/P1-01-dag-engine-and-handler-boundaries-spec.md`.
-
-- [ ] **Step 4: Verify the task**
-
-Run the same focused command again. Expected result after implementation: pass, or documentation check exits 0.
-
-- [ ] **Step 5: Review the scoped diff**
-
-Run `git diff -- .` and verify the diff only touches files justified by this task and the package spec.
+- Added `TriggerAdmissionService`, `CanvasExecutionConfigLoader`, and `ExecutionLaneDispatcher`.
+- Updated `CanvasExecutionService` to delegate trigger admission/dedup/overflow retry decisions, canvas/version/graph loading, trigger-node lookup, and final lane slot acquisition.
+- Kept `ExecutionLifecycleGate` as the shutdown guard component and verified lifecycle rejection through `CanvasExecutionServiceResumeTest` and `ExecutionLifecycleGateTest`.
+- Added `TriggerAdmissionServiceTest`, `CanvasExecutionConfigLoaderTest`, and `ExecutionLaneDispatcherTest`; updated resume/wait tests for the new constructor boundaries.
+- Focused Task 3 command passed: `cd backend && mvn -pl canvas-engine -Dtest=TriggerAdmissionServiceTest,CanvasExecutionConfigLoaderTest,ExecutionLaneDispatcherTest,CanvasExecutionServiceResumeTest,WaitResumeServiceTest test`
+- Focused Task 3 result: 21 tests, 0 failures, 0 errors, 0 skipped.
+- `CanvasExecutionService.java` line count after extraction: 850 lines.
+- `CanvasExecutionService.java` no longer imports canvas/version/config mapper/cache/parser dependencies, `RocketMQTemplate`, `TriggerPriorityConfig`, or `ExecutionLaneResolver`.
 
 ### Task 4: Introduce domain service boundaries for mapper-heavy handlers
 
 **Files:**
-- Read: `../specs/P1-01-dag-engine-and-handler-boundaries-spec.md`
-- Read: `../todo/coverage-matrix.md`
-- Modify: repository files named in this package spec evidence
-- Test: focused tests created beside the affected code
+- Production: `backend/canvas-engine/src/main/java/org/chovy/canvas/engine/handlers/SubFlowRefHandler.java`
+- Production: `backend/canvas-engine/src/main/java/org/chovy/canvas/engine/handlers/PointsOperationHandler.java`
+- Production: `backend/canvas-engine/src/main/java/org/chovy/canvas/engine/handlers/SendMqHandler.java`
+- Production: `backend/canvas-engine/src/main/java/org/chovy/canvas/engine/handlers/MqTriggerHandler.java`
+- Production: `backend/canvas-engine/src/main/java/org/chovy/canvas/domain/canvas/SubFlowLookupService.java`
+- Production: `backend/canvas-engine/src/main/java/org/chovy/canvas/domain/canvas/ConnectedContentGateway.java`
+- Production: `backend/canvas-engine/src/main/java/org/chovy/canvas/domain/canvas/ConnectedContentGatewayService.java`
+- Production: `backend/canvas-engine/src/main/java/org/chovy/canvas/domain/cdp/CustomerPointsLedgerService.java`
+- Production: `backend/canvas-engine/src/main/java/org/chovy/canvas/domain/meta/MqMessageDefinitionService.java`
+- Test: `backend/canvas-engine/src/test/java/org/chovy/canvas/engine/handlers/SubFlowRefHandlerTest.java`
+- Test: `backend/canvas-engine/src/test/java/org/chovy/canvas/engine/handlers/PointsOperationHandlerTest.java`
+- Test: `backend/canvas-engine/src/test/java/org/chovy/canvas/engine/handlers/SendMqHandlerTest.java`
+- Test: `backend/canvas-engine/src/test/java/org/chovy/canvas/engine/handlers/MqTriggerHandlerTest.java`
+- Test: `backend/canvas-engine/src/test/java/org/chovy/canvas/engine/handlers/ConnectedContentHandlerTest.java`
+- Test: `backend/canvas-engine/src/test/java/org/chovy/canvas/domain/canvas/ConnectedContentGatewayServiceTest.java`
 
-Existing package notes:
-- Source task has no additional notes beyond its title.
+- [x] Move subflow lookup, points ledger writes, and MQ definition lookup behind domain service methods.
+- [x] Move connected content cache lookup/save and outbound HTTP gateway behind a domain gateway service.
+- [x] Keep handler tests focused on node input, node output, idempotency, and failure semantics.
+- [x] Scan handler package for remaining direct mapper injections and record accepted residuals in evidence.
 
-- [ ] **Step 1: Lock the failing behavior**
+Run:
 
-Read `../specs/P1-01-dag-engine-and-handler-boundaries-spec.md` and write the smallest failing test or documentation check that demonstrates this task gap before changing implementation files.
+```bash
+cd backend && mvn -pl canvas-engine -Dtest=SubFlowRefHandlerTest,PointsOperationHandlerTest,SendMqHandlerTest,MqTriggerHandlerTest test
+rg -n "Mapper" backend/canvas-engine/src/main/java/org/chovy/canvas/engine/handlers
+# Do not stage or commit in this session unless the user explicitly asks.
+```
 
-- [ ] **Step 2: Run the focused check before implementation**
+Result on 2026-06-04:
 
-Run the narrowest backend, frontend, or documentation command that exercises the new check. Expected result before implementation: the new check fails or the documentation diff shows the missing section.
+- Added `SubFlowLookupService`, `CustomerPointsLedgerService`, and `MqMessageDefinitionService`.
+- Updated `SubFlowRefHandler`, `PointsOperationHandler`, `SendMqHandler`, and `MqTriggerHandler` to depend on those services.
+- Added/updated `SubFlowRefHandlerTest`, `PointsOperationHandlerTest`, `SendMqHandlerTest`, `MqTriggerHandlerTest`, and `BlockingHandlerAssemblyTest`.
+- Focused command passed: `cd backend && mvn -pl canvas-engine -Dtest=BlockingHandlerAssemblyTest,PointsOperationHandlerTest,SubFlowRefHandlerTest,SendMqHandlerTest,MqTriggerHandlerTest test`
+- Focused result: 19 tests, 0 failures, 0 errors, 0 skipped.
+- Added `ConnectedContentGateway` and `ConnectedContentGatewayService`; updated `ConnectedContentHandler` to depend on the gateway interface.
+- Added `ConnectedContentGatewayServiceTest` and updated `ConnectedContentHandlerTest`.
+- Expanded focused command passed: `cd backend && mvn -pl canvas-engine -Dtest=ConnectedContentGatewayServiceTest,ConnectedContentHandlerTest,BlockingHandlerAssemblyTest,PointsOperationHandlerTest,SubFlowRefHandlerTest,SendMqHandlerTest,MqTriggerHandlerTest test`
+- Expanded focused result: 30 tests, 0 failures, 0 errors, 0 skipped.
+- Handler mapper scan returned no `org.chovy.canvas.dal.mapper` imports in `backend/canvas-engine/src/main/java/org/chovy/canvas/engine/handlers`.
+- Full backend command passed: `cd backend && mvn -pl canvas-engine test`
+- Full result: 505 tests, 0 failures, 0 errors, 0 skipped.
 
-- [ ] **Step 3: Implement the scoped change**
-
-Change only the files required by this task and keep the behavior aligned with the acceptance criteria in `../specs/P1-01-dag-engine-and-handler-boundaries-spec.md`.
-
-- [ ] **Step 4: Verify the task**
-
-Run the same focused command again. Expected result after implementation: pass, or documentation check exits 0.
-
-- [ ] **Step 5: Review the scoped diff**
-
-Run `git diff -- .` and verify the diff only touches files justified by this task and the package spec.
-
-### Task 5: Move handlers into domain-oriented packages only after tests are in place
-
-**Files:**
-- Read: `../specs/P1-01-dag-engine-and-handler-boundaries-spec.md`
-- Read: `../todo/coverage-matrix.md`
-- Modify: repository files named in this package spec evidence
-- Test: focused tests created beside the affected code
-
-Existing package notes:
-- Source task has no additional notes beyond its title.
-
-- [ ] **Step 1: Lock the failing behavior**
-
-Read `../specs/P1-01-dag-engine-and-handler-boundaries-spec.md` and write the smallest failing test or documentation check that demonstrates this task gap before changing implementation files.
-
-- [ ] **Step 2: Run the focused check before implementation**
-
-Run the narrowest backend, frontend, or documentation command that exercises the new check. Expected result before implementation: the new check fails or the documentation diff shows the missing section.
-
-- [ ] **Step 3: Implement the scoped change**
-
-Change only the files required by this task and keep the behavior aligned with the acceptance criteria in `../specs/P1-01-dag-engine-and-handler-boundaries-spec.md`.
-
-- [ ] **Step 4: Verify the task**
-
-Run the same focused command again. Expected result after implementation: pass, or documentation check exits 0.
-
-- [ ] **Step 5: Review the scoped diff**
-
-Run `git diff -- .` and verify the diff only touches files justified by this task and the package spec.
-
-### Task 6: Run backend tests after each extraction step
+### Task 5: Validate DAG boundaries
 
 **Files:**
-- Read: `../specs/P1-01-dag-engine-and-handler-boundaries-spec.md`
-- Read: `../todo/coverage-matrix.md`
-- Modify: repository files named in this package spec evidence
-- Test: focused tests created beside the affected code
+- Docs: `docs/architecture/evidence/P1-01-dag-engine-boundaries.md`
+- Plan: `docs/architecture/plans/P1-01-dag-engine-and-handler-boundaries-plan.md`
+- Spec: `docs/architecture/specs/P1-01-dag-engine-and-handler-boundaries-spec.md`
 
-Existing package notes:
-- Source task has no additional notes beyond its title.
+- [x] Run the package test set after all extractions.
+- [x] Re-run line count and mapper-in-handler scans.
+- [x] Run the backend module suite after focused checks pass.
 
-- [ ] **Step 1: Lock the failing behavior**
+Current line counts are `DagEngine.java` 1387 lines and `CanvasExecutionService.java` 850 lines.
 
-Read `../specs/P1-01-dag-engine-and-handler-boundaries-spec.md` and write the smallest failing test or documentation check that demonstrates this task gap before changing implementation files.
+Run:
 
-- [ ] **Step 2: Run the focused check before implementation**
+```bash
+cd backend && mvn -pl canvas-engine -Dtest=DagEngineCommitActionTest,DagEngineDepthTest,DagEnginePendingTest,CanvasExecutionServiceResumeTest,NodeGateCoordinatorTest,NodeTimeoutCoordinatorTest,NodeResultRouterTest,ExecutionDlqWriterTest,TriggerAdmissionServiceTest,CanvasExecutionConfigLoaderTest,ExecutionLaneDispatcherTest,SubFlowRefHandlerTest,PointsOperationHandlerTest,SendMqHandlerTest,MqTriggerHandlerTest test
+wc -l backend/canvas-engine/src/main/java/org/chovy/canvas/engine/scheduler/DagEngine.java backend/canvas-engine/src/main/java/org/chovy/canvas/engine/trigger/CanvasExecutionService.java
+rg -n "Mapper" backend/canvas-engine/src/main/java/org/chovy/canvas/engine/handlers || true
+cd backend && mvn -pl canvas-engine test
+# Do not stage or commit in this session unless the user explicitly asks.
+```
 
-Run the narrowest backend, frontend, or documentation command that exercises the new check. Expected result before implementation: the new check fails or the documentation diff shows the missing section.
+Expected: focused and backend module tests pass; evidence shows reduced responsibilities and no unowned direct mapper injection in node handlers.
 
-- [ ] **Step 3: Implement the scoped change**
+Result on 2026-06-04:
 
-Change only the files required by this task and keep the behavior aligned with the acceptance criteria in `../specs/P1-01-dag-engine-and-handler-boundaries-spec.md`.
-
-- [ ] **Step 4: Verify the task**
-
-Run the same focused command again. Expected result after implementation: pass, or documentation check exits 0.
-
-- [ ] **Step 5: Review the scoped diff**
-
-Run `git diff -- .` and verify the diff only touches files justified by this task and the package spec.
-
+- P1-01 package command passed: `cd backend && mvn -pl canvas-engine -Dtest=DagEngineCommitActionTest,DagEngineDepthTest,DagEnginePendingTest,DagEngineLifecycleTest,CanvasExecutionServiceResumeTest,NodeGateCoordinatorTest,NodeTimeoutCoordinatorTest,NodeResultRouterTest,ExecutionDlqWriterTest,TriggerAdmissionServiceTest,CanvasExecutionConfigLoaderTest,ExecutionLaneDispatcherTest,SubFlowRefHandlerTest,PointsOperationHandlerTest,SendMqHandlerTest,MqTriggerHandlerTest,ConnectedContentHandlerTest,ConnectedContentGatewayServiceTest,BlockingHandlerAssemblyTest,WaitResumeServiceTest,NodeTypeGovernanceTest test`
+- P1-01 package result: 72 tests, 0 failures, 0 errors, 0 skipped.
+- Handler mapper scan result: no `org.chovy.canvas.dal.mapper` imports under `backend/canvas-engine/src/main/java/org/chovy/canvas/engine/handlers`.
+- `CanvasExecutionService` boundary scan result: no direct `CanvasMapper`, `CanvasVersionMapper`, `CanvasConfigCache`, `CanvasEntityCache`, `DagParser`, `MqTriggerHandler`, `RocketMQTemplate`, `TriggerPriorityConfig`, or `ExecutionLaneResolver` references.
+- Full backend command passed: `cd backend && mvn -pl canvas-engine test`
+- Full backend result: 601 tests, 0 failures, 0 errors, 1 skipped.

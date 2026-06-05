@@ -39,6 +39,18 @@ public final class ErrorCode {
     /** 并发编辑冲突（乐观锁）。 */
     public static final String CANVAS_010 = "CANVAS_010";
 
+    // API 边界：请求格式、校验和通用 HTTP 错误
+    /** 请求参数校验失败。 */
+    public static final String API_001 = "API_001";
+    /** 请求体格式不合法。 */
+    public static final String API_002 = "API_002";
+    /** 资源不存在。 */
+    public static final String API_003 = "API_003";
+    /** 请求状态冲突。 */
+    public static final String API_004 = "API_004";
+    /** 服务端内部错误。 */
+    public static final String API_005 = "API_005";
+
     // 执行相关：运行期定位、超时、调用链限制
     /** 触发器节点未找到。 */
     public static final String EXEC_001 = "EXEC_001";

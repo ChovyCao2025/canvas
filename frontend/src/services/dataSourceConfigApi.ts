@@ -23,8 +23,8 @@ export interface DataSourceConfig {
   /** 登录用户名。 */
   username: string
 
-  /** 登录密码；列表接口可能返回脱敏值，保存时按后端约定处理。 */
-  password: string
+  /** 登录密码；后端按 write-only 处理，列表接口不会返回明文。 */
+  password?: string
 
   /** JDBC 驱动类名，部分数据库需要显式指定。 */
   driverClassName?: string
@@ -43,6 +43,10 @@ export interface DataSourceConfig {
 
   /** 更新时间。 */
   updatedAt?: string
+}
+
+export interface DataSourceConfigPayload extends Omit<DataSourceConfig, 'id' | 'createdAt' | 'updatedAt'> {
+  password: string
 }
 
 /** 数据源表结构元数据，供配置表名和用户 ID 列时下拉选择。 */
@@ -65,11 +69,11 @@ export const dataSourceConfigApi = {
     http.get<R<DataSourceTableMeta[]>, R<DataSourceTableMeta[]>>(`/canvas/data-sources/${id}/tables`),
 
   /** 新建数据源配置。 */
-  create: (body: DataSourceConfig) =>
+  create: (body: DataSourceConfigPayload) =>
     http.post<R<DataSourceConfig>, R<DataSourceConfig>>('/canvas/data-sources', body),
 
   /** 更新数据源配置。 */
-  update: (id: number, body: DataSourceConfig) =>
+  update: (id: number, body: DataSourceConfigPayload) =>
     http.put<R<void>, R<void>>(`/canvas/data-sources/${id}`, body),
 
   /** 删除数据源配置；已有业务引用时由后端决定是否允许删除。 */

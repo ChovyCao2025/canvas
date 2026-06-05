@@ -2,10 +2,12 @@ package org.chovy.canvas.engine.request;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import lombok.RequiredArgsConstructor;
+import org.chovy.canvas.dal.dataobject.CanvasDO;
 import org.chovy.canvas.dal.dataobject.CanvasExecutionRequestDO;
+import org.chovy.canvas.dal.mapper.CanvasMapper;
 import org.chovy.canvas.dal.mapper.CanvasExecutionRequestMapper;
 import org.chovy.canvas.perf.PerfRunContext;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.nio.charset.StandardCharsets;
@@ -21,13 +23,27 @@ import java.util.UUID;
  * <p>该层位于触发入口和 DAG 执行之间，核心目标是保护执行引擎稳定性。
  */
 @Service
-@RequiredArgsConstructor
 public class CanvasExecutionRequestService {
 
     /** 执行请求 Mapper，用于落库排队请求并支持幂等插入。 */
     private final CanvasExecutionRequestMapper mapper;
     /** Jackson ObjectMapper，用于 JSON 序列化和反序列化。 */
     private final ObjectMapper objectMapper;
+    /** 画布 Mapper，用于按目标画布解析租户归属。 */
+    private final CanvasMapper canvasMapper;
+
+    public CanvasExecutionRequestService(CanvasExecutionRequestMapper mapper, ObjectMapper objectMapper) {
+        this(mapper, objectMapper, null);
+    }
+
+    @Autowired
+    public CanvasExecutionRequestService(CanvasExecutionRequestMapper mapper,
+                                         ObjectMapper objectMapper,
+                                         CanvasMapper canvasMapper) {
+        this.mapper = mapper;
+        this.objectMapper = objectMapper;
+        this.canvasMapper = canvasMapper;
+    }
 
     /** 将触发请求写入执行请求表，供异步派发。 */
     public String enqueue(Long canvasId,
@@ -40,6 +56,7 @@ public class CanvasExecutionRequestService {
         String requestId = buildRequestId(canvasId, triggerType, sourceMsgId);
         CanvasExecutionRequestDO request = new CanvasExecutionRequestDO();
         request.setId(requestId);
+        request.setTenantId(resolveTenantId(canvasId));
         request.setCanvasId(canvasId);
         request.setUserId(userId);
         // 压测批次标识直接写入请求记录，后续执行和指标可沿着同一条链路关联。
@@ -55,6 +72,17 @@ public class CanvasExecutionRequestService {
         request.setAttemptCount(0);
         mapper.insertIgnore(request);
         return requestId;
+    }
+
+    private Long resolveTenantId(Long canvasId) {
+        if (canvasMapper == null) {
+            return null;
+        }
+        CanvasDO canvas = canvasMapper.selectById(canvasId);
+        if (canvas == null) {
+            throw new IllegalArgumentException("Canvas not found: " + canvasId);
+        }
+        return canvas.getTenantId();
     }
 
     /** 根据来源消息 ID 生成幂等请求 ID；无来源 ID 时生成随机请求 ID。 */

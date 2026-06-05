@@ -11,6 +11,7 @@ import org.chovy.canvas.dal.mapper.AudienceComputeRunMapper;
 import org.chovy.canvas.dal.dataobject.AudienceStatDO;
 import org.chovy.canvas.dal.mapper.AudienceStatMapper;
 import org.chovy.canvas.engine.rule.AudienceDefinitionRuleValidator;
+import org.chovy.canvas.infrastructure.reactor.BlockingWorkScheduler;
 import org.roaringbitmap.RoaringBitmap;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.jdbc.DataSourceBuilder;
@@ -71,6 +72,8 @@ public class AudienceBatchComputeService {
     private final CdpAudienceSourceService cdpAudienceSourceService;
     /** 统一 HTTP 客户端构建器，继承全局超时、连接池和响应大小限制。 */
     private final WebClient.Builder webClientBuilder;
+    /** 统一阻塞适配器，离线计算线程上等待远程响应时集中做线程边界校验。 */
+    private final BlockingWorkScheduler blockingWorkScheduler;
 
     /** Tagger 服务地址。 */
     @Value("${canvas.integration.tagger-service-url}")
@@ -241,15 +244,16 @@ public class AudienceBatchComputeService {
         while (true) {
             int currentPage = page;
             // 先按种子标签分页取候选用户，避免对全量用户逐个拉取上下文。
-            Map<String, Object> response = client.get()
-                    .uri(uriBuilder -> uriBuilder.path("/offline/users")
-                            .queryParam("tagCode", seedTagCode)
-                            .queryParam("page", currentPage)
-                            .queryParam("size", PAGE_SIZE)
-                            .build())
-                    .retrieve()
-                    .bodyToMono(new ParameterizedTypeReference<Map<String, Object>>() {})
-                    .block();
+            Map<String, Object> response = blockingWorkScheduler.await(
+                    "audience seed users fetch",
+                    client.get()
+                            .uri(uriBuilder -> uriBuilder.path("/offline/users")
+                                    .queryParam("tagCode", seedTagCode)
+                                    .queryParam("page", currentPage)
+                                    .queryParam("size", PAGE_SIZE)
+                                    .build())
+                            .retrieve()
+                            .bodyToMono(new ParameterizedTypeReference<Map<String, Object>>() {}));
             List<String> userIds = extractUserIds(response);
             if (userIds.isEmpty()) {
                 break;

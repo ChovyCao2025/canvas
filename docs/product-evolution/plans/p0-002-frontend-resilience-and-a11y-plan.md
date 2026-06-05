@@ -8,6 +8,11 @@
 
 **Tech Stack:** React 18, React Router 6, Ant Design, Axios, Vite, Vitest, jsdom, Testing Library React, TypeScript.
 
+## Implementation Status
+
+- Status: implemented and verified on 2026-06-05.
+- Commit: not created in this session because the worktree contains many unrelated and parallel product-evolution changes.
+
 ---
 
 ## Spec Reference
@@ -56,13 +61,17 @@
 - Modify: `frontend/vite.config.ts`
 - Create: `frontend/src/test/setupTests.ts`
 
-- [ ] **Step 1: Install component-test dependencies**
+- [x] **Step 1: Install component-test dependencies**
 
-Run: `cd frontend && npm install -D jsdom @testing-library/react @testing-library/jest-dom @testing-library/user-event`
+Run:
+
+```bash
+cd frontend && npm install -D jsdom @testing-library/react @testing-library/jest-dom @testing-library/user-event
+```
 
 Expected: `package.json` and `package-lock.json` include the four dev dependencies.
 
-- [ ] **Step 2: Add Testing Library setup file**
+- [x] **Step 2: Add Testing Library setup file**
 
 Create `frontend/src/test/setupTests.ts`.
 
@@ -70,7 +79,7 @@ Create `frontend/src/test/setupTests.ts`.
 import '@testing-library/jest-dom/vitest'
 ```
 
-- [ ] **Step 3: Wire setup without changing the default environment**
+- [x] **Step 3: Wire setup without changing the default environment**
 
 Modify `frontend/vite.config.ts`.
 
@@ -83,9 +92,13 @@ test: {
 
 Component tests must start with `/* @vitest-environment jsdom */`; pure helper tests keep the existing `node` behavior.
 
-- [ ] **Step 4: Run an existing pure test**
+- [x] **Step 4: Run an existing pure test**
 
-Run: `cd frontend && npm test -- homeOverview.test.ts`
+Run:
+
+```bash
+cd frontend && npm test -- homeOverview.test.ts
+```
 
 Expected: PASS; the setup file does not require jsdom for existing pure tests.
 
@@ -100,7 +113,7 @@ Expected: PASS; the setup file does not require jsdom for existing pure tests.
 - Modify: `frontend/src/auth/guards.tsx`
 - Modify: `frontend/src/App.tsx`
 
-- [ ] **Step 1: Write ErrorBoundary component tests**
+- [x] **Step 1: Write ErrorBoundary component tests**
 
 Create `AppErrorBoundary.test.tsx`.
 
@@ -139,7 +152,7 @@ describe('AppErrorBoundary', () => {
 })
 ```
 
-- [ ] **Step 2: Write route fallback tests**
+- [x] **Step 2: Write route fallback tests**
 
 Create `routeFallbacks.test.tsx`.
 
@@ -168,13 +181,17 @@ describe('route fallback pages', () => {
 })
 ```
 
-- [ ] **Step 3: Run fallback tests and confirm red state**
+- [x] **Step 3: Run fallback tests and confirm red state**
 
-Run: `cd frontend && npm test -- AppErrorBoundary.test.tsx routeFallbacks.test.tsx`
+Run:
+
+```bash
+cd frontend && npm test -- AppErrorBoundary.test.tsx routeFallbacks.test.tsx
+```
 
 Expected: FAIL because the three components do not exist yet.
 
-- [ ] **Step 4: Implement fallback components**
+- [x] **Step 4: Implement fallback components**
 
 Create `AppErrorBoundary.tsx`.
 
@@ -228,7 +245,7 @@ export default function NotFoundPage() {
 }
 ```
 
-- [ ] **Step 5: Wire route guards and catch-all route**
+- [x] **Step 5: Wire route guards and catch-all route**
 
 In `guards.tsx`, replace inline forbidden `<div>` returns with `<ForbiddenPage />`.
 
@@ -254,9 +271,13 @@ In `App.tsx`, import `AppErrorBoundary` and `NotFoundPage`. Wrap the routed app 
 </AppErrorBoundary>
 ```
 
-- [ ] **Step 6: Run fallback tests and confirm green state**
+- [x] **Step 6: Run fallback tests and confirm green state**
 
-Run: `cd frontend && npm test -- AppErrorBoundary.test.tsx routeFallbacks.test.tsx`
+Run:
+
+```bash
+cd frontend && npm test -- AppErrorBoundary.test.tsx routeFallbacks.test.tsx
+```
 
 Expected: PASS.
 
@@ -267,7 +288,7 @@ Expected: PASS.
 - Create: `frontend/src/services/apiError.ts`
 - Modify: `frontend/src/services/api.ts`
 
-- [ ] **Step 1: Write error-classification tests**
+- [x] **Step 1: Write error-classification tests**
 
 Create `apiResilience.test.ts`.
 
@@ -301,13 +322,17 @@ describe('classifyApiError', () => {
 })
 ```
 
-- [ ] **Step 2: Run API tests and confirm red state**
+- [x] **Step 2: Run API tests and confirm red state**
 
-Run: `cd frontend && npm test -- apiResilience.test.ts`
+Run:
+
+```bash
+cd frontend && npm test -- apiResilience.test.ts
+```
 
 Expected: FAIL because `apiError.ts` does not exist.
 
-- [ ] **Step 3: Implement `apiError.ts`**
+- [x] **Step 3: Implement `apiError.ts`**
 
 Create `frontend/src/services/apiError.ts`.
 
@@ -335,7 +360,7 @@ export function classifyApiError(error: any): ClassifiedApiError {
 }
 ```
 
-- [ ] **Step 4: Update shared Axios client**
+- [x] **Step 4: Update shared Axios client**
 
 Modify the `http` client in `api.ts`.
 
@@ -357,9 +382,13 @@ if (classified.kind === 'unauthorized') {
 return Promise.reject(classified)
 ```
 
-- [ ] **Step 5: Run API tests and build**
+- [x] **Step 5: Run API tests and build**
 
-Run: `cd frontend && npm test -- apiResilience.test.ts && npm run build`
+Run:
+
+```bash
+cd frontend && npm test -- apiResilience.test.ts && npm run build
+```
 
 Expected: PASS; TypeScript accepts the classified error export and Axios timeout option.
 
@@ -372,7 +401,7 @@ Expected: PASS; TypeScript accepts the classified error export and Axios timeout
 - Modify: `frontend/src/components/layout/AppLayout.tsx`
 - Modify: `frontend/src/App.tsx`
 
-- [ ] **Step 1: Write accessibility shell tests**
+- [x] **Step 1: Write accessibility shell tests**
 
 Create `AppLayout.a11y.test.tsx`.
 
@@ -398,13 +427,17 @@ describe('app shell accessibility', () => {
 })
 ```
 
-- [ ] **Step 2: Run accessibility tests and confirm red state**
+- [x] **Step 2: Run accessibility tests and confirm red state**
 
-Run: `cd frontend && npm test -- AppLayout.a11y.test.tsx`
+Run:
+
+```bash
+cd frontend && npm test -- AppLayout.a11y.test.tsx
+```
 
 Expected: FAIL because `LiveRegion` and `RouteA11y` do not exist.
 
-- [ ] **Step 3: Implement `LiveRegion`**
+- [x] **Step 3: Implement `LiveRegion`**
 
 Create `LiveRegion.tsx`.
 
@@ -426,7 +459,7 @@ export default function LiveRegion({ message }: { message: string }) {
 }
 ```
 
-- [ ] **Step 4: Implement route announcements and focus**
+- [x] **Step 4: Implement route announcements and focus**
 
 Create `RouteA11y.tsx`.
 
@@ -456,7 +489,7 @@ export default function RouteA11y() {
 }
 ```
 
-- [ ] **Step 5: Wire app shell landmarks**
+- [x] **Step 5: Wire app shell landmarks**
 
 In `App.tsx`, render `<RouteA11y />` inside `BrowserRouter` before `Routes`.
 
@@ -472,9 +505,13 @@ In `AppLayout.tsx`, add a skip link before the `Sider`, add `role="navigation"` 
 </Content>
 ```
 
-- [ ] **Step 6: Run accessibility tests and build**
+- [x] **Step 6: Run accessibility tests and build**
 
-Run: `cd frontend && npm test -- AppLayout.a11y.test.tsx && npm run build`
+Run:
+
+```bash
+cd frontend && npm test -- AppLayout.a11y.test.tsx && npm run build
+```
 
 Expected: PASS.
 
@@ -485,7 +522,7 @@ Expected: PASS.
 - Create: `frontend/src/pages/canvas-editor/unsavedChangeGuard.ts`
 - Modify: `frontend/src/pages/canvas-editor/index.tsx`
 
-- [ ] **Step 1: Write unload guard tests**
+- [x] **Step 1: Write unload guard tests**
 
 Create `unsavedChangeGuard.test.ts`.
 
@@ -513,13 +550,17 @@ describe('unsavedChangeGuard', () => {
 })
 ```
 
-- [ ] **Step 2: Run unload tests and confirm red state**
+- [x] **Step 2: Run unload tests and confirm red state**
 
-Run: `cd frontend && npm test -- unsavedChangeGuard.test.ts`
+Run:
+
+```bash
+cd frontend && npm test -- unsavedChangeGuard.test.ts
+```
 
 Expected: FAIL because `unsavedChangeGuard.ts` does not exist.
 
-- [ ] **Step 3: Implement unload guard helpers**
+- [x] **Step 3: Implement unload guard helpers**
 
 Create `unsavedChangeGuard.ts`.
 
@@ -544,7 +585,7 @@ export function bindBeforeUnloadGuard(shouldWarn: () => boolean) {
 }
 ```
 
-- [ ] **Step 4: Wire canvas editor dirty state**
+- [x] **Step 4: Wire canvas editor dirty state**
 
 In `frontend/src/pages/canvas-editor/index.tsx`, import the helpers and add an effect near the existing local-draft dirty-state effect.
 
@@ -554,9 +595,13 @@ useEffect(() => {
 }, [isDirty, readonly])
 ```
 
-- [ ] **Step 5: Run unload tests and editor build**
+- [x] **Step 5: Run unload tests and editor build**
 
-Run: `cd frontend && npm test -- unsavedChangeGuard.test.ts && npm run build`
+Run:
+
+```bash
+cd frontend && npm test -- unsavedChangeGuard.test.ts && npm run build
+```
 
 Expected: PASS; TypeScript accepts `BeforeUnloadEvent` and the editor registers the guard only while mounted.
 
@@ -566,25 +611,37 @@ Expected: PASS; TypeScript accepts `BeforeUnloadEvent` and the editor registers 
 - Modify: `docs/product-evolution/specs/p0-002-frontend-resilience-and-a11y.md`
 - Modify: `docs/product-evolution/plans/p0-002-frontend-resilience-and-a11y-plan.md`
 
-- [ ] **Step 1: Run focused frontend tests**
+- [x] **Step 1: Run focused frontend tests**
 
-Run: `cd frontend && npm test -- AppErrorBoundary.test.tsx routeFallbacks.test.tsx apiResilience.test.ts AppLayout.a11y.test.tsx unsavedChangeGuard.test.ts`
+Run:
+
+```bash
+cd frontend && npm test -- AppErrorBoundary.test.tsx routeFallbacks.test.tsx apiResilience.test.ts AppLayout.a11y.test.tsx unsavedChangeGuard.test.ts
+```
 
 Expected: PASS for all P0-002 tests.
 
-- [ ] **Step 2: Run existing frontend suite**
+- [x] **Step 2: Run existing frontend suite**
 
-Run: `cd frontend && npm test`
+Run:
+
+```bash
+cd frontend && npm test
+```
 
 Expected: PASS for existing pure tests and new jsdom component tests.
 
-- [ ] **Step 3: Run frontend production build**
+- [x] **Step 3: Run frontend production build**
 
-Run: `cd frontend && npm run build`
+Run:
+
+```bash
+cd frontend && npm run build
+```
 
 Expected: PASS with TypeScript and Vite build success.
 
-- [ ] **Step 4: Add rollout notes to the implementation PR**
+- [x] **Step 4: Add rollout notes to the implementation PR**
 
 Use this exact checklist in the PR body.
 
@@ -597,8 +654,38 @@ Rollout notes:
 - Dirty editor unload warning is active only when the canvas editor has unsaved writable changes.
 ```
 
+### Verification Evidence
+
+- Focused frontend suite:
+
+```bash
+cd frontend && npm test -- AppErrorBoundary.test.tsx routeFallbacks.test.tsx apiResilience.test.ts AppLayout.a11y.test.tsx unsavedChangeGuard.test.ts
+```
+
+Result: 5 test files, 15 tests passed.
+
+- Frontend module regression:
+
+```bash
+cd frontend && npm test
+```
+
+Result: 73 test files, 271 tests passed.
+
+- Frontend production build:
+
+```bash
+cd frontend && npm run build
+```
+
+Result: passed.
+
 - [ ] **Step 5: Commit the implementation slice**
 
-Run: `git add frontend/package.json frontend/package-lock.json frontend/vite.config.ts frontend/src docs/product-evolution/specs/p0-002-frontend-resilience-and-a11y.md docs/product-evolution/plans/p0-002-frontend-resilience-and-a11y-plan.md && git commit -m "feat: add frontend resilience shell"`
+Run:
+
+```bash
+git add frontend/package.json frontend/package-lock.json frontend/vite.config.ts frontend/src docs/product-evolution/specs/p0-002-frontend-resilience-and-a11y.md docs/product-evolution/plans/p0-002-frontend-resilience-and-a11y-plan.md && git commit -m "feat: add frontend resilience shell"
+```
 
 Expected: commit contains the P0-002 frontend resilience and accessibility slice.

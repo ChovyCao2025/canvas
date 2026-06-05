@@ -8,6 +8,7 @@ import lombok.RequiredArgsConstructor;
 import org.chovy.canvas.common.OutboundUrlValidator;
 import org.chovy.canvas.dto.TagImportResult;
 import org.chovy.canvas.dto.TagImportRow;
+import org.chovy.canvas.infrastructure.reactor.BlockingWorkScheduler;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
@@ -53,6 +54,8 @@ public class TagImportSourceService {
     private final ObjectMapper objectMapper;
     /** WebClient 构建器，用于创建远程 HTTP 调用客户端。 */
     private final WebClient.Builder webClientBuilder;
+    /** 统一阻塞适配器，避免在 Netty 事件循环线程上等待远程调用结果。 */
+    private final BlockingWorkScheduler blockingWorkScheduler;
 
     /** 按条件查询列表数据。 */
     public List<TagImportSourceDO> list(Integer enabled) {
@@ -140,7 +143,9 @@ public class TagImportSourceService {
                     .contentType(MediaType.APPLICATION_JSON)
                     .bodyValue(parseBodyTemplate(source.getBodyTemplate()));
         }
-        return spec.retrieve().bodyToMono(JsonNode.class).block();
+        return blockingWorkScheduler.await(
+                "tag-import-source remote request",
+                spec.retrieve().bodyToMono(JsonNode.class));
     }
 
     /** 将配置中的 JSON 头信息追加到 WebClient 请求。 */

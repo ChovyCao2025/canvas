@@ -4,6 +4,7 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import org.chovy.canvas.common.MapFieldKeys;
+import org.chovy.canvas.infrastructure.reactor.BlockingWorkScheduler;
 import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.client.WebClient;
 
@@ -26,6 +27,8 @@ public class AudienceEvaluationContextFetcher {
 
     /** 规则 JSON 解析器。 */
     private final ObjectMapper objectMapper;
+    /** 统一阻塞适配器，避免直接在事件循环线程上等待 Tagger API。 */
+    private final BlockingWorkScheduler blockingWorkScheduler;
     private final ConcurrentMap<String, List<String>> fieldCache = new ConcurrentHashMap<>();
 
     /**
@@ -42,13 +45,14 @@ public class AudienceEvaluationContextFetcher {
             // 规则不依赖任何字段时，返回空上下文即可
             return Map.of();
         }
-        Map<String, Object> response = client.post()
-                .uri("/offline/user-tags/query")
-                // 只把规则里出现过的字段传给 Tagger，降低单用户上下文拉取成本。
-                .bodyValue(Map.of(MapFieldKeys.USER_ID, userId, MapFieldKeys.TAG_CODES, fields))
-                .retrieve()
-                .bodyToMono(new org.springframework.core.ParameterizedTypeReference<Map<String, Object>>() {})
-                .block();
+        Map<String, Object> response = blockingWorkScheduler.await(
+                "audience context fetch",
+                client.post()
+                        .uri("/offline/user-tags/query")
+                        // 只把规则里出现过的字段传给 Tagger，降低单用户上下文拉取成本。
+                        .bodyValue(Map.of(MapFieldKeys.USER_ID, userId, MapFieldKeys.TAG_CODES, fields))
+                        .retrieve()
+                        .bodyToMono(new org.springframework.core.ParameterizedTypeReference<Map<String, Object>>() {}));
         Object tags = response == null ? null : response.get("tags");
         if (!(tags instanceof Map<?, ?> tagMap)) {
             // 标签服务返回结构异常时降级为空上下文

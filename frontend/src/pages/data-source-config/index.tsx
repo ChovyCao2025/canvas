@@ -7,7 +7,7 @@ import { useEffect, useState } from 'react'
 import { Button, Form, Input, Modal, Popconfirm, Select, Space, Switch, Table, Tag, Typography, message } from 'antd'
 import { DeleteOutlined, EditOutlined, PlusOutlined } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
-import { dataSourceConfigApi, type DataSourceConfig } from '../../services/dataSourceConfigApi'
+import { dataSourceConfigApi, type DataSourceConfig, type DataSourceConfigPayload } from '../../services/dataSourceConfigApi'
 
 /** 页面标题组件别名。 */
 const { Title } = Typography
@@ -69,9 +69,10 @@ export default function DataSourceConfigPage() {
     const values = await form.validateFields()
     setSaving(true)
     try {
-      const body: DataSourceConfig = {
+      const body: DataSourceConfigPayload = {
         ...values,
         type: 'JDBC',
+        password: values.password ?? '',
         enabled: values.enabled ? 1 : 0,
       }
       if (editing?.id) {

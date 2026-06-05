@@ -1,0 +1,227 @@
+{{- if .Values.backend.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "canvas.backendName" . }}
+  namespace: {{ .Values.namespace }}
+  labels:
+    {{- include "canvas.labels" . | nindent 4 }}
+    app.kubernetes.io/component: backend
+spec:
+  replicas: {{ .Values.backend.replicaCount }}
+  revisionHistoryLimit: 10
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: {{ include "canvas.name" . }}
+      app.kubernetes.io/instance: {{ .Release.Name }}
+      app.kubernetes.io/component: backend
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: {{ .Values.backend.strategy.maxSurge }}
+      maxUnavailable: {{ .Values.backend.strategy.maxUnavailable }}
+  template:
+    metadata:
+      labels:
+        {{- include "canvas.labels" . | nindent 8 }}
+        app.kubernetes.io/component: backend
+    spec:
+      serviceAccountName: {{ .Values.backend.serviceAccountName }}
+      terminationGracePeriodSeconds: 60
+      {{- with .Values.global.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: {{ .Values.backend.name }}
+          image: "{{ .Values.backend.image.repository }}:{{ .Values.backend.image.tag }}"
+          imagePullPolicy: {{ .Values.backend.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.backend.containerPort }}
+          env:
+            - name: SPRING_PROFILES_ACTIVE
+              value: {{ .Values.backend.profile | quote }}
+            - name: JAVA_OPTS
+              value: {{ .Values.backend.javaOpts | quote }}
+            - name: SPRING_DATASOURCE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.backend.secretName }}
+                  key: {{ .Values.backend.secretKeys.springDatasourceUrl }}
+            - name: SPRING_DATASOURCE_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.backend.secretName }}
+                  key: {{ .Values.backend.secretKeys.springDatasourceUsername }}
+            - name: SPRING_DATASOURCE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.backend.secretName }}
+                  key: {{ .Values.backend.secretKeys.springDatasourcePassword }}
+            - name: SPRING_DATASOURCE_HIKARI_MAXIMUM_POOL_SIZE
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ include "canvas.backendName" . }}
+                  key: spring-datasource-hikari-maximum-pool-size
+            - name: SPRING_DATASOURCE_HIKARI_MINIMUM_IDLE
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ include "canvas.backendName" . }}
+                  key: spring-datasource-hikari-minimum-idle
+            - name: SPRING_DATA_REDIS_HOST
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ include "canvas.backendName" . }}
+                  key: spring-data-redis-host
+            - name: SPRING_DATA_REDIS_PORT
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ include "canvas.backendName" . }}
+                  key: spring-data-redis-port
+            - name: SPRING_DATA_REDIS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.backend.secretName }}
+                  key: {{ .Values.backend.secretKeys.springDataRedisPassword }}
+            - name: ROCKETMQ_NAME_SERVER
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ include "canvas.backendName" . }}
+                  key: rocketmq-name-server
+            - name: CANVAS_CORS_ALLOWED_ORIGINS
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ include "canvas.backendName" . }}
+                  key: canvas-cors-allowed-origins
+            - name: CANVAS_FRONTEND_API_BASE_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ include "canvas.backendName" . }}
+                  key: canvas-frontend-api-base-url
+            - name: CANVAS_EVENT_REPORT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.backend.secretName }}
+                  key: {{ .Values.backend.secretKeys.canvasEventReportSecret }}
+            - name: CANVAS_INTERNAL_API_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.backend.secretName }}
+                  key: {{ .Values.backend.secretKeys.canvasInternalApiToken }}
+            - name: CANVAS_PUBLIC_TRIGGER_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.backend.secretName }}
+                  key: {{ .Values.backend.secretKeys.canvasPublicTriggerSecret }}
+            - name: CANVAS_JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.backend.secretName }}
+                  key: {{ .Values.backend.secretKeys.canvasJwtSecret }}
+            - name: CANVAS_SECRET_CIPHER_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.backend.secretName }}
+                  key: {{ .Values.backend.secretKeys.canvasSecretCipherKey }}
+          readinessProbe:
+            httpGet:
+              path: {{ .Values.backend.probes.readinessPath }}
+              port: http
+            initialDelaySeconds: {{ .Values.backend.probes.readinessInitialDelaySeconds }}
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 3
+          livenessProbe:
+            httpGet:
+              path: {{ .Values.backend.probes.livenessPath }}
+              port: http
+            initialDelaySeconds: {{ .Values.backend.probes.livenessInitialDelaySeconds }}
+            periodSeconds: 20
+            timeoutSeconds: 5
+            failureThreshold: 3
+          startupProbe:
+            httpGet:
+              path: {{ .Values.backend.probes.startupPath }}
+              port: http
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: {{ .Values.backend.probes.startupFailureThreshold }}
+          resources:
+            {{- toYaml .Values.backend.resources | nindent 12 }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+{{- end }}
+---
+{{- if .Values.frontend.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "canvas.frontendName" . }}
+  namespace: {{ .Values.namespace }}
+  labels:
+    {{- include "canvas.labels" . | nindent 4 }}
+    app.kubernetes.io/component: frontend
+spec:
+  replicas: {{ .Values.frontend.replicaCount }}
+  revisionHistoryLimit: 10
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: {{ include "canvas.name" . }}
+      app.kubernetes.io/instance: {{ .Release.Name }}
+      app.kubernetes.io/component: frontend
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  template:
+    metadata:
+      labels:
+        {{- include "canvas.labels" . | nindent 8 }}
+        app.kubernetes.io/component: frontend
+    spec:
+      serviceAccountName: {{ .Values.frontend.serviceAccountName }}
+      terminationGracePeriodSeconds: 30
+      {{- with .Values.global.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: {{ .Values.frontend.name }}
+          image: "{{ .Values.frontend.image.repository }}:{{ .Values.frontend.image.tag }}"
+          imagePullPolicy: {{ .Values.frontend.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.frontend.containerPort }}
+          env:
+            - name: CANVAS_API_UPSTREAM
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ include "canvas.frontendName" . }}
+                  key: canvas-api-upstream
+          readinessProbe:
+            httpGet:
+              path: {{ .Values.frontend.probes.readinessPath }}
+              port: http
+            initialDelaySeconds: {{ .Values.frontend.probes.readinessInitialDelaySeconds }}
+            periodSeconds: 10
+            timeoutSeconds: 3
+          livenessProbe:
+            httpGet:
+              path: {{ .Values.frontend.probes.livenessPath }}
+              port: http
+            initialDelaySeconds: {{ .Values.frontend.probes.livenessInitialDelaySeconds }}
+            periodSeconds: 20
+            timeoutSeconds: 5
+          resources:
+            {{- toYaml .Values.frontend.resources | nindent 12 }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+{{- end }}

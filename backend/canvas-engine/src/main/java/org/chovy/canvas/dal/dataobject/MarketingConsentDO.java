@@ -28,6 +28,9 @@ public class MarketingConsentDO {
     /** 营销授权记录主键 ID */
     private Long id;
 
+    @TableField("tenant_id")
+    private Long tenantId;
+
     /** 业务用户 ID */
     private String userId;
 

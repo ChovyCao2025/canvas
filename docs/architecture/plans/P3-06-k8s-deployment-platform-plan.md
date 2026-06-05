@@ -2,64 +2,101 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Turn the Kubernetes deployment proposal into deployable, testable platform assets.
+**Goal:** Turn the Kubernetes deployment proposal into environment-aware, renderable, and rollback-ready platform assets.
 
-**Architecture:** Build environment-aware deployment assets around explicit production SLOs and dependency ownership. Treat databases, Redis, and RocketMQ as managed dependencies unless the team commits to operating them.
+**Architecture:** Build deployment assets around explicit ownership and SLOs. Treat MySQL, Redis, and RocketMQ as managed dependencies unless an operating model assigns ownership, backup, HA, and restore responsibilities. Per `../specs/P3-00-architecture-boundary-review-spec.md`, Kubernetes topology is a platform deployment decision and must not define domain or service boundaries.
 
-**Tech Stack:** Kubernetes, Helm, Docker, Spring Boot actuator, Prometheus, Grafana, CI/CD pipeline tooling.
+**Tech Stack:** Kubernetes, Helm, Docker, Spring Boot actuator, Prometheus, Grafana, GitHub Actions, shell validation.
 
 ---
 
 ## Source Material
 
 - Spec: `../specs/P3-06-k8s-deployment-platform-spec.md`
+- Boundary review: `../specs/P3-00-architecture-boundary-review-spec.md`
+- Boundary evidence: `../evidence/p3-00-architecture-boundary-review.md`
 - Evolution doc: `../archive/evolution/k8s-deployment-plan.md`
 - Coverage matrix: `../todo/coverage-matrix.md`
 
 ## File Structure
 
-- Create: `deploy/helm/canvas/`
+- Create: `docs/architecture/evidence/p3-06-k8s-platform.md`
 - Create: `docs/architecture/k8s-operating-model.md`
-- Test: template rendering, smoke checks, and rollback drills
+- Create: `deploy/helm/canvas/Chart.yaml`
+- Create: `deploy/helm/canvas/values.yaml`
+- Create: `deploy/helm/canvas/values-staging.yaml`
+- Create: `deploy/helm/canvas/values-prod.yaml`
+- Create: `deploy/helm/canvas/templates/deployment.yaml`
+- Create: `deploy/helm/canvas/templates/service.yaml`
+- Create: `deploy/helm/canvas/templates/ingress.yaml`
+- Create: `deploy/helm/canvas/templates/configmap.yaml`
+- Create: `deploy/helm/canvas/templates/secret-ref.yaml`
+- Create: `docs/architecture/runbooks/k8s-rollout-rollback.md`
 
 ### Task 1: Define Operating Model
 
-- [ ] **Step 1: Document dependency ownership**
+**Files:**
+- Create: `docs/architecture/k8s-operating-model.md`
+- Create: `docs/architecture/evidence/p3-06-k8s-platform.md`
 
-Write `docs/architecture/k8s-operating-model.md` naming who operates MySQL, Redis, RocketMQ, ingress, monitoring, and secrets.
+- [x] Name owners for MySQL, Redis, RocketMQ, ingress, monitoring, secrets, image registry, and cluster upgrades.
+- [x] Define dev, staging, and production SLO/resource differences.
+- [x] Define which dependencies are managed services and which are self-operated.
 
-- [ ] **Step 2: Add SLO and environment matrix**
+Run:
 
-Include dev, staging, and production resource/SLO differences.
+```bash
+test -f docs/architecture/k8s-operating-model.md
+rg -n "MySQL|Redis|RocketMQ|Ingress|Monitoring|Secrets|SLO|staging|production|managed service|self-operated" docs/architecture/k8s-operating-model.md
+```
 
-- [ ] **Step 3: Verify completeness**
+Expected: operating model names dependency owners, environments, SLOs, and operating responsibility.
 
-Run `rg -n "MySQL|Redis|RocketMQ|Ingress|Secrets|SLO|Rollback" docs/architecture/k8s-operating-model.md`. Expected: all terms appear.
+### Task 2: Scaffold Renderable Helm Assets
 
-### Task 2: Scaffold Deployment Assets
+**Files:**
+- Create: `deploy/helm/canvas/Chart.yaml`
+- Create: `deploy/helm/canvas/values.yaml`
+- Create: `deploy/helm/canvas/values-staging.yaml`
+- Create: `deploy/helm/canvas/values-prod.yaml`
+- Create: `deploy/helm/canvas/templates/deployment.yaml`
+- Create: `deploy/helm/canvas/templates/service.yaml`
+- Create: `deploy/helm/canvas/templates/ingress.yaml`
+- Create: `deploy/helm/canvas/templates/configmap.yaml`
+- Create: `deploy/helm/canvas/templates/secret-ref.yaml`
 
-- [ ] **Step 1: Create Helm chart structure**
+- [x] Create chart metadata and environment-specific values.
+- [x] Define deployment, service, ingress, configmap, and secret-reference templates without embedding secrets.
+- [x] Include readiness/liveness probes, resource requests/limits, HPA-compatible labels, and actuator paths.
 
-Create chart, values files, deployment, service, ingress, config, and secret templates.
+Run:
 
-- [ ] **Step 2: Render templates locally**
+```bash
+test -f deploy/helm/canvas/Chart.yaml
+helm template canvas deploy/helm/canvas -f deploy/helm/canvas/values-staging.yaml >/tmp/canvas-staging.yaml
+rg -n "readinessProbe|livenessProbe|resources|secretKeyRef|actuator|Service|Ingress" /tmp/canvas-staging.yaml
+```
 
-Run the chart template command used by this repository or CI. Expected: Kubernetes YAML renders without missing values.
+Expected: Helm template renders staging YAML and includes probes, resources, secret references, actuator paths, service, and ingress resources.
 
-- [ ] **Step 3: Review diff**
+### Task 3: Add Rollout And Rollback Runbook
 
-Run `git diff -- deploy/helm docs/architecture/k8s-operating-model.md`. Expected: only platform deployment assets and operating docs are changed.
+**Files:**
+- Create: `docs/architecture/runbooks/k8s-rollout-rollback.md`
+- Modify: `docs/architecture/evidence/p3-06-k8s-platform.md`
+- Modify: `docs/architecture/plans/P3-06-k8s-deployment-platform-plan.md`
 
-### Task 3: Add Rollout And Rollback Checks
+- [x] Define smoke checks for health, metrics, frontend load, login, and one safe API request.
+- [x] Define rollback for image, config, migration, ingress, and dependency failure.
+- [x] Define evidence capture paths for rendered YAML, deployed image tag, smoke output, and rollback drill.
 
-- [ ] **Step 1: Define smoke checks**
+Run:
 
-Document health, metrics, frontend load, login, and one safe API request.
+```bash
+test -f docs/architecture/runbooks/k8s-rollout-rollback.md
+rg -n "Smoke|Health|Metrics|Login|Rollback|Migration|Image|Config|Evidence" docs/architecture/runbooks/k8s-rollout-rollback.md
+git diff -- deploy/helm/canvas docs/architecture/k8s-operating-model.md docs/architecture/runbooks/k8s-rollout-rollback.md docs/architecture/evidence/p3-06-k8s-platform.md docs/architecture/plans/P3-06-k8s-deployment-platform-plan.md
+# Do not stage or commit in this session unless the user explicitly asks.
+```
 
-- [ ] **Step 2: Define rollback**
-
-Document image rollback, config rollback, migration rollback, and dependency rollback boundaries.
-
-- [ ] **Step 3: Verify runbook sections**
-
-Run `rg -n "Smoke|Rollback|Migration|Health|Metrics" docs/architecture/k8s-operating-model.md`. Expected: all sections exist.
+Expected: documentation and Helm diff contains only Helm assets, K8s operating model, rollout/rollback runbook, evidence, and plan changes; no files are staged or committed.

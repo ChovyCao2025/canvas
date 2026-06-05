@@ -2,9 +2,9 @@ package org.chovy.canvas.infrastructure.cache;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.apache.rocketmq.spring.core.RocketMQTemplate;
 import org.chovy.cache.CacheInvalidationEvent;
 import org.chovy.cache.CacheInvalidationPublisher;
+import org.chovy.canvas.infrastructure.mq.CanvasMessageBus;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
@@ -15,8 +15,8 @@ import org.springframework.stereotype.Component;
 @Component
 @RequiredArgsConstructor
 public class RocketMqCacheInvalidationPublisher implements CacheInvalidationPublisher {
-    /** RocketMQ 发送模板，用于广播缓存失效事件。 */
-    private final RocketMQTemplate rocketMQTemplate;
+    /** 画布消息总线，用于广播缓存失效事件。 */
+    private final CanvasMessageBus messageBus;
 
     /** 缓存失效事件发布 topic。 */
     @Value("${canvas.cache.invalidation.topic:CANVAS_CACHE_INVALIDATE}")
@@ -32,7 +32,7 @@ public class RocketMqCacheInvalidationPublisher implements CacheInvalidationPubl
     @Override
     public void publish(CacheInvalidationEvent event) {
         // 使用 cacheName 作为 RocketMQ tag，订阅端仍广播接收，便于按缓存域观察和排查失效事件。
-        rocketMQTemplate.syncSend(topic + ":" + event.cacheName(), event);
+        messageBus.publishCacheInvalidation(topic, event);
         log.debug("[CACHE_INVALIDATION_MQ] published cache={} key={} version={}",
                 event.cacheName(), event.rawKey(), event.version());
     }

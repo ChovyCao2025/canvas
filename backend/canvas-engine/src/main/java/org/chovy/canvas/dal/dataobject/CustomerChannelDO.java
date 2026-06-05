@@ -1,6 +1,7 @@
 package org.chovy.canvas.dal.dataobject;
 
 import com.baomidou.mybatisplus.annotation.FieldFill;
+import com.baomidou.mybatisplus.annotation.FieldStrategy;
 import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
@@ -22,6 +23,9 @@ public class CustomerChannelDO {
     /** 客户渠道记录主键 ID */
     private Long id;
 
+    @TableField("tenant_id")
+    private Long tenantId;
+
     /** 业务用户 ID */
     private String userId;
 
@@ -29,6 +33,7 @@ public class CustomerChannelDO {
     private String channel;
 
     /** 渠道地址，如手机号、邮箱或设备标识 */
+    @TableField(updateStrategy = FieldStrategy.ALWAYS)
     private String address;
 
     /** 是否启用该渠道，1=启用，0=禁用 */
@@ -38,6 +43,7 @@ public class CustomerChannelDO {
     private Integer verified;
 
     /** 渠道扩展信息 JSON，如设备、地区或第三方账号信息 */
+    @TableField(updateStrategy = FieldStrategy.ALWAYS)
     private String metadata;
 
     @TableField(fill = FieldFill.INSERT)

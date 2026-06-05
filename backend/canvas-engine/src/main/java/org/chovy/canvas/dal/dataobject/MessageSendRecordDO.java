@@ -34,6 +34,9 @@ public class MessageSendRecordDO {
     /** 消息发送记录主键 ID */
     private Long id;
 
+    @TableField("tenant_id")
+    private Long tenantId;
+
     /** 所属画布执行 ID */
     private String executionId;
 

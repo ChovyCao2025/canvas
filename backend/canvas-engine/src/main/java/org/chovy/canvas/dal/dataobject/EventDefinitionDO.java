@@ -35,6 +35,12 @@ public class EventDefinitionDO {
     /** 事件描述 */
     private String description;
 
+    /** 是否允许 SDK 上报自动发现新属性：1=允许，0=拒绝。 */
+    private Integer autoDiscover;
+
+    /** 自动发现策略：REJECT_UNKNOWN 或 PENDING_REVIEW。 */
+    private String discoveryMode;
+
     /** 是否启用，1=启用，0=禁用 */
     private Integer enabled;
 

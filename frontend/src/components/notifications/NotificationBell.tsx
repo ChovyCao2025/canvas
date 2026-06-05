@@ -3,7 +3,7 @@
  *
  * 维护说明：组件消费 NotificationContext，不直接维护 WebSocket 或轮询。
  */
-import { useEffect, type ReactNode, useState } from 'react'
+import { useEffect, type KeyboardEvent, type ReactNode, useState } from 'react'
 import {
   Badge,
   Button,
@@ -197,6 +197,14 @@ export default function NotificationBell() {
     }
   }
 
+  function handleNotificationKey(event: KeyboardEvent<HTMLElement>, item: UserNotification) {
+    if (event.key !== 'Enter' && event.key !== ' ') {
+      return
+    }
+    event.preventDefault()
+    handleClick(item).catch(() => undefined)
+  }
+
   /** 批量已读只作用于当前用户的未归档通知。 */
   async function handleMarkAllRead() {
     try {
@@ -227,7 +235,7 @@ export default function NotificationBell() {
         <Badge count={shouldShowUnreadBadge(unreadCount) ? unreadCount : 0} size="small">
           <Button
             type="text"
-            aria-label="通知"
+            aria-label="打开消息中心"
             icon={<BellOutlined />}
             onClick={handleOpen}
             style={{ color: connected ? '#9ad17b' : 'rgba(255,255,255,.72)' }}
@@ -277,6 +285,7 @@ export default function NotificationBell() {
         <Space direction="vertical" size={12} style={{ width: '100%' }}>
           <Segmented
             block
+            aria-label="通知分类筛选"
             value={filter}
             options={[...FILTER_OPTIONS]}
             onChange={value => setFilter(value as FilterValue)}
@@ -293,6 +302,7 @@ export default function NotificationBell() {
                     key="archive"
                     type="text"
                     size="small"
+                    aria-label={`归档通知 ${item.title}`}
                     icon={<InboxOutlined />}
                     onClick={(event) => {
                       event.stopPropagation()
@@ -308,7 +318,11 @@ export default function NotificationBell() {
                   borderRadius: 8,
                   background: item.readAt || showArchived ? '#fff' : '#f4f8ff',
                 }}
+                role="button"
+                tabIndex={0}
+                aria-label={`查看通知 ${item.title}`}
                 onClick={() => handleClick(item)}
+                onKeyDown={(event) => handleNotificationKey(event, item)}
               >
                 <List.Item.Meta
                   title={(

@@ -1,0 +1,80 @@
+{
+  "package": "p3-001-plugin-marketplace",
+  "rollout": {
+    "migration": "none",
+    "runtimeChange": false,
+    "reason": "This slice records marketplace evidence in Git and does not create runtime plugin marketplace state."
+  },
+  "candidates": [
+    {
+      "key": "plugin-submission",
+      "owner": "Platform Product",
+      "status": "Needs Evidence",
+      "evidence": ["Internal plugin foundations must prove packaging and install boundaries first."],
+      "proofCommand": "node --test tools/strategy/plugin-marketplace-evidence.test.mjs",
+      "launchGate": "Submission checklist approved by platform, security, and support owners.",
+      "rollback": "Do not expose public submission entry points.",
+      "dependencies": ["P2-002 plugin foundations"]
+    },
+    {
+      "key": "security-review",
+      "owner": "Security",
+      "status": "Needs Evidence",
+      "evidence": ["Review must cover package signing, permission boundaries, vulnerability response, and tenant isolation."],
+      "proofCommand": "node --test tools/strategy/plugin-marketplace-evidence.test.mjs",
+      "launchGate": "Security review checklist is approved and linked from a child spec.",
+      "rollback": "Block plugin publishing until manual review passes.",
+      "dependencies": ["P2-002 plugin foundations"]
+    },
+    {
+      "key": "marketplace-publishing",
+      "owner": "Platform Product",
+      "status": "Deferred",
+      "evidence": ["Publishing depends on submission, review, support, and commercial policy."],
+      "proofCommand": "node --test tools/strategy/plugin-marketplace-evidence.test.mjs",
+      "launchGate": "Publishing child spec names moderation and rollback controls.",
+      "rollback": "Hide marketplace catalog and keep internal plugin registry only.",
+      "dependencies": ["plugin-submission", "security-review", "partner-support"]
+    },
+    {
+      "key": "sdk-compatibility",
+      "owner": "Developer Experience",
+      "status": "Needs Evidence",
+      "evidence": ["SDK versioning must describe supported host APIs and deprecation windows."],
+      "proofCommand": "node --test tools/strategy/plugin-marketplace-evidence.test.mjs",
+      "launchGate": "SDK compatibility matrix is reviewed before public examples ship.",
+      "rollback": "Freeze public SDK claims and keep examples internal.",
+      "dependencies": ["P2-002 plugin foundations"]
+    },
+    {
+      "key": "commercial-terms",
+      "owner": "Business Operations",
+      "status": "Deferred",
+      "evidence": ["Marketplace pricing and revenue share require commercial and legal review."],
+      "proofCommand": "node --test tools/strategy/plugin-marketplace-evidence.test.mjs",
+      "launchGate": "Commercial owner approves terms and support cost model.",
+      "rollback": "Launch no paid marketplace offers.",
+      "dependencies": ["P3-004 commercial model and billing"]
+    },
+    {
+      "key": "partner-support",
+      "owner": "Customer Success",
+      "status": "Needs Evidence",
+      "evidence": ["Support must cover escalation, ownership, SLAs, and partner contact routing."],
+      "proofCommand": "node --test tools/strategy/plugin-marketplace-evidence.test.mjs",
+      "launchGate": "Support escalation runbook is accepted.",
+      "rollback": "Disable partner listing and route support to internal plugins only.",
+      "dependencies": ["plugin-submission"]
+    },
+    {
+      "key": "plugin-takedown",
+      "owner": "Security",
+      "status": "Needs Evidence",
+      "evidence": ["Takedown policy must cover abuse, vulnerabilities, tenant impact, and customer notice."],
+      "proofCommand": "node --test tools/strategy/plugin-marketplace-evidence.test.mjs",
+      "launchGate": "Takedown workflow has security and support approval.",
+      "rollback": "Remove marketplace listing and block installs for affected plugin key.",
+      "dependencies": ["security-review", "partner-support"]
+    }
+  ]
+}

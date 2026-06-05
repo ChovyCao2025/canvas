@@ -78,6 +78,40 @@ function requireVerifierVerdict(input) {
   return verdict
 }
 
+export function evaluateHardeningGates(samples) {
+  const stopGates = []
+
+  if (samples.redisP95Ms > 20 || samples.redisP99Ms > 50) {
+    stopGates.push('REDIS_REGISTRY_LATENCY_SUSTAINED')
+  }
+  if ((samples.mysqlActiveConnections / samples.mysqlMaxConnections) >= 0.85) {
+    stopGates.push('MYSQL_POOL_SATURATION')
+  }
+  if (samples.mysqlSlowSqlMs > 1000) {
+    stopGates.push('MYSQL_SLOW_SQL')
+  }
+  if (samples.normalMqBacklogGrowing) {
+    stopGates.push('NORMAL_MQ_BACKLOG_STARVED_BY_RETRY')
+  }
+  if (samples.disruptorOverflowConsecutiveSamples >= 2) {
+    stopGates.push('DISRUPTOR_OVERFLOW_GROWING')
+  }
+  if (samples.retryBacklogGrowingAfterRecovery) {
+    stopGates.push('RETRY_BACKLOG_GROWING_AFTER_RECOVERY')
+  }
+  if (samples.dlqGrowingAfterRecovery) {
+    stopGates.push('DLQ_GROWING_AFTER_RECOVERY')
+  }
+  if (samples.lightP95Ms > 1000 || samples.standardP95Ms > 1000) {
+    stopGates.push('PROTECTED_LANE_LATENCY_VIOLATION')
+  }
+
+  return {
+    verdict: stopGates.length === 0 ? 'PASS' : 'STOP',
+    stopGates,
+  }
+}
+
 export function estimateCapacity(input) {
   for (const name of REQUIRED_POSITIVE_ARGS) {
     requirePositive(input, name)

@@ -2,65 +2,87 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Decide and stage production platform components with ADRs and proof-of-value gates.
+**Goal:** Decide which production platform components are justified by validated capability gaps and stage only one proof-of-value at a time.
 
-**Architecture:** Evaluate one component at a time against a concrete capability gap. Keep core business code protected by local interfaces where component churn is likely.
+**Architecture:** Use ADRs and local abstractions before adopting platform components. Each component must have a problem statement, alternatives, operational owner, failure mode, rollback path, and measurable proof before production rollout. Per `../specs/P3-00-architecture-boundary-review-spec.md`, component choices are platform decisions and must not create domain-service boundaries by themselves.
 
-**Tech Stack:** Spring Boot, Redis/Redisson, RocketMQ, Nacos, Sentinel, Feign or WebClient, Spring Boot Admin, ClickHouse, logging/metrics stack.
+**Tech Stack:** Spring Boot, Redis/Redisson, RocketMQ, Nacos, Sentinel, WebClient/Feign, Spring Boot Admin, ClickHouse, Prometheus/Grafana, Markdown ADRs.
 
 ---
 
 ## Source Material
 
 - Spec: `../specs/P3-07-production-platform-components-spec.md`
+- Boundary review: `../specs/P3-00-architecture-boundary-review-spec.md`
+- Boundary evidence: `../evidence/p3-00-architecture-boundary-review.md`
 - Evolution doc: `../archive/evolution/production-practice-review.md`
 - Coverage matrix: `../todo/coverage-matrix.md`
 
 ## File Structure
 
+- Create: `docs/architecture/evidence/p3-07-platform-components.md`
 - Create: `docs/architecture/platform-component-decision-matrix.md`
-- Create: ADR files under `docs/architecture/adr/`
-- Modify: implementation only after a component ADR is approved
-- Test: proof-of-value tests for selected components
+- Create: `docs/architecture/adr/platform-component-first-pov.md`
+- Create: `docs/architecture/platform-component-abstraction-plan.md`
+- Read: `docs/architecture/archive/evolution/production-practice-review.md`
 
 ### Task 1: Build The Decision Matrix
 
-- [ ] **Step 1: List candidate components**
+**Files:**
+- Create: `docs/architecture/platform-component-decision-matrix.md`
+- Create: `docs/architecture/evidence/p3-07-platform-components.md`
 
-Extract candidates from `../archive/evolution/production-practice-review.md`.
+- [x] Extract candidate components from the production-practice review.
+- [x] For each candidate, record problem, current workaround, alternatives, operational owner, cost, failure mode, rollback, and decision.
+- [x] Mark components as accepted for proof, needs evidence, deferred, or rejected.
 
-- [ ] **Step 2: Create matrix**
+Run:
 
-Write `docs/architecture/platform-component-decision-matrix.md` with problem, alternative, operational owner, cost, failure mode, and decision.
+```bash
+test -f docs/architecture/platform-component-decision-matrix.md
+rg -n "XXL|Redisson|Nacos|Knife4j|Sentinel|Spring Boot Admin|ClickHouse|owner|failure mode|rollback|decision" docs/architecture/platform-component-decision-matrix.md
+```
 
-- [ ] **Step 3: Verify candidates**
-
-Run `rg -n "XXL|Redisson|Nacos|Knife4j|Sentinel|Spring Boot Admin|ClickHouse" docs/architecture/platform-component-decision-matrix.md`. Expected: each candidate appears.
+Expected: matrix includes all named candidates plus owner, failure mode, rollback, and decision fields.
 
 ### Task 2: Pick One Component For Proof Of Value
 
-- [ ] **Step 1: Select the highest value component**
+**Files:**
+- Create: `docs/architecture/adr/platform-component-first-pov.md`
+- Modify: `docs/architecture/evidence/p3-07-platform-components.md`
+- Read: `docs/architecture/platform-component-decision-matrix.md`
 
-Choose the candidate that closes a confirmed P0/P1/P2 gap with the smallest rollout risk.
+- [x] Select the component that closes a confirmed P0/P1/P2 gap with the smallest rollout risk.
+- [x] Write ADR sections for problem, decision, alternatives, rollout, rollback, owner, success metric, and stop criteria.
+- [x] State why all other candidates are deferred.
 
-- [ ] **Step 2: Write ADR**
+Run:
 
-Create an ADR with problem, selected option, alternatives, rollout, rollback, and owner.
+```bash
+test -f docs/architecture/adr/platform-component-first-pov.md
+rg -n "Problem|Decision|Alternatives|Rollout|Rollback|Owner|Success metric|Stop criteria|Deferred" docs/architecture/adr/platform-component-first-pov.md
+```
 
-- [ ] **Step 3: Verify ADR**
+Expected: ADR chooses at most one proof-of-value component and defers the rest with reasons.
 
-Run `rg -n "Problem|Decision|Alternatives|Rollout|Rollback|Owner" docs/architecture/adr`. Expected: the ADR includes each section.
+### Task 3: Define The Implementation Boundary
 
-### Task 3: Plan The Implementation Boundary
+**Files:**
+- Create: `docs/architecture/platform-component-abstraction-plan.md`
+- Modify: `docs/architecture/evidence/p3-07-platform-components.md`
+- Modify: `docs/architecture/plans/P3-07-production-platform-components-plan.md`
 
-- [ ] **Step 1: Define local abstraction**
+- [x] Define the local interface that shields business code from the selected component.
+- [x] Define proof tests, operational drill, metrics, dashboard signal, and rollback command.
+- [x] Define production rollout prerequisites and owner signoff.
 
-Document the interface that isolates business code from the component.
+Run:
 
-- [ ] **Step 2: Define proof-of-value test**
+```bash
+test -f docs/architecture/platform-component-abstraction-plan.md
+rg -n "interface|proof test|operational drill|metric|dashboard|rollback command|owner signoff" docs/architecture/platform-component-abstraction-plan.md
+git diff -- docs/architecture/evidence/p3-07-platform-components.md docs/architecture/platform-component-decision-matrix.md docs/architecture/adr/platform-component-first-pov.md docs/architecture/platform-component-abstraction-plan.md docs/architecture/plans/P3-07-production-platform-components-plan.md
+# Do not stage or commit in this session unless the user explicitly asks.
+```
 
-Specify the test, metric, or operational drill that proves the component solves the stated problem.
-
-- [ ] **Step 3: Review diff**
-
-Run `git diff -- docs/architecture`. Expected: only platform decision docs are changed before implementation starts.
+Expected: documentation diff contains only platform component evidence, decision matrix, ADR, abstraction plan, and plan changes; no files are staged or committed.

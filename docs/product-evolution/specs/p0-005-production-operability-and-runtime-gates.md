@@ -5,6 +5,10 @@ Sequence: 005
 Source: `docs/optimization/production-readiness-checklist.md`, `docs/optimization/bmad-product-review-2026-05.md`, `docs/optimization/todo/2026-05-31-evolution-directions.md`
 Implementation plan: `../plans/p0-005-production-operability-and-runtime-gates-plan.md`
 
+## Implementation Status
+
+Implemented and verified on 2026-06-05. Verification evidence is recorded in `../plans/p0-005-production-operability-and-runtime-gates-plan.md`.
+
 ## Goal
 
 Add the minimum operational gates required to ship, observe, pause, and recover the platform in production.
@@ -90,3 +94,16 @@ Engineering and operations teams get repeatable quality gates, dashboards, alert
 - Production/staging configs disable unsafe development defaults.
 - Grafana dashboard JSON and alert rules are present and referenced by runbook.
 - Ops emergency controls reject unauthorized users and write audit events.
+
+## Implementation Evidence
+
+Verified on 2026-06-05:
+
+- Backend full gate: `cd backend && mvn -pl canvas-engine clean test` passed with 1295 tests, 0 failures, 0 errors, 1 skipped.
+- Frontend full gate: `cd frontend && npm test` passed with 65 test files and 242 tests.
+- Frontend production build: `cd frontend && npm run build` passed.
+- Backend image: `docker build -f backend/canvas-engine/Dockerfile backend` passed.
+- Frontend image: `docker build -f frontend/Dockerfile frontend` passed.
+- Ops dashboard assets: Grafana JSON parsed successfully and Prometheus alert YAML loaded successfully.
+- Current focused ops slice: `cd backend && mvn -pl canvas-engine test -Dtest=OpsControllerSecurityTest,RuntimeAlertNotificationTest,SecurityConfigRoleTest,SecurityConfigRouteTest,OpsControllerRecoveryTest,OpsControllerTemplateTest,NotificationEventServiceTest,CanvasMetricsTest` passed with 25 tests.
+- Current frontend ops dashboard slice: `cd frontend && npm test -- opsDashboardPresentation.test.ts` passed with 1 test file and 2 tests.

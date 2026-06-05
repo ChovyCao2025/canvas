@@ -4,9 +4,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.chovy.canvas.common.MapFieldKeys;
 import org.chovy.canvas.common.enums.TriggerType;
 import org.chovy.canvas.dal.dataobject.CanvasDO;
-import org.chovy.canvas.dal.mapper.CanvasMapper;
 import org.chovy.canvas.dal.dataobject.CanvasVersionDO;
-import org.chovy.canvas.dal.mapper.CanvasVersionMapper;
+import org.chovy.canvas.domain.canvas.SubFlowLookupService;
 import org.chovy.canvas.engine.context.ExecutionContext;
 import org.chovy.canvas.engine.dag.DagGraph;
 import org.chovy.canvas.engine.handler.NodeHandler;
@@ -38,11 +37,8 @@ import java.util.*;
 @NodeHandlerType("SUB_FLOW_REF")
 public class SubFlowRefHandler implements NodeHandler {
 
-    /** 画布数据访问器，用于校验子流程画布发布状态。 */
-    private final CanvasMapper        canvasMapper;
-
-    /** 画布版本访问器，用于读取指定子流程版本内容。 */
-    private final CanvasVersionMapper canvasVersionMapper;
+    /** 子流程查询服务，用于隔离 handler 与持久层细节。 */
+    private final SubFlowLookupService subFlowLookupService;
 
     /** 画布配置缓存，用于加载 WORKFLOW 子流程 DAG。 */
     private final CanvasConfigCache   configCache;
@@ -58,22 +54,19 @@ public class SubFlowRefHandler implements NodeHandler {
      *
      * <p>执行过程中会根据节点配置和上下文决定成功、失败或下一跳路由。
      *
-     * @param canvasMapper canvasMapper 画布相关对象或标识
-     * @param canvasVersionMapper canvasVersionMapper 画布相关对象或标识
+     * @param subFlowLookupService 子流程查询服务
      * @param configCache configCache 方法执行所需的业务参数
      * @param dagEngine dagEngine 方法执行所需的业务参数
      * @param objectMapper objectMapper 方法执行所需的业务参数
      */
-    public SubFlowRefHandler(CanvasMapper canvasMapper,
-                             CanvasVersionMapper canvasVersionMapper,
+    public SubFlowRefHandler(SubFlowLookupService subFlowLookupService,
                              CanvasConfigCache configCache,
                              @Lazy DagEngine dagEngine,
                              ObjectMapper objectMapper) {
-        this.canvasMapper        = canvasMapper;
-        this.canvasVersionMapper = canvasVersionMapper;
-        this.configCache         = configCache;
-        this.dagEngine           = dagEngine;
-        this.objectMapper        = objectMapper;
+        this.subFlowLookupService = subFlowLookupService;
+        this.configCache          = configCache;
+        this.dagEngine            = dagEngine;
+        this.objectMapper         = objectMapper;
     }
 
     /**
@@ -138,20 +131,20 @@ public class SubFlowRefHandler implements NodeHandler {
                                            Map<String, Object> inputMapping,
                                            Map<String, Object> config,
                                            ExecutionContext ctx) {
-        CanvasDO canvas = canvasMapper.selectById(subFlowId);
+        CanvasDO canvas = subFlowLookupService.findCanvas(subFlowId);
         if (canvas == null || canvas.getStatus() != 1) {
             return PreparedSubFlow.failure(NodeResult.fail("子流程画布未发布: " + subFlowId));
         }
         Long versionId = subFlowVersion == -1
                 ? canvas.getPublishedVersionId()
-                : resolveVersion(subFlowId, subFlowVersion);
+                : subFlowLookupService.resolveVersionId(subFlowId, subFlowVersion);
         // subFlowVersion=-1 使用当前发布版本；指定版本则按版本号解析。
         if (versionId == null) {
             return PreparedSubFlow.failure(NodeResult.fail("子流程版本不存在: " + subFlowVersion));
         }
 
         // 加载子流程 graph_json
-        CanvasVersionDO version = canvasVersionMapper.selectById(versionId);
+        CanvasVersionDO version = subFlowLookupService.findVersion(versionId);
         if (version == null) {
             return PreparedSubFlow.failure(NodeResult.fail("子流程版本记录不存在"));
         }
@@ -306,22 +299,4 @@ public class SubFlowRefHandler implements NodeHandler {
                 });
     }
 
-    /**
-     * 构建、解析或转换 resolve Version 相关的业务数据。
-     *
-     * <p>执行过程中会根据节点配置和上下文决定成功、失败或下一跳路由。
-     *
-     * @param canvasId canvasId 对应的业务主键或标识
-     * @param version version 方法执行所需的业务参数
-     * @return 计算得到的数值结果
-     */
-// ── helper ───────────────────────────────────────────────────
-
-    private Long resolveVersion(Long canvasId, int version) {
-        return canvasVersionMapper.selectList(
-                        new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<CanvasVersionDO>()
-                                .eq(CanvasVersionDO::getCanvasId, canvasId)
-                                .eq(CanvasVersionDO::getVersion, version))
-                .stream().findFirst().map(CanvasVersionDO::getId).orElse(null);
-    }
 }

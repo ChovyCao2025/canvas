@@ -1,5 +1,6 @@
 package org.chovy.canvas.engine.context;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.RepeatedTest;
 import org.junit.jupiter.api.Test;
 import java.util.ArrayList;
@@ -100,5 +101,46 @@ class ExecutionContextConcurrencyTest {
         }
         assertThatNoException().isThrownBy(() ->
             ctx.getNodeOutputs().forEach((k, v) -> { /* read all */ }));
+    }
+
+    @Test
+    void putNodeOutputStoresImmutableSnapshotAndClearsStaleFlatKeys() {
+        ExecutionContext ctx = new ExecutionContext();
+        Map<String, Object> first = new HashMap<>();
+        first.put("old", "old-value");
+        first.put("shared", "from-a");
+
+        ctx.putNodeOutput("a", first);
+        ctx.putNodeOutput("b", Map.of("shared", "from-b"));
+        first.put("old", "mutated");
+        ctx.putNodeOutput("a", Map.of("new", "new-value"));
+
+        assertThat(ctx.getNodeOutputs().get("a")).containsExactlyEntriesOf(Map.of("new", "new-value"));
+        assertThat(ctx.getContextValue("old")).isNull();
+        assertThat(ctx.getContextValue("a.old")).isNull();
+        assertThat(ctx.getContextValue("new")).isEqualTo("new-value");
+        assertThat(ctx.getContextValue("a.new")).isEqualTo("new-value");
+        assertThat(ctx.getContextValue("shared")).isEqualTo("from-b");
+        assertThat(ctx.getContextValue("b.shared")).isEqualTo("from-b");
+    }
+
+    @Test
+    void approximateSizeReflectsCurrentNodeOutputSnapshots() {
+        ExecutionContext ctx = new ExecutionContext();
+
+        ctx.putNodeOutput("node", Map.of("large", "x".repeat(1_000)));
+        int large = ctx.getApproxSizeBytes();
+        ctx.putNodeOutput("node", Map.of("s", "1"));
+
+        assertThat(ctx.getApproxSizeBytes()).isLessThan(large);
+        assertThat(ctx.getApproxSizeBytes()).isEqualTo(serializedSize(Map.of("node", Map.of("s", "1"))));
+    }
+
+    private int serializedSize(Map<String, Map<String, Object>> outputs) {
+        try {
+            return new ObjectMapper().writeValueAsBytes(outputs).length;
+        } catch (Exception e) {
+            throw new AssertionError(e);
+        }
     }
 }

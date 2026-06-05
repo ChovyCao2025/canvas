@@ -24,7 +24,7 @@
 - Modify: `backend/canvas-engine/src/main/java/org/chovy/canvas/web/CanvasController.java`
 - Modify: `frontend/src/services/api.ts`
 - Create: `frontend/src/pages/canvas-list/canvasImportExport.ts`
-- Create: `frontend/src/pages/canvas-list/importExportFlow.test.tsx`
+- Create: `frontend/src/pages/canvas-list/importExportFlow.test.ts`
 - Modify: `frontend/src/pages/canvas-list/index.tsx`
 
 ### Task 1: Backend Package Service
@@ -36,7 +36,7 @@
 - Create: `backend/canvas-engine/src/main/java/org/chovy/canvas/dto/canvas/CanvasImportResp.java`
 - Create: `backend/canvas-engine/src/main/java/org/chovy/canvas/domain/canvas/CanvasImportExportService.java`
 
-- [ ] **Step 1: Write import/export tests**
+- [x] **Step 1: Write import/export tests**
 
 Create `CanvasImportExportServiceTest.java`:
 
@@ -129,7 +129,7 @@ class CanvasImportExportServiceTest {
 }
 ```
 
-- [ ] **Step 2: Run tests and confirm red state**
+- [x] **Step 2: Run tests and confirm red state**
 
 Run:
 
@@ -139,7 +139,7 @@ cd backend && mvn -pl canvas-engine test -Dtest=CanvasImportExportServiceTest
 
 Expected: FAIL because service and DTOs do not exist.
 
-- [ ] **Step 3: Add DTOs**
+- [x] **Step 3: Add DTOs**
 
 Create DTO records:
 
@@ -160,7 +160,7 @@ public record CanvasImportResp(CanvasDO canvas, Long draftVersionId) {
 }
 ```
 
-- [ ] **Step 4: Implement service**
+- [x] **Step 4: Implement service**
 
 Create `CanvasImportExportService.java`:
 
@@ -229,7 +229,7 @@ public class CanvasImportExportService {
 
 Add private helpers `requireCanvas`, `canvasMeta`, `sanitizeGraph`, `removeRuntimeKeys`, `parseMap`, `objectMap`, `validateGraph`, `asInt`, `string`, and `writeJson`. `sanitizeGraph` must call `removeRuntimeKeys` before `DataMaskingUtil.maskObject`.
 
-- [ ] **Step 5: Run service tests**
+- [x] **Step 5: Run service tests**
 
 Run:
 
@@ -245,9 +245,9 @@ Expected: PASS.
 - Modify: `backend/canvas-engine/src/main/java/org/chovy/canvas/web/CanvasController.java`
 - Modify: `frontend/src/services/api.ts`
 - Create: `frontend/src/pages/canvas-list/canvasImportExport.ts`
-- Create: `frontend/src/pages/canvas-list/importExportFlow.test.tsx`
+- Create: `frontend/src/pages/canvas-list/importExportFlow.test.ts`
 
-- [ ] **Step 1: Add controller endpoints**
+- [x] **Step 1: Add controller endpoints**
 
 Inject service:
 
@@ -276,9 +276,9 @@ public Mono<R<CanvasImportResp>> importCanvas(@RequestBody CanvasImportReq req) 
 }
 ```
 
-- [ ] **Step 2: Add frontend helper tests**
+- [x] **Step 2: Add frontend helper tests**
 
-Create `importExportFlow.test.tsx`:
+Create `importExportFlow.test.ts`:
 
 ```ts
 import { describe, expect, it } from 'vitest'
@@ -297,7 +297,7 @@ describe('canvas import export helpers', () => {
 })
 ```
 
-- [ ] **Step 3: Add helper and API methods**
+- [x] **Step 3: Add helper and API methods**
 
 Create `canvasImportExport.ts`:
 
@@ -339,12 +339,12 @@ export const canvasApi = {
 
 Merge these methods into the existing `canvasApi` object.
 
-- [ ] **Step 4: Run frontend helper tests**
+- [x] **Step 4: Run frontend helper tests**
 
 Run:
 
 ```bash
-cd frontend && npm test -- importExportFlow.test.tsx
+cd frontend && npm test -- importExportFlow.test.ts
 ```
 
 Expected: PASS.
@@ -354,7 +354,7 @@ Expected: PASS.
 **Files:**
 - Modify: `frontend/src/pages/canvas-list/index.tsx`
 
-- [ ] **Step 1: Add import state and export handler**
+- [x] **Step 1: Add import state and export handler**
 
 Add state:
 
@@ -391,7 +391,7 @@ const handleImport = async () => {
 }
 ```
 
-- [ ] **Step 2: Add buttons and modal**
+- [x] **Step 2: Add buttons and modal**
 
 Add an import button near the existing create button:
 
@@ -428,16 +428,42 @@ Add modal:
 </Modal>
 ```
 
-- [ ] **Step 3: Run focused verification**
+- [x] **Step 3: Run focused verification**
 
 Run:
 
 ```bash
 cd backend && mvn -pl canvas-engine test -Dtest=CanvasImportExportServiceTest
-cd frontend && npm test -- importExportFlow.test.tsx
+cd frontend && npm test -- importExportFlow.test.ts
 ```
 
 Expected: PASS.
+
+### Verification Evidence
+
+- Backend import/export service and controller operator loop suite:
+
+```bash
+cd backend && mvn -pl canvas-engine test -Dtest=CanvasImportExportServiceTest,CanvasControllerOperatorLoopTest
+```
+
+Result: 7 tests, 0 failures, 0 errors, 0 skipped.
+
+- Frontend import/export helper suite:
+
+```bash
+cd frontend && npm test -- importExportFlow.test.ts
+```
+
+Result: 1 test file, 2 tests passed.
+
+- Frontend production build:
+
+```bash
+cd frontend && npm run build
+```
+
+Result: TypeScript and Vite build passed.
 
 ### Task 4: Commit This Slice
 
@@ -458,7 +484,7 @@ git add backend/canvas-engine/src/main/java/org/chovy/canvas/domain/canvas/Canva
   backend/canvas-engine/src/test/java/org/chovy/canvas/domain/canvas/CanvasImportExportServiceTest.java \
   frontend/src/services/api.ts \
   frontend/src/pages/canvas-list/canvasImportExport.ts \
-  frontend/src/pages/canvas-list/importExportFlow.test.tsx \
+  frontend/src/pages/canvas-list/importExportFlow.test.ts \
   frontend/src/pages/canvas-list/index.tsx \
   docs/product-evolution/specs/p1-003e-canvas-import-export-package.md \
   docs/product-evolution/plans/p1-003e-canvas-import-export-package-plan.md

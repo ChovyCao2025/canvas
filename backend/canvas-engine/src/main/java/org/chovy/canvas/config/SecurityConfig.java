@@ -1,5 +1,9 @@
 package org.chovy.canvas.config;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import org.chovy.canvas.common.ErrorCode;
+import org.chovy.canvas.common.R;
 import org.chovy.canvas.common.tenant.RoleNames;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -13,6 +17,9 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.web.server.SecurityWebFilterChain;
 import reactor.core.publisher.Mono;
 
+import java.nio.charset.StandardCharsets;
+import java.util.UUID;
+
 /**
  * WebFlux 安全配置：
  * 定义认证入口、接口权限策略以及 JWT 过滤器挂载顺序。
@@ -21,11 +28,30 @@ import reactor.core.publisher.Mono;
 @EnableWebFluxSecurity
 public class SecurityConfig {
 
+    private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
+
     static final String[] SUPER_ADMIN_ROUTE_ROLES = {RoleNames.ADMIN, RoleNames.SUPER_ADMIN};
+    static final String[] OPS_READ_ROUTE_ROLES = {
+            RoleNames.ADMIN,
+            RoleNames.SUPER_ADMIN,
+            RoleNames.TENANT_ADMIN,
+            RoleNames.OPERATOR
+    };
+    static final String[] OPS_WRITE_ROUTE_ROLES = {
+            RoleNames.ADMIN,
+            RoleNames.SUPER_ADMIN,
+            RoleNames.TENANT_ADMIN
+    };
+    static final String[] OPS_ROUTE_ROLES = OPS_WRITE_ROUTE_ROLES;
     static final String[] TENANT_ADMIN_ROUTE_ROLES = {
             RoleNames.ADMIN,
             RoleNames.SUPER_ADMIN,
             RoleNames.TENANT_ADMIN
+    };
+    static final String[] INTERNAL_OPEN_API_ROUTES = {
+            "/canvas/events/report",
+            "/canvas/execute/direct/*",
+            "/canvas/trigger/behavior"
     };
     /** 密码编码器（BCrypt）。 */
     @Bean
@@ -36,7 +62,7 @@ public class SecurityConfig {
     /** 主安全过滤链。 */
     @Bean
     public SecurityWebFilterChain securityWebFilterChain(
-            ServerHttpSecurity http, JwtAuthFilter jwtAuthFilter) {
+            ServerHttpSecurity http, JwtAuthFilter jwtAuthFilter, InternalApiAuthFilter internalApiAuthFilter) {
 
         return http
                 // API 服务不依赖浏览器表单态，关闭有状态防护入口后统一走 JWT。
@@ -44,29 +70,37 @@ public class SecurityConfig {
                 .httpBasic(ServerHttpSecurity.HttpBasicSpec::disable)
                 .formLogin(ServerHttpSecurity.FormLoginSpec::disable)
                 // 未登录时返回 JSON 401，不触发浏览器原生 Basic Auth 弹窗
-                .exceptionHandling(ex -> ex.authenticationEntryPoint((exchange, e) -> {
-                    var response = exchange.getResponse();
-                    response.setStatusCode(HttpStatus.UNAUTHORIZED);
-                    response.getHeaders().setContentType(MediaType.APPLICATION_JSON);
-                    var body = "{\"code\":-1,\"message\":\"未登录或 Token 已过期\",\"data\":null}";
-                    var buffer = response.bufferFactory().wrap(body.getBytes());
-                    return response.writeWith(Mono.just(buffer));
-                }))
+                .exceptionHandling(ex -> ex
+                        .authenticationEntryPoint((exchange, e) -> writeError(exchange, HttpStatus.UNAUTHORIZED,
+                                ErrorCode.AUTH_002, "未登录或 Token 已过期"))
+                        .accessDeniedHandler((exchange, e) -> writeError(exchange, HttpStatus.FORBIDDEN,
+                                ErrorCode.AUTH_003, "无权限执行此操作")))
                 .authorizeExchange(ex -> ex
                         // 公开接口
                         .pathMatchers("/auth/login").permitAll()
                         .pathMatchers("/swagger-ui.html", "/swagger-ui/**",
                                 "/v3/api-docs/**", "/webjars/**").permitAll()
                         // OpenAPI：事件上报无需登录（业务系统直接调用）
-                        .pathMatchers(HttpMethod.POST, "/canvas/events/report").permitAll()
+                        .pathMatchers(HttpMethod.POST, INTERNAL_OPEN_API_ROUTES).permitAll()
                         // OpenAPI：直调执行无需登录，但控制器必须校验 HMAC 签名。
                         .pathMatchers(HttpMethod.POST, "/canvas/execute/direct/*").permitAll()
                         // OpenAPI：行为触发无需登录，但控制器必须校验 HMAC 签名。
                         .pathMatchers(HttpMethod.POST, "/canvas/trigger/behavior").permitAll()
                         // WebSocket 使用一次性票据鉴权；票据接口本身仍要求登录。
                         .pathMatchers("/canvas/ws/notifications").permitAll()
-                        // 运维接口：必须由管理员调用。
-                        .pathMatchers("/ops/**").hasAnyRole(SUPER_ADMIN_ROUTE_ROLES)
+                        // Provider receipt callback uses its own shared-secret validation in the controller.
+                        .pathMatchers(HttpMethod.POST, "/delivery/receipts").permitAll()
+                        // BI embed render verifies a signed short-lived ticket without exposing ticket creation.
+                        .pathMatchers(HttpMethod.POST, "/canvas/bi/embed-tickets/verify").permitAll()
+                        // Public marketing forms are anonymous lead-capture endpoints.
+                        .pathMatchers(HttpMethod.GET, "/public/marketing-forms/**").permitAll()
+                        .pathMatchers(HttpMethod.POST, "/public/marketing-forms/**").permitAll()
+                        // 运维接口：读状态允许运营角色，写控制面只允许租户管理员以上。
+                        .pathMatchers(HttpMethod.GET, "/ops/**").hasAnyRole(OPS_READ_ROUTE_ROLES)
+                        .pathMatchers("/ops/**").hasAnyRole(OPS_WRITE_ROUTE_ROLES)
+                        // 投递 outbox 查询、重放和 reconcile 是运营控制面，只允许租户管理员以上角色。
+                        .pathMatchers("/message-deliveries", "/message-deliveries/**")
+                        .hasAnyRole(TENANT_ADMIN_ROUTE_ROLES)
                         // 画布管理动作：SaaS rollout 期间允许 legacy ADMIN、新 SUPER_ADMIN、TENANT_ADMIN。
                         .pathMatchers(HttpMethod.POST,
                                 "/canvas/*/publish", "/canvas/*/offline",
@@ -95,7 +129,40 @@ public class SecurityConfig {
                         .anyExchange().authenticated()
                 )
                 // JWT 过滤器必须位于认证阶段，先解析身份再进入后续授权判断。
+                .addFilterAt(internalApiAuthFilter, SecurityWebFiltersOrder.FIRST)
                 .addFilterAt(jwtAuthFilter, SecurityWebFiltersOrder.AUTHENTICATION)
                 .build();
+    }
+
+    private static Mono<Void> writeError(
+            org.springframework.web.server.ServerWebExchange exchange,
+            HttpStatus status,
+            String errorCode,
+            String message) {
+        var response = exchange.getResponse();
+        response.setStatusCode(status);
+        response.getHeaders().setContentType(MediaType.APPLICATION_JSON);
+        R<Void> body = R.fail(errorCode, status.value(), message, currentTraceId());
+        var buffer = response.bufferFactory().wrap(toJson(body));
+        return response.writeWith(Mono.just(buffer));
+    }
+
+    private static String currentTraceId() {
+        return CorrelationIdWebFilter.currentTraceId()
+                .orElseGet(() -> UUID.randomUUID().toString());
+    }
+
+    private static byte[] toJson(R<Void> body) {
+        try {
+            return OBJECT_MAPPER.writeValueAsBytes(body);
+        } catch (JsonProcessingException e) {
+            String fallback = String.format(
+                    "{\"code\":%d,\"errorCode\":\"%s\",\"message\":\"%s\",\"data\":null,\"traceId\":\"%s\"}",
+                    body.getCode(),
+                    body.getErrorCode(),
+                    body.getMessage(),
+                    body.getTraceId());
+            return fallback.getBytes(StandardCharsets.UTF_8);
+        }
     }
 }

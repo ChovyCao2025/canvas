@@ -1,0 +1,21 @@
+CREATE TABLE IF NOT EXISTS cdp_warehouse_realtime_checkpoint (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    tenant_id BIGINT NOT NULL DEFAULT 0,
+    stream_key VARCHAR(128) NOT NULL,
+    last_event_log_id BIGINT DEFAULT NULL,
+    last_message_id VARCHAR(128) DEFAULT NULL,
+    last_event_code VARCHAR(128) DEFAULT NULL,
+    last_event_time DATETIME DEFAULT NULL,
+    last_received_at DATETIME DEFAULT NULL,
+    last_delivered_at DATETIME DEFAULT NULL,
+    last_delivery_source VARCHAR(64) DEFAULT NULL,
+    delivered_count BIGINT NOT NULL DEFAULT 0,
+    failure_count BIGINT NOT NULL DEFAULT 0,
+    last_failure_at DATETIME DEFAULT NULL,
+    last_failure_message VARCHAR(1000) DEFAULT NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY uk_cdp_warehouse_realtime_checkpoint (tenant_id, stream_key),
+    INDEX idx_cdp_warehouse_realtime_checkpoint_delivered (tenant_id, stream_key, last_delivered_at),
+    INDEX idx_cdp_warehouse_realtime_checkpoint_failure (tenant_id, stream_key, last_failure_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='CDP warehouse realtime delivery checkpoint';

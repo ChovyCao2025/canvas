@@ -3,8 +3,10 @@ package org.chovy.canvas.web;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import jakarta.validation.Valid;
 import org.chovy.canvas.common.PageResult;
 import org.chovy.canvas.common.R;
+import org.chovy.canvas.common.validation.ApiRequestValidation;
 import org.chovy.canvas.dal.dataobject.EventDefinitionDO;
 import org.chovy.canvas.domain.meta.EventDefinitionCacheService;
 import org.chovy.canvas.dal.mapper.EventDefinitionMapper;
@@ -12,11 +14,15 @@ import org.chovy.canvas.dto.EventReportReq;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.chovy.canvas.service.EventDefinitionService;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.server.reactive.ServerHttpRequest;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.server.ResponseStatusException;
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
 
+import java.io.IOException;
 import java.util.Map;
 
 /**
@@ -31,6 +37,7 @@ import java.util.Map;
 @RestController
 @RequestMapping("/canvas")
 @RequiredArgsConstructor
+@Validated
 public class EventDefinitionController {
 
     /** 事件定义 Mapper，用于读写事件定义。 */
@@ -137,15 +144,23 @@ public class EventDefinitionController {
     @PostMapping("/events/report")
     public Mono<R<Map<String, Object>>> reportEvent(
             ServerHttpRequest request,
-            @RequestBody Mono<String> rawBody) {
+            @Valid @RequestBody Mono<String> rawBody) {
         return rawBody.defaultIfEmpty("")
                 .flatMap(body -> Mono.fromCallable(() -> {
                             eventReportAuthService.verify(request.getHeaders(), body);
-                            EventReportReq req = objectMapper.readValue(body, EventReportReq.class);
+                            EventReportReq req = parseAndValidateEventReport(body);
                             return eventDefinitionService.doReportEvent(req);
                         })
                         .subscribeOn(Schedulers.boundedElastic()))
                 .map(R::ok);
+    }
+
+    private EventReportReq parseAndValidateEventReport(String body) {
+        try {
+            return ApiRequestValidation.validate(objectMapper.readValue(body, EventReportReq.class));
+        } catch (IOException e) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "请求体 JSON 不合法", e);
+        }
     }
 
     private void invalidateEventCode(String eventCode) {

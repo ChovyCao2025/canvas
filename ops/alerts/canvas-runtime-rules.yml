@@ -1,0 +1,74 @@
+groups:
+  - name: canvas-runtime-p0
+    rules:
+      - alert: CanvasFailedExecutionSpike
+        expr: sum(rate(canvas_execution_total{status="FAILED"}[5m])) / clamp_min(sum(rate(canvas_execution_total[5m])), 1) > 0.05
+        for: 10m
+        labels:
+          severity: critical
+          service: canvas-engine
+          scope: tenant
+        annotations:
+          summary: Canvas execution failure rate is elevated
+          description: Failed execution ratio stayed above 5 percent for 10 minutes.
+          runbook_url: docs/product-evolution/runbooks/production-runtime-runbook.md#failed-execution-spike
+
+      - alert: CanvasDlqGrowth
+        expr: sum(canvas_capacity_dlq_backlog) > 0
+        for: 15m
+        labels:
+          severity: critical
+          service: canvas-engine
+          scope: tenant
+        annotations:
+          summary: Canvas DLQ backlog is non-empty
+          description: Replayable execution DLQ has remained non-empty.
+          runbook_url: docs/product-evolution/runbooks/production-runtime-runbook.md#dlq-growth
+
+      - alert: CanvasDeliveryOutboxDeadRows
+        expr: sum(canvas_delivery_outbox_status_count{status="DEAD"}) > 0
+        for: 15m
+        labels:
+          severity: warning
+          service: canvas-engine
+          scope: tenant
+        annotations:
+          summary: Delivery outbox has dead rows
+          description: Delivery outbox DEAD rows require replay or provider escalation.
+          runbook_url: docs/product-evolution/runbooks/production-runtime-runbook.md#delivery-outbox-dead-rows
+
+      - alert: CanvasTraceBufferOverflow
+        expr: sum(rate(canvas_trace_dropped_total[5m])) > 0
+        for: 5m
+        labels:
+          severity: warning
+          service: canvas-engine
+          scope: system
+        annotations:
+          summary: Canvas trace buffer is dropping records
+          description: Trace writes are being dropped or degraded.
+          runbook_url: docs/product-evolution/runbooks/production-runtime-runbook.md#trace-buffer-overflow
+
+      - alert: CanvasRedisRegistryLatencyHigh
+        expr: histogram_quantile(0.95, sum(rate(canvas_redis_registry_latency_seconds_bucket[5m])) by (le, operation)) > 0.5
+        for: 10m
+        labels:
+          severity: warning
+          service: canvas-engine
+          scope: system
+        annotations:
+          summary: Redis registry latency is high
+          description: Runtime route registry operations are slower than the P0 threshold.
+          runbook_url: docs/product-evolution/runbooks/production-runtime-runbook.md#redis-registry-outage
+
+      - alert: CanvasMysqlPoolPressureHigh
+        expr: max(canvas_mysql_pool_pressure_percent) > 85
+        for: 10m
+        labels:
+          severity: warning
+          service: canvas-engine
+          scope: system
+        annotations:
+          summary: MySQL pool pressure is high
+          description: Hikari pool pressure exceeded 85 percent.
+          runbook_url: docs/product-evolution/runbooks/production-runtime-runbook.md#mysql-pool-pressure

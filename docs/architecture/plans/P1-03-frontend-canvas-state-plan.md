@@ -2,11 +2,11 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Execute the architecture remediation package described in `../specs/P1-03-frontend-canvas-state-spec.md`.
+**Goal:** Split the canvas editor page into focused state hooks and components with typed service models for graph state, selection, history, publish/test workflows, settings, and local drafts.
 
-**Architecture:** Start from the archived evidence and current repository verification, add failing tests around the confirmed behavior, then implement the smallest scoped changes that satisfy the package acceptance criteria. Keep unrelated refactors out of the package unless a test proves the boundary must change.
+**Architecture:** Characterize editor behavior first, then move cohesive state groups out of `frontend/src/pages/canvas-editor/index.tsx` without changing user-visible behavior. Keep graph operations, workflow modals, local draft persistence, and API models behind named hooks and pure helpers that can be tested independently.
 
-**Tech Stack:** Java 21, Spring Boot 3.2, WebFlux, MyBatis-Plus, Reactor, Redis, RocketMQ, React 18, TypeScript, Vite, Vitest, JUnit 5.
+**Tech Stack:** React 18, TypeScript, Vite, Vitest, React Flow, Ant Design, ES modules.
 
 ---
 
@@ -18,167 +18,160 @@
 
 ## File Structure
 
-- Read: `../specs/P1-03-frontend-canvas-state-spec.md`
-- Read: `../todo/coverage-matrix.md`
-- Read: `../todo/p1/frontend-canvas-state/plan.md`
-- Modify: repository files named in the spec evidence for this package
-- Test: focused tests created beside the affected backend or frontend code before implementation
+- Editor shell: `frontend/src/pages/canvas-editor/index.tsx`
+- Existing graph helpers: `frontend/src/pages/canvas-editor/graphHydration.ts`
+- Existing graph helpers: `frontend/src/pages/canvas-editor/connectionInteraction.ts`
+- Existing graph helpers: `frontend/src/pages/canvas-editor/insertNode.ts`
+- Existing history/local draft helpers: `frontend/src/pages/canvas-editor/localDraft.ts`
+- Existing autosave helpers: `frontend/src/pages/canvas-editor/canvasEditorAutosave.ts`
+- New hook: `frontend/src/pages/canvas-editor/useCanvasGraphState.ts`
+- New hook: `frontend/src/pages/canvas-editor/useCanvasSelectionState.ts`
+- New hook: `frontend/src/pages/canvas-editor/useCanvasHistoryState.ts`
+- New hook: `frontend/src/pages/canvas-editor/useCanvasPublishWorkflow.ts`
+- New hook: `frontend/src/pages/canvas-editor/useCanvasTestRunWorkflow.ts`
+- New component: `frontend/src/pages/canvas-editor/CanvasEditorToolbar.tsx`
+- New component: `frontend/src/pages/canvas-editor/CanvasEditorSettingsPanel.tsx`
+- New component: `frontend/src/pages/canvas-editor/CanvasWorkflowModals.tsx`
+- Service model: `frontend/src/services/api.ts`
+- Type model: `frontend/src/types/canvas.ts`
+- Tests: `frontend/src/pages/canvas-editor/graphHydration.test.ts`
+- Tests: `frontend/src/pages/canvas-editor/connectionInteraction.test.ts`
+- Tests: `frontend/src/pages/canvas-editor/insertNode.test.ts`
+- Tests: `frontend/src/pages/canvas-editor/localDraft.test.ts`
+- Tests: `frontend/src/pages/canvas-editor/canvasEditorAutosave.test.tsx`
+- Tests: `frontend/src/pages/canvas-editor/useCanvasGraphState.test.tsx`
+- Tests: `frontend/src/pages/canvas-editor/useCanvasWorkflow.test.tsx`
+- Evidence: `docs/architecture/evidence/P1-03-frontend-canvas-state.md`
 
-### Task 1: Add characterization tests for editor load, graph edit, publish validation, test run, and local draft
-
-**Files:**
-- Read: `../specs/P1-03-frontend-canvas-state-spec.md`
-- Read: `../todo/coverage-matrix.md`
-- Modify: repository files named in this package spec evidence
-- Test: focused tests created beside the affected code
-
-Existing package notes:
-- Source task has no additional notes beyond its title.
-
-- [ ] **Step 1: Lock the failing behavior**
-
-Read `../specs/P1-03-frontend-canvas-state-spec.md` and write the smallest failing test or documentation check that demonstrates this task gap before changing implementation files.
-
-- [ ] **Step 2: Run the focused check before implementation**
-
-Run the narrowest backend, frontend, or documentation command that exercises the new check. Expected result before implementation: the new check fails or the documentation diff shows the missing section.
-
-- [ ] **Step 3: Implement the scoped change**
-
-Change only the files required by this task and keep the behavior aligned with the acceptance criteria in `../specs/P1-03-frontend-canvas-state-spec.md`.
-
-- [ ] **Step 4: Verify the task**
-
-Run the same focused command again. Expected result after implementation: pass, or documentation check exits 0.
-
-- [ ] **Step 5: Review the scoped diff**
-
-Run `git diff -- .` and verify the diff only touches files justified by this task and the package spec.
-
-### Task 2: Extract editor state hooks
+### Task 1: Add characterization tests for editor workflows
 
 **Files:**
-- Read: `../specs/P1-03-frontend-canvas-state-spec.md`
-- Read: `../todo/coverage-matrix.md`
-- Modify: repository files named in this package spec evidence
-- Test: focused tests created beside the affected code
+- Production: `frontend/src/pages/canvas-editor/index.tsx`
+- Production: `frontend/src/pages/canvas-editor/graphHydration.ts`
+- Production: `frontend/src/pages/canvas-editor/connectionInteraction.ts`
+- Production: `frontend/src/pages/canvas-editor/insertNode.ts`
+- Production: `frontend/src/pages/canvas-editor/localDraft.ts`
+- Test: `frontend/src/pages/canvas-editor/graphHydration.test.ts`
+- Test: `frontend/src/pages/canvas-editor/connectionInteraction.test.ts`
+- Test: `frontend/src/pages/canvas-editor/insertNode.test.ts`
+- Test: `frontend/src/pages/canvas-editor/localDraft.test.ts`
+- Test: `frontend/src/pages/canvas-editor/canvasEditorAutosave.test.tsx`
+- Docs: `docs/architecture/evidence/P1-03-frontend-canvas-state.md`
 
-Existing package notes:
-   - graph state;
-   - selection/insert state;
-   - history/undo state;
-   - publish/test/canary workflows.
+- [x] Cover editor load hydration, graph edit, publish pre-check, test run payload, autosave, and local draft restore.
+- [x] Record current editor state groups and line count in the evidence file.
+- [x] Keep tests focused on pure helpers and stable UI behavior before extraction begins.
 
-- [ ] **Step 1: Lock the failing behavior**
+Run:
 
-Read `../specs/P1-03-frontend-canvas-state-spec.md` and write the smallest failing test or documentation check that demonstrates this task gap before changing implementation files.
+```bash
+cd frontend && npm run test -- src/pages/canvas-editor/graphHydration.test.ts src/pages/canvas-editor/connectionInteraction.test.ts src/pages/canvas-editor/insertNode.test.ts src/pages/canvas-editor/localDraft.test.ts src/pages/canvas-editor/canvasEditorAutosave.test.tsx
+wc -l frontend/src/pages/canvas-editor/index.tsx
+# Do not stage or commit in this session unless the user explicitly asks.
+```
 
-- [ ] **Step 2: Run the focused check before implementation**
+Expected: existing editor behavior is covered before state extraction; evidence names the state groups to move.
 
-Run the narrowest backend, frontend, or documentation command that exercises the new check. Expected result before implementation: the new check fails or the documentation diff shows the missing section.
-
-- [ ] **Step 3: Implement the scoped change**
-
-Change only the files required by this task and keep the behavior aligned with the acceptance criteria in `../specs/P1-03-frontend-canvas-state-spec.md`.
-
-- [ ] **Step 4: Verify the task**
-
-Run the same focused command again. Expected result after implementation: pass, or documentation check exits 0.
-
-- [ ] **Step 5: Review the scoped diff**
-
-Run `git diff -- .` and verify the diff only touches files justified by this task and the package spec.
-
-### Task 3: Move large UI sections into focused components
+### Task 2: Extract graph, selection, and history hooks
 
 **Files:**
-- Read: `../specs/P1-03-frontend-canvas-state-spec.md`
-- Read: `../todo/coverage-matrix.md`
-- Modify: repository files named in this package spec evidence
-- Test: focused tests created beside the affected code
+- Production: `frontend/src/pages/canvas-editor/index.tsx`
+- Production: `frontend/src/pages/canvas-editor/useCanvasGraphState.ts`
+- Production: `frontend/src/pages/canvas-editor/useCanvasSelectionState.ts`
+- Production: `frontend/src/pages/canvas-editor/useCanvasHistoryState.ts`
+- Production: `frontend/src/pages/canvas-editor/graphHydration.ts`
+- Production: `frontend/src/pages/canvas-editor/connectionInteraction.ts`
+- Production: `frontend/src/pages/canvas-editor/insertNode.ts`
+- Test: `frontend/src/pages/canvas-editor/useCanvasGraphState.test.tsx`
+- Test: `frontend/src/pages/canvas-editor/connectionInteraction.test.ts`
+- Test: `frontend/src/pages/canvas-editor/insertNode.test.ts`
 
-Existing package notes:
-- Source task has no additional notes beyond its title.
+- [x] Move nodes, edges, selected node, selected edge, insert placeholder, and branch connection state into explicit hooks.
+- [x] Move undo/redo snapshots into `useCanvasHistoryState`.
+- [x] Keep `index.tsx` as orchestration glue for React Flow and extracted hooks.
 
-- [ ] **Step 1: Lock the failing behavior**
+Run:
 
-Read `../specs/P1-03-frontend-canvas-state-spec.md` and write the smallest failing test or documentation check that demonstrates this task gap before changing implementation files.
+```bash
+cd frontend && npm run test -- src/pages/canvas-editor/useCanvasGraphState.test.tsx src/pages/canvas-editor/connectionInteraction.test.ts src/pages/canvas-editor/insertNode.test.ts
+cd frontend && npm run build
+# Do not stage or commit in this session unless the user explicitly asks.
+```
 
-- [ ] **Step 2: Run the focused check before implementation**
+Expected: graph hook tests and frontend build pass; graph editing, selection, and undo state are no longer owned directly by the page shell.
 
-Run the narrowest backend, frontend, or documentation command that exercises the new check. Expected result before implementation: the new check fails or the documentation diff shows the missing section.
-
-- [ ] **Step 3: Implement the scoped change**
-
-Change only the files required by this task and keep the behavior aligned with the acceptance criteria in `../specs/P1-03-frontend-canvas-state-spec.md`.
-
-- [ ] **Step 4: Verify the task**
-
-Run the same focused command again. Expected result after implementation: pass, or documentation check exits 0.
-
-- [ ] **Step 5: Review the scoped diff**
-
-Run `git diff -- .` and verify the diff only touches files justified by this task and the package spec.
-
-### Task 4: Type service calls and editor data models used by those sections
+### Task 3: Extract publish, test, canary, and settings workflows
 
 **Files:**
-- Read: `../specs/P1-03-frontend-canvas-state-spec.md`
-- Read: `../todo/coverage-matrix.md`
-- Modify: repository files named in this package spec evidence
-- Test: focused tests created beside the affected code
+- Production: `frontend/src/pages/canvas-editor/index.tsx`
+- Production: `frontend/src/pages/canvas-editor/useCanvasPublishWorkflow.ts`
+- Production: `frontend/src/pages/canvas-editor/useCanvasTestRunWorkflow.ts`
+- Production: `frontend/src/pages/canvas-editor/CanvasWorkflowModals.tsx`
+- Production: `frontend/src/pages/canvas-editor/CanvasEditorSettingsPanel.tsx`
+- Production: `frontend/src/pages/canvas-editor/settingsPresentation.ts`
+- Production: `frontend/src/pages/canvas-editor/settingsPanel.css`
+- Test: `frontend/src/pages/canvas-editor/useCanvasWorkflow.test.tsx`
+- Test: `frontend/src/pages/canvas-editor/settingsPresentation.test.ts`
 
-Existing package notes:
-- Source task has no additional notes beyond its title.
+- [x] Move publish validation, publish submit, test execution, canary workflow, and modal state into workflow hooks/components.
+- [x] Move settings panel rendering into a focused component with typed props.
+- [x] Keep API request construction tested through pure helpers or hook tests.
 
-- [ ] **Step 1: Lock the failing behavior**
+Run:
 
-Read `../specs/P1-03-frontend-canvas-state-spec.md` and write the smallest failing test or documentation check that demonstrates this task gap before changing implementation files.
+```bash
+cd frontend && npm run test -- src/pages/canvas-editor/useCanvasWorkflow.test.tsx src/pages/canvas-editor/settingsPresentation.test.ts
+cd frontend && npm run build
+# Do not stage or commit in this session unless the user explicitly asks.
+```
 
-- [ ] **Step 2: Run the focused check before implementation**
+Expected: workflow tests and frontend build pass; publish/test/canary/settings state is isolated from graph editing state.
 
-Run the narrowest backend, frontend, or documentation command that exercises the new check. Expected result before implementation: the new check fails or the documentation diff shows the missing section.
-
-- [ ] **Step 3: Implement the scoped change**
-
-Change only the files required by this task and keep the behavior aligned with the acceptance criteria in `../specs/P1-03-frontend-canvas-state-spec.md`.
-
-- [ ] **Step 4: Verify the task**
-
-Run the same focused command again. Expected result after implementation: pass, or documentation check exits 0.
-
-- [ ] **Step 5: Review the scoped diff**
-
-Run `git diff -- .` and verify the diff only touches files justified by this task and the package spec.
-
-### Task 5: Run frontend tests and build after each extraction group
+### Task 4: Type service calls and editor data models
 
 **Files:**
-- Read: `../specs/P1-03-frontend-canvas-state-spec.md`
-- Read: `../todo/coverage-matrix.md`
-- Modify: repository files named in this package spec evidence
-- Test: focused tests created beside the affected code
+- Production: `frontend/src/services/api.ts`
+- Production: `frontend/src/types/canvas.ts`
+- Production: `frontend/src/types/index.ts`
+- Production: `frontend/src/pages/canvas-editor/index.tsx`
+- Production: `frontend/src/pages/canvas-editor/useCanvasPublishWorkflow.ts`
+- Production: `frontend/src/pages/canvas-editor/useCanvasTestRunWorkflow.ts`
+- Test: `frontend/src/services/api.test.ts`
+- Test: `frontend/src/pages/canvas-editor/useCanvasWorkflow.test.tsx`
 
-Existing package notes:
-- Source task has no additional notes beyond its title.
+- [x] Replace high-risk canvas editor `any` casts with typed canvas graph, node config, publish, test execution, and canary models.
+- [x] Align frontend request/response types with backend API contract work.
+- [x] Keep remaining casts documented in the evidence file with a removal owner.
 
-- [ ] **Step 1: Lock the failing behavior**
+Run:
 
-Read `../specs/P1-03-frontend-canvas-state-spec.md` and write the smallest failing test or documentation check that demonstrates this task gap before changing implementation files.
+```bash
+cd frontend && npm run test -- src/services/api.test.ts src/pages/canvas-editor/useCanvasWorkflow.test.tsx
+cd frontend && npm run build
+# Do not stage or commit in this session unless the user explicitly asks.
+```
 
-- [ ] **Step 2: Run the focused check before implementation**
+Expected: frontend service tests and build pass; editor request and response models are explicit for graph, publish, test, and canary operations.
 
-Run the narrowest backend, frontend, or documentation command that exercises the new check. Expected result before implementation: the new check fails or the documentation diff shows the missing section.
+### Task 5: Validate frontend canvas state boundaries
 
-- [ ] **Step 3: Implement the scoped change**
+**Files:**
+- Docs: `docs/architecture/evidence/P1-03-frontend-canvas-state.md`
+- Plan: `docs/architecture/plans/P1-03-frontend-canvas-state-plan.md`
+- Spec: `docs/architecture/specs/P1-03-frontend-canvas-state-spec.md`
 
-Change only the files required by this task and keep the behavior aligned with the acceptance criteria in `../specs/P1-03-frontend-canvas-state-spec.md`.
+- [x] Run the canvas editor focused test set.
+- [x] Run all frontend tests and production build.
+- [x] Record final editor line count, extracted hooks/components, and remaining cast inventory in evidence.
 
-- [ ] **Step 4: Verify the task**
+Run:
 
-Run the same focused command again. Expected result after implementation: pass, or documentation check exits 0.
+```bash
+cd frontend && npm run test -- src/pages/canvas-editor/graphHydration.test.ts src/pages/canvas-editor/connectionInteraction.test.ts src/pages/canvas-editor/insertNode.test.ts src/pages/canvas-editor/localDraft.test.ts src/pages/canvas-editor/canvasEditorAutosave.test.tsx src/pages/canvas-editor/useCanvasGraphState.test.tsx src/pages/canvas-editor/useCanvasWorkflow.test.tsx src/pages/canvas-editor/settingsPresentation.test.ts src/services/api.test.ts
+cd frontend && npm run test
+cd frontend && npm run build
+wc -l frontend/src/pages/canvas-editor/index.tsx
+# Do not stage or commit in this session unless the user explicitly asks.
+```
 
-- [ ] **Step 5: Review the scoped diff**
-
-Run `git diff -- .` and verify the diff only touches files justified by this task and the package spec.
-
+Expected: focused editor tests, full frontend tests, and build pass; evidence shows graph, selection, history, workflow, and settings state owned by named hooks/components.

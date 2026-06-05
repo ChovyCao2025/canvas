@@ -2,98 +2,142 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Use `../specs/P3-00-architecture-boundary-review-spec.md` as the decision gate before executing any service split, data platform, WeCom, K8s, or production component plan.
+**Goal:** Make `../specs/P3-00-architecture-boundary-review-spec.md` the enforced gate for every P3 service split, data platform, WeCom, Kubernetes, and platform-component proposal.
 
-**Architecture:** Keep the review as a governance and design-control plan, not an immediate code migration. Each downstream P3 plan must prove that it follows the bounded-context model, service extraction triggers, and dependency rules in the review spec.
+**Architecture:** Keep the current canvas application as a modular monolith until a downstream P3 item proves data ownership, API/event contracts, tenant propagation, observability, rollout, rollback, and characterization tests. Use the seven bounded contexts from the review as the default boundary model.
 
-**Tech Stack:** Markdown, ADRs, Java 21, Spring Boot 3.2, MyBatis-Plus, Redis, RocketMQ, React, TypeScript.
+**Tech Stack:** Markdown evidence docs, ADRs, Java 21, Spring Boot 3.2, MyBatis-Plus, Redis, RocketMQ, React 18, TypeScript, JUnit 5, Vitest.
 
 ---
 
 ## Source Material
 
 - Spec: `../specs/P3-00-architecture-boundary-review-spec.md`
+- Code verification: `../specs/P3-00-architecture-boundary-code-verification.md`
 - Coverage matrix: `../todo/coverage-matrix.md`
 - Related specs: `../specs/P3-02-service-decomposition-and-domain-boundaries-spec.md`, `../specs/P3-03-data-platform-architecture-spec.md`, `../specs/P3-08-wecom-scrm-module-spec.md`
 
 ## File Structure
 
-- Read: `../specs/P3-00-architecture-boundary-review-spec.md`
-- Modify: downstream P3 specs and plans only when they contradict the boundary review
-- Create: ADRs under `docs/architecture/adr/` when a physical service extraction is proposed
-- Test: documentation checks plus characterization tests for the context being extracted
+- Read: `docs/architecture/specs/P3-00-architecture-boundary-review-spec.md`
+- Read: `docs/architecture/specs/P3-00-architecture-boundary-code-verification.md`
+- Read: `backend/canvas-engine/src/main/java/org/chovy/canvas/domain/canvas/CanvasService.java`
+- Read: `backend/canvas-engine/src/main/java/org/chovy/canvas/engine/trigger/CanvasExecutionService.java`
+- Read: `backend/canvas-engine/src/main/java/org/chovy/canvas/domain/cdp/CanvasUserQueryService.java`
+- Read: `backend/canvas-engine/src/main/java/org/chovy/canvas/domain/tenant/TenantService.java`
+- Read: `backend/canvas-engine/src/main/java/org/chovy/canvas/engine/delivery/ReachDeliveryService.java`
+- Create: `docs/architecture/evidence/p3-00-architecture-boundary-review.md`
+- Modify: `docs/architecture/adr/ADR-0000-template.md`
+- Create: `docs/architecture/adr/ADR-0006-service-extraction-gate.md`
+- Test: `backend/canvas-engine/src/test/java/org/chovy/canvas/domain/cdp/CanvasUserQueryServiceTest.java`
+- Test: `backend/canvas-engine/src/test/java/org/chovy/canvas/domain/notification/NotificationServiceTest.java`
+- Test: `backend/canvas-engine/src/test/java/org/chovy/canvas/domain/tenant/TenantServiceTest.java`
 
-### Task 1: Apply The Boundary Review To P3 Specs
-
-**Files:**
-- Read: `../specs/P3-00-architecture-boundary-review-spec.md`
-- Modify: `../specs/P3-02-service-decomposition-and-domain-boundaries-spec.md`
-- Modify: `../specs/P3-03-data-platform-architecture-spec.md`
-- Modify: `../specs/P3-08-wecom-scrm-module-spec.md`
-
-- [ ] **Step 1: Check each P3 spec against the seven-context model**
-
-Run `rg -n "service|bounded context|data platform|WeCom|K8s|component" ../specs/P3-*.md`.
-
-- [ ] **Step 2: Remove direct service-extraction assumptions**
-
-Replace any statement that implies immediate physical service extraction with a requirement to satisfy the extraction triggers in the review spec.
-
-- [ ] **Step 3: Verify references**
-
-Run `rg -n "P3-00-architecture-boundary-review-spec.md|service extraction triggers|bounded context" ../specs/P3-*.md`. Expected: downstream P3 specs reference the boundary review or its rules.
-
-### Task 2: Gate Service Extraction With ADRs
+### Task 1: Refresh the boundary evidence gate
 
 **Files:**
-- Create: `docs/architecture/adr/`
-- Read: `../specs/P3-00-architecture-boundary-review-spec.md`
+- Create: `docs/architecture/evidence/p3-00-architecture-boundary-review.md`
+- Read: `docs/architecture/specs/P3-00-architecture-boundary-code-verification.md`
+- Read: `backend/canvas-engine/src/main/java/org/chovy/canvas/domain/canvas/CanvasService.java`
+- Read: `backend/canvas-engine/src/main/java/org/chovy/canvas/engine/trigger/CanvasExecutionService.java`
+- Read: `backend/canvas-engine/src/main/java/org/chovy/canvas/domain/cdp/CanvasUserQueryService.java`
+- Read: `backend/canvas-engine/src/main/java/org/chovy/canvas/domain/tenant/TenantService.java`
 
-- [ ] **Step 1: Create ADR template if absent**
+- [x] Re-run package, controller, mapper, and migration inventory commands against the current repo.
+- [x] Record the seven bounded contexts, current code anchors, direct cross-context imports, shared mapper access, and tenant propagation gaps.
+- [x] Record the recommendation: modular-monolith boundary cleanup before physical service extraction.
 
-Create a template with sections for context, decision, alternatives, data ownership, API/event contracts, rollout, rollback, observability, tenant propagation, and idempotency.
+**Run:**
+```bash
+find backend/canvas-engine/src/main/java/org/chovy/canvas -maxdepth 2 -type d | sort
+rg "Mapper|StringRedisTemplate|RocketMQTemplate|WebClient|@Transactional" backend/canvas-engine/src/main/java/org/chovy/canvas/domain backend/canvas-engine/src/main/java/org/chovy/canvas/engine backend/canvas-engine/src/main/java/org/chovy/canvas/web
+test -f docs/architecture/evidence/p3-00-architecture-boundary-review.md
+rg "Canvas Authoring|Execution Runtime|CDP / Audience|Reach / Notification|Integration|Platform|Data Platform / Analytics|modular monolith" docs/architecture/evidence/p3-00-architecture-boundary-review.md
+```
 
-- [ ] **Step 2: Require ADR for each physical service proposal**
+**Expected:** Evidence file exists and confirms the seven-context boundary model with current code anchors and current blockers.
 
-Before extracting a service, create one ADR under `docs/architecture/adr/` and link it from the relevant P3 plan.
-
-- [ ] **Step 3: Verify ADR readiness**
-
-Run `rg -n "Data ownership|API|Event|Rollback|Observability|Tenant|Idempotency" docs/architecture/adr`. Expected: every physical service ADR contains these sections.
-
-### Task 3: Add Characterization Tests Before Extraction
-
-**Files:**
-- Read: affected context code under `backend/canvas-engine/src/main/java/org/chovy/canvas`
-- Test: affected context tests under `backend/canvas-engine/src/test/java/org/chovy/canvas`
-
-- [ ] **Step 1: Identify the context being extracted**
-
-Use the context table in `../specs/P3-00-architecture-boundary-review-spec.md` to name the context and current code anchors.
-
-- [ ] **Step 2: Add characterization tests**
-
-Add tests for current API behavior, data ownership behavior, event behavior, tenant propagation, and failure behavior.
-
-- [ ] **Step 3: Run focused tests**
-
-Run the relevant backend or frontend test command. Expected before refactor: tests pass against current behavior and protect the migration.
-
-### Task 4: Re-Review After Each Boundary Change
+### Task 2: Apply the boundary review to downstream P3 specs and plans
 
 **Files:**
-- Read: `../specs/P3-00-architecture-boundary-review-spec.md`
-- Read: `../todo/coverage-matrix.md`
-- Modify: `../specs/README.md`, `../plans/README.md`, and `../todo/coverage-matrix.md` when package scope changes
+- Read: `docs/architecture/specs/P3-00-architecture-boundary-review-spec.md`
+- Read: `docs/architecture/specs/P3-02-service-decomposition-and-domain-boundaries-spec.md`
+- Read: `docs/architecture/specs/P3-03-data-platform-architecture-spec.md`
+- Read: `docs/architecture/specs/P3-06-k8s-deployment-platform-spec.md`
+- Read: `docs/architecture/specs/P3-08-wecom-scrm-module-spec.md`
+- Modify: `docs/architecture/plans/P3-02-service-decomposition-and-domain-boundaries-plan.md`
+- Modify: `docs/architecture/plans/P3-03-data-platform-architecture-plan.md`
+- Modify: `docs/architecture/plans/P3-08-wecom-scrm-module-plan.md`
 
-- [ ] **Step 1: Re-run scope check**
+- [x] Check each P3 plan for immediate physical service extraction language.
+- [x] Require every service, data platform, and WeCom proposal to reference the boundary review and evidence file.
+- [x] Ensure K8s and production-component plans are platform decisions, not domain-boundary drivers.
 
-Confirm the proposed change does not create a new deployable without data ownership, observability, rollback, and tenant propagation.
+**Run:**
+```bash
+rg "P3-00-architecture-boundary-review-spec.md|p3-00-architecture-boundary-review.md|service extraction|bounded context" docs/architecture/plans/P3-*.md docs/architecture/specs/P3-*.md
+rg "immediate physical service|split all services|big-bang" docs/architecture/plans/P3-*.md docs/architecture/specs/P3-*.md --glob '!P3-00-architecture-boundary-review-plan.md'
+```
 
-- [ ] **Step 2: Update traceability**
+**Expected:** Downstream P3 plans reference the boundary review gate, and no plan requires an immediate broad service split.
 
-Update specs, plans, and the coverage matrix if the architecture boundary changes.
+### Task 3: Gate service extraction with ADRs
 
-- [ ] **Step 3: Review diff**
+**Files:**
+- Modify: `docs/architecture/adr/ADR-0000-template.md`
+- Create: `docs/architecture/adr/ADR-0006-service-extraction-gate.md`
+- Read: `docs/architecture/specs/P3-00-architecture-boundary-review-spec.md`
+- Read: `docs/architecture/evidence/p3-00-architecture-boundary-review.md`
 
-Run `git diff -- docs/architecture`. Expected: boundary changes are explicit in spec, plan, ADR, and coverage docs.
+- [x] Ensure the ADR template includes context, decision, alternatives, data ownership, API contracts, event contracts, rollout, rollback, observability, tenant propagation, idempotency, and exit criteria.
+- [x] Create a service-extraction gate ADR that blocks extraction until every trigger in the review spec is satisfied.
+- [x] Link the gate ADR from downstream P3 plans that propose service extraction.
+
+**Run:**
+```bash
+test -f docs/architecture/adr/ADR-0000-template.md
+test -f docs/architecture/adr/ADR-0006-service-extraction-gate.md
+rg "Data Ownership|API Contracts|Event Contracts|Rollback|Observability|Tenant Propagation|Idempotency|Exit Criteria" docs/architecture/adr/ADR-0000-template.md docs/architecture/adr/ADR-0006-service-extraction-gate.md
+```
+
+**Expected:** ADR template and service-extraction gate ADR contain every gate required by the boundary review.
+
+### Task 4: Add characterization tests before extraction
+
+**Files:**
+- Read: `backend/canvas-engine/src/main/java/org/chovy/canvas/domain/cdp/CanvasUserQueryService.java`
+- Read: `backend/canvas-engine/src/main/java/org/chovy/canvas/domain/notification/NotificationService.java`
+- Read: `backend/canvas-engine/src/main/java/org/chovy/canvas/domain/tenant/TenantService.java`
+- Test: `backend/canvas-engine/src/test/java/org/chovy/canvas/domain/cdp/CanvasUserQueryServiceTest.java`
+- Test: `backend/canvas-engine/src/test/java/org/chovy/canvas/domain/notification/NotificationServiceTest.java`
+- Test: `backend/canvas-engine/src/test/java/org/chovy/canvas/domain/tenant/TenantServiceTest.java`
+
+- [x] For each extraction candidate, name the context and current code anchors from the seven-context table.
+- [x] Add characterization tests for current API behavior, mapper reads/writes, tenant behavior, failure behavior, and event/notification behavior.
+- [x] Run the characterization tests before moving packages, tables, or APIs.
+
+**Run:**
+```bash
+cd backend && mvn test -pl canvas-engine -Dtest=CanvasUserQueryServiceTest,NotificationServiceTest,TenantServiceTest
+```
+
+**Expected:** Candidate-context characterization tests pass against current monolith behavior before any extraction begins.
+
+### Task 5: Commit scoped boundary-review gate changes
+
+**Files:**
+- Modify: `docs/architecture/plans/P3-00-architecture-boundary-review-plan.md`
+- Create: `docs/architecture/evidence/p3-00-architecture-boundary-review.md`
+- Modify: `docs/architecture/adr/ADR-0000-template.md`
+- Create: `docs/architecture/adr/ADR-0006-service-extraction-gate.md`
+
+- [x] Review only boundary evidence, ADR, and P3 plan files named in this plan.
+- [x] Do not stage or commit in this session unless the user explicitly asks.
+- [x] Record verification commands and remaining follow-ups in evidence.
+
+**Run:**
+```bash
+git diff -- docs/architecture/plans/P3-00-architecture-boundary-review-plan.md docs/architecture/evidence/p3-00-architecture-boundary-review.md docs/architecture/adr/ADR-0000-template.md docs/architecture/adr/ADR-0006-service-extraction-gate.md docs/architecture/plans/P3-02-service-decomposition-and-domain-boundaries-plan.md docs/architecture/plans/P3-03-data-platform-architecture-plan.md docs/architecture/plans/P3-06-k8s-deployment-platform-plan.md docs/architecture/plans/P3-07-production-platform-components-plan.md docs/architecture/plans/P3-08-wecom-scrm-module-plan.md
+```
+
+**Expected:** The diff contains only the boundary-review plan, evidence file, ADR gate files, and downstream P3 gate references. No commit is created by default.

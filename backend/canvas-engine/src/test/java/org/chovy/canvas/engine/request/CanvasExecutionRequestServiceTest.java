@@ -3,7 +3,9 @@ package org.chovy.canvas.engine.request;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.chovy.canvas.common.enums.NodeType;
 import org.chovy.canvas.common.enums.TriggerType;
+import org.chovy.canvas.dal.dataobject.CanvasDO;
 import org.chovy.canvas.dal.dataobject.CanvasExecutionRequestDO;
+import org.chovy.canvas.dal.mapper.CanvasMapper;
 import org.chovy.canvas.dal.mapper.CanvasExecutionRequestMapper;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -85,5 +87,23 @@ class CanvasExecutionRequestServiceTest {
         assertThat(first).startsWith("mq-10-");
         assertThat(second).startsWith("mq-10-");
         assertThat(second).isNotEqualTo(first);
+    }
+
+    @Test
+    void enqueuePersistsTenantFromTargetCanvas() {
+        CanvasExecutionRequestMapper mapper = mock(CanvasExecutionRequestMapper.class);
+        CanvasMapper canvasMapper = mock(CanvasMapper.class);
+        CanvasDO canvas = new CanvasDO();
+        canvas.setTenantId(99L);
+        when(canvasMapper.selectById(10L)).thenReturn(canvas);
+        CanvasExecutionRequestService service =
+                new CanvasExecutionRequestService(mapper, new ObjectMapper(), canvasMapper);
+
+        service.enqueue(10L, "user-7", TriggerType.MQ, NodeType.MQ_TRIGGER,
+                "order.paid", Map.of(), "MSG-1");
+
+        ArgumentCaptor<CanvasExecutionRequestDO> captor = ArgumentCaptor.forClass(CanvasExecutionRequestDO.class);
+        verify(mapper).insertIgnore(captor.capture());
+        assertThat(captor.getValue().getTenantId()).isEqualTo(99L);
     }
 }

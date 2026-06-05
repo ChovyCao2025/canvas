@@ -5,6 +5,10 @@ Sequence: 001
 Source: `todo/p1/operating-loop-and-effect-closure.md`
 Implementation plan: `../plans/p1-001-operating-loop-and-effect-closure-plan.md`
 
+## Implementation Status
+
+Implemented and verified on 2026-06-05. Verification evidence is recorded in `../plans/p1-001-operating-loop-and-effect-closure-plan.md`.
+
 ## Goal
 
 Make the core operator loop measurable and reversible from template selection through pre-publish checks, publish, control-group holdout, conversion attribution, receipt tracking, version comparison, and rollback.
@@ -58,7 +62,7 @@ Operators can start from a proven template, understand publish risk before launc
 - `backend/canvas-engine/src/main/java/org/chovy/canvas/dal/dataobject/CanvasConversionAttributionDO.java`
 - `backend/canvas-engine/src/main/java/org/chovy/canvas/dal/mapper/CanvasControlGroupHoldoutMapper.java`
 - `backend/canvas-engine/src/main/java/org/chovy/canvas/dal/mapper/CanvasConversionAttributionMapper.java`
-- `backend/canvas-engine/src/main/resources/db/migration/V94__operating_loop_effect_closure.sql`
+- `backend/canvas-engine/src/main/resources/db/migration/V96__operating_loop_effect_closure.sql`
 
 ### Frontend Touchpoints
 

@@ -5,6 +5,10 @@ Sequence: 004D
 Source: `docs/optimization/3000-concurrency-hardening-checklist.md`
 Implementation plan: `../plans/p1-004d-3000-concurrency-runbook-and-baseline-gate-plan.md`
 
+## Implementation Status
+
+Implemented and focused-verified on 2026-06-05. The 3000 concurrency hardening runbook now exists under `docs/product-evolution/runbooks/`, and `tools/perf/README.md` links to it from the 3000 hardening profile section.
+
 ## Goal
 
 Document the executable 3000 hardening release gate with entry requirements, baseline tests, profile execution, stop gates, rollback, degradation actions, and the 4000 block.
@@ -14,7 +18,7 @@ Document the executable 3000 hardening release gate with entry requirements, bas
 - P1-004 adds profile/evidence tooling.
 - P1-004B adds stop-gate evaluation.
 - P1-004C adds backend runtime metrics and lane routing tests.
-- There is no dedicated runbook under `docs/product-evolution/runbooks/`.
+- `docs/product-evolution/runbooks/3000-concurrency-hardening-runbook.md` documents the operator gate and 4000 block.
 
 ## In Scope
 

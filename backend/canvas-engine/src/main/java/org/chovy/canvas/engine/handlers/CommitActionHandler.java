@@ -51,6 +51,20 @@ public class CommitActionHandler implements NodeHandler {
         return true;
     }
 
+    @Override
+    public boolean requiresSideEffectIdempotency(Map<String, Object> config, ExecutionContext ctx) {
+        return true;
+    }
+
+    @Override
+    public String sideEffectOperationKey(Map<String, Object> config, ExecutionContext ctx) {
+        Object explicit = config.get(MapFieldKeys.IDEMPOTENCY_KEY);
+        if (explicit != null && !explicit.toString().isBlank()) {
+            return explicit.toString();
+        }
+        return ctx.getUserId() + ":commit:" + string(config.get(MapFieldKeys.ACTION_TYPE));
+    }
+
     private String string(Object value) {
         return value == null ? null : value.toString();
     }

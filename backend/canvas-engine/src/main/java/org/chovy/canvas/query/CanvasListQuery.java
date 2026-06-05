@@ -22,4 +22,13 @@ public class CanvasListQuery {
 
     /** 按名称模糊匹配（可选，忽略大小写由数据库规则决定）。 */
     private String name;
+
+    /** 所属租户 ID，由认证上下文写入；超级管理员可显式指定或留空查全部。 */
+    private Long tenantId;
+
+    /** 平铺项目分组 key，精确匹配。 */
+    private String projectKey;
+
+    /** 平铺文件夹分组 key，精确匹配。 */
+    private String folderKey;
 }

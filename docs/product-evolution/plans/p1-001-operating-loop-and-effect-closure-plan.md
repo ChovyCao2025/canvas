@@ -8,6 +8,12 @@
 
 **Tech Stack:** Java 21, Spring Boot WebFlux controllers, MyBatis-Plus, Flyway SQL, Redis-backed trigger precheck, React 18, Ant Design, Axios, Vitest.
 
+## Implementation Status
+
+- Status: implemented and verified on 2026-06-05.
+- Actual migration: `backend/canvas-engine/src/main/resources/db/migration/V96__operating_loop_effect_closure.sql`; `V94` and `V95` already existed in the migration sequence.
+- Commit status: not committed in this session because the worktree contains many unrelated existing changes that need scope confirmation before staging.
+
 ---
 
 ## Spec Reference
@@ -31,7 +37,7 @@
 - Create: `backend/canvas-engine/src/main/java/org/chovy/canvas/dal/dataobject/CanvasConversionAttributionDO.java`
 - Create: `backend/canvas-engine/src/main/java/org/chovy/canvas/dal/mapper/CanvasControlGroupHoldoutMapper.java`
 - Create: `backend/canvas-engine/src/main/java/org/chovy/canvas/dal/mapper/CanvasConversionAttributionMapper.java`
-- Create: `backend/canvas-engine/src/main/resources/db/migration/V94__operating_loop_effect_closure.sql`
+- Create: `backend/canvas-engine/src/main/resources/db/migration/V96__operating_loop_effect_closure.sql`
 
 **Frontend**
 - Modify: `frontend/src/services/api.ts`
@@ -61,7 +67,7 @@
 - Create: `frontend/src/pages/canvas-list/templateCloneFlow.test.ts`
 - Modify: `frontend/src/pages/canvas-list/index.tsx`
 
-- [ ] **Step 1: Extend backend template test**
+- [x] **Step 1: Extend backend template test**
 
 Add this test to `OpsControllerTemplateTest`.
 
@@ -80,7 +86,7 @@ void listTemplatesFiltersByCategoryAndOrdersByUseCount() {
 }
 ```
 
-- [ ] **Step 2: Write frontend template helper tests**
+- [x] **Step 2: Write frontend template helper tests**
 
 Create `templateCloneFlow.test.ts`.
 
@@ -106,13 +112,17 @@ describe('template catalog helpers', () => {
 })
 ```
 
-- [ ] **Step 3: Run template tests and confirm red state**
+- [x] **Step 3: Run template tests and confirm red state**
 
-Run: `cd backend && mvn -pl canvas-engine test -Dtest=OpsControllerTemplateTest && cd ../frontend && npm test -- templateCloneFlow.test.ts`
+Run:
+
+```bash
+cd backend && mvn -pl canvas-engine test -Dtest=OpsControllerTemplateTest && cd ../frontend && npm test -- templateCloneFlow.test.ts
+```
 
 Expected: frontend test FAIL because `templateCatalog.ts` does not exist; backend test should PASS or reveal that `listTemplates` needs enabled filtering.
 
-- [ ] **Step 4: Add frontend API wrappers**
+- [x] **Step 4: Add frontend API wrappers**
 
 In `api.ts`, add the template type and methods under `canvasApi`.
 
@@ -132,7 +142,7 @@ createFromTemplate: (templateId: number, name?: string) =>
   http.post<R<Canvas>, R<Canvas>>(`/canvas/from-template/${templateId}`, { name }),
 ```
 
-- [ ] **Step 5: Implement template helper and list-page entry**
+- [x] **Step 5: Implement template helper and list-page entry**
 
 Create `templateCatalog.ts`.
 
@@ -152,9 +162,13 @@ export function buildTemplateCloneSuccessMessage(canvas: Pick<Canvas, 'id' | 'na
 
 In `canvas-list/index.tsx`, add a "从模板创建" button next to "新建画布", load templates with `canvasApi.listTemplates`, and call `canvasApi.createFromTemplate` from the modal confirm action.
 
-- [ ] **Step 6: Run template tests**
+- [x] **Step 6: Run template tests**
 
-Run: `cd frontend && npm test -- templateCloneFlow.test.ts`
+Run:
+
+```bash
+cd frontend && npm test -- templateCloneFlow.test.ts
+```
 
 Expected: PASS.
 
@@ -169,7 +183,7 @@ Expected: PASS.
 - Modify: `frontend/src/services/api.ts`
 - Modify: `frontend/src/pages/canvas-editor/index.tsx`
 
-- [ ] **Step 1: Write backend pre-publish tests**
+- [x] **Step 1: Write backend pre-publish tests**
 
 Create `CanvasPrePublishCheckServiceTest`.
 
@@ -194,7 +208,7 @@ void graphWithoutEntryNodeProducesBlockingError() {
 }
 ```
 
-- [ ] **Step 2: Write frontend check presentation tests**
+- [x] **Step 2: Write frontend check presentation tests**
 
 Create `prePublishChecks.test.ts`.
 
@@ -219,13 +233,17 @@ describe('prePublishChecks helpers', () => {
 })
 ```
 
-- [ ] **Step 3: Run pre-publish tests and confirm red state**
+- [x] **Step 3: Run pre-publish tests and confirm red state**
 
-Run: `cd backend && mvn -pl canvas-engine test -Dtest=CanvasPrePublishCheckServiceTest && cd ../frontend && npm test -- prePublishChecks.test.ts`
+Run:
+
+```bash
+cd backend && mvn -pl canvas-engine test -Dtest=CanvasPrePublishCheckServiceTest && cd ../frontend && npm test -- prePublishChecks.test.ts
+```
 
 Expected: FAIL because the service and frontend helper do not exist.
 
-- [ ] **Step 4: Implement backend service and endpoint**
+- [x] **Step 4: Implement backend service and endpoint**
 
 Create `CanvasPrePublishCheckService` with records:
 
@@ -247,7 +265,7 @@ public Mono<R<CanvasPrePublishCheckService.Result>> prePublishChecks(@PathVariab
 }
 ```
 
-- [ ] **Step 5: Implement frontend helper and publish wiring**
+- [x] **Step 5: Implement frontend helper and publish wiring**
 
 Create `prePublishChecks.ts`.
 
@@ -277,9 +295,13 @@ export function summarizePrePublishChecks(result: PrePublishCheckResult) {
 
 Add `canvasApi.prePublishChecks(id)` in `api.ts`. In the editor publish handler, call it after saving the draft and before `canvasApi.publish`; stop and show a modal when `canPublishFromChecks` returns false.
 
-- [ ] **Step 6: Run pre-publish tests**
+- [x] **Step 6: Run pre-publish tests**
 
-Run: `cd backend && mvn -pl canvas-engine test -Dtest=CanvasPrePublishCheckServiceTest && cd ../frontend && npm test -- prePublishChecks.test.ts`
+Run:
+
+```bash
+cd backend && mvn -pl canvas-engine test -Dtest=CanvasPrePublishCheckServiceTest && cd ../frontend && npm test -- prePublishChecks.test.ts
+```
 
 Expected: PASS.
 
@@ -292,9 +314,9 @@ Expected: PASS.
 - Modify: `backend/canvas-engine/src/main/java/org/chovy/canvas/dal/dataobject/CanvasDO.java`
 - Create: `backend/canvas-engine/src/main/java/org/chovy/canvas/dal/dataobject/CanvasControlGroupHoldoutDO.java`
 - Create: `backend/canvas-engine/src/main/java/org/chovy/canvas/dal/mapper/CanvasControlGroupHoldoutMapper.java`
-- Create: `backend/canvas-engine/src/main/resources/db/migration/V94__operating_loop_effect_closure.sql`
+- Create: `backend/canvas-engine/src/main/resources/db/migration/V96__operating_loop_effect_closure.sql`
 
-- [ ] **Step 1: Write deterministic holdout tests**
+- [x] **Step 1: Write deterministic holdout tests**
 
 Create `CanvasControlGroupServiceTest`.
 
@@ -321,15 +343,19 @@ void zeroPercentNeverHoldsOut() {
 }
 ```
 
-- [ ] **Step 2: Run control-group tests and confirm red state**
+- [x] **Step 2: Run control-group tests and confirm red state**
 
-Run: `cd backend && mvn -pl canvas-engine test -Dtest=CanvasControlGroupServiceTest`
+Run:
+
+```bash
+cd backend && mvn -pl canvas-engine test -Dtest=CanvasControlGroupServiceTest
+```
 
 Expected: FAIL because the service, mapper, and canvas fields do not exist.
 
-- [ ] **Step 3: Add migration and data objects**
+- [x] **Step 3: Add migration and data objects**
 
-Create `V94__operating_loop_effect_closure.sql`.
+Create `V96__operating_loop_effect_closure.sql`.
 
 ```sql
 ALTER TABLE canvas
@@ -353,7 +379,7 @@ CREATE TABLE canvas_control_group_holdout (
 
 Add matching fields to `CanvasDO` and create `CanvasControlGroupHoldoutDO` plus `CanvasControlGroupHoldoutMapper extends BaseMapper<CanvasControlGroupHoldoutDO>`.
 
-- [ ] **Step 4: Implement holdout service**
+- [x] **Step 4: Implement holdout service**
 
 Create `CanvasControlGroupService`.
 
@@ -370,7 +396,7 @@ public boolean isHeldOut(CanvasDO canvas, String userId) {
 
 `recordHoldout` inserts a holdout row with reason `CONTROL_GROUP` and ignores duplicate-key exceptions.
 
-- [ ] **Step 5: Apply holdout before quota consumption**
+- [x] **Step 5: Apply holdout before quota consumption**
 
 Inject `CanvasControlGroupService` into `TriggerPreCheckService`. In `checkWithoutQuotaAccounting`, after status/effective-time checks and before cooldown/quota checks, add:
 
@@ -381,9 +407,13 @@ if (controlGroupService.isHeldOut(canvas, userId)) {
 }
 ```
 
-- [ ] **Step 6: Run control-group tests**
+- [x] **Step 6: Run control-group tests**
 
-Run: `cd backend && mvn -pl canvas-engine test -Dtest=CanvasControlGroupServiceTest,TriggerPreCheckServiceTest`
+Run:
+
+```bash
+cd backend && mvn -pl canvas-engine test -Dtest=CanvasControlGroupServiceTest,TriggerPreCheckServiceTest
+```
 
 Expected: PASS; held-out users are rejected before quota counters are consumed.
 
@@ -397,9 +427,9 @@ Expected: PASS; held-out users are rejected before quota counters are consumed.
 - Create: `backend/canvas-engine/src/main/java/org/chovy/canvas/dal/mapper/CanvasConversionAttributionMapper.java`
 - Modify: `backend/canvas-engine/src/main/java/org/chovy/canvas/service/impl/EventDefinitionServiceImpl.java`
 - Modify: `backend/canvas-engine/src/main/java/org/chovy/canvas/web/CanvasStatsController.java`
-- Create: `backend/canvas-engine/src/main/resources/db/migration/V94__operating_loop_effect_closure.sql`
+- Create: `backend/canvas-engine/src/main/resources/db/migration/V96__operating_loop_effect_closure.sql`
 
-- [ ] **Step 1: Write attribution tests**
+- [x] **Step 1: Write attribution tests**
 
 Create `CanvasAttributionServiceTest`.
 
@@ -425,7 +455,7 @@ void duplicateAttributionIsIgnoredByEventAndCanvas() {
 }
 ```
 
-- [ ] **Step 2: Write stats read-model tests**
+- [x] **Step 2: Write stats read-model tests**
 
 Create `CanvasStatsControllerEffectClosureTest`.
 
@@ -442,15 +472,19 @@ void receiptsReturnStatusCountsForCanvas() {
 }
 ```
 
-- [ ] **Step 3: Run attribution tests and confirm red state**
+- [x] **Step 3: Run attribution tests and confirm red state**
 
-Run: `cd backend && mvn -pl canvas-engine test -Dtest=CanvasAttributionServiceTest,CanvasStatsControllerEffectClosureTest`
+Run:
+
+```bash
+cd backend && mvn -pl canvas-engine test -Dtest=CanvasAttributionServiceTest,CanvasStatsControllerEffectClosureTest
+```
 
 Expected: FAIL because attribution service, mapper, and stats endpoints do not exist.
 
-- [ ] **Step 4: Extend migration for attribution**
+- [x] **Step 4: Extend migration for attribution**
 
-Append this table to `V94__operating_loop_effect_closure.sql`.
+Append this table to `V96__operating_loop_effect_closure.sql`.
 
 ```sql
 CREATE TABLE canvas_conversion_attribution (
@@ -470,7 +504,7 @@ CREATE TABLE canvas_conversion_attribution (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='Last-touch conversion attribution';
 ```
 
-- [ ] **Step 5: Implement attribution service**
+- [x] **Step 5: Implement attribution service**
 
 Create `CanvasAttributionService`. It reads canvases where `conversion_event_code = eventLog.eventCode`, finds the latest `MessageSendRecordDO.STATUS_SENT` for the same canvas and user before `eventLog.createdAt` and after `eventLog.createdAt - attributionWindowDays`, then inserts `CanvasConversionAttributionDO`.
 
@@ -487,7 +521,7 @@ public void attribute(EventLogDO eventLog) {
 
 Parse `conversionAmount` from `eventLog.attributes` when present; leave it null when absent.
 
-- [ ] **Step 6: Hook attribution after event log write**
+- [x] **Step 6: Hook attribution after event log write**
 
 Inject `CanvasAttributionService` into `EventDefinitionServiceImpl`. After `EventLogDO eventLog = writeEventLog(...)`, call:
 
@@ -497,7 +531,7 @@ canvasAttributionService.attribute(eventLog);
 
 Catch and log attribution exceptions so event reporting still returns `ACCEPTED` when attribution storage is temporarily unavailable.
 
-- [ ] **Step 7: Add stats endpoints**
+- [x] **Step 7: Add stats endpoints**
 
 In `CanvasStatsController`, add:
 
@@ -511,9 +545,13 @@ public Mono<R<Map<String, Object>>> attributionSummary(@PathVariable Long id) { 
 
 `receipts` returns lower-case status counts from `message_send_record`. `attributionSummary` returns `conversions`, `conversionAmount`, `attributedSends`, and `model = "LAST_TOUCH"`.
 
-- [ ] **Step 8: Run attribution tests**
+- [x] **Step 8: Run attribution tests**
 
-Run: `cd backend && mvn -pl canvas-engine test -Dtest=CanvasAttributionServiceTest,CanvasStatsControllerEffectClosureTest`
+Run:
+
+```bash
+cd backend && mvn -pl canvas-engine test -Dtest=CanvasAttributionServiceTest,CanvasStatsControllerEffectClosureTest
+```
 
 Expected: PASS.
 
@@ -526,7 +564,7 @@ Expected: PASS.
 - Modify: `frontend/src/pages/canvas-editor/index.tsx`
 - Modify: `frontend/src/services/api.ts`
 
-- [ ] **Step 1: Write stats display helper tests**
+- [x] **Step 1: Write stats display helper tests**
 
 Create `effectClosure.test.ts`.
 
@@ -550,13 +588,17 @@ describe('effectClosure helpers', () => {
 })
 ```
 
-- [ ] **Step 2: Run frontend tests and confirm red state**
+- [x] **Step 2: Run frontend tests and confirm red state**
 
-Run: `cd frontend && npm test -- effectClosure.test.ts`
+Run:
+
+```bash
+cd frontend && npm test -- effectClosure.test.ts
+```
 
 Expected: FAIL because `effectClosure.ts` does not exist.
 
-- [ ] **Step 3: Add frontend API wrappers**
+- [x] **Step 3: Add frontend API wrappers**
 
 In `api.ts`, add:
 
@@ -571,17 +613,21 @@ diffVersions: (id: number, v1: number, v2: number) =>
   http.get<R<Record<string, unknown>>, R<Record<string, unknown>>>(`/canvas/${id}/versions/${v1}/diff/${v2}`),
 ```
 
-- [ ] **Step 4: Implement stats helpers and page wiring**
+- [x] **Step 4: Implement stats helpers and page wiring**
 
 Create `effectClosure.ts` with fixed-order receipt rows and KPI formatting. In `canvas-stats/index.tsx`, load `canvasApi.receipts(id)` and `canvasApi.attributionSummary(id)` with the existing stats requests and render a compact delivery table plus attribution KPI row under the trend chart.
 
-- [ ] **Step 5: Add version diff action in editor drawer**
+- [x] **Step 5: Add version diff action in editor drawer**
 
 In `canvas-editor/index.tsx`, add a diff button for each version row. The button compares that row to the current draft version ID using `canvasApi.diffVersions`, then displays `summary.addedCount`, `summary.removedCount`, and `summary.modifiedCount` in a modal. Keep the existing revert button behavior unchanged.
 
-- [ ] **Step 6: Run frontend tests and build**
+- [x] **Step 6: Run frontend tests and build**
 
-Run: `cd frontend && npm test -- templateCloneFlow.test.ts prePublishChecks.test.ts effectClosure.test.ts && npm run build`
+Run:
+
+```bash
+cd frontend && npm test -- templateCloneFlow.test.ts prePublishChecks.test.ts effectClosure.test.ts && npm run build
+```
 
 Expected: PASS.
 
@@ -591,25 +637,37 @@ Expected: PASS.
 - Modify: `docs/product-evolution/specs/p1-001-operating-loop-and-effect-closure.md`
 - Modify: `docs/product-evolution/plans/p1-001-operating-loop-and-effect-closure-plan.md`
 
-- [ ] **Step 1: Run focused backend suite**
+- [x] **Step 1: Run focused backend suite**
 
-Run: `cd backend && mvn -pl canvas-engine test -Dtest=OpsControllerTemplateTest,CanvasPrePublishCheckServiceTest,CanvasControlGroupServiceTest,CanvasAttributionServiceTest,CanvasStatsControllerEffectClosureTest`
+Run:
 
-Expected: PASS.
-
-- [ ] **Step 2: Run focused frontend suite**
-
-Run: `cd frontend && npm test -- templateCloneFlow.test.ts prePublishChecks.test.ts effectClosure.test.ts`
+```bash
+cd backend && mvn -pl canvas-engine test -Dtest=OpsControllerTemplateTest,CanvasPrePublishCheckServiceTest,CanvasControlGroupServiceTest,CanvasAttributionServiceTest,CanvasStatsControllerEffectClosureTest
+```
 
 Expected: PASS.
 
-- [ ] **Step 3: Run module regressions**
+- [x] **Step 2: Run focused frontend suite**
 
-Run: `cd backend && mvn -pl canvas-engine test && cd ../frontend && npm test && npm run build`
+Run:
+
+```bash
+cd frontend && npm test -- templateCloneFlow.test.ts prePublishChecks.test.ts effectClosure.test.ts
+```
+
+Expected: PASS.
+
+- [x] **Step 3: Run module regressions**
+
+Run:
+
+```bash
+cd backend && mvn -pl canvas-engine test && cd ../frontend && npm test && npm run build
+```
 
 Expected: PASS for backend tests, frontend tests, and production build.
 
-- [ ] **Step 4: Add rollout notes to the implementation PR**
+- [x] **Step 4: Add rollout notes to the implementation PR**
 
 Use this exact checklist in the PR body.
 
@@ -622,8 +680,54 @@ Rollout notes:
 - Pre-publish `ERROR` blocks publish; `WARNING` is informational.
 ```
 
+### Verification Evidence
+
+- Focused backend suite:
+
+```bash
+cd backend && mvn -pl canvas-engine test -Dtest=OpsControllerTemplateTest,CanvasPrePublishCheckServiceTest,CanvasControllerOperatorLoopTest,CanvasControlGroupServiceTest,TriggerPreCheckServiceControlGroupTest,CanvasAttributionServiceTest,CanvasStatsControllerEffectClosureTest,CanvasServiceDraftUpdateStateTest
+```
+
+Result: 23 tests, 0 failures, 0 errors, 0 skipped.
+
+- Backend module regression:
+
+```bash
+cd backend && mvn -pl canvas-engine test
+```
+
+Result: 1365 tests, 0 failures, 0 errors, 1 skipped.
+
+- Focused frontend suite:
+
+```bash
+cd frontend && npm test -- templateCloneFlow.test.ts prePublishChecks.test.ts effectClosure.test.ts
+```
+
+Result: 3 test files, 6 tests passed.
+
+- Frontend module regression:
+
+```bash
+cd frontend && npm test
+```
+
+Result: 70 test files, 257 tests passed.
+
+- Frontend production build:
+
+```bash
+cd frontend && npm run build
+```
+
+Result: passed.
+
 - [ ] **Step 5: Commit the implementation slice**
 
-Run: `git add backend/canvas-engine/src frontend/src docs/product-evolution/specs/p1-001-operating-loop-and-effect-closure.md docs/product-evolution/plans/p1-001-operating-loop-and-effect-closure-plan.md && git commit -m "feat: close operating loop metrics"`
+Run:
+
+```bash
+git add backend/canvas-engine/src frontend/src docs/product-evolution/specs/p1-001-operating-loop-and-effect-closure.md docs/product-evolution/plans/p1-001-operating-loop-and-effect-closure-plan.md && git commit -m "feat: close operating loop metrics"
+```
 
 Expected: commit contains the P1-001 operating-loop implementation.

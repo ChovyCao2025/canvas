@@ -6,7 +6,7 @@ Coverage matrix: `docs/architecture/todo/coverage-matrix.md`
 
 ## Verification Status
 
-Planning material with confirmed prerequisites in P0 data isolation, P1 observability, and P2 dependency abstraction.
+Implemented as shared platform primitive contracts. No identity service, event platform, or engine/web service extraction is approved yet; these contracts are prerequisites. Evidence and contracts are in `docs/architecture/evidence/p3-09-platform-primitives.md`, `docs/architecture/platform-primitives.md`, `docs/architecture/tenant-platform-contract.md`, `docs/architecture/event-schema-governance.md`, and `docs/architecture/engine-web-boundary.md`.
 
 ## Source Documents
 

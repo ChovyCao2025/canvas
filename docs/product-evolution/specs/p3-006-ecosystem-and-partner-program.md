@@ -7,69 +7,75 @@ Implementation plan: `../plans/p3-006-ecosystem-and-partner-program-plan.md`
 
 ## Goal
 
-Define ISV tiers, partner portal, review process, SDK samples, public submission, revenue sharing, support, and community governance.
+Convert ISV tiers, partner portal, review process, SDK samples, public submission, revenue sharing, support, and community governance into an evidence-backed ecosystem program decision.
 
 ## User And Business Value
 
-This keeps the strategy actionable by requiring discovery gates, MVP scope, and measurable exit criteria before engineering scale-up.
+This keeps the strategy actionable by requiring partner demand evidence, review governance, support ownership, and measurable ecosystem readiness before portal or marketplace build-out.
 
 ## In Scope
 
-- ISV profile and tier model.
-- Partner portal MVP.
-- Review and security checklist.
-- Revenue sharing and support policy.
+- Partner-program discovery brief covering target partner types, partner value proposition, operator owner, and support model.
+- Partner tier and review checklist covering ISV profile, security review, sample requirements, support policy, and revenue-share assumptions.
+- Evidence register for partner interviews, integration requests, SDK pain points, and marketplace demand.
+- Governance gate that records whether the strategy exits as proceed, park, or split into child implementation specs.
 
 ## Out Of Scope
 
-- Immediate full-scale implementation.
-- Commercial, legal, or architecture commitments without named owner and evidence.
+- Building partner portal UI, public submission flows, SDK hosting, marketplace listing, payment sharing, or community forums.
+- Adding runtime backend endpoints, frontend routes, or tenant data tables before the governance gate approves a child implementation spec.
+- Commercial, legal, security, or support commitments without named owner and cited evidence.
 
 ## Functional Requirements
 
-1. The feature must expose the smallest useful operator or platform workflow described in the source item.
-2. The implementation must preserve tenant isolation, authorization, auditability, and rollback behavior for every new read or write path.
-3. New UI must use existing React, Ant Design, router, service, and test patterns unless a child spec justifies a new pattern.
-4. New backend behavior must use the existing Spring Boot, MyBatis, Flyway, controller, domain service, and test patterns.
-5. The implementation must include focused automated tests before code changes and a manual verification checklist for the core workflow.
+1. The discovery artifact must name the ecosystem owner, product owner, security owner, support owner, target partner segment, and decision date.
+2. The evidence register must include at least three partner-demand sources with source date, source owner, confidence, and decision implication.
+3. The tier model must define entry criteria, review requirements, support entitlement, and publish criteria for each proposed tier.
+4. The governance gate must choose exactly one outcome: `proceed`, `park`, or `split`.
+5. A `proceed` or `split` outcome must name the next child spec path and the first measurable KPI; a `park` outcome must name the revisit trigger.
 
 ## Technical Scope
 
 ### Backend Touchpoints
 
-- `backend/canvas-engine/src/main/java/org/chovy/canvas/domain`
-- `backend/canvas-engine/src/main/java/org/chovy/canvas/web`
+- No backend runtime files in this P3 strategy slice.
 
 ### Frontend Touchpoints
 
-- `frontend/src/pages`
-- `frontend/src/services`
+- No frontend runtime files in this P3 strategy slice.
 
 ### Data And Configuration Touchpoints
 
-- `backend/canvas-engine/src/main/resources/db/migration/V121__ecosystem_and_partner_program.sql`
+- No Flyway migration in this slice. The work creates discovery and governance documents only; partner-program runtime storage must be introduced by a later child implementation spec if the gate outcome is `proceed` or `split`.
+- Future runtime storage, if approved, should start at `backend/canvas-engine/src/main/resources/db/migration/V178__partner_program_registry.sql`.
+
+### Evidence And Governance Touchpoints
+
+- `docs/product-evolution/evidence/p3-006-partner-program-discovery.md`
+- `docs/product-evolution/evidence/p3-006-partner-tier-and-review-checklist.md`
+- `docs/product-evolution/governance/p3-006-partner-program-gate.md`
 
 ### Test Touchpoints
 
-- `backend/canvas-engine/src/test/java/org/chovy/canvas/strategy/EcosystemAndPartnerProgramTest.java`
-- `frontend/src/pages/ecosystem-and-partner-program/ecosystem-and-partner-program.test.tsx`
+- Markdown validation commands in the implementation plan.
+- Scope scan verifies the spec and plan stay execution-ready.
 
 ## Dependencies
 
-- Requires explicit business or architecture owner.
-- Requires discovery evidence before build-out.
+- Requires named Ecosystem, Product, Security, and Support owners.
+- Requires evidence from partner-facing conversations, integration requests, or SDK support history.
+- Requires agreement that P3 strategy output can be a documented stop or split decision, not a product build.
 
 ## Risks And Controls
 
-- Scope creep: keep the first implementation to the workflow in this spec and move broader ideas to a follow-up spec.
-- Tenant or permission regression: add backend tests for tenant-scoped data and role checks before exposing UI.
-- UI complexity: use one page or one panel first, then expand only after the workflow is verified.
-- Data migration risk: make every migration additive and reversible by disabling the new route or feature flag.
+- Unsupported partner commitments: require support owner sign-off in the gate.
+- Security exposure: require a review checklist before any public submission workflow is approved.
+- Weak demand signal: require confidence and decision implication for each evidence source.
+- Scope creep: keep this slice limited to decision artifacts and create child specs for approved runtime work.
 
 ## Acceptance Criteria
 
-- The source item has a visible implemented workflow or a documented discovery exit if this is a P3 strategy item.
-- All changed backend endpoints reject unauthorized access and preserve tenant scoping.
-- All changed frontend routes handle loading, empty, error, and permission states.
-- Tests named in the plan pass in the local commands for backend and frontend slices.
-- The implementation includes rollout notes covering feature flag, migration, and rollback behavior.
+- The discovery brief, partner tier and review checklist, and governance gate documents exist with the sections defined in the plan.
+- The plan validation commands pass and show the expected section headers.
+- The governance gate records `proceed`, `park`, or `split` with owner, date, KPI, and next action.
+- No backend, frontend, Flyway migration, index, or audit file is required for this strategy slice.

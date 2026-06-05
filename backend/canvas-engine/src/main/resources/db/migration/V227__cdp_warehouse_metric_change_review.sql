@@ -1,0 +1,23 @@
+CREATE TABLE IF NOT EXISTS cdp_warehouse_metric_change_review (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    tenant_id BIGINT NOT NULL DEFAULT 0,
+    dataset_key VARCHAR(128) NOT NULL,
+    metric_key VARCHAR(128) NOT NULL,
+    change_type VARCHAR(32) NOT NULL DEFAULT 'METRIC_CONTRACT',
+    current_snapshot_json JSON NOT NULL,
+    proposed_snapshot_json JSON NOT NULL,
+    impact_summary_json JSON NOT NULL,
+    risk_level VARCHAR(16) NOT NULL,
+    status VARCHAR(32) NOT NULL DEFAULT 'PENDING_REVIEW',
+    requested_by VARCHAR(128) NOT NULL,
+    request_reason VARCHAR(512) NOT NULL,
+    reviewed_by VARCHAR(128) NULL,
+    reviewed_at DATETIME NULL,
+    review_note VARCHAR(512) NULL,
+    applied_at DATETIME NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    INDEX idx_cdp_warehouse_metric_review_target (tenant_id, dataset_key, metric_key, status, created_at),
+    INDEX idx_cdp_warehouse_metric_review_status (tenant_id, status, updated_at),
+    INDEX idx_cdp_warehouse_metric_review_requester (tenant_id, requested_by, created_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='CDP warehouse semantic metric change review guard';

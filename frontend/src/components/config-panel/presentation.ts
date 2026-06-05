@@ -89,10 +89,17 @@ const GROUP_ORDER: ConfigPanelFieldGroupKey[] = ['basic', 'rules', 'mapping', 'p
 
 /** 根据控件类型判断字段在紧凑 inspector 中的分组。 */
 function resolveGroupKey(type: string): ConfigPanelFieldGroupKey {
-  if (['condition-rule-list', 'split-branch-list', 'broadcast-branch-list', 'cron'].includes(type)) {
+  if (['condition-rule-list', 'condition-builder', 'split-branch-list', 'broadcast-branch-list', 'cron'].includes(type)) {
     return 'rules'
   }
-  if (['context-value-list', 'param-define-list', 'key-value', 'api-input-params'].includes(type)) {
+  if ([
+    'context-value-list',
+    'param-define-list',
+    'key-value',
+    'api-input-params',
+    'json-path-mapping-list',
+    'user-input-field-list',
+  ].includes(type)) {
     return 'mapping'
   }
   if (['event-attr-preview', 'edge-hint'].includes(type)) {
@@ -104,6 +111,20 @@ function resolveGroupKey(type: string): ConfigPanelFieldGroupKey {
 /** context-value-list 类型字段必须写回 schema 声明的 key，DIRECT_RETURN 使用 data，触达类节点使用 bizData。 */
 export function resolveContextValueListFieldKey(fieldKey: string): string {
   return fieldKey
+}
+
+/** Returns a visible warning when a send node points at a non-real connector. */
+export function resolveConnectorWarning(input: {
+  nodeType: string
+  bizConfig: Record<string, unknown>
+  connectorMode?: string | null
+}): string | null {
+  if (input.nodeType !== 'SEND_MESSAGE' || !input.connectorMode || input.connectorMode === 'REAL') {
+    return null
+  }
+  const channel = String(input.bizConfig.channel ?? 'UNKNOWN')
+  const provider = String(input.bizConfig.provider ?? 'default')
+  return `${channel}/${provider} is ${input.connectorMode.toLowerCase()}`
 }
 
 /** 把可见字段归并为右侧配置面板分组。 */

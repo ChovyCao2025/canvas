@@ -6,8 +6,10 @@ import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Insert;
+import org.apache.ibatis.annotations.Select;
 
 import java.time.LocalDate;
+import java.util.List;
 
 /**
  * 画布执行统计 MyBatis-Plus Mapper。
@@ -37,4 +39,16 @@ public interface CanvasExecutionStatsMapper extends BaseMapper<CanvasExecutionSt
     int upsertDailyIncrement(@Param("canvasId") Long canvasId,
                              @Param("statDate") LocalDate statDate,
                              @Param("status") int status);
+
+    @Select("""
+            SELECT id, canvas_id, stat_date, total_count, success_count, fail_count,
+                   paused_count, timeout_count, unique_users, avg_duration_ms, p99_duration_ms
+            FROM canvas_execution_stats
+            WHERE canvas_id = #{canvasId}
+              AND stat_date BETWEEN #{sinceDate} AND #{untilDate}
+            ORDER BY stat_date ASC
+            """)
+    List<CanvasExecutionStatsDO> selectByCanvasIdAndDateRange(@Param("canvasId") Long canvasId,
+                                                              @Param("sinceDate") LocalDate sinceDate,
+                                                              @Param("untilDate") LocalDate untilDate);
 }

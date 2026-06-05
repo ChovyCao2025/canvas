@@ -2,11 +2,11 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Define shared platform primitives required before larger service and data-platform evolution work.
+**Goal:** Define shared identity, event, and tenant platform contracts required before service extraction and data-platform evolution.
 
-**Architecture:** Establish canonical identity, event, and tenant contracts before extracting services or building analytics pipelines. Keep contracts versioned, testable, and backward compatible.
+**Architecture:** Establish versioned contracts before runtime implementation. OneID, event schema, tenant quota/visibility, degradation modes, and engine/web boundaries must be documented, testable, and backward compatible before services or analytics pipelines depend on them.
 
-**Tech Stack:** Spring Boot, MyBatis-Plus, Redis, RocketMQ, OpenAPI, JSON schema or equivalent event schema tooling, JUnit 5.
+**Tech Stack:** Spring Boot, MyBatis-Plus, Redis, RocketMQ, OpenAPI, JSON Schema, JUnit 5, Markdown contract docs.
 
 ---
 
@@ -18,49 +18,70 @@
 
 ## File Structure
 
+- Create: `docs/architecture/evidence/p3-09-platform-primitives.md`
 - Create: `docs/architecture/platform-primitives.md`
 - Create: `docs/architecture/event-schema-governance.md`
-- Modify: implementation only after primitive contracts are reviewed
-- Test: contract tests for identity mapping, event compatibility, tenant quota, and degradation behavior
+- Create: `docs/architecture/tenant-platform-contract.md`
+- Create: `docs/architecture/engine-web-boundary.md`
 
 ### Task 1: Define OneID And Tenant Contracts
 
-- [ ] **Step 1: Create platform primitives document**
+**Files:**
+- Create: `docs/architecture/platform-primitives.md`
+- Create: `docs/architecture/tenant-platform-contract.md`
+- Create: `docs/architecture/evidence/p3-09-platform-primitives.md`
 
-Write `docs/architecture/platform-primitives.md` with OneID, source identities, merge/split, tenant visibility, and quota sections.
+- [x] Define canonical OneID, source identity, merge, split, confidence, conflict, and audit rules.
+- [x] Define tenant visibility, tenant quota, tenant-scoped query, and tenant-scope-change audit contracts.
+- [x] Define compatibility rules for existing CDP and canvas tenant fields.
 
-- [ ] **Step 2: Define auditability**
+Run:
 
-Add audit events for identity merge/split, tenant scope changes, and quota changes.
+```bash
+test -f docs/architecture/platform-primitives.md
+test -f docs/architecture/tenant-platform-contract.md
+rg -n "OneID|source identity|merge|split|confidence|conflict|audit|tenant visibility|quota|tenant-scoped|compatibility" docs/architecture/platform-primitives.md docs/architecture/tenant-platform-contract.md
+```
 
-- [ ] **Step 3: Verify sections**
-
-Run `rg -n "OneID|source identity|merge|split|tenant|quota|audit" docs/architecture/platform-primitives.md`. Expected: all sections exist.
+Expected: identity and tenant contracts cover OneID lifecycle, auditability, quota, tenant visibility, and compatibility.
 
 ### Task 2: Define Event Schema Governance
 
-- [ ] **Step 1: Create event governance document**
+**Files:**
+- Create: `docs/architecture/event-schema-governance.md`
+- Modify: `docs/architecture/evidence/p3-09-platform-primitives.md`
 
-Write `docs/architecture/event-schema-governance.md` with schema owner, versioning, compatibility, replay, ordering, and deprecation rules.
+- [x] Define schema owner, versioning, compatibility, replay, ordering, idempotency, deprecation, and retention rules.
+- [x] Define initial event families: canvas lifecycle, execution lifecycle, customer identity, reach delivery, CDP profile, and ops.
+- [x] Include one example event envelope with tenant, correlation, schema version, event ID, idempotency key, and occurred-at timestamp fields.
 
-- [ ] **Step 2: Pick initial event families**
+Run:
 
-Document canvas lifecycle, execution lifecycle, customer identity, reach delivery, and ops events.
+```bash
+test -f docs/architecture/event-schema-governance.md
+rg -n "schema owner|versioning|compatibility|replay|ordering|idempotency|deprecation|retention|canvas lifecycle|execution lifecycle|customer identity|reach delivery|ops|schemaVersion|eventId" docs/architecture/event-schema-governance.md
+```
 
-- [ ] **Step 3: Verify event families**
-
-Run `rg -n "canvas lifecycle|execution lifecycle|customer identity|reach delivery|ops" docs/architecture/event-schema-governance.md`. Expected: all families exist.
+Expected: event governance covers lifecycle rules, initial families, and a concrete event-envelope example.
 
 ### Task 3: Define Degradation And Engine/Web Split
 
-- [ ] **Step 1: Add degradation matrix**
+**Files:**
+- Create: `docs/architecture/engine-web-boundary.md`
+- Modify: `docs/architecture/evidence/p3-09-platform-primitives.md`
+- Modify: `docs/architecture/plans/P3-09-identity-event-and-tenant-platform-plan.md`
 
-Document fail-open/fail-closed behavior for Redis, RocketMQ, datasource, WeCom, and analytics dependencies.
+- [x] Define fail-open/fail-closed behavior for Redis, RocketMQ, datasource, WeCom, analytics, and AI dependencies.
+- [x] Define API, event, data ownership, deployment, rollback, and observability boundaries between web/admin and execution engine.
+- [x] Define contract tests required before any service extraction consumes these primitives.
 
-- [ ] **Step 2: Add engine/web boundary**
+Run:
 
-Document API, events, data ownership, deployment, and rollback boundaries between web/admin and execution engine.
+```bash
+test -f docs/architecture/engine-web-boundary.md
+rg -n "fail-open|fail-closed|Redis|RocketMQ|datasource|WeCom|analytics|AI|API boundary|event boundary|data ownership|deployment|rollback|observability|contract tests" docs/architecture/engine-web-boundary.md
+git diff -- docs/architecture/evidence/p3-09-platform-primitives.md docs/architecture/platform-primitives.md docs/architecture/event-schema-governance.md docs/architecture/tenant-platform-contract.md docs/architecture/engine-web-boundary.md docs/architecture/plans/P3-09-identity-event-and-tenant-platform-plan.md
+# Do not stage or commit in this session unless the user explicitly asks.
+```
 
-- [ ] **Step 3: Review diff**
-
-Run `git diff -- docs/architecture/platform-primitives.md docs/architecture/event-schema-governance.md`. Expected: only platform primitive docs are changed before implementation starts.
+Expected: documentation diff contains only platform primitive evidence, identity/tenant/event/boundary docs, and plan changes; no files are staged or committed.

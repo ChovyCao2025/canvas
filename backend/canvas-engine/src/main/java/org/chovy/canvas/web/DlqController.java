@@ -59,8 +59,10 @@ public class DlqController {
             LambdaQueryWrapper<CanvasExecutionDlqDO> q = new LambdaQueryWrapper<CanvasExecutionDlqDO>()
                     .orderByDesc(CanvasExecutionDlqDO::getFailedAt);
             if (canvasId != null) q.eq(CanvasExecutionDlqDO::getCanvasId, canvasId);
+            int safePage = Math.max(1, page);
+            int safeSize = Math.max(1, Math.min(size, 100));
             com.baomidou.mybatisplus.extension.plugins.pagination.Page<CanvasExecutionDlqDO> p =
-                    new com.baomidou.mybatisplus.extension.plugins.pagination.Page<>(page, size);
+                    new com.baomidou.mybatisplus.extension.plugins.pagination.Page<>(safePage, safeSize);
             var result = dlqMapper.selectPage(p, q);
             return PageResult.of(result.getTotal(), result.getRecords());
         }).subscribeOn(Schedulers.boundedElastic()).map(R::ok);

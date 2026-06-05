@@ -1,0 +1,20 @@
+CREATE TABLE IF NOT EXISTS product_led_growth_evidence (
+  id BIGINT AUTO_INCREMENT PRIMARY KEY,
+  opportunity_key VARCHAR(128) NOT NULL,
+  owner_id VARCHAR(128) NOT NULL,
+  funnel_stage VARCHAR(64) NOT NULL,
+  target_persona VARCHAR(128) NOT NULL,
+  activation_metric VARCHAR(255) NOT NULL,
+  consent_requirement TEXT NOT NULL,
+  content_risk_notes TEXT NOT NULL,
+  experiment_hypothesis TEXT NOT NULL,
+  proof_command VARCHAR(1000) NOT NULL,
+  rollback_note VARCHAR(1000) NOT NULL,
+  decision_status VARCHAR(32) NOT NULL DEFAULT 'BLOCKED_PENDING_REVIEW',
+  reviewed_by VARCHAR(128) NULL,
+  reviewed_at DATETIME NULL,
+  child_spec VARCHAR(255) NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_plg_evidence_opportunity_status (opportunity_key, decision_status),
+  INDEX idx_plg_evidence_funnel_stage (funnel_stage, created_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

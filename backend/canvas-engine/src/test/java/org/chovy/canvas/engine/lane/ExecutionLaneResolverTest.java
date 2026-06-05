@@ -35,4 +35,40 @@ class ExecutionLaneResolverTest {
         assertThat(resolver.resolve(TriggerType.EVENT, NodeType.GROOVY, Map.of(), false, false, 0))
                 .isEqualTo(ExecutionLane.HEAVY);
     }
+
+    @Test
+    void resolvesHeavyLaneForChecklistHeavyWork() {
+        assertThat(resolver.resolve(TriggerType.SCHEDULED, NodeType.SCHEDULED_TRIGGER, Map.of(), false, false, 0))
+                .isEqualTo(ExecutionLane.HEAVY);
+        assertThat(resolver.resolve(TriggerType.DLQ_REPLAY, NodeType.MQ_TRIGGER, Map.of(), false, false, 0))
+                .isEqualTo(ExecutionLane.HEAVY);
+        assertThat(resolver.resolve(TriggerType.EVENT, NodeType.GROOVY, Map.of(), false, false, 0))
+                .isEqualTo(ExecutionLane.HEAVY);
+        assertThat(resolver.resolve(TriggerType.EVENT, NodeType.TAGGER, Map.of("mode", "audience"), false, false, 0))
+                .isEqualTo(ExecutionLane.HEAVY);
+        assertThat(resolver.resolve(TriggerType.SUB_FLOW_REF, NodeType.SUB_FLOW_REF, Map.of(), false, false, 0))
+                .isEqualTo(ExecutionLane.HEAVY);
+    }
+
+    @Test
+    void resolvesLightLaneForDirectAndInternalContinuationWork() {
+        assertThat(resolver.resolve(TriggerType.DIRECT_CALL, NodeType.DIRECT_CALL, Map.of(), false, false, 0))
+                .isEqualTo(ExecutionLane.LIGHT);
+        assertThat(resolver.resolve(TriggerType.WAIT_RESUME, NodeType.WAIT, Map.of(), false, false, 0))
+                .isEqualTo(ExecutionLane.LIGHT);
+        assertThat(resolver.resolve(TriggerType.HUB_TIMEOUT, NodeType.HUB, Map.of(), false, false, 0))
+                .isEqualTo(ExecutionLane.LIGHT);
+        assertThat(resolver.resolve(TriggerType.AGGREGATE_TIMEOUT, NodeType.AGGREGATE, Map.of(), false, false, 0))
+                .isEqualTo(ExecutionLane.LIGHT);
+        assertThat(resolver.resolve(TriggerType.THRESHOLD_TIMEOUT, NodeType.THRESHOLD, Map.of(), false, false, 0))
+                .isEqualTo(ExecutionLane.LIGHT);
+    }
+
+    @Test
+    void resolvesRetryLaneForOverflowAndPersistentRequestRetryBeforeOtherRules() {
+        assertThat(resolver.resolve(TriggerType.DIRECT_CALL, NodeType.DIRECT_CALL, Map.of(), true, false, 0))
+                .isEqualTo(ExecutionLane.RETRY);
+        assertThat(resolver.resolve(TriggerType.SCHEDULED, NodeType.SCHEDULED_TRIGGER, Map.of(), false, true, 2))
+                .isEqualTo(ExecutionLane.RETRY);
+    }
 }

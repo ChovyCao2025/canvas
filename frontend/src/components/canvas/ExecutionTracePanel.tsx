@@ -3,14 +3,22 @@
  *
  * 维护说明：面板数据来自后端 dry-run 或执行记录，前端只做状态归类和可读化展示。
  */
-import { useState, useCallback } from 'react'
+import { useState, useCallback, type HTMLAttributes, type ReactNode } from 'react'
 import {
   Modal, Select, Table, Tag, Tooltip, Typography,
   Button, message, Collapse,
 } from 'antd'
-import { EyeOutlined } from '@ant-design/icons'
+import { DownloadOutlined, EyeOutlined } from '@ant-design/icons'
 import http from '../../services/api'
 import type { R } from '../../types'
+import { buildTraceColorMap, TRACE_COLORS } from '../../pages/canvas-editor/dryRunVisualization'
+import {
+  TRACE_ERROR_PREVIEW_LENGTH,
+  downloadErrorText,
+  formatTraceStatus,
+  isLongError,
+  tracePathClass,
+} from './executionTimelinePresentation'
 
 /** 轨迹面板内使用的文本组件别名。 */
 const { Text } = Typography
@@ -50,21 +58,17 @@ export interface NodeTrace {
  * 节点着色：轨迹状态 -> 节点边框/头部颜色。
  */
 export const TRACE_NODE_COLOR: Record<TraceStatus, string> = {
-  0: '#faad14',
-  1: '#52c41a',
-  2: '#f5222d',
-  3: '#d9d9d9',
+  ...TRACE_COLORS,
 }
 
-/**
- * 轨迹状态的标签展示配置。
- */
-const STATUS_LABEL: Record<TraceStatus, [string, string]> = {
-  0: ['processing', '执行中'],
-  1: ['success',    '成功'],
-  2: ['error',      '失败'],
-  3: ['default',    '跳过'],
-}
+const TRACE_ROW_STYLES = `
+  .execution-trace-path--running > td { background: #fffbe6; }
+  .execution-trace-path--success > td { background: #f6ffed; }
+  .execution-trace-path--error > td { background: #fff1f0; }
+  .execution-trace-path--skipped > td { background: #fafafa; }
+  .execution-trace-path--unknown > td { background: #fff; }
+  .execution-trace-path:hover > td { filter: brightness(0.99); }
+`
 
 /** 执行轨迹面板组件入参。 */
 interface Props {
@@ -76,6 +80,159 @@ interface Props {
    * 让画布上的节点按本次执行结果着色。
    */
   onTraceLoaded: (colorMap: Record<string, string>) => void
+
+  /** 点击轨迹行时定位到画布节点。 */
+  onTraceClick?: (nodeId: string, trace: NodeTrace) => void
+}
+
+interface ExecutionTraceTableProps {
+  traces: NodeTrace[]
+  loading: boolean
+  selectedExecId?: string | null
+  onTraceClick?: (nodeId: string, trace: NodeTrace) => void
+}
+
+export function saveTraceError(trace: NodeTrace, executionId?: string | null): string {
+  const text = downloadErrorText(trace, executionId)
+  if (typeof document === 'undefined') return text
+
+  const blob = new Blob([text], { type: 'text/plain;charset=utf-8' })
+  const url = URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.href = url
+  link.download = `execution-${executionId || 'trace'}-${trace.nodeId || 'node'}-error.txt`
+  document.body.appendChild(link)
+  link.click()
+  link.remove()
+  URL.revokeObjectURL(url)
+
+  return text
+}
+
+export function createTraceRowProps(
+  trace: NodeTrace,
+  onTraceClick?: (nodeId: string, selectedTrace: NodeTrace) => void,
+): HTMLAttributes<HTMLTableRowElement> {
+  if (!onTraceClick) return {}
+
+  return {
+    title: '定位到画布节点',
+    style: { cursor: 'pointer' },
+    onClick: () => onTraceClick(trace.nodeId, trace),
+  }
+}
+
+export function renderTraceError(trace: NodeTrace, selectedExecId?: string | null): ReactNode {
+  const { errorMsg } = trace
+  if (!errorMsg) return '-'
+
+  if (!isLongError(errorMsg)) {
+    return (
+      <Text type="danger" style={{ fontSize: 11, whiteSpace: 'pre-wrap' }}>
+        {errorMsg}
+      </Text>
+    )
+  }
+
+  const preview = `${errorMsg.slice(0, TRACE_ERROR_PREVIEW_LENGTH)}...`
+
+  return (
+    <Collapse
+      size="small"
+      ghost
+      items={[{
+        key: 'error',
+        forceRender: true,
+        label: <Text type="danger" style={{ fontSize: 11 }}>{preview}</Text>,
+        children: (
+          <div style={{ display: 'grid', gap: 8 }}>
+            <pre style={{ fontSize: 11, maxHeight: 240, overflow: 'auto', margin: 0, background: '#fff1f0', padding: 8, borderRadius: 4, whiteSpace: 'pre-wrap' }}>
+              {errorMsg}
+            </pre>
+            <Button
+              size="small"
+              icon={<DownloadOutlined />}
+              onClick={event => {
+                event.stopPropagation()
+                saveTraceError(trace, selectedExecId)
+              }}
+            >
+              下载错误
+            </Button>
+          </div>
+        ),
+      }]}
+    />
+  )
+}
+
+export function getExecutionTraceColumns(selectedExecId?: string | null) {
+  return [
+    { title: '节点名称', dataIndex: 'nodeName', width: 140, ellipsis: true },
+    { title: '类型', dataIndex: 'nodeType', width: 130, ellipsis: true },
+    {
+      title: '状态', dataIndex: 'status', width: 72,
+      render: (s: TraceStatus) => {
+        const { color, label } = formatTraceStatus(s)
+        return <Tag color={color}>{label}</Tag>
+      },
+    },
+    {
+      title: '耗时', dataIndex: 'durationMs', width: 72,
+      render: (v?: number) => v != null ? `${v}ms` : '-',
+    },
+    {
+      title: '错误', dataIndex: 'errorMsg', width: 220,
+      render: (_: string | undefined, trace: NodeTrace) => renderTraceError(trace, selectedExecId),
+    },
+    {
+      title: '输出', dataIndex: 'outputData', ellipsis: true,
+      render: (v?: string) => {
+        if (!v) return '-'
+        try {
+          // 优先按 JSON 美化展示，方便排查节点输出字段
+          const parsed = JSON.parse(v)
+          return (
+            <Collapse size="small" ghost items={[{
+              key: '1',
+              label: <Text style={{ fontSize: 11 }}>查看输出</Text>,
+              children: (
+                <pre style={{ fontSize: 11, maxHeight: 200, overflow: 'auto', margin: 0, background: '#f6f8fa', padding: 8, borderRadius: 4 }}>
+                  {JSON.stringify(parsed, null, 2)}
+                </pre>
+              ),
+            }]} />
+          )
+        } catch {
+          // 非 JSON 时兜底显示原始字符串截断
+          return <Text style={{ fontSize: 11 }}>{v.slice(0, 80)}</Text>
+        }
+      },
+    },
+  ]
+}
+
+export function ExecutionTraceTable({
+  traces,
+  loading,
+  selectedExecId,
+  onTraceClick,
+}: ExecutionTraceTableProps) {
+  return (
+    <>
+      <style>{TRACE_ROW_STYLES}</style>
+      <Table
+        rowKey="nodeId"
+        dataSource={traces}
+        columns={getExecutionTraceColumns(selectedExecId)}
+        size="small"
+        pagination={false}
+        loading={loading}
+        rowClassName={trace => tracePathClass(trace)}
+        onRow={trace => createTraceRowProps(trace, onTraceClick)}
+      />
+    </>
+  )
 }
 
 /**
@@ -84,7 +241,7 @@ interface Props {
  * 2) 选择某次执行后加载节点轨迹；
  * 3) 把轨迹颜色映射同步给画布主视图。
  */
-export default function ExecutionTracePanel({ canvasId, onTraceLoaded }: Props) {
+export default function ExecutionTracePanel({ canvasId, onTraceLoaded, onTraceClick }: Props) {
   // 执行记录下拉选项数据
   const [executions,    setExecutions]    = useState<any[]>([])
   // 当前执行的节点轨迹列表
@@ -114,10 +271,7 @@ export default function ExecutionTracePanel({ canvasId, onTraceLoaded }: Props) 
         `/canvas/${canvasId}/execution/${executionId}/trace`)
       const data = res.data ?? []
       setTraces(data)
-      // nodeId -> color 映射供画布渲染使用
-      const colorMap: Record<string, string> = {}
-      data.forEach(t => { colorMap[t.nodeId] = TRACE_NODE_COLOR[t.status] })
-      onTraceLoaded(colorMap)
+      onTraceLoaded(buildTraceColorMap(data))
     } catch {
       message.error('加载执行轨迹失败')
     } finally { setLoading(false) }
@@ -129,50 +283,6 @@ export default function ExecutionTracePanel({ canvasId, onTraceLoaded }: Props) 
     setTraces([])
     onTraceLoaded({})
   }
-
-  const columns = [
-    { title: '节点名称', dataIndex: 'nodeName', width: 140, ellipsis: true },
-    { title: '类型', dataIndex: 'nodeType', width: 130, ellipsis: true },
-    {
-      title: '状态', dataIndex: 'status', width: 72,
-      render: (s: TraceStatus) => {
-        const [color, label] = STATUS_LABEL[s]
-        return <Tag color={color}>{label}</Tag>
-      },
-    },
-    {
-      title: '耗时', dataIndex: 'durationMs', width: 72,
-      render: (v?: number) => v != null ? `${v}ms` : '-',
-    },
-    {
-      title: '错误', dataIndex: 'errorMsg', width: 120, ellipsis: true,
-      render: (v?: string) => v ? <Text type="danger" style={{ fontSize: 11 }}>{v}</Text> : '-',
-    },
-    {
-      title: '输出', dataIndex: 'outputData', ellipsis: true,
-      render: (v?: string) => {
-        if (!v) return '-'
-        try {
-          // 优先按 JSON 美化展示，方便排查节点输出字段
-          const parsed = JSON.parse(v)
-          return (
-            <Collapse size="small" ghost items={[{
-              key: '1',
-              label: <Text style={{ fontSize: 11 }}>查看输出</Text>,
-              children: (
-                <pre style={{ fontSize: 11, maxHeight: 200, overflow: 'auto', margin: 0, background: '#f6f8fa', padding: 8, borderRadius: 4 }}>
-                  {JSON.stringify(parsed, null, 2)}
-                </pre>
-              ),
-            }]} />
-          )
-        } catch {
-          // 非 JSON 时兜底显示原始字符串截断
-          return <Text style={{ fontSize: 11 }}>{v.slice(0, 80)}</Text>
-        }
-      },
-    },
-  ]
 
   return (
     <>
@@ -236,13 +346,11 @@ export default function ExecutionTracePanel({ canvasId, onTraceLoaded }: Props) 
         />
 
         {selectedExecId && (
-          <Table
-            rowKey="nodeId"
-            dataSource={traces}
-            columns={columns}
-            size="small"
-            pagination={false}
+          <ExecutionTraceTable
+            traces={traces}
             loading={loading}
+            selectedExecId={selectedExecId}
+            onTraceClick={onTraceClick}
           />
         )}
 

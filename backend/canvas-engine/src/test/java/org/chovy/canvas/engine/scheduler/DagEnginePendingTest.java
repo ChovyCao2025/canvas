@@ -1,7 +1,6 @@
 package org.chovy.canvas.engine.scheduler;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import org.chovy.canvas.dal.mapper.CanvasExecutionDlqMapper;
 import org.chovy.canvas.engine.context.ExecutionContext;
 import org.chovy.canvas.engine.context.NodeStatus;
 import org.chovy.canvas.engine.dag.DagGraph;
@@ -58,12 +57,13 @@ class DagEnginePendingTest {
         DagEngine engine = new DagEngine(
                 handlerRegistry,
                 mock(TraceWriteBuffer.class),
-                mock(CanvasExecutionDlqMapper.class),
                 cbRegistry,
                 mock(CanvasMetrics.class),
                 new ObjectMapper(),
                 mock(ContextPersistenceService.class),
-                mock(org.chovy.canvas.engine.trigger.CanvasExecutionService.class)
+                mock(org.chovy.canvas.engine.trigger.CanvasExecutionService.class),
+                mock(ExecutionDlqWriter.class),
+                new NodeResultRouter()
         );
         ReflectionTestUtils.setField(engine, "maxRetry", 1);
         ReflectionTestUtils.setField(engine, "retryBaseDelayMs", 1L);

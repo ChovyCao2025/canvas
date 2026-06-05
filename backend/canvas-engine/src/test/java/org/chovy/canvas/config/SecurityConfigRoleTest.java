@@ -20,8 +20,25 @@ class SecurityConfigRoleTest {
     }
 
     @Test
-    void opsRoutesRequireSuperAdminRoles() {
-        assertThat(SecurityConfig.SUPER_ADMIN_ROUTE_ROLES)
-                .containsExactly(RoleNames.ADMIN, RoleNames.SUPER_ADMIN);
+    void opsRoutesSeparateReadAndWriteRoles() {
+        assertThat(SecurityConfig.OPS_READ_ROUTE_ROLES)
+                .containsExactly(
+                        RoleNames.ADMIN,
+                        RoleNames.SUPER_ADMIN,
+                        RoleNames.TENANT_ADMIN,
+                        RoleNames.OPERATOR);
+        assertThat(SecurityConfig.OPS_WRITE_ROUTE_ROLES)
+                .containsExactly(RoleNames.ADMIN, RoleNames.SUPER_ADMIN, RoleNames.TENANT_ADMIN);
+        assertThat(SecurityConfig.OPS_ROUTE_ROLES)
+                .containsExactly(RoleNames.ADMIN, RoleNames.SUPER_ADMIN, RoleNames.TENANT_ADMIN);
+    }
+
+    @Test
+    void internalOpenApiRoutesStayExplicitlyEnumerated() {
+        assertThat(SecurityConfig.INTERNAL_OPEN_API_ROUTES)
+                .containsExactly(
+                        "/canvas/events/report",
+                        "/canvas/execute/direct/*",
+                        "/canvas/trigger/behavior");
     }
 }

@@ -4,6 +4,14 @@ This folder contains priority-prefixed implementation plans materialized from `d
 
 The package plans use the `superpowers:writing-plans` structure: implementation header, source material, file structure, checkbox tasks, and verification steps.
 
+## Active Decision Policy
+
+Active decisions live in specs, plans, ADRs, guides, reference docs, and runbooks. Archived reviews are historical evidence, not active implementation authority. Before implementation, cite the relevant archive source from an active spec, plan, ADR, guide, reference doc, or runbook so each plan has current ownership, verification status, and rollback expectations.
+
+## P3 Platform Evolution Entry Point
+
+`P3-01-platform-evolution-plan.md` is the platform-evolution entry point. Focused P3 implementation remains blocked until `../platform-evolution-promotion-checklist.md` has owner, success metrics, migration, rollback, operations, security, compliance, tenant impact, team capacity, verification command, and evidence path filled for the promoted item.
+
 | Priority | Plan | Spec |
 |---|---|---|
 | P0 | [P0-00-architecture-spec-plan-materialization-plan.md](P0-00-architecture-spec-plan-materialization-plan.md) | documentation generation plan |

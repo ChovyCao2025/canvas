@@ -1,12 +1,12 @@
-# Globalization And Regional Expansion Implementation Plan
+# Globalization And Regional Expansion Evidence Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Add i18n, locale-aware copy, timezone modes, currency, regional channels, local compliance, and cross-border deployment options when market entry is confirmed.
+**Goal:** Add a region-readiness evidence gate so globalization and regional expansion work cannot proceed until market demand, compliance, channel, residency, proof, and rollback evidence are reviewed.
 
-**Architecture:** Implement the capability as a thin vertical slice: failing tests first, then backend/domain contracts, then frontend service and route integration, then rollout documentation. Keep scope bounded to the spec and use additive migrations or feature flags for risky changes.
+**Architecture:** Implement an additive evidence registry and small domain service. This slice records governance decisions only; it does not add translations, regional channels, currency handling, timezone behavior, data residency routing, or deployment changes.
 
-**Tech Stack:** Java 21, Spring Boot WebFlux style controllers currently returning Mono, MyBatis, Flyway, Redis/RocketMQ where needed, React 18, Vite, TypeScript, Ant Design, Vitest, JUnit 5, Mockito.
+**Tech Stack:** Java 21, Spring Boot project layout, Flyway, JUnit 5, AssertJ, Mockito.
 
 ---
 
@@ -18,129 +18,332 @@
 ## File Structure
 
 **Backend**
-- `backend/canvas-engine/src/main/java/org/chovy/canvas/domain/globalizationandregionalexpansion/GlobalizationAndRegionalExpansionService.java`
-- `backend/canvas-engine/src/main/java/org/chovy/canvas/web/GlobalizationAndRegionalExpansionController.java`
-
-**Frontend**
-- `frontend/src/pages/globalization-and-regional-expansion/index.tsx`
-- `frontend/src/services/globalizationandregionalexpansionApi.ts`
-
-**Data And Config**
-- `backend/canvas-engine/src/main/resources/db/migration/V124__globalization_and_regional_expansion.sql`
+- Create: `backend/canvas-engine/src/main/resources/db/migration/V181__regional_expansion_evidence.sql`
+- Create: `backend/canvas-engine/src/main/java/org/chovy/canvas/strategy/globalization/RegionalExpansionEvidenceService.java`
 
 **Tests**
-- `backend/canvas-engine/src/test/java/org/chovy/canvas/strategy/GlobalizationAndRegionalExpansionTest.java`
-- `frontend/src/pages/globalization-and-regional-expansion/globalization-and-regional-expansion.test.tsx`
+- Create: `backend/canvas-engine/src/test/java/org/chovy/canvas/strategy/globalization/RegionalExpansionEvidenceServiceTest.java`
 
-### Task 1: Contract And Failing Tests
+**Documentation**
+- Modify: `docs/product-evolution/specs/p3-009-globalization-and-regional-expansion.md`
+- Modify: `docs/product-evolution/plans/p3-009-globalization-and-regional-expansion-plan.md`
 
-**Files:**
-- Create: `backend/canvas-engine/src/test/java/org/chovy/canvas/strategy/GlobalizationAndRegionalExpansionTest.java`
-- Create: `frontend/src/pages/globalization-and-regional-expansion/globalization-and-regional-expansion.test.tsx`
-- Read: `docs/product-evolution/specs/p3-009-globalization-and-regional-expansion.md`
+**No Frontend**
+- No frontend files are part of this slice because the spec is a discovery/evidence gate. A UI must be opened by a child spec after `APPROVED_FOR_CHILD_SPEC`.
 
-- [ ] **Step 1: Write backend contract tests**
-
-Create `backend/canvas-engine/src/test/java/org/chovy/canvas/strategy/GlobalizationAndRegionalExpansionTest.java` with tests for authorization, tenant scoping, and the main success path named after `globalization-and-regional-expansion`. Use existing controller or service tests in `backend/canvas-engine/src/test/java/org/chovy/canvas` as style references.
-
-- [ ] **Step 2: Run backend contract tests and confirm red state**
-
-Run: `cd backend && mvn -pl canvas-engine test -Dtest=GlobalizationAndRegionalExpansionTest`
-
-Expected: FAIL because the new route, service method, or behavior has not been implemented yet.
-
-- [ ] **Step 3: Write frontend workflow tests**
-
-Create `frontend/src/pages/globalization-and-regional-expansion/globalization-and-regional-expansion.test.tsx` with Vitest coverage for loading, empty, success, permission, and server-error states for the first UI slice.
-
-- [ ] **Step 4: Run frontend workflow tests and confirm red state**
-
-Run: `cd frontend && npm test -- globalization-and-regional-expansion.test.tsx`
-
-Expected: FAIL because the new page, component, service call, or state handling does not exist yet.
-
-### Task 2: Backend And Data Slice
+### Task 1: Evidence Contract Tests
 
 **Files:**
-- `backend/canvas-engine/src/main/java/org/chovy/canvas/domain/globalizationandregionalexpansion/GlobalizationAndRegionalExpansionService.java`
-- `backend/canvas-engine/src/main/java/org/chovy/canvas/web/GlobalizationAndRegionalExpansionController.java`
-- `backend/canvas-engine/src/main/resources/db/migration/V124__globalization_and_regional_expansion.sql`
-- Test: `backend/canvas-engine/src/test/java/org/chovy/canvas/strategy/GlobalizationAndRegionalExpansionTest.java`
+- Create: `backend/canvas-engine/src/test/java/org/chovy/canvas/strategy/globalization/RegionalExpansionEvidenceServiceTest.java`
 
-- [ ] **Step 1: Add additive data structures when the spec requires storage**
+- [ ] **Step 1: Write migration and service tests**
 
-If this plan has a Flyway file, create it exactly at the data path listed above. Use additive tables, indexes, and nullable columns so rollout can be disabled without rollback data loss.
+Create `RegionalExpansionEvidenceServiceTest`:
 
-- [ ] **Step 2: Implement the domain service**
+```java
+package org.chovy.canvas.strategy.globalization;
 
-Implement the service behavior in the backend files listed above. Keep business rules in the domain service and keep controllers thin.
+import org.junit.jupiter.api.Test;
 
-- [ ] **Step 3: Implement or extend the controller contract**
+import java.nio.file.Files;
+import java.nio.file.Path;
 
-Expose only the endpoints needed by the first workflow. Return `R<T>` or existing project response types consistently with nearby controllers.
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 
-- [ ] **Step 4: Run focused backend tests**
+class RegionalExpansionEvidenceServiceTest {
 
-Run: `cd backend && mvn -pl canvas-engine test -Dtest=GlobalizationAndRegionalExpansionTest`
+    @Test
+    void migrationCreatesRegionalEvidenceGate() throws Exception {
+        String sql = Files.readString(Path.of(
+                "src/main/resources/db/migration/V181__regional_expansion_evidence.sql"));
 
-Expected: PASS for the new contract tests.
+        assertThat(sql)
+                .contains("CREATE TABLE IF NOT EXISTS regional_expansion_evidence")
+                .contains("region_code VARCHAR(32) NOT NULL")
+                .contains("demand_evidence TEXT NOT NULL")
+                .contains("compliance_notes TEXT NOT NULL")
+                .contains("data_residency_notes TEXT NOT NULL")
+                .contains("proof_command VARCHAR(1000) NOT NULL")
+                .contains("rollback_note VARCHAR(1000) NOT NULL")
+                .contains("decision_status VARCHAR(32) NOT NULL");
+    }
 
-### Task 3: Frontend Slice
+    @Test
+    void registerRejectsMissingDemandComplianceResidencyOrRollbackEvidence() {
+        RegionalExpansionEvidenceService.EvidenceRepository repository = mock(RegionalExpansionEvidenceService.EvidenceRepository.class);
+        RegionalExpansionEvidenceService service = new RegionalExpansionEvidenceService(repository);
+
+        assertThatThrownBy(() -> service.register(new RegionalExpansionEvidenceService.EvidenceRequest(
+                "JP", "owner-1", "", "JPY and ja-JP", "Asia/Tokyo", "LINE pending",
+                "APPI review", "Tokyo residency review", "pilot hypothesis",
+                "mvn test", "disable region flag")))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("demand evidence is required");
+
+        assertThatThrownBy(() -> service.register(new RegionalExpansionEvidenceService.EvidenceRequest(
+                "JP", "owner-1", "two enterprise prospects", "JPY and ja-JP", "Asia/Tokyo", "LINE pending",
+                "APPI review", "", "pilot hypothesis", "mvn test", "disable region flag")))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("data residency notes are required");
+    }
+
+    @Test
+    void registerStoresBlockedDecisionUntilReviewed() {
+        RegionalExpansionEvidenceService.EvidenceRepository repository = mock(RegionalExpansionEvidenceService.EvidenceRepository.class);
+        RegionalExpansionEvidenceService service = new RegionalExpansionEvidenceService(repository);
+
+        service.register(new RegionalExpansionEvidenceService.EvidenceRequest(
+                "JP", "owner-1", "two enterprise prospects", "JPY and ja-JP",
+                "Asia/Tokyo", "LINE pending", "APPI review", "Tokyo residency review",
+                "pilot limited to sandbox tenants", "cd backend && mvn -pl canvas-engine test",
+                "disable regional_expansion.registry.enabled"));
+
+        verify(repository).insert(argThat(record ->
+                record.regionCode().equals("JP")
+                        && record.decisionStatus().equals("BLOCKED_PENDING_REVIEW")
+                        && record.rollbackNote().contains("disable regional_expansion")));
+    }
+}
+```
+
+- [ ] **Step 2: Run tests and confirm red state**
+
+Run:
+
+```bash
+cd backend && mvn -pl canvas-engine test -Dtest=RegionalExpansionEvidenceServiceTest
+```
+
+Expected: FAIL because the migration and service do not exist.
+
+### Task 2: Migration And Service
 
 **Files:**
-- `frontend/src/pages/globalization-and-regional-expansion/index.tsx`
-- `frontend/src/services/globalizationandregionalexpansionApi.ts`
-- Test: `frontend/src/pages/globalization-and-regional-expansion/globalization-and-regional-expansion.test.tsx`
+- Create: `backend/canvas-engine/src/main/resources/db/migration/V181__regional_expansion_evidence.sql`
+- Create: `backend/canvas-engine/src/main/java/org/chovy/canvas/strategy/globalization/RegionalExpansionEvidenceService.java`
+- Test: `backend/canvas-engine/src/test/java/org/chovy/canvas/strategy/globalization/RegionalExpansionEvidenceServiceTest.java`
 
-- [ ] **Step 1: Add the typed API wrapper**
+- [ ] **Step 1: Add the additive migration**
 
-Implement the API wrapper in the service file listed above. Reuse `frontend/src/services/api.ts` and return typed request and response objects.
+Create `V181__regional_expansion_evidence.sql`:
 
-- [ ] **Step 2: Add the route, page, panel, or component**
+```sql
+CREATE TABLE IF NOT EXISTS regional_expansion_evidence (
+  id BIGINT AUTO_INCREMENT PRIMARY KEY,
+  region_code VARCHAR(32) NOT NULL,
+  owner_id VARCHAR(128) NOT NULL,
+  demand_evidence TEXT NOT NULL,
+  locale_currency_notes TEXT NOT NULL,
+  timezone_notes TEXT NOT NULL,
+  channel_notes TEXT NOT NULL,
+  compliance_notes TEXT NOT NULL,
+  data_residency_notes TEXT NOT NULL,
+  rollout_hypothesis TEXT NOT NULL,
+  proof_command VARCHAR(1000) NOT NULL,
+  rollback_note VARCHAR(1000) NOT NULL,
+  decision_status VARCHAR(32) NOT NULL DEFAULT 'BLOCKED_PENDING_REVIEW',
+  reviewed_by VARCHAR(128) NULL,
+  reviewed_at DATETIME NULL,
+  child_spec VARCHAR(255) NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_regional_expansion_region_status (region_code, decision_status),
+  INDEX idx_regional_expansion_created_at (created_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+```
 
-Implement the first visible workflow in the frontend files listed above. Include loading, empty, error, permission, and success states.
+- [ ] **Step 2: Implement the evidence gate**
 
-- [ ] **Step 3: Wire navigation only where needed**
+Create `RegionalExpansionEvidenceService`:
 
-Add navigation entry points only if the feature needs a top-level route. Prefer contextual entry points for editor, analytics, or settings capabilities.
+```java
+package org.chovy.canvas.strategy.globalization;
 
-- [ ] **Step 4: Run focused frontend tests**
+public class RegionalExpansionEvidenceService {
 
-Run: `cd frontend && npm test -- globalization-and-regional-expansion.test.tsx`
+    private final EvidenceRepository repository;
 
-Expected: PASS for the new workflow tests.
+    public RegionalExpansionEvidenceService(EvidenceRepository repository) {
+        this.repository = repository;
+    }
 
-### Task 4: Integration Verification And Rollout Notes
+    public EvidenceRecord register(EvidenceRequest request) {
+        requireText(request.regionCode(), "region code is required");
+        requireText(request.ownerId(), "owner is required");
+        requireText(request.demandEvidence(), "demand evidence is required");
+        requireText(request.complianceNotes(), "compliance notes are required");
+        requireText(request.dataResidencyNotes(), "data residency notes are required");
+        requireText(request.proofCommand(), "proof command is required");
+        requireText(request.rollbackNote(), "rollback note is required");
+
+        EvidenceRecord record = new EvidenceRecord(
+                request.regionCode(), request.ownerId(), request.demandEvidence(),
+                request.localeCurrencyNotes(), request.timezoneNotes(), request.channelNotes(),
+                request.complianceNotes(), request.dataResidencyNotes(), request.rolloutHypothesis(),
+                request.proofCommand(), request.rollbackNote(), "BLOCKED_PENDING_REVIEW");
+        repository.insert(record);
+        return record;
+    }
+
+    public void approve(String regionCode, String reviewerId, String childSpec) {
+        requireText(regionCode, "region code is required");
+        requireText(reviewerId, "reviewer is required");
+        requireText(childSpec, "child spec is required");
+        repository.approve(regionCode, reviewerId, childSpec);
+    }
+
+    private static void requireText(String value, String message) {
+        if (value == null || value.isBlank()) {
+            throw new IllegalArgumentException(message);
+        }
+    }
+
+    public record EvidenceRequest(
+            String regionCode,
+            String ownerId,
+            String demandEvidence,
+            String localeCurrencyNotes,
+            String timezoneNotes,
+            String channelNotes,
+            String complianceNotes,
+            String dataResidencyNotes,
+            String rolloutHypothesis,
+            String proofCommand,
+            String rollbackNote) {}
+
+    public record EvidenceRecord(
+            String regionCode,
+            String ownerId,
+            String demandEvidence,
+            String localeCurrencyNotes,
+            String timezoneNotes,
+            String channelNotes,
+            String complianceNotes,
+            String dataResidencyNotes,
+            String rolloutHypothesis,
+            String proofCommand,
+            String rollbackNote,
+            String decisionStatus) {}
+
+    public interface EvidenceRepository {
+        void insert(EvidenceRecord record);
+        void approve(String regionCode, String reviewerId, String childSpec);
+    }
+}
+```
+
+- [ ] **Step 3: Run focused tests**
+
+Run:
+
+```bash
+cd backend && mvn -pl canvas-engine test -Dtest=RegionalExpansionEvidenceServiceTest
+```
+
+Expected: PASS for migration shape and service gate behavior.
+
+### Task 3: Review Gate Extension
+
+**Files:**
+- Modify: `backend/canvas-engine/src/main/java/org/chovy/canvas/strategy/globalization/RegionalExpansionEvidenceService.java`
+- Modify: `backend/canvas-engine/src/test/java/org/chovy/canvas/strategy/globalization/RegionalExpansionEvidenceServiceTest.java`
+
+- [ ] **Step 1: Add approval test**
+
+Add a test that proves approval needs reviewer and child spec:
+
+```java
+@Test
+void approvalRequiresReviewerAndChildSpec() {
+    RegionalExpansionEvidenceService.EvidenceRepository repository = mock(RegionalExpansionEvidenceService.EvidenceRepository.class);
+    RegionalExpansionEvidenceService service = new RegionalExpansionEvidenceService(repository);
+
+    assertThatThrownBy(() -> service.approve("JP", "", "docs/product-evolution/specs/p3-009a-japan-pilot.md"))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessageContaining("reviewer is required");
+
+    assertThatThrownBy(() -> service.approve("JP", "architect-1", ""))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessageContaining("child spec is required");
+
+    service.approve("JP", "architect-1", "docs/product-evolution/specs/p3-009a-japan-pilot.md");
+
+    verify(repository).approve("JP", "architect-1", "docs/product-evolution/specs/p3-009a-japan-pilot.md");
+}
+```
+
+- [ ] **Step 2: Implement approval method**
+
+Add this method to `RegionalExpansionEvidenceService` and add the matching method to `EvidenceRepository`:
+
+```java
+public void approve(String regionCode, String reviewerId, String childSpec) {
+    requireText(regionCode, "region code is required");
+    requireText(reviewerId, "reviewer is required");
+    requireText(childSpec, "child spec is required");
+    repository.approve(regionCode, reviewerId, childSpec);
+}
+
+public interface EvidenceRepository {
+    void insert(EvidenceRecord record);
+    void approve(String regionCode, String reviewerId, String childSpec);
+}
+```
+
+- [ ] **Step 3: Run focused tests**
+
+Run:
+
+```bash
+cd backend && mvn -pl canvas-engine test -Dtest=RegionalExpansionEvidenceServiceTest
+```
+
+Expected: PASS with registration and approval gate coverage.
+
+### Task 4: Verification, Rollout Notes, And Commit
 
 **Files:**
 - Modify: `docs/product-evolution/specs/p3-009-globalization-and-regional-expansion.md`
 - Modify: `docs/product-evolution/plans/p3-009-globalization-and-regional-expansion-plan.md`
-- Read: `docs/product-evolution/todo/INDEX.md`
 
-- [ ] **Step 1: Run backend regression slice**
+- [ ] **Step 1: Run focused verification**
 
-Run: `cd backend && mvn -pl canvas-engine test`
+Run:
 
-Expected: PASS for the canvas-engine module test suite.
+```bash
+cd backend && mvn -pl canvas-engine test -Dtest=RegionalExpansionEvidenceServiceTest
+```
 
-- [ ] **Step 2: Run frontend regression slice**
+Expected: PASS.
 
-Run: `cd frontend && npm test -- --run`
+- [ ] **Step 2: Run migration naming check**
 
-Expected: PASS for the Vitest suite.
+Run:
 
-- [ ] **Step 3: Run frontend build**
+```bash
+test -f backend/canvas-engine/src/main/resources/db/migration/V181__regional_expansion_evidence.sql
+```
 
-Run: `cd frontend && npm run build`
+Expected: command exits 0.
 
-Expected: PASS with TypeScript and Vite build success.
+- [ ] **Step 3: Rollout notes**
 
-- [ ] **Step 4: Add rollout notes to the implementation PR**
+Rollout: run `V181__regional_expansion_evidence.sql`, then allow internal strategy owners to register region evidence through the service or admin tooling. Keep all regions blocked until reviewed. Rollback: stop calling the registry writer or hide the admin entry point; the table is additive and no runtime globalization path depends on it.
 
-Document feature flag or route guard, migration order, tenant and role impact, manual verification steps, and rollback command or disable switch.
+- [ ] **Step 4: Commit the scoped slice**
 
-- [ ] **Step 5: Commit the implementation slice**
+Run:
 
-Run: `git add backend/canvas-engine/src frontend/src docs/product-evolution/specs docs/product-evolution/plans && git commit -m "feat: implement globalization-and-regional-expansion slice"`
+```bash
+git add backend/canvas-engine/src/main/resources/db/migration/V181__regional_expansion_evidence.sql \
+  backend/canvas-engine/src/main/java/org/chovy/canvas/strategy/globalization/RegionalExpansionEvidenceService.java \
+  backend/canvas-engine/src/test/java/org/chovy/canvas/strategy/globalization/RegionalExpansionEvidenceServiceTest.java \
+  docs/product-evolution/specs/p3-009-globalization-and-regional-expansion.md \
+  docs/product-evolution/plans/p3-009-globalization-and-regional-expansion-plan.md
+git commit -m "docs: add regional expansion evidence gate"
+```
 
-Expected: commit contains only files required by this plan.
+Expected: commit contains only the regional expansion evidence migration, service, test, spec, and plan.

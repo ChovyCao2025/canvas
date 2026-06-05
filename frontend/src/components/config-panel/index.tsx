@@ -31,8 +31,15 @@ import {
   getControlLabelStyle,
 } from './controlChrome'
 import { normalizeFieldOptions, resolveDisplayValue } from './displayValues'
-import { buildConfigPanelPresentation, resolveContextValueListFieldKey } from './presentation'
+import { buildConfigPanelPresentation, resolveConnectorWarning, resolveContextValueListFieldKey } from './presentation'
 import { resolveApiInputParamsFieldKey } from './apiInputParams'
+import VariablePicker from './VariablePicker'
+import {
+  availableVariables,
+  type VariableAvailabilityNode,
+  type VariableField,
+} from './variableAvailability'
+import AiLlmConfigPanel from './AiLlmConfigPanel'
 
 /** API 参数定义的最小形态，用于事件属性预览等只读控件。 */
 interface ApiParamDef { name: string; displayName: string; type: string; required: boolean }
@@ -314,11 +321,31 @@ export default function ConfigPanel({ nodeId, nodeData, onChange, nodes, readonl
     })
   }, [form, nodeData, nodeId, onChange])
 
+  /** 在模板字段尾部插入变量 token，并沿用现有 patch 路径回写。 */
+  const insertVariableIntoField = useCallback((fieldKey: string, token: string) => {
+    const current = form.getFieldValue(fieldKey)
+    const nextValue = `${typeof current === 'string' ? current : ''}${token}`
+    form.setFieldValue(fieldKey, nextValue)
+    applyFormPatch({ [fieldKey]: nextValue })
+  }, [applyFormPatch, form])
+
   if (!nodeId || !nodeData) {
     return (
       <div style={{ padding: 16, color: '#bbb', fontSize: 12 }}>
         点击画布中的节点查看配置
       </div>
+    )
+  }
+
+  if (nodeData.nodeType === 'AI_LLM') {
+    return (
+      <AiLlmConfigPanel
+        nodeId={nodeId}
+        nodeData={nodeData}
+        onChange={onChange}
+        nodes={nodes}
+        readonly={readonly}
+      />
     )
   }
 
@@ -346,6 +373,19 @@ export default function ConfigPanel({ nodeId, nodeData, onChange, nodes, readonl
   const groupedSections = presentation.fieldGroups.some(group => group.key === 'basic')
     ? presentation.fieldGroups
     : [{ key: 'basic' as const, title: '基础配置', fields: [] }, ...presentation.fieldGroups]
+  const variableOptions = availableVariables({
+    selectedNodeId: nodeId,
+    nodes: buildVariableAvailabilityNodes(nodes, ctxFields),
+    triggerFields: ctxFields
+      .filter(field => isTriggerContextField(field))
+      .map(contextFieldToVariableField),
+    profileFields: ctxFields
+      .filter(field => isProfileContextField(field))
+      .map(contextFieldToVariableField),
+    computedFields: ctxFields
+      .filter(field => isComputedContextField(field))
+      .map(contextFieldToVariableField),
+  })
 
   /** 根据 schema 字段渲染具体控件，分组只改变布局，不改变字段名和回写路径。 */
   const renderConfigField = (field: SchemaField) => {
@@ -388,27 +428,47 @@ export default function ConfigPanel({ nodeId, nodeData, onChange, nodes, readonl
     // getValueProps 在渲染时将数值转成字符串，确保 Select 能找到匹配选项并回显名称。
     const needsStringCoerce = field.type === 'select' || field.type === 'radio'
     const isDateTime = field.type === 'datetime'
+    const variablePickerVisible = supportsVariablePicker(field) && variableOptions.length > 0
     return (
-      <Form.Item
-        key={field.key}
-        name={field.key}
-        label={renderControlLabel(field.label)}
-        rules={field.required ? [{ required: true, message: `请填写${field.label}` }] : []}
-        getValueProps={
-          isDateTime
-            ? (val) => ({ value: toDatePickerValue(val) })
-            : needsStringCoerce
-              ? (val) => ({ value: val != null ? String(val) : val })
-              : undefined
-        }
-        getValueFromEvent={isDateTime ? fromDatePickerValue : undefined}
-      >
-        {renderControl(field, options, ctxFields, form, sharedOptions, applyFormPatch, nodeId, getNodeName, nodeData)}
-      </Form.Item>
+      <div key={field.key}>
+        <Form.Item
+          name={field.key}
+          label={renderControlLabel(field.label)}
+          rules={field.required ? [{ required: true, message: `请填写${field.label}` }] : []}
+          getValueProps={
+            isDateTime
+              ? (val) => ({ value: toDatePickerValue(val) })
+              : needsStringCoerce
+                ? (val) => ({ value: val != null ? String(val) : val })
+                : undefined
+          }
+          getValueFromEvent={isDateTime ? fromDatePickerValue : undefined}
+        >
+          {renderControl(field, options, ctxFields, form, sharedOptions, applyFormPatch, nodeId, getNodeName, nodeData)}
+        </Form.Item>
+        {variablePickerVisible && (
+          <div style={{ marginTop: -12, marginBottom: 12 }}>
+            <VariablePicker
+              variables={variableOptions}
+              disabled={readonly}
+              onInsert={token => insertVariableIntoField(field.key, token)}
+            />
+          </div>
+        )}
+      </div>
     )
   }
 
   const accentColor = CATEGORY_SOLID[nodeData.category] ?? '#475569'
+  const connectorWarning = resolveConnectorWarning({
+    nodeType: nodeData.nodeType,
+    bizConfig: nodeData.bizConfig,
+    connectorMode: String(
+      (nodeData as Record<string, unknown>).connectorMode
+        ?? nodeData.bizConfig.connectorMode
+        ?? '',
+    ),
+  })
 
   return (
     <div style={{ padding: 12, overflowY: 'auto', height: '100%', background: `${accentColor}0d` }}>
@@ -419,6 +479,25 @@ export default function ConfigPanel({ nodeId, nodeData, onChange, nodes, readonl
         {...presentation.header}
         categoryColor={accentColor}
       />
+
+      {connectorWarning && (
+        <div
+          role="alert"
+          style={{
+            marginBottom: 10,
+            padding: '8px 10px',
+            borderRadius: 8,
+            border: '1px solid #f59e0b55',
+            background: '#fffbeb',
+            color: '#92400e',
+            fontSize: 12,
+            lineHeight: 1.5,
+            fontWeight: 700,
+          }}
+        >
+          {connectorWarning}
+        </div>
+      )}
 
       <Form
         className="config-panel-form"
@@ -496,6 +575,7 @@ function renderControl(
         <Select
           className="config-panel-ios-select"
           classNames={CONTROL_SELECT_CLASS_NAMES}
+          aria-label={field.label}
           style={{ height: controlChrome.height, width: '100%' }}
           options={normalizeFieldOptions(field, options)}
           placeholder={`请选择${field.label}`}
@@ -504,20 +584,26 @@ function renderControl(
         />
       )
     case 'number':
-      return <InputNumber className="config-panel-ios-input-number" style={{ ...controlChrome, width: '100%' }} defaultValue={field.defaultValue as number} />
+      return <InputNumber aria-label={field.label} className="config-panel-ios-input-number" style={{ ...controlChrome, width: '100%' }} defaultValue={field.defaultValue as number} />
+    case 'text':
+      return <Input aria-label={field.label} className="config-panel-ios-input" style={controlChrome} placeholder={field.label} />
+    case 'multi-text':
+      return <Input.TextArea aria-label={field.label} className="config-panel-ios-textarea" rows={4} placeholder={field.label} />
     case 'toggle':
-      return <Switch />
+      return <Switch aria-label={field.label} />
     case 'radio':
       return (
         <Select options={normalizeFieldOptions(field, options)}
           className="config-panel-ios-select"
           classNames={CONTROL_SELECT_CLASS_NAMES}
+          aria-label={field.label}
           style={{ height: controlChrome.height, width: '100%' }}
           placeholder={`请选择${field.label}`} />
       )
     case 'code-editor':
       return (
         <Input.TextArea rows={8}
+          aria-label={field.label}
           className="config-panel-ios-textarea"
           style={{ fontFamily: 'SFMono-Regular, Consolas, monospace', fontSize: 12 }}
           placeholder={`// Groovy 脚本`} />
@@ -525,6 +611,7 @@ function renderControl(
     case 'datetime':
       return (
         <DatePicker
+          aria-label={field.label}
           showTime
           format="YYYY-MM-DD HH:mm:ss"
           style={{ ...controlChrome, width: '100%' }}
@@ -533,6 +620,12 @@ function renderControl(
       )
     case 'cron':
       return <CronBuilder frequencyOptions={sharedOptions.cronFrequencies} weekdayOptions={sharedOptions.weekdays} />
+    case 'duration':
+      return <DurationObjectInput
+        fieldKey={field.key}
+        unitOptions={sharedOptions.delayUnits}
+        applyFormPatch={applyFormPatch}
+      />
     case 'event-attr-preview':
       return <EventAttrPreview />
     case 'edge-hint': {
@@ -554,6 +647,12 @@ function renderControl(
         operatorOptions={sharedOptions.conditionOps}
         fieldKey={getConditionRuleListFieldKey(field.key)}
       />
+    case 'condition-builder':
+      return <EventFilterBuilder
+        fieldKey={field.key}
+        ctxFields={ctxFields}
+        applyFormPatch={applyFormPatch}
+      />
     case 'context-value-list':
       return <ContextValueList
         ctxFields={ctxFields}
@@ -568,13 +667,307 @@ function renderControl(
       return <BroadcastBranchList onBranchesChange={branches => applyFormPatch({ branches })} />
     case 'key-value':
       return <KeyValueMapping fieldKey={field.key} ctxFields={ctxFields} />
+    case 'json-path-mapping-list':
+      return <JsonPathMappingList fieldKey={field.key} applyFormPatch={applyFormPatch} />
+    case 'user-input-field-list':
+      return <UserInputFieldList fieldKey={field.key} applyFormPatch={applyFormPatch} />
     case 'canvas-select':
       return <CanvasSelector />
     case 'node-select':
-      return <Input className="config-panel-ios-input" style={controlChrome} placeholder="节点 ID（连线后自动填入）" />
+      return <Input aria-label={field.label} className="config-panel-ios-input" style={controlChrome} placeholder="节点 ID（连线后自动填入）" />
     default:
-      return <Input className="config-panel-ios-input" style={controlChrome} placeholder={field.label} />
+      return <Input aria-label={field.label} className="config-panel-ios-input" style={controlChrome} placeholder={field.label} />
   }
+}
+
+interface JsonPathMappingItem { path: string; outputKey: string }
+
+function JsonPathMappingList({ fieldKey, applyFormPatch }: {
+  fieldKey: string
+  applyFormPatch: (patch: Record<string, unknown>) => void
+}) {
+  const form = Form.useFormInstance()
+  const items: JsonPathMappingItem[] = Form.useWatch(fieldKey, form) ?? []
+  const inlineChrome = getInlineControlChrome()
+
+  const commit = (next: JsonPathMappingItem[]) => {
+    form.setFieldValue(fieldKey, next)
+    applyFormPatch({ [fieldKey]: next })
+  }
+  const add = () => commit([...items, { path: '$.', outputKey: '' }])
+  const remove = (index: number) => {
+    const next = [...items]
+    next.splice(index, 1)
+    commit(next)
+  }
+  const update = (index: number, patch: Partial<JsonPathMappingItem>) => {
+    const next = [...items]
+    next[index] = { ...next[index], ...patch }
+    commit(next)
+  }
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+      {items.map((item, index) => (
+        <div key={index} style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr) 28px', gap: 6, alignItems: 'center' }}>
+          <Input
+            size="small"
+            style={{ ...inlineChrome, width: '100%' }}
+            placeholder="$.user.name"
+            value={item.path}
+            onChange={event => update(index, { path: event.target.value })}
+          />
+          <Input
+            size="small"
+            style={{ ...inlineChrome, width: '100%' }}
+            placeholder="输出字段"
+            value={item.outputKey}
+            onChange={event => update(index, { outputKey: event.target.value })}
+          />
+          <Button size="small" danger icon={<DeleteOutlined />} onClick={() => remove(index)} />
+        </div>
+      ))}
+      <Button size="small" type="dashed" icon={<PlusOutlined />} onClick={add} style={{ width: '100%' }}>
+        添加映射
+      </Button>
+    </div>
+  )
+}
+
+interface UserInputFieldItem {
+  key: string
+  label: string
+  type: string
+  required?: boolean
+  placeholder?: string
+}
+
+interface EventFilterItem {
+  field: string
+  operator: string
+  value: string
+}
+
+const EVENT_FILTER_OPERATORS = [
+  { label: '=', value: 'eq' },
+  { label: '!=', value: 'ne' },
+  { label: '>', value: 'gt' },
+  { label: '>=', value: 'gte' },
+  { label: '<', value: 'lt' },
+  { label: '<=', value: 'lte' },
+  { label: 'in', value: 'in' },
+]
+
+const USER_INPUT_FIELD_TYPES = [
+  { label: '文本', value: 'text' },
+  { label: '多行文本', value: 'textarea' },
+  { label: '数字', value: 'number' },
+  { label: '邮箱', value: 'email' },
+  { label: '手机', value: 'phone' },
+  { label: '日期', value: 'date' },
+]
+
+function UserInputFieldList({ fieldKey, applyFormPatch }: {
+  fieldKey: string
+  applyFormPatch: (patch: Record<string, unknown>) => void
+}) {
+  const form = Form.useFormInstance()
+  const items: UserInputFieldItem[] = Form.useWatch(fieldKey, form) ?? []
+  const inlineChrome = getInlineControlChrome()
+
+  const commit = (next: UserInputFieldItem[]) => {
+    form.setFieldValue(fieldKey, next)
+    applyFormPatch({ [fieldKey]: next })
+  }
+  const add = () => commit([...items, {
+    key: `field_${items.length + 1}`,
+    label: '',
+    type: 'text',
+    required: false,
+  }])
+  const remove = (index: number) => {
+    const next = [...items]
+    next.splice(index, 1)
+    commit(next)
+  }
+  const update = (index: number, patch: Partial<UserInputFieldItem>) => {
+    const next = [...items]
+    next[index] = { ...next[index], ...patch }
+    commit(next)
+  }
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+      {items.map((item, index) => (
+        <div
+          key={`${item.key || 'field'}-${index}`}
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'minmax(0, 1fr) 84px 48px 28px',
+            gap: 6,
+            alignItems: 'center',
+          }}
+        >
+          <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)', gap: 6 }}>
+            <Input
+              size="small"
+              style={{ ...inlineChrome, width: '100%' }}
+              placeholder="字段 key"
+              value={item.key}
+              onChange={event => update(index, { key: event.target.value })}
+            />
+            <Input
+              size="small"
+              style={{ ...inlineChrome, width: '100%' }}
+              placeholder="标签"
+              value={item.label}
+              onChange={event => update(index, { label: event.target.value })}
+            />
+          </div>
+          <Select
+            className="config-panel-ios-select"
+            classNames={CONTROL_SELECT_CLASS_NAMES}
+            size="small"
+            style={{ width: '100%' }}
+            value={item.type}
+            options={USER_INPUT_FIELD_TYPES}
+            onChange={value => update(index, { type: value })}
+          />
+          <Switch
+            size="small"
+            checked={!!item.required}
+            checkedChildren="必"
+            unCheckedChildren="选"
+            onChange={value => update(index, { required: value })}
+          />
+          <Button size="small" danger icon={<DeleteOutlined />} onClick={() => remove(index)} />
+        </div>
+      ))}
+      <Button size="small" type="dashed" icon={<PlusOutlined />} onClick={add} style={{ width: '100%' }}>
+        添加字段
+      </Button>
+    </div>
+  )
+}
+
+function EventFilterBuilder({ fieldKey, ctxFields, applyFormPatch }: {
+  fieldKey: string
+  ctxFields: ContextField[]
+  applyFormPatch: (patch: Record<string, unknown>) => void
+}) {
+  const form = Form.useFormInstance()
+  const eventCode = Form.useWatch('eventCode', form)
+  const rawFilters = Form.useWatch(fieldKey, form) as Record<string, unknown> | undefined
+  const [attrs, setAttrs] = useState<ApiParamDef[]>([])
+  const inlineChrome = getInlineControlChrome()
+  const items = filtersToItems(rawFilters)
+
+  useEffect(() => {
+    if (!eventCode) {
+      setAttrs([])
+      return
+    }
+    const src = '/meta/event-definitions'
+    const pick = (list: any[]) => {
+      const def = list.find(d => d.value === eventCode)
+      try { setAttrs(def ? JSON.parse(def.requestSchema || '[]') : []) } catch { setAttrs([]) }
+    }
+    if (rawCache.has(src)) {
+      pick(rawCache.get(src)!)
+      return
+    }
+    loadDataSource(src).then(pick)
+  }, [eventCode])
+
+  const fieldOptions = attrs.length > 0
+    ? attrs.map(attr => ({ label: attr.displayName || attr.name, value: attr.name }))
+    : ctxFields.map(field => ({ label: field.fieldName, value: field.fieldKey }))
+
+  const commit = (nextItems: EventFilterItem[]) => {
+    const next = itemsToFilters(nextItems)
+    form.setFieldValue(fieldKey, next)
+    applyFormPatch({ [fieldKey]: next })
+  }
+  const add = () => commit([...items, { field: '', operator: 'eq', value: '' }])
+  const remove = (index: number) => {
+    const next = [...items]
+    next.splice(index, 1)
+    commit(next)
+  }
+  const update = (index: number, patch: Partial<EventFilterItem>) => {
+    const next = [...items]
+    next[index] = { ...next[index], ...patch }
+    commit(next)
+  }
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+      {items.map((item, index) => (
+        <div key={`${item.field || 'filter'}-${index}`} style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 72px minmax(0, 1fr) 28px', gap: 6, alignItems: 'center' }}>
+          <Select
+            className="config-panel-ios-select"
+            classNames={CONTROL_SELECT_CLASS_NAMES}
+            size="small"
+            style={{ width: '100%' }}
+            showSearch
+            placeholder="字段"
+            value={item.field || undefined}
+            options={fieldOptions}
+            onChange={value => update(index, { field: value })}
+          />
+          <Select
+            className="config-panel-ios-select"
+            classNames={CONTROL_SELECT_CLASS_NAMES}
+            size="small"
+            style={{ width: '100%' }}
+            value={item.operator}
+            options={EVENT_FILTER_OPERATORS}
+            onChange={value => update(index, { operator: value })}
+          />
+          <Input
+            size="small"
+            style={{ ...inlineChrome, width: '100%' }}
+            placeholder="值"
+            value={item.value}
+            onChange={event => update(index, { value: event.target.value })}
+          />
+          <Button size="small" danger icon={<DeleteOutlined />} onClick={() => remove(index)} />
+        </div>
+      ))}
+      <Button size="small" type="dashed" icon={<PlusOutlined />} onClick={add} style={{ width: '100%' }}>
+        添加过滤
+      </Button>
+    </div>
+  )
+}
+
+function filtersToItems(filters: Record<string, unknown> | undefined): EventFilterItem[] {
+  if (!filters || typeof filters !== 'object') return []
+  return Object.entries(filters).map(([field, rule]) => {
+    if (rule && typeof rule === 'object' && !Array.isArray(rule)) {
+      const [operator, value] = Object.entries(rule as Record<string, unknown>)[0] ?? ['eq', '']
+      return {
+        field,
+        operator,
+        value: Array.isArray(value) ? value.join(',') : String(value ?? ''),
+      }
+    }
+    return { field, operator: 'eq', value: String(rule ?? '') }
+  })
+}
+
+function itemsToFilters(items: EventFilterItem[]): Record<string, unknown> {
+  const filters: Record<string, unknown> = {}
+  items
+    .filter(item => item.field.trim())
+    .forEach(item => {
+      filters[item.field.trim()] = {
+        [item.operator]: item.operator === 'in'
+          ? item.value.split(',').map(value => value.trim()).filter(Boolean)
+          : item.value,
+      }
+    })
+  return filters
 }
 
 // ── 条件规则列表控件（IF判断 / MQ_TRIGGER 等）─────────
@@ -997,6 +1390,125 @@ function getRenderableSchemaFields(raw: string | undefined, nodeType: string): S
   return fields.filter(field => field.key !== 'userSource' && field.type !== 'user-source-config')
 }
 
+function supportsVariablePicker(field: SchemaField): boolean {
+  return field.type === 'text' || field.type === 'multi-text'
+}
+
+function buildVariableAvailabilityNodes(
+  nodes: Node<CanvasNodeData>[] | undefined,
+  ctxFields: ContextField[],
+): VariableAvailabilityNode[] {
+  return (nodes ?? []).map(node => ({
+    id: node.id,
+    label: node.data.name,
+    nextNodeIds: getNodeTargetIds(node.data.bizConfig),
+    outputs: getNodeVariableOutputs(node, ctxFields),
+  }))
+}
+
+export function getNodeVariableOutputs(node: Node<CanvasNodeData>, ctxFields: ContextField[]): VariableField[] {
+  const config = node.data.bizConfig ?? {}
+  if (node.data.nodeType === 'API_CALL') {
+    const outputPrefix = typeof config.outputPrefix === 'string' ? config.outputPrefix.trim() : ''
+    return ctxFields
+      .filter(field => field.sourceNodeType === 'API_CALL')
+      .filter(field => !outputPrefix || field.fieldKey.startsWith(`${outputPrefix}.`))
+      .map(contextFieldToVariableField)
+  }
+
+  if (node.data.nodeType === 'GROOVY' && Array.isArray(config.outputParams)) {
+    return config.outputParams
+      .map((param): VariableField | null => {
+        if (!param || typeof param !== 'object') return null
+        const record = param as Record<string, unknown>
+        const fieldKey = typeof record.name === 'string' ? record.name.trim() : ''
+        if (!fieldKey) return null
+        return {
+          fieldKey,
+          fieldName: typeof record.description === 'string' && record.description.trim()
+            ? record.description
+            : fieldKey,
+        }
+      })
+      .filter((field): field is VariableField => field !== null)
+  }
+
+  if (node.data.nodeType === 'CONNECTED_CONTENT') {
+    const outputPrefix = typeof config.outputPrefix === 'string' ? config.outputPrefix.trim() : ''
+    const key = (fieldKey: string) => outputPrefix ? `${outputPrefix}.${fieldKey}` : fieldKey
+    const baseOutputs: VariableField[] = [
+      { fieldKey: key('connectedContentStatus'), fieldName: 'Connected Content Status' },
+      { fieldKey: key('connectedContentCacheHit'), fieldName: 'Connected Content Cache Hit' },
+      { fieldKey: key('connectedContentBody'), fieldName: 'Connected Content Body' },
+    ]
+    const mappedOutputs = Array.isArray(config.jsonPathMappings)
+      ? config.jsonPathMappings
+          .map((item): VariableField | null => {
+            if (!item || typeof item !== 'object') return null
+            const record = item as Record<string, unknown>
+            const fieldKey = typeof record.outputKey === 'string' ? record.outputKey.trim() : ''
+            if (!fieldKey) return null
+            return { fieldKey: key(fieldKey), fieldName: fieldKey }
+          })
+          .filter((field): field is VariableField => field !== null)
+      : []
+    return [...baseOutputs, ...mappedOutputs]
+  }
+
+  if (node.data.nodeType === 'USER_INPUT') {
+    return [
+      { fieldKey: 'inputStatus', fieldName: '输入状态' },
+      { fieldKey: 'inputResponseId', fieldName: '响应ID' },
+      { fieldKey: 'inputResponse', fieldName: '输入响应' },
+    ]
+  }
+
+  return []
+}
+
+function getNodeTargetIds(config: Record<string, unknown> | undefined): string[] {
+  const targets = new Set<string>()
+  const visit = (value: unknown, key?: string) => {
+    if (typeof value === 'string') {
+      if (key?.endsWith('NodeId') && value.trim()) {
+        targets.add(value)
+      }
+      return
+    }
+    if (Array.isArray(value)) {
+      value.forEach(item => visit(item))
+      return
+    }
+    if (value && typeof value === 'object') {
+      Object.entries(value as Record<string, unknown>).forEach(([childKey, childValue]) => visit(childValue, childKey))
+    }
+  }
+
+  visit(config)
+  return [...targets]
+}
+
+function contextFieldToVariableField(field: ContextField): VariableField {
+  return {
+    fieldKey: field.fieldKey,
+    fieldName: field.fieldName,
+  }
+}
+
+function isProfileContextField(field: ContextField): boolean {
+  return field.fieldKey.startsWith('profile.')
+}
+
+function isComputedContextField(field: ContextField): boolean {
+  return field.fieldKey.startsWith('computed.')
+}
+
+function isTriggerContextField(field: ContextField): boolean {
+  return !isProfileContextField(field) &&
+    !isComputedContextField(field) &&
+    field.sourceNodeType !== 'API_CALL'
+}
+
 // ── 事件属性只读预览控件 ──────────────────────────────────────────
 // 根据选中的 eventCode，显示该事件定义的属性列表（只读，运行时由上报内容决定）
 function EventAttrPreview() {
@@ -1128,6 +1640,62 @@ function DelayInput({
           </Button>
         ))}
       </Space>
+    </div>
+  )
+}
+
+function DurationObjectInput({ fieldKey, unitOptions, applyFormPatch }: {
+  fieldKey: string
+  unitOptions: { label: string; value: string }[]
+  applyFormPatch: (patch: Record<string, unknown>) => void
+}) {
+  const form = Form.useFormInstance()
+  const rawValue = Form.useWatch(fieldKey, form) as Record<string, unknown> | undefined
+  const controlChrome = getControlChrome()
+  const value = typeof rawValue?.value === 'number'
+    ? rawValue.value
+    : typeof rawValue?.durationValue === 'number'
+      ? rawValue.durationValue
+      : undefined
+  const unit = typeof rawValue?.unit === 'string'
+    ? rawValue.unit
+    : typeof rawValue?.durationUnit === 'string'
+      ? rawValue.durationUnit
+      : 'MINUTE'
+  const displayUnitOptions = unitOptions.map((option) => {
+    const optionValue = String(option.value)
+    if (optionValue === 'SECOND') return { ...option, label: '秒' }
+    if (optionValue === 'MINUTE') return { ...option, label: '分钟' }
+    if (optionValue === 'HOUR') return { ...option, label: '小时' }
+    if (optionValue === 'DAY') return { ...option, label: '天' }
+    return option
+  })
+
+  const commit = (patch: Record<string, unknown>) => {
+    const next = { value, unit, ...(rawValue ?? {}), ...patch }
+    form.setFieldValue(fieldKey, next)
+    applyFormPatch({ [fieldKey]: next })
+  }
+
+  return (
+    <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 104px', gap: 8 }}>
+      <InputNumber
+        className="config-panel-ios-input-number"
+        style={{ ...controlChrome, width: '100%' }}
+        min={1}
+        controls={false}
+        placeholder="时长"
+        value={value}
+        onChange={nextValue => commit({ value: nextValue ?? undefined })}
+      />
+      <Select
+        className="config-panel-ios-select"
+        classNames={CONTROL_SELECT_CLASS_NAMES}
+        style={{ height: controlChrome.height, width: '100%' }}
+        value={unit}
+        options={displayUnitOptions}
+        onChange={nextUnit => commit({ unit: nextUnit })}
+      />
     </div>
   )
 }

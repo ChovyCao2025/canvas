@@ -7,69 +7,70 @@ Implementation plan: `../plans/p3-012-product-led-growth-and-community-plan.md`
 
 ## Goal
 
-Define trial journey, activation milestones, proficiency levels, referral, public examples, case studies, community templates, and customer story loops.
+Create an executable discovery and governance slice for product-led growth and community so trial journey, activation milestones, proficiency levels, referral, public examples, case studies, templates, and customer story loops are ranked by evidence before product build-out.
 
 ## User And Business Value
 
-This keeps the strategy actionable by requiring discovery gates, MVP scope, and measurable exit criteria before engineering scale-up.
+This gives growth, customer success, product, and compliance teams a governed way to decide which PLG and community bets deserve implementation based on activation evidence, consent requirements, content risk, expected lift, proof commands, and rollback notes.
 
 ## In Scope
 
-- Trial and activation event model.
-- Referral and public example policy.
-- Community template governance.
-- Case-study workflow.
+- PLG and community opportunity evidence registry.
+- Activation, referral, public example, template, and case-study assessment metadata.
+- Additive Flyway table for growth evidence decisions.
+- Service tests that block unreviewed public/community workflows.
+- Review states for discovery, experiment approval, rejection, and child-spec conversion.
 
 ## Out Of Scope
 
-- Immediate full-scale implementation.
-- Commercial, legal, or architecture commitments without named owner and evidence.
+- Implementing trial onboarding, activation tracking, referral systems, public galleries, community publishing, case-study workflows, or customer-facing growth UI.
+- Publishing customer stories or public examples without consent and review.
+- Editing product-evolution indexes or `EXECUTABLE_PLAN_AUDIT.md`.
 
 ## Functional Requirements
 
-1. The feature must expose the smallest useful operator or platform workflow described in the source item.
-2. The implementation must preserve tenant isolation, authorization, auditability, and rollback behavior for every new read or write path.
-3. New UI must use existing React, Ant Design, router, service, and test patterns unless a child spec justifies a new pattern.
-4. New backend behavior must use the existing Spring Boot, MyBatis, Flyway, controller, domain service, and test patterns.
-5. The implementation must include focused automated tests before code changes and a manual verification checklist for the core workflow.
+1. A growth evidence record must include opportunity key, owner, funnel stage, target persona, activation metric, consent requirement, content risk, experiment hypothesis, proof command, rollback note, and decision status.
+2. Public examples, customer stories, referrals, and community templates must require consent and risk notes before approval.
+3. Experiment approval must require reviewer identity, reviewed time, and named child spec.
+4. The service must reject incomplete activation metrics or missing rollback notes.
+5. This slice must not launch growth workflows; it records evidence and gates future implementation.
 
 ## Technical Scope
 
 ### Backend Touchpoints
 
-- `backend/canvas-engine/src/main/java/org/chovy/canvas/domain`
-- `backend/canvas-engine/src/main/java/org/chovy/canvas/web`
+- `backend/canvas-engine/src/main/java/org/chovy/canvas/strategy/growth/ProductLedGrowthEvidenceService.java`
+- `backend/canvas-engine/src/main/resources/db/migration/V184__product_led_growth_evidence.sql`
 
 ### Frontend Touchpoints
 
-- `frontend/src/pages`
-- `frontend/src/services`
+- None for this discovery slice. UI work is deferred until a child spec defines a growth or community workflow.
 
 ### Data And Configuration Touchpoints
 
-- `backend/canvas-engine/src/main/resources/db/migration/V127__product_led_growth_and_community.sql`
+- `backend/canvas-engine/src/main/resources/db/migration/V184__product_led_growth_evidence.sql`
 
 ### Test Touchpoints
 
-- `backend/canvas-engine/src/test/java/org/chovy/canvas/strategy/ProductLedGrowthAndCommunityTest.java`
-- `frontend/src/pages/product-led-growth-and-community/product-led-growth-and-community.test.tsx`
+- `backend/canvas-engine/src/test/java/org/chovy/canvas/strategy/growth/ProductLedGrowthEvidenceServiceTest.java`
 
 ## Dependencies
 
-- Requires explicit business or architecture owner.
-- Requires discovery evidence before build-out.
+- Growth owner for activation and funnel evidence.
+- Customer success owner for case-study and community workflows.
+- Compliance or legal owner for consent-sensitive public content.
+- Analytics owner for metric definitions and proof commands.
 
 ## Risks And Controls
 
-- Scope creep: keep the first implementation to the workflow in this spec and move broader ideas to a follow-up spec.
-- Tenant or permission regression: add backend tests for tenant-scoped data and role checks before exposing UI.
-- UI complexity: use one page or one panel first, then expand only after the workflow is verified.
-- Data migration risk: make every migration additive and reversible by disabling the new route or feature flag.
+- Vanity metrics: require activation metric and proof command before approval.
+- Consent risk: public/community opportunities remain blocked when consent evidence is missing.
+- Experiment sprawl: each approved item must name a child spec and rollback note.
+- Data migration risk: `V184__product_led_growth_evidence.sql` is additive and can be disabled by stopping registry writes.
 
 ## Acceptance Criteria
 
-- The source item has a visible implemented workflow or a documented discovery exit if this is a P3 strategy item.
-- All changed backend endpoints reject unauthorized access and preserve tenant scoping.
-- All changed frontend routes handle loading, empty, error, and permission states.
-- Tests named in the plan pass in the local commands for backend and frontend slices.
-- The implementation includes rollout notes covering feature flag, migration, and rollback behavior.
+- `V184__product_led_growth_evidence.sql` creates an additive PLG evidence table with activation, consent, proof, rollback, reviewer, child-spec, and status fields.
+- Service tests prove public/community opportunities remain blocked until reviewed consent and metric evidence are complete.
+- The plan includes real TDD snippets, commands with expected outputs, rollout notes, and scoped git add and commit commands.
+- The slice records governance evidence only; no growth or community runtime workflow is shipped.

@@ -12,6 +12,7 @@ import org.springframework.dao.DuplicateKeyException;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
@@ -59,7 +60,49 @@ class NotificationServiceTest {
         assertThat(inserted.getStatus()).isEqualTo("UNREAD");
         assertThat(inserted.getActionLabel()).isEqualTo("查看结果");
         assertThat(inserted.getActionUrl()).isEqualTo("/audiences?highlight=7&taskId=task_1");
-        verify(realtimePublisher).publish(eq("NOTIFICATION_CREATED"), eq("operator"), eq(inserted), eq(1L));
+        verify(realtimePublisher).publish(eq("NOTIFICATION_CREATED"), eq(null), eq("operator"), eq(inserted), eq(1L));
+    }
+
+    @Test
+    void createForTask_publishesTenantScopedUnreadCountAfterInsert() {
+        when(mapper.selectCount(any())).thenReturn(5L);
+        NotificationService service = new NotificationService(mapper, realtimePublisher);
+
+        NotificationDO notification = service.createForTask(
+                42L,
+                "operator",
+                "TASK_FAILED",
+                "任务失败",
+                "人群计算异常",
+                "/tasks/task_1",
+                "task_1");
+
+        ArgumentCaptor<NotificationDO> captor = ArgumentCaptor.forClass(NotificationDO.class);
+        verify(mapper).insert(captor.capture());
+        assertThat(notification).isSameAs(captor.getValue());
+        assertThat(notification.getTenantId()).isEqualTo(42L);
+        assertThat(notification.getSeverity()).isEqualTo("ERROR");
+        verify(realtimePublisher).publish(
+                eq("NOTIFICATION_CREATED"),
+                eq(42L),
+                eq("operator"),
+                eq(notification),
+                eq(5L));
+    }
+
+    @Test
+    void createRejectsMissingUserBeforeMapperWrite() {
+        NotificationService service = new NotificationService(mapper, realtimePublisher);
+
+        assertThatThrownBy(() -> service.create(NotificationCreateCommand.builder()
+                .type("SYSTEM")
+                .title("Missing user")
+                .build()))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("userId");
+
+        verify(mapper, never()).insert(any(NotificationDO.class));
+        verify(realtimePublisher, never()).publish(any(), any(), any(), any(), any());
     }
 
     @Test
@@ -96,7 +139,7 @@ class NotificationServiceTest {
                 "task_1");
 
         assertThat(notification).isSameAs(existing);
-        verify(realtimePublisher, never()).publish(any(), any(), any(), any());
+        verify(realtimePublisher, never()).publish(any(), any(), any(), any(), any());
     }
 
     @Test
@@ -158,9 +201,25 @@ class NotificationServiceTest {
         assertThat(updateEntity.getStatus()).isEqualTo("READ");
         assertThat(updateEntity.getNotificationId()).isNull();
         assertThat(updateEntity.getUserId()).isNull();
-        verify(realtimePublisher).publish(eq("NOTIFICATION_UPDATED"), eq("operator"), eq(null), eq(0L));
+        verify(realtimePublisher).publish(eq("NOTIFICATION_UPDATED"), eq(null), eq("operator"), eq(null), eq(0L));
         verify(mapper, never()).selectOne(any());
         verify(mapper, never()).updateById(any(NotificationDO.class));
+    }
+
+    @Test
+    void markReadWithTenant_updatesOnlyUnreadNotificationInsideTenant() {
+        when(mapper.selectCount(any())).thenReturn(0L);
+        NotificationService service = new NotificationService(mapper, realtimePublisher);
+
+        service.markRead("operator", "ntf_1", 42L);
+
+        ArgumentCaptor<Wrapper<NotificationDO>> wrapperCaptor = wrapperCaptor();
+        ArgumentCaptor<NotificationDO> updateCaptor = ArgumentCaptor.forClass(NotificationDO.class);
+        verify(mapper).update(updateCaptor.capture(), wrapperCaptor.capture());
+        assertThat(updateCaptor.getValue().getReadAt()).isNotNull();
+        assertThat(updateCaptor.getValue().getStatus()).isEqualTo("READ");
+        assertThat(wrapperCaptor.getValue()).isNotNull();
+        verify(realtimePublisher).publish(eq("NOTIFICATION_UPDATED"), eq(42L), eq("operator"), eq(null), eq(0L));
     }
 
     @Test
@@ -174,7 +233,7 @@ class NotificationServiceTest {
         verify(mapper).update(captor.capture(), any(Wrapper.class));
         assertThat(captor.getValue().getReadAt()).isNotNull();
         assertThat(captor.getValue().getStatus()).isEqualTo("READ");
-        verify(realtimePublisher).publish(eq("NOTIFICATION_UPDATED"), eq("operator"), eq(null), eq(0L));
+        verify(realtimePublisher).publish(eq("NOTIFICATION_UPDATED"), eq(null), eq("operator"), eq(null), eq(0L));
         verify(mapper, never()).selectList(any());
         verify(mapper, never()).updateById(any(NotificationDO.class));
     }
@@ -190,6 +249,12 @@ class NotificationServiceTest {
         verify(mapper).update(captor.capture(), any(Wrapper.class));
         assertThat(captor.getValue().getArchivedAt()).isNotNull();
         assertThat(captor.getValue().getStatus()).isEqualTo("ARCHIVED");
-        verify(realtimePublisher).publish(eq("NOTIFICATION_UPDATED"), eq("operator"), eq(null), eq(2L));
+        verify(realtimePublisher).publish(eq("NOTIFICATION_UPDATED"), eq(null), eq("operator"), eq(null), eq(2L));
     }
+
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    private static <T> ArgumentCaptor<Wrapper<T>> wrapperCaptor() {
+        return (ArgumentCaptor) ArgumentCaptor.forClass(Wrapper.class);
+    }
+
 }

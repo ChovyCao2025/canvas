@@ -21,4 +21,17 @@ public interface NotificationRealtimePublisher {
      * @param unreadCount unreadCount 数量、阈值或分页参数
      */
     void publish(String eventType, String userId, NotificationDO notification, Long unreadCount);
+
+    /**
+     * 发布指定租户内用户的实时通知。
+     *
+     * @param eventType eventType 类型标识或分类条件
+     * @param tenantId tenantId 所属租户，null 表示旧版全局通道
+     * @param userId userId 对应的业务主键或标识
+     * @param notification notification 方法执行所需的业务参数
+     * @param unreadCount unreadCount 数量、阈值或分页参数
+     */
+    default void publish(String eventType, Long tenantId, String userId, NotificationDO notification, Long unreadCount) {
+        publish(eventType, userId, notification, unreadCount);
+    }
 }

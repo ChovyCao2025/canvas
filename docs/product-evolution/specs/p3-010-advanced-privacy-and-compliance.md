@@ -7,69 +7,70 @@ Implementation plan: `../plans/p3-010-advanced-privacy-and-compliance-plan.md`
 
 ## Goal
 
-Explore data deletion/export, GDPR/CCPA/PIPL profiles, differential privacy, federated learning, trusted execution, data residency, and compliance assessment flows.
+Create an executable discovery and governance slice for advanced privacy and compliance so GDPR, CCPA, PIPL, deletion/export, differential privacy, federated learning, trusted execution, and residency ideas are ranked by evidence before implementation.
 
 ## User And Business Value
 
-This keeps the strategy actionable by requiring discovery gates, MVP scope, and measurable exit criteria before engineering scale-up.
+This gives compliance, security, product, and architecture teams a shared record of demand, regulation profile, data touchpoints, technical risk, audit requirements, proof commands, and approval status before high-risk privacy work starts.
 
 ## In Scope
 
-- Data subject request workflow.
-- Regulation profile model.
-- Audit immutability and export artifacts.
-- Privacy computing ranking by demand.
+- Privacy capability evidence registry.
+- Regulation profile and data-subject workflow assessment metadata.
+- Approval gate for child specs.
+- Additive Flyway table for compliance evidence.
+- Tests that prove incomplete privacy evidence cannot pass review.
 
 ## Out Of Scope
 
-- Immediate full-scale implementation.
-- Commercial, legal, or architecture commitments without named owner and evidence.
+- Implementing data deletion/export, differential privacy, federated learning, trusted execution, or data residency runtime behavior.
+- Providing legal advice or final compliance certification.
+- Editing product-evolution indexes or `EXECUTABLE_PLAN_AUDIT.md`.
 
 ## Functional Requirements
 
-1. The feature must expose the smallest useful operator or platform workflow described in the source item.
-2. The implementation must preserve tenant isolation, authorization, auditability, and rollback behavior for every new read or write path.
-3. New UI must use existing React, Ant Design, router, service, and test patterns unless a child spec justifies a new pattern.
-4. New backend behavior must use the existing Spring Boot, MyBatis, Flyway, controller, domain service, and test patterns.
-5. The implementation must include focused automated tests before code changes and a manual verification checklist for the core workflow.
+1. A privacy evidence record must include capability key, owner, regulation profile, affected data classes, audit artifact requirement, residency impact, threat model note, proof command, rollback note, and decision status.
+2. The service must reject approval when proof command, rollback note, affected data classes, or reviewer identity is missing.
+3. Privacy computing candidates must remain `RESEARCH_ONLY` or `BLOCKED_PENDING_REVIEW` until an accepted child spec is named.
+4. Data-subject request candidates must identify export, deletion, retention, and audit implications before implementation is allowed.
+5. This slice must not expose user-facing privacy actions; it records evidence and gates future implementation.
 
 ## Technical Scope
 
 ### Backend Touchpoints
 
-- `backend/canvas-engine/src/main/java/org/chovy/canvas/domain`
-- `backend/canvas-engine/src/main/java/org/chovy/canvas/web`
+- `backend/canvas-engine/src/main/java/org/chovy/canvas/strategy/privacy/PrivacyComplianceEvidenceService.java`
+- `backend/canvas-engine/src/main/resources/db/migration/V182__privacy_compliance_evidence.sql`
 
 ### Frontend Touchpoints
 
-- `frontend/src/pages`
-- `frontend/src/services`
+- None for this discovery slice. UI work is deferred until a child spec defines an operator or compliance workflow.
 
 ### Data And Configuration Touchpoints
 
-- `backend/canvas-engine/src/main/resources/db/migration/V125__advanced_privacy_and_compliance.sql`
+- `backend/canvas-engine/src/main/resources/db/migration/V182__privacy_compliance_evidence.sql`
 
 ### Test Touchpoints
 
-- `backend/canvas-engine/src/test/java/org/chovy/canvas/strategy/AdvancedPrivacyAndComplianceTest.java`
-- `frontend/src/pages/advanced-privacy-and-compliance/advanced-privacy-and-compliance.test.tsx`
+- `backend/canvas-engine/src/test/java/org/chovy/canvas/strategy/privacy/PrivacyComplianceEvidenceServiceTest.java`
 
 ## Dependencies
 
-- Requires explicit business or architecture owner.
-- Requires discovery evidence before build-out.
+- Compliance owner for regulation interpretation.
+- Security owner for threat model evidence.
+- Product owner for customer-demand ranking.
+- Architecture owner for data residency and storage impact.
 
 ## Risks And Controls
 
-- Scope creep: keep the first implementation to the workflow in this spec and move broader ideas to a follow-up spec.
-- Tenant or permission regression: add backend tests for tenant-scoped data and role checks before exposing UI.
-- UI complexity: use one page or one panel first, then expand only after the workflow is verified.
-- Data migration risk: make every migration additive and reversible by disabling the new route or feature flag.
+- Compliance overreach: keep status values separate for research, review, approval, rejection, and merged child specs.
+- Audit gaps: require audit artifact notes before approval.
+- Sensitive-data risk: store evidence summaries and references, not raw personal data.
+- Data migration risk: `V182__privacy_compliance_evidence.sql` is additive and can be disabled by stopping registry writes.
 
 ## Acceptance Criteria
 
-- The source item has a visible implemented workflow or a documented discovery exit if this is a P3 strategy item.
-- All changed backend endpoints reject unauthorized access and preserve tenant scoping.
-- All changed frontend routes handle loading, empty, error, and permission states.
-- Tests named in the plan pass in the local commands for backend and frontend slices.
-- The implementation includes rollout notes covering feature flag, migration, and rollback behavior.
+- `V182__privacy_compliance_evidence.sql` creates an additive privacy evidence table with regulation, data class, proof, rollback, reviewer, and status fields.
+- Service tests prove incomplete or unreviewed privacy evidence cannot unlock implementation.
+- The plan includes real TDD snippets, commands with expected outputs, rollout notes, and scoped git add and commit commands.
+- The slice records governance evidence only; no privacy runtime action is shipped.

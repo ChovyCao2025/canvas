@@ -20,6 +20,8 @@ import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.Disposable;
 import reactor.core.Disposables;
 import reactor.core.publisher.Mono;
+import org.chovy.canvas.infrastructure.reactor.BlockingWorkScheduler;
+import org.chovy.canvas.infrastructure.reactor.TrackedReactiveTaskRegistry;
 
 import java.time.Duration;
 import java.time.LocalDateTime;
@@ -52,7 +54,18 @@ public class CanvasSchedulerService {
     private final ScheduleRegistrar      scheduleRegistrar;
     /** 统一 HTTP 客户端构建器，继承全局超时、连接池和响应大小限制。 */
     private final WebClient.Builder      webClientBuilder;
+    /** 统一阻塞适配器，用于调度器线程上同步读取外部用户来源。 */
+    private final BlockingWorkScheduler  blockingWorkScheduler;
+    /** 跟踪调度器 fire-and-forget 响应式任务，支持关闭时释放。 */
+    private final TrackedReactiveTaskRegistry reactiveTaskRegistry;
     private static final String SCHEDULED_BATCH_USER_PREFIX = "__scheduled_batch__:";
+
+    CanvasSchedulerService(CanvasExecutionService executionService,
+                           ScheduleRegistrar scheduleRegistrar,
+                           WebClient.Builder webClientBuilder) {
+        this(executionService, scheduleRegistrar, webClientBuilder,
+                new BlockingWorkScheduler(), TrackedReactiveTaskRegistry.direct());
+    }
 
     /** 兼容旧测试和默认本地调度器的构造器，生产可替换 ScheduleRegistrar 实现。 */
     @Autowired
@@ -60,10 +73,14 @@ public class CanvasSchedulerService {
                                   org.chovy.canvas.dal.mapper.CanvasMapper canvasMapper,
                                   org.chovy.canvas.infrastructure.cache.CanvasConfigCache configCache,
                                   CanvasExecutionService executionService,
-                                  WebClient.Builder webClientBuilder) {
+                                  WebClient.Builder webClientBuilder,
+                                  BlockingWorkScheduler blockingWorkScheduler,
+                                  TrackedReactiveTaskRegistry reactiveTaskRegistry) {
         this.executionService = executionService;
         this.scheduleRegistrar = new LegacyTaskSchedulerRegistrar(taskScheduler);
         this.webClientBuilder = webClientBuilder;
+        this.blockingWorkScheduler = blockingWorkScheduler;
+        this.reactiveTaskRegistry = reactiveTaskRegistry;
     }
 
 
@@ -94,7 +111,7 @@ public class CanvasSchedulerService {
     /** 调度生命周期锁，保护注册、取消和关闭过程的并发状态。 */
     private final Object lifecycleLock = new Object();
     /** 调度服务是否已关闭。 */
-    private boolean closed;
+    private final AtomicBoolean closed = new AtomicBoolean(false);
 
     /**
      * 注册、调度或初始化 register Scheduled Triggers 相关的业务数据。
@@ -174,7 +191,7 @@ public class CanvasSchedulerService {
         List<PendingJitterGroup> groups;
         List<ScheduleKey> scheduleKeys;
         synchronized (lifecycleLock) {
-            closed = true;
+            closed.set(true);
             groups = new ArrayList<>(pendingJitterTasks.values());
             scheduleKeys = pendingJitterTasks.keySet().stream()
                     .map(taskKey -> new ScheduleKey("canvas", taskKey))
@@ -186,6 +203,33 @@ public class CanvasSchedulerService {
         scheduleKeys.forEach(scheduleRegistrar::unregister);
         groups.forEach(PendingJitterGroup::dispose);
         log.info("[SCHEDULER] 所有定时任务已取消");
+    }
+
+    /** 用发布态 DAG 快照替换当前本机调度注册，用于 Redis/运行态冷恢复。 */
+    public int replaceScheduledTriggers(Map<Long, DagGraph> publishedGraphs) {
+        List<PendingJitterGroup> groups;
+        List<ScheduleKey> scheduleKeys;
+        synchronized (lifecycleLock) {
+            if (closed.get()) {
+                throw new IllegalStateException("Scheduler is closed");
+            }
+            groups = new ArrayList<>(pendingJitterTasks.values());
+            scheduleKeys = pendingJitterTasks.keySet().stream()
+                    .map(taskKey -> new ScheduleKey("canvas", taskKey))
+                    .toList();
+            groups.forEach(PendingJitterGroup::terminate);
+            pendingJitterTasks.clear();
+        }
+        scheduleKeys.forEach(scheduleRegistrar::unregister);
+        groups.forEach(PendingJitterGroup::dispose);
+
+        int registrations = 0;
+        for (Map.Entry<Long, DagGraph> entry : publishedGraphs.entrySet()) {
+            registrations += countScheduledTriggerNodes(entry.getValue());
+            registerScheduledTriggers(entry.getKey(), entry.getValue());
+        }
+        log.info("[SCHEDULER] 运行态调度重建完成 registrations={}", registrations);
+        return registrations;
     }
 
     /**
@@ -216,6 +260,18 @@ public class CanvasSchedulerService {
         cancelScheduledTrigger(new ScheduleKey("canvas", taskKey));
     }
 
+    /** 统计 DAG 中的定时触发节点数量。 */
+    private int countScheduledTriggerNodes(DagGraph graph) {
+        int count = 0;
+        for (String nodeId : graph.allNodeIds()) {
+            DagParser.CanvasNode node = graph.getNode(nodeId);
+            if (node != null && NodeType.SCHEDULED_TRIGGER.equals(node.getType())) {
+                count++;
+            }
+        }
+        return count;
+    }
+
     /** 定时节点到点后只启动一次批处理执行，用户展开交给后续人群节点。 */
     private void triggerForAllUsers(Long canvasId, String nodeId, Map<String, Object> cfg, PendingJitterGroup group) {
         log.info("[SCHEDULER] 定时批处理触发 canvasId={} nodeId={}", canvasId, nodeId);
@@ -225,13 +281,17 @@ public class CanvasSchedulerService {
     /** 创建并登记 jitter 分组，服务关闭后不再接受新分组。 */
     PendingJitterGroup createPendingJitterGroup(String taskKey) {
         synchronized (lifecycleLock) {
-            if (closed) {
+            if (closed.get()) {
                 return null;
             }
             PendingJitterGroup group = new PendingJitterGroup(taskKey);
             pendingJitterTasks.put(taskKey, group);
             return group;
         }
+    }
+
+    boolean isClosed() {
+        return closed.get();
     }
 
     /** 判断指定任务 key 是否仍存在待执行 jitter 分组。 */
@@ -354,13 +414,20 @@ public class CanvasSchedulerService {
             return Disposables.disposed();
         }
 
-        pending.update(Mono.delay(jitter)
-                // 延迟任务无论执行、取消还是失败，都必须从分组中移除以触发空闲清理。
-                .doFinally(signalType -> group.remove(pending))
-                .subscribe(
-                        ignored -> dispatchScheduledTrigger(group, canvasId, userId),
-                        e -> log.warn("[SCHEDULER] jitter 调度失败 taskKey={} userId={}: {}", group.taskKey, userId, e.getMessage())
-                ));
+        try {
+            pending.update(reactiveTaskRegistry.submit(
+                    "scheduler-jitter-" + group.taskKey,
+                    Mono.delay(jitter)
+                            .doOnNext(ignored -> dispatchScheduledTrigger(group, canvasId, userId))
+                            // 延迟任务无论执行、取消还是失败，都必须从分组中移除以触发空闲清理。
+                            .doFinally(signalType -> group.remove(pending))
+                            .then(),
+                    e -> log.warn("[SCHEDULER] jitter 调度失败 taskKey={} userId={}: {}",
+                            group.taskKey, userId, e.getMessage())));
+        } catch (RuntimeException e) {
+            group.remove(pending);
+            throw e;
+        }
         return pending;
     }
 
@@ -371,18 +438,18 @@ public class CanvasSchedulerService {
             return;
         }
         String nodeId = nodeIdFromTaskKey(group.taskKey);
-        executionService.trigger(
-                        canvasId, userId, TriggerType.SCHEDULED,
-                        NodeType.SCHEDULED_TRIGGER, nodeId,
-                        Map.of(
-                                MapFieldKeys.SCHEDULED_BATCH, true,
-                                MapFieldKeys.SCHEDULED_TRIGGER_NODE_ID, nodeId
-                        ),
-                        java.util.UUID.randomUUID().toString(), false)
-                .subscribe(
-                        null,
-                        e -> log.warn("[SCHEDULER] 用户触发失败 userId={}: {}", userId, e.getMessage())
-                );
+        reactiveTaskRegistry.submit(
+                "scheduler-trigger-" + group.taskKey + "-" + userId,
+                executionService.trigger(
+                                canvasId, userId, TriggerType.SCHEDULED,
+                                NodeType.SCHEDULED_TRIGGER, nodeId,
+                                Map.of(
+                                        MapFieldKeys.SCHEDULED_BATCH, true,
+                                        MapFieldKeys.SCHEDULED_TRIGGER_NODE_ID, nodeId
+                                ),
+                                java.util.UUID.randomUUID().toString(), false)
+                        .then(),
+                e -> log.warn("[SCHEDULER] 用户触发失败 userId={}: {}", userId, e.getMessage()));
     }
 
     public static boolean isScheduledBatchUser(String userId) {
@@ -419,14 +486,15 @@ public class CanvasSchedulerService {
                     while (result.size() < limit) {
                         int currentPage = page;
                         @SuppressWarnings("unchecked")
-                        java.util.Map<String, Object> resp = taggerClient.get()
-                                .uri(u -> u.path("/offline/users")
-                                        .queryParam("tagCode", tagCode)
-                                        .queryParam("page", currentPage)
-                                        .queryParam("size", pageSize).build())
-                                .retrieve()
-                                .bodyToMono(java.util.Map.class)
-                                .block();
+                        java.util.Map<String, Object> resp = blockingWorkScheduler.await(
+                                "scheduler tagger group fetch",
+                                taggerClient.get()
+                                        .uri(u -> u.path("/offline/users")
+                                                .queryParam("tagCode", tagCode)
+                                                .queryParam("page", currentPage)
+                                                .queryParam("size", pageSize).build())
+                                        .retrieve()
+                                        .bodyToMono(java.util.Map.class));
                         List<String> batch = resp != null ? (List<String>) resp.getOrDefault("userIds", List.of()) : List.of();
                         result.addAll(batch);
                         if (batch.size() < pageSize) break; // 最后一页
@@ -446,14 +514,15 @@ public class CanvasSchedulerService {
                 if (apiKey == null) { log.warn("[SCHEDULER] USER_API 缺少 apiKey"); yield List.of(); }
                 try {
                     @SuppressWarnings("unchecked")
-                    java.util.Map<String, Object> resp = apiCallClient.post()
-                            .uri("/call")
-                            .bodyValue(java.util.Map.of(
-                                    MapFieldKeys.API_KEY, apiKey,
-                                    MapFieldKeys.PARAMS, src.getOrDefault(MapFieldKeys.PARAMS, java.util.Map.of())))
-                            .retrieve()
-                            .bodyToMono(java.util.Map.class)
-                            .block();
+                    java.util.Map<String, Object> resp = blockingWorkScheduler.await(
+                            "scheduler user api fetch",
+                            apiCallClient.post()
+                                    .uri("/call")
+                                    .bodyValue(java.util.Map.of(
+                                            MapFieldKeys.API_KEY, apiKey,
+                                            MapFieldKeys.PARAMS, src.getOrDefault(MapFieldKeys.PARAMS, java.util.Map.of())))
+                                    .retrieve()
+                                    .bodyToMono(java.util.Map.class));
                     List<String> userIds = resp != null ? (List<String>) resp.getOrDefault("userIds", List.of()) : List.of();
                     log.info("[SCHEDULER] USER_API apiKey={} 返回 {} 个用户", apiKey, userIds.size());
                     yield userIds;

@@ -57,7 +57,13 @@ describe('api http interceptor', () => {
   it('rejects non-zero business code responses', async () => {
     const promise = http.get('/business-fail', {
       adapter: async config => ({
-        data: { code: 40001, message: 'bad request', data: { field: 'name' } },
+        data: {
+          code: 40001,
+          errorCode: 'API_001',
+          message: 'bad request',
+          data: { field: 'name' },
+          traceId: 'trace-1',
+        },
         status: 200,
         statusText: 'OK',
         headers: {},
@@ -68,8 +74,10 @@ describe('api http interceptor', () => {
     await expect(promise).rejects.toBeInstanceOf(ApiBusinessError)
     await expect(promise).rejects.toMatchObject({
       code: 40001,
+      errorCode: 'API_001',
       message: 'bad request',
       data: { field: 'name' },
+      traceId: 'trace-1',
     })
   })
 })

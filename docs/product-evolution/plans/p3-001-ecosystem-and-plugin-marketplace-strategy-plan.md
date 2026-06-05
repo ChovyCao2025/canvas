@@ -2,11 +2,11 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Define public plugin governance, SDKs, marketplace rules, and partner support after internal plugin foundations are stable.
+**Goal:** Build a Git-tracked evidence and governance package that decides whether public plugin marketplace work can graduate into child specs.
 
-**Architecture:** Implement the capability as a thin vertical slice: failing tests first, then backend/domain contracts, then frontend service and route integration, then rollout documentation. Keep scope bounded to the spec and use additive migrations or feature flags for risky changes.
+**Architecture:** Keep this P3 slice discovery-only: Markdown captures policy and decisions, JSON captures machine-checkable evidence, and a Node.js validator blocks unsupported promotion. No backend endpoint, frontend route, or Flyway migration is created because no runtime marketplace behavior ships in this slice.
 
-**Tech Stack:** Java 21, Spring Boot WebFlux style controllers currently returning Mono, MyBatis, Flyway, Redis/RocketMQ where needed, React 18, Vite, TypeScript, Ant Design, Vitest, JUnit 5, Mockito.
+**Tech Stack:** Markdown, JSON, Node.js 18 `node:test`, existing Git workflow.
 
 ---
 
@@ -17,130 +17,386 @@
 
 ## File Structure
 
-**Backend**
-- `backend/canvas-engine/src/main/java/org/chovy/canvas/domain/ecosystemandpluginmarketplacestrategy/EcosystemAndPluginMarketplaceStrategyService.java`
-- `backend/canvas-engine/src/main/java/org/chovy/canvas/web/EcosystemAndPluginMarketplaceStrategyController.java`
+**Discovery Package**
+- Create: `docs/product-evolution/discovery/p3-001-plugin-marketplace/README.md` - package overview, source links, rollout stance, and child-spec rules.
+- Create: `docs/product-evolution/discovery/p3-001-plugin-marketplace/evidence.json` - machine-readable capability evidence.
+- Create: `docs/product-evolution/discovery/p3-001-plugin-marketplace/governance-policy.md` - security, support, compatibility, and takedown policy.
+- Create: `docs/product-evolution/discovery/p3-001-plugin-marketplace/decision-log.md` - accepted, deferred, and rejected marketplace decisions.
 
-**Frontend**
-- `frontend/src/pages/ecosystem-and-plugin-marketplace-strategy/index.tsx`
-- `frontend/src/services/ecosystemandpluginmarketplacestrategyApi.ts`
+**Validation**
+- Create: `tools/strategy/plugin-marketplace-evidence.mjs` - validates the evidence package.
+- Create: `tools/strategy/plugin-marketplace-evidence.test.mjs` - validator tests.
 
-**Data And Config**
-- `backend/canvas-engine/src/main/resources/db/migration/V116__ecosystem_and_plugin_marketplace_strategy.sql`
+No migration is created. The data touchpoint is Git-tracked strategy evidence, not application state.
 
-**Tests**
-- `backend/canvas-engine/src/test/java/org/chovy/canvas/strategy/EcosystemAndPluginMarketplaceStrategyTest.java`
-- `frontend/src/pages/ecosystem-and-plugin-marketplace-strategy/ecosystem-and-plugin-marketplace-strategy.test.tsx`
-
-### Task 1: Contract And Failing Tests
+### Task 1: Validator Tests
 
 **Files:**
-- Create: `backend/canvas-engine/src/test/java/org/chovy/canvas/strategy/EcosystemAndPluginMarketplaceStrategyTest.java`
-- Create: `frontend/src/pages/ecosystem-and-plugin-marketplace-strategy/ecosystem-and-plugin-marketplace-strategy.test.tsx`
-- Read: `docs/product-evolution/specs/p3-001-ecosystem-and-plugin-marketplace-strategy.md`
+- Create: `tools/strategy/plugin-marketplace-evidence.test.mjs`
 
-- [ ] **Step 1: Write backend contract tests**
+- [ ] **Step 1: Write failing validator tests**
 
-Create `backend/canvas-engine/src/test/java/org/chovy/canvas/strategy/EcosystemAndPluginMarketplaceStrategyTest.java` with tests for authorization, tenant scoping, and the main success path named after `ecosystem-and-plugin-marketplace-strategy`. Use existing controller or service tests in `backend/canvas-engine/src/test/java/org/chovy/canvas` as style references.
+Create `tools/strategy/plugin-marketplace-evidence.test.mjs`:
 
-- [ ] **Step 2: Run backend contract tests and confirm red state**
+```js
+import assert from 'node:assert/strict'
+import { execFileSync } from 'node:child_process'
+import { mkdtempSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import path from 'node:path'
+import test from 'node:test'
 
-Run: `cd backend && mvn -pl canvas-engine test -Dtest=EcosystemAndPluginMarketplaceStrategyTest`
+const script = path.resolve('tools/strategy/plugin-marketplace-evidence.mjs')
+const evidence = path.resolve('docs/product-evolution/discovery/p3-001-plugin-marketplace/evidence.json')
 
-Expected: FAIL because the new route, service method, or behavior has not been implemented yet.
+function run(file) {
+  return execFileSync(process.execPath, [script, file], { encoding: 'utf8' })
+}
 
-- [ ] **Step 3: Write frontend workflow tests**
+test('validates the committed plugin marketplace evidence package', () => {
+  const output = JSON.parse(run(evidence))
 
-Create `frontend/src/pages/ecosystem-and-plugin-marketplace-strategy/ecosystem-and-plugin-marketplace-strategy.test.tsx` with Vitest coverage for loading, empty, success, permission, and server-error states for the first UI slice.
+  assert.equal(output.ok, true)
+  assert.deepEqual(output.candidateKeys, [
+    'plugin-submission',
+    'security-review',
+    'marketplace-publishing',
+    'sdk-compatibility',
+    'commercial-terms',
+    'partner-support',
+    'plugin-takedown'
+  ])
+})
 
-- [ ] **Step 4: Run frontend workflow tests and confirm red state**
+test('rejects accepted capabilities without child spec path', () => {
+  const dir = mkdtempSync(path.join(tmpdir(), 'plugin-marketplace-'))
+  const file = path.join(dir, 'evidence.json')
+  writeFileSync(file, JSON.stringify({
+    package: 'p3-001-plugin-marketplace',
+    rollout: { migration: 'none', runtimeChange: false },
+    candidates: [{
+      key: 'plugin-submission',
+      owner: 'Platform Product',
+      status: 'Accepted For Child Spec',
+      evidence: ['P2 plugin foundations define internal extension boundaries'],
+      proofCommand: 'node --test tools/strategy/plugin-marketplace-evidence.test.mjs',
+      launchGate: 'Security owner approves package review checklist',
+      rollback: 'Keep marketplace entry points disabled',
+      dependencies: ['P2-002 plugin foundations']
+    }]
+  }))
 
-Run: `cd frontend && npm test -- ecosystem-and-plugin-marketplace-strategy.test.tsx`
+  assert.throws(() => run(file), /childSpecPath is required/)
+})
+```
 
-Expected: FAIL because the new page, component, service call, or state handling does not exist yet.
+- [ ] **Step 2: Run tests and confirm red state**
 
-### Task 2: Backend And Data Slice
+Run:
+
+```bash
+node --test tools/strategy/plugin-marketplace-evidence.test.mjs
+```
+
+Expected: FAIL because `tools/strategy/plugin-marketplace-evidence.mjs` and the evidence package do not exist.
+
+### Task 2: Evidence Validator
 
 **Files:**
-- `backend/canvas-engine/src/main/java/org/chovy/canvas/domain/ecosystemandpluginmarketplacestrategy/EcosystemAndPluginMarketplaceStrategyService.java`
-- `backend/canvas-engine/src/main/java/org/chovy/canvas/web/EcosystemAndPluginMarketplaceStrategyController.java`
-- `backend/canvas-engine/src/main/resources/db/migration/V116__ecosystem_and_plugin_marketplace_strategy.sql`
-- Test: `backend/canvas-engine/src/test/java/org/chovy/canvas/strategy/EcosystemAndPluginMarketplaceStrategyTest.java`
+- Create: `tools/strategy/plugin-marketplace-evidence.mjs`
+- Test: `tools/strategy/plugin-marketplace-evidence.test.mjs`
 
-- [ ] **Step 1: Add additive data structures when the spec requires storage**
+- [ ] **Step 1: Create the validator script**
 
-If this plan has a Flyway file, create it exactly at the data path listed above. Use additive tables, indexes, and nullable columns so rollout can be disabled without rollback data loss.
+Create `tools/strategy/plugin-marketplace-evidence.mjs`:
 
-- [ ] **Step 2: Implement the domain service**
+```js
+import { readFileSync } from 'node:fs'
+import path from 'node:path'
 
-Implement the service behavior in the backend files listed above. Keep business rules in the domain service and keep controllers thin.
+const file = process.argv[2] || 'docs/product-evolution/discovery/p3-001-plugin-marketplace/evidence.json'
+const payload = JSON.parse(readFileSync(path.resolve(file), 'utf8'))
+const required = ['key', 'owner', 'status', 'evidence', 'proofCommand', 'launchGate', 'rollback', 'dependencies']
+const allowed = new Set(['Accepted For Child Spec', 'Needs Evidence', 'Deferred', 'Rejected'])
+const errors = []
 
-- [ ] **Step 3: Implement or extend the controller contract**
+if (payload.package !== 'p3-001-plugin-marketplace') {
+  errors.push('package must be p3-001-plugin-marketplace')
+}
+if (payload.rollout?.migration !== 'none') {
+  errors.push('rollout.migration must be none')
+}
+if (payload.rollout?.runtimeChange !== false) {
+  errors.push('rollout.runtimeChange must be false')
+}
+if (!Array.isArray(payload.candidates) || payload.candidates.length === 0) {
+  errors.push('candidates must be a non-empty array')
+}
 
-Expose only the endpoints needed by the first workflow. Return `R<T>` or existing project response types consistently with nearby controllers.
+for (const candidate of payload.candidates || []) {
+  for (const field of required) {
+    if (candidate[field] === undefined || candidate[field] === '' || (Array.isArray(candidate[field]) && candidate[field].length === 0)) {
+      errors.push(`${candidate.key || 'unknown'}: ${field} is required`)
+    }
+  }
+  if (!allowed.has(candidate.status)) {
+    errors.push(`${candidate.key}: unsupported status ${candidate.status}`)
+  }
+  if (candidate.status === 'Accepted For Child Spec' && !candidate.childSpecPath) {
+    errors.push(`${candidate.key}: childSpecPath is required for Accepted For Child Spec`)
+  }
+}
 
-- [ ] **Step 4: Run focused backend tests**
+if (errors.length > 0) {
+  console.error(errors.join('\n'))
+  process.exit(1)
+}
 
-Run: `cd backend && mvn -pl canvas-engine test -Dtest=EcosystemAndPluginMarketplaceStrategyTest`
+console.log(JSON.stringify({
+  ok: true,
+  package: payload.package,
+  candidateKeys: payload.candidates.map((candidate) => candidate.key)
+}, null, 2))
+```
 
-Expected: PASS for the new contract tests.
+- [ ] **Step 2: Run tests and confirm evidence still missing**
 
-### Task 3: Frontend Slice
+Run:
+
+```bash
+node --test tools/strategy/plugin-marketplace-evidence.test.mjs
+```
+
+Expected: FAIL because `docs/product-evolution/discovery/p3-001-plugin-marketplace/evidence.json` does not exist.
+
+### Task 3: Discovery Evidence Package
 
 **Files:**
-- `frontend/src/pages/ecosystem-and-plugin-marketplace-strategy/index.tsx`
-- `frontend/src/services/ecosystemandpluginmarketplacestrategyApi.ts`
-- Test: `frontend/src/pages/ecosystem-and-plugin-marketplace-strategy/ecosystem-and-plugin-marketplace-strategy.test.tsx`
+- Create: `docs/product-evolution/discovery/p3-001-plugin-marketplace/README.md`
+- Create: `docs/product-evolution/discovery/p3-001-plugin-marketplace/evidence.json`
+- Create: `docs/product-evolution/discovery/p3-001-plugin-marketplace/governance-policy.md`
+- Create: `docs/product-evolution/discovery/p3-001-plugin-marketplace/decision-log.md`
 
-- [ ] **Step 1: Add the typed API wrapper**
+- [ ] **Step 1: Create evidence JSON**
 
-Implement the API wrapper in the service file listed above. Reuse `frontend/src/services/api.ts` and return typed request and response objects.
+Create `docs/product-evolution/discovery/p3-001-plugin-marketplace/evidence.json`:
 
-- [ ] **Step 2: Add the route, page, panel, or component**
+```json
+{
+  "package": "p3-001-plugin-marketplace",
+  "rollout": {
+    "migration": "none",
+    "runtimeChange": false,
+    "reason": "This slice records marketplace evidence in Git and does not create runtime plugin marketplace state."
+  },
+  "candidates": [
+    {
+      "key": "plugin-submission",
+      "owner": "Platform Product",
+      "status": "Needs Evidence",
+      "evidence": ["Internal plugin foundations must prove packaging and install boundaries first."],
+      "proofCommand": "node --test tools/strategy/plugin-marketplace-evidence.test.mjs",
+      "launchGate": "Submission checklist approved by platform, security, and support owners.",
+      "rollback": "Do not expose public submission entry points.",
+      "dependencies": ["P2-002 plugin foundations"]
+    },
+    {
+      "key": "security-review",
+      "owner": "Security",
+      "status": "Needs Evidence",
+      "evidence": ["Review must cover package signing, permission boundaries, vulnerability response, and tenant isolation."],
+      "proofCommand": "node --test tools/strategy/plugin-marketplace-evidence.test.mjs",
+      "launchGate": "Security review checklist is approved and linked from a child spec.",
+      "rollback": "Block plugin publishing until manual review passes.",
+      "dependencies": ["P2-002 plugin foundations"]
+    },
+    {
+      "key": "marketplace-publishing",
+      "owner": "Platform Product",
+      "status": "Deferred",
+      "evidence": ["Publishing depends on submission, review, support, and commercial policy."],
+      "proofCommand": "node --test tools/strategy/plugin-marketplace-evidence.test.mjs",
+      "launchGate": "Publishing child spec names moderation and rollback controls.",
+      "rollback": "Hide marketplace catalog and keep internal plugin registry only.",
+      "dependencies": ["plugin-submission", "security-review", "partner-support"]
+    },
+    {
+      "key": "sdk-compatibility",
+      "owner": "Developer Experience",
+      "status": "Needs Evidence",
+      "evidence": ["SDK versioning must describe supported host APIs and deprecation windows."],
+      "proofCommand": "node --test tools/strategy/plugin-marketplace-evidence.test.mjs",
+      "launchGate": "SDK compatibility matrix is reviewed before public examples ship.",
+      "rollback": "Freeze public SDK claims and keep examples internal.",
+      "dependencies": ["P2-002 plugin foundations"]
+    },
+    {
+      "key": "commercial-terms",
+      "owner": "Business Operations",
+      "status": "Deferred",
+      "evidence": ["Marketplace pricing and rev-share require commercial and legal review."],
+      "proofCommand": "node --test tools/strategy/plugin-marketplace-evidence.test.mjs",
+      "launchGate": "Commercial owner approves terms and support cost model.",
+      "rollback": "Launch no paid marketplace offers.",
+      "dependencies": ["P3-004 commercial model and billing"]
+    },
+    {
+      "key": "partner-support",
+      "owner": "Customer Success",
+      "status": "Needs Evidence",
+      "evidence": ["Support must cover escalation, ownership, SLAs, and partner contact routing."],
+      "proofCommand": "node --test tools/strategy/plugin-marketplace-evidence.test.mjs",
+      "launchGate": "Support escalation runbook is accepted.",
+      "rollback": "Disable partner listing and route support to internal plugins only.",
+      "dependencies": ["plugin-submission"]
+    },
+    {
+      "key": "plugin-takedown",
+      "owner": "Security",
+      "status": "Needs Evidence",
+      "evidence": ["Takedown policy must cover abuse, vulnerabilities, tenant impact, and customer notice."],
+      "proofCommand": "node --test tools/strategy/plugin-marketplace-evidence.test.mjs",
+      "launchGate": "Takedown workflow has security and support approval.",
+      "rollback": "Remove marketplace listing and block installs for affected plugin key.",
+      "dependencies": ["security-review", "partner-support"]
+    }
+  ]
+}
+```
 
-Implement the first visible workflow in the frontend files listed above. Include loading, empty, error, permission, and success states.
+- [ ] **Step 2: Create package README**
 
-- [ ] **Step 3: Wire navigation only where needed**
+Create `docs/product-evolution/discovery/p3-001-plugin-marketplace/README.md`:
 
-Add navigation entry points only if the feature needs a top-level route. Prefer contextual entry points for editor, analytics, or settings capabilities.
+```markdown
+# P3-001 Plugin Marketplace Discovery
 
-- [ ] **Step 4: Run focused frontend tests**
+This package is a discovery and governance slice for public plugin marketplace strategy. It does not create application tables, routes, UI, payment behavior, plugin upload behavior, or publishing behavior.
 
-Run: `cd frontend && npm test -- ecosystem-and-plugin-marketplace-strategy.test.tsx`
+## Promotion Rule
 
-Expected: PASS for the new workflow tests.
+A capability can move to `Accepted For Child Spec` only when `evidence.json` includes an owner, evidence, proof command, launch gate, rollback path, dependencies, and a child spec path.
 
-### Task 4: Integration Verification And Rollout Notes
+## Verification
+
+Run:
+
+```bash
+node --test tools/strategy/plugin-marketplace-evidence.test.mjs
+node tools/strategy/plugin-marketplace-evidence.mjs
+```
+
+Expected: both commands pass and the validator prints candidate keys for all marketplace capabilities.
+```
+
+- [ ] **Step 3: Create governance policy**
+
+Create `docs/product-evolution/discovery/p3-001-plugin-marketplace/governance-policy.md`:
+
+```markdown
+# Plugin Marketplace Governance Policy
+
+## Required Gates
+
+- Security review covers signing, permissions, tenant isolation, dependency vulnerabilities, and takedown.
+- Developer experience review covers SDK versioning, sample plugin maintenance, and deprecation windows.
+- Support review covers partner contact, customer escalation, incident ownership, and support limits.
+- Commercial review covers paid listing eligibility, marketplace fees, and partner obligations.
+
+## No Runtime Rollout
+
+This P3 slice has no Flyway migration and no runtime route. Rollback is a documentation rollback: revert the discovery package commit or leave capabilities below `Accepted For Child Spec`.
+```
+
+- [ ] **Step 4: Create decision log**
+
+Create `docs/product-evolution/discovery/p3-001-plugin-marketplace/decision-log.md`:
+
+```markdown
+# Plugin Marketplace Decision Log
+
+| Capability | Status | Reason |
+| --- | --- | --- |
+| Plugin submission | Needs Evidence | Internal plugin foundations must prove packaging and install safety. |
+| Security review | Needs Evidence | Public plugins require signing, permission, and vulnerability policy. |
+| Marketplace publishing | Deferred | Publishing depends on submission, review, support, and commercial gates. |
+| SDK compatibility | Needs Evidence | Public SDK support windows are not yet committed. |
+| Commercial terms | Deferred | Marketplace terms belong after commercial billing gates. |
+| Partner support | Needs Evidence | Escalation and ownership are not yet approved. |
+| Plugin takedown | Needs Evidence | Abuse and vulnerability response needs security ownership. |
+```
+
+- [ ] **Step 5: Run validator tests**
+
+Run:
+
+```bash
+node --test tools/strategy/plugin-marketplace-evidence.test.mjs
+node tools/strategy/plugin-marketplace-evidence.mjs
+```
+
+Expected: PASS, and the validator prints all seven candidate keys.
+
+### Task 4: Rollout Notes And Commit
 
 **Files:**
 - Modify: `docs/product-evolution/specs/p3-001-ecosystem-and-plugin-marketplace-strategy.md`
 - Modify: `docs/product-evolution/plans/p3-001-ecosystem-and-plugin-marketplace-strategy-plan.md`
-- Read: `docs/product-evolution/todo/INDEX.md`
 
-- [ ] **Step 1: Run backend regression slice**
+- [ ] **Step 1: Confirm no migration references remain**
 
-Run: `cd backend && mvn -pl canvas-engine test`
+Run:
 
-Expected: PASS for the canvas-engine module test suite.
+```bash
+pattern="$(node -e "console.log('db/' + 'migration|__' + '[a-z0-9_]+' + '[.]sql')")"
+rg -n "$pattern" docs/product-evolution/specs/p3-001-ecosystem-and-plugin-marketplace-strategy.md docs/product-evolution/plans/p3-001-ecosystem-and-plugin-marketplace-strategy-plan.md
+```
 
-- [ ] **Step 2: Run frontend regression slice**
+Expected: no output.
 
-Run: `cd frontend && npm test -- --run`
+- [ ] **Step 2: Scan for implementation-deferral wording**
 
-Expected: PASS for the Vitest suite.
+Run:
 
-- [ ] **Step 3: Run frontend build**
+```bash
+node - <<'EOF'
+const fs = require('node:fs')
+const files = [
+  'docs/product-evolution/specs/p3-001-ecosystem-and-plugin-marketplace-strategy.md',
+  'docs/product-evolution/plans/p3-001-ecosystem-and-plugin-marketplace-strategy-plan.md',
+]
+const blocked = [
+  'T' + 'BD',
+  'T' + 'ODO',
+  'use existing tests as style reference' + 's',
+  'first UI slic' + 'e',
+  'implement the service behavio' + 'r',
+  'add ' + 'the route, page, panel, or componen' + 't',
+  'when the spec require' + 's',
+]
+let found = false
+for (const file of files) {
+  const text = fs.readFileSync(file, 'utf8')
+  for (const phrase of blocked) {
+    if (text.includes(phrase)) {
+      console.error(`${file}: forbidden phrase ${phrase}`)
+      found = true
+    }
+  }
+}
+if (found) process.exit(1)
+EOF
+```
 
-Run: `cd frontend && npm run build`
+Expected: no output.
 
-Expected: PASS with TypeScript and Vite build success.
+- [ ] **Step 3: Commit the discovery slice**
 
-- [ ] **Step 4: Add rollout notes to the implementation PR**
+Run:
 
-Document feature flag or route guard, migration order, tenant and role impact, manual verification steps, and rollback command or disable switch.
+```bash
+git add docs/product-evolution/discovery/p3-001-plugin-marketplace tools/strategy/plugin-marketplace-evidence.mjs tools/strategy/plugin-marketplace-evidence.test.mjs docs/product-evolution/specs/p3-001-ecosystem-and-plugin-marketplace-strategy.md docs/product-evolution/plans/p3-001-ecosystem-and-plugin-marketplace-strategy-plan.md
+git commit -m "docs: add plugin marketplace evidence gates"
+```
 
-- [ ] **Step 5: Commit the implementation slice**
-
-Run: `git add backend/canvas-engine/src frontend/src docs/product-evolution/specs docs/product-evolution/plans && git commit -m "feat: implement ecosystem-and-plugin-marketplace-strategy slice"`
-
-Expected: commit contains only files required by this plan.
+Expected: commit contains only the P3-001 discovery package, validator, test, spec, and plan.

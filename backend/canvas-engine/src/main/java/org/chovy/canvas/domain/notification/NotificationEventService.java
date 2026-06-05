@@ -137,6 +137,93 @@ public class NotificationEventService {
         }
     }
 
+    public void failedExecutionSpike(Long tenantId, long failedCount, String window) {
+        runtimeAlert(
+                tenantId,
+                "RUNTIME_FAILED_EXECUTION_SPIKE",
+                "ERROR",
+                "执行失败率异常",
+                "最近 " + defaultIfBlank(window, "unknown") + " 失败执行数=" + failedCount,
+                "runtime:failed-execution-spike:" + tenantId + ":" + defaultIfBlank(window, "unknown"));
+    }
+
+    public void dlqGrowth(String queue, long count) {
+        runtimeAlert(
+                null,
+                "RUNTIME_DLQ_GROWTH",
+                "WARNING",
+                "DLQ 积压增长",
+                "队列 " + defaultIfBlank(queue, "unknown") + " 待处理数量=" + count,
+                "runtime:dlq-growth:" + defaultIfBlank(queue, "unknown"));
+    }
+
+    public void deliveryOutboxDeadRows(long count) {
+        runtimeAlert(
+                null,
+                "RUNTIME_DELIVERY_OUTBOX_DEAD_ROWS",
+                "ERROR",
+                "投递 outbox 存在死信",
+                "投递 outbox DEAD 数量=" + count,
+                "runtime:delivery-outbox-dead");
+    }
+
+    public void traceBufferOverflow(long droppedCount) {
+        runtimeAlert(
+                null,
+                "RUNTIME_TRACE_BUFFER_OVERFLOW",
+                "WARNING",
+                "执行 trace buffer 溢出",
+                "trace dropped 数量=" + droppedCount,
+                "runtime:trace-buffer-overflow");
+    }
+
+    public void emergencyActionCompleted(String action, Long canvasId, String operator, String reason) {
+        for (String recipient : adminsOrDefault()) {
+            String actionUrl = canvasUrl(canvasId);
+            createBestEffort(NotificationCreateCommand.builder()
+                    .userId(recipient)
+                    .category("CHANGE")
+                    .severity("WARNING")
+                    .type("OPS_EMERGENCY_ACTION_COMPLETED")
+                    .title("运维应急动作已执行")
+                    .content("action=" + defaultIfBlank(action, "UNKNOWN")
+                            + ", operator=" + defaultIfBlank(operator, "system")
+                            + ", reason=" + defaultIfBlank(reason, "未填写"))
+                    .targetUrl(actionUrl)
+                    .actionLabel("查看画布")
+                    .actionUrl(actionUrl)
+                    .bizType("CANVAS")
+                    .bizId(canvasId == null ? null : String.valueOf(canvasId))
+                    .dedupKey("ops:emergency:" + action + ":" + canvasId + ":" + System.currentTimeMillis())
+                    .build());
+        }
+    }
+
+    private void runtimeAlert(Long tenantId,
+                              String type,
+                              String severity,
+                              String title,
+                              String content,
+                              String dedupKey) {
+        for (String recipient : adminsOrDefault()) {
+            createBestEffort(NotificationCreateCommand.builder()
+                    .tenantId(tenantId)
+                    .userId(recipient)
+                    .category("ALERT")
+                    .severity(severity)
+                    .type(type)
+                    .title(title)
+                    .content(content)
+                    .targetUrl("/ops/runtime")
+                    .actionLabel("查看运行状态")
+                    .actionUrl("/ops/runtime")
+                    .bizType("RUNTIME")
+                    .bizId(tenantId == null ? null : String.valueOf(tenantId))
+                    .dedupKey(dedupKey)
+                    .build());
+        }
+    }
+
     /** 封装通知创建的容错逻辑，避免通知失败影响主业务流程。 */
     private void createBestEffort(NotificationCreateCommand command) {
         try {

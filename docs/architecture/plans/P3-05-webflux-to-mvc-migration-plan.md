@@ -2,11 +2,11 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Make and prepare the WebFlux versus MVC architecture decision with evidence.
+**Goal:** Make the WebFlux versus MVC architecture decision with measured evidence before any endpoint migration starts.
 
-**Architecture:** Use measurement and dependency inventory before changing runtime architecture. If migration is selected, move endpoint groups incrementally with compatibility and rollback.
+**Architecture:** Treat runtime migration as a gated decision. Inventory reactive/blocking boundaries, capture baseline performance and transaction behavior, write an ADR comparing hardening, MVC migration, and hybrid containment, then define the first endpoint migration only if the gates pass.
 
-**Tech Stack:** Spring Boot 3.2, WebFlux, Spring MVC, Reactor, MyBatis-Plus, JUnit 5, benchmark scripts.
+**Tech Stack:** Spring Boot 3.2, WebFlux, Spring MVC, Reactor, MyBatis-Plus, JUnit 5, Maven, Markdown ADRs.
 
 ---
 
@@ -18,48 +18,74 @@
 
 ## File Structure
 
-- Create: `docs/architecture/adr/webflux-vs-mvc.md`
+- Create: `docs/architecture/evidence/p3-05-webflux-mvc.md`
 - Create: `docs/architecture/webflux-mvc-migration-inventory.md`
-- Test: focused controller and transaction tests before endpoint migration
+- Create: `docs/architecture/adr/webflux-vs-mvc.md`
+- Create: `docs/architecture/webflux-mvc-first-slice.md`
+- Read: `backend/canvas-engine/src/main/java/org/chovy/canvas/web/`
+- Read: `backend/canvas-engine/src/main/java/org/chovy/canvas/engine/`
+- Read: `backend/canvas-engine/src/test/java/org/chovy/canvas/`
 
 ### Task 1: Build The Runtime Inventory
 
-- [ ] **Step 1: Inventory reactive and blocking usage**
+**Files:**
+- Create: `docs/architecture/webflux-mvc-migration-inventory.md`
+- Create: `docs/architecture/evidence/p3-05-webflux-mvc.md`
+- Read: `backend/canvas-engine/src/main/java/org/chovy/canvas/`
 
-Run `rg -n "\\.block\\(|\\.subscribe\\(|Thread\\.sleep\\(|@Transactional|Mono<|Flux<" backend/canvas-engine/src/main/java`.
+- [x] Inventory `Mono`, `Flux`, `.block()`, `.subscribe()`, `Thread.sleep`, `@Transactional`, Redis, RocketMQ, and MyBatis usage.
+- [x] Group endpoints by controller, blocking dependency, transaction need, streaming/reactive benefit, and migration risk.
+- [x] Record which P0 reactive hazards must be closed before a runtime decision is valid.
 
-- [ ] **Step 2: Create the inventory**
+Run:
 
-Write `docs/architecture/webflux-mvc-migration-inventory.md` with endpoint group, blocking dependencies, transaction needs, and risk.
+```bash
+rg -n "\\.block\\(|\\.subscribe\\(|Thread\\.sleep\\(|@Transactional|Mono<|Flux<|Redis|RocketMQ|MyBatis" backend/canvas-engine/src/main/java/org/chovy/canvas > /tmp/webflux_mvc_inventory.txt
+test -s /tmp/webflux_mvc_inventory.txt
+test -f docs/architecture/webflux-mvc-migration-inventory.md
+rg -n "Controller|blocking dependency|transaction|streaming|migration risk|P0 reactive" docs/architecture/webflux-mvc-migration-inventory.md
+```
 
-- [ ] **Step 3: Verify coverage**
-
-Run `rg -n "Controller|block|transaction|Redis|RocketMQ|MyBatis" docs/architecture/webflux-mvc-migration-inventory.md`. Expected: all categories appear.
+Expected: inventory names controller groups, blocking dependencies, transaction needs, reactive value, migration risk, and P0 prerequisites.
 
 ### Task 2: Write The Architecture Decision
 
-- [ ] **Step 1: Compare options**
+**Files:**
+- Create: `docs/architecture/adr/webflux-vs-mvc.md`
+- Modify: `docs/architecture/evidence/p3-05-webflux-mvc.md`
+- Read: `docs/architecture/webflux-mvc-migration-inventory.md`
 
-Document WebFlux hardening, MVC migration, and hybrid containment in `docs/architecture/adr/webflux-vs-mvc.md`.
+- [x] Compare WebFlux hardening, MVC migration, and hybrid containment.
+- [x] Add benchmark, team-readiness, transaction-safety, rollback, and compatibility gates.
+- [x] Record the decision as `Accepted`, `Deferred`, or `Rejected` with a named owner and revisit trigger.
 
-- [ ] **Step 2: Add acceptance gates**
+Run:
 
-Add benchmark, test, rollback, and team-readiness gates to the ADR.
+```bash
+test -f docs/architecture/adr/webflux-vs-mvc.md
+rg -n "Decision|Options|Benchmark|Team readiness|Transaction safety|Rollback|Compatibility|Revisit" docs/architecture/adr/webflux-vs-mvc.md
+```
 
-- [ ] **Step 3: Verify ADR completeness**
+Expected: ADR contains the required decision sections and does not approve runtime migration without gates.
 
-Run `rg -n "Decision|Options|Benchmark|Rollback|Team" docs/architecture/adr/webflux-vs-mvc.md`. Expected: all sections exist.
+### Task 3: Prepare The First Migration Slice Only If Approved
 
-### Task 3: Prepare Incremental Migration If Approved
+**Files:**
+- Create: `docs/architecture/webflux-mvc-first-slice.md`
+- Modify: `docs/architecture/evidence/p3-05-webflux-mvc.md`
+- Modify: `docs/architecture/plans/P3-05-webflux-to-mvc-migration-plan.md`
 
-- [ ] **Step 1: Choose first endpoint group**
+- [x] Select the lowest-risk endpoint group from the inventory or explicitly defer selection.
+- [x] Define characterization tests for request, response, error, auth, transaction, and actuator behavior.
+- [x] Define rollback steps and compatibility window for the selected slice.
 
-Select the lowest-risk endpoint group from the inventory.
+Run:
 
-- [ ] **Step 2: Add characterization tests**
+```bash
+test -f docs/architecture/webflux-mvc-first-slice.md
+rg -n "endpoint group|request|response|error|auth|transaction|actuator|rollback|compatibility window|deferred" docs/architecture/webflux-mvc-first-slice.md
+git diff -- docs/architecture/evidence/p3-05-webflux-mvc.md docs/architecture/webflux-mvc-migration-inventory.md docs/architecture/adr/webflux-vs-mvc.md docs/architecture/webflux-mvc-first-slice.md docs/architecture/plans/P3-05-webflux-to-mvc-migration-plan.md
+# Do not stage or commit in this session unless the user explicitly asks.
+```
 
-Add tests for current request, response, error, auth, and transaction behavior.
-
-- [ ] **Step 3: Review diff**
-
-Run `git diff -- .`. Expected: migration preparation is isolated to the selected endpoint group and docs.
+Expected: documentation diff contains only WebFlux/MVC evidence, inventory, ADR, first-slice document, and plan changes; no files are staged or committed.

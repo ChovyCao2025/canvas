@@ -18,6 +18,10 @@ public class CanvasExecutionDO {
     @TableId
     private String id;
 
+    /** 所属租户 ID */
+    @TableField("tenant_id")
+    private Long tenantId;
+
     /** 所属画布 ID */
     private Long canvasId;
 

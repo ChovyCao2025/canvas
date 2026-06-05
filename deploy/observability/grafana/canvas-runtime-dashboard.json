@@ -1,0 +1,259 @@
+{
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": {
+          "type": "grafana",
+          "uid": "-- Grafana --"
+        },
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
+      }
+    ]
+  },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 0,
+  "panels": [
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS_PROMETHEUS}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 0
+      },
+      "id": 1,
+      "targets": [
+        {
+          "expr": "sum(rate(canvas_runtime_execution_failures_total[5m]))",
+          "legendFormat": "execution failures/sec",
+          "refId": "A"
+        },
+        {
+          "expr": "sum(rate(canvas_execution_total{status=\"FAILED\"}[5m]))",
+          "legendFormat": "failed executions/sec",
+          "refId": "B"
+        }
+      ],
+      "title": "Execution Failure Rate",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS_PROMETHEUS}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 0
+      },
+      "id": 2,
+      "targets": [
+        {
+          "expr": "canvas_runtime_dlq_backlog",
+          "legendFormat": "runtime dlq backlog",
+          "refId": "A"
+        },
+        {
+          "expr": "sum(rate(canvas_dlq_size_total[5m]))",
+          "legendFormat": "dlq writes/sec",
+          "refId": "B"
+        }
+      ],
+      "title": "DLQ Backlog",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS_PROMETHEUS}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 8
+      },
+      "id": 3,
+      "targets": [
+        {
+          "expr": "max by (lane) (canvas_runtime_lane_pressure)",
+          "legendFormat": "{{lane}}",
+          "refId": "A"
+        },
+        {
+          "expr": "canvas_runtime_disruptor_pressure",
+          "legendFormat": "disruptor",
+          "refId": "B"
+        }
+      ],
+      "title": "Lane And Disruptor Pressure",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS_PROMETHEUS}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 8
+      },
+      "id": 4,
+      "targets": [
+        {
+          "expr": "increase(canvas_runtime_route_rebuild_failures_total[15m])",
+          "legendFormat": "route rebuild failures",
+          "refId": "A"
+        },
+        {
+          "expr": "increase(canvas_runtime_cache_invalidation_failures_total[15m])",
+          "legendFormat": "cache invalidation failures",
+          "refId": "B"
+        }
+      ],
+      "title": "Runtime Operation Failures",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS_PROMETHEUS}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 16
+      },
+      "id": 5,
+      "targets": [
+        {
+          "expr": "canvas_runtime_redis_available",
+          "legendFormat": "redis",
+          "refId": "A"
+        },
+        {
+          "expr": "canvas_runtime_mq_available",
+          "legendFormat": "mq",
+          "refId": "B"
+        }
+      ],
+      "title": "Redis And MQ Availability",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS_PROMETHEUS}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 16
+      },
+      "id": 6,
+      "targets": [
+        {
+          "expr": "max(hikaricp_connections_active / clamp_min(hikaricp_connections_max, 1))",
+          "legendFormat": "hikari active/max",
+          "refId": "A"
+        },
+        {
+          "expr": "increase(canvas_runtime_shutdown_drain_timeout_total[30m])",
+          "legendFormat": "shutdown drain timeout",
+          "refId": "B"
+        }
+      ],
+      "title": "Database Pool And Shutdown Drain",
+      "type": "timeseries"
+    }
+  ],
+  "refresh": "30s",
+  "schemaVersion": 39,
+  "tags": [
+    "canvas",
+    "runtime",
+    "ops"
+  ],
+  "templating": {
+    "list": [
+      {
+        "current": {
+          "selected": false,
+          "text": "Prometheus",
+          "value": "Prometheus"
+        },
+        "hide": 0,
+        "includeAll": false,
+        "label": "Prometheus",
+        "multi": false,
+        "name": "DS_PROMETHEUS",
+        "options": [],
+        "query": "prometheus",
+        "refresh": 1,
+        "regex": "",
+        "type": "datasource"
+      }
+    ]
+  },
+  "time": {
+    "from": "now-6h",
+    "to": "now"
+  },
+  "timepicker": {},
+  "timezone": "",
+  "title": "Canvas Runtime Operations",
+  "uid": "canvas-runtime-ops",
+  "version": 1,
+  "weekStart": ""
+}

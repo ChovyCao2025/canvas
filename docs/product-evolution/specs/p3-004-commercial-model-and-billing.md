@@ -7,69 +7,72 @@ Implementation plan: `../plans/p3-004-commercial-model-and-billing-plan.md`
 
 ## Goal
 
-Define usage metering, tiers, outcome pricing, overage billing, payment, invoices, renewal, and upgrade recommendations.
+Define the evidence, governance, and child-spec gates for billable metrics, plan tiers, overage policy, payment, invoices, renewals, and upgrade recommendations before billing infrastructure is built.
 
 ## User And Business Value
 
-This keeps the strategy actionable by requiring discovery gates, MVP scope, and measurable exit criteria before engineering scale-up.
+This lets the business evaluate monetization options without adding premature billing tables, customer-facing invoices, or payment workflows before finance, legal, product, and engineering owners agree on the first billable slice.
 
 ## In Scope
 
-- First billable metric and plan matrix.
-- Billing usage ledger and invoice draft.
-- Upgrade and overage policy.
-- Finance and legal gate.
+- Commercial metric inventory for executions, contacts, messages, seats, storage, AI usage, and premium connectors.
+- Billing governance policy for finance approval, legal review, invoice accuracy, entitlement boundaries, tenant isolation, and rollback.
+- Evidence scoring for metric measurability, customer value, implementation dependency, support burden, and launch readiness.
+- Decision log for billing capabilities that may graduate into child specs.
 
 ## Out Of Scope
 
-- Immediate full-scale implementation.
-- Commercial, legal, or architecture commitments without named owner and evidence.
+- Implementing metering ledgers, entitlement enforcement, payment provider integration, invoice generation, renewal automation, or upgrade UI.
+- Charging customers or changing production plan access.
+- Flyway schema changes.
 
 ## Functional Requirements
 
-1. The feature must expose the smallest useful operator or platform workflow described in the source item.
-2. The implementation must preserve tenant isolation, authorization, auditability, and rollback behavior for every new read or write path.
-3. New UI must use existing React, Ant Design, router, service, and test patterns unless a child spec justifies a new pattern.
-4. New backend behavior must use the existing Spring Boot, MyBatis, Flyway, controller, domain service, and test patterns.
-5. The implementation must include focused automated tests before code changes and a manual verification checklist for the core workflow.
+1. The billing strategy package must record each commercial capability with owner, metric definition, source-of-truth evidence, finance gate, legal gate, support gate, proof command, rollback path, decision status, and child spec path.
+2. No capability can be marked `Accepted For Child Spec` unless finance and legal gates are present and the source metric can be measured by existing or explicitly planned instrumentation.
+3. The package must distinguish discovery metrics from billable commitments and must not imply active charging.
+4. The validator must fail on missing owner, metric definition, source evidence, approval gate, rollback path, proof command, or child spec path for accepted capabilities.
+5. Rollout notes must confirm that this slice creates documentation and validation tooling only.
 
 ## Technical Scope
 
-### Backend Touchpoints
+### Documentation Touchpoints
 
-- `backend/canvas-engine/src/main/java/org/chovy/canvas/domain`
-- `backend/canvas-engine/src/main/java/org/chovy/canvas/web`
+- `docs/product-evolution/discovery/p3-004-commercial-billing/README.md`
+- `docs/product-evolution/discovery/p3-004-commercial-billing/evidence.json`
+- `docs/product-evolution/discovery/p3-004-commercial-billing/governance-policy.md`
+- `docs/product-evolution/discovery/p3-004-commercial-billing/decision-log.md`
 
-### Frontend Touchpoints
+### Tooling Touchpoints
 
-- `frontend/src/pages`
-- `frontend/src/services`
+- `tools/strategy/commercial-billing-evidence.mjs`
+- `tools/strategy/commercial-billing-evidence.test.mjs`
 
 ### Data And Configuration Touchpoints
 
-- `backend/canvas-engine/src/main/resources/db/migration/V119__commercial_model_and_billing.sql`
+- No Flyway migration is part of this slice. Billing data models, ledgers, entitlements, and invoice tables require a later child spec after finance/legal gates and metric evidence are accepted.
 
 ### Test Touchpoints
 
-- `backend/canvas-engine/src/test/java/org/chovy/canvas/strategy/CommercialModelAndBillingTest.java`
-- `frontend/src/pages/commercial-model-and-billing/commercial-model-and-billing.test.tsx`
+- `tools/strategy/commercial-billing-evidence.test.mjs`
 
 ## Dependencies
 
-- Requires explicit business or architecture owner.
-- Requires discovery evidence before build-out.
+- Product usage analytics and channel/message instrumentation should inform measurable usage candidates.
+- Finance and legal owners must approve billing gates before any child spec designs customer-impacting behavior.
+- Security and tenant isolation constraints must be named before entitlement or invoice data models are proposed.
 
 ## Risks And Controls
 
-- Scope creep: keep the first implementation to the workflow in this spec and move broader ideas to a follow-up spec.
-- Tenant or permission regression: add backend tests for tenant-scoped data and role checks before exposing UI.
-- UI complexity: use one page or one panel first, then expand only after the workflow is verified.
-- Data migration risk: make every migration additive and reversible by disabling the new route or feature flag.
+- Premature charging risk: keep this slice discovery-only and require finance/legal gates for accepted child specs.
+- Metric accuracy risk: require source-of-truth evidence and proof commands before selecting a billable metric.
+- Customer trust risk: require rollback and support gates before any billing workflow is designed.
+- Scope creep: separate metering, entitlement, invoice, payment, renewal, and upgrade implementation into child specs.
 
 ## Acceptance Criteria
 
-- The source item has a visible implemented workflow or a documented discovery exit if this is a P3 strategy item.
-- All changed backend endpoints reject unauthorized access and preserve tenant scoping.
-- All changed frontend routes handle loading, empty, error, and permission states.
-- Tests named in the plan pass in the local commands for backend and frontend slices.
-- The implementation includes rollout notes covering feature flag, migration, and rollback behavior.
+- The evidence validator tests pass and reject accepted billing capabilities missing metric, owner, gates, proof command, rollback, or child spec path.
+- The evidence package covers billable metrics, tiers, overage, payment, invoices, renewal, and upgrade recommendations.
+- The decision log keeps unproven commercial ideas out of implementation.
+- Rollout notes state no migration, no charging behavior, no entitlement change, no invoice generation, and no customer-facing UI.
+- The plan includes scoped `git add` and commit commands limited to the discovery docs, validator, and this spec/plan pair.

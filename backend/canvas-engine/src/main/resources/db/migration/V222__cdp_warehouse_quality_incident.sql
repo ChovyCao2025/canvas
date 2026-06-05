@@ -1,0 +1,23 @@
+CREATE TABLE IF NOT EXISTS cdp_warehouse_incident (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    tenant_id BIGINT NOT NULL DEFAULT 0,
+    incident_key VARCHAR(128) NOT NULL,
+    source_type VARCHAR(64) NOT NULL,
+    source_id BIGINT DEFAULT NULL,
+    severity VARCHAR(32) NOT NULL,
+    status VARCHAR(32) NOT NULL DEFAULT 'OPEN',
+    title VARCHAR(256) NOT NULL,
+    description VARCHAR(1000) DEFAULT NULL,
+    occurrence_count BIGINT NOT NULL DEFAULT 1,
+    first_seen_at DATETIME NOT NULL,
+    last_seen_at DATETIME NOT NULL,
+    acknowledged_by VARCHAR(128) DEFAULT NULL,
+    acknowledged_at DATETIME DEFAULT NULL,
+    resolved_by VARCHAR(128) DEFAULT NULL,
+    resolved_at DATETIME DEFAULT NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY uk_cdp_warehouse_incident_key (tenant_id, incident_key),
+    INDEX idx_cdp_warehouse_incident_status (tenant_id, status, last_seen_at),
+    INDEX idx_cdp_warehouse_incident_severity (tenant_id, severity, status)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='CDP warehouse quality incident lifecycle';

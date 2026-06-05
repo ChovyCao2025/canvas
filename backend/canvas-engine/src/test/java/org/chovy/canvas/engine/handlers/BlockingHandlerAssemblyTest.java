@@ -3,9 +3,8 @@ package org.chovy.canvas.engine.handlers;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.chovy.canvas.common.MapFieldKeys;
 import org.chovy.canvas.dal.dataobject.CustomerPointsLedgerDO;
-import org.chovy.canvas.dal.mapper.CanvasMapper;
-import org.chovy.canvas.dal.mapper.CanvasVersionMapper;
-import org.chovy.canvas.dal.mapper.CustomerPointsLedgerMapper;
+import org.chovy.canvas.domain.canvas.SubFlowLookupService;
+import org.chovy.canvas.domain.cdp.CustomerPointsLedgerService;
 import org.chovy.canvas.engine.context.ExecutionContext;
 import org.chovy.canvas.engine.handler.NodeResult;
 import org.chovy.canvas.engine.scheduler.DagEngine;
@@ -26,26 +25,26 @@ import static org.mockito.Mockito.verifyNoInteractions;
 class BlockingHandlerAssemblyTest {
 
     @Test
-    void pointsOperationDoesNotTouchMapperBeforeSubscription() {
-        CustomerPointsLedgerMapper mapper = mock(CustomerPointsLedgerMapper.class);
+    void pointsOperationDoesNotTouchLedgerServiceBeforeSubscription() {
+        CustomerPointsLedgerService ledgerService = mock(CustomerPointsLedgerService.class);
         doAnswer(invocation -> {
             invocation.getArgument(0, CustomerPointsLedgerDO.class).setId(1L);
             return 1;
-        }).when(mapper).insert(any(CustomerPointsLedgerDO.class));
-        PointsOperationHandler handler = new PointsOperationHandler(mapper);
+        }).when(ledgerService).insert(any(CustomerPointsLedgerDO.class));
+        PointsOperationHandler handler = new PointsOperationHandler(ledgerService);
 
         Mono<NodeResult> result = handler.executeAsync(Map.of("points", 10), ctx());
 
         assertThat(result).isNotNull();
-        verifyNoInteractions(mapper);
+        verifyNoInteractions(ledgerService);
     }
 
     @Test
     void pointsOperationDuplicateInsertIsIdempotent() {
-        CustomerPointsLedgerMapper mapper = mock(CustomerPointsLedgerMapper.class);
+        CustomerPointsLedgerService ledgerService = mock(CustomerPointsLedgerService.class);
         doThrow(new DuplicateKeyException("duplicate"))
-                .when(mapper).insert(any(CustomerPointsLedgerDO.class));
-        PointsOperationHandler handler = new PointsOperationHandler(mapper);
+                .when(ledgerService).insert(any(CustomerPointsLedgerDO.class));
+        PointsOperationHandler handler = new PointsOperationHandler(ledgerService);
 
         NodeResult result = handler.executeAsync(Map.of("points", 10, MapFieldKeys.NEXT_NODE_ID, "next"), ctx()).block();
 
@@ -56,10 +55,9 @@ class BlockingHandlerAssemblyTest {
 
     @Test
     void subFlowRefDoesNotLoadCanvasBeforeSubscription() {
-        CanvasMapper canvasMapper = mock(CanvasMapper.class);
+        SubFlowLookupService lookupService = mock(SubFlowLookupService.class);
         SubFlowRefHandler handler = new SubFlowRefHandler(
-                canvasMapper,
-                mock(CanvasVersionMapper.class),
+                lookupService,
                 mock(CanvasConfigCache.class),
                 mock(DagEngine.class),
                 new ObjectMapper());
@@ -67,7 +65,7 @@ class BlockingHandlerAssemblyTest {
         Mono<NodeResult> result = handler.executeAsync(Map.of("subFlowId", 20L), ctx());
 
         assertThat(result).isNotNull();
-        verifyNoInteractions(canvasMapper);
+        verifyNoInteractions(lookupService);
     }
 
     private static ExecutionContext ctx() {

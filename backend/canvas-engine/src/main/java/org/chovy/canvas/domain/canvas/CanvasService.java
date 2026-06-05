@@ -6,9 +6,12 @@ import org.chovy.canvas.common.enums.NodeType;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import org.chovy.canvas.common.PageResult;
+import org.chovy.canvas.common.tenant.TenantContext;
+import org.chovy.canvas.common.tenant.TenantScopeSupport;
 import org.chovy.canvas.common.enums.CanvasStatusEnum;
 import org.chovy.canvas.common.enums.VersionStatus;
 import org.chovy.canvas.dto.*;
+import org.chovy.canvas.engine.audience.AudienceSnapshotService;
 import org.chovy.canvas.engine.dag.DagGraph;
 import org.chovy.canvas.engine.dag.DagParser;
 import org.chovy.canvas.engine.handlers.GroovyHandler;
@@ -17,15 +20,21 @@ import org.chovy.canvas.engine.trigger.CanvasSchedulerService;
 import org.chovy.canvas.engine.trigger.CanvasExecutionService;
 import org.chovy.canvas.engine.trigger.TriggerPreCheckService;
 import org.chovy.canvas.infrastructure.cache.CanvasConfigCache;
+import org.chovy.canvas.infrastructure.concurrent.ManagedVirtualThreadExecutor;
 import org.chovy.canvas.infrastructure.redis.TriggerRouteService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.Set;
 import org.springframework.data.redis.core.script.RedisScript;
 import org.chovy.canvas.dal.dataobject.CanvasDO;
 import org.chovy.canvas.dal.mapper.CanvasMapper;
@@ -74,8 +83,30 @@ public class CanvasService {
     private final org.springframework.data.redis.core.StringRedisTemplate redis;
     /** 画布事务服务，封装只涉及数据库写入的事务边界。 */
     private final CanvasTransactionService canvasTransactionService;
+    /** 发布时人群快照绑定服务；保持非构造注入以兼容现有单元测试构造器。 */
+    private AudienceSnapshotService audienceSnapshotService;
+    /** 画布状态策略，集中约束生命周期和编辑边界。 */
+    private CanvasStateTransitionPolicy stateTransitionPolicy = new CanvasStateTransitionPolicy();
     /** 示例画布配置属性，控制示例数据展示和过滤。 */
     private final CanvasExamplesProperties examplesProperties;
+    /** 租户查询过滤工具；保持非构造注入以兼容现有单元测试构造器。 */
+    private TenantScopeSupport tenantScopeSupport = new TenantScopeSupport();
+    private ManagedVirtualThreadExecutor backgroundExecutor = ManagedVirtualThreadExecutor.direct();
+
+    @Autowired(required = false)
+    void setBackgroundExecutor(ManagedVirtualThreadExecutor backgroundExecutor) {
+        this.backgroundExecutor = backgroundExecutor;
+    }
+
+    @Autowired(required = false)
+    void setStateTransitionPolicy(CanvasStateTransitionPolicy stateTransitionPolicy) {
+        this.stateTransitionPolicy = stateTransitionPolicy;
+    }
+
+    @Autowired(required = false)
+    void setAudienceSnapshotService(AudienceSnapshotService audienceSnapshotService) {
+        this.audienceSnapshotService = audienceSnapshotService;
+    }
 
     /**
      * 创建画布
@@ -89,12 +120,18 @@ public class CanvasService {
         canvas.setName(req.getName());
         canvas.setDescription(req.getDescription());
         canvas.setStatus(CanvasStatusEnum.DRAFT.getCode());
+        canvas.setTenantId(req.getTenantId());
+        canvas.setProjectKey(req.getProjectKey());
+        canvas.setProjectName(req.getProjectName());
+        canvas.setFolderKey(req.getFolderKey());
+        canvas.setFolderName(req.getFolderName());
         canvasMapper.insert(canvas);
 
         // 若带初始 JSON，创建第一个草稿版本
         if (StrUtil.isNotBlank(req.getGraphJson())) {
             CanvasVersionDO v = new CanvasVersionDO();
             v.setCanvasId(canvas.getId());
+            v.setTenantId(canvas.getTenantId());
             v.setVersion(1);
             v.setGraphJson(req.getGraphJson());
             v.setStatus(VersionStatus.DRAFT.getCode());
@@ -123,6 +160,26 @@ public class CanvasService {
         return dto;
     }
 
+    /** 读取画布并校验租户边界，供控制器和服务层复用。 */
+    public CanvasDO requireTenantAccess(Long id, Long tenantId, boolean superAdmin) {
+        CanvasDO canvas = canvasMapper.selectById(id);
+        if (canvas == null) {
+            throw new IllegalArgumentException("画布不存在: " + id);
+        }
+        assertTenantAccess(canvas, tenantId, superAdmin);
+        return canvas;
+    }
+
+    /** 校验已加载画布是否可被当前租户访问。 */
+    public void assertTenantAccess(CanvasDO canvas, Long tenantId, boolean superAdmin) {
+        if (canvas == null || superAdmin || tenantId == null) {
+            return;
+        }
+        if (!Objects.equals(canvas.getTenantId(), tenantId)) {
+            throw new AccessDeniedException("跨租户访问被拒绝");
+        }
+    }
+
     /**
      * 更新画布草稿
      *
@@ -133,17 +190,18 @@ public class CanvasService {
     public void updateDraft(Long id, CanvasUpdateReq req) {
         CanvasDO canvas = canvasMapper.selectById(id);
         if (canvas == null) throw new IllegalArgumentException("画布不存在: " + id);
+        stateTransitionPolicy.assertDraftUpdateAllowed(canvas);
+        assertPublishedRuntimePolicyUnchanged(canvas, req);
 
         canvas.setName(req.getName());
         canvas.setDescription(req.getDescription());
-        if (req.getTriggerType() != null) canvas.setTriggerType(req.getTriggerType());
-        canvas.setCronExpression(req.getCronExpression());
-        canvas.setValidStart(req.getValidStart());
-        canvas.setValidEnd(req.getValidEnd());
-        canvas.setMaxTotalExecutions(req.getMaxTotalExecutions());
-        canvas.setPerUserDailyLimit(req.getPerUserDailyLimit());
-        canvas.setPerUserTotalLimit(req.getPerUserTotalLimit());
-        canvas.setCooldownSeconds(req.getCooldownSeconds());
+        canvas.setProjectKey(req.getProjectKey());
+        canvas.setProjectName(req.getProjectName());
+        canvas.setFolderKey(req.getFolderKey());
+        canvas.setFolderName(req.getFolderName());
+        if (!stateTransitionPolicy.isPublished(canvas)) {
+            applyRuntimePolicyFields(canvas, req);
+        }
         canvasMapper.updateById(canvas);
 
         if (req.getGraphJson() == null) return;
@@ -156,6 +214,7 @@ public class CanvasService {
             int nextVer = nextVersionNumber(id);
             CanvasVersionDO v = new CanvasVersionDO();
             v.setCanvasId(id);
+            v.setTenantId(canvas.getTenantId());
             v.setVersion(nextVer);
             v.setGraphJson(req.getGraphJson());
             v.setStatus(VersionStatus.DRAFT.getCode());
@@ -171,14 +230,27 @@ public class CanvasService {
      * @return 分页结果
      */
     public PageResult<CanvasDO> list(CanvasListQuery q) {
-        LambdaQueryWrapper<CanvasDO> wrapper = new LambdaQueryWrapper<CanvasDO>()
-                .eq(q.getStatus() != null, CanvasDO::getStatus, q.getStatus())
-                .ne(q.getStatus() == null, CanvasDO::getStatus, CanvasStatusEnum.ARCHIVED.getCode())
-                .eq(!examplesProperties.isEnabled(), CanvasDO::getIsExample, 0)
-                .like(q.getName() != null && !q.getName().isBlank(), CanvasDO::getName, q.getName())
-                .orderByDesc(CanvasDO::getCreatedAt);
+        return listInternal(q, null);
+    }
 
-        IPage<CanvasDO> page = canvasMapper.selectPage(new Page<>(q.getPage(), q.getSize()), wrapper);
+    /**
+     * 分页查询画布列表，并用认证态租户上下文强制约束查询范围。
+     */
+    public PageResult<CanvasDO> list(CanvasListQuery q, TenantContext tenantContext) {
+        return listInternal(q, tenantContext);
+    }
+
+    private PageResult<CanvasDO> listInternal(CanvasListQuery q, TenantContext tenantContext) {
+        CanvasListQuery query = q == null ? new CanvasListQuery() : q;
+        LambdaQueryWrapper<CanvasDO> wrapper = new LambdaQueryWrapper<>();
+        if (tenantContext == null) {
+            wrapper.eq(query.getTenantId() != null, CanvasDO::getTenantId, query.getTenantId());
+        } else {
+            tenantScopeSupport.applyTenantFilter(wrapper, CanvasDO::getTenantId, tenantContext);
+        }
+        CanvasListQuerySupport.apply(wrapper, query, examplesProperties.isEnabled());
+
+        IPage<CanvasDO> page = canvasMapper.selectPage(new Page<>(query.getPage(), query.getSize()), wrapper);
         return PageResult.of(page.getTotal(), page.getRecords());
     }
 
@@ -210,6 +282,7 @@ public class CanvasService {
             // 阶段1：验证（事务外，全部读操作）
             CanvasDO canvas = canvasMapper.selectById(id);
             if (canvas == null) throw new IllegalArgumentException("画布不存在: " + id);
+            stateTransitionPolicy.assertTransition(canvas, CanvasStatusEnum.PUBLISHED);
 
             CanvasVersionDO draft = latestDraft(id);
             if (draft == null) throw new IllegalStateException("没有可发布的草稿");
@@ -222,9 +295,14 @@ public class CanvasService {
             validateSubFlowDependencies(id, graph);
             canvasRuleGraphValidator.validateOrThrow(graph);
 
+            String graphJsonForPublish = bindAudienceSnapshotsForPublish(id, draft, operator);
+            if (!Objects.equals(graphJsonForPublish, draft.getGraphJson())) {
+                graph = dagParser.parse(graphJsonForPublish);
+            }
+
             // 阶段2：DB 事务（只写 DB，不碰 Redis/Scheduler/Cache）
             CanvasTransactionService.PublishResult result =
-                    canvasTransactionService.publishDb(id, draft.getGraphJson(), operator);
+                    canvasTransactionService.publishDb(id, graphJsonForPublish, operator);
 
             // 阶段3：事务外副作用（任一步骤失败不回滚 DB，路由/缓存最终通过 TTL 或再次发布自愈）
             // 使用 publishDb 返回的旧版本 ID 精准清理旧路由，避免误删本次刚注册的新发布路由。
@@ -251,6 +329,17 @@ public class CanvasService {
             Long.class
     );
 
+    private String bindAudienceSnapshotsForPublish(Long canvasId, CanvasVersionDO draft, String operator) {
+        if (audienceSnapshotService == null) {
+            return draft.getGraphJson();
+        }
+        return audienceSnapshotService.bindAudienceSnapshotsForPublish(
+                canvasId,
+                draft.getId(),
+                draft.getGraphJson(),
+                operator);
+    }
+
     /**
      * 清理旧发布版本的触发路由、调度任务和配置缓存（阶段3a，事务外）。
      * 取代原 clearPublishedExternalState，语义更明确。
@@ -272,26 +361,64 @@ public class CanvasService {
      * 若子流程未发布，运行时会失败，应在发布时就拦截。
      */
     private void validateSubFlowDependencies(Long canvasId, DagGraph graph) {
-        java.util.List<String> errors = new java.util.ArrayList<>();
+        List<String> errors = new ArrayList<>();
+        validateSubFlowDependencies(graph, new ArrayList<>(List.of(canvasId)), new HashSet<>(), errors);
+        if (!errors.isEmpty()) {
+            throw new IllegalStateException("发布校验失败：\n" + String.join("\n", errors));
+        }
+    }
+
+    private void validateSubFlowDependencies(DagGraph graph,
+                                             List<Long> path,
+                                             Set<Long> visited,
+                                             List<String> errors) {
         graph.getNodeMap().forEach((nodeId, node) -> {
             if (!NodeType.SUB_FLOW_REF.equals(node.getType())) return;
             Map<String, Object> cfg = node.getConfig();
             if (cfg == null) return;
             Object subFlowIdObj = cfg.get("subFlowId");
             if (subFlowIdObj == null) return;
-            Long subFlowId = Long.parseLong(String.valueOf(subFlowIdObj));
+            Long subFlowId;
+            try {
+                subFlowId = Long.parseLong(String.valueOf(subFlowIdObj));
+            } catch (NumberFormatException e) {
+                errors.add("节点「" + node.getName() + "」引用的子流程 ID 非法: " + subFlowIdObj);
+                return;
+            }
+            int cycleStart = path.indexOf(subFlowId);
+            if (cycleStart >= 0) {
+                List<Long> cycle = new ArrayList<>(path.subList(cycleStart, path.size()));
+                cycle.add(subFlowId);
+                errors.add("节点「" + node.getName() + "」存在子流程循环依赖: " + joinPath(cycle));
+                return;
+            }
             CanvasDO subFlow = canvasMapper.selectById(subFlowId);
             if (subFlow == null) {
                 errors.add("节点「" + node.getName() + "」引用的子流程 ID=" + subFlowId + " 不存在");
             } else if (!Objects.equals(subFlow.getStatus(), CanvasStatusEnum.PUBLISHED.getCode())) {
                 errors.add("节点「" + node.getName() + "」引用的子流程「" + subFlow.getName() + "」未发布（当前状态: " + subFlow.getStatus() + "）");
-            } else if (subFlowId.equals(canvasId)) {
-                errors.add("节点「" + node.getName() + "」引用了自身，会产生循环调用");
+            } else if (subFlow.getPublishedVersionId() == null) {
+                errors.add("节点「" + node.getName() + "」引用的子流程「" + subFlow.getName() + "」缺少发布版本");
+            } else if (visited.add(subFlowId)) {
+                CanvasVersionDO publishedVersion = canvasVersionMapper.selectById(subFlow.getPublishedVersionId());
+                if (publishedVersion == null) {
+                    errors.add("节点「" + node.getName() + "」引用的子流程「" + subFlow.getName() + "」发布版本不存在");
+                    return;
+                }
+                path.add(subFlowId);
+                try {
+                    validateSubFlowDependencies(dagParser.parse(publishedVersion.getGraphJson()), path, visited, errors);
+                } catch (RuntimeException e) {
+                    errors.add("节点「" + node.getName() + "」引用的子流程「" + subFlow.getName() + "」校验失败: " + e.getMessage());
+                } finally {
+                    path.remove(path.size() - 1);
+                }
             }
         });
-        if (!errors.isEmpty()) {
-            throw new IllegalStateException("发布校验失败：\n" + String.join("\n", errors));
-        }
+    }
+
+    private String joinPath(List<Long> path) {
+        return path.stream().map(String::valueOf).collect(java.util.stream.Collectors.joining(" -> "));
     }
 
     /**
@@ -406,6 +533,11 @@ public class CanvasService {
         preCheckService.cleanupCanvasQuotas(canvasId);
     }
 
+    /** 驱逐运行态画布实体缓存，供事务提交后的灰度/回滚变更复用。 */
+    public void invalidateRuntimeCanvas(Long canvasId) {
+        canvasExecutionService.invalidateCanvas(canvasId);
+    }
+
     /**
      * 执行 latest Draft 对应的业务逻辑。
      *
@@ -447,6 +579,9 @@ public class CanvasService {
         CanvasVersionDO target = canvasVersionMapper.selectById(versionId);
         if (target == null) throw new IllegalArgumentException("版本不存在: " + versionId);
         if (!target.getCanvasId().equals(canvasId)) throw new IllegalArgumentException("版本不属于该画布");
+        CanvasDO canvas = canvasMapper.selectById(canvasId);
+        if (canvas == null) throw new IllegalArgumentException("画布不存在: " + canvasId);
+        stateTransitionPolicy.assertDraftUpdateAllowed(canvas);
 
         CanvasVersionDO draft = latestDraft(canvasId);
         if (draft != null) {
@@ -455,6 +590,7 @@ public class CanvasService {
         } else {
             CanvasVersionDO newDraft = new CanvasVersionDO();
             newDraft.setCanvasId(canvasId);
+            newDraft.setTenantId(target.getTenantId());
             newDraft.setVersion(nextVersionNumber(canvasId));
             newDraft.setGraphJson(target.getGraphJson());
             newDraft.setStatus(VersionStatus.DRAFT.getCode());
@@ -536,7 +672,7 @@ public class CanvasService {
      * 异步执行，不阻塞发布流程。
      */
     private void precompileGroovyNodes(Long canvasId, DagGraph graph) {
-        Thread.ofVirtual().start(() -> {
+        backgroundExecutor.submit("canvas-groovy-precompile-" + canvasId, () -> {
             // 脚本预编译是发布后的旁路优化，失败不应阻塞发布主链路。
             graph.getNodeMap().forEach((nodeId, node) -> {
                 if (!NodeType.GROOVY.equals(node.getType())) return;
@@ -549,5 +685,46 @@ public class CanvasService {
             });
             log.info("[PUBLISH] Groovy 预编译完成 canvasId={}", canvasId);
         });
+    }
+
+    private void applyRuntimePolicyFields(CanvasDO canvas, CanvasUpdateReq req) {
+        if (req.getTriggerType() != null) canvas.setTriggerType(req.getTriggerType());
+        canvas.setCronExpression(req.getCronExpression());
+        canvas.setValidStart(req.getValidStart());
+        canvas.setValidEnd(req.getValidEnd());
+        canvas.setMaxTotalExecutions(req.getMaxTotalExecutions());
+        canvas.setPerUserDailyLimit(req.getPerUserDailyLimit());
+        canvas.setPerUserTotalLimit(req.getPerUserTotalLimit());
+        canvas.setCooldownSeconds(req.getCooldownSeconds());
+        canvas.setControlGroupPercent(req.getControlGroupPercent());
+        canvas.setControlGroupSalt(req.getControlGroupSalt());
+        canvas.setConversionEventCode(req.getConversionEventCode());
+        canvas.setAttributionWindowDays(req.getAttributionWindowDays());
+    }
+
+    private void assertPublishedRuntimePolicyUnchanged(CanvasDO canvas, CanvasUpdateReq req) {
+        if (!stateTransitionPolicy.isPublished(canvas)) {
+            return;
+        }
+        boolean changed = changed(req.getTriggerType(), canvas.getTriggerType())
+                || changed(req.getCronExpression(), canvas.getCronExpression())
+                || changed(req.getValidStart(), canvas.getValidStart())
+                || changed(req.getValidEnd(), canvas.getValidEnd())
+                || changed(req.getMaxTotalExecutions(), canvas.getMaxTotalExecutions())
+                || changed(req.getPerUserDailyLimit(), canvas.getPerUserDailyLimit())
+                || changed(req.getPerUserTotalLimit(), canvas.getPerUserTotalLimit())
+                || changed(req.getCooldownSeconds(), canvas.getCooldownSeconds())
+                || changed(req.getControlGroupPercent(), canvas.getControlGroupPercent())
+                || changed(req.getControlGroupSalt(), canvas.getControlGroupSalt())
+                || changed(req.getConversionEventCode(), canvas.getConversionEventCode())
+                || changed(req.getAttributionWindowDays(), canvas.getAttributionWindowDays());
+        if (changed) {
+            throw new IllegalStateException(
+                    "Cannot update published runtime policy; offline or publish a new version first");
+        }
+    }
+
+    private static boolean changed(Object requested, Object current) {
+        return requested != null && !Objects.equals(requested, current);
     }
 }

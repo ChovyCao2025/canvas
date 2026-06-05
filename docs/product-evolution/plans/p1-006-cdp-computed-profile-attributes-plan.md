@@ -122,6 +122,41 @@ cd backend && mvn -pl canvas-engine test -Dtest=ComputedProfileAttributeSchemaTe
 
 Expected: PASS.
 
+### Task 4: Commit This Slice
+
+**Files:**
+- Modify: `backend/canvas-engine/src/main/resources/db/migration/V99__cdp_computed_profile_attributes.sql`
+- Modify: `backend/canvas-engine/src/main/java/org/chovy/canvas/domain/cdp/ComputedProfileAttributeService.java`
+- Modify: `backend/canvas-engine/src/main/java/org/chovy/canvas/web/CdpComputedProfileController.java`
+- Modify: `backend/canvas-engine/src/test/java/org/chovy/canvas/domain/cdp/ComputedProfileAttributeSchemaTest.java`
+- Modify: `backend/canvas-engine/src/test/java/org/chovy/canvas/domain/cdp/ComputedProfileAttributeServiceTest.java`
+- Modify: `frontend/src/pages/cdp-computed-profile/computedProfilePresentation.ts`
+- Modify: `frontend/src/pages/cdp-computed-profile/computedProfilePresentation.test.ts`
+- Modify: `frontend/src/services/cdpApi.ts`
+- Modify: `docs/product-evolution/specs/p1-006-cdp-computed-profile-attributes.md`
+- Modify: `docs/product-evolution/plans/p1-006-cdp-computed-profile-attributes-plan.md`
+
+- [ ] **Step 1: Commit computed profile attribute slice**
+
+Run:
+
+```bash
+git add \
+  backend/canvas-engine/src/main/resources/db/migration/V99__cdp_computed_profile_attributes.sql \
+  backend/canvas-engine/src/main/java/org/chovy/canvas/domain/cdp/ComputedProfileAttributeService.java \
+  backend/canvas-engine/src/main/java/org/chovy/canvas/web/CdpComputedProfileController.java \
+  backend/canvas-engine/src/test/java/org/chovy/canvas/domain/cdp/ComputedProfileAttributeSchemaTest.java \
+  backend/canvas-engine/src/test/java/org/chovy/canvas/domain/cdp/ComputedProfileAttributeServiceTest.java \
+  frontend/src/pages/cdp-computed-profile/computedProfilePresentation.ts \
+  frontend/src/pages/cdp-computed-profile/computedProfilePresentation.test.ts \
+  frontend/src/services/cdpApi.ts \
+  docs/product-evolution/specs/p1-006-cdp-computed-profile-attributes.md \
+  docs/product-evolution/plans/p1-006-cdp-computed-profile-attributes-plan.md
+git commit -m "feat: add cdp computed profile attributes"
+```
+
+Expected: commit contains only computed profile attribute schema, service, API, frontend helpers, tests, spec, and plan.
+
 ### Task 2: Service Preview And Run
 
 **Files:**

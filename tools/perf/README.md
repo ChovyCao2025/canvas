@@ -186,6 +186,36 @@ Stage failure reasons:
 - `P95_EXCEEDED`: runner p95 exceeded `--max-p95-ms`.
 - `VERIFIER_FAIL`: reconciliation failed. This is not valid capacity data.
 
+## 3000 Hardening Profiles
+
+`tools/perf/3000-hardening-profiles.json` is the machine-readable contract for the 3000-concurrency hardening checklist. It fixes the lane budget at LIGHT 600, STANDARD 1800, HEAVY 300, and RETRY 300. LIGHT and STANDARD are protected lanes; HEAVY and RETRY must not borrow from them.
+
+Detailed operational steps live in `docs/product-evolution/runbooks/3000-concurrency-hardening-runbook.md`.
+
+Required profile names:
+
+- `default-mixed-3000`
+- `retry-surge-3000`
+- `heavy-surge-3000`
+- `redis-latency-spike-3000`
+- `mysql-saturation-3000`
+- `rocketmq-backlog-3000`
+- `downstream-partial-failure-3000`
+- `retry-backlog-explosion-3000`
+
+Render the threshold command and write evidence metadata for a run:
+
+```bash
+node tools/perf/hardening-profile.mjs \
+  --profile-file tools/perf/3000-hardening-profiles.json \
+  --profile default-mixed-3000 \
+  --out-dir tmp/perf-3000-hardening \
+  --run-id-prefix perf_3000_hardening_doc_check \
+  --write-evidence true
+```
+
+The command writes `evidence-manifest.json` under the run directory. The manifest records the profile, lane budgets, protected-lane rules, stop gates, rollback actions, degradation actions, threshold command, and expected metric sample filenames.
+
 ## Verify Correctness
 
 Normal event run:

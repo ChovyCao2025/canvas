@@ -2,11 +2,11 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Execute the architecture remediation package described in `../specs/P0-05-production-resilience-and-dr-spec.md`.
+**Goal:** Make shutdown, drain, Redis recovery, and route rebuild behavior deterministic for canvas execution, MQ consumption, scheduler triggers, direct execution, Disruptor publishing, and Groovy/background work.
 
-**Architecture:** Start from the archived evidence and current repository verification, add failing tests around the confirmed behavior, then implement the smallest scoped changes that satisfy the package acceptance criteria. Keep unrelated refactors out of the package unless a test proves the boundary must change.
+**Architecture:** Add explicit application shutdown configuration, centralize execution admission behind a lifecycle gate, make async execution paths drainable, and document Redis-loss recovery with testable route/context reconciliation commands.
 
-**Tech Stack:** Java 21, Spring Boot 3.2, WebFlux, MyBatis-Plus, Reactor, Redis, RocketMQ, React 18, TypeScript, Vite, Vitest, JUnit 5.
+**Tech Stack:** Java 21, Spring Boot WebFlux, Reactor, Disruptor, Redis, RocketMQ, virtual threads, JUnit 5, Maven, YAML application profiles.
 
 ---
 
@@ -18,200 +18,141 @@
 
 ## File Structure
 
-- Read: `../specs/P0-05-production-resilience-and-dr-spec.md`
-- Read: `../todo/coverage-matrix.md`
-- Read: `../todo/p0/production-resilience-and-dr/plan.md`
-- Modify: repository files named in the spec evidence for this package
-- Test: focused tests created beside the affected backend or frontend code before implementation
+- Shutdown config: `backend/canvas-engine/src/main/resources/application.yml`
+- Lifecycle gate: `backend/canvas-engine/src/main/java/org/chovy/canvas/engine/trigger/ExecutionLifecycleGate.java`
+- In-flight tracking: `backend/canvas-engine/src/main/java/org/chovy/canvas/engine/trigger/InFlightExecutionRegistry.java`
+- Direct execution: `backend/canvas-engine/src/main/java/org/chovy/canvas/engine/trigger/CanvasExecutionService.java`
+- Scheduler triggers: `backend/canvas-engine/src/main/java/org/chovy/canvas/engine/trigger/CanvasSchedulerService.java`
+- MQ triggers: `backend/canvas-engine/src/main/java/org/chovy/canvas/infrastructure/mq/MqTriggerConsumer.java`
+- Disruptor: `backend/canvas-engine/src/main/java/org/chovy/canvas/engine/disruptor/CanvasDisruptorService.java`
+- Trace buffer: `backend/canvas-engine/src/main/java/org/chovy/canvas/engine/scheduler/TraceWriteBuffer.java`
+- Redis context: `backend/canvas-engine/src/main/java/org/chovy/canvas/infrastructure/redis/ContextPersistenceService.java`
+- Redis routes: `backend/canvas-engine/src/main/java/org/chovy/canvas/infrastructure/redis/TriggerRouteService.java`
+- Redis routes: `backend/canvas-engine/src/main/java/org/chovy/canvas/infrastructure/redis/MqRouteRefreshService.java`
+- Redis/runtime recovery: `backend/canvas-engine/src/main/java/org/chovy/canvas/infrastructure/redis/TriggerRouteRecoveryService.java`
+- Redis routes: `backend/canvas-engine/src/main/java/org/chovy/canvas/infrastructure/redis/CanvasRouteInitializer.java`
+- Groovy executor: `backend/canvas-engine/src/main/java/org/chovy/canvas/engine/handlers/GroovyHandler.java`
+- Ops command: `backend/canvas-engine/src/main/java/org/chovy/canvas/web/OpsController.java`
+- Tests: `backend/canvas-engine/src/test/java/org/chovy/canvas/config/ApplicationShutdownConfigTest.java`
+- Tests: `backend/canvas-engine/src/test/java/org/chovy/canvas/engine/trigger/ExecutionLifecycleGateTest.java`
+- Tests: `backend/canvas-engine/src/test/java/org/chovy/canvas/engine/trigger/InFlightExecutionRegistryConcurrencyTest.java`
+- Tests: `backend/canvas-engine/src/test/java/org/chovy/canvas/engine/disruptor/CanvasDisruptorServiceLifecycleTest.java`
+- Tests: `backend/canvas-engine/src/test/java/org/chovy/canvas/infra/redis/ContextPersistenceServiceTest.java`
+- Tests: `backend/canvas-engine/src/test/java/org/chovy/canvas/infra/redis/TriggerRouteServiceTest.java`
+- Tests: `backend/canvas-engine/src/test/java/org/chovy/canvas/infra/redis/TriggerRouteRecoveryServiceTest.java`
+- Tests: `backend/canvas-engine/src/test/java/org/chovy/canvas/controller/OpsControllerRecoveryTest.java`
+- Evidence: `docs/architecture/evidence/P0-05-production-resilience-and-dr.md`
 
 ### Task 1: Add graceful shutdown configuration
 
 **Files:**
-- Read: `../specs/P0-05-production-resilience-and-dr-spec.md`
-- Read: `../todo/coverage-matrix.md`
-- Modify: repository files named in this package spec evidence
-- Test: focused tests created beside the affected code
+- Production: `backend/canvas-engine/src/main/resources/application.yml`
+- Production: `backend/canvas-engine/src/main/resources/application-prod.yml`
+- Test: `backend/canvas-engine/src/test/java/org/chovy/canvas/config/ApplicationShutdownConfigTest.java`
 
-Existing package notes:
-- Source task has no additional notes beyond its title.
+- [x] Configure `server.shutdown=graceful` and `spring.lifecycle.timeout-per-shutdown-phase` for production and local defaults.
+- [x] Keep timeout values explicit so drain behavior is visible in config review.
+- [x] Test that required shutdown settings are present and production profile values are not empty.
 
-- [ ] **Step 1: Lock the failing behavior**
+Run:
 
-Read `../specs/P0-05-production-resilience-and-dr-spec.md` and write the smallest failing test or documentation check that demonstrates this task gap before changing implementation files.
+```bash
+cd backend && mvn -pl canvas-engine -Dtest=ApplicationShutdownConfigTest test
+# Do not stage or commit in this session unless the user explicitly asks.
+```
 
-- [ ] **Step 2: Run the focused check before implementation**
-
-Run the narrowest backend, frontend, or documentation command that exercises the new check. Expected result before implementation: the new check fails or the documentation diff shows the missing section.
-
-- [ ] **Step 3: Implement the scoped change**
-
-Change only the files required by this task and keep the behavior aligned with the acceptance criteria in `../specs/P0-05-production-resilience-and-dr-spec.md`.
-
-- [ ] **Step 4: Verify the task**
-
-Run the same focused command again. Expected result after implementation: pass, or documentation check exits 0.
-
-- [ ] **Step 5: Review the scoped diff**
-
-Run `git diff -- .` and verify the diff only touches files justified by this task and the package spec.
+Expected: shutdown config tests pass and production config exposes a deterministic drain timeout.
 
 ### Task 2: Introduce a central execution lifecycle gate
 
 **Files:**
-- Read: `../specs/P0-05-production-resilience-and-dr-spec.md`
-- Read: `../todo/coverage-matrix.md`
-- Modify: repository files named in this package spec evidence
-- Test: focused tests created beside the affected code
+- Production: `backend/canvas-engine/src/main/java/org/chovy/canvas/engine/trigger/ExecutionLifecycleGate.java`
+- Production: `backend/canvas-engine/src/main/java/org/chovy/canvas/engine/trigger/InFlightExecutionRegistry.java`
+- Production: `backend/canvas-engine/src/main/java/org/chovy/canvas/engine/trigger/CanvasExecutionService.java`
+- Production: `backend/canvas-engine/src/main/java/org/chovy/canvas/engine/trigger/CanvasSchedulerService.java`
+- Production: `backend/canvas-engine/src/main/java/org/chovy/canvas/infrastructure/mq/MqTriggerConsumer.java`
+- Test: `backend/canvas-engine/src/test/java/org/chovy/canvas/engine/trigger/ExecutionLifecycleGateTest.java`
+- Test: `backend/canvas-engine/src/test/java/org/chovy/canvas/engine/trigger/InFlightExecutionRegistryConcurrencyTest.java`
 
-Existing package notes:
-   - Reject new direct/MQ/scheduled triggers after shutdown begins.
-   - Track in-flight executions.
+- [x] Route direct execution, scheduled triggers, and MQ trigger admission through `ExecutionLifecycleGate`.
+- [x] Track in-flight execution count and lane ownership through `InFlightExecutionRegistry`.
+- [x] Reject new trigger work once shutdown begins and keep existing in-flight work visible until completion or timeout.
 
-- [ ] **Step 1: Lock the failing behavior**
+Run:
 
-Read `../specs/P0-05-production-resilience-and-dr-spec.md` and write the smallest failing test or documentation check that demonstrates this task gap before changing implementation files.
+```bash
+cd backend && mvn -pl canvas-engine -Dtest=ExecutionLifecycleGateTest,InFlightExecutionRegistryConcurrencyTest test
+# Do not stage or commit in this session unless the user explicitly asks.
+```
 
-- [ ] **Step 2: Run the focused check before implementation**
-
-Run the narrowest backend, frontend, or documentation command that exercises the new check. Expected result before implementation: the new check fails or the documentation diff shows the missing section.
-
-- [ ] **Step 3: Implement the scoped change**
-
-Change only the files required by this task and keep the behavior aligned with the acceptance criteria in `../specs/P0-05-production-resilience-and-dr-spec.md`.
-
-- [ ] **Step 4: Verify the task**
-
-Run the same focused command again. Expected result after implementation: pass, or documentation check exits 0.
-
-- [ ] **Step 5: Review the scoped diff**
-
-Run `git diff -- .` and verify the diff only touches files justified by this task and the package spec.
+Expected: admission tests pass for open, closing, closed, and concurrent completion states; rejected work has a stable reason.
 
 ### Task 3: Make async chains drainable
 
 **Files:**
-- Read: `../specs/P0-05-production-resilience-and-dr-spec.md`
-- Read: `../todo/coverage-matrix.md`
-- Modify: repository files named in this package spec evidence
-- Test: focused tests created beside the affected code
+- Production: `backend/canvas-engine/src/main/java/org/chovy/canvas/engine/disruptor/CanvasDisruptorService.java`
+- Production: `backend/canvas-engine/src/main/java/org/chovy/canvas/engine/scheduler/TraceWriteBuffer.java`
+- Production: `backend/canvas-engine/src/main/java/org/chovy/canvas/engine/handlers/GroovyHandler.java`
+- Production: `backend/canvas-engine/src/main/java/org/chovy/canvas/infrastructure/concurrent/ManagedVirtualThreadExecutor.java`
+- Test: `backend/canvas-engine/src/test/java/org/chovy/canvas/engine/disruptor/CanvasDisruptorServiceLifecycleTest.java`
+- Test: `backend/canvas-engine/src/test/java/org/chovy/canvas/engine/scheduler/TraceWriteBufferTest.java`
+- Test: `backend/canvas-engine/src/test/java/org/chovy/canvas/infrastructure/concurrent/ManagedVirtualThreadExecutorTest.java`
 
-Existing package notes:
-   - Replace untracked `.subscribe()` and raw virtual threads in shutdown-sensitive paths.
+- [x] Ensure Disruptor publishing rejects or drains consistently after shutdown begins.
+- [x] Ensure trace buffer shutdown flushes queued spans or reports dropped spans through a metric/log path.
+- [x] Ensure Groovy and virtual-thread work is tracked, bounded, and drained through managed executor shutdown.
 
-- [ ] **Step 1: Lock the failing behavior**
+Run:
 
-Read `../specs/P0-05-production-resilience-and-dr-spec.md` and write the smallest failing test or documentation check that demonstrates this task gap before changing implementation files.
+```bash
+cd backend && mvn -pl canvas-engine -Dtest=CanvasDisruptorServiceLifecycleTest,TraceWriteBufferTest,ManagedVirtualThreadExecutorTest test
+# Do not stage or commit in this session unless the user explicitly asks.
+```
 
-- [ ] **Step 2: Run the focused check before implementation**
-
-Run the narrowest backend, frontend, or documentation command that exercises the new check. Expected result before implementation: the new check fails or the documentation diff shows the missing section.
-
-- [ ] **Step 3: Implement the scoped change**
-
-Change only the files required by this task and keep the behavior aligned with the acceptance criteria in `../specs/P0-05-production-resilience-and-dr-spec.md`.
-
-- [ ] **Step 4: Verify the task**
-
-Run the same focused command again. Expected result after implementation: pass, or documentation check exits 0.
-
-- [ ] **Step 5: Review the scoped diff**
-
-Run `git diff -- .` and verify the diff only touches files justified by this task and the package spec.
+Expected: shutdown-sensitive async components either complete queued work inside timeout or reject new work with observable status.
 
 ### Task 4: Define Redis recovery behavior
 
 **Files:**
-- Read: `../specs/P0-05-production-resilience-and-dr-spec.md`
-- Read: `../todo/coverage-matrix.md`
-- Modify: repository files named in this package spec evidence
-- Test: focused tests created beside the affected code
+- Production: `backend/canvas-engine/src/main/java/org/chovy/canvas/infrastructure/redis/ContextPersistenceService.java`
+- Production: `backend/canvas-engine/src/main/java/org/chovy/canvas/infrastructure/redis/TriggerRouteService.java`
+- Production: `backend/canvas-engine/src/main/java/org/chovy/canvas/infrastructure/redis/MqRouteRefreshService.java`
+- Production: `backend/canvas-engine/src/main/java/org/chovy/canvas/infrastructure/redis/CanvasRouteInitializer.java`
+- Test: `backend/canvas-engine/src/test/java/org/chovy/canvas/infra/redis/ContextPersistenceServiceTest.java`
+- Test: `backend/canvas-engine/src/test/java/org/chovy/canvas/infra/redis/TriggerRouteServiceTest.java`
+- Test: `backend/canvas-engine/src/test/java/org/chovy/canvas/infra/redis/MqRouteRefreshServiceTest.java`
+- Docs: `docs/architecture/evidence/P0-05-production-resilience-and-dr.md`
 
-Existing package notes:
-   - Persist enough execution context to recover paused/waiting executions.
-   - Add route rebuild and context reconciliation commands.
+- [x] Specify how paused and waiting execution contexts are rebuilt or marked resumable after Redis loss.
+- [x] Specify route rebuild commands for direct, scheduled, and MQ routes.
+- [x] Test context persistence and route refresh behavior using the current Redis service abstractions.
 
-- [ ] **Step 1: Lock the failing behavior**
+Run:
 
-Read `../specs/P0-05-production-resilience-and-dr-spec.md` and write the smallest failing test or documentation check that demonstrates this task gap before changing implementation files.
+```bash
+cd backend && mvn -pl canvas-engine -Dtest=ContextPersistenceServiceTest,TriggerRouteServiceTest,MqRouteRefreshServiceTest test
+# Do not stage or commit in this session unless the user explicitly asks.
+```
 
-- [ ] **Step 2: Run the focused check before implementation**
+Expected: Redis recovery evidence names the exact rebuild entry points and tests prove route/context services can reconstruct expected state.
 
-Run the narrowest backend, frontend, or documentation command that exercises the new check. Expected result before implementation: the new check fails or the documentation diff shows the missing section.
-
-- [ ] **Step 3: Implement the scoped change**
-
-Change only the files required by this task and keep the behavior aligned with the acceptance criteria in `../specs/P0-05-production-resilience-and-dr-spec.md`.
-
-- [ ] **Step 4: Verify the task**
-
-Run the same focused command again. Expected result after implementation: pass, or documentation check exits 0.
-
-- [ ] **Step 5: Review the scoped diff**
-
-Run `git diff -- .` and verify the diff only touches files justified by this task and the package spec.
-
-### Task 5: Add operational runbook steps
+### Task 5: Validate shutdown and disaster recovery
 
 **Files:**
-- Read: `../specs/P0-05-production-resilience-and-dr-spec.md`
-- Read: `../todo/coverage-matrix.md`
-- Modify: repository files named in this package spec evidence
-- Test: focused tests created beside the affected code
+- Docs: `docs/architecture/evidence/P0-05-production-resilience-and-dr.md`
+- Plan: `docs/architecture/plans/P0-05-production-resilience-and-dr-plan.md`
+- Spec: `docs/architecture/specs/P0-05-production-resilience-and-dr-spec.md`
 
-Existing package notes:
-   - Stop order.
-   - Drain timeout.
-   - Redis loss recovery.
-   - Route rebuild.
+- [x] Record stop order, drain timeout, Redis loss recovery, route rebuild, and resumed execution checks in the evidence file.
+- [x] Run the complete focused resilience command.
+- [x] Run the backend module suite after focused checks pass.
 
-- [ ] **Step 1: Lock the failing behavior**
+Run:
 
-Read `../specs/P0-05-production-resilience-and-dr-spec.md` and write the smallest failing test or documentation check that demonstrates this task gap before changing implementation files.
+```bash
+cd backend && mvn -pl canvas-engine -Dtest=ApplicationShutdownConfigTest,ExecutionLifecycleGateTest,InFlightExecutionRegistryConcurrencyTest,CanvasDisruptorServiceLifecycleTest,TraceWriteBufferTest,ManagedVirtualThreadExecutorTest,ContextPersistenceServiceTest,TriggerRouteServiceTest,MqRouteRefreshServiceTest test
+cd backend && mvn -pl canvas-engine test
+# Do not stage or commit in this session unless the user explicitly asks.
+```
 
-- [ ] **Step 2: Run the focused check before implementation**
-
-Run the narrowest backend, frontend, or documentation command that exercises the new check. Expected result before implementation: the new check fails or the documentation diff shows the missing section.
-
-- [ ] **Step 3: Implement the scoped change**
-
-Change only the files required by this task and keep the behavior aligned with the acceptance criteria in `../specs/P0-05-production-resilience-and-dr-spec.md`.
-
-- [ ] **Step 4: Verify the task**
-
-Run the same focused command again. Expected result after implementation: pass, or documentation check exits 0.
-
-- [ ] **Step 5: Review the scoped diff**
-
-Run `git diff -- .` and verify the diff only touches files justified by this task and the package spec.
-
-### Task 6: Validate with targeted tests and a local shutdown script
-
-**Files:**
-- Read: `../specs/P0-05-production-resilience-and-dr-spec.md`
-- Read: `../todo/coverage-matrix.md`
-- Modify: repository files named in this package spec evidence
-- Test: focused tests created beside the affected code
-
-Existing package notes:
-- Source task has no additional notes beyond its title.
-
-- [ ] **Step 1: Lock the failing behavior**
-
-Read `../specs/P0-05-production-resilience-and-dr-spec.md` and write the smallest failing test or documentation check that demonstrates this task gap before changing implementation files.
-
-- [ ] **Step 2: Run the focused check before implementation**
-
-Run the narrowest backend, frontend, or documentation command that exercises the new check. Expected result before implementation: the new check fails or the documentation diff shows the missing section.
-
-- [ ] **Step 3: Implement the scoped change**
-
-Change only the files required by this task and keep the behavior aligned with the acceptance criteria in `../specs/P0-05-production-resilience-and-dr-spec.md`.
-
-- [ ] **Step 4: Verify the task**
-
-Run the same focused command again. Expected result after implementation: pass, or documentation check exits 0.
-
-- [ ] **Step 5: Review the scoped diff**
-
-Run `git diff -- .` and verify the diff only touches files justified by this task and the package spec.
-
+Expected: focused resilience tests and backend module tests pass; evidence contains a rehearsable shutdown and Redis recovery procedure.

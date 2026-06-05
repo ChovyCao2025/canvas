@@ -22,6 +22,9 @@ public class CustomerProfileDO {
     /** 客户画像主键 ID */
     private Long id;
 
+    @TableField("tenant_id")
+    private Long tenantId;
+
     /** 业务用户 ID */
     private String userId;
 

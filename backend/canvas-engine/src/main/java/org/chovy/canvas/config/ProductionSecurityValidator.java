@@ -36,6 +36,7 @@ public class ProductionSecurityValidator implements SmartInitializingSingleton {
         validateEventSecret(failures);
         validateCors(failures);
         validateHealthDetails(failures);
+        validateApiDocs(failures);
         if (!failures.isEmpty()) {
             throw new IllegalStateException("生产安全配置不满足要求: " + String.join("; ", failures));
         }
@@ -102,6 +103,15 @@ public class ProductionSecurityValidator implements SmartInitializingSingleton {
         String showDetails = value("management.endpoint.health.show-details");
         if ("always".equalsIgnoreCase(showDetails)) {
             failures.add("management.endpoint.health.show-details 生产环境不能为 always");
+        }
+    }
+
+    private void validateApiDocs(List<String> failures) {
+        if ("true".equalsIgnoreCase(value("springdoc.api-docs.enabled"))) {
+            failures.add("springdoc.api-docs.enabled 生产环境不能为 true");
+        }
+        if ("true".equalsIgnoreCase(value("springdoc.swagger-ui.enabled"))) {
+            failures.add("springdoc.swagger-ui.enabled 生产环境不能为 true");
         }
     }
 

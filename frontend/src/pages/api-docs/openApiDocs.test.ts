@@ -16,7 +16,10 @@ const spec = {
         summary: 'report event',
         parameters: [{ name: 'source', in: 'query', required: false, description: '来源' }],
         requestBody: { required: true, content: { 'application/json': { schema: { type: 'object' } } } },
-        responses: { '200': { description: 'OK' } },
+        responses: {
+          '200': { description: 'OK' },
+          '400': { description: 'Bad request' },
+        },
       },
     },
     '/canvas/{id}/versions/{versionId}': {
@@ -97,6 +100,22 @@ describe('OpenAPI docs adapter', () => {
         attributes: { orderId: 'ord_202605230001', amount: 199 },
       },
     })
+  })
+
+  it('preserves route contract metadata required by API docs', () => {
+    const { endpoints } = parseOpenApiEndpoints(spec)
+    const endpoint = endpoints.find(endpoint => endpoint.method === 'POST' && endpoint.path === '/canvas/events/report')
+
+    expect(endpoint).toMatchObject({
+      method: 'POST',
+      path: '/canvas/events/report',
+      auth: 'hmac',
+      responses: [
+        { status: '200', desc: 'OK' },
+        { status: '400', desc: 'Bad request' },
+      ],
+    })
+    expect(endpoint?.responseExample).toBeDefined()
   })
 
   it('classifies known path families', () => {

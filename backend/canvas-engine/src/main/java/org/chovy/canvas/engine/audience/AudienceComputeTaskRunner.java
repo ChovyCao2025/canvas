@@ -3,12 +3,14 @@ package org.chovy.canvas.engine.audience;
 import lombok.extern.slf4j.Slf4j;
 import org.chovy.canvas.domain.notification.NotificationService;
 import org.chovy.canvas.domain.task.AsyncTaskService;
+import org.chovy.canvas.infrastructure.concurrent.ManagedVirtualThreadExecutor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.time.Duration;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.concurrent.locks.LockSupport;
 
 /**
  * Audience Compute Task Runner 人群计算组件。
@@ -33,6 +35,7 @@ public class AudienceComputeTaskRunner {
     private final NotificationService notificationService;
     /** 人群计算锁被占用时的实际重试间隔。 */
     private final Duration lockRetryDelay;
+    private ManagedVirtualThreadExecutor backgroundExecutor = ManagedVirtualThreadExecutor.direct();
 
     /**
      * 构造 AudienceComputeTaskRunner 实例，并根据入参初始化依赖、配置或内部状态。
@@ -74,6 +77,11 @@ public class AudienceComputeTaskRunner {
         this.lockRetryDelay = lockRetryDelay;
     }
 
+    @Autowired(required = false)
+    void setBackgroundExecutor(ManagedVirtualThreadExecutor backgroundExecutor) {
+        this.backgroundExecutor = backgroundExecutor;
+    }
+
     /**
      * 注册、调度或初始化 start 相关的业务数据。
      *
@@ -85,7 +93,13 @@ public class AudienceComputeTaskRunner {
      * @param operator operator 操作人标识
      */
     public void start(String taskId, Long audienceId, String audienceName, String operator) {
-        Thread.ofVirtual().start(() -> runNow(taskId, audienceId, audienceName, operator));
+        start(taskId, audienceId, audienceName, operator, null);
+    }
+
+    /** 注册指定租户内的人群计算任务。 */
+    public void start(String taskId, Long audienceId, String audienceName, String operator, Long tenantId) {
+        backgroundExecutor.submit("audience-compute-" + taskId,
+                () -> runNow(taskId, audienceId, audienceName, operator, tenantId));
     }
 
     /**
@@ -99,6 +113,11 @@ public class AudienceComputeTaskRunner {
      * @param operator 发起计算的操作人
      */
     public void runNow(String taskId, Long audienceId, String audienceName, String operator) {
+        runNow(taskId, audienceId, audienceName, operator, null);
+    }
+
+    /** 同步执行指定租户内的人群计算任务并落地任务状态。 */
+    public void runNow(String taskId, Long audienceId, String audienceName, String operator, Long tenantId) {
         asyncTaskService.markRunning(taskId);
         AudienceComputeResult result;
         try {
@@ -108,6 +127,7 @@ public class AudienceComputeTaskRunner {
             log.error("[AUDIENCE] compute task failed taskId={} audienceId={}: {}", taskId, audienceId, error, e);
             markFailedBestEffort(taskId, error);
             createNotificationsBestEffort(
+                    tenantId,
                     taskId,
                     operator,
                     "TASK_FAILED",
@@ -119,6 +139,7 @@ public class AudienceComputeTaskRunner {
         if (result.success()) {
             asyncTaskService.markSucceeded(taskId, successSummary(result));
             createNotificationsBestEffort(
+                    tenantId,
                     taskId,
                     operator,
                     "TASK_SUCCEEDED",
@@ -130,6 +151,7 @@ public class AudienceComputeTaskRunner {
         String error = result.errorMsg() == null ? "计算失败" : result.errorMsg();
         asyncTaskService.markFailed(taskId, error);
         createNotificationsBestEffort(
+                tenantId,
                 taskId,
                 operator,
                 "TASK_FAILED",
@@ -213,7 +235,11 @@ public class AudienceComputeTaskRunner {
         if (lockRetryDelay.isZero() || lockRetryDelay.isNegative()) {
             return;
         }
-        Thread.sleep(lockRetryDelay.toMillis());
+        LockSupport.parkNanos(lockRetryDelay.toNanos());
+        if (Thread.currentThread().isInterrupted()) {
+            Thread.currentThread().interrupt();
+            throw new InterruptedException("Interrupted while waiting for audience compute lock retry");
+        }
     }
 
     /**
@@ -229,9 +255,13 @@ public class AudienceComputeTaskRunner {
      * @param taskId 关联异步任务 ID
      */
     private void createNotificationBestEffort(
-            String operator, String type, String title, String content, String targetUrl, String taskId) {
+            Long tenantId, String operator, String type, String title, String content, String targetUrl, String taskId) {
         try {
-            notificationService.createForTask(operator, type, title, content, targetUrl, taskId);
+            if (tenantId == null) {
+                notificationService.createForTask(operator, type, title, content, targetUrl, taskId);
+            } else {
+                notificationService.createForTask(tenantId, operator, type, title, content, targetUrl, taskId);
+            }
         } catch (Exception notificationException) {
             log.error("[AUDIENCE] failed to create compute task notification taskId={}: {}",
                     taskId, notificationException.getMessage(), notificationException);
@@ -251,9 +281,9 @@ public class AudienceComputeTaskRunner {
      * @param targetUrl targetUrl 方法执行所需的业务参数
      */
     private void createNotificationsBestEffort(
-            String taskId, String fallbackOperator, String type, String title, String content, String targetUrl) {
+            Long tenantId, String taskId, String fallbackOperator, String type, String title, String content, String targetUrl) {
         for (String recipient : notificationRecipients(taskId, fallbackOperator)) {
-            createNotificationBestEffort(recipient, type, title, content, targetUrl, taskId);
+            createNotificationBestEffort(tenantId, recipient, type, title, content, targetUrl, taskId);
         }
     }
 

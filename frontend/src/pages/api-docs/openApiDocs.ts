@@ -19,6 +19,7 @@ interface OpenApiOperation {
   description?: unknown
   parameters?: unknown
   requestBody?: unknown
+  responses?: unknown
 }
 
 interface OpenApiPathItem extends Partial<Record<OpenApiMethod, OpenApiOperation>> {
@@ -176,6 +177,22 @@ const extractParams = (path: string, pathItem: OpenApiPathItem, operation: OpenA
   return params
 }
 
+const extractResponses = (responses: unknown) => {
+  if (!isRecord(responses)) {
+    return []
+  }
+
+  return Object.entries(responses)
+    .filter(([, response]) => isRecord(response))
+    .map(([status, response]) => {
+      const row = response as Record<string, unknown>
+      return {
+        status,
+        desc: typeof row.description === 'string' ? row.description : `${status} response`,
+      }
+    })
+}
+
 const parseOperation = (
   path: string,
   method: ApiDocMethod,
@@ -201,6 +218,7 @@ const parseOperation = (
     params: override?.params ?? extractParams(path, pathItem, operation),
     requestExample: override?.requestExample,
     responseExample: override?.responseExample ?? success({ id: 'demo_id', status: 'ok' }),
+    responses: extractResponses(operation.responses),
   }
 }
 

@@ -2,11 +2,11 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Execute the architecture remediation package described in `../specs/P2-06-frontend-accessibility-and-quality-spec.md`.
+**Goal:** Add frontend error isolation and accessibility checks for the main canvas, admin, and editor workflows without destabilizing existing editor state refactors.
 
-**Architecture:** Start from the archived evidence and current repository verification, add failing tests around the confirmed behavior, then implement the smallest scoped changes that satisfy the package acceptance criteria. Keep unrelated refactors out of the package unless a test proves the boundary must change.
+**Architecture:** Keep route wiring in `frontend/src/App.tsx`, shared error UI in `frontend/src/components/layout`, canvas-editor local isolation in `frontend/src/pages/canvas-editor`, and static accessibility helpers/tests beside the components they check. Browser-level manual evidence is recorded under `docs/architecture/frontend`.
 
-**Tech Stack:** Java 21, Spring Boot 3.2, WebFlux, MyBatis-Plus, Reactor, Redis, RocketMQ, React 18, TypeScript, Vite, Vitest, JUnit 5.
+**Tech Stack:** React 18, TypeScript, Vite, Vitest, Ant Design, React Router, React Flow, server-rendered component tests, optional axe-core for static accessibility checks.
 
 ---
 
@@ -18,164 +18,154 @@
 
 ## File Structure
 
-- Read: `../specs/P2-06-frontend-accessibility-and-quality-spec.md`
-- Read: `../todo/coverage-matrix.md`
-- Read: `../todo/p2/frontend-accessibility-and-quality/plan.md`
-- Modify: repository files named in the spec evidence for this package
-- Test: focused tests created beside the affected backend or frontend code before implementation
+- Read: `docs/architecture/specs/P2-06-frontend-accessibility-and-quality-spec.md`
+- Read: `docs/architecture/todo/p2/frontend-accessibility-and-quality/plan.md`
+- Modify: `frontend/src/App.tsx`
+- Modify: `frontend/src/main.tsx`
+- Modify: `frontend/package.json`
+- Create: `frontend/src/components/layout/ErrorBoundary.tsx`
+- Create: `frontend/src/components/layout/ErrorBoundary.test.tsx`
+- Create: `frontend/src/pages/canvas-editor/CanvasEditorErrorBoundary.tsx`
+- Create: `frontend/src/pages/canvas-editor/canvasEditorAccessibility.ts`
+- Create: `frontend/src/pages/canvas-editor/canvasEditorAccessibility.test.ts`
+- Create: `frontend/src/test/accessibilityChecks.ts`
+- Create: `docs/architecture/frontend/accessibility-audit.md`
+- Test: `frontend/src/context/AuthContext.test.tsx`
+- Test: `frontend/src/pages/canvas-editor/graphHydration.test.ts`
+- Test: `frontend/src/components/config-panel/controlChrome.test.ts`
+- Test: `frontend/src/components/notifications/notificationPresentation.test.ts`
 
 ### Task 1: Add global and route-level ErrorBoundaries
 
 **Files:**
-- Read: `../specs/P2-06-frontend-accessibility-and-quality-spec.md`
-- Read: `../todo/coverage-matrix.md`
-- Modify: repository files named in this package spec evidence
-- Test: focused tests created beside the affected code
+- Modify: `frontend/src/App.tsx`
+- Modify: `frontend/src/main.tsx`
+- Create: `frontend/src/components/layout/ErrorBoundary.tsx`
+- Create: `frontend/src/components/layout/ErrorBoundary.test.tsx`
+- Test: `frontend/src/context/AuthContext.test.tsx`
 
-Existing package notes:
-- Source task has no additional notes beyond its title.
+- [x] Create a reusable `ErrorBoundary` class component with route name, reset key, and accessible fallback action.
+- [x] Wrap the app shell and route groups in `App.tsx` with named boundaries for authenticated layout, admin routes, and canvas routes.
+- [x] Ensure fallback content does not expose tokens, raw stack traces, or localStorage values.
+- [x] Add tests for render success, thrown child fallback, reset behavior, and secret redaction.
 
-- [ ] **Step 1: Lock the failing behavior**
+**Run:**
+```bash
+cd frontend && npm test -- ErrorBoundary AuthContext
+cd frontend && npm run build
+```
 
-Read `../specs/P2-06-frontend-accessibility-and-quality-spec.md` and write the smallest failing test or documentation check that demonstrates this task gap before changing implementation files.
-
-- [ ] **Step 2: Run the focused check before implementation**
-
-Run the narrowest backend, frontend, or documentation command that exercises the new check. Expected result before implementation: the new check fails or the documentation diff shows the missing section.
-
-- [ ] **Step 3: Implement the scoped change**
-
-Change only the files required by this task and keep the behavior aligned with the acceptance criteria in `../specs/P2-06-frontend-accessibility-and-quality-spec.md`.
-
-- [ ] **Step 4: Verify the task**
-
-Run the same focused command again. Expected result after implementation: pass, or documentation check exits 0.
-
-- [ ] **Step 5: Review the scoped diff**
-
-Run `git diff -- .` and verify the diff only touches files justified by this task and the package spec.
+**Expected:** ErrorBoundary tests pass, auth secret-redaction tests still pass, and the production frontend build succeeds.
 
 ### Task 2: Add canvas-editor local error isolation
 
 **Files:**
-- Read: `../specs/P2-06-frontend-accessibility-and-quality-spec.md`
-- Read: `../todo/coverage-matrix.md`
-- Modify: repository files named in this package spec evidence
-- Test: focused tests created beside the affected code
+- Modify: `frontend/src/pages/canvas-editor/index.tsx`
+- Create: `frontend/src/pages/canvas-editor/CanvasEditorErrorBoundary.tsx`
+- Test: `frontend/src/pages/canvas-editor/graphHydration.test.ts`
+- Test: `frontend/src/pages/canvas-editor/settingsPresentation.test.ts`
+- Test: `frontend/src/components/config-panel/presentation.test.ts`
 
-Existing package notes:
-- Source task has no additional notes beyond its title.
+- [x] Wrap graph canvas, inspector/config panel, execution trace panel, and node library with local editor boundaries.
+- [x] Add reset keys for canvas id, graph reload key, and selected node id so a panel failure can recover without remounting the full editor.
+- [x] Add tests that prove graph hydration and config-panel presentation helpers keep their existing behavior.
 
-- [ ] **Step 1: Lock the failing behavior**
+**Run:**
+```bash
+cd frontend && npm test -- graphHydration settingsPresentation presentation
+```
 
-Read `../specs/P2-06-frontend-accessibility-and-quality-spec.md` and write the smallest failing test or documentation check that demonstrates this task gap before changing implementation files.
-
-- [ ] **Step 2: Run the focused check before implementation**
-
-Run the narrowest backend, frontend, or documentation command that exercises the new check. Expected result before implementation: the new check fails or the documentation diff shows the missing section.
-
-- [ ] **Step 3: Implement the scoped change**
-
-Change only the files required by this task and keep the behavior aligned with the acceptance criteria in `../specs/P2-06-frontend-accessibility-and-quality-spec.md`.
-
-- [ ] **Step 4: Verify the task**
-
-Run the same focused command again. Expected result after implementation: pass, or documentation check exits 0.
-
-- [ ] **Step 5: Review the scoped diff**
-
-Run `git diff -- .` and verify the diff only touches files justified by this task and the package spec.
+**Expected:** Existing canvas-editor and config-panel tests pass after local boundary wiring.
 
 ### Task 3: Audit keyboard and focus behavior for core pages
 
 **Files:**
-- Read: `../specs/P2-06-frontend-accessibility-and-quality-spec.md`
-- Read: `../todo/coverage-matrix.md`
-- Modify: repository files named in this package spec evidence
-- Test: focused tests created beside the affected code
+- Create: `docs/architecture/frontend/accessibility-audit.md`
+- Create: `frontend/src/pages/canvas-editor/canvasEditorAccessibility.ts`
+- Create: `frontend/src/pages/canvas-editor/canvasEditorAccessibility.test.ts`
+- Modify: `frontend/src/components/canvas/HoverEdge.tsx`
+- Modify: `frontend/src/components/node-panel/NodeLibraryItem.tsx`
+- Modify: `frontend/src/components/notifications/NotificationBell.tsx`
 
-Existing package notes:
-- Source task has no additional notes beyond its title.
+- [x] Audit login, home, canvas list, canvas editor, API docs, tenant admin, and notification bell workflows.
+- [x] Record keyboard order, focus target, visible focus, label source, screen-reader name, and remediation path for each workflow.
+- [x] Add static helper tests for canvas-editor keyboard labels, ARIA names, and focusable controls.
 
-- [ ] **Step 1: Lock the failing behavior**
+**Run:**
+```bash
+cd frontend && npm test -- canvasEditorAccessibility notificationPresentation nodeLibrary
+test -f docs/architecture/frontend/accessibility-audit.md
+rg "keyboard order|visible focus|screen-reader name|canvas editor|notification bell" docs/architecture/frontend/accessibility-audit.md
+```
 
-Read `../specs/P2-06-frontend-accessibility-and-quality-spec.md` and write the smallest failing test or documentation check that demonstrates this task gap before changing implementation files.
-
-- [ ] **Step 2: Run the focused check before implementation**
-
-Run the narrowest backend, frontend, or documentation command that exercises the new check. Expected result before implementation: the new check fails or the documentation diff shows the missing section.
-
-- [ ] **Step 3: Implement the scoped change**
-
-Change only the files required by this task and keep the behavior aligned with the acceptance criteria in `../specs/P2-06-frontend-accessibility-and-quality-spec.md`.
-
-- [ ] **Step 4: Verify the task**
-
-Run the same focused command again. Expected result after implementation: pass, or documentation check exits 0.
-
-- [ ] **Step 5: Review the scoped diff**
-
-Run `git diff -- .` and verify the diff only touches files justified by this task and the package spec.
+**Expected:** Accessibility audit has concrete workflow rows, and frontend static accessibility tests pass.
 
 ### Task 4: Add accessibility checks to frontend test tooling where practical
 
 **Files:**
-- Read: `../specs/P2-06-frontend-accessibility-and-quality-spec.md`
-- Read: `../todo/coverage-matrix.md`
-- Modify: repository files named in this package spec evidence
-- Test: focused tests created beside the affected code
+- Modify: `frontend/package.json`
+- Create: `frontend/src/test/accessibilityChecks.ts`
+- Modify: `frontend/src/components/config-panel/controlChrome.test.ts`
+- Modify: `frontend/src/components/notifications/notificationPresentation.test.ts`
+- Modify: `frontend/src/pages/api-docs/apiDocs.test.ts`
 
-Existing package notes:
-- Source task has no additional notes beyond its title.
+- [x] Add a small accessibility helper that checks accessible names, roles, missing labels, and focusable-control metadata from rendered strings or presentation models.
+- [x] Add `axe-core` only if the Node test environment can run it without a browser dependency.
+- [x] Wire checks into config-panel, notification, and API-doc tests.
 
-- [ ] **Step 1: Lock the failing behavior**
+**Run:**
+```bash
+cd frontend && npm test -- controlChrome notificationPresentation apiDocs
+cd frontend && npm run build
+```
 
-Read `../specs/P2-06-frontend-accessibility-and-quality-spec.md` and write the smallest failing test or documentation check that demonstrates this task gap before changing implementation files.
+**Expected:** Accessibility helper tests pass, no browser-only test dependency breaks the Node Vitest run, and frontend build succeeds.
 
-- [ ] **Step 2: Run the focused check before implementation**
-
-Run the narrowest backend, frontend, or documentation command that exercises the new check. Expected result before implementation: the new check fails or the documentation diff shows the missing section.
-
-- [ ] **Step 3: Implement the scoped change**
-
-Change only the files required by this task and keep the behavior aligned with the acceptance criteria in `../specs/P2-06-frontend-accessibility-and-quality-spec.md`.
-
-- [ ] **Step 4: Verify the task**
-
-Run the same focused command again. Expected result after implementation: pass, or documentation check exits 0.
-
-- [ ] **Step 5: Review the scoped diff**
-
-Run `git diff -- .` and verify the diff only touches files justified by this task and the package spec.
-
-### Task 5: Fold layout/style cleanup into frontend state refactors to avoid duplicate churn
+### Task 5: Fold layout and style cleanup into frontend state refactors to avoid duplicate churn
 
 **Files:**
-- Read: `../specs/P2-06-frontend-accessibility-and-quality-spec.md`
-- Read: `../todo/coverage-matrix.md`
-- Modify: repository files named in this package spec evidence
-- Test: focused tests created beside the affected code
+- Modify: `frontend/src/pages/canvas-editor/index.tsx`
+- Modify: `frontend/src/pages/canvas-editor/settingsPanel.css`
+- Modify: `frontend/src/components/config-panel/controlChrome.ts`
+- Modify: `frontend/src/components/config-panel/index.tsx`
+- Test: `frontend/src/components/config-panel/controlChrome.test.ts`
+- Test: `frontend/src/components/config-panel/formValues.test.ts`
+- Test: `frontend/src/pages/canvas-editor/localDraft.test.ts`
 
-Existing package notes:
-- Source task has no additional notes beyond its title.
+- [x] Keep cleanup limited to editor layout, focus order, stable control dimensions, and config-panel readability.
+- [x] Preserve existing local draft, graph hydration, autosave, and config-panel presentation behavior.
+- [x] Add tests for any helper extracted from the large editor component.
 
-- [ ] **Step 1: Lock the failing behavior**
+**Run:**
+```bash
+cd frontend && npm test -- controlChrome formValues localDraft graphHydration canvasEditorAutosave
+```
 
-Read `../specs/P2-06-frontend-accessibility-and-quality-spec.md` and write the smallest failing test or documentation check that demonstrates this task gap before changing implementation files.
+**Expected:** Focused editor and config-panel tests pass, and style cleanup does not change saved draft or graph behavior.
 
-- [ ] **Step 2: Run the focused check before implementation**
+### Task 6: Handoff scoped frontend accessibility and quality changes
 
-Run the narrowest backend, frontend, or documentation command that exercises the new check. Expected result before implementation: the new check fails or the documentation diff shows the missing section.
+**Files:**
+- Modify: `docs/architecture/plans/P2-06-frontend-accessibility-and-quality-plan.md`
+- Modify: `frontend/package.json`
+- Modify: `frontend/src/App.tsx`
+- Modify: `frontend/src/main.tsx`
+- Create: `frontend/src/components/layout/ErrorBoundary.tsx`
+- Create: `frontend/src/components/layout/ErrorBoundary.test.tsx`
+- Create: `frontend/src/pages/canvas-editor/CanvasEditorErrorBoundary.tsx`
+- Create: `frontend/src/pages/canvas-editor/canvasEditorAccessibility.ts`
+- Create: `frontend/src/pages/canvas-editor/canvasEditorAccessibility.test.ts`
+- Create: `frontend/src/test/accessibilityChecks.ts`
+- Create: `docs/architecture/frontend/accessibility-audit.md`
 
-- [ ] **Step 3: Implement the scoped change**
+- [x] Review only files named in this plan.
+- [x] Do not stage or commit in this session unless the user explicitly asks.
+- [x] Record verification commands and any remaining follow-ups in evidence.
 
-Change only the files required by this task and keep the behavior aligned with the acceptance criteria in `../specs/P2-06-frontend-accessibility-and-quality-spec.md`.
+**Run:**
+```bash
+git diff -- docs/architecture/plans/P2-06-frontend-accessibility-and-quality-plan.md frontend/package.json frontend/src/App.tsx frontend/src/main.tsx frontend/src/components/layout frontend/src/pages/canvas-editor frontend/src/test/accessibilityChecks.ts docs/architecture/frontend/accessibility-audit.md
+git diff -- docs/architecture/plans/P2-06-frontend-accessibility-and-quality-plan.md docs/architecture/evidence/P2-06-frontend-accessibility-and-quality.md docs/architecture/frontend/accessibility-audit.md frontend/src/App.tsx frontend/src/components/errors/AppErrorBoundary.tsx frontend/src/components/layout/ErrorBoundary.tsx frontend/src/components/layout/ErrorBoundary.test.tsx frontend/src/components/canvas/HoverEdge.tsx frontend/src/components/node-panel/NodeLibraryItem.tsx frontend/src/components/notifications/NotificationBell.tsx frontend/src/components/notifications/notificationPresentation.test.ts frontend/src/components/config-panel/controlChrome.ts frontend/src/components/config-panel/controlChrome.test.ts frontend/src/components/config-panel/index.tsx frontend/src/pages/api-docs/index.tsx frontend/src/pages/api-docs/apiDocs.test.ts frontend/src/pages/canvas-editor/CanvasEditorErrorBoundary.tsx frontend/src/pages/canvas-editor/CanvasEditorErrorBoundary.test.tsx frontend/src/pages/canvas-editor/canvasEditorAccessibility.ts frontend/src/pages/canvas-editor/canvasEditorAccessibility.test.ts frontend/src/pages/canvas-editor/editorLayout.ts frontend/src/pages/canvas-editor/editorLayout.test.ts frontend/src/pages/canvas-editor/index.tsx frontend/src/pages/canvas-editor/settingsPanel.css frontend/src/test/accessibilityChecks.ts
+```
 
-- [ ] **Step 4: Verify the task**
-
-Run the same focused command again. Expected result after implementation: pass, or documentation check exits 0.
-
-- [ ] **Step 5: Review the scoped diff**
-
-Run `git diff -- .` and verify the diff only touches files justified by this task and the package spec.
-
+**Expected:** The diff contains only frontend error isolation, accessibility checks, related docs, and focused tests. No commit is created by default.

@@ -2,11 +2,11 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Execute the architecture remediation package described in `../specs/P0-02-reactive-threading-and-transactions-spec.md`.
+**Goal:** Keep blocking JDBC, Redis, HTTP, MQ, and sleep-based waits off Netty event-loop threads while making asynchronous side effects explicit, drainable, and transaction-aware.
 
-**Architecture:** Start from the archived evidence and current repository verification, add failing tests around the confirmed behavior, then implement the smallest scoped changes that satisfy the package acceptance criteria. Keep unrelated refactors out of the package unless a test proves the boundary must change.
+**Architecture:** First capture every `.block()`, `.subscribe()`, `Thread.sleep()`, and `@Transactional` occurrence in an evidence inventory. Then convert runtime paths to bounded blocking adapters or tracked background execution, and separate DB transactions from Redis, scheduler, and MQ side effects through after-commit orchestration or repairable state transitions.
 
-**Tech Stack:** Java 21, Spring Boot 3.2, WebFlux, MyBatis-Plus, Reactor, Redis, RocketMQ, React 18, TypeScript, Vite, Vitest, JUnit 5.
+**Tech Stack:** Java 21, Spring Boot WebFlux, Reactor, MyBatis-Plus, Redis, RocketMQ, JUnit 5, StepVerifier, Maven.
 
 ---
 
@@ -18,200 +18,137 @@
 
 ## File Structure
 
-- Read: `../specs/P0-02-reactive-threading-and-transactions-spec.md`
-- Read: `../todo/coverage-matrix.md`
-- Read: `../todo/p0/reactive-threading-and-transactions/plan.md`
-- Modify: repository files named in the spec evidence for this package
-- Test: focused tests created beside the affected backend or frontend code before implementation
+- App mode: `backend/canvas-engine/src/main/resources/application.yml`
+- Inventory: `docs/architecture/evidence/P0-02-reactive-threading-inventory.md`
+- Blocking adapter: `backend/canvas-engine/src/main/java/org/chovy/canvas/infrastructure/reactor/BlockingWorkScheduler.java`
+- Background registry: `backend/canvas-engine/src/main/java/org/chovy/canvas/infrastructure/reactor/TrackedReactiveTaskRegistry.java`
+- Transaction side effects: `backend/canvas-engine/src/main/java/org/chovy/canvas/domain/canvas/CanvasTransactionService.java`
+- Transaction side effects: `backend/canvas-engine/src/main/java/org/chovy/canvas/domain/canvas/CanvasService.java`
+- Transaction side effects: `backend/canvas-engine/src/main/java/org/chovy/canvas/domain/canvas/CanvasOpsService.java`
+- Runtime path: `backend/canvas-engine/src/main/java/org/chovy/canvas/domain/meta/TagImportSourceService.java`
+- Runtime path: `backend/canvas-engine/src/main/java/org/chovy/canvas/engine/audience/AudienceBatchComputeService.java`
+- Runtime path: `backend/canvas-engine/src/main/java/org/chovy/canvas/engine/audience/AudienceEvaluationContextFetcher.java`
+- Runtime path: `backend/canvas-engine/src/main/java/org/chovy/canvas/engine/audience/AudienceComputeTaskRunner.java`
+- Runtime path: `backend/canvas-engine/src/main/java/org/chovy/canvas/engine/trigger/CanvasSchedulerService.java`
+- Runtime path: `backend/canvas-engine/src/main/java/org/chovy/canvas/infrastructure/redis/TriggerRouteService.java`
+- Runtime path: `backend/canvas-engine/src/main/java/org/chovy/canvas/infrastructure/redis/CanvasRouteInitializer.java`
+- Tests: `backend/canvas-engine/src/test/java/org/chovy/canvas/infrastructure/reactor/BlockingWorkSchedulerTest.java`
+- Tests: `backend/canvas-engine/src/test/java/org/chovy/canvas/infrastructure/reactor/TrackedReactiveTaskRegistryTest.java`
+- Tests: `backend/canvas-engine/src/test/java/org/chovy/canvas/domain/canvas/CanvasTransactionAnnotationTest.java`
+- Tests: `backend/canvas-engine/src/test/java/org/chovy/canvas/engine/trigger/CanvasSchedulerServiceTest.java`
+- Tests: `backend/canvas-engine/src/test/java/org/chovy/canvas/engine/audience/AudienceComputeTaskRunnerTest.java`
+- Tests: `backend/canvas-engine/src/test/java/org/chovy/canvas/infra/redis/TriggerRouteServiceTest.java`
 
-### Task 1: Inventory all `.block()`, `.subscribe()`, `Thread.sleep()`, and `@Transactional` occurrences
-
-**Files:**
-- Read: `../specs/P0-02-reactive-threading-and-transactions-spec.md`
-- Read: `../todo/coverage-matrix.md`
-- Modify: repository files named in this package spec evidence
-- Test: focused tests created beside the affected code
-
-Existing package notes:
-- Source task has no additional notes beyond its title.
-
-- [ ] **Step 1: Lock the failing behavior**
-
-Read `../specs/P0-02-reactive-threading-and-transactions-spec.md` and write the smallest failing test or documentation check that demonstrates this task gap before changing implementation files.
-
-- [ ] **Step 2: Run the focused check before implementation**
-
-Run the narrowest backend, frontend, or documentation command that exercises the new check. Expected result before implementation: the new check fails or the documentation diff shows the missing section.
-
-- [ ] **Step 3: Implement the scoped change**
-
-Change only the files required by this task and keep the behavior aligned with the acceptance criteria in `../specs/P0-02-reactive-threading-and-transactions-spec.md`.
-
-- [ ] **Step 4: Verify the task**
-
-Run the same focused command again. Expected result after implementation: pass, or documentation check exits 0.
-
-- [ ] **Step 5: Review the scoped diff**
-
-Run `git diff -- .` and verify the diff only touches files justified by this task and the package spec.
-
-### Task 2: Classify each occurrence as acceptable, needs scheduler wrapping, needs API redesign, or should become a managed background task
+### Task 1: Inventory blocking and transactional boundaries
 
 **Files:**
-- Read: `../specs/P0-02-reactive-threading-and-transactions-spec.md`
-- Read: `../todo/coverage-matrix.md`
-- Modify: repository files named in this package spec evidence
-- Test: focused tests created beside the affected code
+- Docs: `docs/architecture/evidence/P0-02-reactive-threading-inventory.md`
+- Spec: `docs/architecture/specs/P0-02-reactive-threading-and-transactions-spec.md`
+- Plan: `docs/architecture/plans/P0-02-reactive-threading-and-transactions-plan.md`
 
-Existing package notes:
-- Source task has no additional notes beyond its title.
+- [x] Record each `.block()`, `.subscribe()`, `Thread.sleep()`, and `@Transactional` occurrence with class, method, caller type, and classification.
+- [x] Mark each occurrence as accepted, scheduler-wrapped, redesigned, tracked background execution, or transaction-side-effect work.
+- [x] Identify the first runtime batch: scheduler trigger execution, audience fetching, tag import source metadata calls, route waits, and canvas publish/offline/kill side effects.
 
-- [ ] **Step 1: Lock the failing behavior**
+Run:
 
-Read `../specs/P0-02-reactive-threading-and-transactions-spec.md` and write the smallest failing test or documentation check that demonstrates this task gap before changing implementation files.
+```bash
+rg -n "\\.block\\(|\\.subscribe\\(|Thread\\.sleep|@Transactional" backend/canvas-engine/src/main/java > /tmp/p0-02-reactive-scan.txt
+# Do not stage or commit in this session unless the user explicitly asks.
+```
 
-- [ ] **Step 2: Run the focused check before implementation**
+Expected: the evidence file maps every scan hit to an owner and next action; no runtime conversion starts without this inventory.
 
-Run the narrowest backend, frontend, or documentation command that exercises the new check. Expected result before implementation: the new check fails or the documentation diff shows the missing section.
-
-- [ ] **Step 3: Implement the scoped change**
-
-Change only the files required by this task and keep the behavior aligned with the acceptance criteria in `../specs/P0-02-reactive-threading-and-transactions-spec.md`.
-
-- [ ] **Step 4: Verify the task**
-
-Run the same focused command again. Expected result after implementation: pass, or documentation check exits 0.
-
-- [ ] **Step 5: Review the scoped diff**
-
-Run `git diff -- .` and verify the diff only touches files justified by this task and the package spec.
-
-### Task 3: Fix critical runtime paths first:
+### Task 2: Introduce managed blocking and background execution primitives
 
 **Files:**
-- Read: `../specs/P0-02-reactive-threading-and-transactions-spec.md`
-- Read: `../todo/coverage-matrix.md`
-- Modify: repository files named in this package spec evidence
-- Test: focused tests created beside the affected code
+- Production: `backend/canvas-engine/src/main/java/org/chovy/canvas/infrastructure/reactor/BlockingWorkScheduler.java`
+- Production: `backend/canvas-engine/src/main/java/org/chovy/canvas/infrastructure/reactor/TrackedReactiveTaskRegistry.java`
+- Test: `backend/canvas-engine/src/test/java/org/chovy/canvas/infrastructure/reactor/BlockingWorkSchedulerTest.java`
+- Test: `backend/canvas-engine/src/test/java/org/chovy/canvas/infrastructure/reactor/TrackedReactiveTaskRegistryTest.java`
 
-Existing package notes:
-   - scheduler trigger execution;
-   - audience evaluation/fetching;
-   - tag import source metadata calls;
-   - route mutation waits;
-   - canvas publish/offline/kill side effects.
+- [x] Add a small adapter that runs blocking callables on `Schedulers.boundedElastic()` and asserts they are not executed on Netty event-loop threads.
+- [x] Add a registry for background `Disposable`, `Mono`, or `Publisher` work with names, lifecycle state, and drain/shutdown behavior.
+- [x] Cover success, failure, cancellation, shutdown rejection, and boundedElastic scheduling with JUnit and StepVerifier.
 
-- [ ] **Step 1: Lock the failing behavior**
+Run:
 
-Read `../specs/P0-02-reactive-threading-and-transactions-spec.md` and write the smallest failing test or documentation check that demonstrates this task gap before changing implementation files.
+```bash
+cd backend && mvn -pl canvas-engine -Dtest=BlockingWorkSchedulerTest,TrackedReactiveTaskRegistryTest test
+# Do not stage or commit in this session unless the user explicitly asks.
+```
 
-- [ ] **Step 2: Run the focused check before implementation**
+Expected: tests prove blocking work shifts to boundedElastic and tracked background tasks can be drained or rejected during shutdown.
 
-Run the narrowest backend, frontend, or documentation command that exercises the new check. Expected result before implementation: the new check fails or the documentation diff shows the missing section.
-
-- [ ] **Step 3: Implement the scoped change**
-
-Change only the files required by this task and keep the behavior aligned with the acceptance criteria in `../specs/P0-02-reactive-threading-and-transactions-spec.md`.
-
-- [ ] **Step 4: Verify the task**
-
-Run the same focused command again. Expected result after implementation: pass, or documentation check exits 0.
-
-- [ ] **Step 5: Review the scoped diff**
-
-Run `git diff -- .` and verify the diff only touches files justified by this task and the package spec.
-
-### Task 4: Introduce a consistent transaction-side-effect pattern
+### Task 3: Convert critical runtime blocking paths
 
 **Files:**
-- Read: `../specs/P0-02-reactive-threading-and-transactions-spec.md`
-- Read: `../todo/coverage-matrix.md`
-- Modify: repository files named in this package spec evidence
-- Test: focused tests created beside the affected code
+- Production: `backend/canvas-engine/src/main/java/org/chovy/canvas/domain/meta/TagImportSourceService.java`
+- Production: `backend/canvas-engine/src/main/java/org/chovy/canvas/engine/audience/AudienceEvaluationContextFetcher.java`
+- Production: `backend/canvas-engine/src/main/java/org/chovy/canvas/engine/audience/AudienceBatchComputeService.java`
+- Production: `backend/canvas-engine/src/main/java/org/chovy/canvas/engine/audience/AudienceComputeTaskRunner.java`
+- Production: `backend/canvas-engine/src/main/java/org/chovy/canvas/engine/trigger/CanvasSchedulerService.java`
+- Production: `backend/canvas-engine/src/main/java/org/chovy/canvas/infrastructure/redis/TriggerRouteService.java`
+- Production: `backend/canvas-engine/src/main/java/org/chovy/canvas/infrastructure/redis/CanvasRouteInitializer.java`
+- Test: `backend/canvas-engine/src/test/java/org/chovy/canvas/engine/trigger/CanvasSchedulerServiceTest.java`
+- Test: `backend/canvas-engine/src/test/java/org/chovy/canvas/engine/audience/AudienceComputeTaskRunnerTest.java`
+- Test: `backend/canvas-engine/src/test/java/org/chovy/canvas/infra/redis/TriggerRouteServiceTest.java`
 
-Existing package notes:
-   - Prefer DB transaction first, outbox/after-commit event second, idempotent external update third.
+- [x] Replace direct `.block()` and `Thread.sleep()` in the named runtime paths with `BlockingWorkScheduler`, Reactor timers, or explicit synchronous service boundaries.
+- [x] Replace business-path fire-and-forget `.subscribe()` with tracked registry calls or returned `Mono` orchestration.
+- [x] Keep accepted scan hits documented in `docs/architecture/evidence/P0-02-reactive-threading-inventory.md` with a reason.
 
-- [ ] **Step 1: Lock the failing behavior**
+Run:
 
-Read `../specs/P0-02-reactive-threading-and-transactions-spec.md` and write the smallest failing test or documentation check that demonstrates this task gap before changing implementation files.
+```bash
+cd backend && mvn -pl canvas-engine -Dtest=CanvasSchedulerServiceTest,AudienceComputeTaskRunnerTest,TriggerRouteServiceTest test
+rg -n "\\.block\\(|\\.subscribe\\(|Thread\\.sleep" backend/canvas-engine/src/main/java/org/chovy/canvas/domain/meta/TagImportSourceService.java backend/canvas-engine/src/main/java/org/chovy/canvas/engine/audience/AudienceEvaluationContextFetcher.java backend/canvas-engine/src/main/java/org/chovy/canvas/engine/audience/AudienceBatchComputeService.java backend/canvas-engine/src/main/java/org/chovy/canvas/engine/audience/AudienceComputeTaskRunner.java backend/canvas-engine/src/main/java/org/chovy/canvas/engine/trigger/CanvasSchedulerService.java backend/canvas-engine/src/main/java/org/chovy/canvas/infrastructure/redis/TriggerRouteService.java backend/canvas-engine/src/main/java/org/chovy/canvas/infrastructure/redis/CanvasRouteInitializer.java
+# Do not stage or commit in this session unless the user explicitly asks.
+```
 
-- [ ] **Step 2: Run the focused check before implementation**
+Expected: targeted tests pass; any remaining scan output for these files is explicitly classified as accepted or pending in the evidence file.
 
-Run the narrowest backend, frontend, or documentation command that exercises the new check. Expected result before implementation: the new check fails or the documentation diff shows the missing section.
-
-- [ ] **Step 3: Implement the scoped change**
-
-Change only the files required by this task and keep the behavior aligned with the acceptance criteria in `../specs/P0-02-reactive-threading-and-transactions-spec.md`.
-
-- [ ] **Step 4: Verify the task**
-
-Run the same focused command again. Expected result after implementation: pass, or documentation check exits 0.
-
-- [ ] **Step 5: Review the scoped diff**
-
-Run `git diff -- .` and verify the diff only touches files justified by this task and the package spec.
-
-### Task 5: Add tests
+### Task 4: Separate transactions from external side effects
 
 **Files:**
-- Read: `../specs/P0-02-reactive-threading-and-transactions-spec.md`
-- Read: `../todo/coverage-matrix.md`
-- Modify: repository files named in this package spec evidence
-- Test: focused tests created beside the affected code
+- Production: `backend/canvas-engine/src/main/java/org/chovy/canvas/domain/canvas/CanvasTransactionService.java`
+- Production: `backend/canvas-engine/src/main/java/org/chovy/canvas/domain/canvas/CanvasService.java`
+- Production: `backend/canvas-engine/src/main/java/org/chovy/canvas/domain/canvas/CanvasOpsService.java`
+- Production: `backend/canvas-engine/src/main/java/org/chovy/canvas/domain/cdp/CdpTagService.java`
+- Production: `backend/canvas-engine/src/main/java/org/chovy/canvas/domain/meta/TagImportService.java`
+- Test: `backend/canvas-engine/src/test/java/org/chovy/canvas/domain/canvas/CanvasTransactionAnnotationTest.java`
+- Test: `backend/canvas-engine/src/test/java/org/chovy/canvas/domain/canvas/CanvasTransactionSideEffectTest.java`
 
-Existing package notes:
-   - StepVerifier tests for converted reactive flows.
-   - Transaction rollback tests proving Redis/scheduler side effects are not applied before commit.
+- [x] Ensure DB writes commit before Redis route updates, scheduler registration, MQ publishing, and background task dispatch.
+- [x] Use after-commit callbacks, an outbox table, or an explicit repairable state transition for each side effect.
+- [x] Add rollback tests proving external side effects do not run when the database transaction rolls back.
 
-- [ ] **Step 1: Lock the failing behavior**
+Run:
 
-Read `../specs/P0-02-reactive-threading-and-transactions-spec.md` and write the smallest failing test or documentation check that demonstrates this task gap before changing implementation files.
+```bash
+cd backend && mvn -pl canvas-engine -Dtest=CanvasTransactionAnnotationTest,CanvasTransactionSideEffectTest test
+# Do not stage or commit in this session unless the user explicitly asks.
+```
 
-- [ ] **Step 2: Run the focused check before implementation**
+Expected: rollback tests show no Redis, scheduler, MQ, or background side effect is fired before commit.
 
-Run the narrowest backend, frontend, or documentation command that exercises the new check. Expected result before implementation: the new check fails or the documentation diff shows the missing section.
-
-- [ ] **Step 3: Implement the scoped change**
-
-Change only the files required by this task and keep the behavior aligned with the acceptance criteria in `../specs/P0-02-reactive-threading-and-transactions-spec.md`.
-
-- [ ] **Step 4: Verify the task**
-
-Run the same focused command again. Expected result after implementation: pass, or documentation check exits 0.
-
-- [ ] **Step 5: Review the scoped diff**
-
-Run `git diff -- .` and verify the diff only touches files justified by this task and the package spec.
-
-### Task 6: Run backend tests and targeted stress checks for boundedElastic saturation
+### Task 5: Validate the reactive boundary package
 
 **Files:**
-- Read: `../specs/P0-02-reactive-threading-and-transactions-spec.md`
-- Read: `../todo/coverage-matrix.md`
-- Modify: repository files named in this package spec evidence
-- Test: focused tests created beside the affected code
+- Docs: `docs/architecture/evidence/P0-02-reactive-threading-inventory.md`
+- Plan: `docs/architecture/plans/P0-02-reactive-threading-and-transactions-plan.md`
+- Spec: `docs/architecture/specs/P0-02-reactive-threading-and-transactions-spec.md`
 
-Existing package notes:
-- Source task has no additional notes beyond its title.
+- [x] Run all focused tests from this package in one Maven invocation.
+- [x] Run the backend module suite.
+- [x] Update the evidence file with accepted scan hits and converted scan hits.
 
-- [ ] **Step 1: Lock the failing behavior**
+Run:
 
-Read `../specs/P0-02-reactive-threading-and-transactions-spec.md` and write the smallest failing test or documentation check that demonstrates this task gap before changing implementation files.
+```bash
+cd backend && mvn -pl canvas-engine -Dtest=BlockingWorkSchedulerTest,TrackedReactiveTaskRegistryTest,CanvasSchedulerServiceTest,AudienceComputeTaskRunnerTest,TriggerRouteServiceTest,CanvasTransactionAnnotationTest,CanvasTransactionSideEffectTest test
+cd backend && mvn -pl canvas-engine test
+# Do not stage or commit in this session unless the user explicitly asks.
+```
 
-- [ ] **Step 2: Run the focused check before implementation**
-
-Run the narrowest backend, frontend, or documentation command that exercises the new check. Expected result before implementation: the new check fails or the documentation diff shows the missing section.
-
-- [ ] **Step 3: Implement the scoped change**
-
-Change only the files required by this task and keep the behavior aligned with the acceptance criteria in `../specs/P0-02-reactive-threading-and-transactions-spec.md`.
-
-- [ ] **Step 4: Verify the task**
-
-Run the same focused command again. Expected result after implementation: pass, or documentation check exits 0.
-
-- [ ] **Step 5: Review the scoped diff**
-
-Run `git diff -- .` and verify the diff only touches files justified by this task and the package spec.
-
+Expected: focused tests and backend module tests pass; evidence explains every remaining blocking or subscription scan hit.

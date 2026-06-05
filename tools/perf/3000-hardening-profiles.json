@@ -1,6 +1,21 @@
 {
   "targetConcurrency": 3000,
   "observationWindowSeconds": 1800,
+  "protectedLanes": ["LIGHT", "STANDARD"],
+  "borrowRules": {
+    "HEAVY": { "cannotBorrowFrom": ["LIGHT", "STANDARD"] },
+    "RETRY": { "cannotBorrowFrom": ["LIGHT", "STANDARD"] }
+  },
+  "requiredProfiles": [
+    "default-mixed-3000",
+    "retry-surge-3000",
+    "heavy-surge-3000",
+    "redis-latency-spike-3000",
+    "mysql-saturation-3000",
+    "rocketmq-backlog-3000",
+    "downstream-partial-failure-3000",
+    "retry-backlog-explosion-3000"
+  ],
   "lanes": {
     "LIGHT": { "concurrency": 600, "share": 0.2 },
     "STANDARD": { "concurrency": 1800, "share": 0.6 },
@@ -32,23 +47,29 @@
       ],
       "maxFailed": 0,
       "maxP95Ms": 1000,
-      "waitAfterRunMs": 10000
+      "waitAfterRunMs": 10000,
+      "stopGates": ["RUNNER_FAILED", "VERIFIER_FAIL", "P95_EXCEEDED"],
+      "rollbackActions": ["restore_previous_lane_budgets", "pause_new_perf_runs"],
+      "degradeActions": ["lower_global_admission_limit", "extend_observation_window"]
     },
     {
-      "name": "retry-surge-300",
+      "name": "retry-surge-3000",
       "description": "Retry lane reaches 300 while LIGHT and STANDARD stay protected.",
       "mode": "event",
-      "eventCode": "PERF_ORDER_PAID",
+      "eventCode": "PERF_RETRY_SURGE",
       "stages": [
         { "count": 5000, "concurrency": 100 },
         { "count": 15000, "concurrency": 300 }
       ],
       "maxFailed": 0,
       "maxP95Ms": 1500,
-      "waitAfterRunMs": 30000
+      "waitAfterRunMs": 30000,
+      "stopGates": ["RETRY_BACKLOG_GROWING_AFTER_RECOVERY", "DLQ_GROWING_AFTER_RECOVERY"],
+      "rollbackActions": ["restore_previous_lane_budgets", "pause_retry_replay"],
+      "degradeActions": ["lower_retry_lane", "lengthen_retry_backoff"]
     },
     {
-      "name": "heavy-surge-300",
+      "name": "heavy-surge-3000",
       "description": "Heavy lane reaches 300 and must not borrow LIGHT or STANDARD budget.",
       "mode": "event",
       "eventCode": "PERF_HEAVY_FLOW",
@@ -58,23 +79,13 @@
       ],
       "maxFailed": 0,
       "maxP95Ms": 3000,
-      "waitAfterRunMs": 30000
+      "waitAfterRunMs": 30000,
+      "stopGates": ["P95_EXCEEDED", "DISRUPTOR_OVERFLOW_GROWING"],
+      "rollbackActions": ["restore_previous_lane_budgets", "disable_heavy_lane_expansion"],
+      "degradeActions": ["lower_heavy_lane", "cap_heavy_batch_size"]
     },
     {
-      "name": "slow-downstream-standard",
-      "description": "One downstream is slow; timeout, circuit breaker, and bulkhead must contain impact.",
-      "mode": "event",
-      "eventCode": "PERF_SLOW_DOWNSTREAM",
-      "stages": [
-        { "count": 5000, "concurrency": 300 },
-        { "count": 20000, "concurrency": 1200 }
-      ],
-      "maxFailed": 100,
-      "maxP95Ms": 5000,
-      "waitAfterRunMs": 30000
-    },
-    {
-      "name": "redis-registry-latency",
+      "name": "redis-latency-spike-3000",
       "description": "Redis registry latency spike must fail conservatively and never over-admit.",
       "mode": "event",
       "eventCode": "PERF_ORDER_PAID",
@@ -84,10 +95,29 @@
       ],
       "maxFailed": 500,
       "maxP95Ms": 5000,
-      "waitAfterRunMs": 30000
+      "waitAfterRunMs": 30000,
+      "stopGates": ["REDIS_REGISTRY_LATENCY_SUSTAINED", "REGISTRY_UNAVAILABLE_OVER_ADMIT"],
+      "rollbackActions": ["restore_previous_registry_config", "disable_new_admission_borrowing"],
+      "degradeActions": ["lower_global_admission_limit", "fail_closed_on_registry_timeout"]
     },
     {
-      "name": "rocketmq-backlog-recovery",
+      "name": "mysql-saturation-3000",
+      "description": "MySQL pool saturation must be visible and bounded under 3000 target traffic.",
+      "mode": "event",
+      "eventCode": "PERF_ORDER_PAID",
+      "stages": [
+        { "count": 5000, "concurrency": 300 },
+        { "count": 20000, "concurrency": 1200 }
+      ],
+      "maxFailed": 100,
+      "maxP95Ms": 5000,
+      "waitAfterRunMs": 30000,
+      "stopGates": ["MYSQL_POOL_SATURATION", "P95_EXCEEDED"],
+      "rollbackActions": ["restore_previous_pool_limits", "pause_scale_out_decision"],
+      "degradeActions": ["lower_standard_lane", "shorten_db_query_timeout"]
+    },
+    {
+      "name": "rocketmq-backlog-3000",
       "description": "Normal, retry, and heavy backlog are observed separately; retry recovery must not starve normal traffic.",
       "mode": "event",
       "eventCode": "PERF_MQ",
@@ -97,7 +127,42 @@
       ],
       "maxFailed": 0,
       "maxP95Ms": 2000,
-      "waitAfterRunMs": 30000
+      "waitAfterRunMs": 30000,
+      "stopGates": ["NORMAL_MQ_BACKLOG_STARVED_BY_RETRY", "RETRY_BACKLOG_GROWING_AFTER_RECOVERY"],
+      "rollbackActions": ["restore_previous_consumer_threads", "pause_retry_replay"],
+      "degradeActions": ["lower_retry_lane", "reserve_normal_mq_consumers"]
+    },
+    {
+      "name": "downstream-partial-failure-3000",
+      "description": "One downstream is slow or partially failing; timeout, circuit breaker, and bulkhead must contain impact.",
+      "mode": "event",
+      "eventCode": "PERF_SLOW_DOWNSTREAM",
+      "stages": [
+        { "count": 5000, "concurrency": 300 },
+        { "count": 20000, "concurrency": 1200 }
+      ],
+      "maxFailed": 100,
+      "maxP95Ms": 5000,
+      "waitAfterRunMs": 30000,
+      "stopGates": ["P95_EXCEEDED", "RUNNER_FAILED"],
+      "rollbackActions": ["restore_previous_downstream_timeout", "disable_downstream_experiment"],
+      "degradeActions": ["open_circuit_for_unhealthy_downstream", "lower_downstream_bulkhead_limit"]
+    },
+    {
+      "name": "retry-backlog-explosion-3000",
+      "description": "Retry backlog explosion must recover without DLQ growth or starvation of protected lanes.",
+      "mode": "event",
+      "eventCode": "PERF_RETRY_BACKLOG",
+      "stages": [
+        { "count": 5000, "concurrency": 100 },
+        { "count": 20000, "concurrency": 300 }
+      ],
+      "maxFailed": 0,
+      "maxP95Ms": 3000,
+      "waitAfterRunMs": 30000,
+      "stopGates": ["RETRY_BACKLOG_GROWING_AFTER_RECOVERY", "DLQ_GROWING_AFTER_RECOVERY", "NORMAL_MQ_BACKLOG_STARVED_BY_RETRY"],
+      "rollbackActions": ["pause_retry_replay", "restore_previous_retry_policy"],
+      "degradeActions": ["lower_retry_lane", "increase_retry_dead_letter_threshold"]
     }
   ]
 }

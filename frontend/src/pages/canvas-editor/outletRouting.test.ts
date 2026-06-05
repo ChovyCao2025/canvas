@@ -85,6 +85,18 @@ describe('outlet routing helpers', () => {
     ])
   })
 
+  it('does not derive stale edges after bizConfig target is cleared', () => {
+    const before = deriveEdges([
+      { id: 'node_a', type: 'WAIT', name: '等待', x: 0, y: 0, config: { nextNodeId: 'node_b' } },
+    ])
+    expect(before).toHaveLength(1)
+
+    const after = deriveEdges([
+      { id: 'node_a', type: 'WAIT', name: '等待', x: 0, y: 0, config: { nextNodeId: undefined } },
+    ])
+    expect(after).toEqual([])
+  })
+
   it('derives DIRECT_CALL fan-out branches as multiple default outlet edges', () => {
     expect(deriveEdges([
       {

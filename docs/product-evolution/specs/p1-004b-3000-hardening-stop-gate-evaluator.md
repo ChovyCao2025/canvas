@@ -5,6 +5,10 @@ Sequence: 004B
 Source: `docs/optimization/3000-concurrency-hardening-checklist.md`
 Implementation plan: `../plans/p1-004b-3000-hardening-stop-gate-evaluator-plan.md`
 
+## Implementation Status
+
+Implemented and focused-verified on 2026-06-05. `capacity-report.mjs` now exports `evaluateHardeningGates(samples)` with deterministic gate ordering for Redis, MySQL, MQ, Disruptor overflow, retry backlog, DLQ, and protected lane latency samples.
+
 ## Goal
 
 Add a deterministic evaluator that converts 3000 hardening metric samples into `PASS` or `STOP` decisions with named stop gates.
@@ -12,7 +16,7 @@ Add a deterministic evaluator that converts 3000 hardening metric samples into `
 ## Current Baseline
 
 - `tools/perf/capacity-report.mjs` estimates capacity bottlenecks.
-- It does not evaluate the 3000 hardening checklist gates for Redis, MySQL, MQ, overflow, retry backlog, DLQ, or protected lane latency.
+- `evaluateHardeningGates(samples)` evaluates the 3000 hardening checklist gates for Redis, MySQL, MQ, overflow, retry backlog, DLQ, and protected lane latency.
 
 ## In Scope
 

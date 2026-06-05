@@ -7,29 +7,53 @@ Coverage matrix: `docs/architecture/todo/coverage-matrix.md`
 
 ## Verification Status
 
-Mixed: mostly confirmed, with one stale subclaim.
+Implemented for the P0-01 focused backend scope, with focused verification passing for production startup guards, CORS policy, privileged route authorization, public trigger HMAC verification, and generic error-message sanitization.
 
-## Confirmed Problems
+Verification evidence:
 
-- `application.yml` still defaults datasource credentials to `root/root`.
-- `canvas.events.report-secret` still has a weak default.
-- CORS still uses `addAllowedOriginPattern("*")` with `allowCredentials(true)`.
-- Swagger, direct execution, behavior trigger, notification websocket, and `/ops/**` are public in `SecurityConfig`.
-- `GlobalExceptionHandler` still returns `"系统错误: " + e.getMessage()` for generic 500s.
+- `ProductionConfigGuardTest`
+- `ProductionSecurityValidatorTest`
+- `WebConfigTest`
+- `SecurityConfigRouteTest`
+- `SecurityConfigRoleTest`
+- `PublicTriggerAuthServiceTest`
+- `ExecutionControllerMachineAuthTest`
+- `EventDefinitionControllerTest`
+- `ExecutionControllerTest`
+- `GlobalExceptionHandlerTest`
+- Command: `JAVA_HOME=/Users/photonpay/Library/Java/JavaVirtualMachines/ms-21.0.11/Contents/Home PATH=/Users/photonpay/Library/Java/JavaVirtualMachines/ms-21.0.11/Contents/Home/bin:$PATH mvn -pl canvas-engine -Dtest=ProductionConfigGuardTest,ProductionSecurityValidatorTest,WebConfigTest,SecurityConfigRouteTest,SecurityConfigRoleTest,PublicTriggerAuthServiceTest,ExecutionControllerMachineAuthTest,GlobalExceptionHandlerTest,EventDefinitionControllerTest,ExecutionControllerTest test`
+- Module command: `JAVA_HOME=/Users/photonpay/Library/Java/JavaVirtualMachines/ms-21.0.11/Contents/Home PATH=/Users/photonpay/Library/Java/JavaVirtualMachines/ms-21.0.11/Contents/Home/bin:$PATH mvn -pl canvas-engine test`
 
-## Corrected Finding
+## Resolved Problems
 
-The previous "JWT Secret no startup validation" claim is stale. `JwtUtil` validates blank, default, and short secrets. The remaining task is to make deployment configuration explicit and tested.
+- Production-like profiles fail fast for root datasource credentials, blank/short/default JWT secrets, weak/default event report secrets, wildcard credentialed CORS, exposed health details, enabled Springdoc API docs, and enabled Swagger UI.
+- `application-prod.yml` requires deployment-provided secrets and disables Springdoc API docs and Swagger UI.
+- CORS wildcard origin remains available only for local developer convenience; production-like profiles reject it.
+- `/ops/**` requires ADMIN/SUPER_ADMIN authorization.
+- Public trigger endpoints use HMAC verification before parsing or dispatching caller-controlled payloads.
+- Generic 500 responses no longer expose `Throwable#getMessage()` and return a trace id for log correlation.
 
 ## Evidence
 
-- `backend/canvas-engine/src/main/resources/application.yml:8-9`
-- `backend/canvas-engine/src/main/resources/application.yml:52-59`
-- `backend/canvas-engine/src/main/resources/application.yml:166`
-- `backend/canvas-engine/src/main/java/org/chovy/canvas/config/WebConfig.java:36-45`
-- `backend/canvas-engine/src/main/java/org/chovy/canvas/config/SecurityConfig.java:58-70`
-- `backend/canvas-engine/src/main/java/org/chovy/canvas/config/GlobalExceptionHandler.java:84`
-- `backend/canvas-engine/src/main/java/org/chovy/canvas/auth/util/JwtUtil.java:45-54`
+- `backend/canvas-engine/src/main/resources/application.yml`
+- `backend/canvas-engine/src/main/resources/application-prod.yml`
+- `backend/canvas-engine/src/main/java/org/chovy/canvas/config/ProductionConfigGuard.java`
+- `backend/canvas-engine/src/main/java/org/chovy/canvas/config/ProductionSecurityValidator.java`
+- `backend/canvas-engine/src/main/java/org/chovy/canvas/config/WebConfig.java`
+- `backend/canvas-engine/src/main/java/org/chovy/canvas/config/SecurityConfig.java`
+- `backend/canvas-engine/src/main/java/org/chovy/canvas/security/CanvasHmacVerifier.java`
+- `backend/canvas-engine/src/main/java/org/chovy/canvas/security/PublicTriggerAuthService.java`
+- `backend/canvas-engine/src/main/java/org/chovy/canvas/web/EventReportAuthService.java`
+- `backend/canvas-engine/src/main/java/org/chovy/canvas/web/ExecutionController.java`
+- `backend/canvas-engine/src/main/java/org/chovy/canvas/web/EventDefinitionController.java`
+- `backend/canvas-engine/src/main/java/org/chovy/canvas/config/GlobalExceptionHandler.java`
+- `docs/architecture/evidence/P0-01-security-hardening.md`
+
+## Remaining Risks
+
+- Swagger/API-doc paths are still route-level `permitAll`, but production profiles disable Springdoc and startup validation rejects enabled Springdoc flags.
+- Public trigger endpoints are intentionally anonymous at the route layer and protected by controller-level HMAC verification.
+- Notification websocket is intentionally anonymous at the route layer and depends on the websocket ticket flow for connection authorization.
 
 ## Acceptance Criteria
 

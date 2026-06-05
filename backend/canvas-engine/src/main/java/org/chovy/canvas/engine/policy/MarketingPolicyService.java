@@ -169,6 +169,30 @@ public class MarketingPolicyService {
         return PolicyDecision.allow();
     }
 
+    /** 预览当前频控桶是否允许下一次触达，不消费额度。 */
+    public PolicyDecision previewFrequency(
+            String userId,
+            Long canvasId,
+            String nodeId,
+            String scope,
+            String channel,
+            int maxCount,
+            Duration window
+    ) {
+        if (maxCount <= 0) {
+            return PolicyDecision.blocked("FREQUENCY_CAP_EXCEEDED", "频控上限为 0");
+        }
+        Duration safeWindow = window == null || window.isZero() || window.isNegative()
+                ? Duration.ofDays(1)
+                : window;
+        String key = frequencyKey(userId, canvasId, nodeId, scope, channel, safeWindow);
+        String rawCount = redisTemplate.opsForValue().get(key);
+        long currentCount = parseCounter(rawCount);
+        return currentCount >= maxCount
+                ? PolicyDecision.blocked("FREQUENCY_CAP_EXCEEDED", "用户触达频率超过限制")
+                : PolicyDecision.allow();
+    }
+
     /** 根据频控作用域、渠道、节点和时间窗口生成 Redis 计数 key。 */
     private String frequencyKey(
             String userId,
@@ -188,6 +212,18 @@ public class MarketingPolicyService {
             default -> "journey:" + canvasId;
         };
         return "canvas:marketing:freq:" + normalizedScope + ":" + dimension + ":" + userId + ":" + bucket;
+    }
+
+    /** 解析 Redis 计数桶，异常值按 0 处理，避免解释接口被脏数据阻断。 */
+    private long parseCounter(String rawCount) {
+        if (rawCount == null || rawCount.isBlank()) {
+            return 0L;
+        }
+        try {
+            return Long.parseLong(rawCount);
+        } catch (NumberFormatException ignored) {
+            return 0L;
+        }
     }
 
     /** 判断当前本地时间是否位于静默窗口内，支持跨午夜窗口。 */

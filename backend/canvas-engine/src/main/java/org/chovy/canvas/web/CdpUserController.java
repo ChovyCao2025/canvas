@@ -2,6 +2,9 @@ package org.chovy.canvas.web;
 
 import lombok.RequiredArgsConstructor;
 import org.chovy.canvas.common.R;
+import org.chovy.canvas.common.tenant.RoleNames;
+import org.chovy.canvas.common.tenant.TenantContext;
+import org.chovy.canvas.common.tenant.TenantContextResolver;
 import org.chovy.canvas.domain.cdp.CdpUserDirectoryService;
 import org.chovy.canvas.domain.cdp.CdpTagService;
 import org.chovy.canvas.domain.cdp.CdpUserInsightService;
@@ -43,11 +46,14 @@ public class CdpUserController {
     private final CdpUserService userService;
     /** CDP 标签服务，用于查询用户标签。 */
     private final CdpTagService tagService;
+    /** 租户上下文解析器，用于隔离 CDP 用户和标签数据。 */
+    private final TenantContextResolver tenantContextResolver;
 
     @GetMapping
     public Mono<R<List<CanvasUserRowDTO>>> list(@org.springframework.web.bind.annotation.RequestParam(required = false) String keyword) {
-        return Mono.fromCallable(() -> R.ok(directoryService.listUsers(keyword)))
-                .subscribeOn(Schedulers.boundedElastic());
+        return tenantContextResolver.currentOrError().flatMap(context ->
+                Mono.fromCallable(() -> R.ok(directoryService.listUsers(tenantId(context), keyword)))
+                        .subscribeOn(Schedulers.boundedElastic()));
     }
 
     /**
@@ -60,8 +66,9 @@ public class CdpUserController {
      */
     @GetMapping("/{userId}")
     public Mono<R<CdpUserDetailDTO>> get(@PathVariable String userId) {
-        return Mono.fromCallable(() -> R.ok(userService.toDetail(userService.getRequiredProfile(userId))))
-                .subscribeOn(Schedulers.boundedElastic());
+        return tenantContextResolver.currentOrError().flatMap(context ->
+                Mono.fromCallable(() -> R.ok(userService.toDetail(userService.getRequiredProfile(tenantId(context), userId))))
+                        .subscribeOn(Schedulers.boundedElastic()));
     }
 
     /**
@@ -74,8 +81,9 @@ public class CdpUserController {
      */
     @GetMapping("/{userId}/insight")
     public Mono<R<CanvasUserDetailDTO>> getInsight(@PathVariable String userId) {
-        return Mono.fromCallable(() -> R.ok(insightService.getUserInsight(userId)))
-                .subscribeOn(Schedulers.boundedElastic());
+        return tenantContextResolver.currentOrError().flatMap(context ->
+                Mono.fromCallable(() -> R.ok(insightService.getUserInsight(tenantId(context), userId)))
+                        .subscribeOn(Schedulers.boundedElastic()));
     }
 
     /**
@@ -88,8 +96,9 @@ public class CdpUserController {
      */
     @GetMapping("/{userId}/tags")
     public Mono<R<List<CdpUserTagDTO>>> listTags(@PathVariable String userId) {
-        return Mono.fromCallable(() -> R.ok(tagService.listCurrentTags(userId)))
-                .subscribeOn(Schedulers.boundedElastic());
+        return tenantContextResolver.currentOrError().flatMap(context ->
+                Mono.fromCallable(() -> R.ok(tagService.listCurrentTags(tenantId(context), userId)))
+                        .subscribeOn(Schedulers.boundedElastic()));
     }
 
     /**
@@ -102,8 +111,9 @@ public class CdpUserController {
      */
     @GetMapping("/{userId}/tag-history")
     public Mono<R<List<CdpUserTagHistoryDTO>>> listTagHistory(@PathVariable String userId) {
-        return Mono.fromCallable(() -> R.ok(tagService.listHistory(userId)))
-                .subscribeOn(Schedulers.boundedElastic());
+        return tenantContextResolver.currentOrError().flatMap(context ->
+                Mono.fromCallable(() -> R.ok(tagService.listHistory(tenantId(context), userId)))
+                        .subscribeOn(Schedulers.boundedElastic()));
     }
 
     /**
@@ -117,10 +127,11 @@ public class CdpUserController {
      */
     @PostMapping("/{userId}/tags")
     public Mono<R<Void>> addTag(@PathVariable String userId, @RequestBody CdpTagWriteReq req) {
-        return Mono.fromCallable(() -> {
-            tagService.setTag(userId, req);
-            return R.<Void>ok();
-        }).subscribeOn(Schedulers.boundedElastic());
+        return tenantContextResolver.currentOrError().flatMap(context ->
+                Mono.fromCallable(() -> {
+                    tagService.setTag(tenantId(context), userId, req);
+                    return R.<Void>ok();
+                }).subscribeOn(Schedulers.boundedElastic()));
     }
 
     /**
@@ -134,9 +145,20 @@ public class CdpUserController {
      */
     @DeleteMapping("/{userId}/tags/{tagCode}")
     public Mono<R<Void>> removeTag(@PathVariable String userId, @PathVariable String tagCode) {
-        return Mono.fromCallable(() -> {
-            tagService.removeTag(userId, tagCode, "用户详情移除标签", null);
-            return R.<Void>ok();
-        }).subscribeOn(Schedulers.boundedElastic());
+        return tenantContextResolver.currentOrError().flatMap(context ->
+                Mono.fromCallable(() -> {
+                    tagService.removeTag(tenantId(context), userId, tagCode, "用户详情移除标签", null);
+                    return R.<Void>ok();
+                }).subscribeOn(Schedulers.boundedElastic()));
+    }
+
+    private Long tenantId(TenantContext context) {
+        if (context.tenantId() == null && RoleNames.ADMIN.equals(context.role())) {
+            return null;
+        }
+        if (context.tenantId() == null) {
+            throw new SecurityException("AUTH_003: missing tenant context");
+        }
+        return context.tenantId();
     }
 }

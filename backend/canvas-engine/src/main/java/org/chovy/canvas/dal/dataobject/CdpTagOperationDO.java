@@ -23,6 +23,10 @@ public class CdpTagOperationDO {
     /** 标签操作记录主键 ID */
     private Long id;
 
+    @TableField("tenant_id")
+    /** 所属租户 ID */
+    private Long tenantId;
+
     /** 操作类型，如批量新增、批量更新或批量删除标签 */
     private String operationType;
 

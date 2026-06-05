@@ -6,7 +6,7 @@
 export type ApiDocMethod = 'GET' | 'POST' | 'PUT' | 'DELETE'
 
 /** API 文档鉴权方式枚举。 */
-export type ApiDocAuth = 'none' | 'bearer'
+export type ApiDocAuth = 'none' | 'bearer' | 'hmac'
 
 /** 文档中的单个参数描述。 */
 export interface ApiDocParam {
@@ -20,6 +20,15 @@ export interface ApiDocParam {
   required?: boolean
 
   /** 参数说明。 */
+  desc: string
+}
+
+/** 文档中的响应描述。 */
+export interface ApiDocResponse {
+  /** HTTP 状态码或 OpenAPI default。 */
+  status: string
+
+  /** 响应说明。 */
   desc: string
 }
 
@@ -57,6 +66,9 @@ export interface ApiDocEndpoint {
 
   /** 响应示例。 */
   responseExample?: unknown
+
+  /** OpenAPI 响应元数据。 */
+  responses?: ApiDocResponse[]
 }
 
 /** API 文档分类定义。 */

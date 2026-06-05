@@ -1,0 +1,31 @@
+{{- if .Values.backend.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "canvas.backendName" . }}
+  namespace: {{ .Values.namespace }}
+  labels:
+    {{- include "canvas.labels" . | nindent 4 }}
+    app.kubernetes.io/component: backend
+data:
+  spring-data-redis-host: {{ .Values.backend.config.springDataRedisHost | quote }}
+  spring-data-redis-port: {{ .Values.backend.config.springDataRedisPort | quote }}
+  rocketmq-name-server: {{ .Values.backend.config.rocketmqNameServer | quote }}
+  canvas-cors-allowed-origins: {{ .Values.backend.config.canvasCorsAllowedOrigins | quote }}
+  canvas-frontend-api-base-url: {{ .Values.backend.config.canvasFrontendApiBaseUrl | quote }}
+  spring-datasource-hikari-maximum-pool-size: {{ .Values.backend.config.springDatasourceHikariMaximumPoolSize | quote }}
+  spring-datasource-hikari-minimum-idle: {{ .Values.backend.config.springDatasourceHikariMinimumIdle | quote }}
+{{- end }}
+---
+{{- if .Values.frontend.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "canvas.frontendName" . }}
+  namespace: {{ .Values.namespace }}
+  labels:
+    {{- include "canvas.labels" . | nindent 4 }}
+    app.kubernetes.io/component: frontend
+data:
+  canvas-api-upstream: {{ default (printf "http://%s:%v" (include "canvas.backendName" .) .Values.backend.service.port) .Values.frontend.apiUpstream | quote }}
+{{- end }}

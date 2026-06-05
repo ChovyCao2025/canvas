@@ -23,6 +23,10 @@ public class CdpUserProfileDO {
     /** 用户画像记录主键 ID */
     private Long id;
 
+    @TableField("tenant_id")
+    /** 所属租户 ID */
+    private Long tenantId;
+
     /** CDP 内部统一用户 ID */
     private String userId;
 

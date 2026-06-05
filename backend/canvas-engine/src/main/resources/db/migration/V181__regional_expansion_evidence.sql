@@ -1,0 +1,21 @@
+CREATE TABLE IF NOT EXISTS regional_expansion_evidence (
+  id BIGINT AUTO_INCREMENT PRIMARY KEY,
+  region_code VARCHAR(32) NOT NULL,
+  owner_id VARCHAR(128) NOT NULL,
+  demand_evidence TEXT NOT NULL,
+  locale_currency_notes TEXT NOT NULL,
+  timezone_notes TEXT NOT NULL,
+  channel_notes TEXT NOT NULL,
+  compliance_notes TEXT NOT NULL,
+  data_residency_notes TEXT NOT NULL,
+  rollout_hypothesis TEXT NOT NULL,
+  proof_command VARCHAR(1000) NOT NULL,
+  rollback_note VARCHAR(1000) NOT NULL,
+  decision_status VARCHAR(32) NOT NULL DEFAULT 'BLOCKED_PENDING_REVIEW',
+  reviewed_by VARCHAR(128) NULL,
+  reviewed_at DATETIME NULL,
+  child_spec VARCHAR(255) NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_regional_expansion_region_status (region_code, decision_status),
+  INDEX idx_regional_expansion_created_at (created_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

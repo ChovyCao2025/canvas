@@ -47,7 +47,7 @@ This converts a filtered opportunity into a bounded medium-term implementation c
 
 ### Data And Configuration Touchpoints
 
-- `backend/canvas-engine/src/main/resources/db/migration/V104__message_template_center.sql`
+- `backend/canvas-engine/src/main/resources/db/migration/V164__message_template_center.sql`
 
 ### Test Touchpoints
 

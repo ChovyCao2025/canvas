@@ -2,11 +2,11 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Define and validate a safe path from one database/pool to isolated datasource groups.
+**Goal:** Define a verified, reversible path from the current single datasource to isolated datasource groups for control, runtime, CDP/customer, analytics, and ops data.
 
-**Architecture:** Start by mapping table ownership and transaction flows. Introduce datasource separation only behind explicit repositories, migration ownership, and reconciliation paths.
+**Architecture:** Keep this P3 slice evidence-first. Map table ownership and transaction flows before introducing routing code; any runtime split must use outbox, saga, or repairable reconciliation rather than implicit distributed transactions.
 
-**Tech Stack:** Spring Boot 3.2, MyBatis-Plus, HikariCP, Flyway, MySQL, Redis, RocketMQ, Micrometer.
+**Tech Stack:** Spring Boot 3.2, MyBatis-Plus, HikariCP, Flyway, MySQL, Redis, RocketMQ, Micrometer, Markdown evidence docs.
 
 ---
 
@@ -18,48 +18,75 @@
 
 ## File Structure
 
+- Create: `docs/architecture/evidence/p3-04-multi-datasource-isolation.md`
 - Create: `docs/architecture/datasource-ownership-map.md`
+- Create: `docs/architecture/datasource-transaction-boundary-map.md`
 - Create: `docs/architecture/datasource-migration-plan.md`
-- Test: datasource routing, transaction boundary, and reconciliation tests before runtime split
+- Read: `backend/canvas-engine/src/main/resources/db/migration/`
+- Read: `backend/canvas-engine/src/main/java/org/chovy/canvas/dal/`
+- Read: `backend/canvas-engine/src/main/java/org/chovy/canvas/domain/`
 
 ### Task 1: Map Table Ownership
 
-- [ ] **Step 1: Extract schema tables**
+**Files:**
+- Create: `docs/architecture/datasource-ownership-map.md`
+- Create: `docs/architecture/evidence/p3-04-multi-datasource-isolation.md`
+- Read: `backend/canvas-engine/src/main/resources/db/migration/`
 
-Run `rg -n "CREATE TABLE" backend/canvas-engine/src/main/resources/db/migration`.
+- [x] List every table created by Flyway migrations and assign it to one owner group: control, runtime, CDP/customer, analytics, or ops.
+- [x] For each group, record owner package, tenant-scope rule, PII class, retention expectation, and backup owner.
+- [x] Record tables that cannot be moved until P0 data-security and tenant-isolation criteria are met.
 
-- [ ] **Step 2: Create ownership map**
+Run:
 
-Write `docs/architecture/datasource-ownership-map.md` grouping tables into control, runtime, CDP/customer, analytics, and ops.
+```bash
+rg -n "CREATE TABLE" backend/canvas-engine/src/main/resources/db/migration > /tmp/canvas_tables.txt
+test -s /tmp/canvas_tables.txt
+test -f docs/architecture/datasource-ownership-map.md
+rg -n "control|runtime|CDP/customer|analytics|ops|tenant|PII|retention|backup" docs/architecture/datasource-ownership-map.md
+```
 
-- [ ] **Step 3: Verify required groups**
-
-Run `rg -n "control|runtime|CDP|analytics|ops" docs/architecture/datasource-ownership-map.md`. Expected: all groups appear.
+Expected: ownership map exists and names all five datasource groups plus tenant, PII, retention, and backup fields.
 
 ### Task 2: Identify Cross-Datasource Transactions
 
-- [ ] **Step 1: Find transactional methods**
+**Files:**
+- Create: `docs/architecture/datasource-transaction-boundary-map.md`
+- Modify: `docs/architecture/evidence/p3-04-multi-datasource-isolation.md`
+- Read: `backend/canvas-engine/src/main/java/org/chovy/canvas/`
 
-Run `rg -n "@Transactional" backend/canvas-engine/src/main/java`.
+- [x] Inventory current `@Transactional` methods and repository writes that touch multiple future datasource groups.
+- [x] Classify each flow as same-datasource, outbox, saga, reconciliation, or blocked.
+- [x] For every cross-group write, name the event, idempotency key, reconciliation command, and rollback decision owner.
 
-- [ ] **Step 2: Classify each cross-domain write**
+Run:
 
-Add a table to `docs/architecture/datasource-migration-plan.md` listing current transaction, target datasource groups, and replacement pattern.
+```bash
+rg -n "@Transactional|insert\\(|update\\(|delete\\(" backend/canvas-engine/src/main/java/org/chovy/canvas > /tmp/canvas_write_flows.txt
+test -s /tmp/canvas_write_flows.txt
+test -f docs/architecture/datasource-transaction-boundary-map.md
+rg -n "outbox|saga|reconciliation|blocked|idempotency|rollback owner" docs/architecture/datasource-transaction-boundary-map.md
+```
 
-- [ ] **Step 3: Verify no implicit distributed transaction plan**
+Expected: boundary map names a safe replacement pattern for each cross-datasource write and does not depend on distributed transactions.
 
-Run `rg -n "outbox|saga|reconciliation|repair" docs/architecture/datasource-migration-plan.md`. Expected: each cross-datasource flow names one of these patterns.
+### Task 3: Define Migration, Rollback, And Monitoring
 
-### Task 3: Define Migration And Rollback
+**Files:**
+- Create: `docs/architecture/datasource-migration-plan.md`
+- Modify: `docs/architecture/evidence/p3-04-multi-datasource-isolation.md`
+- Modify: `docs/architecture/plans/P3-04-multi-datasource-isolation-plan.md`
 
-- [ ] **Step 1: Document Flyway ownership**
+- [x] Define Flyway ownership conventions for each datasource group, including directory naming and startup order.
+- [x] Define rollback for schema, data copy, datasource routing, application deployment, and reconciliation state.
+- [x] Define monitoring for pool health, migration status, replication lag, event backlog, and reconciliation failures.
 
-Add datasource-specific migration directories or ownership conventions to the migration plan.
+Run:
 
-- [ ] **Step 2: Document rollback**
+```bash
+test -f docs/architecture/datasource-migration-plan.md
+rg -n "Flyway|startup order|schema rollback|data copy|routing rollback|pool health|migration status|replication lag|reconciliation failure" docs/architecture/datasource-migration-plan.md
+git diff -- docs/architecture/evidence/p3-04-multi-datasource-isolation.md docs/architecture/datasource-ownership-map.md docs/architecture/datasource-transaction-boundary-map.md docs/architecture/datasource-migration-plan.md docs/architecture/plans/P3-04-multi-datasource-isolation-plan.md
+```
 
-Define rollback for schema, data copy, routing, and application deployment.
-
-- [ ] **Step 3: Review diff**
-
-Run `git diff -- docs/architecture`. Expected: only datasource isolation docs are changed before implementation starts.
+Expected: diff contains only datasource isolation evidence, ownership, transaction, migration, and plan docs. No commit is created by default.

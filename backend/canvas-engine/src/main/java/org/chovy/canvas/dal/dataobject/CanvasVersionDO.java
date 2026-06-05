@@ -18,6 +18,10 @@ public class CanvasVersionDO {
     /** 画布版本主键 ID */
     private Long id;
 
+    /** 所属租户 ID */
+    @TableField("tenant_id")
+    private Long tenantId;
+
     /** 所属画布 ID */
     private Long canvasId;
 

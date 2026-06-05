@@ -7,7 +7,7 @@ Coverage matrix: `docs/architecture/todo/coverage-matrix.md`
 
 ## Verification Status
 
-Partially confirmed. Repository config confirms capacity limits; true production costs require external data.
+Confirmed for repository-controlled artifacts. The SLO model, capacity cliff model, retention policy, retention migration, metric names, dashboards, alerts, and non-publishable baseline record are implemented and verified in-repo. True production costs and publishable capacity numbers still require an external load run with valid `perf-guide report` or `distributed-report` PASS evidence.
 
 ## Problems Covered
 
@@ -24,7 +24,16 @@ Partially confirmed. Repository config confirms capacity limits; true production
 
 ## Acceptance Criteria
 
-- SLA/SLO targets are written and measurable.
-- Capacity model maps QPS/executions/users to app, DB, Redis, MQ, and storage requirements.
-- Retention rules exist for execution, trace, audit, DLQ, and Redis quota keys.
-- Metrics and alerts exist for pool saturation, queue depth, Redis memory, trace drops, and execution failures.
+- [x] SLA/SLO targets are written and measurable.
+- [x] Capacity model maps QPS/executions/users to app, DB, Redis, MQ, and storage requirements.
+- [x] Retention rules exist for execution, trace, audit, DLQ, and Redis quota keys.
+- [x] Metrics and alerts exist for pool saturation, queue depth, Redis memory, trace drops, and execution failures.
+
+## Implementation Evidence
+
+- `docs/architecture/capacity/slo-and-capacity-model.md`
+- `docs/architecture/capacity/retention-policy.md`
+- `docs/architecture/capacity/dashboard-and-alerts.md`
+- `docs/architecture/capacity/baseline-load-result.md`
+- `backend/canvas-engine/src/main/resources/db/migration/V239__execution_retention_policy.sql`
+- `docs/architecture/evidence/P2-02-cost-capacity-and-retention.md`

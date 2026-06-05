@@ -1,0 +1,87 @@
+{
+  "package": "p3-003-architecture-evolution",
+  "rollout": {
+    "migration": "none",
+    "runtimeChange": false,
+    "reason": "This slice records architecture evidence only and does not alter runtime topology or schemas."
+  },
+  "candidates": [
+    {
+      "key": "service-split",
+      "owner": "Architecture",
+      "status": "Needs Evidence",
+      "currentCodeEvidence": ["backend/canvas-engine contains web, domain, scheduler, and persistence code in one deployable application."],
+      "scaleTrigger": "Independent scaling or ownership pain is measured in production readiness work.",
+      "proofCommand": "node --test tools/strategy/architecture-evolution-evidence.test.mjs",
+      "compatibility": "Child spec must keep monolith deploy rollback until split service proves parity.",
+      "rollback": "Deploy the single canvas-engine artifact.",
+      "dependencyStatus": "P0/P1 safety and observability gates must be complete."
+    },
+    {
+      "key": "editor-canvas-alternative",
+      "owner": "Frontend Architecture",
+      "status": "Deferred",
+      "currentCodeEvidence": ["Frontend editor behavior is built around current canvas-editor modules and graph helpers."],
+      "scaleTrigger": "Measured editor performance or maintainability problem exceeds targeted fixes.",
+      "proofCommand": "node --test tools/strategy/architecture-evolution-evidence.test.mjs",
+      "compatibility": "Child spec must preserve import/export and saved graph compatibility.",
+      "rollback": "Keep the current editor implementation and disable alternate editor route.",
+      "dependencyStatus": "Requires editor productivity and graph state evidence."
+    },
+    {
+      "key": "event-processing-cep",
+      "owner": "Runtime Architecture",
+      "status": "Needs Evidence",
+      "currentCodeEvidence": ["Current runtime uses existing scheduler, MQ, and trace paths rather than Flink CEP."],
+      "scaleTrigger": "Complex event workloads exceed current scheduler and MQ guarantees.",
+      "proofCommand": "node --test tools/strategy/architecture-evolution-evidence.test.mjs",
+      "compatibility": "Child spec must prove dual-run or replay compatibility.",
+      "rollback": "Route event execution back to current scheduler path.",
+      "dependencyStatus": "Requires event trace schema and runtime evidence."
+    },
+    {
+      "key": "multi-cloud-deployment",
+      "owner": "Infrastructure",
+      "status": "Deferred",
+      "currentCodeEvidence": ["Local development and deployment assumptions are centered on the current Docker and service stack."],
+      "scaleTrigger": "Customer or resilience requirement demands multiple cloud targets.",
+      "proofCommand": "node --test tools/strategy/architecture-evolution-evidence.test.mjs",
+      "compatibility": "Child spec must define config, secrets, networking, and data-store compatibility.",
+      "rollback": "Deploy only to the current supported environment.",
+      "dependencyStatus": "Requires production operability gates and infrastructure owner."
+    },
+    {
+      "key": "serverless-execution",
+      "owner": "Runtime Architecture",
+      "status": "Rejected",
+      "currentCodeEvidence": ["Current execution model depends on long-running application services and local runtime coordination."],
+      "scaleTrigger": "No accepted trigger; evidence does not justify serverless execution now.",
+      "proofCommand": "node --test tools/strategy/architecture-evolution-evidence.test.mjs",
+      "compatibility": "Would require cold-start, timeout, and state compatibility proof.",
+      "rollback": "Keep execution in canvas-engine runtime.",
+      "dependencyStatus": "Blocked until runtime evidence shows serverless fit."
+    },
+    {
+      "key": "edge-runtime",
+      "owner": "Infrastructure",
+      "status": "Deferred",
+      "currentCodeEvidence": ["Current product runs backend behavior centrally and does not define edge execution contracts."],
+      "scaleTrigger": "Latency or regional availability evidence requires edge placement.",
+      "proofCommand": "node --test tools/strategy/architecture-evolution-evidence.test.mjs",
+      "compatibility": "Child spec must define cache invalidation, auth, and data-access boundaries.",
+      "rollback": "Route traffic to central backend only.",
+      "dependencyStatus": "Requires data residency and deployment evidence."
+    },
+    {
+      "key": "data-residency",
+      "owner": "Privacy Architecture",
+      "status": "Needs Evidence",
+      "currentCodeEvidence": ["Tenant data locality rules are not represented as a first-class architecture decision in this package yet."],
+      "scaleTrigger": "Target regions or enterprise contracts require residency controls.",
+      "proofCommand": "node --test tools/strategy/architecture-evolution-evidence.test.mjs",
+      "compatibility": "Child spec must define tenant routing, backups, analytics, and support access constraints.",
+      "rollback": "Do not sell residency-bound regions until controls are accepted.",
+      "dependencyStatus": "Requires privacy and legal owner."
+    }
+  ]
+}

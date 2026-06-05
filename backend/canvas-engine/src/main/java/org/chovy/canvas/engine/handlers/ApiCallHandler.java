@@ -82,6 +82,21 @@ public class ApiCallHandler implements NodeHandler {
             });
     }
 
+    @Override
+    public boolean requiresSideEffectIdempotency(Map<String, Object> config, ExecutionContext ctx) {
+        return true;
+    }
+
+    @Override
+    public String sideEffectOperationKey(Map<String, Object> config, ExecutionContext ctx) {
+        Object explicit = config.get(MapFieldKeys.IDEMPOTENCY_KEY);
+        if (explicit != null && !explicit.toString().isBlank()) {
+            return explicit.toString();
+        }
+        Object apiKey = config.get(MapFieldKeys.API_KEY);
+        return ctx.getUserId() + ":api:" + (apiKey == null ? "" : apiKey);
+    }
+
     /**
      * 执行 prepare Api Call 对应的业务逻辑。
      *

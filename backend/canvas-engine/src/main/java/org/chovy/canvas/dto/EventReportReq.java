@@ -1,5 +1,7 @@
 package org.chovy.canvas.dto;
 
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
 import lombok.Data;
 
 import java.util.Map;
@@ -14,14 +16,19 @@ import java.util.Map;
 public class EventReportReq {
 
     /** 事件编码，必须在 `event_definition` 中已定义。 */
+    @NotBlank
+    @Size(max = 128)
     private String eventCode;
 
     /** 触发用户 ID（用于人群/配额/上下文聚合主键）。 */
+    @NotBlank
+    @Size(max = 128)
     private String userId;
 
     /** 事件属性，key-value 结构，与事件定义中的 attributes 对应。 */
     private Map<String, Object> attributes;
 
     /** 幂等 key，可选（用于上报重试去重）。 */
+    @Size(max = 128)
     private String idempotencyKey;
 }

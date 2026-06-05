@@ -8,6 +8,10 @@ Supporting verification artifacts:
 
 - [P3-00-architecture-boundary-code-verification.md](P3-00-architecture-boundary-code-verification.md): code-level validation for the architecture boundary review and service extraction order.
 
+## Active Decision Policy
+
+Active decisions live in specs, plans, ADRs, guides, reference docs, and runbooks. Archived reviews are historical evidence, not active implementation authority. Before implementation, cite the relevant archive source from an active spec, plan, ADR, guide, reference doc, or runbook so the current owner, verification status, and rollback path are clear.
+
 | Priority | Spec | Plan |
 |---|---|---|
 | P0 | [P0-01-security-hardening-spec.md](P0-01-security-hardening-spec.md) | [plan](../plans/P0-01-security-hardening-plan.md) |

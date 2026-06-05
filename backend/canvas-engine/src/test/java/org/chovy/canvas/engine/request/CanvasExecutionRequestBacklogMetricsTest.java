@@ -41,4 +41,19 @@ class CanvasExecutionRequestBacklogMetricsTest {
         verify(metrics, never()).setExecutionRequestBacklog(CanvasExecutionRequestStatus.SUCCEEDED, 99L);
         verify(metrics, never()).setExecutionRequestBacklog(CanvasExecutionRequestStatus.FAILED, 0L);
     }
+
+    @Test
+    void refreshPublishesRetryBacklogPressure() {
+        CanvasExecutionRequestMapper mapper = mock(CanvasExecutionRequestMapper.class);
+        CanvasMetrics metrics = mock(CanvasMetrics.class);
+        CanvasExecutionRequestBacklogMetrics backlogMetrics =
+                new CanvasExecutionRequestBacklogMetrics(mapper, metrics);
+        when(mapper.countByStatus()).thenReturn(List.of(
+                new CanvasExecutionRequestStatusCount(CanvasExecutionRequestStatus.RETRY, 30L)
+        ));
+
+        backlogMetrics.refresh();
+
+        verify(metrics).setExecutionRequestBacklog(CanvasExecutionRequestStatus.RETRY, 30L);
+    }
 }

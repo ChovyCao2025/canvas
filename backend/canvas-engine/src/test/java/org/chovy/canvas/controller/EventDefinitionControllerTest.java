@@ -12,6 +12,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.mock.http.server.reactive.MockServerHttpRequest;
+import org.springframework.web.server.ResponseStatusException;
 import reactor.core.publisher.Mono;
 
 import javax.crypto.Mac;
@@ -21,9 +22,11 @@ import java.util.HexFormat;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 class EventDefinitionControllerTest {
@@ -106,6 +109,22 @@ class EventDefinitionControllerTest {
         verify(eventDefinitionService).doReportEvent(captor.capture());
         assertThat(captor.getValue().getEventCode()).isEqualTo("ORDER_COMPLETE");
         assertThat(captor.getValue().getUserId()).isEqualTo("user-99");
+    }
+
+    @Test
+    void reportEventRejectsSignedInvalidBodyBeforeDelegating() throws Exception {
+        String body = "{\"eventCode\":\"ORDER_COMPLETE\",\"attributes\":{\"orderId\":\"ORD-001\"}}";
+        String timestamp = String.valueOf(System.currentTimeMillis());
+        MockServerHttpRequest request = MockServerHttpRequest.post("/canvas/events/report")
+                .header(EventReportAuthService.TIMESTAMP_HEADER, timestamp)
+                .header(EventReportAuthService.SIGNATURE_HEADER, hmac(timestamp + "\n" + body))
+                .body(body);
+
+        assertThatThrownBy(() -> controller.reportEvent(request, Mono.just(body)).block())
+                .isInstanceOf(ResponseStatusException.class)
+                .hasMessageContaining("400")
+                .hasMessageContaining("userId");
+        verifyNoInteractions(eventDefinitionService);
     }
 
     private static String hmac(String canonical) throws Exception {

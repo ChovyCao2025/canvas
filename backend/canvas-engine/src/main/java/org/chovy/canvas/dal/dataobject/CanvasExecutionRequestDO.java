@@ -22,6 +22,10 @@ public class CanvasExecutionRequestDO {
     /** 执行请求主键 ID，贯穿排队、执行、重试和重放流程 */
     private String id;
 
+    @TableField("tenant_id")
+    /** 所属租户 ID，按目标画布写入，供管理查询、重放和审计隔离。 */
+    private Long tenantId;
+
     /** 目标画布 ID */
     private Long canvasId;
 

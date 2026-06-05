@@ -37,11 +37,19 @@ public class CdpUserDirectoryService {
 
     /** 查询用户列表或指定画布下的用户聚合视图。 */
     public List<CanvasUserRowDTO> listUsers(String keyword) {
+        return listUsers(null, keyword);
+    }
+
+    /** 查询指定租户内的用户列表或指定画布下的用户聚合视图。 */
+    public List<CanvasUserRowDTO> listUsers(Long tenantId, String keyword) {
         String normalizedKeyword = keyword == null ? null : keyword.trim();
-        List<CdpUserProfileDO> profiles = profileMapper.selectList(new LambdaQueryWrapper<CdpUserProfileDO>()
-                .like(normalizedKeyword != null && !normalizedKeyword.isBlank(), CdpUserProfileDO::getUserId, normalizedKeyword)
-                .or(normalizedKeyword != null && !normalizedKeyword.isBlank())
-                .like(normalizedKeyword != null && !normalizedKeyword.isBlank(), CdpUserProfileDO::getDisplayName, normalizedKeyword)
+        LambdaQueryWrapper<CdpUserProfileDO> profileQuery = profileQuery(tenantId);
+        if (normalizedKeyword != null && !normalizedKeyword.isBlank()) {
+            profileQuery.and(q -> q.like(CdpUserProfileDO::getUserId, normalizedKeyword)
+                    .or()
+                    .like(CdpUserProfileDO::getDisplayName, normalizedKeyword));
+        }
+        List<CdpUserProfileDO> profiles = profileMapper.selectList(profileQuery
                 .orderByDesc(CdpUserProfileDO::getLastSeenAt)
                 .orderByDesc(CdpUserProfileDO::getId));
 
@@ -50,7 +58,7 @@ public class CdpUserDirectoryService {
         }
 
         Set<String> userIds = profiles.stream().map(CdpUserProfileDO::getUserId).collect(Collectors.toSet());
-        List<CanvasExecutionDO> executions = executionMapper.selectList(new LambdaQueryWrapper<CanvasExecutionDO>()
+        List<CanvasExecutionDO> executions = executionMapper.selectList(executionQuery(tenantId)
                 .in(CanvasExecutionDO::getUserId, userIds)
                 .orderByDesc(CanvasExecutionDO::getCreatedAt));
         Map<String, List<CanvasExecutionDO>> executionsByUser = new LinkedHashMap<>();
@@ -59,12 +67,12 @@ public class CdpUserDirectoryService {
         }
 
         return profiles.stream()
-                .map(profile -> toRow(profile, executionsByUser.getOrDefault(profile.getUserId(), List.of())))
+                .map(profile -> toRow(tenantId, profile, executionsByUser.getOrDefault(profile.getUserId(), List.of())))
                 .toList();
     }
 
     /** 将用户画像与执行统计合并为用户目录列表行。 */
-    private CanvasUserRowDTO toRow(CdpUserProfileDO profile, List<CanvasExecutionDO> executions) {
+    private CanvasUserRowDTO toRow(Long tenantId, CdpUserProfileDO profile, List<CanvasExecutionDO> executions) {
         long successCount = executions.stream()
                 .filter(item -> item.getStatus() != null && item.getStatus() == ExecutionStatus.SUCCESS.getCode())
                 .count();
@@ -85,7 +93,7 @@ public class CdpUserDirectoryService {
                 latest == null ? "-" : statusLabel(latest.getStatus()),
                 firstEnteredAt,
                 lastEnteredAt,
-                tagService.listCurrentTags(profile.getUserId())
+                tagService.listCurrentTags(tenantId, profile.getUserId())
         );
     }
 
@@ -104,5 +112,21 @@ public class CdpUserDirectoryService {
             return "RUNNING";
         }
         return status == null ? "-" : String.valueOf(status);
+    }
+
+    private LambdaQueryWrapper<CdpUserProfileDO> profileQuery(Long tenantId) {
+        LambdaQueryWrapper<CdpUserProfileDO> query = new LambdaQueryWrapper<>();
+        if (tenantId != null) {
+            query.eq(CdpUserProfileDO::getTenantId, tenantId);
+        }
+        return query;
+    }
+
+    private LambdaQueryWrapper<CanvasExecutionDO> executionQuery(Long tenantId) {
+        LambdaQueryWrapper<CanvasExecutionDO> query = new LambdaQueryWrapper<>();
+        if (tenantId != null) {
+            query.eq(CanvasExecutionDO::getTenantId, tenantId);
+        }
+        return query;
     }
 }

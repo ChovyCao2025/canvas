@@ -20,6 +20,11 @@ public class TenantContextResolver {
                 .map(this::fromClaims);
     }
 
+    public Mono<TenantContext> currentOrError() {
+        return current().switchIfEmpty(Mono.error(
+                new SecurityException("AUTH_003: missing tenant context")));
+    }
+
     private TenantContext fromClaims(Claims claims) {
         return new TenantContext(
                 readLong(claims.get("tenantId")),

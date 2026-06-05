@@ -9,9 +9,11 @@ import org.chovy.canvas.dal.dataobject.CanvasVersionDO;
 import org.chovy.canvas.dal.mapper.CanvasVersionMapper;
 import org.chovy.canvas.common.enums.CanvasStatusEnum;
 import org.chovy.canvas.common.enums.NodeType;
+import org.chovy.canvas.config.CanvasRuntimeMetrics;
 import org.chovy.canvas.engine.dag.DagGraph;
 import org.chovy.canvas.engine.dag.DagParser;
 import org.chovy.canvas.engine.handlers.MqTriggerHandler;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.util.HashMap;
@@ -43,10 +45,17 @@ public class MqRouteRefreshService {
     private final TriggerRouteService triggerRouteService;
     /** MQ 触发节点处理器，用于解析和匹配 MQ 触发入口。 */
     private final MqTriggerHandler mqTriggerHandler;
+    /** 运行时运维指标。 */
+    private CanvasRuntimeMetrics runtimeMetrics;
 
-    /** 扫描已发布画布并重建 MQ 触发路由表。 */
-    public void rebuildMqRoutes() {
-        // 路由重建只以“已发布画布 + 已发布版本”为数据源，草稿版本不进入运行时 MQ 路由。
+    @Autowired(required = false)
+    void setRuntimeMetrics(CanvasRuntimeMetrics runtimeMetrics) {
+        this.runtimeMetrics = runtimeMetrics;
+    }
+
+    /** 扫描已发布画布并重建全部触发路由表。 */
+    public void rebuildTriggerRoutes() {
+        // 路由重建只以“已发布画布 + 已发布版本”为数据源，草稿版本不进入运行时触发路由。
         List<CanvasDO> published = canvasMapper.selectList(
                 new LambdaQueryWrapper<CanvasDO>().eq(CanvasDO::getStatus, CanvasStatusEnum.PUBLISHED.getCode()));
         List<Long> versionIds = published.stream()
@@ -61,7 +70,9 @@ public class MqRouteRefreshService {
 
         int canvasCount = 0;
         int routeCount = 0;
-        Map<String, Set<String>> routes = new HashMap<>();
+        Map<String, Set<String>> mqRoutes = new HashMap<>();
+        Map<String, Set<String>> behaviorRoutes = new HashMap<>();
+        Map<String, Set<String>> taggerRoutes = new HashMap<>();
         for (CanvasDO canvas : published) {
             CanvasVersionDO version = versionMap.get(canvas.getPublishedVersionId());
             if (version == null || version.getGraphJson() == null) {
@@ -70,22 +81,38 @@ public class MqRouteRefreshService {
             }
             try {
                 DagGraph graph = dagParser.parse(version.getGraphJson());
-                routeCount += collectMqRoutes(canvas.getId(), graph, routes);
+                routeCount += collectTriggerRoutes(canvas.getId(), graph, mqRoutes, behaviorRoutes, taggerRoutes);
                 canvasCount++;
             } catch (Exception e) {
-                log.error("[MQ_ROUTE] rebuild failed canvasId={}: {}", canvas.getId(), e.getMessage(), e);
+                log.error("[TRIGGER_ROUTE] rebuild failed canvasId={}: {}", canvas.getId(), e.getMessage(), e);
+                recordRouteRebuildFailure("canvas_parse");
             }
         }
-        triggerRouteService.replaceMqRoutes(routes);
-        log.info("[MQ_ROUTE] rebuild completed canvases={} routes={}", canvasCount, routeCount);
+        try {
+            triggerRouteService.replaceAllTriggerRoutes(
+                    new TriggerRouteService.TriggerRouteSnapshot(mqRoutes, behaviorRoutes, taggerRoutes));
+        } catch (RuntimeException e) {
+            recordRouteRebuildFailure(e.getClass().getSimpleName());
+            throw e;
+        }
+        log.info("[TRIGGER_ROUTE] rebuild completed canvases={} routes={}", canvasCount, routeCount);
     }
 
-    /** 从单个画布 DAG 中收集 MQ 触发 topic 到画布 ID 的路由关系。 */
-    private int collectMqRoutes(Long canvasId, DagGraph graph, Map<String, Set<String>> routes) {
+    /** 扫描已发布画布并重建触发路由表。保留旧入口以兼容 MQ 配置变更调用方。 */
+    public void rebuildMqRoutes() {
+        rebuildTriggerRoutes();
+    }
+
+    /** 从单个画布 DAG 中收集三类触发路由到画布 ID 的关系。 */
+    private int collectTriggerRoutes(Long canvasId,
+                                     DagGraph graph,
+                                     Map<String, Set<String>> mqRoutes,
+                                     Map<String, Set<String>> behaviorRoutes,
+                                     Map<String, Set<String>> taggerRoutes) {
         int count = 0;
         for (String nodeId : graph.allNodeIds()) {
             DagParser.CanvasNode node = graph.getNode(nodeId);
-            if (node == null || !NodeType.MQ_TRIGGER.equals(node.getType())) {
+            if (node == null) {
                 continue;
             }
             Map<String, Object> config = new HashMap<>();
@@ -95,13 +122,43 @@ public class MqRouteRefreshService {
             if (node.getConfig() != null) {
                 config.putAll(node.getConfig());
             }
-            String topic = mqTriggerHandler.resolveTopic(config);
-            if (topic != null && !topic.isBlank()) {
-                // Redis 路由的写入单位是 topic -> canvasId 集合，同一 topic 可命中多个已发布画布。
-                routes.computeIfAbsent(topic, ignored -> new HashSet<>()).add(String.valueOf(canvasId));
-                count++;
+            switch (node.getType()) {
+                case NodeType.MQ_TRIGGER -> {
+                    String topic = mqTriggerHandler.resolveTopic(config);
+                    if (topic != null && !topic.isBlank()) {
+                        mqRoutes.computeIfAbsent(topic, ignored -> new HashSet<>()).add(String.valueOf(canvasId));
+                        count++;
+                    }
+                }
+                case NodeType.EVENT_TRIGGER -> {
+                    String eventCode = (String) config.get("eventCode");
+                    if (eventCode != null && !eventCode.isBlank()) {
+                        behaviorRoutes.computeIfAbsent(eventCode, ignored -> new HashSet<>())
+                                .add(String.valueOf(canvasId));
+                        count++;
+                    }
+                }
+                case NodeType.TAGGER -> {
+                    if (!"realtime".equals(String.valueOf(config.getOrDefault("mode", "")))) {
+                        continue;
+                    }
+                    String tagCodeKey = (String) config.get("tagCodeKey");
+                    if (tagCodeKey != null && !tagCodeKey.isBlank()) {
+                        taggerRoutes.computeIfAbsent(tagCodeKey, ignored -> new HashSet<>())
+                                .add(String.valueOf(canvasId));
+                        count++;
+                    }
+                }
+                default -> {
+                }
             }
         }
         return count;
+    }
+
+    private void recordRouteRebuildFailure(String reason) {
+        if (runtimeMetrics != null) {
+            runtimeMetrics.recordRouteRebuildFailure(reason);
+        }
     }
 }

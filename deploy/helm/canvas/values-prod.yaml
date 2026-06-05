@@ -1,0 +1,40 @@
+backend:
+  replicaCount: 3
+  image:
+    tag: prod
+  resources:
+    requests:
+      cpu: "1"
+      memory: 2Gi
+    limits:
+      cpu: "4"
+      memory: 6Gi
+  config:
+    springDataRedisHost: redis-prod.example.internal
+    springDataRedisPort: "6379"
+    rocketmqNameServer: rocketmq-prod.example.internal:9876
+    canvasCorsAllowedOrigins: https://canvas.example.com
+    canvasFrontendApiBaseUrl: https://canvas.example.com
+  autoscaling:
+    minReplicas: 3
+    maxReplicas: 10
+
+frontend:
+  replicaCount: 2
+  image:
+    tag: prod
+  resources:
+    requests:
+      cpu: 200m
+      memory: 256Mi
+    limits:
+      cpu: "1"
+      memory: 1Gi
+  autoscaling:
+    minReplicas: 2
+    maxReplicas: 6
+
+ingress:
+  host: canvas.example.com
+  tls:
+    secretName: canvas-prod-tls

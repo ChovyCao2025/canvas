@@ -1,0 +1,95 @@
+{
+  "package": "p3-004-commercial-billing",
+  "rollout": {
+    "migration": "none",
+    "runtimeChange": false,
+    "customerCharging": false,
+    "reason": "This slice records billing evidence only and does not create ledgers, entitlements, invoices, payments, or charges."
+  },
+  "capabilities": [
+    {
+      "key": "billable-metrics",
+      "owner": "Commercial Product",
+      "status": "Needs Evidence",
+      "metricDefinition": "Rank executions, contacts, messages, seats, storage, AI usage, and premium connectors as candidate billable metrics.",
+      "sourceEvidence": ["Product usage analytics and execution traces must prove measurable tenant-scoped usage."],
+      "financeGate": "Finance approves metric as billable and auditable.",
+      "legalGate": "Legal approves customer-facing metric language.",
+      "supportGate": "Support approves usage dispute process.",
+      "proofCommand": "node --test tools/strategy/commercial-billing-evidence.test.mjs",
+      "rollback": "Do not expose billing metrics to customers."
+    },
+    {
+      "key": "plan-tiers",
+      "owner": "Commercial Product",
+      "status": "Needs Evidence",
+      "metricDefinition": "Plan tiers map included usage, seats, connectors, and support level to named packages.",
+      "sourceEvidence": ["Customer segmentation and usage distribution are required before tier commitments."],
+      "financeGate": "Finance approves package economics.",
+      "legalGate": "Legal approves plan terms.",
+      "supportGate": "Support approves service-level expectations.",
+      "proofCommand": "node --test tools/strategy/commercial-billing-evidence.test.mjs",
+      "rollback": "Keep pricing unpublished."
+    },
+    {
+      "key": "overage-policy",
+      "owner": "Finance",
+      "status": "Deferred",
+      "metricDefinition": "Overage defines behavior when measured usage exceeds included plan quantity.",
+      "sourceEvidence": ["Billable metric and plan tiers must be accepted first."],
+      "financeGate": "Finance approves overage pricing and grace policy.",
+      "legalGate": "Legal approves notification and contract language.",
+      "supportGate": "Support approves escalation process.",
+      "proofCommand": "node --test tools/strategy/commercial-billing-evidence.test.mjs",
+      "rollback": "Disable overage enforcement and keep advisory notices internal."
+    },
+    {
+      "key": "payment-provider",
+      "owner": "Finance Systems",
+      "status": "Deferred",
+      "metricDefinition": "Payment provider handles collection after invoice and entitlement requirements are accepted.",
+      "sourceEvidence": ["Provider choice depends on regions, invoice requirements, and finance system ownership."],
+      "financeGate": "Finance approves provider and reconciliation flow.",
+      "legalGate": "Legal approves payment terms and data processing.",
+      "supportGate": "Support approves failed-payment handling.",
+      "proofCommand": "node --test tools/strategy/commercial-billing-evidence.test.mjs",
+      "rollback": "Keep payment collection outside product."
+    },
+    {
+      "key": "invoice-drafts",
+      "owner": "Finance",
+      "status": "Needs Evidence",
+      "metricDefinition": "Invoice drafts summarize tenant usage, plan, discounts, taxes, and adjustments before charge.",
+      "sourceEvidence": ["Usage ledger and finance review are required before invoice drafts are generated."],
+      "financeGate": "Finance approves invoice format and reconciliation.",
+      "legalGate": "Legal approves invoice terms and tax assumptions.",
+      "supportGate": "Support approves invoice dispute handling.",
+      "proofCommand": "node --test tools/strategy/commercial-billing-evidence.test.mjs",
+      "rollback": "Do not generate customer-visible invoices."
+    },
+    {
+      "key": "renewal-process",
+      "owner": "Revenue Operations",
+      "status": "Deferred",
+      "metricDefinition": "Renewal process combines account term, usage evidence, contract status, and owner review.",
+      "sourceEvidence": ["Account lifecycle and billing source of truth are not accepted."],
+      "financeGate": "Finance approves renewal forecast inputs.",
+      "legalGate": "Legal approves renewal notice obligations.",
+      "supportGate": "Customer Success approves renewal workflow.",
+      "proofCommand": "node --test tools/strategy/commercial-billing-evidence.test.mjs",
+      "rollback": "Keep renewals manual."
+    },
+    {
+      "key": "upgrade-recommendations",
+      "owner": "Growth Product",
+      "status": "Deferred",
+      "metricDefinition": "Upgrade recommendations use usage thresholds and plan fit to suggest higher tiers.",
+      "sourceEvidence": ["Plan tiers and billable metrics must be accepted first."],
+      "financeGate": "Finance approves recommendation economics.",
+      "legalGate": "Legal approves customer-facing recommendation language.",
+      "supportGate": "Support approves customer escalation path.",
+      "proofCommand": "node --test tools/strategy/commercial-billing-evidence.test.mjs",
+      "rollback": "Hide upgrade recommendations."
+    }
+  ]
+}

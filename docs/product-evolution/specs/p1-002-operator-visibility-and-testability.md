@@ -5,6 +5,10 @@ Sequence: 002
 Source: `todo/p1/operator-visibility-and-testability.md`
 Implementation plan: `../plans/p1-002-operator-visibility-and-testability-plan.md`
 
+## Implementation Status
+
+Implemented and focused-verified on 2026-06-05. Verification evidence is recorded in `../plans/p1-002-operator-visibility-and-testability-plan.md`.
+
 ## Goal
 
 Expose backend execution, send-record, policy, dry-run, trace, and table-operation capabilities through operator-facing APIs and UI helpers that can be tested without reading logs.
@@ -62,7 +66,7 @@ This spec implements operator visibility and testability surfaces. Production ru
 - `backend/canvas-engine/src/main/java/org/chovy/canvas/dal/mapper/MarketingConsentMapper.java`
 - `backend/canvas-engine/src/main/java/org/chovy/canvas/dal/mapper/MarketingSuppressionMapper.java`
 - `backend/canvas-engine/src/main/java/org/chovy/canvas/dal/mapper/CustomerChannelMapper.java`
-- `backend/canvas-engine/src/main/resources/db/migration/V95__operator_visibility_and_testability.sql`
+- `backend/canvas-engine/src/main/resources/db/migration/V250__operator_visibility_and_testability.sql`
 
 ### Frontend Touchpoints
 

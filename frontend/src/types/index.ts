@@ -11,11 +11,17 @@ export interface R<T> {
   /** 业务状态码，0 表示成功。 */
   code: number
 
+  /** 稳定错误码，成功响应通常为空。 */
+  errorCode?: string
+
   /** 响应消息。 */
   message: string
 
   /** 具体数据载荷。 */
   data: T
+
+  /** 链路追踪 ID，用于错误排查时关联日志。 */
+  traceId?: string
 }
 
 /** 后端统一分页结果。 */
@@ -66,6 +72,18 @@ export interface Canvas {
   /** 来源官方模板 key。 */
   sourceTemplateKey?: string
 
+  /** 平铺项目分组 key。 */
+  projectKey?: string
+
+  /** 平铺项目展示名。 */
+  projectName?: string
+
+  /** 平铺文件夹分组 key。 */
+  folderKey?: string
+
+  /** 平铺文件夹展示名。 */
+  folderName?: string
+
   /** 创建时间。 */
   createdAt: string
 
@@ -98,6 +116,18 @@ export interface Canvas {
 
   /** 冷却时长（秒）。 */
   cooldownSeconds?: number
+
+  /** 控制组比例，0-50。 */
+  controlGroupPercent?: number
+
+  /** 控制组分桶盐值。 */
+  controlGroupSalt?: string
+
+  /** 转化事件编码。 */
+  conversionEventCode?: string
+
+  /** 归因窗口天数。 */
+  attributionWindowDays?: number
 }
 
 /** 画布详情，包含画布元信息和草稿图结构。 */
@@ -126,8 +156,8 @@ export interface CanvasVersion {
   /** 当时图结构。 */
   graphJson: string
 
-  /** 0草稿 1已发布 */
-  status: 0 | 1
+  /** 0草稿 1已发布 2已下线（兼容历史版本列表展示） */
+  status: 0 | 1 | 2
 
   /** 操作人。 */
   createdBy?: string
