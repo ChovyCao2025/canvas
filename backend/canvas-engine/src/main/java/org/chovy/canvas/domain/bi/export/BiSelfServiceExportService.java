@@ -32,6 +32,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -51,6 +52,9 @@ public class BiSelfServiceExportService {
     private static final String APPROVAL_PENDING = "PENDING";
     private static final String APPROVAL_APPROVED = "APPROVED";
     private static final String APPROVAL_REJECTED = "REJECTED";
+    private static final int PROGRESS_QUEUED = 0;
+    private static final int PROGRESS_RUNNING = 50;
+    private static final int PROGRESS_COMPLETED = 100;
     private static final int MAX_PREVIEW_LIMIT = 500;
     private static final int MAX_EXPORT_LIMIT = 10000;
 
@@ -63,6 +67,10 @@ public class BiSelfServiceExportService {
     private final BiFileStorage fileStorage;
     private final int retentionDays;
     private final int approvalRowThreshold;
+    private final int maxRetryCount;
+    private final long retryInitialDelayMinutes;
+    private final double retryBackoffMultiplier;
+    private final long retryMaxDelayMinutes;
 
     @Autowired
     public BiSelfServiceExportService(BiDatasetMapper datasetMapper,
@@ -73,7 +81,11 @@ public class BiSelfServiceExportService {
                                       ObjectProvider<BiFileStorage> storageProvider,
                                       @Value("${canvas.bi.export.dir:${java.io.tmpdir}/canvas-bi-exports}") String exportDir,
                                       @Value("${canvas.bi.export.retention-days:7}") int retentionDays,
-                                      @Value("${canvas.bi.export.approval.row-threshold:5000}") int approvalRowThreshold) {
+                                      @Value("${canvas.bi.export.approval.row-threshold:5000}") int approvalRowThreshold,
+                                      @Value("${canvas.bi.export.retry.max-attempts:3}") int maxRetryCount,
+                                      @Value("${canvas.bi.export.retry.initial-delay-minutes:15}") long retryInitialDelayMinutes,
+                                      @Value("${canvas.bi.export.retry.backoff-multiplier:2}") double retryBackoffMultiplier,
+                                      @Value("${canvas.bi.export.retry.max-delay-minutes:1440}") long retryMaxDelayMinutes) {
         this(datasetMapper,
                 exportJobMapper,
                 queryExecutionService,
@@ -82,7 +94,11 @@ public class BiSelfServiceExportService {
                 Path.of(exportDir),
                 storageProvider == null ? null : storageProvider.getIfAvailable(),
                 retentionDays,
-                approvalRowThreshold);
+                approvalRowThreshold,
+                maxRetryCount,
+                retryInitialDelayMinutes,
+                retryBackoffMultiplier,
+                retryMaxDelayMinutes);
     }
 
     public BiSelfServiceExportService(BiDatasetMapper datasetMapper,
@@ -136,7 +152,11 @@ public class BiSelfServiceExportService {
                 Path.of(System.getProperty("java.io.tmpdir"), "canvas-bi-exports"),
                 fileStorage,
                 retentionDays,
-                approvalRowThreshold);
+                approvalRowThreshold,
+                3,
+                15,
+                2,
+                1440);
     }
 
     public BiSelfServiceExportService(BiDatasetMapper datasetMapper,
@@ -148,6 +168,34 @@ public class BiSelfServiceExportService {
                                       BiFileStorage fileStorage,
                                       int retentionDays,
                                       int approvalRowThreshold) {
+        this(datasetMapper,
+                exportJobMapper,
+                queryExecutionService,
+                permissionService,
+                objectMapper,
+                exportRoot,
+                fileStorage,
+                retentionDays,
+                approvalRowThreshold,
+                3,
+                15,
+                2,
+                1440);
+    }
+
+    public BiSelfServiceExportService(BiDatasetMapper datasetMapper,
+                                      BiExportJobMapper exportJobMapper,
+                                      BiQueryExecutionService queryExecutionService,
+                                      BiPermissionService permissionService,
+                                      ObjectMapper objectMapper,
+                                      Path exportRoot,
+                                      BiFileStorage fileStorage,
+                                      int retentionDays,
+                                      int approvalRowThreshold,
+                                      int maxRetryCount,
+                                      long retryInitialDelayMinutes,
+                                      double retryBackoffMultiplier,
+                                      long retryMaxDelayMinutes) {
         this.datasetMapper = datasetMapper;
         this.exportJobMapper = exportJobMapper;
         this.queryExecutionService = queryExecutionService;
@@ -157,6 +205,10 @@ public class BiSelfServiceExportService {
         this.fileStorage = fileStorage == null ? new LocalBiFileStorage(exportRoot) : fileStorage;
         this.retentionDays = retentionDays;
         this.approvalRowThreshold = approvalRowThreshold;
+        this.maxRetryCount = Math.max(0, maxRetryCount);
+        this.retryInitialDelayMinutes = Math.max(1, retryInitialDelayMinutes);
+        this.retryBackoffMultiplier = retryBackoffMultiplier <= 0 ? 1 : retryBackoffMultiplier;
+        this.retryMaxDelayMinutes = Math.max(1, retryMaxDelayMinutes);
     }
 
     public BiQueryResult preview(Long tenantId, String username, String role, BiSelfServicePreviewRequest request) {
@@ -187,9 +239,12 @@ public class BiSelfServiceExportService {
         row.setRequestJson(json(command));
         row.setRowLimit(rowLimit);
         row.setStatus(STATUS_QUEUED);
+        row.setProgressPercent(PROGRESS_QUEUED);
         row.setRetentionDays(retentionDays > 0 ? retentionDays : null);
         row.setExpiresAt(retentionDays > 0 ? LocalDateTime.now().plusDays(retentionDays) : null);
         row.setDownloadCount(0);
+        row.setRetryCount(0);
+        row.setMaxRetryCount(maxRetryCount);
         row.setCreatedBy(defaultUser(username));
         if (requiresApproval(command, rowLimit)) {
             row.setStatus(STATUS_PENDING_APPROVAL);
@@ -264,21 +319,85 @@ public class BiSelfServiceExportService {
                                               String resourceKey) {
         try {
             row.setStatus(STATUS_RUNNING);
+            row.setProgressPercent(PROGRESS_RUNNING);
             exportJobMapper.updateById(row);
             BiQueryResult result = queryExecutionService.execute(query, new BiQueryContext(tenantId, username, role));
             BiStoredFile storedFile = writeFile(tenantId, row.getId(), row.getExportFormat(), result);
             row.setStatus(STATUS_COMPLETED);
+            row.setProgressPercent(PROGRESS_COMPLETED);
             row.setFileUrl("/canvas/bi/self-service/exports/" + row.getId() + "/download");
             row.setStorageProvider(storedFile.provider());
             row.setStorageKey(storedFile.key());
+            row.setNextRetryAt(null);
+            row.setRetryExhaustedAt(null);
             row.setErrorMessage(null);
             exportJobMapper.updateById(row);
             return toView(row, resourceKey);
         } catch (RuntimeException e) {
             row.setStatus(STATUS_FAILED);
             row.setErrorMessage(truncate(e.getMessage(), 1000));
+            scheduleRetryAfterFailure(row, LocalDateTime.now());
             exportJobMapper.updateById(row);
             throw e;
+        }
+    }
+
+    public BiExportRetryResult retryFailedExports(Long tenantId, String username, String role, int limit) {
+        Long scopedTenantId = normalizeTenant(tenantId);
+        int capped = Math.max(1, Math.min(limit <= 0 ? 20 : limit, 50));
+        List<BiExportJobDO> retryable = safeList(exportJobMapper.selectList(new LambdaQueryWrapper<BiExportJobDO>()
+                .eq(BiExportJobDO::getTenantId, scopedTenantId)
+                .eq(BiExportJobDO::getStatus, STATUS_FAILED)
+                .lt(BiExportJobDO::getRetryCount, maxRetryCount)
+                .isNull(BiExportJobDO::getRetryExhaustedAt)
+                .and(query -> query.isNull(BiExportJobDO::getNextRetryAt)
+                        .or()
+                        .le(BiExportJobDO::getNextRetryAt, LocalDateTime.now()))
+                .orderByAsc(BiExportJobDO::getNextRetryAt)
+                .orderByAsc(BiExportJobDO::getCreatedAt)
+                .orderByAsc(BiExportJobDO::getId)
+                .last("LIMIT " + capped)));
+        List<BiExportJobView> jobs = new ArrayList<>();
+        int completed = 0;
+        int failed = 0;
+        for (BiExportJobDO row : retryable) {
+            BiExportJobView view = retryFailedExport(scopedTenantId, row, username, role);
+            jobs.add(view);
+            if (STATUS_COMPLETED.equals(view.status())) {
+                completed++;
+            } else {
+                failed++;
+            }
+        }
+        return new BiExportRetryResult(retryable.size(), jobs.size(), completed, failed, jobs);
+    }
+
+    private BiExportJobView retryFailedExport(Long tenantId, BiExportJobDO row, String username, String role) {
+        String resourceKey = datasetKey(row.getResourceId());
+        try {
+            int attempt = retryAttempt(row);
+            row.setRetryCount(attempt);
+            row.setMaxRetryCount(configuredMaxRetryCount(row));
+            row.setLastRetryAt(LocalDateTime.now());
+            row.setNextRetryAt(null);
+            row.setRetryExhaustedAt(null);
+            row.setProgressPercent(PROGRESS_QUEUED);
+            exportJobMapper.updateById(row);
+
+            BiExportJobCommand original = exportCommand(row);
+            BiQueryRequest query = withLimit(original.query(), cappedLimit(original.rowLimit(), MAX_EXPORT_LIMIT));
+            BiDatasetDO dataset = datasetMapper.selectById(row.getResourceId());
+            if (dataset != null) {
+                enforceExportPermission(tenantId, dataset, username, role);
+                resourceKey = dataset.getDatasetKey();
+            }
+            return runApprovedExport(tenantId, row, query, username, role, resourceKey);
+        } catch (RuntimeException e) {
+            row.setStatus(STATUS_FAILED);
+            row.setErrorMessage(truncate(e.getMessage(), 1000));
+            scheduleRetryAfterFailure(row, LocalDateTime.now());
+            exportJobMapper.updateById(row);
+            return toView(row, resourceKey);
         }
     }
 
@@ -525,6 +644,39 @@ public class BiSelfServiceExportService {
         return approvalRowThreshold > 0 && rowLimit > approvalRowThreshold;
     }
 
+    private int retryAttempt(BiExportJobDO row) {
+        Integer current = row == null ? null : row.getRetryCount();
+        return Math.max(0, current == null ? 0 : current) + 1;
+    }
+
+    private int configuredMaxRetryCount(BiExportJobDO row) {
+        Integer rowMax = row == null ? null : row.getMaxRetryCount();
+        return Math.max(0, rowMax == null ? maxRetryCount : rowMax);
+    }
+
+    private void scheduleRetryAfterFailure(BiExportJobDO row, LocalDateTime failedAt) {
+        if (row == null) {
+            return;
+        }
+        int configuredMax = configuredMaxRetryCount(row);
+        row.setMaxRetryCount(configuredMax);
+        int currentRetryCount = Math.max(0, row.getRetryCount() == null ? 0 : row.getRetryCount());
+        if (configuredMax <= 0 || currentRetryCount >= configuredMax) {
+            row.setNextRetryAt(null);
+            row.setRetryExhaustedAt(failedAt);
+            return;
+        }
+        long delay = retryDelayMinutes(currentRetryCount);
+        row.setNextRetryAt(failedAt.plusMinutes(delay));
+        row.setRetryExhaustedAt(null);
+    }
+
+    private long retryDelayMinutes(int retryCount) {
+        double multiplier = Math.pow(retryBackoffMultiplier, Math.max(0, retryCount));
+        long delay = Math.round(retryInitialDelayMinutes * multiplier);
+        return Math.max(1, Math.min(delay, retryMaxDelayMinutes));
+    }
+
     private String approvalReason(BiExportJobCommand command, int rowLimit) {
         String reason = optionalText(command.approvalReason(), "approvalReason");
         if (reason != null) {
@@ -588,6 +740,7 @@ public class BiSelfServiceExportService {
                 row.getExportFormat(),
                 row.getRowLimit(),
                 row.getStatus(),
+                row.getProgressPercent(),
                 row.getFileUrl(),
                 row.getStorageProvider(),
                 row.getStorageKey(),
@@ -603,6 +756,11 @@ public class BiSelfServiceExportService {
                 row.getReviewedAt(),
                 row.getReviewComment(),
                 row.getErrorMessage(),
+                row.getRetryCount(),
+                row.getMaxRetryCount(),
+                row.getNextRetryAt(),
+                row.getLastRetryAt(),
+                row.getRetryExhaustedAt(),
                 row.getCreatedBy(),
                 row.getCreatedAt(),
                 row.getUpdatedAt());
@@ -614,6 +772,44 @@ public class BiSelfServiceExportService {
         } catch (JsonProcessingException e) {
             throw new IllegalArgumentException("invalid BI export payload", e);
         }
+    }
+
+    private void scheduleRetryAfterFailure(BiExportJobDO row, LocalDateTime now) {
+        int retryCount = retryCount(row);
+        int rowMaxRetryCount = configuredMaxRetryCount(row);
+        row.setMaxRetryCount(rowMaxRetryCount);
+        if (row.getProgressPercent() == null) {
+            row.setProgressPercent(PROGRESS_QUEUED);
+        }
+        if (rowMaxRetryCount <= 0 || retryCount >= rowMaxRetryCount) {
+            row.setNextRetryAt(null);
+            row.setRetryExhaustedAt(now);
+            return;
+        }
+        row.setNextRetryAt(now.plusMinutes(retryDelayMinutes(retryCount + 1)));
+        row.setRetryExhaustedAt(null);
+    }
+
+    private int retryAttempt(BiExportJobDO row) {
+        return retryCount(row) + 1;
+    }
+
+    private int retryCount(BiExportJobDO row) {
+        return Math.max(0, row == null || row.getRetryCount() == null ? 0 : row.getRetryCount());
+    }
+
+    private int configuredMaxRetryCount(BiExportJobDO row) {
+        int rowMaxRetryCount = row == null || row.getMaxRetryCount() == null
+                ? maxRetryCount
+                : row.getMaxRetryCount();
+        return Math.max(0, rowMaxRetryCount);
+    }
+
+    private long retryDelayMinutes(int nextAttempt) {
+        int attempt = Math.max(1, nextAttempt);
+        double multiplier = Math.pow(retryBackoffMultiplier, attempt - 1);
+        long delay = Math.round(retryInitialDelayMinutes * multiplier);
+        return Math.max(1, Math.min(delay, retryMaxDelayMinutes));
     }
 
     private List<Long> tenantScope(Long tenantId) {

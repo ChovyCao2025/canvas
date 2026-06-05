@@ -8,6 +8,7 @@ import org.chovy.canvas.domain.bi.export.BiExportApprovalReviewCommand;
 import org.chovy.canvas.domain.bi.export.BiExportDownload;
 import org.chovy.canvas.domain.bi.export.BiExportJobCommand;
 import org.chovy.canvas.domain.bi.export.BiExportJobView;
+import org.chovy.canvas.domain.bi.export.BiExportRetryResult;
 import org.chovy.canvas.domain.bi.export.BiSelfServiceExportService;
 import org.chovy.canvas.domain.bi.export.BiSelfServicePreviewRequest;
 import org.chovy.canvas.domain.bi.query.BiQueryResult;
@@ -101,6 +102,17 @@ public class BiSelfServiceController {
     public Mono<R<BiExportCleanupResult>> cleanupExports(@RequestParam(defaultValue = "100") int limit) {
         return currentTenant().flatMap(context -> Mono.fromCallable(() ->
                         R.ok(exportService.cleanupExpiredExports(context.tenantId(), limit)))
+                .subscribeOn(Schedulers.boundedElastic()));
+    }
+
+    @PostMapping("/exports/retry")
+    public Mono<R<BiExportRetryResult>> retryExports(@RequestParam(defaultValue = "20") int limit) {
+        return currentTenant().flatMap(context -> Mono.fromCallable(() ->
+                        R.ok(exportService.retryFailedExports(
+                                context.tenantId(),
+                                context.username(),
+                                context.role(),
+                                limit)))
                 .subscribeOn(Schedulers.boundedElastic()));
     }
 

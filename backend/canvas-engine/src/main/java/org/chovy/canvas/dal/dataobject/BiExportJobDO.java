@@ -30,6 +30,8 @@ public class BiExportJobDO {
 
     private String status;
 
+    private Integer progressPercent;
+
     private String fileUrl;
 
     private String storageProvider;
@@ -59,6 +61,16 @@ public class BiExportJobDO {
     private String reviewComment;
 
     private String errorMessage;
+
+    private Integer retryCount;
+
+    private Integer maxRetryCount;
+
+    private LocalDateTime nextRetryAt;
+
+    private LocalDateTime lastRetryAt;
+
+    private LocalDateTime retryExhaustedAt;
 
     private String createdBy;
 

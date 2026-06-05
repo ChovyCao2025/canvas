@@ -3,6 +3,7 @@ package org.chovy.canvas.web;
 import org.chovy.canvas.common.R;
 import org.chovy.canvas.common.tenant.TenantContext;
 import org.chovy.canvas.common.tenant.TenantContextResolver;
+import org.chovy.canvas.domain.warehouse.CdpWarehousePrivacyAudienceBitmapRebuildAutomationService;
 import org.chovy.canvas.domain.warehouse.CdpWarehousePrivacyAudienceBitmapRebuildService;
 import org.chovy.canvas.domain.warehouse.CdpWarehousePrivacyErasureExecutionService;
 import org.chovy.canvas.domain.warehouse.CdpWarehousePrivacyErasureService;
@@ -119,6 +120,33 @@ class CdpWarehousePrivacyErasureControllerTest {
 
         assertThat(response.getData()).isSameAs(result);
         verify(rebuildService).rebuild(9L, 101L, command);
+    }
+
+    @Test
+    void runAudienceBitmapRebuildAutomationUsesCurrentTenantAndBody() {
+        CdpWarehousePrivacyErasureService service = mock(CdpWarehousePrivacyErasureService.class);
+        CdpWarehousePrivacyErasureExecutionService executionService =
+                mock(CdpWarehousePrivacyErasureExecutionService.class);
+        CdpWarehousePrivacyAudienceBitmapRebuildService rebuildService =
+                mock(CdpWarehousePrivacyAudienceBitmapRebuildService.class);
+        CdpWarehousePrivacyAudienceBitmapRebuildAutomationService automationService =
+                mock(CdpWarehousePrivacyAudienceBitmapRebuildAutomationService.class);
+        CdpWarehousePrivacyAudienceBitmapRebuildAutomationService.AutomationCommand command =
+                new CdpWarehousePrivacyAudienceBitmapRebuildAutomationService.AutomationCommand(
+                        "privacy-ops", 25, 100, true);
+        CdpWarehousePrivacyAudienceBitmapRebuildAutomationService.AutomationResult result =
+                new CdpWarehousePrivacyAudienceBitmapRebuildAutomationService.AutomationResult(
+                        9L, "PASS", 2, 1, 1, 1, 0, List.of());
+        when(automationService.run(9L, command)).thenReturn(result);
+        CdpWarehousePrivacyErasureController controller =
+                new CdpWarehousePrivacyErasureController(
+                        service, executionService, rebuildService, automationService, tenantResolver(9L));
+
+        R<CdpWarehousePrivacyAudienceBitmapRebuildAutomationService.AutomationResult> response =
+                controller.runAudienceBitmapRebuildAutomation(command).block();
+
+        assertThat(response.getData()).isSameAs(result);
+        verify(automationService).run(9L, command);
     }
 
     @Test
