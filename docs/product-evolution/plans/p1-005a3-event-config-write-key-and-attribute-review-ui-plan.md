@@ -24,7 +24,8 @@ Verification evidence:
 
 - `cd frontend && PATH="/opt/homebrew/bin:$PATH" npm run test -- cdpEventApi.test.ts eventAttributeReview.test.ts` passed: 2 files, 6 tests.
 - `cd frontend && PATH="/opt/homebrew/bin:$PATH" npm run build` passed.
-- Backend compile verification is covered by the final integration pass for this branch.
+- `cd backend && JAVA_HOME=/Users/photonpay/Library/Java/JavaVirtualMachines/ms-21.0.11/Contents/Home PATH="/Users/photonpay/Library/Java/JavaVirtualMachines/ms-21.0.11/Contents/Home/bin:$PATH" mvn -pl canvas-engine -DskipTests compile` passed.
+- `cd backend && JAVA_HOME=/Users/photonpay/Library/Java/JavaVirtualMachines/ms-21.0.11/Contents/Home PATH="/Users/photonpay/Library/Java/JavaVirtualMachines/ms-21.0.11/Contents/Home/bin:$PATH" mvn -pl canvas-engine test -Dtest=EventAttributeDiscoveryControllerTest -DfailIfNoTests=true` is blocked during global `testCompile` by unrelated current workspace test sources, including duplicate `KillSwitchSubscriberTest`, missing P2-079 automation run classes, and constructor/API mismatches in existing tests.
 
 ## Spec Reference
 

@@ -24,14 +24,14 @@ Notes:
 - `frontend/src/components/layout/AppLayout.tsx` already exposes `/event-config` under `事件配置`, so no navigation change was required.
 - The frontend-required discovered attribute list API was missing, so `GET /canvas/event-attributes/discovered` was added as a read-only backend endpoint.
 - Attribute approve/reject HTTP actions remain out of scope for this slice.
-- Backend verification is blocked by an existing unresolved merge conflict in `backend/canvas-engine/src/main/java/org/chovy/canvas/engine/trigger/CanvasExecutionService.java`, which is outside this slice.
+- Backend production compile passes. Focused backend test execution is blocked by unrelated test-source compile errors in the current dirty workspace.
 
 ## Verification Evidence
 
 - `cd frontend && PATH="/opt/homebrew/bin:$PATH" npm run test -- cdpEventApi.test.ts eventAttributeReview.test.ts` passed: 2 files, 6 tests.
 - `cd frontend && PATH="/opt/homebrew/bin:$PATH" npm run build` passed.
-- `cd backend && JAVA_HOME=/Users/photonpay/Library/Java/JavaVirtualMachines/ms-21.0.11/Contents/Home PATH="/Users/photonpay/Library/Java/JavaVirtualMachines/ms-21.0.11/Contents/Home/bin:$PATH" mvn -pl canvas-engine -DskipTests compile` is blocked by `CanvasExecutionService.java` conflict markers.
-- `cd backend && JAVA_HOME=/Users/photonpay/Library/Java/JavaVirtualMachines/ms-21.0.11/Contents/Home PATH="/Users/photonpay/Library/Java/JavaVirtualMachines/ms-21.0.11/Contents/Home/bin:$PATH" mvn -pl canvas-engine test -Dtest=EventAttributeDiscoveryControllerTest -DfailIfNoTests=true` is blocked by the same backend conflict and cannot reach the focused test.
+- `cd backend && JAVA_HOME=/Users/photonpay/Library/Java/JavaVirtualMachines/ms-21.0.11/Contents/Home PATH="/Users/photonpay/Library/Java/JavaVirtualMachines/ms-21.0.11/Contents/Home/bin:$PATH" mvn -pl canvas-engine -DskipTests compile` passed.
+- `cd backend && JAVA_HOME=/Users/photonpay/Library/Java/JavaVirtualMachines/ms-21.0.11/Contents/Home PATH="/Users/photonpay/Library/Java/JavaVirtualMachines/ms-21.0.11/Contents/Home/bin:$PATH" mvn -pl canvas-engine test -Dtest=EventAttributeDiscoveryControllerTest -DfailIfNoTests=true` is blocked during global `testCompile` by unrelated current workspace test sources, including duplicate `KillSwitchSubscriberTest`, missing P2-079 automation run classes, and constructor/API mismatches in existing tests.
 
 ## Goal
 
