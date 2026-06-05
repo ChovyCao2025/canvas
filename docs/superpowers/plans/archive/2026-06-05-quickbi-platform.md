@@ -1327,7 +1327,7 @@ Add distributed cache, slow query detail drilldown, datasource health history, e
 
 - [ ] **Complete BI resource CRUD**
 
-Dataset draft/publish/archive/version history/restore, dashboard draft/publish/clone/archive/import/export/resource-package file upload/download/version history/restore, chart draft/publish/archive/version history/restore, portal draft/publish/archive/version history/restore, resource movement foundations/workbench controls, resource transfer foundations/workbench controls, favorites, comments, edit lock foundations, publishing approval, save/publish permission checks, edit-lock binding for draft save and version restore mutations, dashboard widget drag movement, collision-aware grid positioning, explicit CSS grid placement, resize handles, and undo/redo helpers are done. Continue with managed screenshot execution, notification audit, and export/object-storage hardening.
+Dataset draft/publish/archive/version history/restore, dashboard draft/publish/clone/archive/import/export/resource-package file upload/download/version history/restore, chart draft/publish/archive/version history/restore, portal draft/publish/archive/version history/restore, resource movement foundations/workbench controls, resource transfer foundations/workbench controls, favorites, comments, edit lock foundations, publishing approval, save/publish permission checks, edit-lock binding for draft save and version restore mutations, dashboard widget drag movement, collision-aware grid positioning, explicit CSS grid placement, resize handles, and undo/redo helpers are done. Continue with managed screenshot execution, notification audit, and export hardening.
 
 - [ ] **Permission management and cross-channel enforcement**
 
@@ -1335,11 +1335,11 @@ Query-time resource permission, row permission, column denial, column masking, c
 
 - [ ] **Self-service extraction and export**
 
-Preview, CSV/JSON/XLSX task-shaped export, storage-backed download, export resource permission enforcement, export approval foundation, configurable retention, expired download rejection, download audit, cleanup endpoint, progress/retry metadata, failed export retry endpoint, and workbench task list are done. Continue with field drag/drop extraction builder, true async queue, PDF export, external object-storage provider, and audit detail pages.
+Preview, CSV/JSON/XLSX async task-shaped export, storage-backed download, external S3-compatible object storage provider, export resource permission enforcement, export approval foundation, configurable retention, expired download rejection, download audit, cleanup endpoint, progress/retry metadata, failed export retry endpoint, queued export processor, and workbench task list are done. Continue with field drag/drop extraction builder, PDF export, and audit detail pages.
 
 - [ ] **Production subscription and alert delivery**
 
-Subscription and alert management APIs, manual runtime, threshold evaluation, recent-run baseline anomaly checks, notification-center delivery, SMTP email, Webhook/Lark/Feishu/DingTalk/enterprise-WeChat HTTP adapters, pending/failed retry with backoff, due-check scheduler, manual scheduler endpoint, storage-backed delivery attachment foundation, MIME email attachments, retry-time email attachment replay, configurable HTTP browser screenshot renderer, attachment retention/download audit, delivery audit summary, scheduler lease/distributed locking, and workbench delivery history are done. Continue with a managed screenshot execution cluster, external object-storage provider, and multi-page PDF hardening.
+Subscription and alert management APIs, manual runtime, threshold evaluation, recent-run baseline anomaly checks, notification-center delivery, SMTP email, Webhook/Lark/Feishu/DingTalk/enterprise-WeChat HTTP adapters, pending/failed retry with backoff, due-check scheduler, manual scheduler endpoint, storage-backed delivery attachment foundation, S3-compatible attachment storage provider, MIME email attachments, retry-time email attachment replay, configurable HTTP browser screenshot renderer, attachment retention/download audit, delivery audit summary, scheduler lease/distributed locking, and workbench delivery history are done. Continue with a managed screenshot execution cluster and multi-page PDF hardening.
 
 - [ ] **Big screen and spreadsheet resources**
 
@@ -3014,3 +3014,87 @@ JAVA_HOME=/Users/photonpay/Library/Java/JavaVirtualMachines/ms-21.0.11/Contents/
 Observed result: `biWorkbench` passed with 32 tests; frontend production build completed; backend clean main compile succeeded; focused export service/controller tests passed with 17 tests, 0 failures, 0 errors, 0 skipped. During clean compile verification, Maven initially failed to delete generated `target/classes/org/chovy/canvas/domain/warehouse`; removing generated `backend/canvas-engine/target` and rerunning clean compile succeeded.
 
 Remaining production work after this task: managed screenshot execution cluster, multi-page PDF rendering hardening, true async export queue, external S3/OSS/MinIO storage provider, and AI BI agents.
+
+## Task 62: Add True Async Self-Service Export Queue
+
+**Files:**
+- Create: `backend/canvas-engine/src/main/java/org/chovy/canvas/domain/bi/export/BiExportQueueResult.java`
+- Modify: `backend/canvas-engine/src/main/java/org/chovy/canvas/domain/bi/export/BiSelfServiceExportService.java`
+- Modify: `backend/canvas-engine/src/main/java/org/chovy/canvas/web/bi/BiSelfServiceController.java`
+- Modify: `backend/canvas-engine/src/test/java/org/chovy/canvas/domain/bi/export/BiSelfServiceExportServiceTest.java`
+- Modify: `backend/canvas-engine/src/test/java/org/chovy/canvas/web/bi/BiSelfServiceControllerTest.java`
+- Modify: `backend/canvas-engine/src/main/java/org/chovy/canvas/dal/dataobject/CanvasExecutionDO.java`
+- Modify: `backend/canvas-engine/src/main/java/org/chovy/canvas/domain/meta/TagImportSourceService.java`
+- Modify: `docs/superpowers/specs/2026-06-05-quickbi-platform-design.md`
+- Modify: `docs/superpowers/plans/2026-06-05-quickbi-platform.md`
+
+- [x] **Step 1: Add RED async queue tests**
+
+Add export service tests proving normal export creation persists a `QUEUED` job without executing the warehouse query, and that a separate queued export processor restores the persisted request and writes the downloadable file. Add a controller test proving `POST /canvas/bi/self-service/exports/queue/run` passes tenant, username, role, and limit into the service. The RED path was blocked at compile time by the missing `BiExportQueueResult` and `processQueuedExports(...)` contract after first restoring unrelated main compile blockers.
+
+- [x] **Step 2: Queue creation and approval instead of running inline**
+
+`BiSelfServiceExportService.createExport(...)` now returns `QUEUED` for non-approval exports without calling `BiQueryExecutionService`; approval review marks approved jobs back to `QUEUED` instead of generating files inline. Failed retry processing remains separate through `/exports/retry`.
+
+- [x] **Step 3: Add queue processor and endpoint**
+
+Add `BiExportQueueResult`, `processQueuedExports(...)`, and a disabled-by-default scheduled cycle controlled by `canvas.bi.export.queue.*`. `BiSelfServiceController` exposes `POST /canvas/bi/self-service/exports/queue/run` for manual tenant-scoped processing. Queued processing restores `request_json`, enforces export permission, runs the structured query, writes through `BiFileStorage`, and updates progress/file metadata or retryable failure metadata.
+
+- [x] **Step 4: Restore backend compile path for this slice**
+
+Fresh main compile initially surfaced unrelated current-worktree API drift: `CanvasExecutionDO` did not expose the already-migrated `context_snapshot_json` field, and `TagImportSourceController` called `TagImportSourceService.runAsync(...)` while the service only exposed blocking `run(...)`. Add the missing DO property and the service's `BlockingWorkScheduler` wrapper so backend main compilation can proceed.
+
+- [x] **Step 5: Verify async export queue slice**
+
+Observed on 2026-06-05:
+
+```bash
+JAVA_HOME=/Users/photonpay/Library/Java/JavaVirtualMachines/ms-21.0.11/Contents/Home PATH="$JAVA_HOME/bin:$PATH" mvn -f backend/canvas-engine/pom.xml -DskipTests compile
+JAVA_HOME=/Users/photonpay/Library/Java/JavaVirtualMachines/ms-21.0.11/Contents/Home PATH="$JAVA_HOME/bin:$PATH" javac --release 21 -encoding UTF-8 -cp "backend/canvas-engine/target/classes:backend/canvas-engine/target/test-classes:$(cat /tmp/canvas-engine-test-classpath.txt)" -d backend/canvas-engine/target/test-classes backend/canvas-engine/src/test/java/org/chovy/canvas/domain/bi/export/BiSelfServiceExportServiceTest.java backend/canvas-engine/src/test/java/org/chovy/canvas/web/bi/BiSelfServiceControllerTest.java
+JAVA_HOME=/Users/photonpay/Library/Java/JavaVirtualMachines/ms-21.0.11/Contents/Home PATH="$JAVA_HOME/bin:$PATH" mvn -f backend/canvas-engine/pom.xml -Dtest=BiSelfServiceExportServiceTest,BiSelfServiceControllerTest -DfailIfNoTests=false -DforkCount=0 surefire:test
+```
+
+Observed result: backend main compile succeeded; focused export service/controller test sources compiled; focused export service/controller tests passed with 20 tests, 0 failures, 0 errors, 0 skipped. A broad Maven test compile is still blocked by unrelated dirty-worktree tests including duplicate `KillSwitchSubscriberTest`, missing `CdpWarehousePrivacyAudienceBitmapRebuildAutomationRun*` test dependencies, and stale execution-engine test APIs.
+
+Remaining production work after this task: managed screenshot execution cluster, multi-page PDF rendering hardening, external S3/OSS/MinIO storage provider, and AI BI agents.
+
+## Task 63: Add S3-Compatible BI Object Storage Provider
+
+**Files:**
+- Create: `backend/canvas-engine/src/main/java/org/chovy/canvas/domain/bi/storage/BiFileStorageConfiguration.java`
+- Create: `backend/canvas-engine/src/main/java/org/chovy/canvas/domain/bi/storage/S3CompatibleBiStorageProperties.java`
+- Create: `backend/canvas-engine/src/main/java/org/chovy/canvas/domain/bi/storage/S3CompatibleBiFileStorage.java`
+- Create: `backend/canvas-engine/src/main/java/org/chovy/canvas/domain/bi/storage/S3ObjectClient.java`
+- Create: `backend/canvas-engine/src/main/java/org/chovy/canvas/domain/bi/storage/S3ObjectRequest.java`
+- Create: `backend/canvas-engine/src/main/java/org/chovy/canvas/domain/bi/storage/HttpS3ObjectClient.java`
+- Create: `backend/canvas-engine/src/test/java/org/chovy/canvas/domain/bi/storage/BiFileStorageConfigurationTest.java`
+- Create: `backend/canvas-engine/src/test/java/org/chovy/canvas/domain/bi/storage/S3CompatibleBiFileStorageTest.java`
+- Create: `backend/canvas-engine/src/test/java/org/chovy/canvas/domain/bi/storage/HttpS3ObjectClientTest.java`
+- Modify: `docs/superpowers/specs/2026-06-05-quickbi-platform-design.md`
+- Modify: `docs/superpowers/plans/2026-06-05-quickbi-platform.md`
+
+- [x] **Step 1: Add RED S3-compatible storage tests**
+
+Add storage tests proving a non-local provider writes, reads, and deletes through a configured bucket/prefix while keeping the logical `storage_key` stable, rejects blank/absolute/traversal keys, and only creates a global `BiFileStorage` bean when `canvas.bi.storage.provider=s3`. The RED focused compile failed because `S3ObjectClient`, `S3ObjectRequest`, `S3CompatibleBiStorageProperties`, `S3CompatibleBiFileStorage`, and `BiFileStorageConfiguration` were missing.
+
+- [x] **Step 2: Implement the S3-compatible provider**
+
+Add `S3CompatibleBiFileStorage` behind the existing `BiFileStorage` SPI. It stores logical keys in BI rows, applies configured `key-prefix` only when calling object storage, returns `S3` provider metadata, rejects unsafe keys, and uses `S3ObjectClient` for object operations. Add `BiFileStorageConfiguration`, which keeps the existing local per-service fallback by default and creates the S3-compatible bean only when `canvas.bi.storage.provider=s3`.
+
+- [x] **Step 3: Add production HTTP object client**
+
+Add `HttpS3ObjectClient` using Java `HttpClient`, path-style or virtual-hosted S3-compatible object URLs, SHA-256 payload hashes, and AWS Signature V4 headers. This supports S3, MinIO, and OSS S3-compatible endpoints without adding a new dependency.
+
+- [x] **Step 4: Verify S3-compatible storage slice**
+
+Observed on 2026-06-05:
+
+```bash
+JAVA_HOME=/Users/photonpay/Library/Java/JavaVirtualMachines/ms-21.0.11/Contents/Home PATH="$JAVA_HOME/bin:$PATH" javac --release 21 -encoding UTF-8 -cp "backend/canvas-engine/target/classes:backend/canvas-engine/target/test-classes:$(cat /tmp/canvas-engine-test-classpath.txt)" -d backend/canvas-engine/target/test-classes backend/canvas-engine/src/main/java/org/chovy/canvas/domain/bi/storage/S3CompatibleBiStorageProperties.java backend/canvas-engine/src/main/java/org/chovy/canvas/domain/bi/storage/S3ObjectRequest.java backend/canvas-engine/src/main/java/org/chovy/canvas/domain/bi/storage/S3ObjectClient.java backend/canvas-engine/src/main/java/org/chovy/canvas/domain/bi/storage/S3CompatibleBiFileStorage.java backend/canvas-engine/src/main/java/org/chovy/canvas/domain/bi/storage/HttpS3ObjectClient.java backend/canvas-engine/src/main/java/org/chovy/canvas/domain/bi/storage/BiFileStorageConfiguration.java backend/canvas-engine/src/test/java/org/chovy/canvas/domain/bi/storage/S3CompatibleBiFileStorageTest.java backend/canvas-engine/src/test/java/org/chovy/canvas/domain/bi/storage/BiFileStorageConfigurationTest.java backend/canvas-engine/src/test/java/org/chovy/canvas/domain/bi/storage/HttpS3ObjectClientTest.java
+JAVA_HOME=/Users/photonpay/Library/Java/JavaVirtualMachines/ms-21.0.11/Contents/Home PATH="$JAVA_HOME/bin:$PATH" mvn -f backend/canvas-engine/pom.xml -Dtest=S3CompatibleBiFileStorageTest,BiFileStorageConfigurationTest,HttpS3ObjectClientTest -DfailIfNoTests=false -DforkCount=0 surefire:test
+JAVA_HOME=/Users/photonpay/Library/Java/JavaVirtualMachines/ms-21.0.11/Contents/Home PATH="$JAVA_HOME/bin:$PATH" mvn -f backend/canvas-engine/pom.xml -DskipTests compile
+```
+
+Observed result: focused storage test sources compiled; focused storage tests passed with 5 tests, 0 failures, 0 errors, 0 skipped; backend main compile recompiled 971 source files successfully.
+
+Remaining production work after this task: managed screenshot execution cluster, multi-page PDF rendering hardening, and AI BI agents.

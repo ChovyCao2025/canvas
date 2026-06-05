@@ -343,7 +343,7 @@ Quick BI 自助取数参考落点：
 当前自助取数 foundation：
 
 - `POST /canvas/bi/self-service/preview` 基于结构化 `BiQueryRequest` 进行预览，复用查询执行链路，因此自动继承租户隔离、行权限、列权限、脱敏、字段治理和查询历史。
-- `POST /canvas/bi/self-service/exports` 创建异步导出任务并返回 `QUEUED`；任务处理器会从 `bi_export_job` 恢复原始结构化请求、执行查询，并通过 `BiFileStorage` 写入可下载对象；默认 provider 是本地文件实现，表模型保存 `storage_provider`/`storage_key`，后续可直接替换为 S3/OSS/MinIO provider；敏感导出、显式 `approvalRequired` 或超过 `canvas.bi.export.approval.row-threshold` 的任务会进入 `PENDING_APPROVAL`，不会执行查询或生成文件。
+- `POST /canvas/bi/self-service/exports` 创建异步导出任务并返回 `QUEUED`；任务处理器会从 `bi_export_job` 恢复原始结构化请求、执行查询，并通过 `BiFileStorage` 写入可下载对象；默认 provider 是本地文件实现，表模型保存 `storage_provider`/`storage_key`；当 `canvas.bi.storage.provider=s3` 时，导出和订阅附件会通过 S3-compatible provider 写入 S3/MinIO/OSS S3 兼容端点，支持 endpoint、region、bucket、access key、secret key、key prefix、path-style 和 public base URL 配置；敏感导出、显式 `approvalRequired` 或超过 `canvas.bi.export.approval.row-threshold` 的任务会进入 `PENDING_APPROVAL`，不会执行查询或生成文件。
 - `GET /canvas/bi/self-service/exports` 返回最近导出任务。
 - `POST /canvas/bi/self-service/exports/{id}/review` 由管理员角色审批或驳回待审批导出；批准后标记为 `QUEUED` 等待异步处理，驳回后标记 `REJECTED`。
 - `POST /canvas/bi/self-service/exports/queue/run` 手动处理当前租户的 `QUEUED` 导出任务，返回 checked/processed/completed/failed 计数和处理后的任务视图；生产环境也可启用 `canvas.bi.export.queue.*` 定时处理配置。
@@ -351,12 +351,12 @@ Quick BI 自助取数参考落点：
 - `POST /canvas/bi/self-service/exports/cleanup` 清理当前租户已过期导出任务，并返回检查数、过期数、删除文件数和失败数。
 - `POST /canvas/bi/self-service/exports/retry` 对当前租户到达 `next_retry_at` 的失败导出任务执行一次性重试，恢复原始结构化查询、复用 `BiFileStorage` 写文件，并返回 checked/retried/completed/failed 计数和重试后的任务视图。
 - 导出格式支持 `CSV`、`JSON` 和 `XLSX`；导出前会校验数据集 `EXPORT` 资源权限，查询过程继续执行行列权限和脱敏。
-- 默认本地 storage 根目录为 `${java.io.tmpdir}/canvas-bi-exports`，可通过 `canvas.bi.export.dir` 配置；导出任务默认保留 7 天，可通过 `canvas.bi.export.retention-days` 配置。
+- 未启用全局对象存储时，默认本地 storage 根目录为 `${java.io.tmpdir}/canvas-bi-exports`，可通过 `canvas.bi.export.dir` 配置；导出任务默认保留 7 天，可通过 `canvas.bi.export.retention-days` 配置。
 - 下载会累计 `download_count` 和 `last_downloaded_at`；已过期导出会拒绝下载并标记为 `EXPIRED`，清理接口会通过 `BiFileStorage` 删除对象，同时保留旧本地路径行的兼容清理。
 - 任务表保存并返回 `progress_percent`、`retry_count`、`max_retry_count`、`next_retry_at`、`last_retry_at` 和 `retry_exhausted_at`；失败任务按 `canvas.bi.export.retry.*` 配置写入可轮询的重试状态，默认最多 3 次、初始延迟 15 分钟、指数退避倍率 2、最大延迟 1440 分钟。
 - 前端 BI 工作台展示自助取数预览、普通 CSV 导出、敏感导出申请、导出任务列表、审批状态、批准/驳回操作、保留期、下载次数、过期状态、进度条、失败重试状态、手动重试结果、清理结果和下载入口。
 
-后续仍需要补齐：外部对象存储 provider、百万行分片、导出审计详情、Excel 样式和 PDF 导出。
+后续仍需要补齐：百万行分片、导出审计详情、Excel 样式和 PDF 导出。
 
 ### 4.9 数据门户
 
@@ -431,7 +431,7 @@ Canvas 预置门户：
 - `GET /canvas/bi/delivery-logs` 查询订阅和告警投递流水。
 - `GET /canvas/bi/delivery-audit` 按 jobType、status、channel、jobId 和 limit 返回投递审计窗口，汇总 total、delivered、triggered、skipped、pending、failed、retryable 和 retryExhausted，并返回对应明细。
 - `GET /canvas/bi/delivery-attachments` 查询订阅投递附件，`GET /canvas/bi/delivery-attachments/{id}/download` 下载已生成文件，`POST /canvas/bi/delivery-attachments/cleanup` 清理过期附件对象并兼容旧本地路径。
-- 订阅运行时会根据 `delivery.content` 和 `delivery.attachment(s)` 生成服务端快照/附件：`SNAPSHOT_LINK`/`SNAPSHOT` 默认生成 HTML 快照，`snapshotFormat`/`screenshotFormat` 设置为 `PNG` 或 `JPEG` 时会调用可配置 HTTP browser renderer 生成图片截图，`CSV`/`JSON`/`XLSX`/`PDF` 生成投递摘要附件，其中 PDF 会按摘要内容自动分页并生成多页 Page/Contents 对象，附件元数据会写入 payload；附件通过 `BiFileStorage` 写入并记录 `storage_provider`/`storage_key`，默认本地 storage 根目录为 `${java.io.tmpdir}/canvas-bi-delivery-attachments`；附件默认留存 7 天，可通过 `canvas.bi.delivery.attachment.retention-days` 调整；下载会累计下载次数和最后下载时间，过期附件拒绝下载并可被清理任务标记为 `EXPIRED` 且删除存储对象；邮件渠道会读取生成文件并作为 MIME 附件发送，飞书、钉钉、企微和 Webhook 等非邮件渠道使用文本下载链接；失败邮件重试会从历史 payload 中的附件 ID 重新下载文件并回放为 MIME 附件。
+- 订阅运行时会根据 `delivery.content` 和 `delivery.attachment(s)` 生成服务端快照/附件：`SNAPSHOT_LINK`/`SNAPSHOT` 默认生成 HTML 快照，`snapshotFormat`/`screenshotFormat` 设置为 `PNG` 或 `JPEG` 时会调用可配置 HTTP browser renderer 生成图片截图，`CSV`/`JSON`/`XLSX`/`PDF` 生成投递摘要附件，其中 PDF 会按摘要内容自动分页并生成多页 Page/Contents 对象，附件元数据会写入 payload；附件通过 `BiFileStorage` 写入并记录 `storage_provider`/`storage_key`，默认本地 storage 根目录为 `${java.io.tmpdir}/canvas-bi-delivery-attachments`，启用 `canvas.bi.storage.provider=s3` 后复用同一 S3-compatible 对象存储 provider；附件默认留存 7 天，可通过 `canvas.bi.delivery.attachment.retention-days` 调整；下载会累计下载次数和最后下载时间，过期附件拒绝下载并可被清理任务标记为 `EXPIRED` 且删除存储对象；邮件渠道会读取生成文件并作为 MIME 附件发送，飞书、钉钉、企微和 Webhook 等非邮件渠道使用文本下载链接；失败邮件重试会从历史 payload 中的附件 ID 重新下载文件并回放为 MIME 附件。
 - `BiSnapshotRenderer` 定义浏览器截图渲染 SPI；`HttpBiSnapshotRenderer` 默认关闭，通过 `canvas.bi.delivery.snapshot.renderer.enabled:true` 和 `canvas.bi.delivery.snapshot.renderer.url` 接入内部 Playwright/Browserless 渲染服务，协议为 JSON 请求和 base64 图片响应，支持 PNG/JPEG、宽高和缩放倍率。
 - `BiDeliveryAdapterService` 提供外部投递 adapter foundation，支持 `EMAIL`、`WEBHOOK`、`LARK`、`FEISHU`、`DINGTALK`、`DING`、`WECOM`、`WECHAT_WORK` 和 `ENTERPRISE_WECHAT` 等渠道；Lark/飞书、钉钉和企业微信机器人采用文本消息 payload，通用 Webhook 采用 `BI_DELIVERY` 结构化 payload。
 - `BiSmtpEmailDeliveryClient` 提供无第三方依赖的 SMTP 邮件 foundation，默认关闭，可通过 `canvas.bi.delivery.email.*` 配置启用，支持基本 SMTP、SSL、STARTTLS、AUTH LOGIN、纯文本正文和 `multipart/mixed` 附件。
