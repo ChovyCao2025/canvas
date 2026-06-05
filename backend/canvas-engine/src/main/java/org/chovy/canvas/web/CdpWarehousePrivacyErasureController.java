@@ -2,6 +2,7 @@ package org.chovy.canvas.web;
 
 import org.chovy.canvas.common.R;
 import org.chovy.canvas.common.tenant.TenantContextResolver;
+import org.chovy.canvas.domain.warehouse.CdpWarehousePrivacyAudienceBitmapRebuildAutomationService;
 import org.chovy.canvas.domain.warehouse.CdpWarehousePrivacyAudienceBitmapRebuildService;
 import org.chovy.canvas.domain.warehouse.CdpWarehousePrivacyErasureExecutionService;
 import org.chovy.canvas.domain.warehouse.CdpWarehousePrivacyErasureService;
@@ -25,31 +26,41 @@ public class CdpWarehousePrivacyErasureController {
     private final CdpWarehousePrivacyErasureService erasureService;
     private final CdpWarehousePrivacyErasureExecutionService executionService;
     private final CdpWarehousePrivacyAudienceBitmapRebuildService rebuildService;
+    private final CdpWarehousePrivacyAudienceBitmapRebuildAutomationService automationService;
     private final TenantContextResolver tenantContextResolver;
 
     public CdpWarehousePrivacyErasureController(CdpWarehousePrivacyErasureService erasureService) {
-        this(erasureService, null, null, null);
+        this(erasureService, null, null, null, null);
     }
 
     public CdpWarehousePrivacyErasureController(CdpWarehousePrivacyErasureService erasureService,
                                                 TenantContextResolver tenantContextResolver) {
-        this(erasureService, null, null, tenantContextResolver);
+        this(erasureService, null, null, null, tenantContextResolver);
     }
 
     public CdpWarehousePrivacyErasureController(CdpWarehousePrivacyErasureService erasureService,
                                                 CdpWarehousePrivacyErasureExecutionService executionService,
                                                 TenantContextResolver tenantContextResolver) {
-        this(erasureService, executionService, null, tenantContextResolver);
+        this(erasureService, executionService, null, null, tenantContextResolver);
+    }
+
+    public CdpWarehousePrivacyErasureController(CdpWarehousePrivacyErasureService erasureService,
+                                                CdpWarehousePrivacyErasureExecutionService executionService,
+                                                CdpWarehousePrivacyAudienceBitmapRebuildService rebuildService,
+                                                TenantContextResolver tenantContextResolver) {
+        this(erasureService, executionService, rebuildService, null, tenantContextResolver);
     }
 
     @Autowired
     public CdpWarehousePrivacyErasureController(CdpWarehousePrivacyErasureService erasureService,
                                                 CdpWarehousePrivacyErasureExecutionService executionService,
                                                 CdpWarehousePrivacyAudienceBitmapRebuildService rebuildService,
+                                                CdpWarehousePrivacyAudienceBitmapRebuildAutomationService automationService,
                                                 TenantContextResolver tenantContextResolver) {
         this.erasureService = erasureService;
         this.executionService = executionService;
         this.rebuildService = rebuildService;
+        this.automationService = automationService;
         this.tenantContextResolver = tenantContextResolver;
     }
 
@@ -92,6 +103,21 @@ public class CdpWarehousePrivacyErasureController {
                         throw new IllegalStateException("privacy audience bitmap rebuild service is not configured");
                     }
                     return R.ok(rebuildService.rebuild(tenantId, id, command));
+                })
+                .subscribeOn(Schedulers.boundedElastic()));
+    }
+
+    @PostMapping("/audience-rebuild/automation/run")
+    public Mono<R<CdpWarehousePrivacyAudienceBitmapRebuildAutomationService.AutomationResult>>
+    runAudienceBitmapRebuildAutomation(
+            @RequestBody(required = false)
+            CdpWarehousePrivacyAudienceBitmapRebuildAutomationService.AutomationCommand command) {
+        return currentTenantId().flatMap(tenantId -> Mono.fromCallable(() -> {
+                    if (automationService == null) {
+                        throw new IllegalStateException(
+                                "privacy audience bitmap rebuild automation service is not configured");
+                    }
+                    return R.ok(automationService.run(tenantId, command));
                 })
                 .subscribeOn(Schedulers.boundedElastic()));
     }

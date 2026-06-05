@@ -506,6 +506,7 @@ export interface BiExportJobView {
   exportFormat: string
   rowLimit: number
   status: string
+  progressPercent?: number | null
   fileUrl?: string | null
   storageProvider?: string | null
   storageKey?: string | null
@@ -521,9 +522,22 @@ export interface BiExportJobView {
   reviewedAt?: string | null
   reviewComment?: string | null
   errorMessage?: string | null
+  retryCount?: number | null
+  maxRetryCount?: number | null
+  nextRetryAt?: string | null
+  lastRetryAt?: string | null
+  retryExhaustedAt?: string | null
   createdBy?: string | null
   createdAt?: string | null
   updatedAt?: string | null
+}
+
+export interface BiExportRetryResult {
+  checked: number
+  retried: number
+  completed: number
+  failed: number
+  jobs: BiExportJobView[]
 }
 
 export interface BiExportApprovalReviewCommand {
@@ -890,6 +904,8 @@ export const biApi = {
     http.post<R<BiExportJobView>, R<BiExportJobView>>(`/canvas/bi/self-service/exports/${id}/review`, command),
   cleanupExports: (limit = 100) =>
     http.post<R<BiExportCleanupResult>, R<BiExportCleanupResult>>(`/canvas/bi/self-service/exports/cleanup?limit=${limit}`, {}),
+  retryExports: (limit = 20) =>
+    http.post<R<BiExportRetryResult>, R<BiExportRetryResult>>(`/canvas/bi/self-service/exports/retry?limit=${limit}`, {}),
   listSubscriptions: (limit = 20) =>
     http.get<R<BiSubscriptionView[]>, R<BiSubscriptionView[]>>(`/canvas/bi/subscriptions?limit=${limit}`),
   upsertSubscription: (command: BiSubscriptionCommand) =>

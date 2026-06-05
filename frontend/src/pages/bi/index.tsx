@@ -153,6 +153,7 @@ import {
   type BiEmbedTicket,
   type BiExportCleanupResult,
   type BiExportJobView,
+  type BiExportRetryResult,
   type BiPortalResource,
   type BiPortalVersionView,
   type BiColumnPermissionView,
@@ -669,6 +670,20 @@ function createExportJobColumns(
         <Text type={isExpiredAt(row.expiresAt) || row.status === 'EXPIRED' ? 'danger' : 'secondary'} style={{ fontSize: 11 }}>
           {(isExpiredAt(row.expiresAt) || row.status === 'EXPIRED') ? '已过期' : `过期 ${formatAttachmentTime(row.expiresAt)}`} · 下载 {row.downloadCount ?? 0}
         </Text>
+        <Progress
+          percent={exportProgressPercent(row)}
+          size="small"
+          status={exportProgressStatus(row)}
+          showInfo={false}
+          style={{ width: 160 }}
+        />
+        {row.status === 'FAILED' && (
+          <Text type={row.retryExhaustedAt ? 'danger' : 'secondary'} style={{ fontSize: 11 }}>
+            {row.retryExhaustedAt
+              ? `重试耗尽 ${row.retryCount ?? 0}/${row.maxRetryCount ?? 0}`
+              : `下次重试 ${formatAttachmentTime(row.nextRetryAt)}`}
+          </Text>
+        )}
       </Space>
     ),
   },
@@ -932,8 +947,10 @@ export default function BiWorkbenchPage() {
   const [creatingExport, setCreatingExport] = useState(false)
   const [reviewingExport, setReviewingExport] = useState<string | null>(null)
   const [cleaningExports, setCleaningExports] = useState(false)
+  const [retryingExports, setRetryingExports] = useState(false)
   const [selfServicePreview, setSelfServicePreview] = useState<BiQueryResult | null>(null)
   const [exportCleanupResult, setExportCleanupResult] = useState<BiExportCleanupResult | null>(null)
+  const [exportRetryResult, setExportRetryResult] = useState<BiExportRetryResult | null>(null)
   const [subscriptions, setSubscriptions] = useState<BiSubscriptionView[]>([])
   const [alertRules, setAlertRules] = useState<BiAlertRuleView[]>([])
   const [deliveryLogs, setDeliveryLogs] = useState<BiDeliveryLogView[]>([])
@@ -1112,6 +1129,10 @@ export default function BiWorkbenchPage() {
   )
   const exportDownloadCount = useMemo(
     () => exportJobs.reduce((total, job) => total + (job.downloadCount ?? 0), 0),
+    [exportJobs],
+  )
+  const retryableExportCount = useMemo(
+    () => exportJobs.filter(isRetryableExportJob).length,
     [exportJobs],
   )
 

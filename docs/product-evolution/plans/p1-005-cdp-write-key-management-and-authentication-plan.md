@@ -16,7 +16,7 @@
 
 ## File Structure
 
-- Create: `backend/canvas-engine/src/main/resources/db/migration/V97__cdp_write_key_management.sql`
+- Create: `backend/canvas-engine/src/main/resources/db/migration/V100__cdp_write_key_management.sql`
 - Create: `backend/canvas-engine/src/test/java/org/chovy/canvas/domain/cdp/CdpWriteKeySchemaTest.java`
 - Create: `backend/canvas-engine/src/main/java/org/chovy/canvas/dal/dataobject/CdpWriteKeyDO.java`
 - Create: `backend/canvas-engine/src/main/java/org/chovy/canvas/dal/mapper/CdpWriteKeyMapper.java`
@@ -32,11 +32,11 @@
 
 **Files:**
 - Create: `backend/canvas-engine/src/test/java/org/chovy/canvas/domain/cdp/CdpWriteKeySchemaTest.java`
-- Create: `backend/canvas-engine/src/main/resources/db/migration/V97__cdp_write_key_management.sql`
+- Create: `backend/canvas-engine/src/main/resources/db/migration/V100__cdp_write_key_management.sql`
 - Create: `backend/canvas-engine/src/main/java/org/chovy/canvas/dal/dataobject/CdpWriteKeyDO.java`
 - Create: `backend/canvas-engine/src/main/java/org/chovy/canvas/dal/mapper/CdpWriteKeyMapper.java`
 
-- [ ] **Step 1: Write schema test**
+- [x] **Step 1: Write schema test**
 
 ```java
 class CdpWriteKeySchemaTest {
@@ -44,7 +44,7 @@ class CdpWriteKeySchemaTest {
     @Test
     void migrationCreatesWriteKeyTableWithoutRawSecretStorage() throws Exception {
         String sql = Files.readString(Path.of(
-                "src/main/resources/db/migration/V97__cdp_write_key_management.sql"));
+                "src/main/resources/db/migration/V100__cdp_write_key_management.sql"));
 
         assertThat(sql)
                 .contains("CREATE TABLE IF NOT EXISTS cdp_write_key")
@@ -60,7 +60,7 @@ class CdpWriteKeySchemaTest {
 }
 ```
 
-- [ ] **Step 2: Run schema test and confirm red state**
+- [x] **Step 2: Run schema test and confirm red state**
 
 Run:
 
@@ -70,9 +70,11 @@ cd backend && mvn -pl canvas-engine test -Dtest=CdpWriteKeySchemaTest
 
 Expected: FAIL because migration does not exist.
 
-- [ ] **Step 3: Add migration**
+Observed: The migration already existed as `V100__cdp_write_key_management.sql` in the current workspace, so this red-state step was superseded by existing implementation.
 
-Create `V97__cdp_write_key_management.sql`:
+- [x] **Step 3: Add migration**
+
+Create `V100__cdp_write_key_management.sql`:
 
 ```sql
 CREATE TABLE IF NOT EXISTS cdp_write_key (
@@ -95,7 +97,7 @@ CREATE TABLE IF NOT EXISTS cdp_write_key (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='CDP SDK write keys';
 ```
 
-- [ ] **Step 4: Add data object and mapper**
+- [x] **Step 4: Add data object and mapper**
 
 Create `CdpWriteKeyDO.java`:
 
@@ -143,13 +145,15 @@ cd backend && mvn -pl canvas-engine test -Dtest=CdpWriteKeySchemaTest
 
 Expected: PASS.
 
+Observed: Blocked on 2026-06-05 by unrelated backend compile errors outside P1-005.
+
 ### Task 2: Authentication Service
 
 **Files:**
 - Create: `backend/canvas-engine/src/test/java/org/chovy/canvas/domain/cdp/CdpWriteKeyAuthServiceTest.java`
 - Create: `backend/canvas-engine/src/main/java/org/chovy/canvas/domain/cdp/CdpWriteKeyAuthService.java`
 
-- [ ] **Step 1: Write auth tests**
+- [x] **Step 1: Write auth tests**
 
 Create `CdpWriteKeyAuthServiceTest.java`:
 
@@ -229,7 +233,7 @@ class CdpWriteKeyAuthServiceTest {
 }
 ```
 
-- [ ] **Step 2: Run auth tests and confirm red state**
+- [x] **Step 2: Run auth tests and confirm red state**
 
 Run:
 
@@ -239,7 +243,9 @@ cd backend && mvn -pl canvas-engine test -Dtest=CdpWriteKeyAuthServiceTest
 
 Expected: FAIL because service does not exist.
 
-- [ ] **Step 3: Implement auth service**
+Observed: The service already existed in the current workspace, so this red-state step was superseded by existing implementation.
+
+- [x] **Step 3: Implement auth service**
 
 Create `CdpWriteKeyAuthService.java`:
 
@@ -322,6 +328,8 @@ cd backend && mvn -pl canvas-engine test -Dtest=CdpWriteKeyAuthServiceTest
 
 Expected: PASS.
 
+Observed: Blocked on 2026-06-05 by unrelated backend compile errors outside P1-005.
+
 ### Task 3: Admin DTOs And Controller
 
 **Files:**
@@ -331,7 +339,7 @@ Expected: PASS.
 - Create: `backend/canvas-engine/src/main/java/org/chovy/canvas/web/CdpWriteKeyController.java`
 - Create: `backend/canvas-engine/src/test/java/org/chovy/canvas/web/CdpWriteKeyControllerTest.java`
 
-- [ ] **Step 1: Add DTO records**
+- [x] **Step 1: Add DTO records**
 
 ```java
 public record CdpWriteKeyCreateReq(
@@ -369,7 +377,7 @@ public record CdpWriteKeyRowDTO(
 }
 ```
 
-- [ ] **Step 2: Add create/list/disable service methods**
+- [x] **Step 2: Add create/list/disable service methods**
 
 Add to `CdpWriteKeyAuthService`:
 
@@ -406,7 +414,7 @@ public void disable(Long tenantId, Long id) {
 }
 ```
 
-- [ ] **Step 3: Add controller**
+- [x] **Step 3: Add controller**
 
 Create `CdpWriteKeyController.java`:
 
@@ -457,7 +465,7 @@ public class CdpWriteKeyController {
 }
 ```
 
-- [ ] **Step 4: Add controller tests**
+- [x] **Step 4: Add controller tests**
 
 In `CdpWriteKeyControllerTest`, verify create response contains `writeKey` and list response only contains `keyPrefix`:
 
@@ -486,6 +494,14 @@ cd backend && mvn -pl canvas-engine test -Dtest=CdpWriteKeySchemaTest,CdpWriteKe
 
 Expected: PASS.
 
+Observed: Blocked on 2026-06-05 by unrelated backend compile errors outside P1-005. Static checks confirmed:
+
+```bash
+rg -n "CREATE TABLE IF NOT EXISTS cdp_write_key|key_prefix|key_hash|raw_key|UNIQUE KEY uk_cdp_write_key_prefix" backend/canvas-engine/src/main/resources/db/migration/V100__cdp_write_key_management.sql
+rg -n "@RequestMapping\\(\"/cdp/write-keys\"\\)|@GetMapping|@PostMapping|@DeleteMapping|writeKeyService\\.generateRawKey|listTenantKeys|disable\\(" backend/canvas-engine/src/main/java/org/chovy/canvas/web/CdpWriteKeyController.java
+rg -n "class CdpWriteKeySchemaTest|class CdpWriteKeyAuthServiceTest|class CdpWriteKeyControllerTest|authenticateRejectsDisabledWriteKey|createReturnsRawKeyOnce" backend/canvas-engine/src/test/java/org/chovy/canvas/domain/cdp/CdpWriteKeySchemaTest.java backend/canvas-engine/src/test/java/org/chovy/canvas/domain/cdp/CdpWriteKeyAuthServiceTest.java backend/canvas-engine/src/test/java/org/chovy/canvas/web/CdpWriteKeyControllerTest.java
+```
+
 ### Task 4: Commit This Slice
 
 **Files:**
@@ -497,7 +513,7 @@ Expected: PASS.
 Run:
 
 ```bash
-git add backend/canvas-engine/src/main/resources/db/migration/V97__cdp_write_key_management.sql \
+git add backend/canvas-engine/src/main/resources/db/migration/V100__cdp_write_key_management.sql \
   backend/canvas-engine/src/main/java/org/chovy/canvas/dal/dataobject/CdpWriteKeyDO.java \
   backend/canvas-engine/src/main/java/org/chovy/canvas/dal/mapper/CdpWriteKeyMapper.java \
   backend/canvas-engine/src/main/java/org/chovy/canvas/domain/cdp/CdpWriteKeyAuthService.java \
