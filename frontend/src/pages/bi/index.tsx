@@ -2104,6 +2104,16 @@ export default function BiWorkbenchPage() {
       .finally(() => setCleaningExports(false))
   }
 
+  const retryExports = () => {
+    setRetryingExports(true)
+    biApi.retryExports(10)
+      .then(response => {
+        setExportRetryResult(response.data ?? null)
+        return reloadExports()
+      })
+      .finally(() => setRetryingExports(false))
+  }
+
   const createDashboardSubscription = () => {
     setSavingSubscription('subscription')
     biApi.upsertSubscription({
@@ -2782,6 +2792,12 @@ export default function BiWorkbenchPage() {
                   <Tag>{exportJobs.length} 条</Tag>
                   {exportDownloadCount > 0 && <Tag color="geekblue">{exportDownloadCount} 下载</Tag>}
                   {expiredExportCount > 0 && <Tag color="gold">{expiredExportCount} 过期</Tag>}
+                  {retryableExportCount > 0 && <Tag color="volcano">{retryableExportCount} 可重试</Tag>}
+                  {exportRetryResult && (
+                    <Tag color={exportRetryResult.failed > 0 ? 'red' : 'green'}>
+                      重试 {exportRetryResult.completed}/{exportRetryResult.checked}
+                    </Tag>
+                  )}
                   {exportCleanupResult && (
                     <Tag color={exportCleanupResult.failed > 0 ? 'red' : 'purple'}>
                       清理 {exportCleanupResult.expired}/{exportCleanupResult.checked}
@@ -2790,6 +2806,7 @@ export default function BiWorkbenchPage() {
                 </Space>
                 <Space size={8}>
                   <Badge status={loadingExports ? 'processing' : 'success'} text={loadingExports ? '同步中' : '已就绪'} />
+                  <Button size="small" icon={<SyncOutlined />} loading={retryingExports} onClick={retryExports}>重试失败</Button>
                   <Button size="small" icon={<DeleteOutlined />} loading={cleaningExports} onClick={cleanupExports}>清理过期</Button>
                 </Space>
               </Space>
@@ -3776,6 +3793,29 @@ function exportStatusColor(status: string): string {
   return 'gold'
 }
 
+function exportProgressPercent(row: BiExportJobView): number {
+  const value = row.progressPercent ?? (row.status === 'COMPLETED' ? 100 : row.status === 'RUNNING' ? 50 : 0)
+  if (!Number.isFinite(value)) return 0
+  return Math.max(0, Math.min(100, Math.round(value)))
+}
+
+function exportProgressStatus(row: BiExportJobView): 'exception' | 'active' | 'success' | 'normal' {
+  if (row.status === 'COMPLETED') return 'success'
+  if (row.status === 'FAILED' || row.status === 'REJECTED' || row.status === 'EXPIRED') return 'exception'
+  if (row.status === 'RUNNING') return 'active'
+  return 'normal'
+}
+
+function isRetryableExportJob(row: BiExportJobView): boolean {
+  if (row.status !== 'FAILED' || row.retryExhaustedAt) return false
+  const retryCount = row.retryCount ?? 0
+  const maxRetryCount = row.maxRetryCount ?? 0
+  if (maxRetryCount <= 0 || retryCount >= maxRetryCount) return false
+  if (!row.nextRetryAt) return true
+  const nextRetryTime = Date.parse(row.nextRetryAt)
+  return Number.isFinite(nextRetryTime) && nextRetryTime <= Date.now()
+}
+
 function deliveryStatusColor(status: string): string {
   if (status === 'DELIVERED' || status === 'TRIGGERED') return 'green'
   if (status === 'FAILED') return 'red'
@@ -3925,8 +3965,13 @@ function exportJobTooltip(row: BiExportJobView): ReactNode {
         {row.status ?? '-'} · {expired ? '已过期' : `过期 ${formatAttachmentTime(row.expiresAt)}`}
       </Text>
       <Text style={{ color: 'inherit', fontSize: 11 }}>
-        下载 {row.downloadCount ?? 0} · 留存 {row.retentionDays ?? '-'} 天
+        进度 {exportProgressPercent(row)}% · 下载 {row.downloadCount ?? 0} · 留存 {row.retentionDays ?? '-'} 天
       </Text>
+      {row.status === 'FAILED' && (
+        <Text style={{ color: 'inherit', fontSize: 11 }}>
+          重试 {row.retryCount ?? 0}/{row.maxRetryCount ?? 0} · {row.retryExhaustedAt ? '已耗尽' : formatRetryTime(row.nextRetryAt)}
+        </Text>
+      )}
       {row.lastDownloadedAt && (
         <Text style={{ color: 'inherit', fontSize: 11 }}>最近下载 {formatAttachmentTime(row.lastDownloadedAt)}</Text>
       )}

@@ -741,6 +741,44 @@ public class BiSelfServiceExportService {
         }
     }
 
+    private void scheduleRetryAfterFailure(BiExportJobDO row, LocalDateTime now) {
+        int retryCount = retryCount(row);
+        int rowMaxRetryCount = configuredMaxRetryCount(row);
+        row.setMaxRetryCount(rowMaxRetryCount);
+        if (row.getProgressPercent() == null) {
+            row.setProgressPercent(PROGRESS_QUEUED);
+        }
+        if (rowMaxRetryCount <= 0 || retryCount >= rowMaxRetryCount) {
+            row.setNextRetryAt(null);
+            row.setRetryExhaustedAt(now);
+            return;
+        }
+        row.setNextRetryAt(now.plusMinutes(retryDelayMinutes(retryCount + 1)));
+        row.setRetryExhaustedAt(null);
+    }
+
+    private int retryAttempt(BiExportJobDO row) {
+        return retryCount(row) + 1;
+    }
+
+    private int retryCount(BiExportJobDO row) {
+        return Math.max(0, row == null || row.getRetryCount() == null ? 0 : row.getRetryCount());
+    }
+
+    private int configuredMaxRetryCount(BiExportJobDO row) {
+        int rowMaxRetryCount = row == null || row.getMaxRetryCount() == null
+                ? maxRetryCount
+                : row.getMaxRetryCount();
+        return Math.max(0, rowMaxRetryCount);
+    }
+
+    private long retryDelayMinutes(int nextAttempt) {
+        int attempt = Math.max(1, nextAttempt);
+        double multiplier = Math.pow(retryBackoffMultiplier, attempt - 1);
+        long delay = Math.round(retryInitialDelayMinutes * multiplier);
+        return Math.max(1, Math.min(delay, retryMaxDelayMinutes));
+    }
+
     private List<Long> tenantScope(Long tenantId) {
         Long scopedTenantId = normalizeTenant(tenantId);
         if (scopedTenantId == 0L) {
