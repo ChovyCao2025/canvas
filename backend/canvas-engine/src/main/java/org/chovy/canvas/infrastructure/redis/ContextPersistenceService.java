@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.chovy.canvas.dal.dataobject.CanvasExecutionDO;
 import org.chovy.canvas.dal.mapper.CanvasExecutionMapper;
 import org.chovy.canvas.engine.context.ExecutionContext;
+import org.chovy.canvas.engine.context.NodeStatus;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -12,7 +13,9 @@ import org.springframework.data.redis.core.script.RedisScript;
 import org.springframework.stereotype.Service;
 
 import java.time.Duration;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * ExecutionContext 在 Redis 中的持久化（多阶段执行挂起/恢复）。
@@ -48,6 +51,9 @@ public class ContextPersistenceService {
     /** 上下文快照过期时间（秒），默认 24 小时。 */
     @Value("${canvas.execution.context-ttl-sec:86400}")
     private long ttlSec;
+
+    public record NodeState(NodeStatus status, Map<String, Object> output) {
+    }
 
     /**
      * 创建或新增 save 相关的业务数据。
@@ -97,6 +103,100 @@ public class ContextPersistenceService {
     /** 删除上下文快照（执行结束或失败后清理）。 */
     public void delete(Long canvasId, String userId) {
         redis.delete(keys.context(canvasId, userId));
+    }
+
+    public void saveNodeState(String executionId, String nodeId,
+                              NodeStatus status, Map<String, Object> output) {
+        String stateKey = keys.nodeState(executionId, nodeId);
+        String indexKey = keys.nodeStateIndex(executionId);
+        Map<String, String> fields = new LinkedHashMap<>();
+        fields.put("status", status.name());
+        try {
+            fields.put("output", objectMapper.writeValueAsString(output == null ? Map.of() : output));
+            redis.opsForSet().add(indexKey, nodeId);
+            if (!Boolean.TRUE.equals(redis.expire(indexKey, Duration.ofSeconds(ttlSec)))) {
+                throw new IllegalStateException("Failed to refresh node state index TTL");
+            }
+            redis.opsForHash().putAll(stateKey, fields);
+            if (!Boolean.TRUE.equals(redis.expire(stateKey, Duration.ofSeconds(ttlSec)))) {
+                redis.delete(stateKey);
+                throw new IllegalStateException("Failed to refresh node state TTL");
+            }
+        } catch (Exception e) {
+            try {
+                redis.delete(stateKey);
+            } catch (Exception ignored) {
+            }
+            throw new IllegalStateException("Failed to save node state to Redis", e);
+        }
+    }
+
+    public void deleteNodeState(String executionId, String nodeId) {
+        String resetKey = keys.nodeStateResetIndex(executionId);
+        String stateKey = keys.nodeState(executionId, nodeId);
+        try {
+            redis.opsForSet().add(resetKey, nodeId);
+            if (!Boolean.TRUE.equals(redis.expire(resetKey, Duration.ofSeconds(ttlSec)))) {
+                throw new IllegalStateException("Failed to refresh node state reset TTL");
+            }
+            redis.delete(stateKey);
+            redis.opsForSet().remove(keys.nodeStateIndex(executionId), nodeId);
+        } catch (Exception e) {
+            throw new IllegalStateException("Failed to delete node state from Redis", e);
+        }
+    }
+
+    @SuppressWarnings("unchecked")
+    public NodeState loadNodeState(String executionId, String nodeId) {
+        try {
+            Map<Object, Object> raw = redis.opsForHash().entries(keys.nodeState(executionId, nodeId));
+            if (raw == null || raw.isEmpty()) {
+                return null;
+            }
+            Object statusValue = raw.get("status");
+            NodeStatus status = NodeStatus.valueOf(String.valueOf(statusValue));
+            Object outputValue = raw.get("output");
+            Map<String, Object> output = Map.of();
+            if (outputValue != null && !String.valueOf(outputValue).isBlank()) {
+                try {
+                    output = objectMapper.readValue(String.valueOf(outputValue), Map.class);
+                } catch (Exception e) {
+                    throw new IllegalStateException("Failed to parse node output from Redis", e);
+                }
+            }
+            return new NodeState(status, output);
+        } catch (IllegalStateException e) {
+            throw e;
+        } catch (Exception e) {
+            throw new IllegalStateException("Failed to load node state from Redis", e);
+        }
+    }
+
+    public boolean tryAcquireNodeGate(String executionId, String nodeId, String owner, Duration ttl) {
+        long ttlMillis = Math.max(1L, ttl == null ? 1L : ttl.toMillis());
+        try {
+            Long acquired = redis.execute(NODE_GATE_ACQUIRE_SCRIPT,
+                    List.of(keys.gate(executionId, nodeId), keys.gateRepeat(executionId, nodeId)),
+                    owner, String.valueOf(ttlMillis));
+            return Long.valueOf(1L).equals(acquired);
+        } catch (Exception e) {
+            log.warn("[CTX] node gate acquire failed executionId={} nodeId={}: {}",
+                    executionId, nodeId, e.getMessage());
+            return false;
+        }
+    }
+
+    public boolean releaseNodeGate(String executionId, String nodeId, String owner) {
+        try {
+            Long repeat = redis.execute(NODE_GATE_RELEASE_SCRIPT,
+                    List.of(keys.gate(executionId, nodeId), keys.gateRepeat(executionId, nodeId)),
+                    owner);
+            return Long.valueOf(1L).equals(repeat);
+        } catch (Exception e) {
+            log.warn("[CTX] node gate release failed executionId={} nodeId={}: {}",
+                    executionId, nodeId, e.getMessage());
+            return false;
+        }
     }
 
     /** 判断上下文是否存在（常用于恢复分支判断）。 */
@@ -223,6 +323,19 @@ public class ContextPersistenceService {
     /** 释放 WAIT 恢复锁的 Lua 脚本，保证只释放当前持有者的锁。 */
     private static final RedisScript<Long> RESUME_LOCK_RELEASE_SCRIPT = RedisScript.of(
             "if redis.call('GET', KEYS[1]) == ARGV[1] then return redis.call('DEL', KEYS[1]) else return 0 end",
+            Long.class
+    );
+
+    private static final RedisScript<Long> NODE_GATE_ACQUIRE_SCRIPT = RedisScript.of(
+            "if redis.call('SET', KEYS[1], ARGV[1], 'NX', 'PX', ARGV[2]) then "
+                    + "return 1 else redis.call('SET', KEYS[2], '1', 'PX', ARGV[2]); return 0 end",
+            Long.class
+    );
+
+    private static final RedisScript<Long> NODE_GATE_RELEASE_SCRIPT = RedisScript.of(
+            "if redis.call('GET', KEYS[1]) == ARGV[1] then "
+                    + "redis.call('DEL', KEYS[1]); return redis.call('DEL', KEYS[2]); "
+                    + "else return 0 end",
             Long.class
     );
 

@@ -1,7 +1,6 @@
 package org.chovy.canvas.engine.scheduler;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import org.chovy.canvas.dal.mapper.CanvasExecutionDlqMapper;
 import org.chovy.canvas.engine.context.ExecutionContext;
 import org.chovy.canvas.engine.dag.DagGraph;
 import org.chovy.canvas.engine.dag.DagParser;
@@ -93,11 +92,15 @@ class DagEngineCircuitBreakerTest {
         DagEngine engine = new DagEngine(
                 handlerRegistry,
                 mock(TraceWriteBuffer.class),
-                mock(CanvasExecutionDlqMapper.class),
                 cbRegistry,
                 mock(CanvasMetrics.class),
                 new ObjectMapper(),
                 ctxStore,
+                mock(org.chovy.canvas.engine.trigger.CanvasExecutionService.class),
+                mock(ExecutionDlqWriter.class),
+                new NodeResultRouter(),
+                new NodeGateCoordinator(),
+                new NodeTimeoutCoordinator(),
                 mock(org.chovy.canvas.infrastructure.redis.RedisDelayQueue.class)
         );
         ReflectionTestUtils.setField(engine, "maxRetry", 1);

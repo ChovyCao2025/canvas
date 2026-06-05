@@ -1,7 +1,7 @@
 package org.chovy.canvas.infra.redis;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import org.chovy.canvas.engine.scheduler.TraceWriteBuffer;
+import org.chovy.canvas.dal.mapper.CanvasExecutionMapper;
 import org.chovy.canvas.infrastructure.redis.ContextPersistenceService;
 import org.chovy.canvas.infrastructure.redis.RedisKeyUtil;
 import org.junit.jupiter.api.Test;
@@ -104,6 +104,6 @@ class NodeGateRedisTest {
 
     private ContextPersistenceService service(StringRedisTemplate redis) {
         return new ContextPersistenceService(redis, new ObjectMapper(), new RedisKeyUtil(),
-                mock(TraceWriteBuffer.class));
+                mock(CanvasExecutionMapper.class));
     }
 }

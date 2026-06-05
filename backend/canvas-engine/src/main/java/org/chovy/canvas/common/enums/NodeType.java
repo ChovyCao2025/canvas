@@ -13,6 +13,7 @@ public final class NodeType {
     public static final String START = "START";
     public static final String END = "END";
     public static final String DIRECT_RETURN = "DIRECT_RETURN";
+    public static final String LOOP = "LOOP";
 
     // 入口触发
     public static final String DIRECT_CALL = "DIRECT_CALL";

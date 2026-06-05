@@ -4,7 +4,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.chovy.canvas.common.MapFieldKeys;
 import org.chovy.canvas.common.enums.NodeType;
 import org.chovy.canvas.common.enums.TriggerType;
-import org.chovy.canvas.dal.mapper.CanvasExecutionDlqMapper;
 import org.chovy.canvas.engine.context.ExecutionContext;
 import org.chovy.canvas.engine.context.NodeStatus;
 import org.chovy.canvas.engine.dag.DagGraph;
@@ -175,11 +174,15 @@ class SpecialNodeTimeoutQueueTest {
         DagEngine engine = new DagEngine(
                 handlerRegistry,
                 mock(TraceWriteBuffer.class),
-                mock(CanvasExecutionDlqMapper.class),
                 cbRegistry,
                 mock(CanvasMetrics.class),
                 new ObjectMapper(),
                 ctxStore,
+                mock(org.chovy.canvas.engine.trigger.CanvasExecutionService.class),
+                mock(ExecutionDlqWriter.class),
+                new NodeResultRouter(),
+                new NodeGateCoordinator(),
+                new NodeTimeoutCoordinator(),
                 delayQueue
         );
         ReflectionTestUtils.setField(engine, "maxRetry", 1);

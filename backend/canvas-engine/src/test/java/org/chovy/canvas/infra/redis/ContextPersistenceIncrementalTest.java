@@ -1,8 +1,8 @@
 package org.chovy.canvas.infra.redis;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.chovy.canvas.dal.mapper.CanvasExecutionMapper;
 import org.chovy.canvas.engine.context.NodeStatus;
-import org.chovy.canvas.engine.scheduler.TraceWriteBuffer;
 import org.chovy.canvas.infrastructure.redis.ContextPersistenceService;
 import org.chovy.canvas.infrastructure.redis.RedisKeyUtil;
 import org.junit.jupiter.api.Test;
@@ -271,7 +271,7 @@ class ContextPersistenceIncrementalTest {
 
     private ContextPersistenceService service(StringRedisTemplate redis, ObjectMapper objectMapper) {
         ContextPersistenceService service = new ContextPersistenceService(
-                redis, objectMapper, new RedisKeyUtil(), mock(TraceWriteBuffer.class));
+                redis, objectMapper, new RedisKeyUtil(), mock(CanvasExecutionMapper.class));
         ReflectionTestUtils.setField(service, "ttlSec", 123L);
         return service;
     }

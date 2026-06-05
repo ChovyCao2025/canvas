@@ -139,7 +139,6 @@ public class RedisDelayQueue {
 
     public static String timerKey(String nodeType, String nodeId) {
         return switch (nodeType) {
-            case NodeType.LOGIC_RELATION -> "lr:" + nodeId;
             case NodeType.AGGREGATE -> "ag:" + nodeId;
             case NodeType.THRESHOLD -> "th:" + nodeId;
             default -> nodeId;
@@ -149,7 +148,6 @@ public class RedisDelayQueue {
     public static String triggerTypeForNodeType(String nodeType) {
         return switch (nodeType) {
             case NodeType.HUB -> TriggerType.HUB_TIMEOUT;
-            case NodeType.LOGIC_RELATION -> TriggerType.LOGIC_RELATION_TIMEOUT;
             case NodeType.AGGREGATE -> TriggerType.AGGREGATE_TIMEOUT;
             case NodeType.THRESHOLD -> TriggerType.THRESHOLD_TIMEOUT;
             default -> throw new IllegalArgumentException("Unsupported special node type: " + nodeType);
@@ -158,7 +156,6 @@ public class RedisDelayQueue {
 
     public static boolean isSpecialTimeoutTrigger(String triggerType) {
         return TriggerType.HUB_TIMEOUT.equals(triggerType)
-                || TriggerType.LOGIC_RELATION_TIMEOUT.equals(triggerType)
                 || TriggerType.AGGREGATE_TIMEOUT.equals(triggerType)
                 || TriggerType.THRESHOLD_TIMEOUT.equals(triggerType);
     }

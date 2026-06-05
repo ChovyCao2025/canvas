@@ -11,7 +11,6 @@ public final class TriggerType {
     public static final String DLQ_REPLAY = "DLQ_REPLAY";
 
     public static final String HUB_TIMEOUT = "HUB_TIMEOUT";
-    public static final String LOGIC_RELATION_TIMEOUT = "LOGIC_RELATION_TIMEOUT";
     public static final String AGGREGATE_TIMEOUT = "AGGREGATE_TIMEOUT";
     public static final String THRESHOLD_TIMEOUT = "THRESHOLD_TIMEOUT";
     public static final String WAIT_RESUME = "WAIT_RESUME";

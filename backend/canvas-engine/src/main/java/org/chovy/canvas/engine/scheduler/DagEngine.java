@@ -22,6 +22,7 @@ import org.chovy.canvas.engine.idempotency.NodeSideEffectIdempotencyService;
 import org.chovy.canvas.engine.trace.ExecutionTraceContext;
 import org.chovy.canvas.infrastructure.reactor.TrackedReactiveTaskRegistry;
 import org.chovy.canvas.infrastructure.redis.ContextPersistenceService;
+import org.chovy.canvas.infrastructure.redis.RedisDelayQueue;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
@@ -97,6 +98,8 @@ public class DagEngine {
     private final NodeGateCoordinator nodeGateCoordinator;
     /** 特殊等待节点超时调度协调器。 */
     private final NodeTimeoutCoordinator nodeTimeoutCoordinator;
+    /** 跨实例可恢复的特殊等待节点超时延时队列。 */
+    private final RedisDelayQueue delayQueue;
     /** 节点熔断器注册表。 */
     private final CircuitBreakerRegistry cbRegistry;
     /** 画布执行指标埋点器。 */
@@ -142,10 +145,11 @@ public class DagEngine {
                      ExecutionDlqWriter dlqWriter,
                      NodeResultRouter nodeResultRouter,
                      NodeGateCoordinator nodeGateCoordinator,
-                     NodeTimeoutCoordinator nodeTimeoutCoordinator) {
+                     NodeTimeoutCoordinator nodeTimeoutCoordinator,
+                     RedisDelayQueue delayQueue) {
         this(handlerRegistry, traceBuffer, cbRegistry, metrics, objectMapper, ctxStore,
                 executionService, newSpecialNodeTimeoutScheduler(), true, reactiveTaskRegistry, dlqWriter,
-                nodeResultRouter, nodeGateCoordinator, nodeTimeoutCoordinator);
+                nodeResultRouter, nodeGateCoordinator, nodeTimeoutCoordinator, delayQueue);
     }
 
     DagEngine(HandlerRegistry handlerRegistry,
@@ -203,7 +207,24 @@ public class DagEngine {
               NodeTimeoutCoordinator nodeTimeoutCoordinator) {
         this(handlerRegistry, traceBuffer, cbRegistry, metrics, objectMapper, ctxStore,
                 executionService, Schedulers.parallel(), false, TrackedReactiveTaskRegistry.direct(), dlqWriter,
-                nodeResultRouter, nodeGateCoordinator, nodeTimeoutCoordinator);
+                nodeResultRouter, nodeGateCoordinator, nodeTimeoutCoordinator, null);
+    }
+
+    DagEngine(HandlerRegistry handlerRegistry,
+              TraceWriteBuffer traceBuffer,
+              CircuitBreakerRegistry cbRegistry,
+              CanvasMetrics metrics,
+              ObjectMapper objectMapper,
+              ContextPersistenceService ctxStore,
+              @Lazy org.chovy.canvas.engine.trigger.CanvasExecutionService executionService,
+              ExecutionDlqWriter dlqWriter,
+              NodeResultRouter nodeResultRouter,
+              NodeGateCoordinator nodeGateCoordinator,
+              NodeTimeoutCoordinator nodeTimeoutCoordinator,
+              RedisDelayQueue delayQueue) {
+        this(handlerRegistry, traceBuffer, cbRegistry, metrics, objectMapper, ctxStore,
+                executionService, Schedulers.parallel(), false, TrackedReactiveTaskRegistry.direct(), dlqWriter,
+                nodeResultRouter, nodeGateCoordinator, nodeTimeoutCoordinator, delayQueue);
     }
 
     DagEngine(HandlerRegistry handlerRegistry,
@@ -270,7 +291,7 @@ public class DagEngine {
         this(handlerRegistry, traceBuffer, cbRegistry, metrics, objectMapper, ctxStore,
                 executionService, specialNodeTimeoutScheduler, ownsSpecialNodeTimeoutScheduler,
                 TrackedReactiveTaskRegistry.direct(), dlqWriter, nodeResultRouter, nodeGateCoordinator,
-                nodeTimeoutCoordinator);
+                nodeTimeoutCoordinator, null);
     }
 
     DagEngine(HandlerRegistry handlerRegistry,
@@ -287,6 +308,27 @@ public class DagEngine {
               NodeResultRouter nodeResultRouter,
               NodeGateCoordinator nodeGateCoordinator,
               NodeTimeoutCoordinator nodeTimeoutCoordinator) {
+        this(handlerRegistry, traceBuffer, cbRegistry, metrics, objectMapper, ctxStore,
+                executionService, specialNodeTimeoutScheduler, ownsSpecialNodeTimeoutScheduler,
+                reactiveTaskRegistry, dlqWriter, nodeResultRouter, nodeGateCoordinator,
+                nodeTimeoutCoordinator, null);
+    }
+
+    DagEngine(HandlerRegistry handlerRegistry,
+              TraceWriteBuffer traceBuffer,
+              CircuitBreakerRegistry cbRegistry,
+              CanvasMetrics metrics,
+              ObjectMapper objectMapper,
+              ContextPersistenceService ctxStore,
+              @Lazy org.chovy.canvas.engine.trigger.CanvasExecutionService executionService,
+              Scheduler specialNodeTimeoutScheduler,
+              boolean ownsSpecialNodeTimeoutScheduler,
+              TrackedReactiveTaskRegistry reactiveTaskRegistry,
+              ExecutionDlqWriter dlqWriter,
+              NodeResultRouter nodeResultRouter,
+              NodeGateCoordinator nodeGateCoordinator,
+              NodeTimeoutCoordinator nodeTimeoutCoordinator,
+              RedisDelayQueue delayQueue) {
         this.handlerRegistry = handlerRegistry;
         // traceMapper 保留供 writeSkippedNodes 直接写入；批量写走 traceBuffer
         this.traceBuffer = traceBuffer;
@@ -294,6 +336,7 @@ public class DagEngine {
         this.nodeResultRouter = nodeResultRouter;
         this.nodeGateCoordinator = nodeGateCoordinator;
         this.nodeTimeoutCoordinator = nodeTimeoutCoordinator;
+        this.delayQueue = delayQueue;
         this.cbRegistry = cbRegistry;
         this.metrics = metrics;
         this.objectMapper = objectMapper;
@@ -400,6 +443,12 @@ public class DagEngine {
             Map<String, Object> config = needsNodeId
                     ? resolveConfigWithNodeId(rawConfig, ctx, nodeId, node.getType())
                     : resolveConfig(rawConfig, ctx);
+
+            Mono<Map<String, Object>> specialTimeoutTrigger =
+                    executeSpecialTimeoutTriggerIfNeeded(graph, nodeId, node, config, ctx, depth);
+            if (specialTimeoutTrigger != null) {
+                return specialTimeoutTrigger;
+            }
 
             // ──────────────────────────────────────────────────────
             // 阶段 2：HUB / AGGREGATE / THRESHOLD 特殊处理
@@ -749,6 +798,162 @@ public class DagEngine {
     @org.springframework.beans.factory.annotation.Value("${canvas.execution.global-timeout-sec:600}")
     private long globalTimeout;
 
+    private Mono<Map<String, Object>> executeSpecialTimeoutTriggerIfNeeded(
+            DagGraph graph,
+            String nodeId,
+            DagParser.CanvasNode node,
+            Map<String, Object> config,
+            ExecutionContext ctx,
+            int depth) {
+        if (!RedisDelayQueue.isSpecialTimeoutTrigger(ctx.getTriggerType())) {
+            return null;
+        }
+        if (!isSpecialTimeoutNode(node.getType())
+                || !Objects.equals(ctx.getTriggerNodeType(), node.getType())
+                || !Objects.equals(ctx.getMatchKey(), nodeId)) {
+            return null;
+        }
+        String timerKey = RedisDelayQueue.timerKey(node.getType(), nodeId);
+        if (!timeoutPayloadMatches(ctx, nodeId, timerKey)) {
+            return Mono.just(Map.of(MapFieldKeys.SKIPPED, "stale-timeout-payload"));
+        }
+        int timeoutSec = timeoutSecondsForSpecialNode(node.getType(), config, ctx);
+        return executeSpecialTimeoutBranch(graph, nodeId, node, config, ctx, depth,
+                specialNodeLabel(node.getType()), timeoutSec);
+    }
+
+    private boolean timeoutPayloadMatches(ExecutionContext ctx, String nodeId, String timerKey) {
+        if (ctx.getNodeStatus(nodeId) != NodeStatus.WAITING) {
+            return false;
+        }
+        Map<String, Object> payload = ctx.getTriggerPayload();
+        Object payloadExecutionId = payload.get(MapFieldKeys.EXECUTION_ID);
+        if (payloadExecutionId != null && !Objects.equals(ctx.getExecutionId(), payloadExecutionId.toString())) {
+            return false;
+        }
+        Long payloadVersionId = payloadLong(payload.get(MapFieldKeys.VERSION_ID));
+        if (payloadVersionId != null && !Objects.equals(ctx.getVersionId(), payloadVersionId)) {
+            return false;
+        }
+        Object payloadTimerKey = payload.get(MapFieldKeys.TIMEOUT_TIMER_KEY);
+        if (payloadTimerKey == null || !Objects.equals(timerKey, payloadTimerKey.toString())) {
+            return false;
+        }
+        Long payloadScheduledAt = payloadLong(payload.get(MapFieldKeys.TIMEOUT_SCHEDULED_AT_EPOCH_MS));
+        Long currentScheduledAt = ctx.getHubStartTimes().get(timerKey);
+        return payloadScheduledAt != null && Objects.equals(currentScheduledAt, payloadScheduledAt);
+    }
+
+    private Mono<Map<String, Object>> executeSpecialTimeoutBranch(
+            DagGraph graph,
+            String nodeId,
+            DagParser.CanvasNode node,
+            Map<String, Object> config,
+            ExecutionContext ctx,
+            int depth,
+            String label,
+            int timeoutSec) {
+        if (!ctx.setNodeStatusIfNotDone(nodeId, NodeStatus.TIMEOUT)) {
+            return Mono.just(Map.of(MapFieldKeys.SKIPPED, "timeout-node-terminal"));
+        }
+        log.warn("[{}] 等待超时 timeout={}s nodeId={}", label, timeoutSec, nodeId);
+        String targetNodeId = resolveSpecialTimeoutTarget(config);
+        Map<String, Object> timeoutOutput = new LinkedHashMap<>();
+        timeoutOutput.put(MapFieldKeys.NODE_ID, nodeId);
+        timeoutOutput.put(MapFieldKeys.NODE_TYPE, node.getType());
+        timeoutOutput.put(MapFieldKeys.OUTCOME, NodeOutcome.TIMEOUT.name());
+        timeoutOutput.put(MapFieldKeys.REASON_CODE, "SPECIAL_NODE_TIMEOUT");
+        timeoutOutput.put(MapFieldKeys.REASON_MESSAGE, label + " 等待超时");
+        ctx.putNodeOutput(nodeId, timeoutOutput);
+        saveSpecialNodeState(ctx, nodeId, NodeStatus.TIMEOUT, timeoutOutput);
+        writeTraceEnd(ctx, node, NodeResult.timeout(targetNodeId,
+                "SPECIAL_NODE_TIMEOUT", label + " 等待超时"), 0);
+
+        if (targetNodeId == null || targetNodeId.isBlank()) {
+            return Mono.error(new RuntimeException(label + " 等待超时 nodeId=" + nodeId));
+        }
+        return executeNode(graph, targetNodeId, ctx, depth + 1).defaultIfEmpty(Map.of());
+    }
+
+    private boolean scheduleSpecialNodeTimeoutRequired(
+            ExecutionContext ctx, String nodeId, String nodeType, int timeoutSec) {
+        String timerKey = RedisDelayQueue.timerKey(nodeType, nodeId);
+        if (!ctx.getScheduledHubTimeouts().add(timerKey)) {
+            return false;
+        }
+        ctx.getHubStartTimes().putIfAbsent(timerKey, System.currentTimeMillis());
+        try {
+            delayQueue.scheduleSpecialNodeTimeout(ctx, nodeId, nodeType, timeoutSec);
+            return true;
+        } catch (Exception e) {
+            ctx.getScheduledHubTimeouts().remove(timerKey);
+            ctx.setNodeStatus(nodeId, NodeStatus.FAILED);
+            Map<String, Object> output = Map.of(
+                    MapFieldKeys.ERROR, e.getMessage() == null ? "redis delay queue unavailable" : e.getMessage(),
+                    MapFieldKeys.NODE_ID, nodeId);
+            saveSpecialNodeState(ctx, nodeId, NodeStatus.FAILED, output);
+            throw new SpecialNodeTimeoutFailureException(
+                    "Failed to schedule special node timeout nodeId=" + nodeId, e);
+        }
+    }
+
+    private void saveSpecialNodeState(
+            ExecutionContext ctx, String nodeId, NodeStatus status, Map<String, Object> output) {
+        if (ctx.getExecutionId() == null || ctx.getExecutionId().isBlank()) {
+            return;
+        }
+        ctxStore.saveNodeState(ctx.getExecutionId(), nodeId, status, output == null ? Map.of() : output);
+    }
+
+    private void clearSpecialTimeoutGeneration(ExecutionContext ctx, String nodeId, String nodeType) {
+        if (!isSpecialTimeoutNode(nodeType)) {
+            return;
+        }
+        String timerKey = RedisDelayQueue.timerKey(nodeType, nodeId);
+        ctx.getHubStartTimes().remove(timerKey);
+        ctx.getScheduledHubTimeouts().remove(timerKey);
+    }
+
+    private boolean isSpecialTimeoutNode(String nodeType) {
+        return NodeType.HUB.equals(nodeType)
+                || NodeType.AGGREGATE.equals(nodeType)
+                || NodeType.THRESHOLD.equals(nodeType);
+    }
+
+    private int timeoutSecondsForSpecialNode(String nodeType, Map<String, Object> config, ExecutionContext ctx) {
+        Long payloadTimeout = payloadLong(ctx.getTriggerPayload().get(MapFieldKeys.TIMEOUT_SECONDS));
+        if (payloadTimeout != null) {
+            return payloadTimeout.intValue();
+        }
+        if (NodeType.HUB.equals(nodeType)) {
+            return HubHandler.getTimeoutSeconds(config);
+        }
+        return config.get("timeout") instanceof Number n ? n.intValue() : (int) globalTimeout;
+    }
+
+    private String specialNodeLabel(String nodeType) {
+        return switch (nodeType) {
+            case NodeType.HUB -> "HUB";
+            case NodeType.AGGREGATE -> "AGGREGATE";
+            case NodeType.THRESHOLD -> "THRESHOLD";
+            default -> nodeType;
+        };
+    }
+
+    private Long payloadLong(Object value) {
+        if (value instanceof Number number) {
+            return number.longValue();
+        }
+        if (value instanceof String text && !text.isBlank()) {
+            try {
+                return Long.parseLong(text);
+            } catch (NumberFormatException ignored) {
+                return null;
+            }
+        }
+        return null;
+    }
+
     // ══════════════════════════════════════════════════════════════
     // HUB 处理（含超时延迟任务，设计文档 HUB 节点说明）
     // ══════════════════════════════════════════════════════════════
@@ -817,6 +1022,14 @@ public class DagEngine {
         if (!HubHandler.allUpstreamDone(upstreamIds, ctx)) {
             ctx.setNodeStatusIfNotDone(nodeId, NodeStatus.WAITING);  // 设 WAITING 供 isPaused 检测
             int timeoutSec = HubHandler.getTimeoutSeconds(config);
+            saveSpecialNodeState(ctx, nodeId, NodeStatus.WAITING, Map.of());
+            if (delayQueue != null) {
+                boolean scheduled = scheduleSpecialNodeTimeoutRequired(ctx, nodeId, NodeType.HUB, timeoutSec);
+                if (scheduled) {
+                    log.debug("[HUB] 启动 Redis 超时延迟队列 {}s nodeId={}", timeoutSec, nodeId);
+                }
+                return Mono.just(Map.of());
+            }
             boolean scheduled = nodeTimeoutCoordinator.scheduleOnce(
                     ctx,
                     nodeId,
@@ -871,6 +1084,14 @@ public class DagEngine {
             ctx.setNodeStatusIfNotDone(nodeId, NodeStatus.WAITING);
             String timerKey = "ag:" + nodeId;
             int timeoutSec = config.get("timeout") instanceof Number n ? n.intValue() : (int) globalTimeout;
+            saveSpecialNodeState(ctx, nodeId, NodeStatus.WAITING, Map.of());
+            if (delayQueue != null) {
+                boolean scheduled = scheduleSpecialNodeTimeoutRequired(ctx, nodeId, NodeType.AGGREGATE, timeoutSec);
+                if (scheduled) {
+                    log.debug("[AGGREGATE] 启动 Redis 超时延迟队列 {}s nodeId={}", timeoutSec, nodeId);
+                }
+                return Mono.just(Map.of());
+            }
             boolean scheduled = nodeTimeoutCoordinator.scheduleOnce(
                     ctx,
                     timerKey,
@@ -909,6 +1130,10 @@ public class DagEngine {
                                                   int depth) {
         String timerKey = "th:" + nodeId;
         int timeoutSec = config.get("timeout") instanceof Number n ? n.intValue() : (int) globalTimeout;
+        if (delayQueue != null) {
+            scheduleSpecialNodeTimeoutRequired(ctx, nodeId, NodeType.THRESHOLD, timeoutSec);
+            return;
+        }
         nodeTimeoutCoordinator.scheduleOnce(
                 ctx,
                 timerKey,
@@ -942,6 +1167,7 @@ public class DagEngine {
         timeoutOutput.put(MapFieldKeys.REASON_CODE, "SPECIAL_NODE_TIMEOUT");
         timeoutOutput.put(MapFieldKeys.REASON_MESSAGE, label + " 等待超时");
         ctx.putNodeOutput(nodeId, timeoutOutput);
+        saveSpecialNodeState(ctx, nodeId, NodeStatus.TIMEOUT, timeoutOutput);
         writeTraceEnd(ctx, node, NodeResult.timeout(targetNodeId,
                 "SPECIAL_NODE_TIMEOUT", label + " 等待超时"), 0);
 
@@ -1144,6 +1370,16 @@ public class DagEngine {
                 continue;
             }
             ctx.resetNodeStatusForReentry(current);
+            DagParser.CanvasNode currentNode = graph.getNode(current);
+            clearSpecialTimeoutGeneration(ctx, current, currentNode == null ? null : currentNode.getType());
+            if (ctx.getExecutionId() != null && !ctx.getExecutionId().isBlank()) {
+                try {
+                    ctxStore.deleteNodeState(ctx.getExecutionId(), current);
+                } catch (RuntimeException e) {
+                    log.warn("[ENGINE] reset 删除节点增量状态失败 executionId={} nodeId={}: {}",
+                            ctx.getExecutionId(), current, e.getMessage());
+                }
+            }
             if (current.equals(sourceNodeId)) {
                 continue;
             }
