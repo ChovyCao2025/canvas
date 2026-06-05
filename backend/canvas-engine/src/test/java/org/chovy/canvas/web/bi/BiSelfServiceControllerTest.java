@@ -59,7 +59,7 @@ class BiSelfServiceControllerTest {
                 false,
                 false,
                 null);
-        when(service.createExport(7L, "alice", RoleNames.OPERATOR, command)).thenReturn(exportView());
+        when(service.createExport(7L, "alice", RoleNames.OPERATOR, command)).thenReturn(queuedExportView());
         BiSelfServiceController controller = new BiSelfServiceController(resolver, service);
 
         StepVerifier.create(controller.createExport(command))
@@ -189,6 +189,43 @@ class BiSelfServiceControllerTest {
                 "COMPLETED",
                 100,
                 "/canvas/bi/self-service/exports/55/download",
+                null,
+                null,
+                7,
+                LocalDateTime.parse("2026-06-12T05:10:00"),
+                0,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                0,
+                3,
+                null,
+                null,
+                null,
+                "alice",
+                LocalDateTime.parse("2026-06-05T05:10:00"),
+                LocalDateTime.parse("2026-06-05T05:10:00"));
+    }
+
+    private BiExportJobView queuedExportView() {
+        return new BiExportJobView(
+                55L,
+                7L,
+                3L,
+                "DATASET",
+                "canvas_daily_stats",
+                11L,
+                "CSV",
+                100,
+                "QUEUED",
+                0,
+                null,
                 null,
                 null,
                 7,

@@ -94,12 +94,24 @@ class BiSelfServiceExportServiceTest {
                         false,
                         null));
 
+        assertThat(view.status()).isEqualTo("QUEUED");
+        assertThat(view.fileUrl()).isNull();
+        verify(fixture.queryExecutionService, never()).execute(any(), any());
+        when(fixture.exportJobMapper.selectList(any())).thenAnswer(invocation -> List.of(persisted.get()));
+
+        BiExportQueueResult queueResult = fixture.service.processQueuedExports(
+                7L,
+                "alice",
+                RoleNames.OPERATOR,
+                10);
+        view = queueResult.jobs().getFirst();
+
         assertThat(view.status()).isEqualTo("COMPLETED");
         assertThat(view.fileUrl()).isEqualTo("/canvas/bi/self-service/exports/55/download");
         assertThat(view.retentionDays()).isEqualTo(7);
         assertThat(view.expiresAt()).isAfter(LocalDateTime.now().plusDays(6));
         assertThat(view.downloadCount()).isZero();
-        verify(fixture.permissionService).enforceResourceAccess(
+        verify(fixture.permissionService, atLeast(1)).enforceResourceAccess(
                 eq(7L),
                 eq(3L),
                 eq("DATASET"),
@@ -268,6 +280,18 @@ class BiSelfServiceExportServiceTest {
                         false,
                         null));
 
+        assertThat(view.status()).isEqualTo("QUEUED");
+        assertThat(view.storageProvider()).isNull();
+        assertThat(view.storageKey()).isNull();
+        when(exportJobMapper.selectList(any())).thenAnswer(invocation -> List.of(persisted.get()));
+
+        BiExportQueueResult queueResult = service.processQueuedExports(
+                7L,
+                "alice",
+                RoleNames.OPERATOR,
+                10);
+        view = queueResult.jobs().getFirst();
+
         assertThat(view.status()).isEqualTo("COMPLETED");
         assertThat(view.storageProvider()).isEqualTo("MEMORY");
         assertThat(view.storageKey()).isEqualTo("exports/tenant-7/export-70.csv");
@@ -298,7 +322,7 @@ class BiSelfServiceExportServiceTest {
             return 1;
         }).when(fixture.exportJobMapper).updateById(any(BiExportJobDO.class));
 
-        assertThatThrownBy(() -> fixture.service.createExport(
+        BiExportJobView queued = fixture.service.createExport(
                 7L,
                 "alice",
                 RoleNames.OPERATOR,
@@ -311,9 +335,18 @@ class BiSelfServiceExportServiceTest {
                         100,
                         false,
                         false,
-                        null)))
-                .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("warehouse is busy");
+                        null));
+
+        assertThat(queued.status()).isEqualTo("QUEUED");
+        when(fixture.exportJobMapper.selectList(any())).thenAnswer(invocation -> List.of(persisted.get()));
+
+        BiExportQueueResult result = fixture.service.processQueuedExports(
+                7L,
+                "alice",
+                RoleNames.OPERATOR,
+                10);
+
+        assertThat(result.failed()).isEqualTo(1);
 
         BiExportJobDO row = persisted.get();
         assertThat(row.getStatus()).isEqualTo("FAILED");
@@ -477,11 +510,23 @@ class BiSelfServiceExportServiceTest {
                 59L,
                 new BiExportApprovalReviewCommand("APPROVED", "ok"));
 
-        assertThat(approved.status()).isEqualTo("COMPLETED");
+        assertThat(approved.status()).isEqualTo("QUEUED");
         assertThat(approved.approvalStatus()).isEqualTo("APPROVED");
         assertThat(approved.reviewedBy()).isEqualTo("admin");
         assertThat(approved.reviewComment()).isEqualTo("ok");
-        assertThat(approved.fileUrl()).isEqualTo("/canvas/bi/self-service/exports/59/download");
+        assertThat(approved.fileUrl()).isNull();
+        verify(fixture.queryExecutionService, never()).execute(any(), any());
+        when(fixture.exportJobMapper.selectList(any())).thenAnswer(invocation -> List.of(persisted.get()));
+
+        BiExportQueueResult queueResult = fixture.service.processQueuedExports(
+                7L,
+                "export-worker",
+                RoleNames.OPERATOR,
+                10);
+        BiExportJobView completed = queueResult.jobs().getFirst();
+
+        assertThat(completed.status()).isEqualTo("COMPLETED");
+        assertThat(completed.fileUrl()).isEqualTo("/canvas/bi/self-service/exports/59/download");
         ArgumentCaptor<BiQueryRequest> queryCaptor = ArgumentCaptor.forClass(BiQueryRequest.class);
         ArgumentCaptor<BiQueryContext> contextCaptor = ArgumentCaptor.forClass(BiQueryContext.class);
         verify(fixture.queryExecutionService).execute(queryCaptor.capture(), contextCaptor.capture());
@@ -494,7 +539,7 @@ class BiSelfServiceExportServiceTest {
             assertThat(filter.operator()).isEqualTo(BiFilter.Operator.EQ);
             assertThat(String.valueOf(filter.value())).isEqualTo("12");
         });
-        assertThat(contextCaptor.getValue()).isEqualTo(new BiQueryContext(7L, "alice", RoleNames.OPERATOR));
+        assertThat(contextCaptor.getValue()).isEqualTo(new BiQueryContext(7L, "export-worker", RoleNames.OPERATOR));
         assertThat(tempDir.resolve("exports").resolve("tenant-7").resolve("export-59.csv")).exists();
     }
 
