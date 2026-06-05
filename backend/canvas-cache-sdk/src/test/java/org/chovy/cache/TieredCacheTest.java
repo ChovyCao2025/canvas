@@ -168,6 +168,24 @@ class TieredCacheTest {
     }
 
     @Test
+    void safeWriteSchedulesDelayedSecondInvalidationWithoutBlockingCaller() throws Exception {
+        TieredCache<Integer, SampleValue> cache = sampleCache(key -> new SampleValue("unused"));
+        when(values.increment("sample:v1:__invalidate__:42")).thenReturn(1L, 2L);
+
+        long start = System.nanoTime();
+        cache.safeWrite(42, () -> {}, 500);
+        long elapsedMs = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - start);
+
+        assertThat(elapsedMs).isLessThan(100);
+        verify(redis, times(1)).delete("sample:v1:42");
+
+        Thread.sleep(650);
+        verify(redis, times(2)).delete("sample:v1:42");
+        verify(values, times(2)).increment("sample:v1:__invalidate__:42");
+        verify(redis, times(2)).convertAndSend("tiered-cache:sample:invalidate", "42");
+    }
+
+    @Test
     void getInvalidatesLocalEntryWhenInvalidationVersionAdvanced() {
         when(values.get("sample:v1:42")).thenReturn(null, null);
         when(values.get("sample:v1:__invalidate__:42")).thenReturn(null, "1", "1");

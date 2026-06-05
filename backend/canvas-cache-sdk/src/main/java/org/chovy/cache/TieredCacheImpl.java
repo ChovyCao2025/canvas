@@ -34,6 +34,8 @@ import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.UUID;
 import java.util.function.Function;
@@ -51,6 +53,13 @@ import java.util.concurrent.atomic.LongAdder;
 public class TieredCacheImpl<K, V> implements TieredCache<K, V> {
     /** 表示已缓存空值的 Redis 字符串哨兵。 */
     static final String NULL_SENTINEL = "__NULL__";
+
+    /** 延迟双删使用独立守护线程，避免阻塞写入调用线程。 */
+    private static final ScheduledExecutorService DELAYED_INVALIDATION_EXECUTOR = Executors.newSingleThreadScheduledExecutor(r -> {
+        Thread thread = new Thread(r, "tiered-cache-delayed-invalidation");
+        thread.setDaemon(true);
+        return thread;
+    });
 
     /** 缓存实例名称。 */
     @Getter private final String name;
@@ -454,17 +463,16 @@ public class TieredCacheImpl<K, V> implements TieredCache<K, V> {
      */
     @Override
     public void safeWrite(K key, Runnable writeAction, long delayMs) {
-        invalidateLocal(key);
-        deleteL2(key);
-        publishInvalidate(keyToString(key), bumpInvalidationVersion(key));
-        try {
-            writeAction.run();
-            if (delayMs > 0) {
-                Thread.sleep(delayMs);
-            }
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
+        invalidateEverywhere(key);
+        writeAction.run();
+        if (delayMs > 0) {
+            DELAYED_INVALIDATION_EXECUTOR.schedule(() -> invalidateEverywhere(key), delayMs, TimeUnit.MILLISECONDS);
+        } else {
+            invalidateEverywhere(key);
         }
+    }
+
+    private void invalidateEverywhere(K key) {
         invalidateLocal(key);
         deleteL2(key);
         publishInvalidate(keyToString(key), bumpInvalidationVersion(key));

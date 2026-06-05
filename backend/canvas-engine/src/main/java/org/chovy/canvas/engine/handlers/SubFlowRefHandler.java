@@ -280,7 +280,7 @@ public class SubFlowRefHandler implements NodeHandler {
         childCtx.setTriggerType(TriggerType.SUB_FLOW_REF);
         childCtx.getCallStack().addAll(ctx.getCallStack());
         childCtx.getCallStack().add(ctx.getCanvasId());
-        childCtx.getTriggerPayload().putAll(inputData);
+        childCtx.putTriggerPayloadValues(inputData);
 
         // WORKFLOW 子流程复用 DagEngine 执行，使用独立 childCtx 隔离节点状态。
         DagGraph graph = configCache.get(subFlowId, versionId);
@@ -289,7 +289,7 @@ public class SubFlowRefHandler implements NodeHandler {
         return dagEngine.execute(graph, graph.entryNodes().get(0), childCtx)
                 .map(output -> {
                     // 合并子流程所有输出，加 outputPrefix 前缀写回父上下文防 key 冲突
-                    Map<String, Object> merged = new HashMap<>(childCtx.getFlatContext());
+                    Map<String, Object> merged = new HashMap<>(childCtx.exportContextValues());
                     if (output != null) merged.putAll(output);
                     Map<String, Object> prefixed = new HashMap<>();
                     merged.forEach((k, v) -> prefixed.put(outputPrefix + "_" + k, v));

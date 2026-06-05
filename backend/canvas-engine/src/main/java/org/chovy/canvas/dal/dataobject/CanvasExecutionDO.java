@@ -49,6 +49,9 @@ public class CanvasExecutionDO {
     /** 执行结果 JSON（成功时为输出数据，失败时包含 error 字段） */
     private String result;
 
+    /** 挂起执行上下文快照 JSON，用于 Redis 丢失后的冷恢复 */
+    private String contextSnapshotJson;
+
     /**
      * 去重 Key，正在执行时持有，执行结束后清空。
      * Watchdog 通过此字段识别僵尸执行并释放去重锁。

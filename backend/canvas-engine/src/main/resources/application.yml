@@ -106,6 +106,7 @@ canvas:
     shutdown-drain-timeout-ms: 10000
     context-ttl-sec: 86400
     max-concurrency: 3000
+    per-canvas-max-concurrent: 50
     max-retry: 3
     retry-base-delay-ms: 1000
     retry-max-delay-ms: 30000
@@ -190,6 +191,10 @@ canvas:
       failure-threshold: 5
       open-duration-sec: 30
       half-open-attempts: 3
+    redis:
+      key-prefix: cb:
+      pub-sub-channel: circuit-breaker-events
+      local-cache-ttl-sec: 5
   # 集成层外部系统 URL（dev 指向 WireMock）
   integration:
     coupon-service-url: http://localhost:8099/mock/coupon

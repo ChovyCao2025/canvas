@@ -36,7 +36,7 @@
 **Files:**
 - Create: `backend/canvas-engine/src/test/java/org/chovy/canvas/strategy/privacy/PrivacyComplianceEvidenceServiceTest.java`
 
-- [ ] **Step 1: Write migration and service tests**
+- [x] **Step 1: Write migration and service tests**
 
 Create `PrivacyComplianceEvidenceServiceTest`:
 
@@ -109,7 +109,7 @@ class PrivacyComplianceEvidenceServiceTest {
 }
 ```
 
-- [ ] **Step 2: Run tests and confirm red state**
+- [x] **Step 2: Run tests and confirm red state**
 
 Run:
 
@@ -119,6 +119,8 @@ cd backend && mvn -pl canvas-engine test -Dtest=PrivacyComplianceEvidenceService
 
 Expected: FAIL because the migration and service do not exist.
 
+Actual: FAIL before implementation because the service and migration did not exist.
+
 ### Task 2: Migration And Service
 
 **Files:**
@@ -126,7 +128,7 @@ Expected: FAIL because the migration and service do not exist.
 - Create: `backend/canvas-engine/src/main/java/org/chovy/canvas/strategy/privacy/PrivacyComplianceEvidenceService.java`
 - Test: `backend/canvas-engine/src/test/java/org/chovy/canvas/strategy/privacy/PrivacyComplianceEvidenceServiceTest.java`
 
-- [ ] **Step 1: Add the additive migration**
+- [x] **Step 1: Add the additive migration**
 
 Create `V182__privacy_compliance_evidence.sql`:
 
@@ -152,7 +154,7 @@ CREATE TABLE IF NOT EXISTS privacy_compliance_evidence (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 ```
 
-- [ ] **Step 2: Implement the evidence gate**
+- [x] **Step 2: Implement the evidence gate**
 
 Create `PrivacyComplianceEvidenceService`:
 
@@ -230,7 +232,7 @@ public class PrivacyComplianceEvidenceService {
 }
 ```
 
-- [ ] **Step 3: Run focused tests**
+- [x] **Step 3: Run focused tests**
 
 Run:
 
@@ -240,13 +242,15 @@ cd backend && mvn -pl canvas-engine test -Dtest=PrivacyComplianceEvidenceService
 
 Expected: PASS for migration shape and service gate behavior.
 
+Actual: PASS after adding the migration and service.
+
 ### Task 3: Compliance Approval Gate
 
 **Files:**
 - Modify: `backend/canvas-engine/src/main/java/org/chovy/canvas/strategy/privacy/PrivacyComplianceEvidenceService.java`
 - Modify: `backend/canvas-engine/src/test/java/org/chovy/canvas/strategy/privacy/PrivacyComplianceEvidenceServiceTest.java`
 
-- [ ] **Step 1: Add approval test**
+- [x] **Step 1: Add approval test**
 
 Add this test:
 
@@ -270,7 +274,7 @@ void approvalRequiresReviewerAndNamedChildSpec() {
 }
 ```
 
-- [ ] **Step 2: Implement approval method**
+- [x] **Step 2: Implement approval method**
 
 Add this method to `PrivacyComplianceEvidenceService` and add the matching method to `EvidenceRepository`:
 
@@ -288,7 +292,7 @@ public interface EvidenceRepository {
 }
 ```
 
-- [ ] **Step 3: Run focused tests**
+- [x] **Step 3: Run focused tests**
 
 Run:
 
@@ -298,13 +302,15 @@ cd backend && mvn -pl canvas-engine test -Dtest=PrivacyComplianceEvidenceService
 
 Expected: PASS with registration and approval gate coverage.
 
+Actual: PASS with registration and approval gate coverage.
+
 ### Task 4: Verification, Rollout Notes, And Commit
 
 **Files:**
 - Modify: `docs/product-evolution/specs/p3-010-advanced-privacy-and-compliance.md`
 - Modify: `docs/product-evolution/plans/p3-010-advanced-privacy-and-compliance-plan.md`
 
-- [ ] **Step 1: Run focused verification**
+- [x] **Step 1: Run focused verification**
 
 Run:
 
@@ -314,7 +320,9 @@ cd backend && mvn -pl canvas-engine test -Dtest=PrivacyComplianceEvidenceService
 
 Expected: PASS.
 
-- [ ] **Step 2: Run migration naming check**
+Actual: PASS.
+
+- [x] **Step 2: Run migration naming check**
 
 Run:
 
@@ -324,7 +332,9 @@ test -f backend/canvas-engine/src/main/resources/db/migration/V182__privacy_comp
 
 Expected: command exits 0.
 
-- [ ] **Step 3: Rollout notes**
+Actual: command exited 0.
+
+- [x] **Step 3: Rollout notes**
 
 Rollout: run `V182__privacy_compliance_evidence.sql`, then allow compliance owners to register candidate evidence. Keep privacy actions unavailable until a reviewed child spec exists. Rollback: disable evidence registration or hide the admin entry point; no runtime privacy action depends on this additive table.
 

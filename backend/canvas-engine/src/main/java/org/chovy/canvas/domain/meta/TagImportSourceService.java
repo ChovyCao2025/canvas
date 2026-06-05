@@ -13,6 +13,7 @@ import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
+import reactor.core.publisher.Mono;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -101,6 +102,11 @@ public class TagImportSourceService {
         List<Map<String, Object>> records = resolveRecords(source, response);
         List<TagImportRow> rows = mapRows(source, records);
         return tagImportService.importRows("API_PULL", null, source.getUrl(), rows);
+    }
+
+    /** 异步执行一次远程标签来源拉取，避免阻塞 WebFlux 事件循环。 */
+    public Mono<TagImportResult> runAsync(Long id) {
+        return blockingWorkScheduler.call("tag import source run", () -> run(id));
     }
 
     /**

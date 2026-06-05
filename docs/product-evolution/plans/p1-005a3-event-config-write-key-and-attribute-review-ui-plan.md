@@ -10,6 +10,22 @@
 
 ---
 
+## Implementation Status
+
+Status: implemented on 2026-06-05.
+
+Implementation notes:
+
+- `frontend/src/components/layout/AppLayout.tsx` already had the `/event-config` navigation entry, so it was not modified.
+- Added `backend/canvas-engine/src/main/java/org/chovy/canvas/web/EventAttributeDiscoveryController.java` because the planned frontend list endpoint did not exist.
+- Added `GET /canvas/event-attributes/discovered` only; approve/reject endpoints remain out of scope for this slice.
+
+Verification evidence:
+
+- `cd frontend && PATH="/opt/homebrew/bin:$PATH" npm run test -- cdpEventApi.test.ts eventAttributeReview.test.ts` passed: 2 files, 6 tests.
+- `cd frontend && PATH="/opt/homebrew/bin:$PATH" npm run build` passed.
+- Backend compile verification is covered by the final integration pass for this branch.
+
 ## Spec Reference
 
 - `docs/product-evolution/specs/p1-005a3-event-config-write-key-and-attribute-review-ui.md`
@@ -23,7 +39,9 @@
 - Create: `frontend/src/pages/event-config/eventAttributeReview.ts`
 - Create: `frontend/src/pages/event-config/eventAttributeReview.test.ts`
 - Modify: `frontend/src/pages/event-config/index.tsx`
-- Modify: `frontend/src/components/layout/AppLayout.tsx`
+- Read/confirm: `frontend/src/components/layout/AppLayout.tsx`
+- Create: `backend/canvas-engine/src/main/java/org/chovy/canvas/web/EventAttributeDiscoveryController.java`
+- Existing/tracked test: `backend/canvas-engine/src/test/java/org/chovy/canvas/web/EventAttributeDiscoveryControllerTest.java`
 
 ### Task 1: API Helper
 
@@ -31,7 +49,7 @@
 - Create: `frontend/src/services/cdpEventApi.ts`
 - Create: `frontend/src/services/cdpEventApi.test.ts`
 
-- [ ] **Step 1: Write API helper tests**
+- [x] **Step 1: Write API helper tests**
 
 Create `cdpEventApi.test.ts`:
 
@@ -73,7 +91,7 @@ describe('cdp event api helpers', () => {
 })
 ```
 
-- [ ] **Step 2: Add API helper**
+- [x] **Step 2: Add API helper**
 
 Create `cdpEventApi.ts`:
 
@@ -159,7 +177,7 @@ export const cdpEventApi = {
 }
 ```
 
-- [ ] **Step 3: Run API helper tests**
+- [x] **Step 3: Run API helper tests**
 
 Run:
 
@@ -175,7 +193,7 @@ Expected: PASS.
 - Create: `frontend/src/pages/event-config/eventAttributeReview.ts`
 - Create: `frontend/src/pages/event-config/eventAttributeReview.test.ts`
 
-- [ ] **Step 1: Write presentation tests**
+- [x] **Step 1: Write presentation tests**
 
 Create `eventAttributeReview.test.ts`:
 
@@ -196,7 +214,7 @@ describe('event attribute review presentation', () => {
 })
 ```
 
-- [ ] **Step 2: Add presentation helper**
+- [x] **Step 2: Add presentation helper**
 
 Create `eventAttributeReview.ts`:
 
@@ -216,7 +234,7 @@ export function statusColor(status: string) {
 }
 ```
 
-- [ ] **Step 3: Run presentation tests**
+- [x] **Step 3: Run presentation tests**
 
 Run:
 
@@ -232,7 +250,7 @@ Expected: PASS.
 - Modify: `frontend/src/pages/event-config/index.tsx`
 - Modify: `frontend/src/components/layout/AppLayout.tsx`
 
-- [ ] **Step 1: Add navigation entry**
+- [x] **Step 1: Add navigation entry**
 
 In `AppLayout.tsx`, add a child item under the current event/config or CDP section:
 
@@ -246,7 +264,9 @@ In `AppLayout.tsx`, add a child item under the current event/config or CDP secti
 
 Reuse the icon import already present in the file when available.
 
-- [ ] **Step 2: Add event-config operational header**
+Implementation note: the `/event-config` navigation entry already existed in `AppLayout.tsx`, so no edit was needed.
+
+- [x] **Step 2: Add event-config operational header**
 
 In `event-config/index.tsx`, import the API helper and presentation helpers:
 
@@ -276,7 +296,7 @@ const loadDiscoveredAttributes = async () => {
 }
 ```
 
-- [ ] **Step 3: Render compact tables**
+- [x] **Step 3: Render compact tables**
 
 Add a write-key table:
 
@@ -313,7 +333,7 @@ Add an attribute review table:
 />
 ```
 
-- [ ] **Step 4: Run frontend focused tests**
+- [x] **Step 4: Run frontend focused tests**
 
 Run:
 
