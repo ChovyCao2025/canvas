@@ -784,7 +784,7 @@ Phase 10 (Month 12): 进阶能力
 
 ## 十二、相关文档
 
-- [目标架构总览](target-architecture-overview.md) — 需更新：新增第7个Bounded Context
-- [K8s部署方案](k8s-deployment-plan.md) — 需更新：新增数据中台组件
-- [多数据源隔离方案](multi-datasource-isolation.md)
-- [WebFlux→Spring MVC迁移](webflux-to-mvc-migration.md)
+- [目标架构总览](./target-architecture-overview.md) — 需更新：新增第7个Bounded Context
+- [K8s部署方案](./k8s-deployment-plan.md) — 需更新：新增数据中台组件
+- [多数据源隔离方案](./multi-datasource-isolation.md)
+- [WebFlux→Spring MVC迁移](./webflux-to-mvc-migration.md)

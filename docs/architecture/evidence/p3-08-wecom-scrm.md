@@ -8,9 +8,9 @@ WeCom implementation remains deferred, but the first candidate slice is defined 
 
 ## Created Documents
 
-- `docs/architecture/work-products/p3-08-wecom-scrm/wecom-scrm-implementation-slice.md`
-- `docs/architecture/work-products/p3-08-wecom-scrm/wecom-scrm-integration-boundary.md`
-- `docs/architecture/work-products/p3-08-wecom-scrm/wecom-scrm-test-plan.md`
+- `docs/architecture/decisions/work-products/p3-08-wecom-scrm/wecom-scrm-implementation-slice.md`
+- `docs/architecture/decisions/work-products/p3-08-wecom-scrm/wecom-scrm-integration-boundary.md`
+- `docs/architecture/decisions/work-products/p3-08-wecom-scrm/wecom-scrm-test-plan.md`
 
 ## Inventory Commands
 
@@ -36,12 +36,12 @@ find frontend/src -iname '*channel*' -o -iname '*connector*' -o -iname '*wecom*'
 ## Verification Commands
 
 ```bash
-test -f docs/architecture/work-products/p3-08-wecom-scrm/wecom-scrm-implementation-slice.md
-rg -n "Scope|Out of scope|API|Data|Consent|Compliance|Callback|Rollback|Owner|Deferred" docs/architecture/work-products/p3-08-wecom-scrm/wecom-scrm-implementation-slice.md
-test -f docs/architecture/work-products/p3-08-wecom-scrm/wecom-scrm-integration-boundary.md
-rg -n "adapter|domain service|handler contract|callback|frontend API|signature|replay|idempotency|retry|DLQ|reconciliation|generic DAG" docs/architecture/work-products/p3-08-wecom-scrm/wecom-scrm-integration-boundary.md
-test -f docs/architecture/work-products/p3-08-wecom-scrm/wecom-scrm-test-plan.md
-rg -n "signature|replay|idempotency|retry|adapter failure|DLQ|handler output|form payload|disabled state|sandbox|secrets" docs/architecture/work-products/p3-08-wecom-scrm/wecom-scrm-test-plan.md
+test -f docs/architecture/decisions/work-products/p3-08-wecom-scrm/wecom-scrm-implementation-slice.md
+rg -n "Scope|Out of scope|API|Data|Consent|Compliance|Callback|Rollback|Owner|Deferred" docs/architecture/decisions/work-products/p3-08-wecom-scrm/wecom-scrm-implementation-slice.md
+test -f docs/architecture/decisions/work-products/p3-08-wecom-scrm/wecom-scrm-integration-boundary.md
+rg -n "adapter|domain service|handler contract|callback|frontend API|signature|replay|idempotency|retry|DLQ|reconciliation|generic DAG" docs/architecture/decisions/work-products/p3-08-wecom-scrm/wecom-scrm-integration-boundary.md
+test -f docs/architecture/decisions/work-products/p3-08-wecom-scrm/wecom-scrm-test-plan.md
+rg -n "signature|replay|idempotency|retry|adapter failure|DLQ|handler output|form payload|disabled state|sandbox|secrets" docs/architecture/decisions/work-products/p3-08-wecom-scrm/wecom-scrm-test-plan.md
 ```
 
 Result: all documentation checks passed.

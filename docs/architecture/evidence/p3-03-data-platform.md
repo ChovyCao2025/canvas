@@ -10,9 +10,9 @@ The proof starts from source ownership, retention, PII classification, replay, d
 
 ## Created Documents
 
-- `docs/architecture/work-products/p3-03-data-platform/data-platform-source-inventory.md`
-- `docs/architecture/work-products/p3-03-data-platform/data-platform-poc-plan.md`
-- `docs/architecture/work-products/p3-03-data-platform/data-platform-contract-governance.md`
+- `docs/architecture/decisions/work-products/p3-03-data-platform/data-platform-source-inventory.md`
+- `docs/architecture/decisions/work-products/p3-03-data-platform/data-platform-poc-plan.md`
+- `docs/architecture/decisions/work-products/p3-03-data-platform/data-platform-contract-governance.md`
 
 ## Inventory Summary
 
@@ -38,20 +38,20 @@ Selected slice: audience compute history.
 
 Success metric: 99 percent of completed `audience_compute_run` rows visible in the serving model within 5 minutes, with zero raw PII fields and zero impact on online audience membership checks.
 
-Stop criteria are recorded in `docs/architecture/work-products/p3-03-data-platform/data-platform-poc-plan.md`.
+Stop criteria are recorded in `docs/architecture/decisions/work-products/p3-03-data-platform/data-platform-poc-plan.md`.
 
 ## Verification Commands
 
 ```bash
 rg "CREATE TABLE" backend/canvas-engine/src/main/resources/db/migration
 rg "EventLogDO|RocketMQ|MqTriggerMessage|MessageSendRecordDO|CdpUserIdentityDO" backend/canvas-engine/src/main/java/org/chovy/canvas
-test -f docs/architecture/work-products/p3-03-data-platform/data-platform-source-inventory.md
-rg "canvas|execution|trace|CDP|audience|notification|consent|PII|freshness|retention" docs/architecture/work-products/p3-03-data-platform/data-platform-source-inventory.md
-test -f docs/architecture/work-products/p3-03-data-platform/data-platform-poc-plan.md
-rg "Input sources|Transform|Storage|Serving API|SLA|Retention|PII|Cost|Rollback|Success metric|full data platform is deferred" docs/architecture/work-products/p3-03-data-platform/data-platform-poc-plan.md
-test -f docs/architecture/work-products/p3-03-data-platform/data-platform-contract-governance.md
-rg "schema versioning|compatibility|replay|ordering|backfill|deletion propagation|lineage|CDC|event contract" docs/architecture/work-products/p3-03-data-platform/data-platform-contract-governance.md
-rg "contract test|freshness|dropped records|backfill duration|query latency|storage growth|stop criteria" docs/architecture/work-products/p3-03-data-platform/data-platform-poc-plan.md docs/architecture/evidence/p3-03-data-platform.md
+test -f docs/architecture/decisions/work-products/p3-03-data-platform/data-platform-source-inventory.md
+rg "canvas|execution|trace|CDP|audience|notification|consent|PII|freshness|retention" docs/architecture/decisions/work-products/p3-03-data-platform/data-platform-source-inventory.md
+test -f docs/architecture/decisions/work-products/p3-03-data-platform/data-platform-poc-plan.md
+rg "Input sources|Transform|Storage|Serving API|SLA|Retention|PII|Cost|Rollback|Success metric|full data platform is deferred" docs/architecture/decisions/work-products/p3-03-data-platform/data-platform-poc-plan.md
+test -f docs/architecture/decisions/work-products/p3-03-data-platform/data-platform-contract-governance.md
+rg "schema versioning|compatibility|replay|ordering|backfill|deletion propagation|lineage|CDC|event contract" docs/architecture/decisions/work-products/p3-03-data-platform/data-platform-contract-governance.md
+rg "contract test|freshness|dropped records|backfill duration|query latency|storage growth|stop criteria" docs/architecture/decisions/work-products/p3-03-data-platform/data-platform-poc-plan.md docs/architecture/evidence/p3-03-data-platform.md
 ```
 
 Result: all documentation checks passed.

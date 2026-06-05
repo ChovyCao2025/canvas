@@ -1,8 +1,8 @@
 # Spec: Dependency Abstraction And Vendor Lock-In
 
-Source package: `docs/architecture/reviewed-packages/p2/dependency-abstraction-and-vendor-lock-in/`
+Source package: `docs/architecture/active/reviewed-packages/p2/dependency-abstraction-and-vendor-lock-in/`
 
-Coverage matrix: `docs/architecture/reviewed-packages/coverage-matrix.md`
+Coverage matrix: `docs/architecture/active/reviewed-packages/coverage-matrix.md`
 
 
 ## Verification Status
@@ -10,7 +10,7 @@ Coverage matrix: `docs/architecture/reviewed-packages/coverage-matrix.md`
 Confirmed and partially remediated in repo-controlled code. Message publishing, replay rate
 limiting, Groovy execution, reach delivery HTTP calls, and React Flow graph helper reuse now have
 local contracts or adapter boundaries. Remaining direct usages are documented as `leave direct`,
-`adapter only`, or future migration candidates in `docs/architecture/dependencies/`.
+`adapter only`, or future migration candidates in `docs/architecture/evidence/dependencies/`.
 
 ## Problems Covered
 
@@ -33,8 +33,8 @@ local contracts or adapter boundaries. Remaining direct usages are documented as
 
 ## Implementation Artifacts
 
-- `docs/architecture/dependencies/dependency-inventory.md`
-- `docs/architecture/dependencies/vendor-alternatives.md`
+- `docs/architecture/evidence/dependencies/dependency-inventory.md`
+- `docs/architecture/evidence/dependencies/vendor-alternatives.md`
 - `backend/canvas-engine/src/main/java/org/chovy/canvas/infrastructure/mq/CanvasMessageBus.java`
 - `backend/canvas-engine/src/main/java/org/chovy/canvas/infrastructure/redis/DistributedRateLimiter.java`
 - `backend/canvas-engine/src/main/java/org/chovy/canvas/engine/expression/ExpressionEngine.java`

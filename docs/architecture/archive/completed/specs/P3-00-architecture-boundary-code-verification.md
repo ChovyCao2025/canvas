@@ -2,7 +2,7 @@
 
 Date: 2026-06-03
 
-Related spec: [P3-00-architecture-boundary-review-spec.md](P3-00-architecture-boundary-review-spec.md)
+Related spec: [P3-00-architecture-boundary-review-spec.md](./P3-00-architecture-boundary-review-spec.md)
 
 ## Scope
 

@@ -1,5 +1,5 @@
 # 架构整改方案 — ops
-> 详见 [README.md](README.md) 获取完整索引
+> 详见 [README.md](./README.md) 获取完整索引
 
 
 ## 第四部分：运维与基础设施问题（19项）

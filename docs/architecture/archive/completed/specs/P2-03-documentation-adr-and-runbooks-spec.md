@@ -1,8 +1,8 @@
 # Spec: Documentation, ADRs, And Runbooks
 
-Source package: `docs/architecture/reviewed-packages/p2/documentation-adr-and-runbooks/`
+Source package: `docs/architecture/active/reviewed-packages/p2/documentation-adr-and-runbooks/`
 
-Coverage matrix: `docs/architecture/reviewed-packages/coverage-matrix.md`
+Coverage matrix: `docs/architecture/active/reviewed-packages/coverage-matrix.md`
 
 
 ## Verification Status
@@ -32,15 +32,15 @@ Confirmed for repository-controlled artifacts. ADRs, handler guidance, Redis key
 
 ## Implementation Evidence
 
-- `docs/architecture/adr/`
-- `docs/architecture/guides/node-handler-development.md`
-- `docs/architecture/reference/redis-key-catalog.md`
-- `docs/architecture/runbooks/dag-execution-flow.md`
-- `docs/architecture/runbooks/failure-triage.md`
-- `docs/architecture/runbooks/dlq-replay.md`
-- `docs/architecture/runbooks/route-rebuild.md`
-- `docs/architecture/runbooks/cache-invalidation.md`
-- `docs/architecture/runbooks/deploy-rollback.md`
+- `docs/architecture/decisions/adr/`
+- `docs/architecture/evidence/guides/node-handler-development.md`
+- `docs/architecture/decisions/reference/redis-key-catalog.md`
+- `docs/architecture/evidence/runbooks/dag-execution-flow.md`
+- `docs/architecture/evidence/runbooks/failure-triage.md`
+- `docs/architecture/evidence/runbooks/dlq-replay.md`
+- `docs/architecture/evidence/runbooks/route-rebuild.md`
+- `docs/architecture/evidence/runbooks/cache-invalidation.md`
+- `docs/architecture/evidence/runbooks/deploy-rollback.md`
 - `backend/canvas-engine/src/main/java/org/chovy/canvas/config/OpenApiSecurityConfig.java`
 - `frontend/src/pages/api-docs/openApiDocs.ts`
 - `docs/architecture/evidence/P2-03-documentation-adr-and-runbooks.md`

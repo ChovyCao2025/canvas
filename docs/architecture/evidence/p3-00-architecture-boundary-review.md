@@ -86,7 +86,7 @@ Keep the current backend as a modular monolith. Before extracting any service, c
 - characterization tests for API shape, mapper reads/writes, tenant behavior, failure behavior, and event/notification behavior;
 - tenant, trace, operator, and idempotency propagation across the proposed boundary;
 - independent observability, rollout, rollback, and reconciliation plans;
-- an accepted candidate ADR that links `docs/architecture/adr/ADR-0006-service-extraction-gate.md`.
+- an accepted candidate ADR that links `docs/architecture/decisions/adr/ADR-0006-service-extraction-gate.md`.
 
 Canvas Authoring and Execution Runtime should not be first extraction candidates because graph versioning, scheduler registration, execution context, route/cache behavior, runtime policy, and state transitions remain tightly coupled.
 
@@ -101,9 +101,9 @@ find backend/canvas-engine/src/main/java/org/chovy/canvas -maxdepth 2 -type d | 
 rg "Mapper|StringRedisTemplate|RocketMQTemplate|WebClient|@Transactional" backend/canvas-engine/src/main/java/org/chovy/canvas/domain backend/canvas-engine/src/main/java/org/chovy/canvas/engine backend/canvas-engine/src/main/java/org/chovy/canvas/web
 test -f docs/architecture/evidence/p3-00-architecture-boundary-review.md
 rg "Canvas Authoring|Execution Runtime|CDP / Audience|Reach / Notification|Integration|Platform|Data Platform / Analytics|modular monolith" docs/architecture/evidence/p3-00-architecture-boundary-review.md
-test -f docs/architecture/adr/ADR-0000-template.md
-test -f docs/architecture/adr/ADR-0006-service-extraction-gate.md
-rg "Data Ownership|API Contracts|Event Contracts|Rollback|Observability|Tenant Propagation|Idempotency|Exit Criteria" docs/architecture/adr/ADR-0000-template.md docs/architecture/adr/ADR-0006-service-extraction-gate.md
+test -f docs/architecture/decisions/adr/ADR-0000-template.md
+test -f docs/architecture/decisions/adr/ADR-0006-service-extraction-gate.md
+rg "Data Ownership|API Contracts|Event Contracts|Rollback|Observability|Tenant Propagation|Idempotency|Exit Criteria" docs/architecture/decisions/adr/ADR-0000-template.md docs/architecture/decisions/adr/ADR-0006-service-extraction-gate.md
 ```
 
 All documentation gate checks passed.

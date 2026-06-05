@@ -1,12 +1,12 @@
 # Spec: Multi Datasource Isolation
 
-Source package: `docs/architecture/reviewed-packages/p3/platform-evolution/`
+Source package: `docs/architecture/active/reviewed-packages/p3/platform-evolution/`
 
-Coverage matrix: `docs/architecture/reviewed-packages/coverage-matrix.md`
+Coverage matrix: `docs/architecture/active/reviewed-packages/coverage-matrix.md`
 
 ## Verification Status
 
-Implemented as datasource ownership, transaction-boundary, and migration planning artifacts. Physical datasource isolation remains blocked until tenant/data-security and reconciliation gates pass. Evidence and maps are in `docs/architecture/evidence/p3-04-multi-datasource-isolation.md`, `docs/architecture/work-products/p3-04-multi-datasource/datasource-ownership-map.md`, `docs/architecture/work-products/p3-04-multi-datasource/datasource-transaction-boundary-map.md`, and `docs/architecture/work-products/p3-04-multi-datasource/datasource-migration-plan.md`.
+Implemented as datasource ownership, transaction-boundary, and migration planning artifacts. Physical datasource isolation remains blocked until tenant/data-security and reconciliation gates pass. Evidence and maps are in `docs/architecture/evidence/p3-04-multi-datasource-isolation.md`, `docs/architecture/decisions/work-products/p3-04-multi-datasource/datasource-ownership-map.md`, `docs/architecture/decisions/work-products/p3-04-multi-datasource/datasource-transaction-boundary-map.md`, and `docs/architecture/decisions/work-products/p3-04-multi-datasource/datasource-migration-plan.md`.
 
 ## Source Documents
 

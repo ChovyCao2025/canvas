@@ -1,5 +1,5 @@
 # 架构整改方案 — logic-testing
-> 详见 [README.md](README.md) 获取完整索引
+> 详见 [README.md](./README.md) 获取完整索引
 
 
 ### 问题二十五：业务逻辑正确性缺陷（34项）

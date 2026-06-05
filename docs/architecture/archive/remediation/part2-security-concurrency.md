@@ -1,5 +1,5 @@
 # 架构整改方案 — security-concurrency
-> 详见 [README.md](README.md) 获取完整索引
+> 详见 [README.md](./README.md) 获取完整索引
 
 
 ## 第二部分：安全与并发问题（31项）

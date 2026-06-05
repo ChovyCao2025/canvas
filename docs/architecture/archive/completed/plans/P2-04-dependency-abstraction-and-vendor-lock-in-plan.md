@@ -19,7 +19,7 @@
 ## File Structure
 
 - Read: `docs/architecture/archive/completed/specs/P2-04-dependency-abstraction-and-vendor-lock-in-spec.md`
-- Read: `docs/architecture/reviewed-packages/p2/dependency-abstraction-and-vendor-lock-in/plan.md`
+- Read: `docs/architecture/active/reviewed-packages/p2/dependency-abstraction-and-vendor-lock-in/plan.md`
 - Read: `backend/canvas-engine/src/main/java/org/chovy/canvas/engine/handlers/SendMqHandler.java`
 - Read: `backend/canvas-engine/src/main/java/org/chovy/canvas/infrastructure/mq/MqTriggerConsumer.java`
 - Read: `backend/canvas-engine/src/main/java/org/chovy/canvas/infrastructure/cache/RocketMqCacheInvalidationPublisher.java`
@@ -27,8 +27,8 @@
 - Read: `backend/canvas-engine/src/main/java/org/chovy/canvas/engine/handlers/GroovyHandler.java`
 - Read: `backend/canvas-engine/src/main/java/org/chovy/canvas/engine/delivery/ReachDeliveryService.java`
 - Read: `frontend/src/pages/canvas-editor/index.tsx`
-- Create: `docs/architecture/dependencies/dependency-inventory.md`
-- Create: `docs/architecture/dependencies/vendor-alternatives.md`
+- Create: `docs/architecture/evidence/dependencies/dependency-inventory.md`
+- Create: `docs/architecture/evidence/dependencies/vendor-alternatives.md`
 - Create: `backend/canvas-engine/src/main/java/org/chovy/canvas/infrastructure/mq/CanvasMessageBus.java`
 - Create: `backend/canvas-engine/src/main/java/org/chovy/canvas/infrastructure/mq/RocketMqCanvasMessageBus.java`
 - Create: `backend/canvas-engine/src/main/java/org/chovy/canvas/infrastructure/redis/DistributedRateLimiter.java`
@@ -46,7 +46,7 @@
 ### Task 1: Inventory direct usages of Redis, RocketMQ, Groovy, WebClient, and React Flow APIs
 
 **Files:**
-- Create: `docs/architecture/dependencies/dependency-inventory.md`
+- Create: `docs/architecture/evidence/dependencies/dependency-inventory.md`
 - Read: `backend/canvas-engine/src/main/java/org/chovy/canvas`
 - Read: `frontend/src`
 
@@ -58,8 +58,8 @@
 ```bash
 rg "RocketMQTemplate|StringRedisTemplate|WebClient|GroovyShell|SecureASTCustomizer" backend/canvas-engine/src/main/java
 rg "@xyflow/react|ReactFlow|useReactFlow" frontend/src
-test -f docs/architecture/dependencies/dependency-inventory.md
-rg "contract now|adapter only|leave direct|RocketMQTemplate|StringRedisTemplate|@xyflow/react" docs/architecture/dependencies/dependency-inventory.md
+test -f docs/architecture/evidence/dependencies/dependency-inventory.md
+rg "contract now|adapter only|leave direct|RocketMQTemplate|StringRedisTemplate|@xyflow/react" docs/architecture/evidence/dependencies/dependency-inventory.md
 ```
 
 **Expected:** The inventory names every direct framework usage and classifies each one before code migration starts.
@@ -67,8 +67,8 @@ rg "contract now|adapter only|leave direct|RocketMQTemplate|StringRedisTemplate|
 ### Task 2: Identify high-value abstractions: message bus, distributed lock, rate limiter, expression engine, external client
 
 **Files:**
-- Modify: `docs/architecture/dependencies/dependency-inventory.md`
-- Create: `docs/architecture/dependencies/vendor-alternatives.md`
+- Modify: `docs/architecture/evidence/dependencies/dependency-inventory.md`
+- Create: `docs/architecture/evidence/dependencies/vendor-alternatives.md`
 - Read: `backend/canvas-engine/src/main/java/org/chovy/canvas/infrastructure/cache/RocketMqCacheInvalidationPublisher.java`
 - Read: `backend/canvas-engine/src/main/java/org/chovy/canvas/engine/handlers/SendMqHandler.java`
 - Read: `backend/canvas-engine/src/main/java/org/chovy/canvas/engine/request/CanvasExecutionReplayRateLimiter.java`
@@ -81,8 +81,8 @@ rg "contract now|adapter only|leave direct|RocketMQTemplate|StringRedisTemplate|
 
 **Run:**
 ```bash
-test -f docs/architecture/dependencies/vendor-alternatives.md
-rg "RocketMQ|Redisson|Groovy|Aviator|QLExpress|WebClient|Feign|React Flow|non-goals" docs/architecture/dependencies/vendor-alternatives.md
+test -f docs/architecture/evidence/dependencies/vendor-alternatives.md
+rg "RocketMQ|Redisson|Groovy|Aviator|QLExpress|WebClient|Feign|React Flow|non-goals" docs/architecture/evidence/dependencies/vendor-alternatives.md
 ```
 
 **Expected:** The alternatives document names the chosen contracts, candidate replacements, operational cost, and non-goals.
@@ -160,7 +160,7 @@ rg "GroovyShell|SecureASTCustomizer|WebClient" backend/canvas-engine/src/main/ja
 ### Task 6: Document alternatives and React Flow adapter non-goals
 
 **Files:**
-- Modify: `docs/architecture/dependencies/vendor-alternatives.md`
+- Modify: `docs/architecture/evidence/dependencies/vendor-alternatives.md`
 - Create: `frontend/src/pages/canvas-editor/reactFlowAdapter.ts`
 - Modify: `frontend/src/pages/canvas-editor/index.tsx`
 - Test: `frontend/src/pages/canvas-editor/graphHydration.test.ts`
@@ -173,7 +173,7 @@ rg "GroovyShell|SecureASTCustomizer|WebClient" backend/canvas-engine/src/main/ja
 **Run:**
 ```bash
 cd frontend && npm test -- graphHydration connectionInteraction
-rg "React Flow|replacement trigger|migration cost|reactFlowAdapter" docs/architecture/dependencies/vendor-alternatives.md frontend/src/pages/canvas-editor
+rg "React Flow|replacement trigger|migration cost|reactFlowAdapter" docs/architecture/evidence/dependencies/vendor-alternatives.md frontend/src/pages/canvas-editor
 ```
 
 **Expected:** Frontend graph tests pass, and the alternatives doc states why React Flow remains the runtime library.
@@ -182,8 +182,8 @@ rg "React Flow|replacement trigger|migration cost|reactFlowAdapter" docs/archite
 
 **Files:**
 - Modify: `docs/architecture/archive/completed/plans/P2-04-dependency-abstraction-and-vendor-lock-in-plan.md`
-- Create: `docs/architecture/dependencies/dependency-inventory.md`
-- Create: `docs/architecture/dependencies/vendor-alternatives.md`
+- Create: `docs/architecture/evidence/dependencies/dependency-inventory.md`
+- Create: `docs/architecture/evidence/dependencies/vendor-alternatives.md`
 - Create: `backend/canvas-engine/src/main/java/org/chovy/canvas/infrastructure/mq/CanvasMessageBus.java`
 - Create: `backend/canvas-engine/src/main/java/org/chovy/canvas/infrastructure/mq/RocketMqCanvasMessageBus.java`
 - Create: `backend/canvas-engine/src/main/java/org/chovy/canvas/infrastructure/redis/DistributedRateLimiter.java`
@@ -200,7 +200,7 @@ rg "React Flow|replacement trigger|migration cost|reactFlowAdapter" docs/archite
 
 **Run:**
 ```bash
-git diff -- docs/architecture/archive/completed/plans/P2-04-dependency-abstraction-and-vendor-lock-in-plan.md docs/architecture/dependencies backend/canvas-engine/src/main/java/org/chovy/canvas/infrastructure/mq backend/canvas-engine/src/main/java/org/chovy/canvas/infrastructure/redis backend/canvas-engine/src/main/java/org/chovy/canvas/engine/expression backend/canvas-engine/src/main/java/org/chovy/canvas/infrastructure/http backend/canvas-engine/src/main/java/org/chovy/canvas/engine/handlers backend/canvas-engine/src/main/java/org/chovy/canvas/engine/request backend/canvas-engine/src/main/java/org/chovy/canvas/engine/delivery frontend/src/pages/canvas-editor
+git diff -- docs/architecture/archive/completed/plans/P2-04-dependency-abstraction-and-vendor-lock-in-plan.md docs/architecture/evidence/dependencies backend/canvas-engine/src/main/java/org/chovy/canvas/infrastructure/mq backend/canvas-engine/src/main/java/org/chovy/canvas/infrastructure/redis backend/canvas-engine/src/main/java/org/chovy/canvas/engine/expression backend/canvas-engine/src/main/java/org/chovy/canvas/infrastructure/http backend/canvas-engine/src/main/java/org/chovy/canvas/engine/handlers backend/canvas-engine/src/main/java/org/chovy/canvas/engine/request backend/canvas-engine/src/main/java/org/chovy/canvas/engine/delivery frontend/src/pages/canvas-editor
 ```
 
 **Expected:** The diff contains dependency inventory, local contracts, adapter implementations, migrated call sites, and tests for this package; no commit is created during handoff.

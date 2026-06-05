@@ -334,11 +334,11 @@ Month 10-12: 数据服务 + 智能分析
 
 ## 十、相关文档
 
-- [架构师审查报告：8个关键缺失](architect-critical-review.md)
-- [服务划分与新应用搭建方案](service-architecture-design.md)
-- [架构演进路线图](architecture-evolution-roadmap.md)
-- [数据平台架构设计](data-platform-architecture.md)
-- [企微SCRM模块设计](wecom-scrm-module-design.md)
-- [K8s部署方案](k8s-deployment-plan.md)
-- [WebFlux→Spring MVC迁移](webflux-to-mvc-migration.md)
-- [多数据源隔离方案](multi-datasource-isolation.md)
+- [架构师审查报告：8个关键缺失](./architect-critical-review.md)
+- [服务划分与新应用搭建方案](./service-architecture-design.md)
+- [架构演进路线图](./architecture-evolution-roadmap.md)
+- [数据平台架构设计](./data-platform-architecture.md)
+- [企微SCRM模块设计](./wecom-scrm-module-design.md)
+- [K8s部署方案](./k8s-deployment-plan.md)
+- [WebFlux→Spring MVC迁移](./webflux-to-mvc-migration.md)
+- [多数据源隔离方案](./multi-datasource-isolation.md)

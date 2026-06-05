@@ -1,14 +1,14 @@
 # Spec: Architecture Boundary Review
 
-Source package: `docs/architecture/reviewed-packages/p3/platform-evolution/`
+Source package: `docs/architecture/active/reviewed-packages/p3/platform-evolution/`
 
-Coverage matrix: `docs/architecture/reviewed-packages/coverage-matrix.md`
+Coverage matrix: `docs/architecture/active/reviewed-packages/coverage-matrix.md`
 
 ## Review Status
 
 Decision review. This document evaluates the service-split and platform-evolution documents before implementation planning.
 
-Supporting code verification: [P3-00-architecture-boundary-code-verification.md](P3-00-architecture-boundary-code-verification.md).
+Supporting code verification: [P3-00-architecture-boundary-code-verification.md](./P3-00-architecture-boundary-code-verification.md).
 
 ## Source Documents Reviewed
 

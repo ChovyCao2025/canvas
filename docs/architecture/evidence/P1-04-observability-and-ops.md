@@ -75,16 +75,16 @@ rg -n "CanvasExecutionFailureRate|CanvasDlqBacklog|route_rebuild|cache_invalidat
 Runbooks:
 
 ```text
-docs/architecture/runbooks/dlq-handling.md
-docs/architecture/runbooks/route-rebuild.md
-docs/architecture/runbooks/cache-invalidation.md
-docs/architecture/runbooks/shutdown-drain.md
+docs/architecture/evidence/runbooks/dlq-handling.md
+docs/architecture/evidence/runbooks/route-rebuild.md
+docs/architecture/evidence/runbooks/cache-invalidation.md
+docs/architecture/evidence/runbooks/shutdown-drain.md
 ```
 
 Runbook structure check:
 
 ```bash
-rg -n "Owner|Command|Verify|Rollback|Evidence" docs/architecture/runbooks/dlq-handling.md docs/architecture/runbooks/route-rebuild.md docs/architecture/runbooks/cache-invalidation.md docs/architecture/runbooks/shutdown-drain.md
+rg -n "Owner|Command|Verify|Rollback|Evidence" docs/architecture/evidence/runbooks/dlq-handling.md docs/architecture/evidence/runbooks/route-rebuild.md docs/architecture/evidence/runbooks/cache-invalidation.md docs/architecture/evidence/runbooks/shutdown-drain.md
 ```
 
 ## Remaining Decisions

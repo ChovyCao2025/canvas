@@ -31,10 +31,10 @@
 - Tests: `backend/canvas-engine/src/test/java/org/chovy/canvas/config/CanvasRuntimeMetricsTest.java`
 - Ops asset: `deploy/observability/prometheus/canvas-alert-rules.yml`
 - Ops asset: `deploy/observability/grafana/canvas-runtime-dashboard.json`
-- Runbook: `docs/architecture/runbooks/dlq-handling.md`
-- Runbook: `docs/architecture/runbooks/route-rebuild.md`
-- Runbook: `docs/architecture/runbooks/cache-invalidation.md`
-- Runbook: `docs/architecture/runbooks/shutdown-drain.md`
+- Runbook: `docs/architecture/evidence/runbooks/dlq-handling.md`
+- Runbook: `docs/architecture/evidence/runbooks/route-rebuild.md`
+- Runbook: `docs/architecture/evidence/runbooks/cache-invalidation.md`
+- Runbook: `docs/architecture/evidence/runbooks/shutdown-drain.md`
 - Evidence: `docs/architecture/evidence/P1-04-observability-and-ops.md`
 
 ### Task 1: Add request and execution correlation ID propagation
@@ -112,10 +112,10 @@ Expected: metrics tests pass, alert/dashboard files exist, and the named operati
 ### Task 4: Add operational runbooks
 
 **Files:**
-- Runbook: `docs/architecture/runbooks/dlq-handling.md`
-- Runbook: `docs/architecture/runbooks/route-rebuild.md`
-- Runbook: `docs/architecture/runbooks/cache-invalidation.md`
-- Runbook: `docs/architecture/runbooks/shutdown-drain.md`
+- Runbook: `docs/architecture/evidence/runbooks/dlq-handling.md`
+- Runbook: `docs/architecture/evidence/runbooks/route-rebuild.md`
+- Runbook: `docs/architecture/evidence/runbooks/cache-invalidation.md`
+- Runbook: `docs/architecture/evidence/runbooks/shutdown-drain.md`
 - Evidence: `docs/architecture/evidence/P1-04-observability-and-ops.md`
 
 - [x] Write DLQ handling steps with diagnosis command, replay command, rollback/stop condition, owner, and evidence capture path.
@@ -125,7 +125,7 @@ Expected: metrics tests pass, alert/dashboard files exist, and the named operati
 Run:
 
 ```bash
-rg -n "Owner|Command|Verify|Rollback|Evidence" docs/architecture/runbooks/dlq-handling.md docs/architecture/runbooks/route-rebuild.md docs/architecture/runbooks/cache-invalidation.md docs/architecture/runbooks/shutdown-drain.md
+rg -n "Owner|Command|Verify|Rollback|Evidence" docs/architecture/evidence/runbooks/dlq-handling.md docs/architecture/evidence/runbooks/route-rebuild.md docs/architecture/evidence/runbooks/cache-invalidation.md docs/architecture/evidence/runbooks/shutdown-drain.md
 # Do not stage or commit in this session unless the user explicitly asks.
 ```
 

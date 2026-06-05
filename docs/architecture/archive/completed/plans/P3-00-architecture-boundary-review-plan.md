@@ -27,8 +27,8 @@
 - Read: `backend/canvas-engine/src/main/java/org/chovy/canvas/domain/tenant/TenantService.java`
 - Read: `backend/canvas-engine/src/main/java/org/chovy/canvas/engine/delivery/ReachDeliveryService.java`
 - Create: `docs/architecture/evidence/p3-00-architecture-boundary-review.md`
-- Modify: `docs/architecture/adr/ADR-0000-template.md`
-- Create: `docs/architecture/adr/ADR-0006-service-extraction-gate.md`
+- Modify: `docs/architecture/decisions/adr/ADR-0000-template.md`
+- Create: `docs/architecture/decisions/adr/ADR-0006-service-extraction-gate.md`
 - Test: `backend/canvas-engine/src/test/java/org/chovy/canvas/domain/cdp/CanvasUserQueryServiceTest.java`
 - Test: `backend/canvas-engine/src/test/java/org/chovy/canvas/domain/notification/NotificationServiceTest.java`
 - Test: `backend/canvas-engine/src/test/java/org/chovy/canvas/domain/tenant/TenantServiceTest.java`
@@ -84,8 +84,8 @@ rg "immediate physical service|split all services|big-bang" docs/architecture/ar
 ### Task 3: Gate service extraction with ADRs
 
 **Files:**
-- Modify: `docs/architecture/adr/ADR-0000-template.md`
-- Create: `docs/architecture/adr/ADR-0006-service-extraction-gate.md`
+- Modify: `docs/architecture/decisions/adr/ADR-0000-template.md`
+- Create: `docs/architecture/decisions/adr/ADR-0006-service-extraction-gate.md`
 - Read: `docs/architecture/archive/completed/specs/P3-00-architecture-boundary-review-spec.md`
 - Read: `docs/architecture/evidence/p3-00-architecture-boundary-review.md`
 
@@ -95,9 +95,9 @@ rg "immediate physical service|split all services|big-bang" docs/architecture/ar
 
 **Run:**
 ```bash
-test -f docs/architecture/adr/ADR-0000-template.md
-test -f docs/architecture/adr/ADR-0006-service-extraction-gate.md
-rg "Data Ownership|API Contracts|Event Contracts|Rollback|Observability|Tenant Propagation|Idempotency|Exit Criteria" docs/architecture/adr/ADR-0000-template.md docs/architecture/adr/ADR-0006-service-extraction-gate.md
+test -f docs/architecture/decisions/adr/ADR-0000-template.md
+test -f docs/architecture/decisions/adr/ADR-0006-service-extraction-gate.md
+rg "Data Ownership|API Contracts|Event Contracts|Rollback|Observability|Tenant Propagation|Idempotency|Exit Criteria" docs/architecture/decisions/adr/ADR-0000-template.md docs/architecture/decisions/adr/ADR-0006-service-extraction-gate.md
 ```
 
 **Expected:** ADR template and service-extraction gate ADR contain every gate required by the boundary review.
@@ -128,8 +128,8 @@ cd backend && mvn test -pl canvas-engine -Dtest=CanvasUserQueryServiceTest,Notif
 **Files:**
 - Modify: `docs/architecture/archive/completed/plans/P3-00-architecture-boundary-review-plan.md`
 - Create: `docs/architecture/evidence/p3-00-architecture-boundary-review.md`
-- Modify: `docs/architecture/adr/ADR-0000-template.md`
-- Create: `docs/architecture/adr/ADR-0006-service-extraction-gate.md`
+- Modify: `docs/architecture/decisions/adr/ADR-0000-template.md`
+- Create: `docs/architecture/decisions/adr/ADR-0006-service-extraction-gate.md`
 
 - [x] Review only boundary evidence, ADR, and P3 plan files named in this plan.
 - [x] Do not stage or commit in this session unless the user explicitly asks.
@@ -137,7 +137,7 @@ cd backend && mvn test -pl canvas-engine -Dtest=CanvasUserQueryServiceTest,Notif
 
 **Run:**
 ```bash
-git diff -- docs/architecture/archive/completed/plans/P3-00-architecture-boundary-review-plan.md docs/architecture/evidence/p3-00-architecture-boundary-review.md docs/architecture/adr/ADR-0000-template.md docs/architecture/adr/ADR-0006-service-extraction-gate.md docs/architecture/archive/completed/plans/P3-02-service-decomposition-and-domain-boundaries-plan.md docs/architecture/archive/completed/plans/P3-03-data-platform-architecture-plan.md docs/architecture/archive/completed/plans/P3-06-k8s-deployment-platform-plan.md docs/architecture/archive/completed/plans/P3-07-production-platform-components-plan.md docs/architecture/archive/completed/plans/P3-08-wecom-scrm-module-plan.md
+git diff -- docs/architecture/archive/completed/plans/P3-00-architecture-boundary-review-plan.md docs/architecture/evidence/p3-00-architecture-boundary-review.md docs/architecture/decisions/adr/ADR-0000-template.md docs/architecture/decisions/adr/ADR-0006-service-extraction-gate.md docs/architecture/archive/completed/plans/P3-02-service-decomposition-and-domain-boundaries-plan.md docs/architecture/archive/completed/plans/P3-03-data-platform-architecture-plan.md docs/architecture/archive/completed/plans/P3-06-k8s-deployment-platform-plan.md docs/architecture/archive/completed/plans/P3-07-production-platform-components-plan.md docs/architecture/archive/completed/plans/P3-08-wecom-scrm-module-plan.md
 ```
 
 **Expected:** The diff contains only the boundary-review plan, evidence file, ADR gate files, and downstream P3 gate references. No commit is created by default.

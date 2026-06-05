@@ -1,8 +1,8 @@
 # Spec: Frontend Accessibility And Quality
 
-Source package: `docs/architecture/reviewed-packages/p2/frontend-accessibility-and-quality/`
+Source package: `docs/architecture/active/reviewed-packages/p2/frontend-accessibility-and-quality/`
 
-Coverage matrix: `docs/architecture/reviewed-packages/coverage-matrix.md`
+Coverage matrix: `docs/architecture/active/reviewed-packages/coverage-matrix.md`
 
 
 ## Verification Status
@@ -28,13 +28,13 @@ Implemented and locally verified on 2026-06-05. The archived review flagged acce
 - Canvas editor has error isolation for graph/config panels.
   - Status: implemented locally for node library, graph canvas, execution trace, and config panel regions.
 - Keyboard navigation and screen-reader basics are checked for core workflows.
-  - Status: implemented locally in `docs/architecture/frontend/accessibility-audit.md` and `canvasEditorAccessibility.ts`.
+  - Status: implemented locally in `docs/architecture/evidence/frontend/accessibility-audit.md` and `canvasEditorAccessibility.ts`.
 - Automated accessibility checks are added where practical.
   - Status: implemented locally with `frontend/src/test/accessibilityChecks.ts` wired into config-panel, notification, and API-doc tests.
 
 ## Evidence
 
-- `docs/architecture/frontend/accessibility-audit.md`
+- `docs/architecture/evidence/frontend/accessibility-audit.md`
 - `docs/architecture/evidence/P2-06-frontend-accessibility-and-quality.md`
 - `frontend/src/components/layout/ErrorBoundary.test.tsx`
 - `frontend/src/pages/canvas-editor/CanvasEditorErrorBoundary.test.tsx`

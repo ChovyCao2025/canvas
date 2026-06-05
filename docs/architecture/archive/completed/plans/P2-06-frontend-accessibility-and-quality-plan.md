@@ -4,7 +4,7 @@
 
 **Goal:** Add frontend error isolation and accessibility checks for the main canvas, admin, and editor workflows without destabilizing existing editor state refactors.
 
-**Architecture:** Keep route wiring in `frontend/src/App.tsx`, shared error UI in `frontend/src/components/layout`, canvas-editor local isolation in `frontend/src/pages/canvas-editor`, and static accessibility helpers/tests beside the components they check. Browser-level manual evidence is recorded under `docs/architecture/frontend`.
+**Architecture:** Keep route wiring in `frontend/src/App.tsx`, shared error UI in `frontend/src/components/layout`, canvas-editor local isolation in `frontend/src/pages/canvas-editor`, and static accessibility helpers/tests beside the components they check. Browser-level manual evidence is recorded under `docs/architecture/evidence/frontend`.
 
 **Tech Stack:** React 18, TypeScript, Vite, Vitest, Ant Design, React Router, React Flow, server-rendered component tests, optional axe-core for static accessibility checks.
 
@@ -19,7 +19,7 @@
 ## File Structure
 
 - Read: `docs/architecture/archive/completed/specs/P2-06-frontend-accessibility-and-quality-spec.md`
-- Read: `docs/architecture/reviewed-packages/p2/frontend-accessibility-and-quality/plan.md`
+- Read: `docs/architecture/active/reviewed-packages/p2/frontend-accessibility-and-quality/plan.md`
 - Modify: `frontend/src/App.tsx`
 - Modify: `frontend/src/main.tsx`
 - Modify: `frontend/package.json`
@@ -29,7 +29,7 @@
 - Create: `frontend/src/pages/canvas-editor/canvasEditorAccessibility.ts`
 - Create: `frontend/src/pages/canvas-editor/canvasEditorAccessibility.test.ts`
 - Create: `frontend/src/test/accessibilityChecks.ts`
-- Create: `docs/architecture/frontend/accessibility-audit.md`
+- Create: `docs/architecture/evidence/frontend/accessibility-audit.md`
 - Test: `frontend/src/context/AuthContext.test.tsx`
 - Test: `frontend/src/pages/canvas-editor/graphHydration.test.ts`
 - Test: `frontend/src/components/config-panel/controlChrome.test.ts`
@@ -80,7 +80,7 @@ cd frontend && npm test -- graphHydration settingsPresentation presentation
 ### Task 3: Audit keyboard and focus behavior for core pages
 
 **Files:**
-- Create: `docs/architecture/frontend/accessibility-audit.md`
+- Create: `docs/architecture/evidence/frontend/accessibility-audit.md`
 - Create: `frontend/src/pages/canvas-editor/canvasEditorAccessibility.ts`
 - Create: `frontend/src/pages/canvas-editor/canvasEditorAccessibility.test.ts`
 - Modify: `frontend/src/components/canvas/HoverEdge.tsx`
@@ -94,8 +94,8 @@ cd frontend && npm test -- graphHydration settingsPresentation presentation
 **Run:**
 ```bash
 cd frontend && npm test -- canvasEditorAccessibility notificationPresentation nodeLibrary
-test -f docs/architecture/frontend/accessibility-audit.md
-rg "keyboard order|visible focus|screen-reader name|canvas editor|notification bell" docs/architecture/frontend/accessibility-audit.md
+test -f docs/architecture/evidence/frontend/accessibility-audit.md
+rg "keyboard order|visible focus|screen-reader name|canvas editor|notification bell" docs/architecture/evidence/frontend/accessibility-audit.md
 ```
 
 **Expected:** Accessibility audit has concrete workflow rows, and frontend static accessibility tests pass.
@@ -156,7 +156,7 @@ cd frontend && npm test -- controlChrome formValues localDraft graphHydration ca
 - Create: `frontend/src/pages/canvas-editor/canvasEditorAccessibility.ts`
 - Create: `frontend/src/pages/canvas-editor/canvasEditorAccessibility.test.ts`
 - Create: `frontend/src/test/accessibilityChecks.ts`
-- Create: `docs/architecture/frontend/accessibility-audit.md`
+- Create: `docs/architecture/evidence/frontend/accessibility-audit.md`
 
 - [x] Review only files named in this plan.
 - [x] Do not stage or commit in this session unless the user explicitly asks.
@@ -164,8 +164,8 @@ cd frontend && npm test -- controlChrome formValues localDraft graphHydration ca
 
 **Run:**
 ```bash
-git diff -- docs/architecture/archive/completed/plans/P2-06-frontend-accessibility-and-quality-plan.md frontend/package.json frontend/src/App.tsx frontend/src/main.tsx frontend/src/components/layout frontend/src/pages/canvas-editor frontend/src/test/accessibilityChecks.ts docs/architecture/frontend/accessibility-audit.md
-git diff -- docs/architecture/archive/completed/plans/P2-06-frontend-accessibility-and-quality-plan.md docs/architecture/evidence/P2-06-frontend-accessibility-and-quality.md docs/architecture/frontend/accessibility-audit.md frontend/src/App.tsx frontend/src/components/errors/AppErrorBoundary.tsx frontend/src/components/layout/ErrorBoundary.tsx frontend/src/components/layout/ErrorBoundary.test.tsx frontend/src/components/canvas/HoverEdge.tsx frontend/src/components/node-panel/NodeLibraryItem.tsx frontend/src/components/notifications/NotificationBell.tsx frontend/src/components/notifications/notificationPresentation.test.ts frontend/src/components/config-panel/controlChrome.ts frontend/src/components/config-panel/controlChrome.test.ts frontend/src/components/config-panel/index.tsx frontend/src/pages/api-docs/index.tsx frontend/src/pages/api-docs/apiDocs.test.ts frontend/src/pages/canvas-editor/CanvasEditorErrorBoundary.tsx frontend/src/pages/canvas-editor/CanvasEditorErrorBoundary.test.tsx frontend/src/pages/canvas-editor/canvasEditorAccessibility.ts frontend/src/pages/canvas-editor/canvasEditorAccessibility.test.ts frontend/src/pages/canvas-editor/editorLayout.ts frontend/src/pages/canvas-editor/editorLayout.test.ts frontend/src/pages/canvas-editor/index.tsx frontend/src/pages/canvas-editor/settingsPanel.css frontend/src/test/accessibilityChecks.ts
+git diff -- docs/architecture/archive/completed/plans/P2-06-frontend-accessibility-and-quality-plan.md frontend/package.json frontend/src/App.tsx frontend/src/main.tsx frontend/src/components/layout frontend/src/pages/canvas-editor frontend/src/test/accessibilityChecks.ts docs/architecture/evidence/frontend/accessibility-audit.md
+git diff -- docs/architecture/archive/completed/plans/P2-06-frontend-accessibility-and-quality-plan.md docs/architecture/evidence/P2-06-frontend-accessibility-and-quality.md docs/architecture/evidence/frontend/accessibility-audit.md frontend/src/App.tsx frontend/src/components/errors/AppErrorBoundary.tsx frontend/src/components/layout/ErrorBoundary.tsx frontend/src/components/layout/ErrorBoundary.test.tsx frontend/src/components/canvas/HoverEdge.tsx frontend/src/components/node-panel/NodeLibraryItem.tsx frontend/src/components/notifications/NotificationBell.tsx frontend/src/components/notifications/notificationPresentation.test.ts frontend/src/components/config-panel/controlChrome.ts frontend/src/components/config-panel/controlChrome.test.ts frontend/src/components/config-panel/index.tsx frontend/src/pages/api-docs/index.tsx frontend/src/pages/api-docs/apiDocs.test.ts frontend/src/pages/canvas-editor/CanvasEditorErrorBoundary.tsx frontend/src/pages/canvas-editor/CanvasEditorErrorBoundary.test.tsx frontend/src/pages/canvas-editor/canvasEditorAccessibility.ts frontend/src/pages/canvas-editor/canvasEditorAccessibility.test.ts frontend/src/pages/canvas-editor/editorLayout.ts frontend/src/pages/canvas-editor/editorLayout.test.ts frontend/src/pages/canvas-editor/index.tsx frontend/src/pages/canvas-editor/settingsPanel.css frontend/src/test/accessibilityChecks.ts
 ```
 
 **Expected:** The diff contains only frontend error isolation, accessibility checks, related docs, and focused tests. No commit is created by default.

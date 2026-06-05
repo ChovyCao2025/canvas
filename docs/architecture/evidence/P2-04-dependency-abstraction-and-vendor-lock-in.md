@@ -46,10 +46,10 @@ Result: 2 test files, 8 tests passed.
 Documentation gates:
 
 ```bash
-rg "contract now|adapter only|leave direct|RocketMQTemplate|StringRedisTemplate|@xyflow/react" docs/architecture/dependencies/dependency-inventory.md
-rg "RocketMQ|Redisson|Groovy|Aviator|QLExpress|WebClient|Feign|React Flow|non-goals" docs/architecture/dependencies/vendor-alternatives.md
-test -f docs/architecture/dependencies/dependency-inventory.md
-test -f docs/architecture/dependencies/vendor-alternatives.md
+rg "contract now|adapter only|leave direct|RocketMQTemplate|StringRedisTemplate|@xyflow/react" docs/architecture/evidence/dependencies/dependency-inventory.md
+rg "RocketMQ|Redisson|Groovy|Aviator|QLExpress|WebClient|Feign|React Flow|non-goals" docs/architecture/evidence/dependencies/vendor-alternatives.md
+test -f docs/architecture/evidence/dependencies/dependency-inventory.md
+test -f docs/architecture/evidence/dependencies/vendor-alternatives.md
 ```
 
 Result: all exited 0.
@@ -75,7 +75,7 @@ rg "GroovyShell|SecureASTCustomizer|WebClient" backend/canvas-engine/src/main/ja
 Result: Groovy runtime details are in `GroovyExpressionEngine` and `GroovyScriptCache`; reach delivery WebClient is in `WebClientExternalHttpClient`. `CouponHandler` and `ApiCallHandler` still use WebClient directly and are documented as `leave direct` because they are dynamic or provider-specific handler integrations outside this package's migrated reach-delivery path.
 
 ```bash
-rg "React Flow|replacement trigger|migration cost|reactFlowAdapter" docs/architecture/dependencies/vendor-alternatives.md frontend/src/pages/canvas-editor
+rg "React Flow|replacement trigger|migration cost|reactFlowAdapter" docs/architecture/evidence/dependencies/vendor-alternatives.md frontend/src/pages/canvas-editor
 ```
 
 Result: exits 0; React Flow runtime remains intentionally direct, with helper boundary documented through `reactFlowAdapter.ts`.

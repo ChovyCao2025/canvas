@@ -2,7 +2,7 @@
 
 Date: 2026-06-05
 
-Scope: `docs/architecture/archive/completed/specs`, `docs/architecture/archive/completed/plans`, `docs/architecture/specs/README.md`, `docs/architecture/plans/README.md`, `docs/architecture/reviewed-packages`, `docs/architecture/index.md`, architecture-related entries in `docs/INDEX.md`, P3 decision evidence, and P3 promotion gates.
+Scope: `docs/architecture/archive/completed/specs`, `docs/architecture/archive/completed/plans`, `docs/architecture/active/specs/README.md`, `docs/architecture/active/plans/README.md`, `docs/architecture/active/reviewed-packages`, `docs/architecture/index.md`, architecture-related entries in `docs/INDEX.md`, P3 decision evidence, and P3 promotion gates.
 
 ## Verdict
 
@@ -31,14 +31,14 @@ The architecture-evolution material is not left as a single broad backlog item. 
 - `P3-08`: WeCom SCRM integration boundary and first slice.
 - `P3-09`: OneID, event schema, tenant, and engine/web platform primitives.
 
-Implementation remains gated by `docs/architecture/work-products/p3-01-platform-evolution/platform-evolution-promotion-checklist.md` and by P0/P1 prerequisites where applicable.
+Implementation remains gated by `docs/architecture/decisions/work-products/p3-01-platform-evolution/platform-evolution-promotion-checklist.md` and by P0/P1 prerequisites where applicable.
 
 ## Fixes Recorded In This Audit
 
 - Corrected the P3-07 promotion checklist evidence path to `docs/architecture/evidence/p3-07-platform-components.md`.
 - Updated P3 source-queue wording so it points to the focused P3 decision packages instead of presenting the item as unprocessed planning text.
-- Updated `docs/architecture/reviewed-packages/coverage-matrix.md` so evolution-document rows name the concrete P3 decision package that covers each source topic.
-- Updated `docs/architecture/work-products/audits/EXECUTABLE_PLAN_AUDIT.md` so plan handoff does not require default staging or commits.
+- Updated `docs/architecture/active/reviewed-packages/coverage-matrix.md` so evolution-document rows name the concrete P3 decision package that covers each source topic.
+- Updated `docs/architecture/decisions/work-products/audits/EXECUTABLE_PLAN_AUDIT.md` so plan handoff does not require default staging or commits.
 - Updated architecture-related entries in `docs/INDEX.md` to point to archived specs/plans or archived source documents.
 
 ## Verification Commands

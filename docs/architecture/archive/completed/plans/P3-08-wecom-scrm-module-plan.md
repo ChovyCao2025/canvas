@@ -22,15 +22,15 @@
 ## File Structure
 
 - Create: `docs/architecture/evidence/p3-08-wecom-scrm.md`
-- Create: `docs/architecture/work-products/p3-08-wecom-scrm/wecom-scrm-implementation-slice.md`
-- Create: `docs/architecture/work-products/p3-08-wecom-scrm/wecom-scrm-integration-boundary.md`
-- Create: `docs/architecture/work-products/p3-08-wecom-scrm/wecom-scrm-test-plan.md`
+- Create: `docs/architecture/decisions/work-products/p3-08-wecom-scrm/wecom-scrm-implementation-slice.md`
+- Create: `docs/architecture/decisions/work-products/p3-08-wecom-scrm/wecom-scrm-integration-boundary.md`
+- Create: `docs/architecture/decisions/work-products/p3-08-wecom-scrm/wecom-scrm-test-plan.md`
 - Read: `docs/architecture/archive/evolution/wecom-scrm-module-design.md`
 
 ### Task 1: Confirm Product Slice
 
 **Files:**
-- Create: `docs/architecture/work-products/p3-08-wecom-scrm/wecom-scrm-implementation-slice.md`
+- Create: `docs/architecture/decisions/work-products/p3-08-wecom-scrm/wecom-scrm-implementation-slice.md`
 - Create: `docs/architecture/evidence/p3-08-wecom-scrm.md`
 - Read: `docs/architecture/archive/evolution/wecom-scrm-module-design.md`
 
@@ -41,8 +41,8 @@
 Run:
 
 ```bash
-test -f docs/architecture/work-products/p3-08-wecom-scrm/wecom-scrm-implementation-slice.md
-rg -n "Scope|Out of scope|API|Data|Consent|Compliance|Callback|Rollback|Owner|Deferred" docs/architecture/work-products/p3-08-wecom-scrm/wecom-scrm-implementation-slice.md
+test -f docs/architecture/decisions/work-products/p3-08-wecom-scrm/wecom-scrm-implementation-slice.md
+rg -n "Scope|Out of scope|API|Data|Consent|Compliance|Callback|Rollback|Owner|Deferred" docs/architecture/decisions/work-products/p3-08-wecom-scrm/wecom-scrm-implementation-slice.md
 ```
 
 Expected: slice document names first slice or deferral reason and covers scope, API, data, compliance, rollback, and owner.
@@ -50,9 +50,9 @@ Expected: slice document names first slice or deferral reason and covers scope, 
 ### Task 2: Define Integration Boundary
 
 **Files:**
-- Create: `docs/architecture/work-products/p3-08-wecom-scrm/wecom-scrm-integration-boundary.md`
+- Create: `docs/architecture/decisions/work-products/p3-08-wecom-scrm/wecom-scrm-integration-boundary.md`
 - Modify: `docs/architecture/evidence/p3-08-wecom-scrm.md`
-- Read: `docs/architecture/work-products/p3-08-wecom-scrm/wecom-scrm-implementation-slice.md`
+- Read: `docs/architecture/decisions/work-products/p3-08-wecom-scrm/wecom-scrm-implementation-slice.md`
 
 - [x] Define adapter interfaces, domain services, handler contracts, callback endpoint contract, frontend API contract, and data ownership.
 - [x] Define signature verification, replay protection, idempotency key, retry classification, DLQ, and reconciliation command.
@@ -61,8 +61,8 @@ Expected: slice document names first slice or deferral reason and covers scope, 
 Run:
 
 ```bash
-test -f docs/architecture/work-products/p3-08-wecom-scrm/wecom-scrm-integration-boundary.md
-rg -n "adapter|domain service|handler contract|callback|frontend API|signature|replay|idempotency|retry|DLQ|reconciliation|generic DAG" docs/architecture/work-products/p3-08-wecom-scrm/wecom-scrm-integration-boundary.md
+test -f docs/architecture/decisions/work-products/p3-08-wecom-scrm/wecom-scrm-integration-boundary.md
+rg -n "adapter|domain service|handler contract|callback|frontend API|signature|replay|idempotency|retry|DLQ|reconciliation|generic DAG" docs/architecture/decisions/work-products/p3-08-wecom-scrm/wecom-scrm-integration-boundary.md
 ```
 
 Expected: integration boundary isolates WeCom adapters and covers callback safety mechanisms.
@@ -70,7 +70,7 @@ Expected: integration boundary isolates WeCom adapters and covers callback safet
 ### Task 3: Plan Tests Before Implementation
 
 **Files:**
-- Create: `docs/architecture/work-products/p3-08-wecom-scrm/wecom-scrm-test-plan.md`
+- Create: `docs/architecture/decisions/work-products/p3-08-wecom-scrm/wecom-scrm-test-plan.md`
 - Modify: `docs/architecture/evidence/p3-08-wecom-scrm.md`
 - Modify: `docs/architecture/archive/completed/plans/P3-08-wecom-scrm-module-plan.md`
 
@@ -81,9 +81,9 @@ Expected: integration boundary isolates WeCom adapters and covers callback safet
 Run:
 
 ```bash
-test -f docs/architecture/work-products/p3-08-wecom-scrm/wecom-scrm-test-plan.md
-rg -n "signature|replay|idempotency|retry|adapter failure|DLQ|handler output|form payload|disabled state|sandbox|secrets" docs/architecture/work-products/p3-08-wecom-scrm/wecom-scrm-test-plan.md
-git diff -- docs/architecture/evidence/p3-08-wecom-scrm.md docs/architecture/work-products/p3-08-wecom-scrm/wecom-scrm-implementation-slice.md docs/architecture/work-products/p3-08-wecom-scrm/wecom-scrm-integration-boundary.md docs/architecture/work-products/p3-08-wecom-scrm/wecom-scrm-test-plan.md docs/architecture/archive/completed/plans/P3-08-wecom-scrm-module-plan.md
+test -f docs/architecture/decisions/work-products/p3-08-wecom-scrm/wecom-scrm-test-plan.md
+rg -n "signature|replay|idempotency|retry|adapter failure|DLQ|handler output|form payload|disabled state|sandbox|secrets" docs/architecture/decisions/work-products/p3-08-wecom-scrm/wecom-scrm-test-plan.md
+git diff -- docs/architecture/evidence/p3-08-wecom-scrm.md docs/architecture/decisions/work-products/p3-08-wecom-scrm/wecom-scrm-implementation-slice.md docs/architecture/decisions/work-products/p3-08-wecom-scrm/wecom-scrm-integration-boundary.md docs/architecture/decisions/work-products/p3-08-wecom-scrm/wecom-scrm-test-plan.md docs/architecture/archive/completed/plans/P3-08-wecom-scrm-module-plan.md
 # Do not stage or commit in this session unless the user explicitly asks.
 ```
 

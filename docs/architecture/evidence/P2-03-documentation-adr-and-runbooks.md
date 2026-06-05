@@ -8,15 +8,15 @@ Implemented and verified active architecture decision records, handler guidance,
 
 ## Implemented Artifacts
 
-- `docs/architecture/adr/ADR-0000-template.md` plus five initial ADRs for WebFlux/MVC runtime, NodeHandler model, Groovy, Redis/RocketMQ/MySQL choices, and data isolation.
-- `docs/architecture/guides/node-handler-development.md` documents `NodeHandler`, `@NodeHandlerType`, blocking-call rules, trace expectations, mapper access restrictions, and handler test checklist.
-- `docs/architecture/runbooks/dag-execution-flow.md` documents trigger admission through `DagParser`, handler dispatch, wait/resume, trace writes, and completion.
-- `docs/architecture/reference/redis-key-catalog.md` catalogs key prefix, owner service, TTL, payload, invalidation, risk, and cleanup link for Redis key families.
-- `docs/architecture/runbooks/failure-triage.md`, `dlq-replay.md`, `route-rebuild.md`, `cache-invalidation.md`, and `deploy-rollback.md` provide command-oriented runbooks.
+- `docs/architecture/decisions/adr/ADR-0000-template.md` plus five initial ADRs for WebFlux/MVC runtime, NodeHandler model, Groovy, Redis/RocketMQ/MySQL choices, and data isolation.
+- `docs/architecture/evidence/guides/node-handler-development.md` documents `NodeHandler`, `@NodeHandlerType`, blocking-call rules, trace expectations, mapper access restrictions, and handler test checklist.
+- `docs/architecture/evidence/runbooks/dag-execution-flow.md` documents trigger admission through `DagParser`, handler dispatch, wait/resume, trace writes, and completion.
+- `docs/architecture/decisions/reference/redis-key-catalog.md` catalogs key prefix, owner service, TTL, payload, invalidation, risk, and cleanup link for Redis key families.
+- `docs/architecture/evidence/runbooks/failure-triage.md`, `dlq-replay.md`, `route-rebuild.md`, `cache-invalidation.md`, and `deploy-rollback.md` provide command-oriented runbooks.
 - `backend/canvas-engine/src/main/java/org/chovy/canvas/config/OpenApiSecurityConfig.java` defines bearer and trigger HMAC OpenAPI schemes.
 - Core Canvas, Execution, and Audience controllers now include OpenAPI tags and operation metadata.
 - Frontend API docs preserve response metadata and HMAC auth overrides from OpenAPI/local metadata.
-- `docs/architecture/specs/README.md` and `docs/architecture/plans/README.md` state that archived reviews are historical evidence, not active implementation authority.
+- `docs/architecture/active/specs/README.md` and `docs/architecture/active/plans/README.md` state that archived reviews are historical evidence, not active implementation authority.
 
 ## Verification
 

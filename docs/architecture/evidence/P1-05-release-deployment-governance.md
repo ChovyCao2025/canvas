@@ -11,7 +11,7 @@
 | container build | `scripts/release/build-image.sh` | Executable | Platform | `CANVAS_IMAGE_TAG=<tag> bash scripts/release/build-image.sh` | Task 4 |
 | staging deploy | `deploy/k8s/` and `scripts/release/pre-deploy-check.sh` | Executable template and dry-run gate | Platform | `bash scripts/release/pre-deploy-check.sh --dry-run` | Task 5 |
 | post-deploy validation | `scripts/release/post-deploy-check.sh` | Executable | Runtime | `CANVAS_BASE_URL=<url> bash scripts/release/post-deploy-check.sh` | Task 5 |
-| emergency rollback | `scripts/release/rollback-drill.sh` and `docs/architecture/runbooks/release-deployment.md` | Executable drill | Runtime/DBA | `bash scripts/release/rollback-drill.sh --dry-run` | Task 5 |
+| emergency rollback | `scripts/release/rollback-drill.sh` and `docs/architecture/evidence/runbooks/release-deployment.md` | Executable drill | Runtime/DBA | `bash scripts/release/rollback-drill.sh --dry-run` | Task 5 |
 
 ## Classification
 
@@ -40,7 +40,7 @@ Production deployment remains blocked until environment-specific evidence exists
 - Post-deploy check: `scripts/release/post-deploy-check.sh`
 - Rollback drill: `scripts/release/rollback-drill.sh`
 - K8s templates: `deploy/k8s/canvas-engine-deployment.yaml`, `deploy/k8s/canvas-engine-service.yaml`, `deploy/k8s/canvas-engine-hpa.yaml`, `deploy/k8s/canvas-engine-network-policy.yaml`
-- Runbooks: `docs/architecture/runbooks/flyway-backup-rollback.md`, `docs/architecture/runbooks/release-deployment.md`
+- Runbooks: `docs/architecture/evidence/runbooks/flyway-backup-rollback.md`, `docs/architecture/evidence/runbooks/release-deployment.md`
 - Maven tests: `ProductionProfileValidationTest`, `FlywayMigrationPolicyTest`
 
 ## Verification
@@ -61,8 +61,8 @@ Date: 2026-06-04
 | `cd frontend && npm test` | Pass | 55 test files, 201 tests passed. |
 | `cd frontend && npm run build` | Pass | TypeScript and Vite production build passed. |
 | `rg -n "mvn test|npm test|npm run build|validate-production-profile|check-flyway-migration|pre-deploy-check|post-deploy-check|rollback-drill|build-image" .github/workflows/canvas-ci.yml` | Pass | CI contains backend, frontend, profile, migration, deployment, and image gates. |
-| `rg -n "Backup|Restore|Dry run|Rollback owner" docs/architecture/runbooks/flyway-backup-rollback.md` | Pass | Flyway runbook contains required sections. |
-| `rg -n "kubectl|helm|health|prometheus|rollback|evidence" docs/architecture/runbooks/release-deployment.md deploy/k8s` | Pass | Deployment runbook and templates contain required operational commands. |
+| `rg -n "Backup|Restore|Dry run|Rollback owner" docs/architecture/evidence/runbooks/flyway-backup-rollback.md` | Pass | Flyway runbook contains required sections. |
+| `rg -n "kubectl|helm|health|prometheus|rollback|evidence" docs/architecture/evidence/runbooks/release-deployment.md deploy/k8s` | Pass | Deployment runbook and templates contain required operational commands. |
 
 ## Residual Risks
 

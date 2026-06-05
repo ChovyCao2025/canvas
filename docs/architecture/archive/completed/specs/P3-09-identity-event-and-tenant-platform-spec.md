@@ -1,12 +1,12 @@
 # Spec: Identity, Event, And Tenant Platform
 
-Source package: `docs/architecture/reviewed-packages/p3/platform-evolution/`
+Source package: `docs/architecture/active/reviewed-packages/p3/platform-evolution/`
 
-Coverage matrix: `docs/architecture/reviewed-packages/coverage-matrix.md`
+Coverage matrix: `docs/architecture/active/reviewed-packages/coverage-matrix.md`
 
 ## Verification Status
 
-Implemented as shared platform primitive contracts. No identity service, event platform, or engine/web service extraction is approved yet; these contracts are prerequisites. Evidence and contracts are in `docs/architecture/evidence/p3-09-platform-primitives.md`, `docs/architecture/work-products/p3-09-platform-primitives/platform-primitives.md`, `docs/architecture/work-products/p3-09-platform-primitives/tenant-platform-contract.md`, `docs/architecture/work-products/p3-09-platform-primitives/event-schema-governance.md`, and `docs/architecture/work-products/p3-09-platform-primitives/engine-web-boundary.md`.
+Implemented as shared platform primitive contracts. No identity service, event platform, or engine/web service extraction is approved yet; these contracts are prerequisites. Evidence and contracts are in `docs/architecture/evidence/p3-09-platform-primitives.md`, `docs/architecture/decisions/work-products/p3-09-platform-primitives/platform-primitives.md`, `docs/architecture/decisions/work-products/p3-09-platform-primitives/tenant-platform-contract.md`, `docs/architecture/decisions/work-products/p3-09-platform-primitives/event-schema-governance.md`, and `docs/architecture/decisions/work-products/p3-09-platform-primitives/engine-web-boundary.md`.
 
 ## Source Documents
 

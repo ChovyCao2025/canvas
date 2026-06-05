@@ -1,8 +1,8 @@
 # Spec: Compliance And Data Governance
 
-Source package: `docs/architecture/reviewed-packages/p2/compliance-data-governance/`
+Source package: `docs/architecture/active/reviewed-packages/p2/compliance-data-governance/`
 
-Coverage matrix: `docs/architecture/reviewed-packages/coverage-matrix.md`
+Coverage matrix: `docs/architecture/active/reviewed-packages/coverage-matrix.md`
 
 
 ## Verification Status
@@ -32,12 +32,12 @@ Implemented and locally verified on 2026-06-05. Repository evidence includes a c
 - Consent/suppression model is documented and implemented for marketing execution.
   - Status: implemented locally. `MarketingPolicyServiceTest` covers opt-in, opt-out, missing consent, active suppression, no active suppression, and expired/all-channel suppression query matching.
 - Security incident response and compliance evidence checklists exist.
-  - Status: implemented in `docs/architecture/compliance/compliance-evidence-checklist.md`.
+  - Status: implemented in `docs/architecture/evidence/compliance/compliance-evidence-checklist.md`.
 
 ## Evidence
 
-- `docs/architecture/compliance/data-inventory.md`
-- `docs/architecture/compliance/audit-event-matrix.md`
-- `docs/architecture/compliance/deletion-and-retention-workflows.md`
-- `docs/architecture/compliance/compliance-evidence-checklist.md`
+- `docs/architecture/evidence/compliance/data-inventory.md`
+- `docs/architecture/evidence/compliance/audit-event-matrix.md`
+- `docs/architecture/evidence/compliance/deletion-and-retention-workflows.md`
+- `docs/architecture/evidence/compliance/compliance-evidence-checklist.md`
 - `docs/architecture/evidence/P2-05-compliance-data-governance.md`

@@ -1,8 +1,8 @@
 # Spec: Frontend Canvas State
 
-Source package: `docs/architecture/reviewed-packages/p1/frontend-canvas-state/`
+Source package: `docs/architecture/active/reviewed-packages/p1/frontend-canvas-state/`
 
-Coverage matrix: `docs/architecture/reviewed-packages/coverage-matrix.md`
+Coverage matrix: `docs/architecture/active/reviewed-packages/coverage-matrix.md`
 
 
 ## Verification Status

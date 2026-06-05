@@ -1,8 +1,8 @@
 # Spec: Release And Deployment Governance
 
-Source package: `docs/architecture/reviewed-packages/p1/release-deployment-governance/`
+Source package: `docs/architecture/active/reviewed-packages/p1/release-deployment-governance/`
 
-Coverage matrix: `docs/architecture/reviewed-packages/coverage-matrix.md`
+Coverage matrix: `docs/architecture/active/reviewed-packages/coverage-matrix.md`
 
 
 ## Verification Status
@@ -43,8 +43,8 @@ Implemented and locally verified on 2026-06-04.
 - `deploy/k8s/canvas-engine-service.yaml`
 - `deploy/k8s/canvas-engine-hpa.yaml`
 - `deploy/k8s/canvas-engine-network-policy.yaml`
-- `docs/architecture/runbooks/flyway-backup-rollback.md`
-- `docs/architecture/runbooks/release-deployment.md`
+- `docs/architecture/evidence/runbooks/flyway-backup-rollback.md`
+- `docs/architecture/evidence/runbooks/release-deployment.md`
 - `backend/canvas-engine/src/test/java/org/chovy/canvas/config/ProductionProfileValidationTest.java`
 - `backend/canvas-engine/src/test/java/org/chovy/canvas/migration/FlywayMigrationPolicyTest.java`
 

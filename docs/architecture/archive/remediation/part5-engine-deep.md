@@ -1,5 +1,5 @@
 # 架构整改方案 — engine-deep
-> 详见 [README.md](README.md) 获取完整索引
+> 详见 [README.md](./README.md) 获取完整索引
 
 
 ## 第五部分：深度结构设计问题（4大维度扫描）

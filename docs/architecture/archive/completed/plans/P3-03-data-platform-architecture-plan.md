@@ -31,9 +31,9 @@
 - Read: `backend/canvas-engine/src/main/java/org/chovy/canvas/dal/dataobject/EventLogDO.java`
 - Read: `backend/canvas-engine/src/main/java/org/chovy/canvas/engine/audience/AudienceBatchComputeService.java`
 - Create: `docs/architecture/evidence/p3-03-data-platform.md`
-- Create: `docs/architecture/work-products/p3-03-data-platform/data-platform-source-inventory.md`
-- Create: `docs/architecture/work-products/p3-03-data-platform/data-platform-poc-plan.md`
-- Create: `docs/architecture/work-products/p3-03-data-platform/data-platform-contract-governance.md`
+- Create: `docs/architecture/decisions/work-products/p3-03-data-platform/data-platform-source-inventory.md`
+- Create: `docs/architecture/decisions/work-products/p3-03-data-platform/data-platform-poc-plan.md`
+- Create: `docs/architecture/decisions/work-products/p3-03-data-platform/data-platform-contract-governance.md`
 - Test: `backend/canvas-engine/src/test/java/org/chovy/canvas/domain/execution/PerfRunTrackingSchemaTest.java`
 - Test: `backend/canvas-engine/src/test/java/org/chovy/canvas/domain/audience/AudienceComputeRunTrackingSchemaTest.java`
 
@@ -41,7 +41,7 @@
 
 **Files:**
 - Create: `docs/architecture/evidence/p3-03-data-platform.md`
-- Create: `docs/architecture/work-products/p3-03-data-platform/data-platform-source-inventory.md`
+- Create: `docs/architecture/decisions/work-products/p3-03-data-platform/data-platform-source-inventory.md`
 - Read: `backend/canvas-engine/src/main/resources/db/migration`
 - Read: `backend/canvas-engine/src/main/java/org/chovy/canvas/dal/dataobject`
 - Read: `backend/canvas-engine/src/main/java/org/chovy/canvas/infrastructure/mq`
@@ -54,8 +54,8 @@
 ```bash
 rg "CREATE TABLE" backend/canvas-engine/src/main/resources/db/migration
 rg "EventLogDO|RocketMQ|MqTriggerMessage|MessageSendRecordDO|CdpUserIdentityDO" backend/canvas-engine/src/main/java/org/chovy/canvas
-test -f docs/architecture/work-products/p3-03-data-platform/data-platform-source-inventory.md
-rg "canvas|execution|trace|CDP|audience|notification|consent|PII|freshness|retention" docs/architecture/work-products/p3-03-data-platform/data-platform-source-inventory.md
+test -f docs/architecture/decisions/work-products/p3-03-data-platform/data-platform-source-inventory.md
+rg "canvas|execution|trace|CDP|audience|notification|consent|PII|freshness|retention" docs/architecture/decisions/work-products/p3-03-data-platform/data-platform-source-inventory.md
 ```
 
 **Expected:** Source inventory covers every core source group and records ownership, ingestion, freshness, retention, PII, deletion, and consumers.
@@ -63,7 +63,7 @@ rg "canvas|execution|trace|CDP|audience|notification|consent|PII|freshness|reten
 ### Task 2: Define the thin vertical slice
 
 **Files:**
-- Create: `docs/architecture/work-products/p3-03-data-platform/data-platform-poc-plan.md`
+- Create: `docs/architecture/decisions/work-products/p3-03-data-platform/data-platform-poc-plan.md`
 - Modify: `docs/architecture/evidence/p3-03-data-platform.md`
 - Read: `backend/canvas-engine/src/main/java/org/chovy/canvas/engine/audience/AudienceBatchComputeService.java`
 - Read: `backend/canvas-engine/src/main/java/org/chovy/canvas/web/CanvasStatsController.java`
@@ -75,8 +75,8 @@ rg "canvas|execution|trace|CDP|audience|notification|consent|PII|freshness|reten
 
 **Run:**
 ```bash
-test -f docs/architecture/work-products/p3-03-data-platform/data-platform-poc-plan.md
-rg "Input sources|Transform|Storage|Serving API|SLA|Retention|PII|Cost|Rollback|Success metric|full data platform is deferred" docs/architecture/work-products/p3-03-data-platform/data-platform-poc-plan.md
+test -f docs/architecture/decisions/work-products/p3-03-data-platform/data-platform-poc-plan.md
+rg "Input sources|Transform|Storage|Serving API|SLA|Retention|PII|Cost|Rollback|Success metric|full data platform is deferred" docs/architecture/decisions/work-products/p3-03-data-platform/data-platform-poc-plan.md
 ```
 
 **Expected:** Proof-of-concept plan defines one measurable vertical slice and defers broad platform selection.
@@ -84,10 +84,10 @@ rg "Input sources|Transform|Storage|Serving API|SLA|Retention|PII|Cost|Rollback|
 ### Task 3: Define contracts and governance
 
 **Files:**
-- Create: `docs/architecture/work-products/p3-03-data-platform/data-platform-contract-governance.md`
-- Modify: `docs/architecture/work-products/p3-03-data-platform/data-platform-poc-plan.md`
-- Read: `docs/architecture/compliance/data-inventory.md`
-- Read: `docs/architecture/capacity/retention-policy.md`
+- Create: `docs/architecture/decisions/work-products/p3-03-data-platform/data-platform-contract-governance.md`
+- Modify: `docs/architecture/decisions/work-products/p3-03-data-platform/data-platform-poc-plan.md`
+- Read: `docs/architecture/evidence/compliance/data-inventory.md`
+- Read: `docs/architecture/evidence/capacity/retention-policy.md`
 
 - [x] Document schema versioning, ownership, compatibility, replay, ordering, late-arriving data, backfill, deletion propagation, and lineage rules.
 - [x] Include CDC/event contract examples for the selected slice.
@@ -95,8 +95,8 @@ rg "Input sources|Transform|Storage|Serving API|SLA|Retention|PII|Cost|Rollback|
 
 **Run:**
 ```bash
-test -f docs/architecture/work-products/p3-03-data-platform/data-platform-contract-governance.md
-rg "schema versioning|compatibility|replay|ordering|backfill|deletion propagation|lineage|CDC|event contract" docs/architecture/work-products/p3-03-data-platform/data-platform-contract-governance.md
+test -f docs/architecture/decisions/work-products/p3-03-data-platform/data-platform-contract-governance.md
+rg "schema versioning|compatibility|replay|ordering|backfill|deletion propagation|lineage|CDC|event contract" docs/architecture/decisions/work-products/p3-03-data-platform/data-platform-contract-governance.md
 cd backend && mvn test -pl canvas-engine -Dtest=PerfRunTrackingSchemaTest,AudienceComputeRunTrackingSchemaTest
 ```
 
@@ -105,7 +105,7 @@ cd backend && mvn test -pl canvas-engine -Dtest=PerfRunTrackingSchemaTest,Audien
 ### Task 4: Define proof-of-concept tests and operating evidence
 
 **Files:**
-- Modify: `docs/architecture/work-products/p3-03-data-platform/data-platform-poc-plan.md`
+- Modify: `docs/architecture/decisions/work-products/p3-03-data-platform/data-platform-poc-plan.md`
 - Modify: `docs/architecture/evidence/p3-03-data-platform.md`
 - Test: `backend/canvas-engine/src/test/java/org/chovy/canvas/domain/execution/PerfRunTrackingSchemaTest.java`
 - Test: `backend/canvas-engine/src/test/java/org/chovy/canvas/domain/audience/AudienceComputeRunTrackingSchemaTest.java`
@@ -117,7 +117,7 @@ cd backend && mvn test -pl canvas-engine -Dtest=PerfRunTrackingSchemaTest,Audien
 **Run:**
 ```bash
 cd backend && mvn test -pl canvas-engine -Dtest=PerfRunTrackingSchemaTest,AudienceComputeRunTrackingSchemaTest
-rg "contract test|freshness|dropped records|backfill duration|query latency|storage growth|stop criteria" docs/architecture/work-products/p3-03-data-platform/data-platform-poc-plan.md docs/architecture/evidence/p3-03-data-platform.md
+rg "contract test|freshness|dropped records|backfill duration|query latency|storage growth|stop criteria" docs/architecture/decisions/work-products/p3-03-data-platform/data-platform-poc-plan.md docs/architecture/evidence/p3-03-data-platform.md
 ```
 
 **Expected:** Proof-of-concept has testable contracts, operating evidence, and rejection criteria.
@@ -127,9 +127,9 @@ rg "contract test|freshness|dropped records|backfill duration|query latency|stor
 **Files:**
 - Modify: `docs/architecture/archive/completed/plans/P3-03-data-platform-architecture-plan.md`
 - Create: `docs/architecture/evidence/p3-03-data-platform.md`
-- Create: `docs/architecture/work-products/p3-03-data-platform/data-platform-source-inventory.md`
-- Create: `docs/architecture/work-products/p3-03-data-platform/data-platform-poc-plan.md`
-- Create: `docs/architecture/work-products/p3-03-data-platform/data-platform-contract-governance.md`
+- Create: `docs/architecture/decisions/work-products/p3-03-data-platform/data-platform-source-inventory.md`
+- Create: `docs/architecture/decisions/work-products/p3-03-data-platform/data-platform-poc-plan.md`
+- Create: `docs/architecture/decisions/work-products/p3-03-data-platform/data-platform-contract-governance.md`
 
 - [x] Review only files named in this plan.
 - [x] Do not stage or commit in this session unless the user explicitly asks.
@@ -137,7 +137,7 @@ rg "contract test|freshness|dropped records|backfill duration|query latency|stor
 
 **Run:**
 ```bash
-git diff -- docs/architecture/archive/completed/plans/P3-03-data-platform-architecture-plan.md docs/architecture/evidence/p3-03-data-platform.md docs/architecture/work-products/p3-03-data-platform/data-platform-source-inventory.md docs/architecture/work-products/p3-03-data-platform/data-platform-poc-plan.md docs/architecture/work-products/p3-03-data-platform/data-platform-contract-governance.md
+git diff -- docs/architecture/archive/completed/plans/P3-03-data-platform-architecture-plan.md docs/architecture/evidence/p3-03-data-platform.md docs/architecture/decisions/work-products/p3-03-data-platform/data-platform-source-inventory.md docs/architecture/decisions/work-products/p3-03-data-platform/data-platform-poc-plan.md docs/architecture/decisions/work-products/p3-03-data-platform/data-platform-contract-governance.md
 ```
 
 **Expected:** The diff contains only data platform evidence, architecture docs, governance docs, and plan changes. No commit is created by default.

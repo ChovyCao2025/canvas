@@ -1,5 +1,5 @@
 # 架构整改方案 — frontend
-> 详见 [README.md](README.md) 获取完整索引
+> 详见 [README.md](./README.md) 获取完整索引
 
 
 ## 第三部分：前端架构问题（23项）

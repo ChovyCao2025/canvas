@@ -24,16 +24,16 @@
 - Read: `docs/architecture/archive/completed/specs/P3-02-service-decomposition-and-domain-boundaries-spec.md`
 - Read: `docs/architecture/archive/completed/specs/P3-00-architecture-boundary-review-spec.md`
 - Read: `docs/architecture/evidence/p3-00-architecture-boundary-review.md`
-- Read: `docs/architecture/adr/ADR-0006-service-extraction-gate.md`
+- Read: `docs/architecture/decisions/adr/ADR-0006-service-extraction-gate.md`
 - Read: `backend/canvas-engine/src/main/java/org/chovy/canvas/domain/canvas/CanvasService.java`
 - Read: `backend/canvas-engine/src/main/java/org/chovy/canvas/engine/trigger/CanvasExecutionService.java`
 - Read: `backend/canvas-engine/src/main/java/org/chovy/canvas/domain/cdp/CanvasUserQueryService.java`
 - Read: `backend/canvas-engine/src/main/java/org/chovy/canvas/engine/delivery/ReachDeliveryService.java`
 - Read: `backend/canvas-engine/src/main/java/org/chovy/canvas/domain/tenant/TenantService.java`
 - Create: `docs/architecture/evidence/p3-02-service-decomposition.md`
-- Create: `docs/architecture/work-products/p3-02-service-boundaries/domain-map.md`
-- Create: `docs/architecture/work-products/p3-02-service-boundaries/domain-contract-inventory.md`
-- Create: `docs/architecture/adr/ADR-0007-first-extraction-candidate.md`
+- Create: `docs/architecture/decisions/work-products/p3-02-service-boundaries/domain-map.md`
+- Create: `docs/architecture/decisions/work-products/p3-02-service-boundaries/domain-contract-inventory.md`
+- Create: `docs/architecture/decisions/adr/ADR-0007-first-extraction-candidate.md`
 - Test: `backend/canvas-engine/src/test/java/org/chovy/canvas/domain/cdp/CanvasUserQueryServiceTest.java`
 - Test: `backend/canvas-engine/src/test/java/org/chovy/canvas/domain/notification/NotificationServiceTest.java`
 - Test: `backend/canvas-engine/src/test/java/org/chovy/canvas/engine/trigger/CanvasExecutionServiceCdpTest.java`
@@ -42,7 +42,7 @@
 
 **Files:**
 - Create: `docs/architecture/evidence/p3-02-service-decomposition.md`
-- Create: `docs/architecture/work-products/p3-02-service-boundaries/domain-map.md`
+- Create: `docs/architecture/decisions/work-products/p3-02-service-boundaries/domain-map.md`
 - Read: `backend/canvas-engine/src/main/java/org/chovy/canvas`
 - Read: `backend/canvas-engine/src/main/resources/db/migration`
 
@@ -54,8 +54,8 @@
 ```bash
 find backend/canvas-engine/src/main/java/org/chovy/canvas -maxdepth 3 -type d | sort
 rg "CREATE TABLE" backend/canvas-engine/src/main/resources/db/migration
-test -f docs/architecture/work-products/p3-02-service-boundaries/domain-map.md
-rg "Canvas Authoring|Execution Runtime|CDP / Audience|Reach / Notification|Integration|Platform|Data Platform / Analytics|forbidden dependencies" docs/architecture/work-products/p3-02-service-boundaries/domain-map.md
+test -f docs/architecture/decisions/work-products/p3-02-service-boundaries/domain-map.md
+rg "Canvas Authoring|Execution Runtime|CDP / Audience|Reach / Notification|Integration|Platform|Data Platform / Analytics|forbidden dependencies" docs/architecture/decisions/work-products/p3-02-service-boundaries/domain-map.md
 ```
 
 **Expected:** The domain map names all seven contexts, current code anchors, data candidates, and forbidden dependencies.
@@ -63,10 +63,10 @@ rg "Canvas Authoring|Execution Runtime|CDP / Audience|Reach / Notification|Integ
 ### Task 2: Choose the first extraction candidate
 
 **Files:**
-- Modify: `docs/architecture/work-products/p3-02-service-boundaries/domain-map.md`
-- Create: `docs/architecture/adr/ADR-0007-first-extraction-candidate.md`
+- Modify: `docs/architecture/decisions/work-products/p3-02-service-boundaries/domain-map.md`
+- Create: `docs/architecture/decisions/adr/ADR-0007-first-extraction-candidate.md`
 - Read: `docs/architecture/archive/completed/specs/P3-00-architecture-boundary-review-spec.md`
-- Read: `docs/architecture/adr/ADR-0006-service-extraction-gate.md`
+- Read: `docs/architecture/decisions/adr/ADR-0006-service-extraction-gate.md`
 - Read: `docs/architecture/evidence/p3-02-service-decomposition.md`
 
 - [x] Score CDP / Audience, Reach / Notification, and Integration / WeCom on coupling, data ownership clarity, traffic pressure, operational noise, tenant risk, and rollback difficulty.
@@ -75,8 +75,8 @@ rg "Canvas Authoring|Execution Runtime|CDP / Audience|Reach / Notification|Integ
 
 **Run:**
 ```bash
-test -f docs/architecture/adr/ADR-0007-first-extraction-candidate.md
-rg "CDP / Audience|Reach / Notification|Integration / WeCom|coupling|data ownership|rollback|Deferred|ADR-0006" docs/architecture/work-products/p3-02-service-boundaries/domain-map.md docs/architecture/adr/ADR-0007-first-extraction-candidate.md
+test -f docs/architecture/decisions/adr/ADR-0007-first-extraction-candidate.md
+rg "CDP / Audience|Reach / Notification|Integration / WeCom|coupling|data ownership|rollback|Deferred|ADR-0006" docs/architecture/decisions/work-products/p3-02-service-boundaries/domain-map.md docs/architecture/decisions/adr/ADR-0007-first-extraction-candidate.md
 ```
 
 **Expected:** ADR contains a candidate decision or deferral decision with scoring and rollback rationale.
@@ -84,7 +84,7 @@ rg "CDP / Audience|Reach / Notification|Integration / WeCom|coupling|data owners
 ### Task 3: Define contracts before moving code
 
 **Files:**
-- Create: `docs/architecture/work-products/p3-02-service-boundaries/domain-contract-inventory.md`
+- Create: `docs/architecture/decisions/work-products/p3-02-service-boundaries/domain-contract-inventory.md`
 - Read: `backend/canvas-engine/src/main/java/org/chovy/canvas/web/CdpUserController.java`
 - Read: `backend/canvas-engine/src/main/java/org/chovy/canvas/web/NotificationController.java`
 - Read: `backend/canvas-engine/src/main/java/org/chovy/canvas/web/DataSourceConfigController.java`
@@ -97,8 +97,8 @@ rg "CDP / Audience|Reach / Notification|Integration / WeCom|coupling|data owners
 
 **Run:**
 ```bash
-test -f docs/architecture/work-products/p3-02-service-boundaries/domain-contract-inventory.md
-rg "REST|event|Redis key|MQ|table|DTO|tenant|synchronous API|read model|prohibited coupling|compatibility window" docs/architecture/work-products/p3-02-service-boundaries/domain-contract-inventory.md
+test -f docs/architecture/decisions/work-products/p3-02-service-boundaries/domain-contract-inventory.md
+rg "REST|event|Redis key|MQ|table|DTO|tenant|synchronous API|read model|prohibited coupling|compatibility window" docs/architecture/decisions/work-products/p3-02-service-boundaries/domain-contract-inventory.md
 ```
 
 **Expected:** Contract inventory covers every external dependency of the chosen context.
@@ -126,9 +126,9 @@ cd frontend && npm test -- api
 ### Task 5: Plan the strangler migration
 
 **Files:**
-- Modify: `docs/architecture/work-products/p3-02-service-boundaries/domain-contract-inventory.md`
-- Modify: `docs/architecture/adr/ADR-0007-first-extraction-candidate.md`
-- Read: `docs/architecture/runbooks/deploy-rollback.md`
+- Modify: `docs/architecture/decisions/work-products/p3-02-service-boundaries/domain-contract-inventory.md`
+- Modify: `docs/architecture/decisions/adr/ADR-0007-first-extraction-candidate.md`
+- Read: `docs/architecture/evidence/runbooks/deploy-rollback.md`
 
 - [x] Document old path, new path, proxy/adapter layer, dual-read or dual-write decision, compatibility window, rollback trigger, and reconciliation flow.
 - [x] Define deployment order for schema, backend, frontend, Redis/MQ, dashboards, alerts, and runbooks.
@@ -136,7 +136,7 @@ cd frontend && npm test -- api
 
 **Run:**
 ```bash
-rg "old path|new path|dual-read|dual-write|compatibility window|rollback trigger|reconciliation|tenant context|trace context|idempotency|ADR-0006" docs/architecture/work-products/p3-02-service-boundaries/domain-contract-inventory.md docs/architecture/adr/ADR-0007-first-extraction-candidate.md
+rg "old path|new path|dual-read|dual-write|compatibility window|rollback trigger|reconciliation|tenant context|trace context|idempotency|ADR-0006" docs/architecture/decisions/work-products/p3-02-service-boundaries/domain-contract-inventory.md docs/architecture/decisions/adr/ADR-0007-first-extraction-candidate.md
 ```
 
 **Expected:** Strangler migration plan is reversible and names compatibility, deployment, rollback, and reconciliation details.
@@ -146,9 +146,9 @@ rg "old path|new path|dual-read|dual-write|compatibility window|rollback trigger
 **Files:**
 - Modify: `docs/architecture/archive/completed/plans/P3-02-service-decomposition-and-domain-boundaries-plan.md`
 - Create: `docs/architecture/evidence/p3-02-service-decomposition.md`
-- Create: `docs/architecture/work-products/p3-02-service-boundaries/domain-map.md`
-- Create: `docs/architecture/work-products/p3-02-service-boundaries/domain-contract-inventory.md`
-- Create: `docs/architecture/adr/ADR-0007-first-extraction-candidate.md`
+- Create: `docs/architecture/decisions/work-products/p3-02-service-boundaries/domain-map.md`
+- Create: `docs/architecture/decisions/work-products/p3-02-service-boundaries/domain-contract-inventory.md`
+- Create: `docs/architecture/decisions/adr/ADR-0007-first-extraction-candidate.md`
 
 - [x] Review only files named in this plan.
 - [x] Do not stage or commit in this session unless the user explicitly asks.
@@ -156,7 +156,7 @@ rg "old path|new path|dual-read|dual-write|compatibility window|rollback trigger
 
 **Run:**
 ```bash
-git diff -- docs/architecture/archive/completed/plans/P3-02-service-decomposition-and-domain-boundaries-plan.md docs/architecture/evidence/p3-02-service-decomposition.md docs/architecture/work-products/p3-02-service-boundaries/domain-map.md docs/architecture/work-products/p3-02-service-boundaries/domain-contract-inventory.md docs/architecture/adr/ADR-0007-first-extraction-candidate.md
+git diff -- docs/architecture/archive/completed/plans/P3-02-service-decomposition-and-domain-boundaries-plan.md docs/architecture/evidence/p3-02-service-decomposition.md docs/architecture/decisions/work-products/p3-02-service-boundaries/domain-map.md docs/architecture/decisions/work-products/p3-02-service-boundaries/domain-contract-inventory.md docs/architecture/decisions/adr/ADR-0007-first-extraction-candidate.md
 ```
 
 **Expected:** The diff contains only service decomposition docs, evidence, ADR, and plan changes. No commit is created by default.

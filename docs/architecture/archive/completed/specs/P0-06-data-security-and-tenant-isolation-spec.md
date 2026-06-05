@@ -1,8 +1,8 @@
 # Spec: Data Security And Tenant Isolation
 
-Source package: `docs/architecture/reviewed-packages/p0/data-security-and-tenant-isolation/`
+Source package: `docs/architecture/active/reviewed-packages/p0/data-security-and-tenant-isolation/`
 
-Coverage matrix: `docs/architecture/reviewed-packages/coverage-matrix.md`
+Coverage matrix: `docs/architecture/active/reviewed-packages/coverage-matrix.md`
 
 
 ## Verification Status

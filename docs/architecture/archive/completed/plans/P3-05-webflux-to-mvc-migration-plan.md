@@ -19,9 +19,9 @@
 ## File Structure
 
 - Create: `docs/architecture/evidence/p3-05-webflux-mvc.md`
-- Create: `docs/architecture/work-products/p3-05-runtime-model/webflux-mvc-migration-inventory.md`
-- Create: `docs/architecture/adr/webflux-vs-mvc.md`
-- Create: `docs/architecture/work-products/p3-05-runtime-model/webflux-mvc-first-slice.md`
+- Create: `docs/architecture/decisions/work-products/p3-05-runtime-model/webflux-mvc-migration-inventory.md`
+- Create: `docs/architecture/decisions/adr/webflux-vs-mvc.md`
+- Create: `docs/architecture/decisions/work-products/p3-05-runtime-model/webflux-mvc-first-slice.md`
 - Read: `backend/canvas-engine/src/main/java/org/chovy/canvas/web/`
 - Read: `backend/canvas-engine/src/main/java/org/chovy/canvas/engine/`
 - Read: `backend/canvas-engine/src/test/java/org/chovy/canvas/`
@@ -29,7 +29,7 @@
 ### Task 1: Build The Runtime Inventory
 
 **Files:**
-- Create: `docs/architecture/work-products/p3-05-runtime-model/webflux-mvc-migration-inventory.md`
+- Create: `docs/architecture/decisions/work-products/p3-05-runtime-model/webflux-mvc-migration-inventory.md`
 - Create: `docs/architecture/evidence/p3-05-webflux-mvc.md`
 - Read: `backend/canvas-engine/src/main/java/org/chovy/canvas/`
 
@@ -42,8 +42,8 @@ Run:
 ```bash
 rg -n "\\.block\\(|\\.subscribe\\(|Thread\\.sleep\\(|@Transactional|Mono<|Flux<|Redis|RocketMQ|MyBatis" backend/canvas-engine/src/main/java/org/chovy/canvas > /tmp/webflux_mvc_inventory.txt
 test -s /tmp/webflux_mvc_inventory.txt
-test -f docs/architecture/work-products/p3-05-runtime-model/webflux-mvc-migration-inventory.md
-rg -n "Controller|blocking dependency|transaction|streaming|migration risk|P0 reactive" docs/architecture/work-products/p3-05-runtime-model/webflux-mvc-migration-inventory.md
+test -f docs/architecture/decisions/work-products/p3-05-runtime-model/webflux-mvc-migration-inventory.md
+rg -n "Controller|blocking dependency|transaction|streaming|migration risk|P0 reactive" docs/architecture/decisions/work-products/p3-05-runtime-model/webflux-mvc-migration-inventory.md
 ```
 
 Expected: inventory names controller groups, blocking dependencies, transaction needs, reactive value, migration risk, and P0 prerequisites.
@@ -51,9 +51,9 @@ Expected: inventory names controller groups, blocking dependencies, transaction 
 ### Task 2: Write The Architecture Decision
 
 **Files:**
-- Create: `docs/architecture/adr/webflux-vs-mvc.md`
+- Create: `docs/architecture/decisions/adr/webflux-vs-mvc.md`
 - Modify: `docs/architecture/evidence/p3-05-webflux-mvc.md`
-- Read: `docs/architecture/work-products/p3-05-runtime-model/webflux-mvc-migration-inventory.md`
+- Read: `docs/architecture/decisions/work-products/p3-05-runtime-model/webflux-mvc-migration-inventory.md`
 
 - [x] Compare WebFlux hardening, MVC migration, and hybrid containment.
 - [x] Add benchmark, team-readiness, transaction-safety, rollback, and compatibility gates.
@@ -62,8 +62,8 @@ Expected: inventory names controller groups, blocking dependencies, transaction 
 Run:
 
 ```bash
-test -f docs/architecture/adr/webflux-vs-mvc.md
-rg -n "Decision|Options|Benchmark|Team readiness|Transaction safety|Rollback|Compatibility|Revisit" docs/architecture/adr/webflux-vs-mvc.md
+test -f docs/architecture/decisions/adr/webflux-vs-mvc.md
+rg -n "Decision|Options|Benchmark|Team readiness|Transaction safety|Rollback|Compatibility|Revisit" docs/architecture/decisions/adr/webflux-vs-mvc.md
 ```
 
 Expected: ADR contains the required decision sections and does not approve runtime migration without gates.
@@ -71,7 +71,7 @@ Expected: ADR contains the required decision sections and does not approve runti
 ### Task 3: Prepare The First Migration Slice Only If Approved
 
 **Files:**
-- Create: `docs/architecture/work-products/p3-05-runtime-model/webflux-mvc-first-slice.md`
+- Create: `docs/architecture/decisions/work-products/p3-05-runtime-model/webflux-mvc-first-slice.md`
 - Modify: `docs/architecture/evidence/p3-05-webflux-mvc.md`
 - Modify: `docs/architecture/archive/completed/plans/P3-05-webflux-to-mvc-migration-plan.md`
 
@@ -82,9 +82,9 @@ Expected: ADR contains the required decision sections and does not approve runti
 Run:
 
 ```bash
-test -f docs/architecture/work-products/p3-05-runtime-model/webflux-mvc-first-slice.md
-rg -n "endpoint group|request|response|error|auth|transaction|actuator|rollback|compatibility window|deferred" docs/architecture/work-products/p3-05-runtime-model/webflux-mvc-first-slice.md
-git diff -- docs/architecture/evidence/p3-05-webflux-mvc.md docs/architecture/work-products/p3-05-runtime-model/webflux-mvc-migration-inventory.md docs/architecture/adr/webflux-vs-mvc.md docs/architecture/work-products/p3-05-runtime-model/webflux-mvc-first-slice.md docs/architecture/archive/completed/plans/P3-05-webflux-to-mvc-migration-plan.md
+test -f docs/architecture/decisions/work-products/p3-05-runtime-model/webflux-mvc-first-slice.md
+rg -n "endpoint group|request|response|error|auth|transaction|actuator|rollback|compatibility window|deferred" docs/architecture/decisions/work-products/p3-05-runtime-model/webflux-mvc-first-slice.md
+git diff -- docs/architecture/evidence/p3-05-webflux-mvc.md docs/architecture/decisions/work-products/p3-05-runtime-model/webflux-mvc-migration-inventory.md docs/architecture/decisions/adr/webflux-vs-mvc.md docs/architecture/decisions/work-products/p3-05-runtime-model/webflux-mvc-first-slice.md docs/architecture/archive/completed/plans/P3-05-webflux-to-mvc-migration-plan.md
 # Do not stage or commit in this session unless the user explicitly asks.
 ```
 

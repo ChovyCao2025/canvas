@@ -4,7 +4,7 @@
 
 **Goal:** Materialize the reviewed architecture work into priority-prefixed spec and plan files under `docs/architecture/archive/completed/specs/` and `docs/architecture/archive/completed/plans/`, with stable indexes and coverage-matrix traceability.
 
-**Architecture:** `docs/architecture/reviewed-packages/` remains the reviewed source-package traceability root. `docs/architecture/archive/completed/specs/` and `docs/architecture/archive/completed/plans/` are flattened handoff views. The current set contains 18 reviewed source packages plus 9 expanded P3 architecture evolution/boundary packages, for 27 package specs and 27 package plans. This P0-00 plan is the materialization closure plan, and `P3-00-architecture-boundary-code-verification.md` is a supporting verification sidecar rather than a package spec.
+**Architecture:** `docs/architecture/active/reviewed-packages/` remains the reviewed source-package traceability root. `docs/architecture/archive/completed/specs/` and `docs/architecture/archive/completed/plans/` are flattened handoff views. The current set contains 18 reviewed source packages plus 9 expanded P3 architecture evolution/boundary packages, for 27 package specs and 27 package plans. This P0-00 plan is the materialization closure plan, and `P3-00-architecture-boundary-code-verification.md` is a supporting verification sidecar rather than a package spec.
 
 **Tech Stack:** Markdown, zsh, `find`, `rg`, `git status`.
 
@@ -46,11 +46,11 @@ P3-09 identity-event-and-tenant-platform
 
 ## File Structure
 
-- Specs index: `docs/architecture/specs/README.md`
-- Plans index: `docs/architecture/plans/README.md`
+- Specs index: `docs/architecture/active/specs/README.md`
+- Plans index: `docs/architecture/active/plans/README.md`
 - Architecture entry point: `docs/architecture/index.md`
-- Todo source index: `docs/architecture/reviewed-packages/README.md`
-- Coverage matrix: `docs/architecture/reviewed-packages/coverage-matrix.md`
+- Todo source index: `docs/architecture/active/reviewed-packages/README.md`
+- Coverage matrix: `docs/architecture/active/reviewed-packages/coverage-matrix.md`
 - Package specs: `docs/architecture/archive/completed/specs/P*-*-spec.md`
 - Package plans: `docs/architecture/archive/completed/plans/P*-*-plan.md`
 - Supporting sidecar: `docs/architecture/archive/completed/specs/P3-00-architecture-boundary-code-verification.md`
@@ -58,9 +58,9 @@ P3-09 identity-event-and-tenant-platform
 ## Task 1: Materialize Specs
 
 **Files:**
-- Source: `docs/architecture/reviewed-packages/*/*/spec.md`
+- Source: `docs/architecture/active/reviewed-packages/*/*/spec.md`
 - Destination: `docs/architecture/archive/completed/specs/P*-*-spec.md`
-- Supporting: `docs/architecture/reviewed-packages/coverage-matrix.md`
+- Supporting: `docs/architecture/active/reviewed-packages/coverage-matrix.md`
 
 - [x] Define the canonical materialized package order.
 - [x] Materialize package specs into `docs/architecture/archive/completed/specs/`.
@@ -70,7 +70,7 @@ P3-09 identity-event-and-tenant-platform
 Verification:
 
 ```bash
-find docs/architecture/specs -maxdepth 1 -name 'P*-*-spec.md' | wc -l | tr -d ' '
+find docs/architecture/active/specs -maxdepth 1 -name 'P*-*-spec.md' | wc -l | tr -d ' '
 ```
 
 Result: `27`.
@@ -91,7 +91,7 @@ Result: exit code `0`.
 ## Task 2: Materialize Plans
 
 **Files:**
-- Source: `docs/architecture/reviewed-packages/*/*/plan.md`
+- Source: `docs/architecture/active/reviewed-packages/*/*/plan.md`
 - Destination: `docs/architecture/archive/completed/plans/P*-*-plan.md`
 
 - [x] Generate a skill-compliant header for each package plan.
@@ -101,8 +101,8 @@ Result: exit code `0`.
 Verification:
 
 ```bash
-find docs/architecture/plans -maxdepth 1 -name 'P*-*-plan.md' ! -name 'P0-00-*' | wc -l | tr -d ' '
-find docs/architecture/plans -maxdepth 1 -name 'P*-*-plan.md' | wc -l | tr -d ' '
+find docs/architecture/active/plans -maxdepth 1 -name 'P*-*-plan.md' ! -name 'P0-00-*' | wc -l | tr -d ' '
+find docs/architecture/active/plans -maxdepth 1 -name 'P*-*-plan.md' | wc -l | tr -d ' '
 ```
 
 Result: `27` package plans, `28` total plans including this P0-00 closure plan.
@@ -122,8 +122,8 @@ Result: exit code `0`.
 ## Task 3: Add Folder Indexes
 
 **Files:**
-- `docs/architecture/specs/README.md`
-- `docs/architecture/plans/README.md`
+- `docs/architecture/active/specs/README.md`
+- `docs/architecture/active/plans/README.md`
 
 - [x] Write `specs/README.md` with all 27 package specs in priority order.
 - [x] Write `plans/README.md` with this materialization plan plus all 27 package plans in priority order.
@@ -133,7 +133,7 @@ Verification:
 
 ```bash
 rg -n "P0-01-security-hardening|P3-09-identity-event-and-tenant-platform" \
-  docs/architecture/specs/README.md docs/architecture/plans/README.md
+  docs/architecture/active/specs/README.md docs/architecture/active/plans/README.md
 ```
 
 Result: both README files contain the first and last package links.
@@ -142,8 +142,8 @@ Result: both README files contain the first and last package links.
 
 **Files:**
 - `docs/architecture/index.md`
-- `docs/architecture/reviewed-packages/README.md`
-- `docs/architecture/reviewed-packages/coverage-matrix.md`
+- `docs/architecture/active/reviewed-packages/README.md`
+- `docs/architecture/active/reviewed-packages/coverage-matrix.md`
 
 - [x] Update the top-level architecture index with `reviewed-packages/`, `specs/`, `plans/`, and `archive/` links.
 - [x] Update the reviewed-packages README with flattened spec/plan locations.
@@ -154,7 +154,7 @@ Verification:
 
 ```bash
 rg -n "docs/architecture/(architecture-|remediation/|evolution/|backend-architecture|frontend-architecture|security-considerations|testing-strategy|deployment-guide|database-schema|tech-stack|coding-standards|api-spec-summary|brownfield-architecture|production-deployment)" \
-  docs/architecture/specs docs/architecture/plans docs/architecture/reviewed-packages docs/architecture/index.md
+  docs/architecture/active/specs docs/architecture/active/plans docs/architecture/active/reviewed-packages docs/architecture/index.md
 ```
 
 Result: no output.
@@ -165,8 +165,8 @@ Result: no output.
 - `docs/architecture/archive/completed/specs/`
 - `docs/architecture/archive/completed/plans/`
 - `docs/architecture/index.md`
-- `docs/architecture/reviewed-packages/README.md`
-- `docs/architecture/reviewed-packages/coverage-matrix.md`
+- `docs/architecture/active/reviewed-packages/README.md`
+- `docs/architecture/active/reviewed-packages/coverage-matrix.md`
 
 - [x] Verify every package spec has exactly one matching package plan.
 - [x] Verify every package plan, excluding this P0-00 closure plan, has a matching package spec.
@@ -198,7 +198,7 @@ Index coverage check:
 ```bash
 for f in docs/architecture/archive/completed/specs/P*-*-spec.md; do
   base=$(basename "$f")
-  rg -q "$base" docs/architecture/specs/README.md docs/architecture/plans/README.md docs/architecture/reviewed-packages/coverage-matrix.md \
+  rg -q "$base" docs/architecture/active/specs/README.md docs/architecture/active/plans/README.md docs/architecture/active/reviewed-packages/coverage-matrix.md \
     || echo "missing index coverage for $base"
 done
 ```
@@ -209,7 +209,7 @@ Marker scan:
 
 ```bash
 marker_pattern='T''BD|TO''DO|FIX''ME|待''定|待''补|place''holder'
-rg -n "$marker_pattern" docs/architecture/specs docs/architecture/plans docs/architecture/index.md docs/architecture/reviewed-packages/README.md docs/architecture/reviewed-packages/coverage-matrix.md
+rg -n "$marker_pattern" docs/architecture/active/specs docs/architecture/active/plans docs/architecture/index.md docs/architecture/active/reviewed-packages/README.md docs/architecture/active/reviewed-packages/coverage-matrix.md
 ```
 
 Accepted results:
@@ -220,7 +220,7 @@ Accepted results:
 Git visibility check:
 
 ```bash
-git status --short docs/architecture/specs docs/architecture/plans docs/architecture/index.md docs/architecture/reviewed-packages/README.md docs/architecture/reviewed-packages/coverage-matrix.md
+git status --short docs/architecture/active/specs docs/architecture/active/plans docs/architecture/index.md docs/architecture/active/reviewed-packages/README.md docs/architecture/active/reviewed-packages/coverage-matrix.md
 ```
 
 Result: generated architecture spec/plan/index files are visible as modified or untracked files in the current worktree.

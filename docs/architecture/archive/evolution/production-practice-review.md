@@ -442,7 +442,7 @@ Spring Boot Admin Dashboard 可以看：
 
 ## 六、相关文档
 
-- [架构师审查报告：8个关键缺失](architect-critical-review.md)
-- [服务划分与新应用搭建方案](service-architecture-design.md)
-- [架构演进路线图](architecture-evolution-roadmap.md)
-- [目标架构总览](target-architecture-overview.md)
+- [架构师审查报告：8个关键缺失](./architect-critical-review.md)
+- [服务划分与新应用搭建方案](./service-architecture-design.md)
+- [架构演进路线图](./architecture-evolution-roadmap.md)
+- [目标架构总览](./target-architecture-overview.md)

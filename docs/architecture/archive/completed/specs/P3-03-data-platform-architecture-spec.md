@@ -1,12 +1,12 @@
 # Spec: Data Platform Architecture
 
-Source package: `docs/architecture/reviewed-packages/p3/platform-evolution/`
+Source package: `docs/architecture/active/reviewed-packages/p3/platform-evolution/`
 
-Coverage matrix: `docs/architecture/reviewed-packages/coverage-matrix.md`
+Coverage matrix: `docs/architecture/active/reviewed-packages/coverage-matrix.md`
 
 ## Verification Status
 
-Implemented as a data-platform proof-of-concept definition and governance package. Full data platform rollout remains deferred; the selected thin slice is audience compute history. Evidence and contracts are in `docs/architecture/evidence/p3-03-data-platform.md`, `docs/architecture/work-products/p3-03-data-platform/data-platform-source-inventory.md`, `docs/architecture/work-products/p3-03-data-platform/data-platform-poc-plan.md`, and `docs/architecture/work-products/p3-03-data-platform/data-platform-contract-governance.md`.
+Implemented as a data-platform proof-of-concept definition and governance package. Full data platform rollout remains deferred; the selected thin slice is audience compute history. Evidence and contracts are in `docs/architecture/evidence/p3-03-data-platform.md`, `docs/architecture/decisions/work-products/p3-03-data-platform/data-platform-source-inventory.md`, `docs/architecture/decisions/work-products/p3-03-data-platform/data-platform-poc-plan.md`, and `docs/architecture/decisions/work-products/p3-03-data-platform/data-platform-contract-governance.md`.
 
 ## Source Documents
 

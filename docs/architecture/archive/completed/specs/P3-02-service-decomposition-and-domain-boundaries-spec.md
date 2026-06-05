@@ -1,12 +1,12 @@
 # Spec: Service Decomposition And Domain Boundaries
 
-Source package: `docs/architecture/reviewed-packages/p3/platform-evolution/`
+Source package: `docs/architecture/active/reviewed-packages/p3/platform-evolution/`
 
-Coverage matrix: `docs/architecture/reviewed-packages/coverage-matrix.md`
+Coverage matrix: `docs/architecture/active/reviewed-packages/coverage-matrix.md`
 
 ## Verification Status
 
-Implemented as a bounded-context and extraction-gate decision package. Physical extraction is deferred; Reach / Notification boundary hardening is the first modular-monolith slice. Evidence and active decisions are in `docs/architecture/evidence/p3-02-service-decomposition.md`, `docs/architecture/work-products/p3-02-service-boundaries/domain-map.md`, `docs/architecture/work-products/p3-02-service-boundaries/domain-contract-inventory.md`, and `docs/architecture/adr/ADR-0007-first-extraction-candidate.md`.
+Implemented as a bounded-context and extraction-gate decision package. Physical extraction is deferred; Reach / Notification boundary hardening is the first modular-monolith slice. Evidence and active decisions are in `docs/architecture/evidence/p3-02-service-decomposition.md`, `docs/architecture/decisions/work-products/p3-02-service-boundaries/domain-map.md`, `docs/architecture/decisions/work-products/p3-02-service-boundaries/domain-contract-inventory.md`, and `docs/architecture/decisions/adr/ADR-0007-first-extraction-candidate.md`.
 
 ## Source Documents
 

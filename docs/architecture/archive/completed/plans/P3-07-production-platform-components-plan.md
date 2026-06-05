@@ -21,15 +21,15 @@
 ## File Structure
 
 - Create: `docs/architecture/evidence/p3-07-platform-components.md`
-- Create: `docs/architecture/work-products/p3-07-platform-components/platform-component-decision-matrix.md`
-- Create: `docs/architecture/adr/platform-component-first-pov.md`
-- Create: `docs/architecture/work-products/p3-07-platform-components/platform-component-abstraction-plan.md`
+- Create: `docs/architecture/decisions/work-products/p3-07-platform-components/platform-component-decision-matrix.md`
+- Create: `docs/architecture/decisions/adr/platform-component-first-pov.md`
+- Create: `docs/architecture/decisions/work-products/p3-07-platform-components/platform-component-abstraction-plan.md`
 - Read: `docs/architecture/archive/evolution/production-practice-review.md`
 
 ### Task 1: Build The Decision Matrix
 
 **Files:**
-- Create: `docs/architecture/work-products/p3-07-platform-components/platform-component-decision-matrix.md`
+- Create: `docs/architecture/decisions/work-products/p3-07-platform-components/platform-component-decision-matrix.md`
 - Create: `docs/architecture/evidence/p3-07-platform-components.md`
 
 - [x] Extract candidate components from the production-practice review.
@@ -39,8 +39,8 @@
 Run:
 
 ```bash
-test -f docs/architecture/work-products/p3-07-platform-components/platform-component-decision-matrix.md
-rg -n "XXL|Redisson|Nacos|Knife4j|Sentinel|Spring Boot Admin|ClickHouse|owner|failure mode|rollback|decision" docs/architecture/work-products/p3-07-platform-components/platform-component-decision-matrix.md
+test -f docs/architecture/decisions/work-products/p3-07-platform-components/platform-component-decision-matrix.md
+rg -n "XXL|Redisson|Nacos|Knife4j|Sentinel|Spring Boot Admin|ClickHouse|owner|failure mode|rollback|decision" docs/architecture/decisions/work-products/p3-07-platform-components/platform-component-decision-matrix.md
 ```
 
 Expected: matrix includes all named candidates plus owner, failure mode, rollback, and decision fields.
@@ -48,9 +48,9 @@ Expected: matrix includes all named candidates plus owner, failure mode, rollbac
 ### Task 2: Pick One Component For Proof Of Value
 
 **Files:**
-- Create: `docs/architecture/adr/platform-component-first-pov.md`
+- Create: `docs/architecture/decisions/adr/platform-component-first-pov.md`
 - Modify: `docs/architecture/evidence/p3-07-platform-components.md`
-- Read: `docs/architecture/work-products/p3-07-platform-components/platform-component-decision-matrix.md`
+- Read: `docs/architecture/decisions/work-products/p3-07-platform-components/platform-component-decision-matrix.md`
 
 - [x] Select the component that closes a confirmed P0/P1/P2 gap with the smallest rollout risk.
 - [x] Write ADR sections for problem, decision, alternatives, rollout, rollback, owner, success metric, and stop criteria.
@@ -59,8 +59,8 @@ Expected: matrix includes all named candidates plus owner, failure mode, rollbac
 Run:
 
 ```bash
-test -f docs/architecture/adr/platform-component-first-pov.md
-rg -n "Problem|Decision|Alternatives|Rollout|Rollback|Owner|Success metric|Stop criteria|Deferred" docs/architecture/adr/platform-component-first-pov.md
+test -f docs/architecture/decisions/adr/platform-component-first-pov.md
+rg -n "Problem|Decision|Alternatives|Rollout|Rollback|Owner|Success metric|Stop criteria|Deferred" docs/architecture/decisions/adr/platform-component-first-pov.md
 ```
 
 Expected: ADR chooses at most one proof-of-value component and defers the rest with reasons.
@@ -68,7 +68,7 @@ Expected: ADR chooses at most one proof-of-value component and defers the rest w
 ### Task 3: Define The Implementation Boundary
 
 **Files:**
-- Create: `docs/architecture/work-products/p3-07-platform-components/platform-component-abstraction-plan.md`
+- Create: `docs/architecture/decisions/work-products/p3-07-platform-components/platform-component-abstraction-plan.md`
 - Modify: `docs/architecture/evidence/p3-07-platform-components.md`
 - Modify: `docs/architecture/archive/completed/plans/P3-07-production-platform-components-plan.md`
 
@@ -79,9 +79,9 @@ Expected: ADR chooses at most one proof-of-value component and defers the rest w
 Run:
 
 ```bash
-test -f docs/architecture/work-products/p3-07-platform-components/platform-component-abstraction-plan.md
-rg -n "interface|proof test|operational drill|metric|dashboard|rollback command|owner signoff" docs/architecture/work-products/p3-07-platform-components/platform-component-abstraction-plan.md
-git diff -- docs/architecture/evidence/p3-07-platform-components.md docs/architecture/work-products/p3-07-platform-components/platform-component-decision-matrix.md docs/architecture/adr/platform-component-first-pov.md docs/architecture/work-products/p3-07-platform-components/platform-component-abstraction-plan.md docs/architecture/archive/completed/plans/P3-07-production-platform-components-plan.md
+test -f docs/architecture/decisions/work-products/p3-07-platform-components/platform-component-abstraction-plan.md
+rg -n "interface|proof test|operational drill|metric|dashboard|rollback command|owner signoff" docs/architecture/decisions/work-products/p3-07-platform-components/platform-component-abstraction-plan.md
+git diff -- docs/architecture/evidence/p3-07-platform-components.md docs/architecture/decisions/work-products/p3-07-platform-components/platform-component-decision-matrix.md docs/architecture/decisions/adr/platform-component-first-pov.md docs/architecture/decisions/work-products/p3-07-platform-components/platform-component-abstraction-plan.md docs/architecture/archive/completed/plans/P3-07-production-platform-components-plan.md
 # Do not stage or commit in this session unless the user explicitly asks.
 ```
 

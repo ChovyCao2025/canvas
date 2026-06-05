@@ -1,8 +1,8 @@
 # Spec: DAG Engine And Handler Boundaries
 
-Source package: `docs/architecture/reviewed-packages/p1/dag-engine-and-handler-boundaries/`
+Source package: `docs/architecture/active/reviewed-packages/p1/dag-engine-and-handler-boundaries/`
 
-Coverage matrix: `docs/architecture/reviewed-packages/coverage-matrix.md`
+Coverage matrix: `docs/architecture/active/reviewed-packages/coverage-matrix.md`
 
 
 ## Verification Status

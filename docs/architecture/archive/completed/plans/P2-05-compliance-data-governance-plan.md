@@ -4,7 +4,7 @@
 
 **Goal:** Make audit coverage, data retention, deletion workflows, PII masking, consent/suppression checks, and compliance evidence concrete enough to implement and verify.
 
-**Architecture:** Add compliance primitives inside the current backend deployable. Audit and data-governance services live under `domain/compliance`, existing marketing policy checks remain in `engine/policy`, schema changes use a new Flyway migration, and evidence checklists live under `docs/architecture/compliance`. Sensitive-field rules must apply to logs, DTOs, API responses, and deletion workflows.
+**Architecture:** Add compliance primitives inside the current backend deployable. Audit and data-governance services live under `domain/compliance`, existing marketing policy checks remain in `engine/policy`, schema changes use a new Flyway migration, and evidence checklists live under `docs/architecture/evidence/compliance`. Sensitive-field rules must apply to logs, DTOs, API responses, and deletion workflows.
 
 **Tech Stack:** Java 21, Spring Boot 3.2, MyBatis-Plus, Flyway/MySQL, Jackson, JUnit 5, AssertJ, Redis key catalog, Markdown evidence docs.
 
@@ -19,7 +19,7 @@
 ## File Structure
 
 - Read: `docs/architecture/archive/completed/specs/P2-05-compliance-data-governance-spec.md`
-- Read: `docs/architecture/reviewed-packages/p2/compliance-data-governance/plan.md`
+- Read: `docs/architecture/active/reviewed-packages/p2/compliance-data-governance/plan.md`
 - Read: `backend/canvas-engine/src/main/resources/db/migration/V3__auth_and_supplements.sql`
 - Read: `backend/canvas-engine/src/main/resources/db/migration/V60__marketing_policy_tables.sql`
 - Read: `backend/canvas-engine/src/main/resources/db/migration/V71__data_source_config.sql`
@@ -27,10 +27,10 @@
 - Read: `backend/canvas-engine/src/main/java/org/chovy/canvas/engine/policy/MarketingPolicyService.java`
 - Read: `backend/canvas-engine/src/main/java/org/chovy/canvas/web/CanvasController.java`
 - Read: `backend/canvas-engine/src/main/java/org/chovy/canvas/web/TenantController.java`
-- Create: `docs/architecture/compliance/data-inventory.md`
-- Create: `docs/architecture/compliance/audit-event-matrix.md`
-- Create: `docs/architecture/compliance/deletion-and-retention-workflows.md`
-- Create: `docs/architecture/compliance/compliance-evidence-checklist.md`
+- Create: `docs/architecture/evidence/compliance/data-inventory.md`
+- Create: `docs/architecture/evidence/compliance/audit-event-matrix.md`
+- Create: `docs/architecture/evidence/compliance/deletion-and-retention-workflows.md`
+- Create: `docs/architecture/evidence/compliance/compliance-evidence-checklist.md`
 - Use existing: `backend/canvas-engine/src/main/resources/db/migration/V3__auth_and_supplements.sql`
 - Note: do not create `V92__compliance_governance.sql`; `V92` already exists. Use the next available migration version if schema changes are needed.
 - Create: `backend/canvas-engine/src/main/java/org/chovy/canvas/domain/compliance/AuditEventService.java`
@@ -44,7 +44,7 @@
 ### Task 1: Inventory PII and credential fields
 
 **Files:**
-- Create: `docs/architecture/compliance/data-inventory.md`
+- Create: `docs/architecture/evidence/compliance/data-inventory.md`
 - Read: `backend/canvas-engine/src/main/resources/db/migration/V3__auth_and_supplements.sql`
 - Read: `backend/canvas-engine/src/main/resources/db/migration/V60__marketing_policy_tables.sql`
 - Read: `backend/canvas-engine/src/main/resources/db/migration/V71__data_source_config.sql`
@@ -57,8 +57,8 @@
 
 **Run:**
 ```bash
-test -f docs/architecture/compliance/data-inventory.md
-rg "PII|credential|masking rule|retention rule|deletion rule|owning context|data_source_config|marketing_consent" docs/architecture/compliance/data-inventory.md
+test -f docs/architecture/evidence/compliance/data-inventory.md
+rg "PII|credential|masking rule|retention rule|deletion rule|owning context|data_source_config|marketing_consent" docs/architecture/evidence/compliance/data-inventory.md
 ```
 
 **Expected:** The inventory names every sensitive table family from the spec and maps each field to owner, retention, deletion, and masking rules.
@@ -66,7 +66,7 @@ rg "PII|credential|masking rule|retention rule|deletion rule|owning context|data
 ### Task 2: Define audit events and implement audit writes for critical operations
 
 **Files:**
-- Create: `docs/architecture/compliance/audit-event-matrix.md`
+- Create: `docs/architecture/evidence/compliance/audit-event-matrix.md`
 - Create: `backend/canvas-engine/src/main/java/org/chovy/canvas/domain/compliance/AuditEventService.java`
 - Use existing: `backend/canvas-engine/src/main/resources/db/migration/V3__auth_and_supplements.sql`
 - Modify: `backend/canvas-engine/src/main/java/org/chovy/canvas/web/CanvasController.java`
@@ -81,9 +81,9 @@ rg "PII|credential|masking rule|retention rule|deletion rule|owning context|data
 
 **Run:**
 ```bash
-test -f docs/architecture/compliance/audit-event-matrix.md
+test -f docs/architecture/evidence/compliance/audit-event-matrix.md
 cd backend && mvn test -pl canvas-engine -Dtest=AuditEventServiceTest,CanvasStatsControllerTest,TenantServiceTest
-rg "canvas publish|execution replay|data-source credential|consent|deletion request" docs/architecture/compliance/audit-event-matrix.md
+rg "canvas publish|execution replay|data-source credential|consent|deletion request" docs/architecture/evidence/compliance/audit-event-matrix.md
 ```
 
 **Expected:** Audit matrix names critical operations, tests prove audit writes, and masked metadata is used for sensitive values.
@@ -91,11 +91,11 @@ rg "canvas publish|execution replay|data-source credential|consent|deletion requ
 ### Task 3: Define retention and deletion workflows
 
 **Files:**
-- Create: `docs/architecture/compliance/deletion-and-retention-workflows.md`
+- Create: `docs/architecture/evidence/compliance/deletion-and-retention-workflows.md`
 - Create: `backend/canvas-engine/src/main/java/org/chovy/canvas/domain/compliance/DataDeletionService.java`
 - Use existing: `backend/canvas-engine/src/main/resources/db/migration/V3__auth_and_supplements.sql`
 - Test: `backend/canvas-engine/src/test/java/org/chovy/canvas/domain/compliance/DataDeletionServiceTest.java`
-- Read: `docs/architecture/capacity/retention-policy.md`
+- Read: `docs/architecture/evidence/capacity/retention-policy.md`
 
 - [x] Define request intake, authorization, identity matching, dry-run, deletion, tombstone, audit, rollback limit, and evidence capture for delete requests.
 - [x] Implement deletion workflow for CDP user profile, identities, tags, marketing consent/suppression, and message send records.
@@ -105,9 +105,9 @@ rg "canvas publish|execution replay|data-source credential|consent|deletion requ
 
 **Run:**
 ```bash
-test -f docs/architecture/compliance/deletion-and-retention-workflows.md
+test -f docs/architecture/evidence/compliance/deletion-and-retention-workflows.md
 cd backend && mvn test -pl canvas-engine -Dtest=DataDeletionServiceTest
-rg "dry-run|tombstone|audit|CDP user profile|marketing consent|message send records|execution traces" docs/architecture/compliance/deletion-and-retention-workflows.md
+rg "dry-run|tombstone|audit|CDP user profile|marketing consent|message send records|execution traces" docs/architecture/evidence/compliance/deletion-and-retention-workflows.md
 ```
 
 **Expected:** Deletion workflow is documented, dry-run and execution tests pass, and retained evidence is explicit.
@@ -162,10 +162,10 @@ rg "OPT_IN|OPT_OUT|suppression|frequency" backend/canvas-engine/src/main/java/or
 ### Task 6: Add tests and compliance evidence checklist
 
 **Files:**
-- Create: `docs/architecture/compliance/compliance-evidence-checklist.md`
-- Modify: `docs/architecture/compliance/data-inventory.md`
-- Modify: `docs/architecture/compliance/audit-event-matrix.md`
-- Modify: `docs/architecture/compliance/deletion-and-retention-workflows.md`
+- Create: `docs/architecture/evidence/compliance/compliance-evidence-checklist.md`
+- Modify: `docs/architecture/evidence/compliance/data-inventory.md`
+- Modify: `docs/architecture/evidence/compliance/audit-event-matrix.md`
+- Modify: `docs/architecture/evidence/compliance/deletion-and-retention-workflows.md`
 - Test: `backend/canvas-engine/src/test/java/org/chovy/canvas/domain/compliance/AuditEventServiceTest.java`
 - Test: `backend/canvas-engine/src/test/java/org/chovy/canvas/domain/compliance/DataDeletionServiceTest.java`
 - Test: `backend/canvas-engine/src/test/java/org/chovy/canvas/domain/compliance/PiiMaskingServiceTest.java`
@@ -177,8 +177,8 @@ rg "OPT_IN|OPT_OUT|suppression|frequency" backend/canvas-engine/src/main/java/or
 **Run:**
 ```bash
 cd backend && mvn test -pl canvas-engine -Dtest=AuditEventServiceTest,DataDeletionServiceTest,PiiMaskingServiceTest,MarketingPolicyServiceTest
-test -f docs/architecture/compliance/compliance-evidence-checklist.md
-rg "audit evidence|deletion evidence|retention evidence|masking evidence|incident response|owner" docs/architecture/compliance/compliance-evidence-checklist.md
+test -f docs/architecture/evidence/compliance/compliance-evidence-checklist.md
+rg "audit evidence|deletion evidence|retention evidence|masking evidence|incident response|owner" docs/architecture/evidence/compliance/compliance-evidence-checklist.md
 ```
 
 **Expected:** Compliance-focused backend tests pass and the checklist links every evidence type to a concrete source.
@@ -187,7 +187,7 @@ rg "audit evidence|deletion evidence|retention evidence|masking evidence|inciden
 
 **Files:**
 - Modify: `docs/architecture/archive/completed/plans/P2-05-compliance-data-governance-plan.md`
-- Create: `docs/architecture/compliance/`
+- Create: `docs/architecture/evidence/compliance/`
 - Use existing: `backend/canvas-engine/src/main/resources/db/migration/V3__auth_and_supplements.sql`
 - Create: `backend/canvas-engine/src/main/java/org/chovy/canvas/domain/compliance/`
 - Modify: `backend/canvas-engine/src/main/java/org/chovy/canvas/engine/policy/MarketingPolicyService.java`
@@ -202,7 +202,7 @@ rg "audit evidence|deletion evidence|retention evidence|masking evidence|inciden
 
 **Run:**
 ```bash
-git diff -- docs/architecture/archive/completed/plans/P2-05-compliance-data-governance-plan.md docs/architecture/compliance docs/architecture/evidence/P2-05-compliance-data-governance.md backend/canvas-engine/src/main/java/org/chovy/canvas/domain/compliance backend/canvas-engine/src/main/java/org/chovy/canvas/dal/dataobject/CanvasAuditLogDO.java backend/canvas-engine/src/main/java/org/chovy/canvas/dal/mapper/CanvasAuditLogMapper.java backend/canvas-engine/src/main/java/org/chovy/canvas/config/GlobalExceptionHandler.java backend/canvas-engine/src/test/java/org/chovy/canvas/domain/compliance backend/canvas-engine/src/test/java/org/chovy/canvas/engine/policy/MarketingPolicyServiceTest.java backend/canvas-engine/src/test/java/org/chovy/canvas/config/GlobalExceptionHandlerTest.java
+git diff -- docs/architecture/archive/completed/plans/P2-05-compliance-data-governance-plan.md docs/architecture/evidence/compliance docs/architecture/evidence/P2-05-compliance-data-governance.md backend/canvas-engine/src/main/java/org/chovy/canvas/domain/compliance backend/canvas-engine/src/main/java/org/chovy/canvas/dal/dataobject/CanvasAuditLogDO.java backend/canvas-engine/src/main/java/org/chovy/canvas/dal/mapper/CanvasAuditLogMapper.java backend/canvas-engine/src/main/java/org/chovy/canvas/config/GlobalExceptionHandler.java backend/canvas-engine/src/test/java/org/chovy/canvas/domain/compliance backend/canvas-engine/src/test/java/org/chovy/canvas/engine/policy/MarketingPolicyServiceTest.java backend/canvas-engine/src/test/java/org/chovy/canvas/config/GlobalExceptionHandlerTest.java
 ```
 
 **Expected:** The diff contains only compliance docs, services, audit persistence boundary, exception masking, and compliance tests. No commit is created by default.

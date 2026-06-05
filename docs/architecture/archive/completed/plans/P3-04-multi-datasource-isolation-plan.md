@@ -19,9 +19,9 @@
 ## File Structure
 
 - Create: `docs/architecture/evidence/p3-04-multi-datasource-isolation.md`
-- Create: `docs/architecture/work-products/p3-04-multi-datasource/datasource-ownership-map.md`
-- Create: `docs/architecture/work-products/p3-04-multi-datasource/datasource-transaction-boundary-map.md`
-- Create: `docs/architecture/work-products/p3-04-multi-datasource/datasource-migration-plan.md`
+- Create: `docs/architecture/decisions/work-products/p3-04-multi-datasource/datasource-ownership-map.md`
+- Create: `docs/architecture/decisions/work-products/p3-04-multi-datasource/datasource-transaction-boundary-map.md`
+- Create: `docs/architecture/decisions/work-products/p3-04-multi-datasource/datasource-migration-plan.md`
 - Read: `backend/canvas-engine/src/main/resources/db/migration/`
 - Read: `backend/canvas-engine/src/main/java/org/chovy/canvas/dal/`
 - Read: `backend/canvas-engine/src/main/java/org/chovy/canvas/domain/`
@@ -29,7 +29,7 @@
 ### Task 1: Map Table Ownership
 
 **Files:**
-- Create: `docs/architecture/work-products/p3-04-multi-datasource/datasource-ownership-map.md`
+- Create: `docs/architecture/decisions/work-products/p3-04-multi-datasource/datasource-ownership-map.md`
 - Create: `docs/architecture/evidence/p3-04-multi-datasource-isolation.md`
 - Read: `backend/canvas-engine/src/main/resources/db/migration/`
 
@@ -42,8 +42,8 @@ Run:
 ```bash
 rg -n "CREATE TABLE" backend/canvas-engine/src/main/resources/db/migration > /tmp/canvas_tables.txt
 test -s /tmp/canvas_tables.txt
-test -f docs/architecture/work-products/p3-04-multi-datasource/datasource-ownership-map.md
-rg -n "control|runtime|CDP/customer|analytics|ops|tenant|PII|retention|backup" docs/architecture/work-products/p3-04-multi-datasource/datasource-ownership-map.md
+test -f docs/architecture/decisions/work-products/p3-04-multi-datasource/datasource-ownership-map.md
+rg -n "control|runtime|CDP/customer|analytics|ops|tenant|PII|retention|backup" docs/architecture/decisions/work-products/p3-04-multi-datasource/datasource-ownership-map.md
 ```
 
 Expected: ownership map exists and names all five datasource groups plus tenant, PII, retention, and backup fields.
@@ -51,7 +51,7 @@ Expected: ownership map exists and names all five datasource groups plus tenant,
 ### Task 2: Identify Cross-Datasource Transactions
 
 **Files:**
-- Create: `docs/architecture/work-products/p3-04-multi-datasource/datasource-transaction-boundary-map.md`
+- Create: `docs/architecture/decisions/work-products/p3-04-multi-datasource/datasource-transaction-boundary-map.md`
 - Modify: `docs/architecture/evidence/p3-04-multi-datasource-isolation.md`
 - Read: `backend/canvas-engine/src/main/java/org/chovy/canvas/`
 
@@ -64,8 +64,8 @@ Run:
 ```bash
 rg -n "@Transactional|insert\\(|update\\(|delete\\(" backend/canvas-engine/src/main/java/org/chovy/canvas > /tmp/canvas_write_flows.txt
 test -s /tmp/canvas_write_flows.txt
-test -f docs/architecture/work-products/p3-04-multi-datasource/datasource-transaction-boundary-map.md
-rg -n "outbox|saga|reconciliation|blocked|idempotency|rollback owner" docs/architecture/work-products/p3-04-multi-datasource/datasource-transaction-boundary-map.md
+test -f docs/architecture/decisions/work-products/p3-04-multi-datasource/datasource-transaction-boundary-map.md
+rg -n "outbox|saga|reconciliation|blocked|idempotency|rollback owner" docs/architecture/decisions/work-products/p3-04-multi-datasource/datasource-transaction-boundary-map.md
 ```
 
 Expected: boundary map names a safe replacement pattern for each cross-datasource write and does not depend on distributed transactions.
@@ -73,7 +73,7 @@ Expected: boundary map names a safe replacement pattern for each cross-datasourc
 ### Task 3: Define Migration, Rollback, And Monitoring
 
 **Files:**
-- Create: `docs/architecture/work-products/p3-04-multi-datasource/datasource-migration-plan.md`
+- Create: `docs/architecture/decisions/work-products/p3-04-multi-datasource/datasource-migration-plan.md`
 - Modify: `docs/architecture/evidence/p3-04-multi-datasource-isolation.md`
 - Modify: `docs/architecture/archive/completed/plans/P3-04-multi-datasource-isolation-plan.md`
 
@@ -84,9 +84,9 @@ Expected: boundary map names a safe replacement pattern for each cross-datasourc
 Run:
 
 ```bash
-test -f docs/architecture/work-products/p3-04-multi-datasource/datasource-migration-plan.md
-rg -n "Flyway|startup order|schema rollback|data copy|routing rollback|pool health|migration status|replication lag|reconciliation failure" docs/architecture/work-products/p3-04-multi-datasource/datasource-migration-plan.md
-git diff -- docs/architecture/evidence/p3-04-multi-datasource-isolation.md docs/architecture/work-products/p3-04-multi-datasource/datasource-ownership-map.md docs/architecture/work-products/p3-04-multi-datasource/datasource-transaction-boundary-map.md docs/architecture/work-products/p3-04-multi-datasource/datasource-migration-plan.md docs/architecture/archive/completed/plans/P3-04-multi-datasource-isolation-plan.md
+test -f docs/architecture/decisions/work-products/p3-04-multi-datasource/datasource-migration-plan.md
+rg -n "Flyway|startup order|schema rollback|data copy|routing rollback|pool health|migration status|replication lag|reconciliation failure" docs/architecture/decisions/work-products/p3-04-multi-datasource/datasource-migration-plan.md
+git diff -- docs/architecture/evidence/p3-04-multi-datasource-isolation.md docs/architecture/decisions/work-products/p3-04-multi-datasource/datasource-ownership-map.md docs/architecture/decisions/work-products/p3-04-multi-datasource/datasource-transaction-boundary-map.md docs/architecture/decisions/work-products/p3-04-multi-datasource/datasource-migration-plan.md docs/architecture/archive/completed/plans/P3-04-multi-datasource-isolation-plan.md
 ```
 
 Expected: diff contains only datasource isolation evidence, ownership, transaction, migration, and plan docs. No commit is created by default.

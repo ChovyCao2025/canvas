@@ -1,5 +1,5 @@
 # 架构整改方案 — structure
-> 详见 [README.md](README.md) 获取完整索引
+> 详见 [README.md](./README.md) 获取完整索引
 
 
 ## 问题一：单体巨石无服务边界

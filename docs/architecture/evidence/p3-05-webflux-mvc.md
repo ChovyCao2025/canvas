@@ -8,9 +8,9 @@ Runtime migration from WebFlux to Spring MVC is deferred. The current codebase s
 
 ## Created Documents
 
-- `docs/architecture/work-products/p3-05-runtime-model/webflux-mvc-migration-inventory.md`
-- `docs/architecture/adr/webflux-vs-mvc.md`
-- `docs/architecture/work-products/p3-05-runtime-model/webflux-mvc-first-slice.md`
+- `docs/architecture/decisions/work-products/p3-05-runtime-model/webflux-mvc-migration-inventory.md`
+- `docs/architecture/decisions/adr/webflux-vs-mvc.md`
+- `docs/architecture/decisions/work-products/p3-05-runtime-model/webflux-mvc-first-slice.md`
 
 ## Inventory Commands
 
@@ -51,12 +51,12 @@ rg -n "spring-boot-starter-webflux|spring-boot-starter-web|spring\.threads\.virt
 ## Verification Commands
 
 ```bash
-test -f docs/architecture/work-products/p3-05-runtime-model/webflux-mvc-migration-inventory.md
-rg -n "Controller|blocking dependency|transaction|streaming|migration risk|P0 reactive" docs/architecture/work-products/p3-05-runtime-model/webflux-mvc-migration-inventory.md
-test -f docs/architecture/adr/webflux-vs-mvc.md
-rg -n "Decision|Options|Benchmark|Team readiness|Transaction safety|Rollback|Compatibility|Revisit" docs/architecture/adr/webflux-vs-mvc.md
-test -f docs/architecture/work-products/p3-05-runtime-model/webflux-mvc-first-slice.md
-rg -n "endpoint group|request|response|error|auth|transaction|actuator|rollback|compatibility window|deferred" docs/architecture/work-products/p3-05-runtime-model/webflux-mvc-first-slice.md
+test -f docs/architecture/decisions/work-products/p3-05-runtime-model/webflux-mvc-migration-inventory.md
+rg -n "Controller|blocking dependency|transaction|streaming|migration risk|P0 reactive" docs/architecture/decisions/work-products/p3-05-runtime-model/webflux-mvc-migration-inventory.md
+test -f docs/architecture/decisions/adr/webflux-vs-mvc.md
+rg -n "Decision|Options|Benchmark|Team readiness|Transaction safety|Rollback|Compatibility|Revisit" docs/architecture/decisions/adr/webflux-vs-mvc.md
+test -f docs/architecture/decisions/work-products/p3-05-runtime-model/webflux-mvc-first-slice.md
+rg -n "endpoint group|request|response|error|auth|transaction|actuator|rollback|compatibility window|deferred" docs/architecture/decisions/work-products/p3-05-runtime-model/webflux-mvc-first-slice.md
 ```
 
 Result: all documentation checks passed.

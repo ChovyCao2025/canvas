@@ -4,7 +4,7 @@
 
 **Goal:** Build an executable testing foundation for the canvas engine and editor so P0/P1 fixes are protected by backend integration tests, frontend behavior tests, and CI gates.
 
-**Architecture:** Keep the current monorepo and module layout. Backend tests stay under `backend/canvas-engine/src/test/java/org/chovy/canvas`, integration harness code lives under `backend/canvas-engine/src/test/java/org/chovy/canvas/testsupport`, and frontend tests stay beside feature helpers in `frontend/src`. Testcontainers covers MySQL, Redis, and RocketMQ when available; any local substitute must be documented in `docs/architecture/testing/manual-verification.md` with owner and expiration date.
+**Architecture:** Keep the current monorepo and module layout. Backend tests stay under `backend/canvas-engine/src/test/java/org/chovy/canvas`, integration harness code lives under `backend/canvas-engine/src/test/java/org/chovy/canvas/testsupport`, and frontend tests stay beside feature helpers in `frontend/src`. Testcontainers covers MySQL, Redis, and RocketMQ when available; any local substitute must be documented in `docs/architecture/evidence/testing/manual-verification.md` with owner and expiration date.
 
 **Tech Stack:** Java 21, Spring Boot 3.2, JUnit 5, AssertJ, Reactor Test, Testcontainers, MySQL 8, Redis 7, RocketMQ 5.3.1, React 18, TypeScript, Vitest, Vite, GitHub Actions.
 
@@ -19,14 +19,14 @@
 ## File Structure
 
 - Read: `docs/architecture/archive/completed/specs/P2-01-testing-foundation-spec.md`
-- Read: `docs/architecture/reviewed-packages/p2/testing-foundation/plan.md`
-- Read: `docs/architecture/reviewed-packages/coverage-matrix.md`
+- Read: `docs/architecture/active/reviewed-packages/p2/testing-foundation/plan.md`
+- Read: `docs/architecture/active/reviewed-packages/coverage-matrix.md`
 - Modify: `backend/canvas-engine/pom.xml`
 - Modify: `.github/workflows/canvas-ci.yml`
 - Create: `backend/canvas-engine/src/test/java/org/chovy/canvas/testsupport/CanvasIntegrationTestBase.java`
 - Create: `backend/canvas-engine/src/test/java/org/chovy/canvas/testsupport/CanvasRocketMqTestSupport.java`
-- Create: `docs/architecture/testing/test-layer-map.md`
-- Create: `docs/architecture/testing/manual-verification.md`
+- Create: `docs/architecture/evidence/testing/test-layer-map.md`
+- Create: `docs/architecture/evidence/testing/manual-verification.md`
 - Test: `backend/canvas-engine/src/test/java/org/chovy/canvas/domain/canvas/CanvasTransactionAnnotationTest.java`
 - Test: `backend/canvas-engine/src/test/java/org/chovy/canvas/engine/trigger/ExecutionLifecycleGateTest.java`
 - Test: `backend/canvas-engine/src/test/java/org/chovy/canvas/engine/request/CanvasExecutionRequestServiceIdempotencyIntegrationTest.java`
@@ -38,7 +38,7 @@
 ### Task 1: Define test layers
 
 **Files:**
-- Create: `docs/architecture/testing/test-layer-map.md`
+- Create: `docs/architecture/evidence/testing/test-layer-map.md`
 - Read: `backend/canvas-engine/src/test/java/org/chovy/canvas/domain/canvas/CanvasTransactionAnnotationTest.java`
 - Read: `backend/canvas-engine/src/test/java/org/chovy/canvas/engine/trigger/ExecutionLifecycleGateTest.java`
 - Read: `frontend/src/pages/canvas-editor/graphHydration.test.ts`
@@ -50,8 +50,8 @@
 
 **Run:**
 ```bash
-test -f docs/architecture/testing/test-layer-map.md
-rg "canvas state machine|Redis/DB side effects|direct execution auth|end-to-end canvas execution" docs/architecture/testing/test-layer-map.md
+test -f docs/architecture/evidence/testing/test-layer-map.md
+rg "canvas state machine|Redis/DB side effects|direct execution auth|end-to-end canvas execution" docs/architecture/evidence/testing/test-layer-map.md
 cd backend && mvn test -pl canvas-engine -Dtest=CanvasTransactionAnnotationTest,ExecutionLifecycleGateTest,ExecutionControllerMachineAuthTest
 cd frontend && npm test -- graphHydration formValues
 ```
@@ -76,12 +76,12 @@ cd frontend && npm test -- graphHydration formValues
 cd backend && mvn -pl canvas-engine -am -P integration-tests -Dapi.version=1.54 -Dtest=CanvasExecutionRequestServiceIdempotencyIntegrationTest test
 ```
 
-**Expected:** Tests start containerized MySQL and Redis or fail with one named documented substitute in `docs/architecture/testing/manual-verification.md`; no test depends on a developer's existing local database state.
+**Expected:** Tests start containerized MySQL and Redis or fail with one named documented substitute in `docs/architecture/evidence/testing/manual-verification.md`; no test depends on a developer's existing local database state.
 
 ### Task 3: Add tests for P0 package acceptance criteria before code changes
 
 **Files:**
-- Modify: `docs/architecture/testing/test-layer-map.md`
+- Modify: `docs/architecture/evidence/testing/test-layer-map.md`
 - Test: `backend/canvas-engine/src/test/java/org/chovy/canvas/config/SecurityConfigRouteTest.java`
 - Test: `backend/canvas-engine/src/test/java/org/chovy/canvas/domain/canvas/CanvasTransactionAnnotationTest.java`
 - Test: `backend/canvas-engine/src/test/java/org/chovy/canvas/engine/trigger/InFlightExecutionRegistryConcurrencyTest.java`
@@ -98,7 +98,7 @@ cd backend && mvn test -pl canvas-engine -Dtest=SecurityConfigRouteTest,CanvasTr
 cd frontend && npm test -- localDraft
 ```
 
-**Expected:** The P0 rows in `docs/architecture/testing/test-layer-map.md` name a concrete test file, and the focused backend/frontend commands pass.
+**Expected:** The P0 rows in `docs/architecture/evidence/testing/test-layer-map.md` name a concrete test file, and the focused backend/frontend commands pass.
 
 ### Task 4: Add CI commands for backend and frontend tests
 
@@ -111,7 +111,7 @@ cd frontend && npm test -- localDraft
 - [x] Keep CI backend execution on `cd backend && mvn test`.
 - [x] Keep CI frontend execution on `cd frontend && npm test` and `cd frontend && npm run build`.
 - [x] Add a separate integration-test job or profile only after Task 2 is stable in CI.
-- [x] Document required Docker services for local integration runs in the workflow comments or `docs/architecture/testing/test-layer-map.md`.
+- [x] Document required Docker services for local integration runs in the workflow comments or `docs/architecture/evidence/testing/test-layer-map.md`.
 
 **Run:**
 ```bash
@@ -125,7 +125,7 @@ cd frontend && npm run build
 ### Task 5: Track residual manual verification where infrastructure cannot be containerized locally
 
 **Files:**
-- Create: `docs/architecture/testing/manual-verification.md`
+- Create: `docs/architecture/evidence/testing/manual-verification.md`
 - Read: `docker-compose.local.yml`
 - Read: `docs/stressTest/local-capacity-runbook.md`
 - Read: `docs/stressTest/distributed-capacity-runbook.md`
@@ -137,8 +137,8 @@ cd frontend && npm run build
 
 **Run:**
 ```bash
-test -f docs/architecture/testing/manual-verification.md
-rg "dependency|owner|expiration date|automated replacement path|RocketMQ" docs/architecture/testing/manual-verification.md
+test -f docs/architecture/evidence/testing/manual-verification.md
+rg "dependency|owner|expiration date|automated replacement path|RocketMQ" docs/architecture/evidence/testing/manual-verification.md
 ```
 
 **Expected:** Every manual verification item has a command, owner, evidence destination, and removal condition.
@@ -151,8 +151,8 @@ rg "dependency|owner|expiration date|automated replacement path|RocketMQ" docs/a
 - Modify: `backend/canvas-engine/pom.xml`
 - Create: `backend/canvas-engine/src/test/java/org/chovy/canvas/testsupport/CanvasIntegrationTestBase.java`
 - Create: `backend/canvas-engine/src/test/java/org/chovy/canvas/testsupport/CanvasRocketMqTestSupport.java`
-- Create: `docs/architecture/testing/test-layer-map.md`
-- Create: `docs/architecture/testing/manual-verification.md`
+- Create: `docs/architecture/evidence/testing/test-layer-map.md`
+- Create: `docs/architecture/evidence/testing/manual-verification.md`
 - Create: `docs/architecture/evidence/P2-01-testing-foundation.md`
 
 - [x] Review testing foundation files and evidence for this plan.
@@ -161,7 +161,7 @@ rg "dependency|owner|expiration date|automated replacement path|RocketMQ" docs/a
 
 **Run:**
 ```bash
-git diff -- docs/architecture/archive/completed/plans/P2-01-testing-foundation-plan.md docs/architecture/archive/completed/specs/P2-01-testing-foundation-spec.md .github/workflows/canvas-ci.yml backend/canvas-engine/pom.xml backend/canvas-engine/src/test/java/org/chovy/canvas/testsupport docs/architecture/testing docs/architecture/evidence/P2-01-testing-foundation.md
+git diff -- docs/architecture/archive/completed/plans/P2-01-testing-foundation-plan.md docs/architecture/archive/completed/specs/P2-01-testing-foundation-spec.md .github/workflows/canvas-ci.yml backend/canvas-engine/pom.xml backend/canvas-engine/src/test/java/org/chovy/canvas/testsupport docs/architecture/evidence/testing docs/architecture/evidence/P2-01-testing-foundation.md
 ```
 
 **Expected:** The handoff evidence names the files changed, commands run, and remaining manual substitutes; no commit is created unless the user explicitly requests one.

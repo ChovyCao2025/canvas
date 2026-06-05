@@ -4,7 +4,7 @@
 
 **Goal:** Replace broad archived review material with active ADRs, handler guidance, Redis key catalog, OpenAPI generation checks, and runbooks that operators and implementers can execute.
 
-**Architecture:** Keep archived files under `docs/architecture/archive` as evidence. New active docs live under `docs/architecture/adr`, `docs/architecture/guides`, `docs/architecture/reference`, and `docs/architecture/runbooks`. Documentation checks use `rg`, backend OpenAPI tests, and frontend API-doc tests.
+**Architecture:** Keep archived files under `docs/architecture/archive` as evidence. New active docs live under `docs/architecture/decisions/adr`, `docs/architecture/evidence/guides`, `docs/architecture/decisions/reference`, and `docs/architecture/evidence/runbooks`. Documentation checks use `rg`, backend OpenAPI tests, and frontend API-doc tests.
 
 **Tech Stack:** Markdown, Java 21, Springdoc OpenAPI WebFlux, Spring Boot Actuator, Redis key helpers, JUnit 5, TypeScript, Vitest.
 
@@ -19,39 +19,39 @@
 ## File Structure
 
 - Read: `docs/architecture/archive/completed/specs/P2-03-documentation-adr-and-runbooks-spec.md`
-- Read: `docs/architecture/reviewed-packages/p2/documentation-adr-and-runbooks/plan.md`
+- Read: `docs/architecture/active/reviewed-packages/p2/documentation-adr-and-runbooks/plan.md`
 - Read: `docs/architecture/archive/evolution/production-practice-review.md`
 - Read: `docs/architecture/archive/reviews/architect-checklist-report.md`
 - Read: `backend/canvas-engine/src/main/java/org/chovy/canvas/infrastructure/redis/RedisKeyUtil.java`
 - Read: `backend/canvas-engine/src/main/java/org/chovy/canvas/engine/dag/DagParser.java`
 - Read: `backend/canvas-engine/src/main/java/org/chovy/canvas/engine/handler/NodeHandler.java`
 - Read: `backend/canvas-engine/src/main/java/org/chovy/canvas/web/CanvasController.java`
-- Create: `docs/architecture/adr/ADR-0000-template.md`
-- Create: `docs/architecture/adr/ADR-0001-web-runtime-model.md`
-- Create: `docs/architecture/adr/ADR-0002-node-handler-model.md`
-- Create: `docs/architecture/adr/ADR-0003-groovy-expression-engine.md`
-- Create: `docs/architecture/adr/ADR-0004-redis-rocketmq-mysql-choices.md`
-- Create: `docs/architecture/adr/ADR-0005-data-isolation-model.md`
-- Create: `docs/architecture/guides/node-handler-development.md`
-- Create: `docs/architecture/reference/redis-key-catalog.md`
-- Create: `docs/architecture/runbooks/dag-execution-flow.md`
-- Create: `docs/architecture/runbooks/failure-triage.md`
-- Create: `docs/architecture/runbooks/dlq-replay.md`
-- Create: `docs/architecture/runbooks/route-rebuild.md`
-- Create: `docs/architecture/runbooks/cache-invalidation.md`
-- Create: `docs/architecture/runbooks/deploy-rollback.md`
+- Create: `docs/architecture/decisions/adr/ADR-0000-template.md`
+- Create: `docs/architecture/decisions/adr/ADR-0001-web-runtime-model.md`
+- Create: `docs/architecture/decisions/adr/ADR-0002-node-handler-model.md`
+- Create: `docs/architecture/decisions/adr/ADR-0003-groovy-expression-engine.md`
+- Create: `docs/architecture/decisions/adr/ADR-0004-redis-rocketmq-mysql-choices.md`
+- Create: `docs/architecture/decisions/adr/ADR-0005-data-isolation-model.md`
+- Create: `docs/architecture/evidence/guides/node-handler-development.md`
+- Create: `docs/architecture/decisions/reference/redis-key-catalog.md`
+- Create: `docs/architecture/evidence/runbooks/dag-execution-flow.md`
+- Create: `docs/architecture/evidence/runbooks/failure-triage.md`
+- Create: `docs/architecture/evidence/runbooks/dlq-replay.md`
+- Create: `docs/architecture/evidence/runbooks/route-rebuild.md`
+- Create: `docs/architecture/evidence/runbooks/cache-invalidation.md`
+- Create: `docs/architecture/evidence/runbooks/deploy-rollback.md`
 - Test: `frontend/src/pages/api-docs/apiDocs.test.ts`
 - Test: `frontend/src/pages/api-docs/openApiDocs.test.ts`
 
 ### Task 1: Create ADR template and initial ADR list
 
 **Files:**
-- Create: `docs/architecture/adr/ADR-0000-template.md`
-- Create: `docs/architecture/adr/ADR-0001-web-runtime-model.md`
-- Create: `docs/architecture/adr/ADR-0002-node-handler-model.md`
-- Create: `docs/architecture/adr/ADR-0003-groovy-expression-engine.md`
-- Create: `docs/architecture/adr/ADR-0004-redis-rocketmq-mysql-choices.md`
-- Create: `docs/architecture/adr/ADR-0005-data-isolation-model.md`
+- Create: `docs/architecture/decisions/adr/ADR-0000-template.md`
+- Create: `docs/architecture/decisions/adr/ADR-0001-web-runtime-model.md`
+- Create: `docs/architecture/decisions/adr/ADR-0002-node-handler-model.md`
+- Create: `docs/architecture/decisions/adr/ADR-0003-groovy-expression-engine.md`
+- Create: `docs/architecture/decisions/adr/ADR-0004-redis-rocketmq-mysql-choices.md`
+- Create: `docs/architecture/decisions/adr/ADR-0005-data-isolation-model.md`
 - Read: `docs/architecture/archive/completed/specs/P3-00-architecture-boundary-review-spec.md`
 
 - [x] Create an ADR template with status, context, decision, alternatives, consequences, rollback trigger, and owner.
@@ -60,9 +60,9 @@
 
 **Run:**
 ```bash
-test -f docs/architecture/adr/ADR-0000-template.md
-rg "Status|Context|Decision|Alternatives|Consequences|Rollback Trigger|Owner" docs/architecture/adr/ADR-0000-template.md
-rg "WebFlux|NodeHandler|Groovy|RocketMQ|data isolation" docs/architecture/adr
+test -f docs/architecture/decisions/adr/ADR-0000-template.md
+rg "Status|Context|Decision|Alternatives|Consequences|Rollback Trigger|Owner" docs/architecture/decisions/adr/ADR-0000-template.md
+rg "WebFlux|NodeHandler|Groovy|RocketMQ|data isolation" docs/architecture/decisions/adr
 ```
 
 **Expected:** The ADR directory exists, the template has all required sections, and the five initial ADRs cite controlling specs.
@@ -70,8 +70,8 @@ rg "WebFlux|NodeHandler|Groovy|RocketMQ|data isolation" docs/architecture/adr
 ### Task 2: Write DAG execution flow and Handler development guide
 
 **Files:**
-- Create: `docs/architecture/guides/node-handler-development.md`
-- Create: `docs/architecture/runbooks/dag-execution-flow.md`
+- Create: `docs/architecture/evidence/guides/node-handler-development.md`
+- Create: `docs/architecture/evidence/runbooks/dag-execution-flow.md`
 - Read: `backend/canvas-engine/src/main/java/org/chovy/canvas/engine/dag/DagParser.java`
 - Read: `backend/canvas-engine/src/main/java/org/chovy/canvas/engine/handler/NodeHandler.java`
 - Read: `backend/canvas-engine/src/main/java/org/chovy/canvas/engine/handlers/StartHandler.java`
@@ -84,9 +84,9 @@ rg "WebFlux|NodeHandler|Groovy|RocketMQ|data isolation" docs/architecture/adr
 
 **Run:**
 ```bash
-test -f docs/architecture/guides/node-handler-development.md
-test -f docs/architecture/runbooks/dag-execution-flow.md
-rg "DagParser|NodeHandler|@NodeHandlerType|wait/resume|trace|mapper access" docs/architecture/guides/node-handler-development.md docs/architecture/runbooks/dag-execution-flow.md
+test -f docs/architecture/evidence/guides/node-handler-development.md
+test -f docs/architecture/evidence/runbooks/dag-execution-flow.md
+rg "DagParser|NodeHandler|@NodeHandlerType|wait/resume|trace|mapper access" docs/architecture/evidence/guides/node-handler-development.md docs/architecture/evidence/runbooks/dag-execution-flow.md
 cd backend && mvn test -pl canvas-engine -Dtest=StartHandlerTest,WaitHandlerTest,NodeRouteResolverTest
 ```
 
@@ -95,7 +95,7 @@ cd backend && mvn test -pl canvas-engine -Dtest=StartHandlerTest,WaitHandlerTest
 ### Task 3: Generate Redis key catalog from RedisKeyUtil and related services
 
 **Files:**
-- Create: `docs/architecture/reference/redis-key-catalog.md`
+- Create: `docs/architecture/decisions/reference/redis-key-catalog.md`
 - Read: `backend/canvas-engine/src/main/java/org/chovy/canvas/infrastructure/redis/RedisKeyUtil.java`
 - Read: `backend/canvas-engine/src/main/java/org/chovy/canvas/infrastructure/redis/ContextPersistenceService.java`
 - Read: `backend/canvas-engine/src/main/java/org/chovy/canvas/infrastructure/redis/TriggerRouteService.java`
@@ -103,12 +103,12 @@ cd backend && mvn test -pl canvas-engine -Dtest=StartHandlerTest,WaitHandlerTest
 
 - [x] Catalog each key prefix, owner service, TTL, payload shape, invalidation path, and operational risk.
 - [x] Include Redis context, trigger route, entity cache, quota, lock, and kill-switch key families.
-- [x] Link each key family to its cleanup or retention rule in `docs/architecture/capacity/retention-policy.md` when that file exists.
+- [x] Link each key family to its cleanup or retention rule in `docs/architecture/evidence/capacity/retention-policy.md` when that file exists.
 
 **Run:**
 ```bash
-test -f docs/architecture/reference/redis-key-catalog.md
-rg "prefix|owner service|TTL|payload|invalidation|ContextPersistenceService|TriggerRouteService" docs/architecture/reference/redis-key-catalog.md
+test -f docs/architecture/decisions/reference/redis-key-catalog.md
+rg "prefix|owner service|TTL|payload|invalidation|ContextPersistenceService|TriggerRouteService" docs/architecture/decisions/reference/redis-key-catalog.md
 cd backend && mvn test -pl canvas-engine -Dtest=CanvasEntityCacheTest,CacheConfigTest
 ```
 
@@ -117,11 +117,11 @@ cd backend && mvn test -pl canvas-engine -Dtest=CanvasEntityCacheTest,CacheConfi
 ### Task 4: Write operational runbooks for DLQ, route rebuild, cache invalidation, deploy, rollback, and incident triage
 
 **Files:**
-- Create: `docs/architecture/runbooks/failure-triage.md`
-- Create: `docs/architecture/runbooks/dlq-replay.md`
-- Create: `docs/architecture/runbooks/route-rebuild.md`
-- Create: `docs/architecture/runbooks/cache-invalidation.md`
-- Create: `docs/architecture/runbooks/deploy-rollback.md`
+- Create: `docs/architecture/evidence/runbooks/failure-triage.md`
+- Create: `docs/architecture/evidence/runbooks/dlq-replay.md`
+- Create: `docs/architecture/evidence/runbooks/route-rebuild.md`
+- Create: `docs/architecture/evidence/runbooks/cache-invalidation.md`
+- Create: `docs/architecture/evidence/runbooks/deploy-rollback.md`
 - Read: `backend/canvas-engine/src/main/java/org/chovy/canvas/web/DlqController.java`
 - Read: `backend/canvas-engine/src/main/java/org/chovy/canvas/web/OpsController.java`
 - Read: `backend/canvas-engine/src/main/java/org/chovy/canvas/infrastructure/redis/CanvasRouteInitializer.java`
@@ -133,12 +133,12 @@ cd backend && mvn test -pl canvas-engine -Dtest=CanvasEntityCacheTest,CacheConfi
 
 **Run:**
 ```bash
-test -f docs/architecture/runbooks/failure-triage.md
-test -f docs/architecture/runbooks/dlq-replay.md
-test -f docs/architecture/runbooks/route-rebuild.md
-test -f docs/architecture/runbooks/cache-invalidation.md
-test -f docs/architecture/runbooks/deploy-rollback.md
-rg "symptom|severity|diagnostic commands|remediation commands|rollback commands|evidence" docs/architecture/runbooks
+test -f docs/architecture/evidence/runbooks/failure-triage.md
+test -f docs/architecture/evidence/runbooks/dlq-replay.md
+test -f docs/architecture/evidence/runbooks/route-rebuild.md
+test -f docs/architecture/evidence/runbooks/cache-invalidation.md
+test -f docs/architecture/evidence/runbooks/deploy-rollback.md
+rg "symptom|severity|diagnostic commands|remediation commands|rollback commands|evidence" docs/architecture/evidence/runbooks
 cd backend && mvn test -pl canvas-engine -Dtest=OpsControllerTemplateTest,CanvasExecutionDlqSchemaTest
 ```
 
@@ -170,8 +170,8 @@ cd frontend && npm test -- api-docs
 ### Task 6: Keep archive docs as historical evidence, not active specs
 
 **Files:**
-- Modify: `docs/architecture/specs/README.md`
-- Modify: `docs/architecture/plans/README.md`
+- Modify: `docs/architecture/active/specs/README.md`
+- Modify: `docs/architecture/active/plans/README.md`
 - Read: `docs/architecture/archive/reviews/architect-checklist-report.md`
 - Read: `docs/architecture/archive/evolution/production-practice-review.md`
 
@@ -181,7 +181,7 @@ cd frontend && npm test -- api-docs
 
 **Run:**
 ```bash
-rg "archive|historical evidence|active decisions|ADRs|runbooks" docs/architecture/specs/README.md docs/architecture/plans/README.md
+rg "archive|historical evidence|active decisions|ADRs|runbooks" docs/architecture/active/specs/README.md docs/architecture/active/plans/README.md
 ```
 
 **Expected:** Specs and plans README files explain how archived docs feed active architecture decisions.
@@ -190,12 +190,12 @@ rg "archive|historical evidence|active decisions|ADRs|runbooks" docs/architectur
 
 **Files:**
 - Modify: `docs/architecture/archive/completed/plans/P2-03-documentation-adr-and-runbooks-plan.md`
-- Modify: `docs/architecture/specs/README.md`
-- Modify: `docs/architecture/plans/README.md`
-- Create: `docs/architecture/adr/`
-- Create: `docs/architecture/guides/node-handler-development.md`
-- Create: `docs/architecture/reference/redis-key-catalog.md`
-- Create: `docs/architecture/runbooks/`
+- Modify: `docs/architecture/active/specs/README.md`
+- Modify: `docs/architecture/active/plans/README.md`
+- Create: `docs/architecture/decisions/adr/`
+- Create: `docs/architecture/evidence/guides/node-handler-development.md`
+- Create: `docs/architecture/decisions/reference/redis-key-catalog.md`
+- Create: `docs/architecture/evidence/runbooks/`
 
 - [x] Review only docs and tests named in this plan.
 - [x] Record evidence for active docs, ADRs, runbooks, OpenAPI changes, and tests.
@@ -203,7 +203,7 @@ rg "archive|historical evidence|active decisions|ADRs|runbooks" docs/architectur
 
 **Run:**
 ```bash
-git diff -- docs/architecture/archive/completed/plans/P2-03-documentation-adr-and-runbooks-plan.md docs/architecture/archive/completed/specs/P2-03-documentation-adr-and-runbooks-spec.md docs/architecture/specs/README.md docs/architecture/plans/README.md docs/architecture/evidence/P2-03-documentation-adr-and-runbooks.md docs/architecture/adr docs/architecture/guides docs/architecture/reference docs/architecture/runbooks backend/canvas-engine/src/main/java/org/chovy/canvas/config/OpenApiSecurityConfig.java backend/canvas-engine/src/main/java/org/chovy/canvas/web frontend/src/pages/api-docs backend/canvas-engine/src/test/java/org/chovy/canvas/domain/analytics/AudienceMaterializationScheduleServiceTest.java
+git diff -- docs/architecture/archive/completed/plans/P2-03-documentation-adr-and-runbooks-plan.md docs/architecture/archive/completed/specs/P2-03-documentation-adr-and-runbooks-spec.md docs/architecture/active/specs/README.md docs/architecture/active/plans/README.md docs/architecture/evidence/P2-03-documentation-adr-and-runbooks.md docs/architecture/decisions/adr docs/architecture/evidence/guides docs/architecture/decisions/reference docs/architecture/evidence/runbooks backend/canvas-engine/src/main/java/org/chovy/canvas/config/OpenApiSecurityConfig.java backend/canvas-engine/src/main/java/org/chovy/canvas/web frontend/src/pages/api-docs backend/canvas-engine/src/test/java/org/chovy/canvas/domain/analytics/AudienceMaterializationScheduleServiceTest.java
 ```
 
 **Expected:** The handoff contains active architecture documentation, OpenAPI metadata changes, related tests, and evidence scoped to this package; no commit is created automatically.

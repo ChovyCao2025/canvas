@@ -551,7 +551,7 @@ public MybatisPlusInterceptor mybatisPlusInterceptor() {
 
 ## 十、相关文档
 
-- [目标架构总览](target-architecture-overview.md)
-- [企微SCRM模块设计](wecom-scrm-module-design.md)
-- [K8s部署方案](k8s-deployment-plan.md)
-- [WebFlux→Spring MVC迁移](webflux-to-mvc-migration.md)
+- [目标架构总览](./target-architecture-overview.md)
+- [企微SCRM模块设计](./wecom-scrm-module-design.md)
+- [K8s部署方案](./k8s-deployment-plan.md)
+- [WebFlux→Spring MVC迁移](./webflux-to-mvc-migration.md)

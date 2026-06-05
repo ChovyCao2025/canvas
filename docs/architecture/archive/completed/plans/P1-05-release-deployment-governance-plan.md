@@ -33,8 +33,8 @@
 - Deployment: `deploy/k8s/canvas-engine-service.yaml`
 - Deployment: `deploy/k8s/canvas-engine-hpa.yaml`
 - Deployment: `deploy/k8s/canvas-engine-network-policy.yaml`
-- Runbook: `docs/architecture/runbooks/release-deployment.md`
-- Runbook: `docs/architecture/runbooks/flyway-backup-rollback.md`
+- Runbook: `docs/architecture/evidence/runbooks/release-deployment.md`
+- Runbook: `docs/architecture/evidence/runbooks/flyway-backup-rollback.md`
 - Evidence: `docs/architecture/evidence/P1-05-release-deployment-governance.md`
 - Tests: `backend/canvas-engine/src/test/java/org/chovy/canvas/config/ProductionProfileValidationTest.java`
 - Tests: `backend/canvas-engine/src/test/java/org/chovy/canvas/migration/FlywayMigrationPolicyTest.java`
@@ -88,7 +88,7 @@ Expected: Maven test and shell script fail for unsafe production profile values 
 
 **Files:**
 - Script: `scripts/release/check-flyway-migration.sh`
-- Runbook: `docs/architecture/runbooks/flyway-backup-rollback.md`
+- Runbook: `docs/architecture/evidence/runbooks/flyway-backup-rollback.md`
 - Test: `backend/canvas-engine/src/test/java/org/chovy/canvas/migration/FlywayMigrationPolicyTest.java`
 - Read: `backend/canvas-engine/src/main/resources/db/migration/`
 
@@ -101,7 +101,7 @@ Run:
 ```bash
 cd backend && mvn -pl canvas-engine -Dtest=FlywayMigrationPolicyTest test
 bash scripts/release/check-flyway-migration.sh
-rg -n "Backup|Restore|Dry run|Rollback owner" docs/architecture/runbooks/flyway-backup-rollback.md
+rg -n "Backup|Restore|Dry run|Rollback owner" docs/architecture/evidence/runbooks/flyway-backup-rollback.md
 # Do not stage or commit in this session unless the user explicitly asks.
 ```
 
@@ -141,7 +141,7 @@ Expected: workflow contains backend, frontend, profile, migration, and container
 - Deployment: `deploy/k8s/canvas-engine-service.yaml`
 - Deployment: `deploy/k8s/canvas-engine-hpa.yaml`
 - Deployment: `deploy/k8s/canvas-engine-network-policy.yaml`
-- Runbook: `docs/architecture/runbooks/release-deployment.md`
+- Runbook: `docs/architecture/evidence/runbooks/release-deployment.md`
 
 - [x] Create Kubernetes deployment, service, HPA, and network-policy templates for the engine with secret references instead of embedded secrets.
 - [x] Add pre-deploy checks for image tag, migration backup, profile validation, and dependency reachability.
@@ -154,7 +154,7 @@ Run:
 bash scripts/release/pre-deploy-check.sh --dry-run
 bash scripts/release/post-deploy-check.sh --dry-run
 bash scripts/release/rollback-drill.sh --dry-run
-rg -n "kubectl|helm|health|prometheus|rollback|evidence" docs/architecture/runbooks/release-deployment.md deploy/k8s
+rg -n "kubectl|helm|health|prometheus|rollback|evidence" docs/architecture/evidence/runbooks/release-deployment.md deploy/k8s
 # Do not stage or commit in this session unless the user explicitly asks.
 ```
 

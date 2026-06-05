@@ -1,5 +1,5 @@
 # 架构整改方案 — resilience
-> 详见 [README.md](README.md) 获取完整索引
+> 详见 [README.md](./README.md) 获取完整索引
 
 
 ---
@@ -444,4 +444,4 @@ public CircuitBreaker taggerCircuitBreaker {
 
 
 ---
-> 问题总览、优先级排序和路线图见 [README.md](README.md)
+> 问题总览、优先级排序和路线图见 [README.md](./README.md)

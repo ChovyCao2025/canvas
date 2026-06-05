@@ -1,8 +1,8 @@
 # Spec: Observability And Ops
 
-Source package: `docs/architecture/reviewed-packages/p1/observability-and-ops/`
+Source package: `docs/architecture/active/reviewed-packages/p1/observability-and-ops/`
 
-Coverage matrix: `docs/architecture/reviewed-packages/coverage-matrix.md`
+Coverage matrix: `docs/architecture/active/reviewed-packages/coverage-matrix.md`
 
 
 ## Verification Status
@@ -40,5 +40,5 @@ Implemented and verified on 2026-06-04.
 - Runtime metrics: `backend/canvas-engine/src/main/java/org/chovy/canvas/config/CanvasRuntimeMetrics.java`
 - Alert rules: `deploy/observability/prometheus/canvas-alert-rules.yml`
 - Dashboard: `deploy/observability/grafana/canvas-runtime-dashboard.json`
-- Runbooks: `docs/architecture/runbooks/`
+- Runbooks: `docs/architecture/evidence/runbooks/`
 - Verification record: `docs/architecture/evidence/P1-04-observability-and-ops.md`

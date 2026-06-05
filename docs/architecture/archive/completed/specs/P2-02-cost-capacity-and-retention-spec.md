@@ -1,8 +1,8 @@
 # Spec: Cost, Capacity, And Retention
 
-Source package: `docs/architecture/reviewed-packages/p2/cost-capacity-and-retention/`
+Source package: `docs/architecture/active/reviewed-packages/p2/cost-capacity-and-retention/`
 
-Coverage matrix: `docs/architecture/reviewed-packages/coverage-matrix.md`
+Coverage matrix: `docs/architecture/active/reviewed-packages/coverage-matrix.md`
 
 
 ## Verification Status
@@ -31,9 +31,9 @@ Confirmed for repository-controlled artifacts. The SLO model, capacity cliff mod
 
 ## Implementation Evidence
 
-- `docs/architecture/capacity/slo-and-capacity-model.md`
-- `docs/architecture/capacity/retention-policy.md`
-- `docs/architecture/capacity/dashboard-and-alerts.md`
-- `docs/architecture/capacity/baseline-load-result.md`
+- `docs/architecture/evidence/capacity/slo-and-capacity-model.md`
+- `docs/architecture/evidence/capacity/retention-policy.md`
+- `docs/architecture/evidence/capacity/dashboard-and-alerts.md`
+- `docs/architecture/evidence/capacity/baseline-load-result.md`
 - `backend/canvas-engine/src/main/resources/db/migration/V239__execution_retention_policy.sql`
 - `docs/architecture/evidence/P2-02-cost-capacity-and-retention.md`

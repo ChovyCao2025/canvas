@@ -1,6 +1,6 @@
 # Completed Architecture Packages
 
-This folder contains completed architecture design packages that were materialized from `docs/architecture/reviewed-packages/`.
+This folder contains completed architecture design packages that were materialized from `docs/architecture/active/reviewed-packages/`.
 
 - `specs/`: priority-prefixed architecture specs.
 - `plans/`: matching priority-prefixed implementation plans.

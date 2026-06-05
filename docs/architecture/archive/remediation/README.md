@@ -8,39 +8,39 @@
 
 | # | 问题类别 | P0 | P1 | P2 | 总项数 | 工时 | 详细文档 |
 |---|---------|----|----|-----|--------|------|---------|
-| 1 | 单体巨石无边界 | - | - | - | 1 | 38h | [part1-structure](part1-structure.md) |
-| 2 | WebFlux+MyBatis矛盾 | - | - | - | 1 | 33h | [part1-structure](part1-structure.md) |
-| 3 | 单库单连接池耦合 | - | - | - | 1 | 30h | [part1-structure](part1-structure.md) |
-| 4 | Handler平铺 | - | - | - | 1 | 7h | [part1-structure](part1-structure.md) |
-| 5 | Service层缺失 | - | - | - | 1 | 40h | [part1-structure](part1-structure.md) |
-| 6 | DO直接暴露 | - | - | - | 1 | 40h | [part1-structure](part1-structure.md) |
-| 7 | 安全漏洞 | 3 | 6 | 1 | 10 | 9h | [part2-security-concurrency](part2-security-concurrency.md) |
-| 8 | 并发安全缺陷 | 3 | 3 | 2 | 8 | 16h | [part2-security-concurrency](part2-security-concurrency.md) |
-| 9 | 异常处理缺陷 | 0 | 3 | 5 | 8 | 4.5h | [part2-security-concurrency](part2-security-concurrency.md) |
-| 10 | 资源泄露 | 1 | 3 | 1 | 5 | 10h | [part2-security-concurrency](part2-security-concurrency.md) |
-| 11 | 无全局状态管理 | - | - | - | 3 | 24h | [part3-frontend](part3-frontend.md) |
-| 12 | API层缺陷 | - | - | - | 3 | 30h | [part3-frontend](part3-frontend.md) |
-| 13 | 路由权限缺陷 | - | - | - | 4 | 6h | [part3-frontend](part3-frontend.md) |
-| 14 | TypeScript any泛滥 | - | - | - | 4 | 14h | [part3-frontend](part3-frontend.md) |
-| 15 | 前端性能问题 | - | - | - | 3 | 9h | [part3-frontend](part3-frontend.md) |
-| 16 | 无生产部署方案 | - | - | - | 5 | 24h | [part4-ops](part4-ops.md) |
-| 17 | 配置管理缺陷 | - | - | - | 5 | 10h | [part4-ops](part4-ops.md) |
-| 18 | 可观测性缺失 | - | - | - | 4 | 20h | [part4-ops](part4-ops.md) |
-| 19 | MQ配置不完整 | - | - | - | 4 | 8h | [part4-ops](part4-ops.md) |
-| 20 | Flyway无回滚 | - | - | - | 1 | 8h | [part4-ops](part4-ops.md) |
-| 21 | DAG引擎核心设计 | 2 | 7 | 4 | 19 | 67h | [part5-engine-deep](part5-engine-deep.md) |
-| 22 | 数据模型与持久化 | 4 | 6 | 3 | 17 | 52h | [part5-engine-deep](part5-engine-deep.md) |
-| 23 | API层与集成设计 | 2 | 5 | 3 | 12 | 44h | [part5-engine-deep](part5-engine-deep.md) |
-| 24 | 前端架构深度 | 2 | 5 | 4 | 13 | 60.5h | [part5-engine-deep](part5-engine-deep.md) |
-| 25 | 业务逻辑正确性 | 4 | 10 | 4 | 34 | 44h | [part6-logic-testing](part6-logic-testing.md) |
-| 26 | 测试架构与覆盖 | 2 | 4 | 4 | 28 | 84h | [part6-logic-testing](part6-logic-testing.md) |
-| 27 | 技术债与代码质量 | 0 | 2 | 4 | 30 | 22h | [part6-logic-testing](part6-logic-testing.md) |
-| 28 | 可观测性与韧性 | 3 | 5 | 4 | 28 | 40h | [part7-resilience](part7-resilience.md) |
-| 28.7 | Reactor线程模型违规 | 5 | 9 | 66 | 80+ | 17h | [part7-resilience](part7-resilience.md) |
-| 28.8 | API输入验证零覆盖 | 0 | 1 | 0 | 29 Controller | 27h | [part7-resilience](part7-resilience.md) |
-| 28.9 | 硬删除不一致 | 0 | 0 | 1 | 13 | 11h | [part7-resilience](part7-resilience.md) |
-| 28.10 | @Transactional+Reactive陷阱 | 0 | 1 | 0 | 17 | 13h | [part7-resilience](part7-resilience.md) |
-| 28.11 | 前端状态与数据流 | 0 | 1 | 3 | 62 any+91 useEffect | 21h | [part7-resilience](part7-resilience.md) |
+| 1 | 单体巨石无边界 | - | - | - | 1 | 38h | [part1-structure](./part1-structure.md) |
+| 2 | WebFlux+MyBatis矛盾 | - | - | - | 1 | 33h | [part1-structure](./part1-structure.md) |
+| 3 | 单库单连接池耦合 | - | - | - | 1 | 30h | [part1-structure](./part1-structure.md) |
+| 4 | Handler平铺 | - | - | - | 1 | 7h | [part1-structure](./part1-structure.md) |
+| 5 | Service层缺失 | - | - | - | 1 | 40h | [part1-structure](./part1-structure.md) |
+| 6 | DO直接暴露 | - | - | - | 1 | 40h | [part1-structure](./part1-structure.md) |
+| 7 | 安全漏洞 | 3 | 6 | 1 | 10 | 9h | [part2-security-concurrency](./part2-security-concurrency.md) |
+| 8 | 并发安全缺陷 | 3 | 3 | 2 | 8 | 16h | [part2-security-concurrency](./part2-security-concurrency.md) |
+| 9 | 异常处理缺陷 | 0 | 3 | 5 | 8 | 4.5h | [part2-security-concurrency](./part2-security-concurrency.md) |
+| 10 | 资源泄露 | 1 | 3 | 1 | 5 | 10h | [part2-security-concurrency](./part2-security-concurrency.md) |
+| 11 | 无全局状态管理 | - | - | - | 3 | 24h | [part3-frontend](./part3-frontend.md) |
+| 12 | API层缺陷 | - | - | - | 3 | 30h | [part3-frontend](./part3-frontend.md) |
+| 13 | 路由权限缺陷 | - | - | - | 4 | 6h | [part3-frontend](./part3-frontend.md) |
+| 14 | TypeScript any泛滥 | - | - | - | 4 | 14h | [part3-frontend](./part3-frontend.md) |
+| 15 | 前端性能问题 | - | - | - | 3 | 9h | [part3-frontend](./part3-frontend.md) |
+| 16 | 无生产部署方案 | - | - | - | 5 | 24h | [part4-ops](./part4-ops.md) |
+| 17 | 配置管理缺陷 | - | - | - | 5 | 10h | [part4-ops](./part4-ops.md) |
+| 18 | 可观测性缺失 | - | - | - | 4 | 20h | [part4-ops](./part4-ops.md) |
+| 19 | MQ配置不完整 | - | - | - | 4 | 8h | [part4-ops](./part4-ops.md) |
+| 20 | Flyway无回滚 | - | - | - | 1 | 8h | [part4-ops](./part4-ops.md) |
+| 21 | DAG引擎核心设计 | 2 | 7 | 4 | 19 | 67h | [part5-engine-deep](./part5-engine-deep.md) |
+| 22 | 数据模型与持久化 | 4 | 6 | 3 | 17 | 52h | [part5-engine-deep](./part5-engine-deep.md) |
+| 23 | API层与集成设计 | 2 | 5 | 3 | 12 | 44h | [part5-engine-deep](./part5-engine-deep.md) |
+| 24 | 前端架构深度 | 2 | 5 | 4 | 13 | 60.5h | [part5-engine-deep](./part5-engine-deep.md) |
+| 25 | 业务逻辑正确性 | 4 | 10 | 4 | 34 | 44h | [part6-logic-testing](./part6-logic-testing.md) |
+| 26 | 测试架构与覆盖 | 2 | 4 | 4 | 28 | 84h | [part6-logic-testing](./part6-logic-testing.md) |
+| 27 | 技术债与代码质量 | 0 | 2 | 4 | 30 | 22h | [part6-logic-testing](./part6-logic-testing.md) |
+| 28 | 可观测性与韧性 | 3 | 5 | 4 | 28 | 40h | [part7-resilience](./part7-resilience.md) |
+| 28.7 | Reactor线程模型违规 | 5 | 9 | 66 | 80+ | 17h | [part7-resilience](./part7-resilience.md) |
+| 28.8 | API输入验证零覆盖 | 0 | 1 | 0 | 29 Controller | 27h | [part7-resilience](./part7-resilience.md) |
+| 28.9 | 硬删除不一致 | 0 | 0 | 1 | 13 | 11h | [part7-resilience](./part7-resilience.md) |
+| 28.10 | @Transactional+Reactive陷阱 | 0 | 1 | 0 | 17 | 13h | [part7-resilience](./part7-resilience.md) |
+| 28.11 | 前端状态与数据流 | 0 | 1 | 3 | 62 any+91 useEffect | 21h | [part7-resilience](./part7-resilience.md) |
 | **合计** | | **34** | **80** | **124** | **~430项** | **~825.5h** | |
 
 ---
@@ -112,12 +112,12 @@ Week 7-8: 测试补全 + 前端深度
 
 | 文件 | 内容 |
 |---------|------|
-| [part1-structure.md](part1-structure.md) | 问题1-6：架构结构性问题 |
-| [part2-security-concurrency.md](part2-security-concurrency.md) | 问题7-10：安全/并发/异常/资源泄露 |
-| [part3-frontend.md](part3-frontend.md) | 问题11-15：前端架构问题 |
-| [part4-ops.md](part4-ops.md) | 问题16-20：运维与基础设施 |
-| [part5-engine-deep.md](part5-engine-deep.md) | 问题21-24：引擎核心/数据模型/API集成/前端深度 |
-| [part6-logic-testing.md](part6-logic-testing.md) | 问题25-27：业务逻辑/测试/技术债 |
-| [part7-resilience.md](part7-resilience.md) | 问题28/28.7-28.11：韧性/线程模型/验证/删除/事务/前端状态 |
+| [part1-structure.md](./part1-structure.md) | 问题1-6：架构结构性问题 |
+| [part2-security-concurrency.md](./part2-security-concurrency.md) | 问题7-10：安全/并发/异常/资源泄露 |
+| [part3-frontend.md](./part3-frontend.md) | 问题11-15：前端架构问题 |
+| [part4-ops.md](./part4-ops.md) | 问题16-20：运维与基础设施 |
+| [part5-engine-deep.md](./part5-engine-deep.md) | 问题21-24：引擎核心/数据模型/API集成/前端深度 |
+| [part6-logic-testing.md](./part6-logic-testing.md) | 问题25-27：业务逻辑/测试/技术债 |
+| [part7-resilience.md](./part7-resilience.md) | 问题28/28.7-28.11：韧性/线程模型/验证/删除/事务/前端状态 |
 
 **总工时**: ~825.5h（约103人日，8周并行 / 16周串行）

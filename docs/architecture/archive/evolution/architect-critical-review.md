@@ -779,7 +779,7 @@ Week 17-20: Notification-Service 独立部署
 
 ## 相关文档
 
-- [服务划分与新应用搭建方案](service-architecture-design.md)
-- [架构演进路线图](architecture-evolution-roadmap.md)
-- [目标架构总览](target-architecture-overview.md)
-- [数据平台架构设计](data-platform-architecture.md)
+- [服务划分与新应用搭建方案](./service-architecture-design.md)
+- [架构演进路线图](./architecture-evolution-roadmap.md)
+- [目标架构总览](./target-architecture-overview.md)
+- [数据平台架构设计](./data-platform-architecture.md)

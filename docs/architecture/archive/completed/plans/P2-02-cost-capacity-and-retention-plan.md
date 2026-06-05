@@ -19,7 +19,7 @@
 ## File Structure
 
 - Read: `docs/architecture/archive/completed/specs/P2-02-cost-capacity-and-retention-spec.md`
-- Read: `docs/architecture/reviewed-packages/p2/cost-capacity-and-retention/plan.md`
+- Read: `docs/architecture/active/reviewed-packages/p2/cost-capacity-and-retention/plan.md`
 - Read: `backend/canvas-engine/src/main/resources/application.yml`
 - Read: `backend/canvas-engine/src/main/resources/application-prod.yml`
 - Read: `docker-compose.local.yml`
@@ -27,9 +27,9 @@
 - Read: `docs/stressTest/distributed-capacity-runbook.md`
 - Modify: `backend/canvas-engine/src/main/java/org/chovy/canvas/engine/request/CanvasExecutionRequestBacklogMetrics.java`
 - Modify: `backend/canvas-engine/src/main/java/org/chovy/canvas/engine/scheduler/CanvasMetrics.java`
-- Create: `docs/architecture/capacity/slo-and-capacity-model.md`
-- Create: `docs/architecture/capacity/retention-policy.md`
-- Create: `docs/architecture/capacity/baseline-load-result.md`
+- Create: `docs/architecture/evidence/capacity/slo-and-capacity-model.md`
+- Create: `docs/architecture/evidence/capacity/retention-policy.md`
+- Create: `docs/architecture/evidence/capacity/baseline-load-result.md`
 - Create: `backend/canvas-engine/src/main/resources/db/migration/V239__execution_retention_policy.sql`
 - Test: `backend/canvas-engine/src/test/java/org/chovy/canvas/engine/request/CanvasExecutionRequestBacklogMetricsTest.java`
 - Test: `backend/canvas-engine/src/test/java/org/chovy/canvas/domain/execution/PerfRunTrackingSchemaTest.java`
@@ -38,7 +38,7 @@
 ### Task 1: Define product-facing SLA/SLO targets
 
 **Files:**
-- Create: `docs/architecture/capacity/slo-and-capacity-model.md`
+- Create: `docs/architecture/evidence/capacity/slo-and-capacity-model.md`
 - Read: `backend/canvas-engine/src/main/resources/application.yml`
 - Read: `backend/canvas-engine/src/main/resources/application-prod.yml`
 
@@ -48,8 +48,8 @@
 
 **Run:**
 ```bash
-test -f docs/architecture/capacity/slo-and-capacity-model.md
-rg "availability|trigger admission|execution completion|API p95|trace durability|error budget" docs/architecture/capacity/slo-and-capacity-model.md
+test -f docs/architecture/evidence/capacity/slo-and-capacity-model.md
+rg "availability|trigger admission|execution completion|API p95|trace durability|error budget" docs/architecture/evidence/capacity/slo-and-capacity-model.md
 ```
 
 **Expected:** The SLO document contains measurable targets, a metric source, and alert severity for each product-facing behavior.
@@ -57,7 +57,7 @@ rg "availability|trigger admission|execution completion|API p95|trace durability
 ### Task 2: Build a baseline capacity model from current config
 
 **Files:**
-- Modify: `docs/architecture/capacity/slo-and-capacity-model.md`
+- Modify: `docs/architecture/evidence/capacity/slo-and-capacity-model.md`
 - Read: `backend/canvas-engine/src/main/resources/application.yml`
 - Read: `docker-compose.local.yml`
 - Read: `backend/canvas-engine/src/main/java/org/chovy/canvas/engine/request/CanvasExecutionRequestBacklogMetrics.java`
@@ -69,7 +69,7 @@ rg "availability|trigger admission|execution completion|API p95|trace durability
 **Run:**
 ```bash
 rg "maximum-pool-size|max-active|ring-buffer-size|max-concurrency|queue-limit|consume-thread-number|trigger-concurrency" backend/canvas-engine/src/main/resources/application.yml
-rg "QPS|DAU|Redis memory|MQ depth|capacity cliff" docs/architecture/capacity/slo-and-capacity-model.md
+rg "QPS|DAU|Redis memory|MQ depth|capacity cliff" docs/architecture/evidence/capacity/slo-and-capacity-model.md
 ```
 
 **Expected:** The capacity model traces every listed config limit to workload input, saturation symptom, and mitigation.
@@ -77,7 +77,7 @@ rg "QPS|DAU|Redis memory|MQ depth|capacity cliff" docs/architecture/capacity/slo
 ### Task 3: Add data retention policy for MySQL tables and Redis key families
 
 **Files:**
-- Create: `docs/architecture/capacity/retention-policy.md`
+- Create: `docs/architecture/evidence/capacity/retention-policy.md`
 - Read: `backend/canvas-engine/src/main/java/org/chovy/canvas/infrastructure/redis/RedisKeyUtil.java`
 - Read: `backend/canvas-engine/src/main/resources/db/migration/V4__dlq_table.sql`
 - Read: `backend/canvas-engine/src/main/resources/db/migration/V46__canvas_execution_request.sql`
@@ -91,8 +91,8 @@ rg "QPS|DAU|Redis memory|MQ depth|capacity cliff" docs/architecture/capacity/slo
 
 **Run:**
 ```bash
-test -f docs/architecture/capacity/retention-policy.md
-rg "canvas_execution|canvas_execution_trace|canvas_execution_dlq|canvas_execution_request|Redis TTL|quota|audit" docs/architecture/capacity/retention-policy.md
+test -f docs/architecture/evidence/capacity/retention-policy.md
+rg "canvas_execution|canvas_execution_trace|canvas_execution_dlq|canvas_execution_request|Redis TTL|quota|audit" docs/architecture/evidence/capacity/retention-policy.md
 cd backend && mvn test -pl canvas-engine -Dtest=PerfRunTrackingSchemaTest,CanvasExecutionDlqSchemaTest
 ```
 
@@ -102,7 +102,7 @@ cd backend && mvn test -pl canvas-engine -Dtest=PerfRunTrackingSchemaTest,Canvas
 
 **Files:**
 - Create: `backend/canvas-engine/src/main/resources/db/migration/V239__execution_retention_policy.sql`
-- Modify: `docs/architecture/capacity/retention-policy.md`
+- Modify: `docs/architecture/evidence/capacity/retention-policy.md`
 - Test: `backend/canvas-engine/src/test/java/org/chovy/canvas/domain/execution/PerfRunTrackingSchemaTest.java`
 - Test: `backend/canvas-engine/src/test/java/org/chovy/canvas/domain/execution/CanvasExecutionDlqSchemaTest.java`
 
@@ -123,7 +123,7 @@ cd backend && mvn test -pl canvas-engine -Dtest=PerfRunTrackingSchemaTest,Canvas
 **Files:**
 - Modify: `backend/canvas-engine/src/main/java/org/chovy/canvas/engine/request/CanvasExecutionRequestBacklogMetrics.java`
 - Modify: `backend/canvas-engine/src/main/java/org/chovy/canvas/engine/scheduler/CanvasMetrics.java`
-- Create: `docs/architecture/capacity/dashboard-and-alerts.md`
+- Create: `docs/architecture/evidence/capacity/dashboard-and-alerts.md`
 - Test: `backend/canvas-engine/src/test/java/org/chovy/canvas/engine/request/CanvasExecutionRequestBacklogMetricsTest.java`
 - Test: `backend/canvas-engine/src/test/java/org/chovy/canvas/engine/trigger/TriggerPriorityConfigTest.java`
 
@@ -134,7 +134,7 @@ cd backend && mvn test -pl canvas-engine -Dtest=PerfRunTrackingSchemaTest,Canvas
 **Run:**
 ```bash
 cd backend && mvn test -pl canvas-engine -Dtest=CanvasExecutionRequestBacklogMetricsTest,TriggerPriorityConfigTest
-rg "pool saturation|queue depth|Redis memory|trace drops|DLQ|execution failures" docs/architecture/capacity/dashboard-and-alerts.md
+rg "pool saturation|queue depth|Redis memory|trace drops|DLQ|execution failures" docs/architecture/evidence/capacity/dashboard-and-alerts.md
 ```
 
 **Expected:** Dashboard documentation covers every metric in the spec, and backend metric tests pass.
@@ -142,7 +142,7 @@ rg "pool saturation|queue depth|Redis memory|trace drops|DLQ|execution failures"
 ### Task 6: Record baseline load readiness and non-publishable result status
 
 **Files:**
-- Create: `docs/architecture/capacity/baseline-load-result.md`
+- Create: `docs/architecture/evidence/capacity/baseline-load-result.md`
 - Read: `docs/stressTest/local-capacity-runbook.md`
 - Read: `docs/stressTest/distributed-capacity-runbook.md`
 - Read: `docker-compose.local.yml`
@@ -156,8 +156,8 @@ rg "pool saturation|queue depth|Redis memory|trace drops|DLQ|execution failures"
 cd backend && mvn test -pl canvas-engine -Dtest=CanvasExecutionRequestServiceTest,CanvasExecutionRequestExecutorTest
 node --test tools/perf/*.test.mjs
 node tools/perf/perf-guide.mjs doctor
-test -f docs/architecture/capacity/baseline-load-result.md
-rg "QPS|p95|execution failures|queue depth|Redis memory|DB pool|bottleneck" docs/architecture/capacity/baseline-load-result.md
+test -f docs/architecture/evidence/capacity/baseline-load-result.md
+rg "QPS|p95|execution failures|queue depth|Redis memory|DB pool|bottleneck" docs/architecture/evidence/capacity/baseline-load-result.md
 ```
 
 **Expected:** Baseline evidence exists with command, timestamp, dependency versions, required fields, and an explicit rule that `not measured` values must not be used as capacity claims.
@@ -169,10 +169,10 @@ rg "QPS|p95|execution failures|queue depth|Redis memory|DB pool|bottleneck" docs
 - Modify: `backend/canvas-engine/src/main/java/org/chovy/canvas/engine/request/CanvasExecutionRequestBacklogMetrics.java`
 - Modify: `backend/canvas-engine/src/main/java/org/chovy/canvas/engine/scheduler/CanvasMetrics.java`
 - Create: `backend/canvas-engine/src/main/resources/db/migration/V239__execution_retention_policy.sql`
-- Create: `docs/architecture/capacity/slo-and-capacity-model.md`
-- Create: `docs/architecture/capacity/retention-policy.md`
-- Create: `docs/architecture/capacity/dashboard-and-alerts.md`
-- Create: `docs/architecture/capacity/baseline-load-result.md`
+- Create: `docs/architecture/evidence/capacity/slo-and-capacity-model.md`
+- Create: `docs/architecture/evidence/capacity/retention-policy.md`
+- Create: `docs/architecture/evidence/capacity/dashboard-and-alerts.md`
+- Create: `docs/architecture/evidence/capacity/baseline-load-result.md`
 
 - [x] Review only files named in this plan.
 - [x] Record verification evidence for the plan, metrics, migration, tests, and capacity docs.
@@ -180,7 +180,7 @@ rg "QPS|p95|execution failures|queue depth|Redis memory|DB pool|bottleneck" docs
 
 **Run:**
 ```bash
-git diff -- docs/architecture/archive/completed/plans/P2-02-cost-capacity-and-retention-plan.md docs/architecture/archive/completed/specs/P2-02-cost-capacity-and-retention-spec.md docs/architecture/evidence/P2-02-cost-capacity-and-retention.md backend/canvas-engine/src/main/java/org/chovy/canvas/engine/request/CanvasExecutionRequestBacklogMetrics.java backend/canvas-engine/src/main/java/org/chovy/canvas/engine/scheduler/CanvasMetrics.java backend/canvas-engine/src/main/resources/db/migration/V239__execution_retention_policy.sql docs/architecture/capacity
+git diff -- docs/architecture/archive/completed/plans/P2-02-cost-capacity-and-retention-plan.md docs/architecture/archive/completed/specs/P2-02-cost-capacity-and-retention-spec.md docs/architecture/evidence/P2-02-cost-capacity-and-retention.md backend/canvas-engine/src/main/java/org/chovy/canvas/engine/request/CanvasExecutionRequestBacklogMetrics.java backend/canvas-engine/src/main/java/org/chovy/canvas/engine/scheduler/CanvasMetrics.java backend/canvas-engine/src/main/resources/db/migration/V239__execution_retention_policy.sql docs/architecture/evidence/capacity
 ```
 
 **Expected:** The handoff contains only the scoped capacity, retention, metric, migration, test, and evidence files for this package; no commit is created automatically.

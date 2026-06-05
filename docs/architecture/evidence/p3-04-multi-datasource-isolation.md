@@ -8,9 +8,9 @@ The current repository remains a single datasource and single Flyway stream. P3-
 
 ## Created Documents
 
-- `docs/architecture/work-products/p3-04-multi-datasource/datasource-ownership-map.md`
-- `docs/architecture/work-products/p3-04-multi-datasource/datasource-transaction-boundary-map.md`
-- `docs/architecture/work-products/p3-04-multi-datasource/datasource-migration-plan.md`
+- `docs/architecture/decisions/work-products/p3-04-multi-datasource/datasource-ownership-map.md`
+- `docs/architecture/decisions/work-products/p3-04-multi-datasource/datasource-transaction-boundary-map.md`
+- `docs/architecture/decisions/work-products/p3-04-multi-datasource/datasource-migration-plan.md`
 
 ## Inventory Commands
 
@@ -25,9 +25,9 @@ test -s /tmp/canvas_write_flows.txt
 ## Summary
 
 - Target datasource groups: control, runtime, CDP/customer, analytics, and ops.
-- Table assignment is recorded in `docs/architecture/work-products/p3-04-multi-datasource/datasource-ownership-map.md`.
-- Cross-group write flows are classified as same-datasource, outbox, saga, reconciliation, or blocked in `docs/architecture/work-products/p3-04-multi-datasource/datasource-transaction-boundary-map.md`.
-- Migration, rollback, and monitoring rules are recorded in `docs/architecture/work-products/p3-04-multi-datasource/datasource-migration-plan.md`.
+- Table assignment is recorded in `docs/architecture/decisions/work-products/p3-04-multi-datasource/datasource-ownership-map.md`.
+- Cross-group write flows are classified as same-datasource, outbox, saga, reconciliation, or blocked in `docs/architecture/decisions/work-products/p3-04-multi-datasource/datasource-transaction-boundary-map.md`.
+- Migration, rollback, and monitoring rules are recorded in `docs/architecture/decisions/work-products/p3-04-multi-datasource/datasource-migration-plan.md`.
 
 ## Blockers
 
@@ -40,12 +40,12 @@ test -s /tmp/canvas_write_flows.txt
 ## Verification Commands
 
 ```bash
-test -f docs/architecture/work-products/p3-04-multi-datasource/datasource-ownership-map.md
-rg -n "control|runtime|CDP/customer|analytics|ops|tenant|PII|retention|backup" docs/architecture/work-products/p3-04-multi-datasource/datasource-ownership-map.md
-test -f docs/architecture/work-products/p3-04-multi-datasource/datasource-transaction-boundary-map.md
-rg -n "outbox|saga|reconciliation|blocked|idempotency|rollback owner" docs/architecture/work-products/p3-04-multi-datasource/datasource-transaction-boundary-map.md
-test -f docs/architecture/work-products/p3-04-multi-datasource/datasource-migration-plan.md
-rg -n "Flyway|startup order|schema rollback|data copy|routing rollback|pool health|migration status|replication lag|reconciliation failure" docs/architecture/work-products/p3-04-multi-datasource/datasource-migration-plan.md
+test -f docs/architecture/decisions/work-products/p3-04-multi-datasource/datasource-ownership-map.md
+rg -n "control|runtime|CDP/customer|analytics|ops|tenant|PII|retention|backup" docs/architecture/decisions/work-products/p3-04-multi-datasource/datasource-ownership-map.md
+test -f docs/architecture/decisions/work-products/p3-04-multi-datasource/datasource-transaction-boundary-map.md
+rg -n "outbox|saga|reconciliation|blocked|idempotency|rollback owner" docs/architecture/decisions/work-products/p3-04-multi-datasource/datasource-transaction-boundary-map.md
+test -f docs/architecture/decisions/work-products/p3-04-multi-datasource/datasource-migration-plan.md
+rg -n "Flyway|startup order|schema rollback|data copy|routing rollback|pool health|migration status|replication lag|reconciliation failure" docs/architecture/decisions/work-products/p3-04-multi-datasource/datasource-migration-plan.md
 ```
 
 Result: all documentation checks passed.

@@ -1226,8 +1226,8 @@ logging:
 
 ## 八、相关文档
 
-- [架构演进路线图](architecture-evolution-roadmap.md)
-- [目标架构总览](target-architecture-overview.md)
-- [数据平台架构设计](data-platform-architecture.md)
-- [K8s部署方案](k8s-deployment-plan.md)
-- [企微SCRM模块设计](wecom-scrm-module-design.md)
+- [架构演进路线图](./architecture-evolution-roadmap.md)
+- [目标架构总览](./target-architecture-overview.md)
+- [数据平台架构设计](./data-platform-architecture.md)
+- [K8s部署方案](./k8s-deployment-plan.md)
+- [企微SCRM模块设计](./wecom-scrm-module-design.md)

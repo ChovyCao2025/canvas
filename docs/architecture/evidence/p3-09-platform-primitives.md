@@ -8,10 +8,10 @@ P3-09 now defines shared OneID, tenant, event schema, and engine/web boundary co
 
 ## Created Documents
 
-- `docs/architecture/work-products/p3-09-platform-primitives/platform-primitives.md`
-- `docs/architecture/work-products/p3-09-platform-primitives/tenant-platform-contract.md`
-- `docs/architecture/work-products/p3-09-platform-primitives/event-schema-governance.md`
-- `docs/architecture/work-products/p3-09-platform-primitives/engine-web-boundary.md`
+- `docs/architecture/decisions/work-products/p3-09-platform-primitives/platform-primitives.md`
+- `docs/architecture/decisions/work-products/p3-09-platform-primitives/tenant-platform-contract.md`
+- `docs/architecture/decisions/work-products/p3-09-platform-primitives/event-schema-governance.md`
+- `docs/architecture/decisions/work-products/p3-09-platform-primitives/engine-web-boundary.md`
 
 ## Inventory Commands
 
@@ -30,13 +30,13 @@ find backend/canvas-engine/src/main/java/org/chovy/canvas -path '*tenant*' -o -p
 ## Verification Commands
 
 ```bash
-test -f docs/architecture/work-products/p3-09-platform-primitives/platform-primitives.md
-test -f docs/architecture/work-products/p3-09-platform-primitives/tenant-platform-contract.md
-rg -n "OneID|source identity|merge|split|confidence|conflict|audit|tenant visibility|quota|tenant-scoped|compatibility" docs/architecture/work-products/p3-09-platform-primitives/platform-primitives.md docs/architecture/work-products/p3-09-platform-primitives/tenant-platform-contract.md
-test -f docs/architecture/work-products/p3-09-platform-primitives/event-schema-governance.md
-rg -n "schema owner|versioning|compatibility|replay|ordering|idempotency|deprecation|retention|canvas lifecycle|execution lifecycle|customer identity|reach delivery|ops|schemaVersion|eventId" docs/architecture/work-products/p3-09-platform-primitives/event-schema-governance.md
-test -f docs/architecture/work-products/p3-09-platform-primitives/engine-web-boundary.md
-rg -n "fail-open|fail-closed|Redis|RocketMQ|datasource|WeCom|analytics|AI|API boundary|event boundary|data ownership|deployment|rollback|observability|contract tests" docs/architecture/work-products/p3-09-platform-primitives/engine-web-boundary.md
+test -f docs/architecture/decisions/work-products/p3-09-platform-primitives/platform-primitives.md
+test -f docs/architecture/decisions/work-products/p3-09-platform-primitives/tenant-platform-contract.md
+rg -n "OneID|source identity|merge|split|confidence|conflict|audit|tenant visibility|quota|tenant-scoped|compatibility" docs/architecture/decisions/work-products/p3-09-platform-primitives/platform-primitives.md docs/architecture/decisions/work-products/p3-09-platform-primitives/tenant-platform-contract.md
+test -f docs/architecture/decisions/work-products/p3-09-platform-primitives/event-schema-governance.md
+rg -n "schema owner|versioning|compatibility|replay|ordering|idempotency|deprecation|retention|canvas lifecycle|execution lifecycle|customer identity|reach delivery|ops|schemaVersion|eventId" docs/architecture/decisions/work-products/p3-09-platform-primitives/event-schema-governance.md
+test -f docs/architecture/decisions/work-products/p3-09-platform-primitives/engine-web-boundary.md
+rg -n "fail-open|fail-closed|Redis|RocketMQ|datasource|WeCom|analytics|AI|API boundary|event boundary|data ownership|deployment|rollback|observability|contract tests" docs/architecture/decisions/work-products/p3-09-platform-primitives/engine-web-boundary.md
 ```
 
 Result: all documentation checks passed.

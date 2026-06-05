@@ -829,7 +829,7 @@ Phase 1.1 (数据模型)
 
 ## 九、相关文档
 
-- [目标架构总览](target-architecture-overview.md)
-- [K8s部署方案](k8s-deployment-plan.md)
-- [WebFlux→Spring MVC迁移](webflux-to-mvc-migration.md)
-- [多数据源隔离方案](multi-datasource-isolation.md)
+- [目标架构总览](./target-architecture-overview.md)
+- [K8s部署方案](./k8s-deployment-plan.md)
+- [WebFlux→Spring MVC迁移](./webflux-to-mvc-migration.md)
+- [多数据源隔离方案](./multi-datasource-isolation.md)

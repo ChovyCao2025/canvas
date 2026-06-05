@@ -21,14 +21,14 @@
 
 - Read: `docs/architecture/archive/completed/specs/P3-01-platform-evolution-spec.md`
 - Read: `docs/architecture/archive/completed/specs/P3-00-architecture-boundary-review-spec.md`
-- Read: `docs/architecture/reviewed-packages/p3/platform-evolution/plan.md`
+- Read: `docs/architecture/active/reviewed-packages/p3/platform-evolution/plan.md`
 - Read: `docs/architecture/archive/evolution/service-architecture-design.md`
 - Read: `docs/architecture/archive/evolution/target-architecture-overview.md`
 - Read: `docs/architecture/archive/evolution/production-practice-review.md`
 - Create: `docs/architecture/evidence/p3-01-platform-evolution.md`
-- Create: `docs/architecture/work-products/p3-01-platform-evolution/platform-evolution-promotion-checklist.md`
-- Modify: `docs/architecture/plans/README.md`
-- Modify: `docs/architecture/reviewed-packages/coverage-matrix.md`
+- Create: `docs/architecture/decisions/work-products/p3-01-platform-evolution/platform-evolution-promotion-checklist.md`
+- Modify: `docs/architecture/active/plans/README.md`
+- Modify: `docs/architecture/active/reviewed-packages/coverage-matrix.md`
 
 ### Task 1: Archive the existing evolution documents as source material
 
@@ -55,8 +55,8 @@ rg "service-architecture-design|target-architecture-overview|architect-critical-
 ### Task 2: Keep P3-01 as the umbrella entry point
 
 **Files:**
-- Modify: `docs/architecture/plans/README.md`
-- Create: `docs/architecture/work-products/p3-01-platform-evolution/platform-evolution-promotion-checklist.md`
+- Modify: `docs/architecture/active/plans/README.md`
+- Create: `docs/architecture/decisions/work-products/p3-01-platform-evolution/platform-evolution-promotion-checklist.md`
 - Read: `docs/architecture/archive/completed/specs/P3-01-platform-evolution-spec.md`
 - Read: `docs/architecture/archive/completed/plans/P3-02-service-decomposition-and-domain-boundaries-plan.md`
 - Read: `docs/architecture/archive/completed/plans/P3-03-data-platform-architecture-plan.md`
@@ -68,8 +68,8 @@ rg "service-architecture-design|target-architecture-overview|architect-critical-
 
 **Run:**
 ```bash
-test -f docs/architecture/work-products/p3-01-platform-evolution/platform-evolution-promotion-checklist.md
-rg "P3-01|platform-evolution entry point|owner|success metrics|migration|rollback|team capacity" docs/architecture/plans/README.md docs/architecture/work-products/p3-01-platform-evolution/platform-evolution-promotion-checklist.md
+test -f docs/architecture/decisions/work-products/p3-01-platform-evolution/platform-evolution-promotion-checklist.md
+rg "P3-01|platform-evolution entry point|owner|success metrics|migration|rollback|team capacity" docs/architecture/active/plans/README.md docs/architecture/decisions/work-products/p3-01-platform-evolution/platform-evolution-promotion-checklist.md
 ```
 
 **Expected:** P3-01 is the umbrella entry point, and the promotion checklist names every required gate.
@@ -77,8 +77,8 @@ rg "P3-01|platform-evolution entry point|owner|success metrics|migration|rollbac
 ### Task 3: Revisit after P0/P1 closure
 
 **Files:**
-- Modify: `docs/architecture/work-products/p3-01-platform-evolution/platform-evolution-promotion-checklist.md`
-- Read: `docs/architecture/reviewed-packages/coverage-matrix.md`
+- Modify: `docs/architecture/decisions/work-products/p3-01-platform-evolution/platform-evolution-promotion-checklist.md`
+- Read: `docs/architecture/active/reviewed-packages/coverage-matrix.md`
 - Read: `docs/architecture/archive/completed/specs/P0-01-security-hardening-spec.md`
 - Read: `docs/architecture/archive/completed/specs/P0-03-canvas-state-data-consistency-spec.md`
 - Read: `docs/architecture/archive/completed/specs/P1-04-observability-and-ops-spec.md`
@@ -90,7 +90,7 @@ rg "P3-01|platform-evolution entry point|owner|success metrics|migration|rollbac
 
 **Run:**
 ```bash
-rg "P0-01|P0-03|P0-06|P1-04|P1-05|risk acceptance|expiration date" docs/architecture/work-products/p3-01-platform-evolution/platform-evolution-promotion-checklist.md
+rg "P0-01|P0-03|P0-06|P1-04|P1-05|risk acceptance|expiration date" docs/architecture/decisions/work-products/p3-01-platform-evolution/platform-evolution-promotion-checklist.md
 cd backend && mvn test -pl canvas-engine -Dtest=SecurityConfigRouteTest,CanvasTransactionAnnotationTest,TenantServiceTest
 ```
 
@@ -99,7 +99,7 @@ cd backend && mvn test -pl canvas-engine -Dtest=SecurityConfigRouteTest,CanvasTr
 ### Task 4: Use the focused P3 specs for promoted evolution items
 
 **Files:**
-- Modify: `docs/architecture/work-products/p3-01-platform-evolution/platform-evolution-promotion-checklist.md`
+- Modify: `docs/architecture/decisions/work-products/p3-01-platform-evolution/platform-evolution-promotion-checklist.md`
 - Read: `docs/architecture/archive/completed/specs/P3-02-service-decomposition-and-domain-boundaries-spec.md`
 - Read: `docs/architecture/archive/completed/specs/P3-03-data-platform-architecture-spec.md`
 - Read: `docs/architecture/archive/completed/specs/P3-04-multi-datasource-isolation-spec.md`
@@ -115,7 +115,7 @@ cd backend && mvn test -pl canvas-engine -Dtest=SecurityConfigRouteTest,CanvasTr
 
 **Run:**
 ```bash
-rg "P3-02|P3-03|P3-04|P3-05|P3-06|P3-07|P3-08|P3-09|ADR|evidence file" docs/architecture/work-products/p3-01-platform-evolution/platform-evolution-promotion-checklist.md
+rg "P3-02|P3-03|P3-04|P3-05|P3-06|P3-07|P3-08|P3-09|ADR|evidence file" docs/architecture/decisions/work-products/p3-01-platform-evolution/platform-evolution-promotion-checklist.md
 ```
 
 **Expected:** Every focused P3 spec has a promotion row and evidence requirement.
@@ -123,8 +123,8 @@ rg "P3-02|P3-03|P3-04|P3-05|P3-06|P3-07|P3-08|P3-09|ADR|evidence file" docs/arch
 ### Task 5: Require migration, rollback, operations, and team-capacity sections before implementation
 
 **Files:**
-- Modify: `docs/architecture/work-products/p3-01-platform-evolution/platform-evolution-promotion-checklist.md`
-- Modify: `docs/architecture/reviewed-packages/coverage-matrix.md`
+- Modify: `docs/architecture/decisions/work-products/p3-01-platform-evolution/platform-evolution-promotion-checklist.md`
+- Modify: `docs/architecture/active/reviewed-packages/coverage-matrix.md`
 - Read: `docs/architecture/archive/completed/specs/P3-01-platform-evolution-spec.md`
 
 - [x] Add checklist rows for migration plan, rollback plan, operating model, on-call owner, runbook, test plan, data migration, observability, and team capacity.
@@ -133,8 +133,8 @@ rg "P3-02|P3-03|P3-04|P3-05|P3-06|P3-07|P3-08|P3-09|ADR|evidence file" docs/arch
 
 **Run:**
 ```bash
-rg "migration plan|rollback plan|operating model|on-call owner|runbook|test plan|data migration|observability|team capacity" docs/architecture/work-products/p3-01-platform-evolution/platform-evolution-promotion-checklist.md
-rg "P3 platform evolution" docs/architecture/reviewed-packages/coverage-matrix.md
+rg "migration plan|rollback plan|operating model|on-call owner|runbook|test plan|data migration|observability|team capacity" docs/architecture/decisions/work-products/p3-01-platform-evolution/platform-evolution-promotion-checklist.md
+rg "P3 platform evolution" docs/architecture/active/reviewed-packages/coverage-matrix.md
 ```
 
 **Expected:** Promotion checklist and coverage matrix both show the required implementation-readiness sections.
@@ -143,10 +143,10 @@ rg "P3 platform evolution" docs/architecture/reviewed-packages/coverage-matrix.m
 
 **Files:**
 - Modify: `docs/architecture/archive/completed/plans/P3-01-platform-evolution-plan.md`
-- Modify: `docs/architecture/plans/README.md`
-- Modify: `docs/architecture/reviewed-packages/coverage-matrix.md`
+- Modify: `docs/architecture/active/plans/README.md`
+- Modify: `docs/architecture/active/reviewed-packages/coverage-matrix.md`
 - Create: `docs/architecture/evidence/p3-01-platform-evolution.md`
-- Create: `docs/architecture/work-products/p3-01-platform-evolution/platform-evolution-promotion-checklist.md`
+- Create: `docs/architecture/decisions/work-products/p3-01-platform-evolution/platform-evolution-promotion-checklist.md`
 
 - [x] Review only files named in this plan.
 - [x] Do not stage or commit in this session unless the user explicitly asks.
@@ -154,7 +154,7 @@ rg "P3 platform evolution" docs/architecture/reviewed-packages/coverage-matrix.m
 
 **Run:**
 ```bash
-git diff -- docs/architecture/archive/completed/plans/P3-01-platform-evolution-plan.md docs/architecture/plans/README.md docs/architecture/reviewed-packages/coverage-matrix.md docs/architecture/evidence/p3-01-platform-evolution.md docs/architecture/work-products/p3-01-platform-evolution/platform-evolution-promotion-checklist.md
+git diff -- docs/architecture/archive/completed/plans/P3-01-platform-evolution-plan.md docs/architecture/active/plans/README.md docs/architecture/active/reviewed-packages/coverage-matrix.md docs/architecture/evidence/p3-01-platform-evolution.md docs/architecture/decisions/work-products/p3-01-platform-evolution/platform-evolution-promotion-checklist.md
 ```
 
 **Expected:** The diff contains only P3-01 governance, evidence, checklist, README, and coverage-matrix changes. No commit is created by default.

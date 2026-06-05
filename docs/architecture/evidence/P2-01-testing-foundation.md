@@ -8,8 +8,8 @@ Implemented and verified the testing foundation for backend unit/controller test
 
 ## Implemented Artifacts
 
-- `docs/architecture/testing/test-layer-map.md` maps backend unit, backend integration, migration/schema, controller/API, and frontend behavior layers.
-- `docs/architecture/testing/manual-verification.md` records RocketMQ, local capacity, and distributed capacity manual substitutes with owners, evidence destinations, expiration dates, and automated replacement paths.
+- `docs/architecture/evidence/testing/test-layer-map.md` maps backend unit, backend integration, migration/schema, controller/API, and frontend behavior layers.
+- `docs/architecture/evidence/testing/manual-verification.md` records RocketMQ, local capacity, and distributed capacity manual substitutes with owners, evidence destinations, expiration dates, and automated replacement paths.
 - `backend/canvas-engine/src/test/java/org/chovy/canvas/testsupport/CanvasIntegrationTestBase.java` starts MySQL 8 and Redis 7 Testcontainers and applies Flyway migrations.
 - `backend/canvas-engine/src/test/java/org/chovy/canvas/testsupport/CanvasRocketMqTestSupport.java` gates RocketMQ-dependent integration tests behind a documented local substitute.
 - `.github/workflows/canvas-ci.yml` contains backend unit, backend integration, frontend, Flyway, profile, deployment config, and container build jobs.
@@ -35,6 +35,6 @@ Implemented and verified the testing foundation for backend unit/controller test
 
 ## Residual Manual Items
 
-- RocketMQ broker integration remains manual through `docs/architecture/testing/manual-verification.md` until a stable RocketMQ Testcontainer replaces the substitute.
+- RocketMQ broker integration remains manual through `docs/architecture/evidence/testing/manual-verification.md` until a stable RocketMQ Testcontainer replaces the substitute.
 - Local and distributed capacity runs remain manual because they require the local Docker stack or multi-worker environment.
 - No commit was created; the working tree contains unrelated active changes and staging/commit should be user-controlled.

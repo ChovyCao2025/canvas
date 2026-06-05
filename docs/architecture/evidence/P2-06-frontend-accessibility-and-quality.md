@@ -11,7 +11,7 @@ Status date: 2026-06-05
 - Added `frontend/src/pages/canvas-editor/CanvasEditorErrorBoundary.tsx` for local editor-region recovery.
 - Wrapped the canvas editor node library, React Flow canvas, execution trace entry, and config panel in local boundaries.
 - Added `frontend/src/pages/canvas-editor/CanvasEditorErrorBoundary.test.tsx` for local fallback and selected-node reset behavior.
-- Added `docs/architecture/frontend/accessibility-audit.md` covering login, home, canvas list, canvas editor, API docs, tenant admin, and notification bell workflows.
+- Added `docs/architecture/evidence/frontend/accessibility-audit.md` covering login, home, canvas list, canvas editor, API docs, tenant admin, and notification bell workflows.
 - Added `frontend/src/pages/canvas-editor/canvasEditorAccessibility.ts` and tests for static keyboard/focus/ARIA coverage.
 - Improved focus/ARIA behavior for `HoverEdge`, `NodeLibraryItem`, and `NotificationBell`.
 - Added `frontend/src/test/accessibilityChecks.ts` to check role, accessible-name, missing-label, and focusable metadata in Node-compatible tests.
@@ -60,8 +60,8 @@ Result: 51 tests, 0 failures, 0 errors.
 ```bash
 cd frontend
 npm test -- canvasEditorAccessibility notificationPresentation nodeLibrary
-test -f ../docs/architecture/frontend/accessibility-audit.md
-rg "keyboard order|visible focus|screen-reader name|canvas editor|notification bell" ../docs/architecture/frontend/accessibility-audit.md
+test -f ../docs/architecture/evidence/frontend/accessibility-audit.md
+rg "keyboard order|visible focus|screen-reader name|canvas editor|notification bell" ../docs/architecture/evidence/frontend/accessibility-audit.md
 ```
 
 Result: 12 tests, 0 failures, 0 errors, and the audit document keyword check exited 0.

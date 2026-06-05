@@ -21,7 +21,7 @@
 ## File Structure
 
 - Create: `docs/architecture/evidence/p3-06-k8s-platform.md`
-- Create: `docs/architecture/work-products/p3-06-k8s-platform/k8s-operating-model.md`
+- Create: `docs/architecture/decisions/work-products/p3-06-k8s-platform/k8s-operating-model.md`
 - Create: `deploy/helm/canvas/Chart.yaml`
 - Create: `deploy/helm/canvas/values.yaml`
 - Create: `deploy/helm/canvas/values-staging.yaml`
@@ -31,12 +31,12 @@
 - Create: `deploy/helm/canvas/templates/ingress.yaml`
 - Create: `deploy/helm/canvas/templates/configmap.yaml`
 - Create: `deploy/helm/canvas/templates/secret-ref.yaml`
-- Create: `docs/architecture/runbooks/k8s-rollout-rollback.md`
+- Create: `docs/architecture/evidence/runbooks/k8s-rollout-rollback.md`
 
 ### Task 1: Define Operating Model
 
 **Files:**
-- Create: `docs/architecture/work-products/p3-06-k8s-platform/k8s-operating-model.md`
+- Create: `docs/architecture/decisions/work-products/p3-06-k8s-platform/k8s-operating-model.md`
 - Create: `docs/architecture/evidence/p3-06-k8s-platform.md`
 
 - [x] Name owners for MySQL, Redis, RocketMQ, ingress, monitoring, secrets, image registry, and cluster upgrades.
@@ -46,8 +46,8 @@
 Run:
 
 ```bash
-test -f docs/architecture/work-products/p3-06-k8s-platform/k8s-operating-model.md
-rg -n "MySQL|Redis|RocketMQ|Ingress|Monitoring|Secrets|SLO|staging|production|managed service|self-operated" docs/architecture/work-products/p3-06-k8s-platform/k8s-operating-model.md
+test -f docs/architecture/decisions/work-products/p3-06-k8s-platform/k8s-operating-model.md
+rg -n "MySQL|Redis|RocketMQ|Ingress|Monitoring|Secrets|SLO|staging|production|managed service|self-operated" docs/architecture/decisions/work-products/p3-06-k8s-platform/k8s-operating-model.md
 ```
 
 Expected: operating model names dependency owners, environments, SLOs, and operating responsibility.
@@ -82,7 +82,7 @@ Expected: Helm template renders staging YAML and includes probes, resources, sec
 ### Task 3: Add Rollout And Rollback Runbook
 
 **Files:**
-- Create: `docs/architecture/runbooks/k8s-rollout-rollback.md`
+- Create: `docs/architecture/evidence/runbooks/k8s-rollout-rollback.md`
 - Modify: `docs/architecture/evidence/p3-06-k8s-platform.md`
 - Modify: `docs/architecture/archive/completed/plans/P3-06-k8s-deployment-platform-plan.md`
 
@@ -93,9 +93,9 @@ Expected: Helm template renders staging YAML and includes probes, resources, sec
 Run:
 
 ```bash
-test -f docs/architecture/runbooks/k8s-rollout-rollback.md
-rg -n "Smoke|Health|Metrics|Login|Rollback|Migration|Image|Config|Evidence" docs/architecture/runbooks/k8s-rollout-rollback.md
-git diff -- deploy/helm/canvas docs/architecture/work-products/p3-06-k8s-platform/k8s-operating-model.md docs/architecture/runbooks/k8s-rollout-rollback.md docs/architecture/evidence/p3-06-k8s-platform.md docs/architecture/archive/completed/plans/P3-06-k8s-deployment-platform-plan.md
+test -f docs/architecture/evidence/runbooks/k8s-rollout-rollback.md
+rg -n "Smoke|Health|Metrics|Login|Rollback|Migration|Image|Config|Evidence" docs/architecture/evidence/runbooks/k8s-rollout-rollback.md
+git diff -- deploy/helm/canvas docs/architecture/decisions/work-products/p3-06-k8s-platform/k8s-operating-model.md docs/architecture/evidence/runbooks/k8s-rollout-rollback.md docs/architecture/evidence/p3-06-k8s-platform.md docs/architecture/archive/completed/plans/P3-06-k8s-deployment-platform-plan.md
 # Do not stage or commit in this session unless the user explicitly asks.
 ```
 

@@ -8,15 +8,15 @@ P3-07 accepts only one production platform component for proof: Redisson behind 
 
 ## Created Documents
 
-- `docs/architecture/work-products/p3-07-platform-components/platform-component-decision-matrix.md`
-- `docs/architecture/adr/platform-component-first-pov.md`
-- `docs/architecture/work-products/p3-07-platform-components/platform-component-abstraction-plan.md`
+- `docs/architecture/decisions/work-products/p3-07-platform-components/platform-component-decision-matrix.md`
+- `docs/architecture/decisions/adr/platform-component-first-pov.md`
+- `docs/architecture/decisions/work-products/p3-07-platform-components/platform-component-abstraction-plan.md`
 
 ## Inventory Commands
 
 ```bash
 rg -n "^##|^###|XXL|Redisson|Nacos|Knife4j|Sentinel|Spring Boot Admin|ClickHouse|Logstash|Kibana|Zipkin|Harbor|Nexus|SonarQube|JMeter|Locust|Feign|Gateway|DolphinScheduler" docs/architecture/archive/evolution/production-practice-review.md
-rg -n "Redisson|RLock|tryLock|StringRedisTemplate|LockSupport|lock:|distributed lock|@Scheduled|Scheduled|Scheduler|Nacos|Sentinel|resilience4j|CircuitBreaker|Spring Boot Admin|Knife4j|springdoc|ClickHouse|Doris|Prometheus|Grafana|Logstash|Zipkin" backend/canvas-engine/src/main/java backend/canvas-engine/src/main/resources docs/architecture/evidence docs/architecture/runbooks deploy ops
+rg -n "Redisson|RLock|tryLock|StringRedisTemplate|LockSupport|lock:|distributed lock|@Scheduled|Scheduled|Scheduler|Nacos|Sentinel|resilience4j|CircuitBreaker|Spring Boot Admin|Knife4j|springdoc|ClickHouse|Doris|Prometheus|Grafana|Logstash|Zipkin" backend/canvas-engine/src/main/java backend/canvas-engine/src/main/resources docs/architecture/evidence docs/architecture/evidence/runbooks deploy ops
 rg -n "@Scheduled" backend/canvas-engine/src/main/java/org/chovy/canvas
 ```
 
@@ -37,12 +37,12 @@ rg -n "@Scheduled" backend/canvas-engine/src/main/java/org/chovy/canvas
 ## Verification Commands
 
 ```bash
-test -f docs/architecture/work-products/p3-07-platform-components/platform-component-decision-matrix.md
-rg -n "XXL|Redisson|Nacos|Knife4j|Sentinel|Spring Boot Admin|ClickHouse|owner|failure mode|rollback|decision" docs/architecture/work-products/p3-07-platform-components/platform-component-decision-matrix.md
-test -f docs/architecture/adr/platform-component-first-pov.md
-rg -n "Problem|Decision|Alternatives|Rollout|Rollback|Owner|Success metric|Stop criteria|Deferred" docs/architecture/adr/platform-component-first-pov.md
-test -f docs/architecture/work-products/p3-07-platform-components/platform-component-abstraction-plan.md
-rg -n "interface|proof test|operational drill|metric|dashboard|rollback command|owner signoff" docs/architecture/work-products/p3-07-platform-components/platform-component-abstraction-plan.md
+test -f docs/architecture/decisions/work-products/p3-07-platform-components/platform-component-decision-matrix.md
+rg -n "XXL|Redisson|Nacos|Knife4j|Sentinel|Spring Boot Admin|ClickHouse|owner|failure mode|rollback|decision" docs/architecture/decisions/work-products/p3-07-platform-components/platform-component-decision-matrix.md
+test -f docs/architecture/decisions/adr/platform-component-first-pov.md
+rg -n "Problem|Decision|Alternatives|Rollout|Rollback|Owner|Success metric|Stop criteria|Deferred" docs/architecture/decisions/adr/platform-component-first-pov.md
+test -f docs/architecture/decisions/work-products/p3-07-platform-components/platform-component-abstraction-plan.md
+rg -n "interface|proof test|operational drill|metric|dashboard|rollback command|owner signoff" docs/architecture/decisions/work-products/p3-07-platform-components/platform-component-abstraction-plan.md
 ```
 
 Result: all documentation checks passed.

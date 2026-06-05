@@ -8,10 +8,10 @@ Implemented and verified repository-controlled SLO, capacity, retention, dashboa
 
 ## Implemented Artifacts
 
-- `docs/architecture/capacity/slo-and-capacity-model.md` defines measurable SLOs, current capacity inputs, workload mapping, and capacity cliffs.
-- `docs/architecture/capacity/retention-policy.md` defines MySQL retention/archive/delete policy and Redis TTL rules.
-- `docs/architecture/capacity/dashboard-and-alerts.md` maps capacity metrics to dashboard panels, thresholds, owners, and runbooks.
-- `docs/architecture/capacity/baseline-load-result.md` records the non-publishable baseline status, required result fields, dependency versions, and acceptance rule.
+- `docs/architecture/evidence/capacity/slo-and-capacity-model.md` defines measurable SLOs, current capacity inputs, workload mapping, and capacity cliffs.
+- `docs/architecture/evidence/capacity/retention-policy.md` defines MySQL retention/archive/delete policy and Redis TTL rules.
+- `docs/architecture/evidence/capacity/dashboard-and-alerts.md` maps capacity metrics to dashboard panels, thresholds, owners, and runbooks.
+- `docs/architecture/evidence/capacity/baseline-load-result.md` records the non-publishable baseline status, required result fields, dependency versions, and acceptance rule.
 - `backend/canvas-engine/src/main/resources/db/migration/V239__execution_retention_policy.sql` adds retention policy schema through the next available migration version.
 - `backend/canvas-engine/src/main/java/org/chovy/canvas/engine/scheduler/CanvasMetrics.java` exposes capacity gauges/counters for pool saturation, lane saturation, queue depth, Redis memory, DLQ backlog, and trace drops.
 - Schema and metrics tests assert the new migration and metric names.
