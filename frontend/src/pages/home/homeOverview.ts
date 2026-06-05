@@ -54,13 +54,35 @@ export interface HomeTopCanvas {
   failed: number
 }
 
+/** 首页关注项和风险摘要支持的展示等级。 */
+export type AttentionSeverity = 'error' | 'warning' | 'info' | 'success' | string
+
 /** 需要运营关注的异常或提示项。 */
 export interface HomeAttentionItem {
   canvasId: number
   name: string
   type: 'HIGH_FAILURE_RATE' | 'HAS_FAILURES' | 'NO_RECENT_EXECUTIONS' | string
   message: string
-  severity: 'warning' | 'info' | string
+  severity: AttentionSeverity
+}
+
+/** 首页风险摘要展示模型。 */
+export interface RiskSummary {
+  healthy: boolean
+  title: string
+  message: string
+  severity: AttentionSeverity
+  actionLabel: string
+  targetCanvasId: number | null
+  failedExecutions: string
+  successRate: string
+  pendingCount: number
+}
+
+/** 关注项主操作展示模型。 */
+export interface AttentionAction {
+  label: string
+  destination: 'stats' | 'edit'
 }
 
 /** KPI 卡片展示模型，页面直接消费。 */
@@ -144,6 +166,80 @@ export function getAttentionPresentation(severity: string) {
   if (severity === 'warning') return { color: 'orange', label: '关注' }
   if (severity === 'error') return { color: 'red', label: '异常' }
   return { color: 'blue', label: '提示' }
+}
+
+/** 按运营处理优先级排序关注项，同等级保持后端原始顺序。 */
+export function sortAttentionItems(items: HomeAttentionItem[]): HomeAttentionItem[] {
+  return items
+    .map((item, index) => ({ item, index }))
+    .sort((left, right) => {
+      const priorityDiff = severityPriority(left.item.severity) - severityPriority(right.item.severity)
+      if (priorityDiff !== 0) return priorityDiff
+      return left.index - right.index
+    })
+    .map(({ item }) => item)
+}
+
+/** 根据关注项类型给出页面主操作。 */
+export function getAttentionAction(type: HomeAttentionItem['type']): AttentionAction {
+  if (type === 'NO_RECENT_EXECUTIONS') return { label: '编辑', destination: 'edit' }
+  if (type === 'HIGH_FAILURE_RATE') return { label: '处理', destination: 'stats' }
+  return { label: '查看', destination: 'stats' }
+}
+
+/** 汇总首页当前最高优先级风险和关键运行指标。 */
+export function buildRiskSummary(overview: HomeOverview): RiskSummary {
+  const failedExecutions = formatNumber(overview.summary.failedExecutions)
+  const successRate = overview.summary.successRate || '0%'
+  const pendingCount = overview.attentionItems.length
+
+  if (pendingCount === 0) {
+    return {
+      healthy: true,
+      title: '当前暂无高优先级异常',
+      message: '近 7 天旅程运行稳定，可继续关注触达趋势和 Top 旅程表现',
+      severity: 'success',
+      actionLabel: '查看趋势',
+      targetCanvasId: null,
+      failedExecutions,
+      successRate,
+      pendingCount,
+    }
+  }
+
+  const [selectedItem] = sortAttentionItems(overview.attentionItems)
+  const action = getAttentionAction(selectedItem.type)
+
+  return {
+    healthy: false,
+    title: selectedItem.name,
+    message: selectedItem.message,
+    severity: selectedItem.severity,
+    actionLabel: action.label,
+    targetCanvasId: selectedItem.canvasId,
+    failedExecutions,
+    successRate,
+    pendingCount,
+  }
+}
+
+/** 基于本地关键词筛选 Top 旅程和关注项，不改变后端原始概览对象。 */
+export function filterHomeOverview(overview: HomeOverview, keyword: string): HomeOverview {
+  const normalizedKeyword = keyword.trim().toLowerCase()
+  if (!normalizedKeyword) return overview
+
+  return {
+    ...overview,
+    topCanvases: overview.topCanvases.filter(canvas => canvas.name.toLowerCase().includes(normalizedKeyword)),
+    attentionItems: overview.attentionItems.filter(item => item.name.toLowerCase().includes(normalizedKeyword)),
+  }
+}
+
+function severityPriority(severity: AttentionSeverity) {
+  if (severity === 'error') return 0
+  if (severity === 'warning') return 1
+  if (severity === 'info') return 2
+  return 3
 }
 
 /** 数字统一格式化为本地千分位，空值按 0 处理。 */
