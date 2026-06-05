@@ -11,7 +11,8 @@ Add tenant-scoped webhook subscription storage, delivery log storage, callback U
 
 ## Current Baseline
 
-- There is no `webhook_subscription` table or `webhook_delivery_log` table.
+- Implemented on 2026-06-05.
+- `webhook_subscription` and `webhook_delivery_log` are created by `V103__webhook_subscription_schema.sql`.
 - `OutboundUrlValidator` already validates outbound HTTP URLs and blocks local/private hosts.
 - P1-005A2 provides the internal CDP event shape and P1-005A provides enriched event identity fields.
 
@@ -38,15 +39,24 @@ Add tenant-scoped webhook subscription storage, delivery log storage, callback U
 
 ## Technical Scope
 
-- `backend/canvas-engine/src/main/resources/db/migration/V98__webhook_subscription_schema.sql`
+- `backend/canvas-engine/src/main/resources/db/migration/V103__webhook_subscription_schema.sql`
 - `backend/canvas-engine/src/main/java/org/chovy/canvas/dal/dataobject/WebhookSubscriptionDO.java`
 - `backend/canvas-engine/src/main/java/org/chovy/canvas/dal/dataobject/WebhookDeliveryLogDO.java`
 - Matching MyBatis-Plus mappers.
-- `backend/canvas-engine/src/main/java/org/chovy/canvas/domain/webhook/WebhookSignatureService.java`
-- `backend/canvas-engine/src/main/java/org/chovy/canvas/domain/webhook/WebhookSubscriptionValidator.java`
+- `backend/canvas-engine/src/main/java/org/chovy/canvas/domain/cdp/WebhookSignatureService.java`
+- `backend/canvas-engine/src/main/java/org/chovy/canvas/domain/cdp/WebhookSubscriptionValidator.java`
+- `backend/canvas-engine/src/test/java/org/chovy/canvas/domain/cdp/WebhookSubscriptionSchemaTest.java`
+- `backend/canvas-engine/src/test/java/org/chovy/canvas/domain/cdp/WebhookSignatureServiceTest.java`
+- `backend/canvas-engine/src/test/java/org/chovy/canvas/domain/cdp/WebhookSubscriptionValidatorTest.java`
 
 ## Acceptance Criteria
 
 - Schema tests prove subscription and delivery log fields exist.
 - Signature tests prove deterministic HMAC headers.
 - Validator tests reject localhost/private callback URLs and blank event type lists.
+
+## Implementation Status
+
+- Status: implemented on 2026-06-05.
+- Production compile: `cd backend && JAVA_HOME=/Users/photonpay/Library/Java/JavaVirtualMachines/ms-21.0.11/Contents/Home PATH="/Users/photonpay/Library/Java/JavaVirtualMachines/ms-21.0.11/Contents/Home/bin:$PATH" mvn -pl canvas-engine -DskipTests compile` passed.
+- Focused backend tests were added, but Maven `testCompile` is currently blocked by unrelated existing test-source errors before these tests can run. Known blockers include duplicate `KillSwitchSubscriberTest`, missing P2-079 automation-run classes, stale constructor/API expectations in existing tests, and missing `ExecutionContext#getNodeOutput(...)` expected by `ExecutionContextNamespaceTest`.
