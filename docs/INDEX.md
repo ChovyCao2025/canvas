@@ -15,6 +15,7 @@
 - [architecture/index.md](architecture/index.md) — 架构文档目录索引
 - [architecture/specs/README.md](architecture/specs/README.md) — 已审核并按优先级展开的架构 specs
 - [architecture/plans/README.md](architecture/plans/README.md) — 与 specs 配对的架构实施 plans
+- [architecture/status/implementation-status.md](architecture/status/implementation-status.md) — 架构工程实施状态台账，区分文档完成与工程完成
 - [architecture/reviewed-packages/coverage-matrix.md](architecture/reviewed-packages/coverage-matrix.md) — 历史来源到当前包的覆盖矩阵
 - [architecture/work-products/README.md](architecture/work-products/README.md) — P3 架构包产出的支撑文档索引
 - [architecture/archive/reference/backend-architecture.md](architecture/archive/reference/backend-architecture.md) — 后端架构历史参考：单体 WebFlux + MyBatis-Plus + Disruptor
@@ -191,7 +192,7 @@
 |------------|-------------|
 | 系统整体设计 | `marketing-canvas-design.md` |
 | 技术选型理由 | `product-evolution/archive/2026-06-03/tech-selection-whitepaper.md` |
-| 当前架构问题 | `architecture/specs/README.md` + `architecture/reviewed-packages/coverage-matrix.md` |
+| 当前架构问题 | `architecture/status/implementation-status.md` + `architecture/specs/README.md` |
 | 架构如何演进 | `architecture/archive/completed/specs/P3-01-platform-evolution-spec.md` + `architecture/work-products/p3-01-platform-evolution/platform-evolution-promotion-checklist.md` |
 | 代码质量问题 | `code-review/deep-code-audit-all-rounds-summary.md` |
 | 安全漏洞 | `code-review/deep-code-audit-round9.md` + `round10.md` |

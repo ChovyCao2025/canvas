@@ -5,14 +5,16 @@
 - [reviewed-packages/](reviewed-packages/README.md)：已审核的来源问题包，按优先级保留，用于追溯；它不是当前待开发清单。
 - [specs/](specs/README.md)：已完成并归档的优先级 spec 导航入口。
 - [plans/](plans/README.md)：已完成并归档的优先级实施 plan 导航入口。
+- [status/](status/README.md)：架构工程实施状态台账，说明哪些只是文档完成、哪些仍待实现或待决策。
 - [work-products/](work-products/README.md)：P3 架构包实施过程中产出的支撑文档。
 - [archive/](archive/README.md)：已处理的历史来源材料，以及已完成的 spec/plan 归档。
 
-判断文档状态时，以 `archive/completed/` 作为“已完成 spec/plan”的正式记录；以 `reviewed-packages/` 作为“已审核来源包”的追溯记录；以 `work-products/` 存放支撑性的决策、清单、矩阵和检查表。旧的评审和整改文档已经抽取主要问题并重新核实，原文保留在归档目录中。
+判断文档状态时，以 `archive/completed/` 作为“已完成 spec/plan”的正式记录；以 `status/implementation-status.md` 判断工程是否落地；以 `reviewed-packages/` 作为“已审核来源包”的追溯记录；以 `work-products/` 存放支撑性的决策、清单、矩阵和检查表。旧的评审和整改文档已经抽取主要问题并重新核实，原文保留在归档目录中。
 
 ## 状态说明
 
 - 已完成的文档包：`archive/completed/specs/` 和 `archive/completed/plans/`。
+- 工程实施状态：`status/implementation-status.md`。
 - 已完成 P3 包的支撑产物：`work-products/`。
 - 已审核但仅用于追溯的来源包：`reviewed-packages/`。
 - 尚未采纳、过期或依赖外部决策的问题：仅在 `reviewed-packages/needs-review/`。
@@ -68,7 +70,7 @@ P3：
 
 ## 验证说明
 
-证据汇总见 [reviewed-packages/verification-summary.md](reviewed-packages/verification-summary.md)，来源到包的覆盖关系见 [reviewed-packages/coverage-matrix.md](reviewed-packages/coverage-matrix.md)，代码级架构边界核查见 [archive/completed/specs/P3-00-architecture-boundary-code-verification.md](archive/completed/specs/P3-00-architecture-boundary-code-verification.md)。关键修正包括：
+工程实施状态见 [status/implementation-status.md](status/implementation-status.md)，证据汇总见 [reviewed-packages/verification-summary.md](reviewed-packages/verification-summary.md)，来源到包的覆盖关系见 [reviewed-packages/coverage-matrix.md](reviewed-packages/coverage-matrix.md)，代码级架构边界核查见 [archive/completed/specs/P3-00-architecture-boundary-code-verification.md](archive/completed/specs/P3-00-architecture-boundary-code-verification.md)。关键修正包括：
 
 - JWT secret 启动校验已经存在，剩余问题是部署配置强制校验。
 - 测试已经存在，剩余问题是关键路径和集成覆盖不足。
