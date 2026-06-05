@@ -141,6 +141,23 @@ public class ExecutionContext {
                 : new ConcurrentHashMap<>(triggerPayload);
     }
 
+    public void putTriggerPayloadValues(Map<String, Object> values) {
+        if (values == null || values.isEmpty()) {
+            return;
+        }
+        values.forEach((key, value) -> {
+            if (key != null && value != null) {
+                triggerPayload.put(key, value);
+            }
+        });
+    }
+
+    public Map<String, Object> exportContextValues() {
+        Map<String, Object> values = new LinkedHashMap<>(triggerPayload);
+        values.putAll(flatContext);
+        return values;
+    }
+
     public void setCallStack(List<Long> callStack) {
         this.callStack = callStack == null
                 ? new CopyOnWriteArrayList<>()

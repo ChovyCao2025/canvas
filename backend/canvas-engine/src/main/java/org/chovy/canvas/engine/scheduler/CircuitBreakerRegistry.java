@@ -49,6 +49,14 @@ public class CircuitBreakerRegistry {
                         defaultOpenDurationSec, defaultHalfOpenAttempts));
     }
 
+    void updateLocalState(String nodeType, CircuitBreaker.State state) {
+        get(nodeType).forceState(state);
+    }
+
+    void invalidateLocalState(String nodeType) {
+        registry.remove(nodeType);
+    }
+
     // ── 内部熔断器实现 ────────────────────────────────────────────
 
     public static class CircuitBreaker {
@@ -188,6 +196,11 @@ public class CircuitBreakerRegistry {
 
         int halfOpenTryCount() {
             return stateRef.get().halfTries;
+        }
+
+        void forceState(State state) {
+            long openedAt = state == State.OPEN ? System.currentTimeMillis() : 0L;
+            stateRef.set(new StateSnapshot(state, 0, 0, openedAt));
         }
 
         private record StateSnapshot(State state, int failures, int halfTries, long openedAt) {

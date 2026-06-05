@@ -8,6 +8,7 @@ import org.chovy.canvas.domain.bi.export.BiExportApprovalReviewCommand;
 import org.chovy.canvas.domain.bi.export.BiExportDownload;
 import org.chovy.canvas.domain.bi.export.BiExportJobCommand;
 import org.chovy.canvas.domain.bi.export.BiExportJobView;
+import org.chovy.canvas.domain.bi.export.BiExportQueueResult;
 import org.chovy.canvas.domain.bi.export.BiExportRetryResult;
 import org.chovy.canvas.domain.bi.export.BiSelfServiceExportService;
 import org.chovy.canvas.domain.bi.export.BiSelfServicePreviewRequest;
@@ -62,7 +63,7 @@ class BiSelfServiceControllerTest {
         BiSelfServiceController controller = new BiSelfServiceController(resolver, service);
 
         StepVerifier.create(controller.createExport(command))
-                .assertNext(response -> assertThat(response.getData().fileUrl()).contains("/download"))
+                .assertNext(response -> assertThat(response.getData().status()).isEqualTo("QUEUED"))
                 .verifyComplete();
     }
 
@@ -133,6 +134,26 @@ class BiSelfServiceControllerTest {
                 .verifyComplete();
 
         verify(service).retryFailedExports(7L, "alice", RoleNames.OPERATOR, 10);
+    }
+
+    @Test
+    void runExportQueueUsesCurrentTenantUserAndRole() {
+        TenantContextResolver resolver = resolver();
+        BiSelfServiceExportService service = mock(BiSelfServiceExportService.class);
+        when(service.processQueuedExports(7L, "alice", RoleNames.OPERATOR, 10))
+                .thenReturn(new BiExportQueueResult(1, 1, 1, 0, List.of(exportView())));
+        BiSelfServiceController controller = new BiSelfServiceController(resolver, service);
+
+        StepVerifier.create(controller.runExportQueue(10))
+                .assertNext(response -> {
+                    assertThat(response.getData().checked()).isEqualTo(1);
+                    assertThat(response.getData().completed()).isEqualTo(1);
+                    assertThat(response.getData().jobs()).singleElement().satisfies(job ->
+                            assertThat(job.id()).isEqualTo(55L));
+                })
+                .verifyComplete();
+
+        verify(service).processQueuedExports(7L, "alice", RoleNames.OPERATOR, 10);
     }
 
     private TenantContextResolver resolver() {

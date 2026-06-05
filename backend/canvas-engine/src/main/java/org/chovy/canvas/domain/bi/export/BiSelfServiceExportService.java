@@ -24,6 +24,7 @@ import org.chovy.canvas.domain.bi.storage.LocalBiFileStorage;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
 import java.io.ByteArrayOutputStream;
@@ -72,6 +73,16 @@ public class BiSelfServiceExportService {
     private final long retryInitialDelayMinutes;
     private final double retryBackoffMultiplier;
     private final long retryMaxDelayMinutes;
+    @Value("${canvas.bi.export.queue.enabled:false}")
+    private boolean exportQueueEnabled;
+    @Value("${canvas.bi.export.queue.tenant-id:0}")
+    private Long exportQueueTenantId;
+    @Value("${canvas.bi.export.queue.operator:bi-export-worker}")
+    private String exportQueueOperator;
+    @Value("${canvas.bi.export.queue.role:SYSTEM}")
+    private String exportQueueRole;
+    @Value("${canvas.bi.export.queue.limit:20}")
+    private int exportQueueLimit;
 
     @Autowired
     public BiSelfServiceExportService(BiDatasetMapper datasetMapper,
@@ -263,7 +274,7 @@ public class BiSelfServiceExportService {
             return toView(row, dataset.getDatasetKey());
         }
 
-        return runApprovedExport(scopedTenantId, row, query, username, role, dataset.getDatasetKey());
+        return toView(row, dataset.getDatasetKey());
     }
 
     public BiExportJobView reviewExport(Long tenantId,
@@ -300,16 +311,67 @@ public class BiSelfServiceExportService {
             return toView(row, datasetKey(row.getResourceId()));
         }
 
+        row.setStatus(STATUS_QUEUED);
+        row.setProgressPercent(PROGRESS_QUEUED);
+        row.setErrorMessage(null);
         exportJobMapper.updateById(row);
-        BiExportJobCommand original = exportCommand(row);
-        BiQueryRequest query = withLimit(original.query(), cappedLimit(original.rowLimit(), MAX_EXPORT_LIMIT));
-        return runApprovedExport(
-                scopedTenantId,
-                row,
-                query,
-                defaultUser(row.getCreatedBy()),
-                RoleNames.OPERATOR,
-                datasetKey(row.getResourceId()));
+        return toView(row, datasetKey(row.getResourceId()));
+    }
+
+    @Scheduled(fixedDelayString = "${canvas.bi.export.queue.fixed-delay-ms:60000}")
+    public void scheduledExportQueueCycle() {
+        if (!exportQueueEnabled) {
+            return;
+        }
+        processQueuedExports(
+                exportQueueTenantId,
+                exportQueueOperator,
+                exportQueueRole,
+                exportQueueLimit);
+    }
+
+    public BiExportQueueResult processQueuedExports(Long tenantId, String username, String role, int limit) {
+        Long scopedTenantId = normalizeTenant(tenantId);
+        int capped = Math.max(1, Math.min(limit <= 0 ? 20 : limit, 50));
+        List<BiExportJobDO> queued = safeList(exportJobMapper.selectList(new LambdaQueryWrapper<BiExportJobDO>()
+                .eq(BiExportJobDO::getTenantId, scopedTenantId)
+                .eq(BiExportJobDO::getStatus, STATUS_QUEUED)
+                .orderByAsc(BiExportJobDO::getCreatedAt)
+                .orderByAsc(BiExportJobDO::getId)
+                .last("LIMIT " + capped)));
+        List<BiExportJobView> jobs = new ArrayList<>();
+        int completed = 0;
+        int failed = 0;
+        for (BiExportJobDO row : queued) {
+            BiExportJobView view = processQueuedExport(scopedTenantId, row, username, role);
+            jobs.add(view);
+            if (STATUS_COMPLETED.equals(view.status())) {
+                completed++;
+            } else if (STATUS_FAILED.equals(view.status())) {
+                failed++;
+            }
+        }
+        return new BiExportQueueResult(queued.size(), jobs.size(), completed, failed, jobs);
+    }
+
+    private BiExportJobView processQueuedExport(Long tenantId, BiExportJobDO row, String username, String role) {
+        String resourceKey = datasetKey(row.getResourceId());
+        try {
+            BiExportJobCommand original = exportCommand(row);
+            BiQueryRequest query = withLimit(original.query(), cappedLimit(original.rowLimit(), MAX_EXPORT_LIMIT));
+            BiDatasetDO dataset = datasetMapper.selectById(row.getResourceId());
+            if (dataset != null) {
+                enforceExportPermission(tenantId, dataset, username, role);
+                resourceKey = dataset.getDatasetKey();
+            }
+            return runApprovedExport(tenantId, row, query, username, role, resourceKey);
+        } catch (RuntimeException e) {
+            row.setStatus(STATUS_FAILED);
+            row.setErrorMessage(truncate(e.getMessage(), 1000));
+            scheduleRetryAfterFailure(row, LocalDateTime.now());
+            exportJobMapper.updateById(row);
+            return toView(row, resourceKey);
+        }
     }
 
     private BiExportJobView runApprovedExport(Long tenantId,

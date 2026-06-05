@@ -22,6 +22,7 @@ public final class NodeType {
 
     // 条件与分流
     public static final String IF_CONDITION = "IF_CONDITION";
+    public static final String LOGIC_RELATION = "LOGIC_RELATION";
     public static final String SPLIT = "SPLIT";
 
     // 等待与汇聚
