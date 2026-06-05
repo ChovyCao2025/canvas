@@ -119,9 +119,9 @@ describe('homeOverview helpers', () => {
   })
 
   it('maps attention type to the primary action', () => {
-    expect(getAttentionAction('NO_RECENT_EXECUTIONS')).toEqual({ label: '编辑', destination: 'edit' })
-    expect(getAttentionAction('HIGH_FAILURE_RATE')).toEqual({ label: '处理', destination: 'stats' })
-    expect(getAttentionAction('HAS_FAILURES')).toEqual({ label: '查看', destination: 'stats' })
+    expect(getAttentionAction({ type: 'NO_RECENT_EXECUTIONS' })).toEqual({ label: '编辑', destination: 'edit' })
+    expect(getAttentionAction({ type: 'HIGH_FAILURE_RATE' })).toEqual({ label: '处理', destination: 'stats' })
+    expect(getAttentionAction({ type: 'HAS_FAILURES' })).toEqual({ label: '查看', destination: 'stats' })
   })
 })
 

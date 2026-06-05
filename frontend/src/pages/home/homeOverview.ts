@@ -181,9 +181,9 @@ export function sortAttentionItems(items: HomeAttentionItem[]): HomeAttentionIte
 }
 
 /** 根据关注项类型给出页面主操作。 */
-export function getAttentionAction(type: HomeAttentionItem['type']): AttentionAction {
-  if (type === 'NO_RECENT_EXECUTIONS') return { label: '编辑', destination: 'edit' }
-  if (type === 'HIGH_FAILURE_RATE') return { label: '处理', destination: 'stats' }
+export function getAttentionAction(item: Pick<HomeAttentionItem, 'type'>): AttentionAction {
+  if (item.type === 'NO_RECENT_EXECUTIONS') return { label: '编辑', destination: 'edit' }
+  if (item.type === 'HIGH_FAILURE_RATE') return { label: '处理', destination: 'stats' }
   return { label: '查看', destination: 'stats' }
 }
 
@@ -208,7 +208,7 @@ export function buildRiskSummary(overview: HomeOverview): RiskSummary {
   }
 
   const [selectedItem] = sortAttentionItems(overview.attentionItems)
-  const action = getAttentionAction(selectedItem.type)
+  const action = getAttentionAction(selectedItem)
 
   return {
     healthy: false,
