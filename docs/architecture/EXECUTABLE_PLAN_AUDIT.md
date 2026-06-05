@@ -7,8 +7,8 @@ This audit records the current executable-state check for `docs/architecture` sp
 ## Checks Passed
 
 - Architecture spec and plan indexes link only to existing local files.
-- `docs/architecture/archive/specs/` has 28 priority-prefixed Markdown files, including the `P3-00` boundary code-verification artifact.
-- `docs/architecture/archive/plans/` has 28 plan files, including the `P0-00` materialization plan.
+- `docs/architecture/archive/completed/specs/` has 28 priority-prefixed Markdown files, including the `P3-00` boundary code-verification artifact.
+- `docs/architecture/archive/completed/plans/` has 28 plan files, including the `P0-00` materialization plan.
 - Every numbered architecture package spec from `P0-01` through `P3-09` has a matching implementation plan.
 - Every architecture plan includes the agentic-worker header, `Goal`, `Architecture`, `Tech Stack`, task sections, checkbox steps, fenced command blocks, `Run:` commands, and `Expected:` results.
 - Architecture plans do not stage or commit by default; version-control commit timing remains controlled by the repository owner unless explicitly requested.
@@ -24,10 +24,10 @@ Expected and observed: PASS, 58 tests run, 0 failures, 0 errors, 0 skipped.
 
 ## Repaired In This Pass
 
-- Rewrote `archive/plans/P0-03-canvas-state-data-consistency-plan.md` from a completed-task template into a concrete integration plan from `p0-reactive-boundaries` into `main`.
-- Updated `archive/specs/P0-03-canvas-state-data-consistency-spec.md` to avoid claiming that `main` has completed the implementation before merge.
-- Updated `archive/plans/P0-00-architecture-spec-plan-materialization-plan.md` so handoff does not create a commit by default.
-- Updated `archive/specs/P0-04-execution-concurrency-safety-spec.md` with the Java 21 verification command that was actually run.
+- Rewrote `archive/completed/plans/P0-03-canvas-state-data-consistency-plan.md` from a completed-task template into a concrete integration plan from `p0-reactive-boundaries` into `main`.
+- Updated `archive/completed/specs/P0-03-canvas-state-data-consistency-spec.md` to avoid claiming that `main` has completed the implementation before merge.
+- Updated `archive/completed/plans/P0-00-architecture-spec-plan-materialization-plan.md` so handoff does not create a commit by default.
+- Updated `archive/completed/specs/P0-04-execution-concurrency-safety-spec.md` with the Java 21 verification command that was actually run.
 - Rewrote the architecture package plans from `P0-01` through `P3-09` into package-specific executable plans with concrete files, commands, expected results, and no default staging or commit step.
 
 ## Remaining Strict Writing-Plans Queue

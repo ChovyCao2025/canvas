@@ -34,7 +34,7 @@ Runtime platform owner.
 
 ## Linked Specs
 
-- `docs/architecture/archive/specs/P0-05-production-resilience-and-dr-spec.md`
-- `docs/architecture/archive/specs/P1-04-observability-and-ops-spec.md`
-- `docs/architecture/archive/specs/P2-02-cost-capacity-and-retention-spec.md`
-- `docs/architecture/archive/specs/P2-04-dependency-abstraction-and-vendor-lock-in-spec.md`
+- `docs/architecture/archive/completed/specs/P0-05-production-resilience-and-dr-spec.md`
+- `docs/architecture/archive/completed/specs/P1-04-observability-and-ops-spec.md`
+- `docs/architecture/archive/completed/specs/P2-02-cost-capacity-and-retention-spec.md`
+- `docs/architecture/archive/completed/specs/P2-04-dependency-abstraction-and-vendor-lock-in-spec.md`

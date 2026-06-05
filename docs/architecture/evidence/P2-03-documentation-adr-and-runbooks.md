@@ -16,7 +16,7 @@ Implemented and verified active architecture decision records, handler guidance,
 - `backend/canvas-engine/src/main/java/org/chovy/canvas/config/OpenApiSecurityConfig.java` defines bearer and trigger HMAC OpenAPI schemes.
 - Core Canvas, Execution, and Audience controllers now include OpenAPI tags and operation metadata.
 - Frontend API docs preserve response metadata and HMAC auth overrides from OpenAPI/local metadata.
-- `docs/architecture/archive/specs/README.md` and `docs/architecture/archive/plans/README.md` state that archived reviews are historical evidence, not active implementation authority.
+- `docs/architecture/specs/README.md` and `docs/architecture/plans/README.md` state that archived reviews are historical evidence, not active implementation authority.
 
 ## Verification
 

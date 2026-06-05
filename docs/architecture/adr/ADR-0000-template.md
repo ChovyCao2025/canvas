@@ -69,4 +69,4 @@ Name the owning team or role.
 
 ## Linked Specs
 
-- `docs/architecture/archive/specs/<spec>.md`
+- `docs/architecture/archive/completed/specs/<spec>.md`

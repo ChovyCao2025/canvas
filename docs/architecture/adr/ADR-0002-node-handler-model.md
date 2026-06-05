@@ -33,6 +33,6 @@ Canvas engine owner.
 
 ## Linked Specs
 
-- `docs/architecture/archive/specs/P1-01-dag-engine-and-handler-boundaries-spec.md`
-- `docs/architecture/archive/specs/P1-02-api-contract-and-validation-spec.md`
-- `docs/architecture/archive/specs/P3-02-service-decomposition-and-domain-boundaries-spec.md`
+- `docs/architecture/archive/completed/specs/P1-01-dag-engine-and-handler-boundaries-spec.md`
+- `docs/architecture/archive/completed/specs/P1-02-api-contract-and-validation-spec.md`
+- `docs/architecture/archive/completed/specs/P3-02-service-decomposition-and-domain-boundaries-spec.md`

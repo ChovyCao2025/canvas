@@ -14,7 +14,7 @@ Current repository inventory used by this map:
 - 85 migration files contain `CREATE TABLE`; there are 172 `CREATE TABLE` statements.
 - Newer BI, CDP warehouse, analytics, AI, and channel-integration modules are already present in the monolith.
 
-This map uses the seven bounded contexts from `docs/architecture/archive/specs/P3-00-architecture-boundary-review-spec.md` and `docs/architecture/evidence/p3-00-architecture-boundary-review.md`.
+This map uses the seven bounded contexts from `docs/architecture/archive/completed/specs/P3-00-architecture-boundary-review-spec.md` and `docs/architecture/evidence/p3-00-architecture-boundary-review.md`.
 
 ## Context Summary
 

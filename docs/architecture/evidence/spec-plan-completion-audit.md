@@ -2,7 +2,7 @@
 
 Date: 2026-06-05
 
-Scope: `docs/architecture/archive/specs`, `docs/architecture/archive/plans`, `docs/architecture/specs/README.md`, `docs/architecture/plans/README.md`, `docs/architecture/todo`, `docs/architecture/index.md`, architecture-related entries in `docs/INDEX.md`, P3 decision evidence, and P3 promotion gates.
+Scope: `docs/architecture/archive/completed/specs`, `docs/architecture/archive/completed/plans`, `docs/architecture/specs/README.md`, `docs/architecture/plans/README.md`, `docs/architecture/todo`, `docs/architecture/index.md`, architecture-related entries in `docs/INDEX.md`, P3 decision evidence, and P3 promotion gates.
 
 ## Verdict
 
@@ -10,8 +10,8 @@ The architecture review material has been covered by active specs, matching plan
 
 Numbered package coverage is complete:
 
-- `docs/architecture/archive/specs/` has 28 priority-prefixed files: 27 package specs plus the supporting `P3-00` code-verification artifact.
-- `docs/architecture/archive/plans/` has 28 priority-prefixed files: 27 matching package plans plus the `P0-00` materialization plan.
+- `docs/architecture/archive/completed/specs/` has 28 priority-prefixed files: 27 package specs plus the supporting `P3-00` code-verification artifact.
+- `docs/architecture/archive/completed/plans/` has 28 priority-prefixed files: 27 matching package plans plus the `P0-00` materialization plan.
 - Every package spec from `P0-01` through `P3-09` has a matching plan.
 - Every package plan from `P0-01` through `P3-09` has a matching spec.
 - The intentional exceptions are `P3-00-architecture-boundary-code-verification.md` as supporting evidence and `P0-00-architecture-spec-plan-materialization-plan.md` as the original materialization plan.
@@ -46,13 +46,13 @@ Implementation remains gated by `docs/architecture/platform-evolution-promotion-
 No unchecked work items remain in architecture specs and plans, excluding the instructional checkbox-format line:
 
 ```bash
-rg -n "\[ \]" docs/architecture/archive/plans docs/architecture/archive/specs | rg -v "Steps use checkbox" || true
+rg -n "\[ \]" docs/architecture/archive/completed/plans docs/architecture/archive/completed/specs | rg -v "Steps use checkbox" || true
 ```
 
 No default VCS staging or commit command remains in architecture specs or plans:
 
 ```bash
-rg -n "git (add|commit)" docs/architecture/archive/plans docs/architecture/archive/specs || true
+rg -n "git (add|commit)" docs/architecture/archive/completed/plans docs/architecture/archive/completed/specs || true
 ```
 
 No stale P3-07 evidence path or old planning-status phrase remains in architecture docs:
@@ -64,8 +64,8 @@ rg -n "p3-07-production[-]components|[Pp]lanning material" docs/architecture doc
 Spec and plan pairs are complete, with the two intentional support-plan exceptions excluded:
 
 ```bash
-bash -lc 'comm -23 <(find docs/architecture/archive/specs -maxdepth 1 -type f -name "P*.md" ! -name "P3-00-architecture-boundary-code-verification.md" -printf "%f\n" 2>/dev/null | sed "s/-spec\\.md$//" | sed "s/$/-plan.md/" | sort) <(find docs/architecture/archive/plans -maxdepth 1 -type f -name "P*.md" -printf "%f\n" 2>/dev/null | sort) || true'
-bash -lc 'comm -23 <(find docs/architecture/archive/plans -maxdepth 1 -type f -name "P*.md" ! -name "P0-00-architecture-spec-plan-materialization-plan.md" -printf "%f\n" 2>/dev/null | sed "s/-plan\\.md$//" | sed "s/$/-spec.md/" | sort) <(find docs/architecture/archive/specs -maxdepth 1 -type f -name "P*.md" -printf "%f\n" 2>/dev/null | sort) || true'
+bash -lc 'comm -23 <(find docs/architecture/archive/completed/specs -maxdepth 1 -type f -name "P*.md" ! -name "P3-00-architecture-boundary-code-verification.md" -printf "%f\n" 2>/dev/null | sed "s/-spec\\.md$//" | sed "s/$/-plan.md/" | sort) <(find docs/architecture/archive/completed/plans -maxdepth 1 -type f -name "P*.md" -printf "%f\n" 2>/dev/null | sort) || true'
+bash -lc 'comm -23 <(find docs/architecture/archive/completed/plans -maxdepth 1 -type f -name "P*.md" ! -name "P0-00-architecture-spec-plan-materialization-plan.md" -printf "%f\n" 2>/dev/null | sed "s/-plan\\.md$//" | sed "s/$/-spec.md/" | sort) <(find docs/architecture/archive/completed/specs -maxdepth 1 -type f -name "P*.md" -printf "%f\n" 2>/dev/null | sort) || true'
 ```
 
 Selected architecture markdown links exist in the active indexes, coverage matrix, and promotion checklist.

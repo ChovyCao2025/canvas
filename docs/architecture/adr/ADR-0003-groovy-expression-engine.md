@@ -33,6 +33,6 @@ Canvas engine owner with security reviewer sign-off.
 
 ## Linked Specs
 
-- `docs/architecture/archive/specs/P0-01-security-hardening-spec.md`
-- `docs/architecture/archive/specs/P1-01-dag-engine-and-handler-boundaries-spec.md`
-- `docs/architecture/archive/specs/P2-02-cost-capacity-and-retention-spec.md`
+- `docs/architecture/archive/completed/specs/P0-01-security-hardening-spec.md`
+- `docs/architecture/archive/completed/specs/P1-01-dag-engine-and-handler-boundaries-spec.md`
+- `docs/architecture/archive/completed/specs/P2-02-cost-capacity-and-retention-spec.md`
