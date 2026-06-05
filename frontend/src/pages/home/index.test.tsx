@@ -32,7 +32,7 @@ describe('HomePage', () => {
   })
 
   it('renders the material ops dashboard layout', async () => {
-    overviewMock.mockResolvedValueOnce({ data: overview() })
+    overviewMock.mockResolvedValueOnce(ok(overview()))
 
     renderHome()
 
@@ -47,7 +47,7 @@ describe('HomePage', () => {
 
   it('filters loaded journey names locally without re-calling the API', async () => {
     const user = userEvent.setup()
-    overviewMock.mockResolvedValueOnce({ data: overview() })
+    overviewMock.mockResolvedValueOnce(ok(overview()))
 
     renderHome()
     await screen.findByText('新人激活 7 日链路')
@@ -60,12 +60,12 @@ describe('HomePage', () => {
   })
 
   it('shows a healthy summary when there are no attention items', async () => {
-    overviewMock.mockResolvedValueOnce({
-      data: {
+    overviewMock.mockResolvedValueOnce(
+      ok({
         ...overview(),
         attentionItems: [],
-      },
-    })
+      }),
+    )
 
     renderHome()
 
@@ -77,7 +77,7 @@ describe('HomePage', () => {
     const user = userEvent.setup()
     overviewMock
       .mockRejectedValueOnce(new Error('network down'))
-      .mockResolvedValueOnce({ data: overview() })
+      .mockResolvedValueOnce(ok(overview()))
 
     renderHome()
     expect(await screen.findByText('首页数据加载失败')).toBeInTheDocument()
@@ -90,8 +90,8 @@ describe('HomePage', () => {
   })
 
   it('does not navigate aggregate no-execution attention to canvas 0 edit', async () => {
-    overviewMock.mockResolvedValueOnce({
-      data: {
+    overviewMock.mockResolvedValueOnce(
+      ok({
         ...overview(),
         topCanvases: [],
         attentionItems: [
@@ -103,8 +103,8 @@ describe('HomePage', () => {
             severity: 'info',
           },
         ],
-      },
-    })
+      }),
+    )
 
     renderHome()
 
@@ -125,6 +125,10 @@ function renderHome() {
       <HomePage />
     </MemoryRouter>,
   )
+}
+
+function ok(data: HomeOverview) {
+  return { code: 0, message: 'ok', data }
 }
 
 function overview(): HomeOverview {
