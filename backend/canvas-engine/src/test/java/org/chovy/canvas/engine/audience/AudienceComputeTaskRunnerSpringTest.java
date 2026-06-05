@@ -2,6 +2,7 @@ package org.chovy.canvas.engine.audience;
 
 import org.chovy.canvas.domain.notification.NotificationService;
 import org.chovy.canvas.domain.task.AsyncTaskService;
+import org.chovy.canvas.engine.concurrent.BackgroundTaskExecutor;
 import org.junit.jupiter.api.Test;
 import org.springframework.context.annotation.AnnotationConfigApplicationContext;
 
@@ -22,6 +23,7 @@ class AudienceComputeTaskRunnerSpringTest {
             context.registerBean(AudienceBatchComputeService.class, () -> mock(AudienceBatchComputeService.class));
             context.registerBean(AsyncTaskService.class, () -> mock(AsyncTaskService.class));
             context.registerBean(NotificationService.class, () -> mock(NotificationService.class));
+            context.registerBean(BackgroundTaskExecutor.class, () -> mock(BackgroundTaskExecutor.class));
             context.register(AudienceComputeTaskRunner.class);
 
             context.refresh();

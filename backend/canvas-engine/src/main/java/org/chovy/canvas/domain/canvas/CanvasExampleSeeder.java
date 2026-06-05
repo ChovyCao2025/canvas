@@ -32,6 +32,8 @@ public class CanvasExampleSeeder implements ApplicationRunner {
 
     /** 官方示例导入时写入的创建人标识。 */
     static final String CREATED_BY = "example-seed";
+    /** 历史单租户迁移创建的默认租户 ID。 */
+    static final Long DEFAULT_TENANT_ID = 1L;
 
     /** 画布模板 Mapper，用于读取启用的官方模板。 */
     private final CanvasTemplateMapper templateMapper;
@@ -98,6 +100,7 @@ public class CanvasExampleSeeder implements ApplicationRunner {
         }
 
         CanvasDO canvas = new CanvasDO();
+        canvas.setTenantId(DEFAULT_TENANT_ID);
         canvas.setName(template.getName());
         canvas.setDescription(template.getDescription());
         canvas.setStatus(CanvasStatusEnum.DRAFT.getCode());
@@ -108,6 +111,7 @@ public class CanvasExampleSeeder implements ApplicationRunner {
 
         // 示例仅创建草稿版本，不注册触发路由，也不进入发布态执行链路。
         CanvasVersionDO version = new CanvasVersionDO();
+        version.setTenantId(DEFAULT_TENANT_ID);
         version.setCanvasId(canvas.getId());
         version.setVersion(1);
         version.setGraphJson(template.getGraphJson());

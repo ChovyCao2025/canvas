@@ -1,6 +1,8 @@
 package org.chovy.canvas.infrastructure.redis;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.chovy.canvas.dal.dataobject.CanvasExecutionDO;
+import org.chovy.canvas.dal.mapper.CanvasExecutionMapper;
 import org.chovy.canvas.engine.context.ExecutionContext;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -40,6 +42,9 @@ public class ContextPersistenceService {
      */
     private final RedisKeyUtil keys;
 
+    /** 执行记录 Mapper，用于挂起上下文的 DB 冷备和恢复。 */
+    private final CanvasExecutionMapper executionMapper;
+
     /** 上下文快照过期时间（秒），默认 24 小时。 */
     @Value("${canvas.execution.context-ttl-sec:86400}")
     private long ttlSec;
@@ -55,27 +60,38 @@ public class ContextPersistenceService {
 
     /** 保存或覆盖上下文快照，并刷新 TTL。 */
     public void save(ExecutionContext ctx) {
+        String json;
         try {
-            String json = objectMapper.writeValueAsString(ctx);
-            // 覆盖写 + TTL 续期：每次挂起/恢复都会刷新上下文生命周期
+            json = objectMapper.writeValueAsString(ctx);
+        } catch (Exception e) {
+            log.error("序列化 ExecutionContext 失败: {}", e.getMessage());
+            return;
+        }
+
+        try {
             redis.opsForValue().set(keys.context(ctx.getCanvasId(), ctx.getUserId()),
                     json, Duration.ofSeconds(ttlSec));
         } catch (Exception e) {
-            log.error("保存 ExecutionContext 失败: {}", e.getMessage());
+            log.warn("保存 ExecutionContext 到 Redis 失败: {}", e.getMessage());
         }
+
+        saveColdBackup(ctx, json);
     }
 
     /** 加载上下文；不存在或反序列化失败时返回 null。 */
     public ExecutionContext load(Long canvasId, String userId) {
-        String json = redis.opsForValue().get(keys.context(canvasId, userId));
-        if (json == null) return null;
+        String redisKey = keys.context(canvasId, userId);
+        String json = null;
         try {
-            // 恢复执行直接反序列化完整上下文，保持挂起前的节点状态和用户变量。
-            return objectMapper.readValue(json, ExecutionContext.class);
+            json = redis.opsForValue().get(redisKey);
         } catch (Exception e) {
-            log.error("反序列化 ExecutionContext 失败: {}", e.getMessage());
-            return null;
+            log.warn("读取 Redis ExecutionContext 失败，尝试 DB 冷恢复 canvasId={} userId={}: {}",
+                    canvasId, userId, e.getMessage());
         }
+        if (hasText(json)) {
+            return deserializeContext(json, "Redis");
+        }
+        return loadColdBackup(canvasId, userId, redisKey);
     }
 
     /** 删除上下文快照（执行结束或失败后清理）。 */
@@ -85,7 +101,71 @@ public class ContextPersistenceService {
 
     /** 判断上下文是否存在（常用于恢复分支判断）。 */
     public boolean exists(Long canvasId, String userId) {
-        return redis.hasKey(keys.context(canvasId, userId));
+        try {
+            if (Boolean.TRUE.equals(redis.hasKey(keys.context(canvasId, userId)))) {
+                return true;
+            }
+        } catch (Exception e) {
+            log.warn("检查 Redis ExecutionContext 失败，尝试 DB 冷备 canvasId={} userId={}: {}",
+                    canvasId, userId, e.getMessage());
+        }
+        CanvasExecutionDO backup = latestPausedBackup(canvasId, userId);
+        return backup != null && hasText(backup.getContextSnapshotJson());
+    }
+
+    private void saveColdBackup(ExecutionContext ctx, String json) {
+        if (ctx == null || !hasText(ctx.getExecutionId())) {
+            return;
+        }
+        try {
+            executionMapper.updateContextSnapshot(ctx.getExecutionId(), json);
+        } catch (Exception e) {
+            log.warn("保存 ExecutionContext DB 冷备失败 executionId={}: {}",
+                    ctx.getExecutionId(), e.getMessage());
+        }
+    }
+
+    private ExecutionContext loadColdBackup(Long canvasId, String userId, String redisKey) {
+        CanvasExecutionDO backup = latestPausedBackup(canvasId, userId);
+        if (backup == null || !hasText(backup.getContextSnapshotJson())) {
+            return null;
+        }
+        ExecutionContext ctx = deserializeContext(backup.getContextSnapshotJson(), "DB cold backup");
+        if (ctx != null) {
+            refreshRedisSnapshot(redisKey, backup.getContextSnapshotJson());
+        }
+        return ctx;
+    }
+
+    private CanvasExecutionDO latestPausedBackup(Long canvasId, String userId) {
+        try {
+            return executionMapper.selectLatestPausedContextSnapshot(canvasId, userId);
+        } catch (Exception e) {
+            log.warn("读取 ExecutionContext DB 冷备失败 canvasId={} userId={}: {}",
+                    canvasId, userId, e.getMessage());
+            return null;
+        }
+    }
+
+    private ExecutionContext deserializeContext(String json, String source) {
+        try {
+            return objectMapper.readValue(json, ExecutionContext.class);
+        } catch (Exception e) {
+            log.error("反序列化 {} ExecutionContext 失败: {}", source, e.getMessage());
+            return null;
+        }
+    }
+
+    private void refreshRedisSnapshot(String redisKey, String json) {
+        try {
+            redis.opsForValue().set(redisKey, json, Duration.ofSeconds(ttlSec));
+        } catch (Exception e) {
+            log.warn("DB 冷恢复后回填 Redis ExecutionContext 失败 key={}: {}", redisKey, e.getMessage());
+        }
+    }
+
+    private static boolean hasText(String value) {
+        return value != null && !value.isBlank();
     }
 
     /**
@@ -136,8 +216,7 @@ public class ContextPersistenceService {
         try {
             redis.execute(RESUME_LOCK_RELEASE_SCRIPT, List.of(key), token);
         } catch (Exception e) {
-            log.warn("[CTX] resumeLock Lua 释放失败，降级 DEL key={}: {}", key, e.getMessage());
-            redis.delete(key);
+            log.warn("[CTX] resumeLock Lua 释放失败，保留锁等待 TTL 过期 key={}: {}", key, e.getMessage());
         }
     }
 

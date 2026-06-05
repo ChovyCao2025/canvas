@@ -1,4 +1,9 @@
 import { describe, expect, it, vi } from 'vitest'
+
+vi.mock('./api', () => ({
+  default: {},
+}))
+
 import {
   buildCreateWriteKeyPayload,
   createCdpEventApi,

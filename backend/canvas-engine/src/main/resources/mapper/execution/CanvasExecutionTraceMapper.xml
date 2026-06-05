@@ -7,11 +7,11 @@
     <!-- 批量插入轨迹记录（TraceWriteBuffer 每 500ms 调用一次） -->
     <insert id="insertBatch" parameterType="java.util.List">
         INSERT INTO canvas_execution_trace
-            (execution_id, node_id, node_type, node_name, status,
+            (tenant_id, execution_id, node_id, node_type, node_name, status,
              input_data, output_data, error_msg, started_at, finished_at, duration_ms)
         VALUES
         <foreach collection="list" item="t" separator=",">
-            (#{t.executionId}, #{t.nodeId}, #{t.nodeType}, #{t.nodeName}, #{t.status},
+            (#{t.tenantId}, #{t.executionId}, #{t.nodeId}, #{t.nodeType}, #{t.nodeName}, #{t.status},
              #{t.inputData}, #{t.outputData}, #{t.errorMsg}, #{t.startedAt}, #{t.finishedAt}, #{t.durationMs})
         </foreach>
     </insert>

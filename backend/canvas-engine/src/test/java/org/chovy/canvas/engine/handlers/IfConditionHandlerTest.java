@@ -25,11 +25,13 @@ class IfConditionHandlerTest {
     @BeforeEach
     void setUp() {
         ctx = new ExecutionContext();
-        ctx.getFlatContext().put("userId", "user_001");
-        ctx.getFlatContext().put("orderStatus", "PAID");
-        ctx.getFlatContext().put("amount", "500");
-        ctx.getFlatContext().put("marketIdentity", "newUser");
-        ctx.getFlatContext().put("tripPhase", "待出行");
+        ctx.putNodeOutput("seed", Map.of(
+                "userId", "user_001",
+                "orderStatus", "PAID",
+                "amount", "500",
+                "marketIdentity", "newUser",
+                "tripPhase", "待出行"
+        ));
     }
 
     @Nested
@@ -73,7 +75,7 @@ class IfConditionHandlerTest {
         @Test
         void contains_substring_without_comma() {
             // 无逗号时退化为子串匹配
-            ctx.getFlatContext().put("desc", "机票订单已支付");
+            ctx.putNodeOutput("desc-node", Map.of("desc", "机票订单已支付"));
             Map<String, Object> rule = rule("desc", "CONTAINS", "已支付");
             assertThat(IfConditionHandler.evaluate(rule, ctx)).isTrue();
         }
@@ -99,7 +101,7 @@ class IfConditionHandlerTest {
         @Test
         void lt_numeric_10_vs_9() {
             // 经典字典序陷阱："10" < "9" 字典序为真，但数值 10 > 9
-            ctx.getFlatContext().put("count", "10");
+            ctx.putNodeOutput("count-node", Map.of("count", "10"));
             Map<String, Object> rule = rule("count", "LT", "9");
             assertThat(IfConditionHandler.evaluate(rule, ctx)).isFalse(); // 10 不小于 9
         }
@@ -118,7 +120,7 @@ class IfConditionHandlerTest {
 
         @Test
         void invalid_numeric_values_do_not_match_order_comparisons() {
-            ctx.getFlatContext().put("amount", "unknown");
+            ctx.putNodeOutput("amount-node", Map.of("amount", "unknown"));
             Map<String, Object> rule = rule("amount", "GT", "50");
 
             assertThat(IfConditionHandler.evaluate(rule, ctx)).isFalse();
@@ -126,7 +128,7 @@ class IfConditionHandlerTest {
 
         @Test
         void invalid_actual_numeric_values_do_not_match_lt_comparison() {
-            ctx.getFlatContext().put("amount", "unknown");
+            ctx.putNodeOutput("amount-node", Map.of("amount", "unknown"));
             Map<String, Object> rule = rule("amount", "LT", "50");
 
             assertThat(IfConditionHandler.evaluate(rule, ctx)).isFalse();
@@ -134,7 +136,7 @@ class IfConditionHandlerTest {
 
         @Test
         void invalid_actual_numeric_values_do_not_match_lte_comparison() {
-            ctx.getFlatContext().put("amount", "unknown");
+            ctx.putNodeOutput("amount-node", Map.of("amount", "unknown"));
             Map<String, Object> rule = rule("amount", "LTE", "50");
 
             assertThat(IfConditionHandler.evaluate(rule, ctx)).isFalse();

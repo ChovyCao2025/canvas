@@ -122,6 +122,106 @@ class BiSelfServiceExportServiceTest {
     }
 
     @Test
+    void createExportQueuesJobWithoutExecutingWarehouseQuery() {
+        Fixture fixture = fixture();
+        AtomicReference<BiExportJobDO> persisted = new AtomicReference<>();
+        when(fixture.datasetMapper.selectOne(any())).thenReturn(dataset());
+        doAnswer(invocation -> {
+            BiExportJobDO row = invocation.getArgument(0);
+            row.setId(73L);
+            persisted.set(row);
+            return 1;
+        }).when(fixture.exportJobMapper).insert(any(BiExportJobDO.class));
+
+        BiExportJobView view = fixture.service.createExport(
+                7L,
+                "alice",
+                RoleNames.OPERATOR,
+                new BiExportJobCommand(
+                        "DATASET",
+                        "canvas_daily_stats",
+                        null,
+                        "CSV",
+                        query(100),
+                        100,
+                        false,
+                        false,
+                        null));
+
+        assertThat(view.id()).isEqualTo(73L);
+        assertThat(view.status()).isEqualTo("QUEUED");
+        assertThat(view.progressPercent()).isZero();
+        assertThat(view.fileUrl()).isNull();
+        assertThat(view.storageProvider()).isNull();
+        assertThat(view.storageKey()).isNull();
+        verify(fixture.permissionService).enforceResourceAccess(
+                eq(7L),
+                eq(3L),
+                eq("DATASET"),
+                eq(11L),
+                eq(new BiQueryContext(7L, "alice", RoleNames.OPERATOR)),
+                eq(BiPermissionService.ACTION_EXPORT));
+        verify(fixture.queryExecutionService, never()).execute(any(), any());
+        assertThat(persisted.get().getStatus()).isEqualTo("QUEUED");
+        assertThat(persisted.get().getProgressPercent()).isZero();
+        assertThat(persisted.get().getFileUrl()).isNull();
+    }
+
+    @Test
+    void processQueuedExportsRunsPersistedRequestsAndWritesDownloadableFiles() throws Exception {
+        Fixture fixture = fixture();
+        AtomicReference<BiExportJobDO> persisted = new AtomicReference<>();
+        BiExportJobCommand command = new BiExportJobCommand(
+                "DATASET",
+                "canvas_daily_stats",
+                null,
+                "CSV",
+                query(100),
+                100,
+                false,
+                false,
+                null);
+        BiExportJobDO row = exportJob();
+        row.setId(74L);
+        row.setStatus("QUEUED");
+        row.setProgressPercent(0);
+        row.setRequestJson(new ObjectMapper().writeValueAsString(command));
+        row.setFileUrl(null);
+        row.setStorageProvider(null);
+        row.setStorageKey(null);
+        persisted.set(row);
+        when(fixture.exportJobMapper.selectList(any())).thenReturn(List.of(row));
+        when(fixture.datasetMapper.selectById(11L)).thenReturn(dataset());
+        when(fixture.queryExecutionService.execute(any(), any())).thenReturn(result());
+        doAnswer(invocation -> {
+            persisted.set(invocation.getArgument(0));
+            return 1;
+        }).when(fixture.exportJobMapper).updateById(any(BiExportJobDO.class));
+
+        BiExportQueueResult result = fixture.service.processQueuedExports(
+                7L,
+                "export-worker",
+                RoleNames.OPERATOR,
+                10);
+
+        assertThat(result.checked()).isEqualTo(1);
+        assertThat(result.processed()).isEqualTo(1);
+        assertThat(result.completed()).isEqualTo(1);
+        assertThat(result.failed()).isZero();
+        assertThat(result.jobs()).singleElement().satisfies(view -> {
+            assertThat(view.id()).isEqualTo(74L);
+            assertThat(view.status()).isEqualTo("COMPLETED");
+            assertThat(view.progressPercent()).isEqualTo(100);
+            assertThat(view.fileUrl()).isEqualTo("/canvas/bi/self-service/exports/74/download");
+        });
+        assertThat(persisted.get().getStatus()).isEqualTo("COMPLETED");
+        assertThat(persisted.get().getProgressPercent()).isEqualTo(100);
+        verify(fixture.queryExecutionService).execute(
+                eq(query(100)),
+                eq(new BiQueryContext(7L, "export-worker", RoleNames.OPERATOR)));
+    }
+
+    @Test
     void createExportStoresDownloadableFileThroughConfiguredStorage() {
         BiDatasetMapper datasetMapper = mock(BiDatasetMapper.class);
         BiExportJobMapper exportJobMapper = mock(BiExportJobMapper.class);

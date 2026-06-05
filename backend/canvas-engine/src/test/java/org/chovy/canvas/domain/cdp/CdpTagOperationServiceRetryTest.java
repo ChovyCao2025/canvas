@@ -12,6 +12,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import org.chovy.canvas.dal.dataobject.CdpTagOperationDO;
 import org.chovy.canvas.dal.mapper.CdpTagOperationMapper;
+import org.chovy.canvas.engine.concurrent.BackgroundTaskExecutor;
 
 /**
  * CDP 标签操作 Service Retry 测试类。
@@ -25,7 +26,8 @@ class CdpTagOperationServiceRetryTest {
     void retryFailedRequeuesOnlyFailedUsers() {
         CdpTagOperationMapper mapper = Mockito.mock(CdpTagOperationMapper.class);
         CdpTagService tagService = Mockito.mock(CdpTagService.class);
-        CdpTagOperationService service = new CdpTagOperationService(mapper, tagService);
+        CdpTagOperationService service = new CdpTagOperationService(
+                mapper, tagService, Mockito.mock(BackgroundTaskExecutor.class));
 
         CdpTagOperationDO existing = new CdpTagOperationDO();
         existing.setId(7L);

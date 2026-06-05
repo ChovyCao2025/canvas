@@ -4,12 +4,21 @@
  * 维护说明：事件编码会被触发器节点引用，因此编辑时要保留与运行时上报格式的一致性。
  */
 import { useEffect, useState } from 'react'
-import { Button, Table, Tag, Space, Modal, Form, Input, Select, Switch, message, Typography, Popconfirm, Divider, Alert } from 'antd'
-import { PlusOutlined, EditOutlined, DeleteOutlined, CodeOutlined } from '@ant-design/icons'
+import { Button, Table, Tag, Space, Modal, Form, Input, Select, Switch, message, Typography, Popconfirm, Divider, Alert, InputNumber } from 'antd'
+import { PlusOutlined, EditOutlined, DeleteOutlined, CodeOutlined, KeyOutlined, ReloadOutlined, StopOutlined } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
 import http from '../../services/api'
+import {
+  cdpEventApi,
+  normalizeDiscoveredAttributeRows,
+  safeWriteKeyRows,
+  type DiscoveredAttribute,
+  type WriteKeyCreateForm,
+  type WriteKeyRow,
+} from '../../services/cdpEventApi'
 import type { ApiParam } from '../api-config'
 import { useSystemOptions } from '../../hooks/useSystemOptions'
+import { statusColor, statusLabel } from './eventAttributeReview'
 
 /** 页面标题和辅助文本组件别名，保持 JSX 可读。 */
 const { Title, Text } = Typography
@@ -105,7 +114,15 @@ export default function EventConfigPage() {
   const [visible, setVisible] = useState(false)
   const [editing, setEditing] = useState<EventDef | null>(null)
   const [form] = Form.useForm()
+  const [writeKeyForm] = Form.useForm<WriteKeyCreateForm>()
   const [saving, setSaving] = useState(false)
+  const [writeKeys, setWriteKeys] = useState<WriteKeyRow[]>([])
+  const [writeKeysLoading, setWriteKeysLoading] = useState(false)
+  const [writeKeyModalOpen, setWriteKeyModalOpen] = useState(false)
+  const [creatingWriteKey, setCreatingWriteKey] = useState(false)
+  const [createdWriteKey, setCreatedWriteKey] = useState<string | null>(null)
+  const [discoveredAttributes, setDiscoveredAttributes] = useState<DiscoveredAttribute[]>([])
+  const [discoveredLoading, setDiscoveredLoading] = useState(false)
   const { options: attrTypeOptions } = useSystemOptions('event_attr_type')
 
   /** 分页加载事件定义列表。 */
@@ -117,12 +134,67 @@ export default function EventConfigPage() {
     } finally { setLoading(false) }
   }
 
-  useEffect(() => { fetchList(1) }, [])
+  /** 加载当前租户的 CDP write key 列表；列表不包含原始密钥。 */
+  const loadWriteKeys = async () => {
+    setWriteKeysLoading(true)
+    try {
+      const res = await cdpEventApi.listWriteKeys()
+      setWriteKeys(safeWriteKeyRows(res.data))
+    } finally {
+      setWriteKeysLoading(false)
+    }
+  }
+
+  /** 加载自动发现的事件属性，前端保证待审核项优先展示。 */
+  const loadDiscoveredAttributes = async () => {
+    setDiscoveredLoading(true)
+    try {
+      const res = await cdpEventApi.listDiscoveredAttributes()
+      setDiscoveredAttributes(normalizeDiscoveredAttributeRows(res.data))
+    } finally {
+      setDiscoveredLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    fetchList(1)
+    loadWriteKeys()
+    loadDiscoveredAttributes()
+  }, [])
 
   /** 打开新建弹窗，并初始化启用状态和空属性 schema。 */
   const openCreate = () => {
     setEditing(null); form.resetFields()
     form.setFieldsValue({ enabled: true, attributes: [] }); setVisible(true)
+  }
+
+  /** 打开 write key 创建弹窗，使用 SDK 接入的默认平台和 QPS。 */
+  const openWriteKeyCreate = () => {
+    writeKeyForm.resetFields()
+    writeKeyForm.setFieldsValue({ platform: 'WEB', rateLimitQps: 100, dailyQuota: null, description: '' })
+    setWriteKeyModalOpen(true)
+  }
+
+  /** 创建 write key；原始 key 仅使用创建响应展示一次，不进入列表状态。 */
+  const handleCreateWriteKey = async () => {
+    const values = await writeKeyForm.validateFields()
+    setCreatingWriteKey(true)
+    try {
+      const res = await cdpEventApi.createWriteKey(values)
+      setCreatedWriteKey(res.data.writeKey)
+      setWriteKeyModalOpen(false)
+      message.success('Write Key 已创建')
+      await loadWriteKeys()
+    } finally {
+      setCreatingWriteKey(false)
+    }
+  }
+
+  /** 禁用指定 write key。 */
+  const disableWriteKey = async (row: WriteKeyRow) => {
+    await cdpEventApi.disableWriteKey(row.id)
+    message.success('Write Key 已禁用')
+    loadWriteKeys()
   }
   /** 打开编辑弹窗，将后端 attributes 字符串转换为表单数组。 */
   const openEdit = (r: EventDef) => {
@@ -180,6 +252,49 @@ export default function EventConfigPage() {
     },
   ]
 
+  const writeKeyColumns: ColumnsType<WriteKeyRow> = [
+    { title: '名称', dataIndex: 'name', width: 150 },
+    { title: 'Key 前缀', dataIndex: 'keyPrefix', width: 140, render: value => <Text code>{value}</Text> },
+    { title: '平台', dataIndex: 'platform', width: 90 },
+    { title: 'QPS', dataIndex: 'rateLimitQps', width: 80 },
+    { title: '日配额', dataIndex: 'dailyQuota', width: 100, render: value => value ?? '-' },
+    {
+      title: '状态',
+      dataIndex: 'status',
+      width: 90,
+      render: value => <Tag color={value === 'ACTIVE' ? 'green' : 'default'}>{value}</Tag>,
+    },
+    {
+      title: '操作',
+      width: 90,
+      render: (_, row) => row.status === 'ACTIVE' ? (
+        <Popconfirm
+          title="确认禁用该 Write Key？"
+          onConfirm={() => disableWriteKey(row)}
+          okText="禁用"
+          okType="danger"
+          cancelText="取消"
+        >
+          <Button size="small" danger icon={<StopOutlined />}>禁用</Button>
+        </Popconfirm>
+      ) : '-',
+    },
+  ]
+
+  const discoveredAttributeColumns: ColumnsType<DiscoveredAttribute> = [
+    { title: '事件', dataIndex: 'eventCode', width: 160, render: value => <Text code>{value}</Text> },
+    { title: '属性', dataIndex: 'attrName', width: 140 },
+    { title: '类型', dataIndex: 'attrType', width: 90 },
+    {
+      title: '状态',
+      dataIndex: 'status',
+      width: 100,
+      render: status => <Tag color={statusColor(status)}>{statusLabel(status)}</Tag>,
+    },
+    { title: '样例值', dataIndex: 'sampleValue', ellipsis: true, render: value => value ?? '-' },
+    { title: '最近发现', dataIndex: 'lastSeenAt', width: 170, render: value => value ?? '-' },
+  ]
+
   return (
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
@@ -200,6 +315,68 @@ export default function EventConfigPage() {
           </div>
         }
       />
+
+      {createdWriteKey && (
+        <Alert
+          type="success"
+          showIcon
+          closable
+          style={{ marginBottom: 16 }}
+          message="新 Write Key 仅显示一次"
+          onClose={() => setCreatedWriteKey(null)}
+          description={(
+            <Input.TextArea
+              value={createdWriteKey}
+              readOnly
+              autoSize
+              style={{ marginTop: 8, fontFamily: 'monospace' }}
+            />
+          )}
+        />
+      )}
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 16, marginBottom: 16 }}>
+        <section style={{ border: '1px solid #f0f0f0', borderRadius: 6, padding: 16, minWidth: 0 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, marginBottom: 12 }}>
+            <div>
+              <Title level={5} style={{ margin: 0 }}>CDP Write Key</Title>
+              <Text type="secondary">管理 SDK 上报密钥，列表仅显示安全前缀。</Text>
+            </div>
+            <Space>
+              <Button size="small" icon={<ReloadOutlined />} onClick={loadWriteKeys} loading={writeKeysLoading}>刷新</Button>
+              <Button size="small" type="primary" icon={<KeyOutlined />} onClick={openWriteKeyCreate}>新建</Button>
+            </Space>
+          </div>
+          <Table
+            rowKey="id"
+            size="small"
+            dataSource={writeKeys}
+            columns={writeKeyColumns}
+            loading={writeKeysLoading}
+            pagination={false}
+            scroll={{ x: 720 }}
+          />
+        </section>
+
+        <section style={{ border: '1px solid #f0f0f0', borderRadius: 6, padding: 16, minWidth: 0 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, marginBottom: 12 }}>
+            <div>
+              <Title level={5} style={{ margin: 0 }}>发现属性审核</Title>
+              <Text type="secondary">自动发现的属性按待审核优先展示。</Text>
+            </div>
+            <Button size="small" icon={<ReloadOutlined />} onClick={loadDiscoveredAttributes} loading={discoveredLoading}>刷新</Button>
+          </div>
+          <Table
+            rowKey="id"
+            size="small"
+            dataSource={discoveredAttributes}
+            columns={discoveredAttributeColumns}
+            loading={discoveredLoading}
+            pagination={{ pageSize: 5, hideOnSinglePage: true }}
+            scroll={{ x: 760 }}
+          />
+        </section>
+      </div>
 
       <Table rowKey="id" dataSource={data} columns={columns} loading={loading}
         pagination={{ total, pageSize: 20, current: page, onChange: p => { setPage(p); fetchList(p) } }} />
@@ -227,6 +404,34 @@ export default function EventConfigPage() {
           </div>
           <Form.Item name="attributes" style={{ marginBottom: 0 }}>
             <AttrSchemaEditor attrTypeOptions={attrTypeOptions} />
+          </Form.Item>
+        </Form>
+      </Modal>
+
+      <Modal
+        title="新建 CDP Write Key"
+        open={writeKeyModalOpen}
+        onOk={handleCreateWriteKey}
+        onCancel={() => setWriteKeyModalOpen(false)}
+        confirmLoading={creatingWriteKey}
+        okText="创建"
+        cancelText="取消"
+      >
+        <Form form={writeKeyForm} layout="vertical" style={{ marginTop: 16 }}>
+          <Form.Item name="name" label="名称" rules={[{ required: true, message: '请输入名称' }]}>
+            <Input placeholder="如：官网 Web SDK" />
+          </Form.Item>
+          <Form.Item name="platform" label="平台">
+            <Select options={[{ value: 'WEB', label: 'WEB' }, { value: 'SERVER', label: 'SERVER' }, { value: 'APP', label: 'APP' }]} />
+          </Form.Item>
+          <Form.Item name="rateLimitQps" label="QPS 限流">
+            <InputNumber min={1} style={{ width: '100%' }} />
+          </Form.Item>
+          <Form.Item name="dailyQuota" label="每日配额">
+            <InputNumber min={1} style={{ width: '100%' }} placeholder="不填表示不限" />
+          </Form.Item>
+          <Form.Item name="description" label="说明">
+            <Input.TextArea rows={2} />
           </Form.Item>
         </Form>
       </Modal>

@@ -3,4 +3,29 @@
         PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="org.chovy.canvas.dal.mapper.CanvasExecutionMapper">
+    <update id="updateContextSnapshot">
+        UPDATE `canvas_execution`
+        SET `context_snapshot_json` = #{contextSnapshotJson},
+            `updated_at` = NOW()
+        WHERE `id` = #{executionId}
+    </update>
+
+    <select id="selectLatestPausedContextSnapshot"
+            resultType="org.chovy.canvas.dal.dataobject.CanvasExecutionDO">
+        SELECT
+            `id`,
+            `canvas_id`,
+            `user_id`,
+            `status`,
+            `context_snapshot_json`,
+            `updated_at`
+        FROM `canvas_execution`
+        WHERE `canvas_id` = #{canvasId}
+          AND `user_id` = #{userId}
+          AND `status` = 1
+          AND `context_snapshot_json` IS NOT NULL
+          AND `context_snapshot_json` &lt;&gt; ''
+        ORDER BY `updated_at` DESC, `created_at` DESC
+        LIMIT 1
+    </select>
 </mapper>
