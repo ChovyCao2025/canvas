@@ -2,7 +2,7 @@
 
 Date: 2026-06-05
 
-Scope: `docs/architecture/specs`, `docs/architecture/plans`, `docs/architecture/todo`, `docs/architecture/index.md`, architecture-related entries in `docs/INDEX.md`, P3 decision evidence, and P3 promotion gates.
+Scope: `docs/architecture/archive/specs`, `docs/architecture/archive/plans`, `docs/architecture/specs/README.md`, `docs/architecture/plans/README.md`, `docs/architecture/todo`, `docs/architecture/index.md`, architecture-related entries in `docs/INDEX.md`, P3 decision evidence, and P3 promotion gates.
 
 ## Verdict
 
@@ -39,20 +39,20 @@ Implementation remains gated by `docs/architecture/platform-evolution-promotion-
 - Updated P3 source-queue wording so it points to the focused P3 decision packages instead of presenting the item as unprocessed planning text.
 - Updated `docs/architecture/todo/coverage-matrix.md` so evolution-document rows name the concrete P3 decision package that covers each source topic.
 - Updated `docs/architecture/EXECUTABLE_PLAN_AUDIT.md` so plan handoff does not require default staging or commits.
-- Updated architecture-related entries in `docs/INDEX.md` to point to active specs/plans or archived source documents.
+- Updated architecture-related entries in `docs/INDEX.md` to point to archived specs/plans or archived source documents.
 
 ## Verification Commands
 
 No unchecked work items remain in architecture specs and plans, excluding the instructional checkbox-format line:
 
 ```bash
-rg -n "\[ \]" docs/architecture/plans docs/architecture/specs | rg -v "Steps use checkbox" || true
+rg -n "\[ \]" docs/architecture/archive/plans docs/architecture/archive/specs | rg -v "Steps use checkbox" || true
 ```
 
 No default VCS staging or commit command remains in architecture specs or plans:
 
 ```bash
-rg -n "git (add|commit)" docs/architecture/plans docs/architecture/specs || true
+rg -n "git (add|commit)" docs/architecture/archive/plans docs/architecture/archive/specs || true
 ```
 
 No stale P3-07 evidence path or old planning-status phrase remains in architecture docs:
@@ -64,8 +64,8 @@ rg -n "p3-07-production[-]components|[Pp]lanning material" docs/architecture doc
 Spec and plan pairs are complete, with the two intentional support-plan exceptions excluded:
 
 ```bash
-bash -lc 'comm -23 <(find docs/architecture/specs -maxdepth 1 -type f -name "P*.md" ! -name "P3-00-architecture-boundary-code-verification.md" -printf "%f\n" 2>/dev/null | sed "s/-spec\\.md$//" | sed "s/$/-plan.md/" | sort) <(find docs/architecture/plans -maxdepth 1 -type f -name "P*.md" -printf "%f\n" 2>/dev/null | sort) || true'
-bash -lc 'comm -23 <(find docs/architecture/plans -maxdepth 1 -type f -name "P*.md" ! -name "P0-00-architecture-spec-plan-materialization-plan.md" -printf "%f\n" 2>/dev/null | sed "s/-plan\\.md$//" | sed "s/$/-spec.md/" | sort) <(find docs/architecture/specs -maxdepth 1 -type f -name "P*.md" -printf "%f\n" 2>/dev/null | sort) || true'
+bash -lc 'comm -23 <(find docs/architecture/archive/specs -maxdepth 1 -type f -name "P*.md" ! -name "P3-00-architecture-boundary-code-verification.md" -printf "%f\n" 2>/dev/null | sed "s/-spec\\.md$//" | sed "s/$/-plan.md/" | sort) <(find docs/architecture/archive/plans -maxdepth 1 -type f -name "P*.md" -printf "%f\n" 2>/dev/null | sort) || true'
+bash -lc 'comm -23 <(find docs/architecture/archive/plans -maxdepth 1 -type f -name "P*.md" ! -name "P0-00-architecture-spec-plan-materialization-plan.md" -printf "%f\n" 2>/dev/null | sed "s/-plan\\.md$//" | sed "s/$/-spec.md/" | sort) <(find docs/architecture/archive/specs -maxdepth 1 -type f -name "P*.md" -printf "%f\n" 2>/dev/null | sort) || true'
 ```
 
 Selected architecture markdown links exist in the active indexes, coverage matrix, and promotion checklist.

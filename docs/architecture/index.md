@@ -3,11 +3,11 @@
 This folder now has two roles:
 
 - [todo/](todo/README.md): active, verified architecture work packages grouped by priority.
-- [specs/](specs/README.md): flattened priority-prefixed specs for each active package.
-- [plans/](plans/README.md): flattened priority-prefixed implementation plans for each active package.
+- [specs/](specs/README.md): navigation index for archived priority-prefixed specs.
+- [plans/](plans/README.md): navigation index for archived priority-prefixed implementation plans.
 - [archive/](archive/README.md): processed source documents kept for traceability.
 
-Use `todo/` as the traceability queue, `specs/` for package requirements, and `plans/` for execution handoff. The old review and remediation documents have been archived after extracting and re-checking their main claims against the current repository.
+Use `todo/` as the traceability queue, `specs/README.md` for the archived package-requirement index, and `plans/README.md` for the archived execution-handoff index. The old review and remediation documents have been archived after extracting and re-checking their main claims against the current repository.
 
 ## Active Priority Queue
 
@@ -60,7 +60,7 @@ P3:
 
 ## Verification Notes
 
-See [todo/verification-summary.md](todo/verification-summary.md) for evidence, [todo/coverage-matrix.md](todo/coverage-matrix.md) for source-to-package traceability, and [specs/P3-00-architecture-boundary-code-verification.md](archive/specs/P3-00-architecture-boundary-code-verification.md) for the code-level architecture boundary check. Key corrections:
+See [todo/verification-summary.md](todo/verification-summary.md) for evidence, [todo/coverage-matrix.md](todo/coverage-matrix.md) for source-to-package traceability, and [archive/specs/P3-00-architecture-boundary-code-verification.md](archive/specs/P3-00-architecture-boundary-code-verification.md) for the code-level architecture boundary check. Key corrections:
 
 - JWT secret startup validation exists; deployment config enforcement remains.
 - Tests exist; the remaining issue is critical-path and integration coverage.
