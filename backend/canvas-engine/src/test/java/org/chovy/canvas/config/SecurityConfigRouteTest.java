@@ -67,6 +67,18 @@ class SecurityConfigRouteTest {
         assertThat(exchange.getResponse().getStatusCode()).isNull();
     }
 
+    @Test
+    void cdpTrackEndpointAllowsAnonymousSecurityFilterAccess() {
+        MockServerWebExchange exchange = MockServerWebExchange.from(
+                MockServerHttpRequest.method(HttpMethod.POST, "/cdp/events/track").build());
+        WebFilterChainProxy security = securityProxy();
+
+        StepVerifier.create(security.filter(exchange, ignored -> Mono.empty()))
+                .verifyComplete();
+
+        assertThat(exchange.getResponse().getStatusCode()).isNull();
+    }
+
     private WebFilterChainProxy securityProxy() {
         JwtAuthFilter jwtAuthFilter = mock(JwtAuthFilter.class);
         when(jwtAuthFilter.filter(any(), any()))

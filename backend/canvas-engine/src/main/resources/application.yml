@@ -63,6 +63,10 @@ canvas:
     expiry-hours: 24
   events:
     report-secret: ${CANVAS_EVENT_REPORT_SECRET:canvas-event-report-secret-2026!!}
+  cdp:
+    event-topic: ${CANVAS_CDP_EVENT_TOPIC:CDP_EVENT_INGESTED}
+    ingestion:
+      max-batch-size: ${CANVAS_CDP_INGESTION_MAX_BATCH_SIZE:100}
   internal-api:
     token: ${CANVAS_INTERNAL_API_TOKEN:}
   public-trigger:

@@ -1335,7 +1335,7 @@ Query-time resource permission, row permission, column denial, column masking, c
 
 - [ ] **Self-service extraction and export**
 
-Preview, CSV/JSON/XLSX task-shaped export, storage-backed download, export resource permission enforcement, export approval foundation, configurable retention, expired download rejection, download audit, cleanup endpoint, and workbench task list are done. Continue with field drag/drop extraction builder, async queue, PDF export, external object-storage provider, progress polling, retry, and audit detail pages.
+Preview, CSV/JSON/XLSX task-shaped export, storage-backed download, export resource permission enforcement, export approval foundation, configurable retention, expired download rejection, download audit, cleanup endpoint, progress/retry metadata, failed export retry endpoint, and workbench task list are done. Continue with field drag/drop extraction builder, true async queue, PDF export, external object-storage provider, and audit detail pages.
 
 - [ ] **Production subscription and alert delivery**
 

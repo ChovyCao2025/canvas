@@ -32,7 +32,7 @@
 
 Create P2-078 docs and insert index rows after P2-077.
 
-- [ ] **Step 2: Write failing controller test**
+- [x] **Step 2: Write failing controller test**
 
 Add a test that constructs `CdpWarehousePrivacyErasureController` with a mocked `CdpWarehousePrivacyAudienceBitmapRebuildAutomationService`, calls `runAudienceBitmapRebuildAutomation`, and verifies tenant id plus command delegation.
 
@@ -45,7 +45,7 @@ mvn -pl canvas-engine test -Dtest=CdpWarehousePrivacyErasureControllerTest
 
 Expected failure before implementation: controller constructor or method for automation run is missing.
 
-- [ ] **Step 3: Implement controller injection and endpoint**
+- [x] **Step 3: Implement controller injection and endpoint**
 
 Add the automation service field, keep existing test-friendly constructors source-compatible, add the Spring constructor with the automation service, and implement:
 
@@ -59,7 +59,7 @@ runAudienceBitmapRebuildAutomation(
 
 The method resolves current tenant, fails closed if the automation service is absent, delegates to `automationService.run(tenantId, command)`, and returns `R.ok(result)`.
 
-- [ ] **Step 4: Verify focused tests**
+- [x] **Step 4: Verify focused tests**
 
 Run:
 
@@ -70,7 +70,7 @@ mvn -pl canvas-engine test -Dtest=CdpWarehousePrivacyErasureControllerTest,CdpWa
 
 Expected: all selected tests pass.
 
-- [ ] **Step 5: Verify warehouse/CDP regression**
+- [x] **Step 5: Verify warehouse/CDP regression**
 
 Run:
 
@@ -83,4 +83,15 @@ Expected: all selected tests pass; `DorisConnectionTest` may be skipped unless `
 
 ## Verification
 
-Record fresh command output after implementation.
+- P2-078 RED verified on 2026-06-05:
+  `mvn -s "$tmp_settings" -pl canvas-engine clean test -Dtest=CdpWarehousePrivacyErasureControllerTest`
+  - Result: failed at test compile because the automation constructor and `runAudienceBitmapRebuildAutomation` endpoint were missing.
+- P2-078 controller test passed on 2026-06-05:
+  `mvn -s "$tmp_settings" -pl canvas-engine test -Dtest=CdpWarehousePrivacyErasureControllerTest`
+  - Result: 6 tests, 0 failures.
+- Focused P2-078/P2-077 plus touched BI export tests passed on 2026-06-05:
+  `mvn -s "$tmp_settings" -pl canvas-engine test -Dtest=CdpWarehousePrivacyErasureControllerTest,CdpWarehousePrivacyAudienceBitmapRebuildAutomationServiceTest,CdpWarehousePrivacyAudienceBitmapRebuildSchedulerTest,CdpWarehousePrivacyAudienceBitmapRebuildServiceTest,BiSelfServiceExportServiceTest,BiSelfServiceControllerTest`
+  - Result: 34 tests, 0 failures.
+- Warehouse/CDP regression passed on 2026-06-05:
+  `mvn -s "$tmp_settings" -pl canvas-engine clean test -Dtest='CdpWarehouse*Test,Doris*Test,CdpEventIngestion*Test,CdpUserServiceTest'`
+  - Result: 419 tests, 0 failures, 1 skipped (`DorisConnectionTest`).

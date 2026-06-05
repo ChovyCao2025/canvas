@@ -12,6 +12,7 @@ import org.chovy.canvas.dal.dataobject.BiExportJobDO;
 import org.chovy.canvas.dal.mapper.BiDatasetMapper;
 import org.chovy.canvas.dal.mapper.BiExportJobMapper;
 import org.chovy.canvas.domain.bi.permission.BiPermissionService;
+import org.chovy.canvas.domain.bi.query.BiFilter;
 import org.chovy.canvas.domain.bi.query.BiQueryColumn;
 import org.chovy.canvas.domain.bi.query.BiQueryContext;
 import org.chovy.canvas.domain.bi.query.BiQueryExecutionService;
@@ -679,10 +680,46 @@ public class BiSelfServiceExportService {
             if (command == null || command.query() == null) {
                 throw new IllegalArgumentException("export query is required");
             }
-            return command;
+            return new BiExportJobCommand(
+                    command.resourceType(),
+                    command.resourceKey(),
+                    command.resourceId(),
+                    command.exportFormat(),
+                    normalizeRestoredQuery(command.query()),
+                    command.rowLimit(),
+                    command.approvalRequired(),
+                    command.sensitive(),
+                    command.approvalReason());
         } catch (JsonProcessingException e) {
             throw new IllegalStateException("BI export request cannot be restored: " + row.getId(), e);
         }
+    }
+
+    private BiQueryRequest normalizeRestoredQuery(BiQueryRequest query) {
+        return new BiQueryRequest(
+                query.datasetKey(),
+                query.dimensions(),
+                query.metrics(),
+                query.filters().stream()
+                        .filter(filter -> filter != null)
+                        .map(this::normalizeRestoredFilter)
+                        .toList(),
+                query.sorts(),
+                query.limit());
+    }
+
+    private BiFilter normalizeRestoredFilter(BiFilter filter) {
+        return new BiFilter(filter.field(), filter.operator(), normalizeRestoredFilterValue(filter.value()));
+    }
+
+    private Object normalizeRestoredFilterValue(Object value) {
+        if (value instanceof Integer || value instanceof Short || value instanceof Byte) {
+            return ((Number) value).longValue();
+        }
+        if (value instanceof List<?> values) {
+            return values.stream().map(this::normalizeRestoredFilterValue).toList();
+        }
+        return value;
     }
 
     private String optionalText(String value, String fieldName) {

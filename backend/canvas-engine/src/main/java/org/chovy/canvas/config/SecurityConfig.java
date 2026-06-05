@@ -82,6 +82,8 @@ public class SecurityConfig {
                                 "/v3/api-docs/**", "/webjars/**").permitAll()
                         // OpenAPI：事件上报无需登录（业务系统直接调用）
                         .pathMatchers(HttpMethod.POST, INTERNAL_OPEN_API_ROUTES).permitAll()
+                        // CDP SDK ingestion is anonymous at the filter layer and validates write keys in controller.
+                        .pathMatchers(HttpMethod.POST, "/cdp/events/track").permitAll()
                         // OpenAPI：直调执行无需登录，但控制器必须校验 HMAC 签名。
                         .pathMatchers(HttpMethod.POST, "/canvas/execute/direct/*").permitAll()
                         // OpenAPI：行为触发无需登录，但控制器必须校验 HMAC 签名。

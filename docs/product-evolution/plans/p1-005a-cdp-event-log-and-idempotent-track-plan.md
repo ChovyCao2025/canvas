@@ -10,6 +10,21 @@
 
 ---
 
+## Implementation Status
+
+Status: implemented on 2026-06-05.
+
+Notes:
+- Actual migration version is `V101__cdp_event_log_and_track_endpoint.sql`; the original `V97_1` slot was superseded by existing migrations.
+- `CdpEventLogDO`, `CdpEventLogMapper`, DTOs, and `CdpEventIngestionService` already existed before this slice and were verified against this plan.
+- This slice added `CdpEventIngestionController`, security filter-level permit for `POST /cdp/events/track`, explicit `canvas.cdp.ingestion.max-batch-size`, and focused schema/service/controller/security tests.
+- Commit was not performed in this session.
+
+Verification evidence:
+- Red run: `mvn -pl canvas-engine test -Dtest=CdpEventLogSchemaTest,CdpEventIngestionServiceTest,CdpEventIngestionControllerTest,SecurityConfigRouteTest -DfailIfNoTests=true` failed at test compile because `CdpEventIngestionController` was missing.
+- Green run: `JAVA_HOME=/Users/photonpay/Library/Java/JavaVirtualMachines/ms-21.0.11/Contents/Home PATH="/Users/photonpay/Library/Java/JavaVirtualMachines/ms-21.0.11/Contents/Home/bin:$PATH" mvn -pl canvas-engine test -Dtest=CdpEventLogSchemaTest,CdpEventIngestionServiceTest,CdpEventIngestionControllerTest,SecurityConfigRouteTest -DfailIfNoTests=true`
+- Result: 11 tests run, 0 failures, 0 errors, 0 skipped.
+
 ## Spec Reference
 
 - `docs/product-evolution/specs/p1-005a-cdp-event-log-and-idempotent-track.md`
@@ -17,7 +32,7 @@
 
 ## File Structure
 
-- Create: `backend/canvas-engine/src/main/resources/db/migration/V97_1__cdp_event_log_and_track_endpoint.sql`
+- Create: `backend/canvas-engine/src/main/resources/db/migration/V101__cdp_event_log_and_track_endpoint.sql`
 - Create: `backend/canvas-engine/src/test/java/org/chovy/canvas/domain/cdp/CdpEventLogSchemaTest.java`
 - Create: `backend/canvas-engine/src/main/java/org/chovy/canvas/dal/dataobject/CdpEventLogDO.java`
 - Create: `backend/canvas-engine/src/main/java/org/chovy/canvas/dal/mapper/CdpEventLogMapper.java`
@@ -33,12 +48,12 @@
 
 **Files:**
 - Create: `backend/canvas-engine/src/test/java/org/chovy/canvas/domain/cdp/CdpEventLogSchemaTest.java`
-- Create: `backend/canvas-engine/src/main/resources/db/migration/V97_1__cdp_event_log_and_track_endpoint.sql`
+- Create: `backend/canvas-engine/src/main/resources/db/migration/V101__cdp_event_log_and_track_endpoint.sql`
 - Create: `backend/canvas-engine/src/main/java/org/chovy/canvas/dal/dataobject/CdpEventLogDO.java`
 - Create: `backend/canvas-engine/src/main/java/org/chovy/canvas/dal/mapper/CdpEventLogMapper.java`
 - Create: DTOs under `backend/canvas-engine/src/main/java/org/chovy/canvas/dto/cdp/`
 
-- [ ] **Step 1: Write schema test**
+- [x] **Step 1: Write schema test**
 
 ```java
 class CdpEventLogSchemaTest {
@@ -46,7 +61,7 @@ class CdpEventLogSchemaTest {
     @Test
     void migrationCreatesEnrichedEventLogWithDuplicateKeys() throws Exception {
         String sql = Files.readString(Path.of(
-                "src/main/resources/db/migration/V97_1__cdp_event_log_and_track_endpoint.sql"));
+                "src/main/resources/db/migration/V101__cdp_event_log_and_track_endpoint.sql"));
 
         assertThat(sql)
                 .contains("CREATE TABLE IF NOT EXISTS cdp_event_log")
@@ -63,7 +78,7 @@ class CdpEventLogSchemaTest {
 }
 ```
 
-- [ ] **Step 2: Run schema test and confirm red state**
+- [x] **Step 2: Run schema test and confirm red state**
 
 Run:
 
@@ -73,9 +88,9 @@ cd backend && mvn -pl canvas-engine test -Dtest=CdpEventLogSchemaTest
 
 Expected: FAIL because migration does not exist.
 
-- [ ] **Step 3: Add migration**
+- [x] **Step 3: Add migration**
 
-Create `V97_1__cdp_event_log_and_track_endpoint.sql` with `cdp_event_log`:
+Create `V101__cdp_event_log_and_track_endpoint.sql` with `cdp_event_log`:
 
 ```sql
 CREATE TABLE IF NOT EXISTS cdp_event_log (
@@ -109,7 +124,7 @@ CREATE TABLE IF NOT EXISTS cdp_event_log (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='CDP event ingestion log';
 ```
 
-- [ ] **Step 4: Add data object, mapper, and DTOs**
+- [x] **Step 4: Add data object, mapper, and DTOs**
 
 Create `CdpEventLogDO.java`:
 
@@ -169,7 +184,7 @@ public record IngestionError(String messageId, String code, String message) {
 }
 ```
 
-- [ ] **Step 5: Run schema test**
+- [x] **Step 5: Run schema test**
 
 Run:
 
@@ -185,7 +200,7 @@ Expected: PASS.
 - Create: `backend/canvas-engine/src/test/java/org/chovy/canvas/domain/cdp/CdpEventIngestionServiceTest.java`
 - Create: `backend/canvas-engine/src/main/java/org/chovy/canvas/domain/cdp/CdpEventIngestionService.java`
 
-- [ ] **Step 1: Write service tests**
+- [x] **Step 1: Write service tests**
 
 Create `CdpEventIngestionServiceTest.java` with these tests:
 
@@ -242,7 +257,7 @@ void ingestRejectsUnknownTrackEvent() {
 
 Use helper methods in the same test class to build `key()` and `validEvent(...)`; mock `eventDefinitionCacheService.getPublishedByCode("OrderComplete")` to return a published `EventDefinitionDO`.
 
-- [ ] **Step 2: Run service tests and confirm red state**
+- [x] **Step 2: Run service tests and confirm red state**
 
 Run:
 
@@ -252,7 +267,7 @@ cd backend && mvn -pl canvas-engine test -Dtest=CdpEventIngestionServiceTest
 
 Expected: FAIL because ingestion service does not exist.
 
-- [ ] **Step 3: Implement service core**
+- [x] **Step 3: Implement service core**
 
 Create `CdpEventIngestionService.java`:
 
@@ -316,7 +331,7 @@ public class CdpEventIngestionService {
 
 Add private helpers `toRow`, `isDuplicateMessage`, `isDuplicateIdempotency`, `readContextString`, `writeJson`, `toLocal`, `blankToNull`, and `requireText` exactly matching the DTO fields in the spec.
 
-- [ ] **Step 4: Run service tests**
+- [x] **Step 4: Run service tests**
 
 Run:
 
@@ -334,7 +349,7 @@ Expected: PASS.
 - Modify: `backend/canvas-engine/src/main/java/org/chovy/canvas/config/SecurityConfig.java`
 - Modify: `backend/canvas-engine/src/main/resources/application.yml`
 
-- [ ] **Step 1: Write controller auth test**
+- [x] **Step 1: Write controller auth test**
 
 ```java
 @Test
@@ -357,7 +372,7 @@ void trackAuthenticatesBeforeIngestion() {
 }
 ```
 
-- [ ] **Step 2: Add controller**
+- [x] **Step 2: Add controller**
 
 Create `CdpEventIngestionController.java`:
 
@@ -379,7 +394,7 @@ public class CdpEventIngestionController {
 }
 ```
 
-- [ ] **Step 3: Permit route and add config**
+- [x] **Step 3: Permit route and add config**
 
 In `SecurityConfig`, permit:
 
@@ -396,7 +411,7 @@ canvas:
       max-batch-size: ${CANVAS_CDP_INGESTION_MAX_BATCH_SIZE:100}
 ```
 
-- [ ] **Step 4: Run focused backend tests**
+- [x] **Step 4: Run focused backend tests**
 
 Run:
 
@@ -417,7 +432,7 @@ Expected: PASS.
 Run:
 
 ```bash
-git add backend/canvas-engine/src/main/resources/db/migration/V97_1__cdp_event_log_and_track_endpoint.sql \
+git add backend/canvas-engine/src/main/resources/db/migration/V101__cdp_event_log_and_track_endpoint.sql \
   backend/canvas-engine/src/main/java/org/chovy/canvas/dal/dataobject/CdpEventLogDO.java \
   backend/canvas-engine/src/main/java/org/chovy/canvas/dal/mapper/CdpEventLogMapper.java \
   backend/canvas-engine/src/main/java/org/chovy/canvas/dto/cdp \
