@@ -117,6 +117,24 @@ describe('HomePage', () => {
       expect(String(path)).not.toContain('/canvas/0')
     }
   })
+
+  it('routes new canvas actions to the existing canvas list entry', async () => {
+    const user = userEvent.setup()
+    overviewMock.mockResolvedValueOnce(ok(overview()))
+
+    renderHome()
+    await screen.findByText('运营驾驶舱')
+
+    const newCanvasButtons = screen.getAllByRole('button', { name: /新建画布/ })
+    expect(newCanvasButtons).toHaveLength(2)
+
+    await user.click(newCanvasButtons[0])
+    await user.click(newCanvasButtons[1])
+
+    expect(navigateMock).toHaveBeenNthCalledWith(1, '/canvas')
+    expect(navigateMock).toHaveBeenNthCalledWith(2, '/canvas')
+    expect(navigateMock).not.toHaveBeenCalledWith('/canvas/new')
+  })
 })
 
 function renderHome() {

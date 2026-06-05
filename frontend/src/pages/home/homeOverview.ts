@@ -92,7 +92,6 @@ export interface KpiCard {
   value: string
   hint: string
   icon: ReactNode
-  bg: string
   iconBg: string
   color: string
 }
@@ -104,6 +103,11 @@ export const HOME_RANGE_OPTIONS = [
   { label: '近 30 天', value: 30 },
 ] as const
 
+/** 将统计天数转换为首页可读范围文案。 */
+export function formatHomeRangeLabel(days: number) {
+  return days === 1 ? '今日' : `近 ${days} 天`
+}
+
 /** 将后端 summary 转换为首页 KPI 卡片展示模型。 */
 export function buildKpiCards(overview: HomeOverview): KpiCard[] {
   const { summary } = overview
@@ -114,7 +118,6 @@ export function buildKpiCards(overview: HomeOverview): KpiCard[] {
       value: formatNumber(summary.publishedCanvasCount),
       hint: '线上生效活动',
       icon: createElement(ApartmentOutlined),
-      bg: '#fffbeb',
       iconBg: '#fef3c7',
       color: '#f59e0b',
     },
@@ -124,7 +127,6 @@ export function buildKpiCards(overview: HomeOverview): KpiCard[] {
       value: formatNumber(summary.uniqueUsers),
       hint: '去重用户规模',
       icon: createElement(TeamOutlined),
-      bg: '#eff6ff',
       iconBg: '#dbeafe',
       color: '#3b82f6',
     },
@@ -134,7 +136,6 @@ export function buildKpiCards(overview: HomeOverview): KpiCard[] {
       value: summary.successRate || '0%',
       hint: '成功执行占比',
       icon: createElement(CheckCircleOutlined),
-      bg: '#f0fdf4',
       iconBg: '#dcfce7',
       color: '#22c55e',
     },
@@ -144,7 +145,6 @@ export function buildKpiCards(overview: HomeOverview): KpiCard[] {
       value: formatNumber(summary.totalExecutions),
       hint: '当前范围总量',
       icon: createElement(ThunderboltOutlined),
-      bg: '#faf5ff',
       iconBg: '#ede9fe',
       color: '#8b5cf6',
     },
@@ -154,7 +154,6 @@ export function buildKpiCards(overview: HomeOverview): KpiCard[] {
       value: formatNumber(summary.failedExecutions),
       hint: '需要排查次数',
       icon: createElement(CloseCircleOutlined),
-      bg: '#fff1f2',
       iconBg: '#fee2e2',
       color: '#ef4444',
     },
@@ -198,7 +197,7 @@ export function buildRiskSummary(overview: HomeOverview): RiskSummary {
     return {
       healthy: true,
       title: '当前暂无高优先级异常',
-      message: '近 7 天旅程运行稳定，可继续关注触达趋势和 Top 旅程表现',
+      message: `${formatHomeRangeLabel(overview.range.days)}旅程运行稳定，可继续关注触达趋势和 Top 旅程表现`,
       severity: 'success',
       actionLabel: '查看趋势',
       targetCanvasId: null,

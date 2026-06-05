@@ -47,6 +47,7 @@ import {
   buildKpiCards,
   buildRiskSummary,
   filterHomeOverview,
+  formatHomeRangeLabel,
   getAttentionAction,
   getAttentionPresentation,
   HOME_RANGE_OPTIONS,
@@ -108,7 +109,8 @@ export default function HomePage() {
   }, [navigate])
 
   return (
-    <div style={pageStyle}>
+    <div className="home-dashboard" style={pageStyle}>
+      <style>{homeResponsiveStyle}</style>
       {/* 页头：时间范围和刷新动作影响下方全部模块。 */}
       <div style={headerStyle}>
         <div>
@@ -119,10 +121,10 @@ export default function HomePage() {
             <Title level={3} style={{ margin: 0, color: '#0f172a' }}>运营驾驶舱</Title>
           </Space>
           <Text type="secondary" style={{ display: 'block', marginTop: 8 }}>
-            默认聚焦近 7 天活动表现，快速定位有效旅程和待处理异常
+            当前聚焦{formatHomeRangeLabel(days)}活动表现，快速定位有效旅程和待处理异常
           </Text>
         </div>
-        <Space wrap style={{ justifyContent: 'flex-end' }}>
+        <Space className="home-header-actions" wrap style={{ justifyContent: 'flex-end' }}>
           <Input
             allowClear
             prefix={<SearchOutlined style={{ color: '#94a3b8' }} />}
@@ -132,12 +134,13 @@ export default function HomePage() {
             style={{ width: 240 }}
           />
           <Segmented
+            className="home-range-control"
             value={days}
             options={HOME_RANGE_OPTIONS.map(item => ({ label: item.label, value: item.value }))}
             onChange={value => setDays(Number(value))}
           />
           <Button icon={<ReloadOutlined />} onClick={load}>刷新</Button>
-          <Button type="primary" icon={<PlusOutlined />} onClick={() => navigate('/canvas/new')}>新建画布</Button>
+          <Button type="primary" icon={<PlusOutlined />} onClick={() => navigate('/canvas')}>新建画布</Button>
         </Space>
       </div>
 
@@ -194,9 +197,9 @@ export default function HomePage() {
                       <Tooltip />
                       <Legend />
                       <Area type="monotone" dataKey="total" name="触发次数"
-                        stroke="#2563eb" strokeWidth={2.4} fill="url(#homeTotal)" />
+                        stroke="#2563eb" strokeWidth={2.4} fill="url(#homeTotal)" isAnimationActive={false} />
                       <Area type="monotone" dataKey="failed" name="失败次数"
-                        stroke="#e11d48" strokeWidth={2.2} fill="url(#homeFailed)" />
+                        stroke="#e11d48" strokeWidth={2.2} fill="url(#homeFailed)" isAnimationActive={false} />
                     </AreaChart>
                   </ResponsiveContainer>
                 )}
@@ -232,8 +235,8 @@ export default function HomePage() {
             </Col>
             <Col xs={24} xl={10}>
               <Card title="常用动作" variant="borderless" style={cardStyle}>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 12 }}>
-                  <QuickAction icon={<PlusOutlined />} label="新建画布" color="#2563eb" onClick={() => navigate('/canvas/new')} />
+                <div className="home-quick-actions" style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 12 }}>
+                  <QuickAction icon={<PlusOutlined />} label="新建画布" color="#2563eb" onClick={() => navigate('/canvas')} />
                   <QuickAction icon={<BarChartOutlined />} label="旅程管理" color="#7c3aed" onClick={() => navigate('/canvas')} />
                   <QuickAction icon={<TeamOutlined />} label="人群管理" color="#059669" onClick={() => navigate('/audiences')} />
                   <QuickAction icon={<ApiOutlined />} label="API 配置" color="#dc2626" onClick={() => navigate('/api-config')} />
@@ -252,19 +255,20 @@ export default function HomePage() {
 /** 风险摘要横幅，使用原始 overview 聚合结果，不受本地搜索影响。 */
 function RiskSummaryBanner({ summary, onOpen }: { summary: RiskSummary; onOpen: () => void }) {
   const presentation = getAttentionPresentation(summary.severity)
+  const tone = getRiskBannerTone(summary)
   const title = summary.healthy ? summary.title : `最高风险：${summary.title}`
   const message = summary.healthy ? summary.message : `建议优先处理：${summary.message}`
   return (
-    <div style={{
+    <div className="home-risk-banner" style={{
       ...riskBannerStyle,
-      borderColor: summary.healthy ? '#bbf7d0' : '#fed7aa',
-      background: summary.healthy ? '#f0fdf4' : '#fff7ed',
+      borderColor: tone.borderColor,
+      background: tone.background,
     }}>
       <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12, minWidth: 0 }}>
         <div style={{
           ...riskIconStyle,
-          color: summary.healthy ? '#16a34a' : '#ea580c',
-          background: summary.healthy ? '#dcfce7' : '#ffedd5',
+          color: tone.iconColor,
+          background: tone.iconBackground,
         }}>
           <LineChartOutlined />
         </div>
@@ -276,7 +280,7 @@ function RiskSummaryBanner({ summary, onOpen }: { summary: RiskSummary; onOpen: 
           <Text type="secondary" style={{ display: 'block', marginTop: 6 }}>{message}</Text>
         </div>
       </div>
-      <Space size={18} wrap style={{ justifyContent: 'flex-end' }}>
+      <Space className="home-risk-metrics" size={18} wrap style={{ justifyContent: 'flex-end' }}>
         <Metric label="待处理" value={summary.pendingCount.toLocaleString()} />
         <Metric label="失败次数" value={summary.failedExecutions} />
         <Metric label="成功率" value={summary.successRate} />
@@ -284,6 +288,31 @@ function RiskSummaryBanner({ summary, onOpen }: { summary: RiskSummary; onOpen: 
       </Space>
     </div>
   )
+}
+
+function getRiskBannerTone(summary: RiskSummary) {
+  if (summary.healthy) {
+    return {
+      borderColor: '#bbf7d0',
+      background: '#f0fdf4',
+      iconColor: '#16a34a',
+      iconBackground: '#dcfce7',
+    }
+  }
+  if (summary.severity === 'error') {
+    return {
+      borderColor: '#fecaca',
+      background: '#fef2f2',
+      iconColor: '#dc2626',
+      iconBackground: '#fee2e2',
+    }
+  }
+  return {
+    borderColor: '#fed7aa',
+    background: '#fff7ed',
+    iconColor: '#ea580c',
+    iconBackground: '#ffedd5',
+  }
 }
 
 /** KPI 白色材料卡片，颜色仅作为图标和状态强调。 */
@@ -411,6 +440,67 @@ function attentionUrl(item: HomeAttentionItem) {
   if (item.type === 'NO_RECENT_EXECUTIONS') return `/canvas/${item.canvasId}/edit`
   return `/canvas/${item.canvasId}/stats`
 }
+
+const homeResponsiveStyle = `
+  @media (max-width: 767px) {
+    .home-dashboard {
+      padding: 18px 0 28px !important;
+    }
+
+    .home-dashboard .home-header-actions {
+      width: 100%;
+      justify-content: flex-start !important;
+      row-gap: 8px;
+    }
+
+    .home-dashboard .home-header-actions .ant-space-item {
+      max-width: 100%;
+    }
+
+    .home-dashboard .home-header-actions .ant-input-affix-wrapper,
+    .home-dashboard .home-range-control {
+      width: 100% !important;
+    }
+
+    .home-dashboard .home-range-control .ant-segmented-group {
+      width: 100%;
+    }
+
+    .home-dashboard .home-range-control .ant-segmented-item {
+      flex: 1;
+      text-align: center;
+    }
+
+    .home-dashboard .home-risk-banner {
+      align-items: flex-start !important;
+      padding: 14px !important;
+    }
+
+    .home-dashboard .home-risk-metrics {
+      width: 100%;
+      justify-content: space-between !important;
+      gap: 12px !important;
+    }
+
+    .home-dashboard .home-risk-metrics .ant-space-item:last-child,
+    .home-dashboard .home-risk-metrics .ant-btn {
+      width: 100%;
+    }
+
+    .home-dashboard .home-quick-actions {
+      grid-template-columns: 1fr !important;
+    }
+
+    .home-dashboard .ant-card-head {
+      min-height: 48px;
+      padding: 0 16px;
+    }
+
+    .home-dashboard .ant-card-body {
+      padding: 16px !important;
+    }
+  }
+`
 
 const pageStyle: CSSProperties = {
   minHeight: '100vh',

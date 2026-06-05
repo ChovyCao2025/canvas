@@ -85,6 +85,11 @@ describe('homeOverview helpers', () => {
     })
   })
 
+  it('uses the active range in the healthy risk summary', () => {
+    expect(buildRiskSummary({ ...overview(), range: { days: 30, since: '2026-04-24', until: '2026-05-23' } }).message)
+      .toBe('近 30 天旅程运行稳定，可继续关注触达趋势和 Top 旅程表现')
+  })
+
   it('builds risk summary for aggregate no-execution attention without an actionable canvas target', () => {
     expect(buildRiskSummary(overviewWithAggregateNoExecution())).toEqual({
       healthy: false,

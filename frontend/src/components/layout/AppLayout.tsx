@@ -3,8 +3,8 @@
  *
  * 维护说明：菜单 key 与路由路径强绑定，新增页面时需要同步这里的导航配置。
  */
-import { useEffect, useState } from 'react'
-import { Layout, Menu, Avatar, Dropdown, Tooltip, type MenuProps } from 'antd'
+import { useEffect, useState, type CSSProperties } from 'react'
+import { Layout, Menu, Avatar, Dropdown, Tooltip, Button, type MenuProps } from 'antd'
 import {
   ApartmentOutlined, SettingOutlined, ApiOutlined,
   ExperimentOutlined, TeamOutlined, LogoutOutlined,
@@ -56,6 +56,13 @@ export default function AppLayout() {
   const location = useLocation()
   const { user, isAdmin, canManageTenants, logout } = useAuth()
   const [collapsed, setCollapsed] = useState(false)
+  const [mobileOpen, setMobileOpen] = useState(false)
+  const isMobile = useMediaQuery('(max-width: 767px)')
+  const effectiveCollapsed = isMobile ? false : collapsed
+
+  useEffect(() => {
+    if (!isMobile) setMobileOpen(false)
+  }, [isMobile])
 
   // 根据当前 URL 计算菜单高亮 key
   const selectedKey = (() => {
@@ -91,15 +98,20 @@ export default function AppLayout() {
   const [openKeys, setOpenKeys] = useState<string[]>(getDesiredOpenKeys)
 
   useEffect(() => {
-    if (!collapsed) setOpenKeys(getDesiredOpenKeys())
-  }, [collapsed, selectedKey])
+    if (!effectiveCollapsed) setOpenKeys(getDesiredOpenKeys())
+  }, [effectiveCollapsed, selectedKey])
+
+  const go = (path: string) => {
+    navigate(path)
+    if (isMobile) setMobileOpen(false)
+  }
 
   const menuItems: MenuProps['items'] = [
     {
       key: 'home',
       icon: <HomeOutlined />,
       label: '首页',
-      onClick: () => navigate('/home'),
+      onClick: () => go('/home'),
     },
     {
       key: 'marketing',
@@ -110,7 +122,7 @@ export default function AppLayout() {
           key: 'canvas',
           icon: <ApartmentOutlined />,
           label: '旅程管理',
-          onClick: () => navigate('/canvas'),
+          onClick: () => go('/canvas'),
         },
       ],
     },
@@ -123,7 +135,7 @@ export default function AppLayout() {
           key: 'cdp-users',
           icon: <IdcardOutlined />,
           label: '用户中心',
-          onClick: () => navigate('/cdp/users'),
+          onClick: () => go('/cdp/users'),
         },
       ],
     },
@@ -136,31 +148,31 @@ export default function AppLayout() {
           key: 'audiences',
           icon: <TeamOutlined />,
           label: '人群管理',
-          onClick: () => navigate('/audiences'),
+          onClick: () => go('/audiences'),
         },
         {
           key: 'tag-config',
           icon: <TagsOutlined />,
           label: '标签配置',
-          onClick: () => navigate('/tag-config'),
+          onClick: () => go('/tag-config'),
         },
         {
           key: 'identity-types',
           icon: <UserOutlined />,
           label: 'ID 类型配置',
-          onClick: () => navigate('/identity-types'),
+          onClick: () => go('/identity-types'),
         },
         {
           key: 'tag-import',
           icon: <TagsOutlined />,
           label: '标签导入',
-          onClick: () => navigate('/tag-import'),
+          onClick: () => go('/tag-import'),
         },
         {
           key: 'ab-experiments',
           icon: <ExperimentOutlined />,
           label: 'AB 实验管理',
-          onClick: () => navigate('/ab-experiments'),
+          onClick: () => go('/ab-experiments'),
         },
       ],
     }] : []),
@@ -173,25 +185,25 @@ export default function AppLayout() {
           key: 'api-config',
           icon: <ApiOutlined />,
           label: 'API 接口配置',
-          onClick: () => navigate('/api-config'),
+          onClick: () => go('/api-config'),
         },
         {
           key: 'data-source-config',
           icon: <DatabaseOutlined />,
           label: '数据源配置',
-          onClick: () => navigate('/data-source-config'),
+          onClick: () => go('/data-source-config'),
         },
         {
           key: 'mq-config',
           icon: <NotificationOutlined />,
           label: 'MQ 消息配置',
-          onClick: () => navigate('/mq-config'),
+          onClick: () => go('/mq-config'),
         },
         {
           key: 'event-config',
           icon: <ThunderboltOutlined />,
           label: '事件配置',
-          onClick: () => navigate('/event-config'),
+          onClick: () => go('/event-config'),
         },
       ],
     }] : []),
@@ -204,7 +216,7 @@ export default function AppLayout() {
           key: 'api-docs',
           icon: <ApiOutlined />,
           label: 'API 说明',
-          onClick: () => navigate('/api-docs'),
+          onClick: () => go('/api-docs'),
         },
       ],
     }] : []),
@@ -217,19 +229,19 @@ export default function AppLayout() {
           key: 'system-options',
           icon: <SettingOutlined />,
           label: '系统选项配置',
-          onClick: () => navigate('/system-options'),
+          onClick: () => go('/system-options'),
         },
         ...(canManageTenants ? [{
           key: 'admin-tenants',
           icon: <BankOutlined />,
           label: '租户管理',
-          onClick: () => navigate('/admin/tenants'),
+          onClick: () => go('/admin/tenants'),
         }] : []),
         ...(isAdmin ? [{
           key: 'admin-users',
           icon: <TeamOutlined />,
           label: '用户管理',
-          onClick: () => navigate('/admin/users'),
+          onClick: () => go('/admin/users'),
         }] : []),
       ],
     }] : []),
@@ -250,10 +262,44 @@ export default function AppLayout() {
   return (
     <Layout style={{ minHeight: '100vh' }}>
       <style>{siderChildrenStyle}</style>
+      {isMobile && (
+        <>
+          <div style={mobileHeaderStyle}>
+            <Button
+              type="text"
+              aria-label="打开导航"
+              icon={<MenuUnfoldOutlined />}
+              onClick={() => setMobileOpen(true)}
+              style={{ color: '#fff' }}
+            />
+            <div
+              style={{
+                width: 28,
+                height: 28,
+                borderRadius: 8,
+                flexShrink: 0,
+                background: `linear-gradient(135deg, ${ACCENT} 0%, #7c3aed 100%)`,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                cursor: 'pointer',
+              }}
+              onClick={() => go('/home')}
+            >
+              <ApartmentOutlined style={{ color: '#fff', fontSize: 14 }} />
+            </div>
+            <span style={{ color: '#fff', fontSize: 15, fontWeight: 700, whiteSpace: 'nowrap' }}>营销画布</span>
+            <div style={{ marginLeft: 'auto' }}>
+              <NotificationBell />
+            </div>
+          </div>
+          {mobileOpen && <div style={mobileBackdropStyle} onClick={() => setMobileOpen(false)} />}
+        </>
+      )}
       <Sider
         className="app-sider"
-        collapsible
-        collapsed={collapsed}
+        collapsible={!isMobile}
+        collapsed={effectiveCollapsed}
         trigger={null}
         width={220}
         collapsedWidth={64}
@@ -263,9 +309,12 @@ export default function AppLayout() {
           flexDirection: 'column',
           position: 'fixed',
           left: 0, top: 0, bottom: 0,
-          zIndex: 100,
+          zIndex: isMobile ? 1000 : 100,
           boxShadow: '2px 0 12px rgba(0,0,0,.35)',
           overflow: 'hidden',
+          transform: isMobile && !mobileOpen ? 'translateX(-100%)' : 'translateX(0)',
+          transition: 'transform .2s ease, width .2s',
+          pointerEvents: isMobile && !mobileOpen ? 'none' : 'auto',
         }}
       >
         {/* Logo 行 + 收起按钮 */}
@@ -286,33 +335,33 @@ export default function AppLayout() {
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               cursor: 'pointer',
             }}
-            onClick={() => navigate('/canvas')}
+            onClick={() => go('/canvas')}
           >
             <ApartmentOutlined style={{ color: '#fff', fontSize: 14 }} />
           </div>
 
-          {!collapsed && (
+          {!effectiveCollapsed && (
             <span
               style={{ color: '#fff', fontSize: 15, fontWeight: 700, letterSpacing: '.5px', whiteSpace: 'nowrap', flex: 1, cursor: 'pointer' }}
-              onClick={() => navigate('/canvas')}
+              onClick={() => go('/canvas')}
             >
               营销画布
             </span>
           )}
 
           {/* 收起/展开按钮放在 logo 行右侧 */}
-          <Tooltip title={collapsed ? '展开' : '收起'} placement="right">
+          <Tooltip title={isMobile ? '关闭导航' : collapsed ? '展开' : '收起'} placement="right">
             <div
-              onClick={() => setCollapsed(c => !c)}
+              onClick={() => isMobile ? setMobileOpen(false) : setCollapsed(c => !c)}
               style={{
                 color: 'rgba(255,255,255,.35)', fontSize: 15, cursor: 'pointer',
                 flexShrink: 0, transition: 'color .15s',
-                marginLeft: collapsed ? 0 : 'auto',
+                marginLeft: effectiveCollapsed ? 0 : 'auto',
               }}
               onMouseEnter={e => (e.currentTarget.style.color = 'rgba(255,255,255,.8)')}
               onMouseLeave={e => (e.currentTarget.style.color = 'rgba(255,255,255,.35)')}
             >
-              {collapsed ? <MenuUnfoldOutlined /> : <MenuFoldOutlined />}
+              {isMobile || !effectiveCollapsed ? <MenuFoldOutlined /> : <MenuUnfoldOutlined />}
             </div>
           </Tooltip>
         </div>
@@ -322,7 +371,7 @@ export default function AppLayout() {
           <Menu
             mode="inline"
             selectedKeys={[selectedKey]}
-            openKeys={collapsed ? [] : openKeys}
+            openKeys={effectiveCollapsed ? [] : openKeys}
             onOpenChange={keys => setOpenKeys(keys as string[])}
             items={menuItems}
             style={{ background: 'transparent', border: 'none' }}
@@ -335,17 +384,17 @@ export default function AppLayout() {
           <div style={{
             display: 'flex',
             alignItems: 'center',
-            gap: collapsed ? 6 : 8,
-            flexDirection: collapsed ? 'column' : 'row',
+            gap: effectiveCollapsed ? 6 : 8,
+            flexDirection: effectiveCollapsed ? 'column' : 'row',
           }}>
-            <NotificationBell />
+            {!isMobile && <NotificationBell />}
             <Dropdown menu={{ items: userMenu }} placement="topLeft" trigger={['click']}>
               <div
                 style={{
                   display: 'flex', alignItems: 'center', gap: 10,
-                  padding: collapsed ? '8px 10px' : '8px 12px',
+                  padding: effectiveCollapsed ? '8px 10px' : '8px 12px',
                   borderRadius: 8, cursor: 'pointer', transition: 'background .15s',
-                  flex: collapsed ? 'none' : 1,
+                  flex: effectiveCollapsed ? 'none' : 1,
                   minWidth: 0,
                 }}
                 onMouseEnter={e => (e.currentTarget.style.background = SIDER_HOVER)}
@@ -357,7 +406,7 @@ export default function AppLayout() {
                 >
                   {user?.displayName?.[0] ?? <UserOutlined />}
                 </Avatar>
-                {!collapsed && (
+                {!effectiveCollapsed && (
                   <div style={{ overflow: 'hidden', flex: 1 }}>
                     <div style={{ color: 'rgba(255,255,255,.9)', fontSize: 13, fontWeight: 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                       {user?.displayName}
@@ -375,15 +424,62 @@ export default function AppLayout() {
 
       {/* 内容区 */}
       <Layout style={{
-        marginLeft: collapsed ? 64 : 220,
+        marginLeft: isMobile ? 0 : effectiveCollapsed ? 64 : 220,
+        paddingTop: isMobile ? 56 : 0,
         transition: 'margin-left .2s',
         background: '#f5f6fa',
         minHeight: '100vh',
       }}>
-        <Content style={{ padding: 24, minHeight: '100vh' }}>
+        <Content style={{ padding: isMobile ? 12 : 24, minHeight: isMobile ? 'calc(100vh - 56px)' : '100vh' }}>
           <Outlet />
         </Content>
       </Layout>
     </Layout>
   )
+}
+
+/** 读取媒体查询状态，供主布局在移动端切换为抽屉导航。 */
+function useMediaQuery(query: string) {
+  const [matches, setMatches] = useState(() => {
+    if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return false
+    return window.matchMedia(query).matches
+  })
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return undefined
+    const media = window.matchMedia(query)
+    const update = () => setMatches(media.matches)
+    update()
+    if (media.addEventListener) {
+      media.addEventListener('change', update)
+      return () => media.removeEventListener('change', update)
+    }
+    media.addListener(update)
+    return () => media.removeListener(update)
+  }, [query])
+
+  return matches
+}
+
+const mobileHeaderStyle: CSSProperties = {
+  position: 'fixed',
+  left: 0,
+  right: 0,
+  top: 0,
+  height: 56,
+  zIndex: 900,
+  display: 'flex',
+  alignItems: 'center',
+  gap: 10,
+  padding: '0 12px',
+  background: SIDER_DARK,
+  borderBottom: '1px solid rgba(255,255,255,.08)',
+  boxShadow: '0 6px 18px rgba(15,23,42,.2)',
+}
+
+const mobileBackdropStyle: CSSProperties = {
+  position: 'fixed',
+  inset: 0,
+  zIndex: 999,
+  background: 'rgba(15,23,42,.42)',
 }
