@@ -181,7 +181,8 @@ export function sortAttentionItems(items: HomeAttentionItem[]): HomeAttentionIte
 }
 
 /** 根据关注项类型给出页面主操作。 */
-export function getAttentionAction(item: Pick<HomeAttentionItem, 'type'>): AttentionAction {
+export function getAttentionAction(item: Pick<HomeAttentionItem, 'type' | 'canvasId'>): AttentionAction {
+  if (item.canvasId <= 0) return { label: '查看', destination: 'stats' }
   if (item.type === 'NO_RECENT_EXECUTIONS') return { label: '编辑', destination: 'edit' }
   if (item.type === 'HIGH_FAILURE_RATE') return { label: '处理', destination: 'stats' }
   return { label: '查看', destination: 'stats' }
@@ -216,7 +217,7 @@ export function buildRiskSummary(overview: HomeOverview): RiskSummary {
     message: selectedItem.message,
     severity: selectedItem.severity,
     actionLabel: action.label,
-    targetCanvasId: selectedItem.canvasId,
+    targetCanvasId: selectedItem.canvasId > 0 ? selectedItem.canvasId : null,
     failedExecutions,
     successRate,
     pendingCount,

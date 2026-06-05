@@ -85,6 +85,20 @@ describe('homeOverview helpers', () => {
     })
   })
 
+  it('builds risk summary for aggregate no-execution attention without an actionable canvas target', () => {
+    expect(buildRiskSummary(overviewWithAggregateNoExecution())).toEqual({
+      healthy: false,
+      title: '全部旅程',
+      message: '最近暂无执行记录',
+      severity: 'info',
+      actionLabel: '查看',
+      targetCanvasId: null,
+      failedExecutions: '26',
+      successRate: '97.8%',
+      pendingCount: 1,
+    })
+  })
+
   it('sorts attention items by severity while preserving backend order within the same severity', () => {
     const sorted = sortAttentionItems(overviewWithAttention().attentionItems)
 
@@ -119,9 +133,22 @@ describe('homeOverview helpers', () => {
   })
 
   it('maps attention type to the primary action', () => {
-    expect(getAttentionAction({ type: 'NO_RECENT_EXECUTIONS' })).toEqual({ label: '编辑', destination: 'edit' })
-    expect(getAttentionAction({ type: 'HIGH_FAILURE_RATE' })).toEqual({ label: '处理', destination: 'stats' })
-    expect(getAttentionAction({ type: 'HAS_FAILURES' })).toEqual({ label: '查看', destination: 'stats' })
+    expect(getAttentionAction({ type: 'NO_RECENT_EXECUTIONS', canvasId: 3 })).toEqual({
+      label: '编辑',
+      destination: 'edit',
+    })
+    expect(getAttentionAction({ type: 'HIGH_FAILURE_RATE', canvasId: 2 })).toEqual({
+      label: '处理',
+      destination: 'stats',
+    })
+    expect(getAttentionAction({ type: 'HAS_FAILURES', canvasId: 5 })).toEqual({ label: '查看', destination: 'stats' })
+  })
+
+  it('maps aggregate no-execution attention to a stats action', () => {
+    expect(getAttentionAction({ type: 'NO_RECENT_EXECUTIONS', canvasId: 0 })).toEqual({
+      label: '查看',
+      destination: 'stats',
+    })
   })
 })
 
@@ -220,6 +247,21 @@ function overviewForRiskSummary(): HomeOverview {
         type: 'NO_RECENT_EXECUTIONS',
         message: '近 7 天暂无执行',
         severity: 'warning',
+      },
+    ],
+  }
+}
+
+function overviewWithAggregateNoExecution(): HomeOverview {
+  return {
+    ...overview(),
+    attentionItems: [
+      {
+        canvasId: 0,
+        name: '全部旅程',
+        type: 'NO_RECENT_EXECUTIONS',
+        message: '最近暂无执行记录',
+        severity: 'info',
       },
     ],
   }
