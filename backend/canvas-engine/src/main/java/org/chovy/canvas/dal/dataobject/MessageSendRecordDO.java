@@ -30,8 +30,8 @@ public class MessageSendRecordDO {
     /** 消息因策略或条件跳过发送状态 */
     public static final String STATUS_SKIPPED = "SKIPPED";
 
-    @TableId(type = IdType.AUTO)
     /** 消息发送记录主键 ID */
+    @TableId(value = "id", type = IdType.AUTO)
     private Long id;
 
     @TableField("tenant_id")

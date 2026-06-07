@@ -20,6 +20,11 @@ import {
   DashboardOutlined,
   SafetyCertificateOutlined,
   FormOutlined,
+  FolderOpenOutlined,
+  MessageOutlined,
+  AlertOutlined,
+  SearchOutlined,
+  GiftOutlined,
 } from '@ant-design/icons'
 import { Outlet, useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
@@ -76,21 +81,36 @@ export default function AppLayout() {
     if (location.pathname.startsWith('/data-source-config')) return 'data-source-config'
     if (location.pathname.startsWith('/ab-experiments')) return 'ab-experiments'
     if (location.pathname.startsWith('/tag-config'))     return 'tag-config'
+    if (location.pathname.startsWith('/cdp/computed-profile')) return 'cdp-computed-profile'
+    if (location.pathname.startsWith('/cdp/computed-tags')) return 'cdp-computed-tags'
+    if (location.pathname.startsWith('/cdp/realtime-audiences')) return 'cdp-realtime-audiences'
     if (location.pathname.startsWith('/identity-types')) return 'identity-types'
     if (location.pathname.startsWith('/tag-import'))     return 'tag-import'
     if (location.pathname.startsWith('/audiences'))      return 'audiences'
     if (location.pathname.startsWith('/mq-config'))      return 'mq-config'
     if (location.pathname.startsWith('/event-config'))   return 'event-config'
+    if (location.pathname.startsWith('/webhook-subscriptions')) return 'webhook-subscriptions'
+    if (location.pathname.startsWith('/channel-connectors')) return 'channel-connectors'
     if (location.pathname.startsWith('/api-docs'))       return 'api-docs'
     if (location.pathname.startsWith('/system-options')) return 'system-options'
     if (location.pathname.startsWith('/admin/tenants'))  return 'admin-tenants'
     if (location.pathname.startsWith('/admin/users'))    return 'admin-users'
+    if (location.pathname.startsWith('/admin/projects')) return 'admin-projects'
     if (location.pathname.startsWith('/test-users'))     return 'test-users'
     if (location.pathname.startsWith('/message-deliveries')) return 'message-deliveries'
     if (location.pathname.startsWith('/mautic-insights')) return 'mautic-insights'
+    if (location.pathname.startsWith('/marketing-platform')) return 'marketing-platform'
+    if (location.pathname.startsWith('/growth-activities')) return 'growth-activities'
+    if (location.pathname.startsWith('/search-marketing')) return 'search-marketing'
     if (location.pathname.startsWith('/marketing-preferences')) return 'marketing-preferences'
     if (location.pathname.startsWith('/marketing-forms')) return 'marketing-forms'
+    if (location.pathname.startsWith('/content-hub')) return 'content-hub'
+    if (location.pathname.startsWith('/message-templates')) return 'message-templates'
+    if (location.pathname.startsWith('/demo-sandbox')) return 'demo-sandbox'
+    if (location.pathname.startsWith('/approvals')) return 'approvals'
     if (location.pathname.startsWith('/ops')) return 'ops'
+    if (location.pathname.startsWith('/conversations')) return 'conversations'
+    if (location.pathname.startsWith('/marketing-monitoring')) return 'marketing-monitoring'
     if (location.pathname.startsWith('/bi')) return 'bi'
     if (location.pathname.startsWith('/ai-predictions')) return 'ai-predictions'
     if (location.pathname.startsWith('/cdp/users'))      return 'cdp-users'
@@ -100,14 +120,14 @@ export default function AppLayout() {
   /** 根据当前菜单高亮项计算需要展开的父级菜单。 */
   const getDesiredOpenKeys = () => {
     if (selectedKey === 'home') return []
-    if (selectedKey === 'ops') return ['operations']
+    if (['ops', 'approvals', 'conversations', 'marketing-monitoring'].includes(selectedKey)) return ['operations']
     if (selectedKey === 'bi') return ['analytics']
     if (['cdp-users', 'ai-predictions'].includes(selectedKey)) return ['insight']
-    if (['test-users', 'message-deliveries', 'mautic-insights', 'marketing-preferences', 'marketing-forms'].includes(selectedKey)) return ['marketing']
+    if (['test-users', 'message-deliveries', 'mautic-insights', 'marketing-platform', 'growth-activities', 'search-marketing', 'marketing-preferences', 'marketing-forms', 'content-hub', 'message-templates', 'demo-sandbox'].includes(selectedKey)) return ['marketing']
     if (selectedKey === 'api-docs') return ['developer']
-    if (['audiences', 'tag-config', 'identity-types', 'tag-import', 'ab-experiments'].includes(selectedKey)) return ['data']
-    if (['api-config', 'data-source-config', 'mq-config', 'event-config'].includes(selectedKey)) return ['integration']
-    if (['system-options', 'admin-tenants', 'admin-users'].includes(selectedKey)) return ['settings']
+    if (['audiences', 'tag-config', 'cdp-computed-profile', 'cdp-computed-tags', 'cdp-realtime-audiences', 'identity-types', 'tag-import', 'ab-experiments'].includes(selectedKey)) return ['data']
+    if (['api-config', 'data-source-config', 'mq-config', 'event-config', 'webhook-subscriptions', 'channel-connectors'].includes(selectedKey)) return ['integration']
+    if (['system-options', 'admin-tenants', 'admin-users', 'admin-projects'].includes(selectedKey)) return ['settings']
     return ['marketing']
   }
 
@@ -141,6 +161,24 @@ export default function AppLayout() {
           onClick: () => go('/canvas'),
         },
         {
+          key: 'marketing-platform',
+          icon: <DashboardOutlined />,
+          label: '营销中台',
+          onClick: () => navigate('/marketing-platform'),
+        },
+        {
+          key: 'search-marketing',
+          icon: <SearchOutlined />,
+          label: 'SEO / SEM 管理',
+          onClick: () => go('/search-marketing'),
+        },
+        {
+          key: 'growth-activities',
+          icon: <GiftOutlined />,
+          label: '增长活动',
+          onClick: () => go('/growth-activities'),
+        },
+        {
           key: 'mautic-insights',
           icon: <EyeOutlined />,
           label: '解释台',
@@ -157,6 +195,24 @@ export default function AppLayout() {
           icon: <FormOutlined />,
           label: '表单中心',
           onClick: () => navigate('/marketing-forms'),
+        },
+        {
+          key: 'content-hub',
+          icon: <FolderOpenOutlined />,
+          label: '内容中心',
+          onClick: () => navigate('/content-hub'),
+        },
+        {
+          key: 'message-templates',
+          icon: <BookOutlined />,
+          label: '模板中心',
+          onClick: () => navigate('/message-templates'),
+        },
+        {
+          key: 'demo-sandbox',
+          icon: <ExperimentOutlined />,
+          label: '演示沙箱',
+          onClick: () => navigate('/demo-sandbox'),
         },
         ...(isAdmin ? [{
           key: 'test-users',
@@ -195,6 +251,24 @@ export default function AppLayout() {
           label: '运维控制台',
           onClick: () => navigate('/ops'),
         },
+        {
+          key: 'approvals',
+          icon: <SafetyCertificateOutlined />,
+          label: '审批任务',
+          onClick: () => navigate('/approvals'),
+        },
+        {
+          key: 'conversations',
+          icon: <MessageOutlined />,
+          label: '会话工作台',
+          onClick: () => navigate('/conversations'),
+        },
+        {
+          key: 'marketing-monitoring',
+          icon: <AlertOutlined />,
+          label: '监测工作台',
+          onClick: () => navigate('/marketing-monitoring'),
+        },
       ],
     },
     {
@@ -228,10 +302,28 @@ export default function AppLayout() {
           onClick: () => go('/audiences'),
         },
         {
+          key: 'cdp-realtime-audiences',
+          icon: <ThunderboltOutlined />,
+          label: '实时人群',
+          onClick: () => go('/cdp/realtime-audiences'),
+        },
+        {
           key: 'tag-config',
           icon: <TagsOutlined />,
           label: '标签配置',
           onClick: () => go('/tag-config'),
+        },
+        {
+          key: 'cdp-computed-profile',
+          icon: <ThunderboltOutlined />,
+          label: '计算画像属性',
+          onClick: () => go('/cdp/computed-profile'),
+        },
+        {
+          key: 'cdp-computed-tags',
+          icon: <TagsOutlined />,
+          label: '计算标签',
+          onClick: () => go('/cdp/computed-tags'),
         },
         {
           key: 'identity-types',
@@ -282,6 +374,18 @@ export default function AppLayout() {
           label: '事件配置',
           onClick: () => go('/event-config'),
         },
+        {
+          key: 'webhook-subscriptions',
+          icon: <ApiOutlined />,
+          label: 'Webhook 订阅',
+          onClick: () => go('/webhook-subscriptions'),
+        },
+        {
+          key: 'channel-connectors',
+          icon: <SafetyCertificateOutlined />,
+          label: '渠道连接器',
+          onClick: () => go('/channel-connectors'),
+        },
       ],
     }] : []),
     ...(isAdmin ? [{
@@ -315,6 +419,11 @@ export default function AppLayout() {
           onClick: () => go('/admin/tenants'),
         }] : []),
         ...(isAdmin ? [{
+          key: 'admin-projects',
+          icon: <ApartmentOutlined />,
+          label: '项目管理',
+          onClick: () => go('/admin/projects'),
+        }, {
           key: 'admin-users',
           icon: <TeamOutlined />,
           label: '用户管理',
@@ -337,7 +446,7 @@ export default function AppLayout() {
   ]
 
   return (
-    <Layout style={{ minHeight: '100vh' }}>
+    <Layout style={{ minHeight: '100vh', width: '100%', maxWidth: '100vw', overflowX: 'hidden' }}>
       <style>{siderChildrenStyle}</style>
       <a
         href="#main-content"
@@ -525,12 +634,16 @@ export default function AppLayout() {
         transition: 'margin-left .2s',
         background: '#f5f6fa',
         minHeight: '100vh',
+        minWidth: 0,
+        width: '100%',
+        maxWidth: '100vw',
+        overflowX: 'hidden',
       }}>
         <Content
           id="main-content"
           role="main"
           tabIndex={-1}
-          style={{ padding: isMobile ? 12 : 24, minHeight: isMobile ? 'calc(100vh - 56px)' : '100vh' }}
+          style={{ padding: isMobile ? 12 : 24, minHeight: isMobile ? 'calc(100vh - 56px)' : '100vh', minWidth: 0, maxWidth: '100%' }}
         >
           <Outlet />
         </Content>

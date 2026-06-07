@@ -66,6 +66,12 @@ public record NodeResult(
         return new NodeResult(null, null, null, null, null, Map.of(), false, errorMessage, false,
                 NodeOutcome.FAIL, Map.of(), "NODE_FAILED", errorMessage, null);
     }
+
+    /** 执行失败，同时保留节点输出字段供审计和前端展示。 */
+    public static NodeResult fail(String errorMessage, Map<String, Object> output) {
+        return new NodeResult(null, null, null, null, null, output == null ? Map.of() : output,
+                false, errorMessage, false, NodeOutcome.FAIL, Map.of(), "NODE_FAILED", errorMessage, null);
+    }
     /** 多出口节点结果。 */
     public static NodeResult multiNext(Map<String, String> branchMap, String elseNodeId) {
         // branchMap key 仅作为分支标签，value 才是实际节点 ID
@@ -172,6 +178,13 @@ public record NodeResult(
     public static NodeResult pending(Long resumeAtEpochMs, String reasonCode, String reasonMessage) {
         return new NodeResult(null, null, null, null, null, Map.of(), true, null, true,
                 NodeOutcome.PENDING, Map.of(), reasonCode, reasonMessage, resumeAtEpochMs);
+    }
+
+    /** 返回一个仅替换 output 的结果副本，用于策略类结果保留审计字段。 */
+    public NodeResult withOutput(Map<String, Object> nextOutput) {
+        return new NodeResult(nextNodeId, successNodeId, failNodeId, elseNodeId, branchMap,
+                nextOutput == null ? Map.of() : nextOutput,
+                success, errorMessage, pending, outcome, routes, reasonCode, reasonMessage, resumeAtEpochMs);
     }
 
     /**

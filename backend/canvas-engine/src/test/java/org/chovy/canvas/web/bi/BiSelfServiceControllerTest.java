@@ -6,6 +6,7 @@ import org.chovy.canvas.common.tenant.TenantContextResolver;
 import org.chovy.canvas.domain.bi.export.BiExportCleanupResult;
 import org.chovy.canvas.domain.bi.export.BiExportApprovalReviewCommand;
 import org.chovy.canvas.domain.bi.export.BiExportDownload;
+import org.chovy.canvas.domain.bi.export.BiExportJobDetailView;
 import org.chovy.canvas.domain.bi.export.BiExportJobCommand;
 import org.chovy.canvas.domain.bi.export.BiExportJobView;
 import org.chovy.canvas.domain.bi.export.BiExportQueueResult;
@@ -83,10 +84,37 @@ class BiSelfServiceControllerTest {
     }
 
     @Test
+    void getExportDetailUsesCurrentTenant() {
+        TenantContextResolver resolver = resolver();
+        BiSelfServiceExportService service = mock(BiSelfServiceExportService.class);
+        BiExportJobCommand command = new BiExportJobCommand(
+                "DATASET",
+                "canvas_daily_stats",
+                null,
+                "CSV",
+                query(),
+                100,
+                false,
+                false,
+                null);
+        when(service.getExportDetail(7L, 55L)).thenReturn(new BiExportJobDetailView(exportView(), command));
+        BiSelfServiceController controller = new BiSelfServiceController(resolver, service);
+
+        StepVerifier.create(controller.getExportDetail(55L))
+                .assertNext(response -> {
+                    assertThat(response.getData().job().id()).isEqualTo(55L);
+                    assertThat(response.getData().request().query().datasetKey()).isEqualTo("canvas_daily_stats");
+                })
+                .verifyComplete();
+
+        verify(service).getExportDetail(7L, 55L);
+    }
+
+    @Test
     void downloadReturnsAttachment() {
         TenantContextResolver resolver = resolver();
         BiSelfServiceExportService service = mock(BiSelfServiceExportService.class);
-        when(service.download(7L, 55L)).thenReturn(new BiExportDownload("export-55.csv", "text/csv", "a,b\n".getBytes()));
+        when(service.download(7L, "alice", 55L)).thenReturn(new BiExportDownload("export-55.csv", "text/csv", "a,b\n".getBytes()));
         BiSelfServiceController controller = new BiSelfServiceController(resolver, service);
 
         StepVerifier.create(controller.download(55L))
@@ -95,6 +123,26 @@ class BiSelfServiceControllerTest {
                     assertThat(response.getBody()).containsExactly("a,b\n".getBytes());
                 })
                 .verifyComplete();
+
+        verify(service).download(7L, "alice", 55L);
+    }
+
+    @Test
+    void cancelExportUsesCurrentTenantAndUser() {
+        TenantContextResolver resolver = resolver();
+        BiSelfServiceExportService service = mock(BiSelfServiceExportService.class);
+        when(service.cancelExport(7L, "alice", 55L)).thenReturn(canceledExportView());
+        BiSelfServiceController controller = new BiSelfServiceController(resolver, service);
+
+        StepVerifier.create(controller.cancelExport(55L))
+                .assertNext(response -> {
+                    assertThat(response.getData().id()).isEqualTo(55L);
+                    assertThat(response.getData().status()).isEqualTo("CANCELED");
+                    assertThat(response.getData().errorMessage()).contains("alice");
+                })
+                .verifyComplete();
+
+        verify(service).cancelExport(7L, "alice", 55L);
     }
 
     @Test
@@ -240,6 +288,43 @@ class BiSelfServiceControllerTest {
                 null,
                 null,
                 null,
+                0,
+                3,
+                null,
+                null,
+                null,
+                "alice",
+                LocalDateTime.parse("2026-06-05T05:10:00"),
+                LocalDateTime.parse("2026-06-05T05:10:00"));
+    }
+
+    private BiExportJobView canceledExportView() {
+        return new BiExportJobView(
+                55L,
+                7L,
+                3L,
+                "DATASET",
+                "canvas_daily_stats",
+                11L,
+                "CSV",
+                100,
+                "CANCELED",
+                100,
+                null,
+                null,
+                null,
+                7,
+                LocalDateTime.parse("2026-06-12T05:10:00"),
+                0,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                "BI export canceled by alice",
                 0,
                 3,
                 null,

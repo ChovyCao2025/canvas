@@ -65,6 +65,10 @@ npm run build
 
 - [x] Backend main compile passes on 2026-06-05: `JAVA_HOME=$(/usr/libexec/java_home -v 21) PATH="$JAVA_HOME/bin:$PATH" mvn -pl canvas-engine test -Dmaven.test.skip=true`.
 - [x] New backend test sources compile standalone on 2026-06-05 with Maven-generated test classpath.
-- [ ] Full backend test run is blocked by pre-existing dirty-tree test compile errors in BI/CanvasProject tests unrelated to P1-012.
+- [ ] Full backend test run was not rerun in this session; previous broader runs reported unrelated dirty-tree failures outside P1-012.
 - [x] Frontend focused tests pass on 2026-06-05: `npm run test -- src/services/marketingFormsApi.test.ts src/pages/marketing-forms/marketingFormsPresentation.test.ts src/components/layout/AppLayout.a11y.test.tsx` (3 files, 8 tests).
 - [x] Frontend production build passes on 2026-06-05: `npm run build`.
+- [x] Reverified in this session on 2026-06-05: `JAVA_HOME=/Users/photonpay/Library/Java/JavaVirtualMachines/ms-21.0.11/Contents/Home PATH="/Users/photonpay/Library/Java/JavaVirtualMachines/ms-21.0.11/Contents/Home/bin:$PATH" mvn -pl canvas-engine -Dtest=MarketingFormServiceTest,MarketingFormControllerTest,SecurityConfigRouteTest test` from `backend` (10 tests, 0 failures, 0 errors, 0 skipped).
+- [x] Reverified in this session on 2026-06-05: `PATH="/opt/homebrew/bin:$PATH" npm run test -- marketingFormsApi.test.ts marketingFormsPresentation.test.ts AppLayout.a11y.test.tsx` from `frontend` (8 tests, 0 failures).
+- [x] Reverified in this session on 2026-06-05: `PATH="/opt/homebrew/bin:$PATH" npm run build` from `frontend` (build succeeded; generated `marketing-forms-BSE2u0Dd.js` and `public-marketing-form-DxLsmilE.js`).
+- [x] Reverified in this session on 2026-06-05: `rg -n "form-collect-node|public/forms|public/marketing-forms"` confirms `form-collect-node` is seeded in `V161__plugin_integration_foundations.sql` and public/operator form routes are wired.

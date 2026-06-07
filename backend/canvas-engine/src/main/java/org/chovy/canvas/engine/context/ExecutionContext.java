@@ -2,9 +2,11 @@ package org.chovy.canvas.engine.context;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.ToString;
+import java.lang.reflect.Array;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -18,6 +20,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 @Getter
 @Setter
 @ToString(exclude = {"scheduledHubTimeouts"})
+@JsonIgnoreProperties(ignoreUnknown = true)
 public class ExecutionContext {
 
     /** 执行实例 ID（UUID）。 */
@@ -51,9 +54,10 @@ public class ExecutionContext {
     private Map<String, Object> triggerPayload = new ConcurrentHashMap<>();
 
     /** 各节点产出数据历史（nodeId → {fieldKey → value}），供轨迹查询 */
-    private final Map<String, Map<String, Object>> nodeOutputs = new ConcurrentHashMap<>();
+    private final Map<String, Map<String, Object>> nodeOutputs = new LinkedHashMap<>();
 
     /** 扁平化快速查找 Map，O(1)。由 putNodeOutput 维护 */
+    @JsonIgnore
     private final Map<String, Object> flatContext = new ConcurrentHashMap<>();
 
     /** 节点输出写入锁，保证分组输出、扁平索引和大小估算保持同一快照。 */
@@ -67,6 +71,14 @@ public class ExecutionContext {
     /** 每个节点写入过的扁平索引 key，用于覆盖节点输出时清理旧字段。 */
     @JsonIgnore
     private final Map<String, Set<String>> nodeFlatKeys = new ConcurrentHashMap<>();
+
+    /** 兼容裸字段读取的最新节点输出值；不序列化，恢复时由 nodeOutputs 重建。 */
+    @JsonIgnore
+    private final Map<String, Object> latestOutputValues = new ConcurrentHashMap<>();
+
+    /** latestOutputValues 的所属节点，用于覆盖/淘汰节点输出时清理裸字段兼容索引。 */
+    @JsonIgnore
+    private final Map<String, String> latestOutputOwners = new ConcurrentHashMap<>();
 
     /** 各节点执行状态（需持久化，多阶段恢复和汇聚判断依赖此状态） */
     private Map<String, NodeStatus> nodeStatuses = new ConcurrentHashMap<>();
@@ -132,28 +144,75 @@ public class ExecutionContext {
 
     /** 获取所有节点的输出（只读），用于聚合评估等需要跨节点读输出的场景 */
     public Map<String, Map<String, Object>> getNodeOutputs() {
-        return java.util.Collections.unmodifiableMap(nodeOutputs);
+        synchronized (outputLock) {
+            return Collections.unmodifiableMap(new LinkedHashMap<>(nodeOutputs));
+        }
+    }
+
+    public void setNodeOutputs(Map<String, Map<String, Object>> nodeOutputs) {
+        synchronized (outputLock) {
+            this.nodeOutputs.clear();
+            if (nodeOutputs != null) {
+                nodeOutputs.forEach((nodeId, output) -> {
+                    if (nodeId != null) {
+                        this.nodeOutputs.put(nodeId, immutableOutputSnapshot(output));
+                    }
+                });
+            }
+            rebuildDerivedStateLocked();
+        }
+    }
+
+    public Object getNodeOutput(String nodeId, String fieldKey) {
+        synchronized (outputLock) {
+            Map<String, Object> output = nodeOutputs.get(nodeId);
+            return output == null ? null : output.get(fieldKey);
+        }
+    }
+
+    public Map<String, Object> getTriggerPayload() {
+        return readOnlyMapSnapshot(triggerPayload);
+    }
+
+    public Map<String, Object> getFlatContext() {
+        return readOnlyMapSnapshot(flatContext);
     }
 
     public void setTriggerPayload(Map<String, Object> triggerPayload) {
-        this.triggerPayload = triggerPayload == null
-                ? new ConcurrentHashMap<>()
-                : new ConcurrentHashMap<>(triggerPayload);
+        Map<String, Object> snapshot = mutableDeepCopyMap(triggerPayload);
+        synchronized (outputLock) {
+            int candidateSize = serializedContextSize(snapshot, nodeOutputs);
+            if (candidateSize > maxSizeBytes) {
+                throw contextOverflow(candidateSize);
+            }
+            this.triggerPayload = new ConcurrentHashMap<>(snapshot);
+            approxSizeBytes.set(candidateSize);
+        }
     }
 
     public void putTriggerPayloadValues(Map<String, Object> values) {
         if (values == null || values.isEmpty()) {
             return;
         }
-        values.forEach((key, value) -> {
-            if (key != null && value != null) {
-                triggerPayload.put(key, value);
+        synchronized (outputLock) {
+            Map<String, Object> candidate = mutableDeepCopyMap(triggerPayload);
+            mutableDeepCopyMap(values).forEach((key, value) -> {
+                if (value != null) {
+                    candidate.put(key, value);
+                }
+            });
+            int candidateSize = serializedContextSize(candidate, nodeOutputs);
+            if (candidateSize > maxSizeBytes) {
+                throw contextOverflow(candidateSize);
             }
-        });
+            triggerPayload = new ConcurrentHashMap<>(candidate);
+            approxSizeBytes.set(candidateSize);
+        }
     }
 
     public Map<String, Object> exportContextValues() {
         Map<String, Object> values = new LinkedHashMap<>(triggerPayload);
+        values.putAll(latestOutputValues);
         values.putAll(flatContext);
         return values;
     }
@@ -177,27 +236,13 @@ public class ExecutionContext {
         Map<String, Object> snapshot = immutableOutputSnapshot(output);
 
         synchronized (outputLock) {
-            int candidateSize = candidateNodeOutputSizeLocked(nodeId, snapshot);
-            if (candidateSize > maxSizeBytes) {
-                throw new IllegalStateException("execution context exceeds max bytes: "
-                        + candidateSize + " > " + maxSizeBytes);
-            }
-            clearOwnedFlatKeys(nodeId);
-            nodeOutputs.put(nodeId, snapshot);
-            Set<String> writtenFlatKeys = new HashSet<>();
-            snapshot.forEach((k, v) -> {
-                if (v == null) {
-                    return;
-                }
-                putOwnedFlatKey(nodeId, k, v, writtenFlatKeys);
-                putOwnedFlatKey(nodeId, qualifiedOutputKey(nodeId, k), v, writtenFlatKeys);
-            });
-            if (writtenFlatKeys.isEmpty()) {
-                nodeFlatKeys.remove(nodeId);
-            } else {
-                nodeFlatKeys.put(nodeId, writtenFlatKeys);
-            }
-            approxSizeBytes.set(candidateSize);
+            LinkedHashMap<String, Map<String, Object>> candidate = new LinkedHashMap<>(nodeOutputs);
+            candidate.remove(nodeId);
+            candidate.put(nodeId, snapshot);
+            fitUnderLimit(candidate);
+            nodeOutputs.clear();
+            nodeOutputs.putAll(candidate);
+            rebuildDerivedStateLocked();
         }
 
         if (approxSizeBytes.get() > warnSizeBytes) {
@@ -206,16 +251,7 @@ public class ExecutionContext {
     }
 
     private Map<String, Object> immutableOutputSnapshot(Map<String, Object> output) {
-        if (output == null || output.isEmpty()) {
-            return Map.of();
-        }
-        Map<String, Object> snapshot = new LinkedHashMap<>();
-        output.forEach((key, value) -> {
-            if (key != null) {
-                snapshot.put(key, value);
-            }
-        });
-        return Collections.unmodifiableMap(snapshot);
+        return readOnlyMapSnapshot(output);
     }
 
     private void clearOwnedFlatKeys(String nodeId) {
@@ -241,14 +277,8 @@ public class ExecutionContext {
         return nodeId + "." + fieldKey;
     }
 
-    private int candidateNodeOutputSizeLocked(String nodeId, Map<String, Object> output) {
-        Map<String, Map<String, Object>> candidate = new LinkedHashMap<>(nodeOutputs);
-        candidate.put(nodeId, output);
-        return serializedNodeOutputSize(candidate);
-    }
-
     private int currentNodeOutputSizeLocked() {
-        return serializedNodeOutputSize(nodeOutputs);
+        return serializedContextSize(triggerPayload, nodeOutputs);
     }
 
     private int serializedNodeOutputSize(Map<String, Map<String, Object>> outputs) {
@@ -274,11 +304,14 @@ public class ExecutionContext {
     }
 
     /** 是否超过 1MB 上限 */
+    @JsonIgnore
     public boolean isOversized() { return approxSizeBytes.get() > maxSizeBytes; }
 
+    @JsonIgnore
     public boolean isNearSizeLimit() { return approxSizeBytes.get() > warnSizeBytes; }
 
     /** 获取估算大小（字节） */
+    @JsonIgnore
     public int getApproxSizeBytes() { return approxSizeBytes.get(); }
 
     public int calculateSerializedContextSize() {
@@ -286,6 +319,12 @@ public class ExecutionContext {
             int size = currentNodeOutputSizeLocked();
             approxSizeBytes.set(size);
             return size;
+        }
+    }
+
+    public void rebuildDerivedState() {
+        synchronized (outputLock) {
+            rebuildDerivedStateLocked();
         }
     }
 
@@ -305,8 +344,16 @@ public class ExecutionContext {
         if (val != null) {
             return val;
         }
-        Object nested = legacyNestedContextValue(fieldKey);
-        return nested != null ? nested : triggerPayload.get(fieldKey);
+        Object legacyNodeOutput = legacyNodeOutputValue(fieldKey);
+        if (legacyNodeOutput != null) {
+            return legacyNodeOutput;
+        }
+        Object latestOutput = latestOutputValues.get(fieldKey);
+        if (latestOutput != null) {
+            return latestOutput;
+        }
+        Object legacyLatestOutput = legacyLatestOutputValue(fieldKey);
+        return legacyLatestOutput != null ? legacyLatestOutput : triggerPayload.get(fieldKey);
     }
 
     public void setContextValue(String fieldKey, Object value) {
@@ -318,24 +365,6 @@ public class ExecutionContext {
         }
         flatContext.put(fieldKey, value);
         flatKeyOwners.put(fieldKey, "__manual__");
-    }
-
-    private Object legacyNestedContextValue(String fieldKey) {
-        if (fieldKey == null || fieldKey.isBlank()) {
-            return null;
-        }
-        int dot = fieldKey.indexOf('.');
-        if (dot > 0 && dot < fieldKey.length() - 1) {
-            Map<String, Object> output = nodeOutputs.get(fieldKey.substring(0, dot));
-            return output == null ? null : output.get(fieldKey.substring(dot + 1));
-        }
-        for (Map<String, Object> output : nodeOutputs.values()) {
-            Object value = output.get(fieldKey);
-            if (value != null) {
-                return value;
-            }
-        }
-        return null;
     }
 
     /**
@@ -446,5 +475,137 @@ public class ExecutionContext {
     /** 获取节点执行门控，不存在时懒建（恢复执行后首次访问时自动创建）。 */
     public NodeGate getGate(String nodeId) {
         return nodeGates.computeIfAbsent(nodeId, k -> new NodeGate());
+    }
+
+    private void fitUnderLimit(LinkedHashMap<String, Map<String, Object>> candidate) {
+        while (serializedContextSize(triggerPayload, candidate) > maxSizeBytes && candidate.size() > 1) {
+            String oldestNodeId = candidate.keySet().iterator().next();
+            candidate.remove(oldestNodeId);
+        }
+        int candidateSize = serializedContextSize(triggerPayload, candidate);
+        if (candidateSize > maxSizeBytes) {
+            throw contextOverflow(candidateSize);
+        }
+    }
+
+    private ContextOverflowException contextOverflow(int candidateSize) {
+        return new ContextOverflowException(
+                "execution context exceeds max bytes (1MB default): " + candidateSize + " > " + maxSizeBytes,
+                candidateSize);
+    }
+
+    private Object legacyNodeOutputValue(String fieldKey) {
+        if (fieldKey == null) {
+            return null;
+        }
+        int separator = fieldKey.indexOf('.');
+        if (separator <= 0 || separator == fieldKey.length() - 1) {
+            return null;
+        }
+        String nodeId = fieldKey.substring(0, separator);
+        String outputKey = fieldKey.substring(separator + 1);
+        synchronized (outputLock) {
+            Map<String, Object> output = nodeOutputs.get(nodeId);
+            return output == null ? null : output.get(outputKey);
+        }
+    }
+
+    private Object legacyLatestOutputValue(String fieldKey) {
+        if (fieldKey == null) {
+            return null;
+        }
+        synchronized (outputLock) {
+            List<Map<String, Object>> outputs = new ArrayList<>(nodeOutputs.values());
+            ListIterator<Map<String, Object>> iterator = outputs.listIterator(outputs.size());
+            while (iterator.hasPrevious()) {
+                Object value = iterator.previous().get(fieldKey);
+                if (value != null) {
+                    return value;
+                }
+            }
+        }
+        return null;
+    }
+
+    private int serializedContextSize(Map<String, Object> payload, Map<String, Map<String, Object>> outputs) {
+        int payloadSize = payload == null || payload.isEmpty() ? 0 : serializedObjectSize(payload);
+        return payloadSize + serializedNodeOutputSize(outputs);
+    }
+
+    private int serializedObjectSize(Object value) {
+        try {
+            return SIZE_OBJECT_MAPPER.writeValueAsBytes(value).length;
+        } catch (Exception ignored) {
+            return value == null ? 4 : value.toString().length();
+        }
+    }
+
+    private void rebuildDerivedStateLocked() {
+        flatContext.clear();
+        flatKeyOwners.clear();
+        nodeFlatKeys.clear();
+        latestOutputValues.clear();
+        latestOutputOwners.clear();
+        nodeOutputs.forEach((nodeId, output) -> {
+            Set<String> writtenFlatKeys = new HashSet<>();
+            output.forEach((key, value) -> {
+                if (value != null) {
+                    putOwnedFlatKey(nodeId, qualifiedOutputKey(nodeId, key), value, writtenFlatKeys);
+                    latestOutputValues.put(key, value);
+                    latestOutputOwners.put(key, nodeId);
+                }
+            });
+            if (!writtenFlatKeys.isEmpty()) {
+                nodeFlatKeys.put(nodeId, writtenFlatKeys);
+            }
+        });
+        approxSizeBytes.set(currentNodeOutputSizeLocked());
+    }
+
+    private Map<String, Object> mutableDeepCopyMap(Map<String, Object> source) {
+        if (source == null || source.isEmpty()) {
+            return new LinkedHashMap<>();
+        }
+        Map<String, Object> snapshot = new LinkedHashMap<>();
+        source.forEach((key, value) -> {
+            if (key != null) {
+                snapshot.put(key, deepCopyValue(value));
+            }
+        });
+        return snapshot;
+    }
+
+    private Map<String, Object> readOnlyMapSnapshot(Map<String, Object> source) {
+        return Collections.unmodifiableMap(mutableDeepCopyMap(source));
+    }
+
+    private Object deepCopyValue(Object value) {
+        if (value == null) {
+            return null;
+        }
+        if (value instanceof Map<?, ?> map) {
+            Map<String, Object> copy = new LinkedHashMap<>();
+            map.forEach((key, nestedValue) -> {
+                if (key != null) {
+                    copy.put(String.valueOf(key), deepCopyValue(nestedValue));
+                }
+            });
+            return Collections.unmodifiableMap(copy);
+        }
+        if (value instanceof Collection<?> collection) {
+            List<Object> copy = collection.stream()
+                    .map(this::deepCopyValue)
+                    .toList();
+            return Collections.unmodifiableList(new ArrayList<>(copy));
+        }
+        if (value.getClass().isArray()) {
+            int length = Array.getLength(value);
+            List<Object> copy = new ArrayList<>(length);
+            for (int i = 0; i < length; i++) {
+                copy.add(deepCopyValue(Array.get(value, i)));
+            }
+            return Collections.unmodifiableList(copy);
+        }
+        return value;
     }
 }

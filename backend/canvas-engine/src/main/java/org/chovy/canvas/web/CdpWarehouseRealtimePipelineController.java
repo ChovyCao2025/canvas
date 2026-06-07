@@ -16,6 +16,9 @@ import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
 
 import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
+import java.time.ZoneId;
+import java.time.format.DateTimeParseException;
 import java.util.List;
 
 @RestController
@@ -141,8 +144,8 @@ public class CdpWarehouseRealtimePipelineController {
         private String sourcePartition;
         private String sourceOffset;
         private String committedOffset;
-        private LocalDateTime watermarkTime;
-        private LocalDateTime checkpointTime;
+        private String watermarkTime;
+        private String checkpointTime;
         private Long lagMs;
         private Long rowCount;
         private String status;
@@ -158,8 +161,8 @@ public class CdpWarehouseRealtimePipelineController {
                     sourcePartition,
                     sourceOffset,
                     committedOffset,
-                    watermarkTime,
-                    checkpointTime,
+                    parseDateTime(watermarkTime, "watermarkTime"),
+                    parseDateTime(checkpointTime, "checkpointTime"),
                     lagMs,
                     rowCount,
                     status,
@@ -167,6 +170,24 @@ public class CdpWarehouseRealtimePipelineController {
                     operator,
                     sourceSchemaVersion,
                     sinkSchemaVersion);
+        }
+
+        private static LocalDateTime parseDateTime(String value, String fieldName) {
+            if (value == null || value.isBlank()) {
+                return null;
+            }
+            String trimmed = value.trim();
+            try {
+                return LocalDateTime.parse(trimmed);
+            } catch (DateTimeParseException localFailure) {
+                try {
+                    return OffsetDateTime.parse(trimmed)
+                            .atZoneSameInstant(ZoneId.systemDefault())
+                            .toLocalDateTime();
+                } catch (DateTimeParseException offsetFailure) {
+                    throw new IllegalArgumentException(fieldName + " must be ISO-8601 datetime", offsetFailure);
+                }
+            }
         }
     }
 }

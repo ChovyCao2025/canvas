@@ -234,22 +234,32 @@ public class CanvasStatsController {
         result.put("conversionAmount", BigDecimal.ZERO);
         result.put("attributedSends", 0L);
         result.put("model", "LAST_TOUCH");
+        result.put("models", "LAST_TOUCH");
         if (attributionMapper == null) {
             return result;
         }
         List<Map<String, Object>> rows = attributionMapper.selectMaps(
                 new QueryWrapper<CanvasConversionAttributionDO>()
-                        .select("COUNT(*) AS conversions",
-                                "COALESCE(SUM(conversion_amount), 0) AS conversionAmount",
-                                "COUNT(DISTINCT send_record_id) AS attributedSends")
+                        .select("COUNT(DISTINCT event_log_id) AS conversions",
+                                "COALESCE(SUM(COALESCE(conversion_amount, 0) * COALESCE(attribution_weight, 1)), 0) AS weightedConversionAmount",
+                                "COUNT(DISTINCT NULLIF(send_record_id, 0)) AS attributedSends",
+                                "GROUP_CONCAT(DISTINCT attribution_model ORDER BY attribution_model) AS models")
                         .eq("canvas_id", canvasId));
         if (rows == null || rows.isEmpty()) {
             return result;
         }
         Map<String, Object> row = rows.getFirst();
         result.put("conversions", toLong(rowValue(row, "conversions")));
-        result.put("conversionAmount", toBigDecimal(rowValue(row, "conversionAmount")));
+        Object amount = rowValue(row, "weightedConversionAmount");
+        if (amount == null) {
+            amount = rowValue(row, "conversionAmount");
+        }
+        result.put("conversionAmount", toBigDecimal(amount));
         result.put("attributedSends", toLong(rowValue(row, "attributedSends")));
+        Object models = rowValue(row, "models");
+        String modelList = models == null || models.toString().isBlank() ? "LAST_TOUCH" : models.toString();
+        result.put("model", modelList);
+        result.put("models", modelList);
         return result;
     }
 

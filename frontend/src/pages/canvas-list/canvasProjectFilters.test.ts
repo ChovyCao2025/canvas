@@ -13,9 +13,10 @@ describe('canvas project filters', () => {
   it('keeps selected project and folder keys', () => {
     expect(buildCanvasListParams({
       page: 1,
+      projectId: 3,
       projectKey: 'growth',
       folderKey: 'new-user',
-    })).toEqual({ page: 1, size: 20, projectKey: 'growth', folderKey: 'new-user' })
+    })).toEqual({ page: 1, size: 20, projectId: 3, projectKey: 'growth', folderKey: 'new-user' })
   })
 
   it('formats project and folder names for table display', () => {

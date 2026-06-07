@@ -116,6 +116,29 @@ class CdpWarehousePrivacyAudienceBitmapRebuildServiceTest {
     }
 
     @Test
+    void targetedRebuildWithNoValidAudienceIdsDoesNotFallBackToAllCandidates() {
+        Fixture fixture = fixture();
+        when(fixture.erasureService.get(9L, 101L)).thenReturn(request(
+                proof("CDP_USER_PROFILE", "PASS"),
+                proof("AUDIENCE_BITMAP_VERSION", "PLANNED")));
+        when(fixture.definitionMapper.selectList(any())).thenReturn(List.of(definition(12L)));
+        when(fixture.erasureService.recordAssetProof(eq(9L), eq(101L), any()))
+                .thenReturn(request(proof("AUDIENCE_BITMAP_VERSION", "SKIPPED")));
+        CdpWarehousePrivacyAudienceBitmapRebuildService service = fixture.service();
+
+        CdpWarehousePrivacyAudienceBitmapRebuildService.AudienceBitmapRebuildResult result =
+                service.rebuild(9L, 101L, command("privacy-ops", 50, List.of(0L, -7L)));
+
+        assertThat(result.status()).isEqualTo("SKIPPED");
+        assertThat(result.selectedAudiences()).isZero();
+        verify(fixture.operationsService, never()).materialize(any(), any(), any());
+        ArgumentCaptor<CdpWarehousePrivacyErasureService.AssetProofCommand> proofCaptor =
+                ArgumentCaptor.forClass(CdpWarehousePrivacyErasureService.AssetProofCommand.class);
+        verify(fixture.erasureService).recordAssetProof(eq(9L), eq(101L), proofCaptor.capture());
+        assertThat(proofCaptor.getValue().status()).isEqualTo("SKIPPED");
+    }
+
+    @Test
     void failedMaterializationRecordsFailProof() {
         Fixture fixture = fixture();
         when(fixture.erasureService.get(9L, 101L)).thenReturn(request(

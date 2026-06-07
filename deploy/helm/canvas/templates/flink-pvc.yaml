@@ -1,0 +1,37 @@
+{{- if .Values.flink.enabled }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "canvas.fullname" . }}-flink-checkpoints
+  namespace: {{ .Values.namespace }}
+  labels:
+    {{- include "canvas.labels" . | nindent 4 }}
+    app.kubernetes.io/component: flink
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: {{ .Values.flink.storage.checkpointStorageSize }}
+  {{- if .Values.flink.storage.storageClassName }}
+  storageClassName: {{ .Values.flink.storage.storageClassName | quote }}
+  {{- end }}
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "canvas.fullname" . }}-flink-savepoints
+  namespace: {{ .Values.namespace }}
+  labels:
+    {{- include "canvas.labels" . | nindent 4 }}
+    app.kubernetes.io/component: flink
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: {{ .Values.flink.storage.savepointStorageSize }}
+  {{- if .Values.flink.storage.storageClassName }}
+  storageClassName: {{ .Values.flink.storage.storageClassName | quote }}
+  {{- end }}
+{{- end }}

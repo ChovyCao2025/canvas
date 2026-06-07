@@ -2,9 +2,11 @@ package org.chovy.canvas.domain.warehouse;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.chovy.canvas.dal.dataobject.CdpWarehouseE2eCertificationRunDO;
 import org.chovy.canvas.dal.mapper.CdpWarehouseE2eCertificationRunMapper;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.time.Clock;
@@ -23,6 +25,7 @@ public class CdpWarehouseE2eCertificationGateService {
     private final Clock clock;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
+    @Autowired
     public CdpWarehouseE2eCertificationGateService(CdpWarehouseE2eCertificationRunMapper runMapper) {
         this(runMapper, Clock.systemDefaultZone());
     }
@@ -102,6 +105,16 @@ public class CdpWarehouseE2eCertificationGateService {
                     normalizedMode, requirePhysical, requireRealtime, requireDataPathProof,
                     safeMaxAge, requiredContracts);
         }
+        if (requireRealtime && requireDataPathProof) {
+            String dataPathReason = realtimeDataPathSourceFailureReason(matched.getDataPathProofJson());
+            if (dataPathReason != null) {
+                return decision(scopedTenantId, STATUS_FAIL,
+                        dataPathReason,
+                        matched.getId(), matched.getStatus(), finishedAt, expiresAt,
+                        normalizedMode, requirePhysical, requireRealtime, requireDataPathProof,
+                        safeMaxAge, requiredContracts);
+            }
+        }
         return decision(scopedTenantId, STATUS_PASS,
                 "fresh PASS certification evidence",
                 matched.getId(), matched.getStatus(), finishedAt, expiresAt,
@@ -140,6 +153,54 @@ public class CdpWarehouseE2eCertificationGateService {
         } catch (Exception ignored) {
             return List.of();
         }
+    }
+
+    private String realtimeDataPathSourceFailureReason(String dataPathProofJson) {
+        if (dataPathProofJson == null || dataPathProofJson.isBlank()) {
+            return "realtime certification requires dataPathProof sourceMode MYSQL_CDC but proof is missing";
+        }
+        try {
+            JsonNode proof = objectMapper.readTree(dataPathProofJson);
+            String sourceMode = text(proof, "sourceMode");
+            String sourceStatus = text(proof, "sourceStatus");
+            String odsStatus = text(proof, "odsStatus");
+            String status = text(proof, "status");
+            if (!"MYSQL_CDC".equals(normalizeStatusLike(sourceMode))) {
+                return "realtime certification requires dataPathProof sourceMode MYSQL_CDC but was "
+                        + defaultText(sourceMode, "missing");
+            }
+            if (!STATUS_PASS.equals(normalizeStatus(sourceStatus))) {
+                return "realtime certification requires dataPathProof sourceStatus PASS but was "
+                        + defaultText(sourceStatus, "missing");
+            }
+            if (!STATUS_PASS.equals(normalizeStatus(odsStatus))) {
+                return "realtime certification requires dataPathProof odsStatus PASS but was "
+                        + defaultText(odsStatus, "missing");
+            }
+            if (status != null && !STATUS_PASS.equals(normalizeStatus(status))) {
+                return "realtime certification requires dataPathProof status PASS but was " + status;
+            }
+            return null;
+        } catch (Exception e) {
+            return "realtime certification requires dataPathProof sourceMode MYSQL_CDC but proof JSON is invalid";
+        }
+    }
+
+    private String text(JsonNode node, String fieldName) {
+        if (node == null || !node.has(fieldName) || node.get(fieldName).isNull()) {
+            return null;
+        }
+        return node.get(fieldName).asText();
+    }
+
+    private String normalizeStatusLike(String value) {
+        return value == null || value.isBlank()
+                ? ""
+                : value.trim().toUpperCase(Locale.ROOT).replace('-', '_');
+    }
+
+    private String defaultText(String value, String defaultValue) {
+        return value == null || value.isBlank() ? defaultValue : value.trim();
     }
 
     private GateDecision decision(Long tenantId,

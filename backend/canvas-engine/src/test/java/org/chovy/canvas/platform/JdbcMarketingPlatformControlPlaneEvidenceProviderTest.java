@@ -5,6 +5,8 @@ import org.chovy.canvas.dal.mapper.CanvasMapper;
 import org.chovy.canvas.dal.mapper.ConversationWorkItemMapper;
 import org.chovy.canvas.dal.mapper.CreatorCampaignMapper;
 import org.chovy.canvas.dal.mapper.CreatorProviderMutationMapper;
+import org.chovy.canvas.dal.mapper.GrowthActivityMapper;
+import org.chovy.canvas.dal.mapper.GrowthRewardPoolMapper;
 import org.chovy.canvas.dal.mapper.MarketingCampaignLinkMapper;
 import org.chovy.canvas.dal.mapper.MarketingCampaignMasterMapper;
 import org.chovy.canvas.dal.mapper.MarketingContentReleaseMapper;
@@ -54,6 +56,8 @@ class JdbcMarketingPlatformControlPlaneEvidenceProviderTest {
         when(mocks.probeRunMapper.countFreshPassingProductionContracts(any(), any())).thenReturn(11L);
         when(mocks.probeRunMapper.countFreshFailingProductionContracts(any(), any())).thenReturn(2L);
         when(mocks.alertMapper.selectCount(any())).thenReturn(3L, 4L);
+        when(mocks.growthActivityMapper.selectCount(any())).thenReturn(16L, 13L, 3L);
+        when(mocks.growthRewardPoolMapper.selectCount(any())).thenReturn(17L);
 
         MarketingPlatformControlPlaneEvidenceProvider.RuntimeEvidence evidence = mocks.provider().evidence(7L);
 
@@ -77,6 +81,10 @@ class JdbcMarketingPlatformControlPlaneEvidenceProviderTest {
         assertThat(evidence.freshFailingProductionIntegrationProbeCount()).isEqualTo(2);
         assertThat(evidence.openIntegrationContractProbeAlertCount()).isEqualTo(3);
         assertThat(evidence.openIntegrationContractSloAlertCount()).isEqualTo(4);
+        assertThat(evidence.activeGrowthActivityCount()).isEqualTo(16);
+        assertThat(evidence.growthActivityRewardPoolCount()).isEqualTo(17);
+        assertThat(evidence.readyGrowthActivityCount()).isEqualTo(13);
+        assertThat(evidence.blockedGrowthActivityReadinessCount()).isEqualTo(3);
     }
 
     @Test
@@ -105,6 +113,8 @@ class JdbcMarketingPlatformControlPlaneEvidenceProviderTest {
         when(mocks.probeRunMapper.countFreshPassingProductionContracts(any(), any())).thenReturn(null);
         when(mocks.probeRunMapper.countFreshFailingProductionContracts(any(), any())).thenReturn(null);
         when(mocks.alertMapper.selectCount(any())).thenReturn(null);
+        when(mocks.growthActivityMapper.selectCount(any())).thenReturn(null);
+        when(mocks.growthRewardPoolMapper.selectCount(any())).thenReturn(null);
 
         MarketingPlatformControlPlaneEvidenceProvider.RuntimeEvidence evidence = mocks.provider().evidence(null);
 
@@ -130,7 +140,9 @@ class JdbcMarketingPlatformControlPlaneEvidenceProviderTest {
             MarketingCampaignLinkMapper campaignLinkMapper,
             MarketingIntegrationContractMapper integrationContractMapper,
             MarketingIntegrationContractProbeRunMapper probeRunMapper,
-            MarketingMonitorAlertMapper alertMapper) {
+            MarketingMonitorAlertMapper alertMapper,
+            GrowthActivityMapper growthActivityMapper,
+            GrowthRewardPoolMapper growthRewardPoolMapper) {
 
         static MapperMocks create() {
             return new MapperMocks(
@@ -152,7 +164,9 @@ class JdbcMarketingPlatformControlPlaneEvidenceProviderTest {
                     mock(MarketingCampaignLinkMapper.class),
                     mock(MarketingIntegrationContractMapper.class),
                     mock(MarketingIntegrationContractProbeRunMapper.class),
-                    mock(MarketingMonitorAlertMapper.class));
+                    mock(MarketingMonitorAlertMapper.class),
+                    mock(GrowthActivityMapper.class),
+                    mock(GrowthRewardPoolMapper.class));
         }
 
         JdbcMarketingPlatformControlPlaneEvidenceProvider provider() {
@@ -175,7 +189,9 @@ class JdbcMarketingPlatformControlPlaneEvidenceProviderTest {
                     campaignLinkMapper,
                     integrationContractMapper,
                     probeRunMapper,
-                    alertMapper);
+                    alertMapper,
+                    growthActivityMapper,
+                    growthRewardPoolMapper);
         }
     }
 }

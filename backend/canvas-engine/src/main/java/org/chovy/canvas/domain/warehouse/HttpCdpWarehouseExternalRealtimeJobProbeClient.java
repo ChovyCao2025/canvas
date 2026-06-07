@@ -2,6 +2,7 @@ package org.chovy.canvas.domain.warehouse;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
@@ -25,6 +26,7 @@ public class HttpCdpWarehouseExternalRealtimeJobProbeClient
     private final ObjectMapper objectMapper;
     private final Duration timeout;
 
+    @Autowired
     public HttpCdpWarehouseExternalRealtimeJobProbeClient(
             ObjectMapper objectMapper,
             @Value("${canvas.warehouse.external-realtime-job-probe.http-timeout-ms:3000}") long timeoutMs) {

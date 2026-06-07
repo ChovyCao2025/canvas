@@ -64,3 +64,6 @@ npm run build
 - [x] Backend focused tests pass on 2026-06-05: `JAVA_HOME=$(/usr/libexec/java_home -v 21) PATH="$JAVA_HOME/bin:$PATH" mvn -f backend/canvas-engine/pom.xml -Dtest=MauticInspiredInsightServiceTest,MauticInspiredInsightControllerTest test` (5 tests, 0 failures, 0 errors, 0 skipped).
 - [x] Frontend focused tests pass on 2026-06-05: `PATH="/opt/homebrew/bin:$PATH" npm run test -- src/services/mauticInsightsApi.test.ts src/pages/mautic-insights/mauticInsightsPresentation.test.ts` (4 tests, 0 failures).
 - [x] Frontend production build passes on 2026-06-05: `PATH="/opt/homebrew/bin:$PATH" npm run build`.
+- [x] Reverified in this session on 2026-06-05: `JAVA_HOME=/Users/photonpay/Library/Java/JavaVirtualMachines/ms-21.0.11/Contents/Home PATH="/Users/photonpay/Library/Java/JavaVirtualMachines/ms-21.0.11/Contents/Home/bin:$PATH" mvn -pl canvas-engine -Dtest=MauticInspiredInsightServiceTest,MauticInspiredInsightControllerTest test` from `backend` (5 tests, 0 failures, 0 errors, 0 skipped).
+- [x] Reverified in this session on 2026-06-05: `PATH="/opt/homebrew/bin:$PATH" npm run test -- mauticInsightsApi.test.ts mauticInsightsPresentation.test.ts` from `frontend` (4 tests, 0 failures).
+- [x] Reverified in this session on 2026-06-05: `PATH="/opt/homebrew/bin:$PATH" npm run build` from `frontend` (build succeeded; generated `mautic-insights-D9MmQ3YP.js`).

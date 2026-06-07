@@ -43,11 +43,15 @@ public interface MarketingPlatformControlPlaneEvidenceProvider {
             long freshPassingProductionIntegrationProbeCount,
             long freshFailingProductionIntegrationProbeCount,
             long openIntegrationContractProbeAlertCount,
-            long openIntegrationContractSloAlertCount) {
+            long openIntegrationContractSloAlertCount,
+            long activeGrowthActivityCount,
+            long growthActivityRewardPoolCount,
+            long readyGrowthActivityCount,
+            long blockedGrowthActivityReadinessCount) {
 
         public static RuntimeEvidence empty() {
             return new RuntimeEvidence(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
+                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
         }
     }
 }

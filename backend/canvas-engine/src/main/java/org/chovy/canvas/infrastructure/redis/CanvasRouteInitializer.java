@@ -11,8 +11,8 @@ import org.chovy.canvas.engine.dag.DagGraph;
 import org.chovy.canvas.engine.dag.DagParser;
 import org.chovy.canvas.engine.handlers.MqTriggerHandler;
 import jakarta.annotation.PostConstruct;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Component;
 
@@ -21,6 +21,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
+import java.util.function.Consumer;
 import java.util.concurrent.locks.LockSupport;
 
 /**
@@ -33,7 +34,6 @@ import java.util.concurrent.locks.LockSupport;
  */
 @Slf4j
 @Component
-@RequiredArgsConstructor
 public class CanvasRouteInitializer {
 
     /** 画布数据访问组件，用于扫描已发布画布。 */
@@ -48,9 +48,40 @@ public class CanvasRouteInitializer {
     private final MqTriggerHandler      mqTriggerHandler;
     /** Redis 模板，用于启动重建锁和路由状态标记。 */
     private final StringRedisTemplate   redis;
+    /** 等待其他实例重建路由的等待器，测试可注入以避免真实 sleep。 */
+    private final Consumer<Duration> rebuildWaiter;
 
     /** 启动路由重建的分布式锁 key。 */
     private static final String REBUILD_LOCK = "canvas:route-init:lock";
+
+    @Autowired
+    public CanvasRouteInitializer(CanvasMapper canvasMapper,
+                                  CanvasVersionMapper canvasVersionMapper,
+                                  DagParser dagParser,
+                                  TriggerRouteService triggerRouteService,
+                                  MqTriggerHandler mqTriggerHandler,
+                                  StringRedisTemplate redis) {
+        this(canvasMapper, canvasVersionMapper, dagParser, triggerRouteService, mqTriggerHandler, redis,
+                delay -> LockSupport.parkNanos(delay.toNanos()));
+    }
+
+    CanvasRouteInitializer(CanvasMapper canvasMapper,
+                           CanvasVersionMapper canvasVersionMapper,
+                           DagParser dagParser,
+                           TriggerRouteService triggerRouteService,
+                           MqTriggerHandler mqTriggerHandler,
+                           StringRedisTemplate redis,
+                           Consumer<Duration> rebuildWaiter) {
+        this.canvasMapper = canvasMapper;
+        this.canvasVersionMapper = canvasVersionMapper;
+        this.dagParser = dagParser;
+        this.triggerRouteService = triggerRouteService;
+        this.mqTriggerHandler = mqTriggerHandler;
+        this.redis = redis;
+        this.rebuildWaiter = rebuildWaiter == null
+                ? delay -> LockSupport.parkNanos(delay.toNanos())
+                : rebuildWaiter;
+    }
 
     /**
      * 启动阶段路由初始化。
@@ -74,7 +105,7 @@ public class CanvasRouteInitializer {
             // 另一实例正在重建，等待 2s 后不再重建（它会完成）
             log.info("[ROUTE_INIT] 另一实例正在重建路由表，本实例跳过");
             // 等待窗口给持锁实例完成 ready 标记；本实例不抢重建，减少启动风暴下的重复写。
-            LockSupport.parkNanos(Duration.ofSeconds(2).toNanos());
+            rebuildWaiter.accept(Duration.ofSeconds(2));
             if (Thread.currentThread().isInterrupted()) {
                 Thread.currentThread().interrupt();
                 log.warn("[ROUTE_INIT] 等待其他实例重建路由时被中断");

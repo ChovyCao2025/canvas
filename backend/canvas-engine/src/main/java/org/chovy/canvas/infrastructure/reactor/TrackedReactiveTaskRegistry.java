@@ -2,6 +2,7 @@ package org.chovy.canvas.infrastructure.reactor;
 
 import jakarta.annotation.PreDestroy;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import reactor.core.Disposable;
@@ -34,6 +35,7 @@ public class TrackedReactiveTaskRegistry {
     private final Duration shutdownTimeout;
     private final boolean closeOnShutdown;
 
+    @Autowired
     public TrackedReactiveTaskRegistry(
             @Value("${canvas.reactive-tasks.shutdown-timeout-ms:5000}") long shutdownTimeoutMs) {
         this(Duration.ofMillis(Math.max(0L, shutdownTimeoutMs)), true);

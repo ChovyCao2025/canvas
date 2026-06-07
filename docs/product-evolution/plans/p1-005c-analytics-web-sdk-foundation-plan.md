@@ -8,6 +8,10 @@
 
 **Tech Stack:** TypeScript, Vitest, browser `fetch`, browser `localStorage`, Web Crypto fallback-free UUID generation, npm scripts.
 
+**Implementation Status:** Implemented and merged into `main` on 2026-06-05. Added a self-contained `sdk/analytics-web` package exporting `CanvasAnalytics` and `createAnalytics`.
+
+**Verification:** `cd sdk/analytics-web && npm test` passed. `cd sdk/analytics-web && npm run build` passed. `node_modules` and `dist` are ignored; `package-lock.json` remains for reproducible SDK installs.
+
 ---
 
 ## Spec Reference
@@ -20,6 +24,7 @@
 
 **SDK package**
 - Create: `sdk/analytics-web/package.json`
+- Create: `sdk/analytics-web/package-lock.json`
 - Create: `sdk/analytics-web/tsconfig.json`
 - Create: `sdk/analytics-web/src/index.ts`
 - Create: `sdk/analytics-web/src/index.test.ts`

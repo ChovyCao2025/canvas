@@ -77,3 +77,13 @@ Core handlers, channel adapters, data exporters, and rule/template packs can evo
 - All changed frontend routes handle loading, empty, error, and permission states.
 - Tests named in the plan pass in the local commands for backend and frontend slices.
 - The implementation includes rollout notes covering feature flag, migration, and rollback behavior.
+
+## Implementation Status
+
+Completed on 2026-06-05.
+
+- `V161__plugin_integration_foundations.sql` creates `built_in_plugin_registry` without runtime code loading fields and seeds WeCom, CSV export, batch operations, AI gateway, and `form-collect-node`.
+- `PluginRegistryService` and `JdbcPluginRepository` expose the built-in plugin catalog, normalize plugin keys, enforce minimum Canvas version compatibility, and update only enable state.
+- `PluginRegistryController` exposes `/canvas/plugins` catalog and `/canvas/plugins/{pluginKey}/enabled` state changes with `X-Canvas-Version` compatibility input.
+- Frontend `pluginRegistryApi` and `pluginIntegrationDocs` helpers provide stable API docs presentation and compatibility/status copy.
+- Rollout: run `V161__plugin_integration_foundations.sql`, then expose `/canvas/plugins` in API docs or an operator surface. Rollback: hide the plugin catalog entry point and set affected built-in plugin rows to `enabled=0`; third-party runtime loading remains disabled.

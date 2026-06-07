@@ -62,7 +62,7 @@ public class CdpWarehouseAudienceMaterializationScheduler {
             @Value("${canvas.warehouse.audience-materialization-scheduler.limit:50}") int limit,
             @Value("${canvas.warehouse.audience-materialization-scheduler.operator:scheduler}") String operator,
             @Value("${canvas.warehouse.audience-materialization-scheduler.lease-ttl-seconds:120}") long leaseTtlSeconds,
-            @Value("${canvas.warehouse.audience-materialization-scheduler.availability-gate.enabled:true}") boolean availabilityGateEnabled,
+            @Value("${canvas.warehouse.audience-materialization-scheduler.availability-gate.enabled:false}") boolean availabilityGateEnabled,
             @Value("${canvas.warehouse.audience-materialization-scheduler.availability-gate.mode:HYBRID}") String availabilityMode,
             @Value("${canvas.warehouse.audience-materialization-scheduler.availability-gate.allow-warn:false}") boolean availabilityAllowWarn,
             @Value("${canvas.warehouse.audience-materialization-scheduler.consumer-contract-gate.enabled:false}") boolean consumerContractGateEnabled,

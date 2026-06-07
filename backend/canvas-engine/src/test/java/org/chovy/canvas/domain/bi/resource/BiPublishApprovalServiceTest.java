@@ -3,12 +3,15 @@ package org.chovy.canvas.domain.bi.resource;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import org.chovy.canvas.dal.dataobject.BiDashboardDO;
 import org.chovy.canvas.dal.dataobject.BiPublishApprovalDO;
+import org.chovy.canvas.dal.dataobject.BiSpreadsheetDO;
 import org.chovy.canvas.dal.dataobject.BiWorkspaceDO;
+import org.chovy.canvas.dal.mapper.BiBigScreenMapper;
 import org.chovy.canvas.dal.mapper.BiChartMapper;
 import org.chovy.canvas.dal.mapper.BiDashboardMapper;
 import org.chovy.canvas.dal.mapper.BiDatasetMapper;
 import org.chovy.canvas.dal.mapper.BiPortalMapper;
 import org.chovy.canvas.dal.mapper.BiPublishApprovalMapper;
+import org.chovy.canvas.dal.mapper.BiSpreadsheetMapper;
 import org.chovy.canvas.dal.mapper.BiWorkspaceMapper;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -34,8 +37,7 @@ class BiPublishApprovalServiceTest {
 
     @Test
     void publishApprovalMigrationCapturesReviewLifecycle() throws Exception {
-        String migration = Files.readString(Path.of(
-                "src/main/resources/db/migration/V248__bi_publish_approval.sql"));
+        String migration = Files.readString(migrationDir().resolve("V248__bi_publish_approval.sql"));
 
         assertThat(migration).contains("CREATE TABLE IF NOT EXISTS bi_publish_approval");
         assertThat(migration).contains("status VARCHAR(32) NOT NULL");
@@ -67,6 +69,37 @@ class BiPublishApprovalServiceTest {
         assertThat(captor.getValue().getRequestedAt()).isEqualTo(LocalDateTime.ofInstant(CLOCK.instant(), ZoneOffset.UTC));
         assertThat(view.status()).isEqualTo("PENDING");
         assertThat(view.reason()).isEqualTo("准备发布周报看板");
+    }
+
+    @Test
+    void requestSpreadsheetPublishApprovalPersistsPendingReview() {
+        BiWorkspaceMapper workspaceMapper = mock(BiWorkspaceMapper.class);
+        BiSpreadsheetMapper spreadsheetMapper = mock(BiSpreadsheetMapper.class);
+        BiPublishApprovalMapper approvalMapper = mock(BiPublishApprovalMapper.class);
+        BiSpreadsheetDO spreadsheet = new BiSpreadsheetDO();
+        spreadsheet.setId(99L);
+        spreadsheet.setStatus("DRAFT");
+        when(workspaceMapper.selectOne(any(LambdaQueryWrapper.class))).thenReturn(workspace());
+        when(spreadsheetMapper.selectOne(any(LambdaQueryWrapper.class))).thenReturn(spreadsheet);
+        BiPublishApprovalService service = service(
+                workspaceMapper,
+                mock(BiDashboardMapper.class),
+                mock(BiBigScreenMapper.class),
+                spreadsheetMapper,
+                approvalMapper);
+
+        BiPublishApprovalView view = service.requestApproval(7L, "alice",
+                new BiPublishApprovalRequestCommand("spreadsheet", "budget-sheet", "准备发布预算模型"));
+
+        ArgumentCaptor<BiPublishApprovalDO> captor = ArgumentCaptor.forClass(BiPublishApprovalDO.class);
+        verify(approvalMapper).insert(captor.capture());
+        assertThat(captor.getValue().getTenantId()).isEqualTo(7L);
+        assertThat(captor.getValue().getWorkspaceId()).isEqualTo(5L);
+        assertThat(captor.getValue().getResourceType()).isEqualTo("SPREADSHEET");
+        assertThat(captor.getValue().getResourceKey()).isEqualTo("budget-sheet");
+        assertThat(captor.getValue().getStatus()).isEqualTo("PENDING");
+        assertThat(view.resourceType()).isEqualTo("SPREADSHEET");
+        assertThat(view.resourceKey()).isEqualTo("budget-sheet");
     }
 
     @Test
@@ -176,12 +209,27 @@ class BiPublishApprovalServiceTest {
     private BiPublishApprovalService service(BiWorkspaceMapper workspaceMapper,
                                              BiDashboardMapper dashboardMapper,
                                              BiPublishApprovalMapper approvalMapper) {
+        return service(
+                workspaceMapper,
+                dashboardMapper,
+                mock(BiBigScreenMapper.class),
+                mock(BiSpreadsheetMapper.class),
+                approvalMapper);
+    }
+
+    private BiPublishApprovalService service(BiWorkspaceMapper workspaceMapper,
+                                             BiDashboardMapper dashboardMapper,
+                                             BiBigScreenMapper bigScreenMapper,
+                                             BiSpreadsheetMapper spreadsheetMapper,
+                                             BiPublishApprovalMapper approvalMapper) {
         return new BiPublishApprovalService(
                 workspaceMapper,
                 mock(BiDatasetMapper.class),
                 dashboardMapper,
                 mock(BiChartMapper.class),
                 mock(BiPortalMapper.class),
+                bigScreenMapper,
+                spreadsheetMapper,
                 approvalMapper,
                 CLOCK);
     }
@@ -190,6 +238,14 @@ class BiPublishApprovalServiceTest {
         BiWorkspaceDO workspace = new BiWorkspaceDO();
         workspace.setId(5L);
         return workspace;
+    }
+
+    private static Path migrationDir() {
+        Path modulePath = Path.of("src/main/resources/db/migration");
+        if (Files.exists(modulePath)) {
+            return modulePath;
+        }
+        return Path.of("canvas-engine/src/main/resources/db/migration");
     }
 
     private BiDashboardDO dashboard(String status) {
@@ -212,4 +268,5 @@ class BiPublishApprovalServiceTest {
         row.setRequestedAt(LocalDateTime.ofInstant(CLOCK.instant(), ZoneOffset.UTC));
         return row;
     }
+
 }

@@ -8,6 +8,8 @@
 
 **Tech Stack:** Java 21, Spring Boot WebFlux-style `Mono`, MyBatis-Plus, Flyway, JUnit 5, Mockito, AssertJ, React 18, TypeScript, Axios, Vitest.
 
+**Implementation status (2026-06-05):** Completed. The actual migration is `V264__platform_product_evolution_workstreams.sql` because this workspace already contains `V162` through `V263`. The homepage now renders a lightweight platform workstream card. Commit was intentionally skipped because the user did not request one.
+
 ---
 
 ## Spec Reference
@@ -18,8 +20,9 @@
 ## File Structure
 
 **Backend**
-- Create: `backend/canvas-engine/src/main/resources/db/migration/V162__platform_product_evolution_workstreams.sql` - platform workstream metadata table.
+- Create: `backend/canvas-engine/src/main/resources/db/migration/V264__platform_product_evolution_workstreams.sql` - platform workstream metadata table.
 - Create: `backend/canvas-engine/src/main/java/org/chovy/canvas/platform/PlatformWorkstreamService.java` - workstream list and child-spec readiness logic.
+- Create: `backend/canvas-engine/src/main/java/org/chovy/canvas/platform/JdbcPlatformWorkstreamRepository.java` - production persistence adapter.
 - Create: `backend/canvas-engine/src/main/java/org/chovy/canvas/web/PlatformWorkstreamController.java` - `/platform/workstreams`.
 - Create: `backend/canvas-engine/src/test/java/org/chovy/canvas/platform/PlatformWorkstreamContractTest.java`
 
@@ -27,15 +30,16 @@
 - Create: `frontend/src/services/platformWorkstreamApi.ts`
 - Create: `frontend/src/pages/home/platformCommandCenter.ts`
 - Create: `frontend/src/pages/home/platformCommandCenter.test.ts`
+- Modify: `frontend/src/pages/home/index.tsx` - render the platform workstream card.
 
 ### Task 1: Workstream Registry
 
 **Files:**
-- Create: `backend/canvas-engine/src/main/resources/db/migration/V162__platform_product_evolution_workstreams.sql`
+- Create: `backend/canvas-engine/src/main/resources/db/migration/V264__platform_product_evolution_workstreams.sql`
 - Create: `backend/canvas-engine/src/main/java/org/chovy/canvas/platform/PlatformWorkstreamService.java`
 - Create: `backend/canvas-engine/src/test/java/org/chovy/canvas/platform/PlatformWorkstreamContractTest.java`
 
-- [ ] **Step 1: Write workstream contract tests**
+- [x] **Step 1: Write workstream contract tests**
 
 Create `backend/canvas-engine/src/test/java/org/chovy/canvas/platform/PlatformWorkstreamContractTest.java`:
 
@@ -58,7 +62,7 @@ class PlatformWorkstreamContractTest {
     @Test
     void migrationCreatesWorkstreamTableWithChildSpecGate() throws Exception {
         String sql = Files.readString(Path.of(
-                "src/main/resources/db/migration/V162__platform_product_evolution_workstreams.sql"));
+                "src/main/resources/db/migration/V264__platform_product_evolution_workstreams.sql"));
 
         assertThat(sql)
                 .contains("CREATE TABLE IF NOT EXISTS platform_workstream")
@@ -96,7 +100,7 @@ class PlatformWorkstreamContractTest {
 }
 ```
 
-- [ ] **Step 2: Run contract tests and confirm red state**
+- [x] **Step 2: Run contract tests and confirm red state**
 
 Run:
 
@@ -106,9 +110,9 @@ cd backend && mvn -pl canvas-engine test -Dtest=PlatformWorkstreamContractTest
 
 Expected: FAIL because the migration and service do not exist.
 
-- [ ] **Step 3: Add migration**
+- [x] **Step 3: Add migration**
 
-Create `backend/canvas-engine/src/main/resources/db/migration/V162__platform_product_evolution_workstreams.sql`:
+Create `backend/canvas-engine/src/main/resources/db/migration/V264__platform_product_evolution_workstreams.sql`:
 
 ```sql
 CREATE TABLE IF NOT EXISTS platform_workstream (
@@ -136,7 +140,7 @@ VALUES
   ('integrations', 'Integrations', 'P2', 1, NULL, 'Inbound webhook, API key management, SSO/OIDC decision, and data source improvements.', 'DISCOVERY');
 ```
 
-- [ ] **Step 4: Implement service**
+- [x] **Step 4: Implement service**
 
 Create `backend/canvas-engine/src/main/java/org/chovy/canvas/platform/PlatformWorkstreamService.java`:
 
@@ -183,7 +187,7 @@ public class PlatformWorkstreamService {
 }
 ```
 
-- [ ] **Step 5: Run service tests**
+- [x] **Step 5: Run service tests**
 
 Run:
 
@@ -199,7 +203,7 @@ Expected: PASS.
 - Create: `backend/canvas-engine/src/main/java/org/chovy/canvas/web/PlatformWorkstreamController.java`
 - Extend: `backend/canvas-engine/src/test/java/org/chovy/canvas/platform/PlatformWorkstreamContractTest.java`
 
-- [ ] **Step 1: Add controller test**
+- [x] **Step 1: Add controller test**
 
 Add this test to `PlatformWorkstreamContractTest`:
 
@@ -222,7 +226,7 @@ void controllerReturnsWorkstreamStatuses() {
 }
 ```
 
-- [ ] **Step 2: Run controller test and confirm red state**
+- [x] **Step 2: Run controller test and confirm red state**
 
 Run:
 
@@ -232,7 +236,7 @@ cd backend && mvn -pl canvas-engine test -Dtest=PlatformWorkstreamContractTest
 
 Expected: FAIL because `PlatformWorkstreamController` does not exist.
 
-- [ ] **Step 3: Add controller**
+- [x] **Step 3: Add controller**
 
 Create `backend/canvas-engine/src/main/java/org/chovy/canvas/web/PlatformWorkstreamController.java`:
 
@@ -266,7 +270,7 @@ public class PlatformWorkstreamController {
 }
 ```
 
-- [ ] **Step 4: Run controller test**
+- [x] **Step 4: Run controller test**
 
 Run:
 
@@ -283,7 +287,7 @@ Expected: PASS.
 - Create: `frontend/src/pages/home/platformCommandCenter.ts`
 - Create: `frontend/src/pages/home/platformCommandCenter.test.ts`
 
-- [ ] **Step 1: Write frontend tests**
+- [x] **Step 1: Write frontend tests**
 
 Create `frontend/src/pages/home/platformCommandCenter.test.ts`:
 
@@ -313,7 +317,7 @@ describe('platformCommandCenter', () => {
 })
 ```
 
-- [ ] **Step 2: Run frontend tests and confirm red state**
+- [x] **Step 2: Run frontend tests and confirm red state**
 
 Run:
 
@@ -323,7 +327,7 @@ cd frontend && npm test -- platformCommandCenter.test.ts
 
 Expected: FAIL because `platformCommandCenter.ts` does not exist.
 
-- [ ] **Step 3: Add API wrapper**
+- [x] **Step 3: Add API wrapper**
 
 Create `frontend/src/services/platformWorkstreamApi.ts`:
 
@@ -337,7 +341,7 @@ export const platformWorkstreamApi = {
 }
 ```
 
-- [ ] **Step 4: Add home helpers**
+- [x] **Step 4: Add home helpers**
 
 Create `frontend/src/pages/home/platformCommandCenter.ts`:
 
@@ -369,7 +373,7 @@ export function workstreamStatusText(status: PlatformWorkstreamStatus['status'])
 }
 ```
 
-- [ ] **Step 5: Run frontend tests**
+- [x] **Step 5: Run frontend tests**
 
 Run:
 
@@ -379,20 +383,22 @@ cd frontend && npm test -- platformCommandCenter.test.ts
 
 Expected: PASS.
 
-### Task 4: Verification And Commit
+### Task 4: Verification And Rollout Notes
 
 **Files:**
 - Modify: `docs/product-evolution/specs/p2-003-platform-product-evolution-workstreams.md`
 - Modify: `docs/product-evolution/plans/p2-003-platform-product-evolution-workstreams-plan.md`
-- Create: `backend/canvas-engine/src/main/resources/db/migration/V162__platform_product_evolution_workstreams.sql`
+- Create: `backend/canvas-engine/src/main/resources/db/migration/V264__platform_product_evolution_workstreams.sql`
 - Create: `backend/canvas-engine/src/main/java/org/chovy/canvas/platform/PlatformWorkstreamService.java`
+- Create: `backend/canvas-engine/src/main/java/org/chovy/canvas/platform/JdbcPlatformWorkstreamRepository.java`
 - Create: `backend/canvas-engine/src/main/java/org/chovy/canvas/web/PlatformWorkstreamController.java`
 - Create: `backend/canvas-engine/src/test/java/org/chovy/canvas/platform/PlatformWorkstreamContractTest.java`
 - Create: `frontend/src/services/platformWorkstreamApi.ts`
 - Create: `frontend/src/pages/home/platformCommandCenter.ts`
 - Create: `frontend/src/pages/home/platformCommandCenter.test.ts`
+- Modify: `frontend/src/pages/home/index.tsx`
 
-- [ ] **Step 1: Run focused backend tests**
+- [x] **Step 1: Run focused backend tests**
 
 Run:
 
@@ -402,7 +408,7 @@ cd backend && mvn -pl canvas-engine test -Dtest=PlatformWorkstreamContractTest
 
 Expected: PASS.
 
-- [ ] **Step 2: Run focused frontend tests**
+- [x] **Step 2: Run focused frontend tests**
 
 Run:
 
@@ -412,30 +418,36 @@ cd frontend && npm test -- platformCommandCenter.test.ts
 
 Expected: PASS.
 
-- [ ] **Step 3: Add rollout notes to the implementation PR**
+- [x] **Step 3: Add rollout notes to the implementation PR**
 
 Use this rollout note text:
 
 ```markdown
-Rollout: run `V162__platform_product_evolution_workstreams.sql`, then surface `/platform/workstreams` in the home command center. Rollback: hide the command-center panel; table rows are additive governance metadata and do not affect runtime execution.
+Rollout: run `V264__platform_product_evolution_workstreams.sql`, then surface `/platform/workstreams` in the home command center. Rollback: hide the command-center panel; table rows are additive governance metadata and do not affect runtime execution.
 ```
 
-- [ ] **Step 4: Commit the implementation slice**
+- [x] **Step 4: Commit skipped by operator instruction**
 
 Run:
 
 ```bash
-git add \
-  backend/canvas-engine/src/main/resources/db/migration/V162__platform_product_evolution_workstreams.sql \
-  backend/canvas-engine/src/main/java/org/chovy/canvas/platform/PlatformWorkstreamService.java \
-  backend/canvas-engine/src/main/java/org/chovy/canvas/web/PlatformWorkstreamController.java \
-  backend/canvas-engine/src/test/java/org/chovy/canvas/platform/PlatformWorkstreamContractTest.java \
-  frontend/src/services/platformWorkstreamApi.ts \
-  frontend/src/pages/home/platformCommandCenter.ts \
-  frontend/src/pages/home/platformCommandCenter.test.ts \
-  docs/product-evolution/specs/p2-003-platform-product-evolution-workstreams.md \
-  docs/product-evolution/plans/p2-003-platform-product-evolution-workstreams-plan.md
-git commit -m "feat: add platform workstream command center"
+Commit was not created because the operator did not request one.
 ```
 
-Expected: commit contains only platform workstream registry, command-center helpers, tests, spec, and plan files.
+Expected: no commit is created; changes remain in the working tree for operator review.
+
+## Acceptance Checklist
+
+- [x] Workstream registry table exists as additive migration `V264__platform_product_evolution_workstreams.sql`.
+- [x] Service marks workstreams without child specs as blocked and rejects broad execution without a child spec.
+- [x] `/platform/workstreams` is authenticated through `TenantContextResolver.currentOrError()`.
+- [x] Frontend API wrapper, presentation helpers, tests, and visible homepage card are implemented.
+- [x] Rollout and rollback notes are documented.
+
+## Verification Evidence
+
+- [x] Backend red state on 2026-06-05: `JAVA_HOME=/Users/photonpay/Library/Java/JavaVirtualMachines/ms-21.0.11/Contents/Home PATH="/Users/photonpay/Library/Java/JavaVirtualMachines/ms-21.0.11/Contents/Home/bin:$PATH" mvn -pl canvas-engine -Dtest=PlatformWorkstreamContractTest test` failed in `testCompile` because `PlatformWorkstreamController` did not exist.
+- [x] Frontend red state on 2026-06-05: `PATH="/opt/homebrew/bin:$PATH" npm run test -- platformCommandCenter.test.ts platformWorkstreamApi.test.ts` failed because `platformCommandCenter` and `platformWorkstreamApi` did not exist.
+- [x] Frontend focused tests pass on 2026-06-05: `PATH="/opt/homebrew/bin:$PATH" npm run test -- platformCommandCenter.test.ts platformWorkstreamApi.test.ts` from `frontend` (4 tests, 0 failures).
+- [x] Backend focused tests pass on 2026-06-05 after the transient unrelated BI test-source compile gap was resolved: `JAVA_HOME=/Users/photonpay/Library/Java/JavaVirtualMachines/ms-21.0.11/Contents/Home PATH="/Users/photonpay/Library/Java/JavaVirtualMachines/ms-21.0.11/Contents/Home/bin:$PATH" mvn -pl canvas-engine -Dtest=PlatformWorkstreamContractTest test` from `backend` (5 tests, 0 failures, 0 errors, 0 skipped).
+- [x] Frontend production build passes on 2026-06-05: `PATH="/opt/homebrew/bin:$PATH" npm run build` from `frontend`.

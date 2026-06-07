@@ -12,7 +12,7 @@ class DataSecurityMigrationTest {
 
     @Test
     void migrationFilesAfterRepairDoNotSeedRootJdbcCredentials() throws Exception {
-        Path migrationRoot = Path.of("src/main/resources/db/migration");
+        Path migrationRoot = migrationDir();
         try (var files = Files.list(migrationRoot)) {
             var offending = files
                     .filter(path -> path.getFileName().toString().matches("V\\d+__.*\\.sql"))
@@ -27,7 +27,7 @@ class DataSecurityMigrationTest {
 
     @Test
     void repairMigrationDisablesHistoricalDemoRootCredentials() throws Exception {
-        Path migration = Path.of("src/main/resources/db/migration/V91__data_security_and_tenant_isolation.sql");
+        Path migration = migrationDir().resolve("V91__data_security_and_tenant_isolation.sql");
         String sql = Files.readString(migration);
 
         assertThat(sql).contains("data_source_config");
@@ -52,5 +52,13 @@ class DataSecurityMigrationTest {
         int start = name.startsWith("V") ? 1 : 0;
         int end = name.indexOf("__");
         return Integer.parseInt(name.substring(start, end));
+    }
+
+    private static Path migrationDir() {
+        Path modulePath = Path.of("src/main/resources/db/migration");
+        if (Files.exists(modulePath)) {
+            return modulePath;
+        }
+        return Path.of("canvas-engine/src/main/resources/db/migration");
     }
 }

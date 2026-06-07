@@ -193,6 +193,26 @@ class BiDeliveryAttachmentServiceTest {
     }
 
     @Test
+    void browserSnapshotUsesBigScreenWorkbenchModeUrl() {
+        BiSnapshotRenderRequest request = renderSnapshotFor("BIG_SCREEN", 51L);
+
+        assertThat(request.resourceUrl())
+                .isEqualTo("/bi?resourceType=BIG_SCREEN&resourceId=51&mode=big-screen");
+        assertThat(request.metadata().get("resourceUrl"))
+                .isEqualTo("/bi?resourceType=BIG_SCREEN&resourceId=51&mode=big-screen");
+    }
+
+    @Test
+    void browserSnapshotUsesSpreadsheetWorkbenchModeUrl() {
+        BiSnapshotRenderRequest request = renderSnapshotFor("SPREADSHEET", 61L);
+
+        assertThat(request.resourceUrl())
+                .isEqualTo("/bi?resourceType=SPREADSHEET&resourceId=61&mode=spreadsheet");
+        assertThat(request.metadata().get("resourceUrl"))
+                .isEqualTo("/bi?resourceType=SPREADSHEET&resourceId=61&mode=spreadsheet");
+    }
+
+    @Test
     void createsMultiPagePdfWhenSummaryExceedsOnePage() throws Exception {
         BiDeliveryAttachmentMapper mapper = mock(BiDeliveryAttachmentMapper.class);
         AtomicReference<BiDeliveryAttachmentDO> persisted = new AtomicReference<>();
@@ -227,6 +247,39 @@ class BiDeliveryAttachmentServiceTest {
     }
 
     @Test
+    void multiPagePdfIncludesPageFootersAndEscapesLiteralText() throws Exception {
+        BiDeliveryAttachmentMapper mapper = mock(BiDeliveryAttachmentMapper.class);
+        AtomicReference<BiDeliveryAttachmentDO> persisted = new AtomicReference<>();
+        doAnswer(invocation -> {
+            BiDeliveryAttachmentDO row = invocation.getArgument(0);
+            row.setId(502L);
+            persisted.set(row);
+            return 1;
+        }).when(mapper).insert(any(BiDeliveryAttachmentDO.class));
+        doAnswer(invocation -> {
+            persisted.set(invocation.getArgument(0));
+            return 1;
+        }).when(mapper).updateById(any(BiDeliveryAttachmentDO.class));
+        BiSubscriptionDO subscription = subscription();
+        subscription.setName("Canvas Daily (Ops) \\ Review");
+        BiDeliveryAttachmentService service = new BiDeliveryAttachmentService(mapper, new ObjectMapper(), tempDir);
+
+        service.createSubscriptionAttachments(
+                7L,
+                subscription,
+                Map.of("frequency", "DAILY"),
+                Map.of("attachment", "PDF", "notes", "long audit note ".repeat(700)),
+                "alice");
+
+        String pdf = Files.readString(Path.of(persisted.get().getFilePath()), StandardCharsets.US_ASCII);
+        int pageCount = pdf.split("/Type /Page[^s]").length - 1;
+        assertThat(pageCount).isGreaterThanOrEqualTo(2);
+        assertThat(pdf).contains("(Page 1 of " + pageCount + ") Tj");
+        assertThat(pdf).contains("(Page " + pageCount + " of " + pageCount + ") Tj");
+        assertThat(pdf).contains("(title: Canvas Daily \\(Ops\\) \\\\ Review) Tj");
+    }
+
+    @Test
     void rejectsExpiredAttachmentDownloadsAndMarksExpired() throws Exception {
         BiDeliveryAttachmentMapper mapper = mock(BiDeliveryAttachmentMapper.class);
         Path file = tempDir.resolve("tenant-7/attachment-401/report.csv");
@@ -241,6 +294,35 @@ class BiDeliveryAttachmentServiceTest {
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("expired");
 
+        ArgumentCaptor<BiDeliveryAttachmentDO> updateCaptor = ArgumentCaptor.forClass(BiDeliveryAttachmentDO.class);
+        verify(mapper).updateById(updateCaptor.capture());
+        assertThat(updateCaptor.getValue().getStatus()).isEqualTo("EXPIRED");
+    }
+
+    @Test
+    void rejectsExpiredStorageBackedAttachmentDownloadsAndDeletesObject() {
+        BiDeliveryAttachmentMapper mapper = mock(BiDeliveryAttachmentMapper.class);
+        CapturingStorage storage = new CapturingStorage("MEMORY");
+        String storageKey = "attachments/tenant-7/attachment-501/report.csv";
+        storage.write(storageKey, "key,value\n".getBytes(StandardCharsets.UTF_8));
+        BiDeliveryAttachmentDO row = completedAttachment(501L, tempDir.resolve("unused/report.csv"));
+        row.setFilePath(null);
+        row.setStorageProvider("MEMORY");
+        row.setStorageKey(storageKey);
+        row.setExpiresAt(LocalDateTime.now().minusMinutes(1));
+        when(mapper.selectById(501L)).thenReturn(row);
+        BiDeliveryAttachmentService service = new BiDeliveryAttachmentService(
+                mapper,
+                new ObjectMapper(),
+                null,
+                storage,
+                7);
+
+        assertThatThrownBy(() -> service.download(7L, 501L))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("expired");
+
+        assertThat(storage.bytesByKey).doesNotContainKey(storageKey);
         ArgumentCaptor<BiDeliveryAttachmentDO> updateCaptor = ArgumentCaptor.forClass(BiDeliveryAttachmentDO.class);
         verify(mapper).updateById(updateCaptor.capture());
         assertThat(updateCaptor.getValue().getStatus()).isEqualTo("EXPIRED");
@@ -280,6 +362,33 @@ class BiDeliveryAttachmentServiceTest {
         row.setResourceId(21L);
         row.setEnabled(true);
         return row;
+    }
+
+    private BiSnapshotRenderRequest renderSnapshotFor(String resourceType, Long resourceId) {
+        BiDeliveryAttachmentMapper mapper = mock(BiDeliveryAttachmentMapper.class);
+        FakeSnapshotRenderer renderer = new FakeSnapshotRenderer();
+        doAnswer(invocation -> {
+            BiDeliveryAttachmentDO row = invocation.getArgument(0);
+            row.setId(303L);
+            return 1;
+        }).when(mapper).insert(any(BiDeliveryAttachmentDO.class));
+        BiDeliveryAttachmentService service = new BiDeliveryAttachmentService(
+                mapper,
+                new ObjectMapper(),
+                renderer,
+                tempDir);
+        BiSubscriptionDO subscription = subscription();
+        subscription.setResourceType(resourceType);
+        subscription.setResourceId(resourceId);
+
+        service.createSubscriptionAttachments(
+                7L,
+                subscription,
+                Map.of("frequency", "DAILY"),
+                Map.of("content", "SNAPSHOT", "snapshotFormat", "PNG"),
+                "alice");
+
+        return renderer.request;
     }
 
     private BiDeliveryAttachmentDO completedAttachment(Long id, Path file) {

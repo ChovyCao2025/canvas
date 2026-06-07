@@ -60,8 +60,10 @@ public class WebhookDispatcherService {
                     .post()
                     .uri(sub.getCallbackUrl())
                     .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
-                    .header("X-Canvas-Webhook-Timestamp", timestamp)
-                    .header("X-Canvas-Webhook-Signature", signature)
+                    .header("X-Canvas-Event", eventType)
+                    .header("X-Canvas-Delivery", deliveryId)
+                    .header("X-Canvas-Timestamp", timestamp)
+                    .header("X-Canvas-Signature", signature)
                     .bodyValue(rawPayload)
                     .exchangeToMono(clientResponse -> clientResponse.toBodilessEntity())
                     .block(Duration.ofSeconds(10));
@@ -77,7 +79,7 @@ public class WebhookDispatcherService {
     public boolean matches(String eventTypesJson, String eventType) {
         try {
             List<String> eventTypes = objectMapper.readValue(eventTypesJson, STRING_LIST);
-            return eventTypes.contains("*") || eventTypes.contains(eventType);
+            return eventTypes.contains(eventType);
         } catch (Exception e) {
             log.warn("[WEBHOOK] invalid event_types json: {}", e.getMessage());
             return false;

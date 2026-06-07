@@ -8,6 +8,8 @@
 
 **Tech Stack:** Java 21, Spring Boot WebFlux-style `Mono`, Flyway, JUnit 5, Mockito, AssertJ, React 18, TypeScript, Axios, Vitest.
 
+**Implementation status (2026-06-05):** Completed. The actual migration is `V268__message_template_center.sql` because this workspace already uses `V267` for the technical migration evidence registry. The backend uses `TenantContextResolver.currentOrError()` for tenant isolation, and the frontend now exposes a visible `/message-templates` page plus menu entry. Commit was intentionally skipped because the user did not request one.
+
 ---
 
 ## Spec Reference
@@ -18,25 +20,34 @@
 ## File Structure
 
 **Backend**
-- Create: `backend/canvas-engine/src/main/resources/db/migration/V164__message_template_center.sql` - message template table.
+- Create: `backend/canvas-engine/src/main/resources/db/migration/V268__message_template_center.sql` - message template table.
 - Create: `backend/canvas-engine/src/main/java/org/chovy/canvas/domain/template/MessageTemplateService.java` - tenant-scoped create/search/preview logic.
+- Create: `backend/canvas-engine/src/main/java/org/chovy/canvas/domain/template/JdbcMessageTemplateRepository.java` - production persistence adapter.
 - Create: `backend/canvas-engine/src/main/java/org/chovy/canvas/web/MessageTemplateController.java` - `/message-templates` API.
 - Create: `backend/canvas-engine/src/test/java/org/chovy/canvas/domain/template/MessageTemplateServiceTest.java`
 - Create: `backend/canvas-engine/src/test/java/org/chovy/canvas/controller/MessageTemplateControllerTest.java`
 
 **Frontend**
 - Create: `frontend/src/services/messageTemplateApi.ts`
+- Create: `frontend/src/services/messageTemplateApi.test.ts`
 - Create: `frontend/src/pages/message-templates/messageTemplateCenter.ts`
 - Create: `frontend/src/pages/message-templates/messageTemplateCenter.test.ts`
+- Create: `frontend/src/pages/message-templates/index.tsx`
+- Create: `frontend/src/pages/message-templates/index.test.tsx`
+- Modify: `frontend/src/App.tsx`
+- Modify: `frontend/src/components/layout/AppLayout.tsx`
+- Modify: `frontend/src/components/layout/AppLayout.a11y.test.tsx`
+- Modify: `frontend/src/components/accessibility/RouteA11y.tsx`
 
 ### Task 1: Template Schema And Rendering Service
 
 **Files:**
-- Create: `backend/canvas-engine/src/main/resources/db/migration/V164__message_template_center.sql`
+- Create: `backend/canvas-engine/src/main/resources/db/migration/V268__message_template_center.sql`
 - Create: `backend/canvas-engine/src/main/java/org/chovy/canvas/domain/template/MessageTemplateService.java`
+- Create: `backend/canvas-engine/src/main/java/org/chovy/canvas/domain/template/JdbcMessageTemplateRepository.java`
 - Create: `backend/canvas-engine/src/test/java/org/chovy/canvas/domain/template/MessageTemplateServiceTest.java`
 
-- [ ] **Step 1: Write service tests**
+- [x] **Step 1: Write service tests**
 
 Create `backend/canvas-engine/src/test/java/org/chovy/canvas/domain/template/MessageTemplateServiceTest.java`:
 
@@ -62,7 +73,7 @@ class MessageTemplateServiceTest {
     @Test
     void migrationCreatesTenantScopedTemplateTable() throws Exception {
         String sql = Files.readString(Path.of(
-                "src/main/resources/db/migration/V164__message_template_center.sql"));
+                "src/main/resources/db/migration/V268__message_template_center.sql"));
 
         assertThat(sql)
                 .contains("CREATE TABLE IF NOT EXISTS message_template")
@@ -127,7 +138,7 @@ class MessageTemplateServiceTest {
 }
 ```
 
-- [ ] **Step 2: Run service tests and confirm red state**
+- [x] **Step 2: Run service tests and confirm red state**
 
 Run:
 
@@ -137,9 +148,9 @@ cd backend && mvn -pl canvas-engine test -Dtest=MessageTemplateServiceTest
 
 Expected: FAIL because the migration and service do not exist.
 
-- [ ] **Step 3: Add template migration**
+- [x] **Step 3: Add template migration**
 
-Create `backend/canvas-engine/src/main/resources/db/migration/V164__message_template_center.sql`:
+Create `backend/canvas-engine/src/main/resources/db/migration/V268__message_template_center.sql`:
 
 ```sql
 CREATE TABLE IF NOT EXISTS message_template (
@@ -159,7 +170,7 @@ CREATE TABLE IF NOT EXISTS message_template (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 ```
 
-- [ ] **Step 4: Implement message template service**
+- [x] **Step 4: Implement message template service**
 
 Create `backend/canvas-engine/src/main/java/org/chovy/canvas/domain/template/MessageTemplateService.java`:
 
@@ -243,7 +254,7 @@ public class MessageTemplateService {
 }
 ```
 
-- [ ] **Step 5: Run service tests**
+- [x] **Step 5: Run service tests**
 
 Run:
 
@@ -259,7 +270,7 @@ Expected: PASS.
 - Create: `backend/canvas-engine/src/main/java/org/chovy/canvas/web/MessageTemplateController.java`
 - Create: `backend/canvas-engine/src/test/java/org/chovy/canvas/controller/MessageTemplateControllerTest.java`
 
-- [ ] **Step 1: Write controller tests**
+- [x] **Step 1: Write controller tests**
 
 Create `backend/canvas-engine/src/test/java/org/chovy/canvas/controller/MessageTemplateControllerTest.java`:
 
@@ -321,7 +332,7 @@ class MessageTemplateControllerTest {
 }
 ```
 
-- [ ] **Step 2: Run controller tests and confirm red state**
+- [x] **Step 2: Run controller tests and confirm red state**
 
 Run:
 
@@ -331,7 +342,7 @@ cd backend && mvn -pl canvas-engine test -Dtest=MessageTemplateControllerTest
 
 Expected: FAIL because `MessageTemplateController` does not exist.
 
-- [ ] **Step 3: Add controller**
+- [x] **Step 3: Add controller**
 
 Create `backend/canvas-engine/src/main/java/org/chovy/canvas/web/MessageTemplateController.java`:
 
@@ -393,7 +404,7 @@ public class MessageTemplateController {
 }
 ```
 
-- [ ] **Step 4: Run controller tests**
+- [x] **Step 4: Run controller tests**
 
 Run:
 
@@ -407,10 +418,17 @@ Expected: PASS.
 
 **Files:**
 - Create: `frontend/src/services/messageTemplateApi.ts`
+- Create: `frontend/src/services/messageTemplateApi.test.ts`
 - Create: `frontend/src/pages/message-templates/messageTemplateCenter.ts`
 - Create: `frontend/src/pages/message-templates/messageTemplateCenter.test.ts`
+- Create: `frontend/src/pages/message-templates/index.tsx`
+- Create: `frontend/src/pages/message-templates/index.test.tsx`
+- Modify: `frontend/src/App.tsx`
+- Modify: `frontend/src/components/layout/AppLayout.tsx`
+- Modify: `frontend/src/components/layout/AppLayout.a11y.test.tsx`
+- Modify: `frontend/src/components/accessibility/RouteA11y.tsx`
 
-- [ ] **Step 1: Write frontend tests**
+- [x] **Step 1: Write frontend tests**
 
 Create `frontend/src/pages/message-templates/messageTemplateCenter.test.ts`:
 
@@ -439,7 +457,7 @@ describe('messageTemplateCenter', () => {
 })
 ```
 
-- [ ] **Step 2: Run frontend tests and confirm red state**
+- [x] **Step 2: Run frontend tests and confirm red state**
 
 Run:
 
@@ -449,7 +467,7 @@ cd frontend && npm test -- messageTemplateCenter.test.ts
 
 Expected: FAIL because `messageTemplateCenter.ts` does not exist.
 
-- [ ] **Step 3: Add API wrapper**
+- [x] **Step 3: Add API wrapper**
 
 Create `frontend/src/services/messageTemplateApi.ts`:
 
@@ -468,7 +486,7 @@ export const messageTemplateApi = {
 }
 ```
 
-- [ ] **Step 4: Add presentation helpers**
+- [x] **Step 4: Add presentation helpers**
 
 Create `frontend/src/pages/message-templates/messageTemplateCenter.ts`:
 
@@ -516,7 +534,7 @@ export function templatePreviewState(result: TemplatePreviewResult) {
 }
 ```
 
-- [ ] **Step 5: Run frontend tests**
+- [x] **Step 5: Run frontend tests**
 
 Run:
 
@@ -526,21 +544,29 @@ cd frontend && npm test -- messageTemplateCenter.test.ts
 
 Expected: PASS.
 
-### Task 4: Verification And Commit
+### Task 4: Verification And Rollout Notes
 
 **Files:**
 - Modify: `docs/product-evolution/specs/p2-005-message-template-center.md`
 - Modify: `docs/product-evolution/plans/p2-005-message-template-center-plan.md`
-- Create: `backend/canvas-engine/src/main/resources/db/migration/V164__message_template_center.sql`
+- Create: `backend/canvas-engine/src/main/resources/db/migration/V268__message_template_center.sql`
 - Create: `backend/canvas-engine/src/main/java/org/chovy/canvas/domain/template/MessageTemplateService.java`
+- Create: `backend/canvas-engine/src/main/java/org/chovy/canvas/domain/template/JdbcMessageTemplateRepository.java`
 - Create: `backend/canvas-engine/src/main/java/org/chovy/canvas/web/MessageTemplateController.java`
 - Create: `backend/canvas-engine/src/test/java/org/chovy/canvas/domain/template/MessageTemplateServiceTest.java`
 - Create: `backend/canvas-engine/src/test/java/org/chovy/canvas/controller/MessageTemplateControllerTest.java`
 - Create: `frontend/src/services/messageTemplateApi.ts`
+- Create: `frontend/src/services/messageTemplateApi.test.ts`
 - Create: `frontend/src/pages/message-templates/messageTemplateCenter.ts`
 - Create: `frontend/src/pages/message-templates/messageTemplateCenter.test.ts`
+- Create: `frontend/src/pages/message-templates/index.tsx`
+- Create: `frontend/src/pages/message-templates/index.test.tsx`
+- Modify: `frontend/src/App.tsx`
+- Modify: `frontend/src/components/layout/AppLayout.tsx`
+- Modify: `frontend/src/components/layout/AppLayout.a11y.test.tsx`
+- Modify: `frontend/src/components/accessibility/RouteA11y.tsx`
 
-- [ ] **Step 1: Run focused backend tests**
+- [x] **Step 1: Run focused backend tests**
 
 Run:
 
@@ -550,41 +576,47 @@ cd backend && mvn -pl canvas-engine test -Dtest=MessageTemplateServiceTest,Messa
 
 Expected: PASS.
 
-- [ ] **Step 2: Run focused frontend tests**
+- [x] **Step 2: Run focused frontend tests**
 
 Run:
 
 ```bash
-cd frontend && npm test -- messageTemplateCenter.test.ts
+cd frontend && npm test -- src/pages/message-templates/messageTemplateCenter.test.ts src/services/messageTemplateApi.test.ts src/pages/message-templates/index.test.tsx src/components/layout/AppLayout.a11y.test.tsx
 ```
 
 Expected: PASS.
 
-- [ ] **Step 3: Add rollout notes to the implementation PR**
+- [x] **Step 3: Add rollout notes to the implementation PR**
 
 Use this rollout note text:
 
 ```markdown
-Rollout: run `V164__message_template_center.sql`, then expose template search/create/preview entry points to operators. Rollback: hide the template center route; template rows are additive and do not affect runtime sends until a child approval/channel-adaptation spec wires them into canvas nodes.
+Rollout: run `V268__message_template_center.sql`, then expose template search/create/preview entry points to operators. Rollback: hide the template center route; template rows are additive and do not affect runtime sends until a child approval/channel-adaptation spec wires them into canvas nodes.
 ```
 
-- [ ] **Step 4: Commit the implementation slice**
+- [x] **Step 4: Commit skipped by operator instruction**
 
 Run:
 
 ```bash
-git add \
-  backend/canvas-engine/src/main/resources/db/migration/V164__message_template_center.sql \
-  backend/canvas-engine/src/main/java/org/chovy/canvas/domain/template/MessageTemplateService.java \
-  backend/canvas-engine/src/main/java/org/chovy/canvas/web/MessageTemplateController.java \
-  backend/canvas-engine/src/test/java/org/chovy/canvas/domain/template/MessageTemplateServiceTest.java \
-  backend/canvas-engine/src/test/java/org/chovy/canvas/controller/MessageTemplateControllerTest.java \
-  frontend/src/services/messageTemplateApi.ts \
-  frontend/src/pages/message-templates/messageTemplateCenter.ts \
-  frontend/src/pages/message-templates/messageTemplateCenter.test.ts \
-  docs/product-evolution/specs/p2-005-message-template-center.md \
-  docs/product-evolution/plans/p2-005-message-template-center-plan.md
-git commit -m "feat: add message template center foundation"
+Commit was not created because the operator did not request one.
 ```
 
-Expected: commit contains only template center schema, service/API, frontend helpers, tests, spec, and plan files.
+Expected: no commit is created; changes remain in the working tree for operator review.
+
+## Acceptance Checklist
+
+- [x] Tenant-scoped message template table exists as additive migration `V268__message_template_center.sql`.
+- [x] Backend create/search/preview preserves tenant context and rejects unsupported channels.
+- [x] Variables are extracted in stable display order, persisted as JSON, and used by preview rendering.
+- [x] `/message-templates` read/write/preview endpoints require authenticated tenant context.
+- [x] Frontend API wrapper, helper functions, page, route, navigation entry, empty/loading/error/saving states, and route announcement are implemented.
+- [x] Rollout and rollback notes are documented.
+
+## Verification Evidence
+
+- [x] Backend red state on 2026-06-05: `JAVA_HOME=/Users/photonpay/Library/Java/JavaVirtualMachines/ms-21.0.11/Contents/Home PATH="/Users/photonpay/Library/Java/JavaVirtualMachines/ms-21.0.11/Contents/Home/bin:$PATH" mvn -pl canvas-engine -Dtest=MessageTemplateServiceTest,MessageTemplateControllerTest test` from `backend` failed in `testCompile` because `MessageTemplateService` did not exist.
+- [x] Backend focused tests pass on 2026-06-05: `JAVA_HOME=/Users/photonpay/Library/Java/JavaVirtualMachines/ms-21.0.11/Contents/Home PATH="/Users/photonpay/Library/Java/JavaVirtualMachines/ms-21.0.11/Contents/Home/bin:$PATH" mvn -pl canvas-engine -Dtest=MessageTemplateServiceTest,MessageTemplateControllerTest test` from `backend` (8 tests, 0 failures, 0 errors, 0 skipped).
+- [x] Frontend red state on 2026-06-05: `PATH="/opt/homebrew/bin:$PATH" npm run test -- messageTemplateCenter.test.ts messageTemplateApi.test.ts index.test.tsx` from `frontend` failed because `messageTemplateApi`, `messageTemplateCenter`, and `message-templates/index.tsx` did not exist.
+- [x] Frontend focused tests pass on 2026-06-05: `PATH="/opt/homebrew/bin:$PATH" npm run test -- src/pages/message-templates/messageTemplateCenter.test.ts src/services/messageTemplateApi.test.ts src/pages/message-templates/index.test.tsx src/components/layout/AppLayout.a11y.test.tsx` from `frontend` (9 tests, 0 failures).
+- [x] Frontend production build passes on 2026-06-05: `PATH="/opt/homebrew/bin:$PATH" npm run build` from `frontend`.

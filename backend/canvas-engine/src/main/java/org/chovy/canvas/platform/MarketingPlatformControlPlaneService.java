@@ -90,6 +90,7 @@ public class MarketingPlatformControlPlaneService {
         boolean campaignReady = evidence.activeCampaignMasterCount() > 0
                 && evidence.requiredCampaignResourceLinkCount() > 0
                 && campaignLaunchCoverageReady(evidence);
+        boolean growthActivityReady = growthActivityReady(evidence);
         boolean integrationContractReady = integrationContractReady(evidence);
         return List.of(
                 capability(
@@ -118,6 +119,26 @@ public class MarketingPlatformControlPlaneService {
                                         evidence.campaignsMissingPrimaryDependency()),
                                 absenceSignal("campaignsMissingMeasurementDependency", "Missing measurement campaigns",
                                         evidence.campaignsMissingMeasurementDependency()))),
+                capability(
+                        "growth-activity-center",
+                        "Growth Activity Center",
+                        "growth",
+                        readyStatus(growthActivityReady),
+                        "/growth-activities",
+                        "/canvas/growth-activities",
+                        "operator-facing",
+                        List.of("activity lifecycle", "reward pool governance",
+                                "readiness blockers", "grant and referral closure"),
+                        growthActivityGaps(evidence),
+                        evidence(
+                                signal("activeGrowthActivities", "Active activities",
+                                        evidence.activeGrowthActivityCount()),
+                                signal("growthActivityRewardPools", "Reward pools",
+                                        evidence.growthActivityRewardPoolCount()),
+                                signal("readyGrowthActivities", "Ready activities",
+                                        evidence.readyGrowthActivityCount()),
+                                absenceSignal("blockedGrowthActivityReadiness", "Blocked readiness",
+                                        evidence.blockedGrowthActivityReadinessCount()))),
                 capability(
                         "integration-contract-registry",
                         "Integration Contract Registry",
@@ -313,6 +334,13 @@ public class MarketingPlatformControlPlaneService {
                 .collect(Collectors.toMap(CapabilityCard::capabilityKey, CapabilityCard::status));
         return List.of(
                 lane(
+                        "campaign-to-growth-activities",
+                        "Campaign Master To Growth Activities",
+                        "campaign-master-ledger",
+                        "growth-activity-center",
+                        laneStatus(capabilityStatuses, "campaign-master-ledger", "growth-activity-center"),
+                        List.of("campaign-owned activity launch", "readiness gate", "reward cost closure")),
+                lane(
                         "content-to-journey",
                         "Content Releases To Journey Runtime",
                         "content-lifecycle",
@@ -384,6 +412,29 @@ public class MarketingPlatformControlPlaneService {
                 && credentialReady;
         boolean paidMediaReady = evidence.enabledPaidMediaDestinationCount() > 0 && credentialReady;
         return List.of(
+                asset(
+                        "growth-activity-center",
+                        "Growth Activity Center",
+                        "INTERNAL_GOVERNANCE",
+                        "growth-activity-center",
+                        "GROWTH",
+                        readyStatus(growthActivityReady(evidence)),
+                        "/canvas/growth-activities",
+                        "reward provider contract when configured",
+                        0,
+                        evidence.blockedGrowthActivityReadinessCount(),
+                        List.of("campaign link", "activity readiness", "reward pool budget",
+                                "grant ledger closure"),
+                        growthActivityGaps(evidence),
+                        evidence(
+                                signal("activeGrowthActivities", "Active activities",
+                                        evidence.activeGrowthActivityCount()),
+                                signal("growthActivityRewardPools", "Reward pools",
+                                        evidence.growthActivityRewardPoolCount()),
+                                signal("readyGrowthActivities", "Ready activities",
+                                        evidence.readyGrowthActivityCount()),
+                                absenceSignal("blockedGrowthActivityReadiness", "Blocked readiness",
+                                        evidence.blockedGrowthActivityReadinessCount()))),
                 asset(
                         "marketing-integration-contract-registry",
                         "Marketing Integration Contract Registry",
@@ -620,6 +671,32 @@ public class MarketingPlatformControlPlaneService {
                 && evidence.campaignsWithInactiveRequiredLinks() == 0
                 && evidence.campaignsMissingPrimaryDependency() == 0
                 && evidence.campaignsMissingMeasurementDependency() == 0;
+    }
+
+    private static boolean growthActivityReady(
+            MarketingPlatformControlPlaneEvidenceProvider.RuntimeEvidence evidence) {
+        return evidence.activeGrowthActivityCount() > 0
+                && evidence.growthActivityRewardPoolCount() > 0
+                && evidence.readyGrowthActivityCount() >= evidence.activeGrowthActivityCount()
+                && evidence.blockedGrowthActivityReadinessCount() == 0;
+    }
+
+    private static List<String> growthActivityGaps(
+            MarketingPlatformControlPlaneEvidenceProvider.RuntimeEvidence evidence) {
+        List<String> gaps = new ArrayList<>();
+        if (evidence.activeGrowthActivityCount() <= 0) {
+            gaps.add("create at least one active growth activity");
+        }
+        if (evidence.growthActivityRewardPoolCount() <= 0) {
+            gaps.add("configure reward pools for growth activities");
+        }
+        if (evidence.readyGrowthActivityCount() < evidence.activeGrowthActivityCount()) {
+            gaps.add("complete readiness for every active growth activity");
+        }
+        if (evidence.blockedGrowthActivityReadinessCount() > 0) {
+            gaps.add("resolve growth activity readiness blockers");
+        }
+        return gaps;
     }
 
     private static boolean integrationContractReady(

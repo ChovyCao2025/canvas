@@ -21,7 +21,7 @@
 
 ## Files
 
-- Create `backend/canvas-engine/src/main/resources/db/migration/V261__cdp_warehouse_privacy_audience_rebuild_automation_run.sql`.
+- Create `backend/canvas-engine/src/main/resources/db/migration/V261__privacy_audience_rebuild_automation_run.sql`.
 - Create `backend/canvas-engine/src/main/java/org/chovy/canvas/dal/dataobject/CdpWarehousePrivacyAudienceBitmapRebuildAutomationRunDO.java`.
 - Create `backend/canvas-engine/src/main/java/org/chovy/canvas/dal/mapper/CdpWarehousePrivacyAudienceBitmapRebuildAutomationRunMapper.java`.
 - Create `backend/canvas-engine/src/main/java/org/chovy/canvas/domain/warehouse/CdpWarehousePrivacyAudienceBitmapRebuildAutomationRunService.java`.
@@ -39,7 +39,7 @@
 
 Create P2-079 docs and insert rows after P2-078.
 
-- [ ] **Step 2: Write failing schema and run service tests**
+- [x] **Step 2: Write failing schema and run service tests**
 
 Add tests for migration contents, success persistence, failure persistence, recent listing, and tenant-scoped get.
 
@@ -52,19 +52,19 @@ mvn -pl canvas-engine test -Dtest=CdpWarehousePrivacyAudienceBitmapRebuildAutoma
 
 Expected failure before implementation: missing migration, DO, mapper, or run service.
 
-- [ ] **Step 3: Write failing controller and scheduler tests**
+- [x] **Step 3: Write failing controller and scheduler tests**
 
 Add tests proving manual runs call the run history service, recent/get APIs are tenant scoped, and scheduler uses `triggerSource=SCHEDULED` when the run history service is configured.
 
-- [ ] **Step 4: Implement migration, DO, mapper, and run service**
+- [x] **Step 4: Implement migration, DO, mapper, and run service**
 
 Persist `RUNNING` before delegation, update the row on success/failure, serialize the P2-077 result JSON, and expose recent/get methods.
 
-- [ ] **Step 5: Wire controller and scheduler**
+- [x] **Step 5: Wire controller and scheduler**
 
 Route P2-078 manual execution through the run history service when configured, keep fallback to P2-077 automation service, add history query endpoints, and route scheduler execution through the wrapper when configured.
 
-- [ ] **Step 6: Verify focused tests**
+- [x] **Step 6: Verify focused tests**
 
 Run:
 
@@ -75,7 +75,7 @@ mvn -pl canvas-engine test -Dtest=CdpWarehousePrivacyAudienceBitmapRebuildAutoma
 
 Expected: all selected tests pass.
 
-- [ ] **Step 7: Verify warehouse/CDP regression**
+- [x] **Step 7: Verify warehouse/CDP regression**
 
 Run:
 
@@ -88,4 +88,9 @@ Expected: all selected tests pass; `DorisConnectionTest` may be skipped unless `
 
 ## Verification
 
-Record fresh command output after implementation.
+- P2-079 focused suite passed on 2026-06-05:
+  `JAVA_HOME=$(/usr/libexec/java_home -v 21) mvn -pl canvas-engine test -Dtest='CdpWarehousePrivacyAudienceBitmapRebuildAutomationRunSchemaTest,CdpWarehousePrivacyAudienceBitmapRebuildAutomationRunServiceTest,CdpWarehousePrivacyErasureControllerTest,CdpWarehousePrivacyAudienceBitmapRebuildSchedulerTest,CdpWarehousePrivacyAudienceBitmapRebuildAutomationServiceTest,CdpWarehousePrivacyAudienceBitmapRebuildServiceTest'`
+  - Result: 26 tests, 0 failures.
+- Warehouse/BI/audience/CDP regression passed on 2026-06-05:
+  `JAVA_HOME=$(/usr/libexec/java_home -v 21) mvn -pl canvas-engine test -Dtest='CdpWarehouse*Test,CdpAudience*Test,Bi*Test,MarketingBi*Test,Doris*Test,AudienceMaterialization*Test,CdpOlapAudienceSchemaTest,StableUserIndexServiceTest,VersionedAudienceBitmapStoreTest,BehaviorAudienceRuleCompilerTest,AudienceQualityServiceTest,MyBatisAudienceDefinitionRepositoryTest,CdpEventIngestion*Test,CdpUserServiceTest'`
+  - Result: 774 tests, 0 failures, 1 skipped (`DorisConnectionTest`).

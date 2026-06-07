@@ -6,10 +6,13 @@ import com.lmax.disruptor.util.DaemonThreadFactory;
 import lombok.Getter;
 import org.chovy.canvas.engine.scheduler.CanvasMetrics;
 import org.chovy.canvas.engine.request.CanvasExecutionRequestExecutor;
+import org.chovy.canvas.engine.lifecycle.ExecutionLifecycleGate;
 import org.chovy.canvas.engine.lane.ExecutionLane;
+import org.chovy.canvas.engine.reactive.BackgroundSubscriptionRegistry;
 import org.chovy.canvas.engine.trigger.CanvasExecutionService;
 import jakarta.annotation.PreDestroy;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
@@ -49,12 +52,15 @@ public class CanvasDisruptorService {
     private final RingBuffer<CanvasExecutionEvent> ringBuffer;
     /** 画布执行指标组件。 */
     private final CanvasMetrics metrics;
+    private final BackgroundSubscriptionRegistry backgroundSubscriptions;
+    private final ExecutionLifecycleGate lifecycleGate;
     /** 已订阅但尚未完成的 Reactor 执行数。 */
     private final AtomicInteger inFlight = new AtomicInteger();
     /** shutdown 后拒绝继续发布新事件。 */
     private final AtomicBoolean accepting = new AtomicBoolean(true);
 
     /** 初始化 Disruptor、worker pool 和异常处理器。 */
+    @Autowired
     public CanvasDisruptorService(
             @Lazy CanvasExecutionService executionService,
             @Lazy CanvasExecutionRequestExecutor requestExecutor,
@@ -62,7 +68,35 @@ public class CanvasDisruptorService {
             @Value("${canvas.disruptor.ring-buffer-size:65536}") int ringBufferSize,
             @Value("${canvas.disruptor.consumers:0}") int configuredConsumers
     ) {
+        this(executionService, requestExecutor, metrics, ringBufferSize, configuredConsumers,
+                new BackgroundSubscriptionRegistry(), new ExecutionLifecycleGate());
+    }
+
+    public CanvasDisruptorService(
+            @Lazy CanvasExecutionService executionService,
+            @Lazy CanvasExecutionRequestExecutor requestExecutor,
+            CanvasMetrics metrics,
+            int ringBufferSize,
+            int configuredConsumers,
+            BackgroundSubscriptionRegistry backgroundSubscriptions) {
+        this(executionService, requestExecutor, metrics, ringBufferSize, configuredConsumers,
+                backgroundSubscriptions, new ExecutionLifecycleGate());
+    }
+
+    public CanvasDisruptorService(
+            @Lazy CanvasExecutionService executionService,
+            @Lazy CanvasExecutionRequestExecutor requestExecutor,
+            CanvasMetrics metrics,
+            int ringBufferSize,
+            int configuredConsumers,
+            BackgroundSubscriptionRegistry backgroundSubscriptions,
+            ExecutionLifecycleGate lifecycleGate
+    ) {
         this.metrics = metrics;
+        this.backgroundSubscriptions = backgroundSubscriptions == null
+                ? new BackgroundSubscriptionRegistry()
+                : backgroundSubscriptions;
+        this.lifecycleGate = lifecycleGate == null ? new ExecutionLifecycleGate() : lifecycleGate;
 
         // consumers=0 时自动使用 CPU 核数
         int consumers = determineConsumerCount(configuredConsumers);
@@ -176,9 +210,8 @@ public class CanvasDisruptorService {
     private <T> void subscribeTracked(Mono<T> mono, java.util.function.Consumer<Throwable> onError) {
         inFlight.incrementAndGet();
         try {
-            Objects.requireNonNull(mono, "disruptor execution mono")
-                    .doFinally(signal -> inFlight.decrementAndGet())
-                    .subscribe(null, onError);
+            backgroundSubscriptions.track("canvas-disruptor", Objects.requireNonNull(mono, "disruptor execution mono")
+                    .doFinally(signal -> inFlight.decrementAndGet()), onError);
         } catch (RuntimeException e) {
             inFlight.decrementAndGet();
             throw e;
@@ -262,6 +295,7 @@ public class CanvasDisruptorService {
                          ExecutionLane executionLane,
                          DispatchOptions dispatchOptions) {
         assertAccepting();
+        lifecycleGate.ensureAccepting("disruptor:" + triggerType);
         long sequence;
         try {
             // tryNext 失败说明 ring buffer 已满，属于上游回压信号。
@@ -292,6 +326,7 @@ public class CanvasDisruptorService {
     /** 发布已入库的执行请求 ID 事件。 */
     public void publishRequest(String requestId) {
         assertAccepting();
+        lifecycleGate.ensureAccepting("disruptor:REQUEST");
         long sequence;
         try {
             // 请求事件和普通触发事件共享同一个 ring buffer，满时同样需要快速失败。

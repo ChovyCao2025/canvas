@@ -8,6 +8,7 @@ import org.springframework.stereotype.Component;
 
 import java.time.Duration;
 import java.util.Objects;
+import java.util.concurrent.Callable;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -67,9 +68,14 @@ public class ManagedVirtualThreadExecutor {
 
     public Future<?> submit(String taskName, Runnable task) {
         Objects.requireNonNull(task, "task must not be null");
+        return submit(taskName, Executors.callable(task, null));
+    }
+
+    public <T> Future<T> submit(String taskName, Callable<T> task) {
+        Objects.requireNonNull(task, "task must not be null");
         String resolvedTaskName = taskName == null || taskName.isBlank() ? "background-task" : taskName;
         reserve(resolvedTaskName);
-        Runnable decoratedTask = MdcTaskDecorator.decorate(task);
+        Callable<T> decoratedTask = MdcTaskDecorator.decorate(task);
         if (direct) {
             return runDirect(resolvedTaskName, decoratedTask);
         }
@@ -92,11 +98,10 @@ public class ManagedVirtualThreadExecutor {
         }
     }
 
-    private Future<?> runDirect(String taskName, Runnable task) {
-        CompletableFuture<Void> future = new CompletableFuture<>();
+    private <T> Future<T> runDirect(String taskName, Callable<T> task) {
+        CompletableFuture<T> future = new CompletableFuture<>();
         try {
-            task.run();
-            future.complete(null);
+            future.complete(task.call());
         } catch (Throwable e) {
             log.warn("[BACKGROUND] task failed taskName={}: {}", taskName, e.getMessage(), e);
             future.completeExceptionally(e);
@@ -106,12 +111,18 @@ public class ManagedVirtualThreadExecutor {
         return future;
     }
 
-    private void runTracked(String taskName, Runnable task) {
+    private <T> T runTracked(String taskName, Callable<T> task) throws Exception {
         try {
-            task.run();
+            return task.call();
         } catch (Throwable e) {
             log.warn("[BACKGROUND] task failed taskName={}: {}", taskName, e.getMessage(), e);
-            throw e;
+            if (e instanceof Exception exception) {
+                throw exception;
+            }
+            if (e instanceof Error error) {
+                throw error;
+            }
+            throw new RuntimeException(e);
         } finally {
             inFlight.decrementAndGet();
         }

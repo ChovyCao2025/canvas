@@ -8,6 +8,8 @@
 
 **Tech Stack:** Java 21, Spring Boot, MyBatis-Plus, JUnit 5, React 18, TypeScript, Ant Design, Vitest.
 
+**Implementation status (2026-06-05):** Completed. Existing controller/page/API/helper files were retained and verified; this pass added the missing app route, navigation entry, route announcement, and updated stale presentation test expectations. Broader Maven focused backend testing is still blocked by unrelated `RedisBiQueryResultCacheTest` testCompile failures, so final backend coverage used an isolated `/tmp` runner with 44/44 passing tests. Commit was intentionally skipped because the user did not request one.
+
 ---
 
 ## Spec Reference
@@ -24,6 +26,9 @@
 - Create: `frontend/src/pages/channel-connectors/channelConnectorPresentation.ts`
 - Create: `frontend/src/pages/channel-connectors/channelConnectorPresentation.test.ts`
 - Create: `frontend/src/pages/channel-connectors/index.tsx`
+- Modify: `frontend/src/App.tsx`
+- Modify: `frontend/src/components/layout/AppLayout.tsx`
+- Modify: `frontend/src/components/accessibility/RouteA11y.tsx`
 - Modify: `frontend/src/components/config-panel/presentation.ts`
 - Modify: `frontend/src/components/config-panel/presentation.test.ts`
 - Modify: `frontend/src/components/config-panel/index.tsx`
@@ -34,7 +39,7 @@
 - Create: `backend/canvas-engine/src/test/java/org/chovy/canvas/web/ChannelConnectorControllerTest.java`
 - Create: `backend/canvas-engine/src/main/java/org/chovy/canvas/web/ChannelConnectorController.java`
 
-- [ ] **Step 1: Write controller tests**
+- [x] **Step 1: Write controller tests**
 
 Create focused WebFlux/controller tests:
 
@@ -65,7 +70,7 @@ void validatesFallbackPolicyBeforeSave() {
 }
 ```
 
-- [ ] **Step 2: Run controller tests and confirm red state**
+- [x] **Step 2: Run controller tests and confirm red state**
 
 Run:
 
@@ -75,7 +80,7 @@ cd backend && mvn -pl canvas-engine test -Dtest=ChannelConnectorControllerTest
 
 Expected: FAIL because controller does not exist.
 
-- [ ] **Step 3: Implement controller contract**
+- [x] **Step 3: Implement controller contract**
 
 Create `ChannelConnectorController`:
 
@@ -135,7 +140,7 @@ public class ChannelConnectorController {
 }
 ```
 
-- [ ] **Step 4: Run controller tests**
+- [x] **Step 4: Run controller tests**
 
 Run:
 
@@ -153,7 +158,7 @@ Expected: PASS.
 - Create: `frontend/src/pages/channel-connectors/channelConnectorPresentation.ts`
 - Create: `frontend/src/pages/channel-connectors/channelConnectorPresentation.test.ts`
 
-- [ ] **Step 1: Write frontend API tests**
+- [x] **Step 1: Write frontend API tests**
 
 Create `frontend/src/services/channelConnectorApi.test.ts`:
 
@@ -183,7 +188,7 @@ describe('channelConnectorApi', () => {
 })
 ```
 
-- [ ] **Step 2: Write presentation tests**
+- [x] **Step 2: Write presentation tests**
 
 Create `channelConnectorPresentation.test.ts`:
 
@@ -206,7 +211,7 @@ describe('channelConnectorPresentation', () => {
 })
 ```
 
-- [ ] **Step 3: Implement API wrapper and helpers**
+- [x] **Step 3: Implement API wrapper and helpers**
 
 Create `frontend/src/services/channelConnectorApi.ts`:
 
@@ -252,7 +257,7 @@ export function formatDecisionRow(row: { originalChannel: string; finalChannel?:
 }
 ```
 
-- [ ] **Step 4: Run frontend helper tests**
+- [x] **Step 4: Run frontend helper tests**
 
 Run:
 
@@ -270,7 +275,7 @@ Expected: PASS.
 - Modify: `frontend/src/components/config-panel/presentation.test.ts`
 - Modify: `frontend/src/components/config-panel/index.tsx`
 
-- [ ] **Step 1: Add config-panel warning tests**
+- [x] **Step 1: Add config-panel warning tests**
 
 Append to `presentation.test.ts`:
 
@@ -284,7 +289,7 @@ it('returns connector warnings for non-real send message channels', () => {
 })
 ```
 
-- [ ] **Step 2: Add warning helper**
+- [x] **Step 2: Add warning helper**
 
 In `presentation.ts`:
 
@@ -301,11 +306,11 @@ export function resolveConnectorWarning(input: {
 }
 ```
 
-- [ ] **Step 3: Build connector page**
+- [x] **Step 3: Build connector page**
 
 Create a page with connector table, mode badge, health badge, mode update action, fallback validation form, latest decisions table, and dedupe records table. Keep data formatting in `channelConnectorPresentation.ts`.
 
-- [ ] **Step 4: Run page and config-panel tests**
+- [x] **Step 4: Run page and config-panel tests**
 
 Run:
 
@@ -321,7 +326,20 @@ Expected: PASS.
 - Modify: `docs/product-evolution/specs/p1-008c-channel-connector-operator-surface.md`
 - Modify: `docs/product-evolution/plans/p1-008c-channel-connector-operator-surface-plan.md`
 
-- [ ] **Step 1: Run focused verification**
+Actual verification used in this session:
+
+```bash
+cd backend
+JAVA_HOME=/Users/photonpay/Library/Java/JavaVirtualMachines/ms-21.0.11/Contents/Home PATH="/Users/photonpay/Library/Java/JavaVirtualMachines/ms-21.0.11/Contents/Home/bin:$PATH" mvn -pl canvas-engine -DskipTests clean compile
+JAVA_HOME=/Users/photonpay/Library/Java/JavaVirtualMachines/ms-21.0.11/Contents/Home PATH="/Users/photonpay/Library/Java/JavaVirtualMachines/ms-21.0.11/Contents/Home/bin:$PATH" mvn -pl canvas-engine -Dtest=ChannelConnectorControllerTest test
+# Broader Maven focused suites were blocked by unrelated RedisBiQueryResultCacheTest testCompile failures.
+# Final backend focused coverage used /tmp/canvas-p1-008-test.classpath + /tmp/canvas-p1-008-test-classes and P1008FocusedRunner: 44/44 pass.
+cd ../frontend
+PATH="/opt/homebrew/bin:$PATH" npm run test -- channelConnectorApi.test.ts channelConnectorPresentation.test.ts presentation.test.ts AppLayout.a11y.test.tsx
+PATH="/opt/homebrew/bin:$PATH" npm run build
+```
+
+- [x] **Step 1: Run focused verification**
 
 Run:
 
@@ -332,7 +350,7 @@ cd frontend && npm test -- channelConnectorApi.test.ts channelConnectorPresentat
 
 Expected: PASS.
 
-- [ ] **Step 2: Run frontend build**
+- [x] **Step 2: Run frontend build**
 
 Run:
 
@@ -342,13 +360,13 @@ cd frontend && npm run build
 
 Expected: PASS.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit skipped**
 
 Run:
 
 ```bash
 git add backend/canvas-engine/src/main/java/org/chovy/canvas/web/ChannelConnectorController.java backend/canvas-engine/src/test/java/org/chovy/canvas/web/ChannelConnectorControllerTest.java frontend/src/services/channelConnectorApi.ts frontend/src/services/channelConnectorApi.test.ts frontend/src/pages/channel-connectors frontend/src/components/config-panel docs/product-evolution/specs/p1-008c-channel-connector-operator-surface.md docs/product-evolution/plans/p1-008c-channel-connector-operator-surface-plan.md
-git commit -m "feat: add channel connector operator surface"
+# Skipped in this session because the user did not request a commit.
 ```
 
 Expected: commit contains only connector operator API, frontend API/page/helpers, config-panel warnings, tests, and related docs.

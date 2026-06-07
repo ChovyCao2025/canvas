@@ -8,9 +8,15 @@ import org.chovy.canvas.common.PageResult;
 import org.chovy.canvas.common.R;
 import org.chovy.canvas.common.tenant.TenantContext;
 import org.chovy.canvas.common.tenant.TenantContextResolver;
+import org.chovy.canvas.domain.approval.ApprovalInstanceView;
+import org.chovy.canvas.domain.approval.CanvasPublishApprovalRequest;
+import org.chovy.canvas.domain.approval.CanvasPublishApprovalService;
+import org.chovy.canvas.domain.approval.CanvasPublishApprovalStatusView;
 import org.chovy.canvas.domain.canvas.*;
 import org.chovy.canvas.domain.compliance.AuditEventService;
 import org.chovy.canvas.domain.notification.NotificationEventService;
+import org.chovy.canvas.domain.project.CanvasProjectAction;
+import org.chovy.canvas.domain.project.CanvasProjectPermissionService;
 import org.chovy.canvas.dto.*;
 import org.chovy.canvas.dto.canvas.CanvasExportPackage;
 import org.chovy.canvas.dto.canvas.CanvasImportReq;
@@ -63,10 +69,24 @@ public class CanvasController {
     private final CanvasPrePublishCheckService prePublishCheckService;
     /** 可选审计服务，用于记录运营闭环动作。 */
     private AuditEventService auditEventService;
+    /** 可选项目权限服务，用于项目治理上线后的细粒度授权。 */
+    private CanvasProjectPermissionService projectPermissionService;
+    /** 可选发布审批服务；存在时发布必须先经过审批门禁。 */
+    private CanvasPublishApprovalService canvasPublishApprovalService;
 
     @Autowired(required = false)
     void setAuditEventService(AuditEventService auditEventService) {
         this.auditEventService = auditEventService;
+    }
+
+    @Autowired(required = false)
+    void setProjectPermissionService(CanvasProjectPermissionService projectPermissionService) {
+        this.projectPermissionService = projectPermissionService;
+    }
+
+    @Autowired(required = false)
+    void setCanvasPublishApprovalService(CanvasPublishApprovalService canvasPublishApprovalService) {
+        this.canvasPublishApprovalService = canvasPublishApprovalService;
     }
 
     /**
@@ -81,6 +101,7 @@ public class CanvasController {
         return currentTenant().flatMap(context ->
                 Mono.fromCallable(() -> {
                             applyCreateTenant(req, context);
+                            requireTargetProjectAction(req.getProjectId(), context, CanvasProjectAction.EDIT);
                             CanvasDO canvas = canvasService.create(req);
                             recordCanvasAudit(context, context.username(), "canvas create",
                                     canvas == null ? null : canvas.getId(),
@@ -107,6 +128,7 @@ public class CanvasController {
                                 return R.<CanvasDetailDTO>fail("画布不存在");
                             }
                             canvasService.assertTenantAccess(detail.getCanvas(), tenantId(context), isSuperAdmin(context));
+                            requireCanvasAction(detail.getCanvas(), context, CanvasProjectAction.READ);
                             return R.ok(detail);
                         })
                         .subscribeOn(Schedulers.boundedElastic()));
@@ -124,7 +146,7 @@ public class CanvasController {
     public Mono<R<Void>> update(@PathVariable Long id, @Valid @RequestBody CanvasUpdateReq req) {
         return currentTenant().flatMap(context ->
                 Mono.<Void>fromRunnable(() -> {
-                            requireTenantAccess(id, context);
+                            requireCanvasAction(id, context, CanvasProjectAction.EDIT);
                             canvasService.updateDraft(id, req);
                             recordCanvasAudit(context, context.username(), "canvas update",
                                     id, metadata("name", req.getName()));
@@ -165,14 +187,43 @@ public class CanvasController {
             @RequestParam(defaultValue = "system") String operator) {
         return currentTenant().flatMap(context ->
                 Mono.fromCallable(() -> {
-                            requireTenantAccess(id, context);
+                            requireCanvasAction(id, context, CanvasProjectAction.PUBLISH);
                             // 发布会修改版本状态并刷新运行配置，属于阻塞事务操作。
-                            CanvasVersionDO version = canvasService.publish(id, operator);
+                            CanvasVersionDO version = canvasPublishApprovalService == null
+                                    ? canvasService.publish(id, operator)
+                                    : canvasPublishApprovalService.publishWithApprovalGate(tenantId(context), id, operator);
                             notifyCanvasChange("CANVAS_PUBLISHED", id, "画布已发布",
                                     "operator=" + operator + " versionId=" + version.getId(),
                                     "INFO", operator);
                             recordPublishAudit(context, id, operator, version);
                             return version;
+                        })
+                        .subscribeOn(Schedulers.boundedElastic())
+                        .map(R::ok));
+    }
+
+    @PostMapping("/{id}/submit-review")
+    @Operation(operationId = "submitCanvasPublishReview", summary = "Submit canvas publish approval")
+    public Mono<R<ApprovalInstanceView>> submitReview(
+            @PathVariable Long id,
+            @RequestBody(required = false) CanvasPublishApprovalRequest req) {
+        return currentTenant().flatMap(context ->
+                Mono.fromCallable(() -> {
+                            requireCanvasAction(id, context, CanvasProjectAction.PUBLISH);
+                            return requiredCanvasPublishApprovalService().submitReview(
+                                    tenantId(context), id, defaultOperator(context.username()), req);
+                        })
+                        .subscribeOn(Schedulers.boundedElastic())
+                        .map(R::ok));
+    }
+
+    @GetMapping("/{id}/approval-status")
+    @Operation(operationId = "getCanvasPublishApprovalStatus", summary = "Get canvas publish approval status")
+    public Mono<R<CanvasPublishApprovalStatusView>> approvalStatus(@PathVariable Long id) {
+        return currentTenant().flatMap(context ->
+                Mono.fromCallable(() -> {
+                            requireCanvasAction(id, context, CanvasProjectAction.READ);
+                            return requiredCanvasPublishApprovalService().approvalStatus(tenantId(context), id);
                         })
                         .subscribeOn(Schedulers.boundedElastic())
                         .map(R::ok));
@@ -204,7 +255,7 @@ public class CanvasController {
             @RequestParam(defaultValue = "system") String operator) {
         return currentTenant().flatMap(context ->
                 Mono.<Void>fromRunnable(() -> {
-                            requireTenantAccess(id, context);
+                            requireCanvasAction(id, context, CanvasProjectAction.PUBLISH);
                             canvasService.offline(id, operator);
                             notifyCanvasChange("CANVAS_OFFLINE", id, "画布已下线",
                                     "operator=" + operator, "WARNING", operator);
@@ -221,7 +272,7 @@ public class CanvasController {
             @RequestParam(defaultValue = "system") String operator) {
         return currentTenant().flatMap(context ->
                 Mono.<Void>fromRunnable(() -> {
-                            requireTenantAccess(id, context);
+                            requireCanvasAction(id, context, CanvasProjectAction.PUBLISH);
                             canvasService.archive(id, operator);
                             notifyCanvasChange("CANVAS_ARCHIVED", id, "画布已归档",
                                     "operator=" + operator, "WARNING", operator);
@@ -525,7 +576,8 @@ public class CanvasController {
         return currentTenant().flatMap(context ->
                 Mono.fromCallable(() -> {
                             requireTenantAccess(id, context);
-                            return projectFolderMetadataService.getMetadata(id);
+                            requireCanvasAction(id, context, CanvasProjectAction.READ);
+                            return projectFolderMetadataService.getMetadata(tenantId(context), id);
                         })
                         .subscribeOn(Schedulers.boundedElastic())
                         .map(R::ok));
@@ -538,14 +590,16 @@ public class CanvasController {
             @RequestBody ProjectFolderMetadataReq req) {
         return currentTenant().flatMap(context ->
                 Mono.fromCallable(() -> {
-                            requireTenantAccess(id, context);
+                            requireCanvasAction(id, context, CanvasProjectAction.EDIT);
+                            requireTargetProjectAction(req.projectId(), context, CanvasProjectAction.EDIT);
                             ProjectFolderMetadataReq normalized = new ProjectFolderMetadataReq(
+                                    req.projectId(),
                                     req.projectKey(),
                                     req.projectName(),
                                     req.folderKey(),
                                     req.folderName(),
                                     defaultOperator(req.operator()));
-                            return projectFolderMetadataService.saveMetadata(id, normalized);
+                            return projectFolderMetadataService.saveMetadata(tenantId(context), id, normalized);
                         })
                         .subscribeOn(Schedulers.boundedElastic())
                         .map(R::ok));
@@ -597,6 +651,24 @@ public class CanvasController {
         canvasService.requireTenantAccess(canvasId, tenantId(context), isSuperAdmin(context));
     }
 
+    private CanvasDO requireCanvasAction(Long canvasId, TenantContext context, CanvasProjectAction action) {
+        CanvasDO canvas = canvasService.requireTenantAccess(canvasId, tenantId(context), isSuperAdmin(context));
+        requireCanvasAction(canvas, context, action);
+        return canvas;
+    }
+
+    private void requireCanvasAction(CanvasDO canvas, TenantContext context, CanvasProjectAction action) {
+        if (projectPermissionService != null) {
+            projectPermissionService.requireCanvasAction(canvas, context, action);
+        }
+    }
+
+    private void requireTargetProjectAction(Long projectId, TenantContext context, CanvasProjectAction action) {
+        if (projectId != null && projectPermissionService != null) {
+            projectPermissionService.requireProjectAction(tenantId(context), projectId, context, action);
+        }
+    }
+
     private Long tenantId(TenantContext context) {
         return context == null ? null : context.tenantId();
     }
@@ -607,6 +679,13 @@ public class CanvasController {
 
     private String defaultOperator(String operator) {
         return operator == null || operator.isBlank() ? "system" : operator.trim();
+    }
+
+    private CanvasPublishApprovalService requiredCanvasPublishApprovalService() {
+        if (canvasPublishApprovalService == null) {
+            throw new IllegalStateException("Canvas publish approval service is not configured");
+        }
+        return canvasPublishApprovalService;
     }
 
     /**

@@ -1,11 +1,13 @@
 package org.chovy.canvas.web.bi;
 
 import org.chovy.canvas.common.R;
+import org.chovy.canvas.common.tenant.RoleNames;
 import org.chovy.canvas.common.tenant.TenantContext;
 import org.chovy.canvas.common.tenant.TenantContextResolver;
 import org.chovy.canvas.domain.bi.dashboard.BiDashboardPreset;
 import org.chovy.canvas.domain.bi.dashboard.MarketingBiDashboardPresetRegistry;
 import org.chovy.canvas.domain.bi.embed.BiEmbedTicket;
+import org.chovy.canvas.domain.bi.embed.BiEmbedTokenCleanupResult;
 import org.chovy.canvas.domain.bi.embed.BiEmbedTicketPayload;
 import org.chovy.canvas.domain.bi.embed.BiEmbedTicketRequest;
 import org.chovy.canvas.domain.bi.embed.BiEmbedTicketService;
@@ -16,15 +18,33 @@ import org.chovy.canvas.domain.bi.query.BiDatasetSpec;
 import org.chovy.canvas.domain.bi.query.BiDatasetSpecResolver;
 import org.chovy.canvas.domain.bi.query.BiDatasourceHealth;
 import org.chovy.canvas.domain.bi.query.BiDatasourceHealthProvider;
+import org.chovy.canvas.domain.bi.query.BiDatasourceHealthSloSummary;
+import org.chovy.canvas.domain.bi.query.BiDatasourceHealthSnapshot;
 import org.chovy.canvas.domain.bi.query.BiFieldSpec;
 import org.chovy.canvas.domain.bi.query.BiMetricSpec;
 import org.chovy.canvas.domain.bi.query.BiQueryContext;
 import org.chovy.canvas.domain.bi.query.BiQueryCompiler;
+import org.chovy.canvas.domain.bi.query.BiQueryCancellationResult;
+import org.chovy.canvas.domain.bi.query.BiQueryCacheInvalidationCommand;
+import org.chovy.canvas.domain.bi.query.BiQueryCacheInvalidationResult;
+import org.chovy.canvas.domain.bi.query.BiQueryCacheStats;
+import org.chovy.canvas.domain.bi.query.BiQueryCachePolicyService;
+import org.chovy.canvas.domain.bi.query.BiQueryCachePolicyUpdateCommand;
+import org.chovy.canvas.domain.bi.query.BiQueryCachePolicyView;
 import org.chovy.canvas.domain.bi.query.BiQueryExecutionService;
+import org.chovy.canvas.domain.bi.query.BiQueryExplanation;
+import org.chovy.canvas.domain.bi.query.BiQueryHistoryDetail;
 import org.chovy.canvas.domain.bi.query.BiQueryHistoryItem;
 import org.chovy.canvas.domain.bi.query.BiQueryHistoryReader;
+import org.chovy.canvas.domain.bi.query.BiQueryGovernanceAuditEntry;
+import org.chovy.canvas.domain.bi.query.BiQueryGovernancePolicy;
+import org.chovy.canvas.domain.bi.query.BiQueryGovernancePolicyService;
+import org.chovy.canvas.domain.bi.query.BiQueryGovernancePolicyUpdateCommand;
+import org.chovy.canvas.domain.bi.query.BiQueryGovernancePolicyView;
+import org.chovy.canvas.domain.bi.query.BiQueryGovernanceSummary;
 import org.chovy.canvas.domain.bi.query.BiQueryRequest;
 import org.chovy.canvas.domain.bi.query.BiQueryResult;
+import org.chovy.canvas.domain.bi.query.BiQueryResultCache;
 import org.chovy.canvas.domain.warehouse.CdpWarehouseFieldGovernanceService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.ObjectProvider;
@@ -32,6 +52,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -54,6 +75,9 @@ public class BiQueryController {
     private final BiDatasetSpecResolver datasetSpecResolver;
     private final CdpWarehouseFieldGovernanceService fieldGovernanceService;
     private final BiPermissionService permissionService;
+    private final BiQueryGovernancePolicy queryGovernancePolicy;
+    private final BiQueryGovernancePolicyService queryGovernancePolicyService;
+    private final BiQueryCachePolicyService queryCachePolicyService;
     private final BiQueryCompiler compiler = new BiQueryCompiler();
 
     public BiQueryController() {
@@ -76,12 +100,18 @@ public class BiQueryController {
                              BiDatasourceHealthProvider datasourceHealthProvider,
                              ObjectProvider<BiDatasetSpecResolver> datasetSpecResolverProvider,
                              ObjectProvider<CdpWarehouseFieldGovernanceService> fieldGovernanceServiceProvider,
-                             ObjectProvider<BiPermissionService> permissionServiceProvider) {
+                             ObjectProvider<BiPermissionService> permissionServiceProvider,
+                             ObjectProvider<BiQueryGovernancePolicy> queryGovernancePolicyProvider,
+                             ObjectProvider<BiQueryGovernancePolicyService> queryGovernancePolicyServiceProvider,
+                             ObjectProvider<BiQueryCachePolicyService> queryCachePolicyServiceProvider) {
         this(tenantContextResolver, embedTicketService, queryExecutionService, queryHistoryReader,
                 datasourceHealthProvider,
                 datasetSpecResolverProvider.getIfAvailable(BiDatasetSpecResolver::builtIn),
                 fieldGovernanceServiceProvider.getIfAvailable(),
-                permissionServiceProvider.getIfAvailable());
+                permissionServiceProvider.getIfAvailable(),
+                queryGovernancePolicyProvider.getIfAvailable(BiQueryGovernancePolicy::defaults),
+                queryGovernancePolicyServiceProvider.getIfAvailable(),
+                queryCachePolicyServiceProvider == null ? null : queryCachePolicyServiceProvider.getIfAvailable());
     }
 
     public BiQueryController(TenantContextResolver tenantContextResolver,
@@ -113,6 +143,51 @@ public class BiQueryController {
                              BiDatasetSpecResolver datasetSpecResolver,
                              CdpWarehouseFieldGovernanceService fieldGovernanceService,
                              BiPermissionService permissionService) {
+        this(tenantContextResolver, embedTicketService, queryExecutionService, queryHistoryReader,
+                datasourceHealthProvider, datasetSpecResolver, fieldGovernanceService, permissionService,
+                BiQueryGovernancePolicy.defaults());
+    }
+
+    public BiQueryController(TenantContextResolver tenantContextResolver,
+                             BiEmbedTicketService embedTicketService,
+                             BiQueryExecutionService queryExecutionService,
+                             BiQueryHistoryReader queryHistoryReader,
+                             BiDatasourceHealthProvider datasourceHealthProvider,
+                             BiDatasetSpecResolver datasetSpecResolver,
+                             CdpWarehouseFieldGovernanceService fieldGovernanceService,
+                             BiPermissionService permissionService,
+                             BiQueryGovernancePolicy queryGovernancePolicy) {
+        this(tenantContextResolver, embedTicketService, queryExecutionService, queryHistoryReader,
+                datasourceHealthProvider, datasetSpecResolver, fieldGovernanceService, permissionService,
+                queryGovernancePolicy, null);
+    }
+
+    public BiQueryController(TenantContextResolver tenantContextResolver,
+                             BiEmbedTicketService embedTicketService,
+                             BiQueryExecutionService queryExecutionService,
+                             BiQueryHistoryReader queryHistoryReader,
+                             BiDatasourceHealthProvider datasourceHealthProvider,
+                             BiDatasetSpecResolver datasetSpecResolver,
+                             CdpWarehouseFieldGovernanceService fieldGovernanceService,
+                             BiPermissionService permissionService,
+                             BiQueryGovernancePolicy queryGovernancePolicy,
+                             BiQueryGovernancePolicyService queryGovernancePolicyService) {
+        this(tenantContextResolver, embedTicketService, queryExecutionService, queryHistoryReader,
+                datasourceHealthProvider, datasetSpecResolver, fieldGovernanceService, permissionService,
+                queryGovernancePolicy, queryGovernancePolicyService, null);
+    }
+
+    public BiQueryController(TenantContextResolver tenantContextResolver,
+                             BiEmbedTicketService embedTicketService,
+                             BiQueryExecutionService queryExecutionService,
+                             BiQueryHistoryReader queryHistoryReader,
+                             BiDatasourceHealthProvider datasourceHealthProvider,
+                             BiDatasetSpecResolver datasetSpecResolver,
+                             CdpWarehouseFieldGovernanceService fieldGovernanceService,
+                             BiPermissionService permissionService,
+                             BiQueryGovernancePolicy queryGovernancePolicy,
+                             BiQueryGovernancePolicyService queryGovernancePolicyService,
+                             BiQueryCachePolicyService queryCachePolicyService) {
         this.tenantContextResolver = tenantContextResolver;
         this.embedTicketService = embedTicketService;
         this.queryExecutionService = queryExecutionService;
@@ -121,6 +196,11 @@ public class BiQueryController {
         this.datasetSpecResolver = datasetSpecResolver == null ? BiDatasetSpecResolver.builtIn() : datasetSpecResolver;
         this.fieldGovernanceService = fieldGovernanceService;
         this.permissionService = permissionService;
+        this.queryGovernancePolicy = queryGovernancePolicy == null
+                ? BiQueryGovernancePolicy.defaults()
+                : queryGovernancePolicy;
+        this.queryGovernancePolicyService = queryGovernancePolicyService;
+        this.queryCachePolicyService = queryCachePolicyService;
     }
 
     public BiQueryController(TenantContextResolver tenantContextResolver,
@@ -189,6 +269,22 @@ public class BiQueryController {
                 .subscribeOn(Schedulers.boundedElastic()));
     }
 
+    @PostMapping("/query/explain")
+    public Mono<R<BiQueryExplanation>> explain(@RequestBody BiQueryRequest request) {
+        return currentTenant().flatMap(context -> Mono.fromCallable(() ->
+                        R.ok(queryExecutionService.explain(request,
+                                new BiQueryContext(normalizeTenant(context), context.username(), context.role()))))
+                .subscribeOn(Schedulers.boundedElastic()));
+    }
+
+    @PostMapping("/query/cancel/{sqlHash}")
+    public Mono<R<BiQueryCancellationResult>> cancelQuery(@PathVariable String sqlHash) {
+        return currentTenant().flatMap(context -> Mono.fromCallable(() ->
+                        R.ok(queryExecutionService.cancel(sqlHash,
+                                new BiQueryContext(normalizeTenant(context), context.username(), context.role()))))
+                .subscribeOn(Schedulers.boundedElastic()));
+    }
+
     @PostMapping("/query/execute-gated")
     public Mono<R<BiQueryExecutionService.GatedBiQueryResult>> executeGated(
             @RequestBody GatedQueryRequest request) {
@@ -231,9 +327,124 @@ public class BiQueryController {
                 .subscribeOn(Schedulers.boundedElastic()));
     }
 
+    @GetMapping("/query/history/{historyId}")
+    public Mono<R<BiQueryHistoryDetail>> queryHistoryDetail(@PathVariable Long historyId) {
+        return currentTenantId().flatMap(tenantId -> Mono.fromCallable(() -> R.ok(queryHistoryReader
+                        .detail(tenantId, historyId)
+                        .orElseThrow(() -> new IllegalArgumentException("BI query history not found: " + historyId))))
+                .subscribeOn(Schedulers.boundedElastic()));
+    }
+
+    @GetMapping("/query/governance-summary")
+    public Mono<R<BiQueryGovernanceSummary>> queryGovernanceSummary(@RequestParam(defaultValue = "100") int limit) {
+        return currentTenantId().flatMap(tenantId -> Mono.fromCallable(() ->
+                        R.ok(queryHistoryReader.governanceSummary(tenantId, limit, effectiveGovernancePolicy(tenantId))))
+                .subscribeOn(Schedulers.boundedElastic()));
+    }
+
+    @GetMapping("/query/governance-policy")
+    public Mono<R<BiQueryGovernancePolicyView>> queryGovernancePolicy() {
+        return currentTenantId().flatMap(tenantId -> Mono.fromCallable(() ->
+                        R.ok(queryGovernancePolicyService == null
+                                ? toPolicyView(queryGovernancePolicy)
+                                : queryGovernancePolicyService.currentPolicyView(tenantId)))
+                .subscribeOn(Schedulers.boundedElastic()));
+    }
+
+    @PostMapping("/query/governance-policy")
+    public Mono<R<BiQueryGovernancePolicyView>> upsertQueryGovernancePolicy(
+            @RequestBody BiQueryGovernancePolicyUpdateCommand command) {
+        return currentTenant().flatMap(context -> Mono.fromCallable(() -> {
+                    requireAdmin(context);
+                    if (queryGovernancePolicyService == null) {
+                        throw new IllegalStateException("BI query governance policy service is not configured");
+                    }
+                    return R.ok(queryGovernancePolicyService.upsertPolicy(
+                            normalizeTenant(context),
+                            command,
+                            context.username()));
+                })
+                .subscribeOn(Schedulers.boundedElastic()));
+    }
+
+    @GetMapping("/query/governance-audit")
+    public Mono<R<List<BiQueryGovernanceAuditEntry>>> queryGovernanceAudit(@RequestParam(defaultValue = "20") int limit) {
+        return currentTenant().flatMap(context -> Mono.fromCallable(() -> {
+                    requireAdmin(context);
+                    return R.ok(queryGovernancePolicyService == null
+                            ? List.<BiQueryGovernanceAuditEntry>of()
+                            : queryGovernancePolicyService.recentAudit(normalizeTenant(context), limit));
+                })
+                .subscribeOn(Schedulers.boundedElastic()));
+    }
+
+    @GetMapping("/query/cache-policy")
+    public Mono<R<BiQueryCachePolicyView>> queryCachePolicy() {
+        return currentTenantId().flatMap(tenantId -> Mono.fromCallable(() -> {
+                    if (queryCachePolicyService == null) {
+                        return R.ok(new BiQueryCachePolicyView(true, 300L, "CACHE", List.of()));
+                    }
+                    return R.ok(queryCachePolicyService.currentPolicyView(tenantId));
+                })
+                .subscribeOn(Schedulers.boundedElastic()));
+    }
+
+    @PostMapping("/query/cache-policy")
+    public Mono<R<BiQueryCachePolicyView>> upsertQueryCachePolicy(
+            @RequestBody BiQueryCachePolicyUpdateCommand command) {
+        return currentTenant().flatMap(context -> Mono.fromCallable(() -> {
+                    requireAdmin(context);
+                    if (queryCachePolicyService == null) {
+                        throw new IllegalStateException("BI query cache policy service is not configured");
+                    }
+                    return R.ok(queryCachePolicyService.upsertPolicy(
+                            normalizeTenant(context),
+                            command,
+                            context.username()));
+                })
+                .subscribeOn(Schedulers.boundedElastic()));
+    }
+
+    @PostMapping("/query/cache/invalidate")
+    public Mono<R<BiQueryCacheInvalidationResult>> invalidateQueryCache(
+            @RequestBody BiQueryCacheInvalidationCommand command) {
+        return currentTenant().flatMap(context -> Mono.fromCallable(() -> {
+                    requireAdmin(context);
+                    if (queryCachePolicyService == null) {
+                        throw new IllegalStateException("BI query cache policy service is not configured");
+                    }
+                    return R.ok(queryCachePolicyService.invalidate(command));
+                })
+                .subscribeOn(Schedulers.boundedElastic()));
+    }
+
+    @GetMapping("/query/cache-stats")
+    public Mono<R<BiQueryCacheStats>> queryCacheStats() {
+        return currentTenant().flatMap(context -> Mono.fromCallable(() -> {
+                    requireAdmin(context);
+                    if (queryCachePolicyService == null) {
+                        return R.ok(BiQueryResultCache.noop().stats());
+                    }
+                    return R.ok(queryCachePolicyService.cacheStats());
+                })
+                .subscribeOn(Schedulers.boundedElastic()));
+    }
+
     @GetMapping("/datasources/health")
     public Mono<R<List<BiDatasourceHealth>>> datasourceHealth() {
         return Mono.fromCallable(() -> R.ok(datasourceHealthProvider.health()))
+                .subscribeOn(Schedulers.boundedElastic());
+    }
+
+    @GetMapping("/datasources/health/history")
+    public Mono<R<List<BiDatasourceHealthSnapshot>>> datasourceHealthHistory(@RequestParam(defaultValue = "20") int limit) {
+        return Mono.fromCallable(() -> R.ok(datasourceHealthProvider.healthHistory(limit)))
+                .subscribeOn(Schedulers.boundedElastic());
+    }
+
+    @GetMapping("/datasources/health/slo")
+    public Mono<R<BiDatasourceHealthSloSummary>> datasourceHealthSlo(@RequestParam(defaultValue = "100") int limit) {
+        return Mono.fromCallable(() -> R.ok(datasourceHealthProvider.healthSlo(limit)))
                 .subscribeOn(Schedulers.boundedElastic());
     }
 
@@ -248,9 +459,48 @@ public class BiQueryController {
     }
 
     @PostMapping("/embed-tickets/verify")
-    public Mono<R<BiEmbedTicketPayload>> verifyEmbedTicket(@RequestBody BiEmbedTicketVerifyRequest request) {
+    public Mono<R<BiEmbedTicketPayload>> verifyEmbedTicket(
+            @RequestBody BiEmbedTicketVerifyRequest request,
+            @RequestHeader(value = "Origin", required = false) String origin,
+            @RequestHeader(value = "Referer", required = false) String referer) {
+        return Mono.fromCallable(() -> R.ok(embedTicketService.verifyForUse(
+                        request.ticket(),
+                        origin == null || origin.isBlank() ? referer : origin)))
+                .subscribeOn(Schedulers.boundedElastic());
+    }
+
+    public Mono<R<BiEmbedTicketPayload>> verifyEmbedTicket(BiEmbedTicketVerifyRequest request) {
         return Mono.fromCallable(() -> R.ok(embedTicketService.verify(request.ticket())))
                 .subscribeOn(Schedulers.boundedElastic());
+    }
+
+    @PostMapping("/embed/query/execute")
+    public Mono<R<BiQueryResult>> executeEmbedQuery(
+            @RequestBody EmbedQueryRequest request,
+            @RequestHeader(value = "Origin", required = false) String origin,
+            @RequestHeader(value = "Referer", required = false) String referer) {
+        return Mono.fromCallable(() -> {
+                    if (request == null || request.query() == null) {
+                        throw new IllegalArgumentException("embed query is required");
+                    }
+                    BiEmbedTicketPayload preview = embedTicketService.verify(request.ticket());
+                    enforceEmbedQueryScope(preview, request);
+                    BiEmbedTicketPayload payload = embedTicketService.verifyForUse(
+                            request.ticket(),
+                            origin == null || origin.isBlank() ? referer : origin);
+                    enforceEmbedQueryScope(payload, request);
+                    return R.ok(queryExecutionService.execute(
+                            request.query(),
+                            new BiQueryContext(payload.tenantId(), payload.username(), RoleNames.OPERATOR)));
+                })
+                .subscribeOn(Schedulers.boundedElastic());
+    }
+
+    @PostMapping("/embed-tickets/cleanup")
+    public Mono<R<BiEmbedTokenCleanupResult>> cleanupEmbedTickets(@RequestParam(defaultValue = "100") int limit) {
+        return currentTenant().flatMap(context -> Mono.fromCallable(() ->
+                        R.ok(embedTicketService.cleanupExpiredTokens(normalizeTenant(context), limit)))
+                .subscribeOn(Schedulers.boundedElastic()));
     }
 
     private Mono<Long> currentTenantId() {
@@ -269,6 +519,30 @@ public class BiQueryController {
         return context == null || context.tenantId() == null ? 0L : context.tenantId();
     }
 
+    private BiQueryGovernancePolicy effectiveGovernancePolicy(Long tenantId) {
+        return queryGovernancePolicyService == null
+                ? queryGovernancePolicy
+                : queryGovernancePolicyService.currentPolicy(tenantId);
+    }
+
+    private BiQueryGovernancePolicyView toPolicyView(BiQueryGovernancePolicy policy) {
+        return new BiQueryGovernancePolicyView(
+                policy.defaultTimeoutMs(),
+                policy.defaultQuotaRows(),
+                policy.datasets().entrySet().stream()
+                        .map(entry -> new BiQueryGovernancePolicyView.DatasetPolicyView(
+                                entry.getKey(),
+                                entry.getValue().timeoutMs(),
+                                entry.getValue().quotaRows()))
+                        .toList());
+    }
+
+    private void requireAdmin(TenantContext context) {
+        if (context == null || (!context.isTenantAdmin() && !context.isSuperAdmin())) {
+            throw new org.springframework.security.access.AccessDeniedException("BI query governance policy requires admin role");
+        }
+    }
+
     private void enforceFieldPolicy(BiDatasetSpec dataset, BiQueryRequest request, TenantContext context) {
         if (fieldGovernanceService == null) {
             return;
@@ -281,6 +555,28 @@ public class BiQueryController {
                         context == null ? "system" : context.username(),
                         context == null ? null : context.role()),
                 CdpWarehouseFieldGovernanceService.ACTION_BI_COMPILE);
+    }
+
+    private void enforceEmbedQueryScope(BiEmbedTicketPayload payload, EmbedQueryRequest request) {
+        if (payload == null) {
+            throw new SecurityException("BI embed ticket is required");
+        }
+        if (!"DASHBOARD".equalsIgnoreCase(payload.resourceType())) {
+            throw new SecurityException("BI embed query only supports dashboard tickets");
+        }
+        if (!equalsIgnoreCase(payload.resourceType(), request.resourceType())
+                || !payload.resourceKey().equals(request.resourceKey())) {
+            throw new SecurityException("BI embed query resource does not match ticket");
+        }
+        if (request.query() == null
+                || request.query().dashboardKey() == null
+                || !payload.resourceKey().equals(request.query().dashboardKey())) {
+            throw new SecurityException("BI embed query dashboard does not match ticket resource");
+        }
+    }
+
+    private boolean equalsIgnoreCase(String left, String right) {
+        return left == null ? right == null : left.equalsIgnoreCase(right);
     }
 
     private BiQueryRequest prepareQuery(BiDatasetSpec dataset, BiQueryRequest request, BiQueryContext context) {
@@ -338,6 +634,15 @@ public class BiQueryController {
             String contractKey,
             LocalDateTime from,
             LocalDateTime to
+    ) {
+    }
+
+    public record EmbedQueryRequest(
+            String ticket,
+            String resourceType,
+            String resourceKey,
+            String widgetKey,
+            BiQueryRequest query
     ) {
     }
 }

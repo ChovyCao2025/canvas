@@ -3,12 +3,15 @@ package org.chovy.canvas.domain.bi.resource;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import org.chovy.canvas.dal.dataobject.BiDashboardDO;
 import org.chovy.canvas.dal.dataobject.BiResourceFavoriteDO;
+import org.chovy.canvas.dal.dataobject.BiSpreadsheetDO;
 import org.chovy.canvas.dal.dataobject.BiWorkspaceDO;
+import org.chovy.canvas.dal.mapper.BiBigScreenMapper;
 import org.chovy.canvas.dal.mapper.BiChartMapper;
 import org.chovy.canvas.dal.mapper.BiDashboardMapper;
 import org.chovy.canvas.dal.mapper.BiDatasetMapper;
 import org.chovy.canvas.dal.mapper.BiPortalMapper;
 import org.chovy.canvas.dal.mapper.BiResourceFavoriteMapper;
+import org.chovy.canvas.dal.mapper.BiSpreadsheetMapper;
 import org.chovy.canvas.dal.mapper.BiWorkspaceMapper;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -54,6 +57,8 @@ class BiResourceFavoriteServiceTest {
                 dashboardMapper,
                 mock(BiChartMapper.class),
                 mock(BiPortalMapper.class),
+                mock(BiBigScreenMapper.class),
+                mock(BiSpreadsheetMapper.class),
                 favoriteMapper);
 
         BiResourceFavoriteView favorite = service.favorite(7L, "alice",
@@ -68,6 +73,43 @@ class BiResourceFavoriteServiceTest {
         assertThat(favoriteCaptor.getValue().getUsername()).isEqualTo("alice");
         assertThat(favorite.resourceType()).isEqualTo("DASHBOARD");
         assertThat(favorite.resourceKey()).isEqualTo("canvas-effect");
+        assertThat(favorite.username()).isEqualTo("alice");
+    }
+
+    @Test
+    void favoriteSpreadsheetPersistsTenantScopedUser() {
+        BiWorkspaceMapper workspaceMapper = mock(BiWorkspaceMapper.class);
+        BiSpreadsheetMapper spreadsheetMapper = mock(BiSpreadsheetMapper.class);
+        BiResourceFavoriteMapper favoriteMapper = mock(BiResourceFavoriteMapper.class);
+        BiWorkspaceDO workspace = new BiWorkspaceDO();
+        workspace.setId(5L);
+        BiSpreadsheetDO spreadsheet = new BiSpreadsheetDO();
+        spreadsheet.setId(99L);
+        spreadsheet.setStatus("PUBLISHED");
+        when(workspaceMapper.selectOne(any(LambdaQueryWrapper.class))).thenReturn(workspace);
+        when(spreadsheetMapper.selectOne(any(LambdaQueryWrapper.class))).thenReturn(spreadsheet);
+        BiResourceFavoriteService service = new BiResourceFavoriteService(
+                workspaceMapper,
+                mock(BiDatasetMapper.class),
+                mock(BiDashboardMapper.class),
+                mock(BiChartMapper.class),
+                mock(BiPortalMapper.class),
+                mock(BiBigScreenMapper.class),
+                spreadsheetMapper,
+                favoriteMapper);
+
+        BiResourceFavoriteView favorite = service.favorite(7L, "alice",
+                new BiResourceFavoriteCommand("spreadsheet", "budget-sheet"));
+
+        ArgumentCaptor<BiResourceFavoriteDO> favoriteCaptor = ArgumentCaptor.forClass(BiResourceFavoriteDO.class);
+        verify(favoriteMapper).upsert(favoriteCaptor.capture());
+        assertThat(favoriteCaptor.getValue().getTenantId()).isEqualTo(7L);
+        assertThat(favoriteCaptor.getValue().getWorkspaceId()).isEqualTo(5L);
+        assertThat(favoriteCaptor.getValue().getResourceType()).isEqualTo("SPREADSHEET");
+        assertThat(favoriteCaptor.getValue().getResourceKey()).isEqualTo("budget-sheet");
+        assertThat(favoriteCaptor.getValue().getUsername()).isEqualTo("alice");
+        assertThat(favorite.resourceType()).isEqualTo("SPREADSHEET");
+        assertThat(favorite.resourceKey()).isEqualTo("budget-sheet");
         assertThat(favorite.username()).isEqualTo("alice");
     }
 
@@ -88,6 +130,8 @@ class BiResourceFavoriteServiceTest {
                 dashboardMapper,
                 mock(BiChartMapper.class),
                 mock(BiPortalMapper.class),
+                mock(BiBigScreenMapper.class),
+                mock(BiSpreadsheetMapper.class),
                 mock(BiResourceFavoriteMapper.class));
 
         assertThatThrownBy(() -> service.favorite(7L, "alice",
@@ -117,6 +161,8 @@ class BiResourceFavoriteServiceTest {
                 mock(BiDashboardMapper.class),
                 mock(BiChartMapper.class),
                 mock(BiPortalMapper.class),
+                mock(BiBigScreenMapper.class),
+                mock(BiSpreadsheetMapper.class),
                 favoriteMapper);
 
         List<BiResourceFavoriteView> favorites = service.list(7L, "alice", "dashboard");
@@ -142,6 +188,8 @@ class BiResourceFavoriteServiceTest {
                 mock(BiDashboardMapper.class),
                 mock(BiChartMapper.class),
                 mock(BiPortalMapper.class),
+                mock(BiBigScreenMapper.class),
+                mock(BiSpreadsheetMapper.class),
                 favoriteMapper);
 
         service.unfavorite(7L, "alice", "dashboard", "canvas-effect");

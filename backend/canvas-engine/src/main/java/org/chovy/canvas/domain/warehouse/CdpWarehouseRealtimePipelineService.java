@@ -34,6 +34,10 @@ public class CdpWarehouseRealtimePipelineService {
     private static final String STATUS_FAIL = "FAIL";
     private static final String SEMANTICS_AT_LEAST_ONCE = "AT_LEAST_ONCE";
     private static final String SEMANTICS_EXACTLY_ONCE = "EXACTLY_ONCE";
+    private static final String STARTUP_SOURCE_PARTITION = "job-startup";
+    private static final String STARTUP_OFFSET = "submitted";
+    private static final String STARTUP_EVIDENCE_REASON =
+            "startup submission is not runtime checkpoint evidence";
     private static final String ASSET_TYPE_TABLE = "TABLE";
     private static final String AVAILABILITY_MODE_REALTIME = "REALTIME";
     private static final String EVIDENCE_SOURCE_REALTIME_CHECKPOINT = "REALTIME_CHECKPOINT";
@@ -283,6 +287,10 @@ public class CdpWarehouseRealtimePipelineService {
             String detail = hasText(command.errorMessage()) ? ": " + command.errorMessage().trim() : "";
             reasons.add("reported status is " + reportedStatus + detail);
         }
+        if (isStartupSubmission(command.checkpointId(), command.sourcePartition(),
+                command.sourceOffset(), command.committedOffset())) {
+            reasons.add(STARTUP_EVIDENCE_REASON);
+        }
         if (SEMANTICS_EXACTLY_ONCE.equalsIgnoreCase(pipeline.getDeliverySemantics())) {
             if (!hasText(command.checkpointId())) {
                 reasons.add("exactly-once checkpoint id is missing");
@@ -335,6 +343,10 @@ public class CdpWarehouseRealtimePipelineService {
                 reasons.add("exactly-once committed offset is missing");
             }
         }
+        if (isStartupSubmission(pipeline.lastCheckpointId(), null,
+                pipeline.lastSourceOffset(), pipeline.lastCommittedOffset())) {
+            reasons.add(STARTUP_EVIDENCE_REASON);
+        }
         String status = reasons.isEmpty() ? STATUS_PASS : STATUS_WARN;
         return new RuntimeEvaluation(status, reasons.isEmpty() ? "Realtime pipeline healthy" : String.join("; ", reasons),
                 List.copyOf(reasons));
@@ -345,6 +357,10 @@ public class CdpWarehouseRealtimePipelineService {
         if (STATUS_FAIL.equals(checkpoint.status())) {
             reasons.add(defaultString(checkpoint.message(), "last checkpoint failed"));
             return new RuntimeEvaluation(STATUS_FAIL, String.join("; ", reasons), List.copyOf(reasons));
+        }
+        if (isStartupSubmission(checkpoint.checkpointId(), checkpoint.sourcePartition(),
+                checkpoint.sourceOffset(), checkpoint.committedOffset())) {
+            reasons.add(STARTUP_EVIDENCE_REASON);
         }
         if (pipeline.maxCheckpointAgeSeconds() != null && checkpoint.checkpointTime() != null) {
             long ageSeconds = Duration.between(checkpoint.checkpointTime(), now()).getSeconds();
@@ -371,6 +387,16 @@ public class CdpWarehouseRealtimePipelineService {
         String status = reasons.isEmpty() ? STATUS_PASS : STATUS_WARN;
         return new RuntimeEvaluation(status, reasons.isEmpty() ? "Realtime pipeline healthy" : String.join("; ", reasons),
                 List.copyOf(reasons));
+    }
+
+    private boolean isStartupSubmission(String checkpointId,
+                                        String sourcePartition,
+                                        String sourceOffset,
+                                        String committedOffset) {
+        return defaultString(checkpointId, "").endsWith("-startup")
+                || STARTUP_SOURCE_PARTITION.equalsIgnoreCase(defaultString(sourcePartition, ""))
+                || (STARTUP_OFFSET.equalsIgnoreCase(defaultString(sourceOffset, ""))
+                && STARTUP_OFFSET.equalsIgnoreCase(defaultString(committedOffset, "")));
     }
 
     private CheckpointReport toCheckpoint(CdpWarehouseStreamCheckpointDO row) {

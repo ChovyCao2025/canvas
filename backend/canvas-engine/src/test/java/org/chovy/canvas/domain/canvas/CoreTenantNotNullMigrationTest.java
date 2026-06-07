@@ -10,9 +10,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 class CoreTenantNotNullMigrationTest {
 
     @Test
-    void v92BackfillsAndEnforcesCoreTenantColumns() throws Exception {
-        String sql = Files.readString(Path.of(
-                "src/main/resources/db/migration/V92__enforce_core_tenant_not_null.sql"));
+    void v273BackfillsAndEnforcesCoreTenantColumns() throws Exception {
+        String sql = Files.readString(migrationDir().resolve("V273__enforce_core_tenant_not_null.sql"));
 
         assertThat(sql).contains("UPDATE canvas");
         assertThat(sql).contains("UPDATE canvas_version");
@@ -27,8 +26,7 @@ class CoreTenantNotNullMigrationTest {
 
     @Test
     void v93ScopesDatasourceAndExecutionRequestTablesByTenant() throws Exception {
-        String sql = Files.readString(Path.of(
-                "src/main/resources/db/migration/V93__tenant_scope_datasources_and_execution_requests.sql"));
+        String sql = Files.readString(migrationDir().resolve("V93__tenant_scope_datasources_and_execution_requests.sql"));
 
         assertThat(sql).contains("ALTER TABLE data_source_config");
         assertThat(sql).contains("ADD COLUMN tenant_id BIGINT NULL AFTER id");
@@ -41,5 +39,13 @@ class CoreTenantNotNullMigrationTest {
                 .contains("MODIFY COLUMN tenant_id BIGINT NOT NULL")
                 .contains("idx_execution_request_tenant_status_updated")
                 .contains("idx_execution_request_tenant_canvas_status_updated");
+    }
+
+    private static Path migrationDir() {
+        Path modulePath = Path.of("src/main/resources/db/migration");
+        if (Files.exists(modulePath)) {
+            return modulePath;
+        }
+        return Path.of("canvas-engine/src/main/resources/db/migration");
     }
 }

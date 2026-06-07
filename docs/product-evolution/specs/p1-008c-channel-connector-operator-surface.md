@@ -41,3 +41,13 @@ Expose connector modes, health, provider limits, fallback decisions, and dedupe 
 - Backend API tests cover list/detail/update/health/fallback validation.
 - Frontend tests cover mode badge, health badge, limit editor, validation error, fallback decision table, dedupe table, and permission denied state.
 - Config panel tests cover disabled/sandbox warning rendering.
+
+## Implementation Status
+
+Completed on 2026-06-05.
+
+- Backend `ChannelConnectorController` exposes connector list, limits, mode update, health test, fallback validation, fallback decisions, and dedupe records with tenant-scoped service access.
+- Frontend `channelConnectorApi`, channel connector page, and presentation helpers expose mode/health badges, provider limits, fallback decisions, and dedupe records.
+- `/channel-connectors` is routed under the authenticated admin app shell and appears in the integration navigation group.
+- Config-panel presentation renders warnings for SEND_MESSAGE nodes when the connector mode is not `REAL`.
+- Verified with backend clean compile, `ChannelConnectorControllerTest`, isolated P1-008B/P1-008C backend runner `44/44`, focused frontend tests, and frontend production build.

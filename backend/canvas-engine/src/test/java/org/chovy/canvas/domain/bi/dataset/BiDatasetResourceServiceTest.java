@@ -87,6 +87,105 @@ class BiDatasetResourceServiceTest {
     }
 
     @Test
+    void saveDraftAcceptsSqlDatasetWithReadOnlyLintedSource() {
+        BiWorkspaceMapper workspaceMapper = mock(BiWorkspaceMapper.class);
+        BiDatasetMapper datasetMapper = mock(BiDatasetMapper.class);
+        BiDatasetFieldMapper fieldMapper = mock(BiDatasetFieldMapper.class);
+        BiMetricMapper metricMapper = mock(BiMetricMapper.class);
+        when(workspaceMapper.selectOne(any(LambdaQueryWrapper.class))).thenReturn(workspace());
+        when(datasetMapper.selectOne(any(LambdaQueryWrapper.class))).thenReturn(sqlDataset("DRAFT"));
+        BiDatasetResourceService service = service(workspaceMapper, datasetMapper, fieldMapper, metricMapper);
+
+        BiDatasetResource resource = service.saveDraft(7L, "alice", sqlDatasetResource());
+
+        ArgumentCaptor<BiDatasetDO> datasetCaptor = ArgumentCaptor.forClass(BiDatasetDO.class);
+        verify(datasetMapper).upsert(datasetCaptor.capture());
+        assertThat(datasetCaptor.getValue().getDatasetType()).isEqualTo("SQL");
+        assertThat(datasetCaptor.getValue().getTableExpression())
+                .isEqualTo("(SELECT tenant_id, stat_date, total_cost FROM campaign_daily WHERE deleted = 0) sql_dataset");
+        assertThat(datasetCaptor.getValue().getModelJson()).contains("\"sqlApprovalRequired\":true");
+        assertThat(resource.datasetType()).isEqualTo("SQL");
+        assertThat(resource.tableExpression())
+                .isEqualTo("(SELECT tenant_id, stat_date, total_cost FROM campaign_daily WHERE deleted = 0) sql_dataset");
+    }
+
+    @Test
+    void saveDraftAcceptsSqlDatasetWithBoundParametersAndStoresTemplateMetadata() {
+        BiWorkspaceMapper workspaceMapper = mock(BiWorkspaceMapper.class);
+        BiDatasetMapper datasetMapper = mock(BiDatasetMapper.class);
+        BiDatasetFieldMapper fieldMapper = mock(BiDatasetFieldMapper.class);
+        BiMetricMapper metricMapper = mock(BiMetricMapper.class);
+        BiDatasetDO persisted = sqlDataset("DRAFT");
+        persisted.setTableExpression("(SELECT tenant_id, stat_date, total_cost FROM campaign_daily WHERE stat_date >= ? AND channel = ?) sql_dataset");
+        when(workspaceMapper.selectOne(any(LambdaQueryWrapper.class))).thenReturn(workspace());
+        when(datasetMapper.selectOne(any(LambdaQueryWrapper.class))).thenReturn(sqlDataset("DRAFT"), persisted);
+        BiDatasetResourceService service = service(workspaceMapper, datasetMapper, fieldMapper, metricMapper);
+
+        BiDatasetResource resource = service.saveDraft(7L, "alice", parameterizedSqlDatasetResource());
+
+        ArgumentCaptor<BiDatasetDO> datasetCaptor = ArgumentCaptor.forClass(BiDatasetDO.class);
+        verify(datasetMapper).upsert(datasetCaptor.capture());
+        assertThat(datasetCaptor.getValue().getTableExpression())
+                .isEqualTo("(SELECT tenant_id, stat_date, total_cost FROM campaign_daily WHERE stat_date >= ? AND channel = ?) sql_dataset");
+        assertThat(datasetCaptor.getValue().getModelJson())
+                .contains("\"sqlApprovalRequired\":true")
+                .contains("\"sqlTemplate\":\"SELECT tenant_id, stat_date, total_cost FROM campaign_daily WHERE stat_date >= {{start_date}} AND channel = {{channel}}\"")
+                .contains("\"sqlParameterOrder\":[\"start_date\",\"channel\"]")
+                .contains("\"key\":\"start_date\"")
+                .contains("\"allowedValues\":[\"PAID\",\"EMAIL\"]");
+        assertThat(resource.tableExpression())
+                .isEqualTo("(SELECT tenant_id, stat_date, total_cost FROM campaign_daily WHERE stat_date >= ? AND channel = ?) sql_dataset");
+    }
+
+    @Test
+    void saveDraftRejectsSqlDatasetWithUnboundTemplateParameter() {
+        BiDatasetResourceService service = service(
+                mock(BiWorkspaceMapper.class),
+                mock(BiDatasetMapper.class),
+                mock(BiDatasetFieldMapper.class),
+                mock(BiMetricMapper.class));
+        BiDatasetResource resource = new BiDatasetResource(
+                "campaign_sql",
+                "Campaign SQL",
+                "SQL",
+                "SELECT tenant_id, stat_date FROM campaign_daily WHERE stat_date >= {{start_date}}",
+                "tenant_id",
+                Map.of("sqlParameters", List.of()),
+                sqlDatasetResource().fields(),
+                sqlDatasetResource().metrics(),
+                "DRAFT",
+                "CLIENT");
+
+        assertThatThrownBy(() -> service.saveDraft(7L, "alice", resource))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("SQL parameter definition is required: start_date");
+    }
+
+    @Test
+    void saveDraftRejectsSqlDatasetWithUnsafeStatement() {
+        BiDatasetResourceService service = service(
+                mock(BiWorkspaceMapper.class),
+                mock(BiDatasetMapper.class),
+                mock(BiDatasetFieldMapper.class),
+                mock(BiMetricMapper.class));
+        BiDatasetResource resource = new BiDatasetResource(
+                "campaign_sql",
+                "Campaign SQL",
+                "SQL",
+                "SELECT tenant_id, stat_date FROM campaign_daily; DROP TABLE users",
+                "tenant_id",
+                Map.of(),
+                sqlDatasetResource().fields(),
+                sqlDatasetResource().metrics(),
+                "DRAFT",
+                "CLIENT");
+
+        assertThatThrownBy(() -> service.saveDraft(7L, "alice", resource))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("SQL dataset query must be a single read-only SELECT");
+    }
+
+    @Test
     void resolvesPersistedDatasetSpecForQueryCompiler() {
         BiWorkspaceMapper workspaceMapper = mock(BiWorkspaceMapper.class);
         BiDatasetMapper datasetMapper = mock(BiDatasetMapper.class);
@@ -105,6 +204,7 @@ class BiDatasetResourceServiceTest {
         assertThat(spec.fields()).containsKeys("stat_date", "send_count");
         assertThat(spec.metrics()).containsKey("send_count");
         assertThat(spec.metrics().get("send_count").allowedDimensions()).containsExactly("stat_date");
+        assertThat(spec.model()).containsEntry("category", "CHANNEL");
     }
 
     @Test
@@ -335,6 +435,40 @@ class BiDatasetResourceServiceTest {
     }
 
     @Test
+    void sqlDatasetPublishRequiresApprovalEvenForTenantAdmin() {
+        BiWorkspaceMapper workspaceMapper = mock(BiWorkspaceMapper.class);
+        BiDatasetMapper datasetMapper = mock(BiDatasetMapper.class);
+        BiDatasetFieldMapper fieldMapper = mock(BiDatasetFieldMapper.class);
+        BiMetricMapper metricMapper = mock(BiMetricMapper.class);
+        BiPublishApprovalService approvalService = mock(BiPublishApprovalService.class);
+        LocalDateTime updatedAt = LocalDateTime.of(2026, 6, 6, 9, 30);
+        BiDatasetDO draft = sqlDataset("DRAFT");
+        draft.setUpdatedAt(updatedAt);
+        when(workspaceMapper.selectOne(any(LambdaQueryWrapper.class))).thenReturn(workspace());
+        when(datasetMapper.selectOne(any(LambdaQueryWrapper.class))).thenReturn(draft);
+        org.mockito.Mockito.doThrow(new BiPublishApprovalService.BiPublishApprovalRequiredException(
+                        "approved BI publish approval is required"))
+                .when(approvalService)
+                .requireApprovedApproval(7L, 5L, "DATASET", "campaign_sql", updatedAt);
+        BiDatasetResourceService service = new BiDatasetResourceService(
+                workspaceMapper,
+                datasetMapper,
+                fieldMapper,
+                metricMapper,
+                null,
+                new ObjectMapper(),
+                null,
+                approvalService);
+
+        assertThatThrownBy(() -> service.publish(7L, "admin", "TENANT_ADMIN", "campaign_sql"))
+                .isInstanceOf(BiPublishApprovalService.BiPublishApprovalRequiredException.class)
+                .hasMessageContaining("approved BI publish approval is required");
+
+        verify(approvalService).requireApprovedApproval(7L, 5L, "DATASET", "campaign_sql", updatedAt);
+        verify(datasetMapper, org.mockito.Mockito.never()).publish(7L, 5L, "campaign_sql");
+    }
+
+    @Test
     void listAndRestoreDatasetVersionsUseSnapshots() {
         BiWorkspaceMapper workspaceMapper = mock(BiWorkspaceMapper.class);
         BiDatasetMapper datasetMapper = mock(BiDatasetMapper.class);
@@ -408,6 +542,21 @@ class BiDatasetResourceServiceTest {
         return row;
     }
 
+    private BiDatasetDO sqlDataset(String status) {
+        BiDatasetDO row = new BiDatasetDO();
+        row.setId(12L);
+        row.setTenantId(7L);
+        row.setWorkspaceId(5L);
+        row.setDatasetKey("campaign_sql");
+        row.setName("Campaign SQL");
+        row.setDatasetType("SQL");
+        row.setTableExpression("(SELECT tenant_id, stat_date, total_cost FROM campaign_daily WHERE deleted = 0) sql_dataset");
+        row.setTenantColumn("tenant_id");
+        row.setModelJson("{\"sqlApprovalRequired\":true}");
+        row.setStatus(status);
+        return row;
+    }
+
     private BiDatasetResource datasetResource() {
         return new BiDatasetResource(
                 "channel_performance_daily",
@@ -420,6 +569,48 @@ class BiDatasetResourceServiceTest {
                         new BiDatasetFieldResource("stat_date", "Date", "stat_date", "DIMENSION", "DATE", "DATE", null, "yyyy-MM-dd", null, true, "NORMAL", 10),
                         new BiDatasetFieldResource("send_count", "Send Count", "send_count", "MEASURE", "NUMBER", "COUNT", "SUM", "#,##0", "次", true, "NORMAL", 20)),
                 List.of(new BiMetricResource("send_count", "Send Count", "SUM(send_count)", "SUM", "NUMBER", "次", "#,##0", List.of("stat_date"), "alice", "Daily sends", "ACTIVE")),
+                "DRAFT",
+                "CLIENT");
+    }
+
+    private BiDatasetResource sqlDatasetResource() {
+        return new BiDatasetResource(
+                "campaign_sql",
+                "Campaign SQL",
+                "SQL",
+                "SELECT tenant_id, stat_date, total_cost FROM campaign_daily WHERE deleted = 0",
+                "tenant_id",
+                Map.of("dataSourceConfigId", 7L),
+                List.of(
+                        new BiDatasetFieldResource("stat_date", "Date", "stat_date", "DIMENSION", "DATE", "DATE", null, "yyyy-MM-dd", null, true, "NORMAL", 10),
+                        new BiDatasetFieldResource("total_cost", "Total Cost", "total_cost", "MEASURE", "NUMBER", null, "SUM", "#,##0.00", "元", true, "NORMAL", 20)),
+                List.of(new BiMetricResource("total_cost", "Total Cost", "SUM(total_cost)", "SUM", "NUMBER", "元", "#,##0.00", List.of("stat_date"), "alice", "SQL metric", "ACTIVE")),
+                "DRAFT",
+                "CLIENT");
+    }
+
+    private BiDatasetResource parameterizedSqlDatasetResource() {
+        return new BiDatasetResource(
+                "campaign_sql",
+                "Campaign SQL",
+                "SQL",
+                "SELECT tenant_id, stat_date, total_cost FROM campaign_daily WHERE stat_date >= {{start_date}} AND channel = {{channel}}",
+                "tenant_id",
+                Map.of(
+                        "dataSourceConfigId", 7L,
+                        "sqlParameters", List.of(
+                                Map.of(
+                                        "key", "start_date",
+                                        "dataType", "DATE",
+                                        "required", true),
+                                Map.of(
+                                        "key", "channel",
+                                        "dataType", "STRING",
+                                        "required", false,
+                                        "defaultValue", "PAID",
+                                        "allowedValues", List.of("PAID", "EMAIL")))),
+                sqlDatasetResource().fields(),
+                sqlDatasetResource().metrics(),
                 "DRAFT",
                 "CLIENT");
     }

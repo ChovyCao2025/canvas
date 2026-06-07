@@ -3,7 +3,7 @@
  *
  * 维护说明：文件较大是因为它连接 React Flow、后端草稿和右侧配置面板；新增逻辑应优先抽纯函数。
  */
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   ReactFlow, ReactFlowProvider,
   useReactFlow, Background, Controls, MiniMap,
@@ -12,13 +12,15 @@ import {
 import '@xyflow/react/dist/style.css'
 import './settingsPanel.css'
 import dagre from '@dagrejs/dagre'
-import { Button, Divider, Form, Input, message, Modal, Space, Spin, Tag, Tooltip } from 'antd'
+import { Alert, Button, Divider, Form, Input, message, Modal, Space, Spin, Tag, Tooltip } from 'antd'
 import {
   ArrowLeftOutlined, CaretRightOutlined, CloudUploadOutlined, SaveOutlined, ApartmentOutlined, UndoOutlined, RedoOutlined, SyncOutlined, DeleteOutlined, QuestionCircleOutlined, HistoryOutlined, SettingOutlined, ExperimentOutlined, CheckOutlined, CloseOutlined, EyeOutlined,
 } from '@ant-design/icons'
 import dayjs from 'dayjs'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
+import { useStore } from 'zustand'
 import type { BackendNode, BizConfig, CanvasNodeData } from '../../types/canvas'
+import { parseCanvasGraphJson } from '../../types/canvasSchemas'
 import { canvasApi, metaApi, type MessagePreviewResp } from '../../services/api'
 import type { CanvasDetail, NodeTypeRegistry } from '../../types'
 import CanvasNodeCmp from '../../components/canvas/CanvasNode'
@@ -47,7 +49,6 @@ import { buildCanvasNameUpdate, getCanvasNameStatusGap, shouldShowCanvasNameActi
 import { clearCanvasEditorAutosave, scheduleCanvasEditorAutosave } from './canvasEditorAutosave'
 import { cleanCanvasBizConfigRefs, cloneCanvasNodeBizConfigForPaste } from './canvasEditorClipboard'
 import { bindBeforeUnloadGuard, shouldWarnBeforeUnload } from './unsavedChangeGuard'
-import { useCanvasHistoryState } from './useCanvasHistoryState'
 import {
   CANVAS_CONNECTION_RADIUS,
   buildSaveGraphJson,
@@ -79,10 +80,24 @@ import { useCanvasPublishWorkflow } from './useCanvasPublishWorkflow'
 import { useCanvasSelectionState } from './useCanvasSelectionState'
 import { useCanvasGraphState } from './useCanvasGraphState'
 import { buildMessagePreviewPayload } from './messagePreview'
+import { createEditorStore } from './editorStore'
+import { createSaveQueue } from './saveQueue'
 
 /** 后端可能返回空值或历史值，这里统一收敛成编辑器支持的触发类型。 */
 function normalizeCanvasTriggerType(triggerType?: string): CanvasTriggerType {
   return triggerType === 'SCHEDULED' ? 'SCHEDULED' : 'REALTIME'
+}
+
+function parseNodeDefaultConfig(raw: string | undefined): BizConfig {
+  if (!raw) return {}
+  try {
+    const parsed = JSON.parse(raw) as unknown
+    return parsed != null && typeof parsed === 'object' && !Array.isArray(parsed)
+      ? parsed as BizConfig
+      : {}
+  } catch {
+    return {}
+  }
 }
 
 /** React Flow 节点类型注册表。 */
@@ -132,10 +147,52 @@ function normalizeCanvasSettingsFromDetail(detail: CanvasDetail): CanvasSettings
 
 /** 一次保存所需的完整快照，用于自动保存期间避免读取过期闭包状态。 */
 interface SaveSnapshot {
-  nodes: Node[]
+  nodes: Node<CanvasNodeData>[]
   canvasName: string
   canvasSettings: CanvasSettingsLike
   description?: string
+}
+
+interface SaveSnapshotComparable {
+  graphJson: string
+  canvasName: string
+  canvasSettings: CanvasSettingsLike
+  description?: string
+}
+
+function buildSaveSnapshotComparable(snapshot: SaveSnapshot): SaveSnapshotComparable {
+  return {
+    graphJson: buildSaveGraphJson(snapshot.nodes),
+    canvasName: snapshot.canvasName,
+    canvasSettings: snapshot.canvasSettings,
+    description: snapshot.description,
+  }
+}
+
+function buildCanvasSaveBody(snapshot: SaveSnapshot, editVersion: number) {
+  const settings = snapshot.canvasSettings
+  return {
+    name: snapshot.canvasName,
+    description: snapshot.description,
+    graphJson: buildSaveGraphJson(snapshot.nodes),
+    editVersion,
+    triggerType: settings.triggerType,
+    cronExpression: settings.cronExpression ?? null,
+    validStart: settings.validStart ?? null,
+    validEnd: settings.validEnd ?? null,
+    maxTotalExecutions: settings.maxTotalExecutions ?? null,
+    perUserDailyLimit: settings.perUserDailyLimit ?? null,
+    perUserTotalLimit: settings.perUserTotalLimit ?? null,
+    cooldownSeconds: settings.cooldownSeconds ?? null,
+    controlGroupPercent: settings.controlGroupPercent ?? null,
+    controlGroupSalt: settings.controlGroupSalt ?? null,
+    conversionEventCode: settings.conversionEventCode ?? null,
+    attributionWindowDays: settings.attributionWindowDays ?? null,
+    projectKey: settings.projectKey ?? null,
+    projectName: settings.projectName ?? null,
+    folderKey: settings.folderKey ?? null,
+    folderName: settings.folderName ?? null,
+  }
 }
 
 // ── 撤销/重做历史 ─────────────────────────────────────────────
@@ -236,6 +293,41 @@ function EditorInner({ detail, onStatusChange, onCanvasNameChange }: {
   const { options: cronFrequencyOptions } = useSystemOptions('cron_frequency')
   const { raw: weekdayRows } = useSystemOptions('weekday')
   const weekdayOptions = weekdayRows.map(option => ({ label: option.label, value: Number(option.key) }))
+  const editorStore = useMemo(() => createEditorStore(), [])
+  const selectedNodeId = useStore(editorStore, state => state.selectedNodeId)
+  const setSelectedNodeId = useStore(editorStore, state => state.setSelectedNodeId)
+  const isDirty = useStore(editorStore, state => state.dirty)
+  const markDirty = useStore(editorStore, state => state.markDirty)
+  const markClean = useStore(editorStore, state => state.markClean)
+  const saveStatus = useStore(editorStore, state => state.saveStatus)
+  const saveAttempt = useStore(editorStore, state => state.saveAttempt)
+  const conflict = useStore(editorStore, state => state.conflict)
+  const setSaveStatus = useStore(editorStore, state => state.setSaveStatus)
+  const setConflict = useStore(editorStore, state => state.setConflict)
+  const settingsOpen = useStore(editorStore, state => Boolean(state.modals.settings))
+  const messagePreviewOpen = useStore(editorStore, state => Boolean(state.modals.messagePreview))
+  const canUndo = useStore(editorStore, state => state.history.length > 0)
+  const canRedo = useStore(editorStore, state => state.future.length > 0)
+  const undoLabel = useStore(editorStore, state => (
+    state.history.length ? `撤销：${state.history[state.history.length - 1].actionName}` : '没有可撤销的操作'
+  ))
+  const redoLabel = useStore(editorStore, state => (
+    state.future.length ? `重做：${state.future[0].actionName}` : '没有可重做的操作'
+  ))
+  const saving = saveStatus === 'saving' || saveStatus === 'retrying'
+  const setIsDirty = useCallback((dirty: boolean) => {
+    if (dirty) {
+      markDirty()
+    } else {
+      markClean()
+    }
+  }, [markClean, markDirty])
+  const setSettingsOpen = useCallback((open: boolean) => {
+    editorStore.getState().setModalOpen('settings', open)
+  }, [editorStore])
+  const setMessagePreviewOpen = useCallback((open: boolean) => {
+    editorStore.getState().setModalOpen('messagePreview', open)
+  }, [editorStore])
 
   const {
     nodes,
@@ -271,39 +363,69 @@ function EditorInner({ detail, onStatusChange, onCanvasNameChange }: {
     folderKey: detail.canvas.folderKey,
     folderName: detail.canvas.folderName,
   })
-  const [saving, setSaving]         = useState(false)
-  const [isDirty, setIsDirty]       = useState(false)
   const [isEditingCanvasName, setIsEditingCanvasName] = useState(false)
   const [, setTraceColorMap] = useState<Record<string, string>>({})
-  // 画布设置弹窗状态。
-  const [settingsOpen, setSettingsOpen] = useState(false)
   const [limitsExpanded, setLimitsExpanded] = useState(false)
   const [settingsForm] = Form.useForm()
-  const [messagePreviewOpen, setMessagePreviewOpen] = useState(false)
   const [messagePreviewUserId, setMessagePreviewUserId] = useState('user_test_001')
   const [messagePreviewContext, setMessagePreviewContext] = useState('{}')
   const [messagePreviewResult, setMessagePreviewResult] = useState<MessagePreviewResp | null>(null)
   const [messagePreviewLoading, setMessagePreviewLoading] = useState(false)
+  const [graphLoadError, setGraphLoadError] = useState<string | null>(null)
   const editVersion   = useRef(detail.canvas.editVersion ?? 0)
   const autoSaveTimer = useRef<ReturnType<typeof setTimeout>>()
   const savedCanvasName = useRef(detail.canvas.name)
   const localDraftReadyRef = useRef(false)
-  const savingPromiseRef = useRef<Promise<boolean> | null>(null)
   const latestSaveSnapshotRef = useRef<SaveSnapshot>({
     nodes: [],
     canvasName: detail.canvas.name,
     canvasSettings: normalizeCanvasSettingsFromDetail(detail),
     description: detail.canvas.description,
   })
-  const { snapshot, undo, redo, canUndo, canRedo, undoLabel, redoLabel } = useCanvasHistoryState(nodes as Node<CanvasNodeData>[], edges)
+  const saveQueue = useMemo(() => createSaveQueue<SaveSnapshot, SaveSnapshotComparable>({
+    save: async (payload, signal) => {
+      const usedEditVersion = editVersion.current
+      const comparable = buildSaveSnapshotComparable(payload)
+      await canvasApi.update(canvasId, buildCanvasSaveBody(payload, usedEditVersion), { signal })
+      editVersion.current = usedEditVersion + 1
+      savedCanvasName.current = payload.canvasName.trim()
+      return comparable
+    },
+    maxAttempts: 3,
+    baseDelayMs: 300,
+    onStateChange: state => {
+      if (state.status === 'conflict') {
+        setConflict({
+          serverVersion: state.serverVersion,
+          localVersion: editVersion.current,
+          payload: state.payload,
+        })
+        return
+      }
+      setSaveStatus(state.status, state.attempts)
+    },
+  }), [canvasId, setConflict, setSaveStatus])
   const {
-    selectedNodeId,
-    setSelectedNodeId,
     insertContext,
     setInsertContext,
     clipboard,
     setClipboard,
   } = useCanvasSelectionState()
+  const snapshot = useCallback((actionName = '操作') => {
+    editorStore.getState().snapshot(nodes as Node<CanvasNodeData>[], edges, actionName)
+  }, [editorStore, edges, nodes])
+  const undo = useCallback(() => {
+    const restored = editorStore.getState().undo()
+    if (!restored) return
+    setNodes(restored.nodes)
+    setEdges(restored.edges)
+  }, [editorStore, setEdges, setNodes])
+  const redo = useCallback(() => {
+    const restored = editorStore.getState().redo()
+    if (!restored) return
+    setNodes(restored.nodes)
+    setEdges(restored.edges)
+  }, [editorStore, setEdges, setNodes])
   const {
     testModalOpen,
     setTestModalOpen,
@@ -340,10 +462,14 @@ function EditorInner({ detail, onStatusChange, onCanvasNameChange }: {
   const showCanvasNameActions = shouldShowCanvasNameActions(isEditingCanvasName)
   const statusTagGap = getCanvasNameStatusGap(isEditingCanvasName && !readonly)
 
+  useEffect(() => {
+    editorStore.getState().syncGraph(realNodes as Node<CanvasNodeData>[], edges)
+  }, [editorStore, edges, realNodes])
+
   // 保存快照必须始终指向最新节点/设置，否则自动保存可能保存旧闭包中的状态。
   useEffect(() => {
     latestSaveSnapshotRef.current = {
-      nodes,
+      nodes: nodes as Node<CanvasNodeData>[],
       canvasName,
       canvasSettings,
       description: detail.canvas.description,
@@ -421,7 +547,9 @@ function EditorInner({ detail, onStatusChange, onCanvasNameChange }: {
       nodeTypes: NodeTypeRegistry[],
     ) => {
       // 先用节点类型注册表补齐 outletSchema，再转换成 React Flow 节点/边。
-      const parsedNodes: BackendNode[] = JSON.parse(graphJson || '{"nodes":[]}').nodes ?? []
+      const graph = parseCanvasGraphJson(graphJson)
+      setGraphLoadError(null)
+      const parsedNodes: BackendNode[] = graph.nodes
       const backendNodes = hydrateBackendNodeOutletSchemas(parsedNodes, nodeTypes)
       setCanvasName(nextName)
       savedCanvasName.current = nextName
@@ -471,13 +599,19 @@ function EditorInner({ detail, onStatusChange, onCanvasNameChange }: {
         nodeTypes = []
       }
       if (cancelled) return
-      applyCanvasDraft(
-        detail.graphJson,
-        detail.canvas.name,
-        normalizeCanvasSettingsFromDetail(detail),
-        detail.canvas.editVersion ?? 0,
-        nodeTypes,
-      )
+      try {
+        applyCanvasDraft(
+          detail.graphJson,
+          detail.canvas.name,
+          normalizeCanvasSettingsFromDetail(detail),
+          detail.canvas.editVersion ?? 0,
+          nodeTypes,
+        )
+      } catch (error) {
+        setGraphLoadError(error instanceof Error ? error.message : 'Invalid canvas graph')
+        localDraftReadyRef.current = true
+        return
+      }
       if (readonly) {
         setIsDirty(false)
         localDraftReadyRef.current = true
@@ -499,14 +633,18 @@ function EditorInner({ detail, onStatusChange, onCanvasNameChange }: {
         okText: '恢复本地草稿',
         cancelText: '保持当前内容',
         onOk: () => {
-          applyCanvasDraft(
-            localDraft.graphJson,
-            localDraft.name,
-            localDraft.settings,
-            localDraft.editVersion || detail.canvas.editVersion || 0,
-            nodeTypes,
-          )
-          setIsDirty(true)
+          try {
+            applyCanvasDraft(
+              localDraft.graphJson,
+              localDraft.name,
+              localDraft.settings,
+              localDraft.editVersion || detail.canvas.editVersion || 0,
+              nodeTypes,
+            )
+            setIsDirty(true)
+          } catch (error) {
+            setGraphLoadError(error instanceof Error ? error.message : 'Invalid canvas graph')
+          }
           localDraftReadyRef.current = true
         },
         onCancel: () => {
@@ -581,8 +719,10 @@ function EditorInner({ detail, onStatusChange, onCanvasNameChange }: {
 
     const nodeType = e.dataTransfer.getData('application/canvas-node-type')
     const category = e.dataTransfer.getData('application/canvas-node-category')
+    const displayName = e.dataTransfer.getData('application/canvas-node-name') || undefined
     const configSchema = e.dataTransfer.getData('application/canvas-node-config-schema') || undefined
     const outletSchema = e.dataTransfer.getData('application/canvas-node-outlet-schema') || undefined
+    const defaultConfigPayload = e.dataTransfer.getData('application/canvas-node-default-config') || undefined
     if (!nodeType) return
 
     const dropPos = screenToFlowPosition({ x: e.clientX, y: e.clientY })
@@ -604,6 +744,7 @@ function EditorInner({ detail, onStatusChange, onCanvasNameChange }: {
     const defaultBizConfig = {
       ...buildConfigDefaultsFromSchema(configSchema),
       ...buildDefaultBizConfig(nodeType),
+      ...parseNodeDefaultConfig(defaultConfigPayload),
     }
     // 有分支出口的普通节点不能安全插入到默认边中间，改为空白创建或占位吸附。
     const branchHandles = getOutletHandles({ nodeType, bizConfig: defaultBizConfig, outletSchema })
@@ -638,6 +779,7 @@ function EditorInner({ detail, onStatusChange, onCanvasNameChange }: {
       nodeType,
       category,
       position: newPos,
+      displayName,
       bizConfig: defaultBizConfig,
       outletSchema,
     })
@@ -865,98 +1007,59 @@ function EditorInner({ detail, onStatusChange, onCanvasNameChange }: {
   }, [getNodes, getEdges])
 
   // 保存
-  /** 保存草稿；并发保存会复用同一个 Promise，避免重复提交同一 editVersion。 */
+  /** 保存草稿；队列会合并快速编辑、限制重试次数，并在冲突时保留本地草稿。 */
   const handleSave = useCallback(async (silent = false) => {
-    if (savingPromiseRef.current) {
-      try {
-        await savingPromiseRef.current
-      } catch {
-        // The leading save call owns user-facing error handling.
-      }
-      return
-    }
+    const payload = latestSaveSnapshotRef.current
+    setConflict(undefined)
+    setSaveStatus('saving', 0)
 
-    setSaving(true)
-
-    const savePromise = (async () => {
-      let savedAny = false
-
-      while (true) {
-        // 每轮都读取最新快照：如果保存过程中用户继续编辑，while 会再保存一轮。
-        const snapshot = latestSaveSnapshotRef.current
-        const graphJson = buildSaveGraphJson(snapshot.nodes)
-        const savedSnapshot = {
-          graphJson,
-          canvasName: snapshot.canvasName,
-          canvasSettings: snapshot.canvasSettings,
-          description: snapshot.description,
-        }
-
-        await canvasApi.update(canvasId, {
-          name: snapshot.canvasName,
-          description: snapshot.description,
-          graphJson,
-          editVersion: editVersion.current,
-          triggerType: snapshot.canvasSettings.triggerType,
-          cronExpression: snapshot.canvasSettings.cronExpression ?? null,
-          validStart: snapshot.canvasSettings.validStart ?? null,
-          validEnd: snapshot.canvasSettings.validEnd ?? null,
-          maxTotalExecutions: snapshot.canvasSettings.maxTotalExecutions ?? null,
-          perUserDailyLimit: snapshot.canvasSettings.perUserDailyLimit ?? null,
-          perUserTotalLimit: snapshot.canvasSettings.perUserTotalLimit ?? null,
-          cooldownSeconds: snapshot.canvasSettings.cooldownSeconds ?? null,
-          controlGroupPercent: snapshot.canvasSettings.controlGroupPercent ?? null,
-          controlGroupSalt: snapshot.canvasSettings.controlGroupSalt ?? null,
-          conversionEventCode: snapshot.canvasSettings.conversionEventCode ?? null,
-          attributionWindowDays: snapshot.canvasSettings.attributionWindowDays ?? null,
-          projectKey: snapshot.canvasSettings.projectKey ?? null,
-          projectName: snapshot.canvasSettings.projectName ?? null,
-          folderKey: snapshot.canvasSettings.folderKey ?? null,
-          folderName: snapshot.canvasSettings.folderName ?? null,
-        })
-        savedAny = true
-        editVersion.current += 1
-        savedCanvasName.current = snapshot.canvasName.trim()
-
-        // 保存完成后再比较最新快照，确认没有新变化才能清掉脏标记和本地草稿。
-        const latestSnapshot = latestSaveSnapshotRef.current
-        const latestComparable = {
-          graphJson: buildSaveGraphJson(latestSnapshot.nodes),
-          canvasName: latestSnapshot.canvasName,
-          canvasSettings: latestSnapshot.canvasSettings,
-          description: latestSnapshot.description,
-        }
-        if (sameSaveSnapshot(savedSnapshot, latestComparable)) {
+    try {
+      const result = await saveQueue.enqueue(payload)
+      if (result.status === 'saved') {
+        const savedSnapshot = buildSaveSnapshotComparable(result.payload)
+        const latestSnapshot = buildSaveSnapshotComparable(latestSaveSnapshotRef.current)
+        if (sameSaveSnapshot(savedSnapshot, latestSnapshot)) {
           clearCanvasLocalDraft(canvasId)
           setIsDirty(false)
-          return savedAny
+        } else {
+          setIsDirty(true)
         }
-
-        setIsDirty(true)
+        if (!silent) message.success('保存成功')
+        return
       }
-    })()
 
-    savingPromiseRef.current = savePromise
-    try {
-      const saved = await savePromise
-      if (saved && !silent) message.success('保存成功')
-    } catch (err) {
-      if (isApiConflict(err)) {
-        Modal.confirm({
-          title: '画布已被他人修改',
-          content: '当前画布已有新版本，刷新后你的未保存内容将丢失。是否立即刷新？',
-          okText: '立即刷新',
-          cancelText: '暂不刷新',
-          onOk: () => window.location.reload(),
+      persistLocalDraft({
+        graphJson: buildSaveGraphJson(result.payload.nodes),
+        name: result.payload.canvasName,
+        settings: result.payload.canvasSettings,
+        editVersion: editVersion.current,
+      })
+      setIsDirty(true)
+
+      if (result.status === 'conflict') {
+        setConflict({
+          serverVersion: result.serverVersion,
+          localVersion: editVersion.current,
+          payload: result.payload,
         })
-      } else if (!silent) {
-        message.error('保存失败')
+        if (!silent) message.warning('画布已被他人修改，未保存内容已保留在本地草稿')
+        return
       }
-    } finally {
-      savingPromiseRef.current = null
-      setSaving(false)
+
+      setSaveStatus('failed', result.attempts)
+      if (!silent) message.error('保存失败，未保存内容已保留在本地草稿')
+    } catch (err) {
+      persistLocalDraft()
+      setIsDirty(true)
+      setSaveStatus(isApiConflict(err) ? 'conflict' : 'failed')
+      if (isApiConflict(err)) {
+        setConflict({ localVersion: editVersion.current, payload: latestSaveSnapshotRef.current })
+        if (!silent) message.warning('画布已被他人修改，未保存内容已保留在本地草稿')
+      } else if (!silent) {
+        message.error('保存失败，未保存内容已保留在本地草稿')
+      }
     }
-  }, [canvasId])
+  }, [canvasId, persistLocalDraft, saveQueue, setConflict, setIsDirty, setSaveStatus])
 
   /** 只保存画布名称；用于标题栏快速重命名，不要求先保存图结构。 */
   const handleSaveCanvasName = useCallback(async () => {
@@ -1226,17 +1329,15 @@ function EditorInner({ detail, onStatusChange, onCanvasNameChange }: {
   const deleteEdgeById = (edgeId: string) => {
     snapshot('删除连线')
     setInsertContext(current => current?.kind === 'edge' && current.edgeId === edgeId ? null : current)
-    setEdges(prev => {
-      const edge = prev.find(e => e.id === edgeId)
-      if (edge) {
-        setNodes(nodes => nodes.map(n => {
-          if (n.id !== edge.source) return n
-          const d = n.data as CanvasNodeData
-          return { ...n, data: { ...d, bizConfig: clearEdgeRef(d.bizConfig ?? {}, edge, d.outletSchema) } }
-        }))
-      }
-      return prev.filter(e => e.id !== edgeId)
-    })
+    const edge = displayEdges.find(e => e.id === edgeId)
+    if (edge) {
+      setNodes(nodes => nodes.map(n => {
+        if (n.id !== edge.source) return n
+        const d = n.data as CanvasNodeData
+        return { ...n, data: { ...d, bizConfig: clearEdgeRef(d.bizConfig ?? {}, edge, d.outletSchema) } }
+      }))
+    }
+    setEdges(prev => prev.filter(e => e.id !== edgeId))
     setIsDirty(true)
   }
 
@@ -1556,6 +1657,46 @@ function EditorInner({ detail, onStatusChange, onCanvasNameChange }: {
           ))}
         </div>
       </div>
+
+      {graphLoadError && (
+        <Alert
+          type="error"
+          showIcon
+          message="画布图结构加载失败"
+          description={graphLoadError}
+          style={{ borderRadius: 0, borderLeft: 0, borderRight: 0 }}
+        />
+      )}
+
+      {!readonly && saveStatus === 'retrying' && (
+        <Alert
+          type="info"
+          showIcon
+          message={`保存重试中，第 ${saveAttempt} 次尝试`}
+          style={{ borderRadius: 0, borderLeft: 0, borderRight: 0 }}
+        />
+      )}
+
+      {!readonly && saveStatus === 'conflict' && (
+        <Alert
+          type="warning"
+          showIcon
+          message="画布已被他人修改"
+          description={`未保存内容已保留在本地草稿${conflict?.serverVersion ? `，服务端版本 ${conflict.serverVersion}` : ''}。刷新页面后可选择恢复本地草稿。`}
+          action={<Button size="small" onClick={() => window.location.reload()}>刷新</Button>}
+          style={{ borderRadius: 0, borderLeft: 0, borderRight: 0 }}
+        />
+      )}
+
+      {!readonly && saveStatus === 'failed' && (
+        <Alert
+          type="error"
+          showIcon
+          message="保存失败"
+          description="未保存内容已保留在本地草稿，请检查网络后重试。"
+          style={{ borderRadius: 0, borderLeft: 0, borderRight: 0 }}
+        />
+      )}
 
       <CanvasWorkflowModals
         testModalOpen={testModalOpen}

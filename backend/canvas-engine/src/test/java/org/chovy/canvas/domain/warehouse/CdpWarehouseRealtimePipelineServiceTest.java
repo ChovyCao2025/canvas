@@ -218,6 +218,34 @@ class CdpWarehouseRealtimePipelineServiceTest {
     }
 
     @Test
+    void reportCheckpointWarnsWhenEvidenceIsOnlyJobStartupSubmission() {
+        CdpWarehouseStreamPipelineMapper pipelineMapper = mock(CdpWarehouseStreamPipelineMapper.class);
+        CdpWarehouseStreamCheckpointMapper checkpointMapper = mock(CdpWarehouseStreamCheckpointMapper.class);
+        when(pipelineMapper.selectList(any())).thenReturn(List.of(
+                pipeline(1L, 9L, "mysql_cdp_event_log_to_doris_ods", "canvas_ods.cdp_event_log", 300_000L)));
+        CdpWarehouseRealtimePipelineService service = service(pipelineMapper, checkpointMapper);
+
+        CdpWarehouseRealtimePipelineService.CheckpointReport report = service.reportCheckpoint(9L,
+                new CdpWarehouseRealtimePipelineService.CheckpointCommand(
+                        "mysql_cdp_event_log_to_doris_ods",
+                        "mysql_cdp_event_log_to_doris_ods-startup",
+                        "job-startup",
+                        "submitted",
+                        "submitted",
+                        now(),
+                        now(),
+                        0L,
+                        0L,
+                        "PASS",
+                        null,
+                        "canvas-flink"));
+
+        assertThat(report.status()).isEqualTo("WARN");
+        assertThat(report.message()).contains("startup submission is not runtime checkpoint evidence");
+        assertThat(report.reasons()).contains("startup submission is not runtime checkpoint evidence");
+    }
+
+    @Test
     void reportCheckpointWarnsWhenLagExceedsContract() {
         CdpWarehouseStreamPipelineMapper pipelineMapper = mock(CdpWarehouseStreamPipelineMapper.class);
         when(pipelineMapper.selectList(any())).thenReturn(List.of(

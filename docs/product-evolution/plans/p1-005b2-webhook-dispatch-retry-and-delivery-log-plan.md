@@ -8,6 +8,10 @@
 
 **Tech Stack:** Java 21, Spring Boot WebFlux, WebClient, MyBatis-Plus, Jackson, JUnit 5, Mockito, AssertJ.
 
+**Implementation Status:** Implemented and merged into `main` on 2026-06-05. The actual package is `org.chovy.canvas.domain.cdp` rather than the originally planned `org.chovy.canvas.domain.webhook` package. `WebhookDispatcherService` now uses exact event-type matching and the canonical outbound headers `X-Canvas-Event`, `X-Canvas-Delivery`, `X-Canvas-Timestamp`, and `X-Canvas-Signature`.
+
+**Verification:** `cd backend && JAVA_HOME=/Users/photonpay/Library/Java/JavaVirtualMachines/ms-21.0.11/Contents/Home PATH="/Users/photonpay/Library/Java/JavaVirtualMachines/ms-21.0.11/Contents/Home/bin:$PATH" mvn -pl canvas-engine -DskipTests compile` passed. Focused webhook tests pass in an isolated runner for `WebhookSubscriptionSchemaTest`, `WebhookSignatureServiceTest`, `WebhookSubscriptionValidatorTest`, `WebhookDispatcherServiceTest`, and `WebhookRetryPolicyTest`; Maven `testCompile` remains blocked by unrelated existing test-source errors.
+
 ---
 
 ## Spec Reference
@@ -17,11 +21,11 @@
 
 ## File Structure
 
-- Create: `backend/canvas-engine/src/main/java/org/chovy/canvas/domain/webhook/WebhookRetryPolicy.java`
-- Create: `backend/canvas-engine/src/main/java/org/chovy/canvas/domain/webhook/WebhookDeliveryPayload.java`
-- Create: `backend/canvas-engine/src/main/java/org/chovy/canvas/domain/webhook/WebhookDispatcherService.java`
-- Create: `backend/canvas-engine/src/test/java/org/chovy/canvas/domain/webhook/WebhookRetryPolicyTest.java`
-- Create: `backend/canvas-engine/src/test/java/org/chovy/canvas/domain/webhook/WebhookDispatcherServiceTest.java`
+- Implemented: `backend/canvas-engine/src/main/java/org/chovy/canvas/domain/cdp/WebhookRetryPolicy.java`
+- Implemented: `backend/canvas-engine/src/main/java/org/chovy/canvas/domain/cdp/WebhookDeliveryPayload.java`
+- Implemented: `backend/canvas-engine/src/main/java/org/chovy/canvas/domain/cdp/WebhookDispatcherService.java`
+- Added: `backend/canvas-engine/src/test/java/org/chovy/canvas/domain/cdp/WebhookRetryPolicyTest.java`
+- Added: `backend/canvas-engine/src/test/java/org/chovy/canvas/domain/cdp/WebhookDispatcherServiceTest.java`
 
 ### Task 1: Retry Policy
 

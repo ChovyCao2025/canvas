@@ -4,6 +4,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
 import org.chovy.canvas.dal.dataobject.CanvasExecutionTraceDO;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
@@ -39,6 +40,7 @@ public class DorisStreamLoader {
     private static final DateTimeFormatter DORIS_DATETIME_FORMATTER =
             DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
+    @Autowired
     public DorisStreamLoader(
             @Value("${canvas.doris.enabled:false}") boolean enabled,
             @Value("${canvas.doris.stream-load-url:http://localhost:8040/api/canvas_ods/canvas_execution_trace/_stream_load}") String streamLoadUrl,

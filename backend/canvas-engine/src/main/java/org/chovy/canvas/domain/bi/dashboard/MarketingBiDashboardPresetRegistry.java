@@ -1,6 +1,7 @@
 package org.chovy.canvas.domain.bi.dashboard;
 
 import java.util.List;
+import java.util.Map;
 
 public final class MarketingBiDashboardPresetRegistry {
 
@@ -68,8 +69,30 @@ public final class MarketingBiDashboardPresetRegistry {
             ),
             List.of(
                     new BiDashboardFilter("filter-stat-date", "stat_date", "统计日期", "DATE_RANGE", true, "LAST_7_DAYS"),
-                    new BiDashboardFilter("filter-canvas", "canvas_name", "画布名称", "SEARCH_SELECT", false, null),
-                    new BiDashboardFilter("filter-trigger-type", "trigger_type", "触发方式", "ENUM_MULTI_SELECT", false, null)
+                    new BiDashboardFilter(
+                            "filter-canvas",
+                            "canvas_name",
+                            "画布名称",
+                            "SEARCH_SELECT",
+                            false,
+                            null,
+                            List.of(),
+                            new BiDashboardFilterCascade(List.of("filter-stat-date"), Map.of(), "SAME_SOURCE"),
+                            null,
+                            null,
+                            false),
+                    new BiDashboardFilter(
+                            "filter-trigger-type",
+                            "trigger_type",
+                            "触发方式",
+                            "ENUM_MULTI_SELECT",
+                            false,
+                            null,
+                            List.of(),
+                            new BiDashboardFilterCascade(List.of("filter-stat-date", "filter-canvas"), Map.of(), "SAME_SOURCE"),
+                            null,
+                            null,
+                            false)
             ),
             List.of(
                     new BiDashboardInteraction(

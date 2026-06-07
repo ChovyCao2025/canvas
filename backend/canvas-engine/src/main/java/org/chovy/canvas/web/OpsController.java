@@ -8,6 +8,8 @@ import org.chovy.canvas.domain.canvas.*;
 import org.chovy.canvas.common.enums.ApprovalStatus;
 import org.chovy.canvas.common.enums.CanvasStatusEnum;
 import org.chovy.canvas.common.enums.VersionStatus;
+import org.chovy.canvas.domain.approval.ApprovalTaskView;
+import org.chovy.canvas.domain.approval.ApprovalWorkflowService;
 import org.chovy.canvas.domain.notification.NotificationEventService;
 import org.chovy.canvas.domain.ops.OpsAuditEventService;
 import org.chovy.canvas.infrastructure.cache.CanvasConfigCache;
@@ -15,7 +17,7 @@ import org.chovy.canvas.infrastructure.redis.TriggerRouteRecoveryService;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import lombok.Data;
-import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.web.bind.annotation.*;
 import reactor.core.publisher.Mono;
@@ -36,7 +38,6 @@ import org.chovy.canvas.dal.mapper.CanvasVersionMapper;
  * 运营工具 API（设计文档第二十三章）
  */
 @RestController
-@RequiredArgsConstructor
 public class OpsController {
 
     /** 画布模板 Mapper，用于管理模板记录。 */
@@ -61,6 +62,38 @@ public class OpsController {
     private final OpsAuditEventService opsAuditEventService;
     /** 通知事件服务。 */
     private final NotificationEventService notificationEventService;
+    /** 统一审批工作流服务；存在时 pending-reviews 改读统一审批任务。 */
+    private ApprovalWorkflowService approvalWorkflowService;
+
+    @Autowired
+    public OpsController(CanvasTemplateMapper templateMapper,
+                         CanvasMapper canvasMapper,
+                         CanvasVersionMapper canvasVersionMapper,
+                         CanvasManualApprovalMapper approvalMapper,
+                         CanvasConfigCache configCache,
+                         TriggerRouteRecoveryService routeRecoveryService,
+                         TenantContextResolver tenantContextResolver,
+                         CanvasService canvasService,
+                         CanvasOpsService canvasOpsService,
+                         OpsAuditEventService opsAuditEventService,
+                         NotificationEventService notificationEventService) {
+        this.templateMapper = templateMapper;
+        this.canvasMapper = canvasMapper;
+        this.canvasVersionMapper = canvasVersionMapper;
+        this.approvalMapper = approvalMapper;
+        this.configCache = configCache;
+        this.routeRecoveryService = routeRecoveryService;
+        this.tenantContextResolver = tenantContextResolver;
+        this.canvasService = canvasService;
+        this.canvasOpsService = canvasOpsService;
+        this.opsAuditEventService = opsAuditEventService;
+        this.notificationEventService = notificationEventService;
+    }
+
+    @Autowired(required = false)
+    void setApprovalWorkflowService(ApprovalWorkflowService approvalWorkflowService) {
+        this.approvalWorkflowService = approvalWorkflowService;
+    }
 
     public OpsController(CanvasTemplateMapper templateMapper,
                          CanvasMapper canvasMapper,
@@ -269,13 +302,39 @@ public class OpsController {
      * @return 审批记录列表
      */
     @GetMapping("/canvas/pending-reviews")
-    public Mono<R<List<CanvasManualApprovalDO>>> pendingReviews() {
+    public Mono<R<List<ApprovalTaskView>>> pendingReviews() {
+        if (approvalWorkflowService != null) {
+            return requiredTenantContext().flatMap(context ->
+                    Mono.fromCallable(() -> R.ok(approvalWorkflowService.listTasks(
+                                    context.tenantId() == null ? 0L : context.tenantId(),
+                                    operator(context),
+                                    context.role(),
+                                    ApprovalWorkflowService.STATUS_PENDING)))
+                            .subscribeOn(Schedulers.boundedElastic()));
+        }
         return Mono.fromCallable(() ->
                 approvalMapper.selectList(
-                        new LambdaQueryWrapper<CanvasManualApprovalDO>()
-                                .eq(CanvasManualApprovalDO::getStatus, ApprovalStatus.PENDING)
-                                .orderByAsc(CanvasManualApprovalDO::getTimeoutAt))
+                                new LambdaQueryWrapper<CanvasManualApprovalDO>()
+                                        .eq(CanvasManualApprovalDO::getStatus, ApprovalStatus.PENDING)
+                                        .orderByAsc(CanvasManualApprovalDO::getTimeoutAt))
+                        .stream()
+                        .map(this::legacyApprovalTask)
+                        .toList()
         ).subscribeOn(Schedulers.boundedElastic()).map(R::ok);
+    }
+
+    private ApprovalTaskView legacyApprovalTask(CanvasManualApprovalDO approval) {
+        return new ApprovalTaskView(
+                null,
+                null,
+                null,
+                1,
+                approval.getApprovers(),
+                approval.getStatus(),
+                null,
+                approval.getTimeoutAt(),
+                approval.getResultAt(),
+                null);
     }
 
 

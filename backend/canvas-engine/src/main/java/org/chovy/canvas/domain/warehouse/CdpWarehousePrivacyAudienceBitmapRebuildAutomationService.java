@@ -85,11 +85,16 @@ public class CdpWarehousePrivacyAudienceBitmapRebuildAutomationService {
         CdpWarehousePrivacyAudienceBitmapRebuildService.AudienceBitmapRebuildCommand rebuildCommand =
                 new CdpWarehousePrivacyAudienceBitmapRebuildService.AudienceBitmapRebuildCommand(
                         actor, audienceLimit, null);
-        CdpWarehousePrivacyAudienceBitmapRebuildService.AudienceBitmapRebuildResult rebuild =
-                rebuildService.rebuild(tenantId, request.id(), rebuildCommand);
-        String status = normalizeStatus(rebuild == null ? null : rebuild.status());
-        return new RequestAutomationResult(request.id(), "TRIGGERED", status, true,
-                "audience bitmap rebuild proof triggered", rebuild);
+        try {
+            CdpWarehousePrivacyAudienceBitmapRebuildService.AudienceBitmapRebuildResult rebuild =
+                    rebuildService.rebuild(tenantId, request.id(), rebuildCommand);
+            String status = normalizeStatus(rebuild == null ? null : rebuild.status());
+            return new RequestAutomationResult(request.id(), "TRIGGERED", status, true,
+                    "audience bitmap rebuild proof triggered", rebuild);
+        } catch (RuntimeException e) {
+            return new RequestAutomationResult(request.id(), "TRIGGERED", FAIL, true,
+                    "audience bitmap rebuild proof failed: " + message(e), null);
+        }
     }
 
     private boolean upstreamPassed(CdpWarehousePrivacyErasureService.ErasureRequestView request) {
@@ -130,6 +135,10 @@ public class CdpWarehousePrivacyAudienceBitmapRebuildAutomationService {
 
     private String normalizeStatus(String status) {
         return status == null || status.isBlank() ? FAIL : status.trim().toUpperCase(Locale.ROOT);
+    }
+
+    private String message(RuntimeException e) {
+        return e.getMessage() == null ? e.getClass().getSimpleName() : e.getMessage();
     }
 
     public record AutomationCommand(

@@ -1,16 +1,20 @@
 package org.chovy.canvas.domain.bi.resource;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import org.chovy.canvas.dal.dataobject.BiBigScreenDO;
 import org.chovy.canvas.dal.dataobject.BiDashboardDO;
 import org.chovy.canvas.dal.dataobject.BiResourceCommentDO;
 import org.chovy.canvas.dal.dataobject.BiResourceLockDO;
+import org.chovy.canvas.dal.dataobject.BiSpreadsheetDO;
 import org.chovy.canvas.dal.dataobject.BiWorkspaceDO;
+import org.chovy.canvas.dal.mapper.BiBigScreenMapper;
 import org.chovy.canvas.dal.mapper.BiChartMapper;
 import org.chovy.canvas.dal.mapper.BiDashboardMapper;
 import org.chovy.canvas.dal.mapper.BiDatasetMapper;
 import org.chovy.canvas.dal.mapper.BiPortalMapper;
 import org.chovy.canvas.dal.mapper.BiResourceCommentMapper;
 import org.chovy.canvas.dal.mapper.BiResourceLockMapper;
+import org.chovy.canvas.dal.mapper.BiSpreadsheetMapper;
 import org.chovy.canvas.dal.mapper.BiWorkspaceMapper;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -76,6 +80,36 @@ class BiResourceCollaborationServiceTest {
         assertThat(comment.resourceType()).isEqualTo("DASHBOARD");
         assertThat(comment.widgetKey()).isEqualTo("kpi-total");
         assertThat(comment.commentText()).isEqualTo("本周转化率需要复核");
+    }
+
+    @Test
+    void addCommentSupportsBigScreenResource() {
+        BiWorkspaceMapper workspaceMapper = mock(BiWorkspaceMapper.class);
+        BiBigScreenMapper bigScreenMapper = mock(BiBigScreenMapper.class);
+        BiResourceCommentMapper commentMapper = mock(BiResourceCommentMapper.class);
+        BiBigScreenDO screen = new BiBigScreenDO();
+        screen.setId(99L);
+        screen.setStatus("PUBLISHED");
+        when(workspaceMapper.selectOne(any(LambdaQueryWrapper.class))).thenReturn(workspace());
+        when(bigScreenMapper.selectOne(any(LambdaQueryWrapper.class))).thenReturn(screen);
+        BiResourceCollaborationService service = service(
+                workspaceMapper,
+                mock(BiDashboardMapper.class),
+                bigScreenMapper,
+                mock(BiSpreadsheetMapper.class),
+                commentMapper,
+                mock(BiResourceLockMapper.class));
+
+        BiResourceCommentView comment = service.addComment(7L, "alice",
+                new BiResourceCommentCommand("big_screen", "executive-wall", "revenue-ticker", "检查滚动刷新"));
+
+        ArgumentCaptor<BiResourceCommentDO> captor = ArgumentCaptor.forClass(BiResourceCommentDO.class);
+        verify(commentMapper).insert(captor.capture());
+        assertThat(captor.getValue().getResourceType()).isEqualTo("BIG_SCREEN");
+        assertThat(captor.getValue().getResourceKey()).isEqualTo("executive-wall");
+        assertThat(captor.getValue().getWidgetKey()).isEqualTo("revenue-ticker");
+        assertThat(comment.resourceType()).isEqualTo("BIG_SCREEN");
+        assertThat(comment.resourceKey()).isEqualTo("executive-wall");
     }
 
     @Test
@@ -154,6 +188,37 @@ class BiResourceCollaborationServiceTest {
         assertThat(captor.getValue().getLockedAt()).isEqualTo(LocalDateTime.ofInstant(CLOCK.instant(), ZoneOffset.UTC));
         assertThat(captor.getValue().getExpiresAt()).isEqualTo(LocalDateTime.ofInstant(CLOCK.instant(), ZoneOffset.UTC).plusSeconds(120));
         assertThat(lock.locked()).isTrue();
+    }
+
+    @Test
+    void acquireLockSupportsSpreadsheetResource() {
+        BiWorkspaceMapper workspaceMapper = mock(BiWorkspaceMapper.class);
+        BiSpreadsheetMapper spreadsheetMapper = mock(BiSpreadsheetMapper.class);
+        BiResourceLockMapper lockMapper = mock(BiResourceLockMapper.class);
+        BiSpreadsheetDO spreadsheet = new BiSpreadsheetDO();
+        spreadsheet.setId(99L);
+        spreadsheet.setStatus("DRAFT");
+        when(workspaceMapper.selectOne(any(LambdaQueryWrapper.class))).thenReturn(workspace());
+        when(spreadsheetMapper.selectOne(any(LambdaQueryWrapper.class))).thenReturn(spreadsheet);
+        when(lockMapper.acquire(any(BiResourceLockDO.class))).thenReturn(1);
+        BiResourceCollaborationService service = service(
+                workspaceMapper,
+                mock(BiDashboardMapper.class),
+                mock(BiBigScreenMapper.class),
+                spreadsheetMapper,
+                mock(BiResourceCommentMapper.class),
+                lockMapper);
+
+        BiResourceLockView lock = service.acquireLock(7L, "alice",
+                new BiResourceLockCommand("spreadsheet", "budget-sheet", "token-1", 120));
+
+        ArgumentCaptor<BiResourceLockDO> captor = ArgumentCaptor.forClass(BiResourceLockDO.class);
+        verify(lockMapper).acquire(captor.capture());
+        assertThat(captor.getValue().getResourceType()).isEqualTo("SPREADSHEET");
+        assertThat(captor.getValue().getResourceKey()).isEqualTo("budget-sheet");
+        assertThat(captor.getValue().getLockToken()).isEqualTo("token-1");
+        assertThat(lock.resourceType()).isEqualTo("SPREADSHEET");
+        assertThat(lock.resourceKey()).isEqualTo("budget-sheet");
     }
 
     @Test
@@ -241,12 +306,29 @@ class BiResourceCollaborationServiceTest {
                                                    BiDashboardMapper dashboardMapper,
                                                    BiResourceCommentMapper commentMapper,
                                                    BiResourceLockMapper lockMapper) {
+        return service(
+                workspaceMapper,
+                dashboardMapper,
+                mock(BiBigScreenMapper.class),
+                mock(BiSpreadsheetMapper.class),
+                commentMapper,
+                lockMapper);
+    }
+
+    private BiResourceCollaborationService service(BiWorkspaceMapper workspaceMapper,
+                                                   BiDashboardMapper dashboardMapper,
+                                                   BiBigScreenMapper bigScreenMapper,
+                                                   BiSpreadsheetMapper spreadsheetMapper,
+                                                   BiResourceCommentMapper commentMapper,
+                                                   BiResourceLockMapper lockMapper) {
         return new BiResourceCollaborationService(
                 workspaceMapper,
                 mock(BiDatasetMapper.class),
                 dashboardMapper,
                 mock(BiChartMapper.class),
                 mock(BiPortalMapper.class),
+                bigScreenMapper,
+                spreadsheetMapper,
                 commentMapper,
                 lockMapper,
                 CLOCK);

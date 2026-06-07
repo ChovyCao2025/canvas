@@ -14,7 +14,7 @@ Upgrade offline audience membership into event-driven realtime updates, overlap 
 - `AudienceBatchComputeService` computes offline audiences and writes Redis RoaringBitmap data through `AudienceBitmapStore`.
 - `AudienceBitmapStore` supports save, load, membership, and delete.
 - P1-005A2 emits internal CDP events.
-- There is no realtime audience event consumer, event idempotency table, overlap API, merge/exclusion guard, or snapshot history.
+- Implemented on 2026-06-05: realtime audience event processing, event idempotency ledger, overlap API, merge/exclusion guard, and `cdp_audience_snapshot` history are available in this slice.
 
 ## In Scope
 
@@ -42,7 +42,11 @@ Upgrade offline audience membership into event-driven realtime updates, overlap 
 
 ## Technical Scope
 
-- `backend/canvas-engine/src/main/resources/db/migration/V101__realtime_audience_overlap_snapshots.sql`
+- `backend/canvas-engine/src/main/resources/db/migration/V106__realtime_audience_overlap_snapshots.sql`
+- `backend/canvas-engine/src/main/java/org/chovy/canvas/dal/dataobject/CdpRealtimeAudienceEventLogDO.java`
+- `backend/canvas-engine/src/main/java/org/chovy/canvas/dal/dataobject/CdpAudienceSnapshotDO.java`
+- `backend/canvas-engine/src/main/java/org/chovy/canvas/dal/mapper/CdpRealtimeAudienceEventLogMapper.java`
+- `backend/canvas-engine/src/main/java/org/chovy/canvas/dal/mapper/CdpAudienceSnapshotMapper.java`
 - `backend/canvas-engine/src/main/java/org/chovy/canvas/domain/cdp/RealtimeAudienceService.java`
 - `backend/canvas-engine/src/main/java/org/chovy/canvas/engine/audience/AudienceBitmapStore.java`
 - `backend/canvas-engine/src/main/java/org/chovy/canvas/web/RealtimeAudienceController.java`
@@ -55,3 +59,17 @@ Upgrade offline audience membership into event-driven realtime updates, overlap 
 - Overlap tests prove AND counts and percentages.
 - Merge/exclusion tests prove safe operations and blocked operations.
 - Snapshot trend is visible in the frontend helper tests.
+
+## Implementation Notes
+
+- Actual table names use the CDP prefix: `cdp_realtime_audience_event_log` and `cdp_audience_snapshot`, to avoid colliding with the existing publish-time `audience_snapshot` table from P1-003.
+- `RealtimeAudienceController` accepts event payloads with `properties` and optional `removeOnNoMatch`; the default is `true`.
+- `AudienceBitmapStore` exposes non-mutating `overlap`, `merge`, and `exclude` set operations.
+- Frontend route: `/cdp/realtime-audiences`.
+
+## Verification
+
+- Backend production compile: `cd backend && JAVA_HOME=/Users/photonpay/Library/Java/JavaVirtualMachines/ms-21.0.11/Contents/Home PATH="/Users/photonpay/Library/Java/JavaVirtualMachines/ms-21.0.11/Contents/Home/bin:$PATH" mvn -pl canvas-engine -DskipTests compile` passed.
+- Backend isolated P1-006C suite passed: `RealtimeAudienceSchemaTest`, `AudienceBitmapStoreSetOpsTest`, `RealtimeAudienceServiceTest`, `RealtimeAudienceControllerTest` ran 11 tests, 0 failures.
+- Frontend targeted tests passed: `cd frontend && PATH="/opt/homebrew/bin:$PATH" npm run test -- realtimeAudiencePresentation.test.ts cdpApi.test.ts biWorkbench.test.ts` ran 40 tests, 0 failures.
+- Frontend production build passed: `cd frontend && PATH="/opt/homebrew/bin:$PATH" npm run build`.

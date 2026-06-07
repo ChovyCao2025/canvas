@@ -24,6 +24,9 @@ public class BiQueryCompiler {
         if (request.limit() <= 0 || request.limit() > MAX_LIMIT) {
             throw new IllegalArgumentException("limit must be between 1 and " + MAX_LIMIT);
         }
+        if (request.offset() < 0) {
+            throw new IllegalArgumentException("offset must be greater than or equal to 0");
+        }
 
         List<String> selectParts = new ArrayList<>();
         List<String> groupByParts = new ArrayList<>();
@@ -44,6 +47,7 @@ public class BiQueryCompiler {
         }
 
         List<Object> parameters = new ArrayList<>();
+        bindSqlParameters(dataset, request, parameters);
         parameters.add(tenantId);
         List<String> whereParts = new ArrayList<>();
         whereParts.add(dataset.tenantColumn() + " = ?");
@@ -65,7 +69,30 @@ public class BiQueryCompiler {
             sql.append("\nORDER BY ").append(compileSorts(dataset, request.sorts()));
         }
         sql.append("\nLIMIT ").append(request.limit());
+        if (request.offset() > 0) {
+            sql.append("\nOFFSET ").append(request.offset());
+        }
         return new BiCompiledQuery(sql.toString(), parameters);
+    }
+
+    private void bindSqlParameters(BiDatasetSpec dataset, BiQueryRequest request, List<Object> parameters) {
+        for (BiSqlParameterSpec spec : dataset.sqlParameters()) {
+            String value = request.sqlParameters().get(spec.key());
+            if (value == null || value.isBlank()) {
+                value = spec.defaultValue();
+            }
+            if ((value == null || value.isBlank()) && spec.required()) {
+                throw new IllegalArgumentException("SQL parameter is required: " + spec.key());
+            }
+            if (value == null || value.isBlank()) {
+                parameters.add(null);
+                continue;
+            }
+            if (!spec.allowedValues().isEmpty() && !spec.allowedValues().contains(value)) {
+                throw new IllegalArgumentException("SQL parameter value is not allowed: " + spec.key());
+            }
+            parameters.add(value);
+        }
     }
 
     private BiFieldSpec dimension(BiDatasetSpec dataset, String key) {

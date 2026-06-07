@@ -7,10 +7,13 @@ import com.baomidou.mybatisplus.core.metadata.TableInfoHelper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import org.apache.ibatis.builder.MapperBuilderAssistant;
 import org.chovy.canvas.dal.dataobject.CanvasDO;
+import org.chovy.canvas.dal.dataobject.CanvasProjectFolderDO;
 import org.chovy.canvas.dal.dataobject.CanvasVersionDO;
 import org.chovy.canvas.dal.mapper.CanvasMapper;
+import org.chovy.canvas.dal.mapper.CanvasProjectFolderMapper;
 import org.chovy.canvas.dal.mapper.CanvasVersionMapper;
 import org.chovy.canvas.dto.CanvasCreateReq;
+import org.chovy.canvas.dto.canvas.ProjectFolderMetadataReq;
 import org.chovy.canvas.engine.dag.DagParser;
 import org.chovy.canvas.engine.handlers.GroovyHandler;
 import org.chovy.canvas.engine.rule.CanvasRuleGraphValidator;
@@ -68,6 +71,35 @@ class CanvasTenantIsolationTest {
     }
 
     @Test
+    void createSavesProjectAssignmentWhenProjectIdIsPresent() {
+        CanvasMapper canvasMapper = mock(CanvasMapper.class);
+        CanvasProjectFolderMetadataService metadataService = mock(CanvasProjectFolderMetadataService.class);
+        doAnswer(invocation -> {
+            CanvasDO canvas = invocation.getArgument(0);
+            canvas.setId(100L);
+            return 1;
+        }).when(canvasMapper).insert(any(CanvasDO.class));
+        CanvasService service = service(canvasMapper, mock(CanvasVersionMapper.class));
+        service.setProjectFolderMetadataService(metadataService);
+        CanvasCreateReq req = new CanvasCreateReq();
+        req.setTenantId(9L);
+        req.setName("tenant canvas");
+        req.setProjectId(11L);
+        req.setFolderKey("new-user");
+        req.setFolderName("New User");
+        req.setCreatedBy("alice");
+
+        service.create(req);
+
+        ArgumentCaptor<ProjectFolderMetadataReq> captor = ArgumentCaptor.forClass(ProjectFolderMetadataReq.class);
+        verify(metadataService).saveMetadata(org.mockito.ArgumentMatchers.eq(9L),
+                org.mockito.ArgumentMatchers.eq(100L), captor.capture());
+        assertThat(captor.getValue().projectId()).isEqualTo(11L);
+        assertThat(captor.getValue().folderKey()).isEqualTo("new-user");
+        assertThat(captor.getValue().operator()).isEqualTo("alice");
+    }
+
+    @Test
     void listAddsTenantPredicateWhenTenantIdIsPresent() {
         CanvasMapper canvasMapper = mock(CanvasMapper.class);
         when(canvasMapper.selectPage(any(), any())).thenReturn(new Page<>());
@@ -82,6 +114,30 @@ class CanvasTenantIsolationTest {
         AbstractWrapper<?, ?, ?> wrapper = (AbstractWrapper<?, ?, ?>) wrapperCaptor.getValue();
         assertThat(wrapper.getSqlSegment()).contains("tenant_id");
         assertThat(wrapper.getParamNameValuePairs()).containsValue(9L);
+    }
+
+    @Test
+    void listAddsCanvasIdFilterWhenProjectIdIsPresent() {
+        CanvasMapper canvasMapper = mock(CanvasMapper.class);
+        CanvasProjectFolderMapper folderMapper = mock(CanvasProjectFolderMapper.class);
+        when(canvasMapper.selectPage(any(), any())).thenReturn(new Page<>());
+        CanvasProjectFolderDO assignment = new CanvasProjectFolderDO();
+        assignment.setCanvasId(100L);
+        when(folderMapper.selectList(any())).thenReturn(java.util.List.of(assignment));
+        CanvasService service = service(canvasMapper, mock(CanvasVersionMapper.class));
+        service.setProjectFolderMapper(folderMapper);
+        CanvasListQuery query = new CanvasListQuery();
+        query.setTenantId(9L);
+        query.setProjectId(11L);
+
+        service.list(query);
+
+        verify(folderMapper).selectList(any());
+        ArgumentCaptor<Wrapper<CanvasDO>> wrapperCaptor = ArgumentCaptor.forClass(Wrapper.class);
+        verify(canvasMapper).selectPage(any(), wrapperCaptor.capture());
+        AbstractWrapper<?, ?, ?> wrapper = (AbstractWrapper<?, ?, ?>) wrapperCaptor.getValue();
+        assertThat(wrapper.getSqlSegment()).contains("id");
+        assertThat(wrapper.getParamNameValuePairs()).containsValue(100L);
     }
 
     @Test

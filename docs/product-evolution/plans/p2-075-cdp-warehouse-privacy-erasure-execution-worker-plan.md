@@ -79,3 +79,9 @@ mvn -pl canvas-engine test -Dtest='CdpWarehouse*Test,Doris*Test,CdpEventIngestio
 - Warehouse/CDP regression passed on 2026-06-05:
   `CdpWarehouse*Test,Doris*Test,CdpEventIngestion*Test,CdpUserServiceTest`
   - Result: 402 tests, 0 failures, 1 skipped (`DorisConnectionTest`).
+- P2-075 privacy-ledger redaction audit updated on 2026-06-05:
+  `CdpWarehousePrivacyErasureExecutionServiceTest.dorisExecutorOutputDoesNotPersistRawSubjectValue`
+  proves Doris executor proof/error output is redacted before being returned or recorded through P2-073 proof rows.
+- Focused OLAP privacy slice passed on 2026-06-05:
+  `CdpWarehousePrivacyErasureExecutionServiceTest,CdpWarehousePrivacyErasureServiceTest,CdpWarehousePrivacyErasureControllerTest,CdpWarehousePrivacyTombstoneServiceTest,CdpWarehousePrivacyAudienceBitmapRebuildServiceTest,CdpWarehousePrivacyAudienceBitmapRebuildAutomationServiceTest,CdpWarehousePrivacyAudienceBitmapRebuildSchedulerTest,CdpWarehousePrivacyAudienceBitmapRebuildAutomationRunServiceTest,CdpWarehousePrivacyAudienceBitmapRebuildAutomationRunSchemaTest,CdpWarehouseProductionReadinessProofServiceTest`
+  - Result: 49 tests, 0 failures.

@@ -33,6 +33,22 @@ public class LocalBiFileStorage implements BiFileStorage {
     }
 
     @Override
+    public BiStoredFile write(String storageKey, BiFileStorageWriter writer) {
+        Path file = resolve(storageKey);
+        try {
+            Files.createDirectories(file.getParent());
+            try (var output = Files.newOutputStream(file)) {
+                if (writer != null) {
+                    writer.write(output);
+                }
+            }
+            return new BiStoredFile(PROVIDER, storageKey, file.toString(), Files.size(file));
+        } catch (IOException e) {
+            throw new IllegalStateException("failed to write BI storage object: " + storageKey, e);
+        }
+    }
+
+    @Override
     public byte[] read(String storageKey) {
         try {
             return Files.readAllBytes(resolve(storageKey));

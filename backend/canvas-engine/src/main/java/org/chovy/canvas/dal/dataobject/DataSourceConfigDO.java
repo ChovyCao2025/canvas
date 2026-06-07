@@ -31,6 +31,18 @@ public class DataSourceConfigDO {
     /** 数据源类型，当前支持 JDBC。 */
     private String type;
 
+    @TableField("connector_type")
+    /** BI 连接器类型，例如 MYSQL、DORIS、POSTGRESQL。 */
+    private String connectorType;
+
+    @TableField("connection_mode")
+    /** BI 默认连接模式：DIRECT_QUERY、CACHE、EXTRACT。 */
+    private String connectionMode;
+
+    @TableField("connector_config_json")
+    /** BI 连接器扩展配置，如 API 数据源的请求方法、参数和响应路径。 */
+    private String connectorConfigJson;
+
     /** JDBC URL。 */
     private String url;
 

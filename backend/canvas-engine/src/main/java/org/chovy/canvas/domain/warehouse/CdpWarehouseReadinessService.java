@@ -3,6 +3,7 @@ package org.chovy.canvas.domain.warehouse;
 import org.chovy.canvas.domain.analytics.AudienceMaterializationOperationsService;
 import org.chovy.canvas.domain.bi.query.BiDatasourceHealth;
 import org.chovy.canvas.domain.bi.query.BiDatasourceHealthProvider;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Service;
 
@@ -27,6 +28,7 @@ public class CdpWarehouseReadinessService {
     private final BiDatasourceHealthProvider biDatasourceHealthProvider;
     private final CdpWarehouseSloPolicyService sloPolicyService;
 
+    @Autowired
     public CdpWarehouseReadinessService(
             CdpWarehouseOperationsService operationsService,
             CdpWarehouseRealtimePipelineService realtimePipelineService,

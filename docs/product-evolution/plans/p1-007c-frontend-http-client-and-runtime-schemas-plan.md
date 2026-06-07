@@ -38,7 +38,7 @@
 - Create: `frontend/src/services/httpClient.ts`
 - Modify: `frontend/src/services/api.ts`
 
-- [ ] **Step 1: Write HTTP client tests**
+- [x] **Step 1: Write HTTP client tests**
 
 Create `frontend/src/services/httpClient.test.ts`:
 
@@ -85,7 +85,7 @@ describe('httpClient', () => {
 })
 ```
 
-- [ ] **Step 2: Run HTTP tests and confirm red state**
+- [x] **Step 2: Run HTTP tests and confirm red state**
 
 Run:
 
@@ -95,7 +95,9 @@ cd frontend && npm test -- httpClient.test.ts
 
 Expected: FAIL because `httpClient.ts` does not exist.
 
-- [ ] **Step 3: Implement HTTP client wrapper**
+Actual: failed because `./httpClient` could not be resolved.
+
+- [x] **Step 3: Implement HTTP client wrapper**
 
 Create `frontend/src/services/httpClient.ts`:
 
@@ -170,7 +172,7 @@ export function createHttpClient(instance: AxiosInstance, options: HttpClientOpt
 }
 ```
 
-- [ ] **Step 4: Refactor api.ts without breaking existing exports**
+- [x] **Step 4: Refactor api.ts without breaking existing exports**
 
 In `frontend/src/services/api.ts`, keep the Axios instance export for compatibility, but create a wrapper export:
 
@@ -187,7 +189,9 @@ export const apiClient = createHttpClient(http, {
 
 Replace hard reload handling in the interceptor with the same event dispatch. App shell or auth guard can translate `canvas:unauthorized` to `navigate('/login', { state: { from: intendedPath } })`.
 
-- [ ] **Step 5: Run HTTP and existing API tests**
+Actual: `api.ts` keeps the existing `http` export and existing API function return shape, and now exports `apiClient` for gradual wrapper migration. Existing 401 handling already dispatches `canvas:unauthorized`; `apiClient` uses the same route-preserving callback.
+
+- [x] **Step 5: Run HTTP and existing API tests**
 
 Run:
 
@@ -196,6 +200,8 @@ cd frontend && npm test -- httpClient.test.ts api.test.ts
 ```
 
 Expected: PASS.
+
+Actual: `cd frontend && PATH="/opt/homebrew/bin:$PATH" npm run test -- httpClient.test.ts api.test.ts canvasSchemas.test.ts graphHydration.test.ts` passed: 16 files, 43 tests.
 
 ### Task 2: Runtime Canvas Schemas
 
@@ -206,7 +212,7 @@ Expected: PASS.
 - Create: `frontend/src/types/canvasSchemas.ts`
 - Modify: `frontend/src/pages/canvas-editor/index.tsx`
 
-- [ ] **Step 1: Add Zod dependency**
+- [x] **Step 1: Add Zod dependency**
 
 Run:
 
@@ -216,7 +222,9 @@ cd frontend && npm install zod
 
 Expected: `package.json` and `package-lock.json` include `zod`.
 
-- [ ] **Step 2: Write schema tests**
+Actual: `zod` was added as a direct dependency.
+
+- [x] **Step 2: Write schema tests**
 
 Create `frontend/src/types/canvasSchemas.test.ts`:
 
@@ -248,7 +256,7 @@ describe('canvasSchemas', () => {
 })
 ```
 
-- [ ] **Step 3: Run schema tests and confirm red state**
+- [x] **Step 3: Run schema tests and confirm red state**
 
 Run:
 
@@ -258,7 +266,9 @@ cd frontend && npm test -- canvasSchemas.test.ts
 
 Expected: FAIL because `canvasSchemas.ts` does not exist.
 
-- [ ] **Step 4: Implement canvas schemas**
+Actual: failed because `./canvasSchemas` could not be resolved.
+
+- [x] **Step 4: Implement canvas schemas**
 
 Create `frontend/src/types/canvasSchemas.ts`:
 
@@ -308,7 +318,7 @@ export function parseCanvasGraph(value: unknown): CanvasGraph {
 }
 ```
 
-- [ ] **Step 5: Validate graph hydration path**
+- [x] **Step 5: Validate graph hydration path**
 
 In `canvas-editor/index.tsx`, parse backend graph JSON before mapping to React Flow nodes:
 
@@ -319,7 +329,9 @@ const graph = parseCanvasGraph(rawGraph)
 
 Show the existing editor error state when parsing throws instead of passing invalid data into React Flow.
 
-- [ ] **Step 6: Run schema and editor hydration tests**
+Actual: `canvas-editor/index.tsx` now parses graph JSON with `parseCanvasGraphJson`, catches invalid graph/local draft payloads, and renders a visible `Alert` with the schema error message.
+
+- [x] **Step 6: Run schema and editor hydration tests**
 
 Run:
 
@@ -328,6 +340,8 @@ cd frontend && npm test -- canvasSchemas.test.ts graphHydration.test.ts
 ```
 
 Expected: PASS.
+
+Actual: `cd frontend && PATH="/opt/homebrew/bin:$PATH" npm run test -- httpClient.test.ts canvasSchemas.test.ts` passed: 2 files, 11 tests.
 
 ### Task 3: Verification And Commit
 
@@ -339,7 +353,7 @@ Expected: PASS.
 - Modify: `docs/product-evolution/specs/p1-007c-frontend-http-client-and-runtime-schemas.md`
 - Modify: `docs/product-evolution/plans/p1-007c-frontend-http-client-and-runtime-schemas-plan.md`
 
-- [ ] **Step 1: Run focused frontend tests**
+- [x] **Step 1: Run focused frontend tests**
 
 Run:
 
@@ -349,7 +363,9 @@ cd frontend && npm test -- httpClient.test.ts api.test.ts canvasSchemas.test.ts 
 
 Expected: PASS.
 
-- [ ] **Step 2: Run frontend build**
+Actual: `cd frontend && PATH="/opt/homebrew/bin:$PATH" npm run test -- httpClient.test.ts api.test.ts canvasSchemas.test.ts graphHydration.test.ts` passed: 16 files, 43 tests.
+
+- [x] **Step 2: Run frontend build**
 
 Run:
 
@@ -358,6 +374,8 @@ cd frontend && npm run build
 ```
 
 Expected: PASS.
+
+Actual: `cd frontend && PATH="/opt/homebrew/bin:$PATH" npm run build` passed.
 
 - [ ] **Step 3: Commit**
 
@@ -369,3 +387,5 @@ git commit -m "refactor: add frontend http client and runtime schemas"
 ```
 
 Expected: commit contains only HTTP client, runtime schema, editor validation, tests, package metadata, and related docs.
+
+Actual: skipped in this session because the user requested implementation without committing.

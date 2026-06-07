@@ -34,6 +34,21 @@ frontend:
     minReplicas: 2
     maxReplicas: 6
 
+flink:
+  enabled: true
+  image:
+    repository: registry.example.com/marketing-canvas/canvas-flink-jobs
+    tag: prod
+  config:
+    tenantId: "0"
+    reportedBy: canvas-flink-jobs-prod
+    parallelismDefault: "4"
+  taskManager:
+    replicas: 4
+  storage:
+    checkpointStorageSize: 100Gi
+    savepointStorageSize: 100Gi
+
 ingress:
   host: canvas.example.com
   tls:

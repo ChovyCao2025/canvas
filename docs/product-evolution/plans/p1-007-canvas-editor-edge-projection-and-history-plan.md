@@ -8,6 +8,8 @@
 
 **Tech Stack:** React 18, TypeScript, React Flow, Vitest.
 
+**Implementation Status:** Implemented on 2026-06-05. The repo already had `editorSnapshot.ts` and history hook scaffolding, so this slice completed the missing projection guard by deriving display edges from node `bizConfig` in `useCanvasGraphState.ts`. Commit step was not executed because the user requested no commit.
+
 ---
 
 ## Spec Reference
@@ -26,6 +28,8 @@
 - Modify: `frontend/src/pages/canvas-editor/outletRouting.test.ts`
 - Create: `frontend/src/pages/canvas-editor/editorSnapshot.ts`
 - Create: `frontend/src/pages/canvas-editor/editorSnapshot.test.ts`
+- Create: `frontend/src/pages/canvas-editor/useCanvasGraphState.test.ts`
+- Modify: `frontend/src/pages/canvas-editor/useCanvasGraphState.ts`
 - Modify: `frontend/src/pages/canvas-editor/index.tsx`
 
 ### Task 1: Stale Edge Projection And Snapshot Tests
@@ -35,7 +39,7 @@
 - Create: `frontend/src/pages/canvas-editor/editorSnapshot.test.ts`
 - Create: `frontend/src/pages/canvas-editor/editorSnapshot.ts`
 
-- [ ] **Step 1: Add stale edge projection test**
+- [x] **Step 1: Add stale edge projection test**
 
 Append to `outletRouting.test.ts`:
 
@@ -53,7 +57,7 @@ it('does not derive stale edges after bizConfig target is cleared', () => {
 })
 ```
 
-- [ ] **Step 2: Add deep snapshot tests**
+- [x] **Step 2: Add deep snapshot tests**
 
 Create `frontend/src/pages/canvas-editor/editorSnapshot.test.ts`:
 
@@ -82,7 +86,7 @@ describe('editorSnapshot', () => {
 })
 ```
 
-- [ ] **Step 3: Run tests and confirm red state**
+- [x] **Step 3: Run tests and confirm red state**
 
 Run:
 
@@ -90,9 +94,9 @@ Run:
 cd frontend && npm test -- outletRouting.test.ts editorSnapshot.test.ts
 ```
 
-Expected: FAIL because `editorSnapshot.ts` does not exist.
+Expected: FAIL because `editorSnapshot.ts` does not exist. Actual red state for this continuation was the missing `deriveCanvasDisplayEdges` helper in `useCanvasGraphState.ts`, proving stale edge state still influenced display projection.
 
-- [ ] **Step 4: Implement snapshot helper**
+- [x] **Step 4: Implement snapshot helper**
 
 Create `frontend/src/pages/canvas-editor/editorSnapshot.ts`:
 
@@ -119,7 +123,7 @@ export function cloneEditorSnapshot(snapshot: EditorSnapshot): EditorSnapshot {
 }
 ```
 
-- [ ] **Step 5: Run projection and snapshot tests**
+- [x] **Step 5: Run projection and snapshot tests**
 
 Run:
 
@@ -127,7 +131,7 @@ Run:
 cd frontend && npm test -- outletRouting.test.ts editorSnapshot.test.ts
 ```
 
-Expected: PASS.
+Expected: PASS. Confirmed with `useCanvasGraphState.test.ts`, `outletRouting.test.ts`, and `editorSnapshot.test.ts`: 19 tests, 0 failures.
 
 ### Task 2: Derive Display Edges From Nodes
 
@@ -136,7 +140,7 @@ Expected: PASS.
 - Test: `frontend/src/pages/canvas-editor/connectionInteraction.test.ts`
 - Test: `frontend/src/pages/canvas-editor/graphHydration.test.ts`
 
-- [ ] **Step 1: Replace independent business edge state**
+- [x] **Step 1: Replace independent business edge state**
 
 In `canvas-editor/index.tsx`, keep transient React Flow edge changes only for UI gestures. Derive persisted display edges from current nodes:
 
@@ -155,7 +159,9 @@ const routedEdges = useMemo(() => deriveEdges(backendNodes), [backendNodes])
 const displayEdges = useMemo(() => [...routedEdges, ...phEdges], [routedEdges, phEdges])
 ```
 
-- [ ] **Step 2: Route connect/delete through bizConfig helpers**
+Actual implementation keeps React Flow edge state only as an interaction compatibility layer and exposes `edges: routedEdges`; `displayEdges` is derived through `deriveCanvasDisplayEdges(realNodes, edgeState, phEdges)`, which ignores stale edge state.
+
+- [x] **Step 2: Route connect/delete through bizConfig helpers**
 
 Update connect and delete handlers so their durable action is node config mutation:
 
@@ -175,7 +181,7 @@ setNodes(current => current.map(node => {
 
 For edge deletion, call `clearEdgeRef(data.bizConfig ?? {}, edge, data.outletSchema)` on the source node, then let `routedEdges` drop the display edge.
 
-- [ ] **Step 3: Use immutable snapshot helper in history**
+- [x] **Step 3: Use immutable snapshot helper in history**
 
 Replace shallow history pushes:
 
@@ -185,7 +191,7 @@ setHistory(h => [...h.slice(-49), cloneEditorSnapshot({ nodes, edges: routedEdge
 
 Use cloned snapshots for undo/redo restoration.
 
-- [ ] **Step 4: Run editor routing regression tests**
+- [x] **Step 4: Run editor routing regression tests**
 
 Run:
 
@@ -202,7 +208,7 @@ Expected: PASS.
 - Modify: `docs/product-evolution/specs/p1-007-canvas-editor-edge-projection-and-history.md`
 - Modify: `docs/product-evolution/plans/p1-007-canvas-editor-edge-projection-and-history-plan.md`
 
-- [ ] **Step 1: Run broader editor tests**
+- [x] **Step 1: Run broader editor tests**
 
 Run:
 
@@ -210,9 +216,9 @@ Run:
 cd frontend && npm test -- graphHydration.test.ts graphReloadKey.test.ts insertNode.test.ts outletRouting.test.ts connectionInteraction.test.ts settingsPresentation.test.ts localDraft.test.ts canvasEditorClipboard.test.tsx
 ```
 
-Expected: PASS.
+Expected: PASS. Actual: 11 test files, 51 tests, 0 failures.
 
-- [ ] **Step 2: Run frontend build**
+- [x] **Step 2: Run frontend build**
 
 Run:
 
@@ -220,9 +226,9 @@ Run:
 cd frontend && npm run build
 ```
 
-Expected: PASS with TypeScript and Vite build success.
+Expected: PASS with TypeScript and Vite build success. Actual: PASS.
 
-- [ ] **Step 3: Commit**
+- [ ] **Step 3: Commit** - skipped in this session per user instruction not to commit.
 
 Run:
 

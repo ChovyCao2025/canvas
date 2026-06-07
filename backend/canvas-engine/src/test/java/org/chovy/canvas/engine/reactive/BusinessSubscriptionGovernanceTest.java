@@ -30,7 +30,10 @@ class BusinessSubscriptionGovernanceTest {
     private static void assertManagedSubscriptionsOnly(String sourcePath) throws Exception {
         String source = Files.readString(Path.of(sourcePath));
 
-        assertThat(source).contains("BackgroundSubscriptionRegistry");
+        assertThat(source)
+                .satisfiesAnyOf(
+                        s -> assertThat(s).contains("BackgroundSubscriptionRegistry"),
+                        s -> assertThat(s).contains("TrackedReactiveTaskRegistry"));
         assertThat(source).doesNotContain(".subscribe(");
     }
 }

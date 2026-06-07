@@ -55,6 +55,31 @@ public class CanvasOpsService {
         this.stateTransitionPolicy = stateTransitionPolicy;
     }
 
+    @Autowired
+    public CanvasOpsService(CanvasMapper canvasMapper,
+                            CanvasVersionMapper canvasVersionMapper,
+                            CanvasExecutionMapper executionMapper,
+                            CanvasExecutionRequestMapper executionRequestMapper,
+                            TriggerRouteService triggerRouteService,
+                            TriggerPreCheckService preCheckService,
+                            CanvasTransactionService canvasTransactionService,
+                            CanvasStateTransitionPolicy stateTransitionPolicy,
+                            CanvasService canvasService,
+                            StringRedisTemplate redis) {
+        this.canvasMapper = canvasMapper;
+        this.canvasVersionMapper = canvasVersionMapper;
+        this.executionMapper = executionMapper;
+        this.executionRequestMapper = executionRequestMapper;
+        this.triggerRouteService = triggerRouteService;
+        this.preCheckService = preCheckService;
+        this.canvasTransactionService = canvasTransactionService;
+        this.canvasService = canvasService;
+        this.redis = redis;
+        this.stateTransitionPolicy = stateTransitionPolicy == null
+                ? new CanvasStateTransitionPolicy()
+                : stateTransitionPolicy;
+    }
+
     /**
      * 带乐观锁更新画布草稿信息
      * @param id 画布 ID
@@ -104,21 +129,22 @@ public class CanvasOpsService {
      * 外部副作用失败不会回滚 DB，路由/缓存最终会通过 TTL 或下次操作自愈。
      */
     public void kill(Long id, String mode) {
-        CanvasDO canvas = require(id);
+        CanvasDO canvas = canvasMapper.selectById(id);
         // Step 1: 事务内 DB 操作，返回下线前的 publishedVersionId 供外部清理使用
         Long publishedVersionId = canvasTransactionService.killDb(id);
+        Long tenantId = canvas == null ? null : canvas.getTenantId();
 
         // Step 2: 事务外副作用
         // 广播 Kill 信号（Phase 11 Redis Pub/Sub），各机器收到后立即取消正在进行的执行
         redis.convertAndSend("canvas:kill:" + id, mode);
         if ("FORCE".equalsIgnoreCase(mode)) {
             // FORCE 模式需要同步落库终止存量 RUNNING 记录，避免执行态长期悬挂。
-            markRunningExecutionsFailed(id, canvas.getTenantId());
-            if (canvas.getTenantId() == null) {
+            markRunningExecutionsFailed(id, tenantId);
+            if (tenantId == null) {
                 executionRequestMapper.markForceCancelledByCanvas(id, java.time.LocalDateTime.now());
             } else {
                 executionRequestMapper.markForceCancelledByCanvasAndTenant(
-                        id, canvas.getTenantId(), java.time.LocalDateTime.now());
+                        id, tenantId, java.time.LocalDateTime.now());
             }
         }
         // 清理触发路由、调度任务、缓存、配额

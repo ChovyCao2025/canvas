@@ -29,6 +29,12 @@ class MessageSendRecordControllerTest {
     }
 
     @Test
+    void messageSendRecordPrimaryKeyIsMappedToIdColumn() {
+        assertThat(TableInfoHelper.getTableInfo(MessageSendRecordDO.class).getKeyColumn())
+                .isEqualTo("id");
+    }
+
+    @Test
     void listFiltersByCanvasUserChannelAndStatus() {
         MessageSendRecordMapper mapper = mock(MessageSendRecordMapper.class);
         MessageSendRecordController controller = new MessageSendRecordController(mapper);

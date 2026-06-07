@@ -160,7 +160,7 @@ All compiled queries must include tenant, event code, bounded time window, row l
 
 ## Technical Scope
 
-- `backend/canvas-engine/src/main/resources/db/migration/V189__cdp_olap_audience_materialization.sql`
+- `backend/canvas-engine/src/main/resources/db/migration/V214__cdp_olap_audience_materialization.sql`
 - `backend/canvas-engine/src/main/resources/infrastructure/doris/cdp-audience-ddl.sql`
 - `backend/canvas-engine/src/main/java/org/chovy/canvas/dal/dataobject/CdpUserIndexDO.java`
 - `backend/canvas-engine/src/main/java/org/chovy/canvas/dal/dataobject/AudienceBitmapVersionDO.java`

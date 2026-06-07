@@ -48,9 +48,10 @@ export interface ConversationMessage {
   messageType: string
   externalMessageId?: string
   text?: string
+  textContent?: string
   intent?: string
   content: Record<string, unknown>
-  createdAt: string
+  createdAt?: string
 }
 
 export function formatConversationStatus(status: string) {
@@ -78,7 +79,7 @@ export function conversationMessageLine(message: ConversationMessage) {
     message.direction || '-',
     message.messageType || '-',
     message.intent ?? '-',
-    message.text,
+    message.text ?? message.textContent,
   ].filter((part) => part !== undefined && part !== null && String(part).trim() !== '')
   if (parts.length <= 2) parts.push('-')
   return parts.map(String).join(' · ')

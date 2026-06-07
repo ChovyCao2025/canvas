@@ -37,6 +37,7 @@ public class ProductionSecurityValidator implements SmartInitializingSingleton {
         validateDataSourceCredentialSecret(failures);
         validateJwt(failures);
         validateEventSecret(failures);
+        validateAssetUploadWebhookSecret(failures);
         validateCors(failures);
         validateHealthDetails(failures);
         validateApiDocs(failures);
@@ -104,6 +105,17 @@ public class ProductionSecurityValidator implements SmartInitializingSingleton {
         }
         if (secret.getBytes(StandardCharsets.UTF_8).length < 32) {
             failures.add("canvas.events.report-secret 长度不能少于 32 字节");
+        }
+    }
+
+    private void validateAssetUploadWebhookSecret(List<String> failures) {
+        String secret = value("canvas.marketing.content.asset-upload.webhook-secret");
+        if (secret == null || secret.isBlank()) {
+            failures.add("canvas.marketing.content.asset-upload.webhook-secret 必须配置");
+            return;
+        }
+        if (secret.getBytes(StandardCharsets.UTF_8).length < 32) {
+            failures.add("canvas.marketing.content.asset-upload.webhook-secret 长度不能少于 32 字节");
         }
     }
 

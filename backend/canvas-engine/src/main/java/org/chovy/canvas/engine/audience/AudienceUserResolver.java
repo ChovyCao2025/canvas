@@ -2,6 +2,7 @@ package org.chovy.canvas.engine.audience;
 
 import org.chovy.canvas.dal.dataobject.AudienceDefinitionDO;
 import org.chovy.canvas.dal.mapper.AudienceDefinitionMapper;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.jdbc.DataSourceBuilder;
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
 import org.springframework.stereotype.Service;
@@ -31,6 +32,7 @@ public class AudienceUserResolver {
     private final SqlWhereGenerator sqlWhereGenerator;
     private final DataSourceFactory dataSourceFactory;
 
+    @Autowired
     public AudienceUserResolver(
             AudienceDefinitionMapper definitionMapper,
             CdpAudienceSourceService cdpAudienceSourceService,

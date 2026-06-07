@@ -205,6 +205,12 @@ public final class MapFieldKeys {
     /** 等待恢复状态(内部键)。 */
     public static final String WAIT_RESUME_STATUS = "__waitResumeStatus";
 
+    /** 审批实例 ID。 */
+    public static final String APPROVAL_INSTANCE_ID = "approvalInstanceId";
+
+    /** 审批任务状态。 */
+    public static final String APPROVAL_STATUS = "approvalStatus";
+
     /** 通用类型字段。 */
     public static final String TYPE = "type";
 

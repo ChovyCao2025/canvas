@@ -43,6 +43,7 @@ import {
   YAxis,
 } from 'recharts'
 import { homeApi } from '../../services/api'
+import { platformWorkstreamApi } from '../../services/platformWorkstreamApi'
 import {
   buildKpiCards,
   buildRiskSummary,
@@ -58,6 +59,13 @@ import {
   type KpiCard,
   type RiskSummary,
 } from './homeOverview'
+import {
+  blockedWorkstreamCount,
+  groupWorkstreamsByStatus,
+  workstreamStatusColor,
+  workstreamStatusText,
+  type PlatformWorkstreamStatus,
+} from './platformCommandCenter'
 
 /** 首页常用文本组件别名。 */
 const { Text, Title } = Typography
@@ -71,6 +79,9 @@ export default function HomePage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [keyword, setKeyword] = useState('')
+  const [workstreams, setWorkstreams] = useState<PlatformWorkstreamStatus[]>([])
+  const [workstreamsLoading, setWorkstreamsLoading] = useState(true)
+  const [workstreamsError, setWorkstreamsError] = useState<string | null>(null)
 
   /** 拉取首页聚合数据；失败时保留旧 overview，仅展示错误提示。 */
   const load = useCallback(async () => {
@@ -87,6 +98,21 @@ export default function HomePage() {
   }, [days])
 
   useEffect(() => { load() }, [load])
+
+  const loadWorkstreams = useCallback(async () => {
+    setWorkstreamsLoading(true)
+    setWorkstreamsError(null)
+    try {
+      const res = await platformWorkstreamApi.list()
+      setWorkstreams(res.data ?? [])
+    } catch (err) {
+      setWorkstreamsError(err instanceof Error ? err.message : '平台工作流加载失败')
+    } finally {
+      setWorkstreamsLoading(false)
+    }
+  }, [])
+
+  useEffect(() => { loadWorkstreams() }, [loadWorkstreams])
 
   // KPI 卡片展示模型由纯函数生成，避免 JSX 中混入单位、图标和颜色规则。
   const kpiCards = useMemo(() => overview ? buildKpiCards(overview) : [], [overview])
@@ -219,6 +245,13 @@ export default function HomePage() {
             </Col>
           </Row>
 
+          <PlatformWorkstreamPanel
+            rows={workstreams}
+            loading={workstreamsLoading}
+            error={workstreamsError}
+            onReload={loadWorkstreams}
+          />
+
           <Row gutter={[16, 16]}>
             <Col xs={24} xl={14}>
               <Card title="Top 旅程表现" variant="borderless" style={cardStyle}
@@ -249,6 +282,72 @@ export default function HomePage() {
         </>
       ) : null}
     </div>
+  )
+}
+
+function PlatformWorkstreamPanel({ rows, loading, error, onReload }: {
+  rows: PlatformWorkstreamStatus[]
+  loading: boolean
+  error: string | null
+  onReload: () => void
+}) {
+  const groups = groupWorkstreamsByStatus(rows)
+  const blockedCount = blockedWorkstreamCount(rows)
+  const readyCount = rows.length - blockedCount
+
+  return (
+    <Card
+      title="平台工作流"
+      variant="borderless"
+      style={{ ...cardStyle, marginBottom: 18 }}
+      extra={<Button size="small" icon={<ReloadOutlined />} onClick={onReload}>刷新</Button>}
+    >
+      {error ? (
+        <Alert
+          type="warning"
+          showIcon
+          message="平台工作流加载失败"
+          description={error}
+          action={<Button size="small" onClick={onReload}>重试</Button>}
+        />
+      ) : loading ? (
+        <Spin style={{ display: 'block', margin: '24px auto' }} />
+      ) : rows.length === 0 ? (
+        <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="暂无平台工作流" />
+      ) : (
+        <Space direction="vertical" size={12} style={{ width: '100%' }}>
+          <Space wrap size={12}>
+            <Metric label="待拆子规格" value={blockedCount.toLocaleString()} />
+            <Metric label="可进入子规格" value={readyCount.toLocaleString()} />
+          </Space>
+          <List
+            dataSource={[
+              ...groups.BLOCKED_CHILD_SPEC_REQUIRED,
+              ...groups.READY_FOR_CHILD_EXECUTION,
+            ]}
+            renderItem={item => (
+              <List.Item style={{ padding: '10px 0' }}>
+                <List.Item.Meta
+                  title={(
+                    <Space size={8} wrap>
+                      <Text strong>{item.displayName}</Text>
+                      <Tag>{item.priority}</Tag>
+                      <Tag color={workstreamStatusColor(item.status)}>{workstreamStatusText(item.status)}</Tag>
+                    </Space>
+                  )}
+                  description={(
+                    <Space direction="vertical" size={2}>
+                      <Text type="secondary">{item.summary}</Text>
+                      {item.childSpecPath && <Text type="secondary" style={{ fontSize: 12 }}>{item.childSpecPath}</Text>}
+                    </Space>
+                  )}
+                />
+              </List.Item>
+            )}
+          />
+        </Space>
+      )}
+    </Card>
   )
 }
 

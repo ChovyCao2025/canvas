@@ -51,6 +51,26 @@ public class DataSourceConfigService {
     }
 
     @Transactional
+    public void rotatePassword(Long id, String rawPassword, TenantContext operator) {
+        requireText(rawPassword, "password");
+        Long tenantId = requireTenantId(operator);
+        DataSourceConfigDO existing = requireVisible(id, operator);
+        DataSourceConfigDO rotated = new DataSourceConfigDO();
+        rotated.setId(id);
+        rotated.setTenantId(tenantId);
+        rotated.setName(existing.getName());
+        rotated.setType(existing.getType());
+        rotated.setUrl(existing.getUrl());
+        rotated.setUsername(existing.getUsername());
+        rotated.setPassword(credentialCipher.encrypt(rawPassword));
+        rotated.setDriverClassName(existing.getDriverClassName());
+        rotated.setDescription(existing.getDescription());
+        rotated.setEnabled(existing.getEnabled());
+        rotated.setCreatedBy(existing.getCreatedBy());
+        dataSourceConfigMapper.updateById(rotated);
+    }
+
+    @Transactional
     public void delete(Long id, TenantContext operator) {
         requireVisible(id, operator);
         dataSourceConfigMapper.deleteById(id);

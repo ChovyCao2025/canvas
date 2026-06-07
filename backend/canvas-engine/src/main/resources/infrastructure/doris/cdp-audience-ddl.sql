@@ -5,8 +5,8 @@ CREATE DATABASE IF NOT EXISTS canvas_dws;
 CREATE TABLE IF NOT EXISTS canvas_ods.cdp_event_log (
     tenant_id BIGINT NOT NULL,
     event_log_id BIGINT NOT NULL,
-    message_id VARCHAR(128),
     event_code VARCHAR(128) NOT NULL,
+    message_id VARCHAR(128),
     user_id VARCHAR(128),
     anonymous_id VARCHAR(128),
     session_id VARCHAR(128),

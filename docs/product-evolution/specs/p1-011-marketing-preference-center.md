@@ -73,3 +73,12 @@ Add an operator-facing marketing preference center that lets authenticated opera
 - Frontend tests prove endpoint contracts and presentation labels.
 - The page is reachable from the authenticated app navigation as `偏好中心`.
 - Focused backend tests, focused frontend tests, and frontend production build pass.
+
+## Implementation Status
+
+Completed on 2026-06-05.
+
+- `MarketingPreferenceCenterService` composes tenant-scoped user preference reports and writes consent, channel, suppression, and suppression deactivation records on top of the existing policy tables.
+- `MarketingPreferenceCenterController` exposes `/canvas/marketing-preferences` endpoints with tenant fallback and `R.ok` response wrapping.
+- Frontend `marketingPreferencesApi`, presentation helpers, route, navigation, route announcement, and the operator workbench are wired into the authenticated app as `偏好中心`.
+- This session reverified focused backend tests, focused frontend tests, and the frontend production build.

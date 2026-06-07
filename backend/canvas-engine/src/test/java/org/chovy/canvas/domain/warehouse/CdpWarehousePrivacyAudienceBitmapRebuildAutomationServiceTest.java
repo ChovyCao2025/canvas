@@ -121,6 +121,50 @@ class CdpWarehousePrivacyAudienceBitmapRebuildAutomationServiceTest {
         verify(rebuildService).rebuild(9L, 101L, rebuildCommand);
     }
 
+    @Test
+    void rebuildExceptionRecordsFailedRequestAndContinuesCycle() {
+        CdpWarehousePrivacyErasureService erasureService = mock(CdpWarehousePrivacyErasureService.class);
+        CdpWarehousePrivacyAudienceBitmapRebuildService rebuildService =
+                mock(CdpWarehousePrivacyAudienceBitmapRebuildService.class);
+        CdpWarehousePrivacyErasureService.ErasureRequestView first = request(101L, "WARN",
+                proof(101L, "CDP_USER_PROFILE", "PASS"),
+                proof(101L, "AUDIENCE_BITMAP_VERSION", "WARN"));
+        CdpWarehousePrivacyErasureService.ErasureRequestView second = request(102L, "WARN",
+                proof(102L, "CDP_USER_PROFILE", "PASS"),
+                proof(102L, "AUDIENCE_BITMAP_VERSION", "WARN"));
+        when(erasureService.recent(9L, null, 20)).thenReturn(List.of(first, second));
+        CdpWarehousePrivacyAudienceBitmapRebuildService.AudienceBitmapRebuildCommand rebuildCommand =
+                new CdpWarehousePrivacyAudienceBitmapRebuildService.AudienceBitmapRebuildCommand(
+                        "privacy-rebuild-scheduler", 50, null);
+        when(rebuildService.rebuild(9L, 101L, rebuildCommand))
+                .thenThrow(new IllegalStateException("bitmap store unavailable"));
+        when(rebuildService.rebuild(9L, 102L, rebuildCommand)).thenReturn(rebuildResult(102L, "PASS"));
+        CdpWarehousePrivacyAudienceBitmapRebuildAutomationService service =
+                new CdpWarehousePrivacyAudienceBitmapRebuildAutomationService(erasureService, rebuildService);
+
+        CdpWarehousePrivacyAudienceBitmapRebuildAutomationService.AutomationResult result =
+                service.run(9L, new CdpWarehousePrivacyAudienceBitmapRebuildAutomationService.AutomationCommand(
+                        "privacy-rebuild-scheduler", 20, 50, false));
+
+        assertThat(result.status()).isEqualTo("FAIL");
+        assertThat(result.scanned()).isEqualTo(2);
+        assertThat(result.eligible()).isEqualTo(2);
+        assertThat(result.triggered()).isEqualTo(2);
+        assertThat(result.failed()).isEqualTo(1);
+        assertThat(result.requestResults()).hasSize(2);
+        assertThat(result.requestResults().get(0)).satisfies(item -> {
+            assertThat(item.requestId()).isEqualTo(101L);
+            assertThat(item.status()).isEqualTo("FAIL");
+            assertThat(item.reason()).contains("bitmap store unavailable");
+        });
+        assertThat(result.requestResults().get(1)).satisfies(item -> {
+            assertThat(item.requestId()).isEqualTo(102L);
+            assertThat(item.status()).isEqualTo("PASS");
+        });
+        verify(rebuildService).rebuild(9L, 101L, rebuildCommand);
+        verify(rebuildService).rebuild(9L, 102L, rebuildCommand);
+    }
+
     private CdpWarehousePrivacyAudienceBitmapRebuildService.AudienceBitmapRebuildResult rebuildResult(
             Long requestId,
             String status) {
@@ -153,11 +197,15 @@ class CdpWarehousePrivacyAudienceBitmapRebuildAutomationServiceTest {
     }
 
     private CdpWarehousePrivacyErasureService.AssetProofView proof(String assetKey, String status) {
+        return proof(101L, assetKey, status);
+    }
+
+    private CdpWarehousePrivacyErasureService.AssetProofView proof(Long requestId, String assetKey, String status) {
         return new CdpWarehousePrivacyErasureService.AssetProofView(
                 null,
                 9L,
-                101L,
-                "dsr-101",
+                requestId,
+                "dsr-" + requestId,
                 assetKey,
                 assetKey.startsWith("AUDIENCE") ? "ADS" : "CDP",
                 "ERASURE_PROOF",

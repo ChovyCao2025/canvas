@@ -2,7 +2,9 @@ package org.chovy.canvas.domain.analytics;
 
 import org.chovy.canvas.domain.warehouse.CdpWarehouseJobLeaseService;
 import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Value;
 
+import java.lang.reflect.Constructor;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -19,6 +21,12 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 class CdpWarehouseAudienceMaterializationSchedulerTest {
+
+    @Test
+    void availabilityGateIsDisabledByDefaultAndMustBeOptedIn() {
+        assertThat(autowiredValue("${canvas.warehouse.audience-materialization-scheduler.availability-gate.enabled:"))
+                .isEqualTo("${canvas.warehouse.audience-materialization-scheduler.availability-gate.enabled:false}");
+    }
 
     @Test
     void disabledSchedulerSkipsCycle() {
@@ -134,5 +142,17 @@ class CdpWarehouseAudienceMaterializationSchedulerTest {
 
         assertThat(executed).isTrue();
         assertThat(nestedExecuted).isFalse();
+    }
+
+    private String autowiredValue(String prefix) {
+        for (Constructor<?> constructor : CdpWarehouseAudienceMaterializationScheduler.class.getConstructors()) {
+            for (java.lang.reflect.Parameter parameter : constructor.getParameters()) {
+                Value value = parameter.getAnnotation(Value.class);
+                if (value != null && value.value().startsWith(prefix)) {
+                    return value.value();
+                }
+            }
+        }
+        throw new AssertionError("missing @Value for " + prefix);
     }
 }

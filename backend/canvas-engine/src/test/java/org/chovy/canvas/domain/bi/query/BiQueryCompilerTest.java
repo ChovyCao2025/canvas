@@ -146,4 +146,87 @@ class BiQueryCompilerTest {
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("limit");
     }
+
+    @Test
+    void appendsOffsetForPagedRequests() {
+        BiQueryRequest request = new BiQueryRequest(
+                "canvas_daily_stats",
+                List.of("stat_date"),
+                List.of("total_executions"),
+                List.of(),
+                List.of(new BiSort("stat_date", BiSort.Direction.ASC)),
+                10000,
+                20000
+        );
+
+        BiCompiledQuery query = compiler.compile(dataset, request, 7L);
+
+        assertThat(query.sql()).endsWith("""
+                ORDER BY stat_date ASC
+                LIMIT 10000
+                OFFSET 20000
+                """.stripTrailing());
+    }
+
+    @Test
+    void bindsSqlDatasetTemplateParametersBeforeTenantAndFilters() {
+        BiDatasetSpec sqlDataset = new BiDatasetSpec(
+                "campaign_sql",
+                "(SELECT tenant_id, stat_date, total_cost FROM campaign_daily WHERE stat_date >= ? AND channel = ?) sql_dataset",
+                "tenant_id",
+                Map.of(
+                        "stat_date", new BiFieldSpec("stat_date", "stat_date", BiFieldSpec.Role.DIMENSION, "DATE"),
+                        "total_cost", new BiFieldSpec("total_cost", "total_cost", BiFieldSpec.Role.MEASURE, "NUMBER")),
+                Map.of("total_cost", new BiMetricSpec("total_cost", "SUM(total_cost)", "NUMBER")),
+                List.of(
+                        new BiSqlParameterSpec("start_date", "DATE", true, null, List.of()),
+                        new BiSqlParameterSpec("channel", "STRING", false, "PAID", List.of("PAID", "EMAIL"))));
+        BiQueryRequest request = new BiQueryRequest(
+                "campaign_sql",
+                null,
+                List.of("stat_date"),
+                List.of("total_cost"),
+                List.of(new BiFilter("stat_date", BiFilter.Operator.LTE, "2026-06-30")),
+                List.of(new BiSort("stat_date", BiSort.Direction.ASC)),
+                100,
+                0,
+                Map.of("start_date", "2026-06-01"));
+
+        BiCompiledQuery query = compiler.compile(sqlDataset, request, 7L);
+
+        assertThat(query.sql()).isEqualTo("""
+                SELECT stat_date AS stat_date, SUM(total_cost) AS total_cost
+                FROM (SELECT tenant_id, stat_date, total_cost FROM campaign_daily WHERE stat_date >= ? AND channel = ?) sql_dataset
+                WHERE tenant_id = ? AND stat_date <= ?
+                GROUP BY stat_date
+                ORDER BY stat_date ASC
+                LIMIT 100
+                """.stripTrailing());
+        assertThat(query.parameters()).containsExactly("2026-06-01", "PAID", 7L, "2026-06-30");
+    }
+
+    @Test
+    void rejectsSqlDatasetWhenRequiredTemplateParameterIsMissing() {
+        BiDatasetSpec sqlDataset = new BiDatasetSpec(
+                "campaign_sql",
+                "(SELECT tenant_id, stat_date, total_cost FROM campaign_daily WHERE stat_date >= ?) sql_dataset",
+                "tenant_id",
+                Map.of("stat_date", new BiFieldSpec("stat_date", "stat_date", BiFieldSpec.Role.DIMENSION, "DATE")),
+                Map.of("total_cost", new BiMetricSpec("total_cost", "SUM(total_cost)", "NUMBER")),
+                List.of(new BiSqlParameterSpec("start_date", "DATE", true, null, List.of())));
+        BiQueryRequest request = new BiQueryRequest(
+                "campaign_sql",
+                null,
+                List.of("stat_date"),
+                List.of("total_cost"),
+                List.of(),
+                List.of(),
+                100,
+                0,
+                Map.of());
+
+        assertThatThrownBy(() -> compiler.compile(sqlDataset, request, 7L))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("SQL parameter is required: start_date");
+    }
 }

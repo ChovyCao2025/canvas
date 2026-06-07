@@ -14,7 +14,13 @@ services:
       - "3306:3306"
     volumes:
       - canvas-mysql-data:/var/lib/mysql
-    command: --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
+    command: >
+      --character-set-server=utf8mb4
+      --collation-server=utf8mb4_unicode_ci
+      --server-id=1
+      --log-bin=mysql-bin
+      --binlog-format=ROW
+      --binlog-row-image=FULL
 
   redis:
     image: redis:7-alpine
@@ -85,13 +91,13 @@ services:
     ports:
       - "8081:8082"
 
-  # Doris 2.0 OLAP：执行轨迹与报表聚合的本地验证环境。
+  # Doris OLAP：执行轨迹、离线聚合与 Flink realtime warehouse 的本地验证环境。
   doris-fe:
-    image: apache/doris:2.0.3-fe
+    image: apache/doris:fe-2.1.11
     container_name: canvas-doris-fe
     hostname: doris-fe
     environment:
-      - FE_SERVERS=fe1:doris-fe:9010
+      - FE_SERVERS=fe1:172.30.80.2:9010
       - FE_ID=1
     ports:
       - "8030:8030"
@@ -100,14 +106,18 @@ services:
     volumes:
       - canvas-doris-fe-meta:/opt/apache-doris/fe/doris-meta
       - ./infrastructure/doris:/docker-entrypoint-initdb.d:ro
+    networks:
+      default:
+      doris-static:
+        ipv4_address: 172.30.80.2
 
   doris-be:
-    image: apache/doris:2.0.3-be
+    image: apache/doris:be-2.1.11
     container_name: canvas-doris-be
     hostname: doris-be
     environment:
-      - FE_SERVERS=fe1:doris-fe:9010
-      - BE_ADDR=doris-be:9050
+      - FE_SERVERS=fe1:172.30.80.2:9010
+      - BE_ADDR=172.30.80.3:9050
     depends_on:
       - doris-fe
     ports:
@@ -116,6 +126,86 @@ services:
       - "9060:9060"
     volumes:
       - canvas-doris-be-storage:/opt/apache-doris/be/storage
+    networks:
+      default:
+      doris-static:
+        ipv4_address: 172.30.80.3
+
+  # Flink 1.20：CDP realtime warehouse SQL jobs. Start explicitly when needed:
+  # docker compose --profile flink -f docker-compose.local.yml up -d flink-jobmanager flink-taskmanager
+  flink-init:
+    image: flink:1.20.0-scala_2.12-java17
+    profiles:
+      - flink
+    user: "0:0"
+    entrypoint:
+      - bash
+      - -lc
+      - mkdir -p /opt/flink/checkpoints /opt/flink/savepoints && chown -R 9999:9999 /opt/flink/checkpoints /opt/flink/savepoints
+    volumes:
+      - canvas-flink-checkpoints:/opt/flink/checkpoints
+      - canvas-flink-savepoints:/opt/flink/savepoints
+
+  flink-jobmanager:
+    image: flink:1.20.0-scala_2.12-java17
+    container_name: canvas-flink-jobmanager
+    hostname: flink-jobmanager
+    profiles:
+      - flink
+    command: jobmanager
+    environment:
+      - |
+        FLINK_PROPERTIES=
+        jobmanager.rpc.address: flink-jobmanager
+        jobmanager.rpc.port: 6123
+        state.checkpoints.dir: file:///opt/flink/checkpoints
+        state.savepoints.dir: file:///opt/flink/savepoints
+        execution.checkpointing.interval: 5s
+        execution.checkpointing.timeout: 2min
+        execution.checkpointing.min-pause: 2s
+        execution.checkpointing.tolerable-failed-checkpoints: 3
+    ports:
+      - "8082:8081"
+    depends_on:
+      flink-init:
+        condition: service_completed_successfully
+    volumes:
+      - canvas-flink-checkpoints:/opt/flink/checkpoints
+      - canvas-flink-savepoints:/opt/flink/savepoints
+      - ./backend/canvas-flink-jobs/target:/opt/flink/usrlib:ro
+    networks:
+      default:
+      doris-static:
+
+  flink-taskmanager:
+    image: flink:1.20.0-scala_2.12-java17
+    container_name: canvas-flink-taskmanager
+    hostname: flink-taskmanager
+    profiles:
+      - flink
+    command: taskmanager
+    environment:
+      - |
+        FLINK_PROPERTIES=
+        jobmanager.rpc.address: flink-jobmanager
+        jobmanager.rpc.port: 6123
+        taskmanager.memory.process.size: 2048m
+        taskmanager.numberOfTaskSlots: 4
+        state.checkpoints.dir: file:///opt/flink/checkpoints
+        state.savepoints.dir: file:///opt/flink/savepoints
+        execution.checkpointing.interval: 5s
+        execution.checkpointing.timeout: 2min
+        execution.checkpointing.min-pause: 2s
+        execution.checkpointing.tolerable-failed-checkpoints: 3
+    depends_on:
+      - flink-jobmanager
+    volumes:
+      - canvas-flink-checkpoints:/opt/flink/checkpoints
+      - canvas-flink-savepoints:/opt/flink/savepoints
+      - ./backend/canvas-flink-jobs/target:/opt/flink/usrlib:ro
+    networks:
+      default:
+      doris-static:
 
 volumes:
   canvas-mysql-data:
@@ -124,3 +214,12 @@ volumes:
   canvas-rocketmq-store:
   canvas-doris-fe-meta:
   canvas-doris-be-storage:
+  canvas-flink-checkpoints:
+  canvas-flink-savepoints:
+
+networks:
+  doris-static:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.30.80.0/24

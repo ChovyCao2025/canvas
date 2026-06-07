@@ -16,6 +16,7 @@ public class CdpWarehousePrivacyAudienceBitmapRebuildScheduler {
     static final String LEASE_KEY = "CDP_WAREHOUSE_PRIVACY_AUDIENCE_REBUILD";
 
     private final CdpWarehousePrivacyAudienceBitmapRebuildAutomationService automationService;
+    private final CdpWarehousePrivacyAudienceBitmapRebuildAutomationRunService runService;
     private final CdpWarehouseJobLeaseService leaseService;
     private final boolean enabled;
     private final Long tenantId;
@@ -26,9 +27,38 @@ public class CdpWarehousePrivacyAudienceBitmapRebuildScheduler {
     private final long leaseTtlSeconds;
     private final AtomicBoolean running = new AtomicBoolean(false);
 
+    public CdpWarehousePrivacyAudienceBitmapRebuildScheduler(
+            CdpWarehousePrivacyAudienceBitmapRebuildAutomationService automationService,
+            CdpWarehouseJobLeaseService leaseService,
+            boolean enabled,
+            Long tenantId,
+            int scanLimit,
+            int audienceLimit,
+            boolean retryFailed,
+            String actor,
+            long leaseTtlSeconds) {
+        this(automationService, null, leaseService, enabled, tenantId, scanLimit, audienceLimit, retryFailed, actor,
+                leaseTtlSeconds);
+    }
+
+    public CdpWarehousePrivacyAudienceBitmapRebuildScheduler(
+            CdpWarehousePrivacyAudienceBitmapRebuildAutomationService automationService,
+            CdpWarehouseJobLeaseService leaseService,
+            boolean enabled,
+            long tenantId,
+            int scanLimit,
+            int audienceLimit,
+            boolean retryFailed,
+            String actor,
+            long leaseTtlSeconds) {
+        this(automationService, leaseService, enabled, Long.valueOf(tenantId), scanLimit, audienceLimit, retryFailed,
+                actor, leaseTtlSeconds);
+    }
+
     @Autowired
     public CdpWarehousePrivacyAudienceBitmapRebuildScheduler(
             CdpWarehousePrivacyAudienceBitmapRebuildAutomationService automationService,
+            CdpWarehousePrivacyAudienceBitmapRebuildAutomationRunService runService,
             CdpWarehouseJobLeaseService leaseService,
             @Value("${canvas.warehouse.privacy-audience-rebuild-scheduler.enabled:false}") boolean enabled,
             @Value("${canvas.warehouse.privacy-audience-rebuild-scheduler.tenant-id:0}") Long tenantId,
@@ -38,6 +68,7 @@ public class CdpWarehousePrivacyAudienceBitmapRebuildScheduler {
             @Value("${canvas.warehouse.privacy-audience-rebuild-scheduler.actor:privacy-rebuild-scheduler}") String actor,
             @Value("${canvas.warehouse.privacy-audience-rebuild-scheduler.lease-ttl-seconds:60}") long leaseTtlSeconds) {
         this.automationService = automationService;
+        this.runService = runService;
         this.leaseService = leaseService;
         this.enabled = enabled;
         this.tenantId = tenantId == null ? 0L : tenantId;
@@ -68,9 +99,14 @@ public class CdpWarehousePrivacyAudienceBitmapRebuildScheduler {
             return false;
         }
         try {
-            automationService.run(tenantId,
+            CdpWarehousePrivacyAudienceBitmapRebuildAutomationService.AutomationCommand command =
                     new CdpWarehousePrivacyAudienceBitmapRebuildAutomationService.AutomationCommand(
-                            actor, scanLimit, audienceLimit, retryFailed));
+                            actor, scanLimit, audienceLimit, retryFailed);
+            if (runService != null) {
+                runService.runAndRecord(tenantId, command, "SCHEDULED");
+            } else {
+                automationService.run(tenantId, command);
+            }
             return true;
         } finally {
             running.set(false);

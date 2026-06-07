@@ -6,7 +6,9 @@ import jakarta.annotation.PreDestroy;
 import lombok.extern.slf4j.Slf4j;
 import org.chovy.canvas.dto.notification.NotificationDTO;
 import org.chovy.canvas.dto.notification.NotificationRealtimePayload;
+import org.chovy.canvas.engine.reactive.BackgroundSubscriptionRegistry;
 import org.chovy.canvas.infrastructure.redis.RedisKeyUtil;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.redis.connection.ReactiveRedisConnectionFactory;
 import org.springframework.data.redis.core.StringRedisTemplate;
@@ -51,6 +53,8 @@ public class NotificationRealtimeService implements NotificationRealtimePublishe
     private final int maxSessionsPerUser;
     /** 当前服务实例最大 WebSocket 连接数。 */
     private final int maxTotalSessions;
+    /** 后台订阅注册表，统一托管 Redis Pub/Sub 订阅生命周期。 */
+    private final BackgroundSubscriptionRegistry backgroundSubscriptions;
     /** 响应式 Redis 监听容器，用于订阅跨实例实时通知频道。 */
     private ReactiveRedisMessageListenerContainer listenerContainer;
     /** Redis 通知频道订阅句柄，应用关闭时释放。 */
@@ -64,12 +68,28 @@ public class NotificationRealtimeService implements NotificationRealtimePublishe
             RedisKeyUtil keys,
             @Value("${canvas.notifications.websocket.max-sessions-per-user:5}") int maxSessionsPerUser,
             @Value("${canvas.notifications.websocket.max-total-sessions:1000}") int maxTotalSessions) {
+        this(objectMapper, redis, reactiveRedisConnectionFactory, keys,
+                maxSessionsPerUser, maxTotalSessions, new BackgroundSubscriptionRegistry());
+    }
+
+    @Autowired
+    public NotificationRealtimeService(
+            ObjectMapper objectMapper,
+            StringRedisTemplate redis,
+            ReactiveRedisConnectionFactory reactiveRedisConnectionFactory,
+            RedisKeyUtil keys,
+            @Value("${canvas.notifications.websocket.max-sessions-per-user:5}") int maxSessionsPerUser,
+            @Value("${canvas.notifications.websocket.max-total-sessions:1000}") int maxTotalSessions,
+            BackgroundSubscriptionRegistry backgroundSubscriptions) {
         this.objectMapper = objectMapper;
         this.redis = redis;
         this.reactiveRedisConnectionFactory = reactiveRedisConnectionFactory;
         this.keys = keys;
         this.maxSessionsPerUser = Math.max(1, maxSessionsPerUser);
         this.maxTotalSessions = Math.max(1, maxTotalSessions);
+        this.backgroundSubscriptions = backgroundSubscriptions == null
+                ? new BackgroundSubscriptionRegistry()
+                : backgroundSubscriptions;
     }
 
     /** 订阅 Redis 实时通知频道，接收其他实例发布的通知。 */
@@ -77,9 +97,11 @@ public class NotificationRealtimeService implements NotificationRealtimePublishe
     public void subscribeRedisChannel() {
         try {
             listenerContainer = new ReactiveRedisMessageListenerContainer(reactiveRedisConnectionFactory);
-            subscription = listenerContainer.receive(ChannelTopic.of(keys.notificationChannel()))
-                    .subscribe(message -> handleRemote(message.getMessage()),
-                            e -> log.error("[NOTIFICATION_WS] Redis 订阅异常: {}", e.getMessage(), e));
+            subscription = backgroundSubscriptions.track(
+                    "notification-realtime-redis",
+                    listenerContainer.receive(ChannelTopic.of(keys.notificationChannel()))
+                            .doOnNext(message -> handleRemote(message.getMessage())),
+                    e -> log.error("[NOTIFICATION_WS] Redis 订阅异常: {}", e.getMessage(), e));
         } catch (Exception e) {
             log.warn("[NOTIFICATION_WS] Redis 订阅启动失败，降级为单实例本地推送: {}", e.getMessage());
         }

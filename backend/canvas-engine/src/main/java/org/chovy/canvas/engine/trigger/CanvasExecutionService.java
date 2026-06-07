@@ -177,7 +177,7 @@ public class CanvasExecutionService {
 
                     ExecutionContext ctx = newContext(canvasId, -1L, userId, TriggerType.DRY_RUN);
                     ctx.setTenantId(canvas.getTenantId());
-                    ctx.getTriggerPayload().putAll(triggerAdmissionService.sanitizePayload(payload));
+                    ctx.putTriggerPayloadValues(triggerAdmissionService.sanitizePayload(payload));
                     ctx.setPerfRunId(PerfRunContext.extract(ctx.getTriggerPayload()));
 
                     DagGraph graph;
@@ -636,7 +636,7 @@ public class CanvasExecutionService {
             ctx.setTenantId(canvas.getTenantId());
             populateContext(triggerType, triggerNodeType, matchKey, payload, ctx);
             ctx.setQuotaBypass(quotaBypass);
-            ctx.getTriggerPayload().put(MapFieldKeys.EXECUTION_LANE, executionLane.name());
+            ctx.putTriggerPayloadValues(Map.of(MapFieldKeys.EXECUTION_LANE, executionLane.name()));
 
 
             // 查找画布内容
@@ -698,7 +698,7 @@ public class CanvasExecutionService {
         ctx.setTriggerType(triggerType);
         ctx.setTriggerNodeType(triggerNodeType);
         ctx.setMatchKey(matchKey);
-        ctx.getTriggerPayload().putAll(triggerAdmissionService.sanitizePayload(payload));
+        ctx.putTriggerPayloadValues(triggerAdmissionService.sanitizePayload(payload));
         putCurrentTraceId(ctx);
         ctx.setPerfRunId(PerfRunContext.extract(ctx.getTriggerPayload()));
     }
@@ -779,15 +779,14 @@ public class CanvasExecutionService {
         ctx.setVersionId(versionId);
         ctx.setUserId(userId);
         ctx.setTriggerType(triggerType);
-        if (userId != null) ctx.getTriggerPayload().put(MapFieldKeys.USER_ID, userId);
+        if (userId != null) ctx.putTriggerPayloadValues(Map.of(MapFieldKeys.USER_ID, userId));
         putCurrentTraceId(ctx);
         return ctx;
     }
 
     private void putCurrentTraceId(ExecutionContext ctx) {
         CorrelationIdWebFilter.currentTraceId()
-                .ifPresent(traceId -> ctx.getTriggerPayload()
-                        .put(CorrelationIdWebFilter.MDC_KEY, traceId));
+                .ifPresent(traceId -> ctx.putTriggerPayloadValues(Map.of(CorrelationIdWebFilter.MDC_KEY, traceId)));
     }
 
     /** 确保执行上下文中的用户已写入 CDP 用户画像。 */

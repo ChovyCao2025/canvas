@@ -3,6 +3,7 @@ import type { Node } from '@xyflow/react'
 import { message, Modal } from 'antd'
 import { canvasApi } from '../../services/api'
 import { realCanvasNodes } from './graphSerialization'
+import { shouldSubmitPublishReview } from './canvasPublishApproval'
 import { blockingPrePublishMessages, canPublishFromChecks } from './prePublishChecks'
 import { validateCanvasBeforePublish } from './publishValidation'
 import { editorApiErrorMessage } from './workflowApiAdapters'
@@ -35,6 +36,12 @@ export function useCanvasPublishWorkflow({
           title: '发布检查未通过',
           content: blockingPrePublishMessages(checkResponse.data).join('\n'),
         })
+        return
+      }
+      const approvalStatus = await canvasApi.approvalStatus(canvasId)
+      if (shouldSubmitPublishReview(approvalStatus.data)) {
+        await canvasApi.submitReview(canvasId, { reason: '发布前审批' })
+        message.success('已提交发布审批')
         return
       }
       await canvasApi.publish(canvasId)

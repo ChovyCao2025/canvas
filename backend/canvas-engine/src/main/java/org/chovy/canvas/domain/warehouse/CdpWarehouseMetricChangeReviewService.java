@@ -14,6 +14,7 @@ import org.chovy.canvas.domain.bi.query.BiDatasetSpec;
 import org.chovy.canvas.domain.bi.query.BiDatasetSpecResolver;
 import org.chovy.canvas.domain.bi.query.BiFieldSpec;
 import org.chovy.canvas.domain.bi.query.BiMetricSpec;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Service;
 
@@ -48,6 +49,7 @@ public class CdpWarehouseMetricChangeReviewService {
     private final CdpWarehouseMetricLineageService metricLineageService;
     private final ObjectMapper objectMapper;
 
+    @Autowired
     public CdpWarehouseMetricChangeReviewService(
             CdpWarehouseMetricChangeReviewMapper reviewMapper,
             BiDatasetMapper datasetMapper,

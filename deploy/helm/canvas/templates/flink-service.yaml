@@ -1,0 +1,23 @@
+{{- if .Values.flink.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "canvas.fullname" . }}-flink-jobmanager
+  namespace: {{ .Values.namespace }}
+  labels:
+    {{- include "canvas.labels" . | nindent 4 }}
+    app.kubernetes.io/component: flink-jobmanager
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: {{ include "canvas.name" . }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/component: flink-jobmanager
+  ports:
+    - name: rest
+      port: 8081
+      targetPort: rest
+    - name: rpc
+      port: 6123
+      targetPort: rpc
+{{- end }}

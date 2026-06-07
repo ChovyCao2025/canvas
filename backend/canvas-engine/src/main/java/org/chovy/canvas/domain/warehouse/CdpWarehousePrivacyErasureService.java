@@ -7,6 +7,7 @@ import org.chovy.canvas.dal.dataobject.CdpWarehousePrivacyErasureAssetProofDO;
 import org.chovy.canvas.dal.dataobject.CdpWarehousePrivacyErasureRequestDO;
 import org.chovy.canvas.dal.mapper.CdpWarehousePrivacyErasureAssetProofMapper;
 import org.chovy.canvas.dal.mapper.CdpWarehousePrivacyErasureRequestMapper;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.nio.charset.StandardCharsets;
@@ -18,6 +19,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Set;
+import java.util.regex.Pattern;
 
 @Service
 public class CdpWarehousePrivacyErasureService {
@@ -47,6 +49,7 @@ public class CdpWarehousePrivacyErasureService {
     private final ObjectMapper objectMapper;
     private final Clock clock;
 
+    @Autowired
     public CdpWarehousePrivacyErasureService(CdpWarehousePrivacyErasureRequestMapper requestMapper,
                                              CdpWarehousePrivacyErasureAssetProofMapper proofMapper) {
         this(requestMapper, proofMapper, new ObjectMapper().findAndRegisterModules(), Clock.systemDefaultZone());
@@ -114,8 +117,8 @@ public class CdpWarehousePrivacyErasureService {
         proof.setStatus(proofStatus(command.status()));
         proof.setMatchedCount(nonNegative(command.matchedCount()));
         proof.setAffectedCount(nonNegative(command.affectedCount()));
-        proof.setProofMessage(limit(command.proofMessage()));
-        proof.setErrorMessage(limit(command.errorMessage()));
+        proof.setProofMessage(limit(sanitizeProofText(command.proofMessage(), request)));
+        proof.setErrorMessage(limit(sanitizeProofText(command.errorMessage(), request)));
         proof.setExecutedBy(defaultString(command.executedBy(), "system"));
         proof.setExecutedAt(command.executedAt() == null ? now() : command.executedAt());
         if (proof.getId() == null) {
@@ -404,6 +407,30 @@ public class CdpWarehousePrivacyErasureService {
             return null;
         }
         return value.length() <= MAX_TEXT_LENGTH ? value : value.substring(0, MAX_TEXT_LENGTH);
+    }
+
+    private String sanitizeProofText(String value, CdpWarehousePrivacyErasureRequestDO request) {
+        if (value == null || request == null || !hasText(request.getSubjectRefMasked())) {
+            return value;
+        }
+        String masked = request.getSubjectRefMasked().trim();
+        String sanitized = value.replace(masked, "[REDACTED_SUBJECT]");
+        int marker = masked.indexOf("***");
+        if (marker <= 0 || marker + 3 >= masked.length()) {
+            return sanitized;
+        }
+        String prefix = masked.substring(0, marker);
+        String suffix = masked.substring(marker + 3);
+        if (!hasText(prefix) || !hasText(suffix)) {
+            return sanitized;
+        }
+        Pattern rawSubjectToken = Pattern.compile(
+                "(?<![A-Za-z0-9])"
+                        + Pattern.quote(prefix)
+                        + "[A-Za-z0-9._@+\\-:]{1,200}"
+                        + Pattern.quote(suffix)
+                        + "(?![A-Za-z0-9])");
+        return rawSubjectToken.matcher(sanitized).replaceAll("[REDACTED_SUBJECT]");
     }
 
     private long nonNegative(Long value) {

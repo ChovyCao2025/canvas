@@ -1,14 +1,19 @@
 package org.chovy.canvas.engine.handlers;
 
 import org.chovy.canvas.common.MapFieldKeys;
+import org.chovy.canvas.engine.channel.ChannelDedupeService;
+import org.chovy.canvas.engine.channel.ProviderBackpressureService;
 import org.chovy.canvas.engine.context.ExecutionContext;
 import org.chovy.canvas.engine.handler.NodeHandler;
 import org.chovy.canvas.engine.handler.NodeResult;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Mono;
+import java.time.Duration;
 import java.util.*;
 
 /**
@@ -25,11 +30,34 @@ public class CouponHandler implements NodeHandler {
 
     /** 券系统 HTTP 客户端。 */
     private final WebClient webClient;
+    private final ProviderBackpressureService backpressureService;
+    private final ChannelDedupeService dedupeService;
+
+    @Autowired
+    public CouponHandler(WebClient.Builder webClientBuilder,
+                         @Value("${canvas.integration.coupon-service-url}") String url,
+                         ObjectProvider<ProviderBackpressureService> backpressureProvider,
+                         ObjectProvider<ChannelDedupeService> dedupeProvider) {
+        this.webClient = webClientBuilder.clone().baseUrl(url).build();
+        this.backpressureService = backpressureProvider == null ? null : backpressureProvider.getIfAvailable();
+        this.dedupeService = dedupeProvider == null ? null : dedupeProvider.getIfAvailable();
+    }
 
     public CouponHandler(WebClient.Builder webClientBuilder,
                          @Value("${canvas.integration.coupon-service-url}") String url) {
+        this.webClient = webClientBuilder.clone().baseUrl(url).build();
+        this.backpressureService = null;
+        this.dedupeService = null;
+    }
+
+    CouponHandler(WebClient.Builder webClientBuilder,
+                  String url,
+                  ProviderBackpressureService backpressureService,
+                  ChannelDedupeService dedupeService) {
         // baseUrl 通过配置注入，便于多环境切换
         this.webClient = webClientBuilder.clone().baseUrl(url).build();
+        this.backpressureService = backpressureService;
+        this.dedupeService = dedupeService;
     }
 
     /**
@@ -61,6 +89,37 @@ public class CouponHandler implements NodeHandler {
         body.put(MapFieldKeys.COUPON_TYPE_KEY, couponTypeKey);
         body.put(MapFieldKeys.USER_ID, ctx.getUserId());
         body.put(MapFieldKeys.IDEMPOTENCY_KEY, idempotencyKey);
+
+        String provider = normalizeProvider(string(config, "provider", "COUPON"));
+        String dedupeGroup = string(config, "dedupeGroup", null);
+        if (dedupeService != null && dedupeGroup != null && !dedupeGroup.isBlank()) {
+            ChannelDedupeService.Decision decision = dedupeService.reservePayload(
+                    ctx.getTenantId(),
+                    dedupeGroup,
+                    "COUPON",
+                    ctx.getUserId(),
+                    couponTypeKey,
+                    body,
+                    Duration.ofSeconds(integer(config, "dedupeWindowSeconds", 86_400)));
+            if ("DUPLICATE".equals(decision.status())) {
+                Map<String, Object> output = providerOutput(provider, "DUPLICATE", "duplicate coupon content");
+                output.put("dedupeGroup", dedupeGroup);
+                output.put("dedupeHash", decision.contentHash());
+                return Mono.just(NodeResult.suppressed(
+                        string(config, "dedupeNodeId", string(config, "skipNodeId", null)),
+                        "CHANNEL_DEDUPE",
+                        "duplicate coupon content").withOutput(output));
+            }
+        }
+
+        if (backpressureService != null) {
+            ProviderBackpressureService.Decision decision = backpressureService.decide(
+                    ctx.getTenantId(), "COUPON", provider, "ISSUE_COUPON", false);
+            if (!"ALLOWED".equals(decision.status())) {
+                return Mono.just(NodeResult.fail("coupon provider blocked: " + decision.reason(),
+                        providerOutput(provider, decision.status(), decision.reason())));
+            }
+        }
 
         return webClient.post().uri("/issue").bodyValue(body)
                 .retrieve()
@@ -107,5 +166,43 @@ public class CouponHandler implements NodeHandler {
         }
         String couponTypeKey = String.valueOf(config.getOrDefault(MapFieldKeys.COUPON_TYPE_KEY, ""));
         return ctx.getUserId() + ":coupon:" + couponTypeKey;
+    }
+
+    private Map<String, Object> providerOutput(String provider, String status, String reason) {
+        Map<String, Object> output = new LinkedHashMap<>();
+        output.put("providerChannel", "COUPON");
+        output.put("providerName", provider);
+        if (status != null) {
+            output.put("providerStatus", status);
+        }
+        if (reason != null) {
+            output.put("providerReason", reason);
+            output.put("errorMessage", reason);
+        }
+        return output;
+    }
+
+    private String string(Map<String, Object> config, String key, String fallback) {
+        Object value = config.get(key);
+        return value == null ? fallback : value.toString();
+    }
+
+    private String normalizeProvider(String provider) {
+        return provider == null || provider.isBlank() ? "COUPON" : provider.trim().toUpperCase(Locale.ROOT);
+    }
+
+    private int integer(Map<String, Object> config, String key, int fallback) {
+        Object value = config.get(key);
+        if (value == null) {
+            return fallback;
+        }
+        if (value instanceof Number number) {
+            return number.intValue();
+        }
+        try {
+            return Integer.parseInt(value.toString());
+        } catch (NumberFormatException ignored) {
+            return fallback;
+        }
     }
 }

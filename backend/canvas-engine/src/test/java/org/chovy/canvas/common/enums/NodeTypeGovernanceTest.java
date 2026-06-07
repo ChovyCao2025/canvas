@@ -25,14 +25,15 @@ class NodeTypeGovernanceTest {
 
         assertThat(actual).containsExactlyInAnyOrder(
                 "START", "END", "DIRECT_RETURN",
+                "LOOP",
                 "DIRECT_CALL", "EVENT_TRIGGER", "MQ_TRIGGER", "SCHEDULED_TRIGGER",
-                "IF_CONDITION", "SPLIT",
+                "IF_CONDITION", "LOGIC_RELATION", "SPLIT",
                 "WAIT", "USER_INPUT", "HUB", "AGGREGATE", "THRESHOLD",
                 "API_CALL", "SEND_MQ", "GROOVY",
                 "SEND_MESSAGE",
                 "AI_LLM",
                 "TAGGER", "COMMIT_ACTION",
-                "SUB_FLOW_REF"
+                "SUB_FLOW_REF", "TRANSFER_JOURNEY"
         );
     }
 

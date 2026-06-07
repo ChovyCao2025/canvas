@@ -18,6 +18,8 @@ public class CdpWarehouseSyntheticDataPathProbeRunDO {
 
     private String probeKey;
 
+    private String sourceMode;
+
     private String messageId;
 
     private String eventCode;
@@ -27,6 +29,8 @@ public class CdpWarehouseSyntheticDataPathProbeRunDO {
     private Integer strictMode;
 
     private String status;
+
+    private String sourceStatus;
 
     private String sinkStatus;
 

@@ -6,6 +6,7 @@ import org.chovy.canvas.common.tenant.TenantContextResolver;
 import org.chovy.canvas.domain.bi.export.BiExportCleanupResult;
 import org.chovy.canvas.domain.bi.export.BiExportApprovalReviewCommand;
 import org.chovy.canvas.domain.bi.export.BiExportDownload;
+import org.chovy.canvas.domain.bi.export.BiExportJobDetailView;
 import org.chovy.canvas.domain.bi.export.BiExportJobCommand;
 import org.chovy.canvas.domain.bi.export.BiExportJobView;
 import org.chovy.canvas.domain.bi.export.BiExportQueueResult;
@@ -83,10 +84,17 @@ public class BiSelfServiceController {
                 .subscribeOn(Schedulers.boundedElastic()));
     }
 
+    @GetMapping("/exports/{id}")
+    public Mono<R<BiExportJobDetailView>> getExportDetail(@PathVariable Long id) {
+        return currentTenant().flatMap(context -> Mono.fromCallable(() ->
+                        R.ok(exportService.getExportDetail(context.tenantId(), id)))
+                .subscribeOn(Schedulers.boundedElastic()));
+    }
+
     @GetMapping("/exports/{id}/download")
     public Mono<ResponseEntity<byte[]>> download(@PathVariable Long id) {
         return currentTenant().flatMap(context -> Mono.fromCallable(() -> {
-                    BiExportDownload file = exportService.download(context.tenantId(), id);
+                    BiExportDownload file = exportService.download(context.tenantId(), context.username(), id);
                     return ResponseEntity.ok()
                             .header(HttpHeaders.CONTENT_TYPE, file.contentType())
                             .header(HttpHeaders.CONTENT_DISPOSITION,
@@ -96,6 +104,16 @@ public class BiSelfServiceController {
                                             .toString())
                             .body(file.bytes());
                 })
+                .subscribeOn(Schedulers.boundedElastic()));
+    }
+
+    @PostMapping("/exports/{id}/cancel")
+    public Mono<R<BiExportJobView>> cancelExport(@PathVariable Long id) {
+        return currentTenant().flatMap(context -> Mono.fromCallable(() ->
+                        R.ok(exportService.cancelExport(
+                                context.tenantId(),
+                                context.username(),
+                                id)))
                 .subscribeOn(Schedulers.boundedElastic()));
     }
 

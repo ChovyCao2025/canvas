@@ -1,0 +1,11 @@
+docs/product-evolution/IMPLEMENTATION_ORDER.md
+docs/product-evolution/specs/INDEX.md
+docs/product-evolution/plans/INDEX.md
+docs/product-evolution/specs/p2-080-conversational-session-foundation.md
+docs/product-evolution/plans/p2-080-conversational-session-foundation-plan.md
+frontend/src/services/conversationApi.ts
+frontend/src/services/conversationApi.test.ts
+frontend/src/pages/conversations/conversationPresentation.ts
+frontend/src/pages/conversations/conversationPresentation.test.ts
+frontend/src/pages/conversations/index.tsx
+frontend/src/pages/conversations/index.test.tsx

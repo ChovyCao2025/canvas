@@ -7,7 +7,6 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.Executors;
@@ -37,14 +36,13 @@ class ExecutionContextConcurrencyTest {
     }
 
     @Test
-    void triggerPayloadAndCallStackUseConcurrentContainers() {
+    void triggerPayloadWritesUseThreadSafeMutationApi() {
         ExecutionContext ctx = new ExecutionContext();
 
-        assertThat(ctx.getTriggerPayload()).isInstanceOf(ConcurrentMap.class);
         assertThat(ctx.getCallStack()).isInstanceOf(CopyOnWriteArrayList.class);
 
         IntStream.range(0, 1_000).parallel().forEach(i -> {
-            ctx.getTriggerPayload().put("k" + i, i);
+            ctx.putTriggerPayloadValues(Map.of("k" + i, i));
             ctx.getCallStack().add((long) i);
         });
 
@@ -53,13 +51,13 @@ class ExecutionContextConcurrencyTest {
     }
 
     @Test
-    void triggerPayloadAndCallStackSettersKeepConcurrentContainers() {
+    void triggerPayloadGetterIsReadOnlyAndCallStackSetterKeepsConcurrentContainer() {
         ExecutionContext ctx = new ExecutionContext();
 
         ctx.setTriggerPayload(new HashMap<>(Map.of("orderId", "O-1")));
         ctx.setCallStack(new ArrayList<>(List.of(10L)));
 
-        assertThat(ctx.getTriggerPayload()).isInstanceOf(ConcurrentMap.class);
+        assertThat(ctx.getTriggerPayload()).containsEntry("orderId", "O-1");
         assertThat(ctx.getCallStack()).isInstanceOf(CopyOnWriteArrayList.class);
     }
 

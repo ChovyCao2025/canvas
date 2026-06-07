@@ -1,6 +1,6 @@
 package org.chovy.canvas.infrastructure.redis;
 
-import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.connection.ReactiveRedisConnectionFactory;
 import org.springframework.data.redis.core.Cursor;
 import org.springframework.data.redis.core.RedisOperations;
@@ -20,6 +20,7 @@ import java.util.Objects;
 import java.util.UUID;
 import java.util.Set;
 import java.util.concurrent.locks.LockSupport;
+import java.util.function.IntSupplier;
 import java.util.stream.Collectors;
 
 /**
@@ -31,7 +32,6 @@ import java.util.stream.Collectors;
  * - set members: 命中的 canvasId 集合。
  */
 @Service
-@RequiredArgsConstructor
 public class TriggerRouteService {
 
     /** 阻塞式 Redis 模板，用于 Set 增删查。 */
@@ -42,10 +42,37 @@ public class TriggerRouteService {
 
     /** 响应式 Redis 连接工厂。 */
     private final ReactiveRedisConnectionFactory reactiveFactory;
+    /** 等待路由变更锁的等待器，测试可注入以避免真实 sleep。 */
+    private final IntSupplier routeMutationWaiter;
     /** 路由变更锁 TTL。 */
     private static final Duration ROUTE_MUTATION_LOCK_TTL = Duration.ofSeconds(30);
     /** 等待路由变更锁的最大毫秒数。 */
     private static final long ROUTE_MUTATION_LOCK_WAIT_MS = 5_000L;
+
+    @Autowired
+    public TriggerRouteService(StringRedisTemplate redis,
+                               RedisKeyUtil keys,
+                               ReactiveRedisConnectionFactory reactiveFactory) {
+        this(redis, keys, reactiveFactory, () -> {
+            LockSupport.parkNanos(Duration.ofMillis(50).toNanos());
+            return 0;
+        });
+    }
+
+    TriggerRouteService(StringRedisTemplate redis,
+                        RedisKeyUtil keys,
+                        ReactiveRedisConnectionFactory reactiveFactory,
+                        IntSupplier routeMutationWaiter) {
+        this.redis = redis;
+        this.keys = keys;
+        this.reactiveFactory = reactiveFactory;
+        this.routeMutationWaiter = routeMutationWaiter == null
+                ? () -> {
+                    LockSupport.parkNanos(Duration.ofMillis(50).toNanos());
+                    return 0;
+                }
+                : routeMutationWaiter;
+    }
 
     /** 注册 MQ 触发路由：topicKey -> canvasId。 */
     public void registerMq(Long canvasId, String topicKey) {
@@ -158,6 +185,13 @@ public class TriggerRouteService {
         });
     }
 
+    /** Backward-compatible wrapper for replacing all route families. */
+    public void replaceTriggerRoutes(Map<String, Set<String>> mqRoutes,
+                                     Map<String, Set<String>> behaviorRoutes,
+                                     Map<String, Set<String>> taggerRoutes) {
+        replaceAllTriggerRoutes(new TriggerRouteSnapshot(mqRoutes, behaviorRoutes, taggerRoutes));
+    }
+
     /** 判断触发路由表是否处于可用状态。 */
     public boolean isRouteReady() {
         return Boolean.TRUE.equals(redis.hasKey(keys.triggerRouteReady()));
@@ -173,18 +207,17 @@ public class TriggerRouteService {
         redis.delete(keys.triggerRouteReady());
     }
 
-    /**
-     * 检查路由表是否为空（用 SCAN，不用 KEYS，设计文档 6.4节）。
-     * blockFirst() 在 @PostConstruct 非 reactive 上下文中调用，阻塞安全。
-     */
+    /** 检查路由表是否为空（用 SCAN，不用 KEYS，设计文档 6.4节）。 */
     public boolean isRouteTableEmpty() {
+        ScanOptions options = ScanOptions.scanOptions()
+                .match(keys.triggerPattern())
+                .count(1)
+                .build();
         try {
             // 只取第一条命中即可判空，避免全量扫描带来的资源消耗
-            java.nio.ByteBuffer firstKey = reactiveFactory.getReactiveConnection()
-                    .keyCommands()
-                    .scan(ScanOptions.scanOptions().match(keys.triggerPattern()).count(1).build())
-                    .blockFirst();
-            return firstKey == null;
+            try (Cursor<String> cursor = redis.scan(options)) {
+                return !cursor.hasNext();
+            }
         } catch (Exception e) {
             // Redis 不可用时保守返回 true，由上层触发重建路由流程
             return true;
@@ -214,7 +247,7 @@ public class TriggerRouteService {
                 break;
             }
             // 短暂轮询等待发布/初始化中的路由变更完成，避免直接放大并发冲突。
-            LockSupport.parkNanos(Duration.ofMillis(50).toNanos());
+            routeMutationWaiter.getAsInt();
             if (Thread.currentThread().isInterrupted()) {
                 Thread.currentThread().interrupt();
                 throw new IllegalStateException("Interrupted while waiting for route mutation lock");

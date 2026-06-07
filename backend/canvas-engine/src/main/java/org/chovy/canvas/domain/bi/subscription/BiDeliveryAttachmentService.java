@@ -162,6 +162,7 @@ public class BiDeliveryAttachmentService {
         }
         LocalDateTime now = LocalDateTime.now();
         if (isExpired(row, now)) {
+            deleteFile(row);
             markExpired(row, "BI delivery attachment expired");
             throw new IllegalStateException("BI delivery attachment has expired: " + attachmentId);
         }
@@ -404,7 +405,7 @@ public class BiDeliveryAttachmentService {
         for (int i = 0; i < pages.size(); i++) {
             int pageObjectId = 4 + i * 2;
             int contentObjectId = pageObjectId + 1;
-            String contentText = pdfPageContent(pages.get(i));
+            String contentText = pdfPageContent(pages.get(i), i + 1, pages.size());
             objects.add(pageObjectId + " 0 obj\n"
                     + "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] "
                     + "/Resources << /Font << /F1 3 0 R >> >> "
@@ -443,12 +444,16 @@ public class BiDeliveryAttachmentService {
         return pages;
     }
 
-    private String pdfPageContent(List<String> lines) {
+    private String pdfPageContent(List<String> lines, int pageNumber, int pageCount) {
         StringBuilder content = new StringBuilder("BT\n/F1 11 Tf\n72 760 Td\n14 TL\n");
         for (String line : lines) {
             content.append('(').append(pdfEscape(ascii(line))).append(") Tj\nT*\n");
         }
-        content.append("ET\n");
+        content.append("ET\n")
+                .append("BT\n/F1 9 Tf\n72 42 Td\n")
+                .append('(')
+                .append(pdfEscape("Page " + pageNumber + " of " + pageCount))
+                .append(") Tj\nET\n");
         return content.toString();
     }
 
@@ -667,7 +672,7 @@ public class BiDeliveryAttachmentService {
     }
 
     private String resourceUrl(String resourceType, Long resourceId) {
-        return "/bi?resourceType=" + resourceType + "&resourceId=" + resourceId;
+        return BiDeliveryResourceUrls.workbenchUrl(resourceType, resourceId);
     }
 
     private String normalizeType(String value) {

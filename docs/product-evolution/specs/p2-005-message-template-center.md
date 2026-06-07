@@ -39,20 +39,39 @@ This converts a filtered opportunity into a bounded medium-term implementation c
 
 - `backend/canvas-engine/src/main/java/org/chovy/canvas/web/MessageTemplateController.java`
 - `backend/canvas-engine/src/main/java/org/chovy/canvas/domain/template/MessageTemplateService.java`
+- `backend/canvas-engine/src/main/java/org/chovy/canvas/domain/template/JdbcMessageTemplateRepository.java`
 
 ### Frontend Touchpoints
 
 - `frontend/src/pages/message-templates/index.tsx`
+- `frontend/src/pages/message-templates/messageTemplateCenter.ts`
 - `frontend/src/services/messageTemplateApi.ts`
+- `frontend/src/App.tsx`
+- `frontend/src/components/layout/AppLayout.tsx`
+- `frontend/src/components/accessibility/RouteA11y.tsx`
 
 ### Data And Configuration Touchpoints
 
-- `backend/canvas-engine/src/main/resources/db/migration/V164__message_template_center.sql`
+- `backend/canvas-engine/src/main/resources/db/migration/V268__message_template_center.sql`
 
 ### Test Touchpoints
 
 - `backend/canvas-engine/src/test/java/org/chovy/canvas/domain/template/MessageTemplateServiceTest.java`
-- `frontend/src/pages/message-templates/messageTemplateCenter.test.tsx`
+- `backend/canvas-engine/src/test/java/org/chovy/canvas/controller/MessageTemplateControllerTest.java`
+- `frontend/src/pages/message-templates/messageTemplateCenter.test.ts`
+- `frontend/src/pages/message-templates/index.test.tsx`
+- `frontend/src/services/messageTemplateApi.test.ts`
+- `frontend/src/components/layout/AppLayout.a11y.test.tsx`
+
+## Implementation Status
+
+Completed on 2026-06-05.
+
+- Added `V268__message_template_center.sql` for tenant-scoped template metadata, body content, extracted variable JSON, status, and creator audit fields. The plan originally named `V164`; the current workspace already uses `V267` for the technical migration evidence registry, so this implementation uses the next available migration version.
+- Added `MessageTemplateService` and `JdbcMessageTemplateRepository` for authenticated tenant create/search/preview workflows, variable extraction, channel validation, local rendering, and missing-variable reporting.
+- Added authenticated `MessageTemplateController` at `/message-templates`, guarded by `TenantContextResolver.currentOrError()`.
+- Added `messageTemplateApi`, `messageTemplateCenter` presentation helpers, a visible `/message-templates` page, route registration, main-navigation entry, and route announcement text.
+- Rollout: run `V268__message_template_center.sql`, then expose `/message-templates` to authenticated operators. Rollback: remove or hide the route/menu entry; template rows are additive and do not affect runtime sends until later approval/channel-adaptation specs wire them into journey nodes.
 
 ## Dependencies
 

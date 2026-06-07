@@ -1,14 +1,17 @@
 package org.chovy.canvas.domain.bi.resource;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import org.chovy.canvas.dal.dataobject.BiBigScreenDO;
 import org.chovy.canvas.dal.dataobject.BiDashboardDO;
 import org.chovy.canvas.dal.dataobject.BiResourceLocationDO;
 import org.chovy.canvas.dal.dataobject.BiWorkspaceDO;
+import org.chovy.canvas.dal.mapper.BiBigScreenMapper;
 import org.chovy.canvas.dal.mapper.BiChartMapper;
 import org.chovy.canvas.dal.mapper.BiDashboardMapper;
 import org.chovy.canvas.dal.mapper.BiDatasetMapper;
 import org.chovy.canvas.dal.mapper.BiPortalMapper;
 import org.chovy.canvas.dal.mapper.BiResourceLocationMapper;
+import org.chovy.canvas.dal.mapper.BiSpreadsheetMapper;
 import org.chovy.canvas.dal.mapper.BiWorkspaceMapper;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -55,6 +58,8 @@ class BiResourceMovementServiceTest {
                 dashboardMapper,
                 chartMapper,
                 portalMapper,
+                mock(BiBigScreenMapper.class),
+                mock(BiSpreadsheetMapper.class),
                 locationMapper);
 
         BiResourceLocationView moved = service.move(7L, "alice",
@@ -81,6 +86,43 @@ class BiResourceMovementServiceTest {
     }
 
     @Test
+    void moveBigScreenPersistsTenantScopedFolderLocation() {
+        BiWorkspaceMapper workspaceMapper = mock(BiWorkspaceMapper.class);
+        BiBigScreenMapper bigScreenMapper = mock(BiBigScreenMapper.class);
+        BiResourceLocationMapper locationMapper = mock(BiResourceLocationMapper.class);
+        BiWorkspaceDO workspace = new BiWorkspaceDO();
+        workspace.setId(5L);
+        BiBigScreenDO screen = new BiBigScreenDO();
+        screen.setId(99L);
+        screen.setStatus("PUBLISHED");
+        when(workspaceMapper.selectOne(any(LambdaQueryWrapper.class))).thenReturn(workspace);
+        when(bigScreenMapper.selectOne(any(LambdaQueryWrapper.class))).thenReturn(screen);
+        BiResourceMovementService service = new BiResourceMovementService(
+                workspaceMapper,
+                mock(BiDatasetMapper.class),
+                mock(BiDashboardMapper.class),
+                mock(BiChartMapper.class),
+                mock(BiPortalMapper.class),
+                bigScreenMapper,
+                mock(BiSpreadsheetMapper.class),
+                locationMapper);
+
+        BiResourceLocationView moved = service.move(7L, "alice",
+                new BiResourceMoveCommand("big_screen", "executive-wall", "operations/screens", 20));
+
+        ArgumentCaptor<BiResourceLocationDO> locationCaptor = ArgumentCaptor.forClass(BiResourceLocationDO.class);
+        verify(locationMapper).upsert(locationCaptor.capture());
+        assertThat(locationCaptor.getValue().getTenantId()).isEqualTo(7L);
+        assertThat(locationCaptor.getValue().getWorkspaceId()).isEqualTo(5L);
+        assertThat(locationCaptor.getValue().getResourceType()).isEqualTo("BIG_SCREEN");
+        assertThat(locationCaptor.getValue().getResourceKey()).isEqualTo("executive-wall");
+        assertThat(locationCaptor.getValue().getFolderKey()).isEqualTo("operations/screens");
+        assertThat(locationCaptor.getValue().getSortOrder()).isEqualTo(20);
+        assertThat(moved.resourceType()).isEqualTo("BIG_SCREEN");
+        assertThat(moved.resourceKey()).isEqualTo("executive-wall");
+    }
+
+    @Test
     void moveRejectsMissingResource() {
         BiWorkspaceMapper workspaceMapper = mock(BiWorkspaceMapper.class);
         BiWorkspaceDO workspace = new BiWorkspaceDO();
@@ -92,6 +134,8 @@ class BiResourceMovementServiceTest {
                 mock(BiDashboardMapper.class),
                 mock(BiChartMapper.class),
                 mock(BiPortalMapper.class),
+                mock(BiBigScreenMapper.class),
+                mock(BiSpreadsheetMapper.class),
                 mock(BiResourceLocationMapper.class));
 
         assertThatThrownBy(() -> service.move(7L, "alice",
@@ -117,6 +161,8 @@ class BiResourceMovementServiceTest {
                 dashboardMapper,
                 mock(BiChartMapper.class),
                 mock(BiPortalMapper.class),
+                mock(BiBigScreenMapper.class),
+                mock(BiSpreadsheetMapper.class),
                 mock(BiResourceLocationMapper.class));
 
         assertThatThrownBy(() -> service.move(7L, "alice",
@@ -148,6 +194,8 @@ class BiResourceMovementServiceTest {
                 mock(BiDashboardMapper.class),
                 mock(BiChartMapper.class),
                 mock(BiPortalMapper.class),
+                mock(BiBigScreenMapper.class),
+                mock(BiSpreadsheetMapper.class),
                 locationMapper);
 
         List<BiResourceLocationView> locations = service.list(7L, "dashboard");

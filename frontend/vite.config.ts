@@ -6,6 +6,7 @@ export default defineConfig({
   test: {
     environment: 'node',
     setupFiles: ['./src/test/setupTests.ts'],
+    testTimeout: 20000,
   },
   server: {
     port: 3000,

@@ -2,9 +2,9 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Prove the real CDP warehouse sink-to-Doris-ODS data path with a reserved synthetic event and persisted audit evidence.
+**Goal:** Prove the real CDP warehouse source-to-Doris-ODS data path with a reserved synthetic event and persisted audit evidence.
 
-**Architecture:** Generate a synthetic CDP event in canvas-engine, write it through the existing `CdpWarehouseEventSink`, verify it through Doris JDBC, and persist proof evidence in MySQL. Keep DWD/DWS aggregation out of this slice to avoid synthetic metric pollution.
+**Architecture:** Generate a synthetic CDP event in canvas-engine, write it through an explicit source mode, verify it through Doris JDBC, and persist proof evidence in MySQL. `DIRECT_SINK` exercises the existing `CdpWarehouseEventSink`; `MYSQL_CDC` inserts into `cdp_event_log` and skips direct Stream Load so Flink CDC must make the row visible in Doris ODS. Keep DWD/DWS aggregation out of this slice to avoid synthetic metric pollution.
 
 **Tech Stack:** Java 21, Spring Boot WebFlux controllers, MyBatis-Plus, Flyway, Jackson, JUnit 5, Mockito, AssertJ.
 
@@ -14,7 +14,7 @@
 
 - Add P2-071 spec, plan, and index rows.
 - Add synthetic data-path probe run persistence.
-- Add service that writes through `CdpWarehouseEventSink` and reads back from Doris ODS.
+- Add service that supports `DIRECT_SINK` and `MYSQL_CDC` source modes and reads back from Doris ODS.
 - Add operator API for manual run and recent run listing.
 - Add focused TDD tests and regression verification.
 
@@ -47,7 +47,7 @@ Add migration, DO, and mapper helpers for insert, update completion, and recent 
 
 - [x] **Step 5: Implement synthetic data-path proof service**
 
-Generate synthetic event, write through sink, read ODS with bounded attempts, persist step evidence, and return proof view.
+Generate synthetic event, write through the requested source mode, read ODS with bounded attempts, persist step evidence, and return proof view.
 
 - [x] **Step 6: Implement controller**
 

@@ -2,11 +2,12 @@ package org.chovy.canvas.engine.audience;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import lombok.RequiredArgsConstructor;
 import org.chovy.canvas.common.MapFieldKeys;
 import org.chovy.canvas.infrastructure.reactor.BlockingWorkScheduler;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.client.WebClient;
+import reactor.core.publisher.Mono;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -22,7 +23,6 @@ import java.util.concurrent.ConcurrentMap;
  * 该组件只负责“取数”，不负责规则求值。
  */
 @Component
-@RequiredArgsConstructor
 public class AudienceEvaluationContextFetcher {
 
     /** 规则 JSON 解析器。 */
@@ -30,6 +30,17 @@ public class AudienceEvaluationContextFetcher {
     /** 统一阻塞适配器，避免直接在事件循环线程上等待 Tagger API。 */
     private final BlockingWorkScheduler blockingWorkScheduler;
     private final ConcurrentMap<String, List<String>> fieldCache = new ConcurrentHashMap<>();
+
+    @Autowired
+    public AudienceEvaluationContextFetcher(ObjectMapper objectMapper,
+                                            BlockingWorkScheduler blockingWorkScheduler) {
+        this.objectMapper = objectMapper;
+        this.blockingWorkScheduler = blockingWorkScheduler;
+    }
+
+    public AudienceEvaluationContextFetcher(ObjectMapper objectMapper) {
+        this(objectMapper, new BlockingWorkScheduler());
+    }
 
     /**
      * 拉取某用户的人群评估上下文。
@@ -61,6 +72,10 @@ public class AudienceEvaluationContextFetcher {
         Map<String, Object> result = new HashMap<>();
         tagMap.forEach((key, value) -> result.put(String.valueOf(key), value));
         return result;
+    }
+
+    public Mono<Map<String, Object>> fetchAsync(WebClient client, String userId, String ruleJson) {
+        return blockingWorkScheduler.call("audience context fetch", () -> fetch(client, userId, ruleJson));
     }
 
     /** 从规则 JSON 提取所有字段名（去重后返回）。 */

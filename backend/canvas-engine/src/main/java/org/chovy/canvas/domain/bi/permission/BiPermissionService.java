@@ -11,11 +11,13 @@ import org.chovy.canvas.dal.dataobject.BiColumnPermissionDO;
 import org.chovy.canvas.dal.dataobject.BiDatasetDO;
 import org.chovy.canvas.dal.dataobject.BiResourcePermissionDO;
 import org.chovy.canvas.dal.dataobject.BiRowPermissionDO;
+import org.chovy.canvas.dal.dataobject.BiWorkspaceMemberDO;
 import org.chovy.canvas.dal.mapper.BiAuditLogMapper;
 import org.chovy.canvas.dal.mapper.BiColumnPermissionMapper;
 import org.chovy.canvas.dal.mapper.BiDatasetMapper;
 import org.chovy.canvas.dal.mapper.BiResourcePermissionMapper;
 import org.chovy.canvas.dal.mapper.BiRowPermissionMapper;
+import org.chovy.canvas.dal.mapper.BiWorkspaceMemberMapper;
 import org.chovy.canvas.domain.bi.portal.BiPortalMenuResource;
 import org.chovy.canvas.domain.bi.query.BiDatasetSpec;
 import org.chovy.canvas.domain.bi.query.BiFilter;
@@ -23,6 +25,7 @@ import org.chovy.canvas.domain.bi.query.BiMetricSpec;
 import org.chovy.canvas.domain.bi.query.BiQueryContext;
 import org.chovy.canvas.domain.bi.query.BiQueryRequest;
 import org.chovy.canvas.domain.bi.query.BiSort;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
@@ -68,6 +71,7 @@ public class BiPermissionService {
     private final BiResourcePermissionMapper resourcePermissionMapper;
     private final BiRowPermissionMapper rowPermissionMapper;
     private final BiColumnPermissionMapper columnPermissionMapper;
+    private final BiWorkspaceMemberMapper workspaceMemberMapper;
     private final BiAuditLogMapper auditLogMapper;
     private final ObjectMapper objectMapper;
 
@@ -77,10 +81,23 @@ public class BiPermissionService {
                                BiColumnPermissionMapper columnPermissionMapper,
                                BiAuditLogMapper auditLogMapper,
                                ObjectMapper objectMapper) {
+        this(datasetMapper, resourcePermissionMapper, rowPermissionMapper, columnPermissionMapper, null,
+                auditLogMapper, objectMapper);
+    }
+
+    @Autowired
+    public BiPermissionService(BiDatasetMapper datasetMapper,
+                               BiResourcePermissionMapper resourcePermissionMapper,
+                               BiRowPermissionMapper rowPermissionMapper,
+                               BiColumnPermissionMapper columnPermissionMapper,
+                               BiWorkspaceMemberMapper workspaceMemberMapper,
+                               BiAuditLogMapper auditLogMapper,
+                               ObjectMapper objectMapper) {
         this.datasetMapper = datasetMapper;
         this.resourcePermissionMapper = resourcePermissionMapper;
         this.rowPermissionMapper = rowPermissionMapper;
         this.columnPermissionMapper = columnPermissionMapper;
+        this.workspaceMemberMapper = workspaceMemberMapper;
         this.auditLogMapper = auditLogMapper;
         this.objectMapper = objectMapper;
     }
@@ -104,30 +121,34 @@ public class BiPermissionService {
         if (datasetRow == null || datasetRow.getId() == null) {
             return new BiPreparedQuery(request, List.of(), DEFAULT_SIGNATURE + ":builtin");
         }
+        BiQueryContext effectiveContext = effectiveWorkspaceContext(scopedContext, datasetRow.getWorkspaceId());
 
         enforceResourceAccess(
-                scopedContext.tenantId(),
+                effectiveContext.tenantId(),
                 datasetRow.getWorkspaceId(),
                 RESOURCE_DATASET,
                 datasetRow.getId(),
-                scopedContext,
+                effectiveContext,
                 scopedAction);
 
         List<String> rowRuleKeys = new ArrayList<>();
         List<BiFilter> filters = new ArrayList<>(request.filters());
-        for (BiRowPermissionDO row : matchingRowPermissions(scopedContext, datasetRow.getId())) {
+        for (BiRowPermissionDO row : matchingRowPermissions(effectiveContext, datasetRow.getId())) {
             rowRuleKeys.add(row.getRuleKey());
             filters.addAll(parseRowFilters(row.getRuleKey(), row.getFilterJson()));
         }
         BiQueryRequest scopedRequest = new BiQueryRequest(
                 request.datasetKey(),
+                request.dashboardKey(),
                 request.dimensions(),
                 request.metrics(),
                 filters,
                 request.sorts(),
-                request.limit());
+                request.limit(),
+                request.offset(),
+                request.sqlParameters());
 
-        List<BiColumnMask> masks = evaluateColumnPolicies(dataset, scopedRequest, scopedContext, datasetRow);
+        List<BiColumnMask> masks = evaluateColumnPolicies(dataset, scopedRequest, effectiveContext, datasetRow);
         return new BiPreparedQuery(
                 scopedRequest,
                 masks,
@@ -161,7 +182,7 @@ public class BiPermissionService {
                                       Long resourceId,
                                       BiQueryContext context,
                                       String actionKey) {
-        BiQueryContext scopedContext = scopedContext(context);
+        BiQueryContext scopedContext = effectiveWorkspaceContext(scopedContext(context), workspaceId);
         String scopedAction = upperDefault(actionKey, ACTION_VIEW);
         String scopedType = upperRequired(resourceType, "resourceType");
         if (resourceId == null) {
@@ -187,7 +208,7 @@ public class BiPermissionService {
         }
         boolean allowed = matching.stream()
                 .anyMatch(row -> EFFECT_ALLOW.equals(upperDefault(row.getEffect(), EFFECT_ALLOW)));
-        if (!allowed && !defaultAllow(scopedAction)) {
+        if (!allowed && !defaultAllow(scopedType, scopedAction)) {
             String reason = "BI resource permission is required for " + scopedAction + " on " + scopedType;
             audit(scopedContext.tenantId(), workspaceId, scopedContext.username(), scopedAction,
                     scopedType, resourceId, Map.of("decision", EFFECT_DENY, "reason", reason));
@@ -487,7 +508,10 @@ public class BiPermissionService {
         return false;
     }
 
-    private boolean defaultAllow(String actionKey) {
+    private boolean defaultAllow(String resourceType, String actionKey) {
+        if ("DATASOURCE".equals(upperDefault(resourceType, ""))) {
+            return false;
+        }
         String action = upperDefault(actionKey, ACTION_VIEW);
         return Set.of(ACTION_VIEW, ACTION_USE, ACTION_QUERY, "COMPILE", "EXECUTE").contains(action);
     }
@@ -570,6 +594,23 @@ public class BiPermissionService {
 
     private BiQueryContext scopedContext(BiQueryContext context) {
         return context == null ? new BiQueryContext(0L, "system", RoleNames.OPERATOR) : context;
+    }
+
+    private BiQueryContext effectiveWorkspaceContext(BiQueryContext context, Long workspaceId) {
+        BiQueryContext scoped = scopedContext(context);
+        if (workspaceMemberMapper == null || workspaceId == null || workspaceId <= 0 || !hasText(scoped.username())) {
+            return scoped;
+        }
+        BiWorkspaceMemberDO member = workspaceMemberMapper.selectOne(new LambdaQueryWrapper<BiWorkspaceMemberDO>()
+                .in(BiWorkspaceMemberDO::getTenantId, tenantScope(scoped.tenantId()))
+                .eq(BiWorkspaceMemberDO::getWorkspaceId, workspaceId)
+                .eq(BiWorkspaceMemberDO::getUserId, scoped.username())
+                .orderByDesc(BiWorkspaceMemberDO::getTenantId)
+                .last("LIMIT 1"));
+        if (member == null || !hasText(member.getRoleKey())) {
+            return scoped;
+        }
+        return new BiQueryContext(scoped.tenantId(), scoped.username(), member.getRoleKey().trim());
     }
 
     private List<Long> tenantScope(Long tenantId) {

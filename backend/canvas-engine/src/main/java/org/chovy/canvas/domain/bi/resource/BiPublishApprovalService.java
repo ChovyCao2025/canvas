@@ -1,18 +1,23 @@
 package org.chovy.canvas.domain.bi.resource;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import org.chovy.canvas.dal.dataobject.BiBigScreenDO;
 import org.chovy.canvas.dal.dataobject.BiChartDO;
 import org.chovy.canvas.dal.dataobject.BiDashboardDO;
 import org.chovy.canvas.dal.dataobject.BiDatasetDO;
 import org.chovy.canvas.dal.dataobject.BiPortalDO;
 import org.chovy.canvas.dal.dataobject.BiPublishApprovalDO;
+import org.chovy.canvas.dal.dataobject.BiSpreadsheetDO;
 import org.chovy.canvas.dal.dataobject.BiWorkspaceDO;
+import org.chovy.canvas.dal.mapper.BiBigScreenMapper;
 import org.chovy.canvas.dal.mapper.BiChartMapper;
 import org.chovy.canvas.dal.mapper.BiDashboardMapper;
 import org.chovy.canvas.dal.mapper.BiDatasetMapper;
 import org.chovy.canvas.dal.mapper.BiPortalMapper;
 import org.chovy.canvas.dal.mapper.BiPublishApprovalMapper;
+import org.chovy.canvas.dal.mapper.BiSpreadsheetMapper;
 import org.chovy.canvas.dal.mapper.BiWorkspaceMapper;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.time.Clock;
@@ -37,16 +42,22 @@ public class BiPublishApprovalService {
     private final BiDashboardMapper dashboardMapper;
     private final BiChartMapper chartMapper;
     private final BiPortalMapper portalMapper;
+    private final BiBigScreenMapper bigScreenMapper;
+    private final BiSpreadsheetMapper spreadsheetMapper;
     private final BiPublishApprovalMapper approvalMapper;
     private final Clock clock;
 
+    @Autowired
     public BiPublishApprovalService(BiWorkspaceMapper workspaceMapper,
                                     BiDatasetMapper datasetMapper,
                                     BiDashboardMapper dashboardMapper,
                                     BiChartMapper chartMapper,
                                     BiPortalMapper portalMapper,
+                                    BiBigScreenMapper bigScreenMapper,
+                                    BiSpreadsheetMapper spreadsheetMapper,
                                     BiPublishApprovalMapper approvalMapper) {
         this(workspaceMapper, datasetMapper, dashboardMapper, chartMapper, portalMapper,
+                bigScreenMapper, spreadsheetMapper,
                 approvalMapper, Clock.systemUTC());
     }
 
@@ -55,6 +66,8 @@ public class BiPublishApprovalService {
                              BiDashboardMapper dashboardMapper,
                              BiChartMapper chartMapper,
                              BiPortalMapper portalMapper,
+                             BiBigScreenMapper bigScreenMapper,
+                             BiSpreadsheetMapper spreadsheetMapper,
                              BiPublishApprovalMapper approvalMapper,
                              Clock clock) {
         this.workspaceMapper = workspaceMapper;
@@ -62,6 +75,8 @@ public class BiPublishApprovalService {
         this.dashboardMapper = dashboardMapper;
         this.chartMapper = chartMapper;
         this.portalMapper = portalMapper;
+        this.bigScreenMapper = bigScreenMapper;
+        this.spreadsheetMapper = spreadsheetMapper;
         this.approvalMapper = approvalMapper;
         this.clock = clock;
     }
@@ -199,6 +214,16 @@ public class BiPublishApprovalService {
                     .eq(BiPortalDO::getWorkspaceId, workspaceId)
                     .eq(BiPortalDO::getPortalKey, resourceKey)
                     .last("LIMIT 1"));
+            case "BIG_SCREEN" -> bigScreenMapper.selectOne(new LambdaQueryWrapper<BiBigScreenDO>()
+                    .eq(BiBigScreenDO::getTenantId, tenantId)
+                    .eq(BiBigScreenDO::getWorkspaceId, workspaceId)
+                    .eq(BiBigScreenDO::getScreenKey, resourceKey)
+                    .last("LIMIT 1"));
+            case "SPREADSHEET" -> spreadsheetMapper.selectOne(new LambdaQueryWrapper<BiSpreadsheetDO>()
+                    .eq(BiSpreadsheetDO::getTenantId, tenantId)
+                    .eq(BiSpreadsheetDO::getWorkspaceId, workspaceId)
+                    .eq(BiSpreadsheetDO::getSpreadsheetKey, resourceKey)
+                    .last("LIMIT 1"));
             default -> throw new IllegalArgumentException("unsupported BI resource type: " + resourceType);
         };
         if (row == null) {
@@ -215,6 +240,8 @@ public class BiPublishApprovalService {
             case BiDashboardDO dashboard -> dashboard.getStatus();
             case BiChartDO chart -> chart.getStatus();
             case BiPortalDO portal -> portal.getStatus();
+            case BiBigScreenDO screen -> screen.getStatus();
+            case BiSpreadsheetDO spreadsheet -> spreadsheet.getStatus();
             default -> null;
         };
     }
@@ -250,7 +277,8 @@ public class BiPublishApprovalService {
     private String normalizeResourceType(String resourceType) {
         String value = required(resourceType, "resourceType").toUpperCase(Locale.ROOT);
         if ("DATASET".equals(value) || "DASHBOARD".equals(value)
-                || "CHART".equals(value) || "PORTAL".equals(value)) {
+                || "CHART".equals(value) || "PORTAL".equals(value)
+                || "BIG_SCREEN".equals(value) || "SPREADSHEET".equals(value)) {
             return value;
         }
         throw new IllegalArgumentException("unsupported BI resource type: " + resourceType);

@@ -7,6 +7,7 @@ import org.springframework.stereotype.Service;
 
 import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
@@ -221,6 +222,205 @@ public class AiPromptTemplateService {
                         "properties", object("score", object("type", "number"), "band", object("type", "string")),
                         "required", objectMapper.createArrayNode().add("score").add("band")),
                 object("score", 50, "band", "medium")));
+        templates.put(3L, builtIn(
+                3L,
+                "BI Ask Data Planner",
+                "bi_ask_data",
+                """
+                        Convert the user BI question into a JSON query plan.
+                        Only use the supplied BI semantic catalog. Do not invent tables, fields, metrics, or SQL.
+                        Question: ${question}
+                        Requested dataset key: ${requestedDatasetKey}
+                        Semantic catalog: ${datasets}
+                        Return datasetKey, dimensions, metrics, filters, sorts, limit, and explanation.
+                        """,
+                object("type", "object",
+                        "properties", object(
+                                "datasetKey", object("type", "string"),
+                                "dimensions", object("type", "array"),
+                                "metrics", object("type", "array"),
+                                "filters", object("type", "array"),
+                                "sorts", object("type", "array"),
+                                "limit", object("type", "number"),
+                                "explanation", object("type", "string")),
+                        "required", objectMapper.createArrayNode()
+                                .add("datasetKey")
+                                .add("dimensions")
+                                .add("metrics")
+                                .add("filters")
+                                .add("sorts")
+                                .add("limit")
+                                .add("explanation")),
+                object(
+                        "datasetKey", "canvas_daily_stats",
+                        "dimensions", List.of("stat_date"),
+                        "metrics", List.of("total_executions"),
+                        "filters", List.of(),
+                        "sorts", List.of(),
+                        "limit", 100,
+                        "explanation", "Default BI semantic-layer query plan.")));
+        templates.put(4L, builtIn(
+                4L,
+                "BI Interpretation Agent",
+                "bi_interpretation",
+                """
+                        Explain the BI subject using only the supplied semantic query and result.
+                        Subject type: ${subjectType}
+                        Subject key: ${subjectKey}
+                        Question: ${question}
+                        Query: ${query}
+                        Result: ${result}
+                        Semantic catalog: ${datasets}
+                        Return summary, keyFindings, and recommendations.
+                        """,
+                object("type", "object",
+                        "properties", object(
+                                "summary", object("type", "string"),
+                                "keyFindings", object("type", "array"),
+                                "recommendations", object("type", "array")),
+                        "required", objectMapper.createArrayNode()
+                                .add("summary")
+                                .add("keyFindings")
+                                .add("recommendations")),
+                object(
+                        "summary", "The BI result is available for semantic-layer interpretation.",
+                        "keyFindings", List.of("Review the returned metrics and dimensions."),
+                        "recommendations", List.of("Compare against recent baselines before acting."))));
+        templates.put(5L, builtIn(
+                5L,
+                "BI Report Agent",
+                "bi_report",
+                """
+                        Generate a BI report from validated semantic query sections.
+                        Report type: ${reportType}
+                        Title: ${title}
+                        Sections: ${sections}
+                        Semantic catalog: ${datasets}
+                        Return title, executiveSummary, sections, and nextActions.
+                        """,
+                object("type", "object",
+                        "properties", object(
+                                "title", object("type", "string"),
+                                "executiveSummary", object("type", "string"),
+                                "sections", object("type", "array"),
+                                "nextActions", object("type", "array")),
+                        "required", objectMapper.createArrayNode()
+                                .add("title")
+                                .add("executiveSummary")
+                                .add("sections")
+                                .add("nextActions")),
+                object(
+                        "title", "BI Report",
+                        "executiveSummary", "The validated BI sections are ready for review.",
+                        "sections", List.of(java.util.Map.of("title", "Overview", "body", "Review the attached BI data.")),
+                        "nextActions", List.of("Review metric changes with the owning team."))));
+        templates.put(6L, builtIn(
+                6L,
+                "BI Dashboard Draft Agent",
+                "bi_dashboard_draft",
+                """
+                        Generate a dashboard draft using only the supplied BI semantic catalog.
+                        Prompt: ${prompt}
+                        Requested dataset key: ${requestedDatasetKey}
+                        Semantic catalog: ${datasets}
+                        Return dashboard, charts, and explanation.
+                        """,
+                object("type", "object",
+                        "properties", object(
+                                "dashboard", object("type", "object"),
+                                "charts", object("type", "array"),
+                                "explanation", object("type", "string")),
+                        "required", objectMapper.createArrayNode()
+                                .add("dashboard")
+                                .add("charts")
+                                .add("explanation")),
+                object(
+                        "dashboard", java.util.Map.of(
+                                "dashboardKey", "ai-canvas-daily-stats",
+                                "title", "AI Canvas Daily Stats",
+                                "description", "AI-generated semantic-layer dashboard draft.",
+                                "datasetKey", "canvas_daily_stats",
+                                "widgets", List.of(java.util.Map.of(
+                                        "widgetKey", "trend-executions",
+                                        "title", "Execution Trend",
+                                        "chartType", "LINE",
+                                        "dimensions", List.of("stat_date"),
+                                        "metrics", List.of("total_executions"),
+                                        "gridX", 0,
+                                        "gridY", 0,
+                                        "gridW", 12,
+                                        "gridH", 6,
+                                        "stylePreset", "time-series")),
+                                "filters", List.of(),
+                                "interactions", List.of(),
+                                "subscriptionChannels", List.of(),
+                                "embedScopes", List.of()),
+                        "charts", List.of(),
+                        "explanation", "Default dashboard draft generated from semantic metadata.")));
+        templates.put(7L, builtIn(
+                7L,
+                "BI Insight Agent",
+                "bi_insight",
+                """
+                        Discover BI trends, anomalies, and opportunities from validated semantic results.
+                        Question: ${question}
+                        Dataset: ${dataset}
+                        Query: ${query}
+                        Current result: ${currentResult}
+                        Baseline result: ${baselineResult}
+                        Return trends, anomalies, and opportunities.
+                        """,
+                object("type", "object",
+                        "properties", object(
+                                "trends", object("type", "array"),
+                                "anomalies", object("type", "array"),
+                                "opportunities", object("type", "array")),
+                        "required", objectMapper.createArrayNode()
+                                .add("trends")
+                                .add("anomalies")
+                                .add("opportunities")),
+                object(
+                        "trends", List.of("Review current metric movement."),
+                        "anomalies", List.of(),
+                        "opportunities", List.of("Investigate segments with positive movement."))));
+        templates.put(9L, builtIn(
+                9L,
+                "Marketing Monitor Inference Agent",
+                "marketing_monitor_inference",
+                """
+                        Analyze this monitored marketing mention. Return JSON only.
+                        Mention context: ${text}
+                        Brand key: ${brandKey}
+                        Source type: ${sourceType}
+                        Language: ${language}
+                        Metadata: ${metadata}
+                        Return sentimentLabel, sentimentScore, confidence, entities, topics, riskFlags, and evidence.
+                        """,
+                object("type", "object",
+                        "properties", object(
+                                "sentimentLabel", object("type", "string"),
+                                "sentimentScore", object("type", "number"),
+                                "confidence", object("type", "number"),
+                                "entities", object("type", "array"),
+                                "topics", object("type", "array"),
+                                "riskFlags", object("type", "array"),
+                                "evidence", object("type", "object")),
+                        "required", objectMapper.createArrayNode()
+                                .add("sentimentLabel")
+                                .add("sentimentScore")
+                                .add("confidence")
+                                .add("entities")
+                                .add("topics")
+                                .add("riskFlags")
+                                .add("evidence")),
+                object(
+                        "sentimentLabel", "NEUTRAL",
+                        "sentimentScore", 0,
+                        "confidence", 0.35,
+                        "entities", List.of(),
+                        "topics", List.of(),
+                        "riskFlags", List.of("GENERATOR_FALLBACK"),
+                        "evidence", java.util.Map.of("summary", "Default monitoring inference fallback."))));
     }
 
     private TemplateRegistration builtIn(Long id,

@@ -20,6 +20,8 @@ public class ExecutionLaneResolver {
             TriggerType.DIRECT_CALL,
             TriggerType.WAIT_RESUME,
             TriggerType.WAIT_TIMEOUT,
+            TriggerType.APPROVAL_RESUME,
+            TriggerType.APPROVAL_TIMEOUT,
             TriggerType.HUB_TIMEOUT,
             TriggerType.AGGREGATE_TIMEOUT,
             TriggerType.THRESHOLD_TIMEOUT
@@ -35,6 +37,7 @@ public class ExecutionLaneResolver {
     private static final Set<String> LIGHT_NODE_TYPES = Set.of(
             NodeType.DIRECT_CALL,
             NodeType.WAIT,
+            NodeType.MANUAL_APPROVAL,
             NodeType.HUB,
             NodeType.AGGREGATE,
             NodeType.THRESHOLD

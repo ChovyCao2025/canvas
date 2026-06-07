@@ -3,6 +3,7 @@ package org.chovy.canvas.domain.cdp;
 import lombok.RequiredArgsConstructor;
 import org.chovy.canvas.dto.cdp.CdpBatchTagReq;
 import org.chovy.canvas.dto.cdp.CdpTagWriteReq;
+import org.chovy.canvas.engine.concurrent.BackgroundTaskExecutor;
 import org.chovy.canvas.infrastructure.concurrent.ManagedVirtualThreadExecutor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -29,6 +30,14 @@ public class CdpTagOperationService {
     /** CDP 标签服务。 */
     private final CdpTagService tagService;
     private ManagedVirtualThreadExecutor backgroundExecutor = ManagedVirtualThreadExecutor.direct();
+
+    @Autowired
+    public CdpTagOperationService(CdpTagOperationMapper operationMapper,
+                                  CdpTagService tagService,
+                                  BackgroundTaskExecutor ignoredBackgroundTaskExecutor) {
+        this.operationMapper = operationMapper;
+        this.tagService = tagService;
+    }
 
     @Autowired(required = false)
     void setBackgroundExecutor(ManagedVirtualThreadExecutor backgroundExecutor) {

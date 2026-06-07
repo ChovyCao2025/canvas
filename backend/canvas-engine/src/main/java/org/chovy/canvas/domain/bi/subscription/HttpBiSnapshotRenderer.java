@@ -3,15 +3,19 @@ package org.chovy.canvas.domain.bi.subscription;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
 
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.Base64;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicInteger;
 
 @Service
 public class HttpBiSnapshotRenderer implements BiSnapshotRenderer {
@@ -19,24 +23,35 @@ public class HttpBiSnapshotRenderer implements BiSnapshotRenderer {
     private final WebClient.Builder webClientBuilder;
     private final ObjectMapper objectMapper;
     private final boolean enabled;
-    private final String endpointUrl;
+    private final List<String> endpointUrls;
     private final int timeoutMs;
+    private final AtomicInteger nextEndpointIndex = new AtomicInteger();
 
+    @Autowired
     public HttpBiSnapshotRenderer(WebClient.Builder webClientBuilder,
                                   ObjectMapper objectMapper,
                                   @Value("${canvas.bi.delivery.snapshot.renderer.enabled:false}") boolean enabled,
                                   @Value("${canvas.bi.delivery.snapshot.renderer.url:}") String endpointUrl,
+                                  @Value("${canvas.bi.delivery.snapshot.renderer.urls:}") String endpointUrls,
                                   @Value("${canvas.bi.delivery.snapshot.renderer.timeout-ms:15000}") int timeoutMs) {
         this.webClientBuilder = webClientBuilder;
         this.objectMapper = objectMapper;
         this.enabled = enabled;
-        this.endpointUrl = endpointUrl == null ? "" : endpointUrl.trim();
+        this.endpointUrls = endpointUrls(endpointUrl, endpointUrls);
         this.timeoutMs = Math.max(1000, timeoutMs);
+    }
+
+    public HttpBiSnapshotRenderer(WebClient.Builder webClientBuilder,
+                                  ObjectMapper objectMapper,
+                                  boolean enabled,
+                                  String endpointUrl,
+                                  int timeoutMs) {
+        this(webClientBuilder, objectMapper, enabled, endpointUrl, "", timeoutMs);
     }
 
     @Override
     public boolean configured() {
-        return enabled && hasText(endpointUrl);
+        return enabled && !endpointUrls.isEmpty();
     }
 
     @Override
@@ -44,6 +59,24 @@ public class HttpBiSnapshotRenderer implements BiSnapshotRenderer {
         if (!configured()) {
             throw new IllegalStateException("BI snapshot renderer is not configured");
         }
+        RuntimeException lastFailure = null;
+        int startIndex = Math.floorMod(nextEndpointIndex.getAndIncrement(), endpointUrls.size());
+        for (int attempt = 0; attempt < endpointUrls.size(); attempt++) {
+            String endpointUrl = endpointUrls.get((startIndex + attempt) % endpointUrls.size());
+            try {
+                return render(endpointUrl, request);
+            } catch (RuntimeException e) {
+                lastFailure = e;
+            }
+        }
+        if (endpointUrls.size() == 1 && lastFailure != null) {
+            throw lastFailure;
+        }
+        throw new IllegalStateException("BI snapshot renderer cluster failed across "
+                + endpointUrls.size() + " endpoint(s)", lastFailure);
+    }
+
+    private BiSnapshotRenderResult render(String endpointUrl, BiSnapshotRenderRequest request) {
         Map<String, Object> response = postRenderRequest(endpointUrl, requestBody(request));
         String contentType = stringValue(response.get("contentType"));
         String format = normalizeFormat(stringValue(response.getOrDefault("format", request.format())));
@@ -55,6 +88,27 @@ public class HttpBiSnapshotRenderer implements BiSnapshotRenderer {
             throw new IllegalStateException("BI snapshot renderer response did not include base64 image data");
         }
         return new BiSnapshotRenderResult(format, contentType, Base64.getDecoder().decode(stripDataUrl(base64)));
+    }
+
+    private List<String> endpointUrls(String primaryEndpointUrl, String clusterEndpointUrls) {
+        List<String> urls = new ArrayList<>();
+        addEndpointUrl(urls, primaryEndpointUrl);
+        if (hasText(clusterEndpointUrls)) {
+            for (String endpointUrl : clusterEndpointUrls.split(",")) {
+                addEndpointUrl(urls, endpointUrl);
+            }
+        }
+        return List.copyOf(urls);
+    }
+
+    private void addEndpointUrl(List<String> urls, String endpointUrl) {
+        if (!hasText(endpointUrl)) {
+            return;
+        }
+        String normalized = endpointUrl.trim();
+        if (!urls.contains(normalized)) {
+            urls.add(normalized);
+        }
     }
 
     protected Map<String, Object> postRenderRequest(String url, Map<String, Object> body) {

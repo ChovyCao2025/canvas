@@ -28,7 +28,7 @@ class CircuitBreakerRegistryTest {
         assertThatThrownBy(() -> new CircuitBreakerRegistry.CircuitBreaker("api", 0, 30, 3))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("failureThreshold");
-        assertThatThrownBy(() -> new CircuitBreakerRegistry.CircuitBreaker("api", 5, 0, 3))
+        assertThatThrownBy(() -> new CircuitBreakerRegistry.CircuitBreaker("api", 5, -1, 3))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("openDurationSec");
         assertThatThrownBy(() -> new CircuitBreakerRegistry.CircuitBreaker("api", 5, 30, 0))

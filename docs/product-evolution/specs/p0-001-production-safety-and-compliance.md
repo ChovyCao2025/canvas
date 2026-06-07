@@ -45,7 +45,7 @@ AI node productization is implemented by `p2-019-ai-llm-node-productionization`.
 ## Functional Requirements
 
 1. `/ops/**` must reject anonymous requests and must be reachable only by `ADMIN` or `SUPER_ADMIN` roles during the current rollout.
-2. `POST /canvas/events/report`, `POST /canvas/execute/direct/*`, and `POST /canvas/trigger/behavior` must require `X-Canvas-Internal-Token` when `canvas.internal-api.token` is configured.
+2. `POST /canvas/events/report`, `POST /canvas/execute/direct/*`, `POST /canvas/trigger/behavior`, and `POST /warehouse/realtime/pipelines/checkpoints` must require `X-Canvas-Internal-Token` when `canvas.internal-api.token` is configured.
 3. Tenant-scoped controllers must read tenant identity from `TenantContextResolver` and must filter by tenant for both list and detail reads.
 4. Inserts for tenant-owned records must set `tenantId` from the current security context unless the caller is a legacy `ADMIN` system flow with no tenant.
 5. The send path must evaluate marketing policy before calling the external reach platform.

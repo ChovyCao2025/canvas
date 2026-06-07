@@ -35,12 +35,25 @@ class SecurityConfigRoleTest {
     }
 
     @Test
+    void contentMarketingRoutesSeparateDraftAndPublishRoles() {
+        assertThat(SecurityConfig.CONTENT_EDITOR_ROUTE_ROLES)
+                .containsExactly(
+                        RoleNames.ADMIN,
+                        RoleNames.SUPER_ADMIN,
+                        RoleNames.TENANT_ADMIN,
+                        RoleNames.OPERATOR);
+        assertThat(SecurityConfig.CONTENT_PUBLISH_ROUTE_ROLES)
+                .containsExactly(RoleNames.ADMIN, RoleNames.SUPER_ADMIN, RoleNames.TENANT_ADMIN);
+    }
+
+    @Test
     void internalOpenApiRoutesStayExplicitlyEnumerated() {
         assertThat(SecurityConfig.INTERNAL_OPEN_API_ROUTES)
                 .containsExactly(
                         "/canvas/events/report",
                         "/canvas/execute/direct/*",
-                        "/canvas/trigger/behavior");
+                        "/canvas/trigger/behavior",
+                        "/warehouse/realtime/pipelines/checkpoints");
     }
 
     @Test

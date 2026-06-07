@@ -8,6 +8,7 @@ import org.chovy.canvas.dal.dataobject.CdpWarehouseWatermarkDO;
 import org.chovy.canvas.dal.mapper.CdpEventLogMapper;
 import org.chovy.canvas.dal.mapper.CdpWarehouseQualityCheckMapper;
 import org.chovy.canvas.dal.mapper.CdpWarehouseWatermarkMapper;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -41,6 +42,7 @@ public class CdpWarehouseQualityService {
         this(eventLogMapper, dorisJdbcTemplate, qualityCheckMapper, watermarkMapper, null);
     }
 
+    @Autowired
     public CdpWarehouseQualityService(CdpEventLogMapper eventLogMapper,
                                       @Qualifier("dorisJdbcTemplate") ObjectProvider<JdbcTemplate> dorisJdbcTemplate,
                                       CdpWarehouseQualityCheckMapper qualityCheckMapper,

@@ -9,6 +9,7 @@ import org.chovy.canvas.common.OutboundUrlValidator;
 import org.chovy.canvas.dto.TagImportResult;
 import org.chovy.canvas.dto.TagImportRow;
 import org.chovy.canvas.infrastructure.reactor.BlockingWorkScheduler;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
@@ -57,6 +58,14 @@ public class TagImportSourceService {
     private final WebClient.Builder webClientBuilder;
     /** 统一阻塞适配器，避免在 Netty 事件循环线程上等待远程调用结果。 */
     private final BlockingWorkScheduler blockingWorkScheduler;
+
+    @Autowired
+    public TagImportSourceService(TagImportSourceMapper tagImportSourceMapper,
+                                  TagImportService tagImportService,
+                                  ObjectMapper objectMapper,
+                                  WebClient.Builder webClientBuilder) {
+        this(tagImportSourceMapper, tagImportService, objectMapper, webClientBuilder, new BlockingWorkScheduler());
+    }
 
     /** 按条件查询列表数据。 */
     public List<TagImportSourceDO> list(Integer enabled) {

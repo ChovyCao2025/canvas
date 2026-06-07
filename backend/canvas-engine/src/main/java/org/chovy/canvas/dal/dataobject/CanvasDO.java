@@ -92,6 +92,9 @@ public class CanvasDO {
     /** 末次触达归因窗口天数 */
     private Integer attributionWindowDays;
 
+    /** 转化归因模型，默认 LAST_TOUCH；可选 FIRST_TOUCH、LINEAR、TIME_DECAY */
+    private String attributionModel;
+
     /**
      * 画布全局最大触发总次数（所有用户合计，生命周期内），null 表示不限制。
      *

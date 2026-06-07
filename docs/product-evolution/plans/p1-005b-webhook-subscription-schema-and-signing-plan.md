@@ -8,6 +8,10 @@
 
 **Tech Stack:** Java 21, Spring Boot, MyBatis-Plus, Flyway, HMAC-SHA256, JUnit 5, Mockito, AssertJ.
 
+**Implementation Status:** Implemented and merged into `main` on 2026-06-05. The actual migration is `backend/canvas-engine/src/main/resources/db/migration/V103__webhook_subscription_schema.sql`, and the domain services live under `org.chovy.canvas.domain.cdp` rather than the originally planned `org.chovy.canvas.domain.webhook` package. Added focused acceptance tests under `backend/canvas-engine/src/test/java/org/chovy/canvas/domain/cdp/`.
+
+**Verification:** `cd backend && JAVA_HOME=/Users/photonpay/Library/Java/JavaVirtualMachines/ms-21.0.11/Contents/Home PATH="/Users/photonpay/Library/Java/JavaVirtualMachines/ms-21.0.11/Contents/Home/bin:$PATH" mvn -pl canvas-engine -DskipTests compile` passed. Focused Maven tests for `WebhookSubscriptionSchemaTest`, `WebhookSignatureServiceTest`, and `WebhookSubscriptionValidatorTest` are currently blocked by unrelated global `testCompile` failures, including duplicate `KillSwitchSubscriberTest`, missing P2-079 automation-run classes, stale constructor/API expectations in existing tests, and `ExecutionContextNamespaceTest` expecting `ExecutionContext#getNodeOutput(...)`.
+
 ---
 
 ## Spec Reference

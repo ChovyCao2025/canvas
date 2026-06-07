@@ -6,6 +6,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
 import org.chovy.canvas.dal.dataobject.CdpEventLogDO;
 import org.chovy.canvas.domain.warehouse.CdpWarehouseEventSink;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
@@ -39,6 +40,7 @@ public class DorisCdpEventStreamLoader implements CdpWarehouseEventSink {
     private final HttpClient httpClient;
     private final ObjectMapper objectMapper;
 
+    @Autowired
     public DorisCdpEventStreamLoader(
             @Value("${canvas.doris.enabled:false}") boolean enabled,
             @Value("${canvas.doris.cdp-event-stream-load-url:http://localhost:8040/api/canvas_ods/cdp_event_log/_stream_load}") String streamLoadUrl,

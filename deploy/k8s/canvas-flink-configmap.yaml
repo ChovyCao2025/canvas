@@ -1,0 +1,23 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: canvas-flink
+  namespace: canvas
+  labels:
+    app.kubernetes.io/name: canvas-flink
+    app.kubernetes.io/part-of: marketing-canvas
+data:
+  flink-conf.yaml: |
+    jobmanager.rpc.address: canvas-flink-jobmanager
+    jobmanager.rpc.port: 6123
+    rest.address: 0.0.0.0
+    rest.port: 8081
+    taskmanager.numberOfTaskSlots: 4
+    parallelism.default: 2
+    state.backend: rocksdb
+    state.checkpoints.dir: file:///opt/flink/checkpoints
+    state.savepoints.dir: file:///opt/flink/savepoints
+    execution.checkpointing.interval: 60s
+    execution.checkpointing.timeout: 10min
+    execution.checkpointing.min-pause: 30s
+    execution.checkpointing.tolerable-failed-checkpoints: 3

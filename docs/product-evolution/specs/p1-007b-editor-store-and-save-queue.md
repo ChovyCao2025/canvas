@@ -11,9 +11,10 @@ Move high-churn canvas editor state into a tested store and add a bounded save q
 
 ## Current Baseline
 
-- `frontend/src/pages/canvas-editor/index.tsx` owns selection, graph state, history, save status, modals, reload behavior, and many side effects.
-- Existing tests cover local drafts, graph hydration, insertion, connection interaction, and several presentation helpers.
-- `frontend/package.json` does not include `zustand` or `immer`.
+- Implemented on 2026-06-05: `frontend/package.json` now includes direct `zustand` and `immer` dependencies.
+- `frontend/src/pages/canvas-editor/editorStore.ts` owns selected node id, mirrored graph snapshots, dirty state, save status, modal state, conflict state, and undo/redo history labels.
+- `frontend/src/pages/canvas-editor/saveQueue.ts` owns save coalescing, bounded retry, exponential backoff, conflict detection, and retry exhaustion state.
+- `frontend/src/pages/canvas-editor/index.tsx` still owns the React Flow graph rendering workflow, but high-churn editor state and save retry state are now delegated to the tested store and queue.
 
 ## In Scope
 
@@ -41,3 +42,17 @@ Move high-churn canvas editor state into a tested store and add a bounded save q
 - Store tests cover selected node, graph update, undo, redo, dirty state, save state, modal state, and selector isolation.
 - Save queue tests cover coalescing, retry count, backoff, recovery, conflict, and retry exhaustion.
 - Existing local draft and editor interaction tests remain green.
+
+## Implementation Notes
+
+- `editorStore.ts` uses a vanilla Zustand store with `subscribeWithSelector` and Immer updates; selector tests prove unrelated modal/save/dirty changes do not notify selected-node subscribers.
+- Undo/redo snapshots are cloned through `cloneEditorSnapshot`, and the page mirrors current React Flow nodes/edges into the store before history restoration.
+- `saveQueue.ts` exposes queue state through `getState()` and `onStateChange`, coalesces rapid edits to the latest payload, drains pending edits after active saves, and stops after the configured retry budget.
+- The editor maps queue `retrying`, `failed`, and `conflict` states into visible Ant Design alerts. Conflicts and failures preserve local drafts instead of clearing dirty state.
+- `canvasApi.update` accepts an optional `AbortSignal`, preparing this slice for the P1-007C HTTP cancellation work.
+
+## Verification
+
+- `cd frontend && PATH="/opt/homebrew/bin:$PATH" npm run test -- editorStore.test.ts saveQueue.test.ts` passed: 2 files, 9 tests.
+- `cd frontend && PATH="/opt/homebrew/bin:$PATH" npm run test -- editorStore.test.ts saveQueue.test.ts localDraft.test.ts canvasNameUpdate.test.ts graphHydration.test.ts connectionInteraction.test.ts useCanvasHistoryState.test.ts useCanvasGraphState.test.ts` passed: 8 files, 29 tests.
+- `cd frontend && PATH="/opt/homebrew/bin:$PATH" npm run build` passed.

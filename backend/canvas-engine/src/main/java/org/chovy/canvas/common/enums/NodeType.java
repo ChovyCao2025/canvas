@@ -29,6 +29,7 @@ public final class NodeType {
     // 等待与汇聚
     public static final String WAIT = "WAIT";
     public static final String USER_INPUT = "USER_INPUT";
+    public static final String MANUAL_APPROVAL = "MANUAL_APPROVAL";
     public static final String HUB = "HUB";
     public static final String AGGREGATE = "AGGREGATE";
     public static final String THRESHOLD = "THRESHOLD";
@@ -50,6 +51,7 @@ public final class NodeType {
 
     // 流程复用
     public static final String SUB_FLOW_REF = "SUB_FLOW_REF";
+    public static final String TRANSFER_JOURNEY = "TRANSFER_JOURNEY";
 
     private NodeType() {
     }

@@ -7,6 +7,7 @@ import org.chovy.canvas.dal.dataobject.MessageSendRecordDO;
 import org.chovy.canvas.dal.mapper.CdpUserProfileMapper;
 import org.chovy.canvas.dal.mapper.EventLogMapper;
 import org.chovy.canvas.dal.mapper.MessageSendRecordMapper;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.time.Clock;
@@ -31,6 +32,7 @@ public class ChurnFeatureSnapshotService {
     private final AiPredictionProperties properties;
     private final Clock clock;
 
+    @Autowired
     public ChurnFeatureSnapshotService(EventLogMapper eventLogMapper,
                                        MessageSendRecordMapper messageSendRecordMapper,
                                        CdpUserProfileMapper profileMapper,

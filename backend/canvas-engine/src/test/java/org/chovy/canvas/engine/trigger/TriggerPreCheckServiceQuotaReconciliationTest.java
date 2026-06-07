@@ -36,8 +36,8 @@ class TriggerPreCheckServiceQuotaReconciliationTest {
         assertThat(reconciled).isEqualTo(2);
         verify(redis).delete("canvas:global_count:10");
         verify(redis).delete("canvas:global_count:11");
-        verify(executor).submit(org.mockito.ArgumentMatchers.eq("quota-cleanup-10"), any());
-        verify(executor).submit(org.mockito.ArgumentMatchers.eq("quota-cleanup-11"), any());
+        verify(executor).submit(org.mockito.ArgumentMatchers.eq("quota-cleanup-10"), any(Runnable.class));
+        verify(executor).submit(org.mockito.ArgumentMatchers.eq("quota-cleanup-11"), any(Runnable.class));
     }
 
     private static CanvasDO canvas(Long id, CanvasStatusEnum status) {

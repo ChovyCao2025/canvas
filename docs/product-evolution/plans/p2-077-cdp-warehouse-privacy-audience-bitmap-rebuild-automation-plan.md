@@ -74,3 +74,9 @@ mvn -pl canvas-engine test -Dtest='CdpWarehouse*Test,Doris*Test,CdpEventIngestio
 - Warehouse/CDP regression passed on 2026-06-05:
   `CdpWarehouse*Test,Doris*Test,CdpEventIngestion*Test,CdpUserServiceTest`
   - Result: 414 tests, 0 failures, 1 skipped (`DorisConnectionTest`).
+- P2-077 robustness audit updated on 2026-06-05:
+  `CdpWarehousePrivacyAudienceBitmapRebuildAutomationServiceTest.rebuildExceptionRecordsFailedRequestAndContinuesCycle`
+  proves one P2-076 rebuild failure is recorded as a per-request `FAIL` result and later eligible requests still run in the same bounded cycle.
+- Focused P2-077/P2-078/P2-079 privacy audience rebuild suite passed on 2026-06-05:
+  `CdpWarehousePrivacyAudienceBitmapRebuildAutomationServiceTest,CdpWarehousePrivacyAudienceBitmapRebuildSchedulerTest,CdpWarehousePrivacyAudienceBitmapRebuildServiceTest,CdpWarehousePrivacyErasureControllerTest,CdpWarehousePrivacyAudienceBitmapRebuildAutomationRunServiceTest,CdpWarehousePrivacyAudienceBitmapRebuildAutomationRunSchemaTest`
+  - Result: 27 tests, 0 failures.

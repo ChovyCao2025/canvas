@@ -2,7 +2,9 @@ package org.chovy.canvas.domain.warehouse;
 
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.springframework.beans.factory.annotation.Autowired;
 
+import java.util.Arrays;
 import java.time.Duration;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicReference;
@@ -17,6 +19,17 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 class CdpWarehousePrivacyAudienceBitmapRebuildSchedulerTest {
+
+    @Test
+    void springConstructorAcceptsRunHistoryServiceForScheduledPersistence() {
+        boolean hasSpringRunHistoryConstructor = Arrays.stream(
+                        CdpWarehousePrivacyAudienceBitmapRebuildScheduler.class.getDeclaredConstructors())
+                .filter(constructor -> constructor.isAnnotationPresent(Autowired.class))
+                .anyMatch(constructor -> Arrays.asList(constructor.getParameterTypes())
+                        .contains(CdpWarehousePrivacyAudienceBitmapRebuildAutomationRunService.class));
+
+        assertThat(hasSpringRunHistoryConstructor).isTrue();
+    }
 
     @Test
     void disabledSchedulerDoesNotRunAutomation() {

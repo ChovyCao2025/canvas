@@ -7,11 +7,13 @@ import org.chovy.canvas.dal.dataobject.BiColumnPermissionDO;
 import org.chovy.canvas.dal.dataobject.BiDatasetDO;
 import org.chovy.canvas.dal.dataobject.BiResourcePermissionDO;
 import org.chovy.canvas.dal.dataobject.BiRowPermissionDO;
+import org.chovy.canvas.dal.dataobject.BiWorkspaceMemberDO;
 import org.chovy.canvas.dal.mapper.BiAuditLogMapper;
 import org.chovy.canvas.dal.mapper.BiColumnPermissionMapper;
 import org.chovy.canvas.dal.mapper.BiDatasetMapper;
 import org.chovy.canvas.dal.mapper.BiResourcePermissionMapper;
 import org.chovy.canvas.dal.mapper.BiRowPermissionMapper;
+import org.chovy.canvas.dal.mapper.BiWorkspaceMemberMapper;
 import org.chovy.canvas.domain.bi.portal.BiPortalMenuResource;
 import org.chovy.canvas.domain.bi.query.BiDatasetSpec;
 import org.chovy.canvas.domain.bi.query.BiFilter;
@@ -70,6 +72,83 @@ class BiPermissionServiceTest {
                 .hasMessageContaining("resource permission DENY");
 
         verify(fixtures.auditLogMapper).insert(any(BiAuditLogDO.class));
+    }
+
+    @Test
+    void datasourceUseRequiresExplicitGrantForDatasetCreation() {
+        Fixtures fixtures = fixtures();
+        when(fixtures.resourcePermissionMapper.selectList(any())).thenReturn(List.of());
+
+        assertThatThrownBy(() -> fixtures.service.enforceResourceAccess(
+                7L,
+                0L,
+                "DATASOURCE",
+                71L,
+                new BiQueryContext(7L, "alice", RoleNames.OPERATOR),
+                BiPermissionService.ACTION_USE))
+                .isInstanceOf(BiPermissionService.BiPermissionDeniedException.class)
+                .hasMessageContaining("permission is required");
+    }
+
+    @Test
+    void datasourceUseGrantAllowsDatasetCreation() {
+        Fixtures fixtures = fixtures();
+        BiResourcePermissionDO grant = resourcePermission(
+                "ROLE",
+                RoleNames.OPERATOR,
+                BiPermissionService.ACTION_USE,
+                "ALLOW");
+        grant.setResourceType("DATASOURCE");
+        grant.setResourceId(71L);
+        grant.setWorkspaceId(0L);
+        when(fixtures.resourcePermissionMapper.selectList(any())).thenReturn(List.of(grant));
+
+        fixtures.service.enforceResourceAccess(
+                7L,
+                0L,
+                "DATASOURCE",
+                71L,
+                new BiQueryContext(7L, "alice", RoleNames.OPERATOR),
+                BiPermissionService.ACTION_USE);
+    }
+
+    @Test
+    void workspaceMemberRoleAllowsResourcePermissionActions() {
+        Fixtures fixtures = fixtures();
+        when(fixtures.workspaceMemberMapper.selectOne(any())).thenReturn(workspaceMember("BI_ANALYST"));
+        when(fixtures.resourcePermissionMapper.selectList(any())).thenReturn(List.of(resourcePermission(
+                "ROLE", "BI_ANALYST", BiPermissionService.ACTION_EXPORT, "ALLOW")));
+
+        fixtures.service.enforceResourceAccess(
+                7L,
+                3L,
+                "DATASET",
+                11L,
+                new BiQueryContext(7L, "alice", RoleNames.OPERATOR),
+                BiPermissionService.ACTION_EXPORT);
+    }
+
+    @Test
+    void workspaceMemberRoleAppliesRowPermissionsDuringQuery() {
+        Fixtures fixtures = fixtures();
+        when(fixtures.workspaceMemberMapper.selectOne(any())).thenReturn(workspaceMember("BI_VIEWER"));
+        when(fixtures.resourcePermissionMapper.selectList(any())).thenReturn(List.of());
+        when(fixtures.rowPermissionMapper.selectList(any())).thenReturn(List.of(rowPermission(
+                "viewer-canvas",
+                "ROLE",
+                "BI_VIEWER",
+                "{\"filters\":[{\"field\":\"canvas_id\",\"operator\":\"EQ\",\"value\":42}]}")));
+        when(fixtures.columnPermissionMapper.selectList(any())).thenReturn(List.of());
+
+        BiPermissionService.BiPreparedQuery prepared = fixtures.service.prepareQuery(
+                dataset(),
+                request(List.of("stat_date"), List.of("total_executions")),
+                new BiQueryContext(7L, "alice", RoleNames.OPERATOR),
+                BiPermissionService.ACTION_USE);
+
+        assertThat(prepared.request().filters()).extracting(BiFilter::field)
+                .containsExactly("canvas_id");
+        assertThat(prepared.permissionSignature()).contains("viewer-canvas");
     }
 
     @Test
@@ -138,6 +217,7 @@ class BiPermissionServiceTest {
         BiResourcePermissionMapper resourcePermissionMapper = mock(BiResourcePermissionMapper.class);
         BiRowPermissionMapper rowPermissionMapper = mock(BiRowPermissionMapper.class);
         BiColumnPermissionMapper columnPermissionMapper = mock(BiColumnPermissionMapper.class);
+        BiWorkspaceMemberMapper workspaceMemberMapper = mock(BiWorkspaceMemberMapper.class);
         BiAuditLogMapper auditLogMapper = mock(BiAuditLogMapper.class);
         when(datasetMapper.selectOne(any())).thenReturn(datasetRow());
         return new Fixtures(
@@ -145,12 +225,14 @@ class BiPermissionServiceTest {
                 resourcePermissionMapper,
                 rowPermissionMapper,
                 columnPermissionMapper,
+                workspaceMemberMapper,
                 auditLogMapper,
                 new BiPermissionService(
                         datasetMapper,
                         resourcePermissionMapper,
                         rowPermissionMapper,
                         columnPermissionMapper,
+                        workspaceMemberMapper,
                         auditLogMapper,
                         new ObjectMapper()));
     }
@@ -204,6 +286,16 @@ class BiPermissionServiceTest {
         return row;
     }
 
+    private BiWorkspaceMemberDO workspaceMember(String roleKey) {
+        BiWorkspaceMemberDO row = new BiWorkspaceMemberDO();
+        row.setId(41L);
+        row.setTenantId(7L);
+        row.setWorkspaceId(3L);
+        row.setUserId("alice");
+        row.setRoleKey(roleKey);
+        return row;
+    }
+
     private BiColumnPermissionDO columnPermission(String fieldKey,
                                                   String subjectType,
                                                   String subjectId,
@@ -239,6 +331,7 @@ class BiPermissionServiceTest {
             BiResourcePermissionMapper resourcePermissionMapper,
             BiRowPermissionMapper rowPermissionMapper,
             BiColumnPermissionMapper columnPermissionMapper,
+            BiWorkspaceMemberMapper workspaceMemberMapper,
             BiAuditLogMapper auditLogMapper,
             BiPermissionService service) {
     }

@@ -114,6 +114,11 @@ public class CdpWarehousePrivacyAudienceBitmapRebuildService {
     }
 
     private List<AudienceDefinitionDO> selectCandidates(Long tenantId, List<Long> audienceIds, int limit) {
+        boolean explicitAudienceScope = audienceIds != null && !audienceIds.isEmpty();
+        List<Long> scopedIds = audienceIds(audienceIds);
+        if (explicitAudienceScope && scopedIds.isEmpty()) {
+            return List.of();
+        }
         LambdaQueryWrapper<AudienceDefinitionDO> query = new LambdaQueryWrapper<AudienceDefinitionDO>()
                 .eq(AudienceDefinitionDO::getTenantId, tenantId)
                 .eq(AudienceDefinitionDO::getEnabled, 1)
@@ -121,7 +126,6 @@ public class CdpWarehousePrivacyAudienceBitmapRebuildService {
                 .orderByAsc(AudienceDefinitionDO::getUpdatedAt)
                 .orderByAsc(AudienceDefinitionDO::getId)
                 .last("LIMIT " + (limit + 1));
-        List<Long> scopedIds = audienceIds(audienceIds);
         if (!scopedIds.isEmpty()) {
             query.in(AudienceDefinitionDO::getId, scopedIds);
         }

@@ -10,7 +10,9 @@ import org.chovy.canvas.common.tenant.TenantContext;
 import org.chovy.canvas.common.tenant.TenantScopeSupport;
 import org.chovy.canvas.common.enums.CanvasStatusEnum;
 import org.chovy.canvas.common.enums.VersionStatus;
+import org.chovy.canvas.dal.dataobject.CanvasProjectFolderDO;
 import org.chovy.canvas.dto.*;
+import org.chovy.canvas.dto.canvas.ProjectFolderMetadataReq;
 import org.chovy.canvas.engine.audience.AudienceSnapshotService;
 import org.chovy.canvas.engine.dag.DagGraph;
 import org.chovy.canvas.engine.dag.DagParser;
@@ -38,6 +40,7 @@ import java.util.Set;
 import org.springframework.data.redis.core.script.RedisScript;
 import org.chovy.canvas.dal.dataobject.CanvasDO;
 import org.chovy.canvas.dal.mapper.CanvasMapper;
+import org.chovy.canvas.dal.mapper.CanvasProjectFolderMapper;
 import org.chovy.canvas.dal.dataobject.CanvasVersionDO;
 import org.chovy.canvas.dal.mapper.CanvasVersionMapper;
 import org.chovy.canvas.query.CanvasListQuery;
@@ -92,6 +95,38 @@ public class CanvasService {
     /** 租户查询过滤工具；保持非构造注入以兼容现有单元测试构造器。 */
     private TenantScopeSupport tenantScopeSupport = new TenantScopeSupport();
     private ManagedVirtualThreadExecutor backgroundExecutor = ManagedVirtualThreadExecutor.direct();
+    /** 项目归属服务；保持非构造注入以兼容现有单元测试构造器。 */
+    private CanvasProjectFolderMetadataService projectFolderMetadataService;
+    /** 项目归属 Mapper，用于 projectId 列表过滤。 */
+    private CanvasProjectFolderMapper projectFolderMapper;
+
+    @Autowired
+    public CanvasService(CanvasMapper canvasMapper,
+                         CanvasVersionMapper canvasVersionMapper,
+                         DagParser dagParser,
+                         TriggerRouteService triggerRouteService,
+                         CanvasSchedulerService schedulerService,
+                         CanvasConfigCache configCache,
+                         CanvasExecutionService canvasExecutionService,
+                         TriggerPreCheckService preCheckService,
+                         GroovyHandler groovyHandler,
+                         org.chovy.canvas.engine.handlers.MqTriggerHandler mqTriggerHandler,
+                         CanvasRuleGraphValidator canvasRuleGraphValidator,
+                         org.springframework.data.redis.core.StringRedisTemplate redis,
+                         CanvasTransactionService canvasTransactionService,
+                         CanvasStateTransitionPolicy stateTransitionPolicy,
+                         CanvasExamplesProperties examplesProperties,
+                         TenantScopeSupport tenantScopeSupport) {
+        this(canvasMapper, canvasVersionMapper, dagParser, triggerRouteService, schedulerService, configCache,
+                canvasExecutionService, preCheckService, groovyHandler, mqTriggerHandler, canvasRuleGraphValidator,
+                redis, canvasTransactionService, examplesProperties);
+        if (stateTransitionPolicy != null) {
+            this.stateTransitionPolicy = stateTransitionPolicy;
+        }
+        if (tenantScopeSupport != null) {
+            this.tenantScopeSupport = tenantScopeSupport;
+        }
+    }
 
     @Autowired(required = false)
     void setBackgroundExecutor(ManagedVirtualThreadExecutor backgroundExecutor) {
@@ -106,6 +141,16 @@ public class CanvasService {
     @Autowired(required = false)
     void setAudienceSnapshotService(AudienceSnapshotService audienceSnapshotService) {
         this.audienceSnapshotService = audienceSnapshotService;
+    }
+
+    @Autowired(required = false)
+    void setProjectFolderMetadataService(CanvasProjectFolderMetadataService projectFolderMetadataService) {
+        this.projectFolderMetadataService = projectFolderMetadataService;
+    }
+
+    @Autowired(required = false)
+    void setProjectFolderMapper(CanvasProjectFolderMapper projectFolderMapper) {
+        this.projectFolderMapper = projectFolderMapper;
     }
 
     /**
@@ -125,7 +170,13 @@ public class CanvasService {
         canvas.setProjectName(req.getProjectName());
         canvas.setFolderKey(req.getFolderKey());
         canvas.setFolderName(req.getFolderName());
+        canvas.setMaxTotalExecutions(req.getMaxTotalExecutions());
+        canvas.setPerUserDailyLimit(req.getPerUserDailyLimit());
+        canvas.setPerUserTotalLimit(req.getPerUserTotalLimit());
+        canvas.setCooldownSeconds(req.getCooldownSeconds());
+        canvas.setCreatedBy(req.getCreatedBy());
         canvasMapper.insert(canvas);
+        saveProjectAssignment(canvas, req);
 
         // 若带初始 JSON，创建第一个草稿版本
         if (StrUtil.isNotBlank(req.getGraphJson())) {
@@ -139,6 +190,12 @@ public class CanvasService {
             canvasVersionMapper.insert(v);
         }
         return canvas;
+    }
+
+    public CanvasDO create(CanvasCreateReq req, Long tenantId) {
+        CanvasCreateReq scoped = req == null ? new CanvasCreateReq() : req;
+        scoped.setTenantId(tenantId);
+        return create(scoped);
     }
 
     /**
@@ -240,6 +297,12 @@ public class CanvasService {
         return listInternal(q, tenantContext);
     }
 
+    public PageResult<CanvasDO> list(CanvasListQuery q, Long tenantId) {
+        CanvasListQuery scoped = q == null ? new CanvasListQuery() : q;
+        scoped.setTenantId(tenantId);
+        return listInternal(scoped, null);
+    }
+
     private PageResult<CanvasDO> listInternal(CanvasListQuery q, TenantContext tenantContext) {
         CanvasListQuery query = q == null ? new CanvasListQuery() : q;
         LambdaQueryWrapper<CanvasDO> wrapper = new LambdaQueryWrapper<>();
@@ -249,9 +312,52 @@ public class CanvasService {
             tenantScopeSupport.applyTenantFilter(wrapper, CanvasDO::getTenantId, tenantContext);
         }
         CanvasListQuerySupport.apply(wrapper, query, examplesProperties.isEnabled());
+        List<Long> projectCanvasIds = projectCanvasIds(query);
+        if (projectCanvasIds != null && projectCanvasIds.isEmpty()) {
+            return PageResult.of(0, List.of());
+        }
+        wrapper.in(projectCanvasIds != null, CanvasDO::getId, projectCanvasIds);
 
         IPage<CanvasDO> page = canvasMapper.selectPage(new Page<>(query.getPage(), query.getSize()), wrapper);
         return PageResult.of(page.getTotal(), page.getRecords());
+    }
+
+    private void saveProjectAssignment(CanvasDO canvas, CanvasCreateReq req) {
+        if (req.getProjectId() == null
+                && isBlank(req.getProjectKey())
+                && isBlank(req.getProjectName())
+                && isBlank(req.getFolderKey())
+                && isBlank(req.getFolderName())) {
+            return;
+        }
+        if (projectFolderMetadataService == null) {
+            throw new IllegalStateException("CanvasProjectFolderMetadataService is required for project assignment");
+        }
+        projectFolderMetadataService.saveMetadata(canvas.getTenantId(), canvas.getId(),
+                new ProjectFolderMetadataReq(
+                        req.getProjectId(),
+                        req.getProjectKey(),
+                        req.getProjectName(),
+                        req.getFolderKey(),
+                        req.getFolderName(),
+                        req.getCreatedBy()));
+    }
+
+    private List<Long> projectCanvasIds(CanvasListQuery query) {
+        if (query.getProjectId() == null) {
+            return null;
+        }
+        if (projectFolderMapper == null) {
+            throw new IllegalStateException("CanvasProjectFolderMapper is required for project filtering");
+        }
+        LambdaQueryWrapper<CanvasProjectFolderDO> wrapper = new LambdaQueryWrapper<CanvasProjectFolderDO>()
+                .eq(CanvasProjectFolderDO::getProjectId, query.getProjectId())
+                .eq(query.getTenantId() != null, CanvasProjectFolderDO::getTenantId, query.getTenantId());
+        return projectFolderMapper.selectList(wrapper).stream()
+                .map(CanvasProjectFolderDO::getCanvasId)
+                .filter(Objects::nonNull)
+                .distinct()
+                .toList();
     }
 
     /**
@@ -726,5 +832,9 @@ public class CanvasService {
 
     private static boolean changed(Object requested, Object current) {
         return requested != null && !Objects.equals(requested, current);
+    }
+
+    private static boolean isBlank(String value) {
+        return value == null || value.isBlank();
     }
 }

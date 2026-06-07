@@ -20,5 +20,7 @@ public class CanvasConversionAttributionDO {
     private String conversionEventCode;
     private BigDecimal conversionAmount;
     private String attributionModel;
+    private BigDecimal attributionWeight;
+    private LocalDateTime touchCreatedAt;
     private LocalDateTime attributedAt;
 }

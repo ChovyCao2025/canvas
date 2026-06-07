@@ -72,7 +72,7 @@ class ExecutionDlqWriterTest {
         ManagedVirtualThreadExecutor backgroundExecutor = mock(ManagedVirtualThreadExecutor.class);
         doThrow(new RejectedExecutionException("closed"))
                 .when(backgroundExecutor)
-                .submit(any(), any());
+                .submit(any(), any(Runnable.class));
         ExecutionDlqWriter writer = new ExecutionDlqWriter(
                 dlqMapper,
                 mock(CanvasMetrics.class),

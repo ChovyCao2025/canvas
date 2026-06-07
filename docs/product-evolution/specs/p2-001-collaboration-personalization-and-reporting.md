@@ -51,7 +51,7 @@ Teams can coordinate editing, personalize work surfaces, and analyze outcomes wi
 
 ### Data And Configuration Touchpoints
 
-- `backend/canvas-engine/src/main/resources/db/migration/V160__collaboration_personalization_reporting.sql`
+- `backend/canvas-engine/src/main/resources/db/migration/V263__collaboration_personalization_reporting.sql`
 
 ### Test Touchpoints
 
@@ -78,3 +78,13 @@ Teams can coordinate editing, personalize work surfaces, and analyze outcomes wi
 - All changed frontend routes handle loading, empty, error, and permission states.
 - Tests named in the plan pass in the local commands for backend and frontend slices.
 - The implementation includes rollout notes covering feature flag, migration, and rollback behavior.
+
+## Implementation Status
+
+Completed on 2026-06-05.
+
+- Added `V263__collaboration_personalization_reporting.sql` for tenant/user-scoped editor preference storage. The plan originally named `V160`, but the repository already contains later migrations, so this implementation uses the next available migration version.
+- Added `UserWorkspacePreferenceService` with a MyBatis-backed repository, allowed editor preference patch keys, default editor preferences, and tenant/user scoped upsert behavior.
+- Added `CanvasCollaborationSummaryService` and `CanvasCollaborationController` for read-only collaboration summary and editor preference GET/PUT endpoints under `/canvas`.
+- Added frontend `collaborationApi` plus editor collaboration awareness presentation helpers and focused tests.
+- Rollout: run `V263__collaboration_personalization_reporting.sql`, then enable editor calls to `/canvas/{canvasId}/collaboration/summary` and `/canvas/preferences/editor` for tenant operators. Rollback: hide the editor collaboration chrome and stop calling the new endpoints; stored preferences are additive and can remain in place.

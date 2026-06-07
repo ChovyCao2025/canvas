@@ -29,7 +29,7 @@ class CdpWarehouseSyntheticDataPathProbeControllerTest {
                 new CdpWarehouseSyntheticDataPathProbeController(service, tenantResolver(9L, "alice"));
 
         R<CdpWarehouseSyntheticDataPathProbeService.ProbeRunView> response =
-                controller.run("ods-cert", "__warehouse_probe_custom", false, 1, 0).block();
+                controller.run("ods-cert", "__warehouse_probe_custom", false, 1, 0, "DIRECT_SINK").block();
 
         assertThat(response.getData()).isSameAs(view);
         verify(service).run(eq(9L), org.mockito.ArgumentMatchers.argThat(command ->
@@ -37,7 +37,8 @@ class CdpWarehouseSyntheticDataPathProbeControllerTest {
                         && "__warehouse_probe_custom".equals(command.eventCode())
                         && Boolean.FALSE.equals(command.strict())
                         && command.verifyAttempts() == 1
-                        && command.verifyDelayMs() == 0));
+                        && command.verifyDelayMs() == 0
+                        && "DIRECT_SINK".equals(command.sourceMode())));
     }
 
     @Test
@@ -62,10 +63,12 @@ class CdpWarehouseSyntheticDataPathProbeControllerTest {
                 7L,
                 9L,
                 "ods-cert",
+                "DIRECT_SINK",
                 "warehouse-probe-1",
                 "__warehouse_probe__",
                 "__warehouse_probe_user_1",
                 true,
+                status,
                 status,
                 status,
                 status,

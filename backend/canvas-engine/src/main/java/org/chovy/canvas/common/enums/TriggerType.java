@@ -15,7 +15,10 @@ public final class TriggerType {
     public static final String THRESHOLD_TIMEOUT = "THRESHOLD_TIMEOUT";
     public static final String WAIT_RESUME = "WAIT_RESUME";
     public static final String WAIT_TIMEOUT = "WAIT_TIMEOUT";
+    public static final String APPROVAL_RESUME = "APPROVAL_RESUME";
+    public static final String APPROVAL_TIMEOUT = "APPROVAL_TIMEOUT";
     public static final String SUB_FLOW_REF = "SUB_FLOW_REF";
+    public static final String TRANSFER_JOURNEY = "TRANSFER_JOURNEY";
 
     private TriggerType() {
     }

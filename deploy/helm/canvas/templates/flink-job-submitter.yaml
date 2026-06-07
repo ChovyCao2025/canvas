@@ -1,0 +1,104 @@
+{{- if .Values.flink.enabled }}
+{{- $root := . }}
+{{- range .Values.flink.pipelines }}
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "canvas.fullname" $root }}-flink-submit-{{ . | replace "_" "-" | trunc 32 | trimSuffix "-" }}
+  namespace: {{ $root.Values.namespace }}
+  labels:
+    {{- include "canvas.labels" $root | nindent 4 }}
+    app.kubernetes.io/component: flink-job-submitter
+    canvas.chovy.org/pipeline-key: {{ . | quote }}
+spec:
+  backoffLimit: 3
+  template:
+    metadata:
+      labels:
+        {{- include "canvas.labels" $root | nindent 8 }}
+        app.kubernetes.io/component: flink-job-submitter
+        canvas.chovy.org/pipeline-key: {{ . | quote }}
+    spec:
+      restartPolicy: OnFailure
+      serviceAccountName: {{ $root.Values.flink.serviceAccountName }}
+      {{- with $root.Values.global.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: submit
+          image: "{{ $root.Values.flink.image.repository }}:{{ $root.Values.flink.image.tag }}"
+          imagePullPolicy: {{ $root.Values.flink.image.pullPolicy }}
+          env:
+            - name: CANVAS_FLINK_JOB_PIPELINE_KEY
+              value: {{ . | quote }}
+            - name: CANVAS_FLINK_TENANT_ID
+              value: {{ $root.Values.flink.config.tenantId | quote }}
+            - name: CANVAS_FLINK_REPORTED_BY
+              value: {{ $root.Values.flink.config.reportedBy | quote }}
+            - name: CANVAS_FLINK_DORIS_LABEL_SUFFIX
+              value: {{ $root.Values.flink.config.dorisLabelSuffix | quote }}
+            - name: CANVAS_FLINK_MYSQL_URL
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $root.Values.flink.secretName }}
+                  key: {{ $root.Values.flink.secretKeys.canvasFlinkMysqlUrl }}
+            - name: CANVAS_FLINK_MYSQL_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $root.Values.flink.secretName }}
+                  key: {{ $root.Values.flink.secretKeys.canvasFlinkMysqlUsername }}
+            - name: CANVAS_FLINK_MYSQL_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $root.Values.flink.secretName }}
+                  key: {{ $root.Values.flink.secretKeys.canvasFlinkMysqlPassword }}
+            - name: CANVAS_FLINK_DORIS_FE_NODES
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $root.Values.flink.secretName }}
+                  key: {{ $root.Values.flink.secretKeys.canvasFlinkDorisFeNodes }}
+            - name: CANVAS_FLINK_DORIS_BE_NODES
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $root.Values.flink.secretName }}
+                  key: {{ $root.Values.flink.secretKeys.canvasFlinkDorisBeNodes }}
+            - name: CANVAS_FLINK_DORIS_JDBC_URL
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $root.Values.flink.secretName }}
+                  key: {{ $root.Values.flink.secretKeys.canvasFlinkDorisJdbcUrl }}
+            - name: CANVAS_FLINK_DORIS_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $root.Values.flink.secretName }}
+                  key: {{ $root.Values.flink.secretKeys.canvasFlinkDorisUsername }}
+            - name: CANVAS_FLINK_DORIS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $root.Values.flink.secretName }}
+                  key: {{ $root.Values.flink.secretKeys.canvasFlinkDorisPassword }}
+            - name: CANVAS_FLINK_CHECKPOINT_ENDPOINT
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $root.Values.flink.secretName }}
+                  key: {{ $root.Values.flink.secretKeys.canvasFlinkCheckpointEndpoint }}
+            - name: CANVAS_FLINK_INTERNAL_API_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $root.Values.flink.secretName }}
+                  key: {{ $root.Values.flink.secretKeys.canvasFlinkInternalApiToken }}
+          command: ["/bin/bash", "-ec"]
+          args:
+            - |
+              until flink list -m {{ include "canvas.fullname" $root }}-flink-jobmanager:8081 >/dev/null 2>&1; do
+                sleep 5
+              done
+              flink run -d \
+                -m {{ include "canvas.fullname" $root }}-flink-jobmanager:8081 \
+                -c org.chovy.canvas.flink.CanvasFlinkJobMain \
+                {{ $root.Values.flink.jobJarPath }} \
+                --pipeline-key={{ . }}
+{{- end }}
+{{- end }}

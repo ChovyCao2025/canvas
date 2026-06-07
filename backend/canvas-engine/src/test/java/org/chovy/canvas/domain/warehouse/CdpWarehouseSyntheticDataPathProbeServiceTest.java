@@ -42,7 +42,7 @@ class CdpWarehouseSyntheticDataPathProbeServiceTest {
 
         CdpWarehouseSyntheticDataPathProbeService.ProbeRunView view = service.run(9L,
                 new CdpWarehouseSyntheticDataPathProbeService.RunCommand(
-                        "ods-cert", null, true, 1, 0));
+                        "ods-cert", null, true, 1, 0, null));
 
         assertThat(view.status()).isEqualTo("PASS");
         assertThat(view.sinkStatus()).isEqualTo("PASS");
@@ -71,7 +71,7 @@ class CdpWarehouseSyntheticDataPathProbeServiceTest {
 
         CdpWarehouseSyntheticDataPathProbeService.ProbeRunView view = service.run(9L,
                 new CdpWarehouseSyntheticDataPathProbeService.RunCommand(
-                        "ods-cert", null, true, 1, 0));
+                        "ods-cert", null, true, 1, 0, null));
 
         assertThat(view.status()).isEqualTo("FAIL");
         assertThat(view.sinkStatus()).isEqualTo("SKIPPED");
@@ -91,7 +91,7 @@ class CdpWarehouseSyntheticDataPathProbeServiceTest {
 
         CdpWarehouseSyntheticDataPathProbeService.ProbeRunView view = service.run(9L,
                 new CdpWarehouseSyntheticDataPathProbeService.RunCommand(
-                        "ods-cert", null, true, 1, 0));
+                        "ods-cert", null, true, 1, 0, null));
 
         assertThat(view.status()).isEqualTo("FAIL");
         assertThat(view.sinkStatus()).isEqualTo("FAIL");
@@ -110,7 +110,7 @@ class CdpWarehouseSyntheticDataPathProbeServiceTest {
 
         CdpWarehouseSyntheticDataPathProbeService.ProbeRunView view = service.run(9L,
                 new CdpWarehouseSyntheticDataPathProbeService.RunCommand(
-                        "ods-cert", null, false, 1, 0));
+                        "ods-cert", null, false, 1, 0, null));
 
         assertThat(view.status()).isEqualTo("WARN");
         assertThat(view.sinkStatus()).isEqualTo("PASS");
@@ -149,7 +149,7 @@ class CdpWarehouseSyntheticDataPathProbeServiceTest {
             ObjectProvider<CdpWarehouseEventSink> sinkProvider,
             ObjectProvider<JdbcTemplate> dorisProvider) {
         return new CdpWarehouseSyntheticDataPathProbeService(
-                mapper, sinkProvider, dorisProvider, new ObjectMapper(), CLOCK);
+                mapper, sinkProvider, dorisProvider, provider(null), new ObjectMapper(), CLOCK);
     }
 
     @SuppressWarnings("unchecked")

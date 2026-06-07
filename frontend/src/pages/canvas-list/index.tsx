@@ -18,11 +18,12 @@ import {
 import type { MenuProps } from 'antd'
 import { useNavigate } from 'react-router-dom'
 import type { ColumnsType } from 'antd/es/table'
-import { canvasApi, type CanvasTemplate } from '../../services/api'
+import { canvasApi, projectApi, type CanvasTemplate, type ProjectSummary } from '../../services/api'
 import { canvasBiEntrypoint } from '../bi/biWorkbench'
 import { buildTemplateCategoryOptions, buildTemplateCloneSuccessMessage } from './templateCatalog'
 import { buildImportPayload, exportedFileName } from './canvasImportExport'
 import { buildCanvasListParams, projectFolderLabel } from './canvasProjectFilters'
+import { buildCanvasCreatePayload } from './canvasProjectPayload'
 import {
   canvasBatchApi,
   type CanvasBatchItem,
@@ -88,6 +89,8 @@ export default function CanvasListPage() {
   const [total, setTotal] = useState(0)
   const [loading, setLoading] = useState(false)
   const [page, setPage] = useState(1)
+  const [projects, setProjects] = useState<ProjectSummary[]>([])
+  const [projectId, setProjectId] = useState<number | undefined>()
   const [projectKey, setProjectKey] = useState('')
   const [folderKey, setFolderKey] = useState('')
   // 创建弹窗态
@@ -120,7 +123,7 @@ export default function CanvasListPage() {
   const fetchList = async (p = page) => {
     setLoading(true)
     try {
-      const res = await canvasApi.list(buildCanvasListParams({ page: p, projectKey, folderKey }))
+      const res = await canvasApi.list(buildCanvasListParams({ page: p, projectId, projectKey, folderKey }))
       setData(res.data.list)
       setTotal(res.data.total)
     } finally {
@@ -130,10 +133,15 @@ export default function CanvasListPage() {
 
   useEffect(() => { fetchList(1) }, [])
 
+  useEffect(() => {
+    if (!isAdmin) return
+    projectApi.list().then(res => setProjects(res.data.filter(project => project.status === 'ACTIVE')))
+  }, [isAdmin])
+
   // 创建新画布：成功后回到第一页刷新列表
   const handleCreate = async () => {
     const values = await form.validateFields()
-    await canvasApi.create({ ...values })
+    await canvasApi.create(buildCanvasCreatePayload(values))
     message.success('创建成功')
     setCreateVisible(false)
     form.resetFields()
@@ -143,6 +151,15 @@ export default function CanvasListPage() {
   const handleProjectFilter = () => {
     setPage(1)
     fetchList(1)
+  }
+
+  const handleCreateProjectChange = (id?: number) => {
+    const project = projects.find(item => item.id === id)
+    form.setFieldsValue({
+      projectId: id,
+      projectKey: project?.projectKey,
+      projectName: project?.projectName,
+    })
   }
 
   const loadTemplates = async (category?: string) => {
@@ -579,6 +596,21 @@ export default function CanvasListPage() {
       </div>
 
       <Space wrap style={{ marginBottom: 12 }}>
+        {isAdmin && (
+          <Select
+            allowClear
+            showSearch
+            style={{ width: 220 }}
+            placeholder="项目"
+            value={projectId}
+            optionFilterProp="label"
+            onChange={value => setProjectId(value)}
+            options={projects.map(project => ({
+              value: project.id,
+              label: `${project.projectName} (${project.projectKey})`,
+            }))}
+          />
+        )}
         <Input
           allowClear
           style={{ width: 180 }}
@@ -689,6 +721,21 @@ export default function CanvasListPage() {
           <Form.Item name="description" label="描述">
             <Input.TextArea rows={3} />
           </Form.Item>
+          {isAdmin && (
+            <Form.Item name="projectId" label="所属项目">
+              <Select
+                allowClear
+                showSearch
+                placeholder="选择项目"
+                optionFilterProp="label"
+                onChange={handleCreateProjectChange}
+                options={projects.map(project => ({
+                  value: project.id,
+                  label: `${project.projectName} (${project.projectKey})`,
+                }))}
+              />
+            </Form.Item>
+          )}
           <Form.Item name="projectKey" label="项目 Key">
             <Input placeholder="例：growth" />
           </Form.Item>

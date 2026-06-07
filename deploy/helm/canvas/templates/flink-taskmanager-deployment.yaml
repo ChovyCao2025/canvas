@@ -1,0 +1,62 @@
+{{- if .Values.flink.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "canvas.fullname" . }}-flink-taskmanager
+  namespace: {{ .Values.namespace }}
+  labels:
+    {{- include "canvas.labels" . | nindent 4 }}
+    app.kubernetes.io/component: flink-taskmanager
+spec:
+  replicas: {{ .Values.flink.taskManager.replicas }}
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: {{ include "canvas.name" . }}
+      app.kubernetes.io/instance: {{ .Release.Name }}
+      app.kubernetes.io/component: flink-taskmanager
+  template:
+    metadata:
+      labels:
+        {{- include "canvas.labels" . | nindent 8 }}
+        app.kubernetes.io/component: flink-taskmanager
+    spec:
+      serviceAccountName: {{ .Values.flink.serviceAccountName }}
+      terminationGracePeriodSeconds: 60
+      {{- with .Values.global.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: flink-taskmanager
+          image: "{{ .Values.flink.image.repository }}:{{ .Values.flink.image.tag }}"
+          imagePullPolicy: {{ .Values.flink.image.pullPolicy }}
+          command: ["taskmanager"]
+          env:
+            - name: FLINK_PROPERTIES
+              value: "taskmanager.numberOfTaskSlots: {{ .Values.flink.config.taskSlots }}"
+          volumeMounts:
+            - name: flink-config
+              mountPath: /opt/flink/conf/flink-conf.yaml
+              subPath: flink-conf.yaml
+            - name: flink-checkpoints
+              mountPath: /opt/flink/checkpoints
+            - name: flink-savepoints
+              mountPath: /opt/flink/savepoints
+          resources:
+            {{- toYaml .Values.flink.taskManager.resources | nindent 12 }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+      volumes:
+        - name: flink-config
+          configMap:
+            name: {{ include "canvas.fullname" . }}-flink
+        - name: flink-checkpoints
+          persistentVolumeClaim:
+            claimName: {{ include "canvas.fullname" . }}-flink-checkpoints
+        - name: flink-savepoints
+          persistentVolumeClaim:
+            claimName: {{ include "canvas.fullname" . }}-flink-savepoints
+{{- end }}

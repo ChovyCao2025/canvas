@@ -146,6 +146,37 @@ class CdpWarehousePrivacyErasureExecutionServiceTest {
         assertThat(proofCaptor.getValue().errorMessage()).contains("Doris privacy erasure executor is not configured");
     }
 
+    @Test
+    void dorisExecutorOutputDoesNotPersistRawSubjectValue() {
+        CdpWarehouseDorisPrivacyErasureExecutor dorisExecutor = command ->
+                new CdpWarehouseDorisPrivacyErasureExecutor.Result(
+                        "FAIL",
+                        1,
+                        0,
+                        "DELETE FROM ods WHERE user_id = 'user-123'",
+                        "failed deleting raw subject user-123");
+        Fixture fixture = fixture(dorisExecutor);
+        when(fixture.erasureService.get(9L, 101L)).thenReturn(request("user-123",
+                List.of("DORIS_ODS_CDP_EVENT_LOG")));
+        when(fixture.erasureService.recordAssetProof(eq(9L), eq(101L), any()))
+                .thenReturn(request("user-123", List.of("DORIS_ODS_CDP_EVENT_LOG")));
+        CdpWarehousePrivacyErasureExecutionService service = fixture.service();
+
+        CdpWarehousePrivacyErasureExecutionService.ErasureExecutionResult result = service.execute(9L, 101L,
+                new CdpWarehousePrivacyErasureExecutionService.ErasureExecutionCommand(
+                        "user-123", false, "privacy-ops", null));
+
+        assertThat(result.assetResults()).singleElement().satisfies(asset -> {
+            assertThat(asset.proofMessage()).doesNotContain("user-123");
+            assertThat(asset.errorMessage()).doesNotContain("user-123");
+        });
+        ArgumentCaptor<CdpWarehousePrivacyErasureService.AssetProofCommand> proofCaptor =
+                ArgumentCaptor.forClass(CdpWarehousePrivacyErasureService.AssetProofCommand.class);
+        verify(fixture.erasureService).recordAssetProof(eq(9L), eq(101L), proofCaptor.capture());
+        assertThat(proofCaptor.getValue().proofMessage()).doesNotContain("user-123");
+        assertThat(proofCaptor.getValue().errorMessage()).doesNotContain("user-123");
+    }
+
     private Fixture fixture(CdpWarehouseDorisPrivacyErasureExecutor dorisExecutor) {
         return new Fixture(
                 mock(CdpWarehousePrivacyErasureService.class),

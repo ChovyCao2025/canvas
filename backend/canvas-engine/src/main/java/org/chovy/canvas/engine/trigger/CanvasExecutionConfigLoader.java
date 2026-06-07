@@ -123,6 +123,7 @@ public class CanvasExecutionConfigLoader {
         return NodeType.WAIT.equals(triggerNodeType)
                 || NodeType.HUB.equals(triggerNodeType)
                 || NodeType.USER_INPUT.equals(triggerNodeType)
+                || NodeType.MANUAL_APPROVAL.equals(triggerNodeType)
                 || NodeType.AGGREGATE.equals(triggerNodeType)
                 || NodeType.THRESHOLD.equals(triggerNodeType)
                 || NodeType.SCHEDULED_TRIGGER.equals(triggerNodeType)

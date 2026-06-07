@@ -53,13 +53,32 @@ class CdpWarehousePrivacyErasureServiceTest {
         assertThat(view.subjectHash()).hasSize(64);
         assertThat(view.subjectRefMasked()).isEqualTo("us***56");
         assertThat(view.subjectRefMasked()).doesNotContain("user-123456");
-        assertThat(view.targetAssetsJson()).contains("DORIS_ODS_CDP_EVENT_LOG", "AUDIENCE_BITMAP_VERSION");
+        assertThat(view.targetAssetsJson()).contains(
+                "CDP_USER_PROFILE",
+                "CDP_USER_IDENTITY",
+                "CDP_USER_TAG",
+                "CDP_EVENT_LOG",
+                "DORIS_ODS_CDP_EVENT_LOG",
+                "DORIS_DWD_CDP_USER_EVENT_FACT",
+                "REALTIME_RETRY_BUFFER",
+                "AUDIENCE_BITMAP_VERSION");
         ArgumentCaptor<CdpWarehousePrivacyErasureAssetProofDO> proofCaptor =
                 ArgumentCaptor.forClass(CdpWarehousePrivacyErasureAssetProofDO.class);
         verify(proofMapper, org.mockito.Mockito.times(8)).insert(proofCaptor.capture());
         assertThat(proofCaptor.getAllValues())
                 .extracting(CdpWarehousePrivacyErasureAssetProofDO::getStatus)
                 .containsOnly("PLANNED");
+        assertThat(proofCaptor.getAllValues())
+                .extracting(CdpWarehousePrivacyErasureAssetProofDO::getAssetKey)
+                .containsExactly(
+                        "CDP_USER_PROFILE",
+                        "CDP_USER_IDENTITY",
+                        "CDP_USER_TAG",
+                        "CDP_EVENT_LOG",
+                        "DORIS_ODS_CDP_EVENT_LOG",
+                        "DORIS_DWD_CDP_USER_EVENT_FACT",
+                        "REALTIME_RETRY_BUFFER",
+                        "AUDIENCE_BITMAP_VERSION");
         assertThat(proofCaptor.getAllValues())
                 .extracting(CdpWarehousePrivacyErasureAssetProofDO::getRequestId)
                 .containsOnly(101L);
@@ -97,6 +116,46 @@ class CdpWarehousePrivacyErasureServiceTest {
     }
 
     @Test
+    void recordAssetProofRedactsRawSubjectCompatibleWithMaskedReference() {
+        CdpWarehousePrivacyErasureRequestMapper requestMapper =
+                mock(CdpWarehousePrivacyErasureRequestMapper.class);
+        CdpWarehousePrivacyErasureAssetProofMapper proofMapper =
+                mock(CdpWarehousePrivacyErasureAssetProofMapper.class);
+        CdpWarehousePrivacyErasureRequestDO request = request(101L, "PENDING", NOW.plusHours(1));
+        request.setSubjectRefMasked("us***56");
+        CdpWarehousePrivacyErasureAssetProofDO proof = proof(201L, "CDP_USER_PROFILE", "PLANNED");
+        when(requestMapper.selectById(101L)).thenReturn(request);
+        when(proofMapper.selectList(any(LambdaQueryWrapper.class)))
+                .thenReturn(List.of(proof))
+                .thenReturn(List.of(proof))
+                .thenReturn(List.of(proof));
+        CdpWarehousePrivacyErasureService service =
+                new CdpWarehousePrivacyErasureService(requestMapper, proofMapper, new ObjectMapper(), CLOCK);
+
+        CdpWarehousePrivacyErasureService.ErasureRequestView view = service.recordAssetProof(9L, 101L,
+                new CdpWarehousePrivacyErasureService.AssetProofCommand(
+                        "CDP_USER_PROFILE", "CDP", "DELETE", "PASS",
+                        1L, 1L, "deleted profile rows for user-123456",
+                        "executor output included user-123456", "privacy-ops", NOW));
+
+        assertThat(view.assetProofs()).hasSize(1);
+        assertThat(view.assetProofs().get(0).proofMessage())
+                .contains("[REDACTED_SUBJECT]")
+                .doesNotContain("user-123456");
+        assertThat(view.assetProofs().get(0).errorMessage())
+                .contains("[REDACTED_SUBJECT]")
+                .doesNotContain("user-123456");
+        ArgumentCaptor<CdpWarehousePrivacyErasureRequestDO> requestCaptor =
+                ArgumentCaptor.forClass(CdpWarehousePrivacyErasureRequestDO.class);
+        verify(requestMapper).updateById(requestCaptor.capture());
+        assertThat(requestCaptor.getValue().getEvidenceJson())
+                .contains("[REDACTED_SUBJECT]")
+                .doesNotContain("user-123456");
+        assertThat(proof.getProofMessage()).doesNotContain("user-123456");
+        assertThat(proof.getErrorMessage()).doesNotContain("user-123456");
+    }
+
+    @Test
     void summaryFailsWhenActiveRequestIsOverdueOrFailed() {
         CdpWarehousePrivacyErasureRequestMapper requestMapper =
                 mock(CdpWarehousePrivacyErasureRequestMapper.class);
@@ -114,6 +173,50 @@ class CdpWarehousePrivacyErasureServiceTest {
         assertThat(summary.activeCount()).isEqualTo(1);
         assertThat(summary.overdueCount()).isEqualTo(1);
         assertThat(summary.reason()).contains("failed or overdue");
+    }
+
+    @Test
+    void summaryWarnsWhenRequestsAreActiveButNotOverdueOrFailed() {
+        CdpWarehousePrivacyErasureRequestMapper requestMapper =
+                mock(CdpWarehousePrivacyErasureRequestMapper.class);
+        CdpWarehousePrivacyErasureAssetProofMapper proofMapper =
+                mock(CdpWarehousePrivacyErasureAssetProofMapper.class);
+        when(requestMapper.selectList(any(LambdaQueryWrapper.class))).thenReturn(List.of(
+                request(101L, "RUNNING", NOW.plusMinutes(1)),
+                request(102L, "PASS", NOW.minusHours(2))));
+        CdpWarehousePrivacyErasureService service =
+                new CdpWarehousePrivacyErasureService(requestMapper, proofMapper, new ObjectMapper(), CLOCK);
+
+        CdpWarehousePrivacyErasureService.BacklogSummary summary = service.summary(9L);
+
+        assertThat(summary.status()).isEqualTo("WARN");
+        assertThat(summary.activeCount()).isEqualTo(1);
+        assertThat(summary.overdueCount()).isZero();
+        assertThat(summary.failedCount()).isZero();
+        assertThat(summary.pendingCount()).isEqualTo(1);
+        assertThat(summary.reason()).contains("active requests");
+    }
+
+    @Test
+    void summaryPassesWhenThereIsNoActiveBacklog() {
+        CdpWarehousePrivacyErasureRequestMapper requestMapper =
+                mock(CdpWarehousePrivacyErasureRequestMapper.class);
+        CdpWarehousePrivacyErasureAssetProofMapper proofMapper =
+                mock(CdpWarehousePrivacyErasureAssetProofMapper.class);
+        when(requestMapper.selectList(any(LambdaQueryWrapper.class))).thenReturn(List.of(
+                request(101L, "PASS", NOW.minusHours(1)),
+                request(102L, "PASS", NOW.minusHours(2))));
+        CdpWarehousePrivacyErasureService service =
+                new CdpWarehousePrivacyErasureService(requestMapper, proofMapper, new ObjectMapper(), CLOCK);
+
+        CdpWarehousePrivacyErasureService.BacklogSummary summary = service.summary(9L);
+
+        assertThat(summary.status()).isEqualTo("PASS");
+        assertThat(summary.activeCount()).isZero();
+        assertThat(summary.overdueCount()).isZero();
+        assertThat(summary.failedCount()).isZero();
+        assertThat(summary.pendingCount()).isZero();
+        assertThat(summary.reason()).contains("clear");
     }
 
     private CdpWarehousePrivacyErasureRequestDO request(Long id, String status, LocalDateTime dueAt) {

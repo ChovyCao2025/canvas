@@ -1,0 +1,62 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: canvas-flink-taskmanager
+  namespace: canvas
+  labels:
+    app.kubernetes.io/name: canvas-flink
+    app.kubernetes.io/component: flink-taskmanager
+    app.kubernetes.io/part-of: marketing-canvas
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: canvas-flink
+      app.kubernetes.io/component: flink-taskmanager
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: canvas-flink
+        app.kubernetes.io/component: flink-taskmanager
+        app.kubernetes.io/part-of: marketing-canvas
+    spec:
+      serviceAccountName: canvas-flink
+      terminationGracePeriodSeconds: 60
+      containers:
+        - name: flink-taskmanager
+          image: registry.example.com/marketing-canvas/canvas-flink-jobs:prod
+          imagePullPolicy: IfNotPresent
+          command: ["taskmanager"]
+          env:
+            - name: FLINK_PROPERTIES
+              value: "taskmanager.numberOfTaskSlots: 4"
+          volumeMounts:
+            - name: flink-config
+              mountPath: /opt/flink/conf/flink-conf.yaml
+              subPath: flink-conf.yaml
+            - name: canvas-flink-checkpoints
+              mountPath: /opt/flink/checkpoints
+            - name: canvas-flink-savepoints
+              mountPath: /opt/flink/savepoints
+          resources:
+            requests:
+              cpu: "1"
+              memory: 2Gi
+            limits:
+              cpu: "4"
+              memory: 6Gi
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+      volumes:
+        - name: flink-config
+          configMap:
+            name: canvas-flink
+        - name: canvas-flink-checkpoints
+          persistentVolumeClaim:
+            claimName: canvas-flink-checkpoints
+        - name: canvas-flink-savepoints
+          persistentVolumeClaim:
+            claimName: canvas-flink-savepoints

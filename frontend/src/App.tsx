@@ -28,6 +28,8 @@ const CanvasEditorPage = lazy(() => import('./pages/canvas-editor'))
 const CanvasStatsPage = lazy(() => import('./pages/canvas-stats'))
 /** 管理员用户页懒加载组件，仅管理员路由会访问。 */
 const AdminUsersPage = lazy(() => import('./pages/admin'))
+/** 项目治理页懒加载组件，仅管理员路由会访问。 */
+const ProjectsPage = lazy(() => import('./pages/projects'))
 /** 租户管理页懒加载组件，仅超级管理员路由会访问。 */
 const TenantAdminPage = lazy(() => import('./pages/tenant-admin'))
 /** API 配置页懒加载组件，维护外部接口定义。 */
@@ -46,6 +48,14 @@ const TagImportPage = lazy(() => import('./pages/tag-import'))
 const MqConfigPage = lazy(() => import('./pages/mq-config'))
 /** 事件定义配置页懒加载组件。 */
 const EventConfigPage = lazy(() => import('./pages/event-config'))
+/** Webhook 订阅管理页懒加载组件。 */
+const WebhookSubscriptionsPage = lazy(() => import('./pages/webhook-subscriptions'))
+/** 计算画像属性页懒加载组件。 */
+const CdpComputedProfilePage = lazy(() => import('./pages/cdp-computed-profile'))
+/** 计算标签页懒加载组件。 */
+const CdpComputedTagsPage = lazy(() => import('./pages/cdp-computed-tags'))
+/** 实时人群运维页懒加载组件。 */
+const RealtimeAudiencesPage = lazy(() => import('./pages/realtime-audiences'))
 /** 人群列表页懒加载组件。 */
 const AudienceListPage = lazy(() => import('./pages/audience-list'))
 /** 人群编辑页懒加载组件。 */
@@ -66,14 +76,34 @@ const TestUsersPage = lazy(() => import('./pages/test-users'))
 const AiPredictionsPage = lazy(() => import('./pages/ai-predictions'))
 /** 投递 outbox 和回执监控页懒加载组件。 */
 const MessageDeliveryPage = lazy(() => import('./pages/message-delivery'))
+/** SCRM 会话工作台懒加载组件。 */
+const ConversationsPage = lazy(() => import('./pages/conversations'))
+/** 品牌和竞品监测工作台懒加载组件。 */
+const MarketingMonitoringPage = lazy(() => import('./pages/marketing-monitoring'))
+/** 渠道连接器运维页懒加载组件。 */
+const ChannelConnectorsPage = lazy(() => import('./pages/channel-connectors'))
 /** 生产运维控制台懒加载组件，运营角色可只读访问。 */
 const OpsDashboardPage = lazy(() => import('./pages/ops-dashboard'))
+/** 统一审批任务页懒加载组件。 */
+const ApprovalsPage = lazy(() => import('./pages/approvals'))
 /** Mautic 启发解释台懒加载组件。 */
 const MauticInsightsPage = lazy(() => import('./pages/mautic-insights'))
+/** 营销中台控制面懒加载组件。 */
+const MarketingPlatformPage = lazy(() => import('./pages/marketing-platform'))
+/** SEO / SEM 管理工作台懒加载组件。 */
+const SearchMarketingPage = lazy(() => import('./pages/search-marketing'))
+/** 增长活动中心懒加载组件。 */
+const GrowthActivitiesPage = lazy(() => import('./pages/growth-activities'))
 /** 营销偏好中心懒加载组件。 */
 const MarketingPreferencesPage = lazy(() => import('./pages/marketing-preferences'))
 /** 营销表单中心懒加载组件。 */
 const MarketingFormsPage = lazy(() => import('./pages/marketing-forms'))
+/** 内容中心懒加载组件，管理 CMS 条目、DAM 资产和内容模板。 */
+const ContentHubPage = lazy(() => import('./pages/content-hub'))
+/** 消息模板中心懒加载组件。 */
+const MessageTemplatesPage = lazy(() => import('./pages/message-templates'))
+/** 演示沙箱页懒加载组件，用于内部销售演示环境。 */
+const DemoSandboxPage = lazy(() => import('./pages/demo-sandbox'))
 /** 公开营销表单页懒加载组件；无需登录，用于线索收集。 */
 const PublicMarketingFormPage = lazy(() => import('./pages/public-marketing-form'))
 /** 通用 BI 工作台懒加载组件。 */
@@ -133,10 +163,19 @@ export default function App() {
                     <Route path="/home" element={<HomePage />} />
                     <Route path="/canvas" element={<CanvasListPage />} />
                     <Route path="/ops" element={<OpsDashboardPage />} />
+                    <Route path="/approvals" element={<ApprovalsPage />} />
+                    <Route path="/conversations" element={<ConversationsPage />} />
+                    <Route path="/marketing-monitoring" element={<MarketingMonitoringPage />} />
                     <Route path="/bi" element={<BiWorkbenchPage />} />
                     <Route path="/mautic-insights" element={<MauticInsightsPage />} />
+                    <Route path="/marketing-platform" element={<MarketingPlatformPage />} />
+                    <Route path="/search-marketing" element={<SearchMarketingPage />} />
+                    <Route path="/growth-activities" element={<GrowthActivitiesPage />} />
                     <Route path="/marketing-preferences" element={<MarketingPreferencesPage />} />
                     <Route path="/marketing-forms" element={<MarketingFormsPage />} />
+                    <Route path="/content-hub" element={<ContentHubPage />} />
+                    <Route path="/message-templates" element={<MessageTemplatesPage />} />
+                    <Route path="/demo-sandbox" element={<DemoSandboxPage />} />
                     <Route path="/cdp/users" element={<CdpUsersPage />} />
                     <Route path="/cdp/users/:userId" element={<CdpUserDetailPage />} />
                   </Route>
@@ -150,10 +189,14 @@ export default function App() {
                 <Route element={<RouteBoundary routeName="管理员路由"><RequireAdmin /></RouteBoundary>}>
                   <Route element={<RouteBoundary routeName="管理员布局"><AppLayout /></RouteBoundary>}>
                     <Route path="/admin/users" element={<AdminUsersPage />} />
+                    <Route path="/admin/projects" element={<ProjectsPage />} />
                     <Route path="/api-config" element={<ApiConfigPage />} />
                     <Route path="/data-source-config" element={<DataSourceConfigPage />} />
                     <Route path="/ab-experiments" element={<AbExperimentPage />} />
                     <Route path="/tag-config" element={<TagConfigPage />} />
+                    <Route path="/cdp/computed-profile" element={<CdpComputedProfilePage />} />
+                    <Route path="/cdp/computed-tags" element={<CdpComputedTagsPage />} />
+                    <Route path="/cdp/realtime-audiences" element={<RealtimeAudiencesPage />} />
                     <Route path="/identity-types" element={<IdentityTypesPage />} />
                     <Route path="/tag-import" element={<TagImportPage />} />
                     <Route path="/audiences" element={<AudienceListPage />} />
@@ -161,11 +204,13 @@ export default function App() {
                     <Route path="/audiences/:id/edit" element={<AudienceEditPage />} />
                     <Route path="/mq-config" element={<MqConfigPage />} />
                     <Route path="/event-config" element={<EventConfigPage />} />
+                    <Route path="/webhook-subscriptions" element={<WebhookSubscriptionsPage />} />
                     <Route path="/api-docs" element={<ApiDocsPage />} />
                     <Route path="/system-options" element={<SystemOptionsPage />} />
                     <Route path="/test-users" element={<TestUsersPage />} />
                     <Route path="/ai-predictions" element={<AiPredictionsPage />} />
                     <Route path="/message-deliveries" element={<MessageDeliveryPage />} />
+                    <Route path="/channel-connectors" element={<ChannelConnectorsPage />} />
                   </Route>
                 </Route>
 

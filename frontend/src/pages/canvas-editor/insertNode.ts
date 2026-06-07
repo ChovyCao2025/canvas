@@ -58,6 +58,7 @@ export function buildDetachedNode(
   nodeType: string,
   category: string,
   position: XYPosition,
+  displayName?: string,
 ): Node<CanvasNodeData> {
   return {
     id: nodeId,
@@ -66,7 +67,7 @@ export function buildDetachedNode(
     data: {
       nodeType,
       category,
-      name: DEFAULT_NAMES[nodeType] ?? nodeType,
+      name: displayName ?? DEFAULT_NAMES[nodeType] ?? nodeType,
       bizConfig: {},
     },
   }
@@ -126,8 +127,9 @@ function buildNode(
   position: XYPosition,
   bizConfig: BizConfig,
   outletSchema?: string,
+  displayName?: string,
 ): Node<CanvasNodeData> {
-  const node = buildDetachedNode(nodeId, nodeType, category, position)
+  const node = buildDetachedNode(nodeId, nodeType, category, position, displayName)
   node.data.bizConfig = bizConfig
   node.data.outletSchema = outletSchema
   return node
@@ -141,8 +143,9 @@ export function buildNodeExpansion(input: {
   position: XYPosition
   bizConfig: BizConfig
   outletSchema?: string
+  displayName?: string
 }): NodeExpansion {
-  const node = buildNode(input.nodeId, input.nodeType, input.category, input.position, input.bizConfig, input.outletSchema)
+  const node = buildNode(input.nodeId, input.nodeType, input.category, input.position, input.bizConfig, input.outletSchema, input.displayName)
   return {
     entryNodeId: node.id,
     exitNodeId: node.id,

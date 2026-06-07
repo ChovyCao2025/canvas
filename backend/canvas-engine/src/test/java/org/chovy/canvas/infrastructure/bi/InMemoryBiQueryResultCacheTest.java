@@ -39,6 +39,31 @@ class InMemoryBiQueryResultCacheTest {
         assertThat(cache.size()).isZero();
     }
 
+    @Test
+    void exposesCapacityHitAndEvictionStats() {
+        MutableClock clock = new MutableClock(Instant.parse("2026-06-05T03:00:00Z"));
+        InMemoryBiQueryResultCache cache = new InMemoryBiQueryResultCache(true, Duration.ofSeconds(60), 2, clock);
+
+        cache.put("hash-1", result("hash-1"));
+        clock.advance(Duration.ofSeconds(1));
+        cache.put("hash-2", result("hash-2"));
+        assertThat(cache.get("hash-1")).isPresent();
+        assertThat(cache.get("missing")).isEmpty();
+        clock.advance(Duration.ofSeconds(1));
+        cache.put("hash-3", result("hash-3"));
+
+        var stats = cache.stats();
+        assertThat(stats.provider()).isEqualTo("memory");
+        assertThat(stats.enabled()).isTrue();
+        assertThat(stats.entryCount()).isEqualTo(2);
+        assertThat(stats.maxEntries()).isEqualTo(2);
+        assertThat(stats.ttlSeconds()).isEqualTo(60);
+        assertThat(stats.hitCount()).isEqualTo(1);
+        assertThat(stats.missCount()).isEqualTo(1);
+        assertThat(stats.putCount()).isEqualTo(3);
+        assertThat(stats.evictionCount()).isEqualTo(1);
+    }
+
     private BiQueryResult result(String sqlHash) {
         return new BiQueryResult(
                 "canvas_daily_stats",

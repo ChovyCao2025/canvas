@@ -146,8 +146,9 @@ public class CdpWarehousePrivacyErasureExecutionService {
             result = new AssetExecutionResult(assetKey, FAIL, 0, 0,
                     "asset erasure failed", e.getMessage());
         }
-        recordProof(tenantId, requestId, dryRun, actor, result);
-        return result;
+        AssetExecutionResult safeResult = sanitize(result, subjectValue);
+        recordProof(tenantId, requestId, dryRun, actor, safeResult);
+        return safeResult;
     }
 
     private <T> AssetExecutionResult executeUserScoped(Long tenantId,
@@ -244,6 +245,26 @@ public class CdpWarehousePrivacyErasureExecutionService {
                 output.affectedCount(),
                 output.proofMessage(),
                 output.errorMessage());
+    }
+
+    private AssetExecutionResult sanitize(AssetExecutionResult result, String subjectValue) {
+        if (result == null) {
+            return null;
+        }
+        return new AssetExecutionResult(
+                result.assetKey(),
+                result.status(),
+                result.matchedCount(),
+                result.affectedCount(),
+                redact(result.proofMessage(), subjectValue),
+                redact(result.errorMessage(), subjectValue));
+    }
+
+    private String redact(String value, String subjectValue) {
+        if (value == null || subjectValue == null || subjectValue.isBlank()) {
+            return value;
+        }
+        return value.replace(subjectValue, "[REDACTED_SUBJECT]");
     }
 
     private void recordProof(Long tenantId,

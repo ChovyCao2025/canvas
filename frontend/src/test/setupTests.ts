@@ -22,6 +22,14 @@ if (typeof window !== 'undefined' && !window.matchMedia) {
   })
 }
 
+if (typeof window !== 'undefined' && typeof window.getComputedStyle === 'function') {
+  const getComputedStyle = window.getComputedStyle.bind(window)
+  Object.defineProperty(window, 'getComputedStyle', {
+    writable: true,
+    value: (element: Element, pseudoElement?: string | null) => getComputedStyle(element, pseudoElement ? null : pseudoElement),
+  })
+}
+
 if (typeof globalThis.ResizeObserver === 'undefined') {
   globalThis.ResizeObserver = class ResizeObserver {
     observe() {}

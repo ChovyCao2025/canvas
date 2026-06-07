@@ -1,9 +1,12 @@
 package org.chovy.canvas.domain.bi.export;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.JsonNode;
 import org.chovy.canvas.common.tenant.RoleNames;
+import org.chovy.canvas.dal.dataobject.BiAuditLogDO;
 import org.chovy.canvas.dal.dataobject.BiDatasetDO;
 import org.chovy.canvas.dal.dataobject.BiExportJobDO;
+import org.chovy.canvas.dal.mapper.BiAuditLogMapper;
 import org.chovy.canvas.dal.mapper.BiDatasetMapper;
 import org.chovy.canvas.dal.mapper.BiExportJobMapper;
 import org.chovy.canvas.domain.bi.permission.BiPermissionService;
@@ -14,18 +17,30 @@ import org.chovy.canvas.domain.bi.query.BiQueryExecutionService;
 import org.chovy.canvas.domain.bi.query.BiQueryRequest;
 import org.chovy.canvas.domain.bi.query.BiQueryResult;
 import org.chovy.canvas.domain.bi.storage.BiFileStorage;
+import org.chovy.canvas.domain.bi.storage.BiFileStorageWriter;
 import org.chovy.canvas.domain.bi.storage.BiStoredFile;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.mockito.ArgumentCaptor;
+import org.apache.poi.ss.usermodel.FillPatternType;
+import org.apache.poi.ss.usermodel.Workbook;
+import org.apache.poi.xssf.usermodel.XSSFSheet;
+import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.security.MessageDigest;
 import java.time.LocalDateTime;
 import java.util.HashMap;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipInputStream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -234,6 +249,391 @@ class BiSelfServiceExportServiceTest {
     }
 
     @Test
+    void processQueuedPdfExportWritesDownloadablePdf() throws Exception {
+        Fixture fixture = fixture();
+        AtomicReference<BiExportJobDO> persisted = new AtomicReference<>();
+        BiExportJobCommand command = new BiExportJobCommand(
+                "DATASET",
+                "canvas_daily_stats",
+                null,
+                "PDF",
+                query(100),
+                100,
+                false,
+                false,
+                null);
+        BiExportJobDO row = exportJob();
+        row.setId(75L);
+        row.setStatus("QUEUED");
+        row.setProgressPercent(0);
+        row.setExportFormat("PDF");
+        row.setRequestJson(new ObjectMapper().writeValueAsString(command));
+        row.setFileUrl(null);
+        row.setStorageProvider(null);
+        row.setStorageKey(null);
+        persisted.set(row);
+        when(fixture.exportJobMapper.selectList(any())).thenReturn(List.of(row));
+        when(fixture.exportJobMapper.selectById(75L)).thenAnswer(invocation -> persisted.get());
+        when(fixture.datasetMapper.selectById(11L)).thenReturn(dataset());
+        when(fixture.queryExecutionService.execute(any(), any())).thenReturn(result());
+        doAnswer(invocation -> {
+            persisted.set(invocation.getArgument(0));
+            return 1;
+        }).when(fixture.exportJobMapper).updateById(any(BiExportJobDO.class));
+
+        BiExportQueueResult queueResult = fixture.service.processQueuedExports(
+                7L,
+                "export-worker",
+                RoleNames.OPERATOR,
+                10);
+        BiExportJobView view = queueResult.jobs().getFirst();
+
+        assertThat(view.status()).isEqualTo("COMPLETED");
+        assertThat(view.exportFormat()).isEqualTo("PDF");
+        assertThat(view.storageKey()).isEqualTo("exports/tenant-7/export-75.pdf");
+        BiExportDownload download = fixture.service.download(7L, 75L);
+        assertThat(download.filename()).isEqualTo("export-75.pdf");
+        assertThat(download.contentType()).isEqualTo("application/pdf");
+        String pdf = new String(download.bytes(), java.nio.charset.StandardCharsets.ISO_8859_1);
+        assertThat(pdf).startsWith("%PDF-");
+        assertThat(pdf)
+                .contains("stat_date")
+                .contains("total_executions")
+                .contains("2026-06-05")
+                .contains("42");
+    }
+
+    @Test
+    void processQueuedXlsxExportAppliesReadableWorkbookStyling() throws Exception {
+        Fixture fixture = fixture();
+        AtomicReference<BiExportJobDO> persisted = new AtomicReference<>();
+        BiExportJobCommand command = new BiExportJobCommand(
+                "DATASET",
+                "canvas_daily_stats",
+                null,
+                "XLSX",
+                query(100),
+                100,
+                false,
+                false,
+                null);
+        BiExportJobDO row = exportJob();
+        row.setId(78L);
+        row.setStatus("QUEUED");
+        row.setProgressPercent(0);
+        row.setExportFormat("XLSX");
+        row.setRequestJson(new ObjectMapper().writeValueAsString(command));
+        row.setFileUrl(null);
+        row.setStorageProvider(null);
+        row.setStorageKey(null);
+        persisted.set(row);
+        when(fixture.exportJobMapper.selectList(any())).thenReturn(List.of(row));
+        when(fixture.exportJobMapper.selectById(78L)).thenAnswer(invocation -> persisted.get());
+        when(fixture.datasetMapper.selectById(11L)).thenReturn(dataset());
+        when(fixture.queryExecutionService.execute(any(), any())).thenReturn(result());
+        doAnswer(invocation -> {
+            persisted.set(invocation.getArgument(0));
+            return 1;
+        }).when(fixture.exportJobMapper).updateById(any(BiExportJobDO.class));
+
+        fixture.service.processQueuedExports(7L, "export-worker", RoleNames.OPERATOR, 10);
+        BiExportDownload download = fixture.service.download(7L, 78L);
+
+        assertThat(download.filename()).isEqualTo("export-78.xlsx");
+        try (Workbook workbook = new XSSFWorkbook(new ByteArrayInputStream(download.bytes()))) {
+            XSSFSheet sheet = (XSSFSheet) workbook.getSheet("BI Export");
+            assertThat(sheet.getPaneInformation()).isNotNull();
+            assertThat(sheet.getPaneInformation().isFreezePane()).isTrue();
+            assertThat(sheet.getCTWorksheet().getAutoFilter()).isNotNull();
+            assertThat(sheet.getRow(0).getCell(0).getCellStyle().getFillPattern()).isEqualTo(FillPatternType.SOLID_FOREGROUND);
+            assertThat(workbook.getFontAt(sheet.getRow(0).getCell(0).getCellStyle().getFontIndex()).getBold()).isTrue();
+            assertThat(sheet.getColumnWidth(0)).isGreaterThan(8 * 256);
+        }
+    }
+
+    @Test
+    void processQueuedLargeCsvExportWritesPartitionedZipWithManifestAndPagedQueries() throws Exception {
+        Fixture fixture = fixture(20_000);
+        AtomicReference<BiExportJobDO> persisted = new AtomicReference<>();
+        List<BiQueryRequest> executedRequests = new ArrayList<>();
+        BiExportJobCommand command = new BiExportJobCommand(
+                "DATASET",
+                "canvas_daily_stats",
+                null,
+                "CSV",
+                query(15_000),
+                15_000,
+                false,
+                false,
+                null);
+        BiExportJobDO row = exportJob();
+        row.setId(79L);
+        row.setStatus("QUEUED");
+        row.setProgressPercent(0);
+        row.setExportFormat("CSV");
+        row.setRowLimit(15_000);
+        row.setRequestJson(new ObjectMapper().writeValueAsString(command));
+        row.setFileUrl(null);
+        row.setStorageProvider(null);
+        row.setStorageKey(null);
+        persisted.set(row);
+        when(fixture.exportJobMapper.selectList(any())).thenReturn(List.of(row));
+        when(fixture.exportJobMapper.selectById(79L)).thenAnswer(invocation -> persisted.get());
+        when(fixture.datasetMapper.selectById(11L)).thenReturn(dataset());
+        when(fixture.queryExecutionService.execute(any(), any())).thenAnswer(invocation -> {
+            BiQueryRequest request = invocation.getArgument(0);
+            executedRequests.add(request);
+            if (request.offset() == 0) {
+                return resultRows(10_000, 0);
+            }
+            if (request.offset() == 10_000) {
+                return resultRows(5_000, 10_000);
+            }
+            return resultRows(0, request.offset());
+        });
+        doAnswer(invocation -> {
+            persisted.set(invocation.getArgument(0));
+            return 1;
+        }).when(fixture.exportJobMapper).updateById(any(BiExportJobDO.class));
+
+        BiExportQueueResult queueResult = fixture.service.processQueuedExports(
+                7L,
+                "export-worker",
+                RoleNames.OPERATOR,
+                10);
+
+        BiExportJobView view = queueResult.jobs().getFirst();
+        assertThat(view.status()).isEqualTo("COMPLETED");
+        assertThat(view.rowLimit()).isEqualTo(15_000);
+        assertThat(view.storageKey()).isEqualTo("exports/tenant-7/export-79.zip");
+        assertThat(executedRequests)
+                .extracting(request -> request.limit() + ":" + request.offset())
+                .containsExactly("10000:0", "5000:10000");
+
+        BiExportDownload download = fixture.service.download(7L, 79L);
+        assertThat(download.filename()).isEqualTo("export-79.zip");
+        assertThat(download.contentType()).isEqualTo("application/zip");
+        Map<String, String> entries = unzipTextEntries(download.bytes());
+        assertThat(entries.keySet()).containsExactly("manifest.json", "part-00001.csv", "part-00002.csv");
+        assertThat(entries.get("manifest.json"))
+                .contains("\"requestedRows\":15000")
+                .contains("\"generatedRows\":15000")
+                .contains("\"partCount\":2")
+                .contains("\"partSize\":10000");
+        assertThat(entries.get("part-00001.csv")).contains("stat_date,total_executions");
+        assertThat(entries.get("part-00002.csv")).contains("2026-06-05-10000");
+    }
+
+    @Test
+    void processQueuedLargeCsvExportStoresPartObjectsWithManifestChecksums() throws Exception {
+        BiDatasetMapper datasetMapper = mock(BiDatasetMapper.class);
+        BiExportJobMapper exportJobMapper = mock(BiExportJobMapper.class);
+        BiQueryExecutionService queryExecutionService = mock(BiQueryExecutionService.class);
+        BiPermissionService permissionService = mock(BiPermissionService.class);
+        CapturingStorage storage = new CapturingStorage("MEMORY");
+        ObjectMapper mapper = new ObjectMapper();
+        BiSelfServiceExportService service = new BiSelfServiceExportService(
+                datasetMapper,
+                exportJobMapper,
+                queryExecutionService,
+                permissionService,
+                mapper,
+                storage,
+                7,
+                20_000);
+        AtomicReference<BiExportJobDO> persisted = new AtomicReference<>();
+        List<BiQueryRequest> executedRequests = new ArrayList<>();
+        BiExportJobCommand command = new BiExportJobCommand(
+                "DATASET",
+                "canvas_daily_stats",
+                null,
+                "CSV",
+                query(15_000),
+                15_000,
+                false,
+                false,
+                null);
+        BiExportJobDO row = exportJob();
+        row.setId(80L);
+        row.setStatus("QUEUED");
+        row.setProgressPercent(0);
+        row.setExportFormat("CSV");
+        row.setRowLimit(15_000);
+        row.setRequestJson(mapper.writeValueAsString(command));
+        row.setFileUrl(null);
+        row.setStorageProvider(null);
+        row.setStorageKey(null);
+        persisted.set(row);
+        when(exportJobMapper.selectList(any())).thenReturn(List.of(row));
+        when(exportJobMapper.selectById(80L)).thenAnswer(invocation -> persisted.get());
+        when(datasetMapper.selectById(11L)).thenReturn(dataset());
+        when(queryExecutionService.execute(any(), any())).thenAnswer(invocation -> {
+            BiQueryRequest request = invocation.getArgument(0);
+            executedRequests.add(request);
+            if (request.offset() == 0) {
+                return resultRows(10_000, 0);
+            }
+            if (request.offset() == 10_000) {
+                return resultRows(5_000, 10_000);
+            }
+            return resultRows(0, request.offset());
+        });
+        doAnswer(invocation -> {
+            persisted.set(invocation.getArgument(0));
+            return 1;
+        }).when(exportJobMapper).updateById(any(BiExportJobDO.class));
+
+        BiExportQueueResult queueResult = service.processQueuedExports(
+                7L,
+                "export-worker",
+                RoleNames.OPERATOR,
+                10);
+
+        BiExportJobView view = queueResult.jobs().getFirst();
+        assertThat(view.status()).isEqualTo("COMPLETED");
+        assertThat(view.storageKey()).isEqualTo("exports/tenant-7/export-80.zip");
+        assertThat(executedRequests)
+                .extracting(request -> request.limit() + ":" + request.offset())
+                .containsExactly("10000:0", "5000:10000");
+        assertThat(storage.bytesByKey.keySet()).contains(
+                "exports/tenant-7/export-80.zip",
+                "exports/tenant-7/export-80/parts/part-00001.csv",
+                "exports/tenant-7/export-80/parts/part-00002.csv");
+
+        Map<String, String> entries = unzipTextEntries(storage.bytesByKey.get("exports/tenant-7/export-80.zip"));
+        assertThat(entries.keySet()).containsExactly("manifest.json", "part-00001.csv", "part-00002.csv");
+        JsonNode manifest = mapper.readTree(entries.get("manifest.json"));
+        assertThat(manifest.path("storageLayout").asText()).isEqualTo("OBJECT_PER_PART_ZIP");
+        assertThat(manifest.path("parts")).hasSize(2);
+        JsonNode firstPart = manifest.path("parts").get(0);
+        byte[] firstPartBytes = storage.bytesByKey.get("exports/tenant-7/export-80/parts/part-00001.csv");
+        assertThat(firstPart.path("name").asText()).isEqualTo("part-00001.csv");
+        assertThat(firstPart.path("storageKey").asText()).isEqualTo("exports/tenant-7/export-80/parts/part-00001.csv");
+        assertThat(firstPart.path("rowCount").asInt()).isEqualTo(10_000);
+        assertThat(firstPart.path("sizeBytes").asLong()).isEqualTo(firstPartBytes.length);
+        assertThat(firstPart.path("sha256").asText()).isEqualTo(sha256Hex(firstPartBytes));
+        assertThat(entries.get("part-00001.csv")).isEqualTo(new String(firstPartBytes, StandardCharsets.UTF_8));
+    }
+
+    @Test
+    void restoreExportObjectsCopiesMissingRootAndPartitionObjectsFromFallbackProvider() throws Exception {
+        BiDatasetMapper datasetMapper = mock(BiDatasetMapper.class);
+        BiExportJobMapper exportJobMapper = mock(BiExportJobMapper.class);
+        BiQueryExecutionService queryExecutionService = mock(BiQueryExecutionService.class);
+        BiPermissionService permissionService = mock(BiPermissionService.class);
+        CapturingStorage primary = new CapturingStorage("PRIMARY");
+        CapturingStorage fallback = new CapturingStorage("ARCHIVE");
+        String rootKey = "exports/tenant-7/export-83.zip";
+        String partKey = "exports/tenant-7/export-83/parts/part-00001.csv";
+        byte[] rootBytes = zipWithManifest("""
+                {
+                  "storageLayout":"OBJECT_PER_PART_ZIP",
+                  "parts":[{"name":"part-00001.csv","storageKey":"exports/tenant-7/export-83/parts/part-00001.csv","rowCount":1,"sizeBytes":11,"sha256":"abc"}]
+                }
+                """);
+        byte[] partBytes = "a,b\n1,2\n".getBytes(StandardCharsets.UTF_8);
+        fallback.write(rootKey, rootBytes);
+        fallback.write(partKey, partBytes);
+        BiExportJobDO row = exportJob();
+        row.setId(83L);
+        row.setStorageProvider("PRIMARY");
+        row.setStorageKey(rootKey);
+        row.setExportFormat("CSV");
+        when(exportJobMapper.selectById(83L)).thenReturn(row);
+        BiSelfServiceExportService service = new BiSelfServiceExportService(
+                datasetMapper,
+                exportJobMapper,
+                queryExecutionService,
+                permissionService,
+                new ObjectMapper(),
+                primary,
+                7,
+                20_000);
+
+        BiExportObjectRestoreResult result = service.restoreExportObjects(7L, 83L, fallback);
+
+        assertThat(result.exportId()).isEqualTo(83L);
+        assertThat(result.primaryProvider()).isEqualTo("PRIMARY");
+        assertThat(result.fallbackProvider()).isEqualTo("ARCHIVE");
+        assertThat(result.checkedObjects()).isEqualTo(2);
+        assertThat(result.restoredObjects()).isEqualTo(2);
+        assertThat(result.missingObjects()).isZero();
+        assertThat(result.restoredKeys()).containsExactly(rootKey, partKey);
+        assertThat(primary.bytesByKey.get(rootKey)).isEqualTo(rootBytes);
+        assertThat(primary.bytesByKey.get(partKey)).isEqualTo(partBytes);
+    }
+
+    @Test
+    void failedPartitionedExportDeletesGeneratedPartObjects() throws Exception {
+        BiDatasetMapper datasetMapper = mock(BiDatasetMapper.class);
+        BiExportJobMapper exportJobMapper = mock(BiExportJobMapper.class);
+        BiQueryExecutionService queryExecutionService = mock(BiQueryExecutionService.class);
+        BiPermissionService permissionService = mock(BiPermissionService.class);
+        FailingZipStorage storage = new FailingZipStorage("MEMORY");
+        ObjectMapper mapper = new ObjectMapper();
+        BiSelfServiceExportService service = new BiSelfServiceExportService(
+                datasetMapper,
+                exportJobMapper,
+                queryExecutionService,
+                permissionService,
+                mapper,
+                storage,
+                7,
+                20_000);
+        AtomicReference<BiExportJobDO> persisted = new AtomicReference<>();
+        BiExportJobCommand command = new BiExportJobCommand(
+                "DATASET",
+                "canvas_daily_stats",
+                null,
+                "CSV",
+                query(15_000),
+                15_000,
+                false,
+                false,
+                null);
+        BiExportJobDO row = exportJob();
+        row.setId(81L);
+        row.setStatus("QUEUED");
+        row.setProgressPercent(0);
+        row.setExportFormat("CSV");
+        row.setRowLimit(15_000);
+        row.setRequestJson(mapper.writeValueAsString(command));
+        row.setFileUrl(null);
+        row.setStorageProvider(null);
+        row.setStorageKey(null);
+        persisted.set(row);
+        when(exportJobMapper.selectList(any())).thenReturn(List.of(row));
+        when(datasetMapper.selectById(11L)).thenReturn(dataset());
+        when(queryExecutionService.execute(any(), any())).thenAnswer(invocation -> {
+            BiQueryRequest request = invocation.getArgument(0);
+            if (request.offset() == 0) {
+                return resultRows(10_000, 0);
+            }
+            if (request.offset() == 10_000) {
+                return resultRows(5_000, 10_000);
+            }
+            return resultRows(0, request.offset());
+        });
+        doAnswer(invocation -> {
+            persisted.set(invocation.getArgument(0));
+            return 1;
+        }).when(exportJobMapper).updateById(any(BiExportJobDO.class));
+
+        BiExportQueueResult queueResult = service.processQueuedExports(
+                7L,
+                "export-worker",
+                RoleNames.OPERATOR,
+                10);
+
+        assertThat(queueResult.failed()).isEqualTo(1);
+        assertThat(persisted.get().getStatus()).isEqualTo("FAILED");
+        assertThat(persisted.get().getNextRetryAt()).isNotNull();
+        assertThat(storage.bytesByKey.keySet())
+                .noneMatch(key -> key.startsWith("exports/tenant-7/export-81/parts/"));
+        assertThat(storage.bytesByKey).doesNotContainKey("exports/tenant-7/export-81.zip");
+    }
+
+    @Test
     void createExportStoresDownloadableFileThroughConfiguredStorage() {
         BiDatasetMapper datasetMapper = mock(BiDatasetMapper.class);
         BiExportJobMapper exportJobMapper = mock(BiExportJobMapper.class);
@@ -417,6 +817,57 @@ class BiSelfServiceExportServiceTest {
     }
 
     @Test
+    void cancelQueuedExportMarksCanceledAndPreventsQueueExecution() throws Exception {
+        Fixture fixture = fixture();
+        AtomicReference<BiExportJobDO> persisted = new AtomicReference<>();
+        BiExportJobCommand command = new BiExportJobCommand(
+                "DATASET",
+                "canvas_daily_stats",
+                null,
+                "CSV",
+                query(100),
+                100,
+                false,
+                false,
+                null);
+        BiExportJobDO row = exportJob();
+        row.setId(82L);
+        row.setStatus("QUEUED");
+        row.setProgressPercent(0);
+        row.setRequestJson(new ObjectMapper().writeValueAsString(command));
+        row.setFileUrl(null);
+        row.setStorageProvider(null);
+        row.setStorageKey(null);
+        persisted.set(row);
+        when(fixture.exportJobMapper.selectById(82L)).thenAnswer(invocation -> persisted.get());
+        doAnswer(invocation -> {
+            persisted.set(invocation.getArgument(0));
+            return 1;
+        }).when(fixture.exportJobMapper).updateById(any(BiExportJobDO.class));
+        when(fixture.datasetMapper.selectById(11L)).thenReturn(dataset());
+
+        BiExportJobView canceled = fixture.service.cancelExport(7L, "alice", 82L);
+
+        assertThat(canceled.status()).isEqualTo("CANCELED");
+        assertThat(canceled.progressPercent()).isEqualTo(100);
+        assertThat(canceled.fileUrl()).isNull();
+        assertThat(canceled.errorMessage()).isEqualTo("BI export canceled by alice");
+        assertThat(persisted.get().getStatus()).isEqualTo("CANCELED");
+        assertThat(persisted.get().getNextRetryAt()).isNull();
+
+        when(fixture.exportJobMapper.selectList(any())).thenReturn(List.of());
+        BiExportQueueResult queueResult = fixture.service.processQueuedExports(
+                7L,
+                "export-worker",
+                RoleNames.OPERATOR,
+                10);
+
+        assertThat(queueResult.checked()).isZero();
+        assertThat(queueResult.jobs()).isEmpty();
+        verify(fixture.queryExecutionService, never()).execute(any(), any());
+    }
+
+    @Test
     void listExportsReturnsMostRecentJobsWithDatasetKey() {
         Fixture fixture = fixture();
         when(fixture.datasetMapper.selectById(11L)).thenReturn(dataset());
@@ -430,6 +881,66 @@ class BiSelfServiceExportServiceTest {
             assertThat(view.resourceKey()).isEqualTo("canvas_daily_stats");
             assertThat(view.status()).isEqualTo("COMPLETED");
         });
+    }
+
+    @Test
+    void getExportDetailReturnsTenantScopedAuditMetadataAndOriginalRequest() throws Exception {
+        Fixture fixture = fixture();
+        BiExportJobCommand command = new BiExportJobCommand(
+                "DATASET",
+                "canvas_daily_stats",
+                null,
+                "PDF",
+                query(250),
+                250,
+                true,
+                true,
+                "finance audit");
+        BiExportJobDO row = exportJob();
+        row.setId(76L);
+        row.setExportFormat("PDF");
+        row.setRequestJson(new ObjectMapper().writeValueAsString(command));
+        row.setStorageProvider("S3");
+        row.setStorageKey("exports/tenant-7/export-76.pdf");
+        row.setDownloadCount(3);
+        row.setLastDownloadedAt(LocalDateTime.parse("2026-06-05T10:15:00"));
+        row.setApprovalStatus("APPROVED");
+        row.setRequestedBy("alice");
+        row.setRequestedAt(LocalDateTime.parse("2026-06-05T09:55:00"));
+        row.setReviewedBy("admin");
+        row.setReviewedAt(LocalDateTime.parse("2026-06-05T10:00:00"));
+        row.setReviewComment("ok");
+        when(fixture.exportJobMapper.selectById(76L)).thenReturn(row);
+        when(fixture.datasetMapper.selectById(11L)).thenReturn(dataset());
+
+        BiExportJobDetailView detail = fixture.service.getExportDetail(7L, 76L);
+
+        assertThat(detail.job().id()).isEqualTo(76L);
+        assertThat(detail.job().resourceKey()).isEqualTo("canvas_daily_stats");
+        assertThat(detail.job().exportFormat()).isEqualTo("PDF");
+        assertThat(detail.job().storageProvider()).isEqualTo("S3");
+        assertThat(detail.job().storageKey()).isEqualTo("exports/tenant-7/export-76.pdf");
+        assertThat(detail.job().downloadCount()).isEqualTo(3);
+        assertThat(detail.job().lastDownloadedAt()).isEqualTo(LocalDateTime.parse("2026-06-05T10:15:00"));
+        assertThat(detail.job().approvalStatus()).isEqualTo("APPROVED");
+        assertThat(detail.request().exportFormat()).isEqualTo("PDF");
+        assertThat(detail.request().approvalReason()).isEqualTo("finance audit");
+        assertThat(detail.request().query().datasetKey()).isEqualTo("canvas_daily_stats");
+        assertThat(detail.request().query().limit()).isEqualTo(250);
+        assertThat(detail.request().query().filters()).singleElement().satisfies(filter ->
+                assertThat(String.valueOf(filter.value())).isEqualTo("12"));
+    }
+
+    @Test
+    void getExportDetailRejectsOtherTenantJob() {
+        Fixture fixture = fixture();
+        BiExportJobDO row = exportJob();
+        row.setTenantId(8L);
+        when(fixture.exportJobMapper.selectById(77L)).thenReturn(row);
+
+        assertThatThrownBy(() -> fixture.service.getExportDetail(7L, 77L))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("not found");
     }
 
     @Test
@@ -598,6 +1109,192 @@ class BiSelfServiceExportServiceTest {
     }
 
     @Test
+    void downloadRejectsExpiredStorageBackedExportAndDeletesObject() {
+        BiDatasetMapper datasetMapper = mock(BiDatasetMapper.class);
+        BiExportJobMapper exportJobMapper = mock(BiExportJobMapper.class);
+        BiQueryExecutionService queryExecutionService = mock(BiQueryExecutionService.class);
+        BiPermissionService permissionService = mock(BiPermissionService.class);
+        CapturingStorage storage = new CapturingStorage("MEMORY");
+        String storageKey = "exports/tenant-7/export-156.csv";
+        storage.write(storageKey, "a,b\n".getBytes());
+        BiExportJobDO row = exportJob();
+        row.setId(156L);
+        row.setStorageProvider("MEMORY");
+        row.setStorageKey(storageKey);
+        row.setExpiresAt(LocalDateTime.now().minusMinutes(1));
+        when(exportJobMapper.selectById(156L)).thenReturn(row);
+        BiSelfServiceExportService service = new BiSelfServiceExportService(
+                datasetMapper,
+                exportJobMapper,
+                queryExecutionService,
+                permissionService,
+                new ObjectMapper(),
+                storage,
+                7,
+                5000);
+
+        assertThatThrownBy(() -> service.download(7L, 156L))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("expired");
+
+        assertThat(storage.bytesByKey).doesNotContainKey(storageKey);
+        ArgumentCaptor<BiExportJobDO> updateCaptor = ArgumentCaptor.forClass(BiExportJobDO.class);
+        verify(exportJobMapper).updateById(updateCaptor.capture());
+        assertThat(updateCaptor.getValue().getStatus()).isEqualTo("EXPIRED");
+    }
+
+    @Test
+    void downloadAppliesUserRateLimitAndAuditsAllowedAndRejectedAttempts() {
+        BiDatasetMapper datasetMapper = mock(BiDatasetMapper.class);
+        BiExportJobMapper exportJobMapper = mock(BiExportJobMapper.class);
+        BiQueryExecutionService queryExecutionService = mock(BiQueryExecutionService.class);
+        BiPermissionService permissionService = mock(BiPermissionService.class);
+        BiAuditLogMapper auditLogMapper = mock(BiAuditLogMapper.class);
+        CapturingStorage storage = new CapturingStorage("MEMORY");
+        String storageKey = "exports/tenant-7/export-90.csv";
+        storage.write(storageKey, "a,b\n".getBytes(StandardCharsets.UTF_8));
+        BiExportJobDO row = exportJob();
+        row.setId(90L);
+        row.setStorageProvider("MEMORY");
+        row.setStorageKey(storageKey);
+        when(exportJobMapper.selectById(90L)).thenReturn(row);
+        BiSelfServiceExportService service = new BiSelfServiceExportService(
+                datasetMapper,
+                exportJobMapper,
+                queryExecutionService,
+                permissionService,
+                new ObjectMapper(),
+                storage,
+                7,
+                5000,
+                auditLogMapper,
+                1);
+
+        BiExportDownload first = service.download(7L, "alice", 90L);
+        assertThat(new String(first.bytes(), StandardCharsets.UTF_8)).contains("a,b");
+
+        assertThatThrownBy(() -> service.download(7L, "alice", 90L))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("rate limit");
+
+        ArgumentCaptor<BiAuditLogDO> auditCaptor = ArgumentCaptor.forClass(BiAuditLogDO.class);
+        verify(auditLogMapper, atLeast(2)).insert(auditCaptor.capture());
+        assertThat(auditCaptor.getAllValues())
+                .extracting(BiAuditLogDO::getActionKey)
+                .contains("BI_EXPORT_DOWNLOAD", "BI_EXPORT_DOWNLOAD_RATE_LIMITED");
+        assertThat(auditCaptor.getAllValues()).allSatisfy(audit -> {
+            assertThat(audit.getTenantId()).isEqualTo(7L);
+            assertThat(audit.getActorId()).isEqualTo("alice");
+            assertThat(audit.getResourceType()).isEqualTo("BI_EXPORT_JOB");
+            assertThat(audit.getResourceId()).isEqualTo(90L);
+        });
+    }
+
+    @Test
+    void downloadRejectsExpiredPartitionedExportAndDeletesPartObjects() {
+        BiDatasetMapper datasetMapper = mock(BiDatasetMapper.class);
+        BiExportJobMapper exportJobMapper = mock(BiExportJobMapper.class);
+        BiQueryExecutionService queryExecutionService = mock(BiQueryExecutionService.class);
+        BiPermissionService permissionService = mock(BiPermissionService.class);
+        CapturingStorage storage = new CapturingStorage("MEMORY");
+        String zipKey = "exports/tenant-7/export-157.zip";
+        String partKey = "exports/tenant-7/export-157/parts/part-00001.csv";
+        storage.write(partKey, "a,b\n".getBytes());
+        storage.write(zipKey, zipWithManifest("""
+                {
+                  "storageLayout": "OBJECT_PER_PART_ZIP",
+                  "parts": [
+                    { "name": "part-00001.csv", "storageKey": "exports/tenant-7/export-157/parts/part-00001.csv" }
+                  ]
+                }
+                """));
+        BiExportJobDO row = exportJob();
+        row.setId(157L);
+        row.setStorageProvider("MEMORY");
+        row.setStorageKey(zipKey);
+        row.setExpiresAt(LocalDateTime.now().minusMinutes(1));
+        when(exportJobMapper.selectById(157L)).thenReturn(row);
+        BiSelfServiceExportService service = new BiSelfServiceExportService(
+                datasetMapper,
+                exportJobMapper,
+                queryExecutionService,
+                permissionService,
+                new ObjectMapper(),
+                storage,
+                7,
+                5000);
+
+        assertThatThrownBy(() -> service.download(7L, 157L))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("expired");
+
+        assertThat(storage.bytesByKey).doesNotContainKeys(zipKey, partKey);
+        ArgumentCaptor<BiExportJobDO> updateCaptor = ArgumentCaptor.forClass(BiExportJobDO.class);
+        verify(exportJobMapper).updateById(updateCaptor.capture());
+        assertThat(updateCaptor.getValue().getStatus()).isEqualTo("EXPIRED");
+    }
+
+    @Test
+    void partitionedDownloadAuditsManifestPartsAndObjectKeys() {
+        BiDatasetMapper datasetMapper = mock(BiDatasetMapper.class);
+        BiExportJobMapper exportJobMapper = mock(BiExportJobMapper.class);
+        BiQueryExecutionService queryExecutionService = mock(BiQueryExecutionService.class);
+        BiPermissionService permissionService = mock(BiPermissionService.class);
+        BiAuditLogMapper auditLogMapper = mock(BiAuditLogMapper.class);
+        CapturingStorage storage = new CapturingStorage("MEMORY");
+        String zipKey = "exports/tenant-7/export-91.zip";
+        String partKey = "exports/tenant-7/export-91/parts/part-00001.csv";
+        storage.write(partKey, "a,b\n".getBytes(StandardCharsets.UTF_8));
+        storage.write(zipKey, zipWithManifest("""
+                {
+                  "storageLayout": "OBJECT_PER_PART_ZIP",
+                  "requestedRows": 15000,
+                  "generatedRows": 10000,
+                  "partCount": 1,
+                  "partSize": 10000,
+                  "parts": [
+                    {
+                      "name": "part-00001.csv",
+                      "storageKey": "exports/tenant-7/export-91/parts/part-00001.csv",
+                      "rowCount": 10000,
+                      "sizeBytes": 4,
+                      "sha256": "abc123"
+                    }
+                  ]
+                }
+                """));
+        BiExportJobDO row = exportJob();
+        row.setId(91L);
+        row.setStorageProvider("MEMORY");
+        row.setStorageKey(zipKey);
+        when(exportJobMapper.selectById(91L)).thenReturn(row);
+        BiSelfServiceExportService service = new BiSelfServiceExportService(
+                datasetMapper,
+                exportJobMapper,
+                queryExecutionService,
+                permissionService,
+                new ObjectMapper(),
+                storage,
+                7,
+                5000,
+                auditLogMapper,
+                0);
+
+        BiExportDownload download = service.download(7L, "alice", 91L);
+
+        assertThat(download.filename()).isEqualTo("export-91.zip");
+        ArgumentCaptor<BiAuditLogDO> auditCaptor = ArgumentCaptor.forClass(BiAuditLogDO.class);
+        verify(auditLogMapper).insert(auditCaptor.capture());
+        BiAuditLogDO audit = auditCaptor.getValue();
+        assertThat(audit.getActionKey()).isEqualTo("BI_EXPORT_DOWNLOAD");
+        assertThat(audit.getDetailJson())
+                .contains("\"storageLayout\":\"OBJECT_PER_PART_ZIP\"")
+                .contains("\"partCount\":1")
+                .contains("\"partStorageKeys\":[\"exports/tenant-7/export-91/parts/part-00001.csv\"]")
+                .contains("\"sha256\":\"abc123\"");
+    }
+
+    @Test
     void cleanupExpiredExportsDeletesFileAndMarksExpired() throws Exception {
         Fixture fixture = fixture();
         Path file = tempDir.resolve("tenant-7").resolve("export-57.csv");
@@ -621,6 +1318,10 @@ class BiSelfServiceExportServiceTest {
     }
 
     private Fixture fixture() {
+        return fixture(5000);
+    }
+
+    private Fixture fixture(int approvalRowThreshold) {
         BiDatasetMapper datasetMapper = mock(BiDatasetMapper.class);
         BiExportJobMapper exportJobMapper = mock(BiExportJobMapper.class);
         BiQueryExecutionService queryExecutionService = mock(BiQueryExecutionService.class);
@@ -636,7 +1337,10 @@ class BiSelfServiceExportServiceTest {
                         queryExecutionService,
                         permissionService,
                         new ObjectMapper(),
-                        tempDir));
+                        tempDir,
+                        null,
+                        7,
+                        approvalRowThreshold));
     }
 
     private BiQueryRequest query(int limit) {
@@ -659,6 +1363,60 @@ class BiSelfServiceExportServiceTest {
                 1,
                 12L,
                 "abcdef");
+    }
+
+    private BiQueryResult resultRows(int count, int offset) {
+        List<Map<String, Object>> rows = new ArrayList<>();
+        for (int index = 0; index < count; index++) {
+            rows.add(Map.of(
+                    "stat_date", "2026-06-05-" + (offset + index),
+                    "total_executions", (long) offset + index));
+        }
+        return new BiQueryResult(
+                "canvas_daily_stats",
+                List.of(
+                        new BiQueryColumn("stat_date", "DIMENSION", "DATE"),
+                        new BiQueryColumn("total_executions", "METRIC", "NUMBER")),
+                rows,
+                rows.size(),
+                12L,
+                "abcdef-" + offset);
+    }
+
+    private Map<String, String> unzipTextEntries(byte[] bytes) throws Exception {
+        Map<String, String> entries = new java.util.LinkedHashMap<>();
+        try (ZipInputStream input = new ZipInputStream(new ByteArrayInputStream(bytes))) {
+            ZipEntry entry;
+            while ((entry = input.getNextEntry()) != null) {
+                ByteArrayOutputStream output = new ByteArrayOutputStream();
+                input.transferTo(output);
+                entries.put(entry.getName(), output.toString(java.nio.charset.StandardCharsets.UTF_8));
+            }
+        }
+        return entries;
+    }
+
+    private String sha256Hex(byte[] bytes) throws Exception {
+        MessageDigest digest = MessageDigest.getInstance("SHA-256");
+        byte[] hash = digest.digest(bytes);
+        StringBuilder builder = new StringBuilder(hash.length * 2);
+        for (byte value : hash) {
+            builder.append(String.format("%02x", value));
+        }
+        return builder.toString();
+    }
+
+    private byte[] zipWithManifest(String manifestJson) {
+        try (ByteArrayOutputStream output = new ByteArrayOutputStream();
+             java.util.zip.ZipOutputStream zip = new java.util.zip.ZipOutputStream(output)) {
+            zip.putNextEntry(new ZipEntry("manifest.json"));
+            zip.write(manifestJson.getBytes(StandardCharsets.UTF_8));
+            zip.closeEntry();
+            zip.finish();
+            return output.toByteArray();
+        } catch (Exception e) {
+            throw new IllegalStateException(e);
+        }
     }
 
     private BiDatasetDO dataset() {
@@ -715,6 +1473,53 @@ class BiSelfServiceExportServiceTest {
         public BiStoredFile write(String storageKey, byte[] bytes) {
             bytesByKey.put(storageKey, bytes);
             return new BiStoredFile(provider, storageKey, "memory://" + storageKey, (long) bytes.length);
+        }
+
+        @Override
+        public byte[] read(String storageKey) {
+            return bytesByKey.get(storageKey);
+        }
+
+        @Override
+        public boolean delete(String storageKey) {
+            return bytesByKey.remove(storageKey) != null;
+        }
+    }
+
+    private static final class FailingZipStorage implements BiFileStorage {
+        private final String provider;
+        private final Map<String, byte[]> bytesByKey = new HashMap<>();
+
+        private FailingZipStorage(String provider) {
+            this.provider = provider;
+        }
+
+        @Override
+        public String provider() {
+            return provider;
+        }
+
+        @Override
+        public BiStoredFile write(String storageKey, byte[] bytes) {
+            if (storageKey.endsWith(".zip")) {
+                throw new IllegalStateException("zip storage unavailable");
+            }
+            byte[] payload = bytes == null ? new byte[0] : bytes;
+            bytesByKey.put(storageKey, payload);
+            return new BiStoredFile(provider, storageKey, "memory://" + storageKey, (long) payload.length);
+        }
+
+        @Override
+        public BiStoredFile write(String storageKey, BiFileStorageWriter writer) {
+            if (storageKey.endsWith(".zip")) {
+                try (ByteArrayOutputStream output = new ByteArrayOutputStream()) {
+                    writer.write(output);
+                } catch (Exception e) {
+                    throw new IllegalStateException(e);
+                }
+                throw new IllegalStateException("zip storage unavailable");
+            }
+            return BiFileStorage.super.write(storageKey, writer);
         }
 
         @Override

@@ -2,7 +2,6 @@ package org.chovy.canvas.domain.warehouse;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import lombok.RequiredArgsConstructor;
 import org.chovy.canvas.dal.dataobject.CdpWarehouseStreamSchemaDO;
 import org.chovy.canvas.dal.mapper.CdpWarehouseStreamSchemaMapper;
 import org.springframework.stereotype.Service;
@@ -19,7 +18,6 @@ import java.util.Locale;
 import java.util.Map;
 
 @Service
-@RequiredArgsConstructor
 public class CdpWarehouseRealtimeSchemaService {
 
     private static final String ROLE_SOURCE = "SOURCE";
@@ -37,6 +35,12 @@ public class CdpWarehouseRealtimeSchemaService {
 
     private final CdpWarehouseStreamSchemaMapper schemaMapper;
     private final ObjectMapper objectMapper;
+
+    public CdpWarehouseRealtimeSchemaService(CdpWarehouseStreamSchemaMapper schemaMapper,
+                                             ObjectMapper objectMapper) {
+        this.schemaMapper = schemaMapper;
+        this.objectMapper = objectMapper;
+    }
 
     public SchemaVersionView register(Long tenantId, SchemaVersionCommand command, String operator) {
         if (command == null) {

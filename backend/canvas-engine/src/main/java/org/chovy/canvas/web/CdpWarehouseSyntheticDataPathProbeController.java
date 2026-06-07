@@ -41,12 +41,13 @@ public class CdpWarehouseSyntheticDataPathProbeController {
             @RequestParam(required = false) String eventCode,
             @RequestParam(defaultValue = "true") boolean strict,
             @RequestParam(defaultValue = "3") int verifyAttempts,
-            @RequestParam(defaultValue = "100") int verifyDelayMs) {
+            @RequestParam(defaultValue = "100") int verifyDelayMs,
+            @RequestParam(defaultValue = "DIRECT_SINK") String sourceMode) {
         return currentTenant().flatMap(context -> Mono.fromCallable(() ->
                         R.ok(probeService.run(
                                 normalizeTenant(context),
                                 new CdpWarehouseSyntheticDataPathProbeService.RunCommand(
-                                        probeKey, eventCode, strict, verifyAttempts, verifyDelayMs))))
+                                        probeKey, eventCode, strict, verifyAttempts, verifyDelayMs, sourceMode))))
                 .subscribeOn(Schedulers.boundedElastic()));
     }
 

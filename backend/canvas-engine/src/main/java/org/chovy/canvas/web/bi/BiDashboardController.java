@@ -9,7 +9,11 @@ import org.chovy.canvas.domain.bi.dashboard.BiDashboardImportCommand;
 import org.chovy.canvas.domain.bi.dashboard.BiDashboardPreset;
 import org.chovy.canvas.domain.bi.dashboard.BiDashboardResource;
 import org.chovy.canvas.domain.bi.dashboard.BiDashboardResourceService;
+import org.chovy.canvas.domain.bi.dashboard.BiDashboardRuntimeStateCommand;
+import org.chovy.canvas.domain.bi.dashboard.BiDashboardRuntimeStateService;
+import org.chovy.canvas.domain.bi.dashboard.BiDashboardRuntimeStateView;
 import org.chovy.canvas.domain.bi.dashboard.BiDashboardVersionView;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.io.buffer.DataBufferUtils;
 import org.springframework.http.ContentDisposition;
 import org.springframework.http.HttpHeaders;
@@ -37,11 +41,20 @@ public class BiDashboardController {
 
     private final TenantContextResolver tenantContextResolver;
     private final BiDashboardResourceService dashboardResourceService;
+    private final BiDashboardRuntimeStateService runtimeStateService;
 
     public BiDashboardController(TenantContextResolver tenantContextResolver,
                                  BiDashboardResourceService dashboardResourceService) {
+        this(tenantContextResolver, dashboardResourceService, null);
+    }
+
+    @Autowired
+    public BiDashboardController(TenantContextResolver tenantContextResolver,
+                                 BiDashboardResourceService dashboardResourceService,
+                                 BiDashboardRuntimeStateService runtimeStateService) {
         this.tenantContextResolver = tenantContextResolver;
         this.dashboardResourceService = dashboardResourceService;
+        this.runtimeStateService = runtimeStateService;
     }
 
     @GetMapping
@@ -187,11 +200,33 @@ public class BiDashboardController {
         return restoreVersion(dashboardKey, null, version);
     }
 
+    @GetMapping("/{dashboardKey}/runtime-state")
+    public Mono<R<BiDashboardRuntimeStateView>> getRuntimeState(@PathVariable String dashboardKey) {
+        return currentTenant().flatMap(context -> Mono.fromCallable(() ->
+                        R.ok(requireRuntimeStateService().get(context.tenantId(), context.username(), dashboardKey)))
+                .subscribeOn(Schedulers.boundedElastic()));
+    }
+
+    @PostMapping("/{dashboardKey}/runtime-state")
+    public Mono<R<BiDashboardRuntimeStateView>> saveRuntimeState(@PathVariable String dashboardKey,
+                                                                 @RequestBody BiDashboardRuntimeStateCommand command) {
+        return currentTenant().flatMap(context -> Mono.fromCallable(() ->
+                        R.ok(requireRuntimeStateService().save(context.tenantId(), context.username(), dashboardKey, command)))
+                .subscribeOn(Schedulers.boundedElastic()));
+    }
+
     private Mono<TenantContext> currentTenant() {
         if (tenantContextResolver == null) {
             return Mono.just(new TenantContext(0L, null, "system"));
         }
         return tenantContextResolver.current()
                 .defaultIfEmpty(new TenantContext(0L, null, "system"));
+    }
+
+    private BiDashboardRuntimeStateService requireRuntimeStateService() {
+        if (runtimeStateService == null) {
+            throw new IllegalStateException("BI dashboard runtime state service is required");
+        }
+        return runtimeStateService;
     }
 }

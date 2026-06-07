@@ -22,4 +22,14 @@ class CdpWarehouseSyntheticDataPathProbeSchemaTest {
                 .contains("ods_row_count BIGINT NOT NULL DEFAULT 0")
                 .contains("UNIQUE KEY uk_cdp_warehouse_synthetic_probe_message (tenant_id, message_id)");
     }
+
+    @Test
+    void migrationAddsSourceModeEvidenceForFlinkCdcProofs() throws Exception {
+        String sql = readMigration("cdp_warehouse_synthetic_probe_source_mode");
+
+        assertThat(sql)
+                .contains("ALTER TABLE cdp_warehouse_synthetic_data_path_probe_run")
+                .contains("source_mode VARCHAR(32) NOT NULL DEFAULT 'DIRECT_SINK'")
+                .contains("source_status VARCHAR(32) DEFAULT NULL");
+    }
 }

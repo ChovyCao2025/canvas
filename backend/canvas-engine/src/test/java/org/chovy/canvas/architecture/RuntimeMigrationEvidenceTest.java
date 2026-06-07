@@ -40,7 +40,8 @@ class RuntimeMigrationEvidenceTest {
         assertThat(groovyHandler).doesNotContain("SecureASTCustomizer");
         assertThat(groovyHandler).doesNotContain("Executors.newVirtualThreadPerTaskExecutor");
         assertThat(groovyExpressionEngine).contains("SecureASTCustomizer");
-        assertThat(groovyExpressionEngine).contains("Executors.newVirtualThreadPerTaskExecutor");
+        assertThat(groovyExpressionEngine).contains("ManagedVirtualThreadExecutor");
+        assertThat(groovyExpressionEngine).doesNotContain("Executors.newVirtualThreadPerTaskExecutor");
         assertThat(groovyExpressionEngine).contains("GroovyScriptCache");
         assertThat(groovyExpressionEngine).contains("timeoutMs");
     }

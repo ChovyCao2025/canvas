@@ -85,3 +85,13 @@ Reference URLs:
 - `ContactabilityExplainerServiceTest` proves ordered checks are returned and overall status is false when any check blocks.
 - `ContactabilityControllerTest` proves the endpoint applies default send-policy options and returns the service result.
 - Focused backend tests pass with `cd backend && mvn -pl canvas-engine test -Dtest=MarketingPolicyServiceFrequencyPreviewTest,ContactabilityExplainerServiceTest,ContactabilityControllerTest`.
+
+## Implementation Status
+
+Completed on 2026-06-05.
+
+- `MarketingPolicyService.previewFrequency` reads the existing frequency bucket without increment/decrement/expire mutations.
+- `ContactabilityExplainerService` returns ordered checks for consent, suppression, channel availability, quiet hours, and frequency preview.
+- `ContactabilityController` exposes `GET /canvas/contactability/explain` with send-path defaults and safe fallbacks for invalid optional fields.
+- Frontend `contactabilityApi` and the CDP user detail contactability card consume the read-only endpoint.
+- Maven broader test execution is still blocked by unrelated `RedisBiQueryResultCacheTest` testCompile failures; this slice was verified with isolated backend runner `5/5` plus focused frontend tests.

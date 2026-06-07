@@ -19,6 +19,7 @@
     <modules>
         <module>canvas-cache-sdk</module>
         <module>canvas-engine</module>
+        <module>canvas-flink-jobs</module>
     </modules>
 
     <properties>
@@ -31,6 +32,9 @@
         <logstash.version>7.4</logstash.version>
         <caffeine.version>3.1.8</caffeine.version>
         <hutool.version>5.8.44</hutool.version>
+        <flink.version>1.20.0</flink.version>
+        <flink.cdc.version>3.4.0</flink.cdc.version>
+        <doris.flink.connector.version>24.0.1</doris.flink.connector.version>
     </properties>
 
     <build>

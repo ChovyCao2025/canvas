@@ -1,17 +1,21 @@
 package org.chovy.canvas.domain.bi.resource;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import org.chovy.canvas.dal.dataobject.BiBigScreenDO;
 import org.chovy.canvas.dal.dataobject.BiChartDO;
 import org.chovy.canvas.dal.dataobject.BiDashboardDO;
 import org.chovy.canvas.dal.dataobject.BiDatasetDO;
 import org.chovy.canvas.dal.dataobject.BiPortalDO;
 import org.chovy.canvas.dal.dataobject.BiResourceLocationDO;
+import org.chovy.canvas.dal.dataobject.BiSpreadsheetDO;
 import org.chovy.canvas.dal.dataobject.BiWorkspaceDO;
+import org.chovy.canvas.dal.mapper.BiBigScreenMapper;
 import org.chovy.canvas.dal.mapper.BiChartMapper;
 import org.chovy.canvas.dal.mapper.BiDashboardMapper;
 import org.chovy.canvas.dal.mapper.BiDatasetMapper;
 import org.chovy.canvas.dal.mapper.BiPortalMapper;
 import org.chovy.canvas.dal.mapper.BiResourceLocationMapper;
+import org.chovy.canvas.dal.mapper.BiSpreadsheetMapper;
 import org.chovy.canvas.dal.mapper.BiWorkspaceMapper;
 import org.springframework.stereotype.Service;
 
@@ -33,6 +37,8 @@ public class BiResourceMovementService {
     private final BiDashboardMapper dashboardMapper;
     private final BiChartMapper chartMapper;
     private final BiPortalMapper portalMapper;
+    private final BiBigScreenMapper bigScreenMapper;
+    private final BiSpreadsheetMapper spreadsheetMapper;
     private final BiResourceLocationMapper locationMapper;
 
     public BiResourceMovementService(BiWorkspaceMapper workspaceMapper,
@@ -40,12 +46,16 @@ public class BiResourceMovementService {
                                      BiDashboardMapper dashboardMapper,
                                      BiChartMapper chartMapper,
                                      BiPortalMapper portalMapper,
+                                     BiBigScreenMapper bigScreenMapper,
+                                     BiSpreadsheetMapper spreadsheetMapper,
                                      BiResourceLocationMapper locationMapper) {
         this.workspaceMapper = workspaceMapper;
         this.datasetMapper = datasetMapper;
         this.dashboardMapper = dashboardMapper;
         this.chartMapper = chartMapper;
         this.portalMapper = portalMapper;
+        this.bigScreenMapper = bigScreenMapper;
+        this.spreadsheetMapper = spreadsheetMapper;
         this.locationMapper = locationMapper;
     }
 
@@ -111,6 +121,16 @@ public class BiResourceMovementService {
                     .eq(BiPortalDO::getWorkspaceId, workspaceId)
                     .eq(BiPortalDO::getPortalKey, resourceKey)
                     .last("LIMIT 1"));
+            case "BIG_SCREEN" -> bigScreenMapper.selectOne(new LambdaQueryWrapper<BiBigScreenDO>()
+                    .eq(BiBigScreenDO::getTenantId, tenantId)
+                    .eq(BiBigScreenDO::getWorkspaceId, workspaceId)
+                    .eq(BiBigScreenDO::getScreenKey, resourceKey)
+                    .last("LIMIT 1"));
+            case "SPREADSHEET" -> spreadsheetMapper.selectOne(new LambdaQueryWrapper<BiSpreadsheetDO>()
+                    .eq(BiSpreadsheetDO::getTenantId, tenantId)
+                    .eq(BiSpreadsheetDO::getWorkspaceId, workspaceId)
+                    .eq(BiSpreadsheetDO::getSpreadsheetKey, resourceKey)
+                    .last("LIMIT 1"));
             default -> throw new IllegalArgumentException("unsupported BI resource type: " + resourceType);
         };
         if (row == null) {
@@ -127,6 +147,8 @@ public class BiResourceMovementService {
             case BiDashboardDO dashboard -> dashboard.getStatus();
             case BiChartDO chart -> chart.getStatus();
             case BiPortalDO portal -> portal.getStatus();
+            case BiBigScreenDO screen -> screen.getStatus();
+            case BiSpreadsheetDO spreadsheet -> spreadsheet.getStatus();
             default -> null;
         };
     }
@@ -161,7 +183,8 @@ public class BiResourceMovementService {
     private String normalizeResourceType(String resourceType) {
         String value = required(resourceType, "resourceType").toUpperCase(Locale.ROOT);
         if ("DATASET".equals(value) || "DASHBOARD".equals(value)
-                || "CHART".equals(value) || "PORTAL".equals(value)) {
+                || "CHART".equals(value) || "PORTAL".equals(value)
+                || "BIG_SCREEN".equals(value) || "SPREADSHEET".equals(value)) {
             return value;
         }
         throw new IllegalArgumentException("unsupported BI resource type: " + resourceType);

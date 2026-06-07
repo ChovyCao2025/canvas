@@ -3,18 +3,22 @@ package org.chovy.canvas.domain.bi.subscription;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.chovy.canvas.dal.dataobject.BiAlertRuleDO;
+import org.chovy.canvas.dal.dataobject.BiBigScreenDO;
 import org.chovy.canvas.dal.dataobject.BiChartDO;
 import org.chovy.canvas.dal.dataobject.BiDashboardDO;
 import org.chovy.canvas.dal.dataobject.BiDatasetDO;
 import org.chovy.canvas.dal.dataobject.BiMetricDO;
 import org.chovy.canvas.dal.dataobject.BiPortalDO;
+import org.chovy.canvas.dal.dataobject.BiSpreadsheetDO;
 import org.chovy.canvas.dal.dataobject.BiSubscriptionDO;
 import org.chovy.canvas.dal.mapper.BiAlertRuleMapper;
+import org.chovy.canvas.dal.mapper.BiBigScreenMapper;
 import org.chovy.canvas.dal.mapper.BiChartMapper;
 import org.chovy.canvas.dal.mapper.BiDashboardMapper;
 import org.chovy.canvas.dal.mapper.BiDatasetMapper;
 import org.chovy.canvas.dal.mapper.BiMetricMapper;
 import org.chovy.canvas.dal.mapper.BiPortalMapper;
+import org.chovy.canvas.dal.mapper.BiSpreadsheetMapper;
 import org.chovy.canvas.dal.mapper.BiSubscriptionMapper;
 import org.chovy.canvas.domain.bi.permission.BiPermissionService;
 import org.chovy.canvas.domain.bi.query.BiQueryContext;
@@ -64,6 +68,93 @@ class BiSubscriptionAdminServiceTest {
         assertThat(captor.getValue().getReceiverJson()).contains("\"EMAIL\"");
         assertThat(view.subscriptionKey()).isEqualTo("canvas-daily");
         assertThat(view.resourceType()).isEqualTo("DASHBOARD");
+    }
+
+    @Test
+    void upsertBigScreenSubscriptionByKeyEnforcesSubscribePermission() {
+        BiSubscriptionMapper subscriptionMapper = mock(BiSubscriptionMapper.class);
+        BiAlertRuleMapper alertRuleMapper = mock(BiAlertRuleMapper.class);
+        BiDatasetMapper datasetMapper = mock(BiDatasetMapper.class);
+        BiMetricMapper metricMapper = mock(BiMetricMapper.class);
+        BiDashboardMapper dashboardMapper = mock(BiDashboardMapper.class);
+        BiChartMapper chartMapper = mock(BiChartMapper.class);
+        BiPortalMapper portalMapper = mock(BiPortalMapper.class);
+        BiBigScreenMapper bigScreenMapper = mock(BiBigScreenMapper.class);
+        BiSpreadsheetMapper spreadsheetMapper = mock(BiSpreadsheetMapper.class);
+        BiPermissionService permissionService = mock(BiPermissionService.class);
+        BiBigScreenDO screen = bigScreen();
+        BiSubscriptionDO persisted = subscriptionRow("BIG_SCREEN", 51L);
+        persisted.setSubscriptionKey("executive-wall-daily");
+        when(bigScreenMapper.selectOne(any(LambdaQueryWrapper.class))).thenReturn(screen);
+        when(bigScreenMapper.selectById(51L)).thenReturn(screen);
+        when(subscriptionMapper.selectOne(any(LambdaQueryWrapper.class))).thenReturn(null, persisted);
+        BiSubscriptionAdminService service = service(subscriptionMapper, alertRuleMapper, datasetMapper, metricMapper,
+                dashboardMapper, chartMapper, portalMapper, bigScreenMapper, spreadsheetMapper, permissionService);
+
+        BiSubscriptionView view = service.upsertSubscription(7L, "alice", "OPERATOR",
+                new BiSubscriptionCommand(
+                        "executive-wall-daily",
+                        "Executive Wall Daily",
+                        "big_screen",
+                        "executive-wall",
+                        null,
+                        Map.of("frequency", "DAILY", "time", "09:00"),
+                        Map.of("channels", List.of("EMAIL"), "users", List.of("alice")),
+                        Map.of("content", "SNAPSHOT_LINK"),
+                        true));
+
+        ArgumentCaptor<BiSubscriptionDO> captor = ArgumentCaptor.forClass(BiSubscriptionDO.class);
+        verify(subscriptionMapper).insert(captor.capture());
+        verify(permissionService).enforceResourceAccess(
+                7L,
+                5L,
+                "BIG_SCREEN",
+                51L,
+                new BiQueryContext(7L, "alice", "OPERATOR"),
+                BiPermissionService.ACTION_SUBSCRIBE);
+        assertThat(captor.getValue().getResourceType()).isEqualTo("BIG_SCREEN");
+        assertThat(captor.getValue().getResourceId()).isEqualTo(51L);
+        assertThat(view.resourceType()).isEqualTo("BIG_SCREEN");
+        assertThat(view.resourceKey()).isEqualTo("executive-wall");
+    }
+
+    @Test
+    void upsertSpreadsheetSubscriptionByIdReturnsSpreadsheetKey() {
+        BiSubscriptionMapper subscriptionMapper = mock(BiSubscriptionMapper.class);
+        BiAlertRuleMapper alertRuleMapper = mock(BiAlertRuleMapper.class);
+        BiDatasetMapper datasetMapper = mock(BiDatasetMapper.class);
+        BiMetricMapper metricMapper = mock(BiMetricMapper.class);
+        BiDashboardMapper dashboardMapper = mock(BiDashboardMapper.class);
+        BiChartMapper chartMapper = mock(BiChartMapper.class);
+        BiPortalMapper portalMapper = mock(BiPortalMapper.class);
+        BiBigScreenMapper bigScreenMapper = mock(BiBigScreenMapper.class);
+        BiSpreadsheetMapper spreadsheetMapper = mock(BiSpreadsheetMapper.class);
+        BiSpreadsheetDO spreadsheet = spreadsheet();
+        BiSubscriptionDO persisted = subscriptionRow("SPREADSHEET", 61L);
+        persisted.setSubscriptionKey("budget-sheet-weekly");
+        when(spreadsheetMapper.selectById(61L)).thenReturn(spreadsheet);
+        when(subscriptionMapper.selectOne(any(LambdaQueryWrapper.class))).thenReturn(null, persisted);
+        BiSubscriptionAdminService service = service(subscriptionMapper, alertRuleMapper, datasetMapper, metricMapper,
+                dashboardMapper, chartMapper, portalMapper, bigScreenMapper, spreadsheetMapper, null);
+
+        BiSubscriptionView view = service.upsertSubscription(7L, "alice", "OPERATOR",
+                new BiSubscriptionCommand(
+                        "budget-sheet-weekly",
+                        "Budget Sheet Weekly",
+                        "spreadsheet",
+                        null,
+                        61L,
+                        Map.of("frequency", "WEEKLY", "weekday", "MONDAY"),
+                        Map.of("channels", List.of("EMAIL"), "users", List.of("alice")),
+                        Map.of("content", "SNAPSHOT_LINK"),
+                        true));
+
+        ArgumentCaptor<BiSubscriptionDO> captor = ArgumentCaptor.forClass(BiSubscriptionDO.class);
+        verify(subscriptionMapper).insert(captor.capture());
+        assertThat(captor.getValue().getResourceType()).isEqualTo("SPREADSHEET");
+        assertThat(captor.getValue().getResourceId()).isEqualTo(61L);
+        assertThat(view.resourceType()).isEqualTo("SPREADSHEET");
+        assertThat(view.resourceKey()).isEqualTo("budget-sheet");
     }
 
     @Test
@@ -154,6 +245,29 @@ class BiSubscriptionAdminServiceTest {
                                                BiChartMapper chartMapper,
                                                BiPortalMapper portalMapper,
                                                BiPermissionService permissionService) {
+        return service(
+                subscriptionMapper,
+                alertRuleMapper,
+                datasetMapper,
+                metricMapper,
+                dashboardMapper,
+                chartMapper,
+                portalMapper,
+                mock(BiBigScreenMapper.class),
+                mock(BiSpreadsheetMapper.class),
+                permissionService);
+    }
+
+    private BiSubscriptionAdminService service(BiSubscriptionMapper subscriptionMapper,
+                                               BiAlertRuleMapper alertRuleMapper,
+                                               BiDatasetMapper datasetMapper,
+                                               BiMetricMapper metricMapper,
+                                               BiDashboardMapper dashboardMapper,
+                                               BiChartMapper chartMapper,
+                                               BiPortalMapper portalMapper,
+                                               BiBigScreenMapper bigScreenMapper,
+                                               BiSpreadsheetMapper spreadsheetMapper,
+                                               BiPermissionService permissionService) {
         return new BiSubscriptionAdminService(
                 subscriptionMapper,
                 alertRuleMapper,
@@ -162,6 +276,8 @@ class BiSubscriptionAdminServiceTest {
                 dashboardMapper,
                 chartMapper,
                 portalMapper,
+                bigScreenMapper,
+                spreadsheetMapper,
                 permissionService,
                 new ObjectMapper());
     }
@@ -217,6 +333,13 @@ class BiSubscriptionAdminServiceTest {
         return row;
     }
 
+    private BiSubscriptionDO subscriptionRow(String resourceType, Long resourceId) {
+        BiSubscriptionDO row = subscriptionRow();
+        row.setResourceType(resourceType);
+        row.setResourceId(resourceId);
+        return row;
+    }
+
     private BiAlertRuleDO alertRow() {
         BiAlertRuleDO row = new BiAlertRuleDO();
         row.setId(41L);
@@ -239,6 +362,28 @@ class BiSubscriptionAdminServiceTest {
         row.setWorkspaceId(5L);
         row.setDashboardKey("canvas-effect");
         row.setName("Canvas Effect");
+        row.setStatus("PUBLISHED");
+        return row;
+    }
+
+    private BiBigScreenDO bigScreen() {
+        BiBigScreenDO row = new BiBigScreenDO();
+        row.setId(51L);
+        row.setTenantId(7L);
+        row.setWorkspaceId(5L);
+        row.setScreenKey("executive-wall");
+        row.setName("Executive Wall");
+        row.setStatus("PUBLISHED");
+        return row;
+    }
+
+    private BiSpreadsheetDO spreadsheet() {
+        BiSpreadsheetDO row = new BiSpreadsheetDO();
+        row.setId(61L);
+        row.setTenantId(7L);
+        row.setWorkspaceId(5L);
+        row.setSpreadsheetKey("budget-sheet");
+        row.setName("Budget Sheet");
         row.setStatus("PUBLISHED");
         return row;
     }

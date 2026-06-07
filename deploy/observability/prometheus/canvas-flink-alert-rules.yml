@@ -1,0 +1,52 @@
+groups:
+  - name: canvas-flink-realtime-warehouse
+    rules:
+      - alert: CanvasFlinkJobManagerDown
+        expr: up{job=~"canvas-flink-jobmanager|flink-jobmanager"} == 0
+        for: 5m
+        labels:
+          severity: critical
+          service: canvas-flink
+        annotations:
+          summary: Canvas Flink JobManager is down
+          description: The realtime warehouse Flink JobManager target has been unavailable for 5 minutes.
+
+      - alert: CanvasFlinkTaskManagerMissing
+        expr: flink_jobmanager_numRegisteredTaskManagers < 1
+        for: 5m
+        labels:
+          severity: critical
+          service: canvas-flink
+        annotations:
+          summary: Canvas Flink has no registered TaskManagers
+          description: No TaskManager is registered with the realtime warehouse JobManager.
+
+      - alert: CanvasFlinkCheckpointFailures
+        expr: increase(flink_jobmanager_job_numberOfFailedCheckpoints[10m]) > 0
+        for: 0m
+        labels:
+          severity: critical
+          service: canvas-flink
+        annotations:
+          summary: Canvas Flink checkpoint failures detected
+          description: At least one realtime warehouse Flink checkpoint failed in the last 10 minutes.
+
+      - alert: CanvasFlinkBackpressureHigh
+        expr: max(flink_taskmanager_job_task_backPressuredTimeMsPerSecond) > 60000
+        for: 10m
+        labels:
+          severity: warning
+          service: canvas-flink
+        annotations:
+          summary: Canvas Flink task backpressure is high
+          description: A realtime warehouse Flink task has sustained high backpressure for 10 minutes.
+
+      - alert: CanvasFlinkCheckpointDurationHigh
+        expr: max(flink_jobmanager_job_lastCheckpointDuration) > 60000
+        for: 10m
+        labels:
+          severity: warning
+          service: canvas-flink
+        annotations:
+          summary: Canvas Flink checkpoint duration is high
+          description: The latest realtime warehouse Flink checkpoint duration exceeded 60 seconds for 10 minutes.

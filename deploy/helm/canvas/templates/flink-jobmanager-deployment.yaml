@@ -1,0 +1,76 @@
+{{- if .Values.flink.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "canvas.fullname" . }}-flink-jobmanager
+  namespace: {{ .Values.namespace }}
+  labels:
+    {{- include "canvas.labels" . | nindent 4 }}
+    app.kubernetes.io/component: flink-jobmanager
+spec:
+  replicas: {{ .Values.flink.jobManager.replicas }}
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: {{ include "canvas.name" . }}
+      app.kubernetes.io/instance: {{ .Release.Name }}
+      app.kubernetes.io/component: flink-jobmanager
+  template:
+    metadata:
+      labels:
+        {{- include "canvas.labels" . | nindent 8 }}
+        app.kubernetes.io/component: flink-jobmanager
+    spec:
+      serviceAccountName: {{ .Values.flink.serviceAccountName }}
+      terminationGracePeriodSeconds: 60
+      {{- with .Values.global.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: flink-jobmanager
+          image: "{{ .Values.flink.image.repository }}:{{ .Values.flink.image.tag }}"
+          imagePullPolicy: {{ .Values.flink.image.pullPolicy }}
+          command: ["jobmanager"]
+          ports:
+            - name: rest
+              containerPort: {{ .Values.flink.jobManager.restPort }}
+            - name: rpc
+              containerPort: {{ .Values.flink.jobManager.rpcPort }}
+          readinessProbe:
+            httpGet:
+              path: /overview
+              port: rest
+            initialDelaySeconds: 20
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /overview
+              port: rest
+            initialDelaySeconds: 60
+            periodSeconds: 20
+          volumeMounts:
+            - name: flink-config
+              mountPath: /opt/flink/conf/flink-conf.yaml
+              subPath: flink-conf.yaml
+            - name: flink-checkpoints
+              mountPath: /opt/flink/checkpoints
+            - name: flink-savepoints
+              mountPath: /opt/flink/savepoints
+          resources:
+            {{- toYaml .Values.flink.jobManager.resources | nindent 12 }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+      volumes:
+        - name: flink-config
+          configMap:
+            name: {{ include "canvas.fullname" . }}-flink
+        - name: flink-checkpoints
+          persistentVolumeClaim:
+            claimName: {{ include "canvas.fullname" . }}-flink-checkpoints
+        - name: flink-savepoints
+          persistentVolumeClaim:
+            claimName: {{ include "canvas.fullname" . }}-flink-savepoints
+{{- end }}

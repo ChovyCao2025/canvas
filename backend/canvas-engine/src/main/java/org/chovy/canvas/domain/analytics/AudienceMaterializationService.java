@@ -1,19 +1,19 @@
 package org.chovy.canvas.domain.analytics;
 
-import lombok.RequiredArgsConstructor;
 import org.chovy.canvas.dal.dataobject.AudienceDefinitionDO;
 import org.chovy.canvas.dal.dataobject.AudienceMaterializationRunDO;
 import org.chovy.canvas.dal.mapper.AudienceMaterializationRunMapper;
 import org.chovy.canvas.engine.audience.StableUserIndexService;
 import org.chovy.canvas.engine.audience.VersionedAudienceBitmapStore;
 import org.roaringbitmap.RoaringBitmap;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
 import java.util.List;
 
 @Service
-@RequiredArgsConstructor
 public class AudienceMaterializationService {
 
     private static final String STATUS_RUNNING = "RUNNING";
@@ -29,6 +29,24 @@ public class AudienceMaterializationService {
     private final VersionedAudienceBitmapStore bitmapStore;
     private final AudienceMaterializationRunMapper runMapper;
     private final int maxRows;
+
+    @Autowired
+    public AudienceMaterializationService(AudienceDefinitionRepository definitions,
+                                          BehaviorAudienceOlapRepository olap,
+                                          BehaviorAudienceRuleCompiler compiler,
+                                          StableUserIndexService indexService,
+                                          VersionedAudienceBitmapStore bitmapStore,
+                                          AudienceMaterializationRunMapper runMapper,
+                                          @Value("${canvas.warehouse.audience-materialization.max-rows:100000}")
+                                          int maxRows) {
+        this.definitions = definitions;
+        this.olap = olap;
+        this.compiler = compiler;
+        this.indexService = indexService;
+        this.bitmapStore = bitmapStore;
+        this.runMapper = runMapper;
+        this.maxRows = maxRows;
+    }
 
     public MaterializationResult materialize(Long tenantId, Long audienceId, String operator) {
         Long scopedTenantId = normalizeTenant(tenantId);

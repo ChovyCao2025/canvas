@@ -2,7 +2,6 @@ package org.chovy.canvas.engine.wait;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.chovy.canvas.common.MapFieldKeys;
 import org.chovy.canvas.common.enums.NodeType;
@@ -10,6 +9,7 @@ import org.chovy.canvas.common.enums.TriggerType;
 import org.chovy.canvas.dal.dataobject.CanvasWaitSubscriptionDO;
 import org.chovy.canvas.engine.trigger.CanvasExecutionService;
 import org.chovy.canvas.infrastructure.reactor.TrackedReactiveTaskRegistry;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
@@ -46,7 +46,6 @@ import java.util.Objects;
  */
 @Slf4j
 @Service
-@RequiredArgsConstructor
 public class WaitResumeService {
 
     /** 等待订阅服务，用于查询和 CAS 完成等待记录。 */
@@ -57,6 +56,17 @@ public class WaitResumeService {
     private final ObjectMapper objectMapper;
     /** 跟踪恢复触发的 fire-and-forget 执行，支持关闭时释放。 */
     private final TrackedReactiveTaskRegistry reactiveTaskRegistry;
+
+    @Autowired
+    public WaitResumeService(WaitSubscriptionService waitSubscriptionService,
+                             CanvasExecutionService executionService,
+                             ObjectMapper objectMapper,
+                             TrackedReactiveTaskRegistry reactiveTaskRegistry) {
+        this.waitSubscriptionService = waitSubscriptionService;
+        this.executionService = executionService;
+        this.objectMapper = objectMapper;
+        this.reactiveTaskRegistry = reactiveTaskRegistry;
+    }
 
     WaitResumeService(WaitSubscriptionService waitSubscriptionService,
                       CanvasExecutionService executionService,

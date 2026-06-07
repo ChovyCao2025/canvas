@@ -58,6 +58,29 @@ class InternalApiAuthFilterTest {
     }
 
     @Test
+    void protectsRealtimeCheckpointRouteWithInternalToken() {
+        InternalApiAuthFilter filter = new InternalApiAuthFilter("secret");
+        MockServerWebExchange missing = MockServerWebExchange.from(
+                MockServerHttpRequest.post("/warehouse/realtime/pipelines/checkpoints").build());
+        MockServerWebExchange matching = MockServerWebExchange.from(
+                MockServerHttpRequest.post("/warehouse/realtime/pipelines/checkpoints")
+                        .header(InternalApiAuthFilter.HEADER_NAME, "secret")
+                        .build());
+        AtomicBoolean invoked = new AtomicBoolean(false);
+
+        StepVerifier.create(filter.filter(missing, e -> Mono.empty()))
+                .verifyComplete();
+        StepVerifier.create(filter.filter(matching, e -> {
+                    invoked.set(true);
+                    return Mono.empty();
+                }))
+                .verifyComplete();
+
+        assertThat(missing.getResponse().getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
+        assertThat(invoked).isTrue();
+    }
+
+    @Test
     void blankConfiguredTokenKeepsLocalCompatibility() {
         InternalApiAuthFilter filter = new InternalApiAuthFilter("");
         MockServerWebExchange exchange = MockServerWebExchange.from(

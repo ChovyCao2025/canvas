@@ -1,0 +1,58 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: canvas-flink
+  namespace: canvas
+  labels:
+    app.kubernetes.io/name: canvas-flink
+    app.kubernetes.io/part-of: marketing-canvas
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: canvas-flink
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: canvas-engine
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: monitoring
+      ports:
+        - protocol: TCP
+          port: 8081
+        - protocol: TCP
+          port: 6123
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              app.kubernetes.io/part-of: data-platform
+      ports:
+        - protocol: TCP
+          port: 3306
+        - protocol: TCP
+          port: 8030
+        - protocol: TCP
+          port: 8040
+        - protocol: TCP
+          port: 9030
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: canvas-engine
+      ports:
+        - protocol: TCP
+          port: 8080

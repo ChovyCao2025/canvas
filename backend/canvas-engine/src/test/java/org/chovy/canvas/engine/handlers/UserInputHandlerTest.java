@@ -57,10 +57,11 @@ class UserInputHandlerTest {
     @Test
     void completedResumeRoutesToCompletedNodeAndOutputsResponse() {
         ExecutionContext ctx = ctx();
-        ctx.getTriggerPayload().put(MapFieldKeys.WAIT_RESUME_STATUS, UserInputService.STATUS_COMPLETED);
-        ctx.getTriggerPayload().put("inputResponseId", 12L);
-        ctx.getTriggerPayload().put("inputResponse", Map.of("email", "a@example.com"));
-        ctx.getTriggerPayload().put("completedNodeId", "done-1");
+        ctx.putTriggerPayloadValues(Map.of(
+                MapFieldKeys.WAIT_RESUME_STATUS, UserInputService.STATUS_COMPLETED,
+                "inputResponseId", 12L,
+                "inputResponse", Map.of("email", "a@example.com"),
+                "completedNodeId", "done-1"));
         UserInputHandler handler = new UserInputHandler(mock(UserInputService.class));
 
         NodeResult result = handler.executeAsync(Map.of(
@@ -78,9 +79,10 @@ class UserInputHandlerTest {
     @Test
     void timeoutResumeRoutesToTimeoutBranch() {
         ExecutionContext ctx = ctx();
-        ctx.getTriggerPayload().put(MapFieldKeys.WAIT_RESUME_STATUS, UserInputService.STATUS_EXPIRED);
-        ctx.getTriggerPayload().put("inputResponseId", 12L);
-        ctx.getTriggerPayload().put(MapFieldKeys.TIMEOUT_NODE_ID, "timeout-1");
+        ctx.putTriggerPayloadValues(Map.of(
+                MapFieldKeys.WAIT_RESUME_STATUS, UserInputService.STATUS_EXPIRED,
+                "inputResponseId", 12L,
+                MapFieldKeys.TIMEOUT_NODE_ID, "timeout-1"));
         UserInputHandler handler = new UserInputHandler(mock(UserInputService.class));
 
         NodeResult result = handler.executeAsync(Map.of(

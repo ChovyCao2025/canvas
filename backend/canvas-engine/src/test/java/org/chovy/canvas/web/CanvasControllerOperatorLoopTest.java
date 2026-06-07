@@ -12,6 +12,9 @@ import org.chovy.canvas.domain.canvas.CanvasProjectFolderMetadataService;
 import org.chovy.canvas.domain.canvas.CanvasService;
 import org.chovy.canvas.domain.compliance.AuditEventService;
 import org.chovy.canvas.domain.notification.NotificationEventService;
+import org.chovy.canvas.domain.project.CanvasProjectAction;
+import org.chovy.canvas.domain.project.CanvasProjectPermissionService;
+import org.chovy.canvas.dto.CanvasCreateReq;
 import org.chovy.canvas.dto.canvas.CanvasImportReq;
 import org.chovy.canvas.dto.canvas.CanvasImportResp;
 import org.chovy.canvas.dto.canvas.MessagePreviewReq;
@@ -108,24 +111,80 @@ class CanvasControllerOperatorLoopTest {
     }
 
     @Test
+    void createWithProjectIdChecksTargetProjectEditPermission() {
+        CanvasService canvasService = mock(CanvasService.class);
+        CanvasProjectPermissionService permissionService = mock(CanvasProjectPermissionService.class);
+        CanvasController controller = controller(canvasService, mock(CanvasMessagePreviewService.class),
+                mock(CanvasImportExportService.class), mock(CanvasProjectFolderMetadataService.class));
+        controller.setProjectPermissionService(permissionService);
+        CanvasDO canvas = new CanvasDO();
+        canvas.setId(62L);
+        when(canvasService.create(any(CanvasCreateReq.class))).thenReturn(canvas);
+
+        CanvasCreateReq req = new CanvasCreateReq();
+        req.setName("Welcome");
+        req.setProjectId(9L);
+
+        StepVerifier.create(controller.create(req))
+                .assertNext(response -> assertThat(response.getData()).isSameAs(canvas))
+                .verifyComplete();
+
+        verify(permissionService).requireProjectAction(
+                eq(10L),
+                eq(9L),
+                any(TenantContext.class),
+                eq(CanvasProjectAction.EDIT));
+    }
+
+    @Test
     void saveProjectFolderMetadataChecksTenantAccessAndDefaultsOperator() {
         CanvasService canvasService = mock(CanvasService.class);
         CanvasProjectFolderMetadataService metadataService = mock(CanvasProjectFolderMetadataService.class);
         CanvasController controller = controller(canvasService, mock(CanvasMessagePreviewService.class),
                 mock(CanvasImportExportService.class), metadataService);
         ProjectFolderMetadataResp resp = new ProjectFolderMetadataResp(
-                62L, "growth", "Growth", "new-user", "New User");
-        when(metadataService.saveMetadata(eq(62L), any(ProjectFolderMetadataReq.class))).thenReturn(resp);
+                62L, 9L, "growth", "Growth", "new-user", "New User");
+        when(metadataService.saveMetadata(eq(10L), eq(62L), any(ProjectFolderMetadataReq.class))).thenReturn(resp);
 
         StepVerifier.create(controller.saveProjectFolderMetadata(62L, new ProjectFolderMetadataReq(
-                        "growth", "Growth", "new-user", "New User", " ")))
+                        9L, "growth", "Growth", "new-user", "New User", " ")))
                 .assertNext(response -> assertThat(response.getData()).isSameAs(resp))
                 .verifyComplete();
 
         verify(canvasService).requireTenantAccess(62L, 10L, false);
         ArgumentCaptor<ProjectFolderMetadataReq> captor = ArgumentCaptor.forClass(ProjectFolderMetadataReq.class);
-        verify(metadataService).saveMetadata(eq(62L), captor.capture());
+        verify(metadataService).saveMetadata(eq(10L), eq(62L), captor.capture());
+        assertThat(captor.getValue().projectId()).isEqualTo(9L);
         assertThat(captor.getValue().operator()).isEqualTo("system");
+    }
+
+    @Test
+    void saveProjectFolderMetadataWithProjectIdChecksTargetProjectEditPermission() {
+        CanvasService canvasService = mock(CanvasService.class);
+        CanvasProjectFolderMetadataService metadataService = mock(CanvasProjectFolderMetadataService.class);
+        CanvasProjectPermissionService permissionService = mock(CanvasProjectPermissionService.class);
+        CanvasController controller = controller(canvasService, mock(CanvasMessagePreviewService.class),
+                mock(CanvasImportExportService.class), metadataService);
+        controller.setProjectPermissionService(permissionService);
+        CanvasDO canvas = new CanvasDO();
+        canvas.setId(62L);
+        canvas.setTenantId(10L);
+        when(canvasService.requireTenantAccess(62L, 10L, false)).thenReturn(canvas);
+        when(metadataService.saveMetadata(eq(10L), eq(62L), any(ProjectFolderMetadataReq.class)))
+                .thenReturn(new ProjectFolderMetadataResp(62L, 9L, "growth", "Growth", null, null));
+
+        StepVerifier.create(controller.saveProjectFolderMetadata(62L, new ProjectFolderMetadataReq(
+                        9L, null, null, null, null, null)))
+                .assertNext(response -> assertThat(response.getData().projectId()).isEqualTo(9L))
+                .verifyComplete();
+
+        verify(permissionService).requireCanvasAction(canvas, new TenantContext(10L, RoleNames.TENANT_ADMIN, "alice"),
+                CanvasProjectAction.EDIT);
+        verify(permissionService).requireProjectAction(
+                eq(10L),
+                eq(9L),
+                any(TenantContext.class),
+                eq(CanvasProjectAction.EDIT));
     }
 
     private CanvasController controller(

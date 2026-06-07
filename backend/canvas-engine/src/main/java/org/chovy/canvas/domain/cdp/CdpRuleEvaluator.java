@@ -3,6 +3,7 @@ package org.chovy.canvas.domain.cdp;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.googlecode.aviator.AviatorEvaluator;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
@@ -21,6 +22,13 @@ public class CdpRuleEvaluator {
     }
 
     public Evaluation evaluate(String expressionJson, Map<String, Object> properties) {
+        return evaluate(expressionJson, "RULE", properties);
+    }
+
+    public Evaluation evaluate(String expressionJson, String computeType, Map<String, Object> properties) {
+        if ("EXPR".equalsIgnoreCase(computeType)) {
+            return evaluateExpression(expressionJson, properties);
+        }
         Map<String, Object> expression = readExpression(expressionJson);
         String field = requireText((String) expression.get("field"), "field");
         String op = requireText((String) expression.get("op"), "op");
@@ -32,6 +40,15 @@ public class CdpRuleEvaluator {
     }
 
     public void validate(String expressionJson) {
+        validate(expressionJson, "RULE");
+    }
+
+    public void validate(String expressionJson, String computeType) {
+        if ("EXPR".equalsIgnoreCase(computeType)) {
+            String expr = readExpressionText(expressionJson);
+            AviatorEvaluator.compile(expr, true);
+            return;
+        }
         Map<String, Object> expression = readExpression(expressionJson);
         requireText((String) expression.get("field"), "field");
         String op = requireText((String) expression.get("op"), "op");
@@ -68,6 +85,16 @@ public class CdpRuleEvaluator {
         } catch (JsonProcessingException e) {
             throw new IllegalArgumentException("expressionJson is invalid", e);
         }
+    }
+
+    private Evaluation evaluateExpression(String expressionJson, Map<String, Object> properties) {
+        Object value = AviatorEvaluator.execute(readExpressionText(expressionJson), properties);
+        return new Evaluation(value != null, value);
+    }
+
+    private String readExpressionText(String expressionJson) {
+        Map<String, Object> expression = readExpression(expressionJson);
+        return requireText((String) expression.get("expr"), "expr");
     }
 
     @SuppressWarnings("unchecked")

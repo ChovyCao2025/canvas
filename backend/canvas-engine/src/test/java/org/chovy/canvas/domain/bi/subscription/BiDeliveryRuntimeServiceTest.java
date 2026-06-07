@@ -20,6 +20,7 @@ import org.mockito.ArgumentCaptor;
 
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
@@ -217,6 +218,233 @@ class BiDeliveryRuntimeServiceTest {
     }
 
     @Test
+    void runAlertTriggersMovingAverageAnomalyWhenRecentWindowDropsBelowOlderBaseline() throws Exception {
+        BiAlertRuleMapper alertRuleMapper = mock(BiAlertRuleMapper.class);
+        BiDatasetMapper datasetMapper = mock(BiDatasetMapper.class);
+        BiDeliveryLogMapper deliveryLogMapper = mock(BiDeliveryLogMapper.class);
+        BiQueryExecutionService queryExecutionService = mock(BiQueryExecutionService.class);
+        BiAlertRuleDO row = alert();
+        row.setConditionJson("""
+                {
+                  "operator":"ANOMALY_DROP",
+                  "model":"MOVING_AVERAGE",
+                  "baselineWindow":3,
+                  "comparisonWindow":2,
+                  "minSamples":3,
+                  "minDeltaPercent":0.15
+                }
+                """);
+        when(alertRuleMapper.selectById(41L)).thenReturn(row);
+        when(datasetMapper.selectById(11L)).thenReturn(dataset());
+        when(queryExecutionService.execute(any(BiQueryRequest.class), any()))
+                .thenReturn(new BiQueryResult(
+                        "canvas_daily_stats",
+                        List.of(new BiQueryColumn("success_rate", "METRIC", "PERCENT")),
+                        List.of(Map.of("success_rate", BigDecimal.valueOf(0.70))),
+                        1,
+                        12,
+                        "hash"));
+        when(deliveryLogMapper.selectList(any()))
+                .thenReturn(List.of(
+                        historicalEvaluation(0.72),
+                        historicalEvaluation(0.99),
+                        historicalEvaluation(1.00),
+                        historicalEvaluation(1.01)));
+        ObjectMapper objectMapper = new ObjectMapper();
+        BiDeliveryRuntimeService service = service(mock(BiSubscriptionMapper.class), alertRuleMapper, datasetMapper,
+                deliveryLogMapper, queryExecutionService, null);
+
+        BiDeliveryRunResult result = service.runAlert(7L, "alice", "OPERATOR", 41L);
+
+        ArgumentCaptor<BiDeliveryLogDO> logCaptor = ArgumentCaptor.forClass(BiDeliveryLogDO.class);
+        verify(deliveryLogMapper, org.mockito.Mockito.times(2)).insert(logCaptor.capture());
+        assertThat(result.status()).isEqualTo("TRIGGERED");
+        BiDeliveryLogDO evaluation = logCaptor.getAllValues().get(0);
+        Map<?, ?> payload = objectMapper.readValue(evaluation.getPayloadJson(), Map.class);
+        Map<?, ?> extra = (Map<?, ?>) payload.get("extra");
+        Map<?, ?> anomaly = (Map<?, ?>) extra.get("anomaly");
+        assertThat(anomaly.get("model")).isEqualTo("MOVING_AVERAGE");
+        assertThat(anomaly.get("comparisonWindow")).isEqualTo(2);
+        assertThat(anomaly.get("comparisonSampleCount")).isEqualTo(2);
+        assertThat(anomaly.get("baselineSampleCount")).isEqualTo(3);
+        assertThat(((Number) anomaly.get("comparisonAverage")).doubleValue())
+                .isCloseTo(0.71, org.assertj.core.data.Offset.offset(0.0001));
+        assertThat(((Number) anomaly.get("baselineAverage")).doubleValue())
+                .isCloseTo(1.0, org.assertj.core.data.Offset.offset(0.0001));
+        assertThat(((Number) anomaly.get("deltaPercent")).doubleValue()).isGreaterThan(0.15);
+    }
+
+    @Test
+    void runAlertTriggersWeekOverWeekAnomalyAgainstCalendarBaselineWindow() throws Exception {
+        BiAlertRuleMapper alertRuleMapper = mock(BiAlertRuleMapper.class);
+        BiDatasetMapper datasetMapper = mock(BiDatasetMapper.class);
+        BiDeliveryLogMapper deliveryLogMapper = mock(BiDeliveryLogMapper.class);
+        BiQueryExecutionService queryExecutionService = mock(BiQueryExecutionService.class);
+        BiAlertRuleDO row = alert();
+        row.setConditionJson("""
+                {
+                  "operator":"ANOMALY_DROP",
+                  "model":"PERIOD_OVER_PERIOD",
+                  "period":"WEEK_OVER_WEEK",
+                  "baselineWindow":2,
+                  "minSamples":2,
+                  "calendarWindowHours":6,
+                  "minDeltaPercent":0.20
+                }
+                """);
+        when(alertRuleMapper.selectById(41L)).thenReturn(row);
+        when(datasetMapper.selectById(11L)).thenReturn(dataset());
+        when(queryExecutionService.execute(any(BiQueryRequest.class), any()))
+                .thenReturn(new BiQueryResult(
+                        "canvas_daily_stats",
+                        List.of(new BiQueryColumn("success_rate", "METRIC", "PERCENT")),
+                        List.of(Map.of("success_rate", BigDecimal.valueOf(0.70))),
+                        1,
+                        12,
+                        "hash"));
+        LocalDateTime now = LocalDateTime.now();
+        when(deliveryLogMapper.selectList(any()))
+                .thenReturn(List.of(
+                        historicalEvaluation(0.71, now.minusDays(1)),
+                        historicalEvaluation(0.99, now.minusWeeks(1).minusHours(2)),
+                        historicalEvaluation(1.01, now.minusWeeks(1).plusHours(1)),
+                        historicalEvaluation(0.75, now.minusWeeks(2))));
+        ObjectMapper objectMapper = new ObjectMapper();
+        BiDeliveryRuntimeService service = service(mock(BiSubscriptionMapper.class), alertRuleMapper, datasetMapper,
+                deliveryLogMapper, queryExecutionService, null);
+
+        BiDeliveryRunResult result = service.runAlert(7L, "alice", "OPERATOR", 41L);
+
+        ArgumentCaptor<BiDeliveryLogDO> logCaptor = ArgumentCaptor.forClass(BiDeliveryLogDO.class);
+        verify(deliveryLogMapper, org.mockito.Mockito.times(2)).insert(logCaptor.capture());
+        assertThat(result.status()).isEqualTo("TRIGGERED");
+        BiDeliveryLogDO evaluation = logCaptor.getAllValues().get(0);
+        Map<?, ?> payload = objectMapper.readValue(evaluation.getPayloadJson(), Map.class);
+        Map<?, ?> extra = (Map<?, ?>) payload.get("extra");
+        Map<?, ?> anomaly = (Map<?, ?>) extra.get("anomaly");
+        assertThat(anomaly.get("model")).isEqualTo("PERIOD_OVER_PERIOD");
+        assertThat(anomaly.get("period")).isEqualTo("WEEK_OVER_WEEK");
+        assertThat(anomaly.get("calendarWindowHours")).isEqualTo(6);
+        assertThat(anomaly.get("baselineSampleCount")).isEqualTo(2);
+        assertThat(((Number) anomaly.get("baselineAverage")).doubleValue())
+                .isCloseTo(1.0, org.assertj.core.data.Offset.offset(0.0001));
+        assertThat(((Number) anomaly.get("deltaPercent")).doubleValue()).isGreaterThan(0.20);
+    }
+
+    @Test
+    void runAlertUsesNaturalMonthBoundaryForMonthOverMonthAnomalyBaseline() throws Exception {
+        BiAlertRuleMapper alertRuleMapper = mock(BiAlertRuleMapper.class);
+        BiDatasetMapper datasetMapper = mock(BiDatasetMapper.class);
+        BiDeliveryLogMapper deliveryLogMapper = mock(BiDeliveryLogMapper.class);
+        BiQueryExecutionService queryExecutionService = mock(BiQueryExecutionService.class);
+        ObjectMapper objectMapper = new ObjectMapper();
+        BiAlertRuleDO row = alert();
+        row.setConditionJson(objectMapper.writeValueAsString(Map.of(
+                "operator", "ANOMALY_DROP",
+                "model", "PERIOD_OVER_PERIOD",
+                "period", "MONTH_OVER_MONTH",
+                "baselineWindow", 2,
+                "minSamples", 2,
+                "naturalBoundary", true,
+                "minDeltaPercent", 0.20)));
+        when(alertRuleMapper.selectById(41L)).thenReturn(row);
+        when(datasetMapper.selectById(11L)).thenReturn(dataset());
+        when(queryExecutionService.execute(any(BiQueryRequest.class), any()))
+                .thenReturn(new BiQueryResult(
+                        "canvas_daily_stats",
+                        List.of(new BiQueryColumn("success_rate", "METRIC", "PERCENT")),
+                        List.of(Map.of("success_rate", BigDecimal.valueOf(0.70))),
+                        1,
+                        12,
+                        "hash"));
+        LocalDateTime previousMonthStart = LocalDate.now().withDayOfMonth(1).minusMonths(1).atStartOfDay();
+        LocalDateTime previousMonthEnd = previousMonthStart.plusMonths(1).minusNanos(1);
+        when(deliveryLogMapper.selectList(any()))
+                .thenReturn(List.of(
+                        historicalEvaluation(0.55, previousMonthStart.minusNanos(1)),
+                        historicalEvaluation(1.01, previousMonthEnd.minusDays(1)),
+                        historicalEvaluation(0.99, previousMonthStart.plusDays(1)),
+                        historicalEvaluation(0.60, previousMonthEnd.plusNanos(1))));
+        BiDeliveryRuntimeService service = service(mock(BiSubscriptionMapper.class), alertRuleMapper, datasetMapper,
+                deliveryLogMapper, queryExecutionService, null);
+
+        BiDeliveryRunResult result = service.runAlert(7L, "alice", "OPERATOR", 41L);
+
+        ArgumentCaptor<BiDeliveryLogDO> logCaptor = ArgumentCaptor.forClass(BiDeliveryLogDO.class);
+        verify(deliveryLogMapper, org.mockito.Mockito.times(2)).insert(logCaptor.capture());
+        assertThat(result.status()).isEqualTo("TRIGGERED");
+        BiDeliveryLogDO evaluation = logCaptor.getAllValues().get(0);
+        Map<?, ?> payload = objectMapper.readValue(evaluation.getPayloadJson(), Map.class);
+        Map<?, ?> extra = (Map<?, ?>) payload.get("extra");
+        Map<?, ?> anomaly = (Map<?, ?>) extra.get("anomaly");
+        assertThat(anomaly.get("period")).isEqualTo("MONTH_OVER_MONTH");
+        assertThat(anomaly.get("naturalBoundary")).isEqualTo(true);
+        assertThat(anomaly.get("targetWindowStart")).isEqualTo(previousMonthStart.toString());
+        assertThat(anomaly.get("targetWindowEnd")).isEqualTo(previousMonthEnd.toString());
+        assertThat(anomaly.get("baselineSampleCount")).isEqualTo(2);
+        assertThat(((Number) anomaly.get("baselineAverage")).doubleValue())
+                .isCloseTo(1.0, org.assertj.core.data.Offset.offset(0.0001));
+    }
+
+    @Test
+    void runAlertUsesHolidayComparisonDateForPeriodOverPeriodAnomalyBaseline() throws Exception {
+        BiAlertRuleMapper alertRuleMapper = mock(BiAlertRuleMapper.class);
+        BiDatasetMapper datasetMapper = mock(BiDatasetMapper.class);
+        BiDeliveryLogMapper deliveryLogMapper = mock(BiDeliveryLogMapper.class);
+        BiQueryExecutionService queryExecutionService = mock(BiQueryExecutionService.class);
+        ObjectMapper objectMapper = new ObjectMapper();
+        LocalDate comparisonDate = LocalDate.now().minusYears(1).minusDays(10);
+        BiAlertRuleDO row = alert();
+        row.setConditionJson(objectMapper.writeValueAsString(Map.of(
+                "operator", "ANOMALY_DROP",
+                "model", "PERIOD_OVER_PERIOD",
+                "period", "YEAR_OVER_YEAR",
+                "baselineWindow", 2,
+                "minSamples", 2,
+                "holidayComparisonDate", comparisonDate.toString(),
+                "holidayName", "spring-festival",
+                "minDeltaPercent", 0.20)));
+        when(alertRuleMapper.selectById(41L)).thenReturn(row);
+        when(datasetMapper.selectById(11L)).thenReturn(dataset());
+        when(queryExecutionService.execute(any(BiQueryRequest.class), any()))
+                .thenReturn(new BiQueryResult(
+                        "canvas_daily_stats",
+                        List.of(new BiQueryColumn("success_rate", "METRIC", "PERCENT")),
+                        List.of(Map.of("success_rate", BigDecimal.valueOf(0.70))),
+                        1,
+                        12,
+                        "hash"));
+        when(deliveryLogMapper.selectList(any()))
+                .thenReturn(List.of(
+                        historicalEvaluation(0.65, comparisonDate.minusDays(1).atTime(10, 0)),
+                        historicalEvaluation(1.02, comparisonDate.atTime(15, 0)),
+                        historicalEvaluation(0.98, comparisonDate.atTime(9, 0)),
+                        historicalEvaluation(0.70, comparisonDate.plusDays(1).atTime(10, 0)),
+                        historicalEvaluation(0.72, LocalDate.now().minusYears(1).atTime(10, 0))));
+        BiDeliveryRuntimeService service = service(mock(BiSubscriptionMapper.class), alertRuleMapper, datasetMapper,
+                deliveryLogMapper, queryExecutionService, null);
+
+        BiDeliveryRunResult result = service.runAlert(7L, "alice", "OPERATOR", 41L);
+
+        ArgumentCaptor<BiDeliveryLogDO> logCaptor = ArgumentCaptor.forClass(BiDeliveryLogDO.class);
+        verify(deliveryLogMapper, org.mockito.Mockito.times(2)).insert(logCaptor.capture());
+        assertThat(result.status()).isEqualTo("TRIGGERED");
+        BiDeliveryLogDO evaluation = logCaptor.getAllValues().get(0);
+        Map<?, ?> payload = objectMapper.readValue(evaluation.getPayloadJson(), Map.class);
+        Map<?, ?> extra = (Map<?, ?>) payload.get("extra");
+        Map<?, ?> anomaly = (Map<?, ?>) extra.get("anomaly");
+        assertThat(anomaly.get("period")).isEqualTo("YEAR_OVER_YEAR");
+        assertThat(anomaly.get("holidayAdjusted")).isEqualTo(true);
+        assertThat(anomaly.get("holidayName")).isEqualTo("spring-festival");
+        assertThat(anomaly.get("holidayComparisonDate")).isEqualTo(comparisonDate.toString());
+        assertThat(anomaly.get("targetWindowStart")).isEqualTo(comparisonDate.atStartOfDay().toString());
+        assertThat(anomaly.get("targetWindowEnd")).isEqualTo(comparisonDate.plusDays(1).atStartOfDay().minusNanos(1).toString());
+        assertThat(anomaly.get("baselineSampleCount")).isEqualTo(2);
+        assertThat(((Number) anomaly.get("baselineAverage")).doubleValue())
+                .isCloseTo(1.0, org.assertj.core.data.Offset.offset(0.0001));
+    }
+
+    @Test
     void runAlertSkipsAnomalyWhenBaselineSamplesAreInsufficient() {
         BiAlertRuleMapper alertRuleMapper = mock(BiAlertRuleMapper.class);
         BiDatasetMapper datasetMapper = mock(BiDatasetMapper.class);
@@ -348,6 +576,18 @@ class BiDeliveryRuntimeServiceTest {
             assertThat(attachment.get("attachmentType")).isEqualTo("PDF");
             assertThat(attachment.get("fileUrl")).isEqualTo("/canvas/bi/delivery-attachments/71/download");
         });
+    }
+
+    @Test
+    void runSubscriptionPayloadUsesBigScreenWorkbenchModeUrl() throws Exception {
+        assertSubscriptionUrl("BIG_SCREEN", 51L,
+                "/bi?resourceType=BIG_SCREEN&resourceId=51&mode=big-screen");
+    }
+
+    @Test
+    void runSubscriptionPayloadUsesSpreadsheetWorkbenchModeUrl() throws Exception {
+        assertSubscriptionUrl("SPREADSHEET", 61L,
+                "/bi?resourceType=SPREADSHEET&resourceId=61&mode=spreadsheet");
     }
 
     @Test
@@ -596,6 +836,37 @@ class BiDeliveryRuntimeServiceTest {
                 new ObjectMapper());
     }
 
+    private void assertSubscriptionUrl(String resourceType, Long resourceId, String expectedUrl) throws Exception {
+        BiSubscriptionMapper subscriptionMapper = mock(BiSubscriptionMapper.class);
+        BiAlertRuleMapper alertRuleMapper = mock(BiAlertRuleMapper.class);
+        BiDatasetMapper datasetMapper = mock(BiDatasetMapper.class);
+        BiDeliveryLogMapper deliveryLogMapper = mock(BiDeliveryLogMapper.class);
+        BiQueryExecutionService queryExecutionService = mock(BiQueryExecutionService.class);
+        BiSubscriptionDO row = subscription();
+        row.setResourceType(resourceType);
+        row.setResourceId(resourceId);
+        row.setReceiverJson("{\"channels\":[\"EMAIL\"],\"users\":[\"alice\"]}");
+        when(subscriptionMapper.selectById(31L)).thenReturn(row);
+        ObjectMapper objectMapper = new ObjectMapper();
+        BiDeliveryRuntimeService service = new BiDeliveryRuntimeService(
+                subscriptionMapper,
+                alertRuleMapper,
+                datasetMapper,
+                deliveryLogMapper,
+                queryExecutionService,
+                null,
+                objectMapper);
+
+        service.runSubscription(7L, 31L, "alice");
+
+        ArgumentCaptor<BiDeliveryLogDO> logCaptor = ArgumentCaptor.forClass(BiDeliveryLogDO.class);
+        verify(deliveryLogMapper).insert(logCaptor.capture());
+        Map<?, ?> payload = objectMapper.readValue(logCaptor.getValue().getPayloadJson(), Map.class);
+        Map<?, ?> extra = (Map<?, ?>) payload.get("extra");
+        assertThat(payload.get("url")).isEqualTo(expectedUrl);
+        assertThat(extra.get("url")).isEqualTo(expectedUrl);
+    }
+
     private BiSubscriptionDO subscription() {
         BiSubscriptionDO row = new BiSubscriptionDO();
         row.setId(31L);
@@ -635,6 +906,10 @@ class BiDeliveryRuntimeServiceTest {
     }
 
     private BiDeliveryLogDO historicalEvaluation(double value) {
+        return historicalEvaluation(value, LocalDateTime.now().minusDays(1));
+    }
+
+    private BiDeliveryLogDO historicalEvaluation(double value, LocalDateTime createdAt) {
         BiDeliveryLogDO row = new BiDeliveryLogDO();
         row.setId(80L);
         row.setTenantId(7L);
@@ -648,7 +923,7 @@ class BiDeliveryRuntimeServiceTest {
         row.setMetricValue(BigDecimal.valueOf(value));
         row.setStatus("SKIPPED");
         row.setTriggeredBy("scheduler");
-        row.setCreatedAt(LocalDateTime.now().minusDays(1));
+        row.setCreatedAt(createdAt);
         return row;
     }
 

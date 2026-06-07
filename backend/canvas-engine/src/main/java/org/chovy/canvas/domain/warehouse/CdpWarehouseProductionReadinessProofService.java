@@ -21,12 +21,45 @@ public class CdpWarehouseProductionReadinessProofService {
     private final CdpWarehouseAvailabilityService availabilityService;
     private final CdpWarehouseConsumerAvailabilityService consumerAvailabilityService;
     private final ObjectProvider<CdpWarehousePrivacyErasureService> privacyErasureService;
+    private final ObjectProvider<CdpWarehouseEnterpriseOlapReadinessService> enterpriseOlapReadinessService;
+    private final ObjectProvider<CdpWarehouseEnterpriseOlapEvidenceService> enterpriseOlapEvidenceService;
+    private final ObjectProvider<CdpWarehouseEnterpriseOlapEvidenceCollectionService> enterpriseOlapEvidenceCollectionService;
 
     public CdpWarehouseProductionReadinessProofService(
             CdpWarehouseReadinessService readinessService,
             CdpWarehouseAvailabilityService availabilityService,
             CdpWarehouseConsumerAvailabilityService consumerAvailabilityService) {
-        this(readinessService, availabilityService, consumerAvailabilityService, null);
+        this(readinessService, availabilityService, consumerAvailabilityService, null, null, null, null);
+    }
+
+    public CdpWarehouseProductionReadinessProofService(
+            CdpWarehouseReadinessService readinessService,
+            CdpWarehouseAvailabilityService availabilityService,
+            CdpWarehouseConsumerAvailabilityService consumerAvailabilityService,
+            ObjectProvider<CdpWarehousePrivacyErasureService> privacyErasureService) {
+        this(readinessService, availabilityService, consumerAvailabilityService, privacyErasureService, null, null,
+                null);
+    }
+
+    public CdpWarehouseProductionReadinessProofService(
+            CdpWarehouseReadinessService readinessService,
+            CdpWarehouseAvailabilityService availabilityService,
+            CdpWarehouseConsumerAvailabilityService consumerAvailabilityService,
+            ObjectProvider<CdpWarehousePrivacyErasureService> privacyErasureService,
+            ObjectProvider<CdpWarehouseEnterpriseOlapReadinessService> enterpriseOlapReadinessService) {
+        this(readinessService, availabilityService, consumerAvailabilityService, privacyErasureService,
+                enterpriseOlapReadinessService, null, null);
+    }
+
+    public CdpWarehouseProductionReadinessProofService(
+            CdpWarehouseReadinessService readinessService,
+            CdpWarehouseAvailabilityService availabilityService,
+            CdpWarehouseConsumerAvailabilityService consumerAvailabilityService,
+            ObjectProvider<CdpWarehousePrivacyErasureService> privacyErasureService,
+            ObjectProvider<CdpWarehouseEnterpriseOlapReadinessService> enterpriseOlapReadinessService,
+            ObjectProvider<CdpWarehouseEnterpriseOlapEvidenceService> enterpriseOlapEvidenceService) {
+        this(readinessService, availabilityService, consumerAvailabilityService, privacyErasureService,
+                enterpriseOlapReadinessService, enterpriseOlapEvidenceService, null);
     }
 
     @Autowired
@@ -34,11 +67,17 @@ public class CdpWarehouseProductionReadinessProofService {
             CdpWarehouseReadinessService readinessService,
             CdpWarehouseAvailabilityService availabilityService,
             CdpWarehouseConsumerAvailabilityService consumerAvailabilityService,
-            ObjectProvider<CdpWarehousePrivacyErasureService> privacyErasureService) {
+            ObjectProvider<CdpWarehousePrivacyErasureService> privacyErasureService,
+            ObjectProvider<CdpWarehouseEnterpriseOlapReadinessService> enterpriseOlapReadinessService,
+            ObjectProvider<CdpWarehouseEnterpriseOlapEvidenceService> enterpriseOlapEvidenceService,
+            ObjectProvider<CdpWarehouseEnterpriseOlapEvidenceCollectionService> enterpriseOlapEvidenceCollectionService) {
         this.readinessService = readinessService;
         this.availabilityService = availabilityService;
         this.consumerAvailabilityService = consumerAvailabilityService;
         this.privacyErasureService = privacyErasureService;
+        this.enterpriseOlapReadinessService = enterpriseOlapReadinessService;
+        this.enterpriseOlapEvidenceService = enterpriseOlapEvidenceService;
+        this.enterpriseOlapEvidenceCollectionService = enterpriseOlapEvidenceCollectionService;
     }
 
     public ProductionReadinessProof proof(Long tenantId,
@@ -62,6 +101,10 @@ public class CdpWarehouseProductionReadinessProofService {
         addContractEvidence(scopedTenantId, windowStart, windowEnd, contractKeys, evidence, contracts);
         CdpWarehousePrivacyErasureService.BacklogSummary privacyErasureBacklog =
                 privacyErasureBacklog(scopedTenantId, evidence);
+        addEnterpriseOlapOperationalEvidence(scopedTenantId, evidence);
+        addEnterpriseOlapCollectionRunEvidence(scopedTenantId, evidence);
+        CdpWarehouseEnterpriseOlapReadinessService.EnterpriseOlapReadiness enterpriseOlapReadiness =
+                enterpriseOlapReadiness(scopedTenantId, evidence);
         return new ProductionReadinessProof(
                 scopedTenantId,
                 worstStatus(evidence.stream().map(ProofEvidence::status).toList()),
@@ -73,7 +116,8 @@ public class CdpWarehouseProductionReadinessProofService {
                 readiness,
                 availability,
                 List.copyOf(contracts),
-                privacyErasureBacklog);
+                privacyErasureBacklog,
+                enterpriseOlapReadiness);
     }
 
     private CdpWarehouseReadinessService.ReadinessSummary readiness(
@@ -171,6 +215,66 @@ public class CdpWarehouseProductionReadinessProofService {
         }
     }
 
+    private CdpWarehouseEnterpriseOlapReadinessService.EnterpriseOlapReadiness enterpriseOlapReadiness(
+            Long tenantId,
+            List<ProofEvidence> evidence) {
+        CdpWarehouseEnterpriseOlapReadinessService service =
+                enterpriseOlapReadinessService == null ? null : enterpriseOlapReadinessService.getIfAvailable();
+        if (service == null) {
+            return null;
+        }
+        try {
+            CdpWarehouseEnterpriseOlapReadinessService.EnterpriseOlapReadiness readiness =
+                    service.evaluateFromProductionEvidence(tenantId, List.copyOf(evidence));
+            String status = normalizeStatus(readiness == null ? null : readiness.status());
+            evidence.add(new ProofEvidence("enterprise_olap_readiness", status,
+                    readiness == null ? "enterprise OLAP readiness summary is missing" : readiness.summary()));
+            return readiness;
+        } catch (RuntimeException e) {
+            evidence.add(new ProofEvidence("enterprise_olap_readiness", STATUS_FAIL,
+                    "enterprise OLAP readiness failed: " + message(e)));
+            return null;
+        }
+    }
+
+    private void addEnterpriseOlapOperationalEvidence(Long tenantId, List<ProofEvidence> evidence) {
+        CdpWarehouseEnterpriseOlapEvidenceService service =
+                enterpriseOlapEvidenceService == null ? null : enterpriseOlapEvidenceService.getIfAvailable();
+        if (service == null) {
+            return;
+        }
+        try {
+            evidence.addAll(service.proofEvidence(tenantId));
+        } catch (RuntimeException e) {
+            for (String key : List.of(
+                    "doris_metrics",
+                    "workload_isolation",
+                    "backup_restore",
+                    "compaction_health",
+                    "ingestion_replay",
+                    "runbook_drill")) {
+                evidence.add(new ProofEvidence("enterprise_olap:" + key, STATUS_FAIL,
+                        "enterprise OLAP evidence collection failed: " + message(e)));
+            }
+        }
+    }
+
+    private void addEnterpriseOlapCollectionRunEvidence(Long tenantId, List<ProofEvidence> evidence) {
+        CdpWarehouseEnterpriseOlapEvidenceCollectionService service =
+                enterpriseOlapEvidenceCollectionService == null
+                        ? null
+                        : enterpriseOlapEvidenceCollectionService.getIfAvailable();
+        if (service == null) {
+            return;
+        }
+        try {
+            evidence.add(service.proofEvidence(tenantId));
+        } catch (RuntimeException e) {
+            evidence.add(new ProofEvidence("enterprise_olap:evidence_collection", STATUS_FAIL,
+                    "enterprise OLAP evidence collection run check failed: " + message(e)));
+        }
+    }
+
     private List<String> safeContractKeys(List<String> contractKeys) {
         if (contractKeys == null) {
             return List.of();
@@ -236,7 +340,24 @@ public class CdpWarehouseProductionReadinessProofService {
             CdpWarehouseReadinessService.ReadinessSummary readiness,
             CdpWarehouseAvailabilityService.AvailabilityDecision availability,
             List<ConsumerContractProof> contracts,
-            CdpWarehousePrivacyErasureService.BacklogSummary privacyErasureBacklog) {
+            CdpWarehousePrivacyErasureService.BacklogSummary privacyErasureBacklog,
+            CdpWarehouseEnterpriseOlapReadinessService.EnterpriseOlapReadiness enterpriseOlapReadiness) {
+        public ProductionReadinessProof(
+                Long tenantId,
+                String status,
+                LocalDateTime generatedAt,
+                LocalDateTime windowStart,
+                LocalDateTime windowEnd,
+                String mode,
+                List<ProofEvidence> evidence,
+                CdpWarehouseReadinessService.ReadinessSummary readiness,
+                CdpWarehouseAvailabilityService.AvailabilityDecision availability,
+                List<ConsumerContractProof> contracts,
+                CdpWarehousePrivacyErasureService.BacklogSummary privacyErasureBacklog) {
+            this(tenantId, status, generatedAt, windowStart, windowEnd, mode, evidence, readiness, availability,
+                    contracts, privacyErasureBacklog, null);
+        }
+
         public ProductionReadinessProof {
             evidence = evidence == null ? List.of() : List.copyOf(evidence);
             contracts = contracts == null ? List.of() : List.copyOf(contracts);

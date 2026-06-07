@@ -103,7 +103,7 @@ public class CdpWarehousePhysicalE2eCertificationService {
         CdpWarehouseRealtimeJobControlService.JobStatusSummary realtimeJobStatus =
                 realtimeJobStatus(scopedTenantId, requireRealtime, evidence);
         CdpWarehouseSyntheticDataPathProbeService.ProbeRunView dataPathProof =
-                dataPathProof(scopedTenantId, requireDataPathProof, evidence);
+                dataPathProof(scopedTenantId, requireRealtime, requireDataPathProof, evidence);
 
         LocalDateTime generatedAt = LocalDateTime.now();
         LocalDateTime windowEnd = productionReadiness == null
@@ -258,6 +258,7 @@ public class CdpWarehousePhysicalE2eCertificationService {
 
     private CdpWarehouseSyntheticDataPathProbeService.ProbeRunView dataPathProof(
             Long tenantId,
+            boolean requireRealtime,
             boolean requireDataPathProof,
             List<CertificationEvidence> evidence) {
         if (!requireDataPathProof) {
@@ -273,7 +274,8 @@ public class CdpWarehousePhysicalE2eCertificationService {
         try {
             CdpWarehouseSyntheticDataPathProbeService.ProbeRunView proof = service.run(tenantId,
                     new CdpWarehouseSyntheticDataPathProbeService.RunCommand(
-                            "e2e-certification", null, true, 3, 100));
+                            "e2e-certification", null, true, 3, 100,
+                            requireRealtime ? "MYSQL_CDC" : "DIRECT_SINK"));
             String status = dataPathProofStatus(proof);
             evidence.add(new CertificationEvidence("synthetic_ods_data_path", status,
                     dataPathProofReason(proof, status)));
@@ -387,6 +389,8 @@ public class CdpWarehousePhysicalE2eCertificationService {
             return "synthetic ODS data-path proof is missing";
         }
         return "synthetic ODS data-path proof " + status.toLowerCase(Locale.ROOT)
+                + " sourceMode=" + proof.sourceMode()
+                + " sourceStatus=" + proof.sourceStatus()
                 + " proofStatus=" + proof.status()
                 + " sinkStatus=" + proof.sinkStatus()
                 + " odsStatus=" + proof.odsStatus()

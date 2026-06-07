@@ -9,6 +9,7 @@ import org.chovy.canvas.common.enums.ExecutionStatus;
 import org.chovy.canvas.dal.dataobject.CanvasExecutionDO;
 import org.chovy.canvas.dal.mapper.CanvasExecutionMapper;
 import org.chovy.canvas.engine.wait.WaitResumeService;
+import org.chovy.canvas.domain.approval.ApprovalWorkflowService;
 import org.chovy.canvas.infrastructure.redis.ContextPersistenceService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -46,6 +47,8 @@ public class ExecutionWatchdog {
     private final CanvasExecutionService     executionService;
     /** WAIT/GOAL 恢复服务，用于批量恢复到期订阅。 */
     private final WaitResumeService          waitResumeService;
+    /** 统一审批工作流服务，用于处理新版审批任务超时。 */
+    private ApprovalWorkflowService approvalWorkflowService;
 
     /** 单次画布执行全局超时时间。 */
     @Value("${canvas.execution.global-timeout-sec:600}")
@@ -58,6 +61,14 @@ public class ExecutionWatchdog {
     /** 单次扫描恢复 WAIT/GOAL 到期订阅的批量上限。 */
     @Value("${canvas.watchdog.wait-expire-batch-size:200}")
     private int waitExpireBatchSize;
+
+    @Value("${canvas.watchdog.approval-expire-batch-size:200}")
+    private int approvalExpireBatchSize;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    void setApprovalWorkflowService(ApprovalWorkflowService approvalWorkflowService) {
+        this.approvalWorkflowService = approvalWorkflowService;
+    }
 
     @Scheduled(fixedDelay = 30_000)
     public void scan() {
@@ -108,6 +119,12 @@ public class ExecutionWatchdog {
 // ── ManualApproval 超时处理（Section 18.2）─────────────────────
 
     private void scanApprovalTimeout() {
+        if (approvalWorkflowService != null) {
+            int expired = approvalWorkflowService.expireDueTasks(approvalExpireBatchSize);
+            if (expired > 0) {
+                log.info("[WATCHDOG] 统一审批任务超时处理 count={}", expired);
+            }
+        }
         List<CanvasManualApprovalDO> timedOut = approvalMapper.selectList(
                 new LambdaQueryWrapper<CanvasManualApprovalDO>()
                         .eq(CanvasManualApprovalDO::getStatus, ApprovalStatus.PENDING)

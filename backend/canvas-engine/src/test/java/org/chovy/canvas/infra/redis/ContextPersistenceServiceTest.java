@@ -36,7 +36,7 @@ class ContextPersistenceServiceTest {
         ExecutionContext ctx = new ExecutionContext();
         ctx.setCanvasId(10L);
         ctx.setUserId("user-1");
-        ctx.getTriggerPayload().put("password", "secret-value");
+        ctx.putTriggerPayloadValues(java.util.Map.of("password", "secret-value"));
 
         service.save(ctx);
 
@@ -58,7 +58,7 @@ class ContextPersistenceServiceTest {
         ctx.setExecutionId("exec-1");
         ctx.setCanvasId(10L);
         ctx.setUserId("user-1");
-        ctx.getTriggerPayload().put("approvalId", "approval-9");
+        ctx.putTriggerPayloadValues(java.util.Map.of("approvalId", "approval-9"));
 
         service.save(ctx);
 
@@ -78,7 +78,7 @@ class ContextPersistenceServiceTest {
         paused.setExecutionId("exec-paused");
         paused.setCanvasId(10L);
         paused.setUserId("user-1");
-        paused.getTriggerPayload().put("waitNode", "wait-1");
+        paused.putTriggerPayloadValues(java.util.Map.of("waitNode", "wait-1"));
         CanvasExecutionDO backup = new CanvasExecutionDO();
         backup.setContextSnapshotJson(OBJECT_MAPPER.writeValueAsString(paused));
         when(values.get("canvas:10:user:user-1")).thenReturn(null);

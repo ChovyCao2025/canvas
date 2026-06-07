@@ -32,7 +32,7 @@
 - Create: `frontend/src/pages/canvas-editor/editorStore.test.ts`
 - Create: `frontend/src/pages/canvas-editor/editorStore.ts`
 
-- [ ] **Step 1: Add dependencies**
+- [x] **Step 1: Add dependencies**
 
 Run:
 
@@ -42,7 +42,9 @@ cd frontend && npm install zustand immer
 
 Expected: `package.json` includes `zustand` and `immer`; `package-lock.json` is updated.
 
-- [ ] **Step 2: Write editor store tests**
+Actual: `zustand` and `immer` were added as direct dependencies.
+
+- [x] **Step 2: Write editor store tests**
 
 Create `frontend/src/pages/canvas-editor/editorStore.test.ts`:
 
@@ -88,7 +90,7 @@ describe('editorStore', () => {
 })
 ```
 
-- [ ] **Step 3: Run store tests and confirm red state**
+- [x] **Step 3: Run store tests and confirm red state**
 
 Run:
 
@@ -98,7 +100,9 @@ cd frontend && npm test -- editorStore.test.ts
 
 Expected: FAIL because `editorStore.ts` does not exist.
 
-- [ ] **Step 4: Implement editor store**
+Actual: failed because `./editorStore` could not be resolved.
+
+- [x] **Step 4: Implement editor store**
 
 Create `frontend/src/pages/canvas-editor/editorStore.ts`:
 
@@ -177,7 +181,7 @@ export function createEditorStore(initialNodes: Node<CanvasNodeData>[] = []) {
 }
 ```
 
-- [ ] **Step 5: Run store tests**
+- [x] **Step 5: Run store tests**
 
 Run:
 
@@ -187,13 +191,15 @@ cd frontend && npm test -- editorStore.test.ts editorSnapshot.test.ts
 
 Expected: PASS.
 
+Actual: implemented `editorStore.ts` with Zustand, Immer, selector subscriptions, graph mirroring, save state, conflict state, modal state, and immutable undo/redo snapshots.
+
 ### Task 2: Save Queue State Machine
 
 **Files:**
 - Create: `frontend/src/pages/canvas-editor/saveQueue.test.ts`
 - Create: `frontend/src/pages/canvas-editor/saveQueue.ts`
 
-- [ ] **Step 1: Write save queue tests**
+- [x] **Step 1: Write save queue tests**
 
 Create `frontend/src/pages/canvas-editor/saveQueue.test.ts`:
 
@@ -237,7 +243,7 @@ describe('saveQueue', () => {
 })
 ```
 
-- [ ] **Step 2: Run save queue tests and confirm red state**
+- [x] **Step 2: Run save queue tests and confirm red state**
 
 Run:
 
@@ -247,7 +253,9 @@ cd frontend && npm test -- saveQueue.test.ts
 
 Expected: FAIL because `saveQueue.ts` does not exist.
 
-- [ ] **Step 3: Implement save queue**
+Actual: failed because `./saveQueue` could not be resolved.
+
+- [x] **Step 3: Implement save queue**
 
 Create `frontend/src/pages/canvas-editor/saveQueue.ts`:
 
@@ -306,7 +314,7 @@ export function createSaveQueue<TPayload>(options: SaveQueueOptions<TPayload>) {
 }
 ```
 
-- [ ] **Step 4: Run save queue tests**
+- [x] **Step 4: Run save queue tests**
 
 Run:
 
@@ -316,6 +324,8 @@ cd frontend && npm test -- saveQueue.test.ts
 
 Expected: PASS.
 
+Actual: `saveQueue.ts` covers latest-payload coalescing, active-save draining, bounded retry, exponential backoff, transient recovery, conflict preservation, retry exhaustion, state reporting, and abort support.
+
 ### Task 3: Editor Integration And Verification
 
 **Files:**
@@ -323,11 +333,13 @@ Expected: PASS.
 - Modify: `docs/product-evolution/specs/p1-007b-editor-store-and-save-queue.md`
 - Modify: `docs/product-evolution/plans/p1-007b-editor-store-and-save-queue-plan.md`
 
-- [ ] **Step 1: Integrate store and queue into editor**
+- [x] **Step 1: Integrate store and queue into editor**
 
 Move selection, dirty state, modal state, save status, conflict state, and undo/redo calls from `canvas-editor/index.tsx` into `useStore(createEditorStore(...))`. Keep node creation, connect, edit config, undo, redo, save, dry-run, and publish behavior unchanged.
 
-- [ ] **Step 2: Wire save queue to existing save command**
+Actual: `canvas-editor/index.tsx` now uses `useStore(createEditorStore(...))` for selected node, dirty state, settings/message-preview modal state, save state, conflict state, and undo/redo labels/restoration. React Flow graph rendering remains in `useCanvasGraphState` and is mirrored into the store.
+
+- [x] **Step 2: Wire save queue to existing save command**
 
 Wrap the current save API call:
 
@@ -341,7 +353,9 @@ const saveQueue = useMemo(() => createSaveQueue({
 
 Map `saved`, `failed`, and `conflict` results into store save state and visible editor banners.
 
-- [ ] **Step 3: Run focused tests**
+Actual: the existing save command is wrapped by `createSaveQueue({ maxAttempts: 3, baseDelayMs: 300 })`; queue states drive save status and visible retry/conflict/failure alerts. Failed and conflicted saves preserve local drafts.
+
+- [x] **Step 3: Run focused tests**
 
 Run:
 
@@ -351,7 +365,9 @@ cd frontend && npm test -- editorStore.test.ts saveQueue.test.ts localDraft.test
 
 Expected: PASS.
 
-- [ ] **Step 4: Run frontend build**
+Actual: `cd frontend && PATH="/opt/homebrew/bin:$PATH" npm run test -- editorStore.test.ts saveQueue.test.ts localDraft.test.ts canvasNameUpdate.test.ts graphHydration.test.ts connectionInteraction.test.ts useCanvasHistoryState.test.ts useCanvasGraphState.test.ts` passed: 8 files, 29 tests.
+
+- [x] **Step 4: Run frontend build**
 
 Run:
 
@@ -360,6 +376,8 @@ cd frontend && npm run build
 ```
 
 Expected: PASS.
+
+Actual: `cd frontend && PATH="/opt/homebrew/bin:$PATH" npm run build` passed.
 
 - [ ] **Step 5: Commit**
 
@@ -371,3 +389,5 @@ git commit -m "refactor: add canvas editor store and save queue"
 ```
 
 Expected: commit contains only editor store, save queue, integration, package metadata, tests, and related docs.
+
+Actual: skipped in this session because the user requested implementation without committing.

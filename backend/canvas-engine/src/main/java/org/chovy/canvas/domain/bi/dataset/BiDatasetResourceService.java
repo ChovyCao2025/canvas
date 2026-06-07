@@ -20,6 +20,7 @@ import org.chovy.canvas.domain.bi.query.BiDatasetSpec;
 import org.chovy.canvas.domain.bi.query.BiDatasetSpecResolver;
 import org.chovy.canvas.domain.bi.query.BiFieldSpec;
 import org.chovy.canvas.domain.bi.query.BiMetricSpec;
+import org.chovy.canvas.domain.bi.query.BiSqlParameterSpec;
 import org.chovy.canvas.domain.bi.query.MarketingBiDatasetRegistry;
 import org.chovy.canvas.domain.bi.resource.BiPublishApprovalService;
 import org.chovy.canvas.domain.bi.resource.BiResourceCollaborationService;
@@ -28,12 +29,14 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Service;
 
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 @Service
@@ -47,7 +50,13 @@ public class BiDatasetResourceService implements BiDatasetSpecResolver {
     private static final Pattern TABLE_EXPRESSION = Pattern.compile("[A-Za-z0-9_]+(\\.[A-Za-z0-9_]+){0,2}");
     private static final Pattern COLUMN_EXPRESSION = Pattern.compile("[A-Za-z0-9_]+(\\.[A-Za-z0-9_]+)?");
     private static final Pattern METRIC_EXPRESSION = Pattern.compile("[A-Za-z0-9_\\s().,+\\-*/<>=]+");
-    private static final Set<String> DATASET_TYPES = Set.of("TABLE", "VIEW");
+    private static final Pattern FORBIDDEN_SQL_TOKEN = Pattern.compile(
+            "\\b(INSERT|UPDATE|DELETE|DROP|ALTER|TRUNCATE|CREATE|MERGE|CALL|EXEC|GRANT|REVOKE|COPY|LOAD)\\b",
+            Pattern.CASE_INSENSITIVE);
+    private static final Pattern SQL_PARAMETER_TEMPLATE = Pattern.compile("\\{\\{\\s*([A-Za-z][A-Za-z0-9_]*)\\s*}}");
+    private static final String SQL_DERIVED_TABLE_ALIAS = "sql_dataset";
+    private static final int MAX_TABLE_EXPRESSION_LENGTH = 500;
+    private static final Set<String> DATASET_TYPES = Set.of("TABLE", "VIEW", "SQL");
     private static final Set<String> FIELD_ROLES = Set.of("DIMENSION", "MEASURE");
     private static final Set<String> DATA_TYPES = Set.of("STRING", "NUMBER", "DATE", "DATETIME", "BOOLEAN", "PERCENT");
 
@@ -60,6 +69,9 @@ public class BiDatasetResourceService implements BiDatasetSpecResolver {
     private final BiResourcePermissionGuard permissionGuard;
     private final BiPublishApprovalService publishApprovalService;
     private final BiResourceCollaborationService collaborationService;
+
+    private record SqlDatasetNormalization(String tableExpression, Map<String, Object> model) {
+    }
 
     public BiDatasetResourceService(BiWorkspaceMapper workspaceMapper,
                                     BiDatasetMapper datasetMapper,
@@ -182,6 +194,11 @@ public class BiDatasetResourceService implements BiDatasetSpecResolver {
         return saveDraftInternal(tenantId, username, role, resource, lockToken, true);
     }
 
+    public BiDatasetDraftNormalization normalizeDraft(BiDatasetResource resource) {
+        BiDatasetResource normalized = validateResource(resource);
+        return new BiDatasetDraftNormalization(normalized, toSpec(normalized));
+    }
+
     private BiDatasetResource saveDraftInternal(Long tenantId,
                                                 String username,
                                                 String role,
@@ -190,42 +207,42 @@ public class BiDatasetResourceService implements BiDatasetSpecResolver {
                                                 boolean enforceEditLock) {
         Long scopedTenantId = normalizeTenant(tenantId);
         Long workspaceId = workspaceId(scopedTenantId);
-        validateResource(resource);
-        BiDatasetDO existing = find(scopedTenantId, workspaceId, resource.datasetKey());
+        BiDatasetResource normalizedResource = validateResource(resource);
+        BiDatasetDO existing = find(scopedTenantId, workspaceId, normalizedResource.datasetKey());
         requirePermission(scopedTenantId, workspaceId, "DATASET", existing == null ? null : existing.getId(),
                 username, role, BiPermissionService.ACTION_EDIT);
-        requireEditLock(scopedTenantId, workspaceId, "DATASET", resource.datasetKey(), username, role,
+        requireEditLock(scopedTenantId, workspaceId, "DATASET", normalizedResource.datasetKey(), username, role,
                 lockToken, enforceEditLock && existing != null);
 
         BiDatasetDO row = new BiDatasetDO();
         row.setTenantId(scopedTenantId);
         row.setWorkspaceId(workspaceId);
-        row.setDatasetKey(required(resource.datasetKey(), "datasetKey"));
-        row.setName(required(resource.name(), "name"));
-        row.setDatasetType(required(resource.datasetType(), "datasetType"));
-        row.setTableExpression(required(resource.tableExpression(), "tableExpression"));
-        row.setTenantColumn(required(resource.tenantColumn(), "tenantColumn"));
-        row.setModelJson(json(resource.model()));
+        row.setDatasetKey(required(normalizedResource.datasetKey(), "datasetKey"));
+        row.setName(required(normalizedResource.name(), "name"));
+        row.setDatasetType(required(normalizedResource.datasetType(), "datasetType"));
+        row.setTableExpression(required(normalizedResource.tableExpression(), "tableExpression"));
+        row.setTenantColumn(required(normalizedResource.tenantColumn(), "tenantColumn"));
+        row.setModelJson(json(normalizedResource.model()));
         row.setStatus(STATUS_DRAFT);
         row.setCreatedBy(username == null || username.isBlank() ? "system" : username);
         datasetMapper.upsert(row);
 
-        BiDatasetDO persisted = find(scopedTenantId, workspaceId, resource.datasetKey());
+        BiDatasetDO persisted = find(scopedTenantId, workspaceId, normalizedResource.datasetKey());
         Long datasetId = persisted == null ? row.getId() : persisted.getId();
         if (datasetId == null) {
-            throw new IllegalStateException("BI dataset was not persisted: " + resource.datasetKey());
+            throw new IllegalStateException("BI dataset was not persisted: " + normalizedResource.datasetKey());
         }
         fieldMapper.deleteByDataset(scopedTenantId, datasetId);
         metricMapper.deleteByDataset(scopedTenantId, datasetId);
-        for (BiDatasetFieldResource field : resource.fields()) {
+        for (BiDatasetFieldResource field : normalizedResource.fields()) {
             fieldMapper.insert(toField(scopedTenantId, datasetId, field));
         }
-        for (BiMetricResource metric : resource.metrics()) {
+        for (BiMetricResource metric : normalizedResource.metrics()) {
             metricMapper.insert(toMetric(scopedTenantId, workspaceId, datasetId, metric));
         }
         return toResource(persisted == null ? row : persisted,
-                resource.fields(),
-                resource.metrics());
+                normalizedResource.fields(),
+                normalizedResource.metrics());
     }
 
     public BiDatasetResource publish(Long tenantId, String datasetKey) {
@@ -244,7 +261,8 @@ public class BiDatasetResourceService implements BiDatasetSpecResolver {
             throw new IllegalArgumentException("BI dataset not found: " + datasetKey);
         }
         requirePermission(scopedTenantId, workspaceId, "DATASET", row.getId(), username, role, BiPermissionService.ACTION_PUBLISH);
-        requirePublishApproval(scopedTenantId, workspaceId, "DATASET", datasetKey, row.getUpdatedAt(), role);
+        requirePublishApproval(scopedTenantId, workspaceId, "DATASET", datasetKey, row.getUpdatedAt(), role,
+                requiresSqlDatasetApproval(row));
         datasetMapper.publish(scopedTenantId, workspaceId, datasetKey);
         BiDatasetDO published = find(scopedTenantId, workspaceId, datasetKey);
         if (published == null) {
@@ -362,11 +380,16 @@ public class BiDatasetResourceService implements BiDatasetSpecResolver {
                                         String resourceType,
                                         String resourceKey,
                                         java.time.LocalDateTime resourceUpdatedAt,
-                                        String role) {
-        if (publishApprovalService != null && !canBypassPublishApproval(role)) {
+                                        String role,
+                                        boolean approvalAlwaysRequired) {
+        if (publishApprovalService != null && (approvalAlwaysRequired || !canBypassPublishApproval(role))) {
             publishApprovalService.requireApprovedApproval(
                     tenantId, workspaceId, resourceType, resourceKey, resourceUpdatedAt);
         }
+    }
+
+    private boolean requiresSqlDatasetApproval(BiDatasetDO row) {
+        return row != null && "SQL".equalsIgnoreCase(row.getDatasetType());
     }
 
     private void requireEditLock(Long tenantId,
@@ -427,23 +450,31 @@ public class BiDatasetResourceService implements BiDatasetSpecResolver {
         return List.copyOf(result.values());
     }
 
-    private void validateResource(BiDatasetResource resource) {
+    private BiDatasetResource validateResource(BiDatasetResource resource) {
         if (resource == null) {
             throw new IllegalArgumentException("dataset resource is required");
         }
-        if (!RESOURCE_KEY.matcher(required(resource.datasetKey(), "datasetKey")).matches()) {
+        String datasetKey = required(resource.datasetKey(), "datasetKey");
+        if (!RESOURCE_KEY.matcher(datasetKey).matches()) {
             throw new IllegalArgumentException("datasetKey contains unsafe characters");
         }
-        required(resource.name(), "name");
-        String datasetType = required(resource.datasetType(), "datasetType");
+        String name = required(resource.name(), "name");
+        String datasetType = required(resource.datasetType(), "datasetType").toUpperCase(Locale.ROOT);
         if (!DATASET_TYPES.contains(datasetType)) {
             throw new IllegalArgumentException("unsupported dataset type: " + datasetType);
         }
-        if (!TABLE_EXPRESSION.matcher(required(resource.tableExpression(), "tableExpression")).matches()) {
-            throw new IllegalArgumentException("tableExpression must be a qualified table name");
-        }
-        if (!COLUMN_EXPRESSION.matcher(required(resource.tenantColumn(), "tenantColumn")).matches()) {
+        String tenantColumn = required(resource.tenantColumn(), "tenantColumn");
+        if (!COLUMN_EXPRESSION.matcher(tenantColumn).matches()) {
             throw new IllegalArgumentException("tenantColumn must be a column identifier");
+        }
+        String tableExpression = required(resource.tableExpression(), "tableExpression");
+        Map<String, Object> model = resource.model();
+        if ("SQL".equals(datasetType)) {
+            SqlDatasetNormalization normalizedSql = normalizeSqlDataset(tableExpression, tenantColumn, model);
+            tableExpression = normalizedSql.tableExpression();
+            model = normalizedSql.model();
+        } else if (!TABLE_EXPRESSION.matcher(tableExpression).matches()) {
+            throw new IllegalArgumentException("tableExpression must be a qualified table name");
         }
         if (resource.fields().isEmpty()) {
             throw new IllegalArgumentException("dataset fields are required");
@@ -465,6 +496,192 @@ public class BiDatasetResourceService implements BiDatasetSpecResolver {
                 throw new IllegalArgumentException("duplicate metric: " + metric.metricKey());
             }
         }
+        return new BiDatasetResource(
+                datasetKey,
+                name,
+                datasetType,
+                tableExpression,
+                tenantColumn,
+                model,
+                resource.fields(),
+                resource.metrics(),
+                resource.status(),
+                resource.source());
+    }
+
+    private SqlDatasetNormalization normalizeSqlDataset(String sql,
+                                                        String tenantColumn,
+                                                        Map<String, Object> model) {
+        String query = normalizedSqlQuery(sql, tenantColumn);
+        List<String> parameterOrder = sqlParameterOrder(query);
+        List<Map<String, Object>> parameterDefinitions = sqlParameterDefinitions(model, parameterOrder);
+        String executableQuery = SQL_PARAMETER_TEMPLATE.matcher(query).replaceAll("?");
+        String expression = "(" + executableQuery + ") " + SQL_DERIVED_TABLE_ALIAS;
+        if (expression.length() > MAX_TABLE_EXPRESSION_LENGTH) {
+            throw new IllegalArgumentException("SQL dataset query is too long");
+        }
+        return new SqlDatasetNormalization(expression, sqlDatasetModel(model, query, parameterOrder, parameterDefinitions));
+    }
+
+    private String normalizedSqlQuery(String sql, String tenantColumn) {
+        String query = sql.trim().replaceAll("\\s+", " ");
+        if (!query.toUpperCase(Locale.ROOT).startsWith("SELECT ")
+                || query.contains(";")
+                || query.contains("--")
+                || query.contains("/*")
+                || query.contains("*/")
+                || FORBIDDEN_SQL_TOKEN.matcher(query).find()) {
+            throw new IllegalArgumentException("SQL dataset query must be a single read-only SELECT");
+        }
+        if (!Pattern.compile("\\b" + Pattern.quote(tenantColumn) + "\\b", Pattern.CASE_INSENSITIVE)
+                .matcher(query)
+                .find()) {
+            throw new IllegalArgumentException("SQL dataset query must include tenant column: " + tenantColumn);
+        }
+        return query;
+    }
+
+    private Map<String, Object> sqlDatasetModel(Map<String, Object> model,
+                                                String sqlTemplate,
+                                                List<String> parameterOrder,
+                                                List<Map<String, Object>> parameterDefinitions) {
+        Map<String, Object> result = new LinkedHashMap<>();
+        if (model != null) {
+            result.putAll(model);
+        }
+        result.put("sqlApprovalRequired", true);
+        result.put("sqlTemplate", sqlTemplate);
+        result.put("sqlParameterOrder", parameterOrder);
+        result.put("sqlParameters", parameterDefinitions);
+        return result;
+    }
+
+    private List<String> sqlParameterOrder(String query) {
+        List<String> order = new ArrayList<>();
+        Matcher matcher = SQL_PARAMETER_TEMPLATE.matcher(query);
+        while (matcher.find()) {
+            order.add(matcher.group(1));
+        }
+        return order;
+    }
+
+    private List<Map<String, Object>> sqlParameterDefinitions(Map<String, Object> model,
+                                                              List<String> parameterOrder) {
+        Map<String, Map<String, Object>> definitions = new LinkedHashMap<>();
+        Object rawParameters = model == null ? null : model.get("sqlParameters");
+        if (rawParameters instanceof List<?> rawList) {
+            for (Object rawParameter : rawList) {
+                Map<String, Object> definition = sqlParameterDefinition(rawParameter);
+                definitions.put(String.valueOf(definition.get("key")), definition);
+            }
+        }
+        Set<String> referenced = new LinkedHashSet<>(parameterOrder);
+        for (String key : referenced) {
+            if (!definitions.containsKey(key)) {
+                throw new IllegalArgumentException("SQL parameter definition is required: " + key);
+            }
+        }
+        for (String key : definitions.keySet()) {
+            if (!referenced.contains(key)) {
+                throw new IllegalArgumentException("SQL parameter definition is not referenced: " + key);
+            }
+        }
+        List<Map<String, Object>> orderedDefinitions = new ArrayList<>();
+        for (String key : referenced) {
+            orderedDefinitions.add(definitions.get(key));
+        }
+        return orderedDefinitions;
+    }
+
+    private Map<String, Object> sqlParameterDefinition(Object rawParameter) {
+        if (!(rawParameter instanceof Map<?, ?> rawMap)) {
+            throw new IllegalArgumentException("SQL parameter definition must be an object");
+        }
+        String key = stringValue(rawMap.get("key"), "SQL parameter key");
+        if (!RESOURCE_KEY.matcher(key).matches()) {
+            throw new IllegalArgumentException("SQL parameter key contains unsafe characters: " + key);
+        }
+        Object rawDataType = rawMap.containsKey("dataType") ? rawMap.get("dataType") : rawMap.get("type");
+        String dataType = stringValue(rawDataType, "SQL parameter dataType")
+                .toUpperCase(Locale.ROOT);
+        if (!DATA_TYPES.contains(dataType)) {
+            throw new IllegalArgumentException("unsupported SQL parameter data type: " + dataType);
+        }
+        Map<String, Object> definition = new LinkedHashMap<>();
+        definition.put("key", key);
+        definition.put("dataType", dataType);
+        definition.put("required", booleanValue(rawMap.get("required")));
+        if (rawMap.containsKey("defaultValue")) {
+            definition.put("defaultValue", rawMap.get("defaultValue"));
+        }
+        definition.put("allowedValues", listValues(rawMap.get("allowedValues")));
+        return definition;
+    }
+
+    private List<BiSqlParameterSpec> sqlParameterSpecs(Map<String, Object> model) {
+        if (model == null || model.isEmpty()) {
+            return List.of();
+        }
+        Object rawParameters = model.get("sqlParameters");
+        if (!(rawParameters instanceof List<?> rawList) || rawList.isEmpty()) {
+            return List.of();
+        }
+        Map<String, Map<String, Object>> definitions = new LinkedHashMap<>();
+        for (Object rawParameter : rawList) {
+            Map<String, Object> definition = sqlParameterDefinition(rawParameter);
+            definitions.put(String.valueOf(definition.get("key")), definition);
+        }
+        List<String> order = stringListValues(model.get("sqlParameterOrder"));
+        List<String> effectiveOrder = order.isEmpty() ? List.copyOf(definitions.keySet()) : order;
+        List<BiSqlParameterSpec> result = new ArrayList<>();
+        for (String key : effectiveOrder) {
+            Map<String, Object> definition = definitions.get(key);
+            if (definition == null) {
+                throw new IllegalArgumentException("SQL parameter definition is required: " + key);
+            }
+            result.add(new BiSqlParameterSpec(
+                    key,
+                    stringValue(definition.get("dataType"), "SQL parameter dataType"),
+                    booleanValue(definition.get("required")),
+                    definition.containsKey("defaultValue") ? stringValue(definition.get("defaultValue")) : null,
+                    stringListValues(definition.get("allowedValues"))));
+        }
+        return result;
+    }
+
+    private String stringValue(Object value, String fieldName) {
+        String text = stringValue(value);
+        if (text == null || text.isBlank()) {
+            throw new IllegalArgumentException(fieldName + " is required");
+        }
+        return text.trim();
+    }
+
+    private String stringValue(Object value) {
+        return value == null ? null : String.valueOf(value);
+    }
+
+    private boolean booleanValue(Object value) {
+        if (value instanceof Boolean bool) {
+            return bool;
+        }
+        return value != null && Boolean.parseBoolean(String.valueOf(value));
+    }
+
+    private List<Object> listValues(Object value) {
+        if (!(value instanceof List<?> list)) {
+            return List.of();
+        }
+        return List.copyOf(list);
+    }
+
+    private List<String> stringListValues(Object value) {
+        if (!(value instanceof List<?> list)) {
+            return List.of();
+        }
+        return list.stream()
+                .map(String::valueOf)
+                .toList();
     }
 
     private void validateField(BiDatasetFieldResource field) {
@@ -634,7 +851,48 @@ public class BiDatasetResourceService implements BiDatasetSpecResolver {
                     metric.dataType(),
                     metric.allowedDimensions()));
         }
-        return new BiDatasetSpec(row.getDatasetKey(), row.getTableExpression(), row.getTenantColumn(), fieldSpecs, metricSpecs);
+        Map<String, Object> model = map(row.getModelJson());
+        return new BiDatasetSpec(
+                row.getDatasetKey(),
+                row.getTableExpression(),
+                row.getTenantColumn(),
+                fieldSpecs,
+                metricSpecs,
+                sqlParameterSpecs(model),
+                model);
+    }
+
+    private BiDatasetSpec toSpec(BiDatasetResource resource) {
+        Map<String, BiFieldSpec> fieldSpecs = new LinkedHashMap<>();
+        for (BiDatasetFieldResource field : resource.fields()) {
+            if (!field.visible()) {
+                continue;
+            }
+            fieldSpecs.put(field.fieldKey(), new BiFieldSpec(
+                    field.fieldKey(),
+                    field.columnExpression(),
+                    BiFieldSpec.Role.valueOf(field.role()),
+                    field.dataType()));
+        }
+        Map<String, BiMetricSpec> metricSpecs = new LinkedHashMap<>();
+        for (BiMetricResource metric : resource.metrics()) {
+            if (STATUS_ARCHIVED.equals(metric.status())) {
+                continue;
+            }
+            metricSpecs.put(metric.metricKey(), new BiMetricSpec(
+                    metric.metricKey(),
+                    metric.expression(),
+                    metric.dataType(),
+                    metric.allowedDimensions()));
+        }
+        return new BiDatasetSpec(
+                resource.datasetKey(),
+                resource.tableExpression(),
+                resource.tenantColumn(),
+                fieldSpecs,
+                metricSpecs,
+                sqlParameterSpecs(resource.model()),
+                resource.model());
     }
 
     private BiDatasetFieldDO toField(Long tenantId, Long datasetId, BiDatasetFieldResource field) {

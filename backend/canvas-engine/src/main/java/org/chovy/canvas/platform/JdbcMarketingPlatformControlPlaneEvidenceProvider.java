@@ -6,6 +6,8 @@ import org.chovy.canvas.dal.dataobject.CanvasDO;
 import org.chovy.canvas.dal.dataobject.ConversationWorkItemDO;
 import org.chovy.canvas.dal.dataobject.CreatorCampaignDO;
 import org.chovy.canvas.dal.dataobject.MarketingContentReleaseDO;
+import org.chovy.canvas.dal.dataobject.GrowthActivityDO;
+import org.chovy.canvas.dal.dataobject.GrowthRewardPoolDO;
 import org.chovy.canvas.dal.dataobject.MarketingMonitorAlertChannelDO;
 import org.chovy.canvas.dal.dataobject.MarketingMonitorAlertDO;
 import org.chovy.canvas.dal.dataobject.MarketingMonitorProviderCredentialDO;
@@ -23,6 +25,8 @@ import org.chovy.canvas.dal.mapper.CanvasMapper;
 import org.chovy.canvas.dal.mapper.ConversationWorkItemMapper;
 import org.chovy.canvas.dal.mapper.CreatorCampaignMapper;
 import org.chovy.canvas.dal.dataobject.CreatorProviderMutationDO;
+import org.chovy.canvas.dal.mapper.GrowthActivityMapper;
+import org.chovy.canvas.dal.mapper.GrowthRewardPoolMapper;
 import org.chovy.canvas.dal.mapper.MarketingContentReleaseMapper;
 import org.chovy.canvas.dal.mapper.MarketingMonitorAlertChannelMapper;
 import org.chovy.canvas.dal.mapper.MarketingMonitorAlertMapper;
@@ -70,6 +74,8 @@ public class JdbcMarketingPlatformControlPlaneEvidenceProvider
     private final MarketingIntegrationContractMapper integrationContractMapper;
     private final MarketingIntegrationContractProbeRunMapper integrationContractProbeRunMapper;
     private final MarketingMonitorAlertMapper alertMapper;
+    private final GrowthActivityMapper growthActivityMapper;
+    private final GrowthRewardPoolMapper growthRewardPoolMapper;
 
     public JdbcMarketingPlatformControlPlaneEvidenceProvider(
             CanvasMapper canvasMapper,
@@ -90,7 +96,9 @@ public class JdbcMarketingPlatformControlPlaneEvidenceProvider
             MarketingCampaignLinkMapper campaignLinkMapper,
             MarketingIntegrationContractMapper integrationContractMapper,
             MarketingIntegrationContractProbeRunMapper integrationContractProbeRunMapper,
-            MarketingMonitorAlertMapper alertMapper) {
+            MarketingMonitorAlertMapper alertMapper,
+            GrowthActivityMapper growthActivityMapper,
+            GrowthRewardPoolMapper growthRewardPoolMapper) {
         this.canvasMapper = canvasMapper;
         this.contentReleaseMapper = contentReleaseMapper;
         this.conversationWorkItemMapper = conversationWorkItemMapper;
@@ -110,6 +118,8 @@ public class JdbcMarketingPlatformControlPlaneEvidenceProvider
         this.integrationContractMapper = integrationContractMapper;
         this.integrationContractProbeRunMapper = integrationContractProbeRunMapper;
         this.alertMapper = alertMapper;
+        this.growthActivityMapper = growthActivityMapper;
+        this.growthRewardPoolMapper = growthRewardPoolMapper;
     }
 
     @Override
@@ -217,7 +227,24 @@ public class JdbcMarketingPlatformControlPlaneEvidenceProvider
                 count(() -> alertMapper.selectCount(new LambdaQueryWrapper<MarketingMonitorAlertDO>()
                         .eq(MarketingMonitorAlertDO::getTenantId, scopedTenantId)
                         .eq(MarketingMonitorAlertDO::getStatus, "OPEN")
-                        .eq(MarketingMonitorAlertDO::getAlertType, INTEGRATION_SLO_BURN_RATE_ALERT))));
+                        .eq(MarketingMonitorAlertDO::getAlertType, INTEGRATION_SLO_BURN_RATE_ALERT))),
+                count(() -> growthActivityMapper.selectCount(new LambdaQueryWrapper<GrowthActivityDO>()
+                        .eq(GrowthActivityDO::getTenantId, scopedTenantId)
+                        .eq(GrowthActivityDO::getStatus, "ACTIVE"))),
+                count(() -> growthRewardPoolMapper.selectCount(new LambdaQueryWrapper<GrowthRewardPoolDO>()
+                        .eq(GrowthRewardPoolDO::getTenantId, scopedTenantId)
+                        .eq(GrowthRewardPoolDO::getStatus, "ACTIVE"))),
+                count(() -> growthActivityMapper.selectCount(new LambdaQueryWrapper<GrowthActivityDO>()
+                        .eq(GrowthActivityDO::getTenantId, scopedTenantId)
+                        .eq(GrowthActivityDO::getStatus, "ACTIVE")
+                        .isNotNull(GrowthActivityDO::getCampaignId)
+                        .isNotNull(GrowthActivityDO::getDashboardRef))),
+                count(() -> growthActivityMapper.selectCount(new LambdaQueryWrapper<GrowthActivityDO>()
+                        .eq(GrowthActivityDO::getTenantId, scopedTenantId)
+                        .eq(GrowthActivityDO::getStatus, "ACTIVE")
+                        .and(wrapper -> wrapper.isNull(GrowthActivityDO::getCampaignId)
+                                .or()
+                                .isNull(GrowthActivityDO::getDashboardRef)))));
     }
 
     private long count(Supplier<Long> supplier) {

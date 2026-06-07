@@ -100,6 +100,69 @@ frontend:
     maxReplicas: 4
     targetCPUUtilizationPercentage: 70
 
+flink:
+  enabled: false
+  image:
+    repository: flink
+    tag: 1.20.0-scala_2.12-java17
+    pullPolicy: IfNotPresent
+  serviceAccountName: canvas-flink
+  jobJarPath: /opt/flink/usrlib/canvas-flink-jobs-1.0.0-SNAPSHOT.jar
+  pipelines:
+    - mysql_cdp_event_log_to_doris_ods
+    - mysql_canvas_trace_to_doris_ods
+    - doris_ods_cdp_event_to_dwd_fact
+    - doris_dwd_user_fact_to_dws_metric_daily
+  config:
+    tenantId: "0"
+    reportedBy: canvas-flink-jobs-prod
+    dorisLabelSuffix: ""
+    checkpointInterval: 60s
+    checkpointTimeout: 10min
+    minPauseBetweenCheckpoints: 30s
+    tolerableCheckpointFailures: "3"
+    taskSlots: "4"
+    parallelismDefault: "2"
+    stateBackend: rocksdb
+    checkpointDir: file:///opt/flink/checkpoints
+    savepointDir: file:///opt/flink/savepoints
+  secretName: canvas-flink-runtime
+  secretKeys:
+    canvasFlinkMysqlUrl: canvas-flink-mysql-url
+    canvasFlinkMysqlUsername: canvas-flink-mysql-username
+    canvasFlinkMysqlPassword: canvas-flink-mysql-password
+    canvasFlinkDorisFeNodes: canvas-flink-doris-fe-nodes
+    canvasFlinkDorisBeNodes: canvas-flink-doris-be-nodes
+    canvasFlinkDorisJdbcUrl: canvas-flink-doris-jdbc-url
+    canvasFlinkDorisUsername: canvas-flink-doris-username
+    canvasFlinkDorisPassword: canvas-flink-doris-password
+    canvasFlinkCheckpointEndpoint: canvas-flink-checkpoint-endpoint
+    canvasFlinkInternalApiToken: canvas-flink-internal-api-token
+  jobManager:
+    replicas: 1
+    restPort: 8081
+    rpcPort: 6123
+    resources:
+      requests:
+        cpu: 500m
+        memory: 1Gi
+      limits:
+        cpu: "2"
+        memory: 2Gi
+  taskManager:
+    replicas: 2
+    resources:
+      requests:
+        cpu: "1"
+        memory: 2Gi
+      limits:
+        cpu: "4"
+        memory: 6Gi
+  storage:
+    checkpointStorageSize: 20Gi
+    savepointStorageSize: 20Gi
+    storageClassName: ""
+
 ingress:
   enabled: true
   className: nginx

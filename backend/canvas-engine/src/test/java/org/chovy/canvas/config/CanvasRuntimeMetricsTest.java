@@ -44,4 +44,27 @@ class CanvasRuntimeMetricsTest {
                 .gauge().value()).isEqualTo(0.75d);
         assertThat(registry.get("canvas.runtime.disruptor.pressure").gauge().value()).isEqualTo(0.5d);
     }
+
+    @Test
+    void recordsMarketingIntegrationProbeResultMetrics() {
+        SimpleMeterRegistry registry = new SimpleMeterRegistry();
+        CanvasRuntimeMetrics metrics = new CanvasRuntimeMetrics(registry);
+
+        metrics.recordMarketingIntegrationProbeResult("SEM", "PRODUCTION", "FAIL", 503, 900L, "provider_timeout");
+
+        assertThat(registry.get("canvas.marketing.integration.probe.result.total")
+                .tag("provider_family", "sem")
+                .tag("environment", "production")
+                .tag("status", "fail")
+                .tag("http.response.status_code", "503")
+                .tag("error.type", "provider_timeout")
+                .counter().count()).isEqualTo(1d);
+        assertThat(registry.get("canvas.marketing.integration.probe.latency")
+                .tag("provider_family", "sem")
+                .tag("environment", "production")
+                .tag("status", "fail")
+                .tag("http.response.status_code", "503")
+                .tag("error.type", "provider_timeout")
+                .timer().totalTime(java.util.concurrent.TimeUnit.MILLISECONDS)).isEqualTo(900d);
+    }
 }

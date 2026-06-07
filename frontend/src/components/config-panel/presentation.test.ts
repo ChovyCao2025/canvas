@@ -170,7 +170,7 @@ describe('buildConfigPanelPresentation', () => {
 
     expect(model.header.tone).toBe('tagger')
     expect(model.header.typeBadge).toBe('TAGGER')
-    expect(model.header.metaBadges).toEqual(['2 出口'])
+    expect(model.header.metaBadges).toEqual(['人群圈选', 'Audience Segment', '2 出口'])
     expect(model.summaryRows).toEqual([
       { label: '模式展示', value: '人群圈选' },
       { label: '圈选对象', value: 'audience_vip' },

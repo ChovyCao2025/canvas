@@ -437,6 +437,7 @@ public class DagEngine {
             boolean needsNodeId = NodeType.API_CALL.equals(node.getType())
                     || NodeType.WAIT.equals(node.getType())
                     || NodeType.USER_INPUT.equals(node.getType())
+                    || NodeType.MANUAL_APPROVAL.equals(node.getType())
                     || NodeType.SEND_MESSAGE.equals(node.getType())
                     || NodeType.COMMIT_ACTION.equals(node.getType())
                     || NodeType.TAGGER.equals(node.getType());
@@ -643,7 +644,7 @@ public class DagEngine {
                     try {
                         cb.checkState(); // 熔断 OPEN 时抛异常，不可重试
                     } catch (CircuitBreakerRegistry.CircuitBreakerOpenException e) {
-                        return Mono.just(NodeResult.fail(e.getMessage()));
+                        return Mono.error(e);
                     }
                     ExecutionTraceContext traceContext = ExecutionTraceContext.from(ctx, nodeId);
                     try (ExecutionTraceContext.Scope ignored = traceContext.open()) {
@@ -651,11 +652,15 @@ public class DagEngine {
                                 handler, config, ctx, nodeId, nodeType)); // ← handler 真正在这里被调用
                     }
                 })
+                .doOnError(e -> {
+                    if (!(e instanceof CircuitBreakerRegistry.CircuitBreakerOpenException)) {
+                        cb.recordFailure();
+                    }
+                })
                 .doOnNext(r -> {
                     if (r.success()) cb.recordSuccess();
                     else cb.recordFailure();
-                })
-                .doOnError(e -> cb.recordFailure());
+                });
 
         // ── ② withRetry：singleCall + 指数退避重试 + DLQ 兜底 ────
         // withRetry 本身也是惰性的（基于 singleCall 的 Mono.defer）：
@@ -1674,8 +1679,68 @@ public class DagEngine {
         if (sourceNodeId != null && !nodeId.equals(sourceNodeId.toString())) {
             return;
         }
-        if (NodeType.WAIT.equals(nodeType) && payload.containsKey(MapFieldKeys.WAIT_RESUME_STATUS)) {
+        if ((NodeType.WAIT.equals(nodeType) || NodeType.MANUAL_APPROVAL.equals(nodeType))
+                && payload.containsKey(MapFieldKeys.WAIT_RESUME_STATUS)) {
             resolved.put(MapFieldKeys.WAIT_RESUME_STATUS, payload.get(MapFieldKeys.WAIT_RESUME_STATUS));
+        }
+    }
+
+    /** Utility for bounded fan-out over large user streams. */
+    static class FanOutBatcher {
+        private final int batchSize;
+        private final java.util.concurrent.ExecutorService executor;
+
+        FanOutBatcher(int batchSize, int maxConcurrent) {
+            if (batchSize <= 0) {
+                throw new IllegalArgumentException("batchSize must be positive");
+            }
+            if (maxConcurrent <= 0) {
+                throw new IllegalArgumentException("maxConcurrent must be positive");
+            }
+            this.batchSize = batchSize;
+            this.executor = java.util.concurrent.Executors.newFixedThreadPool(maxConcurrent);
+        }
+
+        void fanOut(java.util.stream.Stream<String> users, java.util.function.Consumer<List<String>> consumer) {
+            if (users == null || consumer == null) {
+                return;
+            }
+            List<java.util.concurrent.Future<?>> futures = new ArrayList<>();
+            List<String> batch = new ArrayList<>(batchSize);
+            users.forEach(user -> {
+                if (user == null) {
+                    return;
+                }
+                batch.add(user);
+                if (batch.size() == batchSize) {
+                    futures.add(submit(batch, consumer));
+                    batch.clear();
+                }
+            });
+            if (!batch.isEmpty()) {
+                futures.add(submit(batch, consumer));
+            }
+            for (java.util.concurrent.Future<?> future : futures) {
+                try {
+                    future.get();
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    throw new IllegalStateException("fan-out interrupted", e);
+                } catch (java.util.concurrent.ExecutionException e) {
+                    throw new IllegalStateException("fan-out batch failed", e.getCause());
+                }
+            }
+        }
+
+        void shutdown() {
+            executor.shutdownNow();
+        }
+
+        private java.util.concurrent.Future<?> submit(
+                List<String> batch,
+                java.util.function.Consumer<List<String>> consumer) {
+            List<String> snapshot = List.copyOf(batch);
+            return executor.submit(() -> consumer.accept(snapshot));
         }
     }
 

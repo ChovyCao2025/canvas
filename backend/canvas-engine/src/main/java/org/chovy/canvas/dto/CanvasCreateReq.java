@@ -39,6 +39,10 @@ public class CanvasCreateReq {
     @Size(max = 128)
     private String projectKey;
 
+    /** 正式项目治理域 ID。 */
+    @Positive
+    private Long projectId;
+
     /** 平铺项目展示名。 */
     @Size(max = 255)
     private String projectName;
@@ -58,4 +62,20 @@ public class CanvasCreateReq {
     /** 定时触发表达式（triggerType=SCHEDULED 时使用）。 */
     @Size(max = 128)
     private String cronExpression;
+
+    /** 画布全局最大触发总次数。 */
+    @Positive
+    private Integer maxTotalExecutions;
+
+    /** 单用户每日最大执行次数。 */
+    @Positive
+    private Integer perUserDailyLimit;
+
+    /** 单用户全生命周期最大执行次数。 */
+    @Positive
+    private Integer perUserTotalLimit;
+
+    /** 单用户两次执行之间的冷却时间（秒）。 */
+    @Positive
+    private Integer cooldownSeconds;
 }

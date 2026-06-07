@@ -58,7 +58,7 @@ class ExecutionContextBoundsTest {
     void readsLegacyNestedContextForCompatibility() {
         ExecutionContext ctx = new ExecutionContext();
         ctx.putNodeOutput("node-a", Map.of("legacyField", "legacy-value"));
-        ctx.getFlatContext().clear();
+        ctx.setContextValue("node-a.legacyField", null);
 
         assertThat(ctx.getContextValue("node-a.legacyField")).isEqualTo("legacy-value");
         assertThat(ctx.getContextValue("legacyField")).isEqualTo("legacy-value");

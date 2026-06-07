@@ -51,12 +51,22 @@ The product roadmap can advance beyond stabilization without restarting from raw
 
 ### Data And Configuration Touchpoints
 
-- `backend/canvas-engine/src/main/resources/db/migration/V162__platform_product_evolution_workstreams.sql`
+- `backend/canvas-engine/src/main/resources/db/migration/V264__platform_product_evolution_workstreams.sql`
 
 ### Test Touchpoints
 
 - `backend/canvas-engine/src/test/java/org/chovy/canvas/platform/PlatformWorkstreamContractTest.java`
-- `frontend/src/pages/home/platformCommandCenter.test.tsx`
+- `frontend/src/pages/home/platformCommandCenter.test.ts`
+
+## Implementation Status
+
+Completed on 2026-06-05.
+
+- Added `V264__platform_product_evolution_workstreams.sql` for additive workstream governance metadata. The plan originally named `V162`, but the repository already contains later migrations, so this implementation uses the next available migration version.
+- Added `PlatformWorkstreamService` and `JdbcPlatformWorkstreamRepository` to expose workstream readiness and block broad workstreams without child-spec paths.
+- Added authenticated `PlatformWorkstreamController` at `/platform/workstreams`, guarded by `TenantContextResolver.currentOrError()`.
+- Added frontend `platformWorkstreamApi`, `platformCommandCenter` helpers, focused tests, and a visible homepage platform workstream card with loading, empty, error, and status states.
+- Rollout: run `V264__platform_product_evolution_workstreams.sql`, then surface `/platform/workstreams` in the home command center. Rollback: hide the command-center panel and stop calling `/platform/workstreams`; table rows are additive governance metadata and do not affect runtime execution.
 
 ## Dependencies
 

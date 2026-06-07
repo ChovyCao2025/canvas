@@ -3,6 +3,7 @@ package org.chovy.canvas.domain.warehouse;
 import org.chovy.canvas.domain.bi.query.BiDatasetSpec;
 import org.chovy.canvas.domain.bi.query.BiDatasetSpecResolver;
 import org.chovy.canvas.domain.bi.query.BiMetricSpec;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Service;
 
@@ -14,6 +15,7 @@ public class CdpWarehouseSemanticMetricService {
 
     private final BiDatasetSpecResolver datasetSpecResolver;
 
+    @Autowired
     public CdpWarehouseSemanticMetricService(ObjectProvider<BiDatasetSpecResolver> datasetSpecResolverProvider) {
         this(datasetSpecResolverProvider == null
                 ? BiDatasetSpecResolver.builtIn()

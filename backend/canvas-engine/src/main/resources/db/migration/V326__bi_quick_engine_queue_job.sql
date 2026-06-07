@@ -1,0 +1,21 @@
+CREATE TABLE IF NOT EXISTS bi_quick_engine_queue_job (
+  id BIGINT AUTO_INCREMENT PRIMARY KEY,
+  tenant_id BIGINT NOT NULL,
+  pool_key VARCHAR(64) NOT NULL DEFAULT 'STANDARD',
+  sql_hash VARCHAR(128) NOT NULL,
+  dataset_key VARCHAR(128) NOT NULL,
+  requested_by VARCHAR(128) NULL,
+  status VARCHAR(32) NOT NULL DEFAULT 'QUEUED',
+  attempt_count INT NOT NULL DEFAULT 0,
+  queued_at DATETIME NOT NULL,
+  expires_at DATETIME NOT NULL,
+  claimed_by VARCHAR(128) NULL,
+  claimed_at DATETIME NULL,
+  completed_at DATETIME NULL,
+  blocked_reason VARCHAR(1000) NULL,
+  created_at DATETIME NULL,
+  updated_at DATETIME NULL,
+  KEY idx_bi_quick_engine_queue_ready (tenant_id, pool_key, status, expires_at, queued_at, id),
+  KEY idx_bi_quick_engine_queue_claimed (tenant_id, claimed_by, status, claimed_at, id),
+  KEY idx_bi_quick_engine_queue_sql_hash (tenant_id, sql_hash)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='BI quick engine durable queue jobs';

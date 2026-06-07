@@ -11,10 +11,12 @@ Introduce explicit channel connector contracts and fail-closed disabled connecto
 
 ## Current Baseline
 
-- `SendMessageHandler` reads a `channel` value and delegates to `ReachDeliveryService`.
-- `ReachDeliveryService` writes `message_send_record` and calls a configured reach platform.
-- `CouponHandler` calls a coupon service directly.
-- There is no connector mode, capability metadata, connector health abstraction, or disabled-state result.
+- Implemented on 2026-06-05: `ChannelConnector`, `ChannelConnectorRegistry`, `DisabledChannelConnector`, `ChannelConnectorJdbcRepository`, `ChannelConnectorDO`, and `ChannelConnectorMapper` exist.
+- Actual migration is `V120__channel_connector_contract.sql` because `V102` was already used by `V102__event_attribute_discovery_internal_event.sql`.
+- `SendMessageHandler` now resolves connector mode through `ChannelConnectorRegistry` when the registry is injected.
+- Disabled connectors fail closed with visible output fields and do not call `ReachDeliveryService`.
+- Sandbox connectors return deterministic fake external message IDs and do not call real delivery.
+- Existing one-argument `SendMessageHandler` construction remains available for legacy focused tests.
 
 ## In Scope
 
@@ -42,3 +44,17 @@ Introduce explicit channel connector contracts and fail-closed disabled connecto
 - Registry tests prove real, sandbox, and disabled resolution.
 - Handler tests prove missing provider fails closed with output reason.
 - Existing `SendMessageHandlerTest` remains green.
+
+## Implementation Notes
+
+- `AbstractSendMessageHandler` keeps the legacy delivery path when no registry is supplied, and uses registry-backed connector resolution when a registry is present.
+- Handler output includes `connectorMode`, `connectorProvider`, `connectorStatus`, `connectorReason`, and `externalMessageId` where applicable.
+- `NodeResult.fail(String, Map<String, Object>)` preserves disabled connector output for auditing and frontend visibility.
+- REAL connector mode currently validates that a connector is enabled/registered, then persists through the existing `ReachDeliveryService` path. Provider backpressure, fallback, dedupe, and richer provider dispatch remain split into P1-008B.
+- The current focused Maven `test` goal is blocked by unrelated global testCompile drift, so P1-008 tests were verified with isolated compilation/runners against production `target/classes`.
+
+## Verification
+
+- `cd backend && JAVA_HOME=/Users/photonpay/Library/Java/JavaVirtualMachines/ms-21.0.11/Contents/Home PATH="/Users/photonpay/Library/Java/JavaVirtualMachines/ms-21.0.11/Contents/Home/bin:$PATH" mvn -pl canvas-engine -DskipTests compile` passed.
+- Isolated P1-008 suite passed: `ChannelConnectorSchemaTest`, `ChannelConnectorRegistryTest`, `SendMessageHandlerTest`, `ChannelConnectorHandlerTest` (8 tests).
+- Isolated affected handler regression passed: `CouponHandlerTest`, `CommitActionHandlerTest`, `ApiCallHandlerRateLimitTest` (25 tests).

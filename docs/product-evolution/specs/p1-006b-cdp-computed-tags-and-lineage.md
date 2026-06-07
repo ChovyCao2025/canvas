@@ -11,14 +11,16 @@ Add computed tags with dependency validation and lineage so operators can create
 
 ## Current Baseline
 
-- `CdpTagService` writes manual/API/import tags and tag history.
+- Implemented on 2026-06-05 and merged into `main`.
+- `CdpTagService` writes manual/API/import/computed tags and tag history.
 - `TagDefinitionDO` stores tag metadata and value type.
-- Canvas and audience rules can reference tags, but there is no reverse lineage index or delete-impact check.
-- There is no computed tag definition, dependency graph, cycle validation, preview, or run history.
+- Computed tag definition, dependency graph, cycle validation, preview, run-now, run history, and lineage impact checks are available.
+- Operator UI is available at `/cdp/computed-tags` for administrators.
 
 ## In Scope
 
 - Computed tag definitions with RULE, SQL, and EXPR metadata.
+- RULE and EXPR first-slice execution against `cdp_user_profile.properties_json`; SQL is stored/validated as metadata in this slice.
 - Dependency edges between computed tags.
 - Cycle detection with returned cycle path.
 - Preview count and sample users.
@@ -42,11 +44,12 @@ Add computed tags with dependency validation and lineage so operators can create
 
 ## Technical Scope
 
-- `backend/canvas-engine/src/main/resources/db/migration/V100__cdp_computed_tags_lineage.sql`
+- `backend/canvas-engine/src/main/resources/db/migration/V105__cdp_computed_tags_lineage.sql`
 - `backend/canvas-engine/src/main/java/org/chovy/canvas/domain/cdp/ComputedTagService.java`
 - `backend/canvas-engine/src/main/java/org/chovy/canvas/domain/cdp/CdpLineageService.java`
 - `backend/canvas-engine/src/main/java/org/chovy/canvas/web/CdpComputedTagController.java`
 - `frontend/src/pages/cdp-computed-tags/index.tsx`
+- `frontend/src/pages/cdp-computed-tags/computedTagPresentation.ts`
 - `frontend/src/services/cdpApi.ts`
 
 ## Acceptance Criteria
@@ -56,3 +59,11 @@ Add computed tags with dependency validation and lineage so operators can create
 - Lineage tests show tag to audience and tag to canvas impact.
 - Run-now writes tags idempotently via `CdpTagService`.
 
+## Implementation Status
+
+- Status: implemented on 2026-06-05 and merged into `main`.
+- Backend: added `ComputedTagService`, `CdpLineageService`, and `CdpComputedTagController` under `/cdp/computed-tags`; actual migration is `V105__cdp_computed_tags_lineage.sql` using `cdp_computed_tag_*` tables.
+- Computed tag execution supports RULE/EXPR against active user profile JSON, rejects dependency cycles with an exact path, and writes matched tags through `CdpTagService.setTag(tenantId, userId, req)` with deterministic `computed-tag:{runId}:{userId}:{tagCode}` idempotency keys.
+- Lineage impact checks scan computed tag dependencies, audience rule JSON, and published canvas graph JSON.
+- Frontend: added typed `cdpApi.computedTags`, presentation helpers, `/cdp/computed-tags` admin page, route, and side-nav entry.
+- Verification: backend production compile passed with `mvn -pl canvas-engine -DskipTests compile`; focused P1-006B backend tests pass in an isolated runner because Maven `testCompile` remains blocked by unrelated existing test-source errors. Frontend `npm run test -- computedTagPresentation.test.ts cdpApi.test.ts` and `npm run build` passed.

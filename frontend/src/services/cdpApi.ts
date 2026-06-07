@@ -268,61 +268,313 @@ export interface CdpTagOperation {
   updatedAt?: string | null
 }
 
+export interface ComputedProfileAttributePayload {
+  attrCode: string
+  displayName: string
+  valueType: 'STRING' | 'NUMBER' | 'BOOLEAN' | 'JSON'
+  computeType: 'RULE' | 'EXPR' | 'SQL'
+  expressionJson: string
+  refreshMode: 'MANUAL' | 'EVENT'
+}
+
+export interface ComputedProfileAttributeRow extends ComputedProfileAttributePayload {
+  id: number
+  tenantId?: number | null
+  status: string
+  createdBy?: string | null
+  createdAt?: string | null
+  updatedAt?: string | null
+}
+
+export interface ComputedProfilePreviewSample {
+  userId: string
+  oldValue?: string | null
+  newValue?: string | null
+}
+
+export interface ComputedProfilePreviewResult {
+  scannedCount: number
+  matchedCount: number
+  changedCount: number
+  unchangedCount: number
+  samples: ComputedProfilePreviewSample[]
+}
+
+export interface ComputedProfileRunResult {
+  runId?: number | null
+  status: string
+  scannedCount: number
+  matchedCount: number
+  changedCount: number
+  unchangedCount: number
+}
+
+export interface ComputedProfileRunRow extends ComputedProfileRunResult {
+  id: number
+  attrId: number
+  sourceEventId?: string | null
+  errorMessage?: string | null
+  startedAt?: string | null
+  finishedAt?: string | null
+}
+
+export interface ComputedProfileChangeLogRow {
+  id: number
+  attrCode: string
+  userId: string
+  oldValue?: string | null
+  newValue?: string | null
+  sourceRunId: number
+  changedAt?: string | null
+}
+
+export interface ComputedTagPayload {
+  tagCode: string
+  displayName: string
+  valueType: 'STRING' | 'NUMBER' | 'BOOLEAN' | 'JSON'
+  computeType: 'RULE' | 'EXPR' | 'SQL'
+  expressionJson: string
+  refreshMode: 'MANUAL' | 'EVENT'
+  dependencies: string[]
+}
+
+export interface ComputedTagRow extends ComputedTagPayload {
+  id: number
+  tenantId?: number | null
+  status: string
+  createdBy?: string | null
+  createdAt?: string | null
+  updatedAt?: string | null
+}
+
+export interface ComputedTagPreviewSample {
+  userId: string
+  tagValue?: string | null
+}
+
+export interface ComputedTagPreviewResult {
+  scannedCount: number
+  matchedCount: number
+  samples: ComputedTagPreviewSample[]
+}
+
+export interface ComputedTagRunSummary {
+  runId?: number | null
+  status: string
+  scannedCount: number
+  matchedCount: number
+  updatedCount: number
+  skippedCount: number
+  failedCount: number
+  cyclePath?: string | null
+}
+
+export interface ComputedTagRunRow extends ComputedTagRunSummary {
+  id: number
+  tagCode: string
+  errorMessage?: string | null
+  startedAt?: string | null
+  finishedAt?: string | null
+}
+
+export interface LineageImpact {
+  objectType: string
+  objectId?: string | number | null
+  objectName?: string | null
+  referencePath: string
+}
+
+export interface ImpactCheck {
+  allowed: boolean
+  reason?: string | null
+  impacts: LineageImpact[]
+}
+
+export interface RealtimeAudienceEventPayload {
+  sourceEventId: string
+  userId: string
+  eventTime?: string | null
+  properties?: Record<string, unknown>
+  removeOnNoMatch?: boolean
+}
+
+export interface RealtimeAudienceEventResult {
+  status: string
+  operation?: string | null
+  audienceId?: number | string | null
+  userId?: string | null
+  sourceEventId?: string | null
+}
+
+export interface AudienceOverlapResult {
+  leftCount: number
+  rightCount: number
+  intersectionCount: number
+  leftPercentage: number
+  rightPercentage: number
+}
+
+export interface AudienceSetOperationResult {
+  status: string
+  reason?: string | null
+  resultSize?: number | null
+  safeLimit?: number | null
+  resultAudienceId?: number | string | null
+}
+
+export interface AudienceSnapshotRow {
+  id: number
+  tenantId?: number | string | null
+  audienceId: number | string
+  estimatedSize: number
+  bitmapKey?: string | null
+  snapshotSource: string
+  createdBy?: string | null
+  createdAt?: string | null
+}
+
+export interface AudienceSnapshotResult {
+  audienceId: number | string
+  estimatedSize: number
+  bitmapKey: string
+  snapshotSource: string
+}
+
 /** CDP 用户、标签和画布用户洞察接口集合。 */
-export const cdpApi = {
+export function createCdpApi(client = http) {
+  return {
   /** 查询 CDP 用户列表，可按关键字搜索 userId、名称或联系方式。 */
   listUsers: (keyword?: string) =>
-    http.get<R<CanvasUserRow[]>, R<CanvasUserRow[]>>('/cdp/users', { params: keyword ? { keyword } : undefined }),
+    client.get<R<CanvasUserRow[]>, R<CanvasUserRow[]>>('/cdp/users', { params: keyword ? { keyword } : undefined }),
 
   /** 查询用户基础画像。 */
   getUser: (userId: string) =>
-    http.get<R<CdpUserDetail>, R<CdpUserDetail>>(`/cdp/users/${encodeURIComponent(userId)}`),
+    client.get<R<CdpUserDetail>, R<CdpUserDetail>>(`/cdp/users/${encodeURIComponent(userId)}`),
 
   /** 查询用户完整洞察：画像、标签、参与画布。 */
   getUserInsight: (userId: string) =>
-    http.get<R<CanvasUserDetail>, R<CanvasUserDetail>>(`/cdp/users/${encodeURIComponent(userId)}/insight`),
+    client.get<R<CanvasUserDetail>, R<CanvasUserDetail>>(`/cdp/users/${encodeURIComponent(userId)}/insight`),
 
   /** 查询用户当前标签集合。 */
   listUserTags: (userId: string) =>
-    http.get<R<CdpUserTag[]>, R<CdpUserTag[]>>(`/cdp/users/${encodeURIComponent(userId)}/tags`),
+    client.get<R<CdpUserTag[]>, R<CdpUserTag[]>>(`/cdp/users/${encodeURIComponent(userId)}/tags`),
 
   /** 查询用户标签变更历史。 */
   listUserTagHistory: (userId: string) =>
-    http.get<R<CdpUserTagHistory[]>, R<CdpUserTagHistory[]>>(`/cdp/users/${encodeURIComponent(userId)}/tag-history`),
+    client.get<R<CdpUserTagHistory[]>, R<CdpUserTagHistory[]>>(`/cdp/users/${encodeURIComponent(userId)}/tag-history`),
 
   /** 给单个用户新增或更新标签。 */
   addUserTag: (userId: string, body: TagWritePayload) =>
-    http.post<R<void>, R<void>>(`/cdp/users/${encodeURIComponent(userId)}/tags`, body),
+    client.post<R<void>, R<void>>(`/cdp/users/${encodeURIComponent(userId)}/tags`, body),
 
   /** 删除单个用户的指定标签。 */
   removeUserTag: (userId: string, tagCode: string) =>
-    http.delete<R<void>, R<void>>(`/cdp/users/${encodeURIComponent(userId)}/tags/${encodeURIComponent(tagCode)}`),
+    client.delete<R<void>, R<void>>(`/cdp/users/${encodeURIComponent(userId)}/tags/${encodeURIComponent(tagCode)}`),
 
   /** 创建批量标签操作。 */
   createBatchTagOperation: (body: BatchTagPayload) =>
-    http.post<R<CdpTagOperation>, R<CdpTagOperation>>('/cdp/tag-operations', body),
+    client.post<R<CdpTagOperation>, R<CdpTagOperation>>('/cdp/tag-operations', body),
 
   /** 查询最近的批量标签操作。 */
   listTagOperations: (limit = 20) =>
-    http.get<R<CdpTagOperation[]>, R<CdpTagOperation[]>>('/cdp/tag-operations', { params: { limit } }),
+    client.get<R<CdpTagOperation[]>, R<CdpTagOperation[]>>('/cdp/tag-operations', { params: { limit } }),
 
   /** 查询单个批量标签操作详情。 */
   getBatchTagOperation: (id: number) =>
-    http.get<R<CdpTagOperation>, R<CdpTagOperation>>(`/cdp/tag-operations/${id}`),
+    client.get<R<CdpTagOperation>, R<CdpTagOperation>>(`/cdp/tag-operations/${id}`),
 
   /** 仅重试批量操作中的失败用户。 */
   retryFailedTagOperation: (id: number) =>
-    http.post<R<CdpTagOperation>, R<CdpTagOperation>>(`/cdp/tag-operations/${id}/retry-failed`),
+    client.post<R<CdpTagOperation>, R<CdpTagOperation>>(`/cdp/tag-operations/${id}/retry-failed`),
 
   /** 查询某个画布命中过的用户列表。 */
   listCanvasUsers: (canvasId: number) =>
-    http.get<R<CanvasUserRow[]>, R<CanvasUserRow[]>>(`/canvas/${canvasId}/users`),
+    client.get<R<CanvasUserRow[]>, R<CanvasUserRow[]>>(`/canvas/${canvasId}/users`),
 
   /** 查询某个画布下单个用户的汇总行。 */
   getCanvasUser: (canvasId: number, userId: string) =>
-    http.get<R<CanvasUserRow>, R<CanvasUserRow>>(`/canvas/${canvasId}/users/${encodeURIComponent(userId)}`),
+    client.get<R<CanvasUserRow>, R<CanvasUserRow>>(`/canvas/${canvasId}/users/${encodeURIComponent(userId)}`),
 
   /** 查询某个用户在某个画布下的执行明细。 */
   listCanvasUserExecutions: (canvasId: number, userId: string) =>
-    http.get<R<CanvasExecutionRow[]>, R<CanvasExecutionRow[]>>(`/canvas/${canvasId}/users/${encodeURIComponent(userId)}/executions`),
+    client.get<R<CanvasExecutionRow[]>, R<CanvasExecutionRow[]>>(`/canvas/${canvasId}/users/${encodeURIComponent(userId)}/executions`),
+
+  computedProfiles: {
+    list: () =>
+      client.get<R<ComputedProfileAttributeRow[]>, R<ComputedProfileAttributeRow[]>>('/cdp/computed-profile-attributes'),
+    create: (payload: ComputedProfileAttributePayload) =>
+      client.post<R<ComputedProfileAttributeRow>, R<ComputedProfileAttributeRow>>('/cdp/computed-profile-attributes', payload),
+    preview: (id: number) =>
+      client.post<R<ComputedProfilePreviewResult>, R<ComputedProfilePreviewResult>>(`/cdp/computed-profile-attributes/${id}/preview`),
+    activate: (id: number) =>
+      client.post<R<void>, R<void>>(`/cdp/computed-profile-attributes/${id}/activate`),
+    pause: (id: number) =>
+      client.post<R<void>, R<void>>(`/cdp/computed-profile-attributes/${id}/pause`),
+    run: (id: number) =>
+      client.post<R<ComputedProfileRunResult>, R<ComputedProfileRunResult>>(`/cdp/computed-profile-attributes/${id}/run`),
+    runs: (id: number) =>
+      client.get<R<ComputedProfileRunRow[]>, R<ComputedProfileRunRow[]>>(`/cdp/computed-profile-attributes/${id}/runs`),
+    changes: (id: number, userId?: string) =>
+      client.get<R<ComputedProfileChangeLogRow[]>, R<ComputedProfileChangeLogRow[]>>(
+        `/cdp/computed-profile-attributes/${id}/changes`,
+        userId ? { params: { userId } } : undefined,
+      ),
+  },
+  computedTags: {
+    list: () =>
+      client.get<R<ComputedTagRow[]>, R<ComputedTagRow[]>>('/cdp/computed-tags'),
+    create: (payload: ComputedTagPayload) =>
+      client.post<R<ComputedTagRow>, R<ComputedTagRow>>('/cdp/computed-tags', payload),
+    preview: (tagCode: string) =>
+      client.post<R<ComputedTagPreviewResult>, R<ComputedTagPreviewResult>>(`/cdp/computed-tags/${encodeURIComponent(tagCode)}/preview`),
+    activate: (tagCode: string) =>
+      client.post<R<void>, R<void>>(`/cdp/computed-tags/${encodeURIComponent(tagCode)}/activate`),
+    pause: (tagCode: string) =>
+      client.post<R<void>, R<void>>(`/cdp/computed-tags/${encodeURIComponent(tagCode)}/pause`),
+    run: (tagCode: string) =>
+      client.post<R<ComputedTagRunSummary>, R<ComputedTagRunSummary>>(`/cdp/computed-tags/${encodeURIComponent(tagCode)}/run`),
+    runs: (tagCode: string) =>
+      client.get<R<ComputedTagRunRow[]>, R<ComputedTagRunRow[]>>(`/cdp/computed-tags/${encodeURIComponent(tagCode)}/runs`),
+    lineage: (tagCode: string) =>
+      client.get<R<LineageImpact[]>, R<LineageImpact[]>>(`/cdp/computed-tags/${encodeURIComponent(tagCode)}/lineage`),
+    impactCheck: (tagCode: string, oldValueType: string, newValueType: string) =>
+      client.post<R<ImpactCheck>, R<ImpactCheck>>(`/cdp/computed-tags/${encodeURIComponent(tagCode)}/impact-check`, {
+        oldValueType,
+        newValueType,
+      }),
+  },
+  realtimeAudiences: {
+    processEvent: (audienceId: number | string, payload: RealtimeAudienceEventPayload) =>
+      client.post<R<RealtimeAudienceEventResult>, R<RealtimeAudienceEventResult>>(
+        `/cdp/realtime-audiences/${encodeURIComponent(String(audienceId))}/events`,
+        payload,
+      ),
+    createSnapshot: (audienceId: number | string) =>
+      client.post<R<AudienceSnapshotResult>, R<AudienceSnapshotResult>>(
+        `/cdp/realtime-audiences/${encodeURIComponent(String(audienceId))}/snapshot`,
+      ),
+    overlap: (leftId: number | string, rightId: number | string) =>
+      client.get<R<AudienceOverlapResult>, R<AudienceOverlapResult>>(
+        `/cdp/audiences/${encodeURIComponent(String(leftId))}/overlap/${encodeURIComponent(String(rightId))}`,
+      ),
+    merge: (leftId: number | string, rightId: number | string) =>
+      client.post<R<AudienceSetOperationResult>, R<AudienceSetOperationResult>>(
+        '/cdp/audiences/merge',
+        null,
+        { params: { leftId, rightId } },
+      ),
+    exclude: (baseId: number | string, excludedId: number | string) =>
+      client.post<R<AudienceSetOperationResult>, R<AudienceSetOperationResult>>(
+        '/cdp/audiences/exclude',
+        null,
+        { params: { baseId, excludedId } },
+      ),
+    snapshots: (audienceId: number | string) =>
+      client.get<R<AudienceSnapshotRow[]>, R<AudienceSnapshotRow[]>>(
+        `/cdp/realtime-audiences/${encodeURIComponent(String(audienceId))}/snapshots`,
+      ),
+  },
+  }
 }
+
+export const cdpApi = createCdpApi()

@@ -8,6 +8,10 @@
 
 **Tech Stack:** Java 21, Spring Boot WebFlux, MyBatis-Plus, Jackson, JUnit 5, Mockito, AssertJ, React 18, TypeScript, Ant Design, Vitest.
 
+**Implementation Status:** Implemented and merged into `main` on 2026-06-05. Backend management endpoints live at `/cdp/webhooks`, and the operator UI is available at `/webhook-subscriptions`.
+
+**Verification:** `cd backend && JAVA_HOME=/Users/photonpay/Library/Java/JavaVirtualMachines/ms-21.0.11/Contents/Home PATH="/Users/photonpay/Library/Java/JavaVirtualMachines/ms-21.0.11/Contents/Home/bin:$PATH" mvn -pl canvas-engine -DskipTests compile` passed. Focused webhook backend tests for P1-005B/P1-005B2/P1-005B3 pass in an isolated runner because Maven `testCompile` is still blocked by unrelated existing test-source errors. `cd frontend && PATH="/opt/homebrew/bin:$PATH" npm run test -- cdpEventApi.test.ts webhookSubscriptions.test.ts` passed, and `cd frontend && PATH="/opt/homebrew/bin:$PATH" npm run build` passed.
+
 ---
 
 ## Spec Reference
@@ -18,18 +22,18 @@
 
 ## File Structure
 
-- Create: `backend/canvas-engine/src/main/java/org/chovy/canvas/dto/webhook/WebhookSubscriptionReq.java`
-- Create: `backend/canvas-engine/src/main/java/org/chovy/canvas/dto/webhook/WebhookSubscriptionDTO.java`
-- Create: `backend/canvas-engine/src/main/java/org/chovy/canvas/dto/webhook/WebhookDeliveryDTO.java`
-- Create: `backend/canvas-engine/src/main/java/org/chovy/canvas/dto/webhook/WebhookRotateSecretResp.java`
-- Create: `backend/canvas-engine/src/main/java/org/chovy/canvas/web/WebhookSubscriptionController.java`
-- Create: `backend/canvas-engine/src/test/java/org/chovy/canvas/web/WebhookSubscriptionControllerTest.java`
-- Modify: `frontend/src/services/cdpEventApi.ts`
-- Create: `frontend/src/pages/webhook-subscriptions/index.tsx`
-- Create: `frontend/src/pages/webhook-subscriptions/webhookSubscriptionPresentation.ts`
-- Create: `frontend/src/pages/webhook-subscriptions/webhookSubscriptions.test.ts`
-- Modify: `frontend/src/App.tsx`
-- Modify: `frontend/src/components/layout/AppLayout.tsx`
+- Existing: `backend/canvas-engine/src/main/java/org/chovy/canvas/dto/webhook/WebhookSubscriptionReq.java`
+- Existing: `backend/canvas-engine/src/main/java/org/chovy/canvas/dto/webhook/WebhookSubscriptionDTO.java`
+- Existing: `backend/canvas-engine/src/main/java/org/chovy/canvas/dto/webhook/WebhookDeliveryDTO.java`
+- Existing: `backend/canvas-engine/src/main/java/org/chovy/canvas/dto/webhook/WebhookRotateSecretResp.java`
+- Added: `backend/canvas-engine/src/main/java/org/chovy/canvas/web/WebhookSubscriptionController.java`
+- Added: `backend/canvas-engine/src/test/java/org/chovy/canvas/web/WebhookSubscriptionControllerTest.java`
+- Modified: `frontend/src/services/cdpEventApi.ts`
+- Added: `frontend/src/pages/webhook-subscriptions/index.tsx`
+- Added: `frontend/src/pages/webhook-subscriptions/webhookSubscriptionPresentation.ts`
+- Added: `frontend/src/pages/webhook-subscriptions/webhookSubscriptions.test.ts`
+- Modified: `frontend/src/App.tsx`
+- Modified: `frontend/src/components/layout/AppLayout.tsx`
 
 ### Task 1: Controller DTOs And Tests
 

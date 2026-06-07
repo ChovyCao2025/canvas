@@ -16,6 +16,8 @@ import {
   buildCategoryOptions,
   buildNodeLibraryView,
   getNodeSummary,
+  withConversationNodePresets,
+  type NodePaletteItem,
 } from './nodeLibrary'
 
 /** 节点库面板入参。 */
@@ -77,28 +79,30 @@ export default function NodePanel({ onDragStart }: Props) {
   }, [])
 
   // 分类顺序 = 全部 + 用户排序中的有效分类 + 后端新出现但用户尚未排序的分类。
+  const paletteNodes = useMemo(() => withConversationNodePresets(nodes), [nodes])
+
   const categories = useMemo(() => {
-    const built = buildCategoryOptions(nodes)
+    const built = buildCategoryOptions(paletteNodes)
     const base = built.filter(category => category !== '全部')
     const ordered = categoryOrder.filter(category => base.includes(category))
     const missing = base.filter(category => !ordered.includes(category))
     return ['全部', ...ordered, ...missing]
-  }, [categoryOrder, nodes])
+  }, [categoryOrder, paletteNodes])
 
   // 根据分类和关键词生成当前可见节点集合。
   const view = useMemo(
     () =>
-      buildNodeLibraryView(nodes, {
+      buildNodeLibraryView(paletteNodes, {
         activeCategory,
         keyword,
         commonTypeKeys: [],
       }),
-    [activeCategory, keyword, nodes],
+    [activeCategory, keyword, paletteNodes],
   )
 
   // 按后端 category 字段分组，渲染时每组可独立折叠。
   const groupedNodes = useMemo(() => {
-    const groups: Record<string, NodeTypeRegistry[]> = {}
+    const groups: Record<string, NodePaletteItem[]> = {}
     for (const node of view.filteredNodes) {
       if (!groups[node.category]) groups[node.category] = []
       groups[node.category].push(node)
@@ -130,9 +134,13 @@ export default function NodePanel({ onDragStart }: Props) {
   }, [activeCategory, keyword, visibleCategories])
 
   /** 写入拖拽 payload，画布编辑器的 onDrop 会读取这些字段创建节点。 */
-  const handleNodeDragStart = (event: DragEvent<HTMLDivElement>, node: NodeTypeRegistry) => {
+  const handleNodeDragStart = (event: DragEvent<HTMLDivElement>, node: NodePaletteItem) => {
     event.dataTransfer.setData('application/canvas-node-type', node.typeKey)
     event.dataTransfer.setData('application/canvas-node-category', node.category)
+    event.dataTransfer.setData('application/canvas-node-name', node.typeName)
+    if (node.defaultBizConfig) {
+      event.dataTransfer.setData('application/canvas-node-default-config', JSON.stringify(node.defaultBizConfig))
+    }
     if (node.configSchema) {
       event.dataTransfer.setData('application/canvas-node-config-schema', node.configSchema)
     }
@@ -449,7 +457,7 @@ export default function NodePanel({ onDragStart }: Props) {
                     <div style={{ padding: '10px 14px 14px 14px', display: 'grid', gap: 8 }}>
                       {groupedNodes[category].map((node) => (
                         <NodeLibraryItem
-                          key={node.typeKey}
+                          key={node.paletteKey ?? node.typeKey}
                           node={node}
                           detail={getNodeSummary(node)}
                           categoryColor={color}

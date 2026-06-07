@@ -39,20 +39,41 @@ This converts a filtered opportunity into a bounded medium-term implementation c
 
 - `backend/canvas-engine/src/main/java/org/chovy/canvas/web/DemoSandboxController.java`
 - `backend/canvas-engine/src/main/java/org/chovy/canvas/domain/demo/DemoSandboxService.java`
+- `backend/canvas-engine/src/main/java/org/chovy/canvas/domain/demo/JdbcDemoSandboxRepository.java`
 
 ### Frontend Touchpoints
 
 - `frontend/src/pages/demo-sandbox/index.tsx`
+- `frontend/src/pages/demo-sandbox/demoSandbox.ts`
 - `frontend/src/services/demoSandboxApi.ts`
+- `frontend/src/App.tsx`
+- `frontend/src/components/layout/AppLayout.tsx`
+- `frontend/src/components/accessibility/RouteA11y.tsx`
 
 ### Data And Configuration Touchpoints
 
-- `backend/canvas-engine/src/main/resources/db/migration/V165__sandbox_demo_sales_enablement.sql`
+- `backend/canvas-engine/src/main/resources/db/migration/V269__sandbox_demo_sales_enablement.sql`
+- `docs/product-evolution/runbooks/sandbox-demo-sales-guide.md`
 
 ### Test Touchpoints
 
 - `backend/canvas-engine/src/test/java/org/chovy/canvas/domain/demo/DemoSandboxServiceTest.java`
-- `frontend/src/pages/demo-sandbox/demoSandbox.test.tsx`
+- `backend/canvas-engine/src/test/java/org/chovy/canvas/controller/DemoSandboxControllerTest.java`
+- `frontend/src/pages/demo-sandbox/demoSandbox.test.ts`
+- `frontend/src/pages/demo-sandbox/index.test.tsx`
+- `frontend/src/services/demoSandboxApi.test.ts`
+- `frontend/src/components/layout/AppLayout.a11y.test.tsx`
+
+## Implementation Status
+
+Completed on 2026-06-05.
+
+- Added `V269__sandbox_demo_sales_enablement.sql` for sandbox lifecycle rows, `DEMO_TENANT_*` markers, expiry metadata, reset audit fields, and cleanup indexes. The plan originally named `V165`, but the current workspace already uses later migration versions through `V268`.
+- Added `DemoSandboxService` and `JdbcDemoSandboxRepository` for install, reset, and expired-sandbox lookup with bounded TTL validation.
+- Added authenticated `DemoSandboxController` at `/demo-sandboxes`, guarded by `TenantContextResolver.currentOrError()`; reset audit uses the authenticated username instead of a spoofable header.
+- Added `demoSandboxApi`, frontend helpers, visible `/demo-sandbox` page, main-navigation entry, route announcement text, and empty/loading/error/reset states.
+- Added `docs/product-evolution/runbooks/sandbox-demo-sales-guide.md` with demo boundary, walkthrough, reset command, and rollback sections.
+- Rollout: run `V269__sandbox_demo_sales_enablement.sql`, create sandbox lifecycle rows, and expose demo reset only to authenticated internal users. Rollback: hide the demo sandbox route and keep demo rows marked with `DEMO_TENANT_*` for cleanup.
 
 ## Dependencies
 

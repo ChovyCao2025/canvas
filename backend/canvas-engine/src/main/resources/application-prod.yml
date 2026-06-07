@@ -32,6 +32,27 @@ canvas:
     key: ${CANVAS_SECRET_CIPHER_KEY}
   jwt:
     secret: ${CANVAS_JWT_SECRET}
+  marketing:
+    content:
+      asset-upload:
+        webhook-secret: ${CANVAS_MARKETING_ASSET_UPLOAD_WEBHOOK_SECRET}
+        webhook-tolerance-seconds: ${CANVAS_MARKETING_ASSET_UPLOAD_WEBHOOK_TOLERANCE_SECONDS:300}
+        s3:
+          enabled: ${CANVAS_MARKETING_ASSET_UPLOAD_S3_ENABLED:false}
+          endpoint: ${CANVAS_MARKETING_ASSET_UPLOAD_S3_ENDPOINT:}
+          region: ${CANVAS_MARKETING_ASSET_UPLOAD_S3_REGION:us-east-1}
+          bucket: ${CANVAS_MARKETING_ASSET_UPLOAD_S3_BUCKET:}
+          access-key: ${CANVAS_MARKETING_ASSET_UPLOAD_S3_ACCESS_KEY:}
+          secret-key: ${CANVAS_MARKETING_ASSET_UPLOAD_S3_SECRET_KEY:}
+          key-prefix: ${CANVAS_MARKETING_ASSET_UPLOAD_S3_KEY_PREFIX:}
+          path-style: ${CANVAS_MARKETING_ASSET_UPLOAD_S3_PATH_STYLE:true}
+          public-base-url: ${CANVAS_MARKETING_ASSET_UPLOAD_S3_PUBLIC_BASE_URL:}
+        cleanup:
+          enabled: ${CANVAS_MARKETING_ASSET_UPLOAD_CLEANUP_ENABLED:false}
+          tenant-id: ${CANVAS_MARKETING_ASSET_UPLOAD_CLEANUP_TENANT_ID:0}
+          limit: ${CANVAS_MARKETING_ASSET_UPLOAD_CLEANUP_LIMIT:100}
+          fixed-delay-ms: ${CANVAS_MARKETING_ASSET_UPLOAD_CLEANUP_FIXED_DELAY_MS:60000}
+          actor: ${CANVAS_MARKETING_ASSET_UPLOAD_CLEANUP_ACTOR:asset-upload-cleanup-scheduler}
 
 management:
   endpoints:

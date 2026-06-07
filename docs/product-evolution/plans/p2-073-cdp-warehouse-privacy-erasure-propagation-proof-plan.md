@@ -65,3 +65,12 @@ Run focused tests and warehouse regression. Update this plan with observed evide
 
 - `mvn -s "$tmp_settings" -pl canvas-engine test -Dtest=CdpWarehousePrivacyErasureSchemaTest,CdpWarehousePrivacyErasureServiceTest,CdpWarehouseProductionReadinessProofServiceTest,CdpWarehousePrivacyErasureControllerTest` - PASS, 12 tests.
 - `mvn -s "$tmp_settings" -pl canvas-engine test -Dtest='CdpWarehouse*Test,Doris*Test'` - PASS, 375 tests passed, 1 skipped (`DorisConnectionTest`, real Doris disabled).
+- P2-073 privacy-ledger redaction audit updated on 2026-06-05:
+  `CdpWarehousePrivacyErasureServiceTest.recordAssetProofRedactsRawSubjectCompatibleWithMaskedReference`
+  proves operator-submitted proof/error text is redacted before proof rows, returned views, and request `evidenceJson` can persist masked-reference-compatible raw subjects.
+- Focused OLAP privacy slice passed on 2026-06-05:
+  `CdpWarehousePrivacyErasureExecutionServiceTest,CdpWarehousePrivacyErasureServiceTest,CdpWarehousePrivacyErasureControllerTest,CdpWarehousePrivacyTombstoneServiceTest,CdpWarehousePrivacyAudienceBitmapRebuildServiceTest,CdpWarehousePrivacyAudienceBitmapRebuildAutomationServiceTest,CdpWarehousePrivacyAudienceBitmapRebuildSchedulerTest,CdpWarehousePrivacyAudienceBitmapRebuildAutomationRunServiceTest,CdpWarehousePrivacyAudienceBitmapRebuildAutomationRunSchemaTest,CdpWarehouseProductionReadinessProofServiceTest`
+  - Result: 50 tests, 0 failures.
+- Warehouse/BI/CDP regression passed on 2026-06-05:
+  `CdpWarehouse*Test,CdpAudience*Test,Bi*Test,MarketingBi*Test,Doris*Test,AudienceMaterialization*Test,CdpOlapAudienceSchemaTest,StableUserIndexServiceTest,VersionedAudienceBitmapStoreTest,BehaviorAudienceRuleCompilerTest,AudienceQualityServiceTest,MyBatisAudienceDefinitionRepositoryTest,CdpEventIngestion*Test,CdpUserServiceTest,UserWorkspacePreferenceServiceTest,CanvasControllerCollaborationTest`
+  - Result: 793 tests, 0 failures, 1 skipped (`DorisConnectionTest`).

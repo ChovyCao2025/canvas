@@ -23,7 +23,7 @@ Add provider rate-limit decisions, one-level fallback routing, and cross-canvas 
 - Fallback decision audit records.
 - Cross-canvas dedupe records keyed by tenant, dedupe group, content hash, channel, and user.
 - Integrate `SendMessageHandler`, `CouponHandler`, and `ReachDeliveryService` with policy decisions.
-- Policy schema `V103__channel_provider_policies.sql`.
+- Policy schema `V121__channel_provider_policies.sql`.
 
 ## Out Of Scope
 
@@ -45,3 +45,14 @@ Add provider rate-limit decisions, one-level fallback routing, and cross-canvas 
 - Fallback tests prove route selection, disabled target rejection, cycle rejection, and audit output.
 - Dedupe tests prove duplicate suppression across canvases.
 - Handler regression tests remain green.
+
+## Implementation Status
+
+Completed on 2026-06-05.
+
+- Actual migration is `V121__channel_provider_policies.sql`; earlier migration numbers were already allocated.
+- Provider limit, fallback policy/decision, and dedupe repositories/services are present under `org.chovy.canvas.engine.channel`.
+- `SendMessageHandler` now evaluates connector mode, dedupe, provider backpressure, and one-level fallback before sandbox or real delivery.
+- `ReachDeliveryService` preserves the actual provider in delivery request payloads and outbox-facing request metadata.
+- `CouponHandler` now evaluates coupon dedupe and provider backpressure before calling the coupon service.
+- Full Maven test execution is still blocked by unrelated legacy test compilation issues, so this slice was verified with isolated javac/reflection runners plus production compile; final post-clean backend focused runner coverage was `44/44` across P1-008B/P1-008C and handler regression tests.

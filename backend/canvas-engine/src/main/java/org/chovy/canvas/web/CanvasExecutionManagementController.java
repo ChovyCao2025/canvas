@@ -8,12 +8,14 @@ import org.chovy.canvas.common.R;
 import org.chovy.canvas.dal.dataobject.CanvasManualApprovalDO;
 import org.chovy.canvas.dal.mapper.CanvasManualApprovalMapper;
 import org.chovy.canvas.common.enums.ApprovalStatus;
+import org.chovy.canvas.domain.approval.ApprovalWorkflowService;
 import org.chovy.canvas.domain.notification.NotificationEventService;
 import org.chovy.canvas.engine.trigger.CanvasExecutionService;
 import org.chovy.canvas.infrastructure.redis.ContextPersistenceService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.core.context.ReactiveSecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
@@ -45,6 +47,13 @@ public class CanvasExecutionManagementController {
     private final ObjectMapper objectMapper;
     /** 通知事件服务，用于发送审批结果通知。 */
     private final NotificationEventService notificationEventService;
+    /** 统一审批工作流服务；存在时执行审批决策优先写入统一审批任务。 */
+    private ApprovalWorkflowService approvalWorkflowService;
+
+    @Autowired(required = false)
+    void setApprovalWorkflowService(ApprovalWorkflowService approvalWorkflowService) {
+        this.approvalWorkflowService = approvalWorkflowService;
+    }
 
     /**
      * 人工审批通过（设计文档 18.2节）。
@@ -55,10 +64,10 @@ public class CanvasExecutionManagementController {
      */
     @PostMapping("/{executionId}/approve")
     public Mono<R<Void>> approve(@PathVariable String executionId) {
-        return currentUsername()
-                .flatMap(username ->
-                        Mono.<Void>fromRunnable(() -> resumeWithResult(executionId, ApprovalStatus.APPROVED, username,
-                                        /* watchdog */ false))
+        return currentActor()
+                .flatMap(actor ->
+                        Mono.<Void>fromRunnable(() -> resumeWithResult(executionId, ApprovalStatus.APPROVED, actor,
+                                        null, /* watchdog */ false))
                                 .subscribeOn(Schedulers.boundedElastic())
                                 .thenReturn(R.<Void>ok()));
     }
@@ -73,10 +82,10 @@ public class CanvasExecutionManagementController {
     @PostMapping("/{executionId}/reject")
     public Mono<R<Void>> reject(@PathVariable String executionId,
                                 @RequestParam(required = false) String reason) {
-        return currentUsername()
-                .flatMap(username ->
-                        Mono.<Void>fromRunnable(() -> resumeWithResult(executionId, ApprovalStatus.REJECTED, username,
-                                        /* watchdog */ false))
+        return currentActor()
+                .flatMap(actor ->
+                        Mono.<Void>fromRunnable(() -> resumeWithResult(executionId, ApprovalStatus.REJECTED, actor,
+                                        reason, /* watchdog */ false))
                                 .subscribeOn(Schedulers.boundedElastic())
                                 .thenReturn(R.<Void>ok()));
     }
@@ -94,8 +103,23 @@ public class CanvasExecutionManagementController {
      */
 // ── private ──────────────────────────────────────────────────
 
-    private void resumeWithResult(String executionId, String result, String approver,
-                                  boolean isWatchdog) {
+    private void resumeWithResult(String executionId, String result, RuntimeActor actor,
+                                  String comment, boolean isWatchdog) {
+        String approver = actor == null ? "system" : actor.username();
+        if (!isWatchdog && approvalWorkflowService != null) {
+            var decided = approvalWorkflowService.decideTargetTask(
+                    actor == null ? 0L : actor.tenantId(),
+                    "EXECUTION_NODE",
+                    executionId,
+                    approver,
+                    actor == null ? null : actor.role(),
+                    comment,
+                    ApprovalStatus.APPROVED.equals(result));
+            if (decided != null) {
+                log.info("[APPROVAL] 统一审批任务已处理 executionId={} result={}", executionId, result);
+                return;
+            }
+        }
         // 只查 PENDING 记录，审批结果一旦落库后重复请求会自然变成幂等 no-op。
         CanvasManualApprovalDO approval = approvalMapper.selectList(
                         new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<CanvasManualApprovalDO>()
@@ -146,11 +170,35 @@ public class CanvasExecutionManagementController {
     /**
      * 从 JWT SecurityContext 获取当前登录用户名
      */
-    private Mono<String> currentUsername() {
+    private Mono<RuntimeActor> currentActor() {
         return ReactiveSecurityContextHolder.getContext()
                 .map(ctx -> ctx.getAuthentication().getPrincipal())
                 .cast(Claims.class)
-                .map(c -> c.get("username", String.class))
-                .defaultIfEmpty("system");
+                .map(c -> new RuntimeActor(
+                        readLong(c.get("tenantId")),
+                        c.get("role", String.class),
+                        defaultIfBlank(c.get("username", String.class), "system")))
+                .defaultIfEmpty(new RuntimeActor(0L, null, "system"));
+    }
+
+    private Long readLong(Object value) {
+        if (value instanceof Number number) {
+            return number.longValue();
+        }
+        if (value == null || String.valueOf(value).isBlank()) {
+            return 0L;
+        }
+        try {
+            return Long.valueOf(String.valueOf(value));
+        } catch (NumberFormatException ignored) {
+            return 0L;
+        }
+    }
+
+    private String defaultIfBlank(String value, String fallback) {
+        return value == null || value.isBlank() ? fallback : value.trim();
+    }
+
+    private record RuntimeActor(Long tenantId, String role, String username) {
     }
 }

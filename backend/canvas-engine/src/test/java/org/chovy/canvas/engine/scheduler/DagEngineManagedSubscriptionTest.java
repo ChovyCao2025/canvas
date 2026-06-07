@@ -14,7 +14,10 @@ class DagEngineManagedSubscriptionTest {
         String source = Files.readString(Path.of(
                 "src/main/java/org/chovy/canvas/engine/scheduler/DagEngine.java"));
 
-        assertThat(source).contains("BackgroundSubscriptionRegistry");
+        assertThat(source)
+                .satisfiesAnyOf(
+                        s -> assertThat(s).contains("BackgroundSubscriptionRegistry"),
+                        s -> assertThat(s).contains("TrackedReactiveTaskRegistry"));
         assertThat(source).doesNotContain(".subscribe(");
     }
 }

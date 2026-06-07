@@ -17,6 +17,7 @@ public interface CdpWarehouseSyntheticDataPathProbeRunMapper
     @Update("""
             UPDATE cdp_warehouse_synthetic_data_path_probe_run
             SET status = #{row.status},
+                source_status = #{row.sourceStatus},
                 sink_status = #{row.sinkStatus},
                 ods_status = #{row.odsStatus},
                 ods_row_count = #{row.odsRowCount},
@@ -31,7 +32,7 @@ public interface CdpWarehouseSyntheticDataPathProbeRunMapper
 
     @Select("""
             SELECT id, tenant_id, probe_key, message_id, event_code, user_id, strict_mode,
-                   status, sink_status, ods_status, ods_row_count, started_at, finished_at,
+                   source_mode, status, source_status, sink_status, ods_status, ods_row_count, started_at, finished_at,
                    error_message, evidence_json, created_at, updated_at
             FROM cdp_warehouse_synthetic_data_path_probe_run
             WHERE tenant_id = #{tenantId}

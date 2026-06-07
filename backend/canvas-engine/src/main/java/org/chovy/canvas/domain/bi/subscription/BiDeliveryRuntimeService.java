@@ -880,8 +880,12 @@ public class BiDeliveryRuntimeService {
         double minDeltaPercent = doubleConfig(condition, 0.0, "minDeltaPercent", "deltaPercent");
         minDeltaPercent = Math.max(0.0, minDeltaPercent);
         String direction = anomalyDirection(condition);
+        String model = anomalyModel(condition);
+        int comparisonWindow = intConfig(condition, 1, "comparisonWindow", "recentWindow", "currentWindow");
+        comparisonWindow = Math.max(1, Math.min(comparisonWindow, 50));
+        int historyLimit = anomalyHistoryLimit(condition, model, baselineWindow, comparisonWindow);
 
-        List<Double> samples = safeList(deliveryLogMapper.selectList(new LambdaQueryWrapper<BiDeliveryLogDO>()
+        List<BiDeliveryLogDO> history = safeList(deliveryLogMapper.selectList(new LambdaQueryWrapper<BiDeliveryLogDO>()
                         .eq(BiDeliveryLogDO::getTenantId, tenantId)
                         .eq(BiDeliveryLogDO::getJobType, JOB_ALERT)
                         .eq(BiDeliveryLogDO::getJobId, alert.getId())
@@ -889,14 +893,41 @@ public class BiDeliveryRuntimeService {
                         .isNotNull(BiDeliveryLogDO::getMetricValue)
                         .orderByDesc(BiDeliveryLogDO::getCreatedAt)
                         .orderByDesc(BiDeliveryLogDO::getId)
-                        .last("LIMIT " + baselineWindow)))
+                        .last("LIMIT " + historyLimit)));
+        List<Double> samples = history
                 .stream()
                 .map(BiDeliveryLogDO::getMetricValue)
                 .filter(metricValue -> metricValue != null)
                 .map(BigDecimal::doubleValue)
                 .toList();
+        if ("MOVING_AVERAGE".equals(model)) {
+            return evaluateMovingAverageAnomaly(
+                    value,
+                    direction,
+                    baselineWindow,
+                    minSamples,
+                    sensitivity,
+                    minDelta,
+                    minDeltaPercent,
+                    comparisonWindow,
+                    samples,
+                    condition);
+        }
+        if ("PERIOD_OVER_PERIOD".equals(model)) {
+            return evaluatePeriodOverPeriodAnomaly(
+                    value,
+                    direction,
+                    baselineWindow,
+                    minSamples,
+                    sensitivity,
+                    minDelta,
+                    minDeltaPercent,
+                    history,
+                    condition);
+        }
         if (samples.size() < minSamples) {
             return new AnomalyEvaluation(false, true, anomalyPayload(
+                    "POINT",
                     value,
                     direction,
                     samples.size(),
@@ -908,16 +939,16 @@ public class BiDeliveryRuntimeService {
                     null,
                     null,
                     null,
+                    null,
+                    null,
+                    null,
+                    null,
                     false,
                     true));
         }
 
-        double average = samples.stream().mapToDouble(Double::doubleValue).average().orElse(0.0);
-        double variance = samples.stream()
-                .mapToDouble(sample -> Math.pow(sample - average, 2))
-                .average()
-                .orElse(0.0);
-        double standardDeviation = Math.sqrt(variance);
+        double average = average(samples);
+        double standardDeviation = standardDeviation(samples, average);
         double current = value == null ? 0.0 : value.doubleValue();
         double delta = current - average;
         double absoluteDelta = Math.abs(delta);
@@ -932,12 +963,17 @@ public class BiDeliveryRuntimeService {
                 && absoluteDelta >= threshold
                 && deltaPercent >= minDeltaPercent;
         return new AnomalyEvaluation(matched, false, anomalyPayload(
+                "POINT",
                 value,
                 direction,
                 samples.size(),
                 baselineWindow,
                 minSamples,
                 sensitivity,
+                null,
+                null,
+                null,
+                null,
                 average,
                 standardDeviation,
                 delta,
@@ -945,6 +981,200 @@ public class BiDeliveryRuntimeService {
                 threshold,
                 matched,
                 false));
+    }
+
+    private int anomalyHistoryLimit(Map<String, Object> condition,
+                                    String model,
+                                    int baselineWindow,
+                                    int comparisonWindow) {
+        if ("MOVING_AVERAGE".equals(model)) {
+            return Math.min(100, baselineWindow + comparisonWindow - 1);
+        }
+        if ("PERIOD_OVER_PERIOD".equals(model)) {
+            int configured = intConfig(condition, 100, "historyLimit", "calendarHistoryLimit", "periodHistoryLimit");
+            return Math.max(baselineWindow, Math.min(configured, 200));
+        }
+        return baselineWindow;
+    }
+
+    private AnomalyEvaluation evaluateMovingAverageAnomaly(BigDecimal value,
+                                                           String direction,
+                                                           int baselineWindow,
+                                                           int minSamples,
+                                                           double sensitivity,
+                                                           double minDelta,
+                                                           double minDeltaPercent,
+                                                           int comparisonWindow,
+                                                           List<Double> samples,
+                                                           Map<String, Object> condition) {
+        int minComparisonSamples = intConfig(condition, comparisonWindow, "minComparisonSamples", "minimumComparisonSamples");
+        minComparisonSamples = Math.max(1, Math.min(minComparisonSamples, comparisonWindow));
+        List<Double> comparisonSamples = new ArrayList<>();
+        comparisonSamples.add(value == null ? 0.0 : value.doubleValue());
+        int recentHistoryCount = Math.min(Math.max(0, comparisonWindow - 1), samples.size());
+        comparisonSamples.addAll(samples.subList(0, recentHistoryCount));
+        int baselineStart = recentHistoryCount;
+        int baselineEnd = Math.min(samples.size(), baselineStart + baselineWindow);
+        List<Double> baselineSamples = baselineStart >= baselineEnd
+                ? List.of()
+                : samples.subList(baselineStart, baselineEnd);
+        if (baselineSamples.size() < minSamples || comparisonSamples.size() < minComparisonSamples) {
+            return new AnomalyEvaluation(false, true, anomalyPayload(
+                    "MOVING_AVERAGE",
+                    value,
+                    direction,
+                    baselineSamples.size(),
+                    baselineWindow,
+                    minSamples,
+                    sensitivity,
+                    comparisonWindow,
+                    comparisonSamples.size(),
+                    minComparisonSamples,
+                    comparisonSamples.isEmpty() ? null : average(comparisonSamples),
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    false,
+                    true));
+        }
+        double baselineAverage = average(baselineSamples);
+        double standardDeviation = standardDeviation(baselineSamples, baselineAverage);
+        double comparisonAverage = average(comparisonSamples);
+        double delta = comparisonAverage - baselineAverage;
+        double absoluteDelta = Math.abs(delta);
+        double deltaPercent = baselineAverage == 0.0 ? absoluteDelta : absoluteDelta / Math.abs(baselineAverage);
+        double threshold = Math.max(minDelta, standardDeviation * sensitivity);
+        boolean directionMatches = switch (direction) {
+            case "DROP" -> delta < 0;
+            case "RISE" -> delta > 0;
+            default -> delta != 0;
+        };
+        boolean matched = directionMatches
+                && absoluteDelta >= threshold
+                && deltaPercent >= minDeltaPercent;
+        return new AnomalyEvaluation(matched, false, anomalyPayload(
+                "MOVING_AVERAGE",
+                value,
+                direction,
+                baselineSamples.size(),
+                baselineWindow,
+                minSamples,
+                sensitivity,
+                comparisonWindow,
+                comparisonSamples.size(),
+                minComparisonSamples,
+                comparisonAverage,
+                baselineAverage,
+                standardDeviation,
+                delta,
+                deltaPercent,
+                threshold,
+                matched,
+                false));
+    }
+
+    private AnomalyEvaluation evaluatePeriodOverPeriodAnomaly(BigDecimal value,
+                                                              String direction,
+                                                              int baselineWindow,
+                                                              int minSamples,
+                                                              double sensitivity,
+                                                              double minDelta,
+                                                              double minDeltaPercent,
+                                                              List<BiDeliveryLogDO> history,
+                                                              Map<String, Object> condition) {
+        String period = anomalyPeriod(condition);
+        int calendarWindowHours = intConfig(condition, 24,
+                "calendarWindowHours", "periodWindowHours", "periodToleranceHours", "toleranceHours");
+        calendarWindowHours = Math.max(1, Math.min(calendarWindowHours, 24 * 370));
+        PeriodTargetWindow targetWindow = periodTargetWindow(LocalDateTime.now(), period, calendarWindowHours, condition);
+        List<Double> baselineSamples = history.stream()
+                .filter(row -> row.getCreatedAt() != null)
+                .filter(row -> !row.getCreatedAt().isBefore(targetWindow.start())
+                        && !row.getCreatedAt().isAfter(targetWindow.end()))
+                .map(BiDeliveryLogDO::getMetricValue)
+                .filter(metricValue -> metricValue != null)
+                .limit(baselineWindow)
+                .map(BigDecimal::doubleValue)
+                .toList();
+        if (baselineSamples.size() < minSamples) {
+            Map<String, Object> payload = anomalyPayload(
+                    "PERIOD_OVER_PERIOD",
+                    value,
+                    direction,
+                    baselineSamples.size(),
+                    baselineWindow,
+                    minSamples,
+                    sensitivity,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    false,
+                    true);
+            addPeriodPayload(payload, period, calendarWindowHours, targetWindow);
+            return new AnomalyEvaluation(false, true, payload);
+        }
+        double baselineAverage = average(baselineSamples);
+        double standardDeviation = standardDeviation(baselineSamples, baselineAverage);
+        double current = value == null ? 0.0 : value.doubleValue();
+        double delta = current - baselineAverage;
+        double absoluteDelta = Math.abs(delta);
+        double deltaPercent = baselineAverage == 0.0 ? absoluteDelta : absoluteDelta / Math.abs(baselineAverage);
+        double threshold = Math.max(minDelta, standardDeviation * sensitivity);
+        boolean directionMatches = switch (direction) {
+            case "DROP" -> delta < 0;
+            case "RISE" -> delta > 0;
+            default -> delta != 0;
+        };
+        boolean matched = directionMatches
+                && absoluteDelta >= threshold
+                && deltaPercent >= minDeltaPercent;
+        Map<String, Object> payload = anomalyPayload(
+                "PERIOD_OVER_PERIOD",
+                value,
+                direction,
+                baselineSamples.size(),
+                baselineWindow,
+                minSamples,
+                sensitivity,
+                null,
+                null,
+                null,
+                null,
+                baselineAverage,
+                standardDeviation,
+                delta,
+                deltaPercent,
+                threshold,
+                matched,
+                false);
+        addPeriodPayload(payload, period, calendarWindowHours, targetWindow);
+        return new AnomalyEvaluation(matched, false, payload);
+    }
+
+    private void addPeriodPayload(Map<String, Object> payload,
+                                  String period,
+                                  int calendarWindowHours,
+                                  PeriodTargetWindow targetWindow) {
+        payload.put("period", period);
+        payload.put("calendarWindowHours", calendarWindowHours);
+        payload.put("targetWindowStart", targetWindow.start().toString());
+        payload.put("targetWindowEnd", targetWindow.end().toString());
+        payload.put("naturalBoundary", targetWindow.naturalBoundary());
+        payload.put("holidayAdjusted", targetWindow.holidayAdjusted());
+        if (targetWindow.holidayComparisonDate() != null) {
+            payload.put("holidayComparisonDate", targetWindow.holidayComparisonDate());
+        }
+        if (targetWindow.holidayName() != null) {
+            payload.put("holidayName", targetWindow.holidayName());
+        }
     }
 
     private Map<String, Object> anomalyPayload(BigDecimal value,
@@ -960,13 +1190,58 @@ public class BiDeliveryRuntimeService {
                                                Double threshold,
                                                boolean matched,
                                                boolean insufficientBaseline) {
+        return anomalyPayload(
+                "POINT",
+                value,
+                direction,
+                sampleCount,
+                baselineWindow,
+                minSamples,
+                sensitivity,
+                null,
+                null,
+                null,
+                null,
+                baselineAverage,
+                standardDeviation,
+                delta,
+                deltaPercent,
+                threshold,
+                matched,
+                insufficientBaseline);
+    }
+
+    private Map<String, Object> anomalyPayload(String model,
+                                               BigDecimal value,
+                                               String direction,
+                                               int sampleCount,
+                                               int baselineWindow,
+                                               int minSamples,
+                                               double sensitivity,
+                                               Integer comparisonWindow,
+                                               Integer comparisonSampleCount,
+                                               Integer minComparisonSamples,
+                                               Double comparisonAverage,
+                                               Double baselineAverage,
+                                               Double standardDeviation,
+                                               Double delta,
+                                               Double deltaPercent,
+                                               Double threshold,
+                                               boolean matched,
+                                               boolean insufficientBaseline) {
         Map<String, Object> payload = new LinkedHashMap<>();
         payload.put("type", "ANOMALY");
+        payload.put("model", model);
         payload.put("direction", direction);
         payload.put("sampleCount", sampleCount);
+        payload.put("baselineSampleCount", sampleCount);
         payload.put("baselineWindow", baselineWindow);
         payload.put("minSamples", minSamples);
         payload.put("sensitivity", sensitivity);
+        payload.put("comparisonWindow", comparisonWindow);
+        payload.put("comparisonSampleCount", comparisonSampleCount);
+        payload.put("minComparisonSamples", minComparisonSamples);
+        payload.put("comparisonAverage", comparisonAverage);
         payload.put("currentValue", value);
         payload.put("baselineAverage", baselineAverage);
         payload.put("standardDeviation", standardDeviation);
@@ -978,6 +1253,18 @@ public class BiDeliveryRuntimeService {
         return payload;
     }
 
+    private double average(List<Double> values) {
+        return values.stream().mapToDouble(Double::doubleValue).average().orElse(0.0);
+    }
+
+    private double standardDeviation(List<Double> values, double average) {
+        double variance = values.stream()
+                .mapToDouble(sample -> Math.pow(sample - average, 2))
+                .average()
+                .orElse(0.0);
+        return Math.sqrt(variance);
+    }
+
     private boolean isAnomalyCondition(Map<String, Object> condition) {
         if (condition == null || condition.isEmpty()) {
             return false;
@@ -987,6 +1274,132 @@ public class BiDeliveryRuntimeService {
                 .trim()
                 .toUpperCase(Locale.ROOT);
         return operator.startsWith("ANOMALY") || "ANOMALY".equals(mode);
+    }
+
+    private String anomalyModel(Map<String, Object> condition) {
+        String model = String.valueOf(firstValue(condition, "model", "windowModel", "anomalyModel"))
+                .trim()
+                .toUpperCase(Locale.ROOT);
+        return switch (model) {
+            case "MOVING_AVERAGE", "MOVING_AVG", "ROLLING_AVERAGE", "ROLLING_AVG", "RECENT_AVERAGE" -> "MOVING_AVERAGE";
+            case "PERIOD_OVER_PERIOD", "PERIOD", "CALENDAR", "CALENDAR_WINDOW", "DOD", "WOW", "MOM", "YOY",
+                    "DAY_OVER_DAY", "WEEK_OVER_WEEK", "MONTH_OVER_MONTH", "YEAR_OVER_YEAR" -> "PERIOD_OVER_PERIOD";
+            default -> "POINT";
+        };
+    }
+
+    private String anomalyPeriod(Map<String, Object> condition) {
+        String period = String.valueOf(firstValue(condition, "period", "calendarPeriod", "comparePeriod", "periodType"))
+                .trim()
+                .toUpperCase(Locale.ROOT);
+        if (period.isBlank()) {
+            period = String.valueOf(firstValue(condition, "model", "windowModel", "anomalyModel"))
+                    .trim()
+                    .toUpperCase(Locale.ROOT);
+        }
+        return switch (period) {
+            case "DOD", "DAY", "DAILY", "DAY_OVER_DAY" -> "DAY_OVER_DAY";
+            case "WOW", "WEEK", "WEEKLY", "WEEK_OVER_WEEK" -> "WEEK_OVER_WEEK";
+            case "MOM", "MONTH", "MONTHLY", "MONTH_OVER_MONTH" -> "MONTH_OVER_MONTH";
+            case "YOY", "YEAR", "YEARLY", "YEAR_OVER_YEAR" -> "YEAR_OVER_YEAR";
+            default -> "DAY_OVER_DAY";
+        };
+    }
+
+    private LocalDateTime periodTarget(LocalDateTime now, String period) {
+        LocalDateTime evaluatedAt = now == null ? LocalDateTime.now() : now;
+        return switch (period) {
+            case "WEEK_OVER_WEEK" -> evaluatedAt.minusWeeks(1);
+            case "MONTH_OVER_MONTH" -> evaluatedAt.minusMonths(1);
+            case "YEAR_OVER_YEAR" -> evaluatedAt.minusYears(1);
+            default -> evaluatedAt.minusDays(1);
+        };
+    }
+
+    private PeriodTargetWindow periodTargetWindow(LocalDateTime now,
+                                                  String period,
+                                                  int calendarWindowHours,
+                                                  Map<String, Object> condition) {
+        LocalDateTime evaluatedAt = now == null ? LocalDateTime.now() : now;
+        HolidayComparison holiday = holidayComparison(evaluatedAt.toLocalDate(), condition);
+        if (holiday.comparisonDate() != null) {
+            int holidayWindowDays = intConfig(condition, 1,
+                    "holidayWindowDays", "holidayDurationDays", "holidayCalendarWindowDays");
+            holidayWindowDays = Math.max(1, Math.min(holidayWindowDays, 31));
+            LocalDateTime start = holiday.comparisonDate().atStartOfDay();
+            LocalDateTime end = start.plusDays(holidayWindowDays).minusNanos(1);
+            return new PeriodTargetWindow(
+                    start,
+                    end,
+                    true,
+                    true,
+                    holiday.comparisonDate().toString(),
+                    blankToNull(holiday.name()));
+        }
+        if (booleanConfig(condition,
+                "naturalBoundary", "alignNaturalBoundary", "alignToNaturalBoundary",
+                "calendarBoundary", "naturalPeriodBoundary")) {
+            return naturalPeriodTargetWindow(evaluatedAt, period);
+        }
+        LocalDateTime target = periodTarget(evaluatedAt, period);
+        return new PeriodTargetWindow(
+                target.minusHours(calendarWindowHours),
+                target.plusHours(calendarWindowHours),
+                false,
+                false,
+                null,
+                null);
+    }
+
+    private PeriodTargetWindow naturalPeriodTargetWindow(LocalDateTime evaluatedAt, String period) {
+        LocalDate currentDate = (evaluatedAt == null ? LocalDateTime.now() : evaluatedAt).toLocalDate();
+        LocalDateTime start = switch (period) {
+            case "WEEK_OVER_WEEK" -> currentDate
+                    .minusDays(currentDate.getDayOfWeek().getValue() - 1L)
+                    .minusWeeks(1)
+                    .atStartOfDay();
+            case "MONTH_OVER_MONTH" -> currentDate
+                    .withDayOfMonth(1)
+                    .minusMonths(1)
+                    .atStartOfDay();
+            case "YEAR_OVER_YEAR" -> LocalDate
+                    .of(currentDate.getYear() - 1, 1, 1)
+                    .atStartOfDay();
+            default -> currentDate.minusDays(1).atStartOfDay();
+        };
+        LocalDateTime end = switch (period) {
+            case "WEEK_OVER_WEEK" -> start.plusWeeks(1).minusNanos(1);
+            case "MONTH_OVER_MONTH" -> start.plusMonths(1).minusNanos(1);
+            case "YEAR_OVER_YEAR" -> start.plusYears(1).minusNanos(1);
+            default -> start.plusDays(1).minusNanos(1);
+        };
+        return new PeriodTargetWindow(start, end, true, false, null, null);
+    }
+
+    private HolidayComparison holidayComparison(LocalDate currentDate, Map<String, Object> condition) {
+        Object direct = firstValue(condition,
+                "holidayComparisonDate", "holidayBaselineDate", "holidayTargetDate", "holidayDate");
+        LocalDate directDate = parseDate(direct);
+        String directName = stringValue(firstValue(condition, "holidayName", "holiday"));
+        if (directDate != null) {
+            return new HolidayComparison(directDate, directName);
+        }
+        Object configured = firstValue(condition, "holidayComparisons", "holidayCalendar", "holidayMap");
+        if (!(configured instanceof Map<?, ?> rawMap) || rawMap.isEmpty()) {
+            return new HolidayComparison(null, null);
+        }
+        String currentKey = currentDate == null ? LocalDate.now().toString() : currentDate.toString();
+        Object entry = rawMap.get(currentKey);
+        if (entry == null) {
+            entry = rawMap.get("default");
+        }
+        if (entry instanceof Map<?, ?> entryMap) {
+            LocalDate date = parseDate(firstMapValue(entryMap,
+                    "comparisonDate", "baselineDate", "targetDate", "date"));
+            String name = stringValue(firstMapValue(entryMap, "name", "holidayName", "holiday"));
+            return new HolidayComparison(date, name.isBlank() ? directName : name);
+        }
+        return new HolidayComparison(parseDate(entry), directName);
     }
 
     private String anomalyDirection(Map<String, Object> condition) {
@@ -1052,6 +1465,59 @@ public class BiDeliveryRuntimeService {
             }
         }
         return null;
+    }
+
+    private Object firstMapValue(Map<?, ?> map, String... keys) {
+        if (map == null || keys == null) {
+            return null;
+        }
+        for (String key : keys) {
+            if (map.containsKey(key)) {
+                return map.get(key);
+            }
+        }
+        return null;
+    }
+
+    private boolean booleanConfig(Map<String, Object> condition, String... keys) {
+        Object value = firstValue(condition, keys);
+        if (value instanceof Boolean bool) {
+            return bool;
+        }
+        if (value instanceof Number number) {
+            return number.intValue() != 0;
+        }
+        String text = stringValue(value);
+        return "true".equalsIgnoreCase(text)
+                || "yes".equalsIgnoreCase(text)
+                || "y".equalsIgnoreCase(text)
+                || "1".equals(text)
+                || "natural".equalsIgnoreCase(text)
+                || "calendar".equalsIgnoreCase(text);
+    }
+
+    private LocalDate parseDate(Object value) {
+        String text = stringValue(value);
+        if (text.isBlank()) {
+            return null;
+        }
+        try {
+            return LocalDate.parse(text);
+        } catch (DateTimeParseException ignored) {
+            try {
+                return LocalDateTime.parse(text).toLocalDate();
+            } catch (DateTimeParseException ignoredAgain) {
+                return null;
+            }
+        }
+    }
+
+    private String stringValue(Object value) {
+        return value == null ? "" : String.valueOf(value).trim();
+    }
+
+    private String blankToNull(String value) {
+        return value == null || value.isBlank() ? null : value;
     }
 
     private BiDeliveryLogDO insertLog(Long tenantId,
@@ -1179,9 +1645,22 @@ public class BiDeliveryRuntimeService {
     }
 
     private Map<String, Object> payload(String message, String title, Map<String, Object> extra) {
-        return extra == null
-                ? Map.of("title", title, "message", message, "url", "/bi")
-                : Map.of("title", title, "message", message, "url", "/bi", "extra", extra);
+        Map<String, Object> payload = new LinkedHashMap<>();
+        payload.put("title", title);
+        payload.put("message", message);
+        payload.put("url", payloadUrl(extra));
+        if (extra != null) {
+            payload.put("extra", extra);
+        }
+        return payload;
+    }
+
+    private String payloadUrl(Map<String, Object> extra) {
+        if (extra == null) {
+            return "/bi";
+        }
+        Object url = extra.get("url");
+        return url == null || String.valueOf(url).isBlank() ? "/bi" : String.valueOf(url);
     }
 
     private List<Map<String, Object>> attachmentPayload(List<BiDeliveryAttachmentView> attachments) {
@@ -1260,7 +1739,7 @@ public class BiDeliveryRuntimeService {
     }
 
     private String resourceUrl(String resourceType, Long resourceId) {
-        return "/bi?resourceType=" + resourceType + "&resourceId=" + resourceId;
+        return BiDeliveryResourceUrls.workbenchUrl(resourceType, resourceId);
     }
 
     private Map<String, Object> map(String json) {
@@ -1352,6 +1831,22 @@ public class BiDeliveryRuntimeService {
         private static boolean inApp(String channel) {
             return "IN_APP".equals(channel) || "NOTIFICATION".equals(channel) || "MESSAGE_CENTER".equals(channel);
         }
+    }
+
+    private record PeriodTargetWindow(
+            LocalDateTime start,
+            LocalDateTime end,
+            boolean naturalBoundary,
+            boolean holidayAdjusted,
+            String holidayComparisonDate,
+            String holidayName
+    ) {
+    }
+
+    private record HolidayComparison(
+            LocalDate comparisonDate,
+            String name
+    ) {
     }
 
     private record AlertEvaluation(

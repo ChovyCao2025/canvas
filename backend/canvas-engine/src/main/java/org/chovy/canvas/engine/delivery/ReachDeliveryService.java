@@ -6,6 +6,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.chovy.canvas.common.MapFieldKeys;
 import org.chovy.canvas.dal.dataobject.MessageSendRecordDO;
 import org.chovy.canvas.dal.mapper.MessageSendRecordMapper;
+import org.chovy.canvas.engine.channel.ChannelConnector;
+import org.chovy.canvas.engine.channel.ChannelConnectorRegistry;
 import org.chovy.canvas.engine.policy.MarketingPolicyService;
 import org.chovy.canvas.engine.policy.MarketingPolicyService.PolicyDecision;
 import org.chovy.canvas.infrastructure.http.ExternalHttpClient;
@@ -18,6 +20,7 @@ import reactor.core.scheduler.Schedulers;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.LinkedHashMap;
+import java.util.Locale;
 import java.util.Map;
 
 /**
@@ -40,6 +43,8 @@ public class ReachDeliveryService {
     private final DeliveryOutboxService outboxService;
     /** Marketing policy boundary. Null only for legacy/unit-test construction. */
     private final MarketingPolicyService policyService;
+    /** Optional connector registry used by outbox dispatch to call provider-specific connectors. */
+    private final ChannelConnectorRegistry connectorRegistry;
 
     /** 初始化触达投递依赖，并按配置创建外部触达平台客户端。 */
     @Autowired
@@ -48,13 +53,15 @@ public class ReachDeliveryService {
             ObjectMapper objectMapper,
             ExternalHttpClient externalHttpClient,
             ObjectProvider<DeliveryOutboxService> outboxServiceProvider,
-            ObjectProvider<MarketingPolicyService> policyServiceProvider
+            ObjectProvider<MarketingPolicyService> policyServiceProvider,
+            ObjectProvider<ChannelConnectorRegistry> connectorRegistryProvider
     ) {
         this.recordMapper = recordMapper;
         this.objectMapper = objectMapper;
         this.externalHttpClient = externalHttpClient;
         this.outboxService = outboxServiceProvider == null ? null : outboxServiceProvider.getIfAvailable();
         this.policyService = policyServiceProvider == null ? null : policyServiceProvider.getIfAvailable();
+        this.connectorRegistry = connectorRegistryProvider == null ? null : connectorRegistryProvider.getIfAvailable();
     }
 
     /** 初始化触达投递依赖，并按配置创建外部触达平台客户端。 */
@@ -63,7 +70,7 @@ public class ReachDeliveryService {
             ObjectMapper objectMapper,
             ExternalHttpClient externalHttpClient
     ) {
-        this(recordMapper, objectMapper, externalHttpClient, null, null);
+        this(recordMapper, objectMapper, externalHttpClient, null, null, null);
     }
 
     /** 初始化触达投递依赖，并显式传入策略服务，便于 focused tests 覆盖直发路径。 */
@@ -78,6 +85,22 @@ public class ReachDeliveryService {
         this.externalHttpClient = externalHttpClient;
         this.outboxService = null;
         this.policyService = policyService;
+        this.connectorRegistry = null;
+    }
+
+    /** 初始化触达投递依赖，并显式传入连接器注册表，便于 outbox 派发 focused tests。 */
+    public ReachDeliveryService(
+            MessageSendRecordMapper recordMapper,
+            ObjectMapper objectMapper,
+            ExternalHttpClient externalHttpClient,
+            ChannelConnectorRegistry connectorRegistry
+    ) {
+        this.recordMapper = recordMapper;
+        this.objectMapper = objectMapper;
+        this.externalHttpClient = externalHttpClient;
+        this.outboxService = null;
+        this.policyService = null;
+        this.connectorRegistry = connectorRegistry;
     }
 
     /** 执行触达投递并写入发送记录。 */
@@ -153,8 +176,53 @@ public class ReachDeliveryService {
     /** 调用外部触达平台发送消息并返回渠道响应。 */
     @SuppressWarnings("unchecked")
     public Mono<Map<String, Object>> dispatchToProvider(DeliveryOutboxDO outbox) {
-        Map<String, Object> payload = outboxService == null ? Map.of() : outboxService.payloadAsMap(outbox);
+        Map<String, Object> payload = payloadAsMap(outbox);
+        ChannelConnector connector = resolveConnector(outbox);
+        if (connector != null) {
+            return Mono.fromCallable(() -> dispatchToConnector(outbox, payload, connector))
+                    .subscribeOn(Schedulers.boundedElastic());
+        }
         return callReachPlatform(payload);
+    }
+
+    private ChannelConnector resolveConnector(DeliveryOutboxDO outbox) {
+        if (connectorRegistry == null || outbox == null) {
+            return null;
+        }
+        ChannelConnector connector = connectorRegistry.resolve(outbox.getTenantId(), outbox.getChannel(), outbox.getProvider());
+        if (connector == null || connector.mode() == ChannelConnector.ConnectorMode.DISABLED) {
+            return null;
+        }
+        return connector;
+    }
+
+    private Map<String, Object> dispatchToConnector(DeliveryOutboxDO outbox,
+                                                    Map<String, Object> payload,
+                                                    ChannelConnector connector) {
+        ChannelConnector.ConnectorSendResult result = connector.send(new ChannelConnector.ConnectorSendRequest(
+                outbox.getTenantId(),
+                outbox.getChannel(),
+                outbox.getProvider(),
+                outbox.getUserId(),
+                payload));
+        if (!result.accepted()) {
+            String reason = result.reason() == null || result.reason().isBlank()
+                    ? "connector send failed: " + result.status()
+                    : result.reason();
+            throw new IllegalStateException(reason);
+        }
+        Map<String, Object> response = new LinkedHashMap<>();
+        if (result.externalMessageId() != null) {
+            response.put(MapFieldKeys.MESSAGE_ID, result.externalMessageId());
+            response.put("externalMessageId", result.externalMessageId());
+        }
+        if (result.status() != null) {
+            response.put("connectorStatus", result.status());
+        }
+        if (result.reason() != null) {
+            response.put("connectorReason", result.reason());
+        }
+        return response;
     }
 
     private Mono<Map<String, Object>> callReachPlatform(Map<String, Object> payload) {
@@ -262,6 +330,26 @@ public class ReachDeliveryService {
             String idempotencyKey,
             PolicyOptions policyOptions
     ) {
+        return request(tenantId, executionId, canvasId, userId, nodeId, channel, "REACH",
+                templateId, content, variables, idempotencyKey, policyOptions);
+    }
+
+    /** 构造标准化触达投递请求，并保留实际渠道供应商，供 outbox、回执和审计使用。 */
+    public DeliveryRequest request(
+            Long tenantId,
+            String executionId,
+            Long canvasId,
+            String userId,
+            String nodeId,
+            String channel,
+            String provider,
+            String templateId,
+            Map<String, Object> content,
+            Map<String, Object> variables,
+            String idempotencyKey,
+            PolicyOptions policyOptions
+    ) {
+        String normalizedProvider = normalizeProvider(provider);
         Map<String, Object> payload = new LinkedHashMap<>();
         // LinkedHashMap 让序列化后的请求字段顺序稳定，便于日志比对和问题排查。
         payload.put(MapFieldKeys.CHANNEL, channel);
@@ -270,8 +358,8 @@ public class ReachDeliveryService {
         payload.put(MapFieldKeys.CONTENT, content == null ? Map.of() : content);
         payload.put(MapFieldKeys.VARIABLES, variables == null ? Map.of() : variables);
         payload.put(MapFieldKeys.IDEMPOTENCY_KEY, idempotencyKey);
-        payload.put("provider", "REACH");
-        return new DeliveryRequest(tenantId, executionId, canvasId, userId, nodeId, channel, "REACH",
+        payload.put("provider", normalizedProvider);
+        return new DeliveryRequest(tenantId, executionId, canvasId, userId, nodeId, channel, normalizedProvider,
                 templateId, payload, idempotencyKey, policyOptions);
     }
 
@@ -297,6 +385,26 @@ public class ReachDeliveryService {
         } catch (Exception e) {
             throw new IllegalArgumentException("触达请求序列化失败", e);
         }
+    }
+
+    @SuppressWarnings("unchecked")
+    private Map<String, Object> payloadAsMap(DeliveryOutboxDO outbox) {
+        if (outboxService != null) {
+            return outboxService.payloadAsMap(outbox);
+        }
+        if (outbox == null || outbox.getPayloadJson() == null || outbox.getPayloadJson().isBlank()) {
+            return Map.of();
+        }
+        try {
+            Object value = objectMapper.readValue(outbox.getPayloadJson(), Map.class);
+            return value instanceof Map<?, ?> map ? (Map<String, Object>) map : Map.of();
+        } catch (Exception ex) {
+            throw new IllegalArgumentException("delivery payload JSON is invalid", ex);
+        }
+    }
+
+    private String normalizeProvider(String provider) {
+        return provider == null || provider.isBlank() ? "REACH" : provider.trim().toUpperCase(Locale.ROOT);
     }
 
     /** 发送前记录准备结果，标识本次是否命中幂等重复请求。 */

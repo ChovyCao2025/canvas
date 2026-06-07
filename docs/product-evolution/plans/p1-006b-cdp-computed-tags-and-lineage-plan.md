@@ -8,24 +8,39 @@
 
 **Tech Stack:** Java 21, Spring Boot, MyBatis-Plus, Flyway, Jackson, QLExpress/Aviator where already present, JUnit 5, Mockito, AssertJ, React 18, TypeScript, Vitest.
 
+**Implementation Status:** Implemented on 2026-06-05 and merged into `main`. Actual migration is `V105__cdp_computed_tags_lineage.sql` and actual tables/classes use the `cdp_` prefix.
+
+**Verification:** `cd backend && JAVA_HOME=/Users/photonpay/Library/Java/JavaVirtualMachines/ms-21.0.11/Contents/Home PATH="/Users/photonpay/Library/Java/JavaVirtualMachines/ms-21.0.11/Contents/Home/bin:$PATH" mvn -pl canvas-engine -DskipTests compile` passed. Focused P1-006B backend tests pass in an isolated runner because Maven `testCompile` remains blocked by unrelated existing test-source errors. `cd frontend && PATH="/opt/homebrew/bin:$PATH" npm run test -- computedTagPresentation.test.ts cdpApi.test.ts` passed. `cd frontend && PATH="/opt/homebrew/bin:$PATH" npm run build` passed.
+
 ---
 
 ## File Structure
 
-- Create: `backend/canvas-engine/src/main/resources/db/migration/V100__cdp_computed_tags_lineage.sql`
-- Create: `backend/canvas-engine/src/main/java/org/chovy/canvas/domain/cdp/ComputedTagService.java`
-- Create: `backend/canvas-engine/src/main/java/org/chovy/canvas/domain/cdp/CdpLineageService.java`
-- Create: `backend/canvas-engine/src/main/java/org/chovy/canvas/web/CdpComputedTagController.java`
-- Create: `backend/canvas-engine/src/test/java/org/chovy/canvas/domain/cdp/ComputedTagServiceTest.java`
-- Create: `backend/canvas-engine/src/test/java/org/chovy/canvas/domain/cdp/CdpLineageServiceTest.java`
-- Create: `frontend/src/pages/cdp-computed-tags/computedTagPresentation.ts`
-- Create: `frontend/src/pages/cdp-computed-tags/computedTagPresentation.test.ts`
+- Existing: `backend/canvas-engine/src/main/resources/db/migration/V105__cdp_computed_tags_lineage.sql`
+- Existing: `backend/canvas-engine/src/main/java/org/chovy/canvas/dal/dataobject/CdpComputedTagDefinitionDO.java`
+- Existing: `backend/canvas-engine/src/main/java/org/chovy/canvas/dal/dataobject/CdpComputedTagDependencyDO.java`
+- Existing: `backend/canvas-engine/src/main/java/org/chovy/canvas/dal/dataobject/CdpComputedTagRunDO.java`
+- Existing: matching `CdpComputedTag*` mappers under `backend/canvas-engine/src/main/java/org/chovy/canvas/dal/mapper/`
+- Added: `backend/canvas-engine/src/main/java/org/chovy/canvas/domain/cdp/ComputedTagService.java`
+- Added: `backend/canvas-engine/src/main/java/org/chovy/canvas/domain/cdp/CdpLineageService.java`
+- Added: `backend/canvas-engine/src/main/java/org/chovy/canvas/web/CdpComputedTagController.java`
+- Added: `backend/canvas-engine/src/test/java/org/chovy/canvas/domain/cdp/ComputedTagSchemaTest.java`
+- Added: `backend/canvas-engine/src/test/java/org/chovy/canvas/domain/cdp/ComputedTagServiceTest.java`
+- Added: `backend/canvas-engine/src/test/java/org/chovy/canvas/domain/cdp/CdpLineageServiceTest.java`
+- Added: `backend/canvas-engine/src/test/java/org/chovy/canvas/web/CdpComputedTagControllerTest.java`
+- Modified: `frontend/src/services/cdpApi.ts`
+- Modified: `frontend/src/services/cdpApi.test.ts`
+- Added: `frontend/src/pages/cdp-computed-tags/index.tsx`
+- Added: `frontend/src/pages/cdp-computed-tags/computedTagPresentation.ts`
+- Added: `frontend/src/pages/cdp-computed-tags/computedTagPresentation.test.ts`
+- Modified: `frontend/src/App.tsx`
+- Modified: `frontend/src/components/layout/AppLayout.tsx`
 
 ### Task 1: Schema And Dependency Tests
 
 **Files:**
 - Create: `backend/canvas-engine/src/test/java/org/chovy/canvas/domain/cdp/ComputedTagSchemaTest.java`
-- Create: `backend/canvas-engine/src/main/resources/db/migration/V100__cdp_computed_tags_lineage.sql`
+- Create: `backend/canvas-engine/src/main/resources/db/migration/V105__cdp_computed_tags_lineage.sql`
 
 - [ ] **Step 1: Write schema test**
 
@@ -46,20 +61,20 @@ class ComputedTagSchemaTest {
     @Test
     void migrationCreatesComputedTagDefinitionDependencyAndRunTables() throws Exception {
         String sql = Files.readString(Path.of(
-                "src/main/resources/db/migration/V100__cdp_computed_tags_lineage.sql"));
+                "src/main/resources/db/migration/V105__cdp_computed_tags_lineage.sql"));
 
         assertThat(sql)
-                .contains("CREATE TABLE IF NOT EXISTS computed_tag_definition")
+                .contains("CREATE TABLE IF NOT EXISTS cdp_computed_tag_definition")
                 .contains("tenant_id")
                 .contains("tag_code")
                 .contains("compute_type")
                 .contains("expression_json")
                 .contains("refresh_mode")
-                .contains("UNIQUE KEY uk_computed_tag_definition")
-                .contains("CREATE TABLE IF NOT EXISTS computed_tag_dependency")
+                .contains("UNIQUE KEY uk_cdp_computed_tag_definition")
+                .contains("CREATE TABLE IF NOT EXISTS cdp_computed_tag_dependency")
                 .contains("depends_on_tag_code")
-                .contains("UNIQUE KEY uk_computed_tag_dependency")
-                .contains("CREATE TABLE IF NOT EXISTS computed_tag_run")
+                .contains("UNIQUE KEY uk_cdp_computed_tag_dependency")
+                .contains("CREATE TABLE IF NOT EXISTS cdp_computed_tag_run")
                 .contains("cycle_path")
                 .contains("scanned_count")
                 .contains("matched_count")
@@ -72,10 +87,10 @@ class ComputedTagSchemaTest {
 
 - [ ] **Step 2: Add migration**
 
-Create `backend/canvas-engine/src/main/resources/db/migration/V100__cdp_computed_tags_lineage.sql`:
+Create `backend/canvas-engine/src/main/resources/db/migration/V105__cdp_computed_tags_lineage.sql`:
 
 ```sql
-CREATE TABLE IF NOT EXISTS computed_tag_definition (
+CREATE TABLE IF NOT EXISTS cdp_computed_tag_definition (
   id BIGINT AUTO_INCREMENT PRIMARY KEY,
   tenant_id BIGINT NOT NULL DEFAULT 0,
   tag_code VARCHAR(128) NOT NULL,
@@ -88,21 +103,21 @@ CREATE TABLE IF NOT EXISTS computed_tag_definition (
   created_by VARCHAR(128) NULL,
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  UNIQUE KEY uk_computed_tag_definition (tenant_id, tag_code),
+  UNIQUE KEY uk_cdp_computed_tag_definition (tenant_id, tag_code),
   INDEX idx_computed_tag_status (tenant_id, status, updated_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
-CREATE TABLE IF NOT EXISTS computed_tag_dependency (
+CREATE TABLE IF NOT EXISTS cdp_computed_tag_dependency (
   id BIGINT AUTO_INCREMENT PRIMARY KEY,
   tenant_id BIGINT NOT NULL DEFAULT 0,
   tag_code VARCHAR(128) NOT NULL,
   depends_on_tag_code VARCHAR(128) NOT NULL,
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  UNIQUE KEY uk_computed_tag_dependency (tenant_id, tag_code, depends_on_tag_code),
-  INDEX idx_computed_tag_dependency_reverse (tenant_id, depends_on_tag_code)
+  UNIQUE KEY uk_cdp_computed_tag_dependency (tenant_id, tag_code, depends_on_tag_code),
+  INDEX idx_cdp_computed_tag_dependency_reverse (tenant_id, depends_on_tag_code)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
-CREATE TABLE IF NOT EXISTS computed_tag_run (
+CREATE TABLE IF NOT EXISTS cdp_computed_tag_run (
   id BIGINT AUTO_INCREMENT PRIMARY KEY,
   tenant_id BIGINT NOT NULL DEFAULT 0,
   tag_code VARCHAR(128) NOT NULL,
@@ -116,7 +131,7 @@ CREATE TABLE IF NOT EXISTS computed_tag_run (
   error_message VARCHAR(1000) NULL,
   started_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   finished_at DATETIME NULL,
-  INDEX idx_computed_tag_run_tag (tenant_id, tag_code, started_at)
+  INDEX idx_cdp_computed_tag_run_tag (tenant_id, tag_code, started_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 ```
 
@@ -133,13 +148,13 @@ Expected: PASS.
 ### Task 5: Commit This Slice
 
 **Files:**
-- Modify: `backend/canvas-engine/src/main/resources/db/migration/V100__cdp_computed_tags_and_lineage.sql`
+- Modify: `backend/canvas-engine/src/main/resources/db/migration/V105__cdp_computed_tags_lineage.sql`
 - Modify: `backend/canvas-engine/src/main/java/org/chovy/canvas/domain/cdp/ComputedTagService.java`
-- Modify: `backend/canvas-engine/src/main/java/org/chovy/canvas/domain/cdp/ComputedTagLineageService.java`
+- Modify: `backend/canvas-engine/src/main/java/org/chovy/canvas/domain/cdp/CdpLineageService.java`
 - Modify: `backend/canvas-engine/src/main/java/org/chovy/canvas/web/CdpComputedTagController.java`
 - Modify: `backend/canvas-engine/src/test/java/org/chovy/canvas/domain/cdp/ComputedTagSchemaTest.java`
 - Modify: `backend/canvas-engine/src/test/java/org/chovy/canvas/domain/cdp/ComputedTagServiceTest.java`
-- Modify: `backend/canvas-engine/src/test/java/org/chovy/canvas/domain/cdp/ComputedTagLineageServiceTest.java`
+- Modify: `backend/canvas-engine/src/test/java/org/chovy/canvas/domain/cdp/CdpLineageServiceTest.java`
 - Modify: `frontend/src/pages/cdp-computed-tags/computedTagPresentation.ts`
 - Modify: `frontend/src/pages/cdp-computed-tags/computedTagPresentation.test.ts`
 - Modify: `frontend/src/services/cdpApi.ts`
@@ -152,13 +167,13 @@ Run:
 
 ```bash
 git add \
-  backend/canvas-engine/src/main/resources/db/migration/V100__cdp_computed_tags_and_lineage.sql \
+  backend/canvas-engine/src/main/resources/db/migration/V105__cdp_computed_tags_lineage.sql \
   backend/canvas-engine/src/main/java/org/chovy/canvas/domain/cdp/ComputedTagService.java \
-  backend/canvas-engine/src/main/java/org/chovy/canvas/domain/cdp/ComputedTagLineageService.java \
+  backend/canvas-engine/src/main/java/org/chovy/canvas/domain/cdp/CdpLineageService.java \
   backend/canvas-engine/src/main/java/org/chovy/canvas/web/CdpComputedTagController.java \
   backend/canvas-engine/src/test/java/org/chovy/canvas/domain/cdp/ComputedTagSchemaTest.java \
   backend/canvas-engine/src/test/java/org/chovy/canvas/domain/cdp/ComputedTagServiceTest.java \
-  backend/canvas-engine/src/test/java/org/chovy/canvas/domain/cdp/ComputedTagLineageServiceTest.java \
+  backend/canvas-engine/src/test/java/org/chovy/canvas/domain/cdp/CdpLineageServiceTest.java \
   frontend/src/pages/cdp-computed-tags/computedTagPresentation.ts \
   frontend/src/pages/cdp-computed-tags/computedTagPresentation.test.ts \
   frontend/src/services/cdpApi.ts \
@@ -385,7 +400,7 @@ class CdpLineageServiceTest {
         assertThat(impacts).extracting(CdpLineageService.LineageImpact::objectType)
                 .containsExactly("COMPUTED_TAG", "AUDIENCE", "CANVAS_VERSION");
         assertThat(impacts).extracting(CdpLineageService.LineageImpact::referencePath)
-                .contains("computed_tag_dependency.depends_on_tag_code",
+                .contains("cdp_computed_tag_dependency.depends_on_tag_code",
                         "audience_definition.rule_json",
                         "canvas_version.graph_json");
     }
@@ -411,7 +426,7 @@ class CdpLineageServiceTest {
 Scan:
 
 ```text
-computed_tag_dependency.depends_on_tag_code
+cdp_computed_tag_dependency.depends_on_tag_code
 audience_definition.rule_json
 canvas.graph_json
 ```
@@ -476,7 +491,7 @@ describe('computedTagPresentation', () => {
     expect(validateFallbackImpact({
       allowed: false,
       reason: 'INCOMPATIBLE_TYPE_CHANGE',
-      impacts: [{ objectType: 'COMPUTED_TAG', objectId: 'high_value_user', referencePath: 'computed_tag_dependency.depends_on_tag_code' }]
+      impacts: [{ objectType: 'COMPUTED_TAG', objectId: 'high_value_user', referencePath: 'cdp_computed_tag_dependency.depends_on_tag_code' }]
     })).toEqual({ disabled: true, reason: 'INCOMPATIBLE_TYPE_CHANGE (1 impact)' })
   })
 })

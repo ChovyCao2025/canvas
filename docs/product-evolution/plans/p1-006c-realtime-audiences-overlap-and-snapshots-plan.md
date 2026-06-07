@@ -8,6 +8,8 @@
 
 **Tech Stack:** Java 21, Spring Boot, MyBatis-Plus, Flyway, Redis, RoaringBitmap, RocketMQ, JUnit 5, Mockito, AssertJ, React 18, TypeScript, Vitest.
 
+**Implementation Status:** Implemented on 2026-06-05. This repo already used `V106__realtime_audience_overlap_snapshots.sql` and CDP-prefixed tables, so the implementation follows `cdp_realtime_audience_event_log` and `cdp_audience_snapshot` instead of creating unprefixed tables. Commit step was not executed because the user requested no commit.
+
 ---
 
 ## Spec Reference
@@ -17,11 +19,11 @@
 
 ## File Structure
 
-- Create: `backend/canvas-engine/src/main/resources/db/migration/V101__realtime_audience_overlap_snapshots.sql`
-- Create: `backend/canvas-engine/src/main/java/org/chovy/canvas/dal/dataobject/RealtimeAudienceEventLogDO.java`
-- Create: `backend/canvas-engine/src/main/java/org/chovy/canvas/dal/dataobject/AudienceSnapshotDO.java`
-- Create: `backend/canvas-engine/src/main/java/org/chovy/canvas/dal/mapper/RealtimeAudienceEventLogMapper.java`
-- Create: `backend/canvas-engine/src/main/java/org/chovy/canvas/dal/mapper/AudienceSnapshotMapper.java`
+- Existing: `backend/canvas-engine/src/main/resources/db/migration/V106__realtime_audience_overlap_snapshots.sql`
+- Existing: `backend/canvas-engine/src/main/java/org/chovy/canvas/dal/dataobject/CdpRealtimeAudienceEventLogDO.java`
+- Existing: `backend/canvas-engine/src/main/java/org/chovy/canvas/dal/dataobject/CdpAudienceSnapshotDO.java`
+- Existing: `backend/canvas-engine/src/main/java/org/chovy/canvas/dal/mapper/CdpRealtimeAudienceEventLogMapper.java`
+- Existing: `backend/canvas-engine/src/main/java/org/chovy/canvas/dal/mapper/CdpAudienceSnapshotMapper.java`
 - Create: `backend/canvas-engine/src/main/java/org/chovy/canvas/domain/cdp/RealtimeAudienceService.java`
 - Modify: `backend/canvas-engine/src/main/java/org/chovy/canvas/engine/audience/AudienceBitmapStore.java`
 - Create: `backend/canvas-engine/src/main/java/org/chovy/canvas/web/RealtimeAudienceController.java`
@@ -30,21 +32,25 @@
 - Create: `backend/canvas-engine/src/test/java/org/chovy/canvas/engine/audience/AudienceBitmapStoreSetOpsTest.java`
 - Create: `frontend/src/pages/realtime-audiences/realtimeAudiencePresentation.ts`
 - Create: `frontend/src/pages/realtime-audiences/realtimeAudiencePresentation.test.ts`
+- Create: `frontend/src/pages/realtime-audiences/index.tsx`
 - Modify: `frontend/src/services/cdpApi.ts`
+- Modify: `frontend/src/services/cdpApi.test.ts`
+- Modify: `frontend/src/App.tsx`
+- Modify: `frontend/src/components/layout/AppLayout.tsx`
 
 ### Task 1: Schema And Bitmap Set Operations
 
 **Files:**
 - Create: `backend/canvas-engine/src/test/java/org/chovy/canvas/domain/cdp/RealtimeAudienceSchemaTest.java`
 - Create: `backend/canvas-engine/src/test/java/org/chovy/canvas/engine/audience/AudienceBitmapStoreSetOpsTest.java`
-- Create: `backend/canvas-engine/src/main/resources/db/migration/V101__realtime_audience_overlap_snapshots.sql`
-- Create: `backend/canvas-engine/src/main/java/org/chovy/canvas/dal/dataobject/RealtimeAudienceEventLogDO.java`
-- Create: `backend/canvas-engine/src/main/java/org/chovy/canvas/dal/dataobject/AudienceSnapshotDO.java`
-- Create: `backend/canvas-engine/src/main/java/org/chovy/canvas/dal/mapper/RealtimeAudienceEventLogMapper.java`
-- Create: `backend/canvas-engine/src/main/java/org/chovy/canvas/dal/mapper/AudienceSnapshotMapper.java`
+- Existing: `backend/canvas-engine/src/main/resources/db/migration/V106__realtime_audience_overlap_snapshots.sql`
+- Existing: `backend/canvas-engine/src/main/java/org/chovy/canvas/dal/dataobject/CdpRealtimeAudienceEventLogDO.java`
+- Existing: `backend/canvas-engine/src/main/java/org/chovy/canvas/dal/dataobject/CdpAudienceSnapshotDO.java`
+- Existing: `backend/canvas-engine/src/main/java/org/chovy/canvas/dal/mapper/CdpRealtimeAudienceEventLogMapper.java`
+- Existing: `backend/canvas-engine/src/main/java/org/chovy/canvas/dal/mapper/CdpAudienceSnapshotMapper.java`
 - Modify: `backend/canvas-engine/src/main/java/org/chovy/canvas/engine/audience/AudienceBitmapStore.java`
 
-- [ ] **Step 1: Write schema contract test**
+- [x] **Step 1: Write schema contract test**
 
 Create `backend/canvas-engine/src/test/java/org/chovy/canvas/domain/cdp/RealtimeAudienceSchemaTest.java`:
 
@@ -63,16 +69,16 @@ class RealtimeAudienceSchemaTest {
     @Test
     void migrationCreatesRealtimeEventLogAndSnapshotTables() throws Exception {
         String sql = Files.readString(Path.of(
-                "src/main/resources/db/migration/V101__realtime_audience_overlap_snapshots.sql"));
+                "src/main/resources/db/migration/V106__realtime_audience_overlap_snapshots.sql"));
 
         assertThat(sql)
-                .contains("CREATE TABLE IF NOT EXISTS realtime_audience_event_log")
+                .contains("CREATE TABLE IF NOT EXISTS cdp_realtime_audience_event_log")
                 .contains("tenant_id")
                 .contains("audience_id")
                 .contains("source_event_id")
                 .contains("operation")
-                .contains("UNIQUE KEY uk_realtime_audience_event")
-                .contains("CREATE TABLE IF NOT EXISTS audience_snapshot")
+                .contains("UNIQUE KEY uk_cdp_realtime_audience_event")
+                .contains("CREATE TABLE IF NOT EXISTS cdp_audience_snapshot")
                 .contains("estimated_size")
                 .contains("bitmap_key")
                 .contains("snapshot_source")
@@ -81,7 +87,7 @@ class RealtimeAudienceSchemaTest {
 }
 ```
 
-- [ ] **Step 2: Write bitmap set operation tests**
+- [x] **Step 2: Write bitmap set operation tests**
 
 Create `backend/canvas-engine/src/test/java/org/chovy/canvas/engine/audience/AudienceBitmapStoreSetOpsTest.java`:
 
@@ -128,7 +134,7 @@ class AudienceBitmapStoreSetOpsTest {
 }
 ```
 
-- [ ] **Step 3: Run tests and confirm red state**
+- [x] **Step 3: Run tests and confirm red state**
 
 Run:
 
@@ -136,14 +142,14 @@ Run:
 cd backend && mvn -pl canvas-engine test -Dtest=RealtimeAudienceSchemaTest,AudienceBitmapStoreSetOpsTest
 ```
 
-Expected: FAIL because the migration and bitmap set operation methods do not exist.
+Expected: FAIL because bitmap set operation methods do not exist. Confirmed through isolated Java 21 test compilation before implementation.
 
-- [ ] **Step 4: Add migration, data objects, and mappers**
+- [x] **Step 4: Add migration, data objects, and mappers**
 
-Create `backend/canvas-engine/src/main/resources/db/migration/V101__realtime_audience_overlap_snapshots.sql`:
+The actual migration already exists as `backend/canvas-engine/src/main/resources/db/migration/V106__realtime_audience_overlap_snapshots.sql` and creates CDP-prefixed tables:
 
 ```sql
-CREATE TABLE IF NOT EXISTS realtime_audience_event_log (
+CREATE TABLE IF NOT EXISTS cdp_realtime_audience_event_log (
   id BIGINT AUTO_INCREMENT PRIMARY KEY,
   tenant_id BIGINT NOT NULL DEFAULT 0,
   audience_id BIGINT NOT NULL,
@@ -152,11 +158,11 @@ CREATE TABLE IF NOT EXISTS realtime_audience_event_log (
   operation VARCHAR(20) NOT NULL,
   event_time DATETIME(3) NULL,
   processed_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
-  UNIQUE KEY uk_realtime_audience_event (tenant_id, audience_id, source_event_id),
-  INDEX idx_realtime_audience_event_user (tenant_id, user_id, processed_at)
+  UNIQUE KEY uk_cdp_realtime_audience_event (tenant_id, audience_id, source_event_id),
+  INDEX idx_cdp_realtime_audience_event_user (tenant_id, user_id, processed_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
-CREATE TABLE IF NOT EXISTS audience_snapshot (
+CREATE TABLE IF NOT EXISTS cdp_audience_snapshot (
   id BIGINT AUTO_INCREMENT PRIMARY KEY,
   tenant_id BIGINT NOT NULL DEFAULT 0,
   audience_id BIGINT NOT NULL,
@@ -165,13 +171,13 @@ CREATE TABLE IF NOT EXISTS audience_snapshot (
   snapshot_source VARCHAR(32) NOT NULL,
   created_by VARCHAR(128) NULL,
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  INDEX idx_audience_snapshot_audience (tenant_id, audience_id, created_at)
+  INDEX idx_cdp_audience_snapshot_audience (tenant_id, audience_id, created_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 ```
 
-Create `RealtimeAudienceEventLogDO` and `AudienceSnapshotDO` with `@TableName`, `@TableId(type = IdType.AUTO)`, fields matching the migration, and `LocalDateTime` for timestamp columns. Create mappers by extending `BaseMapper<RealtimeAudienceEventLogDO>` and `BaseMapper<AudienceSnapshotDO>`.
+The existing data objects and mappers are `CdpRealtimeAudienceEventLogDO`, `CdpAudienceSnapshotDO`, `CdpRealtimeAudienceEventLogMapper`, and `CdpAudienceSnapshotMapper`.
 
-- [ ] **Step 5: Extend AudienceBitmapStore**
+- [x] **Step 5: Extend AudienceBitmapStore**
 
 Modify `backend/canvas-engine/src/main/java/org/chovy/canvas/engine/audience/AudienceBitmapStore.java`:
 
@@ -195,7 +201,7 @@ public RoaringBitmap exclude(Long baseAudienceId, Long excludedAudienceId) throw
 }
 ```
 
-- [ ] **Step 6: Run schema and bitmap tests**
+- [x] **Step 6: Run schema and bitmap tests**
 
 Run:
 
@@ -208,35 +214,45 @@ Expected: PASS.
 ### Task 5: Commit This Slice
 
 **Files:**
-- Modify: `backend/canvas-engine/src/main/resources/db/migration/V101__realtime_audiences_overlap_snapshots.sql`
+- Existing: `backend/canvas-engine/src/main/resources/db/migration/V106__realtime_audience_overlap_snapshots.sql`
 - Modify: `backend/canvas-engine/src/main/java/org/chovy/canvas/domain/cdp/RealtimeAudienceService.java`
-- Modify: `backend/canvas-engine/src/main/java/org/chovy/canvas/domain/cdp/AudienceBitmapStore.java`
+- Modify: `backend/canvas-engine/src/main/java/org/chovy/canvas/engine/audience/AudienceBitmapStore.java`
 - Modify: `backend/canvas-engine/src/main/java/org/chovy/canvas/web/RealtimeAudienceController.java`
 - Modify: `backend/canvas-engine/src/test/java/org/chovy/canvas/domain/cdp/RealtimeAudienceSchemaTest.java`
-- Modify: `backend/canvas-engine/src/test/java/org/chovy/canvas/domain/cdp/AudienceBitmapStoreSetOpsTest.java`
+- Modify: `backend/canvas-engine/src/test/java/org/chovy/canvas/engine/audience/AudienceBitmapStoreSetOpsTest.java`
 - Modify: `backend/canvas-engine/src/test/java/org/chovy/canvas/domain/cdp/RealtimeAudienceServiceTest.java`
+- Modify: `backend/canvas-engine/src/test/java/org/chovy/canvas/web/RealtimeAudienceControllerTest.java`
 - Modify: `frontend/src/pages/realtime-audiences/realtimeAudiencePresentation.ts`
 - Modify: `frontend/src/pages/realtime-audiences/realtimeAudiencePresentation.test.ts`
+- Modify: `frontend/src/pages/realtime-audiences/index.tsx`
 - Modify: `frontend/src/services/cdpApi.ts`
+- Modify: `frontend/src/services/cdpApi.test.ts`
+- Modify: `frontend/src/App.tsx`
+- Modify: `frontend/src/components/layout/AppLayout.tsx`
 - Modify: `docs/product-evolution/specs/p1-006c-realtime-audiences-overlap-and-snapshots.md`
 - Modify: `docs/product-evolution/plans/p1-006c-realtime-audiences-overlap-and-snapshots-plan.md`
 
-- [ ] **Step 1: Commit realtime audience slice**
+- [ ] **Step 1: Commit realtime audience slice** - skipped in this session per user instruction not to commit.
 
 Run:
 
 ```bash
 git add \
-  backend/canvas-engine/src/main/resources/db/migration/V101__realtime_audiences_overlap_snapshots.sql \
+  backend/canvas-engine/src/main/resources/db/migration/V106__realtime_audience_overlap_snapshots.sql \
   backend/canvas-engine/src/main/java/org/chovy/canvas/domain/cdp/RealtimeAudienceService.java \
-  backend/canvas-engine/src/main/java/org/chovy/canvas/domain/cdp/AudienceBitmapStore.java \
+  backend/canvas-engine/src/main/java/org/chovy/canvas/engine/audience/AudienceBitmapStore.java \
   backend/canvas-engine/src/main/java/org/chovy/canvas/web/RealtimeAudienceController.java \
   backend/canvas-engine/src/test/java/org/chovy/canvas/domain/cdp/RealtimeAudienceSchemaTest.java \
-  backend/canvas-engine/src/test/java/org/chovy/canvas/domain/cdp/AudienceBitmapStoreSetOpsTest.java \
+  backend/canvas-engine/src/test/java/org/chovy/canvas/engine/audience/AudienceBitmapStoreSetOpsTest.java \
   backend/canvas-engine/src/test/java/org/chovy/canvas/domain/cdp/RealtimeAudienceServiceTest.java \
+  backend/canvas-engine/src/test/java/org/chovy/canvas/web/RealtimeAudienceControllerTest.java \
   frontend/src/pages/realtime-audiences/realtimeAudiencePresentation.ts \
   frontend/src/pages/realtime-audiences/realtimeAudiencePresentation.test.ts \
+  frontend/src/pages/realtime-audiences/index.tsx \
   frontend/src/services/cdpApi.ts \
+  frontend/src/services/cdpApi.test.ts \
+  frontend/src/App.tsx \
+  frontend/src/components/layout/AppLayout.tsx \
   docs/product-evolution/specs/p1-006c-realtime-audiences-overlap-and-snapshots.md \
   docs/product-evolution/plans/p1-006c-realtime-audiences-overlap-and-snapshots-plan.md
 git commit -m "feat: add realtime audiences and snapshots"
@@ -250,7 +266,7 @@ Expected: commit contains only realtime audience schema, bitmap set operations, 
 - Create: `backend/canvas-engine/src/test/java/org/chovy/canvas/domain/cdp/RealtimeAudienceServiceTest.java`
 - Create: `backend/canvas-engine/src/main/java/org/chovy/canvas/domain/cdp/RealtimeAudienceService.java`
 
-- [ ] **Step 1: Write realtime service tests**
+- [x] **Step 1: Write realtime service tests**
 
 Create `backend/canvas-engine/src/test/java/org/chovy/canvas/domain/cdp/RealtimeAudienceServiceTest.java`:
 
@@ -372,7 +388,7 @@ class RealtimeAudienceServiceTest {
 }
 ```
 
-- [ ] **Step 2: Run realtime service tests and confirm red state**
+- [x] **Step 2: Run realtime service tests and confirm red state**
 
 Run:
 
@@ -380,9 +396,9 @@ Run:
 cd backend && mvn -pl canvas-engine test -Dtest=RealtimeAudienceServiceTest
 ```
 
-Expected: FAIL because `RealtimeAudienceService` does not exist.
+Expected: FAIL because `RealtimeAudienceService` does not exist. Confirmed with isolated Java 21 test compilation before implementation.
 
-- [ ] **Step 3: Implement service contract**
+- [x] **Step 3: Implement service contract**
 
 Create `backend/canvas-engine/src/main/java/org/chovy/canvas/domain/cdp/RealtimeAudienceService.java` with these records and constructor-facing repository interfaces:
 
@@ -429,7 +445,7 @@ bitmapStore.save(audienceId, bitmap);
 return new EventResult("UPDATED", operation, audienceId, event.sourceEventId(), event.userId());
 ```
 
-- [ ] **Step 4: Implement guarded set operations and snapshots**
+- [x] **Step 4: Implement guarded set operations and snapshots**
 
 Use this guard helper inside `merge` and `exclude`:
 
@@ -455,7 +471,7 @@ public SnapshotResult createSnapshot(Long tenantId, Long audienceId, String sour
 }
 ```
 
-- [ ] **Step 5: Run realtime service tests**
+- [x] **Step 5: Run realtime service tests**
 
 Run:
 
@@ -463,7 +479,7 @@ Run:
 cd backend && mvn -pl canvas-engine test -Dtest=RealtimeAudienceServiceTest
 ```
 
-Expected: PASS.
+Expected: PASS. Confirmed in the isolated P1-006C suite.
 
 ### Task 3: Controller And Frontend Contracts
 
@@ -473,7 +489,7 @@ Expected: PASS.
 - Create: `frontend/src/pages/realtime-audiences/realtimeAudiencePresentation.test.ts`
 - Modify: `frontend/src/services/cdpApi.ts`
 
-- [ ] **Step 1: Add controller endpoints**
+- [x] **Step 1: Add controller endpoints**
 
 Create `backend/canvas-engine/src/main/java/org/chovy/canvas/web/RealtimeAudienceController.java`:
 
@@ -482,17 +498,26 @@ Create `backend/canvas-engine/src/main/java/org/chovy/canvas/web/RealtimeAudienc
 @RequestMapping("/cdp")
 @RequiredArgsConstructor
 public class RealtimeAudienceController {
+    private final TenantContextResolver tenantContextResolver;
     private final RealtimeAudienceService service;
 
     @PostMapping("/realtime-audiences/{id}/events")
-    public RealtimeAudienceService.EventResult processEvent(@PathVariable Long id,
-                                                            @RequestBody RealtimeAudienceService.CdpEvent event) throws IOException {
-        return service.processEvent(0L, id, event, true);
+    public Mono<R<RealtimeAudienceService.EventResult>> processEvent(@PathVariable Long id,
+                                                                     @RequestBody RealtimeEventRequest request) {
+        ...
+        return service.processEvent(tenantId(ctx), id, request.toEvent(), request.removeOnNoMatchOrDefault());
     }
 
     @PostMapping("/realtime-audiences/{id}/snapshot")
-    public RealtimeAudienceService.SnapshotResult snapshot(@PathVariable Long id) throws IOException {
-        return service.createSnapshot(0L, id, "MANUAL", "system");
+    public Mono<R<RealtimeAudienceService.SnapshotResult>> snapshot(@PathVariable Long id) {
+        ...
+        return service.createSnapshot(tenantId(ctx), id, "MANUAL", ctx.username());
+    }
+
+    @GetMapping("/realtime-audiences/{id}/snapshots")
+    public Mono<R<List<RealtimeAudienceService.SnapshotRow>>> snapshots(@PathVariable Long id,
+                                                                        @RequestParam(required = false) Integer limit) {
+        ...
     }
 
     @GetMapping("/audiences/{leftId}/overlap/{rightId}")
@@ -514,7 +539,7 @@ public class RealtimeAudienceController {
 
 The class-level `@RequestMapping("/cdp")` plus method-level `/audiences/{leftId}/overlap/{rightId}` registers exactly `/cdp/audiences/{leftId}/overlap/{rightId}`.
 
-- [ ] **Step 2: Write frontend presentation tests**
+- [x] **Step 2: Write frontend presentation tests**
 
 Create `frontend/src/pages/realtime-audiences/realtimeAudiencePresentation.test.ts`:
 
@@ -551,7 +576,7 @@ describe('realtimeAudiencePresentation', () => {
 })
 ```
 
-- [ ] **Step 3: Add frontend presentation helpers**
+- [x] **Step 3: Add frontend presentation helpers**
 
 Create `frontend/src/pages/realtime-audiences/realtimeAudiencePresentation.ts`:
 
@@ -591,7 +616,7 @@ export function formatSnapshotRow(row: AudienceSnapshotRow): string {
 }
 ```
 
-- [ ] **Step 4: Add typed API wrapper**
+- [x] **Step 4: Add typed API wrapper**
 
 Modify `frontend/src/services/cdpApi.ts`:
 
@@ -613,11 +638,13 @@ export const realtimeAudienceApi = {
   merge: (leftId: number, rightId: number) =>
     http.post<R<unknown>>('/cdp/audiences/merge', null, { params: { leftId, rightId } }),
   exclude: (baseId: number, excludedId: number) =>
-    http.post<R<unknown>>('/cdp/audiences/exclude', null, { params: { baseId, excludedId } })
+    http.post<R<unknown>>('/cdp/audiences/exclude', null, { params: { baseId, excludedId } }),
+  snapshots: (audienceId: number) =>
+    http.get<R<unknown>>(`/cdp/realtime-audiences/${audienceId}/snapshots`)
 }
 ```
 
-- [ ] **Step 5: Run full verification**
+- [x] **Step 5: Run full verification**
 
 Run:
 
@@ -627,3 +654,14 @@ cd frontend && npm test -- realtimeAudiencePresentation.test.ts
 ```
 
 Expected: PASS.
+
+Actual verification:
+
+```bash
+cd backend && JAVA_HOME=/Users/photonpay/Library/Java/JavaVirtualMachines/ms-21.0.11/Contents/Home PATH="/Users/photonpay/Library/Java/JavaVirtualMachines/ms-21.0.11/Contents/Home/bin:$PATH" mvn -pl canvas-engine -DskipTests compile
+cd frontend && PATH="/opt/homebrew/bin:$PATH" npm run test -- realtimeAudiencePresentation.test.ts cdpApi.test.ts biWorkbench.test.ts
+cd frontend && PATH="/opt/homebrew/bin:$PATH" npm run build
+```
+
+Backend isolated suite: `RealtimeAudienceSchemaTest`, `AudienceBitmapStoreSetOpsTest`, `RealtimeAudienceServiceTest`, `RealtimeAudienceControllerTest` ran 11 tests, 0 failures.
+Frontend targeted suite ran 40 tests, 0 failures. Frontend production build passed and emitted the `realtime-audiences` route chunk.

@@ -8,6 +8,8 @@
 
 **Tech Stack:** Java 21, Spring Boot, MyBatis-Plus, Flyway, Redis, JUnit 5, Mockito, AssertJ.
 
+**Implementation status (2026-06-05):** Completed. The actual Flyway migration is `V121__channel_provider_policies.sql` because earlier numbers were already allocated. Existing schema/service/repository code was retained; this pass added runtime handler integration, provider-aware delivery requests, coupon dedupe/backpressure checks, focused tests, and isolated verification. Final post-clean backend focused runner coverage was 44/44 across P1-008B/P1-008C and handler regression tests. Commit was intentionally skipped because the user did not request one.
+
 ---
 
 ## Spec Reference
@@ -17,7 +19,7 @@
 
 ## File Structure
 
-- Create: `backend/canvas-engine/src/main/resources/db/migration/V103__channel_provider_policies.sql`
+- Create: `backend/canvas-engine/src/main/resources/db/migration/V121__channel_provider_policies.sql`
 - Create: `backend/canvas-engine/src/main/java/org/chovy/canvas/dal/dataobject/ChannelProviderLimitDO.java`
 - Create: `backend/canvas-engine/src/main/java/org/chovy/canvas/dal/dataobject/ChannelFallbackPolicyDO.java`
 - Create: `backend/canvas-engine/src/main/java/org/chovy/canvas/dal/dataobject/ChannelFallbackDecisionDO.java`
@@ -35,9 +37,9 @@
 
 **Files:**
 - Create: `backend/canvas-engine/src/test/java/org/chovy/canvas/engine/channel/ChannelProviderPolicySchemaTest.java`
-- Create: `backend/canvas-engine/src/main/resources/db/migration/V103__channel_provider_policies.sql`
+- Create: `backend/canvas-engine/src/main/resources/db/migration/V121__channel_provider_policies.sql`
 
-- [ ] **Step 1: Write schema test**
+- [x] **Step 1: Write schema test**
 
 Create `ChannelProviderPolicySchemaTest.java`:
 
@@ -55,7 +57,7 @@ class ChannelProviderPolicySchemaTest {
 
     @Test
     void migrationCreatesProviderPolicyTables() throws Exception {
-        String sql = Files.readString(Path.of("src/main/resources/db/migration/V103__channel_provider_policies.sql"));
+        String sql = Files.readString(Path.of("src/main/resources/db/migration/V121__channel_provider_policies.sql"));
 
         assertThat(sql)
                 .contains("CREATE TABLE IF NOT EXISTS channel_provider_limit")
@@ -73,7 +75,7 @@ class ChannelProviderPolicySchemaTest {
 }
 ```
 
-- [ ] **Step 2: Run schema test and confirm red state**
+- [x] **Step 2: Run schema test and confirm red state**
 
 Run:
 
@@ -83,9 +85,9 @@ cd backend && mvn -pl canvas-engine test -Dtest=ChannelProviderPolicySchemaTest
 
 Expected: FAIL because migration does not exist.
 
-- [ ] **Step 3: Add policy migration**
+- [x] **Step 3: Add policy migration**
 
-Create `V103__channel_provider_policies.sql`:
+Create `V121__channel_provider_policies.sql`:
 
 ```sql
 CREATE TABLE IF NOT EXISTS channel_provider_limit (
@@ -144,7 +146,7 @@ CREATE TABLE IF NOT EXISTS channel_dedupe_record (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 ```
 
-- [ ] **Step 4: Run schema test**
+- [x] **Step 4: Run schema test**
 
 Run:
 
@@ -162,7 +164,7 @@ Expected: PASS.
 - Create: `backend/canvas-engine/src/main/java/org/chovy/canvas/engine/channel/ProviderBackpressureService.java`
 - Create: `backend/canvas-engine/src/main/java/org/chovy/canvas/engine/channel/ChannelFallbackService.java`
 
-- [ ] **Step 1: Write backpressure tests**
+- [x] **Step 1: Write backpressure tests**
 
 Create tests for isolated limits:
 
@@ -189,7 +191,7 @@ void redisUnavailableFailsClosedForRealModeAndBypassesSandbox() {
 }
 ```
 
-- [ ] **Step 2: Write fallback tests**
+- [x] **Step 2: Write fallback tests**
 
 Create tests for route selection:
 
@@ -221,11 +223,11 @@ void fallbackCycleIsRejected() {
 }
 ```
 
-- [ ] **Step 3: Implement services**
+- [x] **Step 3: Implement services**
 
 Implement `ProviderBackpressureService.Decision` statuses: `ALLOWED`, `THROTTLED_RETRY`, `THROTTLED_SKIP`, `PROVIDER_DISABLED`, `REGISTRY_UNAVAILABLE`. Implement `ChannelFallbackService` with one-level `resolve` and cycle validation across saved policies.
 
-- [ ] **Step 4: Run service tests**
+- [x] **Step 4: Run service tests**
 
 Run:
 
@@ -244,7 +246,7 @@ Expected: PASS.
 - Modify: `backend/canvas-engine/src/main/java/org/chovy/canvas/engine/handlers/CouponHandler.java`
 - Test: `backend/canvas-engine/src/test/java/org/chovy/canvas/engine/handlers/ChannelConnectorHandlerTest.java`
 
-- [ ] **Step 1: Write dedupe tests**
+- [x] **Step 1: Write dedupe tests**
 
 Create `ChannelDedupeServiceTest.java`:
 
@@ -260,11 +262,11 @@ void duplicateContentSuppressesProviderCallWithinWindow() {
 }
 ```
 
-- [ ] **Step 2: Implement dedupe service**
+- [x] **Step 2: Implement dedupe service**
 
 Use a repository method that inserts `channel_dedupe_record` and returns false on duplicate key. Hash payload with SHA-256 over channel, template id, content JSON, and normalized variables.
 
-- [ ] **Step 3: Integrate policy sequence in handlers**
+- [x] **Step 3: Integrate policy sequence in handlers**
 
 Use this order in `AbstractSendMessageHandler` and coupon connector path:
 
@@ -274,7 +276,7 @@ resolve connector -> dedupe reserve -> provider backpressure decision -> fallbac
 
 When dedupe returns duplicate, return `NodeResult.suppressed(skipNodeId, "CHANNEL_DEDUPE", "duplicate channel content")` and do not call provider.
 
-- [ ] **Step 4: Run integration tests**
+- [x] **Step 4: Run integration tests**
 
 Run:
 
@@ -290,7 +292,18 @@ Expected: PASS.
 - Modify: `docs/product-evolution/specs/p1-008b-provider-backpressure-fallback-and-dedupe.md`
 - Modify: `docs/product-evolution/plans/p1-008b-provider-backpressure-fallback-and-dedupe-plan.md`
 
-- [ ] **Step 1: Run focused backend tests**
+Actual verification used in this session:
+
+```bash
+cd backend
+JAVA_HOME=/Users/photonpay/Library/Java/JavaVirtualMachines/ms-21.0.11/Contents/Home PATH="/Users/photonpay/Library/Java/JavaVirtualMachines/ms-21.0.11/Contents/Home/bin:$PATH" mvn -pl canvas-engine -DskipTests compile
+JAVA_HOME=/Users/photonpay/Library/Java/JavaVirtualMachines/ms-21.0.11/Contents/Home PATH="/Users/photonpay/Library/Java/JavaVirtualMachines/ms-21.0.11/Contents/Home/bin:$PATH" javac --release 21 -cp "canvas-engine/target/classes:canvas-engine/target/p1-008-test-classes:$(cat canvas-engine/target/p1-008-test.classpath)" -d canvas-engine/target/p1-008-test-classes <focused P1-008B test sources>
+cd canvas-engine
+JAVA_HOME=/Users/photonpay/Library/Java/JavaVirtualMachines/ms-21.0.11/Contents/Home PATH="/Users/photonpay/Library/Java/JavaVirtualMachines/ms-21.0.11/Contents/Home/bin:$PATH" java -cp "target/classes:target/p1-008-test-classes:$(cat target/p1-008-test.classpath)" P1008BIsolatedRunner
+JAVA_HOME=/Users/photonpay/Library/Java/JavaVirtualMachines/ms-21.0.11/Contents/Home PATH="/Users/photonpay/Library/Java/JavaVirtualMachines/ms-21.0.11/Contents/Home/bin:$PATH" java -cp "target/classes:target/p1-008-test-classes:$(cat target/p1-008-test.classpath)" P1008RegressionRunner
+```
+
+- [x] **Step 1: Run focused backend tests**
 
 Run:
 
@@ -300,7 +313,7 @@ cd backend && mvn -pl canvas-engine test -Dtest=ChannelProviderPolicySchemaTest,
 
 Expected: PASS.
 
-- [ ] **Step 2: Run handler regression**
+- [x] **Step 2: Run handler regression**
 
 Run:
 
@@ -310,13 +323,13 @@ cd backend && mvn -pl canvas-engine test -Dtest=SendMessageHandlerTest,CouponHan
 
 Expected: PASS.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit skipped**
 
 Run:
 
 ```bash
-git add backend/canvas-engine/src/main/resources/db/migration/V103__channel_provider_policies.sql backend/canvas-engine/src/main/java/org/chovy/canvas/engine/channel backend/canvas-engine/src/main/java/org/chovy/canvas/engine/handlers backend/canvas-engine/src/main/java/org/chovy/canvas/engine/delivery backend/canvas-engine/src/main/java/org/chovy/canvas/dal backend/canvas-engine/src/test/java/org/chovy/canvas/engine/channel backend/canvas-engine/src/test/java/org/chovy/canvas/engine/handlers docs/product-evolution/specs/p1-008b-provider-backpressure-fallback-and-dedupe.md docs/product-evolution/plans/p1-008b-provider-backpressure-fallback-and-dedupe-plan.md
-git commit -m "feat: add channel provider policy controls"
+git add backend/canvas-engine/src/main/resources/db/migration/V121__channel_provider_policies.sql backend/canvas-engine/src/main/java/org/chovy/canvas/engine/channel backend/canvas-engine/src/main/java/org/chovy/canvas/engine/handlers backend/canvas-engine/src/main/java/org/chovy/canvas/engine/delivery backend/canvas-engine/src/main/java/org/chovy/canvas/dal backend/canvas-engine/src/test/java/org/chovy/canvas/engine/channel backend/canvas-engine/src/test/java/org/chovy/canvas/engine/handlers docs/product-evolution/specs/p1-008b-provider-backpressure-fallback-and-dedupe.md docs/product-evolution/plans/p1-008b-provider-backpressure-fallback-and-dedupe-plan.md
+# Skipped in this session because the user did not request a commit.
 ```
 
 Expected: commit contains only provider policy schema, backpressure, fallback, dedupe, handler integration, tests, and related docs.

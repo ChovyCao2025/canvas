@@ -4,6 +4,7 @@
  * 维护说明：axios 拦截器在这里注入 token、解包 R<T> 响应，并在 401 时清理登录态。
  */
 import axios from 'axios'
+import type { AxiosRequestConfig } from 'axios'
 import type {
   R, PageResult,
   Canvas, CanvasDetail, CanvasVersion,
@@ -13,6 +14,7 @@ import type {
 } from '../types'
 import type { HomeOverview } from '../pages/home/homeOverview'
 import { classifyApiError } from './apiError'
+import { createHttpClient } from './httpClient'
 
 /**
  * 统一 HTTP 客户端。
@@ -81,6 +83,18 @@ http.interceptors.response.use(
     return Promise.reject(classified)
   },
 )
+
+export const apiClient = createHttpClient(http, {
+  maxGetRetries: 2,
+  onUnauthorized: intendedPath => {
+    globalThis.localStorage?.removeItem('canvas_token')
+    globalThis.localStorage?.removeItem('canvas_user')
+    const event = typeof CustomEvent === 'function'
+      ? new CustomEvent('canvas:unauthorized', { detail: { intendedPath: intendedPath ?? globalThis.location?.pathname } })
+      : new Event('canvas:unauthorized')
+    globalThis.dispatchEvent?.(event)
+  },
+})
 
 // ── 认证 ─────────────────────────────────────────────────────
 
@@ -218,6 +232,94 @@ export const tenantApi = {
     http.get<R<TenantUsage>, R<TenantUsage>>(`/admin/tenants/${id}/usage`),
 }
 
+// ── 项目治理 ─────────────────────────────────────────────────
+
+export type ProjectRole = 'PROJECT_ADMIN' | 'EDITOR' | 'EXECUTOR' | 'VIEWER'
+export type ProjectStatus = 'ACTIVE' | 'DISABLED' | string
+
+export interface ProjectSummary {
+  id: number
+  tenantId: number
+  projectKey: string
+  projectName: string
+  description?: string | null
+  status: ProjectStatus
+  memberCount?: number
+  canvasCount?: number
+}
+
+export interface ProjectDetail extends ProjectSummary {
+  defaultSettingsJson?: string | null
+  requireReviewBeforePublish?: number
+  quietHoursJson?: string | null
+}
+
+export interface ProjectMember {
+  id: number
+  tenantId: number
+  projectId: number
+  userId?: number | null
+  username: string
+  role: ProjectRole | string
+  source?: string
+}
+
+export interface ProjectStats {
+  projectId: number
+  canvasCount: number
+  publishedCanvasCount: number
+  executionCount7d: number
+  failedExecutionCount7d: number
+  avgDurationMs7d: number
+}
+
+export interface ProjectPayload {
+  projectKey?: string
+  projectName: string
+  description?: string | null
+  defaultSettingsJson?: string | null
+  requireReviewBeforePublish?: number
+  quietHoursJson?: string | null
+}
+
+export interface ProjectMemberPayload {
+  username: string
+  role: ProjectRole | string
+}
+
+interface ProjectHttpClient {
+  get: typeof http.get
+  post: typeof http.post
+  put: typeof http.put
+  delete: typeof http.delete
+}
+
+export function createProjectApi(client: ProjectHttpClient = http) {
+  return {
+    list: () => client.get<R<ProjectSummary[]>, R<ProjectSummary[]>>('/admin/projects'),
+    create: (body: ProjectPayload) =>
+      client.post<R<ProjectDetail>, R<ProjectDetail>>('/admin/projects', body),
+    detail: (id: number) =>
+      client.get<R<ProjectDetail>, R<ProjectDetail>>(`/admin/projects/${id}`),
+    update: (id: number, body: Partial<ProjectPayload>) =>
+      client.put<R<ProjectDetail>, R<ProjectDetail>>(`/admin/projects/${id}`, body),
+    disable: (id: number) =>
+      client.put<R<void>, R<void>>(`/admin/projects/${id}/disable`),
+    members: (id: number) =>
+      client.get<R<ProjectMember[]>, R<ProjectMember[]>>(`/admin/projects/${id}/members`),
+    setMember: (projectId: number, userId: number, body: ProjectMemberPayload) =>
+      client.put<R<ProjectMember>, R<ProjectMember>>(`/admin/projects/${projectId}/members/${userId}`, body),
+    removeMember: (projectId: number, userId: number) =>
+      client.delete<R<void>, R<void>>(`/admin/projects/${projectId}/members/${userId}`),
+    canvases: (id: number, params?: CanvasListQuery) =>
+      client.get<R<PageResult<Canvas>>, R<PageResult<Canvas>>>(`/admin/projects/${id}/canvases`, { params }),
+    stats: (id: number) =>
+      client.get<R<ProjectStats>, R<ProjectStats>>(`/admin/projects/${id}/stats`),
+  }
+}
+
+export const projectApi = createProjectApi()
+
 // ── 画布管理 ─────────────────────────────────────────────────
 
 /** 创建画布请求体。 */
@@ -236,6 +338,9 @@ interface CanvasCreateReq {
 
   /** 平铺项目展示名。 */
   projectName?: string | null
+
+  /** 正式项目治理域 ID。 */
+  projectId?: number | null
 
   /** 平铺文件夹分组 key。 */
   folderKey?: string | null
@@ -307,6 +412,8 @@ interface CanvasUpdateReq {
   attributionWindowDays?: number | null
 }
 
+type CanvasUpdateOptions = Pick<AxiosRequestConfig, 'signal'>
+
 /** 画布列表查询参数。 */
 interface CanvasListQuery {
   /** 页码。 */
@@ -323,6 +430,9 @@ interface CanvasListQuery {
 
   /** 平铺项目分组 key。 */
   projectKey?: string
+
+  /** 正式项目治理域 ID。 */
+  projectId?: number
 
   /** 平铺文件夹分组 key。 */
   folderKey?: string
@@ -393,6 +503,86 @@ export interface CanvasImportResp {
   draftVersionId: number
 }
 
+export type ApprovalStatus = 'PENDING' | 'APPROVED' | 'REJECTED' | 'CANCELLED' | 'EXPIRED' | string
+
+export interface ApprovalTaskView {
+  id: number | null
+  tenantId: number | null
+  instanceId: number | null
+  stepNo: number | null
+  approver: string
+  status: ApprovalStatus
+  externalTaskId?: string | null
+  dueAt?: string | null
+  actedAt?: string | null
+  actionComment?: string | null
+}
+
+export interface ApprovalInstanceView {
+  id: number
+  tenantId: number
+  definitionKey: string
+  domain: string
+  targetType: string
+  targetId: string
+  targetVersionId?: number | null
+  status: ApprovalStatus
+  submitter: string
+  submitReason?: string | null
+  riskLevel?: string | null
+  riskReasonsJson?: string | null
+  snapshotJson?: string | null
+  externalInstanceId?: string | null
+  requestedAt?: string | null
+  completedAt?: string | null
+  completedBy?: string | null
+  resultComment?: string | null
+  autoAction?: string | null
+  autoActionStatus?: string | null
+  autoActionError?: string | null
+  pendingTasks: ApprovalTaskView[]
+}
+
+export interface ApprovalDecisionRequest {
+  comment?: string | null
+}
+
+export interface CanvasPublishApprovalRequest {
+  reason?: string | null
+  larkOpenId?: string | null
+  larkUserId?: string | null
+  larkDepartmentId?: string | null
+}
+
+export interface CanvasPublishApprovalStatusView {
+  canvasId: number
+  draftVersionId: number
+  approvalRequired: boolean
+  riskLevel: string
+  riskReasons: string[]
+  latestApproved?: ApprovalInstanceView | null
+}
+
+interface ApprovalHttpClient {
+  get: typeof http.get
+  post: typeof http.post
+}
+
+export function createApprovalApi(client: ApprovalHttpClient = http) {
+  return {
+    tasks: (status = 'PENDING') =>
+      client.get<R<ApprovalTaskView[]>, R<ApprovalTaskView[]>>('/approvals/tasks', { params: { status } }),
+    instances: (params: { targetType?: string; targetId?: string; status?: string } = {}) =>
+      client.get<R<ApprovalInstanceView[]>, R<ApprovalInstanceView[]>>('/approvals/instances', { params }),
+    approve: (taskId: number, body: ApprovalDecisionRequest) =>
+      client.post<R<ApprovalInstanceView>, R<ApprovalInstanceView>>(`/approvals/tasks/${taskId}/approve`, body),
+    reject: (taskId: number, body: ApprovalDecisionRequest) =>
+      client.post<R<ApprovalInstanceView>, R<ApprovalInstanceView>>(`/approvals/tasks/${taskId}/reject`, body),
+  }
+}
+
+export const approvalApi = createApprovalApi()
+
 /** 画布草稿、发布、版本、灰度和执行调试接口集合。 */
 export const canvasApi = {
   create: (body: CanvasCreateReq) =>
@@ -401,8 +591,8 @@ export const canvasApi = {
   get: (id: number) =>
     http.get<R<CanvasDetail>, R<CanvasDetail>>(`/canvas/${id}`),
 
-  update: (id: number, body: CanvasUpdateReq) =>
-    http.put<R<void>, R<void>>(`/canvas/${id}`, body),
+  update: (id: number, body: CanvasUpdateReq, options?: CanvasUpdateOptions) =>
+    http.put<R<void>, R<void>>(`/canvas/${id}`, body, options),
 
   list: (params: CanvasListQuery) =>
     http.get<R<PageResult<Canvas>>, R<PageResult<Canvas>>>('/canvas/list', { params }),
@@ -412,6 +602,12 @@ export const canvasApi = {
 
   prePublishChecks: (id: number) =>
     http.get<R<PrePublishCheckResult>, R<PrePublishCheckResult>>(`/canvas/${id}/pre-publish-checks`),
+
+  approvalStatus: (id: number) =>
+    http.get<R<CanvasPublishApprovalStatusView>, R<CanvasPublishApprovalStatusView>>(`/canvas/${id}/approval-status`),
+
+  submitReview: (id: number, body: CanvasPublishApprovalRequest) =>
+    http.post<R<ApprovalInstanceView>, R<ApprovalInstanceView>>(`/canvas/${id}/submit-review`, body),
 
   offline: (id: number) =>
     http.post<R<void>, R<void>>(`/canvas/${id}/offline`),

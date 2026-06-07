@@ -10,6 +10,7 @@ import org.springframework.stereotype.Service;
 import java.time.Duration;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.function.Consumer;
 import java.util.concurrent.locks.LockSupport;
 
 /**
@@ -35,6 +36,7 @@ public class AudienceComputeTaskRunner {
     private final NotificationService notificationService;
     /** 人群计算锁被占用时的实际重试间隔。 */
     private final Duration lockRetryDelay;
+    private final Consumer<Duration> lockRetryWaiter;
     private ManagedVirtualThreadExecutor backgroundExecutor = ManagedVirtualThreadExecutor.direct();
 
     /**
@@ -75,6 +77,21 @@ public class AudienceComputeTaskRunner {
         this.asyncTaskService = asyncTaskService;
         this.notificationService = notificationService;
         this.lockRetryDelay = lockRetryDelay;
+        this.lockRetryWaiter = null;
+    }
+
+    AudienceComputeTaskRunner(
+            AudienceBatchComputeService computeService,
+            AsyncTaskService asyncTaskService,
+            NotificationService notificationService,
+            Duration lockRetryDelay,
+            Consumer<Duration> lockRetryWaiter
+    ) {
+        this.computeService = computeService;
+        this.asyncTaskService = asyncTaskService;
+        this.notificationService = notificationService;
+        this.lockRetryDelay = lockRetryDelay;
+        this.lockRetryWaiter = lockRetryWaiter;
     }
 
     @Autowired(required = false)
@@ -233,6 +250,10 @@ public class AudienceComputeTaskRunner {
      */
     private void sleepBeforeLockRetry() throws InterruptedException {
         if (lockRetryDelay.isZero() || lockRetryDelay.isNegative()) {
+            return;
+        }
+        if (lockRetryWaiter != null) {
+            lockRetryWaiter.accept(lockRetryDelay);
             return;
         }
         LockSupport.parkNanos(lockRetryDelay.toNanos());

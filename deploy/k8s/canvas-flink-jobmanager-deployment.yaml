@@ -1,0 +1,76 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: canvas-flink-jobmanager
+  namespace: canvas
+  labels:
+    app.kubernetes.io/name: canvas-flink
+    app.kubernetes.io/component: flink-jobmanager
+    app.kubernetes.io/part-of: marketing-canvas
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: canvas-flink
+      app.kubernetes.io/component: flink-jobmanager
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: canvas-flink
+        app.kubernetes.io/component: flink-jobmanager
+        app.kubernetes.io/part-of: marketing-canvas
+    spec:
+      serviceAccountName: canvas-flink
+      terminationGracePeriodSeconds: 60
+      containers:
+        - name: flink-jobmanager
+          image: registry.example.com/marketing-canvas/canvas-flink-jobs:prod
+          imagePullPolicy: IfNotPresent
+          command: ["jobmanager"]
+          ports:
+            - name: rest
+              containerPort: 8081
+            - name: rpc
+              containerPort: 6123
+          readinessProbe:
+            httpGet:
+              path: /overview
+              port: rest
+            initialDelaySeconds: 20
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /overview
+              port: rest
+            initialDelaySeconds: 60
+            periodSeconds: 20
+          volumeMounts:
+            - name: flink-config
+              mountPath: /opt/flink/conf/flink-conf.yaml
+              subPath: flink-conf.yaml
+            - name: canvas-flink-checkpoints
+              mountPath: /opt/flink/checkpoints
+            - name: canvas-flink-savepoints
+              mountPath: /opt/flink/savepoints
+          resources:
+            requests:
+              cpu: 500m
+              memory: 1Gi
+            limits:
+              cpu: "2"
+              memory: 2Gi
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+      volumes:
+        - name: flink-config
+          configMap:
+            name: canvas-flink
+        - name: canvas-flink-checkpoints
+          persistentVolumeClaim:
+            claimName: canvas-flink-checkpoints
+        - name: canvas-flink-savepoints
+          persistentVolumeClaim:
+            claimName: canvas-flink-savepoints

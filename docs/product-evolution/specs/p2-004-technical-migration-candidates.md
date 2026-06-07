@@ -40,22 +40,32 @@ The team can make technology moves based on measured need instead of whitepaper 
 
 ### Backend Touchpoints
 
-- `backend/canvas-engine/src/main/java/org/chovy/canvas/engine`
-- `backend/canvas-engine/src/main/java/org/chovy/canvas/infrastructure`
-- `backend/canvas-engine/src/test/java/org/chovy/canvas/perf`
+- `backend/canvas-engine/src/main/java/org/chovy/canvas/architecture`
+- `backend/canvas-engine/src/main/java/org/chovy/canvas/web/TechnicalMigrationCandidateController.java`
 
 ### Frontend Touchpoints
 
-- `frontend/src/pages/canvas-editor/index.tsx`
+- `frontend/src/services/technicalMigrationApi.ts`
+- `frontend/src/pages/technical-migration-candidates/technicalMigrationCandidates.ts`
 
 ### Data And Configuration Touchpoints
 
-- `backend/canvas-engine/src/main/resources/db/migration/V163__technical_migration_candidate_metrics.sql`
+- `backend/canvas-engine/src/main/resources/db/migration/V267__technical_migration_candidate_metrics.sql`
 
 ### Test Touchpoints
 
 - `backend/canvas-engine/src/test/java/org/chovy/canvas/architecture/TechnicalMigrationCandidateTest.java`
-- `backend/canvas-engine/src/test/java/org/chovy/canvas/perf/PerfRunContextTest.java`
+- `frontend/src/pages/technical-migration-candidates/technical-migration-candidates.test.ts`
+
+## Implementation Status
+
+Completed on 2026-06-05.
+
+- Added `V267__technical_migration_candidate_metrics.sql` for tenant-scoped migration evidence. The plan originally named `V163`; the current workspace already has later migrations including `V265__bi_datasource_health_snapshot.sql`, so this implementation uses the next available migration version.
+- Added `TechnicalMigrationCandidateService` and `JdbcTechnicalMigrationCandidateRepository` to register proof commands, baseline JSON, rollback commands, default `BLOCKED_PENDING_REVIEW` decisions, and tenant-scoped release-gate checks.
+- Added authenticated `TechnicalMigrationCandidateController` at `/architecture/migration-candidates/evidence`, guarded by `TenantContextResolver.currentOrError()`. The server records `submittedBy` from the authenticated tenant context rather than trusting the frontend payload.
+- Reused the existing frontend `technicalMigrationApi` and `technicalMigrationCandidates` helpers for payload creation, candidate labels, gate copy, and endpoint coverage.
+- Rollout: run `V267__technical_migration_candidate_metrics.sql`, then allow authenticated architects/operators to register evidence. Runtime migration remains blocked until reviewed evidence reaches `APPROVED_FOR_CHILD_SPEC`. Rollback: hide the evidence entry point and stop calling the endpoint; the table is additive governance metadata and no runtime path depends on it.
 
 ## Dependencies
 

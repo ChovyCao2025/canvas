@@ -8,6 +8,8 @@
 
 **Tech Stack:** Java 21, Spring Boot WebFlux-style `Mono`, MyBatis-Plus, Flyway, JUnit 5, Mockito, AssertJ, React 18, TypeScript, Axios, Vitest.
 
+**Implementation status (2026-06-05):** Completed. The actual migration is `V267__technical_migration_candidate_metrics.sql` because this workspace already contains later migrations including `V265__bi_datasource_health_snapshot.sql`. The backend registers tenant-scoped evidence through `TenantContextResolver.currentOrError()` and stores the authenticated username as `submittedBy`. Commit was intentionally skipped because the user did not request one.
+
 ---
 
 ## Spec Reference
@@ -18,8 +20,9 @@
 ## File Structure
 
 **Backend**
-- Create: `backend/canvas-engine/src/main/resources/db/migration/V163__technical_migration_candidate_metrics.sql` - evidence registry table.
+- Create: `backend/canvas-engine/src/main/resources/db/migration/V267__technical_migration_candidate_metrics.sql` - evidence registry table.
 - Create: `backend/canvas-engine/src/main/java/org/chovy/canvas/architecture/TechnicalMigrationCandidateService.java` - proof and rollback gate logic.
+- Create: `backend/canvas-engine/src/main/java/org/chovy/canvas/architecture/JdbcTechnicalMigrationCandidateRepository.java` - production persistence adapter.
 - Create: `backend/canvas-engine/src/main/java/org/chovy/canvas/web/TechnicalMigrationCandidateController.java` - `/architecture/migration-candidates`.
 - Create: `backend/canvas-engine/src/test/java/org/chovy/canvas/architecture/TechnicalMigrationCandidateTest.java`
 
@@ -31,11 +34,12 @@
 ### Task 1: Evidence Registry Service
 
 **Files:**
-- Create: `backend/canvas-engine/src/main/resources/db/migration/V163__technical_migration_candidate_metrics.sql`
+- Create: `backend/canvas-engine/src/main/resources/db/migration/V267__technical_migration_candidate_metrics.sql`
 - Create: `backend/canvas-engine/src/main/java/org/chovy/canvas/architecture/TechnicalMigrationCandidateService.java`
+- Create: `backend/canvas-engine/src/main/java/org/chovy/canvas/architecture/JdbcTechnicalMigrationCandidateRepository.java`
 - Create: `backend/canvas-engine/src/test/java/org/chovy/canvas/architecture/TechnicalMigrationCandidateTest.java`
 
-- [ ] **Step 1: Write evidence registry tests**
+- [x] **Step 1: Write evidence registry tests**
 
 Create `backend/canvas-engine/src/test/java/org/chovy/canvas/architecture/TechnicalMigrationCandidateTest.java`:
 
@@ -60,7 +64,7 @@ class TechnicalMigrationCandidateTest {
     @Test
     void migrationCreatesEvidenceTableWithRollbackFields() throws Exception {
         String sql = Files.readString(Path.of(
-                "src/main/resources/db/migration/V163__technical_migration_candidate_metrics.sql"));
+                "src/main/resources/db/migration/V267__technical_migration_candidate_metrics.sql"));
 
         assertThat(sql)
                 .contains("CREATE TABLE IF NOT EXISTS technical_migration_candidate_evidence")
@@ -117,7 +121,7 @@ class TechnicalMigrationCandidateTest {
 }
 ```
 
-- [ ] **Step 2: Run evidence tests and confirm red state**
+- [x] **Step 2: Run evidence tests and confirm red state**
 
 Run:
 
@@ -127,9 +131,9 @@ cd backend && mvn -pl canvas-engine test -Dtest=TechnicalMigrationCandidateTest
 
 Expected: FAIL because the migration and service do not exist.
 
-- [ ] **Step 3: Add migration**
+- [x] **Step 3: Add migration**
 
-Create `backend/canvas-engine/src/main/resources/db/migration/V163__technical_migration_candidate_metrics.sql`:
+Create `backend/canvas-engine/src/main/resources/db/migration/V267__technical_migration_candidate_metrics.sql`:
 
 ```sql
 CREATE TABLE IF NOT EXISTS technical_migration_candidate_evidence (
@@ -148,7 +152,7 @@ CREATE TABLE IF NOT EXISTS technical_migration_candidate_evidence (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 ```
 
-- [ ] **Step 4: Implement evidence service**
+- [x] **Step 4: Implement evidence service**
 
 Create `backend/canvas-engine/src/main/java/org/chovy/canvas/architecture/TechnicalMigrationCandidateService.java`:
 
@@ -197,7 +201,7 @@ public class TechnicalMigrationCandidateService {
 }
 ```
 
-- [ ] **Step 5: Run service tests**
+- [x] **Step 5: Run service tests**
 
 Run:
 
@@ -213,7 +217,7 @@ Expected: PASS.
 - Create: `backend/canvas-engine/src/main/java/org/chovy/canvas/web/TechnicalMigrationCandidateController.java`
 - Extend: `backend/canvas-engine/src/test/java/org/chovy/canvas/architecture/TechnicalMigrationCandidateTest.java`
 
-- [ ] **Step 1: Add controller test**
+- [x] **Step 1: Add controller test**
 
 Add this test to `TechnicalMigrationCandidateTest`:
 
@@ -238,7 +242,7 @@ void controllerRegistersEvidenceWithSubmittedByHeader() {
 }
 ```
 
-- [ ] **Step 2: Run controller test and confirm red state**
+- [x] **Step 2: Run controller test and confirm red state**
 
 Run:
 
@@ -248,7 +252,7 @@ cd backend && mvn -pl canvas-engine test -Dtest=TechnicalMigrationCandidateTest
 
 Expected: FAIL because `TechnicalMigrationCandidateController` does not exist.
 
-- [ ] **Step 3: Add controller**
+- [x] **Step 3: Add controller**
 
 Create `backend/canvas-engine/src/main/java/org/chovy/canvas/web/TechnicalMigrationCandidateController.java`:
 
@@ -290,7 +294,7 @@ public class TechnicalMigrationCandidateController {
 }
 ```
 
-- [ ] **Step 4: Run controller tests**
+- [x] **Step 4: Run controller tests**
 
 Run:
 
@@ -307,7 +311,7 @@ Expected: PASS.
 - Create: `frontend/src/pages/technical-migration-candidates/technicalMigrationCandidates.ts`
 - Create: `frontend/src/pages/technical-migration-candidates/technical-migration-candidates.test.ts`
 
-- [ ] **Step 1: Write frontend tests**
+- [x] **Step 1: Write frontend tests**
 
 Create `frontend/src/pages/technical-migration-candidates/technical-migration-candidates.test.ts`:
 
@@ -339,7 +343,7 @@ describe('technicalMigrationCandidates', () => {
 })
 ```
 
-- [ ] **Step 2: Run frontend tests and confirm red state**
+- [x] **Step 2: Run frontend tests and confirm red state**
 
 Run:
 
@@ -349,7 +353,7 @@ cd frontend && npm test -- technical-migration-candidates.test.ts
 
 Expected: FAIL because `technicalMigrationCandidates.ts` does not exist.
 
-- [ ] **Step 3: Add API wrapper**
+- [x] **Step 3: Add API wrapper**
 
 Create `frontend/src/services/technicalMigrationApi.ts`:
 
@@ -364,7 +368,7 @@ export const technicalMigrationApi = {
 }
 ```
 
-- [ ] **Step 4: Add presentation helpers**
+- [x] **Step 4: Add presentation helpers**
 
 Create `frontend/src/pages/technical-migration-candidates/technicalMigrationCandidates.ts`:
 
@@ -397,7 +401,7 @@ export function canStartMigrationText(canStart: boolean) {
 }
 ```
 
-- [ ] **Step 5: Run frontend tests**
+- [x] **Step 5: Run frontend tests**
 
 Run:
 
@@ -412,15 +416,16 @@ Expected: PASS.
 **Files:**
 - Modify: `docs/product-evolution/specs/p2-004-technical-migration-candidates.md`
 - Modify: `docs/product-evolution/plans/p2-004-technical-migration-candidates-plan.md`
-- Create: `backend/canvas-engine/src/main/resources/db/migration/V163__technical_migration_candidate_metrics.sql`
+- Create: `backend/canvas-engine/src/main/resources/db/migration/V267__technical_migration_candidate_metrics.sql`
 - Create: `backend/canvas-engine/src/main/java/org/chovy/canvas/architecture/TechnicalMigrationCandidateService.java`
+- Create: `backend/canvas-engine/src/main/java/org/chovy/canvas/architecture/JdbcTechnicalMigrationCandidateRepository.java`
 - Create: `backend/canvas-engine/src/main/java/org/chovy/canvas/web/TechnicalMigrationCandidateController.java`
 - Create: `backend/canvas-engine/src/test/java/org/chovy/canvas/architecture/TechnicalMigrationCandidateTest.java`
 - Create: `frontend/src/services/technicalMigrationApi.ts`
 - Create: `frontend/src/pages/technical-migration-candidates/technicalMigrationCandidates.ts`
 - Create: `frontend/src/pages/technical-migration-candidates/technical-migration-candidates.test.ts`
 
-- [ ] **Step 1: Run focused backend tests**
+- [x] **Step 1: Run focused backend tests**
 
 Run:
 
@@ -430,7 +435,7 @@ cd backend && mvn -pl canvas-engine test -Dtest=TechnicalMigrationCandidateTest
 
 Expected: PASS.
 
-- [ ] **Step 2: Run focused frontend tests**
+- [x] **Step 2: Run focused frontend tests**
 
 Run:
 
@@ -440,30 +445,37 @@ cd frontend && npm test -- technical-migration-candidates.test.ts
 
 Expected: PASS.
 
-- [ ] **Step 3: Add rollout notes to the implementation PR**
+- [x] **Step 3: Add rollout notes to the implementation PR**
 
 Use this rollout note text:
 
 ```markdown
-Rollout: run `V163__technical_migration_candidate_metrics.sql`, then allow architects to register migration evidence. Runtime migration remains blocked until a reviewed evidence row reaches `APPROVED_FOR_CHILD_SPEC`. Rollback: hide the evidence entry point; no runtime code path depends on the table.
+Rollout: run `V267__technical_migration_candidate_metrics.sql`, then allow architects to register migration evidence. Runtime migration remains blocked until a reviewed evidence row reaches `APPROVED_FOR_CHILD_SPEC`. Rollback: hide the evidence entry point; no runtime code path depends on the table.
 ```
 
-- [ ] **Step 4: Commit the implementation slice**
+- [x] **Step 4: Commit skipped by operator instruction**
 
 Run:
 
 ```bash
-git add \
-  backend/canvas-engine/src/main/resources/db/migration/V163__technical_migration_candidate_metrics.sql \
-  backend/canvas-engine/src/main/java/org/chovy/canvas/architecture/TechnicalMigrationCandidateService.java \
-  backend/canvas-engine/src/main/java/org/chovy/canvas/web/TechnicalMigrationCandidateController.java \
-  backend/canvas-engine/src/test/java/org/chovy/canvas/architecture/TechnicalMigrationCandidateTest.java \
-  frontend/src/services/technicalMigrationApi.ts \
-  frontend/src/pages/technical-migration-candidates/technicalMigrationCandidates.ts \
-  frontend/src/pages/technical-migration-candidates/technical-migration-candidates.test.ts \
-  docs/product-evolution/specs/p2-004-technical-migration-candidates.md \
-  docs/product-evolution/plans/p2-004-technical-migration-candidates-plan.md
-git commit -m "feat: add technical migration evidence registry"
+Commit was not created because the operator did not request one.
 ```
 
-Expected: commit contains only migration evidence registry, API, frontend helpers, tests, spec, and plan files.
+Expected: no commit is created; changes remain in the working tree for operator review.
+
+## Acceptance Checklist
+
+- [x] Evidence registry table exists as additive migration `V267__technical_migration_candidate_metrics.sql`.
+- [x] Evidence writes are tenant-scoped and default to `BLOCKED_PENDING_REVIEW`.
+- [x] Release-gate checks only use the latest evidence for the same tenant and candidate.
+- [x] `/architecture/migration-candidates/evidence` is authenticated through `TenantContextResolver.currentOrError()` and records the authenticated username as `submittedBy`.
+- [x] Frontend API wrapper and presentation helpers cover payload creation, label formatting, gate copy, and endpoint wiring.
+- [x] Rollout and rollback notes are documented.
+
+## Verification Evidence
+
+- [x] Backend red state on 2026-06-05: `JAVA_HOME=/Users/photonpay/Library/Java/JavaVirtualMachines/ms-21.0.11/Contents/Home PATH="/Users/photonpay/Library/Java/JavaVirtualMachines/ms-21.0.11/Contents/Home/bin:$PATH" mvn -pl canvas-engine -Dtest=TechnicalMigrationCandidateTest test` from `backend` failed in `testCompile` because `TechnicalMigrationCandidateController` did not exist. The same run also showed unrelated BI test-source missing symbols already present in the dirty workspace.
+- [x] Backend main compile passes on 2026-06-05: `JAVA_HOME=/Users/photonpay/Library/Java/JavaVirtualMachines/ms-21.0.11/Contents/Home PATH="/Users/photonpay/Library/Java/JavaVirtualMachines/ms-21.0.11/Contents/Home/bin:$PATH" mvn -pl canvas-engine -DskipTests compile dependency:build-classpath -Dmdep.includeScope=runtime -Dmdep.outputFile=/tmp/canvas-engine-runtime.cp` from `backend`.
+- [x] Backend focused tests pass after migration renumbering on 2026-06-05: `JAVA_HOME=/Users/photonpay/Library/Java/JavaVirtualMachines/ms-21.0.11/Contents/Home PATH="/Users/photonpay/Library/Java/JavaVirtualMachines/ms-21.0.11/Contents/Home/bin:$PATH" mvn -pl canvas-engine -Dtest=TechnicalMigrationCandidateTest test` from `backend` (6 tests, 0 failures, 0 errors, 0 skipped).
+- [x] Frontend focused tests pass on 2026-06-05: `PATH="/opt/homebrew/bin:$PATH" npm run test -- technical-migration-candidates.test.ts` from `frontend` (3 tests, 0 failures).
+- [x] Frontend production build passes on 2026-06-05: `PATH="/opt/homebrew/bin:$PATH" npm run build` from `frontend`.

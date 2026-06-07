@@ -54,7 +54,7 @@ Persist manual and scheduled privacy audience bitmap rebuild automation cycles a
 
 ## Technical Scope
 
-- Add migration `backend/canvas-engine/src/main/resources/db/migration/V261__cdp_warehouse_privacy_audience_rebuild_automation_run.sql`.
+- Add migration `backend/canvas-engine/src/main/resources/db/migration/V261__privacy_audience_rebuild_automation_run.sql`.
 - Add `backend/canvas-engine/src/main/java/org/chovy/canvas/dal/dataobject/CdpWarehousePrivacyAudienceBitmapRebuildAutomationRunDO.java`.
 - Add `backend/canvas-engine/src/main/java/org/chovy/canvas/dal/mapper/CdpWarehousePrivacyAudienceBitmapRebuildAutomationRunMapper.java`.
 - Add `backend/canvas-engine/src/main/java/org/chovy/canvas/domain/warehouse/CdpWarehousePrivacyAudienceBitmapRebuildAutomationRunService.java`.

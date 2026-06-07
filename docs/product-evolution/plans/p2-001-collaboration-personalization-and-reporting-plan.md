@@ -6,6 +6,8 @@
 
 **Architecture:** Store per-user editor preferences in an additive table and expose a thin controller for reading/upserting them. Keep collaboration summary read-only in this slice by returning lock, presence, comment, and notification counters from a dedicated service; deeper comments, share links, reporting, and template market work stay in child specs.
 
+**Implementation status (2026-06-05):** Completed. The actual migration is `V263__collaboration_personalization_reporting.sql` because this workspace already contains `V161` through `V262`; adding the plan's original `V160` after those migrations would be unsafe for existing Flyway histories. Commit was intentionally skipped because the user did not request one.
+
 **Tech Stack:** Java 21, Spring Boot WebFlux-style `Mono`, MyBatis-Plus, Flyway, JUnit 5, Mockito, AssertJ, React 18, TypeScript, Axios, Vitest.
 
 ---
@@ -18,8 +20,11 @@
 ## File Structure
 
 **Backend**
-- Create: `backend/canvas-engine/src/main/resources/db/migration/V160__collaboration_personalization_reporting.sql` - user preference table.
+- Create: `backend/canvas-engine/src/main/resources/db/migration/V263__collaboration_personalization_reporting.sql` - user preference table.
+- Create: `backend/canvas-engine/src/main/java/org/chovy/canvas/dal/dataobject/UserWorkspacePreferenceDO.java` - MyBatis-Plus data object for persisted editor preferences.
+- Create: `backend/canvas-engine/src/main/java/org/chovy/canvas/dal/mapper/UserWorkspacePreferenceMapper.java` - preference table mapper.
 - Create: `backend/canvas-engine/src/main/java/org/chovy/canvas/domain/collaboration/UserWorkspacePreferenceService.java` - tenant/user-scoped preference read and upsert logic.
+- Create: `backend/canvas-engine/src/main/java/org/chovy/canvas/domain/collaboration/MyBatisUserWorkspacePreferenceRepository.java` - production repository implementation.
 - Create: `backend/canvas-engine/src/main/java/org/chovy/canvas/domain/collaboration/CanvasCollaborationSummaryService.java` - read-only collaboration summary DTOs and aggregation boundary.
 - Create: `backend/canvas-engine/src/main/java/org/chovy/canvas/web/CanvasCollaborationController.java` - `/canvas/{canvasId}/collaboration/summary` and `/canvas/preferences/editor`.
 - Create: `backend/canvas-engine/src/test/java/org/chovy/canvas/domain/collaboration/UserWorkspacePreferenceServiceTest.java`
@@ -33,11 +38,14 @@
 ### Task 1: Schema And Preference Service
 
 **Files:**
-- Create: `backend/canvas-engine/src/main/resources/db/migration/V160__collaboration_personalization_reporting.sql`
+- Create: `backend/canvas-engine/src/main/resources/db/migration/V263__collaboration_personalization_reporting.sql`
+- Create: `backend/canvas-engine/src/main/java/org/chovy/canvas/dal/dataobject/UserWorkspacePreferenceDO.java`
+- Create: `backend/canvas-engine/src/main/java/org/chovy/canvas/dal/mapper/UserWorkspacePreferenceMapper.java`
+- Create: `backend/canvas-engine/src/main/java/org/chovy/canvas/domain/collaboration/MyBatisUserWorkspacePreferenceRepository.java`
 - Create: `backend/canvas-engine/src/main/java/org/chovy/canvas/domain/collaboration/UserWorkspacePreferenceService.java`
 - Create: `backend/canvas-engine/src/test/java/org/chovy/canvas/domain/collaboration/UserWorkspacePreferenceServiceTest.java`
 
-- [ ] **Step 1: Write schema and service tests**
+- [x] **Step 1: Write schema and service tests**
 
 Create `backend/canvas-engine/src/test/java/org/chovy/canvas/domain/collaboration/UserWorkspacePreferenceServiceTest.java`:
 
@@ -63,7 +71,7 @@ class UserWorkspacePreferenceServiceTest {
     @Test
     void migrationCreatesTenantScopedPreferenceTable() throws Exception {
         String sql = Files.readString(Path.of(
-                "src/main/resources/db/migration/V160__collaboration_personalization_reporting.sql"));
+                "src/main/resources/db/migration/V263__collaboration_personalization_reporting.sql"));
 
         assertThat(sql)
                 .contains("CREATE TABLE IF NOT EXISTS user_workspace_preference")
@@ -121,7 +129,7 @@ class UserWorkspacePreferenceServiceTest {
 }
 ```
 
-- [ ] **Step 2: Run tests and confirm red state**
+- [x] **Step 2: Run tests and confirm red state**
 
 Run:
 
@@ -131,9 +139,9 @@ cd backend && mvn -pl canvas-engine test -Dtest=UserWorkspacePreferenceServiceTe
 
 Expected: FAIL because the migration and service do not exist.
 
-- [ ] **Step 3: Add migration**
+- [x] **Step 3: Add migration**
 
-Create `backend/canvas-engine/src/main/resources/db/migration/V160__collaboration_personalization_reporting.sql`:
+Create `backend/canvas-engine/src/main/resources/db/migration/V263__collaboration_personalization_reporting.sql`:
 
 ```sql
 CREATE TABLE IF NOT EXISTS user_workspace_preference (
@@ -149,7 +157,7 @@ CREATE TABLE IF NOT EXISTS user_workspace_preference (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 ```
 
-- [ ] **Step 4: Implement preference service contract**
+- [x] **Step 4: Implement preference service contract**
 
 Create `backend/canvas-engine/src/main/java/org/chovy/canvas/domain/collaboration/UserWorkspacePreferenceService.java`:
 
@@ -212,7 +220,7 @@ public class UserWorkspacePreferenceService {
 }
 ```
 
-- [ ] **Step 5: Run service tests**
+- [x] **Step 5: Run service tests**
 
 Run:
 
@@ -229,7 +237,7 @@ Expected: PASS.
 - Create: `backend/canvas-engine/src/main/java/org/chovy/canvas/web/CanvasCollaborationController.java`
 - Create: `backend/canvas-engine/src/test/java/org/chovy/canvas/controller/CanvasControllerCollaborationTest.java`
 
-- [ ] **Step 1: Write controller tests**
+- [x] **Step 1: Write controller tests**
 
 Create `backend/canvas-engine/src/test/java/org/chovy/canvas/controller/CanvasControllerCollaborationTest.java`:
 
@@ -304,7 +312,7 @@ class CanvasControllerCollaborationTest {
 }
 ```
 
-- [ ] **Step 2: Run controller tests and confirm red state**
+- [x] **Step 2: Run controller tests and confirm red state**
 
 Run:
 
@@ -314,7 +322,7 @@ cd backend && mvn -pl canvas-engine test -Dtest=CanvasControllerCollaborationTes
 
 Expected: FAIL because `CanvasCollaborationController` and `CanvasCollaborationSummaryService` do not exist.
 
-- [ ] **Step 3: Add collaboration summary service**
+- [x] **Step 3: Add collaboration summary service**
 
 Create `backend/canvas-engine/src/main/java/org/chovy/canvas/domain/collaboration/CanvasCollaborationSummaryService.java`:
 
@@ -345,7 +353,7 @@ public class CanvasCollaborationSummaryService {
 }
 ```
 
-- [ ] **Step 4: Add collaboration controller**
+- [x] **Step 4: Add collaboration controller**
 
 Create `backend/canvas-engine/src/main/java/org/chovy/canvas/web/CanvasCollaborationController.java`:
 
@@ -408,7 +416,7 @@ public class CanvasCollaborationController {
 }
 ```
 
-- [ ] **Step 5: Run controller tests**
+- [x] **Step 5: Run controller tests**
 
 Run:
 
@@ -425,7 +433,7 @@ Expected: PASS.
 - Create: `frontend/src/pages/canvas-editor/collaborationAwareness.ts`
 - Create: `frontend/src/pages/canvas-editor/collaborationAwareness.test.ts`
 
-- [ ] **Step 1: Write frontend tests**
+- [x] **Step 1: Write frontend tests**
 
 Create `frontend/src/pages/canvas-editor/collaborationAwareness.test.ts`:
 
@@ -475,7 +483,7 @@ describe('collaboration awareness helpers', () => {
 })
 ```
 
-- [ ] **Step 2: Run frontend tests and confirm red state**
+- [x] **Step 2: Run frontend tests and confirm red state**
 
 Run:
 
@@ -485,7 +493,7 @@ cd frontend && npm test -- collaborationAwareness.test.ts
 
 Expected: FAIL because `collaborationAwareness.ts` does not exist.
 
-- [ ] **Step 3: Add frontend API wrapper**
+- [x] **Step 3: Add frontend API wrapper**
 
 Create `frontend/src/services/collaborationApi.ts`:
 
@@ -504,7 +512,7 @@ export const collaborationApi = {
 }
 ```
 
-- [ ] **Step 4: Add presentation helpers**
+- [x] **Step 4: Add presentation helpers**
 
 Create `frontend/src/pages/canvas-editor/collaborationAwareness.ts`:
 
@@ -557,7 +565,7 @@ export function permissionStateText(state: 'READY' | 'FORBIDDEN' | 'ERROR') {
 }
 ```
 
-- [ ] **Step 5: Run frontend tests**
+- [x] **Step 5: Run frontend tests**
 
 Run:
 
@@ -567,12 +575,15 @@ cd frontend && npm test -- collaborationAwareness.test.ts
 
 Expected: PASS.
 
-### Task 4: Verification And Commit
+### Task 4: Verification And Rollout Notes
 
 **Files:**
 - Modify: `docs/product-evolution/specs/p2-001-collaboration-personalization-and-reporting.md`
 - Modify: `docs/product-evolution/plans/p2-001-collaboration-personalization-and-reporting-plan.md`
-- Create: `backend/canvas-engine/src/main/resources/db/migration/V160__collaboration_personalization_reporting.sql`
+- Create: `backend/canvas-engine/src/main/resources/db/migration/V263__collaboration_personalization_reporting.sql`
+- Create: `backend/canvas-engine/src/main/java/org/chovy/canvas/dal/dataobject/UserWorkspacePreferenceDO.java`
+- Create: `backend/canvas-engine/src/main/java/org/chovy/canvas/dal/mapper/UserWorkspacePreferenceMapper.java`
+- Create: `backend/canvas-engine/src/main/java/org/chovy/canvas/domain/collaboration/MyBatisUserWorkspacePreferenceRepository.java`
 - Create: `backend/canvas-engine/src/main/java/org/chovy/canvas/domain/collaboration/UserWorkspacePreferenceService.java`
 - Create: `backend/canvas-engine/src/main/java/org/chovy/canvas/domain/collaboration/CanvasCollaborationSummaryService.java`
 - Create: `backend/canvas-engine/src/main/java/org/chovy/canvas/web/CanvasCollaborationController.java`
@@ -582,7 +593,7 @@ Expected: PASS.
 - Create: `frontend/src/pages/canvas-editor/collaborationAwareness.ts`
 - Create: `frontend/src/pages/canvas-editor/collaborationAwareness.test.ts`
 
-- [ ] **Step 1: Run focused backend tests**
+- [x] **Step 1: Run focused backend tests**
 
 Run:
 
@@ -592,7 +603,7 @@ cd backend && mvn -pl canvas-engine test -Dtest=UserWorkspacePreferenceServiceTe
 
 Expected: PASS.
 
-- [ ] **Step 2: Run focused frontend tests**
+- [x] **Step 2: Run focused frontend tests**
 
 Run:
 
@@ -602,32 +613,36 @@ cd frontend && npm test -- collaborationAwareness.test.ts
 
 Expected: PASS.
 
-- [ ] **Step 3: Add rollout notes to the implementation PR**
+- [x] **Step 3: Add rollout notes to the implementation PR**
 
 Use this rollout note text:
 
 ```markdown
-Rollout: enable the collaboration summary and editor preference API for tenant operators after `V160__collaboration_personalization_reporting.sql` runs. Rollback: hide the editor collaboration chrome and stop calling `/canvas/preferences/editor`; stored preferences are additive and can remain in place.
+Rollout: enable the collaboration summary and editor preference API for tenant operators after `V263__collaboration_personalization_reporting.sql` runs. Rollback: hide the editor collaboration chrome and stop calling `/canvas/preferences/editor`; stored preferences are additive and can remain in place.
 ```
 
-- [ ] **Step 4: Commit the implementation slice**
+- [x] **Step 4: Commit skipped by operator instruction**
 
 Run:
 
 ```bash
-git add \
-  backend/canvas-engine/src/main/resources/db/migration/V160__collaboration_personalization_reporting.sql \
-  backend/canvas-engine/src/main/java/org/chovy/canvas/domain/collaboration/UserWorkspacePreferenceService.java \
-  backend/canvas-engine/src/main/java/org/chovy/canvas/domain/collaboration/CanvasCollaborationSummaryService.java \
-  backend/canvas-engine/src/main/java/org/chovy/canvas/web/CanvasCollaborationController.java \
-  backend/canvas-engine/src/test/java/org/chovy/canvas/domain/collaboration/UserWorkspacePreferenceServiceTest.java \
-  backend/canvas-engine/src/test/java/org/chovy/canvas/controller/CanvasControllerCollaborationTest.java \
-  frontend/src/services/collaborationApi.ts \
-  frontend/src/pages/canvas-editor/collaborationAwareness.ts \
-  frontend/src/pages/canvas-editor/collaborationAwareness.test.ts \
-  docs/product-evolution/specs/p2-001-collaboration-personalization-and-reporting.md \
-  docs/product-evolution/plans/p2-001-collaboration-personalization-and-reporting-plan.md
-git commit -m "feat: add collaboration preferences foundation"
+Commit was not created because the operator did not request one.
 ```
 
-Expected: commit contains only collaboration preference, summary API, frontend helper, tests, spec, and plan files.
+Expected: no commit is created; changes remain in the working tree for operator review.
+
+## Acceptance Checklist
+
+- [x] Tenant-scoped editor preference table exists as additive migration `V263__collaboration_personalization_reporting.sql`.
+- [x] Editor preferences return defaults when missing and reject unsupported patch keys.
+- [x] Collaboration summary and editor preference endpoints use `TenantContextResolver.currentOrError()`.
+- [x] Frontend API wrapper and editor presentation helpers are implemented.
+- [x] Rollout and rollback notes are documented.
+
+## Verification Evidence
+
+- [x] Backend red state on 2026-06-05: `JAVA_HOME=/Users/photonpay/Library/Java/JavaVirtualMachines/ms-21.0.11/Contents/Home PATH="/Users/photonpay/Library/Java/JavaVirtualMachines/ms-21.0.11/Contents/Home/bin:$PATH" mvn -pl canvas-engine -Dtest=UserWorkspacePreferenceServiceTest,CanvasControllerCollaborationTest test` failed in `testCompile` because `CanvasCollaborationSummaryService` and `UserWorkspacePreferenceService` did not exist.
+- [x] Frontend red state on 2026-06-05: `PATH="/opt/homebrew/bin:$PATH" npm run test -- collaborationAwareness.test.ts collaborationApi.test.ts` failed because `collaborationAwareness` and `collaborationApi` did not exist.
+- [x] Backend focused tests pass on 2026-06-05 after implementation and migration version correction: `JAVA_HOME=/Users/photonpay/Library/Java/JavaVirtualMachines/ms-21.0.11/Contents/Home PATH="/Users/photonpay/Library/Java/JavaVirtualMachines/ms-21.0.11/Contents/Home/bin:$PATH" mvn -pl canvas-engine -Dtest=UserWorkspacePreferenceServiceTest,CanvasControllerCollaborationTest test` (7 tests, 0 failures, 0 errors, 0 skipped).
+- [x] Frontend focused tests pass on 2026-06-05: `PATH="/opt/homebrew/bin:$PATH" npm run test -- collaborationAwareness.test.ts collaborationApi.test.ts` (4 tests, 0 failures).
+- [x] Frontend production build passes on 2026-06-05: `PATH="/opt/homebrew/bin:$PATH" npm run build`.

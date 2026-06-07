@@ -11,13 +11,20 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.chovy.canvas.common.R;
+import org.chovy.canvas.common.tenant.TenantContext;
+import org.chovy.canvas.common.tenant.TenantContextResolver;
 import org.chovy.canvas.common.validation.ApiRequestValidation;
 import org.chovy.canvas.common.enums.NodeType;
+import org.chovy.canvas.dal.dataobject.CanvasDO;
+import org.chovy.canvas.domain.canvas.CanvasService;
+import org.chovy.canvas.domain.project.CanvasProjectAction;
+import org.chovy.canvas.domain.project.CanvasProjectPermissionService;
 import org.chovy.canvas.engine.disruptor.CanvasDisruptorService;
 import org.chovy.canvas.engine.trigger.CanvasExecutionService;
 import lombok.Data;
 import lombok.RequiredArgsConstructor;
 import org.chovy.canvas.security.PublicTriggerAuthService;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.context.ReactiveSecurityContextHolder;
 import org.springframework.http.server.reactive.ServerHttpRequest;
@@ -52,6 +59,27 @@ public class ExecutionController {
     private final PublicTriggerAuthService publicTriggerAuthService;
     /** JSON 转换器，用于先验签 raw body，再解析请求体。 */
     private final ObjectMapper objectMapper;
+    /** 可选租户上下文解析器，用于 dry-run 控制台权限检查。 */
+    private TenantContextResolver tenantContextResolver;
+    /** 可选画布服务，用于 dry-run 前读取画布并校验租户。 */
+    private CanvasService canvasService;
+    /** 可选项目权限服务，用于 dry-run 项目角色校验。 */
+    private CanvasProjectPermissionService projectPermissionService;
+
+    @Autowired(required = false)
+    void setTenantContextResolver(TenantContextResolver tenantContextResolver) {
+        this.tenantContextResolver = tenantContextResolver;
+    }
+
+    @Autowired(required = false)
+    void setCanvasService(CanvasService canvasService) {
+        this.canvasService = canvasService;
+    }
+
+    @Autowired(required = false)
+    void setProjectPermissionService(CanvasProjectPermissionService projectPermissionService) {
+        this.projectPermissionService = projectPermissionService;
+    }
 
     /**
      * 业务直调接口：同步执行并等待结果
@@ -136,11 +164,14 @@ public class ExecutionController {
             @PathVariable Long canvasId,
             @Valid @RequestBody DirectCallReq req) {
         // dry-run 使用请求中的 graphJson，不读取线上发布版本，也不产生真实副作用。
-        return currentUserId().flatMap(userId ->
-                executionService.triggerDryRun(
-                                canvasId, userId,
-                                req.getInputParams(), req.getGraphJson())
-                        .map(R::ok));
+        return currentTenant().flatMap(context ->
+                Mono.fromRunnable(() -> requireDryRunAccess(canvasId, context))
+                        .subscribeOn(Schedulers.boundedElastic())
+                        .then(currentUserId())
+                        .flatMap(userId -> executionService.triggerDryRun(
+                                        canvasId, userId,
+                                        req.getInputParams(), req.getGraphJson())
+                                .map(R::ok)));
     }
 
     /**
@@ -164,6 +195,24 @@ public class ExecutionController {
                     return username != null && !username.isBlank() ? username : "system";
                 })
                 .defaultIfEmpty("system");
+    }
+
+    private Mono<TenantContext> currentTenant() {
+        if (tenantContextResolver == null) {
+            return Mono.just(new TenantContext(null, null, "system"));
+        }
+        return tenantContextResolver.current()
+                .defaultIfEmpty(new TenantContext(null, null, "system"));
+    }
+
+    private void requireDryRunAccess(Long canvasId, TenantContext context) {
+        if (canvasService == null || projectPermissionService == null) {
+            return;
+        }
+        CanvasDO canvas = canvasService.requireTenantAccess(canvasId,
+                context == null ? null : context.tenantId(),
+                context != null && context.isSuperAdmin());
+        projectPermissionService.requireCanvasAction(canvas, context, CanvasProjectAction.EXECUTE);
     }
 
     private <T> Mono<T> parseSignedBody(ServerHttpRequest request, Mono<String> rawBody, Class<T> bodyType) {

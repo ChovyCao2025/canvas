@@ -1,14 +1,17 @@
 package org.chovy.canvas.domain.bi.resource;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import org.chovy.canvas.dal.dataobject.BiBigScreenDO;
 import org.chovy.canvas.dal.dataobject.BiDashboardDO;
 import org.chovy.canvas.dal.dataobject.BiResourceOwnershipDO;
 import org.chovy.canvas.dal.dataobject.BiWorkspaceDO;
+import org.chovy.canvas.dal.mapper.BiBigScreenMapper;
 import org.chovy.canvas.dal.mapper.BiChartMapper;
 import org.chovy.canvas.dal.mapper.BiDashboardMapper;
 import org.chovy.canvas.dal.mapper.BiDatasetMapper;
 import org.chovy.canvas.dal.mapper.BiPortalMapper;
 import org.chovy.canvas.dal.mapper.BiResourceOwnershipMapper;
+import org.chovy.canvas.dal.mapper.BiSpreadsheetMapper;
 import org.chovy.canvas.dal.mapper.BiWorkspaceMapper;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -54,6 +57,8 @@ class BiResourceTransferServiceTest {
                 dashboardMapper,
                 mock(BiChartMapper.class),
                 mock(BiPortalMapper.class),
+                mock(BiBigScreenMapper.class),
+                mock(BiSpreadsheetMapper.class),
                 ownershipMapper);
 
         BiResourceOwnershipView transferred = service.transfer(7L, "alice",
@@ -69,6 +74,42 @@ class BiResourceTransferServiceTest {
         assertThat(ownershipCaptor.getValue().getTransferredBy()).isEqualTo("alice");
         assertThat(transferred.ownerUser()).isEqualTo("bob@example.com");
         assertThat(transferred.transferredBy()).isEqualTo("alice");
+    }
+
+    @Test
+    void transferBigScreenPersistsTenantScopedOwner() {
+        BiWorkspaceMapper workspaceMapper = mock(BiWorkspaceMapper.class);
+        BiBigScreenMapper bigScreenMapper = mock(BiBigScreenMapper.class);
+        BiResourceOwnershipMapper ownershipMapper = mock(BiResourceOwnershipMapper.class);
+        BiWorkspaceDO workspace = new BiWorkspaceDO();
+        workspace.setId(5L);
+        BiBigScreenDO screen = new BiBigScreenDO();
+        screen.setId(99L);
+        screen.setStatus("PUBLISHED");
+        when(workspaceMapper.selectOne(any(LambdaQueryWrapper.class))).thenReturn(workspace);
+        when(bigScreenMapper.selectOne(any(LambdaQueryWrapper.class))).thenReturn(screen);
+        BiResourceTransferService service = new BiResourceTransferService(
+                workspaceMapper,
+                mock(BiDatasetMapper.class),
+                mock(BiDashboardMapper.class),
+                mock(BiChartMapper.class),
+                mock(BiPortalMapper.class),
+                bigScreenMapper,
+                mock(BiSpreadsheetMapper.class),
+                ownershipMapper);
+
+        BiResourceOwnershipView transferred = service.transfer(7L, "alice",
+                new BiResourceTransferCommand("big_screen", "executive-wall", "bob@example.com"));
+
+        ArgumentCaptor<BiResourceOwnershipDO> ownershipCaptor = ArgumentCaptor.forClass(BiResourceOwnershipDO.class);
+        verify(ownershipMapper).upsert(ownershipCaptor.capture());
+        assertThat(ownershipCaptor.getValue().getTenantId()).isEqualTo(7L);
+        assertThat(ownershipCaptor.getValue().getWorkspaceId()).isEqualTo(5L);
+        assertThat(ownershipCaptor.getValue().getResourceType()).isEqualTo("BIG_SCREEN");
+        assertThat(ownershipCaptor.getValue().getResourceKey()).isEqualTo("executive-wall");
+        assertThat(ownershipCaptor.getValue().getOwnerUser()).isEqualTo("bob@example.com");
+        assertThat(transferred.resourceType()).isEqualTo("BIG_SCREEN");
+        assertThat(transferred.resourceKey()).isEqualTo("executive-wall");
     }
 
     @Test
@@ -88,6 +129,8 @@ class BiResourceTransferServiceTest {
                 dashboardMapper,
                 mock(BiChartMapper.class),
                 mock(BiPortalMapper.class),
+                mock(BiBigScreenMapper.class),
+                mock(BiSpreadsheetMapper.class),
                 mock(BiResourceOwnershipMapper.class));
 
         assertThatThrownBy(() -> service.transfer(7L, "alice",
@@ -118,6 +161,8 @@ class BiResourceTransferServiceTest {
                 mock(BiDashboardMapper.class),
                 mock(BiChartMapper.class),
                 mock(BiPortalMapper.class),
+                mock(BiBigScreenMapper.class),
+                mock(BiSpreadsheetMapper.class),
                 ownershipMapper);
 
         List<BiResourceOwnershipView> ownerships = service.list(7L, "dashboard");

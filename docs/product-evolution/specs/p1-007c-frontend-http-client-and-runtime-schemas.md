@@ -11,9 +11,11 @@ Replace fragile frontend API behavior with a tested HTTP client wrapper and runt
 
 ## Current Baseline
 
-- `frontend/src/services/api.ts` creates one Axios instance, injects JWT, unwraps backend `R<T>`, and uses `window.location.href = '/login'` on 401.
-- There is no request dedupe, explicit abort wiring, idempotent retry policy, typed error normalization, or runtime validation for graph JSON.
-- `frontend/package.json` does not include `zod`.
+- Implemented on 2026-06-05: `frontend/package.json` now includes `zod`.
+- `frontend/src/services/httpClient.ts` provides a tested wrapper for request `signal`, `requestKey` GET dedupe, bounded GET retry, business error normalization, network/cancel normalization, and route-preserving unauthorized callbacks.
+- `frontend/src/services/api.ts` keeps the existing `http` export for compatibility and now also exports `apiClient` for gradual migration.
+- `frontend/src/types/canvasSchemas.ts` validates critical canvas graph JSON, graph edges, node registry outlet schemas, and canvas detail response shape.
+- `frontend/src/pages/canvas-editor/index.tsx` validates graph JSON before React Flow hydration and renders a visible error alert for invalid graph data.
 
 ## In Scope
 
@@ -41,3 +43,17 @@ Replace fragile frontend API behavior with a tested HTTP client wrapper and runt
 - HTTP tests cover cancellation, dedupe, retry, business error, normalized network errors, and 401 callback.
 - Zod tests accept seeded valid graph data and reject invalid root/node/edge route shapes.
 - Existing API tests continue to pass.
+
+## Implementation Notes
+
+- `createHttpClient` is compatible with both raw Axios responses and the existing `api.ts` interceptor payload shape, so services can migrate incrementally without changing every API call at once.
+- GET requests dedupe only when callers provide a shared `requestKey`; non-GET calls never dedupe and do not retry by default.
+- Retry is limited to idempotent GET calls and retryable network/server failures. Canceled requests are normalized as non-retryable `ApiHttpError`.
+- `parseCanvasGraphJson` falls back to an empty graph for empty strings but rejects malformed JSON, invalid root shapes, invalid nodes, invalid edge route shapes, and invalid outlet target fields.
+- Canvas editor graph loading catches schema errors, sets `graphLoadError`, and displays an Ant Design error alert instead of passing invalid graph data into React Flow.
+
+## Verification
+
+- `cd frontend && PATH="/opt/homebrew/bin:$PATH" npm run test -- httpClient.test.ts canvasSchemas.test.ts` passed: 2 files, 11 tests.
+- `cd frontend && PATH="/opt/homebrew/bin:$PATH" npm run test -- httpClient.test.ts api.test.ts canvasSchemas.test.ts graphHydration.test.ts` passed: 16 files, 43 tests.
+- `cd frontend && PATH="/opt/homebrew/bin:$PATH" npm run build` passed.

@@ -51,6 +51,32 @@ class FlywayMigrationPolicyTest {
         assertThat(filesByVersion).isNotEmpty();
     }
 
+    @Test
+    void mergedDuplicateVersionRepairsRemainExplicitAndExecutable() throws Exception {
+        Path migrationDir = migrationDir();
+
+        assertThat(migrationDir.resolve("V91__sanitize_demo_datasource_credentials.sql"))
+                .as("renumbered after merge conflict with V91__data_security_and_tenant_isolation.sql")
+                .doesNotExist();
+        assertThat(migrationDir.resolve("V92__enforce_core_tenant_not_null.sql"))
+                .as("renumbered after merge conflict with V92__execution_context_cold_backup.sql")
+                .doesNotExist();
+        assertThat(migrationDir.resolve("V272__sanitize_demo_datasource_credentials.sql"))
+                .exists();
+        assertThat(migrationDir.resolve("V273__enforce_core_tenant_not_null.sql"))
+                .exists();
+
+        String v93 = Files.readString(migrationDir.resolve("V93__tenant_scope_datasources_and_execution_requests.sql"));
+        assertThat(v93)
+                .as("V91 data_security already owns data_source_config tenant scope in merged history, so V93 must be idempotent")
+                .contains("INFORMATION_SCHEMA.COLUMNS")
+                .contains("COLUMN_NAME = 'tenant_id'")
+                .contains("INFORMATION_SCHEMA.STATISTICS")
+                .contains("INDEX_NAME = 'idx_data_source_tenant_type_enabled'")
+                .contains("ALTER TABLE canvas_execution_request")
+                .contains("ADD COLUMN tenant_id BIGINT NULL AFTER id");
+    }
+
     private Path migrationDir() {
         Path modulePath = Path.of("src/main/resources/db/migration");
         if (Files.exists(modulePath)) {

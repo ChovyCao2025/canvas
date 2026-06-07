@@ -13,7 +13,7 @@ Make canvas node `bizConfig` the only persisted source for routing edges and mak
 
 - `frontend/src/types/canvas.ts` already documents that `bizConfig` is the route source of truth.
 - `frontend/src/pages/canvas-editor/outletRouting.ts` already derives, patches, and clears many outlet edge cases.
-- `frontend/src/pages/canvas-editor/index.tsx` still owns independent React Flow `edges` state and stores history snapshots with shallow array copies.
+- Implemented on 2026-06-05: displayed React Flow edges are projected from node `bizConfig`, stale edge state is ignored, and undo/redo snapshots are deep cloned.
 
 ## In Scope
 
@@ -42,3 +42,15 @@ Make canvas node `bizConfig` the only persisted source for routing edges and mak
 - Tests prove stale display edges disappear when `bizConfig` no longer references them.
 - Tests prove snapshot mutation after capture does not mutate history.
 - Editor regression tests for hydration, insertion, outlet routing, connection interaction, and clipboard still pass.
+
+## Implementation Notes
+
+- `frontend/src/pages/canvas-editor/useCanvasGraphState.ts` now derives routed display edges with `deriveEdges(buildBackendNodesFromFlowNodes(realNodes))`.
+- `useEdgesState` remains only as a React Flow interaction compatibility layer; it is not a durable business edge source.
+- `deleteEdgeById` resolves the edge from `displayEdges` before clearing `bizConfig`, so toolbar deletion works with derived edges.
+- `frontend/src/pages/canvas-editor/editorSnapshot.ts` deep clones nodes, nested `bizConfig`, and edges for undo/redo.
+
+## Verification
+
+- `cd frontend && PATH="/opt/homebrew/bin:$PATH" npm run test -- graphHydration.test.ts graphReloadKey.test.ts insertNode.test.ts outletRouting.test.ts connectionInteraction.test.ts settingsPresentation.test.ts localDraft.test.ts canvasEditorClipboard.test.tsx useCanvasGraphState.test.ts editorSnapshot.test.ts useCanvasHistoryState.test.ts` passed: 11 files, 51 tests.
+- `cd frontend && PATH="/opt/homebrew/bin:$PATH" npm run build` passed.

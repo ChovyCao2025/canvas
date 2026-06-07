@@ -119,7 +119,6 @@ public class ContextPersistenceService {
             }
             redis.opsForHash().putAll(stateKey, fields);
             if (!Boolean.TRUE.equals(redis.expire(stateKey, Duration.ofSeconds(ttlSec)))) {
-                redis.delete(stateKey);
                 throw new IllegalStateException("Failed to refresh node state TTL");
             }
         } catch (Exception e) {

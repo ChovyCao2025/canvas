@@ -130,6 +130,43 @@ Plans are ordered by priority and sequence. Each plan uses the superpowers writi
 | P2-078 | [CDP Warehouse Privacy Audience Bitmap Rebuild Automation Operations API](p2-078-cdp-warehouse-privacy-audience-bitmap-rebuild-automation-operations-api-plan.md) |
 | P2-079 | [CDP Warehouse Privacy Audience Bitmap Rebuild Automation Run History](p2-079-cdp-warehouse-privacy-audience-bitmap-rebuild-automation-run-history-plan.md) |
 | P2-080 | [Conversational Session Foundation](p2-080-conversational-session-foundation-plan.md) |
+| P2-081 | [CDP Warehouse Enterprise OLAP Readiness](p2-081-cdp-warehouse-enterprise-olap-readiness-plan.md) |
+| P2-082 | [Marketing Platform Gap Closure](p2-082-marketing-platform-gap-closure-plan.md) |
+| P2-082D | [SCRM Operator Workspace](p2-082d-scrm-operator-workspace-plan.md) |
+| P2-082D2 | [Private-Domain Contact And Group Sync](p2-082d2-private-domain-contact-group-sync-plan.md) |
+| P2-082E | [Paid-Media Audience Sync](p2-082e-paid-media-audience-sync-plan.md) |
+| P2-082F | [AI Decision Models](p2-082f-ai-decision-models-plan.md) |
+| P2-082G | [Sentiment And Competitor Monitoring](p2-082g-sentiment-competitor-monitoring-plan.md) |
+| P2-082H | [Monitoring Workbench Frontend](p2-082h-monitoring-workbench-frontend-plan.md) |
+| P2-082I | [Monitoring Webhook Ingestion](p2-082i-monitoring-webhook-ingestion-plan.md) |
+| P2-082J | [Monitoring Alert Fanout](p2-082j-monitoring-alert-fanout-plan.md) |
+| P2-082K | [SCRM Routing And SLA](p2-082k-scrm-routing-and-sla-plan.md) |
+| P2-082L | [SCRM AI Reply Assistance](p2-082l-scrm-ai-reply-assistance-plan.md) |
+| P2-082M | [Monitoring Polling And Trends](p2-082m-monitoring-polling-and-trends-plan.md) |
+| P2-082N | [Monitoring Scheduler And Trend Workbench](p2-082n-monitoring-scheduler-and-trend-workbench-plan.md) |
+| P2-082O | [Creator Collaboration Foundation](p2-082o-creator-collaboration-foundation-plan.md) |
+| P2-082P | [Search Marketing Foundation](p2-082p-search-marketing-foundation-plan.md) |
+| P2-082Q | [Programmatic DSP Foundation](p2-082q-programmatic-dsp-foundation-plan.md) |
+| P2-082R | [Monitoring Anomaly Detection Foundation](p2-082r-monitoring-anomaly-detection-foundation-plan.md) |
+| P2-082S | [Monitoring Provider Connectors](p2-082s-monitoring-provider-connectors-plan.md) |
+| P2-082T | [Monitoring LLM Sentiment Inference Governance](p2-082t-monitoring-llm-sentiment-inference-governance-plan.md) |
+| P2-082U | [Monitoring Provider Credential Lifecycle](p2-082u-monitoring-provider-credential-lifecycle-plan.md) |
+| P2-082V | [Monitoring Provider OAuth Authorization](p2-082v-monitoring-provider-oauth-authorization-plan.md) |
+| P2-082W | [Monitoring Provider OAuth Refresh And Revocation](p2-082w-monitoring-provider-oauth-refresh-revocation-plan.md) |
+| P2-082X | [Monitoring Provider OAuth Wizard UI](p2-082x-monitoring-provider-oauth-wizard-ui-plan.md) |
+| P2-082Y | [Search Marketing Provider Write Gateway](p2-082y-search-marketing-provider-write-gateway-plan.md) |
+| P2-082Z | [Creator Provider Write Gateway](p2-082z-creator-provider-write-gateway-plan.md) |
+| P2-082AA | [Programmatic DSP Provider Write Gateway](p2-082aa-programmatic-dsp-provider-write-gateway-plan.md) |
+| P2-082AB | [Provider Write Operations UI](p2-082ab-provider-write-operations-ui-plan.md) |
+| P2-082AC | [Provider Write Adapter Contracts](p2-082ac-provider-write-adapter-contracts-plan.md) |
+| P2-082AD | [Search Marketing Production Closed Loop](p2-082ad-search-marketing-production-closed-loop-plan.md) |
+| P2-083 | [CDP Warehouse Enterprise OLAP Operational Evidence](p2-083-cdp-warehouse-enterprise-olap-operational-evidence-plan.md) |
+| P2-084 | [CDP Warehouse Enterprise OLAP Evidence Automation](p2-084-cdp-warehouse-enterprise-olap-evidence-automation-plan.md) |
+| P2-085 | [CDP Warehouse Enterprise OLAP Query SLO Evidence](p2-085-cdp-warehouse-enterprise-olap-query-slo-evidence-plan.md) |
+| P2-086 | [Marketing Platform Control Plane](p2-086-marketing-platform-control-plane-plan.md) |
+| P2-087 | [Marketing Campaign Master Ledger](p2-087-marketing-campaign-master-ledger-plan.md) |
+| P2-088 | [Marketing Integration Contract Registry](p2-088-marketing-integration-contract-registry-plan.md) |
+| P2-089 | [Growth Activity Center](p2-089-growth-activity-center-plan.md) |
 | P3-001 | [Ecosystem And Plugin Marketplace Strategy](p3-001-ecosystem-and-plugin-marketplace-strategy-plan.md) |
 | P3-002 | [Long Term AI Commerce And Ecosystem Bets](p3-002-long-term-ai-commerce-and-ecosystem-bets-plan.md) |
 | P3-003 | [Long Term Architecture Evolution](p3-003-long-term-architecture-evolution-plan.md) |

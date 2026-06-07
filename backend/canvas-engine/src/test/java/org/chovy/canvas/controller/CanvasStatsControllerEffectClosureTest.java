@@ -37,10 +37,13 @@ class CanvasStatsControllerEffectClosureTest {
     }
 
     @Test
-    void attributionSummaryReturnsLastTouchTotals() {
+    void attributionSummaryReturnsWeightedMultiTouchTotals() {
         CanvasConversionAttributionMapper attributionMapper = mock(CanvasConversionAttributionMapper.class);
         when(attributionMapper.selectMaps(any())).thenReturn(List.of(
-                Map.of("conversions", 4L, "conversionAmount", new BigDecimal("99.50"), "attributedSends", 3L)));
+                Map.of("conversions", 2L,
+                        "weightedConversionAmount", new BigDecimal("150.25"),
+                        "attributedSends", 3L,
+                        "models", "LAST_TOUCH,LINEAR")));
         CanvasStatsController controller = new CanvasStatsController(
                 mock(CanvasExecutionMapper.class),
                 mock(CanvasExecutionTraceMapper.class),
@@ -52,9 +55,10 @@ class CanvasStatsControllerEffectClosureTest {
         Map<String, Object> data = controller.attributionSummary(10L).block().getData();
 
         assertThat(data)
-                .containsEntry("conversions", 4L)
-                .containsEntry("conversionAmount", new BigDecimal("99.50"))
+                .containsEntry("conversions", 2L)
+                .containsEntry("conversionAmount", new BigDecimal("150.25"))
                 .containsEntry("attributedSends", 3L)
-                .containsEntry("model", "LAST_TOUCH");
+                .containsEntry("model", "LAST_TOUCH,LINEAR")
+                .containsEntry("models", "LAST_TOUCH,LINEAR");
     }
 }

@@ -16,6 +16,7 @@ import org.chovy.canvas.dto.canvas.UserInputSubmitReq;
 import org.chovy.canvas.dto.canvas.UserInputSubmitResp;
 import org.chovy.canvas.engine.context.ExecutionContext;
 import org.chovy.canvas.engine.trigger.CanvasExecutionService;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -40,6 +41,7 @@ public class UserInputService {
     private final CanvasExecutionService executionService;
     private final Clock clock;
 
+    @Autowired
     public UserInputService(UserInputFormMapper formMapper,
                             UserInputResponseMapper responseMapper,
                             UserInputResumeAuditMapper auditMapper,

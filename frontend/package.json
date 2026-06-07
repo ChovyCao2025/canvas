@@ -15,11 +15,14 @@
     "@xyflow/react": "^12.3.6",
     "antd": "^5.17.0",
     "axios": "^1.7.2",
+    "immer": "^11.1.8",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-querybuilder": "^8.12.0",
     "react-router-dom": "^6.23.1",
-    "recharts": "^3.8.1"
+    "recharts": "^3.8.1",
+    "zod": "^4.4.3",
+    "zustand": "^5.0.14"
   },
   "devDependencies": {
     "@testing-library/jest-dom": "^6.9.1",

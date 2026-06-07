@@ -8,26 +8,38 @@
 
 **Tech Stack:** Java 21, Spring Boot, MyBatis-Plus, Flyway, Jackson, QLExpress/Aviator where already present, JUnit 5, Mockito, AssertJ, React 18, TypeScript, Vitest.
 
+**Implementation Status:** Implemented on 2026-06-05 and merged into `main`. Actual migration is `V104__cdp_computed_profile_attributes.sql` and actual tables/classes use the `cdp_` prefix.
+
+**Verification:** `cd backend && JAVA_HOME=/Users/photonpay/Library/Java/JavaVirtualMachines/ms-21.0.11/Contents/Home PATH="/Users/photonpay/Library/Java/JavaVirtualMachines/ms-21.0.11/Contents/Home/bin:$PATH" mvn -pl canvas-engine -DskipTests compile` passed. Focused P1-006 backend tests pass in an isolated runner because Maven `testCompile` remains blocked by unrelated existing test-source errors. `cd frontend && PATH="/opt/homebrew/bin:$PATH" npm run test -- computedProfilePresentation.test.ts cdpApi.test.ts` passed. `cd frontend && PATH="/opt/homebrew/bin:$PATH" npm run build` passed.
+
 ---
 
 ## File Structure
 
-- Create: `backend/canvas-engine/src/main/resources/db/migration/V99__cdp_computed_profile_attributes.sql`
-- Create: `backend/canvas-engine/src/main/java/org/chovy/canvas/dal/dataobject/ComputedProfileAttributeDO.java`
-- Create: `backend/canvas-engine/src/main/java/org/chovy/canvas/dal/dataobject/ComputedProfileRunDO.java`
-- Create: `backend/canvas-engine/src/main/java/org/chovy/canvas/dal/dataobject/ProfileAttributeChangeLogDO.java`
-- Create: matching mappers under `backend/canvas-engine/src/main/java/org/chovy/canvas/dal/mapper/`
-- Create: `backend/canvas-engine/src/main/java/org/chovy/canvas/domain/cdp/ComputedProfileAttributeService.java`
-- Create: `backend/canvas-engine/src/main/java/org/chovy/canvas/web/CdpComputedProfileController.java`
-- Create: `backend/canvas-engine/src/test/java/org/chovy/canvas/domain/cdp/ComputedProfileAttributeServiceTest.java`
-- Create: `frontend/src/pages/cdp-computed-profile/computedProfilePresentation.ts`
-- Create: `frontend/src/pages/cdp-computed-profile/computedProfilePresentation.test.ts`
+- Existing: `backend/canvas-engine/src/main/resources/db/migration/V104__cdp_computed_profile_attributes.sql`
+- Existing: `backend/canvas-engine/src/main/java/org/chovy/canvas/dal/dataobject/CdpComputedProfileAttributeDO.java`
+- Existing: `backend/canvas-engine/src/main/java/org/chovy/canvas/dal/dataobject/CdpComputedProfileRunDO.java`
+- Existing: `backend/canvas-engine/src/main/java/org/chovy/canvas/dal/dataobject/CdpProfileAttributeChangeLogDO.java`
+- Existing: matching `CdpComputedProfile*` mappers under `backend/canvas-engine/src/main/java/org/chovy/canvas/dal/mapper/`
+- Modified: `backend/canvas-engine/src/main/java/org/chovy/canvas/domain/cdp/CdpRuleEvaluator.java`
+- Modified: `backend/canvas-engine/src/main/java/org/chovy/canvas/domain/cdp/ComputedProfileAttributeService.java`
+- Added: `backend/canvas-engine/src/main/java/org/chovy/canvas/web/CdpComputedProfileController.java`
+- Added: `backend/canvas-engine/src/test/java/org/chovy/canvas/domain/cdp/ComputedProfileAttributeSchemaTest.java`
+- Added: `backend/canvas-engine/src/test/java/org/chovy/canvas/domain/cdp/ComputedProfileAttributeServiceTest.java`
+- Added: `backend/canvas-engine/src/test/java/org/chovy/canvas/web/CdpComputedProfileControllerTest.java`
+- Modified: `frontend/src/services/cdpApi.ts`
+- Added: `frontend/src/services/cdpApi.test.ts`
+- Added: `frontend/src/pages/cdp-computed-profile/index.tsx`
+- Added: `frontend/src/pages/cdp-computed-profile/computedProfilePresentation.ts`
+- Added: `frontend/src/pages/cdp-computed-profile/computedProfilePresentation.test.ts`
+- Modified: `frontend/src/App.tsx`
+- Modified: `frontend/src/components/layout/AppLayout.tsx`
 
 ### Task 1: Schema And Contract Tests
 
 **Files:**
 - Create: `backend/canvas-engine/src/test/java/org/chovy/canvas/domain/cdp/ComputedProfileAttributeSchemaTest.java`
-- Create: `backend/canvas-engine/src/main/resources/db/migration/V99__cdp_computed_profile_attributes.sql`
+- Create: `backend/canvas-engine/src/main/resources/db/migration/V104__cdp_computed_profile_attributes.sql`
 
 - [ ] **Step 1: Write schema test**
 
@@ -35,17 +47,17 @@
 @Test
 void migrationCreatesComputedProfileTables() throws Exception {
     String sql = Files.readString(Path.of(
-            "src/main/resources/db/migration/V99__cdp_computed_profile_attributes.sql"));
+            "src/main/resources/db/migration/V104__cdp_computed_profile_attributes.sql"));
 
     assertThat(sql)
-            .contains("CREATE TABLE IF NOT EXISTS computed_profile_attribute")
+            .contains("CREATE TABLE IF NOT EXISTS cdp_computed_profile_attribute")
             .contains("attr_code")
             .contains("compute_type")
             .contains("refresh_mode")
-            .contains("CREATE TABLE IF NOT EXISTS computed_profile_run")
+            .contains("CREATE TABLE IF NOT EXISTS cdp_computed_profile_run")
             .contains("scanned_count")
             .contains("changed_count")
-            .contains("CREATE TABLE IF NOT EXISTS profile_attribute_change_log")
+            .contains("CREATE TABLE IF NOT EXISTS cdp_profile_attribute_change_log")
             .contains("old_value")
             .contains("new_value");
 }
@@ -66,7 +78,7 @@ Expected: FAIL because migration does not exist.
 Create tables with these required columns:
 
 ```sql
-CREATE TABLE IF NOT EXISTS computed_profile_attribute (
+CREATE TABLE IF NOT EXISTS cdp_computed_profile_attribute (
   id BIGINT AUTO_INCREMENT PRIMARY KEY,
   tenant_id BIGINT NOT NULL DEFAULT 0,
   attr_code VARCHAR(128) NOT NULL,
@@ -82,7 +94,7 @@ CREATE TABLE IF NOT EXISTS computed_profile_attribute (
   UNIQUE KEY uk_computed_profile_attr (tenant_id, attr_code)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
-CREATE TABLE IF NOT EXISTS computed_profile_run (
+CREATE TABLE IF NOT EXISTS cdp_computed_profile_run (
   id BIGINT AUTO_INCREMENT PRIMARY KEY,
   tenant_id BIGINT NOT NULL DEFAULT 0,
   attr_id BIGINT NOT NULL,
@@ -98,7 +110,7 @@ CREATE TABLE IF NOT EXISTS computed_profile_run (
   UNIQUE KEY uk_profile_run_event (tenant_id, attr_id, source_event_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
-CREATE TABLE IF NOT EXISTS profile_attribute_change_log (
+CREATE TABLE IF NOT EXISTS cdp_profile_attribute_change_log (
   id BIGINT AUTO_INCREMENT PRIMARY KEY,
   tenant_id BIGINT NOT NULL DEFAULT 0,
   attr_code VARCHAR(128) NOT NULL,
@@ -125,7 +137,7 @@ Expected: PASS.
 ### Task 4: Commit This Slice
 
 **Files:**
-- Modify: `backend/canvas-engine/src/main/resources/db/migration/V99__cdp_computed_profile_attributes.sql`
+- Modify: `backend/canvas-engine/src/main/resources/db/migration/V104__cdp_computed_profile_attributes.sql`
 - Modify: `backend/canvas-engine/src/main/java/org/chovy/canvas/domain/cdp/ComputedProfileAttributeService.java`
 - Modify: `backend/canvas-engine/src/main/java/org/chovy/canvas/web/CdpComputedProfileController.java`
 - Modify: `backend/canvas-engine/src/test/java/org/chovy/canvas/domain/cdp/ComputedProfileAttributeSchemaTest.java`
@@ -142,7 +154,7 @@ Run:
 
 ```bash
 git add \
-  backend/canvas-engine/src/main/resources/db/migration/V99__cdp_computed_profile_attributes.sql \
+  backend/canvas-engine/src/main/resources/db/migration/V104__cdp_computed_profile_attributes.sql \
   backend/canvas-engine/src/main/java/org/chovy/canvas/domain/cdp/ComputedProfileAttributeService.java \
   backend/canvas-engine/src/main/java/org/chovy/canvas/web/CdpComputedProfileController.java \
   backend/canvas-engine/src/test/java/org/chovy/canvas/domain/cdp/ComputedProfileAttributeSchemaTest.java \

@@ -27,6 +27,18 @@ frontend:
     minReplicas: 2
     maxReplicas: 4
 
+flink:
+  enabled: true
+  config:
+    tenantId: "0"
+    reportedBy: canvas-flink-jobs-staging
+    parallelismDefault: "1"
+  taskManager:
+    replicas: 1
+  storage:
+    checkpointStorageSize: 10Gi
+    savepointStorageSize: 10Gi
+
 ingress:
   host: canvas-staging.example.com
   tls:

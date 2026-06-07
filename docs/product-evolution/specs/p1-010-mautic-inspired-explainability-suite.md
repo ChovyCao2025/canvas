@@ -75,3 +75,12 @@ Add a read-only operator explainability suite inspired by Mautic concepts that C
 - Frontend tests prove API wrappers call the documented endpoints and presentation helpers map statuses/checks to stable labels.
 - Frontend production build passes.
 - The feature is visible from the authenticated app navigation as an operator workbench.
+
+## Implementation Status
+
+Completed on 2026-06-05.
+
+- `MauticInspiredInsightService` exposes read-only explanations for audience membership, journey path, channel preference resolution, suppression timeline, publish health, and frequency templates.
+- `MauticInspiredInsightController` serves the suite under `/canvas/mautic-insights` without mutating delivery, audience, or policy state.
+- Frontend `mauticInsightsApi`, presentation helpers, route, navigation, and the operator workbench are wired into the authenticated app.
+- This session reverified focused backend tests, focused frontend tests, and the frontend production build.

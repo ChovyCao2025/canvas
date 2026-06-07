@@ -6,6 +6,7 @@ import org.chovy.canvas.dal.dataobject.AiPredictionRunDO;
 import org.chovy.canvas.dal.dataobject.AiUserPredictionSnapshotDO;
 import org.chovy.canvas.dal.mapper.AiPredictionRunMapper;
 import org.chovy.canvas.dal.mapper.AiUserPredictionSnapshotMapper;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
@@ -37,6 +38,7 @@ public class ChurnPredictionService {
     private final ObjectMapper objectMapper;
     private final Clock clock;
 
+    @Autowired
     public ChurnPredictionService(ChurnFeatureSnapshotService featureSnapshotService,
                                   SmartTimingService smartTimingService,
                                   PredictionProfileWriter profileWriter,

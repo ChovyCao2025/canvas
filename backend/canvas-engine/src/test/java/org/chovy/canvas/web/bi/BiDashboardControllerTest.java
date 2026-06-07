@@ -7,6 +7,9 @@ import org.chovy.canvas.domain.bi.dashboard.BiDashboardExportPackage;
 import org.chovy.canvas.domain.bi.dashboard.BiDashboardImportCommand;
 import org.chovy.canvas.domain.bi.dashboard.BiDashboardResource;
 import org.chovy.canvas.domain.bi.dashboard.BiDashboardResourceService;
+import org.chovy.canvas.domain.bi.dashboard.BiDashboardRuntimeStateCommand;
+import org.chovy.canvas.domain.bi.dashboard.BiDashboardRuntimeStateService;
+import org.chovy.canvas.domain.bi.dashboard.BiDashboardRuntimeStateView;
 import org.chovy.canvas.domain.bi.dashboard.MarketingBiDashboardPresetRegistry;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -19,7 +22,9 @@ import reactor.core.publisher.Mono;
 import reactor.test.StepVerifier;
 
 import java.nio.charset.StandardCharsets;
+import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -85,6 +90,52 @@ class BiDashboardControllerTest {
                 .verifyComplete();
 
         verify(service).cloneResource(7L, "alice", "canvas-effect", command);
+    }
+
+    @Test
+    void savesRuntimeStateForCurrentTenantAndUser() {
+        TenantContextResolver resolver = mock(TenantContextResolver.class);
+        when(resolver.current()).thenReturn(Mono.just(new TenantContext(7L, "TENANT_ADMIN", "alice")));
+        BiDashboardResourceService resourceService = mock(BiDashboardResourceService.class);
+        BiDashboardRuntimeStateService runtimeStateService = mock(BiDashboardRuntimeStateService.class);
+        BiDashboardRuntimeStateCommand command = new BiDashboardRuntimeStateCommand(Map.of(
+                "filter-trigger-type", List.of("TIME", "MQ")));
+        BiDashboardRuntimeStateView view = new BiDashboardRuntimeStateView(
+                "canvas-effect",
+                "alice",
+                Map.of("filter-trigger-type", List.of("TIME", "MQ")),
+                LocalDateTime.parse("2026-06-06T03:30:00"));
+        when(runtimeStateService.save(7L, "alice", "canvas-effect", command)).thenReturn(view);
+        BiDashboardController controller = new BiDashboardController(resolver, resourceService, runtimeStateService);
+
+        StepVerifier.create(controller.saveRuntimeState("canvas-effect", command))
+                .assertNext(response -> assertThat(response.getData().parameters())
+                        .containsEntry("filter-trigger-type", List.of("TIME", "MQ")))
+                .verifyComplete();
+
+        verify(runtimeStateService).save(7L, "alice", "canvas-effect", command);
+    }
+
+    @Test
+    void readsRuntimeStateForCurrentTenantAndUser() {
+        TenantContextResolver resolver = mock(TenantContextResolver.class);
+        when(resolver.current()).thenReturn(Mono.just(new TenantContext(7L, "TENANT_ADMIN", "alice")));
+        BiDashboardResourceService resourceService = mock(BiDashboardResourceService.class);
+        BiDashboardRuntimeStateService runtimeStateService = mock(BiDashboardRuntimeStateService.class);
+        BiDashboardRuntimeStateView view = new BiDashboardRuntimeStateView(
+                "canvas-effect",
+                "alice",
+                Map.of("filter-canvas", "Welcome"),
+                LocalDateTime.parse("2026-06-06T03:30:00"));
+        when(runtimeStateService.get(7L, "alice", "canvas-effect")).thenReturn(view);
+        BiDashboardController controller = new BiDashboardController(resolver, resourceService, runtimeStateService);
+
+        StepVerifier.create(controller.getRuntimeState("canvas-effect"))
+                .assertNext(response -> assertThat(response.getData().parameters())
+                        .containsEntry("filter-canvas", "Welcome"))
+                .verifyComplete();
+
+        verify(runtimeStateService).get(7L, "alice", "canvas-effect");
     }
 
     @Test

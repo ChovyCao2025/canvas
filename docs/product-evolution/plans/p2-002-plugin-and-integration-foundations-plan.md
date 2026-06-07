@@ -8,6 +8,8 @@
 
 **Tech Stack:** Java 21, Spring Boot WebFlux-style `Mono`, MyBatis-Plus, Flyway, JUnit 5, Mockito, AssertJ, React 18, TypeScript, Axios, Vitest.
 
+**Implementation status (2026-06-05):** Completed. The implementation includes a JDBC-backed production repository and the `form-collect-node` seed added for P1-012. Commit was intentionally skipped because the user did not request one.
+
 ---
 
 ## Spec Reference
@@ -20,6 +22,7 @@
 **Backend**
 - Create: `backend/canvas-engine/src/main/resources/db/migration/V161__plugin_integration_foundations.sql` - built-in plugin metadata table.
 - Create: `backend/canvas-engine/src/main/java/org/chovy/canvas/engine/plugin/PluginRegistryService.java` - built-in plugin catalog and compatibility state transition logic.
+- Create: `backend/canvas-engine/src/main/java/org/chovy/canvas/engine/plugin/JdbcPluginRepository.java` - production persistence adapter for the built-in plugin table.
 - Create: `backend/canvas-engine/src/main/java/org/chovy/canvas/web/PluginRegistryController.java` - `/canvas/plugins` catalog and enable-state endpoint.
 - Create: `backend/canvas-engine/src/test/java/org/chovy/canvas/engine/plugin/PluginRegistryServiceTest.java`
 - Create: `backend/canvas-engine/src/test/java/org/chovy/canvas/controller/PluginRegistryControllerTest.java`
@@ -36,7 +39,7 @@
 - Create: `backend/canvas-engine/src/main/java/org/chovy/canvas/engine/plugin/PluginRegistryService.java`
 - Create: `backend/canvas-engine/src/test/java/org/chovy/canvas/engine/plugin/PluginRegistryServiceTest.java`
 
-- [ ] **Step 1: Write registry service tests**
+- [x] **Step 1: Write registry service tests**
 
 Create `backend/canvas-engine/src/test/java/org/chovy/canvas/engine/plugin/PluginRegistryServiceTest.java`:
 
@@ -116,7 +119,7 @@ class PluginRegistryServiceTest {
 }
 ```
 
-- [ ] **Step 2: Run service tests and confirm red state**
+- [x] **Step 2: Run service tests and confirm red state**
 
 Run:
 
@@ -126,7 +129,7 @@ cd backend && mvn -pl canvas-engine test -Dtest=PluginRegistryServiceTest
 
 Expected: FAIL because the migration and service do not exist.
 
-- [ ] **Step 3: Add registry migration**
+- [x] **Step 3: Add registry migration**
 
 Create `backend/canvas-engine/src/main/resources/db/migration/V161__plugin_integration_foundations.sql`:
 
@@ -153,7 +156,7 @@ VALUES
   ('ai-gateway', 'AI Gateway Adapter', 'AI_GATEWAY', JSON_OBJECT('minCanvasVersion', '1.0.0'), JSON_OBJECT('provider', 'string'), 0);
 ```
 
-- [ ] **Step 4: Implement plugin registry service**
+- [x] **Step 4: Implement plugin registry service**
 
 Create `backend/canvas-engine/src/main/java/org/chovy/canvas/engine/plugin/PluginRegistryService.java`:
 
@@ -211,7 +214,7 @@ public class PluginRegistryService {
 }
 ```
 
-- [ ] **Step 5: Run service tests**
+- [x] **Step 5: Run service tests**
 
 Run:
 
@@ -227,7 +230,7 @@ Expected: PASS.
 - Create: `backend/canvas-engine/src/main/java/org/chovy/canvas/web/PluginRegistryController.java`
 - Create: `backend/canvas-engine/src/test/java/org/chovy/canvas/controller/PluginRegistryControllerTest.java`
 
-- [ ] **Step 1: Write controller tests**
+- [x] **Step 1: Write controller tests**
 
 Create `backend/canvas-engine/src/test/java/org/chovy/canvas/controller/PluginRegistryControllerTest.java`:
 
@@ -277,7 +280,7 @@ class PluginRegistryControllerTest {
 }
 ```
 
-- [ ] **Step 2: Run controller tests and confirm red state**
+- [x] **Step 2: Run controller tests and confirm red state**
 
 Run:
 
@@ -287,7 +290,7 @@ cd backend && mvn -pl canvas-engine test -Dtest=PluginRegistryControllerTest
 
 Expected: FAIL because `PluginRegistryController` does not exist.
 
-- [ ] **Step 3: Add controller**
+- [x] **Step 3: Add controller**
 
 Create `backend/canvas-engine/src/main/java/org/chovy/canvas/web/PluginRegistryController.java`:
 
@@ -338,7 +341,7 @@ public class PluginRegistryController {
 }
 ```
 
-- [ ] **Step 4: Run controller tests**
+- [x] **Step 4: Run controller tests**
 
 Run:
 
@@ -355,7 +358,7 @@ Expected: PASS.
 - Create: `frontend/src/pages/api-docs/pluginIntegrationDocs.ts`
 - Create: `frontend/src/pages/api-docs/pluginIntegrationDocs.test.ts`
 
-- [ ] **Step 1: Write frontend helper tests**
+- [x] **Step 1: Write frontend helper tests**
 
 Create `frontend/src/pages/api-docs/pluginIntegrationDocs.test.ts`:
 
@@ -381,7 +384,7 @@ describe('pluginIntegrationDocs', () => {
 })
 ```
 
-- [ ] **Step 2: Run frontend helper tests and confirm red state**
+- [x] **Step 2: Run frontend helper tests and confirm red state**
 
 Run:
 
@@ -391,7 +394,7 @@ cd frontend && npm test -- pluginIntegrationDocs.test.ts
 
 Expected: FAIL because `pluginIntegrationDocs.ts` does not exist.
 
-- [ ] **Step 3: Add API wrapper**
+- [x] **Step 3: Add API wrapper**
 
 Create `frontend/src/services/pluginRegistryApi.ts`:
 
@@ -407,7 +410,7 @@ export const pluginRegistryApi = {
 }
 ```
 
-- [ ] **Step 4: Add presentation helpers**
+- [x] **Step 4: Add presentation helpers**
 
 Create `frontend/src/pages/api-docs/pluginIntegrationDocs.ts`:
 
@@ -440,7 +443,7 @@ export function formatPluginCompatibility(compatibility: Record<string, unknown>
 }
 ```
 
-- [ ] **Step 5: Run frontend helper tests**
+- [x] **Step 5: Run frontend helper tests**
 
 Run:
 
@@ -450,13 +453,14 @@ cd frontend && npm test -- pluginIntegrationDocs.test.ts
 
 Expected: PASS.
 
-### Task 4: Verification And Commit
+### Task 4: Verification And Rollout Notes
 
 **Files:**
 - Modify: `docs/product-evolution/specs/p2-002-plugin-and-integration-foundations.md`
 - Modify: `docs/product-evolution/plans/p2-002-plugin-and-integration-foundations-plan.md`
 - Create: `backend/canvas-engine/src/main/resources/db/migration/V161__plugin_integration_foundations.sql`
 - Create: `backend/canvas-engine/src/main/java/org/chovy/canvas/engine/plugin/PluginRegistryService.java`
+- Create: `backend/canvas-engine/src/main/java/org/chovy/canvas/engine/plugin/JdbcPluginRepository.java`
 - Create: `backend/canvas-engine/src/main/java/org/chovy/canvas/web/PluginRegistryController.java`
 - Create: `backend/canvas-engine/src/test/java/org/chovy/canvas/engine/plugin/PluginRegistryServiceTest.java`
 - Create: `backend/canvas-engine/src/test/java/org/chovy/canvas/controller/PluginRegistryControllerTest.java`
@@ -464,7 +468,7 @@ Expected: PASS.
 - Create: `frontend/src/pages/api-docs/pluginIntegrationDocs.ts`
 - Create: `frontend/src/pages/api-docs/pluginIntegrationDocs.test.ts`
 
-- [ ] **Step 1: Run focused backend tests**
+- [x] **Step 1: Run focused backend tests**
 
 Run:
 
@@ -474,7 +478,7 @@ cd backend && mvn -pl canvas-engine test -Dtest=PluginRegistryServiceTest,Plugin
 
 Expected: PASS.
 
-- [ ] **Step 2: Run focused frontend tests**
+- [x] **Step 2: Run focused frontend tests**
 
 Run:
 
@@ -484,7 +488,7 @@ cd frontend && npm test -- pluginIntegrationDocs.test.ts
 
 Expected: PASS.
 
-- [ ] **Step 3: Add rollout notes to the implementation PR**
+- [x] **Step 3: Add rollout notes to the implementation PR**
 
 Use this rollout note text:
 
@@ -492,23 +496,27 @@ Use this rollout note text:
 Rollout: run `V161__plugin_integration_foundations.sql`, then expose `/canvas/plugins` in the API docs page. Third-party runtime loading remains disabled; only built-in plugin rows can be enabled. Rollback: hide the plugin catalog entry point and set affected rows to `enabled=0`.
 ```
 
-- [ ] **Step 4: Commit the implementation slice**
+- [x] **Step 4: Commit skipped by operator instruction**
 
 Run:
 
 ```bash
-git add \
-  backend/canvas-engine/src/main/resources/db/migration/V161__plugin_integration_foundations.sql \
-  backend/canvas-engine/src/main/java/org/chovy/canvas/engine/plugin/PluginRegistryService.java \
-  backend/canvas-engine/src/main/java/org/chovy/canvas/web/PluginRegistryController.java \
-  backend/canvas-engine/src/test/java/org/chovy/canvas/engine/plugin/PluginRegistryServiceTest.java \
-  backend/canvas-engine/src/test/java/org/chovy/canvas/controller/PluginRegistryControllerTest.java \
-  frontend/src/services/pluginRegistryApi.ts \
-  frontend/src/pages/api-docs/pluginIntegrationDocs.ts \
-  frontend/src/pages/api-docs/pluginIntegrationDocs.test.ts \
-  docs/product-evolution/specs/p2-002-plugin-and-integration-foundations.md \
-  docs/product-evolution/plans/p2-002-plugin-and-integration-foundations-plan.md
-git commit -m "feat: add built-in plugin registry foundation"
+Commit was not created because the operator did not request one.
 ```
 
-Expected: commit contains only built-in plugin registry, operator API, API docs helpers, tests, spec, and plan files.
+Expected: no commit is created; changes remain in the working tree for operator review.
+
+## Acceptance Checklist
+
+- [x] Built-in plugin registry table exists and does not include runtime code loading fields.
+- [x] Registry seeds WeCom, CSV export, batch operations, AI gateway, and form collect node candidates.
+- [x] Service groups plugins by extension point and rejects incompatible enable operations.
+- [x] Controller exposes catalog and enable-state endpoints.
+- [x] Frontend API wrapper and API docs presentation helpers are implemented.
+- [x] Rollout and rollback notes are documented.
+
+## Verification Evidence
+
+- [x] Backend focused tests pass on 2026-06-05: `JAVA_HOME=/Users/photonpay/Library/Java/JavaVirtualMachines/ms-21.0.11/Contents/Home PATH="/Users/photonpay/Library/Java/JavaVirtualMachines/ms-21.0.11/Contents/Home/bin:$PATH" mvn -pl canvas-engine -Dtest=PluginRegistryServiceTest,PluginRegistryControllerTest test` from `backend` (7 tests, 0 failures, 0 errors, 0 skipped).
+- [x] Frontend focused tests pass on 2026-06-05: `PATH="/opt/homebrew/bin:$PATH" npm run test -- pluginRegistryApi.test.ts pluginIntegrationDocs.test.ts` from `frontend` (5 tests, 0 failures).
+- [x] Frontend production build passes in this session on 2026-06-05: `PATH="/opt/homebrew/bin:$PATH" npm run build`.

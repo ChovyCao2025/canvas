@@ -5,18 +5,22 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.chovy.canvas.dal.dataobject.BiAlertRuleDO;
+import org.chovy.canvas.dal.dataobject.BiBigScreenDO;
 import org.chovy.canvas.dal.dataobject.BiChartDO;
 import org.chovy.canvas.dal.dataobject.BiDashboardDO;
 import org.chovy.canvas.dal.dataobject.BiDatasetDO;
 import org.chovy.canvas.dal.dataobject.BiMetricDO;
 import org.chovy.canvas.dal.dataobject.BiPortalDO;
+import org.chovy.canvas.dal.dataobject.BiSpreadsheetDO;
 import org.chovy.canvas.dal.dataobject.BiSubscriptionDO;
 import org.chovy.canvas.dal.mapper.BiAlertRuleMapper;
+import org.chovy.canvas.dal.mapper.BiBigScreenMapper;
 import org.chovy.canvas.dal.mapper.BiChartMapper;
 import org.chovy.canvas.dal.mapper.BiDashboardMapper;
 import org.chovy.canvas.dal.mapper.BiDatasetMapper;
 import org.chovy.canvas.dal.mapper.BiMetricMapper;
 import org.chovy.canvas.dal.mapper.BiPortalMapper;
+import org.chovy.canvas.dal.mapper.BiSpreadsheetMapper;
 import org.chovy.canvas.dal.mapper.BiSubscriptionMapper;
 import org.chovy.canvas.domain.bi.permission.BiPermissionService;
 import org.chovy.canvas.domain.bi.query.BiQueryContext;
@@ -38,13 +42,17 @@ public class BiSubscriptionAdminService {
     private static final String RESOURCE_DASHBOARD = "DASHBOARD";
     private static final String RESOURCE_CHART = "CHART";
     private static final String RESOURCE_PORTAL = "PORTAL";
+    private static final String RESOURCE_BIG_SCREEN = "BIG_SCREEN";
+    private static final String RESOURCE_SPREADSHEET = "SPREADSHEET";
     private static final String STATUS_ARCHIVED = "ARCHIVED";
     private static final Pattern RESOURCE_KEY = Pattern.compile("[A-Za-z0-9][A-Za-z0-9_-]{0,127}");
     private static final Set<String> RESOURCE_TYPES = Set.of(
             RESOURCE_DATASET,
             RESOURCE_DASHBOARD,
             RESOURCE_CHART,
-            RESOURCE_PORTAL);
+            RESOURCE_PORTAL,
+            RESOURCE_BIG_SCREEN,
+            RESOURCE_SPREADSHEET);
 
     private final BiSubscriptionMapper subscriptionMapper;
     private final BiAlertRuleMapper alertRuleMapper;
@@ -53,6 +61,8 @@ public class BiSubscriptionAdminService {
     private final BiDashboardMapper dashboardMapper;
     private final BiChartMapper chartMapper;
     private final BiPortalMapper portalMapper;
+    private final BiBigScreenMapper bigScreenMapper;
+    private final BiSpreadsheetMapper spreadsheetMapper;
     private final BiPermissionService permissionService;
     private final ObjectMapper objectMapper;
 
@@ -64,6 +74,8 @@ public class BiSubscriptionAdminService {
                                       BiDashboardMapper dashboardMapper,
                                       BiChartMapper chartMapper,
                                       BiPortalMapper portalMapper,
+                                      BiBigScreenMapper bigScreenMapper,
+                                      BiSpreadsheetMapper spreadsheetMapper,
                                       ObjectProvider<BiPermissionService> permissionServiceProvider,
                                       ObjectMapper objectMapper) {
         this(subscriptionMapper,
@@ -73,6 +85,8 @@ public class BiSubscriptionAdminService {
                 dashboardMapper,
                 chartMapper,
                 portalMapper,
+                bigScreenMapper,
+                spreadsheetMapper,
                 permissionServiceProvider.getIfAvailable(),
                 objectMapper);
     }
@@ -84,6 +98,8 @@ public class BiSubscriptionAdminService {
                                       BiDashboardMapper dashboardMapper,
                                       BiChartMapper chartMapper,
                                       BiPortalMapper portalMapper,
+                                      BiBigScreenMapper bigScreenMapper,
+                                      BiSpreadsheetMapper spreadsheetMapper,
                                       BiPermissionService permissionService,
                                       ObjectMapper objectMapper) {
         this.subscriptionMapper = subscriptionMapper;
@@ -93,6 +109,8 @@ public class BiSubscriptionAdminService {
         this.dashboardMapper = dashboardMapper;
         this.chartMapper = chartMapper;
         this.portalMapper = portalMapper;
+        this.bigScreenMapper = bigScreenMapper;
+        this.spreadsheetMapper = spreadsheetMapper;
         this.permissionService = permissionService;
         this.objectMapper = objectMapper;
     }
@@ -303,14 +321,38 @@ public class BiSubscriptionAdminService {
             }
             return new ResourceRef(scopedType, row.getId(), row.getWorkspaceId());
         }
-        BiPortalDO row = portalMapper.selectOne(new LambdaQueryWrapper<BiPortalDO>()
-                .in(BiPortalDO::getTenantId, tenantScope(tenantId))
-                .eq(BiPortalDO::getPortalKey, key)
-                .ne(BiPortalDO::getStatus, STATUS_ARCHIVED)
-                .orderByDesc(BiPortalDO::getTenantId)
+        if (RESOURCE_PORTAL.equals(scopedType)) {
+            BiPortalDO row = portalMapper.selectOne(new LambdaQueryWrapper<BiPortalDO>()
+                    .in(BiPortalDO::getTenantId, tenantScope(tenantId))
+                    .eq(BiPortalDO::getPortalKey, key)
+                    .ne(BiPortalDO::getStatus, STATUS_ARCHIVED)
+                    .orderByDesc(BiPortalDO::getTenantId)
+                    .last("LIMIT 1"));
+            if (row == null || row.getId() == null) {
+                throw new IllegalArgumentException("BI portal not found: " + key);
+            }
+            return new ResourceRef(scopedType, row.getId(), row.getWorkspaceId());
+        }
+        if (RESOURCE_BIG_SCREEN.equals(scopedType)) {
+            BiBigScreenDO row = bigScreenMapper.selectOne(new LambdaQueryWrapper<BiBigScreenDO>()
+                    .in(BiBigScreenDO::getTenantId, tenantScope(tenantId))
+                    .eq(BiBigScreenDO::getScreenKey, key)
+                    .ne(BiBigScreenDO::getStatus, STATUS_ARCHIVED)
+                    .orderByDesc(BiBigScreenDO::getTenantId)
+                    .last("LIMIT 1"));
+            if (row == null || row.getId() == null) {
+                throw new IllegalArgumentException("BI big screen not found: " + key);
+            }
+            return new ResourceRef(scopedType, row.getId(), row.getWorkspaceId());
+        }
+        BiSpreadsheetDO row = spreadsheetMapper.selectOne(new LambdaQueryWrapper<BiSpreadsheetDO>()
+                .in(BiSpreadsheetDO::getTenantId, tenantScope(tenantId))
+                .eq(BiSpreadsheetDO::getSpreadsheetKey, key)
+                .ne(BiSpreadsheetDO::getStatus, STATUS_ARCHIVED)
+                .orderByDesc(BiSpreadsheetDO::getTenantId)
                 .last("LIMIT 1"));
         if (row == null || row.getId() == null) {
-            throw new IllegalArgumentException("BI portal not found: " + key);
+            throw new IllegalArgumentException("BI spreadsheet not found: " + key);
         }
         return new ResourceRef(scopedType, row.getId(), row.getWorkspaceId());
     }
@@ -336,6 +378,18 @@ public class BiSubscriptionAdminService {
         }
         if (RESOURCE_PORTAL.equals(resourceType)) {
             BiPortalDO row = portalMapper.selectById(resourceId);
+            if (row != null && tenantScope(tenantId).contains(normalizeTenant(row.getTenantId()))) {
+                return new ResourceRef(resourceType, row.getId(), row.getWorkspaceId());
+            }
+        }
+        if (RESOURCE_BIG_SCREEN.equals(resourceType)) {
+            BiBigScreenDO row = bigScreenMapper.selectById(resourceId);
+            if (row != null && tenantScope(tenantId).contains(normalizeTenant(row.getTenantId()))) {
+                return new ResourceRef(resourceType, row.getId(), row.getWorkspaceId());
+            }
+        }
+        if (RESOURCE_SPREADSHEET.equals(resourceType)) {
+            BiSpreadsheetDO row = spreadsheetMapper.selectById(resourceId);
             if (row != null && tenantScope(tenantId).contains(normalizeTenant(row.getTenantId()))) {
                 return new ResourceRef(resourceType, row.getId(), row.getWorkspaceId());
             }
@@ -409,6 +463,14 @@ public class BiSubscriptionAdminService {
         if (RESOURCE_PORTAL.equals(type)) {
             BiPortalDO row = portalMapper.selectById(resourceId);
             return row == null ? null : row.getPortalKey();
+        }
+        if (RESOURCE_BIG_SCREEN.equals(type)) {
+            BiBigScreenDO row = bigScreenMapper.selectById(resourceId);
+            return row == null ? null : row.getScreenKey();
+        }
+        if (RESOURCE_SPREADSHEET.equals(type)) {
+            BiSpreadsheetDO row = spreadsheetMapper.selectById(resourceId);
+            return row == null ? null : row.getSpreadsheetKey();
         }
         return null;
     }

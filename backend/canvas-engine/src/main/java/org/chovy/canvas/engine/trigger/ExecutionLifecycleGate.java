@@ -15,7 +15,7 @@ import java.util.concurrent.atomic.AtomicInteger;
  * Process-local shutdown gate for canvas execution entrypoints.
  */
 @Slf4j
-@Component
+@Component("triggerExecutionLifecycleGate")
 public class ExecutionLifecycleGate {
 
     private final Duration drainTimeout;

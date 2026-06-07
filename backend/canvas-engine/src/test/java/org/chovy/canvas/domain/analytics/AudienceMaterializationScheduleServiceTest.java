@@ -229,6 +229,41 @@ class AudienceMaterializationScheduleServiceTest {
     }
 
     @Test
+    void refreshDueWithConsumerAvailabilityContractsCountsEvaluationExceptionAsFailure() {
+        AudienceDefinitionMapper definitionMapper = mock(AudienceDefinitionMapper.class);
+        AudienceMaterializationRunMapper runMapper = mock(AudienceMaterializationRunMapper.class);
+        AudienceMaterializationService materializationService = mock(AudienceMaterializationService.class);
+        CdpWarehouseConsumerAvailabilityService consumerAvailabilityService =
+                mock(CdpWarehouseConsumerAvailabilityService.class);
+        LocalDateTime now = LocalDateTime.parse("2026-06-05T05:00:00");
+        LocalDateTime from = LocalDateTime.parse("2026-06-05T04:00:00");
+        AudienceDefinitionDO due = definition(12L, "0 0 * * * *");
+        when(definitionMapper.selectMaterializationCandidates(9L, 100)).thenReturn(List.of(due));
+        when(runMapper.latestSuccessfulRun(9L, 12L)).thenReturn(null);
+        when(consumerAvailabilityService.evaluateContract(9L, "audience_12", from, now))
+                .thenThrow(new IllegalStateException("contract store unavailable"));
+        AudienceMaterializationScheduleService service =
+                new AudienceMaterializationScheduleService(
+                        definitionMapper,
+                        runMapper,
+                        materializationService,
+                        null,
+                        consumerAvailabilityService);
+
+        AudienceMaterializationScheduleService.ContractGatedScheduledRefreshResult result =
+                service.refreshDueWithConsumerAvailabilityContracts(
+                        9L, now, 100, "scheduler", from, now, "audience_");
+
+        assertThat(result.scanned()).isEqualTo(1);
+        assertThat(result.due()).isEqualTo(1);
+        assertThat(result.succeeded()).isZero();
+        assertThat(result.failed()).isEqualTo(1);
+        assertThat(result.blocked()).isZero();
+        assertThat(result.skipped()).isZero();
+        verifyNoInteractions(materializationService);
+    }
+
+    @Test
     void refreshDueWithConsumerAvailabilityContractsHonorsConfigOverride() {
         AudienceDefinitionMapper definitionMapper = mock(AudienceDefinitionMapper.class);
         AudienceMaterializationRunMapper runMapper = mock(AudienceMaterializationRunMapper.class);

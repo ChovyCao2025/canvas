@@ -7,7 +7,7 @@ import type { DragEvent } from 'react'
 import { Popover, Typography } from 'antd'
 import { RightOutlined } from '@ant-design/icons'
 
-import type { NodeTypeRegistry } from '../../types'
+import type { NodePaletteItem } from './nodeLibrary'
 
 /** 节点条目中的文本组件别名。 */
 const { Text } = Typography
@@ -18,13 +18,13 @@ interface Props {
   categoryColor: string
 
   /** 后端节点类型注册信息。 */
-  node: NodeTypeRegistry
+  node: NodePaletteItem
 
   /** 节点摘要说明。 */
   detail: string
 
   /** 拖拽开始回调，由父组件写入 dataTransfer。 */
-  onDragStart: (event: DragEvent<HTMLDivElement>, node: NodeTypeRegistry) => void
+  onDragStart: (event: DragEvent<HTMLDivElement>, node: NodePaletteItem) => void
 }
 
 /** 节点库条目，点击右侧箭头查看说明，拖拽整行可放到画布。 */

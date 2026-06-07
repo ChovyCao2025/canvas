@@ -1,0 +1,25 @@
+{{- if .Values.flink.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "canvas.fullname" . }}-flink
+  namespace: {{ .Values.namespace }}
+  labels:
+    {{- include "canvas.labels" . | nindent 4 }}
+    app.kubernetes.io/component: flink
+data:
+  flink-conf.yaml: |
+    jobmanager.rpc.address: {{ include "canvas.fullname" . }}-flink-jobmanager
+    jobmanager.rpc.port: {{ .Values.flink.jobManager.rpcPort }}
+    rest.address: 0.0.0.0
+    rest.port: {{ .Values.flink.jobManager.restPort }}
+    taskmanager.numberOfTaskSlots: {{ .Values.flink.config.taskSlots }}
+    parallelism.default: {{ .Values.flink.config.parallelismDefault }}
+    state.backend: {{ .Values.flink.config.stateBackend }}
+    state.checkpoints.dir: {{ .Values.flink.config.checkpointDir }}
+    state.savepoints.dir: {{ .Values.flink.config.savepointDir }}
+    execution.checkpointing.interval: {{ .Values.flink.config.checkpointInterval }}
+    execution.checkpointing.timeout: {{ .Values.flink.config.checkpointTimeout }}
+    execution.checkpointing.min-pause: {{ .Values.flink.config.minPauseBetweenCheckpoints }}
+    execution.checkpointing.tolerable-failed-checkpoints: {{ .Values.flink.config.tolerableCheckpointFailures }}
+{{- end }}

@@ -46,6 +46,51 @@ export interface DiscoveredAttribute {
   lastSeenAt?: string | null
 }
 
+export interface WebhookSubscriptionForm {
+  name: string
+  callbackUrl: string
+  eventTypesText: string
+  maxAttempts?: number
+}
+
+export interface WebhookSubscriptionPayload {
+  name: string
+  callbackUrl: string
+  eventTypes: string[]
+  maxAttempts: number
+}
+
+export interface WebhookSubscriptionRow {
+  id: number
+  name: string
+  callbackUrl: string
+  secretPrefix: string
+  eventTypes: string[]
+  status: string
+  maxAttempts: number
+  createdAt?: string | null
+  updatedAt?: string | null
+}
+
+export interface WebhookDeliveryRow {
+  id: number
+  deliveryId: string
+  eventType: string
+  attempt: number
+  httpStatus?: number | null
+  status: string
+  nextRetryAt?: string | null
+  errorMessage?: string | null
+  terminalReason?: string | null
+  createdAt?: string | null
+}
+
+export interface WebhookRotateSecretResp {
+  subscriptionId: number
+  secret: string
+  secretPrefix: string
+}
+
 export function buildCreateWriteKeyPayload(form: WriteKeyCreateForm) {
   return {
     name: form.name.trim(),
@@ -53,6 +98,19 @@ export function buildCreateWriteKeyPayload(form: WriteKeyCreateForm) {
     rateLimitQps: form.rateLimitQps || 100,
     dailyQuota: form.dailyQuota ?? null,
     description: form.description || '',
+  }
+}
+
+export function buildWebhookSubscriptionPayload(form: WebhookSubscriptionForm): WebhookSubscriptionPayload {
+  const eventTypes = Array.from(new Set(form.eventTypesText
+    .split(/[\n,]/)
+    .map(value => value.trim())
+    .filter(Boolean)))
+  return {
+    name: form.name.trim(),
+    callbackUrl: form.callbackUrl.trim(),
+    eventTypes,
+    maxAttempts: form.maxAttempts && form.maxAttempts > 0 ? form.maxAttempts : 3,
   }
 }
 
@@ -102,6 +160,30 @@ export function createCdpEventApi(client = http) {
           { params: { status } },
         )
         : client.get<R<DiscoveredAttribute[]>, R<DiscoveredAttribute[]>>('/canvas/event-attributes/discovered'),
+    listWebhookSubscriptions: () =>
+      client.get<R<WebhookSubscriptionRow[]>, R<WebhookSubscriptionRow[]>>('/cdp/webhooks'),
+    createWebhookSubscription: (form: WebhookSubscriptionForm) =>
+      client.post<R<WebhookSubscriptionRow>, R<WebhookSubscriptionRow>>(
+        '/cdp/webhooks',
+        buildWebhookSubscriptionPayload(form),
+      ),
+    updateWebhookSubscription: (id: number, form: WebhookSubscriptionForm) =>
+      client.put<R<WebhookSubscriptionRow>, R<WebhookSubscriptionRow>>(
+        `/cdp/webhooks/${id}`,
+        buildWebhookSubscriptionPayload(form),
+      ),
+    pauseWebhookSubscription: (id: number) =>
+      client.put<R<void>, R<void>>(`/cdp/webhooks/${id}/pause`),
+    resumeWebhookSubscription: (id: number) =>
+      client.put<R<void>, R<void>>(`/cdp/webhooks/${id}/resume`),
+    disableWebhookSubscription: (id: number) =>
+      client.delete<R<void>, R<void>>(`/cdp/webhooks/${id}`),
+    rotateWebhookSecret: (id: number) =>
+      client.post<R<WebhookRotateSecretResp>, R<WebhookRotateSecretResp>>(`/cdp/webhooks/${id}/rotate-secret`, {}),
+    testWebhookDelivery: (id: number) =>
+      client.post<R<void>, R<void>>(`/cdp/webhooks/${id}/test`, {}),
+    listWebhookDeliveries: (id: number) =>
+      client.get<R<WebhookDeliveryRow[]>, R<WebhookDeliveryRow[]>>(`/cdp/webhooks/${id}/deliveries`),
   }
 }
 

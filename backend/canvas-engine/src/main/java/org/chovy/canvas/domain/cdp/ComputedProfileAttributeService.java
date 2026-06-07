@@ -20,10 +20,14 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 
 @Service
 @RequiredArgsConstructor
 public class ComputedProfileAttributeService {
+    private static final Set<String> SUPPORTED_VALUE_TYPES = Set.of("STRING", "NUMBER", "BOOLEAN", "JSON");
+    private static final Set<String> SUPPORTED_COMPUTE_TYPES = Set.of("RULE", "EXPR");
+
     private final CdpComputedProfileAttributeMapper attributeMapper;
     private final CdpComputedProfileRunMapper runMapper;
     private final CdpProfileAttributeChangeLogMapper changeLogMapper;
@@ -33,7 +37,8 @@ public class ComputedProfileAttributeService {
     public record PreviewSample(String userId, String oldValue, String newValue) {
     }
 
-    public record PreviewResult(long scannedCount, long matchedCount, long changedCount, List<PreviewSample> samples) {
+    public record PreviewResult(long scannedCount, long matchedCount, long changedCount,
+                                long unchangedCount, List<PreviewSample> samples) {
     }
 
     public record RunResult(Long runId, String status, long scannedCount, long matchedCount,
@@ -47,14 +52,14 @@ public class ComputedProfileAttributeService {
     }
 
     public CdpComputedProfileAttributeDO create(Long tenantId, CdpComputedProfileAttributeDO body, String createdBy) {
-        ruleEvaluator.validate(body.getExpressionJson());
         body.setTenantId(normalizeTenantId(tenantId));
         body.setAttrCode(requireText(body.getAttrCode(), "attrCode"));
         body.setDisplayName(body.getDisplayName() == null || body.getDisplayName().isBlank()
                 ? body.getAttrCode()
                 : body.getDisplayName().trim());
-        body.setValueType(defaultText(body.getValueType(), "STRING"));
-        body.setComputeType(defaultText(body.getComputeType(), "RULE"));
+        body.setValueType(validateEnum(defaultText(body.getValueType(), "STRING").toUpperCase(), "valueType", SUPPORTED_VALUE_TYPES));
+        body.setComputeType(validateEnum(defaultText(body.getComputeType(), "RULE").toUpperCase(), "computeType", SUPPORTED_COMPUTE_TYPES));
+        ruleEvaluator.validate(body.getExpressionJson(), body.getComputeType());
         body.setRefreshMode(defaultText(body.getRefreshMode(), "MANUAL"));
         body.setStatus(CdpComputedProfileAttributeDO.DRAFT);
         body.setCreatedBy(createdBy);
@@ -64,8 +69,14 @@ public class ComputedProfileAttributeService {
 
     public void activate(Long tenantId, Long attrId) {
         CdpComputedProfileAttributeDO def = requireDefinition(tenantId, attrId, false);
-        ruleEvaluator.validate(def.getExpressionJson());
+        validateDefinition(def);
         def.setStatus(CdpComputedProfileAttributeDO.ACTIVE);
+        attributeMapper.updateById(def);
+    }
+
+    public void pause(Long tenantId, Long attrId) {
+        CdpComputedProfileAttributeDO def = requireDefinition(tenantId, attrId, false);
+        def.setStatus(CdpComputedProfileAttributeDO.PAUSED);
         attributeMapper.updateById(def);
     }
 
@@ -118,14 +129,40 @@ public class ComputedProfileAttributeService {
         }
     }
 
+    public List<CdpComputedProfileRunDO> listRuns(Long tenantId, Long attrId, Integer limit) {
+        CdpComputedProfileAttributeDO def = requireDefinition(tenantId, attrId, false);
+        return runMapper.selectList(new LambdaQueryWrapper<CdpComputedProfileRunDO>()
+                .eq(CdpComputedProfileRunDO::getTenantId, def.getTenantId())
+                .eq(CdpComputedProfileRunDO::getAttrId, def.getId())
+                .orderByDesc(CdpComputedProfileRunDO::getStartedAt)
+                .last("LIMIT " + normalizeLimit(limit)));
+    }
+
+    public List<CdpProfileAttributeChangeLogDO> listChangeLogs(Long tenantId, Long attrId, String userId, Integer limit) {
+        CdpComputedProfileAttributeDO def = requireDefinition(tenantId, attrId, false);
+        LambdaQueryWrapper<CdpProfileAttributeChangeLogDO> wrapper = new LambdaQueryWrapper<CdpProfileAttributeChangeLogDO>()
+                .eq(CdpProfileAttributeChangeLogDO::getTenantId, def.getTenantId())
+                .eq(CdpProfileAttributeChangeLogDO::getAttrCode, def.getAttrCode())
+                .orderByDesc(CdpProfileAttributeChangeLogDO::getChangedAt)
+                .last("LIMIT " + normalizeLimit(limit));
+        if (userId != null && !userId.isBlank()) {
+            wrapper.eq(CdpProfileAttributeChangeLogDO::getUserId, userId.trim());
+        }
+        return changeLogMapper.selectList(wrapper);
+    }
+
     private EvaluationResult evaluateProfiles(CdpComputedProfileAttributeDO def, boolean mutate, Long runId) {
         List<CdpUserProfileDO> profiles = profileMapper.selectList(new LambdaQueryWrapper<CdpUserProfileDO>()
+                .eq(CdpUserProfileDO::getTenantId, def.getTenantId())
                 .eq(CdpUserProfileDO::getStatus, "ACTIVE"));
         EvaluationResult result = new EvaluationResult();
         for (CdpUserProfileDO profile : profiles) {
+            if (!def.getTenantId().equals(profile.getTenantId())) {
+                continue;
+            }
             result.scannedCount++;
             Map<String, Object> properties = new LinkedHashMap<>(ruleEvaluator.readProperties(profile.getPropertiesJson()));
-            CdpRuleEvaluator.Evaluation evaluation = ruleEvaluator.evaluate(def.getExpressionJson(), properties);
+            CdpRuleEvaluator.Evaluation evaluation = ruleEvaluator.evaluate(def.getExpressionJson(), def.getComputeType(), properties);
             if (!evaluation.matched()) {
                 continue;
             }
@@ -204,8 +241,28 @@ public class ComputedProfileAttributeService {
         return value == null || value.isBlank() ? fallback : value.trim();
     }
 
+    private String validateEnum(String value, String fieldName, Set<String> supported) {
+        if (!supported.contains(value)) {
+            throw new IllegalArgumentException(fieldName + " is not supported: " + value);
+        }
+        return value;
+    }
+
+    private void validateDefinition(CdpComputedProfileAttributeDO def) {
+        validateEnum(defaultText(def.getValueType(), "STRING").toUpperCase(), "valueType", SUPPORTED_VALUE_TYPES);
+        validateEnum(defaultText(def.getComputeType(), "RULE").toUpperCase(), "computeType", SUPPORTED_COMPUTE_TYPES);
+        ruleEvaluator.validate(def.getExpressionJson(), def.getComputeType());
+    }
+
     private Long normalizeTenantId(Long tenantId) {
         return tenantId == null ? 0L : tenantId;
+    }
+
+    private int normalizeLimit(Integer limit) {
+        if (limit == null || limit <= 0) {
+            return 100;
+        }
+        return Math.min(limit, 500);
     }
 
     private static final class EvaluationResult {
@@ -216,7 +273,7 @@ public class ComputedProfileAttributeService {
         final List<PreviewSample> samples = new ArrayList<>();
 
         PreviewResult preview() {
-            return new PreviewResult(scannedCount, matchedCount, changedCount, samples);
+            return new PreviewResult(scannedCount, matchedCount, changedCount, unchangedCount, samples);
         }
     }
 }

@@ -7,6 +7,7 @@ vi.mock('./api', () => ({
 import {
   buildCreateWriteKeyPayload,
   createCdpEventApi,
+  buildWebhookSubscriptionPayload,
   normalizeDiscoveredAttributeRows,
   safeWriteKeyRows,
   type DiscoveredAttribute,
@@ -53,6 +54,7 @@ describe('cdp event api helpers', () => {
     const client = {
       get: vi.fn().mockResolvedValue({ data: [] }),
       post: vi.fn().mockResolvedValue({ data: {} }),
+      put: vi.fn().mockResolvedValue({ data: {} }),
       delete: vi.fn().mockResolvedValue({ data: undefined }),
     }
     const api = createCdpEventApi(client as any)
@@ -72,5 +74,67 @@ describe('cdp event api helpers', () => {
     })
     expect(client.delete).toHaveBeenCalledWith('/cdp/write-keys/7')
     expect(client.get).toHaveBeenCalledWith('/canvas/event-attributes/discovered')
+  })
+
+  it('builds webhook subscription payload with trimmed event types and default attempts', () => {
+    expect(buildWebhookSubscriptionPayload({
+      name: ' CRM ',
+      callbackUrl: ' https://example.com/hook ',
+      eventTypesText: 'cdp.event.ingested\n\nprofile.updated\ncdp.event.ingested',
+    })).toEqual({
+      name: 'CRM',
+      callbackUrl: 'https://example.com/hook',
+      eventTypes: ['cdp.event.ingested', 'profile.updated'],
+      maxAttempts: 3,
+    })
+  })
+
+  it('calls webhook subscription management endpoints', async () => {
+    const client = {
+      get: vi.fn().mockResolvedValue({ data: [] }),
+      post: vi.fn().mockResolvedValue({ data: {} }),
+      put: vi.fn().mockResolvedValue({ data: {} }),
+      delete: vi.fn().mockResolvedValue({ data: undefined }),
+    }
+    const api = createCdpEventApi(client as any)
+
+    await api.listWebhookSubscriptions()
+    await api.createWebhookSubscription({
+      name: 'CRM',
+      callbackUrl: 'https://example.com/hook',
+      eventTypesText: 'cdp.event.ingested',
+    })
+    await api.updateWebhookSubscription(9, {
+      name: 'CRM',
+      callbackUrl: 'https://example.com/hook',
+      eventTypesText: 'cdp.event.ingested',
+      maxAttempts: 5,
+    })
+    await api.pauseWebhookSubscription(9)
+    await api.resumeWebhookSubscription(9)
+    await api.disableWebhookSubscription(9)
+    await api.rotateWebhookSecret(9)
+    await api.testWebhookDelivery(9)
+    await api.listWebhookDeliveries(9)
+
+    expect(client.get).toHaveBeenCalledWith('/cdp/webhooks')
+    expect(client.post).toHaveBeenCalledWith('/cdp/webhooks', {
+      name: 'CRM',
+      callbackUrl: 'https://example.com/hook',
+      eventTypes: ['cdp.event.ingested'],
+      maxAttempts: 3,
+    })
+    expect(client.put).toHaveBeenCalledWith('/cdp/webhooks/9', {
+      name: 'CRM',
+      callbackUrl: 'https://example.com/hook',
+      eventTypes: ['cdp.event.ingested'],
+      maxAttempts: 5,
+    })
+    expect(client.put).toHaveBeenCalledWith('/cdp/webhooks/9/pause')
+    expect(client.put).toHaveBeenCalledWith('/cdp/webhooks/9/resume')
+    expect(client.delete).toHaveBeenCalledWith('/cdp/webhooks/9')
+    expect(client.post).toHaveBeenCalledWith('/cdp/webhooks/9/rotate-secret', {})
+    expect(client.post).toHaveBeenCalledWith('/cdp/webhooks/9/test', {})
+    expect(client.get).toHaveBeenCalledWith('/cdp/webhooks/9/deliveries')
   })
 })

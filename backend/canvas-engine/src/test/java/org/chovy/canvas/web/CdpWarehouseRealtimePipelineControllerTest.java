@@ -8,6 +8,8 @@ import org.junit.jupiter.api.Test;
 import reactor.core.publisher.Mono;
 
 import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
+import java.time.ZoneId;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -74,8 +76,13 @@ class CdpWarehouseRealtimePipelineControllerTest {
         req.setReportedBy("flink-job");
         req.setSourceSchemaVersion("1");
         req.setSinkSchemaVersion("2");
+        req.setWatermarkTime("2026-06-06T01:59:00Z");
+        req.setCheckpointTime("2026-06-06T02:00:00Z");
         CdpWarehouseRealtimePipelineController controller =
                 new CdpWarehouseRealtimePipelineController(service, tenantResolver(9L, "operator"));
+        LocalDateTime expectedCheckpointTime = OffsetDateTime.parse("2026-06-06T02:00:00Z")
+                .atZoneSameInstant(ZoneId.systemDefault())
+                .toLocalDateTime();
 
         R<CdpWarehouseRealtimePipelineService.CheckpointReport> response =
                 controller.reportCheckpoint(req).block();
@@ -87,7 +94,8 @@ class CdpWarehouseRealtimePipelineControllerTest {
                         && "100".equals(command.committedOffset())
                         && "flink-job".equals(command.reportedBy())
                         && "1".equals(command.sourceSchemaVersion())
-                        && "2".equals(command.sinkSchemaVersion())));
+                        && "2".equals(command.sinkSchemaVersion())
+                        && expectedCheckpointTime.equals(command.checkpointTime())));
     }
 
     @Test

@@ -11,8 +11,9 @@ Deliver internal CDP/journey/profile/tag/audience events to active webhook subsc
 
 ## Current Baseline
 
+- Implemented and merged into `main` on 2026-06-05.
 - P1-005B adds webhook subscription and delivery log storage plus signature primitives.
-- There is no `WebhookDispatcherService`.
+- `WebhookDispatcherService`, `WebhookRetryPolicy`, and `WebhookDeliveryPayload` live under `org.chovy.canvas.domain.cdp`.
 - P1-005A2 emits internal CDP events that can be used in tests as synthetic payloads.
 
 ## In Scope
@@ -42,14 +43,21 @@ Deliver internal CDP/journey/profile/tag/audience events to active webhook subsc
 
 ## Technical Scope
 
-- `backend/canvas-engine/src/main/java/org/chovy/canvas/domain/webhook/WebhookDispatcherService.java`
-- `backend/canvas-engine/src/main/java/org/chovy/canvas/domain/webhook/WebhookRetryPolicy.java`
-- `backend/canvas-engine/src/main/java/org/chovy/canvas/domain/webhook/WebhookDeliveryPayload.java`
-- `backend/canvas-engine/src/test/java/org/chovy/canvas/domain/webhook/WebhookDispatcherServiceTest.java`
-- `backend/canvas-engine/src/test/java/org/chovy/canvas/domain/webhook/WebhookRetryPolicyTest.java`
+- `backend/canvas-engine/src/main/java/org/chovy/canvas/domain/cdp/WebhookDispatcherService.java`
+- `backend/canvas-engine/src/main/java/org/chovy/canvas/domain/cdp/WebhookRetryPolicy.java`
+- `backend/canvas-engine/src/main/java/org/chovy/canvas/domain/cdp/WebhookDeliveryPayload.java`
+- `backend/canvas-engine/src/test/java/org/chovy/canvas/domain/cdp/WebhookDispatcherServiceTest.java`
+- `backend/canvas-engine/src/test/java/org/chovy/canvas/domain/cdp/WebhookRetryPolicyTest.java`
 
 ## Acceptance Criteria
 
 - Dispatcher tests prove matching, headers, log writes, and no delivery to inactive subscriptions.
 - Retry policy tests prove 429/5xx/network retry and non-429 4xx terminal failure.
 - Dead-letter tests prove attempts beyond the configured maximum mark `DEAD`.
+
+## Implementation Status
+
+- Status: implemented and merged into `main` on 2026-06-05.
+- P1-005B2 adjustment: `WebhookDispatcherService` now uses exact event-type matching only and sends the canonical headers `X-Canvas-Event`, `X-Canvas-Delivery`, `X-Canvas-Timestamp`, and `X-Canvas-Signature`.
+- Production compile: `cd backend && JAVA_HOME=/Users/photonpay/Library/Java/JavaVirtualMachines/ms-21.0.11/Contents/Home PATH="/Users/photonpay/Library/Java/JavaVirtualMachines/ms-21.0.11/Contents/Home/bin:$PATH" mvn -pl canvas-engine -DskipTests compile` passed.
+- Focused webhook tests pass in an isolated runner because Maven `testCompile` is currently blocked by unrelated existing test-source errors. Covered tests: `WebhookSubscriptionSchemaTest`, `WebhookSignatureServiceTest`, `WebhookSubscriptionValidatorTest`, `WebhookDispatcherServiceTest`, and `WebhookRetryPolicyTest`.

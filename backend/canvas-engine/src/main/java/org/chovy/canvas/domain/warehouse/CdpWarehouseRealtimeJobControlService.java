@@ -4,6 +4,7 @@ import org.chovy.canvas.dal.dataobject.CdpWarehouseStreamJobActionDO;
 import org.chovy.canvas.dal.dataobject.CdpWarehouseStreamJobInstanceDO;
 import org.chovy.canvas.dal.mapper.CdpWarehouseStreamJobActionMapper;
 import org.chovy.canvas.dal.mapper.CdpWarehouseStreamJobInstanceMapper;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.time.Clock;
@@ -40,6 +41,7 @@ public class CdpWarehouseRealtimeJobControlService {
     private final CdpWarehouseStreamJobActionMapper actionMapper;
     private final Clock clock;
 
+    @Autowired
     public CdpWarehouseRealtimeJobControlService(CdpWarehouseStreamJobInstanceMapper instanceMapper,
                                                  CdpWarehouseStreamJobActionMapper actionMapper) {
         this(instanceMapper, actionMapper, Clock.systemDefaultZone());

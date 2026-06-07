@@ -15,9 +15,13 @@
 - `docs/product-evolution/specs/p2-021-cdp-olap-audience-materialization.md`
 - Depends on P1-005A CDP event ingestion, P1-006C realtime audience foundations, P2-016 analytics sink work, and existing `AudienceBitmapStore`.
 
+## Current Status Note
+
+The implementation files and focused GREEN verification are present in the current worktree. The historical RED verification steps remain unchecked because the pre-implementation state cannot be reproduced from the current worktree without reverting completed work.
+
 ## File Structure
 
-- Create: `backend/canvas-engine/src/main/resources/db/migration/V189__cdp_olap_audience_materialization.sql` - MySQL metadata for user indexes, bitmap versions, runs, and quality checks.
+- Create: `backend/canvas-engine/src/main/resources/db/migration/V214__cdp_olap_audience_materialization.sql` - MySQL metadata for user indexes, bitmap versions, runs, and quality checks.
 - Create: `backend/canvas-engine/src/main/resources/infrastructure/doris/cdp-audience-ddl.sql` - Doris ODS/DWD/DWS tables for CDP behavior facts.
 - Create data objects and mappers under `backend/canvas-engine/src/main/java/org/chovy/canvas/dal/`.
 - Create: `StableUserIndexService` - duplicate-safe tenant/user to numeric index allocation.
@@ -30,11 +34,11 @@
 ### Task 1: Schema And DDL
 
 **Files:**
-- Create: `backend/canvas-engine/src/main/resources/db/migration/V189__cdp_olap_audience_materialization.sql`
+- Create: `backend/canvas-engine/src/main/resources/db/migration/V214__cdp_olap_audience_materialization.sql`
 - Create: `backend/canvas-engine/src/main/resources/infrastructure/doris/cdp-audience-ddl.sql`
 - Create: `backend/canvas-engine/src/test/java/org/chovy/canvas/domain/analytics/CdpOlapAudienceSchemaTest.java`
 
-- [ ] **Step 1: Write failing schema tests**
+- [x] **Step 1: Write failing schema tests**
 
 Create `CdpOlapAudienceSchemaTest`:
 
@@ -53,7 +57,7 @@ class CdpOlapAudienceSchemaTest {
     @Test
     void mysqlMigrationCreatesMaterializationMetadata() throws Exception {
         String sql = Files.readString(Path.of(
-                "src/main/resources/db/migration/V189__cdp_olap_audience_materialization.sql"));
+                "src/main/resources/db/migration/V214__cdp_olap_audience_materialization.sql"));
 
         assertThat(sql)
                 .contains("CREATE TABLE IF NOT EXISTS cdp_user_index")
@@ -90,16 +94,16 @@ cd backend && mvn -pl canvas-engine test -Dtest=CdpOlapAudienceSchemaTest
 
 Expected: FAIL because the migration and Doris DDL do not exist.
 
-- [ ] **Step 3: Add MySQL metadata migration**
+- [x] **Step 3: Add MySQL metadata migration**
 
-Create `V189__cdp_olap_audience_materialization.sql` with additive tables for:
+Create `V214__cdp_olap_audience_materialization.sql` with additive tables for:
 
 - `cdp_user_index`
 - `audience_bitmap_version`
 - `audience_materialization_run`
 - `audience_quality_check`
 
-- [ ] **Step 4: Add Doris DDL**
+- [x] **Step 4: Add Doris DDL**
 
 Create `cdp-audience-ddl.sql` with:
 
@@ -107,7 +111,7 @@ Create `cdp-audience-ddl.sql` with:
 - `canvas_dwd.cdp_user_event_fact`
 - `canvas_dws.user_event_metric_daily`
 
-- [ ] **Step 5: Run schema tests**
+- [x] **Step 5: Run schema tests**
 
 Run:
 
@@ -117,6 +121,8 @@ cd backend && mvn -pl canvas-engine test -Dtest=CdpOlapAudienceSchemaTest
 
 Expected: PASS.
 
+Observed on 2026-06-06: covered by `scripts/verify-olap2-focus.sh`.
+
 ### Task 2: Stable User Index
 
 **Files:**
@@ -125,7 +131,7 @@ Expected: PASS.
 - Create: `backend/canvas-engine/src/main/java/org/chovy/canvas/engine/audience/StableUserIndexService.java`
 - Create: `backend/canvas-engine/src/test/java/org/chovy/canvas/engine/audience/StableUserIndexServiceTest.java`
 
-- [ ] **Step 1: Write failing stable index tests**
+- [x] **Step 1: Write failing stable index tests**
 
 Test behaviors:
 
@@ -144,11 +150,11 @@ cd backend && mvn -pl canvas-engine test -Dtest=StableUserIndexServiceTest
 
 Expected: FAIL because the service does not exist.
 
-- [ ] **Step 3: Implement stable user index files**
+- [x] **Step 3: Implement stable user index files**
 
 Implement data object, mapper, and service. The service must normalize null tenant to `0L`, trim user ids, and use `DuplicateKeyException` handling to make concurrent allocation safe.
 
-- [ ] **Step 4: Run stable index tests**
+- [x] **Step 4: Run stable index tests**
 
 Run:
 
@@ -158,6 +164,8 @@ cd backend && mvn -pl canvas-engine test -Dtest=StableUserIndexServiceTest
 
 Expected: PASS.
 
+Observed on 2026-06-06: covered by `scripts/verify-olap2-focus.sh`.
+
 ### Task 3: Versioned Bitmap Store
 
 **Files:**
@@ -166,7 +174,7 @@ Expected: PASS.
 - Create: `backend/canvas-engine/src/main/java/org/chovy/canvas/engine/audience/VersionedAudienceBitmapStore.java`
 - Create: `backend/canvas-engine/src/test/java/org/chovy/canvas/engine/audience/VersionedAudienceBitmapStoreTest.java`
 
-- [ ] **Step 1: Write failing versioned bitmap tests**
+- [x] **Step 1: Write failing versioned bitmap tests**
 
 Test behaviors:
 
@@ -185,11 +193,11 @@ cd backend && mvn -pl canvas-engine test -Dtest=VersionedAudienceBitmapStoreTest
 
 Expected: FAIL because the store does not exist.
 
-- [ ] **Step 3: Implement versioned bitmap store**
+- [x] **Step 3: Implement versioned bitmap store**
 
 Implement Redis binary-safe Base64 storage compatible with current RoaringBitmap serialization. Keep the existing `AudienceBitmapStore` untouched for existing dynamic audiences.
 
-- [ ] **Step 4: Run versioned bitmap tests**
+- [x] **Step 4: Run versioned bitmap tests**
 
 Run:
 
@@ -199,13 +207,15 @@ cd backend && mvn -pl canvas-engine test -Dtest=VersionedAudienceBitmapStoreTest
 
 Expected: PASS.
 
+Observed on 2026-06-06: covered by `scripts/verify-olap2-focus.sh`.
+
 ### Task 4: Behavior Rule Compiler
 
 **Files:**
 - Create: `backend/canvas-engine/src/main/java/org/chovy/canvas/domain/analytics/BehaviorAudienceRuleCompiler.java`
 - Create: `backend/canvas-engine/src/test/java/org/chovy/canvas/domain/analytics/BehaviorAudienceRuleCompilerTest.java`
 
-- [ ] **Step 1: Write failing compiler tests**
+- [x] **Step 1: Write failing compiler tests**
 
 Test behaviors:
 
@@ -222,11 +232,11 @@ cd backend && mvn -pl canvas-engine test -Dtest=BehaviorAudienceRuleCompilerTest
 
 Expected: FAIL because the compiler does not exist.
 
-- [ ] **Step 3: Implement compiler**
+- [x] **Step 3: Implement compiler**
 
 Implement a JSON parser using `ObjectMapper`, explicit enums, a dot-separated filter-path regex, and immutable records for `CompiledBehaviorAudienceQuery` and `Filter`.
 
-- [ ] **Step 4: Run compiler tests**
+- [x] **Step 4: Run compiler tests**
 
 Run:
 
@@ -236,6 +246,8 @@ cd backend && mvn -pl canvas-engine test -Dtest=BehaviorAudienceRuleCompilerTest
 
 Expected: PASS.
 
+Observed on 2026-06-06: covered by `scripts/verify-olap2-focus.sh`.
+
 ### Task 5: Audience Materialization Service
 
 **Files:**
@@ -244,7 +256,7 @@ Expected: PASS.
 - Create: `backend/canvas-engine/src/main/java/org/chovy/canvas/domain/analytics/AudienceMaterializationService.java`
 - Create: `backend/canvas-engine/src/test/java/org/chovy/canvas/domain/analytics/AudienceMaterializationServiceTest.java`
 
-- [ ] **Step 1: Write failing materialization tests**
+- [x] **Step 1: Write failing materialization tests**
 
 Test behaviors:
 
@@ -262,7 +274,7 @@ cd backend && mvn -pl canvas-engine test -Dtest=AudienceMaterializationServiceTe
 
 Expected: FAIL because the service does not exist.
 
-- [ ] **Step 3: Implement materialization service**
+- [x] **Step 3: Implement materialization service**
 
 Implement repository interfaces inside the service:
 
@@ -271,7 +283,7 @@ Implement repository interfaces inside the service:
 
 The first implementation should keep infrastructure boundaries injectable and unit-testable without requiring a live Doris connection.
 
-- [ ] **Step 4: Run materialization tests**
+- [x] **Step 4: Run materialization tests**
 
 Run:
 
@@ -281,6 +293,8 @@ cd backend && mvn -pl canvas-engine test -Dtest=AudienceMaterializationServiceTe
 
 Expected: PASS.
 
+Observed on 2026-06-06: covered by `scripts/verify-olap2-focus.sh`.
+
 ### Task 6: Audience Quality Service
 
 **Files:**
@@ -289,7 +303,7 @@ Expected: PASS.
 - Create: `backend/canvas-engine/src/main/java/org/chovy/canvas/domain/analytics/AudienceQualityService.java`
 - Create: `backend/canvas-engine/src/test/java/org/chovy/canvas/domain/analytics/AudienceQualityServiceTest.java`
 
-- [ ] **Step 1: Write failing quality tests**
+- [x] **Step 1: Write failing quality tests**
 
 Test behaviors:
 
@@ -308,11 +322,11 @@ cd backend && mvn -pl canvas-engine test -Dtest=AudienceQualityServiceTest
 
 Expected: FAIL because the service does not exist.
 
-- [ ] **Step 3: Implement quality service**
+- [x] **Step 3: Implement quality service**
 
 Implement `evaluate(...)` using explicit thresholds and bounded detail JSON.
 
-- [ ] **Step 4: Run quality tests**
+- [x] **Step 4: Run quality tests**
 
 Run:
 
@@ -322,22 +336,42 @@ cd backend && mvn -pl canvas-engine test -Dtest=AudienceQualityServiceTest
 
 Expected: PASS.
 
+Observed on 2026-06-06: covered by `scripts/verify-olap2-focus.sh`.
+
 ### Task 7: Focused Verification
 
 **Files:**
 - All files from Tasks 1-6.
+- Create: `scripts/verify-olap2-focus.sh` - repeatable Java 21 focused verification entry point.
 
-- [ ] **Step 1: Run focused backend tests**
+- [x] **Step 1: Run focused backend tests**
 
 Run:
 
 ```bash
-cd backend && mvn -pl canvas-engine test -Dtest=CdpOlapAudienceSchemaTest,StableUserIndexServiceTest,VersionedAudienceBitmapStoreTest,BehaviorAudienceRuleCompilerTest,AudienceMaterializationServiceTest,AudienceQualityServiceTest
+scripts/verify-olap2-focus.sh
 ```
 
 Expected: PASS.
 
-- [ ] **Step 2: Review changed files**
+Observed on 2026-06-06: the default shell used Java 8 and failed at `testCompile` with `invalid flag: --release`. Re-running with Java 21 passed:
+
+```bash
+cd backend && JAVA_HOME=$(/usr/libexec/java_home -v 21) mvn -pl canvas-engine test -Dtest=CdpOlapAudienceSchemaTest,StableUserIndexServiceTest,VersionedAudienceBitmapStoreTest,BehaviorAudienceRuleCompilerTest,AudienceMaterializationServiceTest,AudienceQualityServiceTest
+```
+
+Result: `Tests run: 20, Failures: 0, Errors: 0, Skipped: 0`.
+
+Acceleration entry point added on 2026-06-06:
+
+```bash
+scripts/verify-olap2-focus.sh --dry-run
+scripts/verify-olap2-focus.sh
+```
+
+The script ignores a stale Java 8 `JAVA_HOME` when a Java 21 runtime is available through `/usr/libexec/java_home -v 21`. It uses an isolated verification path: compile main sources, build the test classpath, compile only the P2-021 test sources, and run the same six focused backend tests through Surefire. This avoids unrelated dirty-worktree test compilation blockers while preserving the olap2 quality gate. Observed result: `Tests run: 20, Failures: 0, Errors: 0, Skipped: 0`.
+
+- [x] **Step 2: Review changed files**
 
 Run:
 
@@ -346,6 +380,8 @@ git status --short
 ```
 
 Expected: P2-021 files are visible and unrelated dirty files are left untouched.
+
+Observed on 2026-06-06: the focused P2-021 implementation files are present in the current tree; broad unrelated dirty worktree changes remain outside this plan.
 
 - [ ] **Step 3: Commit optional**
 

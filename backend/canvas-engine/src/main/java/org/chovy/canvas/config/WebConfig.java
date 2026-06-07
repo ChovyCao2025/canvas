@@ -1,5 +1,6 @@
 package org.chovy.canvas.config;
 
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -18,12 +19,13 @@ import java.util.List;
  * - 仅处理“浏览器跨域访问”层面问题；
  * - 不处理认证与授权（由 Security 配置负责）。
  */
-@Configuration
+@Configuration(proxyBeanMethods = false)
 public class WebConfig {
 
     private final List<String> allowedOrigins;
     private final boolean productionLike;
 
+    @Autowired
     public WebConfig(
             @Value("${canvas.cors.allowed-origins:*}") List<String> allowedOrigins,
             Environment environment) {

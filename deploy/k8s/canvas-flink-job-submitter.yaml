@@ -1,0 +1,383 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: canvas-flink-submit-mysql-cdp-event-log-to-doris-ods
+  namespace: canvas
+  labels:
+    app.kubernetes.io/name: canvas-flink
+    app.kubernetes.io/component: flink-job-submitter
+    app.kubernetes.io/part-of: marketing-canvas
+    canvas.chovy.org/pipeline-key: mysql_cdp_event_log_to_doris_ods
+spec:
+  backoffLimit: 3
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: canvas-flink
+        app.kubernetes.io/component: flink-job-submitter
+        app.kubernetes.io/part-of: marketing-canvas
+    spec:
+      restartPolicy: OnFailure
+      serviceAccountName: canvas-flink
+      containers:
+        - name: submit
+          image: registry.example.com/marketing-canvas/canvas-flink-jobs:prod
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: CANVAS_FLINK_JOB_PIPELINE_KEY
+              value: mysql_cdp_event_log_to_doris_ods
+            - name: CANVAS_FLINK_TENANT_ID
+              value: "0"
+            - name: CANVAS_FLINK_REPORTED_BY
+              value: canvas-flink-jobs-prod
+            - name: CANVAS_FLINK_DORIS_LABEL_SUFFIX
+              value: ""
+            - name: CANVAS_FLINK_MYSQL_URL
+              valueFrom:
+                secretKeyRef:
+                  name: canvas-flink-runtime
+                  key: canvas-flink-mysql-url
+            - name: CANVAS_FLINK_MYSQL_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: canvas-flink-runtime
+                  key: canvas-flink-mysql-username
+            - name: CANVAS_FLINK_MYSQL_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: canvas-flink-runtime
+                  key: canvas-flink-mysql-password
+            - name: CANVAS_FLINK_DORIS_FE_NODES
+              valueFrom:
+                secretKeyRef:
+                  name: canvas-flink-runtime
+                  key: canvas-flink-doris-fe-nodes
+            - name: CANVAS_FLINK_DORIS_BE_NODES
+              valueFrom:
+                secretKeyRef:
+                  name: canvas-flink-runtime
+                  key: canvas-flink-doris-be-nodes
+            - name: CANVAS_FLINK_DORIS_JDBC_URL
+              valueFrom:
+                secretKeyRef:
+                  name: canvas-flink-runtime
+                  key: canvas-flink-doris-jdbc-url
+            - name: CANVAS_FLINK_DORIS_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: canvas-flink-runtime
+                  key: canvas-flink-doris-username
+            - name: CANVAS_FLINK_DORIS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: canvas-flink-runtime
+                  key: canvas-flink-doris-password
+            - name: CANVAS_FLINK_CHECKPOINT_ENDPOINT
+              valueFrom:
+                secretKeyRef:
+                  name: canvas-flink-runtime
+                  key: canvas-flink-checkpoint-endpoint
+            - name: CANVAS_FLINK_INTERNAL_API_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: canvas-flink-runtime
+                  key: canvas-flink-internal-api-token
+          command: ["/bin/bash", "-ec"]
+          args:
+            - |
+              until flink list -m canvas-flink-jobmanager:8081 >/dev/null 2>&1; do
+                sleep 5
+              done
+              flink run -d \
+                -m canvas-flink-jobmanager:8081 \
+                -c org.chovy.canvas.flink.CanvasFlinkJobMain \
+                /opt/flink/usrlib/canvas-flink-jobs-1.0.0-SNAPSHOT.jar \
+                --pipeline-key=mysql_cdp_event_log_to_doris_ods
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: canvas-flink-submit-mysql-canvas-trace-to-doris-ods
+  namespace: canvas
+  labels:
+    app.kubernetes.io/name: canvas-flink
+    app.kubernetes.io/component: flink-job-submitter
+    app.kubernetes.io/part-of: marketing-canvas
+    canvas.chovy.org/pipeline-key: mysql_canvas_trace_to_doris_ods
+spec:
+  backoffLimit: 3
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: canvas-flink
+        app.kubernetes.io/component: flink-job-submitter
+        app.kubernetes.io/part-of: marketing-canvas
+    spec:
+      restartPolicy: OnFailure
+      serviceAccountName: canvas-flink
+      containers:
+        - name: submit
+          image: registry.example.com/marketing-canvas/canvas-flink-jobs:prod
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: CANVAS_FLINK_JOB_PIPELINE_KEY
+              value: mysql_canvas_trace_to_doris_ods
+            - name: CANVAS_FLINK_TENANT_ID
+              value: "0"
+            - name: CANVAS_FLINK_REPORTED_BY
+              value: canvas-flink-jobs-prod
+            - name: CANVAS_FLINK_DORIS_LABEL_SUFFIX
+              value: ""
+            - name: CANVAS_FLINK_MYSQL_URL
+              valueFrom:
+                secretKeyRef:
+                  name: canvas-flink-runtime
+                  key: canvas-flink-mysql-url
+            - name: CANVAS_FLINK_MYSQL_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: canvas-flink-runtime
+                  key: canvas-flink-mysql-username
+            - name: CANVAS_FLINK_MYSQL_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: canvas-flink-runtime
+                  key: canvas-flink-mysql-password
+            - name: CANVAS_FLINK_DORIS_FE_NODES
+              valueFrom:
+                secretKeyRef:
+                  name: canvas-flink-runtime
+                  key: canvas-flink-doris-fe-nodes
+            - name: CANVAS_FLINK_DORIS_BE_NODES
+              valueFrom:
+                secretKeyRef:
+                  name: canvas-flink-runtime
+                  key: canvas-flink-doris-be-nodes
+            - name: CANVAS_FLINK_DORIS_JDBC_URL
+              valueFrom:
+                secretKeyRef:
+                  name: canvas-flink-runtime
+                  key: canvas-flink-doris-jdbc-url
+            - name: CANVAS_FLINK_DORIS_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: canvas-flink-runtime
+                  key: canvas-flink-doris-username
+            - name: CANVAS_FLINK_DORIS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: canvas-flink-runtime
+                  key: canvas-flink-doris-password
+            - name: CANVAS_FLINK_CHECKPOINT_ENDPOINT
+              valueFrom:
+                secretKeyRef:
+                  name: canvas-flink-runtime
+                  key: canvas-flink-checkpoint-endpoint
+            - name: CANVAS_FLINK_INTERNAL_API_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: canvas-flink-runtime
+                  key: canvas-flink-internal-api-token
+          command: ["/bin/bash", "-ec"]
+          args:
+            - |
+              until flink list -m canvas-flink-jobmanager:8081 >/dev/null 2>&1; do
+                sleep 5
+              done
+              flink run -d \
+                -m canvas-flink-jobmanager:8081 \
+                -c org.chovy.canvas.flink.CanvasFlinkJobMain \
+                /opt/flink/usrlib/canvas-flink-jobs-1.0.0-SNAPSHOT.jar \
+                --pipeline-key=mysql_canvas_trace_to_doris_ods
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: canvas-flink-submit-doris-ods-cdp-event-to-dwd-fact
+  namespace: canvas
+  labels:
+    app.kubernetes.io/name: canvas-flink
+    app.kubernetes.io/component: flink-job-submitter
+    app.kubernetes.io/part-of: marketing-canvas
+    canvas.chovy.org/pipeline-key: doris_ods_cdp_event_to_dwd_fact
+spec:
+  backoffLimit: 3
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: canvas-flink
+        app.kubernetes.io/component: flink-job-submitter
+        app.kubernetes.io/part-of: marketing-canvas
+    spec:
+      restartPolicy: OnFailure
+      serviceAccountName: canvas-flink
+      containers:
+        - name: submit
+          image: registry.example.com/marketing-canvas/canvas-flink-jobs:prod
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: CANVAS_FLINK_JOB_PIPELINE_KEY
+              value: doris_ods_cdp_event_to_dwd_fact
+            - name: CANVAS_FLINK_TENANT_ID
+              value: "0"
+            - name: CANVAS_FLINK_REPORTED_BY
+              value: canvas-flink-jobs-prod
+            - name: CANVAS_FLINK_DORIS_LABEL_SUFFIX
+              value: ""
+            - name: CANVAS_FLINK_MYSQL_URL
+              valueFrom:
+                secretKeyRef:
+                  name: canvas-flink-runtime
+                  key: canvas-flink-mysql-url
+            - name: CANVAS_FLINK_MYSQL_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: canvas-flink-runtime
+                  key: canvas-flink-mysql-username
+            - name: CANVAS_FLINK_MYSQL_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: canvas-flink-runtime
+                  key: canvas-flink-mysql-password
+            - name: CANVAS_FLINK_DORIS_FE_NODES
+              valueFrom:
+                secretKeyRef:
+                  name: canvas-flink-runtime
+                  key: canvas-flink-doris-fe-nodes
+            - name: CANVAS_FLINK_DORIS_BE_NODES
+              valueFrom:
+                secretKeyRef:
+                  name: canvas-flink-runtime
+                  key: canvas-flink-doris-be-nodes
+            - name: CANVAS_FLINK_DORIS_JDBC_URL
+              valueFrom:
+                secretKeyRef:
+                  name: canvas-flink-runtime
+                  key: canvas-flink-doris-jdbc-url
+            - name: CANVAS_FLINK_DORIS_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: canvas-flink-runtime
+                  key: canvas-flink-doris-username
+            - name: CANVAS_FLINK_DORIS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: canvas-flink-runtime
+                  key: canvas-flink-doris-password
+            - name: CANVAS_FLINK_CHECKPOINT_ENDPOINT
+              valueFrom:
+                secretKeyRef:
+                  name: canvas-flink-runtime
+                  key: canvas-flink-checkpoint-endpoint
+            - name: CANVAS_FLINK_INTERNAL_API_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: canvas-flink-runtime
+                  key: canvas-flink-internal-api-token
+          command: ["/bin/bash", "-ec"]
+          args:
+            - |
+              until flink list -m canvas-flink-jobmanager:8081 >/dev/null 2>&1; do
+                sleep 5
+              done
+              flink run -d \
+                -m canvas-flink-jobmanager:8081 \
+                -c org.chovy.canvas.flink.CanvasFlinkJobMain \
+                /opt/flink/usrlib/canvas-flink-jobs-1.0.0-SNAPSHOT.jar \
+                --pipeline-key=doris_ods_cdp_event_to_dwd_fact
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: canvas-flink-submit-doris-dwd-user-fact-to-dws-metric-daily
+  namespace: canvas
+  labels:
+    app.kubernetes.io/name: canvas-flink
+    app.kubernetes.io/component: flink-job-submitter
+    app.kubernetes.io/part-of: marketing-canvas
+    canvas.chovy.org/pipeline-key: doris_dwd_user_fact_to_dws_metric_daily
+spec:
+  backoffLimit: 3
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: canvas-flink
+        app.kubernetes.io/component: flink-job-submitter
+        app.kubernetes.io/part-of: marketing-canvas
+    spec:
+      restartPolicy: OnFailure
+      serviceAccountName: canvas-flink
+      containers:
+        - name: submit
+          image: registry.example.com/marketing-canvas/canvas-flink-jobs:prod
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: CANVAS_FLINK_JOB_PIPELINE_KEY
+              value: doris_dwd_user_fact_to_dws_metric_daily
+            - name: CANVAS_FLINK_TENANT_ID
+              value: "0"
+            - name: CANVAS_FLINK_REPORTED_BY
+              value: canvas-flink-jobs-prod
+            - name: CANVAS_FLINK_DORIS_LABEL_SUFFIX
+              value: ""
+            - name: CANVAS_FLINK_MYSQL_URL
+              valueFrom:
+                secretKeyRef:
+                  name: canvas-flink-runtime
+                  key: canvas-flink-mysql-url
+            - name: CANVAS_FLINK_MYSQL_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: canvas-flink-runtime
+                  key: canvas-flink-mysql-username
+            - name: CANVAS_FLINK_MYSQL_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: canvas-flink-runtime
+                  key: canvas-flink-mysql-password
+            - name: CANVAS_FLINK_DORIS_FE_NODES
+              valueFrom:
+                secretKeyRef:
+                  name: canvas-flink-runtime
+                  key: canvas-flink-doris-fe-nodes
+            - name: CANVAS_FLINK_DORIS_BE_NODES
+              valueFrom:
+                secretKeyRef:
+                  name: canvas-flink-runtime
+                  key: canvas-flink-doris-be-nodes
+            - name: CANVAS_FLINK_DORIS_JDBC_URL
+              valueFrom:
+                secretKeyRef:
+                  name: canvas-flink-runtime
+                  key: canvas-flink-doris-jdbc-url
+            - name: CANVAS_FLINK_DORIS_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: canvas-flink-runtime
+                  key: canvas-flink-doris-username
+            - name: CANVAS_FLINK_DORIS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: canvas-flink-runtime
+                  key: canvas-flink-doris-password
+            - name: CANVAS_FLINK_CHECKPOINT_ENDPOINT
+              valueFrom:
+                secretKeyRef:
+                  name: canvas-flink-runtime
+                  key: canvas-flink-checkpoint-endpoint
+            - name: CANVAS_FLINK_INTERNAL_API_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: canvas-flink-runtime
+                  key: canvas-flink-internal-api-token
+          command: ["/bin/bash", "-ec"]
+          args:
+            - |
+              until flink list -m canvas-flink-jobmanager:8081 >/dev/null 2>&1; do
+                sleep 5
+              done
+              flink run -d \
+                -m canvas-flink-jobmanager:8081 \
+                -c org.chovy.canvas.flink.CanvasFlinkJobMain \
+                /opt/flink/usrlib/canvas-flink-jobs-1.0.0-SNAPSHOT.jar \
+                --pipeline-key=doris_dwd_user_fact_to_dws_metric_daily

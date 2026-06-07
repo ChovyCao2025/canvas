@@ -1,12 +1,23 @@
 # Sandbox Demo And Sales Enablement Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox syntax for tracking.
 
 **Goal:** Provide a safe sandbox demo workflow with tracked sandbox tenants, reset commands, expiry metadata, and a sales demo guide.
 
 **Architecture:** Store sandbox lifecycle state in an additive table and keep demo installation/reset as explicit service commands with a `demo_marker` so generated data cannot be mistaken for production data. This slice records and resets demo state; full mock data generation and demo canvas templates can be expanded in child specs.
 
 **Tech Stack:** Java 21, Spring Boot WebFlux-style `Mono`, Flyway, JUnit 5, Mockito, AssertJ, React 18, TypeScript, Axios, Vitest, Markdown docs.
+
+## Implementation Status
+
+Completed on 2026-06-05.
+
+- Actual migration version is `V269__sandbox_demo_sales_enablement.sql`; the earlier planned migration slot was no longer available in this workspace.
+- Backend implementation includes `DemoSandboxService`, `JdbcDemoSandboxRepository`, and authenticated `DemoSandboxController` endpoints for install, reset, and expired-sandbox lookup.
+- Reset auditing uses the username from `TenantContextResolver.currentOrError()` instead of a client-supplied operator value.
+- Frontend implementation includes `demoSandboxApi`, helper/state formatting, a visible `/demo-sandbox` page, route registration, navigation entry, and route accessibility text.
+- Sales enablement material lives in `docs/product-evolution/runbooks/sandbox-demo-sales-guide.md`.
+- Commit was intentionally skipped per operator instruction; these changes remain in the working tree.
 
 ---
 
@@ -18,26 +29,34 @@
 ## File Structure
 
 **Backend**
-- Create: `backend/canvas-engine/src/main/resources/db/migration/V165__sandbox_demo_sales_enablement.sql` - sandbox lifecycle table.
+- Create: `backend/canvas-engine/src/main/resources/db/migration/V269__sandbox_demo_sales_enablement.sql` - sandbox lifecycle table.
 - Create: `backend/canvas-engine/src/main/java/org/chovy/canvas/domain/demo/DemoSandboxService.java` - install/reset/expiry logic.
+- Create: `backend/canvas-engine/src/main/java/org/chovy/canvas/domain/demo/JdbcDemoSandboxRepository.java` - JDBC persistence for sandbox lifecycle rows.
 - Create: `backend/canvas-engine/src/main/java/org/chovy/canvas/web/DemoSandboxController.java` - `/demo-sandboxes` API.
 - Create: `backend/canvas-engine/src/test/java/org/chovy/canvas/domain/demo/DemoSandboxServiceTest.java`
 - Create: `backend/canvas-engine/src/test/java/org/chovy/canvas/controller/DemoSandboxControllerTest.java`
 
 **Frontend And Docs**
 - Create: `frontend/src/services/demoSandboxApi.ts`
+- Create: `frontend/src/services/demoSandboxApi.test.ts`
 - Create: `frontend/src/pages/demo-sandbox/demoSandbox.ts`
 - Create: `frontend/src/pages/demo-sandbox/demoSandbox.test.ts`
+- Create: `frontend/src/pages/demo-sandbox/index.tsx`
+- Create: `frontend/src/pages/demo-sandbox/index.test.tsx`
+- Modify: `frontend/src/App.tsx`
+- Modify: `frontend/src/components/layout/AppLayout.tsx`
+- Modify: `frontend/src/components/layout/AppLayout.a11y.test.tsx`
+- Modify: `frontend/src/components/accessibility/RouteA11y.tsx`
 - Create: `docs/product-evolution/runbooks/sandbox-demo-sales-guide.md`
 
 ### Task 1: Sandbox Lifecycle Service
 
 **Files:**
-- Create: `backend/canvas-engine/src/main/resources/db/migration/V165__sandbox_demo_sales_enablement.sql`
+- Create: `backend/canvas-engine/src/main/resources/db/migration/V269__sandbox_demo_sales_enablement.sql`
 - Create: `backend/canvas-engine/src/main/java/org/chovy/canvas/domain/demo/DemoSandboxService.java`
 - Create: `backend/canvas-engine/src/test/java/org/chovy/canvas/domain/demo/DemoSandboxServiceTest.java`
 
-- [ ] **Step 1: Write lifecycle tests**
+- [x] **Step 1: Write lifecycle tests**
 
 Create `backend/canvas-engine/src/test/java/org/chovy/canvas/domain/demo/DemoSandboxServiceTest.java`:
 
@@ -65,7 +84,7 @@ class DemoSandboxServiceTest {
     @Test
     void migrationCreatesSandboxLifecycleTable() throws Exception {
         String sql = Files.readString(Path.of(
-                "src/main/resources/db/migration/V165__sandbox_demo_sales_enablement.sql"));
+                "src/main/resources/db/migration/V269__sandbox_demo_sales_enablement.sql"));
 
         assertThat(sql)
                 .contains("CREATE TABLE IF NOT EXISTS demo_sandbox")
@@ -132,7 +151,7 @@ class DemoSandboxServiceTest {
 }
 ```
 
-- [ ] **Step 2: Run lifecycle tests and confirm red state**
+- [x] **Step 2: Run lifecycle tests and confirm red state**
 
 Run:
 
@@ -142,9 +161,9 @@ cd backend && mvn -pl canvas-engine test -Dtest=DemoSandboxServiceTest
 
 Expected: FAIL because the migration and service do not exist.
 
-- [ ] **Step 3: Add sandbox migration**
+- [x] **Step 3: Add sandbox migration**
 
-Create `backend/canvas-engine/src/main/resources/db/migration/V165__sandbox_demo_sales_enablement.sql`:
+Create `backend/canvas-engine/src/main/resources/db/migration/V269__sandbox_demo_sales_enablement.sql`:
 
 ```sql
 CREATE TABLE IF NOT EXISTS demo_sandbox (
@@ -164,7 +183,7 @@ CREATE TABLE IF NOT EXISTS demo_sandbox (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 ```
 
-- [ ] **Step 4: Implement sandbox service**
+- [x] **Step 4: Implement sandbox service**
 
 Create `backend/canvas-engine/src/main/java/org/chovy/canvas/domain/demo/DemoSandboxService.java`:
 
@@ -226,7 +245,7 @@ public class DemoSandboxService {
 }
 ```
 
-- [ ] **Step 5: Run lifecycle tests**
+- [x] **Step 5: Run lifecycle tests**
 
 Run:
 
@@ -242,15 +261,19 @@ Expected: PASS.
 - Create: `backend/canvas-engine/src/main/java/org/chovy/canvas/web/DemoSandboxController.java`
 - Create: `backend/canvas-engine/src/test/java/org/chovy/canvas/controller/DemoSandboxControllerTest.java`
 
-- [ ] **Step 1: Write controller tests**
+- [x] **Step 1: Write controller tests**
 
 Create `backend/canvas-engine/src/test/java/org/chovy/canvas/controller/DemoSandboxControllerTest.java`:
 
 ```java
 package org.chovy.canvas.web;
 
+import org.chovy.canvas.common.tenant.RoleNames;
+import org.chovy.canvas.common.tenant.TenantContext;
+import org.chovy.canvas.common.tenant.TenantContextResolver;
 import org.chovy.canvas.domain.demo.DemoSandboxService;
 import org.junit.jupiter.api.Test;
+import reactor.core.publisher.Mono;
 import reactor.test.StepVerifier;
 
 import java.time.Instant;
@@ -264,11 +287,14 @@ import static org.mockito.Mockito.when;
 class DemoSandboxControllerTest {
 
     @Test
-    void installDelegatesToService() {
+    void installRequiresAuthenticatedContextAndDelegatesToService() {
         DemoSandboxService service = mock(DemoSandboxService.class);
-        DemoSandboxController controller = new DemoSandboxController(service);
+        TenantContextResolver resolver = mock(TenantContextResolver.class);
+        when(resolver.currentOrError()).thenReturn(Mono.just(operator()));
+        DemoSandboxController controller = new DemoSandboxController(service, resolver);
         when(service.install(8L, "Retail Demo", 14)).thenReturn(new DemoSandboxService.Sandbox(
-                8L, "Retail Demo", "DEMO_TENANT_8", "ACTIVE", Instant.parse("2026-06-17T00:00:00Z"), null));
+                8L, "Retail Demo", "DEMO_TENANT_8", "ACTIVE",
+                Instant.parse("2026-06-17T00:00:00Z"), null));
 
         StepVerifier.create(controller.install(new DemoSandboxController.InstallRequest(8L, "Retail Demo", 14)))
                 .assertNext(response -> assertThat(response.getData().demoMarker()).isEqualTo("DEMO_TENANT_8"))
@@ -276,34 +302,58 @@ class DemoSandboxControllerTest {
     }
 
     @Test
-    void resetUsesOperatorHeader() {
+    void resetUsesAuthenticatedOperator() {
         DemoSandboxService service = mock(DemoSandboxService.class);
-        DemoSandboxController controller = new DemoSandboxController(service);
+        TenantContextResolver resolver = mock(TenantContextResolver.class);
+        when(resolver.currentOrError()).thenReturn(Mono.just(operator()));
+        DemoSandboxController controller = new DemoSandboxController(service, resolver);
         when(service.reset(8L, "seller-1")).thenReturn(new DemoSandboxService.ResetResult(
                 8L, "DEMO_TENANT_8", Instant.parse("2026-06-03T00:00:00Z")));
 
-        StepVerifier.create(controller.reset(8L, "seller-1"))
-                .assertNext(response -> assertThat(response.getData().resetAt()).isEqualTo(Instant.parse("2026-06-03T00:00:00Z")))
+        StepVerifier.create(controller.reset(8L))
+                .assertNext(response -> assertThat(response.getData().resetAt())
+                        .isEqualTo(Instant.parse("2026-06-03T00:00:00Z")))
                 .verifyComplete();
 
         verify(service).reset(8L, "seller-1");
     }
 
     @Test
-    void expiredReturnsCleanupCandidates() {
+    void expiredRequiresAuthenticatedContext() {
         DemoSandboxService service = mock(DemoSandboxService.class);
-        DemoSandboxController controller = new DemoSandboxController(service);
+        TenantContextResolver resolver = mock(TenantContextResolver.class);
+        when(resolver.currentOrError()).thenReturn(Mono.just(operator()));
+        DemoSandboxController controller = new DemoSandboxController(service, resolver);
         when(service.expired()).thenReturn(List.of(new DemoSandboxService.Sandbox(
-                9L, "Old Demo", "DEMO_TENANT_9", "EXPIRED", Instant.parse("2026-06-01T00:00:00Z"), null)));
+                9L, "Old Demo", "DEMO_TENANT_9", "EXPIRED",
+                Instant.parse("2026-06-01T00:00:00Z"), null)));
 
         StepVerifier.create(controller.expired())
                 .assertNext(response -> assertThat(response.getData()).hasSize(1))
                 .verifyComplete();
     }
+
+    @Test
+    void rejectsMissingTenantContext() {
+        DemoSandboxService service = mock(DemoSandboxService.class);
+        TenantContextResolver resolver = mock(TenantContextResolver.class);
+        when(resolver.currentOrError()).thenReturn(Mono.error(new SecurityException("AUTH_003: missing tenant context")));
+        DemoSandboxController controller = new DemoSandboxController(service, resolver);
+
+        StepVerifier.create(controller.expired())
+                .expectErrorSatisfies(error -> assertThat(error)
+                        .isInstanceOf(SecurityException.class)
+                        .hasMessageContaining("AUTH_003"))
+                .verify();
+    }
+
+    private TenantContext operator() {
+        return new TenantContext(8L, RoleNames.OPERATOR, "seller-1");
+    }
 }
 ```
 
-- [ ] **Step 2: Run controller tests and confirm red state**
+- [x] **Step 2: Run controller tests and confirm red state**
 
 Run:
 
@@ -313,21 +363,20 @@ cd backend && mvn -pl canvas-engine test -Dtest=DemoSandboxControllerTest
 
 Expected: FAIL because `DemoSandboxController` does not exist.
 
-- [ ] **Step 3: Add controller**
+- [x] **Step 3: Add controller**
 
 Create `backend/canvas-engine/src/main/java/org/chovy/canvas/web/DemoSandboxController.java`:
 
 ```java
 package org.chovy.canvas.web;
 
-import lombok.RequiredArgsConstructor;
 import org.chovy.canvas.common.R;
+import org.chovy.canvas.common.tenant.TenantContextResolver;
 import org.chovy.canvas.domain.demo.DemoSandboxService;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import reactor.core.publisher.Mono;
@@ -337,39 +386,46 @@ import java.util.List;
 
 @RestController
 @RequestMapping("/demo-sandboxes")
-@RequiredArgsConstructor
 public class DemoSandboxController {
 
     private final DemoSandboxService service;
+    private final TenantContextResolver tenantContextResolver;
+
+    public DemoSandboxController(DemoSandboxService service,
+                                 TenantContextResolver tenantContextResolver) {
+        this.service = service;
+        this.tenantContextResolver = tenantContextResolver;
+    }
 
     @PostMapping
     public Mono<R<DemoSandboxService.Sandbox>> install(@RequestBody InstallRequest request) {
-        return Mono.fromCallable(() -> service.install(request.tenantId(), request.demoName(), request.ttlDays()))
-                .subscribeOn(Schedulers.boundedElastic())
-                .map(R::ok);
+        return tenantContextResolver.currentOrError()
+                .flatMap(context -> Mono.fromCallable(() ->
+                                R.ok(service.install(request.tenantId(), request.demoName(), request.ttlDays())))
+                        .subscribeOn(Schedulers.boundedElastic()));
     }
 
     @PostMapping("/{tenantId}/reset")
-    public Mono<R<DemoSandboxService.ResetResult>> reset(
-            @PathVariable Long tenantId,
-            @RequestHeader(name = "X-Operator", defaultValue = "unknown") String operator) {
-        return Mono.fromCallable(() -> service.reset(tenantId, operator))
-                .subscribeOn(Schedulers.boundedElastic())
-                .map(R::ok);
+    public Mono<R<DemoSandboxService.ResetResult>> reset(@PathVariable Long tenantId) {
+        return tenantContextResolver.currentOrError()
+                .flatMap(context -> Mono.fromCallable(() ->
+                                R.ok(service.reset(tenantId, context.username())))
+                        .subscribeOn(Schedulers.boundedElastic()));
     }
 
     @GetMapping("/expired")
     public Mono<R<List<DemoSandboxService.Sandbox>>> expired() {
-        return Mono.fromCallable(service::expired)
-                .subscribeOn(Schedulers.boundedElastic())
-                .map(R::ok);
+        return tenantContextResolver.currentOrError()
+                .flatMap(context -> Mono.fromCallable(() -> R.ok(service.expired()))
+                        .subscribeOn(Schedulers.boundedElastic()));
     }
 
-    public record InstallRequest(Long tenantId, String demoName, int ttlDays) {}
+    public record InstallRequest(Long tenantId, String demoName, int ttlDays) {
+    }
 }
 ```
 
-- [ ] **Step 4: Run controller tests**
+- [x] **Step 4: Run controller tests**
 
 Run:
 
@@ -387,7 +443,7 @@ Expected: PASS.
 - Create: `frontend/src/pages/demo-sandbox/demoSandbox.test.ts`
 - Create: `docs/product-evolution/runbooks/sandbox-demo-sales-guide.md`
 
-- [ ] **Step 1: Write frontend helper tests**
+- [x] **Step 1: Write frontend helper tests**
 
 Create `frontend/src/pages/demo-sandbox/demoSandbox.test.ts`:
 
@@ -418,7 +474,7 @@ describe('demoSandbox helpers', () => {
 })
 ```
 
-- [ ] **Step 2: Run frontend tests and confirm red state**
+- [x] **Step 2: Run frontend tests and confirm red state**
 
 Run:
 
@@ -428,7 +484,7 @@ cd frontend && npm test -- demoSandbox.test.ts
 
 Expected: FAIL because `demoSandbox.ts` does not exist.
 
-- [ ] **Step 3: Add API wrapper**
+- [x] **Step 3: Add API wrapper**
 
 Create `frontend/src/services/demoSandboxApi.ts`:
 
@@ -447,7 +503,7 @@ export const demoSandboxApi = {
 }
 ```
 
-- [ ] **Step 4: Add frontend helpers**
+- [x] **Step 4: Add frontend helpers**
 
 Create `frontend/src/pages/demo-sandbox/demoSandbox.ts`:
 
@@ -487,7 +543,7 @@ export function resetStateText(state: ResetState) {
 }
 ```
 
-- [ ] **Step 5: Add sales guide**
+- [x] **Step 5: Add sales guide**
 
 Create `docs/product-evolution/runbooks/sandbox-demo-sales-guide.md`:
 
@@ -511,15 +567,15 @@ Create `docs/product-evolution/runbooks/sandbox-demo-sales-guide.md`:
 ## Reset Command
 
 ```bash
-curl -X POST http://localhost:8080/demo-sandboxes/8/reset -H "X-Operator: seller-1"
+curl -X POST http://localhost:8080/demo-sandboxes/8/reset -H "Authorization: Bearer <token>"
 ```
 
 ## Rollback
 
-Hide the demo sandbox page and stop calling `/demo-sandboxes`; the lifecycle table is additive and can remain in place.
+Hide the demo sandbox page and stop calling `/demo-sandboxes`; the lifecycle table is additive and can remain in place for cleanup.
 ```
 
-- [ ] **Step 6: Run frontend tests**
+- [x] **Step 6: Run frontend tests**
 
 Run:
 
@@ -529,22 +585,30 @@ cd frontend && npm test -- demoSandbox.test.ts
 
 Expected: PASS.
 
-### Task 4: Verification And Commit
+### Task 4: Verification And Rollout Notes
 
 **Files:**
 - Modify: `docs/product-evolution/specs/p2-006-sandbox-demo-sales-enablement.md`
 - Modify: `docs/product-evolution/plans/p2-006-sandbox-demo-sales-enablement-plan.md`
-- Create: `backend/canvas-engine/src/main/resources/db/migration/V165__sandbox_demo_sales_enablement.sql`
+- Create: `backend/canvas-engine/src/main/resources/db/migration/V269__sandbox_demo_sales_enablement.sql`
 - Create: `backend/canvas-engine/src/main/java/org/chovy/canvas/domain/demo/DemoSandboxService.java`
+- Create: `backend/canvas-engine/src/main/java/org/chovy/canvas/domain/demo/JdbcDemoSandboxRepository.java`
 - Create: `backend/canvas-engine/src/main/java/org/chovy/canvas/web/DemoSandboxController.java`
 - Create: `backend/canvas-engine/src/test/java/org/chovy/canvas/domain/demo/DemoSandboxServiceTest.java`
 - Create: `backend/canvas-engine/src/test/java/org/chovy/canvas/controller/DemoSandboxControllerTest.java`
 - Create: `frontend/src/services/demoSandboxApi.ts`
+- Create: `frontend/src/services/demoSandboxApi.test.ts`
 - Create: `frontend/src/pages/demo-sandbox/demoSandbox.ts`
 - Create: `frontend/src/pages/demo-sandbox/demoSandbox.test.ts`
+- Create: `frontend/src/pages/demo-sandbox/index.tsx`
+- Create: `frontend/src/pages/demo-sandbox/index.test.tsx`
+- Modify: `frontend/src/App.tsx`
+- Modify: `frontend/src/components/layout/AppLayout.tsx`
+- Modify: `frontend/src/components/layout/AppLayout.a11y.test.tsx`
+- Modify: `frontend/src/components/accessibility/RouteA11y.tsx`
 - Create: `docs/product-evolution/runbooks/sandbox-demo-sales-guide.md`
 
-- [ ] **Step 1: Run focused backend tests**
+- [x] **Step 1: Run focused backend tests**
 
 Run:
 
@@ -554,17 +618,17 @@ cd backend && mvn -pl canvas-engine test -Dtest=DemoSandboxServiceTest,DemoSandb
 
 Expected: PASS.
 
-- [ ] **Step 2: Run focused frontend tests**
+- [x] **Step 2: Run focused frontend tests**
 
 Run:
 
 ```bash
-cd frontend && npm test -- demoSandbox.test.ts
+cd frontend && npm test -- src/pages/demo-sandbox/demoSandbox.test.ts src/services/demoSandboxApi.test.ts src/pages/demo-sandbox/index.test.tsx src/components/layout/AppLayout.a11y.test.tsx
 ```
 
 Expected: PASS.
 
-- [ ] **Step 3: Verify sales guide sections**
+- [x] **Step 3: Verify sales guide sections**
 
 Run:
 
@@ -574,32 +638,33 @@ rg -n "Demo Boundary|Core Walkthrough|Reset Command|Rollback" docs/product-evolu
 
 Expected: output includes all four section headings.
 
-- [ ] **Step 4: Add rollout notes to the implementation PR**
+- [x] **Step 4: Add rollout notes to the implementation PR**
 
 Use this rollout note text:
 
 ```markdown
-Rollout: run `V165__sandbox_demo_sales_enablement.sql`, create sandbox lifecycle rows, and expose demo reset only to internal sellers/operators. Rollback: hide the demo sandbox route and keep demo rows marked with `DEMO_TENANT_*` for cleanup.
+Rollout: run `V269__sandbox_demo_sales_enablement.sql`, create sandbox lifecycle rows, and expose demo reset only to internal sellers/operators. Rollback: hide the demo sandbox route and keep demo rows marked with `DEMO_TENANT_*` for cleanup.
 ```
 
-- [ ] **Step 5: Commit the implementation slice**
+- [x] **Step 5: Commit skipped by operator instruction**
 
-Run:
+Commit was not created in this session. Keep the working tree changes available for continued product-evolution implementation and create a commit only when explicitly requested.
 
-```bash
-git add \
-  backend/canvas-engine/src/main/resources/db/migration/V165__sandbox_demo_sales_enablement.sql \
-  backend/canvas-engine/src/main/java/org/chovy/canvas/domain/demo/DemoSandboxService.java \
-  backend/canvas-engine/src/main/java/org/chovy/canvas/web/DemoSandboxController.java \
-  backend/canvas-engine/src/test/java/org/chovy/canvas/domain/demo/DemoSandboxServiceTest.java \
-  backend/canvas-engine/src/test/java/org/chovy/canvas/controller/DemoSandboxControllerTest.java \
-  frontend/src/services/demoSandboxApi.ts \
-  frontend/src/pages/demo-sandbox/demoSandbox.ts \
-  frontend/src/pages/demo-sandbox/demoSandbox.test.ts \
-  docs/product-evolution/runbooks/sandbox-demo-sales-guide.md \
-  docs/product-evolution/specs/p2-006-sandbox-demo-sales-enablement.md \
-  docs/product-evolution/plans/p2-006-sandbox-demo-sales-enablement-plan.md
-git commit -m "feat: add sandbox demo lifecycle foundation"
-```
+## Acceptance Checklist
 
-Expected: commit contains only sandbox lifecycle, reset API, frontend helpers, sales guide, tests, spec, and plan files.
+- [x] Additive Flyway migration creates `demo_sandbox` lifecycle storage with marker, expiry, reset audit, and cleanup indexes.
+- [x] Backend service installs sandbox tenants, validates TTL/operator inputs, records reset metadata, and lists expired cleanup candidates.
+- [x] Backend API requires authenticated tenant context and uses the authenticated username for reset audit.
+- [x] Frontend exposes a `/demo-sandbox` operator page with loading, empty, error, install, expired-list, and reset states.
+- [x] Sales guide documents demo boundaries, walkthrough, reset command, and rollback path.
+- [x] Rollout and rollback notes are captured in the spec and this plan.
+- [x] No commit was created because the operator asked to continue without committing.
+
+## Verification Evidence
+
+- Backend red: `mvn -pl canvas-engine test -Dtest=DemoSandboxServiceTest` failed before `DemoSandboxService` and migration existed.
+- Backend green: `mvn -pl canvas-engine -Dtest=DemoSandboxServiceTest,DemoSandboxControllerTest test` passed, 10 tests.
+- Frontend red: focused Vitest failed before `demoSandboxApi`, page helpers, page component, and route announcement existed.
+- Frontend green: `npm run test -- src/pages/demo-sandbox/demoSandbox.test.ts src/services/demoSandboxApi.test.ts src/pages/demo-sandbox/index.test.tsx src/components/layout/AppLayout.a11y.test.tsx` passed, 7 tests.
+- Runbook headings: `rg -n "Demo Boundary|Core Walkthrough|Reset Command|Rollback" docs/product-evolution/runbooks/sandbox-demo-sales-guide.md` returned all required sections.
+- Frontend build: `npm run build` passed.

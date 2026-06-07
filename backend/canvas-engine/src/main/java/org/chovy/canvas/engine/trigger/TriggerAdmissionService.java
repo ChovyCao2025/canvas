@@ -151,6 +151,8 @@ public class TriggerAdmissionService {
     static boolean isInternalContinuationTrigger(String triggerType) {
         return TriggerType.WAIT_RESUME.equals(triggerType)
                 || TriggerType.WAIT_TIMEOUT.equals(triggerType)
+                || TriggerType.APPROVAL_RESUME.equals(triggerType)
+                || TriggerType.APPROVAL_TIMEOUT.equals(triggerType)
                 || TriggerType.HUB_TIMEOUT.equals(triggerType)
                 || TriggerType.AGGREGATE_TIMEOUT.equals(triggerType)
                 || TriggerType.THRESHOLD_TIMEOUT.equals(triggerType);

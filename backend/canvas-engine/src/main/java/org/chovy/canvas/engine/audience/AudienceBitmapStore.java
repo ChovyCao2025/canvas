@@ -85,6 +85,27 @@ public class AudienceBitmapStore {
         }
     }
 
+    /** 返回两个人群的交集 bitmap，不修改已存储的原始 bitmap。 */
+    public RoaringBitmap overlap(Long leftAudienceId, Long rightAudienceId) throws IOException {
+        RoaringBitmap result = load(leftAudienceId);
+        result.and(load(rightAudienceId));
+        return result;
+    }
+
+    /** 返回两个人群的并集 bitmap，不修改已存储的原始 bitmap。 */
+    public RoaringBitmap merge(Long leftAudienceId, Long rightAudienceId) throws IOException {
+        RoaringBitmap result = load(leftAudienceId);
+        result.or(load(rightAudienceId));
+        return result;
+    }
+
+    /** 返回基础人群排除指定人群后的差集 bitmap，不修改已存储的原始 bitmap。 */
+    public RoaringBitmap exclude(Long baseAudienceId, Long excludedAudienceId) throws IOException {
+        RoaringBitmap result = load(baseAudienceId);
+        result.andNot(load(excludedAudienceId));
+        return result;
+    }
+
     /** 删除指定人群 bitmap。 */
     public void delete(Long audienceId) {
         redis.delete(KEY_PREFIX + audienceId);

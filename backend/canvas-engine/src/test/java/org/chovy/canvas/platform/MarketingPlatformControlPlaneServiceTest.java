@@ -27,6 +27,7 @@ class MarketingPlatformControlPlaneServiceTest {
                 .extracting(MarketingPlatformControlPlaneService.CapabilityCard::capabilityKey)
                 .contains(
                         "campaign-master-ledger",
+                        "growth-activity-center",
                         "integration-contract-registry",
                         "journey-orchestration",
                         "content-lifecycle",
@@ -36,6 +37,7 @@ class MarketingPlatformControlPlaneServiceTest {
         assertThat(summary.integrationLanes())
                 .extracting(MarketingPlatformControlPlaneService.IntegrationLane::laneKey)
                 .contains(
+                        "campaign-to-growth-activities",
                         "content-to-journey",
                         "contracts-to-provider-credentials",
                         "search-to-provider-write",
@@ -45,6 +47,7 @@ class MarketingPlatformControlPlaneServiceTest {
                 .extracting(MarketingPlatformControlPlaneService.IntegrationAsset::assetKey)
                 .contains(
                         "marketing-integration-contract-registry",
+                        "growth-activity-center",
                         "campaign-master-resource-ledger",
                         "content-release-runtime-resolver",
                         "search-provider-write-gateway",
@@ -274,6 +277,82 @@ class MarketingPlatformControlPlaneServiceTest {
                 });
     }
 
+    @Test
+    void growthActivityCenterPromotesWhenActivitiesHaveReadyEvidence() {
+        MarketingPlatformControlPlaneEvidenceProvider evidenceProvider = tenantId -> runtimeEvidence(
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                3,
+                0,
+                0,
+                0,
+                2,
+                3,
+                2,
+                0);
+        MarketingPlatformControlPlaneService service =
+                new MarketingPlatformControlPlaneService(evidenceProvider, CLOCK);
+
+        MarketingPlatformControlPlaneService.ControlPlaneSummary summary = service.summary(7L);
+
+        assertThat(capability(summary, "growth-activity-center").status()).isEqualTo("LIVE");
+        assertThat(integrationAsset(summary, "growth-activity-center").status()).isEqualTo("LIVE");
+        assertThat(summary.integrationLanes())
+                .filteredOn(lane -> lane.laneKey().equals("campaign-to-growth-activities"))
+                .singleElement()
+                .satisfies(lane -> assertThat(lane.status()).isEqualTo("GOVERNED"));
+        assertThat(capability(summary, "growth-activity-center").evidence())
+                .extracting(MarketingPlatformControlPlaneService.EvidenceSignal::signalKey)
+                .contains(
+                        "activeGrowthActivities",
+                        "growthActivityRewardPools",
+                        "readyGrowthActivities",
+                        "blockedGrowthActivityReadiness");
+    }
+
+    @Test
+    void readinessBlocksGrowthActivitiesWhenReadyCoverageIsMissing() {
+        MarketingPlatformControlPlaneEvidenceProvider evidenceProvider = tenantId -> runtimeEvidence(
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                3,
+                0,
+                0,
+                0,
+                3,
+                1,
+                1,
+                2);
+        MarketingPlatformControlPlaneService service =
+                new MarketingPlatformControlPlaneService(evidenceProvider, CLOCK);
+
+        MarketingPlatformControlPlaneService.ControlPlaneSummary summary = service.summary(7L);
+
+        assertThat(capability(summary, "growth-activity-center").status())
+                .isEqualTo("CONFIGURATION_REQUIRED");
+        assertThat(integrationAsset(summary, "growth-activity-center").status())
+                .isEqualTo("CONFIGURATION_REQUIRED");
+        assertThat(capability(summary, "growth-activity-center").gaps())
+                .contains(
+                        "complete readiness for every active growth activity",
+                        "resolve growth activity readiness blockers");
+        assertThat(summary.readinessGate().blockers())
+                .anySatisfy(finding -> {
+                    assertThat(finding.itemKey()).isEqualTo("growth-activity-center");
+                    assertThat(finding.reason()).contains("resolve growth activity readiness blockers");
+                });
+    }
+
     private static MarketingPlatformControlPlaneEvidenceProvider.RuntimeEvidence runtimeEvidence(
             long searchFailedWrites,
             long blockedCampaignLinks,
@@ -295,6 +374,10 @@ class MarketingPlatformControlPlaneServiceTest {
                 freshPassingProductionIntegrationProbeCount,
                 freshFailingProductionIntegrationProbeCount,
                 0,
+                0,
+                2,
+                3,
+                2,
                 0);
     }
 
@@ -310,6 +393,40 @@ class MarketingPlatformControlPlaneServiceTest {
             long freshFailingProductionIntegrationProbeCount,
             long openIntegrationContractProbeAlertCount,
             long openIntegrationContractSloAlertCount) {
+        return runtimeEvidence(
+                searchFailedWrites,
+                blockedCampaignLinks,
+                blockedIntegrationContracts,
+                degradedIntegrationContracts,
+                campaignsWithInactiveRequiredLinks,
+                campaignsMissingPrimaryDependency,
+                campaignsMissingMeasurementDependency,
+                freshPassingProductionIntegrationProbeCount,
+                freshFailingProductionIntegrationProbeCount,
+                openIntegrationContractProbeAlertCount,
+                openIntegrationContractSloAlertCount,
+                2,
+                3,
+                2,
+                0);
+    }
+
+    private static MarketingPlatformControlPlaneEvidenceProvider.RuntimeEvidence runtimeEvidence(
+            long searchFailedWrites,
+            long blockedCampaignLinks,
+            long blockedIntegrationContracts,
+            long degradedIntegrationContracts,
+            long campaignsWithInactiveRequiredLinks,
+            long campaignsMissingPrimaryDependency,
+            long campaignsMissingMeasurementDependency,
+            long freshPassingProductionIntegrationProbeCount,
+            long freshFailingProductionIntegrationProbeCount,
+            long openIntegrationContractProbeAlertCount,
+            long openIntegrationContractSloAlertCount,
+            long activeGrowthActivityCount,
+            long growthActivityRewardPoolCount,
+            long readyGrowthActivityCount,
+            long blockedGrowthActivityReadinessCount) {
         return new MarketingPlatformControlPlaneEvidenceProvider.RuntimeEvidence(
                 3,
                 2,
@@ -345,7 +462,11 @@ class MarketingPlatformControlPlaneServiceTest {
                 freshPassingProductionIntegrationProbeCount,
                 freshFailingProductionIntegrationProbeCount,
                 openIntegrationContractProbeAlertCount,
-                openIntegrationContractSloAlertCount);
+                openIntegrationContractSloAlertCount,
+                activeGrowthActivityCount,
+                growthActivityRewardPoolCount,
+                readyGrowthActivityCount,
+                blockedGrowthActivityReadinessCount);
     }
 
     private static MarketingPlatformControlPlaneService.CapabilityCard capability(

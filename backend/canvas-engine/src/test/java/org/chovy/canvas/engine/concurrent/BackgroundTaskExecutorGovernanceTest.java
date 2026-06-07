@@ -27,13 +27,15 @@ class BackgroundTaskExecutorGovernanceTest {
     @Test
     void virtualThreadPerTaskExecutorIsOwnedByBackgroundTaskExecutorOnly() throws Exception {
         Path sourceRoot = Path.of("src/main/java/org/chovy/canvas");
+        List<Path> allowedOwners = List.of(
+                Path.of("engine/concurrent/BackgroundTaskExecutor.java"),
+                Path.of("infrastructure/concurrent/ManagedVirtualThreadExecutor.java"));
         List<Path> owners;
         try (var paths = Files.walk(sourceRoot)) {
             owners = paths
                     .filter(path -> path.toString().endsWith(".java"))
                     .filter(path -> contains(path, "Executors.newVirtualThreadPerTaskExecutor()"))
-                    .filter(path -> !path.endsWith(Path.of(
-                            "engine/concurrent/BackgroundTaskExecutor.java")))
+                    .filter(path -> allowedOwners.stream().noneMatch(path::endsWith))
                     .toList();
         }
 

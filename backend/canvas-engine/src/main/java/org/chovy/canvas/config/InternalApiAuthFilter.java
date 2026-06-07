@@ -43,6 +43,7 @@ public class InternalApiAuthFilter implements WebFilter {
         String path = exchange.getRequest().getPath().pathWithinApplication().value();
         return "/canvas/events/report".equals(path)
                 || "/canvas/trigger/behavior".equals(path)
+                || "/warehouse/realtime/pipelines/checkpoints".equals(path)
                 || isDirectExecutionPath(path);
     }
 

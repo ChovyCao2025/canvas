@@ -29,6 +29,9 @@ public class CanvasListQuery {
     /** 平铺项目分组 key，精确匹配。 */
     private String projectKey;
 
+    /** 正式项目治理域 ID，按 canvas_project_folder 归属过滤。 */
+    private Long projectId;
+
     /** 平铺文件夹分组 key，精确匹配。 */
     private String folderKey;
 }

@@ -3,12 +3,12 @@ package org.chovy.canvas.engine.expression;
 import groovy.lang.Binding;
 import groovy.lang.GroovyShell;
 import groovy.lang.Script;
-import jakarta.annotation.PreDestroy;
 import lombok.extern.slf4j.Slf4j;
 import org.codehaus.groovy.control.CompilerConfiguration;
 import org.codehaus.groovy.control.customizers.SecureASTCustomizer;
 import org.chovy.canvas.engine.handlers.GroovyScriptCache;
-import org.chovy.canvas.infrastructure.observability.MdcTaskDecorator;
+import org.chovy.canvas.infrastructure.concurrent.ManagedVirtualThreadExecutor;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
@@ -16,8 +16,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.BlockingQueue;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
@@ -34,7 +32,7 @@ public class GroovyExpressionEngine implements ExpressionEngine {
 
     private final GroovyScriptCache scriptCache;
     private final BlockingQueue<GroovyShell> shellPool = new LinkedBlockingQueue<>(POOL_SIZE);
-    private final ExecutorService vte = Executors.newVirtualThreadPerTaskExecutor();
+    private final ManagedVirtualThreadExecutor backgroundExecutor;
 
     @Value("${canvas.groovy.timeout-ms:5000}")
     private long timeoutMs = 5000L;
@@ -43,7 +41,16 @@ public class GroovyExpressionEngine implements ExpressionEngine {
     private int maxOutputKb = 64;
 
     public GroovyExpressionEngine(GroovyScriptCache scriptCache) {
+        this(scriptCache, ManagedVirtualThreadExecutor.direct());
+    }
+
+    @Autowired
+    public GroovyExpressionEngine(GroovyScriptCache scriptCache,
+                                  ManagedVirtualThreadExecutor backgroundExecutor) {
         this.scriptCache = scriptCache;
+        this.backgroundExecutor = backgroundExecutor == null
+                ? ManagedVirtualThreadExecutor.direct()
+                : backgroundExecutor;
         CompilerConfiguration cfg = buildConfig();
         for (int i = 0; i < POOL_SIZE; i++) {
             shellPool.offer(new GroovyShell(cfg));
@@ -72,11 +79,11 @@ public class GroovyExpressionEngine implements ExpressionEngine {
 
             String cacheKey = cacheKey(canvasId, nodeId, code);
             GroovyShell finalShell = shell;
-            Future<Object> future = vte.submit(MdcTaskDecorator.decorate(() -> {
+            Future<Object> future = backgroundExecutor.submit("groovy-expression-" + cacheKey, () -> {
                 Script script = scriptCache.getOrCompile(cacheKey, code, finalShell);
                 script.setBinding(binding);
                 return script.run();
-            }));
+            });
 
             Object result;
             try {
@@ -160,8 +167,4 @@ public class GroovyExpressionEngine implements ExpressionEngine {
         return config;
     }
 
-    @PreDestroy
-    void shutdownExecutor() {
-        vte.shutdownNow();
-    }
 }

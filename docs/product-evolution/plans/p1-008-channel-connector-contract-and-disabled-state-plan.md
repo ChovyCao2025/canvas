@@ -44,7 +44,7 @@
 - Create: `backend/canvas-engine/src/main/java/org/chovy/canvas/dal/dataobject/ChannelConnectorDO.java`
 - Create: `backend/canvas-engine/src/main/java/org/chovy/canvas/dal/mapper/ChannelConnectorMapper.java`
 
-- [ ] **Step 1: Write schema test**
+- [x] **Step 1: Write schema test**
 
 Create `ChannelConnectorSchemaTest.java`:
 
@@ -78,7 +78,7 @@ class ChannelConnectorSchemaTest {
 }
 ```
 
-- [ ] **Step 2: Run schema test and confirm red state**
+- [x] **Step 2: Run schema test and confirm red state**
 
 Run:
 
@@ -88,7 +88,9 @@ cd backend && mvn -pl canvas-engine test -Dtest=ChannelConnectorSchemaTest
 
 Expected: FAIL because migration does not exist.
 
-- [ ] **Step 3: Add migration**
+Actual: schema/registry/migration files were already present in the worktree. The migration uses `V120__channel_connector_contract.sql` because `V102` is already occupied by `V102__event_attribute_discovery_internal_event.sql`.
+
+- [x] **Step 3: Add migration**
 
 Create `backend/canvas-engine/src/main/resources/db/migration/V102__channel_connector_contract.sql`:
 
@@ -112,7 +114,7 @@ CREATE TABLE IF NOT EXISTS channel_connector (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 ```
 
-- [ ] **Step 4: Add connector contract**
+- [x] **Step 4: Add connector contract**
 
 Create `backend/canvas-engine/src/main/java/org/chovy/canvas/engine/channel/ChannelConnector.java`:
 
@@ -137,7 +139,7 @@ public interface ChannelConnector {
 }
 ```
 
-- [ ] **Step 5: Run schema test**
+- [x] **Step 5: Run schema test**
 
 Run:
 
@@ -147,6 +149,8 @@ cd backend && mvn -pl canvas-engine test -Dtest=ChannelConnectorSchemaTest
 
 Expected: PASS.
 
+Actual: covered by isolated P1-008 suite; `ChannelConnectorSchemaTest` passed against `V120__channel_connector_contract.sql`.
+
 ### Task 2: Registry And Disabled/Sandbox Connectors
 
 **Files:**
@@ -154,7 +158,7 @@ Expected: PASS.
 - Create: `backend/canvas-engine/src/main/java/org/chovy/canvas/engine/channel/ChannelConnectorRegistry.java`
 - Create: `backend/canvas-engine/src/main/java/org/chovy/canvas/engine/channel/DisabledChannelConnector.java`
 
-- [ ] **Step 1: Write registry tests**
+- [x] **Step 1: Write registry tests**
 
 Create `ChannelConnectorRegistryTest.java`:
 
@@ -199,7 +203,7 @@ class ChannelConnectorRegistryTest {
 }
 ```
 
-- [ ] **Step 2: Run registry tests and confirm red state**
+- [x] **Step 2: Run registry tests and confirm red state**
 
 Run:
 
@@ -209,7 +213,9 @@ cd backend && mvn -pl canvas-engine test -Dtest=ChannelConnectorRegistryTest
 
 Expected: FAIL because registry classes do not exist.
 
-- [ ] **Step 3: Implement disabled and sandbox behavior**
+Actual: registry tests/classes were already present in the worktree.
+
+- [x] **Step 3: Implement disabled and sandbox behavior**
 
 Create `DisabledChannelConnector`:
 
@@ -235,7 +241,7 @@ public class DisabledChannelConnector implements ChannelConnector {
 
 Create `ChannelConnectorRegistry` with `Repository.find(tenantId, channel, provider)`, registered real connectors by connector key, disabled fallback for missing config, and sandbox connector for `mode=SANDBOX`.
 
-- [ ] **Step 4: Run registry tests**
+- [x] **Step 4: Run registry tests**
 
 Run:
 
@@ -244,6 +250,8 @@ cd backend && mvn -pl canvas-engine test -Dtest=ChannelConnectorRegistryTest
 ```
 
 Expected: PASS.
+
+Actual: covered by isolated P1-008 suite; `ChannelConnectorRegistryTest` passed.
 
 ### Task 3: Send Handler Integration
 
@@ -254,7 +262,7 @@ Expected: PASS.
 - Modify: `backend/canvas-engine/src/main/java/org/chovy/canvas/engine/delivery/ReachDeliveryService.java`
 - Modify: `backend/canvas-engine/src/main/java/org/chovy/canvas/engine/handler/NodeResult.java`
 
-- [ ] **Step 1: Write handler tests**
+- [x] **Step 1: Write handler tests**
 
 Create `ChannelConnectorHandlerTest.java`:
 
@@ -322,7 +330,7 @@ class ChannelConnectorHandlerTest {
 }
 ```
 
-- [ ] **Step 2: Run handler tests and confirm red state**
+- [x] **Step 2: Run handler tests and confirm red state**
 
 Run:
 
@@ -332,7 +340,9 @@ cd backend && mvn -pl canvas-engine test -Dtest=ChannelConnectorHandlerTest
 
 Expected: FAIL because handler constructors and connector output are not implemented.
 
-- [ ] **Step 3: Add failure result with output**
+Actual: regular Maven targeted test was blocked by unrelated global `testCompile` drift, but the new handler test covered the missing constructor/output behavior before implementation.
+
+- [x] **Step 3: Add failure result with output**
 
 Modify `backend/canvas-engine/src/main/java/org/chovy/canvas/engine/handler/NodeResult.java`:
 
@@ -343,7 +353,7 @@ public static NodeResult fail(String errorMessage, Map<String, Object> output) {
 }
 ```
 
-- [ ] **Step 4: Integrate registry in send handler path**
+- [x] **Step 4: Integrate registry in send handler path**
 
 Update `SendMessageHandler` constructor to accept `ReachDeliveryService` and `ChannelConnectorRegistry`. In `AbstractSendMessageHandler`, resolve provider from config:
 
@@ -358,7 +368,9 @@ if (connector.mode() == ChannelConnector.ConnectorMode.DISABLED) {
 
 For `SANDBOX`, call `connector.send(...)` and route success/fail without calling `ReachDeliveryService`. For `REAL`, continue through `ReachDeliveryService` while adding connector mode/provider fields to the result output.
 
-- [ ] **Step 5: Run handler and existing send tests**
+Actual: `AbstractSendMessageHandler` now resolves connector provider/mode when a registry is injected. Disabled mode returns `NodeResult.fail(..., output)` without delivery; sandbox mode calls `connector.send(...)` without delivery; real mode continues through `ReachDeliveryService` and adds connector output.
+
+- [x] **Step 5: Run handler and existing send tests**
 
 Run:
 
@@ -368,13 +380,15 @@ cd backend && mvn -pl canvas-engine test -Dtest=ChannelConnectorHandlerTest,Send
 
 Expected: PASS.
 
+Actual: isolated P1-008 suite passed for `ChannelConnectorHandlerTest` and `SendMessageHandlerTest`.
+
 ### Task 4: Verification And Commit
 
 **Files:**
 - Modify: `docs/product-evolution/specs/p1-008-channel-connector-contract-and-disabled-state.md`
 - Modify: `docs/product-evolution/plans/p1-008-channel-connector-contract-and-disabled-state-plan.md`
 
-- [ ] **Step 1: Run focused backend tests**
+- [x] **Step 1: Run focused backend tests**
 
 Run:
 
@@ -384,7 +398,9 @@ cd backend && mvn -pl canvas-engine test -Dtest=ChannelConnectorSchemaTest,Chann
 
 Expected: PASS.
 
-- [ ] **Step 2: Run affected handler regression**
+Actual: `mvn -pl canvas-engine -DskipTests compile` passed, and isolated P1-008 runner passed 8 tests: `ChannelConnectorSchemaTest`, `ChannelConnectorRegistryTest`, `SendMessageHandlerTest`, `ChannelConnectorHandlerTest`.
+
+- [x] **Step 2: Run affected handler regression**
 
 Run:
 
@@ -393,6 +409,8 @@ cd backend && mvn -pl canvas-engine test -Dtest=CouponHandlerTest,CommitActionHa
 ```
 
 Expected: PASS.
+
+Actual: isolated regression runner passed 25 tests: `CouponHandlerTest`, `CommitActionHandlerTest`, `ApiCallHandlerRateLimitTest`.
 
 - [ ] **Step 3: Commit**
 
@@ -404,3 +422,5 @@ git commit -m "feat: add channel connector contract"
 ```
 
 Expected: commit contains only connector contract, disabled/sandbox behavior, handler integration, tests, migration, and related docs.
+
+Actual: skipped in this session because the user requested implementation without committing.

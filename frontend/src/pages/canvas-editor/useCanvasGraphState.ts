@@ -6,25 +6,43 @@ import {
   type Node,
 } from '@xyflow/react'
 import { useBranchPlaceholders } from '../../hooks/useBranchPlaceholders'
-import { realCanvasNodes } from './graphSerialization'
+import type { CanvasNodeData } from '../../types/canvas'
+import { buildBackendNodesFromFlowNodes, realCanvasNodes } from './graphSerialization'
+import { deriveEdges } from './outletRouting'
+
+export function deriveCanvasRoutedEdges(nodes: Node<CanvasNodeData>[]): Edge[] {
+  return deriveEdges(buildBackendNodesFromFlowNodes(nodes))
+}
+
+export function deriveCanvasDisplayEdges(
+  nodes: Node<CanvasNodeData>[],
+  _edgeState: Edge[],
+  placeholderEdges: Edge[],
+): Edge[] {
+  return [...deriveCanvasRoutedEdges(nodes), ...placeholderEdges]
+}
 
 /** Owns React Flow graph state and editor-only placeholder derivation. */
 export function useCanvasGraphState() {
   const [nodes, setNodes, onNodesChange] = useNodesState<Node>([])
-  const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([])
+  const [edgeState, setEdges, onEdgesChange] = useEdgesState<Edge>([])
   const [draggingNodeId, setDraggingNodeId] = useState<string | null>(null)
 
-  const realNodes = realCanvasNodes(nodes)
-  const { nodes: phNodes, edges: phEdges } = useBranchPlaceholders(realNodes, edges, draggingNodeId)
+  const realNodes = useMemo(() => realCanvasNodes(nodes), [nodes])
+  const routedEdges = useMemo(() => deriveCanvasRoutedEdges(realNodes), [realNodes])
+  const { nodes: phNodes, edges: phEdges } = useBranchPlaceholders(realNodes, routedEdges, draggingNodeId)
   const placeholders = phNodes
   const displayNodes = useMemo(() => [...realNodes, ...phNodes], [realNodes, phNodes])
-  const displayEdges = useMemo(() => [...edges, ...phEdges], [edges, phEdges])
+  const displayEdges = useMemo(
+    () => deriveCanvasDisplayEdges(realNodes, edgeState, phEdges),
+    [realNodes, edgeState, phEdges],
+  )
 
   return {
     nodes,
     setNodes,
     onNodesChange,
-    edges,
+    edges: routedEdges,
     setEdges,
     onEdgesChange,
     draggingNodeId,
