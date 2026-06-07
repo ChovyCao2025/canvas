@@ -10,6 +10,7 @@ import {
   DEFAULT_COMMON_NODE_TYPES,
   buildCategoryOptions,
   buildNodeLibraryView,
+  withConversationNodePresets,
   getNodeSummary,
 } from './nodeLibrary'
 
@@ -99,5 +100,35 @@ describe('nodeLibrary helpers', () => {
 
   it('falls back to generic summary when description is empty', () => {
     expect(getNodeSummary(nodes[1])).toBe('处理复杂逻辑或字段加工')
+  })
+
+  it('adds a conversation reply wait preset without changing backend node types', () => {
+    const palette = withConversationNodePresets([
+      ...nodes,
+      {
+        typeKey: 'WAIT',
+        typeName: '等待',
+        category: '等待与汇聚',
+        configSchema: '[]',
+        outputSchema: '[]',
+        isTrigger: 0,
+        isTerminal: 0,
+        description: '等待时间或事件后继续',
+        enabled: 1,
+      },
+    ])
+
+    const preset = palette.find(node => node.paletteKey === 'conversation-reply-wait')
+
+    expect(preset).toMatchObject({
+      typeKey: 'WAIT',
+      typeName: '等待会话回复',
+      category: '等待与汇聚',
+      defaultBizConfig: {
+        waitType: 'UNTIL_EVENT',
+        eventCode: 'CONVERSATION_REPLY',
+      },
+    })
+    expect(getNodeSummary(preset!)).toContain('客户回复')
   })
 })

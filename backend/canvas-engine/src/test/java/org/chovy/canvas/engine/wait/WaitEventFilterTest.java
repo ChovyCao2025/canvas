@@ -106,6 +106,34 @@ class WaitEventFilterTest {
     }
 
     @Test
+    void conversationReplyResumesOnlyWaitsMatchingIntent() {
+        WaitSubscriptionService waitService = mock(WaitSubscriptionService.class);
+        CanvasExecutionService executionService = mock(CanvasExecutionService.class);
+        WaitResumeService service = new WaitResumeService(waitService, executionService, OBJECT_MAPPER);
+        CanvasWaitSubscriptionDO matching = waitRecord();
+        matching.setId(100L);
+        matching.setEventCode("CONVERSATION_REPLY");
+        matching.setEventFilters("{\"intent\":\"PRODUCT_A\"}");
+        CanvasWaitSubscriptionDO skipped = waitRecord();
+        skipped.setId(101L);
+        skipped.setEventCode("CONVERSATION_REPLY");
+        skipped.setEventFilters("{\"intent\":\"PRODUCT_B\"}");
+        when(waitService.findActiveEventWaits("CONVERSATION_REPLY", "user-1")).thenReturn(List.of(matching, skipped));
+        when(waitService.completeWait(eq(100L), any())).thenReturn(1);
+        when(executionService.trigger(any(), any(), any(), any(), any(), any(), any(), eq(false)))
+                .thenReturn(Mono.just(Map.of()));
+
+        int resumed = service.resumeEventWaits("CONVERSATION_REPLY", "user-1",
+                Map.of("intent", "PRODUCT_A", "sessionId", 100L, "messageId", 200L), "evt-1");
+
+        assertThat(resumed).isEqualTo(1);
+        verify(waitService).completeWait(eq(100L), any());
+        verify(waitService, never()).completeWait(eq(101L), any());
+        verify(executionService).trigger(eq(10L), eq("user-1"), eq(TriggerType.WAIT_RESUME),
+                eq(NodeType.WAIT), eq("wait-1"), any(), eq("exec-1:wait:100:COMPLETED"), eq(false));
+    }
+
+    @Test
     void duplicateResumeDoesNotTriggerWhenCasFails() {
         WaitSubscriptionService waitService = mock(WaitSubscriptionService.class);
         CanvasExecutionService executionService = mock(CanvasExecutionService.class);

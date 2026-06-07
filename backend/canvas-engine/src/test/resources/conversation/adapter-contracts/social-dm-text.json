@@ -1,0 +1,36 @@
+{
+  "name": "social dm text fixture",
+  "adapterKey": "social_dm",
+  "rawPayload": {
+    "canvasId": 30,
+    "versionId": 40,
+    "executionId": "dm-exec-1",
+    "userId": "instagram:user-fixture",
+    "platform": "instagram",
+    "provider": "meta",
+    "pageId": "page-fixture",
+    "threadId": "thread-fixture",
+    "externalMessageId": "dm-msg-fixture",
+    "eventId": "dm-event-fixture",
+    "text": "hello",
+    "intent": "GREETING",
+    "occurredAt": "2026-06-02T05:00:00",
+    "attributes": {
+      "locale": "en-US"
+    }
+  },
+  "expectedChannel": "SOCIAL_DM",
+  "expectedProvider": "META",
+  "expectedMessageType": "TEXT",
+  "expectedText": "hello",
+  "expectedExternalMessageId": "dm-msg-fixture",
+  "expectedEventId": "dm-event-fixture",
+  "expectedAttributes": {
+    "adapter": "SOCIAL_DM",
+    "platform": "instagram",
+    "pageId": "page-fixture",
+    "threadId": "thread-fixture",
+    "locale": "en-US"
+  },
+  "missingPayloadMessage": "social DM conversation reply payload is required"
+}

@@ -1,0 +1,25 @@
+{
+  "name": "whatsapp interactive fixture",
+  "adapterKey": "whatsapp",
+  "rawPayload": {
+    "userId": "whatsapp:+15551234567",
+    "provider": "cloud_api",
+    "externalMessageId": "wamid.interactive.fixture",
+    "eventId": "wa-event-interactive-fixture",
+    "interactiveReplyId": "book-demo",
+    "interactiveReplyTitle": "Book a demo",
+    "intent": "BOOK_DEMO"
+  },
+  "expectedChannel": "WHATSAPP",
+  "expectedProvider": "CLOUD_API",
+  "expectedMessageType": "INTERACTIVE",
+  "expectedText": "Book a demo",
+  "expectedExternalMessageId": "wamid.interactive.fixture",
+  "expectedEventId": "wa-event-interactive-fixture",
+  "expectedAttributes": {
+    "adapter": "WHATSAPP",
+    "interactiveReplyId": "book-demo",
+    "interactiveReplyTitle": "Book a demo"
+  },
+  "missingPayloadMessage": "whatsapp conversation reply payload is required"
+}

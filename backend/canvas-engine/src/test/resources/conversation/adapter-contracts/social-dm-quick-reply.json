@@ -1,0 +1,31 @@
+{
+  "name": "social dm quick reply fixture",
+  "adapterKey": "social_dm",
+  "rawPayload": {
+    "userId": "instagram:user-fixture",
+    "platform": "instagram",
+    "provider": "meta",
+    "pageId": "page-fixture",
+    "threadId": "thread-fixture",
+    "externalMessageId": "dm-quick-reply-fixture",
+    "eventId": "dm-quick-reply-event-fixture",
+    "quickReplyPayload": "book-demo",
+    "quickReplyTitle": "Book a demo",
+    "intent": "BOOK_DEMO"
+  },
+  "expectedChannel": "SOCIAL_DM",
+  "expectedProvider": "META",
+  "expectedMessageType": "INTERACTIVE",
+  "expectedText": "Book a demo",
+  "expectedExternalMessageId": "dm-quick-reply-fixture",
+  "expectedEventId": "dm-quick-reply-event-fixture",
+  "expectedAttributes": {
+    "adapter": "SOCIAL_DM",
+    "platform": "instagram",
+    "pageId": "page-fixture",
+    "threadId": "thread-fixture",
+    "quickReplyPayload": "book-demo",
+    "quickReplyTitle": "Book a demo"
+  },
+  "missingPayloadMessage": "social DM conversation reply payload is required"
+}

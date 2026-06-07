@@ -1,0 +1,30 @@
+{
+  "name": "rcs text fixture",
+  "adapterKey": "rcs",
+  "rawPayload": {
+    "canvasId": 70,
+    "versionId": 80,
+    "executionId": "rcs-exec-1",
+    "userId": "rcs:+15551230000",
+    "provider": "google_rcs",
+    "agentId": "agent-fixture",
+    "conversationId": "conversation-fixture",
+    "externalMessageId": "rcs-text-fixture",
+    "eventId": "rcs-text-event-fixture",
+    "text": "hello",
+    "intent": "GREETING",
+    "occurredAt": "2026-06-02T07:00:00"
+  },
+  "expectedChannel": "RCS",
+  "expectedProvider": "GOOGLE_RCS",
+  "expectedMessageType": "TEXT",
+  "expectedText": "hello",
+  "expectedExternalMessageId": "rcs-text-fixture",
+  "expectedEventId": "rcs-text-event-fixture",
+  "expectedAttributes": {
+    "adapter": "RCS",
+    "agentId": "agent-fixture",
+    "conversationId": "conversation-fixture"
+  },
+  "missingPayloadMessage": "RCS conversation reply payload is required"
+}

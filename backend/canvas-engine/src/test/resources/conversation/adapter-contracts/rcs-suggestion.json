@@ -1,0 +1,29 @@
+{
+  "name": "rcs suggestion fixture",
+  "adapterKey": "rcs",
+  "rawPayload": {
+    "userId": "rcs:+15551230000",
+    "provider": "google_rcs",
+    "agentId": "agent-fixture",
+    "conversationId": "conversation-fixture",
+    "externalMessageId": "rcs-msg-fixture",
+    "eventId": "rcs-event-fixture",
+    "suggestionReplyId": "book-demo",
+    "suggestionText": "Book a demo",
+    "intent": "BOOK_DEMO"
+  },
+  "expectedChannel": "RCS",
+  "expectedProvider": "GOOGLE_RCS",
+  "expectedMessageType": "INTERACTIVE",
+  "expectedText": "Book a demo",
+  "expectedExternalMessageId": "rcs-msg-fixture",
+  "expectedEventId": "rcs-event-fixture",
+  "expectedAttributes": {
+    "adapter": "RCS",
+    "agentId": "agent-fixture",
+    "conversationId": "conversation-fixture",
+    "suggestionReplyId": "book-demo",
+    "suggestionText": "Book a demo"
+  },
+  "missingPayloadMessage": "RCS conversation reply payload is required"
+}

@@ -5,7 +5,7 @@
  */
 import type { Edge } from '@xyflow/react'
 import { describe, expect, it } from 'vitest'
-import { applyInsertIntoEdge, buildDetachedNode, buildPlaceholderEdge } from './insertNode'
+import { applyInsertIntoEdge, buildDetachedNode, buildNodeExpansion, buildPlaceholderEdge } from './insertNode'
 
 describe('insertNode helpers', () => {
   const edge: Edge = {
@@ -68,6 +68,26 @@ describe('insertNode helpers', () => {
     expect(node.position).toEqual({ x: 120, y: 80 })
     expect(node.data.nodeType).toBe('GROOVY')
     expect(node.data.bizConfig).toEqual({})
+  })
+
+  it('preserves preset display name and conversation wait config on expansion', () => {
+    const expansion = buildNodeExpansion({
+      nodeId: 'conversation_wait',
+      nodeType: 'WAIT',
+      category: '等待与汇聚',
+      position: { x: 120, y: 80 },
+      displayName: '等待会话回复',
+      bizConfig: {
+        waitType: 'UNTIL_EVENT',
+        eventCode: 'CONVERSATION_REPLY',
+      },
+    })
+
+    expect(expansion.nodes[0].data.name).toBe('等待会话回复')
+    expect(expansion.nodes[0].data.bizConfig).toEqual({
+      waitType: 'UNTIL_EVENT',
+      eventCode: 'CONVERSATION_REPLY',
+    })
   })
 
   it('creates an edge from placeholder source and handle', () => {

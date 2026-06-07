@@ -1,0 +1,32 @@
+{
+  "name": "web chat text fixture",
+  "adapterKey": "web_chat",
+  "rawPayload": {
+    "canvasId": 50,
+    "versionId": 60,
+    "executionId": "web-exec-1",
+    "userId": "visitor-fixture",
+    "webChatSessionId": "chat-session-fixture",
+    "provider": "widget",
+    "externalMessageId": "web-text-fixture",
+    "eventId": "web-text-event-fixture",
+    "text": "hello",
+    "intent": "GREETING",
+    "occurredAt": "2026-06-02T06:00:00",
+    "attributes": {
+      "locale": "en-US"
+    }
+  },
+  "expectedChannel": "WEB_CHAT",
+  "expectedProvider": "WIDGET",
+  "expectedMessageType": "TEXT",
+  "expectedText": "hello",
+  "expectedExternalMessageId": "web-text-fixture",
+  "expectedEventId": "web-text-event-fixture",
+  "expectedAttributes": {
+    "adapter": "WEB_CHAT",
+    "webChatSessionId": "chat-session-fixture",
+    "locale": "en-US"
+  },
+  "missingPayloadMessage": "web chat conversation reply payload is required"
+}

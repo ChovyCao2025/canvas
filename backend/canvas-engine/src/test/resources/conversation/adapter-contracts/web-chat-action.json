@@ -1,0 +1,27 @@
+{
+  "name": "web chat action fixture",
+  "adapterKey": "web_chat",
+  "rawPayload": {
+    "userId": "visitor-fixture",
+    "webChatSessionId": "chat-session-fixture",
+    "provider": "widget",
+    "externalMessageId": "web-msg-fixture",
+    "eventId": "web-event-fixture",
+    "actionId": "book-demo",
+    "actionLabel": "Book a demo",
+    "intent": "BOOK_DEMO"
+  },
+  "expectedChannel": "WEB_CHAT",
+  "expectedProvider": "WIDGET",
+  "expectedMessageType": "INTERACTIVE",
+  "expectedText": "Book a demo",
+  "expectedExternalMessageId": "web-msg-fixture",
+  "expectedEventId": "web-event-fixture",
+  "expectedAttributes": {
+    "adapter": "WEB_CHAT",
+    "webChatSessionId": "chat-session-fixture",
+    "actionId": "book-demo",
+    "actionLabel": "Book a demo"
+  },
+  "missingPayloadMessage": "web chat conversation reply payload is required"
+}

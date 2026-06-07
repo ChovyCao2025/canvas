@@ -5,6 +5,11 @@
  */
 import type { NodeTypeRegistry } from '../../types'
 
+export type NodePaletteItem = NodeTypeRegistry & {
+  paletteKey?: string
+  defaultBizConfig?: Record<string, unknown>
+}
+
 /** 默认展示在“常用节点”区域的节点类型，帮助新用户快速找到高频能力。 */
 export const DEFAULT_COMMON_NODE_TYPES = [
   'DIRECT_CALL',
@@ -50,8 +55,36 @@ const SUMMARY_FALLBACK: Record<string, string> = {
   SUB_FLOW_REF: '引用已有子流程片段',
 }
 
+const CONVERSATION_REPLY_WAIT_PRESET: Pick<
+  NodePaletteItem,
+  'paletteKey' | 'typeName' | 'description' | 'defaultBizConfig'
+> = {
+  paletteKey: 'conversation-reply-wait',
+  typeName: '等待会话回复',
+  description: '等待客户回复后继续旅程，可接入 WhatsApp、Web Chat、Social DM 和 RCS',
+  defaultBizConfig: {
+    waitType: 'UNTIL_EVENT',
+    eventCode: 'CONVERSATION_REPLY',
+  },
+}
+
+export function withConversationNodePresets(nodes: NodeTypeRegistry[]): NodePaletteItem[] {
+  return nodes.flatMap((node) => {
+    if (node.typeKey !== 'WAIT') {
+      return [node]
+    }
+    return [
+      node,
+      {
+        ...node,
+        ...CONVERSATION_REPLY_WAIT_PRESET,
+      },
+    ]
+  })
+}
+
 /** 构建分类筛选项，并把“全部”固定在第一项。 */
-export function buildCategoryOptions(nodes: NodeTypeRegistry[]) {
+export function buildCategoryOptions(nodes: NodePaletteItem[]) {
   const categories = Array.from(new Set(nodes.map(node => node.category))).sort((a, b) => {
     const aIdx = CATEGORY_ORDER.indexOf(a)
     const bIdx = CATEGORY_ORDER.indexOf(b)
@@ -64,14 +97,14 @@ export function buildCategoryOptions(nodes: NodeTypeRegistry[]) {
 }
 
 /** 读取节点摘要；优先使用后端 description，再回退到前端兜底文案和节点名。 */
-export function getNodeSummary(node: NodeTypeRegistry) {
+export function getNodeSummary(node: NodePaletteItem) {
   const summary = (node.description ?? '').trim()
   return summary || SUMMARY_FALLBACK[node.typeKey] || node.typeName
 }
 
 /** 根据当前分类、关键词和常用节点配置计算节点库视图模型。 */
 export function buildNodeLibraryView(
-  nodes: NodeTypeRegistry[],
+  nodes: NodePaletteItem[],
   options: {
     activeCategory: string
     keyword: string

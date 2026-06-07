@@ -1,0 +1,30 @@
+{
+  "name": "whatsapp text fixture",
+  "adapterKey": "whatsapp",
+  "rawPayload": {
+    "canvasId": 10,
+    "versionId": 20,
+    "executionId": "exec-1",
+    "userId": "whatsapp:+15551234567",
+    "provider": "cloud_api",
+    "externalMessageId": "wamid.fixture",
+    "eventId": "wa-event-fixture",
+    "text": "hello",
+    "intent": "GREETING",
+    "occurredAt": "2026-06-02T04:00:00",
+    "attributes": {
+      "profileName": "Mia"
+    }
+  },
+  "expectedChannel": "WHATSAPP",
+  "expectedProvider": "CLOUD_API",
+  "expectedMessageType": "TEXT",
+  "expectedText": "hello",
+  "expectedExternalMessageId": "wamid.fixture",
+  "expectedEventId": "wa-event-fixture",
+  "expectedAttributes": {
+    "adapter": "WHATSAPP",
+    "profileName": "Mia"
+  },
+  "missingPayloadMessage": "whatsapp conversation reply payload is required"
+}
