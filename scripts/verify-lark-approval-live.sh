@@ -42,7 +42,7 @@ DB mode environment:
   DB_NAME       Database name, default canvas
   DB_USER       MySQL user, default root
   DB_PASSWORD   MySQL password, optional
-  SUBMITTER_USERNAME  Optional Canvas username that must have lark_open_id or lark_user_id for instance creation.
+  SUBMITTER_USERNAME  Canvas username that must have lark_open_id or lark_user_id; required when SUBMIT_REVIEW=true.
   EXPECTED_APPROVERS  Optional comma-separated Canvas usernames that must have lark_open_id.
                       When CANVAS_ID is set in DB mode, project admins are checked automatically.
 
@@ -81,7 +81,7 @@ JSON fixture shape:
   }
 
 Optional live HTTP checks:
-  SUBMIT_REVIEW=true requires JWT_TOKEN and CANVAS_ID, then POSTs /canvas/{id}/submit-review
+  SUBMIT_REVIEW=true requires JWT_TOKEN, SUBMITTER_USERNAME, and CANVAS_ID, then POSTs /canvas/{id}/submit-review
     and verifies Lark external instance/task bindings in the response.
     In DB mode it also verifies persisted approval_instance/approval_task bindings.
   VERIFY_LARK_INSTANCE=true reads the submitted Lark instance with lark-cli, or LARK_INSTANCE_CODE if set.
@@ -95,6 +95,7 @@ Examples:
 
   TENANT_ID=7 \
   JWT_TOKEN="$TOKEN" \
+  SUBMITTER_USERNAME=alice \
   CANVAS_ID=62 \
   SUBMIT_REVIEW=true \
   SYNC_AFTER_SUBMIT=true \
@@ -163,7 +164,6 @@ if [[ "$SKIP_LARK_SCHEMA" != "true" ]]; then
 fi
 
 tmpdir="$(mktemp -d)"
-trap 'rm -rf "$tmpdir"' EXIT
 
 evidence_run_dir=""
 if [[ -n "$EVIDENCE_DIR" ]]; then
@@ -181,10 +181,12 @@ copy_evidence() {
 }
 
 write_evidence_summary() {
+  local exit_code="${1:-0}"
   if [[ -z "$evidence_run_dir" ]]; then
     return
   fi
   node - "$evidence_run_dir/summary.json" \
+    "$exit_code" \
     "$TENANT_ID" \
     "$API_BASE" \
     "$SUBMIT_REVIEW" \
@@ -195,8 +197,10 @@ write_evidence_summary() {
     "$CANVAS_ID" \
     "$LARK_INSTANCE_CODE" <<'NODE'
 const fs = require('fs')
+const pathModule = require('path')
 const [
-  path,
+  outputPath,
+  exitCodeRaw,
   tenantId,
   apiBase,
   submitReview,
@@ -212,8 +216,115 @@ function enabled(value) {
   return value === 'true'
 }
 
-fs.writeFileSync(path, JSON.stringify({
+const exitCode = Number(exitCodeRaw)
+const evidenceDir = pathModule.dirname(outputPath)
+
+function readJson(name) {
+  const file = pathModule.join(evidenceDir, name)
+  if (!fs.existsSync(file)) return null
+  return JSON.parse(fs.readFileSync(file, 'utf8'))
+}
+
+function readText(name) {
+  const file = pathModule.join(evidenceDir, name)
+  if (!fs.existsSync(file)) return ''
+  return fs.readFileSync(file, 'utf8').trim()
+}
+
+function dataOf(payload) {
+  if (!payload || typeof payload !== 'object') return payload
+  return Object.prototype.hasOwnProperty.call(payload, 'data') ? payload.data : payload
+}
+
+function larkTasks(data) {
+  if (!data || typeof data !== 'object') return []
+  if (Array.isArray(data.tasks)) return data.tasks
+  if (Array.isArray(data.task_list)) return data.task_list
+  return []
+}
+
+function summarizeSubmit() {
+  const payload = dataOf(readJson('submit-response.json'))
+  if (!payload || typeof payload !== 'object') return null
+  const pendingTasks = Array.isArray(payload.pendingTasks) ? payload.pendingTasks : []
+  return {
+    approvalInstanceId: payload.id ?? null,
+    status: payload.status ?? null,
+    externalInstanceId: payload.externalInstanceId ?? null,
+    pendingTaskCount: pendingTasks.length,
+    externalTaskIds: pendingTasks
+      .map((task) => task && task.externalTaskId)
+      .filter(Boolean)
+      .map(String)
+  }
+}
+
+function summarizeSubmitDbBinding() {
+  const line = readText('submit-db-binding.tsv')
+  if (!line) return null
+  const [externalInstanceId, taskCount, unboundTaskCount] = line.split('\t')
+  return {
+    externalInstanceId: externalInstanceId || null,
+    taskCount: Number(taskCount),
+    unboundTaskCount: Number(unboundTaskCount)
+  }
+}
+
+function summarizeLarkInstance(name) {
+  const payload = readJson(name)
+  const data = dataOf(payload)
+  if (!data || typeof data !== 'object') return null
+  const tasks = larkTasks(data)
+  return {
+    instanceCode: data.instance_code || data.instanceCode || null,
+    status: data.status || null,
+    taskCount: tasks.length,
+    taskIds: tasks
+      .map((task) => task && (task.id || task.task_id))
+      .filter(Boolean)
+      .map(String),
+    taskStatuses: tasks
+      .map((task) => {
+        const taskId = task && (task.id || task.task_id)
+        return taskId ? { taskId: String(taskId), status: task.status || null } : null
+      })
+      .filter(Boolean)
+  }
+}
+
+function summarizeSync() {
+  const payload = readJson('sync-response.json')
+  if (payload === null) return null
+  return { changedCount: dataOf(payload) }
+}
+
+function summarizeDecision() {
+  const payload = dataOf(readJson('decision-response.json'))
+  if (!payload || typeof payload !== 'object') return null
+  return {
+    approvalInstanceId: payload.id ?? null,
+    status: payload.status ?? null
+  }
+}
+
+function summarizeDecisionDbBinding() {
+  const line = readText('decision-db-binding.tsv')
+  if (!line) return null
+  const [taskStatus, externalTaskId, instanceStatus, externalInstanceId] = line.split('\t')
+  return {
+    taskStatus: taskStatus || null,
+    externalTaskId: externalTaskId || null,
+    instanceStatus: instanceStatus || null,
+    externalInstanceId: externalInstanceId || null
+  }
+}
+
+const preflight = readJson('preflight.json')
+
+fs.writeFileSync(outputPath, JSON.stringify({
   verifiedAt: new Date().toISOString(),
+  completed: exitCode === 0,
+  exitCode,
   tenantId: Number(tenantId),
   apiBase,
   canvasId: canvasId || null,
@@ -226,10 +337,43 @@ fs.writeFileSync(path, JSON.stringify({
     approveTask: enabled(approveTask),
     rejectTask: enabled(rejectTask)
   },
+  artifacts: fs.readdirSync(evidenceDir)
+    .filter((name) => name !== 'summary.json')
+    .sort(),
+  preflight: preflight
+    ? {
+        definitionCount: Array.isArray(preflight.definitions) ? preflight.definitions.length : 0,
+        identityCount: Array.isArray(preflight.identities) ? preflight.identities.length : 0,
+        requiredSubmitter: preflight.required_submitter || null,
+        requiredApprovers: Array.isArray(preflight.required_approvers) ? preflight.required_approvers : []
+      }
+    : null,
+  submit: summarizeSubmit(),
+  submitDbBinding: summarizeSubmitDbBinding(),
+  larkInstance: summarizeLarkInstance('lark-instance-get-response.json'),
+  sync: summarizeSync(),
+  decision: summarizeDecision(),
+  decisionDbBinding: summarizeDecisionDbBinding(),
+  decisionLarkInstance: summarizeLarkInstance('decision-lark-instance-get-response.json'),
   secretsRecorded: false
 }, null, 2))
 NODE
 }
+
+finish() {
+  local exit_code=$?
+  write_evidence_summary "$exit_code" || true
+  if [[ -n "$evidence_run_dir" ]]; then
+    echo "Evidence written to $evidence_run_dir"
+  fi
+  rm -rf "$tmpdir"
+  if [[ "$exit_code" -eq 0 ]]; then
+    echo "Lark approval verification completed"
+  fi
+  exit "$exit_code"
+}
+
+trap finish EXIT
 
 preflight_json="$PREFLIGHT_FILE"
 
@@ -443,6 +587,7 @@ decision_external_instance_id_file="$tmpdir/decision-external-instance-id.txt"
 
 if [[ "$SUBMIT_REVIEW" == "true" ]]; then
   [[ -n "$JWT_TOKEN" ]] || fail_usage "JWT_TOKEN is required when SUBMIT_REVIEW=true"
+  [[ -n "$SUBMITTER_USERNAME" ]] || fail_usage "SUBMITTER_USERNAME is required when SUBMIT_REVIEW=true so preflight can verify the JWT user's Lark identity"
   [[ -n "$CANVAS_ID" ]] || fail_usage "CANVAS_ID is required when SUBMIT_REVIEW=true"
 
   echo "Submitting Canvas publish review for canvas $CANVAS_ID"
@@ -760,9 +905,3 @@ console.log(JSON.stringify({
 NODE
   fi
 fi
-
-write_evidence_summary
-if [[ -n "$evidence_run_dir" ]]; then
-  echo "Evidence written to $evidence_run_dir"
-fi
-echo "Lark approval verification completed"

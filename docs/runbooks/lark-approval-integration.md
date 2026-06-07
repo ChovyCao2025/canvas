@@ -129,7 +129,7 @@ The default mode is non-destructive. It checks Lark approval schemas, the active
 
 `TENANT_ID` must be a positive integer because DB-backed verification uses it to query tenant-scoped approval configuration.
 
-When `SUBMITTER_USERNAME` is set, the verifier checks that this Canvas user has `lark_open_id` or `lark_user_id`, because Lark instance creation requires one submitter identity. Set this to the username represented by the `JWT_TOKEN` used for `SUBMIT_REVIEW=true`.
+When `SUBMITTER_USERNAME` is set, the verifier checks that this Canvas user has `lark_open_id` or `lark_user_id`, because Lark instance creation requires one submitter identity. Set this to the username represented by the `JWT_TOKEN` used for `SUBMIT_REVIEW=true`; the live verifier requires it when `SUBMIT_REVIEW=true`.
 
 When `CANVAS_ID` is set in DB mode, the verifier derives the Canvas publish approvers from the canvas project assignment. Project admins are checked first; if no project admins are found, `tenant_admin` is checked as the fallback approver. Every required approver must have a non-empty `lark_open_id`, because local task binding matches Lark `tasks[].user_id` returned with `user_id_type=open_id`.
 
@@ -150,13 +150,22 @@ cp scripts/lark-approval-live.env.example /tmp/lark-approval-live.env
 scripts/verify-lark-approval-live.sh --env-file /tmp/lark-approval-live.env
 ```
 
-For completion evidence, pass an evidence directory. The verifier creates a timestamped subdirectory containing non-secret artifacts such as `preflight.json`, submit/sync/decision responses, Lark instance reads, DB binding checks, and `summary.json`.
+For completion evidence, pass an evidence directory. The verifier creates a timestamped subdirectory containing non-secret artifacts such as `preflight.json`, submit/sync/decision responses, Lark instance reads, DB binding checks, and `summary.json`. The summary lists artifact filenames and extracts non-secret ids/statuses such as local approval instance id, Lark `externalInstanceId`, external task ids, Lark instance status, sync changed count, and post-decision task status when those checks are enabled. It also records `completed` and `exitCode`; on failure, the partial summary helps identify the last successful checkpoint.
 
 ```bash
 scripts/verify-lark-approval-live.sh \
   --env-file /tmp/lark-approval-live.env \
   --evidence-dir /tmp/canvas-lark-approval-evidence
 ```
+
+After a full live run, gate the evidence directory before treating the integration as complete:
+
+```bash
+scripts/verify-lark-approval-evidence.sh \
+  --evidence-dir /tmp/canvas-lark-approval-evidence
+```
+
+This gate requires `secretsRecorded=false`, raw evidence artifact filenames for the live checkpoints, a successful submit, Lark instance read, DB binding check, manual sync, one approve/reject action, DB decision binding, and post-decision Lark task status evidence. It also verifies that the decision response belongs to the submitted local approval instance and that the decided external task id was returned by the same submit-review response.
 
 Do not place real tokens or DB passwords in the evidence directory. The verifier does not write `JWT_TOKEN`, credential references, DB password values, or resolved Feishu/Lark tokens into its evidence summary.
 
@@ -199,6 +208,7 @@ Or use the live verifier explicitly:
 ```bash
 TENANT_ID=<tenant-id> \
 JWT_TOKEN="$TOKEN" \
+SUBMITTER_USERNAME=<canvas-username> \
 CANVAS_ID=<canvas-id> \
 SUBMIT_REVIEW=true \
 scripts/verify-lark-approval-live.sh
@@ -213,6 +223,7 @@ To additionally prove the created `externalInstanceId` is readable from Feishu/L
 ```bash
 TENANT_ID=<tenant-id> \
 JWT_TOKEN="$TOKEN" \
+SUBMITTER_USERNAME=<canvas-username> \
 CANVAS_ID=<canvas-id> \
 SUBMIT_REVIEW=true \
 VERIFY_LARK_INSTANCE=true \
@@ -255,6 +266,7 @@ Or include sync in the live verifier:
 ```bash
 TENANT_ID=<tenant-id> \
 JWT_TOKEN="$TOKEN" \
+SUBMITTER_USERNAME=<canvas-username> \
 CANVAS_ID=<canvas-id> \
 SUBMIT_REVIEW=true \
 SYNC_AFTER_SUBMIT=true \
@@ -293,6 +305,7 @@ Or run a single-submit decision check when the JWT user is allowed to approve th
 ```bash
 TENANT_ID=<tenant-id> \
 JWT_TOKEN="$TOKEN" \
+SUBMITTER_USERNAME=<canvas-username> \
 CANVAS_ID=<canvas-id> \
 SUBMIT_REVIEW=true \
 VERIFY_LARK_INSTANCE=true \
@@ -351,6 +364,7 @@ Live verifier script self-test:
 
 ```bash
 scripts/verify-lark-approval-live.test.sh
+scripts/verify-lark-approval-evidence.test.sh
 scripts/verify-lark-approval-local.test.sh
 ```
 

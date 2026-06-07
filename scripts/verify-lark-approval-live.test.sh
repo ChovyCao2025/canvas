@@ -209,6 +209,14 @@ require_pattern '--env-file' 'env file support'
 require_pattern '--evidence-dir' 'evidence directory support'
 require_pattern 'lark-approval-live\.env\.example' 'env example documented in usage'
 require_pattern 'secretsRecorded' 'evidence summary must state whether secrets are recorded'
+require_pattern 'completed: exitCode === 0' 'evidence summary must report completion status'
+require_pattern 'exitCode' 'evidence summary must report exit code'
+require_pattern 'trap finish EXIT' 'evidence summary must be attempted on failures'
+require_pattern 'artifacts: fs\.readdirSync' 'evidence summary must list artifact files'
+require_pattern 'summarizeSubmit' 'evidence summary must extract submit result ids'
+require_pattern 'summarizeLarkInstance' 'evidence summary must extract Lark instance status'
+require_pattern 'submitDbBinding' 'evidence summary must extract DB submit bindings'
+require_pattern 'decisionLarkInstance' 'evidence summary must extract post-decision Lark status'
 require_pattern 'copy_evidence "\$submit_response" "submit-response\.json"' 'submit response evidence'
 require_pattern 'copy_evidence "\$lark_instance_response" "lark-instance-get-response\.json"' 'Lark instance response evidence'
 require_pattern 'copy_evidence "\$decision_lark_instance_response" "decision-lark-instance-get-response\.json"' 'post-decision Lark evidence'
@@ -219,6 +227,8 @@ require_pattern 'TENANT_ID must be a positive integer' 'tenant id must be SQL-sa
 require_pattern 'SUBMITTER_USERNAME' 'explicit submitter preflight'
 require_pattern 'required submitter is missing lark_open_id or lark_user_id mapping' 'required submitter mapping guard'
 require_pattern 'checkedSubmitter' 'preflight reports checked submitter mapping'
+require_pattern 'SUBMITTER_USERNAME is required when SUBMIT_REVIEW=true' 'live submit requires submitter identity preflight'
+require_pattern 'SUBMITTER_USERNAME=alice' 'live submit examples must include submitter identity'
 require_pattern 'EXPECTED_APPROVERS' 'explicit expected approver preflight'
 require_pattern 'canvas_project_member' 'DB preflight derives Canvas project approvers'
 require_pattern 'required approvers are missing lark_open_id mappings' 'required approver mapping guard'
@@ -264,6 +274,10 @@ if ! grep -Eq 'APPROVE_TASK=false' "$ENV_EXAMPLE"; then
 fi
 if ! grep -Eq 'EVIDENCE_DIR=' "$ENV_EXAMPLE"; then
   echo "Missing evidence directory option in env example" >&2
+  exit 1
+fi
+if ! grep -Eq 'SUBMITTER_USERNAME=' "$ENV_EXAMPLE"; then
+  echo "Missing submitter username option in env example" >&2
   exit 1
 fi
 
