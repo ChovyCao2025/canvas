@@ -47,6 +47,19 @@ done
 
 [[ -d "$MIGRATION_DIR" ]] || fail "migration directory is missing: $MIGRATION_DIR"
 
+if git -C "$ROOT_DIR" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+  missing_tracked_migrations=()
+  while IFS= read -r tracked_migration; do
+    [[ -f "$ROOT_DIR/$tracked_migration" ]] || missing_tracked_migrations+=("$tracked_migration")
+  done < <(git -C "$ROOT_DIR" ls-files 'backend/canvas-engine/src/main/resources/db/migration/V*.sql')
+
+  if [[ ${#missing_tracked_migrations[@]} -gt 0 ]]; then
+    printf 'ERROR: tracked Flyway migration files are missing from the worktree:\n' >&2
+    printf '  - %s\n' "${missing_tracked_migrations[@]}" >&2
+    fail "do not delete or renumber versioned migrations that may have been applied"
+  fi
+fi
+
 if [[ -z "$FROM_VERSION" && -f "$BASELINE_FILE" ]]; then
   FROM_VERSION="$(tr -d '[:space:]' < "$BASELINE_FILE")"
 fi
