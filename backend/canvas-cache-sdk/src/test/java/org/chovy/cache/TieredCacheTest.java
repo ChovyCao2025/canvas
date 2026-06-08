@@ -313,6 +313,16 @@ class TieredCacheTest {
     }
 
     @Test
+    void getAllTreatsNullBatchLoaderResultAsEmptyResult() {
+        when(values.get("sample:v1:1")).thenReturn(null);
+        TieredCache<Integer, SampleValue> cache = sampleCache(key -> new SampleValue("unused"));
+
+        Map<Integer, Optional<SampleValue>> result = cache.getAll(List.of(1), missing -> null);
+
+        assertThat(result).containsEntry(1, Optional.empty());
+    }
+
+    @Test
     void warmupLoadsKeysAndStatsExposeCacheActivity() {
         when(values.get("sample:v1:1")).thenReturn(null);
         when(values.get("sample:v1:2")).thenReturn(null);

@@ -190,6 +190,24 @@ class CreatorProviderMutationServiceTest {
     }
 
     @Test
+    void rejectsSelfApprovalForLiveCreatorProviderMutation() {
+        CreatorProviderMutationMapper mutationMapper = mock(CreatorProviderMutationMapper.class);
+        CreatorProviderMutationDO row = mutation();
+        row.setDryRunRequired(1);
+        when(mutationMapper.selectById(60L)).thenReturn(row);
+        CreatorProviderMutationService service = service(mock(CreatorCampaignMapper.class),
+                mock(CreatorCollaborationMapper.class), mock(CreatorDeliverableMapper.class),
+                mock(CreatorProfileMapper.class), mutationMapper, CreatorProviderWriteGateway.unsupported());
+
+        assertThatThrownBy(() -> service.approve(7L, 60L,
+                new CreatorProviderMutationApprovalCommand("APPROVED", "self-review"), "operator-1"))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("creator cannot approve");
+
+        verify(mutationMapper, never()).updateById(any(CreatorProviderMutationDO.class));
+    }
+
+    @Test
     void redactsProviderRequestMetadataAndResponseEvidence() {
         CreatorCampaignMapper campaignMapper = mock(CreatorCampaignMapper.class);
         CreatorCollaborationMapper collaborationMapper = mock(CreatorCollaborationMapper.class);

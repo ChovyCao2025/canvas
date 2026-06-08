@@ -176,6 +176,24 @@ class SearchMarketingMutationServiceTest {
     }
 
     @Test
+    void rejectsSelfApprovalForLiveSearchProviderMutation() {
+        SearchMarketingMutationMapper mutationMapper = mock(SearchMarketingMutationMapper.class);
+        SearchMarketingMutationDO row = mutation();
+        row.setDryRunRequired(1);
+        when(mutationMapper.selectById(50L)).thenReturn(row);
+        SearchMarketingMutationService service = service(mock(SearchMarketingSourceMapper.class),
+                mock(SearchMarketingKeywordMapper.class), mock(SearchMarketingOpportunityMapper.class),
+                mutationMapper, SearchMarketingProviderWriteGateway.unsupported());
+
+        assertThatThrownBy(() -> service.approve(7L, 50L,
+                new SearchMarketingMutationApprovalCommand("APPROVED", "self-review"), "operator-1"))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("creator cannot approve");
+
+        verify(mutationMapper, never()).updateById(any(SearchMarketingMutationDO.class));
+    }
+
+    @Test
     void redactsProviderRequestMetadataAndResponseEvidence() {
         SearchMarketingSourceMapper sourceMapper = mock(SearchMarketingSourceMapper.class);
         SearchMarketingMutationMapper mutationMapper = mock(SearchMarketingMutationMapper.class);

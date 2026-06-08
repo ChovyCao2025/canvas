@@ -191,6 +191,25 @@ class ProgrammaticDspMutationServiceTest {
     }
 
     @Test
+    void rejectsSelfApprovalForLiveProgrammaticDspProviderMutation() {
+        ProgrammaticDspMutationMapper mutationMapper = mock(ProgrammaticDspMutationMapper.class);
+        ProgrammaticDspMutationDO row = mutation();
+        row.setDryRunRequired(1);
+        when(mutationMapper.selectById(70L)).thenReturn(row);
+        ProgrammaticDspMutationService service = service(mock(ProgrammaticDspSeatMapper.class),
+                mock(ProgrammaticDspCampaignMapper.class), mock(ProgrammaticDspLineItemMapper.class),
+                mock(ProgrammaticDspSupplyPathMapper.class), mutationMapper,
+                ProgrammaticDspProviderWriteGateway.unsupported());
+
+        assertThatThrownBy(() -> service.approve(7L, 70L,
+                new ProgrammaticDspMutationApprovalCommand("APPROVED", "self-review"), "operator-1"))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("creator cannot approve");
+
+        verify(mutationMapper, never()).updateById(any(ProgrammaticDspMutationDO.class));
+    }
+
+    @Test
     void redactsProviderRequestMetadataAndResponseEvidence() {
         ProgrammaticDspSeatMapper seatMapper = mock(ProgrammaticDspSeatMapper.class);
         ProgrammaticDspCampaignMapper campaignMapper = mock(ProgrammaticDspCampaignMapper.class);

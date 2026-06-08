@@ -53,7 +53,7 @@ public class DeliveryReceiptController {
 
     private void requireValidSecret(String candidate) {
         if (receiptSecret == null || receiptSecret.isBlank()) {
-            return;
+            throw new AccessDeniedException("receipt secret is not configured");
         }
         byte[] expected = receiptSecret.getBytes(StandardCharsets.UTF_8);
         byte[] actual = (candidate == null ? "" : candidate).getBytes(StandardCharsets.UTF_8);

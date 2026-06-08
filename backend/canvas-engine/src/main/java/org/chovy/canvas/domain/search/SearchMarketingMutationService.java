@@ -174,6 +174,7 @@ public class SearchMarketingMutationService {
         String decision = normalizeUpper(command == null ? null : command.decision(), "decision");
         LocalDateTime changedAt = now();
         if ("APPROVED".equals(decision)) {
+            rejectSelfApproval(row.getCreatedBy(), actor);
             row.setApprovalStatus("APPROVED");
             row.setStatus("READY");
         } else if ("REJECTED".equals(decision)) {
@@ -496,6 +497,12 @@ public class SearchMarketingMutationService {
     private String defaultString(String value, String fallback) {
         String trimmed = trimToNull(value);
         return trimmed == null ? fallback : trimmed;
+    }
+
+    private void rejectSelfApproval(String createdBy, String actor) {
+        if (Objects.equals(defaultString(createdBy, "system"), defaultString(actor, "system"))) {
+            throw new IllegalStateException("creator cannot approve live search provider mutation");
+        }
     }
 
     private String trimToNull(String value) {

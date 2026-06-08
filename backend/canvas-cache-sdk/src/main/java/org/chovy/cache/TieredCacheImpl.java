@@ -424,6 +424,9 @@ public class TieredCacheImpl<K, V> implements TieredCache<K, V> {
         if (!misses.isEmpty()) {
             // batchLoader 只接收真正 miss 的 key，减少下游数据库或远程服务压力。
             Map<K, V> loaded = batchLoader.apply(List.copyOf(misses));
+            if (loaded == null) {
+                loaded = Map.of();
+            }
             for (K key : misses) {
                 V value = loaded.get(key);
                 writeL2(key, value);

@@ -14,6 +14,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 class DeliveryReceiptControllerTest {
@@ -48,6 +49,17 @@ class DeliveryReceiptControllerTest {
         assertThatThrownBy(() -> controller.receive("bad", request()).block())
                 .isInstanceOf(AccessDeniedException.class)
                 .hasMessageContaining("invalid receipt signature");
+    }
+
+    @Test
+    void blankConfiguredSecretRejectsReceiptBeforeRecording() {
+        DeliveryOutboxService outboxService = mock(DeliveryOutboxService.class);
+        DeliveryReceiptController controller = new DeliveryReceiptController(outboxService, "");
+
+        assertThatThrownBy(() -> controller.receive("anything", request()).block())
+                .isInstanceOf(AccessDeniedException.class)
+                .hasMessageContaining("receipt secret is not configured");
+        verifyNoInteractions(outboxService);
     }
 
     private DeliveryReceiptController.ReceiptCallbackReq request() {

@@ -160,6 +160,9 @@ public class InMemoryTieredCache<K, V> implements TieredCache<K, V> {
         }
         // 只把真正未命中的 key 交给 batchLoader，模拟生产缓存的批量回源边界。
         Map<K, V> loaded = misses.isEmpty() ? Map.of() : batchLoader.apply(misses);
+        if (loaded == null) {
+            loaded = Map.of();
+        }
         for (K key : misses) {
             Optional<V> value = Optional.ofNullable(loaded.get(key));
             store.put(key, value);
