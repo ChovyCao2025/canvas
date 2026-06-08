@@ -24,6 +24,9 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 
+/**
+ * BiDatasetAccelerationService 编排 domain.bi.dataset 场景的领域业务规则。
+ */
 @Service
 public class BiDatasetAccelerationService {
 
@@ -52,6 +55,16 @@ public class BiDatasetAccelerationService {
     private final Clock clock;
     private final int extractRetainedTables;
 
+    /**
+     * 创建 BiDatasetAccelerationService 实例并注入 domain.bi.dataset 场景依赖。
+     * @param policyMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param runMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param auditLogMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param objectMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param datasetSpecResolver 依赖组件，用于完成数据访问、计算或外部能力调用。
+     * @param materializer materializer 参数，用于 BiDatasetAccelerationService 流程中的校验、计算或对象转换。
+     * @param clock 时间参数，用于计算窗口、过期或审计时间。
+     */
     public BiDatasetAccelerationService(BiDatasetAccelerationPolicyMapper policyMapper,
                                         BiDatasetExtractRefreshRunMapper runMapper,
                                         BiAuditLogMapper auditLogMapper,
@@ -69,6 +82,17 @@ public class BiDatasetAccelerationService {
                 2);
     }
 
+    /**
+     * 创建 BiDatasetAccelerationService 实例并注入 domain.bi.dataset 场景依赖。
+     * @param policyMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param runMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param auditLogMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param objectMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param datasetSpecResolver 依赖组件，用于完成数据访问、计算或外部能力调用。
+     * @param materializer materializer 参数，用于 BiDatasetAccelerationService 流程中的校验、计算或对象转换。
+     * @param clock 时间参数，用于计算窗口、过期或审计时间。
+     * @param extractRetainedTables extract retained tables 参数，用于 BiDatasetAccelerationService 流程中的校验、计算或对象转换。
+     */
     public BiDatasetAccelerationService(BiDatasetAccelerationPolicyMapper policyMapper,
                                         BiDatasetExtractRefreshRunMapper runMapper,
                                         BiAuditLogMapper auditLogMapper,
@@ -87,6 +111,16 @@ public class BiDatasetAccelerationService {
         this.extractRetainedTables = Math.max(1, Math.min(extractRetainedTables <= 0 ? 2 : extractRetainedTables, 50));
     }
 
+    /**
+     * 创建 BiDatasetAccelerationService 实例并注入 domain.bi.dataset 场景依赖。
+     * @param policyMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param runMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param auditLogMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param objectMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param datasetSpecResolverProvider 依赖组件，用于完成数据访问、计算或外部能力调用。
+     * @param materializerProvider materializer provider 参数，用于 BiDatasetAccelerationService 流程中的校验、计算或对象转换。
+     * @param extractRetainedTables extract retained tables 参数，用于 BiDatasetAccelerationService 流程中的校验、计算或对象转换。
+     */
     @Autowired
     public BiDatasetAccelerationService(BiDatasetAccelerationPolicyMapper policyMapper,
                                         BiDatasetExtractRefreshRunMapper runMapper,
@@ -109,6 +143,13 @@ public class BiDatasetAccelerationService {
                 extractRetainedTables);
     }
 
+    /**
+     * 读取数据集加速策略视图，用于展示抽取模式、刷新频率和容量占用配置。
+     *
+     * @param tenantId 租户标识，用于限定 BI 资源、权限和审计数据的隔离范围
+     * @param datasetKey 数据集业务键，用于定位语义模型、权限规则和加速策略
+     * @return 用于前端展示或管理端审计的业务视图
+     */
     public BiDatasetAccelerationPolicyView policyView(Long tenantId, String datasetKey) {
         Long scopedTenantId = normalizeTenant(tenantId);
         String scopedDatasetKey = requiredDatasetKey(datasetKey);
@@ -116,10 +157,20 @@ public class BiDatasetAccelerationService {
                 loadRecentRuns(scopedTenantId, scopedDatasetKey, 10));
     }
 
+    /**
+     * 创建或更新治理策略，并记录操作者以支撑后续审计和运行时生效。
+     *
+     * @param tenantId 租户标识，用于限定 BI 资源、权限和审计数据的隔离范围
+     * @param datasetKey 数据集业务键，用于定位语义模型、权限规则和加速策略
+     * @param command 业务操作命令，包含本次请求需要写入或校验的字段
+     * @param actor 触发策略变更、调度或刷新动作的操作者标识
+     * @return 用于前端展示或管理端审计的业务视图
+     */
     public BiDatasetAccelerationPolicyView upsertPolicy(Long tenantId,
                                                         String datasetKey,
                                                         BiDatasetAccelerationPolicyCommand command,
                                                         String actor) {
+        // 准备本次流程的上下文、默认值和中间结果。
         Long scopedTenantId = normalizeTenant(tenantId);
         String scopedDatasetKey = requiredDatasetKey(datasetKey);
         BiDatasetAccelerationPolicyDO existing = findPolicy(scopedTenantId, scopedDatasetKey);
@@ -138,7 +189,9 @@ public class BiDatasetAccelerationService {
         row.setTtlSeconds(positive(value(safeCommand.ttlSeconds(), before.ttlSeconds()), 300L));
         row.setMaxRows(positive(value(safeCommand.maxRows(), before.maxRows()), 100_000L));
         row.setCronExpression(trimToNull(value(safeCommand.cronExpression(), before.cronExpression())));
+        // 访问持久化数据，读取现有配置或写入本次变更。
         row.setUpdatedBy(actor(actor));
+        // 校验策略输入和默认值，避免无效配置进入持久化或查询流程。
         if (row.getId() == null) {
             policyMapper.insert(row);
         } else {
@@ -149,6 +202,14 @@ public class BiDatasetAccelerationService {
         return after;
     }
 
+    /**
+     * 立即触发数据集加速抽取刷新，物化最新数据并记录刷新运行结果。
+     *
+     * @param tenantId 租户标识，用于限定 BI 资源、权限和审计数据的隔离范围
+     * @param datasetKey 数据集业务键，用于定位语义模型、权限规则和加速策略
+     * @param actor 触发策略变更、调度或刷新动作的操作者标识
+     * @return 用于前端展示或管理端审计的业务视图
+     */
     public BiDatasetExtractRefreshRunView refreshNow(Long tenantId, String datasetKey, String actor) {
         Long scopedTenantId = normalizeTenant(tenantId);
         String scopedDatasetKey = requiredDatasetKey(datasetKey);
@@ -182,6 +243,7 @@ public class BiDatasetAccelerationService {
             updatePolicyAfterRefresh(policy, scopedTenantId, scopedDatasetKey, completedRun, STATUS_SUCCESS, null);
             cleanupAfterRefresh(scopedTenantId, scopedDatasetKey);
             return toRunView(completedRun);
+        // 捕获异常并转为业务兜底处理，避免异常扩散到主流程。
         } catch (RuntimeException e) {
             LocalDateTime finishedAt = now();
             BiDatasetExtractRefreshRunDO failedRun = completionRun(run);
@@ -194,11 +256,27 @@ public class BiDatasetAccelerationService {
         }
     }
 
+    /**
+     * 查询数据集加速最近刷新记录，用于观察抽取成功率、耗时和失败原因。
+     *
+     * @param tenantId 租户标识，用于限定 BI 资源、权限和审计数据的隔离范围
+     * @param datasetKey 数据集业务键，用于定位语义模型、权限规则和加速策略
+     * @param limit 本次读取、处理或领取的最大数量
+     * @return 最新的业务视图
+     */
     public List<BiDatasetExtractRefreshRunView> recentRuns(Long tenantId, String datasetKey, int limit) {
         Long scopedTenantId = normalizeTenant(tenantId);
         return loadRecentRuns(scopedTenantId, requiredDatasetKey(datasetKey), limit);
     }
 
+    /**
+     * 汇总数据集抽取容量占用，用于评估加速缓存的存储压力和清理策略。
+     *
+     * @param tenantId 租户标识，用于限定 BI 资源、权限和审计数据的隔离范围
+     * @param datasetKey 数据集业务键，用于定位语义模型、权限规则和加速策略
+     * @param limit 本次读取、处理或领取的最大数量
+     * @return 用于前端展示或管理端审计的业务视图
+     */
     public BiDatasetExtractCapacitySummaryView capacitySummary(Long tenantId, String datasetKey, int limit) {
         Long scopedTenantId = normalizeTenant(tenantId);
         String scopedDatasetKey = requiredDatasetKey(datasetKey);
@@ -229,6 +307,7 @@ public class BiDatasetAccelerationService {
                         retainedRows += Math.max(0L, row.getRowCount() == null ? 0L : row.getRowCount());
                     }
                 }
+            // 根据前序判断结果进入后续条件分支。
             } else if (STATUS_FAILED.equals(status)) {
                 failedRuns++;
             }
@@ -253,6 +332,14 @@ public class BiDatasetAccelerationService {
                 latestDurationMs);
     }
 
+    /**
+     * 清理超过保留数量的历史抽取表，释放加速缓存容量并保留最近可回滚版本。
+     *
+     * @param tenantId 租户标识，用于限定 BI 资源、权限和审计数据的隔离范围
+     * @param datasetKey 数据集业务键，用于定位语义模型、权限规则和加速策略
+     * @param retainTables 需要保留的历史抽取表数量
+     * @return 用于前端展示或管理端审计的业务视图
+     */
     public BiDatasetExtractCleanupResultView cleanupRetainedExtracts(Long tenantId, String datasetKey, int retainTables) {
         Long scopedTenantId = normalizeTenant(tenantId);
         String scopedDatasetKey = requiredDatasetKey(datasetKey);
@@ -260,6 +347,13 @@ public class BiDatasetAccelerationService {
         return cleanupRetainedExtractsInternal(scopedTenantId, scopedDatasetKey, retention);
     }
 
+    /**
+     * 按数据集加速策略改写查询语义，使查询优先命中已物化的 Quick Engine 抽取表。
+     *
+     * @param tenantId 租户标识，用于限定 BI 资源、权限和审计数据的隔离范围
+     * @param dataset 待查询或待加速的数据集语义定义
+     * @return 按加速策略改写后的数据集语义定义
+     */
     public BiDatasetSpec applyAcceleration(Long tenantId, BiDatasetSpec dataset) {
         if (dataset == null) {
             return null;
@@ -270,6 +364,11 @@ public class BiDatasetAccelerationService {
                 || !policy.getEnabled()
                 || !MODE_EXTRACT.equals(normalizeMode(policy.getAccelerationMode()))
                 || !STATUS_SUCCESS.equals(normalizeStatus(policy.getLastStatus()))
+                /**
+                 * 判断业务条件是否成立。
+                 *
+                 * @return 返回布尔判断结果。
+                 */
                 || isBlank(policy.getMaterializedTable())) {
             return dataset;
         }
@@ -283,12 +382,23 @@ public class BiDatasetAccelerationService {
                 dataset.model());
     }
 
+    /**
+     * 执行数据写入或状态变更。
+     *
+     * @param policy policy 参数，用于 updatePolicyAfterRefresh 流程中的校验、计算或对象转换。
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @param datasetKey 业务键，用于在同一租户下定位资源。
+     * @param run run 参数，用于 updatePolicyAfterRefresh 流程中的校验、计算或对象转换。
+     * @param status 业务状态，用于筛选或推进状态流转。
+     * @param errorSummary error summary 参数，用于 updatePolicyAfterRefresh 流程中的校验、计算或对象转换。
+     */
     private void updatePolicyAfterRefresh(BiDatasetAccelerationPolicyDO policy,
                                           Long tenantId,
                                           String datasetKey,
                                           BiDatasetExtractRefreshRunDO run,
                                           String status,
                                           String errorSummary) {
+        // 刷新运行表记录单次执行事实；策略表只保存最后一次状态和当前可查询的物化表指针。
         BiDatasetAccelerationPolicyDO row = policy == null ? new BiDatasetAccelerationPolicyDO() : policy;
         row.setTenantId(tenantId);
         row.setDatasetKey(datasetKey);
@@ -327,6 +437,13 @@ public class BiDatasetAccelerationService {
         }
     }
 
+    /**
+     * 查询或读取业务数据。
+     *
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @param datasetKey 业务键，用于在同一租户下定位资源。
+     * @return 返回符合条件的数据列表或视图。
+     */
     private BiDatasetAccelerationPolicyDO findPolicy(Long tenantId, String datasetKey) {
         List<BiDatasetAccelerationPolicyDO> rows = policyMapper.selectList(
                 new LambdaQueryWrapper<BiDatasetAccelerationPolicyDO>()
@@ -335,14 +452,27 @@ public class BiDatasetAccelerationService {
         return rows == null || rows.isEmpty() ? null : rows.get(0);
     }
 
+    /**
+     * 刷新完成后的保留清理是“尽力而为”的容量治理动作。
+     *
+     * <p>新抽取表已经写入策略并可被查询使用，历史表清理失败不应回滚刷新成功状态；失败的清理会留给后续人工
+     * 或定时清理重试。</p>
+     */
     private void cleanupAfterRefresh(Long tenantId, String datasetKey) {
         try {
             cleanupRetainedExtractsInternal(tenantId, datasetKey, extractRetainedTables);
+        // 捕获异常并转为业务兜底处理，避免异常扩散到主流程。
         } catch (RuntimeException ignored) {
             // A successful extract must remain usable even when old-table cleanup is temporarily unavailable.
         }
     }
 
+    /**
+     * 按刷新完成时间倒序清理超过保留数量的活动物化表。
+     *
+     * <p>同一个物化表可能对应多条成功刷新记录，因此以表名聚合后再删除；删除成功后将该表关联的刷新记录标记为
+     * DROPPED，容量汇总和加速改写都不再把它计为活动版本。</p>
+     */
     private BiDatasetExtractCleanupResultView cleanupRetainedExtractsInternal(Long tenantId, String datasetKey, int retention) {
         Map<String, List<BiDatasetExtractRefreshRunDO>> activeTables = activeMaterializedTables(tenantId, datasetKey);
         int checkedTables = activeTables.size();
@@ -356,12 +486,14 @@ public class BiDatasetAccelerationService {
                 continue;
             }
             try {
+                // 只有物理表删除成功后才改写 retention 状态，避免审计口径与实际存储不一致。
                 if (materializer.dropMaterializedTable(entry.getKey())) {
                     droppedTables++;
                     markDropped(entry.getValue());
                 } else {
                     failedDrops++;
                 }
+            // 捕获异常并转为业务兜底处理，避免异常扩散到主流程。
             } catch (RuntimeException e) {
                 failedDrops++;
             }
@@ -374,9 +506,17 @@ public class BiDatasetAccelerationService {
                 failedDrops);
     }
 
+    /**
+     * 读取当前仍被容量治理视为活动的物化表集合。
+     *
+     * <p>查询只看成功刷新且未被标记 DROPPED 的运行记录，并保持数据库返回顺序以表达“最新优先”的保留口径。
+     * 返回值按物化表名聚合，避免同表多次记录导致重复删除或重复计量。</p>
+     */
     private Map<String, List<BiDatasetExtractRefreshRunDO>> activeMaterializedTables(Long tenantId, String datasetKey) {
         Map<String, List<BiDatasetExtractRefreshRunDO>> tables = new LinkedHashMap<>();
+        // 遍历候选数据并按业务规则筛选、转换或聚合。
         for (BiDatasetExtractRefreshRunDO row : loadSuccessfulRuns(tenantId, datasetKey, 500)) {
+            // 校验关键输入和前置条件，避免无效状态继续进入主流程。
             if (RETENTION_DROPPED.equals(normalizeRetentionStatus(row.getRetentionStatus()))) {
                 continue;
             }
@@ -386,12 +526,18 @@ public class BiDatasetAccelerationService {
             }
             tables.computeIfAbsent(table, ignored -> new java.util.ArrayList<>()).add(row);
         }
+        // 汇总前面计算出的状态和明细，返回给调用方。
         return tables;
     }
 
+    /**
+     * 将一组刷新记录标记为已丢弃，作为容量视图和后续清理的统一事实来源。
+     */
     private void markDropped(List<BiDatasetExtractRefreshRunDO> rows) {
         LocalDateTime droppedAt = now();
+        // 遍历候选数据并按业务规则筛选、转换或聚合。
         for (BiDatasetExtractRefreshRunDO row : rows) {
+            // 访问持久化或外部依赖，获取或写入本次流程需要的数据。
             BiDatasetExtractRefreshRunDO update = new BiDatasetExtractRefreshRunDO();
             update.setId(row.getId());
             update.setRetentionStatus(RETENTION_DROPPED);
@@ -400,16 +546,33 @@ public class BiDatasetAccelerationService {
         }
     }
 
+    /**
+     * 执行 completionRun 流程，围绕 completion run 完成校验、计算或结果组装。
+     *
+     * @param insertedRun inserted run 参数，用于 completionRun 流程中的校验、计算或对象转换。
+     * @return 返回 completionRun 流程生成的业务结果。
+     */
     private BiDatasetExtractRefreshRunDO completionRun(BiDatasetExtractRefreshRunDO insertedRun) {
+        // 准备本次处理所需的上下文和中间变量。
         BiDatasetExtractRefreshRunDO row = new BiDatasetExtractRefreshRunDO();
+        // 访问持久化或外部依赖，获取或写入本次流程需要的数据。
         row.setId(insertedRun.getId());
         row.setTenantId(insertedRun.getTenantId());
         row.setDatasetKey(insertedRun.getDatasetKey());
         row.setRequestedBy(insertedRun.getRequestedBy());
         row.setStartedAt(insertedRun.getStartedAt());
+        // 汇总前面计算出的状态和明细，返回给调用方。
         return row;
     }
 
+    /**
+     * 查询或读取业务数据。
+     *
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @param datasetKey 业务键，用于在同一租户下定位资源。
+     * @param limit 分页或数量限制，避免一次处理过多数据。
+     * @return 返回 load recent runs 汇总后的集合、分页或映射视图。
+     */
     private List<BiDatasetExtractRefreshRunView> loadRecentRuns(Long tenantId, String datasetKey, int limit) {
         int capped = Math.max(1, Math.min(limit <= 0 ? 10 : limit, 100));
         List<BiDatasetExtractRefreshRunDO> rows = runMapper.selectList(
@@ -421,6 +584,14 @@ public class BiDatasetAccelerationService {
         return rows == null ? List.of() : rows.stream().map(this::toRunView).toList();
     }
 
+    /**
+     * 查询或读取业务数据。
+     *
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @param datasetKey 业务键，用于在同一租户下定位资源。
+     * @param limit 分页或数量限制，避免一次处理过多数据。
+     * @return 返回 load raw runs 汇总后的集合、分页或映射视图。
+     */
     private List<BiDatasetExtractRefreshRunDO> loadRawRuns(Long tenantId, String datasetKey, int limit) {
         int capped = Math.max(1, Math.min(limit <= 0 ? 50 : limit, 500));
         List<BiDatasetExtractRefreshRunDO> rows = runMapper.selectList(
@@ -434,6 +605,14 @@ public class BiDatasetAccelerationService {
         return rows == null ? List.of() : rows;
     }
 
+    /**
+     * 查询或读取业务数据。
+     *
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @param datasetKey 业务键，用于在同一租户下定位资源。
+     * @param limit 分页或数量限制，避免一次处理过多数据。
+     * @return 返回 load successful runs 汇总后的集合、分页或映射视图。
+     */
     private List<BiDatasetExtractRefreshRunDO> loadSuccessfulRuns(Long tenantId, String datasetKey, int limit) {
         int capped = Math.max(1, Math.min(limit <= 0 ? 500 : limit, 500));
         List<BiDatasetExtractRefreshRunDO> rows = runMapper.selectList(
@@ -448,9 +627,18 @@ public class BiDatasetAccelerationService {
         return rows == null ? List.of() : rows;
     }
 
+    /**
+     * 转换为接口返回或领域视图。
+     *
+     * @param datasetKey 业务键，用于在同一租户下定位资源。
+     * @param row 持久化行数据，承载数据库记录内容。
+     * @param recentRuns recent runs 参数，用于 view 流程中的校验、计算或对象转换。
+     * @return 返回 view 流程生成的业务结果。
+     */
     private BiDatasetAccelerationPolicyView view(String datasetKey,
                                                  BiDatasetAccelerationPolicyDO row,
                                                  List<BiDatasetExtractRefreshRunView> recentRuns) {
+        // 校验关键输入和前置条件，避免无效状态继续进入主流程。
         if (row == null) {
             return new BiDatasetAccelerationPolicyView(
                     datasetKey,
@@ -467,6 +655,7 @@ public class BiDatasetAccelerationService {
                     null,
                     recentRuns);
         }
+        // 汇总前面计算出的状态和明细，返回给调用方。
         return new BiDatasetAccelerationPolicyView(
                 datasetKey,
                 row.getEnabled() != null && row.getEnabled(),
@@ -483,6 +672,12 @@ public class BiDatasetAccelerationService {
                 recentRuns);
     }
 
+    /**
+     * 转换为接口返回或领域视图。
+     *
+     * @param row 持久化行数据，承载数据库记录内容。
+     * @return 返回组装或转换后的结果对象。
+     */
     private BiDatasetExtractRefreshRunView toRunView(BiDatasetExtractRefreshRunDO row) {
         return new BiDatasetExtractRefreshRunView(
                 row.getId(),
@@ -497,6 +692,15 @@ public class BiDatasetAccelerationService {
                 row.getErrorMessage());
     }
 
+    /**
+     * 记录审计、指标或状态变更信息。
+     *
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @param actor 操作人标识，用于审计和权限判断。
+     * @param datasetKey 业务键，用于在同一租户下定位资源。
+     * @param before before 参数，用于 auditUpdate 流程中的校验、计算或对象转换。
+     * @param after after 参数，用于 auditUpdate 流程中的校验、计算或对象转换。
+     */
     private void auditUpdate(Long tenantId,
                              String actor,
                              String datasetKey,
@@ -514,19 +718,33 @@ public class BiDatasetAccelerationService {
         row.setCreatedAt(now());
         try {
             auditLogMapper.insert(row);
+        // 捕获异常并转为业务兜底处理，避免异常扩散到主流程。
         } catch (RuntimeException ignored) {
             // Acceleration settings should still apply if audit persistence is unavailable.
         }
     }
 
+    /**
+     * 转换为接口返回或领域视图。
+     *
+     * @param value 待处理值，用于规则计算或转换。
+     * @return 返回组装或转换后的结果对象。
+     */
     private String toJson(Object value) {
         try {
             return objectMapper.writeValueAsString(value);
+        // 捕获异常并转为业务兜底处理，避免异常扩散到主流程。
         } catch (JsonProcessingException e) {
             return "{}";
         }
     }
 
+    /**
+     * 规范化输入值。
+     *
+     * @param mode mode 参数，用于 normalizeMode 流程中的校验、计算或对象转换。
+     * @return 返回解析、归一化或安全处理后的值。
+     */
     private String normalizeMode(String mode) {
         String normalized = isBlank(mode) ? MODE_DIRECT_QUERY : mode.trim().toUpperCase(Locale.ROOT);
         if (!MODES.contains(normalized)) {
@@ -535,6 +753,12 @@ public class BiDatasetAccelerationService {
         return normalized;
     }
 
+    /**
+     * 规范化输入值。
+     *
+     * @param mode mode 参数，用于 normalizeRefreshMode 流程中的校验、计算或对象转换。
+     * @return 返回解析、归一化或安全处理后的值。
+     */
     private String normalizeRefreshMode(String mode) {
         String normalized = isBlank(mode) ? REFRESH_MANUAL : mode.trim().toUpperCase(Locale.ROOT);
         if (!REFRESH_MODES.contains(normalized)) {
@@ -543,22 +767,53 @@ public class BiDatasetAccelerationService {
         return normalized;
     }
 
+    /**
+     * 规范化输入值。
+     *
+     * @param status 业务状态，用于筛选或推进状态流转。
+     * @return 返回解析、归一化或安全处理后的值。
+     */
     private String normalizeStatus(String status) {
         return isBlank(status) ? STATUS_IDLE : status.trim().toUpperCase(Locale.ROOT);
     }
 
+    /**
+     * 规范化输入值。
+     *
+     * @param status 业务状态，用于筛选或推进状态流转。
+     * @return 返回解析、归一化或安全处理后的值。
+     */
     private String normalizeRetentionStatus(String status) {
         return isBlank(status) ? RETENTION_ACTIVE : status.trim().toUpperCase(Locale.ROOT);
     }
 
+    /**
+     * 解析并规范化租户 ID。
+     *
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @return 返回解析、归一化或安全处理后的值。
+     */
     private Long normalizeTenant(Long tenantId) {
         return tenantId == null ? 0L : tenantId;
     }
 
+    /**
+     * 校验并获取必需参数、资源或权限。
+     *
+     * @param datasetKey 业务键，用于在同一租户下定位资源。
+     * @return 返回 required dataset key 生成的文本或业务键。
+     */
     private String requiredDatasetKey(String datasetKey) {
         return required(datasetKey, "datasetKey");
     }
 
+    /**
+     * 校验并获取必需参数、资源或权限。
+     *
+     * @param value 待处理值，用于规则计算或转换。
+     * @param fieldName 名称文本，用于展示或唯一性校验。
+     * @return 返回 required 生成的文本或业务键。
+     */
     private String required(String value, String fieldName) {
         if (isBlank(value)) {
             throw new IllegalArgumentException(fieldName + " is required");
@@ -566,18 +821,46 @@ public class BiDatasetAccelerationService {
         return value.trim();
     }
 
+    /**
+     * 执行 value 流程，围绕 value 完成校验、计算或结果组装。
+     *
+     * @param value 待处理值，用于规则计算或转换。
+     * @param fallback fallback 参数，用于 value 流程中的校验、计算或对象转换。
+     * @return 返回 value 的布尔判断结果。
+     */
     private boolean value(Boolean value, boolean fallback) {
         return value == null ? fallback : value;
     }
 
+    /**
+     * 执行 value 流程，围绕 value 完成校验、计算或结果组装。
+     *
+     * @param value 待处理值，用于规则计算或转换。
+     * @param fallback fallback 参数，用于 value 流程中的校验、计算或对象转换。
+     * @return 返回 value 计算得到的数量、金额或指标值。
+     */
     private long value(Long value, long fallback) {
         return value == null ? fallback : value;
     }
 
+    /**
+     * 执行 value 流程，围绕 value 完成校验、计算或结果组装。
+     *
+     * @param value 待处理值，用于规则计算或转换。
+     * @param fallback fallback 参数，用于 value 流程中的校验、计算或对象转换。
+     * @return 返回 value 生成的文本或业务键。
+     */
     private String value(String value, String fallback) {
         return isBlank(value) ? fallback : value;
     }
 
+    /**
+     * 执行 positive 流程，围绕 positive 完成校验、计算或结果组装。
+     *
+     * @param value 待处理值，用于规则计算或转换。
+     * @param fallback fallback 参数，用于 positive 流程中的校验、计算或对象转换。
+     * @return 返回 positive 计算得到的数量、金额或指标值。
+     */
     private long positive(Long value, long fallback) {
         if (value == null || value <= 0) {
             return fallback;
@@ -585,18 +868,43 @@ public class BiDatasetAccelerationService {
         return value;
     }
 
+    /**
+     * 执行 positive 流程，围绕 positive 完成校验、计算或结果组装。
+     *
+     * @param value 待处理值，用于规则计算或转换。
+     * @param fallback fallback 参数，用于 positive 流程中的校验、计算或对象转换。
+     * @return 返回 positive 计算得到的数量、金额或指标值。
+     */
     private long positive(long value, long fallback) {
         return value <= 0 ? fallback : value;
     }
 
+    /**
+     * 解析操作人标识。
+     *
+     * @param actor 操作人标识，用于审计和权限判断。
+     * @return 返回 actor 生成的文本或业务键。
+     */
     private String actor(String actor) {
         return isBlank(actor) ? "system" : actor.trim();
     }
 
+    /**
+     * 解析、归一化或保护输入值，生成安全可用的中间结果。
+     *
+     * @param value 待处理值，用于规则计算或转换。
+     * @return 返回解析、归一化或安全处理后的值。
+     */
     private String trimToNull(String value) {
         return isBlank(value) ? null : value.trim();
     }
 
+    /**
+     * 执行 summarize 流程，围绕 summarize 完成校验、计算或结果组装。
+     *
+     * @param e e 参数，用于 summarize 流程中的校验、计算或对象转换。
+     * @return 返回 summarize 生成的文本或业务键。
+     */
     private String summarize(RuntimeException e) {
         String message = e.getMessage();
         if (message == null || message.isBlank()) {
@@ -605,10 +913,21 @@ public class BiDatasetAccelerationService {
         return message.length() > 500 ? message.substring(0, 500) : message;
     }
 
+    /**
+     * 执行 now 流程，围绕 now 完成校验、计算或结果组装。
+     *
+     * @return 返回 now 流程生成的业务结果。
+     */
     private LocalDateTime now() {
         return LocalDateTime.now(clock);
     }
 
+    /**
+     * 判断业务条件是否成立。
+     *
+     * @param value 待处理值，用于规则计算或转换。
+     * @return 返回布尔判断结果。
+     */
     private boolean isBlank(String value) {
         return value == null || value.isBlank();
     }

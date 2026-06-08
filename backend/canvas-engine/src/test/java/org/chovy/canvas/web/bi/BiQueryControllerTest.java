@@ -12,6 +12,9 @@ import org.chovy.canvas.domain.bi.embed.BiEmbedTokenCleanupResult;
 import org.chovy.canvas.domain.bi.embed.BiEmbedTicketRequest;
 import org.chovy.canvas.domain.bi.embed.BiEmbedTicketService;
 import org.chovy.canvas.domain.bi.embed.BiEmbedTicketVerifyRequest;
+import org.chovy.canvas.domain.bi.portal.BiPortalMenuResource;
+import org.chovy.canvas.domain.bi.portal.BiPortalResource;
+import org.chovy.canvas.domain.bi.portal.BiPortalRuntimeService;
 import org.chovy.canvas.domain.bi.query.BiDatasourceHealth;
 import org.chovy.canvas.domain.bi.query.BiDatasourceHealthProvider;
 import org.chovy.canvas.domain.bi.query.BiDatasourceHealthSloSummary;
@@ -937,6 +940,10 @@ class BiQueryControllerTest {
                             .containsExactly("doris", "primary");
                     assertThat(summary.sources().get(0).availabilityRate()).isEqualTo(50.0);
                     assertThat(summary.sources().get(0).lastMessage()).isEqualTo("timeout");
+                    assertThat(summary.sources().get(0).riskLevel()).isEqualTo("DEGRADED");
+                    assertThat(summary.sources().get(0).recommendedAction()).contains("连接测试");
+                    assertThat(summary.sources().get(1).riskLevel()).isEqualTo("STALE");
+                    assertThat(summary.sources().get(1).recommendedAction()).contains("健康检查");
                 })
                 .verifyComplete();
     }
@@ -1122,6 +1129,146 @@ class BiQueryControllerTest {
     }
 
     @Test
+    void executesEmbedQueryForPortalMenuDashboardUsingSignedPortalTicket() {
+        BiEmbedTicketService embedTicketService = new BiEmbedTicketService(EMBED_SECRET, EMBED_CLOCK);
+        String ticket = embedTicketService.createTicket(7L, "external-viewer", new BiEmbedTicketRequest(
+                "PORTAL",
+                "executive-home",
+                "EXTERNAL_TICKET",
+                Map.of(),
+                300,
+                List.of("reports.example.com")
+        )).ticket();
+        BiQueryExecutionService queryExecutionService = mock(BiQueryExecutionService.class);
+        BiPortalRuntimeService portalRuntimeService = mock(BiPortalRuntimeService.class);
+        when(portalRuntimeService.getPublished(7L, "executive-home", new BiQueryContext(7L, "external-viewer", RoleNames.OPERATOR)))
+                .thenReturn(portalWithMenus(List.of(
+                        new BiPortalMenuResource(
+                                "overview",
+                                null,
+                                "Overview",
+                                "DASHBOARD",
+                                "canvas-effect",
+                                null,
+                                null,
+                                Map.of(),
+                                1))));
+        when(queryExecutionService.execute(any(BiQueryRequest.class), any(BiQueryContext.class)))
+                .thenReturn(new BiQueryResult(
+                        "canvas_daily_stats",
+                        List.of(new BiQueryColumn("total_executions", "MEASURE", "NUMBER")),
+                        List.of(Map.of("total_executions", 42L)),
+                        1,
+                        12L,
+                        "hash-portal-embed"));
+        BiQueryController controller = new BiQueryController(
+                null,
+                embedTicketService,
+                queryExecutionService,
+                BiQueryHistoryReader.empty(),
+                BiDatasourceHealthProvider.empty(),
+                BiDatasetSpecResolver.builtIn(),
+                null,
+                null,
+                BiQueryGovernancePolicy.defaults(),
+                null,
+                null,
+                portalRuntimeService);
+        BiQueryRequest query = new BiQueryRequest(
+                "canvas_daily_stats",
+                "canvas-effect",
+                List.of(),
+                List.of("total_executions"),
+                List.of(),
+                List.of(),
+                100
+        );
+
+        StepVerifier.create(controller.executeEmbedQuery(
+                        new BiQueryController.EmbedQueryRequest(
+                                ticket,
+                                "DASHBOARD",
+                                "canvas-effect",
+                                "kpi-total",
+                                query),
+                        "https://reports.example.com",
+                        null))
+                .assertNext(response -> assertThat(response.getData().sqlHash()).isEqualTo("hash-portal-embed"))
+                .verifyComplete();
+
+        ArgumentCaptor<BiQueryContext> context = ArgumentCaptor.forClass(BiQueryContext.class);
+        verify(queryExecutionService).execute(any(BiQueryRequest.class), context.capture());
+        assertThat(context.getValue().tenantId()).isEqualTo(7L);
+        assertThat(context.getValue().username()).isEqualTo("external-viewer");
+        assertThat(context.getValue().role()).isEqualTo(RoleNames.OPERATOR);
+    }
+
+    @Test
+    void rejectsEmbedQueryForPortalTicketWhenDashboardIsNotInPortalMenus() {
+        BiEmbedTicketService embedTicketService = new BiEmbedTicketService(EMBED_SECRET, EMBED_CLOCK);
+        String ticket = embedTicketService.createTicket(7L, "external-viewer", new BiEmbedTicketRequest(
+                "PORTAL",
+                "executive-home",
+                "EXTERNAL_TICKET",
+                Map.of(),
+                300,
+                List.of("reports.example.com")
+        )).ticket();
+        BiQueryExecutionService queryExecutionService = mock(BiQueryExecutionService.class);
+        BiPortalRuntimeService portalRuntimeService = mock(BiPortalRuntimeService.class);
+        when(portalRuntimeService.getPublished(7L, "executive-home", new BiQueryContext(7L, "external-viewer", RoleNames.OPERATOR)))
+                .thenReturn(portalWithMenus(List.of(
+                        new BiPortalMenuResource(
+                                "overview",
+                                null,
+                                "Overview",
+                                "DASHBOARD",
+                                "canvas-effect",
+                                null,
+                                null,
+                                Map.of(),
+                                1))));
+        BiQueryController controller = new BiQueryController(
+                null,
+                embedTicketService,
+                queryExecutionService,
+                BiQueryHistoryReader.empty(),
+                BiDatasourceHealthProvider.empty(),
+                BiDatasetSpecResolver.builtIn(),
+                null,
+                null,
+                BiQueryGovernancePolicy.defaults(),
+                null,
+                null,
+                portalRuntimeService);
+        BiQueryRequest query = new BiQueryRequest(
+                "canvas_daily_stats",
+                "sales-dashboard",
+                List.of(),
+                List.of("total_executions"),
+                List.of(),
+                List.of(),
+                100
+        );
+
+        StepVerifier.create(controller.executeEmbedQuery(
+                        new BiQueryController.EmbedQueryRequest(
+                                ticket,
+                                "DASHBOARD",
+                                "sales-dashboard",
+                                "kpi-total",
+                                query),
+                        "https://reports.example.com",
+                        null))
+                .expectErrorSatisfies(error -> assertThat(error)
+                        .isInstanceOf(SecurityException.class)
+                        .hasMessageContaining("portal menu"))
+                .verify();
+
+        verify(queryExecutionService, never()).execute(any(BiQueryRequest.class), any(BiQueryContext.class));
+    }
+
+    @Test
     void cleanupEmbedTicketsUsesCurrentTenant() {
         TenantContextResolver resolver = mock(TenantContextResolver.class);
         when(resolver.current()).thenReturn(Mono.just(new TenantContext(7L, "TENANT_ADMIN", "alice")));
@@ -1160,6 +1307,16 @@ class BiQueryControllerTest {
         row.setAllowedUsages(allowedUsages);
         row.setLifecycleStatus("ACTIVE");
         return row;
+    }
+
+    private BiPortalResource portalWithMenus(List<BiPortalMenuResource> menus) {
+        return new BiPortalResource(
+                "executive-home",
+                "Executive Home",
+                Map.of("title", "Executive Portal"),
+                menus,
+                "PUBLISHED",
+                "PERSISTED");
     }
 
     private CdpWarehouseAvailabilityService.AvailabilityDecision availability(String status,

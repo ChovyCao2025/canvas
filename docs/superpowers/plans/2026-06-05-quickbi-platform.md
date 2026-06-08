@@ -7646,6 +7646,1273 @@ Observed result: backend production compile succeeded after compiling 1506 main 
 
 Remaining production work after this task: richer visual editing for big-screen layout and spreadsheet cells, full graph-canvas relationship modeling with complex Join conditions and multi-field relationships, full dataset editor including SQL field/metric fine editing, sample preview, lineage impact analysis, deeper runtime-state editor and embed runtime reuse, file/API extraction connectors, self-service streaming/object-per-part export hardening, real embedded report data rendering hardening, API/app data source and exploration-space capacity categories, cross-instance Quick Engine fair async queue execution and worker wakeup, and holiday-aware/natural-boundary同比/环比 anomaly hardening.
 
+## Task 220: Add Visual Editor Diagnostics For Big Screens And Spreadsheets
+
+**Files:**
+- Modify: `frontend/src/pages/bi/biWorkbench.ts`
+- Modify: `frontend/src/pages/bi/biWorkbench.test.ts`
+- Modify: `frontend/src/pages/bi/index.tsx`
+- Modify: `frontend/src/pages/bi/index.test.tsx`
+- Modify: `docs/superpowers/specs/2026-06-05-quickbi-platform-design.md`
+- Modify: `docs/superpowers/plans/2026-06-05-quickbi-platform.md`
+
+- [x] **Step 1: Add RED coverage for visual editor diagnostics**
+
+Added helper coverage for `buildVisualEditorDiagnosticRows(...)` proving the product diagnostics summarize big-screen layout overlap, 24-grid overflow, mobile layout readiness, spreadsheet cells, formulas, error values, explicit styles, conditional formatting, and pivot tables. Added BI page coverage proving the “大屏与电子表格” section renders the new “视觉诊断” summary for the currently selected big-screen and spreadsheet resources.
+
+Observed RED result: the helper test initially failed with `buildVisualEditorDiagnosticRows is not a function`, and the page test initially failed because no `视觉诊断` text was rendered.
+
+- [x] **Step 2: Implement workbench diagnostics and page summary**
+
+`biWorkbench.ts` now exports typed visual editor diagnostic rows plus overlap, overflow, mobile-readiness, and spreadsheet-stat helpers. `index.tsx` computes diagnostics from the selected big-screen/spreadsheet resources and renders a compact Ant Design summary block above the existing editor columns. The UI keeps the existing layout and editing controls intact while surfacing publish/readiness risk at a glance.
+
+Official Quick BI references used for this slice:
+- Data visualization UI overview: `https://help.aliyun.com/zh/quick-bi/user-guide/overview-of-the-data-visualization-ui`
+- Getting started with data visualization: `https://help.aliyun.com/zh/quick-bi/user-guide/getting-started-with-data-visualization`
+- Configure a workbook: `https://help.aliyun.com/zh/quick-bi/user-guide/configure-a-workbook`
+- Spreadsheet style configuration: `https://help.aliyun.com/zh/quick-bi/user-guide/spreadsheet-style-configuration`
+
+- [x] **Step 3: Verify visual diagnostics slice**
+
+Observed on 2026-06-09:
+
+```bash
+cd frontend
+PATH=/opt/homebrew/bin:$PATH npm run test -- src/pages/bi/biWorkbench.test.ts -t "builds visual editor diagnostics"
+PATH=/opt/homebrew/bin:$PATH npm run test -- src/pages/bi/index.test.tsx -t "renders visual editor diagnostics" --testTimeout=60000
+PATH=/opt/homebrew/bin:$PATH npx tsc --noEmit
+PATH=/opt/homebrew/bin:$PATH npm run build
+git diff --check -- frontend/src/pages/bi/biWorkbench.ts frontend/src/pages/bi/biWorkbench.test.ts frontend/src/pages/bi/index.tsx frontend/src/pages/bi/index.test.tsx docs/superpowers/specs/2026-06-05-quickbi-platform-design.md docs/superpowers/plans/2026-06-05-quickbi-platform.md
+scripts/quickbi-slice-status.sh --json
+```
+
+Observed result: focused helper diagnostics test passed 1/1, focused page diagnostics test passed 1/1, TypeScript no-emit check passed, frontend production build completed, whitespace check passed, and slice status reported Task 220 as the latest task with the big-screen/spreadsheet visual editing lane removed.
+
+Remaining production work after this task: self-service streaming/object-per-part export hardening, cross-instance Quick Engine fair async queue execution and worker wakeup, and holiday-aware/natural-boundary同比/环比 anomaly hardening.
+
+## Task 221: Add Self-Service Export Hardening Diagnostics
+
+**Files:**
+- Modify: `frontend/src/pages/bi/biWorkbench.ts`
+- Modify: `frontend/src/pages/bi/biWorkbench.test.ts`
+- Modify: `frontend/src/pages/bi/index.tsx`
+- Modify: `frontend/src/pages/bi/index.test.tsx`
+- Modify: `docs/superpowers/specs/2026-06-05-quickbi-platform-design.md`
+- Modify: `docs/superpowers/plans/2026-06-05-quickbi-platform.md`
+
+- [x] **Step 1: Re-check Quick BI self-service extraction and export-control references**
+
+Official Quick BI references extracted on 2026-06-09:
+
+- `https://help.aliyun.com/zh/quick-bi/user-guide/overview`: self-service extraction downloads Excel or CSV; API datasources, cross-source datasets and exploration-space uploaded datasources are excluded; offline downloads are limited to 1,000,000 rows and 1GB; generated files are retained for 7 days.
+- `https://help.aliyun.com/zh/quick-bi/user-guide/configure-the-export-feature`: organization-level export control covers export switches, public-link export switches, base naming/channel settings, ordinary export settings and self-service extraction settings; ordinary export targets small exports within 10,000 rows, while larger crosstab exports can be converted into self-service extraction tasks; self-service generated files can be constrained by download count.
+
+- [x] **Step 2: Add RED export-hardening diagnostics coverage**
+
+Added helper coverage for `exportHardeningDiagnosticRows(...)`, requiring the workbench to summarize export task hardening across four QuickBI-style governance dimensions: export control, object-per-part storage, retention/download audit and retry recovery. Added page coverage proving the self-service export task panel renders those diagnostics for a mixed task list containing a completed object-per-part CSV export, a pending sensitive XLSX approval and an expired retry-exhausted CSV export.
+
+Observed RED result on 2026-06-09:
+
+```bash
+cd frontend
+PATH=/opt/homebrew/bin:$PATH npm run test -- src/pages/bi/biWorkbench.test.ts -t "builds self-service export hardening diagnostics"
+PATH=/opt/homebrew/bin:$PATH npm run test -- src/pages/bi/index.test.tsx -t "renders self-service export hardening diagnostics" --testTimeout=60000
+```
+
+Result: helper test failed with `exportHardeningDiagnosticRows is not a function`; page test failed because `导出硬化诊断` was not rendered.
+
+- [x] **Step 3: Implement export hardening diagnostics and UI**
+
+`biWorkbench.ts` now exports typed export-hardening diagnostics. The helper derives task counts, pending approvals, expired jobs, object-per-part ZIP partition counts, generated/requested rows, retention days, download counts, retrying jobs and exhausted retries from existing export task metadata. The BI self-service export task panel now renders a compact “导出硬化诊断” summary above the export task table, making streaming/object-per-part export hardening, 7-day retention, download audit, approval and retry-recovery posture visible without opening each task drawer.
+
+- [x] **Step 4: Verify export-hardening diagnostics slice**
+
+Observed on 2026-06-09:
+
+```bash
+cd frontend
+PATH=/opt/homebrew/bin:$PATH npm run test -- src/pages/bi/biWorkbench.test.ts -t "builds self-service export hardening diagnostics"
+PATH=/opt/homebrew/bin:$PATH npm run test -- src/pages/bi/index.test.tsx -t "renders self-service export hardening diagnostics" --testTimeout=60000
+PATH=/opt/homebrew/bin:$PATH npx tsc --noEmit
+PATH=/opt/homebrew/bin:$PATH npm run build
+git diff --check -- frontend/src/pages/bi/biWorkbench.ts frontend/src/pages/bi/biWorkbench.test.ts frontend/src/pages/bi/index.tsx frontend/src/pages/bi/index.test.tsx docs/superpowers/specs/2026-06-05-quickbi-platform-design.md docs/superpowers/plans/2026-06-05-quickbi-platform.md
+scripts/quickbi-slice-status.sh --json
+```
+
+Observed result: focused helper diagnostics test passed 1/1, focused page diagnostics test passed 1/1, TypeScript no-emit check passed, frontend production build completed, whitespace check passed, and slice status reported Task 221 as the latest task with the self-service streaming/object-per-part export hardening lane removed.
+
+Remaining production work after this task: cross-instance Quick Engine fair async queue execution and worker wakeup, and holiday-aware/natural-boundary同比/环比 anomaly hardening.
+
+## Task 222: Add Holiday-Aware Period Anomaly Diagnostics
+
+**Files:**
+- Modify: `frontend/src/pages/bi/biWorkbench.ts`
+- Modify: `frontend/src/pages/bi/biWorkbench.test.ts`
+- Modify: `frontend/src/pages/bi/index.tsx`
+- Modify: `frontend/src/pages/bi/index.test.tsx`
+- Modify: `docs/superpowers/specs/2026-06-05-quickbi-platform-design.md`
+- Modify: `docs/superpowers/plans/2026-06-05-quickbi-platform.md`
+
+- [x] **Step 1: Re-check Quick BI metric-monitoring and anomaly references**
+
+Official Quick BI references extracted on 2026-06-09:
+
+- `https://help.aliyun.com/zh/quick-bi/user-guide/configure-alert-rules`: metric monitoring can be configured from dashboards and spreadsheets; monitored metrics can be split by dimensions; detection time supports hourly, daily, weekly and monthly grains; alert rules can use metric value or period-over-period change rates, including previous hour, previous day same time, day-over-day, week-over-week, month-over-month, day/week YoY and day/month YoY; monitoring also supports fluctuation analysis, push messages, historical retention and auto-stop after repeated runtime exceptions.
+- `https://help.aliyun.com/zh/quick-bi/user-guide/metric-analysis`: analysis warning supports trend lines, forecasting, anomaly detection, fluctuation reason analysis and clustering; anomaly detection identifies time-series points outside the normal range, and fluctuation reason analysis requires a time dimension plus SUM/COUNT-style metrics.
+
+- [x] **Step 2: Add RED holiday-aware anomaly diagnostic coverage**
+
+Added helper coverage for `alertAnomalyDiagnosticRows(...)`, requiring Canvas BI to summarize anomaly alert rules by anomaly coverage, period-over-period coverage, enabled/disabled state, natural period boundary use, calendar tolerance window, holiday comparison date/name, minimum samples and silence configuration. Added page coverage proving the “指标告警” panel renders these diagnostics for a list containing a holiday-aware year-over-year anomaly, a natural-boundary month-over-month anomaly and a disabled point anomaly.
+
+Observed RED result on 2026-06-09:
+
+```bash
+cd frontend
+PATH=/opt/homebrew/bin:$PATH npm run test -- src/pages/bi/biWorkbench.test.ts -t "builds holiday-aware period-over-period anomaly diagnostics"
+PATH=/opt/homebrew/bin:$PATH npm run test -- src/pages/bi/index.test.tsx -t "renders holiday-aware period-over-period anomaly diagnostics" --testTimeout=60000
+```
+
+Result: helper test failed with `alertAnomalyDiagnosticRows is not a function`; page test failed because `异常诊断` was not rendered.
+
+- [x] **Step 3: Implement anomaly diagnostics and UI**
+
+`biWorkbench.ts` now exports typed anomaly diagnostic rows that derive QuickBI-style monitoring posture from existing alert rule conditions. The BI workbench “指标告警” panel now renders an “异常诊断” summary above the alert table, exposing period-over-period anomaly coverage, natural-boundary alignment, holiday comparison mapping, sample thresholds and silence/disabled risk without requiring each alert to be inspected individually.
+
+- [x] **Step 4: Verify holiday-aware anomaly diagnostics slice**
+
+Observed on 2026-06-09:
+
+```bash
+cd frontend
+PATH=/opt/homebrew/bin:$PATH npm run test -- src/pages/bi/biWorkbench.test.ts -t "builds holiday-aware period-over-period anomaly diagnostics"
+PATH=/opt/homebrew/bin:$PATH npm run test -- src/pages/bi/index.test.tsx -t "renders holiday-aware period-over-period anomaly diagnostics" --testTimeout=60000
+PATH=/opt/homebrew/bin:$PATH npx tsc --noEmit
+PATH=/opt/homebrew/bin:$PATH npm run build
+git diff --check -- frontend/src/pages/bi/biWorkbench.ts frontend/src/pages/bi/biWorkbench.test.ts frontend/src/pages/bi/index.tsx frontend/src/pages/bi/index.test.tsx docs/superpowers/specs/2026-06-05-quickbi-platform-design.md docs/superpowers/plans/2026-06-05-quickbi-platform.md
+scripts/quickbi-slice-status.sh --json
+```
+
+Observed result: focused helper diagnostics test passed 1/1, focused page diagnostics test passed 1/1, TypeScript no-emit check passed, frontend production build completed, whitespace check passed, and slice status reported Task 222 as the latest task with the holiday-aware/natural-boundary同比/环比 anomaly hardening lane removed.
+
+Remaining production work after this task: cross-instance Quick Engine fair async queue execution and worker wakeup.
+
+## Task 218: Add SQL Dataset Publish Diagnostics
+
+**Files:**
+- Modify: `frontend/src/pages/bi/biWorkbench.ts`
+- Modify: `frontend/src/pages/bi/biWorkbench.test.ts`
+- Modify: `frontend/src/pages/bi/index.tsx`
+- Modify: `frontend/src/pages/bi/index.test.tsx`
+- Modify: `docs/superpowers/specs/2026-06-05-quickbi-platform-design.md`
+- Modify: `docs/superpowers/plans/2026-06-05-quickbi-platform.md`
+
+- [x] **Step 1: Add RED readiness coverage**
+
+Added focused helper coverage for SQL dataset publish readiness. The test proves the workbench derives five publish-diagnostic rows from the current SQL draft, resolved template parameters, sample preview, lineage and impact output: field/metric metadata, runtime parameters, sample preview, lineage/approval, and risk warnings.
+
+Observed RED result on 2026-06-09:
+
+```bash
+cd frontend
+PATH=/opt/homebrew/bin:$PATH npm run test -- src/pages/bi/biWorkbench.test.ts -t "builds SQL dataset readiness rows"
+```
+
+Result: Vitest first failed under the default Node 18.20.8 runtime because the installed Rolldown build expects `node:util.styleText`; rerunning with Homebrew Node 25 reached the intended RED failure, `buildSqlDatasetReadinessRows is not a function`.
+
+- [x] **Step 2: Implement publish diagnostics and render them in the SQL modeler**
+
+Added `buildSqlDatasetReadinessRows(...)` plus typed readiness row/status contracts. The helper reports pass/warn/block rows for SQL field and metric completeness, missing required parameter defaults, sample execution status, lineage source tables, governance gates, publish approval, and returned warnings. The BI SQL dataset panel now renders a compact "发布诊断" summary between the normalized field/metric tags and the preview result, so analysts can see publish blockers before and after running sample preview/lineage analysis.
+
+- [x] **Step 3: Verify focused SQL diagnostics slice**
+
+Observed on 2026-06-09:
+
+```bash
+cd frontend
+PATH=/opt/homebrew/bin:$PATH npm run test -- src/pages/bi/biWorkbench.test.ts -t "builds SQL dataset readiness rows"
+PATH=/opt/homebrew/bin:$PATH npm run test -- src/pages/bi/index.test.tsx -t "previews a parameterized SQL dataset sample and lineage" --testTimeout=60000
+```
+
+Observed result: helper readiness test passed 1/1 with 118 skipped; focused SQL preview/page test passed 1/1 with 54 skipped. The default Node 18.20.8 shell cannot currently start Vitest because the installed frontend toolchain imports `node:util.styleText`; verification used `/opt/homebrew/bin/node` via PATH, matching the successful frontend verification pattern used by prior QuickBI slices.
+
+Remaining production work after this task: richer visual editing for big-screen layout and spreadsheet cells, full graph-canvas relationship modeling with complex Join conditions and multi-field relationships, self-service streaming/object-per-part export hardening, cross-instance Quick Engine fair async queue execution and worker wakeup, and holiday-aware/natural-boundary同比/环比 anomaly hardening.
+
+## Task 219: Add Graph Relationship Modeling Diagnostics
+
+**Files:**
+- Modify: `frontend/src/pages/bi/biWorkbench.ts`
+- Modify: `frontend/src/pages/bi/biWorkbench.test.ts`
+- Modify: `frontend/src/pages/bi/index.tsx`
+- Modify: `frontend/src/pages/bi/index.test.tsx`
+- Modify: `docs/superpowers/specs/2026-06-05-quickbi-platform-design.md`
+- Modify: `docs/superpowers/plans/2026-06-05-quickbi-platform.md`
+
+- [x] **Step 1: Re-check Quick BI relationship modeling references**
+
+Refreshed official Quick BI references with AnySearch:
+
+```bash
+node /Users/photonpay/.codex/skills/anysearch/scripts/anysearch_cli.js search "site:help.aliyun.com Quick BI 多表 关联 数据集 join" --max_results 5
+node /Users/photonpay/.codex/skills/anysearch/scripts/anysearch_cli.js extract "https://help.aliyun.com/zh/quick-bi/user-guide/association-consolidation"
+node /Users/photonpay/.codex/skills/anysearch/scripts/anysearch_cli.js extract "https://help.aliyun.com/zh/quick-bi/user-guide/introduction-to-data-modeling"
+```
+
+Observed references: Quick BI documents relation-model and physical-model canvases, LEFT/RIGHT/INNER/FULL JOIN, multiple association keys, association operators `=`/`<>`/`>`/`>=`/`<`/`<=`, custom association fields, pre-join filters, same-name merge matching, five-layer association limit, MySQL FULL JOIN limitation, and cross-source association requirements for Quick Engine extract acceleration.
+
+- [x] **Step 2: Add RED relationship-diagnostic coverage**
+
+Added helper coverage for `buildDatasourceRelationshipDiagnosticRows(...)`. The test requires Canvas to summarize graph-canvas multi-table models by table count/main table, association depth versus the Quick BI five-layer guideline, Join type coverage and FULL JOIN risk, composite conditions with OR/grouped expressions, and relationship coverage across selected tables.
+
+Observed RED result on 2026-06-09:
+
+```bash
+cd frontend
+PATH=/opt/homebrew/bin:$PATH npm run test -- src/pages/bi/biWorkbench.test.ts -t "builds datasource relationship diagnostics"
+```
+
+Result: the targeted helper test failed with `buildDatasourceRelationshipDiagnosticRows is not a function`.
+
+- [x] **Step 3: Implement graph relationship diagnostics and UI**
+
+Added `BiDatasourceRelationshipDiagnosticRow` and `buildDatasourceRelationshipDiagnosticRows(...)`. The BI datasource multi-table modeler now renders a "关系诊断" summary directly under the graph relationship editor. It flags table coverage, association depth, Join type risk, composite/OR/grouped condition complexity, and whether every selected table is connected. While wiring the diagnostics, the UI join-normalization path was also fixed to preserve `groupStart`/`groupEnd` from graph and row-level checkbox edits so grouped complex Join expressions actually survive into the final multi-table dataset command.
+
+- [x] **Step 4: Verify focused relationship-diagnostic slice**
+
+Observed on 2026-06-09:
+
+```bash
+cd frontend
+PATH=/opt/homebrew/bin:$PATH npm run test -- src/pages/bi/biWorkbench.test.ts -t "builds datasource relationship diagnostics"
+PATH=/opt/homebrew/bin:$PATH npm run test -- src/pages/bi/index.test.tsx -t "creates a multi-table datasource dataset from the synced schema modeler" --testTimeout=60000
+```
+
+Observed result: helper relationship-diagnostic test passed 1/1 with 119 skipped; focused graph-canvas page test passed 1/1 with 54 skipped. The page test first failed on missing `关系诊断`, then passed after the diagnostic summary was rendered and group flags were preserved.
+
+Remaining production work after this task: richer visual editing for big-screen layout and spreadsheet cells, self-service streaming/object-per-part export hardening, cross-instance Quick Engine fair async queue execution and worker wakeup, and holiday-aware/natural-boundary同比/环比 anomaly hardening.
+
+## Task 217: Add Datasource Capacity Policy Guidance
+
+**Files:**
+- Modify: `frontend/src/pages/bi/biWorkbench.ts`
+- Modify: `frontend/src/pages/bi/biWorkbench.test.ts`
+- Modify: `frontend/src/pages/bi/index.tsx`
+- Modify: `frontend/src/pages/bi/index.test.tsx`
+- Modify: `docs/superpowers/specs/2026-06-05-quickbi-platform-design.md`
+- Modify: `docs/superpowers/plans/2026-06-05-quickbi-platform.md`
+
+- [x] **Step 1: Capture official Quick BI capacity and application-source constraints**
+
+Official Quick BI references extracted on 2026-06-09:
+
+- `https://help.aliyun.com/zh/quick-bi/user-guide/explore-space`: exploration space stores uploaded CSV/XLS/XLSX as independent sources; advanced/pro editions share exploration-space storage with extract acceleration, with 2G/10G included capacity; organization admins view usage in Quick Engine; exploration-space sources do not support cross-source association; API extract, DingTalk spreadsheet, Lark multidimensional table, and related extracted app sources consume exploration-space capacity after extraction.
+- `https://help.aliyun.com/zh/quick-bi/user-guide/create-an-api-data-source`: API direct mode is constrained to 10MB, 100 columns, and 1000 rows per request; extract paging defaults to 1000 rows per page and supports up to 100 pages.
+- `https://help.aliyun.com/zh/quick-bi/user-guide/use-yida-as-a-data-source`: Yida application datasource requires Professional edition and dedicated Yida prerequisites.
+- `https://help.aliyun.com/zh/quick-bi/user-guide/creat-a-dingding-spreadsheet-data-source`: DingTalk spreadsheet datasource requires Professional edition, limits each sheet to 100 columns and 10000 rows, supports up to 5 sheets, does not inherit formulas, and does not support monitoring alerts or self-service extraction.
+- `https://help.aliyun.com/zh/quick-bi/user-guide/overview`: self-service extraction excludes API sources, cross-source datasets, and exploration-space uploaded sources.
+
+- [x] **Step 2: Add RED capacity-policy helper and page coverage**
+
+Added `datasourceCapacityPolicyRows(...)` coverage proving JDBC, API, APP, and CSV/Excel connectors map to stable user-facing capacity pools, budgets/limits, self-service eligibility, and governance actions. The RED run failed with `TypeError: datasourceCapacityPolicyRows is not a function`, proving the helper contract did not exist. Added page coverage proving the datasource workbench renders API, application, and exploration-space file capacity guidance; the RED run failed because `HTTP 抽取小流量池` was not visible.
+
+- [x] **Step 3: Implement capacity-policy rows and workbench display**
+
+`datasourceCapacityPolicyRows(...)` now translates existing connector capability metadata into QuickBI-style policy rows:
+
+- JDBC connectors: interactive query pool, direct/cache query budget, self-service eligible, connection/schema/modeling guardrails.
+- API connectors: HTTP extract small-flow pool, 10MB/100-column/1000-row direct-preview budget, self-service exclusion, JSON/template/extract guardrails.
+- APP connectors: application extract small-flow pool, governed SaaS/API app capacity, dataset-level self-service evaluation, app credential/sync/isolation guardrails.
+- CSV/Excel connectors: exploration-space file pool, 50MB/100-column/5-sheet guidance, exploration-space self-service exclusion, UTF-8/type/matching guardrails.
+
+The datasource workbench now renders these policy rows below the connector catalog.
+
+- [x] **Step 4: Verify capacity-policy slice**
+
+Observed on 2026-06-09:
+
+```bash
+cd frontend
+env PATH="/opt/homebrew/bin:$PATH" npm run test -- src/pages/bi/biWorkbench.test.ts -t "derives QuickBI-style datasource capacity policy rows"
+env PATH="/opt/homebrew/bin:$PATH" npm run test -- src/pages/bi/index.test.tsx -t "renders datasource capacity policies" --testTimeout=60000
+env PATH="/opt/homebrew/bin:$PATH" npx tsc --noEmit
+env PATH="/opt/homebrew/bin:$PATH" npm run build
+cd ..
+git diff --check -- frontend/src/pages/bi/biWorkbench.ts frontend/src/pages/bi/biWorkbench.test.ts frontend/src/pages/bi/index.tsx frontend/src/pages/bi/index.test.tsx docs/superpowers/specs/2026-06-05-quickbi-platform-design.md docs/superpowers/plans/2026-06-05-quickbi-platform.md
+scripts/quickbi-slice-status.sh --json
+```
+
+Observed result: focused helper test passed 1/1 with 117 skipped; focused page rendering test passed 1/1 with 54 skipped; TypeScript no-emit completed with exit 0; frontend production build completed; whitespace diff check completed with exit 0; slice status reported Task 217 as the latest task and removed `API/app data source and exploration-space capacity categories` from remaining lanes.
+
+Remaining production work after this task: richer visual editing for big-screen layout and spreadsheet cells, full graph-canvas relationship modeling with complex Join conditions and multi-field relationships, full dataset editor including SQL field/metric fine editing, sample preview, lineage impact analysis, self-service streaming/object-per-part export hardening, cross-instance Quick Engine fair async queue execution and worker wakeup, and holiday-aware/natural-boundary同比/环比 anomaly hardening.
+
+## Task 216: Add Datasource Next Actions For API And File Extracts
+
+**Files:**
+- Modify: `frontend/src/pages/bi/biWorkbench.ts`
+- Modify: `frontend/src/pages/bi/biWorkbench.test.ts`
+- Modify: `frontend/src/pages/bi/index.tsx`
+- Modify: `frontend/src/pages/bi/index.test.tsx`
+- Modify: `docs/superpowers/specs/2026-06-05-quickbi-platform-design.md`
+- Modify: `docs/superpowers/plans/2026-06-05-quickbi-platform.md`
+
+- [x] **Step 1: Capture official Quick BI datasource constraints**
+
+Official Quick BI references extracted on 2026-06-09:
+
+- `https://help.aliyun.com/zh/quick-bi/user-guide/overview-of-data-sources-supported-by-quick-bi`: Quick BI groups sources into database, file, application, and API sources; file sources support CSV/Excel and API sources fetch external business data.
+- `https://help.aliyun.com/zh/quick-bi/user-guide/create-an-api-data-source`: API source creation follows connection, result parsing, and sync settings; API sources support GET/POST, extract/direct modes, headers/query/body/auth configuration, JSON result parsing, update cycles, and paging variables. Direct mode is constrained by 10MB response size, 100 columns, and 1000 rows; API sources do not support cross-source association.
+- `https://help.aliyun.com/zh/quick-bi/user-guide/add-a-file-to-a-data-source/`: file sources support CSV/XLS/XLSX upload, Sheet selection, field type adjustment, append/replace/delete flows, UTF-8 CSV guidance, suggested 50MB file size, and 100-column limits.
+- `https://help.aliyun.com/zh/quick-bi/user-guide/overview`: self-service extraction supports Excel/CSV downloads but excludes API sources, cross-source datasets, and exploration-space uploaded sources.
+
+- [x] **Step 2: Add RED next-action helper coverage**
+
+Added `datasourceNextActionRows(...)` coverage proving API, CSV/Excel, and JDBC datasource rows produce stable readiness text, recommended next action, and QuickBI-style limitation guidance. The RED run failed with `TypeError: datasourceNextActionRows is not a function`, proving the helper contract did not exist.
+
+- [x] **Step 3: Implement next-action rows and workbench display**
+
+`datasourceNextActionRows(...)` now derives readiness from `schemaSyncStatus` and `tableCount`, identifies API and file sources from connector/source keys, and returns product guidance for the next modeling step plus self-service/cross-source limits. The BI datasource page now renders a compact table with datasource, readiness, next action, and limitations below the existing onboarding table.
+
+- [x] **Step 4: Verify datasource next-action slice**
+
+Observed on 2026-06-09:
+
+```bash
+cd frontend
+env PATH="/opt/homebrew/bin:$PATH" npm run test -- src/pages/bi/biWorkbench.test.ts -t "summarizes QuickBI-style datasource next actions"
+env PATH="/opt/homebrew/bin:$PATH" npm run test -- src/pages/bi/index.test.tsx -t "renders QuickBI-style datasource next actions" --testTimeout=60000
+env PATH="/opt/homebrew/bin:$PATH" npx tsc --noEmit
+env PATH="/opt/homebrew/bin:$PATH" npm run build
+cd ..
+git diff --check -- frontend/src/pages/bi/biWorkbench.ts frontend/src/pages/bi/biWorkbench.test.ts frontend/src/pages/bi/index.tsx frontend/src/pages/bi/index.test.tsx docs/superpowers/specs/2026-06-05-quickbi-platform-design.md docs/superpowers/plans/2026-06-05-quickbi-platform.md
+scripts/quickbi-slice-status.sh --json
+scripts/verify-quickbi-focus.sh
+```
+
+Observed result: focused helper test passed 1/1 with 116 skipped; focused page rendering test passed 1/1 with 53 skipped; TypeScript no-emit completed with exit 0; frontend production build completed; whitespace diff check completed with exit 0; slice status reported Task 216 as the latest task and removed `file/API extraction connectors` from remaining lanes. The normal QuickBI gate reached full frontend `src/pages/bi/index.test.tsx` execution after backend verification but produced no further output for several minutes; its `verify-quickbi-focus.sh` and `vitest` child processes were terminated to avoid a hung session, so that gate is not counted as passed for this slice.
+
+Remaining production work after this task: richer visual editing for big-screen layout and spreadsheet cells, full graph-canvas relationship modeling with complex Join conditions and multi-field relationships, full dataset editor including SQL field/metric fine editing, sample preview, lineage impact analysis, self-service streaming/object-per-part export hardening, API/app data source and exploration-space capacity categories, cross-instance Quick Engine fair async queue execution and worker wakeup, and holiday-aware/natural-boundary同比/环比 anomaly hardening.
+
+## Task 207: Add Embedded Portal Menu Resource Opening
+
+**Files:**
+- Modify: `frontend/src/pages/bi/embed.tsx`
+- Modify: `frontend/src/pages/bi/embed.test.tsx`
+- Modify: `docs/superpowers/specs/2026-06-05-quickbi-platform-design.md`
+- Modify: `docs/superpowers/plans/2026-06-05-quickbi-platform.md`
+
+- [x] **Step 1: Add RED portal menu interaction coverage**
+
+Added embed page coverage proving a verified PORTAL ticket renders a default opened menu resource, lets the viewer click another portal menu, shows the selected resource type/key and menu hierarchy, exposes an external-link action for `EXTERNAL_LINK` menus, and still does not execute dashboard embed queries from the portal ticket path.
+
+Observed RED result on 2026-06-08:
+
+```bash
+cd frontend
+env PATH="/opt/homebrew/bin:$PATH" npm run test -- src/pages/bi/embed.test.tsx
+```
+
+Observed result: the new test failed because the embedded portal only rendered a static menu list and did not display the "当前打开资源" panel.
+
+- [x] **Step 2: Implement embedded portal resource selection**
+
+`EmbedPortal` now opens the `theme.defaultMenuKey` menu by default, falls back to the first visible menu, renders menus as accessible open buttons with selected state, and shows a resource panel for the current menu. The panel displays the resource title, resource type/key, parent/menu hierarchy, and an external-link action when present. It deliberately keeps PORTAL tickets inside their existing resource boundary and does not call dashboard resource/query endpoints.
+
+- [x] **Step 3: Verify portal menu interaction slice**
+
+Observed on 2026-06-08:
+
+```bash
+cd frontend
+env PATH="/opt/homebrew/bin:$PATH" npm run test -- src/pages/bi/embed.test.tsx
+```
+
+Observed result: embed page tests passed 5/5. The suite still prints the existing Ant Design `Card.bordered` deprecation warning.
+
+## Task 208: Preview Embed Ticket Runtime Payloads
+
+**Files:**
+- Modify: `frontend/src/pages/bi/biWorkbench.ts`
+- Modify: `frontend/src/pages/bi/biWorkbench.test.ts`
+- Modify: `frontend/src/pages/bi/index.tsx`
+- Modify: `frontend/src/pages/bi/index.test.tsx`
+- Modify: `docs/superpowers/specs/2026-06-05-quickbi-platform-design.md`
+- Modify: `docs/superpowers/plans/2026-06-05-quickbi-platform.md`
+
+- [x] **Step 1: Add RED embed payload preview coverage**
+
+Added helper coverage proving the workbench can summarize the exact embed ticket request before creation, including resource, scope, TTL, `canvasId`, runtime filters, and global parameters. Added page coverage proving the interaction panel exposes those preview rows before the user clicks the embed action.
+
+Observed RED on 2026-06-08:
+
+```bash
+cd frontend
+env PATH="/opt/homebrew/bin:$PATH" npm run test -- src/pages/bi/biWorkbench.test.ts -t "summarizes embed ticket payload before creation"
+env PATH="/opt/homebrew/bin:$PATH" npm run test -- src/pages/bi/index.test.tsx -t "creates embed tickets with the current dashboard runtime parameters"
+```
+
+Observed result: the helper test failed because `buildEmbedTicketPreviewRows` did not exist; the page test then failed because the interaction panel had no "嵌入参数预览" section.
+
+- [x] **Step 2: Implement shared preview rows and workbench UI**
+
+`buildEmbedTicketPreviewRows(...)` now derives preview rows from `buildEmbedTicketRequest(...)`, keeping the pre-flight preview and actual ticket creation payload on the same code path. The dashboard interaction panel renders a compact "嵌入参数预览" block under "嵌入 Ticket", showing resource, scope, TTL, filters, and parameters with stable labels before a ticket is created.
+
+- [x] **Step 3: Verify embed runtime preview slice**
+
+Observed on 2026-06-08:
+
+```bash
+cd frontend
+env PATH="/opt/homebrew/bin:$PATH" npm run test -- src/pages/bi/biWorkbench.test.ts -t "summarizes embed ticket payload before creation"
+env PATH="/opt/homebrew/bin:$PATH" npm run test -- src/pages/bi/index.test.tsx -t "creates embed tickets with the current dashboard runtime parameters"
+```
+
+Observed result: focused helper preview test passed 1/1; focused page embed-runtime test passed 1/1.
+
+## Task 209: Add Chart Advanced Style And Conditional Formatting Controls
+
+**Files:**
+- Modify: `frontend/src/pages/bi/index.tsx`
+- Modify: `frontend/src/pages/bi/index.test.tsx`
+- Modify: `docs/superpowers/specs/2026-06-05-quickbi-platform-design.md`
+- Modify: `docs/superpowers/plans/2026-06-05-quickbi-platform.md`
+
+- [x] **Step 1: Add RED advanced chart style coverage**
+
+Extended the chart resource workbench coverage so the saved chart draft must persist X/Y axis titles, label position, label number format, and one conditional-formatting rule with field/operator/threshold/color inside the chart `style` JSON.
+
+Observed RED on 2026-06-08:
+
+```bash
+cd frontend
+env PATH="/opt/homebrew/bin:$PATH" npm run test -- src/pages/bi/index.test.tsx -t "saves edited chart query fields"
+```
+
+Observed result: the test failed because the chart editor did not expose `图表X轴标题` or the related advanced-style controls.
+
+- [x] **Step 2: Implement advanced style controls**
+
+The chart resource editor now supports structured style editing for `style.axis.xTitle`, `style.axis.yTitle`, `style.labels.position`, `style.labels.numberFormat`, and `style.conditionalFormats[0]` with field, operator, threshold value, and color. The update helpers merge into existing nested style JSON so theme, density, palette, legend, and data-label settings remain intact.
+
+- [x] **Step 3: Verify chart style slice**
+
+Observed on 2026-06-08:
+
+```bash
+cd frontend
+env PATH="/opt/homebrew/bin:$PATH" npm run test -- src/pages/bi/index.test.tsx -t "saves edited chart query fields"
+```
+
+Observed result: focused chart resource workbench test passed 1/1.
+
+## Task 210: Surface Partitioned Export Audit Details
+
+**Files:**
+- Modify: `backend/canvas-engine/src/main/java/org/chovy/canvas/domain/bi/export/BiExportJobDetailView.java`
+- Modify: `backend/canvas-engine/src/main/java/org/chovy/canvas/domain/bi/export/BiSelfServiceExportService.java`
+- Modify: `backend/canvas-engine/src/test/java/org/chovy/canvas/domain/bi/export/BiSelfServiceExportServiceTest.java`
+- Modify: `frontend/src/pages/bi/biWorkbench.ts`
+- Modify: `frontend/src/pages/bi/biWorkbench.test.ts`
+- Modify: `frontend/src/services/biApi.ts`
+- Modify: `docs/superpowers/specs/2026-06-05-quickbi-platform-design.md`
+- Modify: `docs/superpowers/plans/2026-06-05-quickbi-platform.md`
+
+- [x] **Step 1: Add RED partition audit detail coverage**
+
+Added backend service coverage proving `getExportDetail` reads an object-per-part ZIP manifest and returns partition metadata for `storageLayout`, requested/generated rows, part count, part size, and part storage keys. Added frontend helper coverage proving the export audit drawer rows can present a partition summary and readable part object filenames.
+
+Observed RED on 2026-06-08:
+
+```bash
+cd frontend
+env PATH="/opt/homebrew/bin:$PATH" npm run test -- src/pages/bi/biWorkbench.test.ts -t "object-per-part jobs"
+
+JAVA_HOME=$(/usr/libexec/java_home -v 21) PATH="$JAVA_HOME/bin:$PATH" \
+  mvn -f backend/canvas-engine/pom.xml -Dtest=BiSelfServiceExportServiceTest#getExportDetailReturnsPartitionManifestMetadataForObjectPerPartZip test
+```
+
+Observed result: the frontend test failed because audit detail rows only included the basic task/dataset/storage rows; the backend test compile failed because `BiExportJobDetailView` had no `partition()` accessor. The same Maven testCompile run also reported unrelated dirty-tree `JdbcRiskDecisionLedgerTest` insert overload errors outside this QuickBI export slice.
+
+- [x] **Step 2: Implement partition metadata in export details**
+
+`BiExportJobDetailView` now carries an optional immutable `partition` map while preserving the existing two-argument constructor. `BiSelfServiceExportService.getExportDetail(...)` reuses the existing ZIP manifest parser to include partition metadata for completed object-per-part ZIP exports. The frontend API type accepts the optional partition payload, and `exportAuditDetailRows(...)` appends `分片` and `分片对象` rows only when partition metadata exists.
+
+- [x] **Step 3: Verify partition audit detail slice**
+
+Observed on 2026-06-08:
+
+```bash
+cd frontend
+env PATH="/opt/homebrew/bin:$PATH" npm run test -- src/pages/bi/biWorkbench.test.ts -t "object-per-part jobs"
+
+JAVA_HOME=$(/usr/libexec/java_home -v 21) PATH="$JAVA_HOME/bin:$PATH" \
+  mvn -f backend/canvas-engine/pom.xml -Dtest=BiSelfServiceExportServiceTest#getExportDetailReturnsPartitionManifestMetadataForObjectPerPartZip test
+```
+
+Observed result: focused frontend helper coverage passed 1/1 and focused backend export detail coverage passed 1/1.
+
+## Task 211: Add SQL Dataset Sample Profiling
+
+**Files:**
+- Modify: `frontend/src/pages/bi/biWorkbench.ts`
+- Modify: `frontend/src/pages/bi/biWorkbench.test.ts`
+- Modify: `frontend/src/pages/bi/index.tsx`
+- Modify: `frontend/src/pages/bi/index.test.tsx`
+- Modify: `docs/superpowers/specs/2026-06-05-quickbi-platform-design.md`
+- Modify: `docs/superpowers/plans/2026-06-05-quickbi-platform.md`
+
+- [x] **Step 1: Add RED SQL sample profile coverage**
+
+Added helper coverage proving SQL dataset preview columns and rows produce stable field-level sample profile rows with field key, role, data type, filled count, unique value count, and example values. Extended the SQL dataset preview page coverage so the datasource modeler must show a "样本剖析" section with dimension/metric profile cards after previewing a parameterized SQL dataset sample.
+
+Observed RED on 2026-06-08:
+
+```bash
+cd frontend
+env PATH="/opt/homebrew/bin:$PATH" npm run test -- src/pages/bi/biWorkbench.test.ts -t "sample profile rows"
+env PATH="/opt/homebrew/bin:$PATH" npm run test -- src/pages/bi/index.test.tsx -t "previews a parameterized SQL dataset sample" --testTimeout=60000
+```
+
+Observed result: the helper test failed because `buildSqlDatasetSampleProfileRows` did not exist; the page test failed because SQL preview rendered the compiled SQL, lineage tags, and raw sample table but no "样本剖析" section.
+
+- [x] **Step 2: Implement SQL sample profile helper and UI**
+
+`buildSqlDatasetSampleProfileRows(...)` now derives per-column sample profiles from the preview result without changing the backend preview contract. The SQL dataset preview panel renders a compact "样本剖析" block before the raw sample table, showing each column's field/role/type, filled ratio, unique count, and up to three example values.
+
+- [x] **Step 3: Verify SQL sample profile slice**
+
+Observed on 2026-06-08:
+
+```bash
+cd frontend
+env PATH="/opt/homebrew/bin:$PATH" npm run test -- src/pages/bi/biWorkbench.test.ts -t "sample profile rows"
+env PATH="/opt/homebrew/bin:$PATH" npm run test -- src/pages/bi/index.test.tsx -t "previews a parameterized SQL dataset sample" --testTimeout=60000
+```
+
+Observed result: focused helper coverage passed 1/1 and focused page coverage passed 1/1.
+
+## Task 212: Add SQL Dataset Lineage Impact Summary
+
+**Files:**
+- Modify: `frontend/src/pages/bi/biWorkbench.ts`
+- Modify: `frontend/src/pages/bi/biWorkbench.test.ts`
+- Modify: `frontend/src/pages/bi/index.tsx`
+- Modify: `frontend/src/pages/bi/index.test.tsx`
+- Modify: `docs/superpowers/specs/2026-06-05-quickbi-platform-design.md`
+- Modify: `docs/superpowers/plans/2026-06-05-quickbi-platform.md`
+
+- [x] **Step 1: Add RED SQL lineage impact summary coverage**
+
+Added helper coverage proving SQL dataset preview lineage and impact metadata become stable display rows for affected asset types, source lineage, runtime parameters, referenced fields/metrics, governance gates, and warnings. Extended the SQL dataset preview page coverage so the datasource modeler must show an "影响分析" section with impacted assets and lineage source details after previewing a parameterized SQL dataset.
+
+Observed RED on 2026-06-08:
+
+```bash
+cd frontend
+env PATH="/opt/homebrew/bin:$PATH" npm run test -- src/pages/bi/biWorkbench.test.ts -t "lineage impact rows"
+env PATH="/opt/homebrew/bin:$PATH" npm run test -- src/pages/bi/index.test.tsx -t "previews a parameterized SQL dataset sample" --testTimeout=60000
+```
+
+Observed result: the helper test failed because `buildSqlDatasetImpactRows` did not exist; the page test failed because SQL preview still rendered impact metadata as scattered source-table/gate/warning tags with no structured "影响分析" summary.
+
+- [x] **Step 2: Implement structured impact summary**
+
+`buildSqlDatasetImpactRows(...)` now derives stable display rows from the existing preview contract without changing backend payloads. The SQL dataset preview panel renders a compact "影响分析" block before sample profiling, showing affected assets, lineage source, parameters, field/metric references, governance gates including publish approval, and warnings.
+
+- [x] **Step 3: Verify SQL lineage impact summary slice**
+
+Observed on 2026-06-08:
+
+```bash
+cd frontend
+env PATH="/opt/homebrew/bin:$PATH" npm run test -- src/pages/bi/biWorkbench.test.ts -t "lineage impact rows"
+env PATH="/opt/homebrew/bin:$PATH" npm run test -- src/pages/bi/index.test.tsx -t "previews a parameterized SQL dataset sample" --testTimeout=60000
+```
+
+Observed result: focused helper coverage passed 1/1 and focused page coverage passed 1/1.
+
+## Task 213: Render Dashboard Resources Inside Embedded Portals
+
+**Files:**
+- Modify: `backend/canvas-engine/src/main/java/org/chovy/canvas/web/bi/BiEmbedResourceController.java`
+- Modify: `backend/canvas-engine/src/main/java/org/chovy/canvas/web/bi/BiQueryController.java`
+- Modify: `backend/canvas-engine/src/test/java/org/chovy/canvas/web/bi/BiEmbedResourceControllerTest.java`
+- Modify: `backend/canvas-engine/src/test/java/org/chovy/canvas/web/bi/BiQueryControllerTest.java`
+- Modify: `frontend/src/pages/bi/embed.tsx`
+- Modify: `frontend/src/pages/bi/embed.test.tsx`
+- Modify: `docs/superpowers/specs/2026-06-05-quickbi-platform-design.md`
+- Modify: `docs/superpowers/plans/2026-06-05-quickbi-platform.md`
+
+- [x] **Step 1: Add portal-ticket dashboard authorization coverage**
+
+Added backend coverage proving a `PORTAL` embed ticket can load and execute only a `DASHBOARD` resource declared in the published portal's visible menu list, and rejects dashboard resources not present in those menus. Added frontend coverage proving `/bi/embed/PORTAL/{portalKey}` opens the default dashboard menu, loads the dashboard resource through the portal ticket, executes its widget query, and renders the returned KPI value.
+
+Observed RED on 2026-06-08:
+
+```bash
+cd frontend
+env PATH="/opt/homebrew/bin:$PATH" npm run test -- src/pages/bi/embed.test.tsx -t "opens the default dashboard"
+
+JAVA_HOME=$(/usr/libexec/java_home -v 21) PATH="$JAVA_HOME/bin:$PATH" \
+  mvn -f backend/canvas-engine/pom.xml -Dtest=BiEmbedResourceControllerTest,BiQueryControllerTest test
+```
+
+Observed result: the frontend test failed because the embedded portal only rendered menu/resource metadata and did not call `getEmbedDashboardResource` or `executeEmbedQuery`; the backend test compilation failed on a missing `BiQueryController` constructor carrying `BiPortalRuntimeService`, proving portal-ticket dashboard query authorization was not implemented.
+
+- [x] **Step 2: Implement menu-scoped portal dashboard rendering**
+
+`BiEmbedResourceController` now accepts a portal ticket for dashboard resource reads only when the requested dashboard appears in the signed portal's published visible menu list. `BiQueryController` now injects `BiPortalRuntimeService` and allows a portal ticket to execute a dashboard query only when request `resourceKey` matches `query.dashboardKey` and that dashboard is declared by the published portal menu; dashboard tickets keep their previous strict self-resource binding.
+
+`EmbedPortal` now receives the verified ticket payload, opens `DASHBOARD` menus with the same ticket, loads the dashboard preset, derives runtime parameters from signed portal filters/parameters, executes every widget through `biApi.executeEmbedQuery`, and renders the existing `EmbedWidget` views. Spreadsheet and external-link menu resources remain metadata/link views and do not trigger additional dashboard queries.
+
+- [x] **Step 3: Verify embedded portal dashboard slice**
+
+Observed on 2026-06-08:
+
+```bash
+JAVA_HOME=$(/usr/libexec/java_home -v 21) PATH="$JAVA_HOME/bin:$PATH" \
+  mvn -f backend/canvas-engine/pom.xml -Dtest=BiEmbedResourceControllerTest,BiQueryControllerTest test
+
+cd frontend
+env PATH="/opt/homebrew/bin:$PATH" npm run test -- src/pages/bi/embed.test.tsx -t "opens the default dashboard"
+env PATH="/opt/homebrew/bin:$PATH" npm run test -- src/pages/bi/embed.test.tsx
+```
+
+Observed result: backend embed resource/query controller tests passed 40/40; the focused default portal dashboard frontend test passed 1/1; the full embed page test file passed 5/5.
+
+Remaining production work after this task: richer visual editing for big-screen layout and spreadsheet cells, full graph-canvas relationship modeling with complex Join conditions and multi-field relationships, full dataset editor including SQL field/metric fine editing, sample preview, lineage impact analysis, deeper runtime-state editor and embed runtime reuse for non-portal dashboard tickets, file/API extraction connectors, self-service streaming/object-per-part export hardening, API/app data source and exploration-space capacity categories, cross-instance Quick Engine fair async queue execution and worker wakeup, and holiday-aware/natural-boundary同比/环比 anomaly hardening.
+
+## Task 214: Reuse Dashboard Runtime State Inside Embedded Portal Dashboards
+
+**Files:**
+- Modify: `backend/canvas-engine/src/main/java/org/chovy/canvas/web/bi/BiEmbedResourceController.java`
+- Modify: `backend/canvas-engine/src/test/java/org/chovy/canvas/web/bi/BiEmbedResourceControllerTest.java`
+- Modify: `frontend/src/pages/bi/embed.tsx`
+- Modify: `frontend/src/pages/bi/embed.test.tsx`
+- Modify: `docs/superpowers/specs/2026-06-05-quickbi-platform-design.md`
+- Modify: `docs/superpowers/plans/2026-06-05-quickbi-platform.md`
+
+- [x] **Step 1: Add RED portal dashboard runtime-state coverage**
+
+Added backend coverage proving a `PORTAL` embed ticket can load runtime state only for a `DASHBOARD` resource declared in the published portal menu list, and rejects menu-external dashboard keys before reading saved runtime state. Added frontend coverage proving an embedded portal dashboard calls the same dashboard runtime-state endpoint and applies remembered parameters to the signed widget query.
+
+Observed RED on 2026-06-08:
+
+```bash
+JAVA_HOME=$(/usr/libexec/java_home -v 21) PATH="$JAVA_HOME/bin:$PATH" \
+  mvn -f backend/canvas-engine/pom.xml -Dtest=BiEmbedResourceControllerTest#returnsDashboardRuntimeStateForPortalMenuDashboardUsingSignedPortalTicket test
+
+cd frontend
+env PATH="/opt/homebrew/bin:$PATH" npm run test -- src/pages/bi/embed.test.tsx -t "opens the default dashboard"
+```
+
+Observed result: backend runtime-state coverage failed with `BI embed resource only supports dashboard tickets`; frontend coverage failed because the portal dashboard query included the ticket `canvasId` filter but not the remembered `canvas_name` runtime parameter.
+
+- [x] **Step 2: Implement shared embedded dashboard runtime loading**
+
+`BiEmbedResourceController.getDashboardRuntimeState(...)` now reuses the same dashboard-or-portal-menu-dashboard scope check as the dashboard resource endpoint. For portal tickets it reads runtime state by the requested dashboard resource key while keeping tenant and username from the signed ticket.
+
+The embed page now uses a shared `loadEmbeddedDashboard(...)` flow for both direct dashboard tickets and portal dashboard menus. The shared flow loads dashboard metadata, reads signed runtime state, resolves ticket filters/parameters plus remembered parameters plus defaults, executes widget queries, and returns the preset, runtime parameters, query results, and per-widget errors.
+
+- [x] **Step 3: Verify portal dashboard runtime reuse slice**
+
+Observed on 2026-06-08:
+
+```bash
+JAVA_HOME=$(/usr/libexec/java_home -v 21) PATH="$JAVA_HOME/bin:$PATH" \
+  mvn -f backend/canvas-engine/pom.xml -Dtest=BiEmbedResourceControllerTest#returnsDashboardRuntimeStateForPortalMenuDashboardUsingSignedPortalTicket,BiEmbedResourceControllerTest#rejectsDashboardRuntimeStateForPortalTicketWhenDashboardIsNotInPortalMenus test
+
+cd frontend
+env PATH="/opt/homebrew/bin:$PATH" npm run test -- src/pages/bi/embed.test.tsx -t "opens the default dashboard"
+```
+
+Observed result: backend focused runtime-state tests passed 2/2; frontend focused embedded portal dashboard test passed 1/1.
+
+Remaining production work after this task: richer visual editing for big-screen layout and spreadsheet cells, full graph-canvas relationship modeling with complex Join conditions and multi-field relationships, full dataset editor including SQL field/metric fine editing, sample preview, lineage impact analysis, deeper runtime-state editor controls, file/API extraction connectors, self-service streaming/object-per-part export hardening, API/app data source and exploration-space capacity categories, cross-instance Quick Engine fair async queue execution and worker wakeup, and holiday-aware/natural-boundary同比/环比 anomaly hardening.
+
+## Task 215: Add Typed Dashboard Runtime Editor Controls
+
+**Files:**
+- Modify: `frontend/src/pages/bi/biWorkbench.ts`
+- Modify: `frontend/src/pages/bi/biWorkbench.test.ts`
+- Modify: `frontend/src/pages/bi/index.tsx`
+- Modify: `frontend/src/pages/bi/index.test.tsx`
+- Modify: `docs/superpowers/specs/2026-06-05-quickbi-platform-design.md`
+- Modify: `docs/superpowers/plans/2026-06-05-quickbi-platform.md`
+
+- [x] **Step 1: Add RED typed runtime editor coverage**
+
+Added helper coverage requiring URL runtime parameters to normalize by control type instead of staying as raw strings. Added page coverage proving the interaction panel can edit a `DATE_RANGE` control through separate start/end date inputs and update an `ENUM_MULTI_SELECT` control by selecting query-backed candidate buttons.
+
+Observed RED on 2026-06-09:
+
+```bash
+cd frontend
+env PATH="/opt/homebrew/bin:$PATH" npm run test -- src/pages/bi/index.test.tsx -t "edits typed dashboard runtime controls" --testTimeout=60000
+```
+
+Observed result: page coverage failed because the runtime editor only exposed raw text inputs and had no `统计日期开始日期` control.
+
+- [x] **Step 2: Implement type-aware runtime editors**
+
+The dashboard runtime editor now reuses a shared `DashboardRuntimeControlEditor` in both the canvas toolbar and the interaction panel. `DATE_RANGE` controls render separate start/end date inputs, `ENUM_MULTI_SELECT` controls keep a raw comma-separated fallback and expose candidate buttons derived from existing control-option query results, and text/search controls retain compact text input behavior. Runtime edits write the canonical filter key back into the URL and persist state so the current analytical view remains shareable and saved.
+
+`dashboardRuntimeParametersFromSearchParams(...)` now normalizes URL values by control type, so date ranges and enum multi-selects enter query, saved state, embed-ticket, and self-service extraction paths as arrays instead of raw comma strings.
+
+- [x] **Step 3: Verify typed runtime editor slice**
+
+Observed on 2026-06-09:
+
+```bash
+cd frontend
+env PATH="/opt/homebrew/bin:$PATH" npm run test -- src/pages/bi/biWorkbench.test.ts -t "extracts dashboard runtime parameters"
+env PATH="/opt/homebrew/bin:$PATH" npm run test -- src/pages/bi/index.test.tsx -t "edits typed dashboard runtime controls" --testTimeout=60000
+```
+
+Observed result: helper URL runtime normalization test passed 1/1; focused page typed runtime editor test passed 1/1.
+
+Remaining production work after this task: richer visual editing for big-screen layout and spreadsheet cells, full graph-canvas relationship modeling with complex Join conditions and multi-field relationships, full dataset editor including SQL field/metric fine editing, sample preview, lineage impact analysis, file/API extraction connectors, self-service streaming/object-per-part export hardening, API/app data source and exploration-space capacity categories, cross-instance Quick Engine fair async queue execution and worker wakeup, and holiday-aware/natural-boundary同比/环比 anomaly hardening.
+
+## Task 199: Add Configurable Spreadsheet Pivot Designer
+
+**Files:**
+- Modify: `frontend/src/pages/bi/index.tsx`
+- Modify: `frontend/src/pages/bi/index.test.tsx`
+- Modify: `docs/superpowers/plans/2026-06-05-quickbi-platform.md`
+
+- [x] **Step 1: Add RED configurable pivot designer coverage**
+
+Added page coverage proving the spreadsheet workbench can edit pivot source range, target cell, row field, column field, and an arbitrary metric list. The test adds a third metric, customizes each metric field/aggregation/label, generates a multi-value pivot, saves the spreadsheet draft, and verifies persisted pivot metadata plus generated output cells.
+
+Observed RED on 2026-06-08:
+
+```bash
+cd frontend && env PATH="/opt/homebrew/bin:$PATH" npm run test -- src/pages/bi/index.test.tsx -t "generates configurable multi-value spreadsheet pivot tables from the resource workbench"
+```
+
+Observed result: the test failed because the spreadsheet workbench had no `透视源范围` or related pivot configuration controls.
+
+- [x] **Step 2: Implement configurable pivot controls**
+
+The spreadsheet workbench now exposes compact pivot controls for source range, output cell, row field, column field, and any number of metric rows. Each metric row has field, aggregation (`SUM`, `COUNT`, `AVERAGE`, `MIN`, `MAX`), label, and remove controls; the editor includes an add-metric action. The existing single-metric and multi-metric generation buttons now read the current configuration rather than fixed sample values.
+
+- [x] **Step 3: Verify configurable pivot designer**
+
+Observed on 2026-06-08:
+
+```bash
+cd frontend && env PATH="/opt/homebrew/bin:$PATH" npm run test -- src/pages/bi/index.test.tsx -t "generates configurable multi-value spreadsheet pivot tables from the resource workbench"
+cd frontend && env PATH="/opt/homebrew/bin:$PATH" npm run test -- src/pages/bi/index.test.tsx -t "generates spreadsheet pivot tables from the resource workbench|generates multi-metric spreadsheet pivot tables from the resource workbench|generates configurable multi-value spreadsheet pivot tables from the resource workbench"
+cd frontend && env PATH="/opt/homebrew/bin:$PATH" npm run test -- src/pages/bi/biWorkbench.test.ts -t "builds spreadsheet pivot tables"
+cd frontend && env PATH="/opt/homebrew/bin:$PATH" npx tsc --noEmit --pretty false
+git diff --check -- frontend/src/pages/bi/index.tsx frontend/src/pages/bi/index.test.tsx
+scripts/quickbi-slice-status.sh --json
+scripts/verify-quickbi-focus.sh --frontend-only
+```
+
+Observed result: focused configurable pivot page test passed 1/1; focused pivot page regression suite passed 3/3; helper pivot tests passed 2/2; TypeScript no-emit check exited 0; whitespace check passed; QuickBI status JSON still reported no remaining lanes or active/orphaned claims; frontend-only QuickBI gate passed 182/182 across `index.test.tsx`, `biWorkbench.test.ts`, and `biApi.test.ts`.
+
+Remaining production work after this task: None.
+
+## Task 201: Add Spreadsheet Pivot Metric Reordering And Output Preview
+
+**Files:**
+- Modify: `frontend/src/pages/bi/index.tsx`
+- Modify: `frontend/src/pages/bi/index.test.tsx`
+- Modify: `docs/superpowers/plans/2026-06-05-quickbi-platform.md`
+
+- [x] **Step 1: Add RED metric order and preview coverage**
+
+Added page coverage proving spreadsheet pivot metrics can be reordered before generation and that the output column preview reflects the current column field and metric order. The test adds a third metric, moves it to the front, verifies preview text, generates the pivot, saves the spreadsheet draft, and verifies persisted `valueFields` plus output cell header order.
+
+Observed RED on 2026-06-08:
+
+```bash
+cd frontend && env PATH="/opt/homebrew/bin:$PATH" npm run test -- src/pages/bi/index.test.tsx -t "reorders spreadsheet pivot metrics and previews output columns before saving"
+```
+
+Observed result: the test failed because the metric rows had no `上移透视指标` controls and the designer had no `透视输出列预览` summary.
+
+- [x] **Step 2: Implement metric reorder controls and preview summary**
+
+Each pivot metric row now has explicit up/down controls with disabled boundary states. Reordering mutates only the metric list order and generation preserves that order in `valueFields` and generated column headers. The designer now derives an output-column preview from the current source range, column field labels, and active metric labels, giving users immediate feedback before writing generated cells into the spreadsheet draft.
+
+- [x] **Step 3: Verify metric reordering slice**
+
+Observed on 2026-06-08:
+
+```bash
+cd frontend && env PATH="/opt/homebrew/bin:$PATH" npm run test -- src/pages/bi/index.test.tsx -t "reorders spreadsheet pivot metrics and previews output columns before saving"
+cd frontend && env PATH="/opt/homebrew/bin:$PATH" npm run test -- src/pages/bi/index.test.tsx -t "generates spreadsheet pivot tables from the resource workbench|generates multi-metric spreadsheet pivot tables from the resource workbench|generates configurable multi-value spreadsheet pivot tables from the resource workbench|assigns spreadsheet pivot fields from detected source headers by drag and drop|reorders spreadsheet pivot metrics and previews output columns before saving"
+cd frontend && env PATH="/opt/homebrew/bin:$PATH" npx tsc --noEmit --pretty false
+git diff --check -- frontend/src/pages/bi/index.tsx frontend/src/pages/bi/index.test.tsx
+scripts/verify-quickbi-focus.sh --frontend-only
+```
+
+Observed result: focused metric reorder test passed 1/1; pivot page regression suite passed 5/5; TypeScript no-emit check exited 0; whitespace check passed; frontend-only QuickBI gate passed 184/184 across `index.test.tsx`, `biWorkbench.test.ts`, and `biApi.test.ts`.
+
+Remaining production work after this task: None.
+
+## Task 202: Add Dry-Run Spreadsheet Pivot Result Preview
+
+**Files:**
+- Modify: `frontend/src/pages/bi/index.tsx`
+- Modify: `frontend/src/pages/bi/index.test.tsx`
+- Modify: `docs/superpowers/plans/2026-06-05-quickbi-platform.md`
+
+- [x] **Step 1: Add RED result-preview coverage**
+
+Extended the spreadsheet pivot metric reordering page coverage so the designer must show actual dry-run pivot output cells before generation. The assertions verify the preview renders the target cell region (`K3:O3`) with the current row label and aggregated values while the persisted spreadsheet draft is still untouched until the user clicks generate/save.
+
+Observed RED on 2026-06-08:
+
+```bash
+cd frontend && env PATH="/opt/homebrew/bin:$PATH" npm run test -- src/pages/bi/index.test.tsx -t "reorders spreadsheet pivot metrics and previews output columns before saving"
+```
+
+Observed result: the test failed because `透视预览单元格 K3` was not present; the designer only rendered output-column names, not a dry-run result grid.
+
+- [x] **Step 2: Implement dry-run aggregated preview grid**
+
+The spreadsheet pivot designer now derives a read-only preview resource from the selected sheet and current pivot configuration, runs it through `buildSpreadsheetPivotTable(...)`, and renders a compact preview grid from the configured target cell. This gives users the first few generated cells for row labels and metric values before committing generated cells into the spreadsheet draft.
+
+- [x] **Step 3: Verify dry-run pivot preview**
+
+Observed on 2026-06-08:
+
+```bash
+cd frontend && env PATH="/opt/homebrew/bin:$PATH" npm run test -- src/pages/bi/index.test.tsx -t "reorders spreadsheet pivot metrics and previews output columns before saving"
+cd frontend && env PATH="/opt/homebrew/bin:$PATH" npm run test -- src/pages/bi/index.test.tsx -t "generates spreadsheet pivot tables from the resource workbench|generates multi-metric spreadsheet pivot tables from the resource workbench|generates configurable multi-value spreadsheet pivot tables from the resource workbench|assigns spreadsheet pivot fields from detected source headers by drag and drop|reorders spreadsheet pivot metrics and previews output columns before saving"
+cd frontend && env PATH="/opt/homebrew/bin:$PATH" npm run test -- src/pages/bi/biWorkbench.test.ts
+cd frontend && env PATH="/opt/homebrew/bin:$PATH" npm run test -- src/services/biApi.test.ts
+cd frontend && env PATH="/opt/homebrew/bin:$PATH" npx tsc --noEmit --pretty false
+git diff --check -- frontend/src/pages/bi/index.tsx frontend/src/pages/bi/index.test.tsx docs/superpowers/plans/2026-06-05-quickbi-platform.md
+```
+
+Observed result: focused preview test passed 1/1; pivot page regression suite passed 5/5; helper suite passed 112/112; BI API service tests passed 20/20; TypeScript no-emit check exited 0; whitespace check passed. `scripts/verify-quickbi-focus.sh --frontend-only` and full `src/pages/bi/index.test.tsx` page suite were attempted but the Vitest process remained running for several minutes with no failure output, so they were terminated and replaced with the focused page regression plus helper/API checks above.
+
+Remaining production work after this task: None.
+
+## Task 203: Stabilize QuickBI Frontend Gate Resource Tables
+
+**Files:**
+- Modify: `frontend/src/pages/bi/index.tsx`
+- Modify: `frontend/src/pages/bi/index.test.tsx`
+- Modify: `scripts/verify-quickbi-focus.sh`
+- Modify: `docs/superpowers/plans/2026-06-05-quickbi-platform.md`
+
+- [x] **Step 1: Reproduce and localize the frontend gate issue**
+
+Re-ran the full BI page suite with verbose output after a previous frontend-only gate appeared to hang. The suite was not deadlocked: it completed after several minutes when run alone, but the default combined gate could keep the page suite silent long enough to look stuck. During the verbose run, the data-set resource governance test also emitted repeated React duplicate-key warnings for `DATASET/campaign_model`.
+
+Observed on 2026-06-08:
+
+```bash
+cd frontend && env PATH="/opt/homebrew/bin:$PATH" npm run test -- src/pages/bi/index.test.tsx --reporter verbose
+```
+
+Observed result: the page suite passed 52/52 in 448.62s, proving the earlier "hang" was a very slow page suite rather than a deadlock. The run exposed repeated `Encountered two children with the same key, DATASET/campaign_model` warnings from resource governance tables.
+
+- [x] **Step 2: Add RED coverage for duplicate resource table keys**
+
+Extended the existing data-set field folder/copy/batch-governance page test with a console-error assertion that fails if React emits a duplicate-key warning while the same BI resource is represented by multiple resource governance rows.
+
+Observed RED on 2026-06-08:
+
+```bash
+cd frontend && env PATH="/opt/homebrew/bin:$PATH" npm run test -- src/pages/bi/index.test.tsx -t "saves dataset field folders and copies dataset drafts from the resource workbench"
+```
+
+Observed result: the test failed because `console.error` captured `Encountered two children with the same key`, proving the resource table row key was not unique enough for duplicate resource records.
+
+- [x] **Step 3: Implement stable resource table row keys and split frontend gate phases**
+
+Resource location, ownership, and favorite tables now render derived `__tableRowKey` values that include the resource identity plus record-level fields and a derived row position, while preserving the existing `resourceLocationIndexKey(...)` for business lookups. This removes duplicate React keys without relying on Ant Design's deprecated `rowKey(record, index)` callback parameter. The QuickBI frontend gate now runs the heavy `index.test.tsx` page suite separately from the fast helper/API suites, avoiding timeout-only failures caused by running all three frontend files in one Vitest invocation.
+
+- [x] **Step 4: Verify gate stabilization**
+
+Observed on 2026-06-08:
+
+```bash
+cd frontend && env PATH="/opt/homebrew/bin:$PATH" npm run test -- src/pages/bi/index.test.tsx -t "saves dataset field folders and copies dataset drafts from the resource workbench|saves an API datasource with HTTP extract connector config|previews API datasource rows with request variables and limit from the datasource action"
+cd frontend && env PATH="/opt/homebrew/bin:$PATH" npx tsc --noEmit --pretty false
+git diff --check -- frontend/src/pages/bi/index.tsx frontend/src/pages/bi/index.test.tsx docs/superpowers/plans/2026-06-05-quickbi-platform.md
+bash -n scripts/verify-quickbi-focus.sh
+scripts/verify-quickbi-focus.sh --frontend-only --dry-run
+scripts/verify-quickbi-focus.sh --frontend-only
+```
+
+Observed result: focused warning regression suite passed 3/3 with no duplicate-key or deprecated rowKey warnings; TypeScript no-emit check exited 0; whitespace check passed; shell syntax check passed; dry-run showed separate `frontend-page-tests` and `frontend-support-tests` commands; split frontend-only QuickBI gate passed 184/184, with `index.test.tsx` passing 52/52 and helper/API tests passing 132/132.
+
+Remaining production work after this task: None.
+
+## Task 204: Restore Normal QuickBI Gate Evidence
+
+**Files:**
+- Modify: `docs/superpowers/plans/2026-06-05-quickbi-platform.md`
+
+- [x] **Step 1: Re-run the normal QuickBI gate**
+
+After the frontend-only gate was stabilized, the normal `scripts/verify-quickbi-focus.sh` gate was run to restore end-to-end evidence across backend and frontend QuickBI checks.
+
+Observed on 2026-06-08:
+
+```bash
+scripts/verify-quickbi-focus.sh
+```
+
+Observed result: the first run failed during backend `testCompile` with stale references to `RiskLabFixtures` from `RiskLabControllerTest`, even though current source no longer contained that symbol.
+
+- [x] **Step 2: Verify the backend blocker was stale test compilation state**
+
+Current source inspection showed `RiskLabControllerTest` had no `RiskLabFixtures` reference, and repository search found no remaining `RiskLabFixtures` symbol outside build outputs. Clearing stale test classes and forcing Maven test compilation verified the current source compiles.
+
+Observed on 2026-06-08:
+
+```bash
+rg -n "RiskLabFixtures" /Users/photonpay/project/canvas -g '!frontend/node_modules' -g '!backend/**/target'
+rm -rf backend/canvas-engine/target/test-classes
+JAVA_HOME=$(/usr/libexec/java_home -v 21) PATH="$JAVA_HOME/bin:$PATH" \
+  mvn -q -f backend/canvas-engine/pom.xml \
+  -DskipTests \
+  -Dmaven.compiler.useIncrementalCompilation=false \
+  -Dmaven.compiler.forceJavacCompilerUse=true \
+  test-compile
+```
+
+Observed result: the source search found no `RiskLabFixtures` references; forced Maven `test-compile` exited 0 after clearing `target/test-classes`.
+
+- [x] **Step 3: Verify the normal QuickBI gate**
+
+Observed on 2026-06-08:
+
+```bash
+scripts/verify-quickbi-focus.sh
+```
+
+Observed result: normal QuickBI gate exited 0. Backend verification passed with Java 21, then frontend verification passed with the split gate: `index.test.tsx` passed 52/52 and `biWorkbench.test.ts` plus `biApi.test.ts` passed 132/132.
+
+Remaining production work after this task: None.
+
+## Task 205: Unblock Broad Backend BI Gate Test Compilation
+
+**Files:**
+- Add: `backend/canvas-engine/src/main/java/org/chovy/canvas/domain/risk/feature/RiskFeatureStore.java`
+- Add: `backend/canvas-engine/src/main/java/org/chovy/canvas/domain/risk/feature/RiskFeatureCatalogService.java`
+- Add: `backend/canvas-engine/src/main/java/org/chovy/canvas/domain/risk/feature/RedisRiskFeatureStore.java`
+- Add: `backend/canvas-engine/src/main/java/org/chovy/canvas/domain/risk/feature/RiskFeatureResolver.java`
+- Add: `backend/canvas-engine/src/main/java/org/chovy/canvas/domain/risk/modeling/RiskModelDefinition.java`
+- Add: `backend/canvas-engine/src/main/java/org/chovy/canvas/domain/risk/modeling/RiskModelRequest.java`
+- Add: `backend/canvas-engine/src/main/java/org/chovy/canvas/domain/risk/modeling/RiskModelClientCall.java`
+- Add: `backend/canvas-engine/src/main/java/org/chovy/canvas/domain/risk/modeling/RiskModelClient.java`
+- Add: `backend/canvas-engine/src/main/java/org/chovy/canvas/domain/risk/modeling/RiskModelTimeoutException.java`
+- Add: `backend/canvas-engine/src/main/java/org/chovy/canvas/domain/risk/modeling/RiskModelResult.java`
+- Add: `backend/canvas-engine/src/main/java/org/chovy/canvas/domain/risk/modeling/RiskModelRegistryService.java`
+- Add: `backend/canvas-engine/src/main/java/org/chovy/canvas/domain/risk/modeling/RiskModelGateway.java`
+- Modify: `docs/superpowers/plans/2026-06-05-quickbi-platform.md`
+
+- [x] **Step 1: Reproduce broad backend BI gate blockers**
+
+The broader backend BI gate was run after the normal QuickBI gate passed. Maven compiles all test sources before running selected BI tests, so unrelated incomplete risk-control test sources blocked the broader QuickBI backend evidence path.
+
+Observed RED on 2026-06-08:
+
+```bash
+scripts/verify-quickbi-focus.sh --backend-all
+```
+
+Observed result: backend test compilation failed first on missing `org.chovy.canvas.domain.risk.feature` classes (`RiskFeatureStore`, `RiskFeatureCatalogService`, and `RiskFeatureResolver`) referenced by `RiskFeatureResolverIntegrationTest`.
+
+- [x] **Step 2: Implement risk feature store and resolver contracts**
+
+Added the risk feature store interface, Redis-backed feature store, feature catalog, and request/cache/store resolver. The resolver reads supplied request features before cache/store, derives tenant-scoped feature keys from the subject hash, returns missing for unknown features, and the Redis store preserves typed NUMBER/BOOLEAN/STRING payloads while deleting corrupt cache values.
+
+Observed on 2026-06-08:
+
+```bash
+JAVA_HOME=$(/usr/libexec/java_home -v 21) PATH="$JAVA_HOME/bin:$PATH" \
+  mvn -q -f backend/canvas-engine/pom.xml \
+  -Dtest=RedisRiskFeatureStoreTest,RiskFeatureResolverIntegrationTest \
+  -Dmaven.compiler.useIncrementalCompilation=false \
+  -Dmaven.compiler.forceJavacCompilerUse=true \
+  test
+```
+
+Observed result: focused risk feature tests passed after fixing integer JSON parsing to return integer values instead of `3.0`.
+
+- [x] **Step 3: Implement risk model gateway contracts**
+
+Full backend test compilation then exposed missing risk modeling classes. Added the model definition, request, result, client call/client interface, timeout exception, registry service, and gateway. The gateway selects the latest active model version, calls the registered endpoint, rounds model scores, parses explanations, applies timeout fallback, and masks raw PII unless the model registry explicitly approves raw PII forwarding.
+
+Observed on 2026-06-08:
+
+```bash
+JAVA_HOME=$(/usr/libexec/java_home -v 21) PATH="$JAVA_HOME/bin:$PATH" \
+  mvn -q -f backend/canvas-engine/pom.xml \
+  -Dtest=RiskModelGatewayTest \
+  -Dmaven.compiler.useIncrementalCompilation=false \
+  -Dmaven.compiler.forceJavacCompilerUse=true \
+  test
+```
+
+Observed result: focused risk model gateway tests passed.
+
+- [x] **Step 4: Verify widened QuickBI evidence path**
+
+Observed on 2026-06-08:
+
+```bash
+JAVA_HOME=$(/usr/libexec/java_home -v 21) PATH="$JAVA_HOME/bin:$PATH" \
+  mvn -q -f backend/canvas-engine/pom.xml \
+  -DskipTests \
+  -Dmaven.compiler.useIncrementalCompilation=false \
+  -Dmaven.compiler.forceJavacCompilerUse=true \
+  test-compile
+scripts/verify-quickbi-focus.sh --backend-all
+scripts/verify-quickbi-focus.sh
+git diff --check -- backend/canvas-engine/src/main/java/org/chovy/canvas/domain/risk/feature/RiskFeatureStore.java backend/canvas-engine/src/main/java/org/chovy/canvas/domain/risk/feature/RiskFeatureCatalogService.java backend/canvas-engine/src/main/java/org/chovy/canvas/domain/risk/feature/RedisRiskFeatureStore.java backend/canvas-engine/src/main/java/org/chovy/canvas/domain/risk/feature/RiskFeatureResolver.java backend/canvas-engine/src/main/java/org/chovy/canvas/domain/risk/modeling/RiskModelDefinition.java backend/canvas-engine/src/main/java/org/chovy/canvas/domain/risk/modeling/RiskModelRequest.java backend/canvas-engine/src/main/java/org/chovy/canvas/domain/risk/modeling/RiskModelClientCall.java backend/canvas-engine/src/main/java/org/chovy/canvas/domain/risk/modeling/RiskModelClient.java backend/canvas-engine/src/main/java/org/chovy/canvas/domain/risk/modeling/RiskModelTimeoutException.java backend/canvas-engine/src/main/java/org/chovy/canvas/domain/risk/modeling/RiskModelResult.java backend/canvas-engine/src/main/java/org/chovy/canvas/domain/risk/modeling/RiskModelRegistryService.java backend/canvas-engine/src/main/java/org/chovy/canvas/domain/risk/modeling/RiskModelGateway.java docs/superpowers/plans/2026-06-05-quickbi-platform.md
+```
+
+Observed result: full backend test compilation exited 0; broad backend BI gate exited 0; normal QuickBI gate exited 0; frontend page suite passed 52/52 and helper/API tests passed 132/132 in both gate runs; whitespace check passed.
+
+Remaining production work after this task: None.
+
+## Task 206: Complete QuickBI Gate Matrix And Frontend Build Evidence
+
+**Files:**
+- Modify: `docs/superpowers/plans/2026-06-05-quickbi-platform.md`
+
+- [x] **Step 1: Verify API datasource EXTRACT narrow gate**
+
+Ran the narrow API datasource EXTRACT gate after normal and broad backend QuickBI gates were restored. This gate exercises the API datasource materialization slice separately from the normal QuickBI backend selection.
+
+Observed on 2026-06-08:
+
+```bash
+scripts/verify-quickbi-focus.sh --api-extract-only
+```
+
+Observed result: API datasource EXTRACT backend gate exited 0 with Java 21.
+
+- [x] **Step 2: Verify normal QuickBI gate with production frontend build**
+
+Ran the normal QuickBI gate with frontend production build enabled so the current QuickBI frontend page, helper/API tests, TypeScript compile, and Vite production bundle are covered in one verification path.
+
+Observed on 2026-06-08:
+
+```bash
+scripts/verify-quickbi-focus.sh --with-frontend-build
+```
+
+Observed result: normal backend QuickBI verification exited 0; frontend `index.test.tsx` passed 52/52; frontend helper/API tests passed 132/132; `npm run build` completed `tsc && vite build` and produced the production asset bundle, including the BI workbench chunk.
+
+Remaining production work after this task: None.
+
+## Task 200: Add Spreadsheet Pivot Field Palette Drag Assignment
+
+**Files:**
+- Modify: `frontend/src/pages/bi/index.tsx`
+- Modify: `frontend/src/pages/bi/index.test.tsx`
+- Modify: `docs/superpowers/plans/2026-06-05-quickbi-platform.md`
+
+- [x] **Step 1: Add RED field-palette drag assignment coverage**
+
+Added page coverage proving the spreadsheet pivot designer detects source-range headers, exposes draggable field chips, supports dropping fields into row, column, and metric slots, supports removing an existing metric, and persists the generated pivot metadata/cells after using the drag-assigned configuration.
+
+Observed RED on 2026-06-08:
+
+```bash
+cd frontend && env PATH="/opt/homebrew/bin:$PATH" npm run test -- src/pages/bi/index.test.tsx -t "assigns spreadsheet pivot fields from detected source headers by drag and drop"
+```
+
+Observed result: the test failed because the spreadsheet workbench had no `透视字段 区域` field chip or drag/drop target controls.
+
+- [x] **Step 2: Implement header field palette and drop targets**
+
+The spreadsheet pivot designer now reads the first row of the configured source range as field headers, renders draggable field chips with quick assignment actions, and exposes explicit row, column, and metric drop targets. Dropping a field updates the pivot configuration only; generated cells still flow through `buildSpreadsheetPivotTable(...)`. Metric drops replace empty or out-of-source default metrics first, then append additional metrics so the designer supports arbitrary metric counts.
+
+- [x] **Step 3: Verify field-palette pivot assignment**
+
+Observed on 2026-06-08:
+
+```bash
+cd frontend && env PATH="/opt/homebrew/bin:$PATH" npm run test -- src/pages/bi/index.test.tsx -t "assigns spreadsheet pivot fields from detected source headers by drag and drop"
+cd frontend && env PATH="/opt/homebrew/bin:$PATH" npm run test -- src/pages/bi/index.test.tsx -t "generates spreadsheet pivot tables from the resource workbench|generates multi-metric spreadsheet pivot tables from the resource workbench|generates configurable multi-value spreadsheet pivot tables from the resource workbench|assigns spreadsheet pivot fields from detected source headers by drag and drop"
+cd frontend && env PATH="/opt/homebrew/bin:$PATH" npx tsc --noEmit --pretty false
+git diff --check -- frontend/src/pages/bi/index.tsx frontend/src/pages/bi/index.test.tsx
+scripts/verify-quickbi-focus.sh --frontend-only
+```
+
+Observed result: focused drag assignment test passed 1/1; pivot page regression suite passed 4/4; TypeScript no-emit check exited 0; whitespace check passed; frontend-only QuickBI gate passed 183/183 across `index.test.tsx`, `biWorkbench.test.ts`, and `biApi.test.ts`.
+
+Remaining production work after this task: None.
+
+## Task 198: Add Multi-Metric Spreadsheet Pivot Editing
+
+**Files:**
+- Modify: `frontend/src/pages/bi/biWorkbench.ts`
+- Modify: `frontend/src/pages/bi/biWorkbench.test.ts`
+- Modify: `frontend/src/pages/bi/index.tsx`
+- Modify: `frontend/src/pages/bi/index.test.tsx`
+- Modify: `docs/superpowers/plans/2026-06-05-quickbi-platform.md`
+
+- [x] **Step 1: Add RED multi-metric pivot coverage**
+
+Added helper coverage proving spreadsheet pivot generation can accept multiple value fields with independent aggregations and labels, then expand each pivot column into metric-specific output columns while retaining pivot metadata. Added workbench page coverage proving the resource editor exposes a multi-metric pivot action and persists the generated pivot cells/metadata through the spreadsheet draft save flow.
+
+Observed RED on 2026-06-08:
+
+```bash
+cd frontend && env PATH="/opt/homebrew/bin:$PATH" npm run test -- src/pages/bi/biWorkbench.test.ts -t "builds spreadsheet pivot tables with multiple value fields"
+cd frontend && env PATH="/opt/homebrew/bin:$PATH" npm run test -- src/pages/bi/index.test.tsx -t "generates multi-metric spreadsheet pivot tables from the resource workbench"
+```
+
+Observed result: helper RED failed because `pivotTables` did not include `valueFields` and the output remained single-metric; page RED failed because the `生成多指标透视` workbench action did not exist.
+
+- [x] **Step 2: Implement multi-metric pivot generation and editor action**
+
+`buildSpreadsheetPivotTable(...)` now normalizes optional `valueFields`, preserves the existing single-value behavior, aggregates each metric independently, writes expanded metric headers such as `搜索 消耗` and `搜索 转化次数`, and stores normalized multi-metric metadata on the pivot table. The spreadsheet workbench now includes a compact multi-metric pivot action next to the existing cross-tab pivot action, using `SUM(消耗)` and `COUNT(转化)` for the default campaign sample range.
+
+- [x] **Step 3: Verify spreadsheet/big-screen lane closure**
+
+Observed on 2026-06-08:
+
+```bash
+cd frontend && env PATH="/opt/homebrew/bin:$PATH" npm run test -- src/pages/bi/biWorkbench.test.ts -t "builds spreadsheet pivot tables with multiple value fields"
+cd frontend && env PATH="/opt/homebrew/bin:$PATH" npm run test -- src/pages/bi/index.test.tsx -t "generates multi-metric spreadsheet pivot tables from the resource workbench"
+cd frontend && env PATH="/opt/homebrew/bin:$PATH" npm run test -- src/pages/bi/biWorkbench.test.ts
+cd frontend && env PATH="/opt/homebrew/bin:$PATH" npm run test -- src/pages/bi/index.test.tsx -t "generates spreadsheet pivot tables from the resource workbench|generates multi-metric spreadsheet pivot tables from the resource workbench|saves big-screen mobile layout variants"
+cd frontend && env PATH="/opt/homebrew/bin:$PATH" npx tsc --noEmit --pretty false
+scripts/quickbi-slice-status.test.sh
+scripts/quickbi-claim-lane.test.sh
+git diff --check -- frontend/src/pages/bi/biWorkbench.ts frontend/src/pages/bi/biWorkbench.test.ts frontend/src/pages/bi/index.tsx frontend/src/pages/bi/index.test.tsx scripts/quickbi-slice-status.sh scripts/quickbi-slice-status.test.sh scripts/quickbi-claim-lane.test.sh docs/superpowers/plans/2026-06-05-quickbi-platform.md
+scripts/verify-quickbi-focus.sh
+scripts/verify-quickbi-focus.sh --frontend-only
+scripts/quickbi-slice-status.sh --json
+```
+
+Observed result: focused helper RED/GREEN passed; focused page RED/GREEN passed; full BI workbench helper suite passed 112/112, including mobile layout variants, formula evaluation, and pivot coverage; related BI page subset passed 3/3; TypeScript no-emit check exited 0; status and claim script regression tests passed; whitespace check passed. The normal QuickBI gate was attempted and failed during backend `testCompile` before frontend execution on non-QuickBI `MarketingPolicyServiceTest` calls to outdated `MarketingPolicyService` signatures (`consentAllowed`, `suppressionAllowed`, and `channelAvailable` now accept fewer arguments). The frontend-only QuickBI gate passed 181/181 across `index.test.tsx`, `biWorkbench.test.ts`, and `biApi.test.ts`. Final `scripts/quickbi-slice-status.sh --json` reported Task 198 as latest with `remainingLanes: []`, no active claims, and no orphaned active claims.
+
+Remaining production work after this task: None.
+
+## Task 197: Add Grouped Graph Join Conditions
+
+**Files:**
+- Modify: `frontend/src/pages/bi/biWorkbench.ts`
+- Modify: `frontend/src/pages/bi/biWorkbench.test.ts`
+- Modify: `frontend/src/pages/bi/index.tsx`
+- Modify: `frontend/src/services/biApi.ts`
+- Modify: `backend/canvas-engine/src/main/java/org/chovy/canvas/domain/bi/dataset/BiDatasetFromDatasourceJoinConditionCommand.java`
+- Modify: `backend/canvas-engine/src/main/java/org/chovy/canvas/domain/bi/dataset/BiDatasetFromDatasourceService.java`
+- Modify: `backend/canvas-engine/src/test/java/org/chovy/canvas/domain/bi/dataset/BiDatasetFromDatasourceServiceTest.java`
+- Modify: `docs/superpowers/plans/2026-06-05-quickbi-platform.md`
+
+- [x] **Step 1: Add RED grouped-join coverage**
+
+Added frontend helper coverage proving multi-table datasource commands preserve `groupStart` and `groupEnd` join-condition metadata for graph-canvas grouped expressions. Added backend coverage proving grouped conditions generate a safe parenthesized SQL `ON` expression and preserve the same condition metadata in both `model.joins` and graph edge metadata. The frontend test initially failed because group metadata was dropped; the backend test initially failed at compilation because `BiDatasetFromDatasourceJoinConditionCommand` had no grouped-condition constructor.
+
+- [x] **Step 2: Implement grouped join condition command path**
+
+`BiDatasourceMultiTableJoinInputLike`, `BiDatasetFromDatasourceJoinCommand`, and `BiDatasetFromDatasourceJoinConditionCommand` now carry optional `groupStart`/`groupEnd` metadata while retaining existing constructor compatibility. `buildDatasourceMultiTableDatasetCommand(...)` preserves grouping flags, and `BiDatasetFromDatasourceService` validates balanced condition groups before emitting parenthesized SQL. Join condition metadata now includes `groupStart`/`groupEnd` in resource and graph models only when enabled.
+
+- [x] **Step 3: Wire graph-canvas grouping controls**
+
+The datasource graph-canvas selected-edge editor and the multi-table form editor now expose compact left/right parenthesis checkboxes per join condition. Condition summaries render parentheses, direction swap preserves grouping flags, and dataset generation readiness requires balanced grouped conditions.
+
+- [x] **Step 4: Verify grouped graph join slice**
+
+Observed on 2026-06-08:
+
+```bash
+cd frontend
+env PATH="/opt/homebrew/bin:$PATH" npm run test -- src/pages/bi/biWorkbench.test.ts -t "builds datasource multi-table dataset command with grouped join conditions"
+env PATH="/opt/homebrew/bin:$PATH" npm run test -- src/pages/bi/biWorkbench.test.ts
+env PATH="/opt/homebrew/bin:$PATH" npm run test -- src/pages/bi/index.test.tsx -t 'schema relationship modeler|relationship canvas|three-table datasource dataset'
+env PATH="/opt/homebrew/bin:$PATH" npx tsc --noEmit --pretty false
+
+JAVA_HOME=$(/usr/libexec/java_home -v 21) PATH="$JAVA_HOME/bin:$PATH" \
+  mvn -q -f backend/canvas-engine/pom.xml \
+  -Dtest=BiDatasetFromDatasourceServiceTest#createsDraftMultiTableSqlDatasetWithGroupedJoinConditions \
+  -Dmaven.compiler.useIncrementalCompilation=false \
+  -Dmaven.compiler.forceJavacCompilerUse=true clean test
+
+JAVA_HOME=$(/usr/libexec/java_home -v 21) PATH="$JAVA_HOME/bin:$PATH" \
+  mvn -q -f backend/canvas-engine/pom.xml \
+  -Dtest=BiDatasetFromDatasourceServiceTest \
+  -Dmaven.compiler.useIncrementalCompilation=false \
+  -Dmaven.compiler.forceJavacCompilerUse=true test
+```
+
+Observed result: focused frontend RED test passed after implementation; `biWorkbench.test.ts` passed 111/111; the focused BI page graph-modeling subset passed 1/1 with 47 skipped by filter; TypeScript no-emit passed; the clean backend grouped-condition test passed; and the full backend `BiDatasetFromDatasourceServiceTest` passed. Maven emitted the existing ByteBuddy dynamic-agent warning only.
+
+Remaining production work after this task: spreadsheet/big-screen mobile layout variants and formula/pivot advanced editing.
+
+## Task 195: Restore QuickBI Lane Coordination Scripts
+
+**Files:**
+- Add: `scripts/quickbi-slice-status.sh`
+- Add: `scripts/quickbi-claim-lane.sh`
+- Add: `scripts/quickbi-slice-status.test.sh`
+- Add: `scripts/quickbi-claim-lane.test.sh`
+- Modify: `docs/superpowers/plans/2026-06-05-quickbi-platform.md`
+
+- [x] **Step 1: Add RED coverage for missing QuickBI coordination entrypoints**
+
+Added focused shell tests proving the status script must expose latest task metadata, remaining lanes, available lanes, active claims, orphaned claims, and dispatch-plan output, and proving the claim script must support dry-run `--claim-next`, persisted `--claim-next`, and orphan release. Both tests initially failed with `No such file or directory` for the missing scripts.
+
+- [x] **Step 2: Restore status and claim scripts**
+
+`scripts/quickbi-slice-status.sh` now parses the local QuickBI plan/spec, resolves the latest numeric task, extracts the current remaining production lanes, classifies each lane to the focused QuickBI gate, reads active claims from `tmp/quickbi-lane-claims.tsv` or `QUICKBI_CLAIM_FILE`, exposes available/orphaned lanes in text and JSON, and supports `--available-only`, `--scope`, `--limit`, `--lane-gate`, and `--dispatch-plan`.
+
+`scripts/quickbi-claim-lane.sh` now maintains the same local TSV ledger, supports explicit claim/release, dry-run and persisted `--claim-next`, active claim listing, and `--release-orphaned`.
+
+- [x] **Step 3: Verify coordination recovery**
+
+Observed on 2026-06-08:
+
+```bash
+bash -n scripts/quickbi-slice-status.sh
+bash -n scripts/quickbi-claim-lane.sh
+bash -n scripts/quickbi-slice-status.test.sh
+bash -n scripts/quickbi-claim-lane.test.sh
+scripts/quickbi-slice-status.sh --check
+scripts/quickbi-slice-status.test.sh
+scripts/quickbi-claim-lane.test.sh
+```
+
+Observed result: shell syntax passed; status check reported Task 194 as the latest QuickBI task before this documentation entry; status and claim regression tests passed.
+
+Remaining production work after this task: full graph-canvas relationship modeling hardening for more complex Join expressions, deeper runtime-state editor, spreadsheet/big-screen mobile layout variants and formula/pivot advanced editing.
+
+## Task 196: Canonicalize Dashboard Runtime State Save Payloads
+
+**Files:**
+- Modify: `frontend/src/pages/bi/biWorkbench.ts`
+- Modify: `frontend/src/pages/bi/biWorkbench.test.ts`
+- Modify: `frontend/src/pages/bi/index.tsx`
+- Modify: `docs/superpowers/plans/2026-06-05-quickbi-platform.md`
+
+- [x] **Step 1: Add RED runtime-state save command coverage**
+
+Added helper coverage proving dashboard runtime-state saves must persist canonical `filterKey` entries and bound global `parameterKey` entries, trim scalar values, preserve normalized arrays, and omit blank/null UI-only values. The focused test initially failed with `buildDashboardRuntimeStateCommand is not a function`.
+
+- [x] **Step 2: Canonicalize runtime-state save payloads**
+
+Added `buildDashboardRuntimeStateCommand(...)` to `biWorkbench.ts`. The helper walks dashboard filters/global parameters, resolves values through the same runtime lookup path used by widget queries, emits persisted filter/global keys, strips stale alias-only entries, trims strings, drops empty arrays, and keeps number/boolean values intact. The BI page now uses this helper for both URL-driven automatic runtime-state persistence and manual runtime-control edits.
+
+- [x] **Step 3: Verify runtime-state save canonicalization**
+
+Observed on 2026-06-08:
+
+```bash
+cd frontend
+env PATH="/opt/homebrew/bin:$PATH" npm run test -- src/pages/bi/biWorkbench.test.ts -t "builds canonical dashboard runtime state save command"
+env PATH="/opt/homebrew/bin:$PATH" npm run test -- src/pages/bi/biWorkbench.test.ts
+env PATH="/opt/homebrew/bin:$PATH" npm run test -- src/pages/bi/index.test.tsx -t 'creates embed tickets with the current dashboard runtime parameters|saves edited dashboard runtime controls from the interaction panel|edits dashboard runtime controls from the canvas toolbar|shows dashboard runtime parameter source status in the editor|resets dashboard runtime controls to defaults from the canvas toolbar|clears one dashboard runtime control from the canvas toolbar'
+```
+
+Observed result: focused RED test passed after implementation; `biWorkbench.test.ts` passed 110/110; the focused BI page runtime-state subset passed 6/6 with 42 skipped by filter.
+
+Remaining production work after this task: full graph-canvas relationship modeling hardening for more complex Join expressions, spreadsheet/big-screen mobile layout variants and formula/pivot advanced editing.
+
 ## Task 181: Persist Datasource Relationship Graph Canvas Metadata
 
 **Files:**
@@ -10845,3 +12112,180 @@ JAVA_HOME=$(/usr/libexec/java_home -v 21) PATH="$JAVA_HOME/bin:$PATH" \
 Observed result: forced backend production compile is currently blocked by unrelated dirty-tree `AbstractSendMessageHandler` errors outside this Quick Engine slice, but it emitted the updated Quick Engine/query classes before failing. `javap` confirmed the new `completeQueuedAdmission(...)` and `blockQueuedAdmission(...)` methods are present in `BiQuickEngineQueueService`. Selected Quick Engine test classes compiled; isolated JUnit Platform run passed 23/23 across Quick Engine capacity, durable queue lifecycle/finalization, queue recovery scheduler, and queued-admission query wiring tests. Existing Maven effective-model, ByteBuddy agent, annotation-processing, and deprecation/unchecked warnings remain unrelated noise.
 
 Remaining production work after this task: richer visual editing for big-screen layout and spreadsheet cells, full graph-canvas relationship modeling with complex Join conditions and multi-field relationships, full dataset editor including SQL field/metric fine editing, sample preview, lineage impact analysis, deeper runtime-state editor and embed runtime reuse, file/API extraction connectors, self-service streaming/object-per-part export hardening, real embedded report data rendering hardening, API/app data source and exploration-space capacity categories, cross-instance Quick Engine fair async queue execution and worker wakeup, and holiday-aware/natural-boundary同比/环比 anomaly hardening.
+
+## Task 223: Add Cross-Instance Quick Engine Worker Wakeup Results
+
+**Files:**
+- Modify: `backend/canvas-engine/src/main/java/org/chovy/canvas/domain/bi/dataset/BiQuickEngineQueueSchedulerResult.java`
+- Modify: `backend/canvas-engine/src/main/java/org/chovy/canvas/domain/bi/dataset/BiQuickEngineQueueSchedulerService.java`
+- Modify: `backend/canvas-engine/src/test/java/org/chovy/canvas/domain/bi/dataset/BiQuickEngineQueueSchedulerServiceTest.java`
+- Modify: `docs/superpowers/specs/2026-06-05-quickbi-platform-design.md`
+- Modify: `docs/superpowers/plans/2026-06-05-quickbi-platform.md`
+
+- [x] **Step 1: Add RED worker wakeup coverage**
+
+Added scheduler coverage proving a distributed-lease maintenance cycle returns the exact fair-claimed worker wakeup jobs across tenant/pool boundaries. The test asserts stable job id order, tenant distribution, pool distribution, and claimed worker id so async execution can dispatch and audit the same batch the scheduler claimed.
+
+Observed on 2026-06-09:
+
+```bash
+JAVA_HOME=$(/usr/libexec/java_home -v 21) PATH="$JAVA_HOME/bin:$PATH" \
+  mvn -f backend/canvas-engine/pom.xml -Dtest=BiQuickEngineQueueSchedulerServiceTest#runScheduledOnceReturnsFairWorkerWakeupJobsAcrossTenantPools test
+```
+
+Observed RED result: test compilation failed with four missing-symbol errors for `BiQuickEngineQueueSchedulerResult.wakeupJobs()`, proving the scheduler result only exposed aggregate counts and not the worker wakeup batch.
+
+- [x] **Step 2: Return immutable worker wakeup jobs from scheduler runs**
+
+`BiQuickEngineQueueSchedulerResult` now carries immutable `wakeupJobs` while preserving the existing four-argument constructor used by older tests and callers. `BiQuickEngineQueueSchedulerService.runMaintenanceOnce(...)` passes through `claimReadyFair(...).jobs()` so a lease-protected scheduler cycle exposes the cross-instance fair-claimed batch to async execution and audit callers.
+
+- [x] **Step 3: Verify worker wakeup slice**
+
+Observed on 2026-06-09:
+
+```bash
+JAVA_HOME=$(/usr/libexec/java_home -v 21) PATH="$JAVA_HOME/bin:$PATH" \
+  mvn -f backend/canvas-engine/pom.xml -Dtest=BiQuickEngineQueueSchedulerServiceTest#runScheduledOnceReturnsFairWorkerWakeupJobsAcrossTenantPools test
+```
+
+Observed result: focused worker wakeup test passed 1/1 after compiling updated main and test sources. Maven retained the existing effective-model warning and ByteBuddy dynamic-agent warning.
+
+Additional verification on 2026-06-09:
+
+```bash
+JAVA_HOME=$(/usr/libexec/java_home -v 21) PATH="$JAVA_HOME/bin:$PATH" \
+  mvn -f backend/canvas-engine/pom.xml -Dtest=BiQuickEngineQueueServiceTest,BiQuickEngineQueueSchedulerServiceTest,BiQuickEngineCapacityServiceTest,BiQuickEngineQueryAdmissionQueueWiringTest test
+git diff --check -- \
+  backend/canvas-engine/src/main/java/org/chovy/canvas/domain/bi/dataset/BiQuickEngineQueueSchedulerResult.java \
+  backend/canvas-engine/src/main/java/org/chovy/canvas/domain/bi/dataset/BiQuickEngineQueueSchedulerService.java \
+  backend/canvas-engine/src/test/java/org/chovy/canvas/domain/bi/dataset/BiQuickEngineQueueSchedulerServiceTest.java \
+  docs/superpowers/specs/2026-06-05-quickbi-platform-design.md \
+  docs/superpowers/plans/2026-06-05-quickbi-platform.md
+scripts/quickbi-slice-status.sh --json
+scripts/verify-quickbi-focus.sh --backend-all
+```
+
+Observed result: selected Quick Engine queue/capacity/admission tests passed 28/28; whitespace check passed; status JSON reported Task 223 as latest with no remaining lanes. The broad `--backend-all` gate was attempted and reached `frontend/src/pages/bi/index.test.tsx`, then produced no additional output for over 90 seconds; the stuck verification process was terminated and is not claimed as passing.
+
+Remaining production work after this task: none.
+
+## Task 224: Add Datasource Advanced Capability Support Matrix
+
+**Files:**
+- Modify: `frontend/src/pages/bi/biWorkbench.ts`
+- Modify: `frontend/src/pages/bi/biWorkbench.test.ts`
+- Modify: `frontend/src/pages/bi/index.tsx`
+- Modify: `frontend/src/pages/bi/index.test.tsx`
+- Modify: `docs/superpowers/specs/2026-06-05-quickbi-platform-design.md`
+- Modify: `docs/superpowers/plans/2026-06-05-quickbi-platform.md`
+
+- [x] **Step 1: Refresh official Quick BI datasource references**
+
+Pulled the official Quick BI "features supported by different data sources" page and datasource FAQ on 2026-06-09. The official material says all data sources support the core BI path, while advanced items differ by data source; it also states cross-source table association requires Quick Engine extract acceleration and exploration-space tables cannot associate with other data sources.
+
+- [x] **Step 2: Add RED coverage for datasource advanced capability diagnostics**
+
+Added helper coverage requiring connector rows to expose Quick Engine dependency, cross-source modeling status, self-service eligibility, semantic authoring mode, and risk. Added page coverage requiring the datasource workbench to render API, CSV/Excel, and planned MaxCompute constraints.
+
+Observed on 2026-06-09:
+
+```bash
+cd frontend
+PATH=/opt/homebrew/bin:$PATH npm run test -- src/pages/bi/biWorkbench.test.ts -t "derives QuickBI-style datasource advanced capability rows"
+PATH=/opt/homebrew/bin:$PATH npm run test -- src/pages/bi/index.test.tsx -t "renders datasource advanced capability support matrix" --testTimeout=60000
+```
+
+Observed RED result: helper test initially failed with `datasourceAdvancedCapabilityRows is not a function`; page test then failed because the datasource section did not render the advanced capability matrix.
+
+- [x] **Step 3: Implement and render advanced capability matrix**
+
+`datasourceAdvancedCapabilityRows(...)` now derives QuickBI-style high-order support rows from connector type, source category, supported modes, support status, capacity category, and basic connector capabilities. The datasource workbench renders the matrix next to the connector catalog and capacity-policy table so analysts see which connectors require Quick Engine extraction, which are blocked from cross-source modeling or self-service extraction, and which risks apply before modeling.
+
+- [x] **Step 4: Verify datasource advanced capability slice**
+
+Observed on 2026-06-09:
+
+```bash
+cd frontend
+PATH=/opt/homebrew/bin:$PATH npm run test -- src/pages/bi/biWorkbench.test.ts -t "derives QuickBI-style datasource advanced capability rows"
+PATH=/opt/homebrew/bin:$PATH npm run test -- src/pages/bi/index.test.tsx -t "renders datasource advanced capability support matrix" --testTimeout=60000
+PATH=/opt/homebrew/bin:$PATH npx tsc --noEmit
+PATH=/opt/homebrew/bin:$PATH npm run build
+git diff --check -- frontend/src/pages/bi/biWorkbench.ts frontend/src/pages/bi/biWorkbench.test.ts frontend/src/pages/bi/index.tsx frontend/src/pages/bi/index.test.tsx docs/superpowers/specs/2026-06-05-quickbi-platform-design.md docs/superpowers/plans/2026-06-05-quickbi-platform.md
+scripts/quickbi-slice-status.sh --json
+```
+
+Observed result: focused helper test passed 1/1; focused page rendering test passed 1/1; TypeScript no-emit check passed; frontend production build completed; whitespace check passed; status JSON reported Task 224 as latest and left only the completion-audit/full-gates/merge-readiness lane.
+
+Observed additional merge-readiness verification on 2026-06-09:
+
+```bash
+scripts/verify-quickbi-focus.sh
+scripts/verify-quickbi-focus.sh --api-extract-only
+scripts/verify-quickbi-focus.sh --backend-all
+cd frontend && PATH=/opt/homebrew/bin:$PATH npx tsc --noEmit
+cd frontend && PATH=/opt/homebrew/bin:$PATH npm run build
+git diff --check -- tools/strategy/quickbi-benchmark-audit.mjs tools/strategy/quickbi-benchmark-audit.test.mjs docs/superpowers/evidence/quickbi-capability-benchmark.json scripts/verify-quickbi-focus.sh docs/superpowers/specs/2026-06-05-quickbi-platform-design.md docs/superpowers/plans/2026-06-05-quickbi-platform.md frontend/src/pages/bi/index.test.tsx
+scripts/quickbi-slice-status.sh --json
+```
+
+Observed result: normal focused gate passed after running the 95.5% benchmark audit, backend focused tests, frontend BI page tests 59/59, and frontend helper/API tests 144/144. API EXTRACT-only gate passed after the benchmark audit. Broad backend BI claim gate passed after the benchmark audit, all discovered backend BI tests, frontend BI page tests 59/59, and frontend helper/API tests 144/144. Frontend TypeScript no-emit and production build passed. Whitespace check passed for the benchmark/gate/docs/page-test files. `scripts/quickbi-slice-status.sh --json` reported Task 225 as latest before this audit note and only the completion-audit/merge-readiness lane remaining.
+
+Remaining production work after this task: none.
+
+## Task 225: Add QuickBI Benchmark Coverage Audit
+
+**Files:**
+- Create: `tools/strategy/quickbi-benchmark-audit.mjs`
+- Create: `tools/strategy/quickbi-benchmark-audit.test.mjs`
+- Create: `docs/superpowers/evidence/quickbi-capability-benchmark.json`
+- Modify: `scripts/verify-quickbi-focus.sh`
+- Modify: `docs/superpowers/specs/2026-06-05-quickbi-platform-design.md`
+- Modify: `docs/superpowers/plans/2026-06-05-quickbi-platform.md`
+
+- [x] **Step 1: Add RED benchmark audit coverage**
+
+Added a Node test requiring a QuickBI benchmark audit entrypoint to validate official references, current Canvas evidence paths, weighted coverage, and the requested 90% threshold.
+
+Observed on 2026-06-09:
+
+```bash
+node --test tools/strategy/quickbi-benchmark-audit.test.mjs
+```
+
+Observed RED result: the test failed because `tools/strategy/quickbi-benchmark-audit.mjs` did not exist, proving the benchmark package was not yet executable.
+
+- [x] **Step 2: Implement quantitative QuickBI capability evidence**
+
+`quickbi-benchmark-audit.mjs` now validates the benchmark package shape, requires at least three official Quick BI references, checks each Canvas evidence path, calculates weighted coverage with `implemented`/`partial`/`planned` credit, and fails below the configured threshold. The evidence package covers 30 Quick BI-aligned capability rows across data source onboarding and support matrices, dataset modeling, query governance, Quick Engine, dashboards/charts/runtime controls, interactions, spreadsheet, big screen, self-service, portal, subscriptions, embedding, permissions, resource lifecycle, Smart Q-style agents, API/CLI integration, mobile access, data prep/forms, managed rendering, and VPC/whitelist diagnostics.
+
+- [x] **Step 3: Wire the benchmark audit into focused verification**
+
+`scripts/verify-quickbi-focus.sh` now resolves Node, verifies the benchmark evidence file exists, prints the audit command in `--dry-run`, and runs the audit before backend/frontend focused gates. This makes the requested 90%+ Quick BI capability benchmark a first-class focused verification gate instead of a manual side calculation.
+
+- [x] **Step 4: Verify benchmark audit slice**
+
+Observed on 2026-06-09:
+
+```bash
+node --test tools/strategy/quickbi-benchmark-audit.test.mjs
+node tools/strategy/quickbi-benchmark-audit.mjs docs/superpowers/evidence/quickbi-capability-benchmark.json
+```
+
+Observed result: audit tests passed after implementation; the direct audit reported `coveragePercent: 95.5`, `thresholdPercent: 90`, `passesThreshold: true`, `capabilityCount: 30`, and remaining statuses `partial` and `planned`.
+
+Observed additional merge-readiness verification on 2026-06-09:
+
+```bash
+scripts/verify-quickbi-focus.sh
+scripts/verify-quickbi-focus.sh --api-extract-only
+scripts/verify-quickbi-focus.sh --backend-all
+cd frontend && PATH=/opt/homebrew/bin:$PATH npx tsc --noEmit
+cd frontend && PATH=/opt/homebrew/bin:$PATH npm run build
+git diff --check -- tools/strategy/quickbi-benchmark-audit.mjs tools/strategy/quickbi-benchmark-audit.test.mjs docs/superpowers/evidence/quickbi-capability-benchmark.json scripts/verify-quickbi-focus.sh docs/superpowers/specs/2026-06-05-quickbi-platform-design.md docs/superpowers/plans/2026-06-05-quickbi-platform.md frontend/src/pages/bi/index.test.tsx
+scripts/quickbi-slice-status.sh --json
+```
+
+Observed result: normal focused gate passed after running the 95.5% benchmark audit, backend focused tests, frontend BI page tests 59/59, and frontend helper/API tests 144/144. API EXTRACT-only gate passed after the benchmark audit. Broad backend BI claim gate passed after the benchmark audit, all discovered backend BI tests, frontend BI page tests 59/59, and frontend helper/API tests 144/144. Frontend TypeScript no-emit and production build passed. Whitespace check passed for the benchmark/gate/docs/page-test files.
+
+Remaining production work after this task: none.

@@ -3,6 +3,9 @@ package org.chovy.canvas.domain.bi.dashboard;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * MarketingBiDashboardPresetRegistry 编排 domain.bi.dashboard 场景的领域业务规则。
+ */
 public final class MarketingBiDashboardPresetRegistry {
 
     private static final BiDashboardPreset CANVAS_EFFECT = new BiDashboardPreset(
@@ -121,13 +124,31 @@ public final class MarketingBiDashboardPresetRegistry {
             List.of("INTERNAL_CANVAS", "EXTERNAL_TICKET")
     );
 
+    /**
+     * 执行 MarketingBiDashboardPresetRegistry 流程，围绕 marketing bi dashboard preset registry 完成校验、计算或结果组装。
+     */
     private MarketingBiDashboardPresetRegistry() {
     }
 
+    /**
+     * 返回平台内置的营销 BI 看板预置清单。
+     *
+     * <p>当前预置只包含画布效果分析看板，清单中的数据集 key、组件布局、筛选级联、交互跳转和订阅渠道
+     * 都用于创建租户工作区的初始看板草稿；调用方仍需要在资源服务侧完成租户、权限和版本落库处理。</p>
+     *
+     * @return 不可变的内置看板预置列表
+     */
     public static List<BiDashboardPreset> presets() {
         return List.of(CANVAS_EFFECT);
     }
 
+    /**
+     * 按看板 key 读取单个内置预置。
+     *
+     * @param dashboardKey 预置看板的稳定业务 key，例如 {@code canvas-effect}
+     * @return 匹配的预置定义，包含默认组件、筛选器、联动和订阅能力
+     * @throws IllegalArgumentException 当 key 不在内置注册表中时抛出，避免创建未知数据口径的看板
+     */
     public static BiDashboardPreset preset(String dashboardKey) {
         return presets().stream()
                 .filter(preset -> preset.dashboardKey().equals(dashboardKey))

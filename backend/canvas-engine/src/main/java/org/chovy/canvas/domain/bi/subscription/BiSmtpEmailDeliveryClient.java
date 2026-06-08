@@ -17,6 +17,9 @@ import java.util.Base64;
 import java.util.List;
 import java.util.UUID;
 
+/**
+ * BiSmtpEmailDeliveryClient 编排 domain.bi.subscription 场景的领域业务规则。
+ */
 @Service
 public class BiSmtpEmailDeliveryClient implements BiEmailDeliveryClient {
 
@@ -30,6 +33,18 @@ public class BiSmtpEmailDeliveryClient implements BiEmailDeliveryClient {
     private final boolean startTls;
     private final int timeoutMs;
 
+    /**
+     * 创建 BiSmtpEmailDeliveryClient 实例并注入 domain.bi.subscription 场景依赖。
+     * @param enabled enabled 参数，用于 BiSmtpEmailDeliveryClient 流程中的校验、计算或对象转换。
+     * @param host host 参数，用于 BiSmtpEmailDeliveryClient 流程中的校验、计算或对象转换。
+     * @param port port 参数，用于 BiSmtpEmailDeliveryClient 流程中的校验、计算或对象转换。
+     * @param username 操作人标识，用于审计和权限判断。
+     * @param password password 参数，用于 BiSmtpEmailDeliveryClient 流程中的校验、计算或对象转换。
+     * @param defaultFrom 时间或范围边界，用于限定统计窗口。
+     * @param ssl ssl 参数，用于 BiSmtpEmailDeliveryClient 流程中的校验、计算或对象转换。
+     * @param startTls start tls 参数，用于 BiSmtpEmailDeliveryClient 流程中的校验、计算或对象转换。
+     * @param timeoutMs 时间参数，用于计算窗口、过期或审计时间。
+     */
     public BiSmtpEmailDeliveryClient(
             @Value("${canvas.bi.delivery.email.enabled:false}") boolean enabled,
             @Value("${canvas.bi.delivery.email.host:}") String host,
@@ -51,11 +66,24 @@ public class BiSmtpEmailDeliveryClient implements BiEmailDeliveryClient {
         this.timeoutMs = Math.max(1000, timeoutMs);
     }
 
+    /**
+     * 判断 SMTP 邮件投递客户端是否具备最小发送配置。
+     *
+     * @return {@code true} 表示邮件开关启用，且已配置 SMTP 主机和默认发件人
+     */
     @Override
     public boolean configured() {
         return enabled && hasText(host) && hasText(defaultFrom);
     }
 
+    /**
+     * 通过 SMTP 协议发送 BI 订阅邮件。
+     *
+     * <p>方法会建立明文、SSL 或 STARTTLS 连接，按需执行 AUTH LOGIN，逐个写入收件人，并发送文本或带附件的 MIME 邮件。
+     * 发送成功无返回；配置缺失、收件人为空或 SMTP 会话失败会抛出异常。</p>
+     *
+     * @param request 邮件投递请求，包含发件人、收件人、主题、正文和附件
+     */
     @Override
     public void send(BiEmailDeliveryRequest request) {
         if (!configured()) {
@@ -87,20 +115,39 @@ public class BiSmtpEmailDeliveryClient implements BiEmailDeliveryClient {
             try (socket; reader; writer) {
                 smtpConversation(writer, reader, from, request);
             }
+        // 捕获异常并转为业务兜底处理，避免异常扩散到主流程。
         } catch (IOException e) {
             throw new IllegalStateException("SMTP email delivery failed: " + e.getMessage(), e);
         }
     }
 
+    /**
+     * 创建业务对象并完成必要的初始化。
+     *
+     * @return 返回 openSocket 流程生成的业务结果。
+     */
     private Socket openSocket() throws IOException {
         Socket socket = ssl
                 ? SSLSocketFactory.getDefault().createSocket()
+                /**
+                 * 执行 Socket 流程，围绕 socket 完成校验、计算或结果组装。
+                 *
+                 * @return 返回 Socket 流程生成的业务结果。
+                 */
                 : new Socket();
         socket.connect(new InetSocketAddress(host, port), timeoutMs);
         socket.setSoTimeout(timeoutMs);
         return socket;
     }
 
+    /**
+     * 执行 smtpConversation 流程，围绕 smtp conversation 完成校验、计算或结果组装。
+     *
+     * @param writer writer 参数，用于 smtpConversation 流程中的校验、计算或对象转换。
+     * @param reader reader 参数，用于 smtpConversation 流程中的校验、计算或对象转换。
+     * @param from 时间或范围边界，用于限定统计窗口。
+     * @param request 请求对象，承载本次操作的输入参数。
+     */
     private void smtpConversation(BufferedWriter writer,
                                   BufferedReader reader,
                                   String from,
@@ -120,6 +167,13 @@ public class BiSmtpEmailDeliveryClient implements BiEmailDeliveryClient {
         command(writer, reader, "QUIT", 221);
     }
 
+    /**
+     * 执行 message 流程，围绕 message 完成校验、计算或结果组装。
+     *
+     * @param from 时间或范围边界，用于限定统计窗口。
+     * @param request 请求对象，承载本次操作的输入参数。
+     * @return 返回 message 生成的文本或业务键。
+     */
     private String message(String from, BiEmailDeliveryRequest request) {
         List<String> to = request.to();
         String subject = hasText(request.subject()) ? request.subject() : "BI 通知";
@@ -137,11 +191,22 @@ public class BiSmtpEmailDeliveryClient implements BiEmailDeliveryClient {
                 + text + "\r\n";
     }
 
+    /**
+     * 执行 multipartMessage 流程，围绕 multipart message 完成校验、计算或结果组装。
+     *
+     * @param from 时间或范围边界，用于限定统计窗口。
+     * @param to 时间或范围边界，用于限定统计窗口。
+     * @param subject 待处理业务值，用于规则计算、转换或外部调用。
+     * @param text text 参数，用于 multipartMessage 流程中的校验、计算或对象转换。
+     * @param attachments attachments 参数，用于 multipartMessage 流程中的校验、计算或对象转换。
+     * @return 返回 multipart message 生成的文本或业务键。
+     */
     private String multipartMessage(String from,
                                     List<String> to,
                                     String subject,
                                     String text,
                                     List<BiEmailAttachment> attachments) {
+        // 准备本次处理所需的上下文和中间变量。
         String boundary = "canvas-bi-" + UUID.randomUUID();
         StringBuilder builder = new StringBuilder()
                 .append("From: ").append(from).append("\r\n")
@@ -156,6 +221,7 @@ public class BiSmtpEmailDeliveryClient implements BiEmailDeliveryClient {
                 .append("Content-Transfer-Encoding: 8bit\r\n")
                 .append("\r\n")
                 .append(text).append("\r\n");
+        // 遍历候选数据并按业务规则筛选、转换或聚合。
         for (BiEmailAttachment attachment : attachments) {
             if (attachment.bytes().length == 0) {
                 continue;
@@ -173,9 +239,16 @@ public class BiSmtpEmailDeliveryClient implements BiEmailDeliveryClient {
                     .append("\r\n");
         }
         builder.append("--").append(boundary).append("--\r\n");
+        // 汇总前面计算出的状态和明细，返回给调用方。
         return builder.toString();
     }
 
+    /**
+     * 写入或更新业务数据，并保持关联状态一致。
+     *
+     * @param writer writer 参数，用于 writeData 流程中的校验、计算或对象转换。
+     * @param message 原因或消息文本，用于记录状态变化的业务依据。
+     */
     private void writeData(BufferedWriter writer, String message) throws IOException {
         for (String line : message.split("\\r?\\n", -1)) {
             writer.write(line.startsWith(".") ? "." + line : line);
@@ -185,6 +258,14 @@ public class BiSmtpEmailDeliveryClient implements BiEmailDeliveryClient {
         writer.flush();
     }
 
+    /**
+     * 执行 command 流程，围绕 command 完成校验、计算或结果组装。
+     *
+     * @param writer writer 参数，用于 command 流程中的校验、计算或对象转换。
+     * @param reader reader 参数，用于 command 流程中的校验、计算或对象转换。
+     * @param command 命令对象，描述本次业务动作及其参数。
+     * @param expectedCodes expected codes 参数，用于 command 流程中的校验、计算或对象转换。
+     */
     private void command(BufferedWriter writer,
                          BufferedReader reader,
                          String command,
@@ -195,6 +276,12 @@ public class BiSmtpEmailDeliveryClient implements BiEmailDeliveryClient {
         expect(reader, expectedCodes);
     }
 
+    /**
+     * 执行 expect 流程，围绕 expect 完成校验、计算或结果组装。
+     *
+     * @param reader reader 参数，用于 expect 流程中的校验、计算或对象转换。
+     * @param expectedCodes expected codes 参数，用于 expect 流程中的校验、计算或对象转换。
+     */
     private void expect(BufferedReader reader, int... expectedCodes) throws IOException {
         SmtpResponse response = readResponse(reader);
         for (int expectedCode : expectedCodes) {
@@ -205,11 +292,19 @@ public class BiSmtpEmailDeliveryClient implements BiEmailDeliveryClient {
         throw new IOException("unexpected SMTP response " + response.code() + ": " + response.message());
     }
 
+    /**
+     * 转换为接口返回或领域视图。
+     *
+     * @param reader reader 参数，用于 readResponse 流程中的校验、计算或对象转换。
+     * @return 返回 readResponse 流程生成的业务结果。
+     */
     private SmtpResponse readResponse(BufferedReader reader) throws IOException {
         StringBuilder message = new StringBuilder();
         int code = -1;
+        // 遍历候选数据并按业务规则筛选、转换或聚合。
         while (true) {
             String line = reader.readLine();
+            // 校验关键输入和前置条件，避免无效状态继续进入主流程。
             if (line == null) {
                 throw new IOException("SMTP server closed connection");
             }
@@ -218,27 +313,55 @@ public class BiSmtpEmailDeliveryClient implements BiEmailDeliveryClient {
             }
             message.append(line).append('\n');
             if (line.length() < 4 || line.charAt(3) != '-') {
+                // 汇总前面计算出的状态和明细，返回给调用方。
                 return new SmtpResponse(code, message.toString());
             }
         }
     }
 
+    /**
+     * 执行 base64 流程，围绕 base64 完成校验、计算或结果组装。
+     *
+     * @param value 待处理值，用于规则计算或转换。
+     * @return 返回 base64 生成的文本或业务键。
+     */
     private String base64(String value) {
         return Base64.getEncoder().encodeToString((value == null ? "" : value).getBytes(StandardCharsets.UTF_8));
     }
 
+    /**
+     * 执行 headerEscape 流程，围绕 header escape 完成校验、计算或结果组装。
+     *
+     * @param value 待处理值，用于规则计算或转换。
+     * @return 返回 header escape 生成的文本或业务键。
+     */
     private String headerEscape(String value) {
         return (value == null ? "" : value).replace("\\", "\\\\").replace("\"", "\\\"");
     }
 
+    /**
+     * 执行 text 流程，围绕 text 完成校验、计算或结果组装。
+     *
+     * @param value 待处理值，用于规则计算或转换。
+     * @return 返回 text 生成的文本或业务键。
+     */
     private String text(String value) {
         return value == null ? "" : value.trim();
     }
 
+    /**
+     * 判断业务条件是否成立。
+     *
+     * @param value 待处理值，用于规则计算或转换。
+     * @return 返回布尔判断结果。
+     */
     private boolean hasText(String value) {
         return value != null && !value.isBlank();
     }
 
+    /**
+     * SmtpResponse 数据记录。
+     */
     private record SmtpResponse(int code, String message) {
     }
 }

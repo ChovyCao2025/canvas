@@ -429,6 +429,137 @@ class BiDatasetFromDatasourceServiceTest {
     }
 
     @Test
+    void createsDraftMultiTableSqlDatasetWithOrJoinConditionConnector() {
+        BiDatasourceRuntimeService datasourceRuntimeService = mock(BiDatasourceRuntimeService.class);
+        BiDatasetResourceService datasetResourceService = mock(BiDatasetResourceService.class);
+        when(datasourceRuntimeService.latestSchemaSnapshot(7L, 42L)).thenReturn(multiTableSnapshot());
+        when(datasetResourceService.saveDraft(
+                org.mockito.Mockito.eq(42L),
+                org.mockito.Mockito.eq("alice"),
+                org.mockito.Mockito.eq("TENANT_ADMIN"),
+                any(BiDatasetResource.class)))
+                .thenAnswer(invocation -> invocation.getArgument(3, BiDatasetResource.class));
+        BiDatasetFromDatasourceService service =
+                new BiDatasetFromDatasourceService(datasourceRuntimeService, datasetResourceService);
+
+        BiDatasetResource resource = service.createMultiTableDataset(
+                42L,
+                "alice",
+                "TENANT_ADMIN",
+                new BiDatasetFromDatasourceMultiTableCommand(
+                        7L,
+                        "campaign_cost_with_or_join",
+                        "Campaign Cost With Or Join",
+                        "campaign_daily",
+                        "tenant_id",
+                        List.of(
+                                new BiDatasetFromDatasourceTableCommand(
+                                        "campaign_daily",
+                                        "fact",
+                                        List.of("tenant_id", "stat_date", "total_cost")),
+                                new BiDatasetFromDatasourceTableCommand(
+                                        "campaign_dim",
+                                        "dim",
+                                        List.of("campaign_name"))),
+                        List.of(new BiDatasetFromDatasourceJoinCommand(
+                                "INNER",
+                                "fact",
+                                null,
+                                "dim",
+                                null,
+                                List.of(
+                                        new BiDatasetFromDatasourceJoinConditionCommand("tenant_id", "tenant_id"),
+                                        new BiDatasetFromDatasourceJoinConditionCommand("campaign_id", "campaign_id", "=", "OR"))))));
+
+        assertThat(resource.tableExpression()).isEqualTo(
+                "SELECT fact.tenant_id AS tenant_id, fact.stat_date AS campaign_daily_stat_date, "
+                        + "fact.total_cost AS campaign_daily_total_cost, dim.campaign_name AS campaign_dim_campaign_name "
+                        + "FROM campaign_daily fact INNER JOIN campaign_dim dim "
+                        + "ON fact.tenant_id = dim.tenant_id OR fact.campaign_id = dim.campaign_id");
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> joins = (List<Map<String, Object>>) resource.model().get("joins");
+        assertThat(joins).singleElement().satisfies(join -> assertThat(join.get("conditions")).isEqualTo(List.of(
+                Map.of("leftColumn", "tenant_id", "rightColumn", "tenant_id"),
+                Map.of("leftColumn", "campaign_id", "rightColumn", "campaign_id", "connector", "OR"))));
+        @SuppressWarnings("unchecked")
+        Map<String, Object> graph = (Map<String, Object>) resource.model().get("graph");
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> edges = (List<Map<String, Object>>) graph.get("edges");
+        assertThat(edges).singleElement().satisfies(edge -> assertThat(edge.get("conditions")).isEqualTo(List.of(
+                Map.of("leftColumn", "tenant_id", "rightColumn", "tenant_id"),
+                Map.of("leftColumn", "campaign_id", "rightColumn", "campaign_id", "connector", "OR"))));
+    }
+
+    @Test
+    void createsDraftMultiTableSqlDatasetWithGroupedJoinConditions() {
+        BiDatasourceRuntimeService datasourceRuntimeService = mock(BiDatasourceRuntimeService.class);
+        BiDatasetResourceService datasetResourceService = mock(BiDatasetResourceService.class);
+        when(datasourceRuntimeService.latestSchemaSnapshot(7L, 42L)).thenReturn(multiTableSnapshot());
+        when(datasetResourceService.saveDraft(
+                org.mockito.Mockito.eq(42L),
+                org.mockito.Mockito.eq("alice"),
+                org.mockito.Mockito.eq("TENANT_ADMIN"),
+                any(BiDatasetResource.class)))
+                .thenAnswer(invocation -> invocation.getArgument(3, BiDatasetResource.class));
+        BiDatasetFromDatasourceService service =
+                new BiDatasetFromDatasourceService(datasourceRuntimeService, datasetResourceService);
+
+        BiDatasetResource resource = service.createMultiTableDataset(
+                42L,
+                "alice",
+                "TENANT_ADMIN",
+                new BiDatasetFromDatasourceMultiTableCommand(
+                        7L,
+                        "campaign_cost_with_grouped_join",
+                        "Campaign Cost With Grouped Join",
+                        "campaign_daily",
+                        "tenant_id",
+                        List.of(
+                                new BiDatasetFromDatasourceTableCommand(
+                                        "campaign_daily",
+                                        "fact",
+                                        List.of("tenant_id", "stat_date", "total_cost")),
+                                new BiDatasetFromDatasourceTableCommand(
+                                        "campaign_dim",
+                                        "dim",
+                                        List.of("campaign_name"))),
+                        List.of(new BiDatasetFromDatasourceJoinCommand(
+                                "LEFT",
+                                "fact",
+                                null,
+                                "dim",
+                                null,
+                                List.of(
+                                        new BiDatasetFromDatasourceJoinConditionCommand("tenant_id", "tenant_id"),
+                                        new BiDatasetFromDatasourceJoinConditionCommand(
+                                                "campaign_id", "campaign_id", "=", null, true, false),
+                                        new BiDatasetFromDatasourceJoinConditionCommand(
+                                                "total_cost", "campaign_id", ">", "OR", false, true))))));
+
+        assertThat(resource.tableExpression()).isEqualTo(
+                "SELECT fact.tenant_id AS tenant_id, fact.stat_date AS campaign_daily_stat_date, "
+                        + "fact.total_cost AS campaign_daily_total_cost, "
+                        + "dim.campaign_name AS campaign_dim_campaign_name "
+                        + "FROM campaign_daily fact LEFT JOIN campaign_dim dim "
+                        + "ON fact.tenant_id = dim.tenant_id AND (fact.campaign_id = dim.campaign_id "
+                        + "OR fact.total_cost > dim.campaign_id)");
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> joins = (List<Map<String, Object>>) resource.model().get("joins");
+        assertThat(joins).singleElement().satisfies(join -> assertThat(join.get("conditions")).isEqualTo(List.of(
+                Map.of("leftColumn", "tenant_id", "rightColumn", "tenant_id"),
+                Map.of("leftColumn", "campaign_id", "rightColumn", "campaign_id", "groupStart", true),
+                Map.of("leftColumn", "total_cost", "rightColumn", "campaign_id", "operator", ">", "connector", "OR", "groupEnd", true))));
+        @SuppressWarnings("unchecked")
+        Map<String, Object> graph = (Map<String, Object>) resource.model().get("graph");
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> edges = (List<Map<String, Object>>) graph.get("edges");
+        assertThat(edges).singleElement().satisfies(edge -> assertThat(edge.get("conditions")).isEqualTo(List.of(
+                Map.of("leftColumn", "tenant_id", "rightColumn", "tenant_id"),
+                Map.of("leftColumn", "campaign_id", "rightColumn", "campaign_id", "groupStart", true),
+                Map.of("leftColumn", "total_cost", "rightColumn", "campaign_id", "operator", ">", "connector", "OR", "groupEnd", true))));
+    }
+
+    @Test
     void persistsGraphCanvasMetadataForMultiTableDatasourceModel() {
         BiDatasourceRuntimeService datasourceRuntimeService = mock(BiDatasourceRuntimeService.class);
         BiDatasetResourceService datasetResourceService = mock(BiDatasetResourceService.class);

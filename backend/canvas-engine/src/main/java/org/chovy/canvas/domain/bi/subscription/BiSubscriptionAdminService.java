@@ -36,6 +36,9 @@ import java.util.Set;
 import java.util.regex.Pattern;
 
 @Service
+/**
+ * BiSubscriptionAdminService 承载对应领域的业务规则、流程编排和结果转换。
+ */
 public class BiSubscriptionAdminService {
 
     private static final String RESOURCE_DATASET = "DATASET";
@@ -67,6 +70,21 @@ public class BiSubscriptionAdminService {
     private final ObjectMapper objectMapper;
 
     @Autowired
+    /**
+     * 初始化 BiSubscriptionAdminService 实例。
+     *
+     * @param subscriptionMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param alertRuleMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param datasetMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param metricMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param dashboardMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param chartMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param portalMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param bigScreenMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param spreadsheetMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param permissionServiceProvider 依赖组件，用于完成数据访问或外部能力调用。
+     * @param objectMapper 依赖组件，用于完成数据访问或外部能力调用。
+     */
     public BiSubscriptionAdminService(BiSubscriptionMapper subscriptionMapper,
                                       BiAlertRuleMapper alertRuleMapper,
                                       BiDatasetMapper datasetMapper,
@@ -91,6 +109,21 @@ public class BiSubscriptionAdminService {
                 objectMapper);
     }
 
+    /**
+     * 初始化 BiSubscriptionAdminService 实例。
+     *
+     * @param subscriptionMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param alertRuleMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param datasetMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param metricMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param dashboardMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param chartMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param portalMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param bigScreenMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param spreadsheetMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param permissionService 依赖组件，用于完成数据访问或外部能力调用。
+     * @param objectMapper 依赖组件，用于完成数据访问或外部能力调用。
+     */
     public BiSubscriptionAdminService(BiSubscriptionMapper subscriptionMapper,
                                       BiAlertRuleMapper alertRuleMapper,
                                       BiDatasetMapper datasetMapper,
@@ -115,6 +148,13 @@ public class BiSubscriptionAdminService {
         this.objectMapper = objectMapper;
     }
 
+    /**
+     * 查询并组装符合条件的业务数据。
+     *
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @param limit 分页或数量限制，避免一次处理过多数据。
+     * @return 返回符合条件的数据列表或视图。
+     */
     public List<BiSubscriptionView> listSubscriptions(Long tenantId, int limit) {
         Long scopedTenantId = normalizeTenant(tenantId);
         int capped = capLimit(limit);
@@ -128,10 +168,20 @@ public class BiSubscriptionAdminService {
                 .toList();
     }
 
+    /**
+     * 写入或更新业务数据，并保持关联状态一致。
+     *
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @param username 操作人标识，用于审计和权限判断。
+     * @param role 角色标识，用于权限校验和访问范围判断。
+     * @param command 命令对象，描述本次业务动作及其参数。
+     * @return 返回流程执行后的业务结果。
+     */
     public BiSubscriptionView upsertSubscription(Long tenantId,
                                                  String username,
                                                  String role,
                                                  BiSubscriptionCommand command) {
+        // 校验关键输入和前置条件，避免无效状态继续进入主流程。
         if (command == null) {
             throw new IllegalArgumentException("subscription command is required");
         }
@@ -142,6 +192,7 @@ public class BiSubscriptionAdminService {
         validateSchedule(command.schedule());
         validateReceivers(command.receivers());
 
+        // 访问持久化或外部依赖，获取或写入本次流程需要的数据。
         BiSubscriptionDO row = subscriptionMapper.selectOne(new LambdaQueryWrapper<BiSubscriptionDO>()
                 .eq(BiSubscriptionDO::getTenantId, scopedTenantId)
                 .eq(BiSubscriptionDO::getWorkspaceId, resource.workspaceId())
@@ -171,9 +222,16 @@ public class BiSubscriptionAdminService {
                 .eq(BiSubscriptionDO::getWorkspaceId, resource.workspaceId())
                 .eq(BiSubscriptionDO::getSubscriptionKey, key)
                 .last("LIMIT 1"));
+        // 汇总前面计算出的状态和明细，返回给调用方。
         return toSubscriptionView(persisted == null ? row : persisted);
     }
 
+    /**
+     * 清理、停用或释放指定业务资源。
+     *
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @param id 业务对象 ID，用于定位具体记录。
+     */
     public void deleteSubscription(Long tenantId, Long id) {
         BiSubscriptionDO row = subscriptionMapper.selectById(id);
         if (row == null || !normalizeTenant(row.getTenantId()).equals(normalizeTenant(tenantId))) {
@@ -182,6 +240,13 @@ public class BiSubscriptionAdminService {
         subscriptionMapper.deleteById(id);
     }
 
+    /**
+     * 查询并组装符合条件的业务数据。
+     *
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @param limit 分页或数量限制，避免一次处理过多数据。
+     * @return 返回符合条件的数据列表或视图。
+     */
     public List<BiAlertRuleView> listAlerts(Long tenantId, int limit) {
         Long scopedTenantId = normalizeTenant(tenantId);
         int capped = capLimit(limit);
@@ -196,10 +261,20 @@ public class BiSubscriptionAdminService {
                 .toList();
     }
 
+    /**
+     * 写入或更新业务数据，并保持关联状态一致。
+     *
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @param username 操作人标识，用于审计和权限判断。
+     * @param role 角色标识，用于权限校验和访问范围判断。
+     * @param command 命令对象，描述本次业务动作及其参数。
+     * @return 返回流程执行后的业务结果。
+     */
     public BiAlertRuleView upsertAlert(Long tenantId,
                                        String username,
                                        String role,
                                        BiAlertRuleCommand command) {
+        // 校验关键输入和前置条件，避免无效状态继续进入主流程。
         if (command == null) {
             throw new IllegalArgumentException("alert rule command is required");
         }
@@ -211,6 +286,7 @@ public class BiSubscriptionAdminService {
         validateReceivers(command.receivers());
         enforceDatasetSubscribe(scopedTenantId, dataset, username, role);
 
+        // 访问持久化或外部依赖，获取或写入本次流程需要的数据。
         BiAlertRuleDO row = alertRuleMapper.selectOne(new LambdaQueryWrapper<BiAlertRuleDO>()
                 .eq(BiAlertRuleDO::getTenantId, scopedTenantId)
                 .eq(BiAlertRuleDO::getWorkspaceId, dataset.getWorkspaceId())
@@ -239,9 +315,16 @@ public class BiSubscriptionAdminService {
                 .eq(BiAlertRuleDO::getWorkspaceId, dataset.getWorkspaceId())
                 .eq(BiAlertRuleDO::getAlertKey, key)
                 .last("LIMIT 1"));
+        // 汇总前面计算出的状态和明细，返回给调用方。
         return toAlertView(persisted == null ? row : persisted, dataset.getDatasetKey());
     }
 
+    /**
+     * 清理、停用或释放指定业务资源。
+     *
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @param id 业务对象 ID，用于定位具体记录。
+     */
     public void deleteAlert(Long tenantId, Long id) {
         BiAlertRuleDO row = alertRuleMapper.selectById(id);
         if (row == null || !normalizeTenant(row.getTenantId()).equals(normalizeTenant(tenantId))) {
@@ -250,6 +333,12 @@ public class BiSubscriptionAdminService {
         alertRuleMapper.deleteById(id);
     }
 
+    /**
+     * 组装输出结构或完成对象转换。
+     *
+     * @param row 持久化行数据，承载数据库记录内容。
+     * @return 返回组装或转换后的结果对象。
+     */
     private BiSubscriptionView toSubscriptionView(BiSubscriptionDO row) {
         return new BiSubscriptionView(
                 row.getId(),
@@ -269,6 +358,13 @@ public class BiSubscriptionAdminService {
                 row.getUpdatedAt());
     }
 
+    /**
+     * 组装输出结构或完成对象转换。
+     *
+     * @param row 持久化行数据，承载数据库记录内容。
+     * @param datasetKey 业务键，用于在同一租户下定位资源。
+     * @return 返回组装或转换后的结果对象。
+     */
     private BiAlertRuleView toAlertView(BiAlertRuleDO row, String datasetKey) {
         return new BiAlertRuleView(
                 row.getId(),
@@ -287,8 +383,18 @@ public class BiSubscriptionAdminService {
                 row.getUpdatedAt());
     }
 
+    /**
+     * 根据输入和依赖数据计算业务判断结果。
+     *
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @param resourceType 类型标识，用于选择对应处理分支。
+     * @param resourceKey 业务键，用于在同一租户下定位资源。
+     * @param resourceId 业务对象 ID，用于定位具体记录。
+     * @return 返回 resolveResource 流程生成的业务结果。
+     */
     private ResourceRef resolveResource(Long tenantId, String resourceType, String resourceKey, Long resourceId) {
         String scopedType = enumValue(resourceType, RESOURCE_TYPES, "resourceType");
+        // 校验关键输入和前置条件，避免无效状态继续进入主流程。
         if (resourceId != null) {
             return resolveResourceById(tenantId, scopedType, resourceId);
         }
@@ -298,6 +404,7 @@ public class BiSubscriptionAdminService {
             return new ResourceRef(scopedType, dataset.getId(), dataset.getWorkspaceId());
         }
         if (RESOURCE_DASHBOARD.equals(scopedType)) {
+            // 访问持久化或外部依赖，获取或写入本次流程需要的数据。
             BiDashboardDO row = dashboardMapper.selectOne(new LambdaQueryWrapper<BiDashboardDO>()
                     .in(BiDashboardDO::getTenantId, tenantScope(tenantId))
                     .eq(BiDashboardDO::getDashboardKey, key)
@@ -354,11 +461,22 @@ public class BiSubscriptionAdminService {
         if (row == null || row.getId() == null) {
             throw new IllegalArgumentException("BI spreadsheet not found: " + key);
         }
+        // 汇总前面计算出的状态和明细，返回给调用方。
         return new ResourceRef(scopedType, row.getId(), row.getWorkspaceId());
     }
 
+    /**
+     * 根据输入和依赖数据计算业务判断结果。
+     *
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @param resourceType 类型标识，用于选择对应处理分支。
+     * @param resourceId 业务对象 ID，用于定位具体记录。
+     * @return 返回 resolveResourceById 流程生成的业务结果。
+     */
     private ResourceRef resolveResourceById(Long tenantId, String resourceType, Long resourceId) {
+        // 校验关键输入和前置条件，避免无效状态继续进入主流程。
         if (RESOURCE_DATASET.equals(resourceType)) {
+            // 访问持久化或外部依赖，获取或写入本次流程需要的数据。
             BiDatasetDO row = datasetMapper.selectById(resourceId);
             if (row != null && tenantScope(tenantId).contains(normalizeTenant(row.getTenantId()))) {
                 return new ResourceRef(resourceType, row.getId(), row.getWorkspaceId());
@@ -391,12 +509,20 @@ public class BiSubscriptionAdminService {
         if (RESOURCE_SPREADSHEET.equals(resourceType)) {
             BiSpreadsheetDO row = spreadsheetMapper.selectById(resourceId);
             if (row != null && tenantScope(tenantId).contains(normalizeTenant(row.getTenantId()))) {
+                // 汇总前面计算出的状态和明细，返回给调用方。
                 return new ResourceRef(resourceType, row.getId(), row.getWorkspaceId());
             }
         }
         throw new IllegalArgumentException("BI resource not found: " + resourceType + "#" + resourceId);
     }
 
+    /**
+     * 根据输入和依赖数据计算业务判断结果。
+     *
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @param datasetKey 业务键，用于在同一租户下定位资源。
+     * @return 返回 resolveDataset 流程生成的业务结果。
+     */
     private BiDatasetDO resolveDataset(Long tenantId, String datasetKey) {
         String key = required(datasetKey, "datasetKey");
         BiDatasetDO dataset = datasetMapper.selectOne(new LambdaQueryWrapper<BiDatasetDO>()
@@ -411,6 +537,13 @@ public class BiSubscriptionAdminService {
         return dataset;
     }
 
+    /**
+     * 校验输入、权限或业务前置条件。
+     *
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @param datasetId 业务对象 ID，用于定位具体记录。
+     * @param metricKey 业务键，用于在同一租户下定位资源。
+     */
     private void validateMetric(Long tenantId, Long datasetId, String metricKey) {
         String key = required(metricKey, "metricKey");
         BiMetricDO metric = metricMapper.selectOne(new LambdaQueryWrapper<BiMetricDO>()
@@ -425,6 +558,14 @@ public class BiSubscriptionAdminService {
         }
     }
 
+    /**
+     * 根据方法职责完成对应的业务处理流程。
+     *
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @param resource resource 参数，用于 enforceSubscribe 流程中的校验、计算或对象转换。
+     * @param username 操作人标识，用于审计和权限判断。
+     * @param role 角色标识，用于权限校验和访问范围判断。
+     */
     private void enforceSubscribe(Long tenantId, ResourceRef resource, String username, String role) {
         if (permissionService == null) {
             return;
@@ -438,17 +579,34 @@ public class BiSubscriptionAdminService {
                 BiPermissionService.ACTION_SUBSCRIBE);
     }
 
+    /**
+     * 根据方法职责完成对应的业务处理流程。
+     *
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @param dataset dataset 参数，用于 enforceDatasetSubscribe 流程中的校验、计算或对象转换。
+     * @param username 操作人标识，用于审计和权限判断。
+     * @param role 角色标识，用于权限校验和访问范围判断。
+     */
     private void enforceDatasetSubscribe(Long tenantId, BiDatasetDO dataset, String username, String role) {
         enforceSubscribe(tenantId, new ResourceRef(RESOURCE_DATASET, dataset.getId(), dataset.getWorkspaceId()),
                 username, role);
     }
 
+    /**
+     * 根据方法职责完成对应的业务处理流程。
+     *
+     * @param resourceType 类型标识，用于选择对应处理分支。
+     * @param resourceId 业务对象 ID，用于定位具体记录。
+     * @return 返回 resource key 生成的文本或业务键。
+     */
     private String resourceKey(String resourceType, Long resourceId) {
+        // 校验关键输入和前置条件，避免无效状态继续进入主流程。
         if (resourceId == null) {
             return null;
         }
         String type = upperDefault(resourceType, "");
         if (RESOURCE_DATASET.equals(type)) {
+            // 访问持久化或外部依赖，获取或写入本次流程需要的数据。
             BiDatasetDO row = datasetMapper.selectById(resourceId);
             return row == null ? null : row.getDatasetKey();
         }
@@ -472,9 +630,16 @@ public class BiSubscriptionAdminService {
             BiSpreadsheetDO row = spreadsheetMapper.selectById(resourceId);
             return row == null ? null : row.getSpreadsheetKey();
         }
+        // 汇总前面计算出的状态和明细，返回给调用方。
         return null;
     }
 
+    /**
+     * 根据方法职责完成对应的业务处理流程。
+     *
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @return 返回 dataset keys 生成的文本或业务键。
+     */
     private Map<Long, String> datasetKeys(Long tenantId) {
         Map<Long, String> keys = new LinkedHashMap<>();
         safeList(datasetMapper.selectList(new LambdaQueryWrapper<BiDatasetDO>()
@@ -484,6 +649,12 @@ public class BiSubscriptionAdminService {
         return keys;
     }
 
+    /**
+     * 校验输入、权限或业务前置条件。
+     *
+     * @param MapString map string 参数，用于 validateSchedule 流程中的校验、计算或对象转换。
+     * @param schedule schedule 参数，用于 validateSchedule 流程中的校验、计算或对象转换。
+     */
     private void validateSchedule(Map<String, Object> schedule) {
         if (schedule == null || schedule.isEmpty()) {
             throw new IllegalArgumentException("schedule is required");
@@ -491,6 +662,12 @@ public class BiSubscriptionAdminService {
         required(String.valueOf(schedule.getOrDefault("frequency", "")), "schedule.frequency");
     }
 
+    /**
+     * 校验输入、权限或业务前置条件。
+     *
+     * @param MapString map string 参数，用于 validateReceivers 流程中的校验、计算或对象转换。
+     * @param receivers receivers 参数，用于 validateReceivers 流程中的校验、计算或对象转换。
+     */
     private void validateReceivers(Map<String, Object> receivers) {
         if (receivers == null || receivers.isEmpty()) {
             throw new IllegalArgumentException("receivers are required");
@@ -501,7 +678,14 @@ public class BiSubscriptionAdminService {
         }
     }
 
+    /**
+     * 校验输入、权限或业务前置条件。
+     *
+     * @param MapString map string 参数，用于 validateAlertCondition 流程中的校验、计算或对象转换。
+     * @param condition condition 参数，用于 validateAlertCondition 流程中的校验、计算或对象转换。
+     */
     private void validateAlertCondition(Map<String, Object> condition) {
+        // 校验关键输入和前置条件，避免无效状态继续进入主流程。
         if (condition == null || condition.isEmpty()) {
             throw new IllegalArgumentException("condition is required");
         }
@@ -510,6 +694,7 @@ public class BiSubscriptionAdminService {
             positiveInt(condition.get("baselineWindow"), "condition.baselineWindow");
             positiveInt(condition.get("minSamples"), "condition.minSamples");
             positiveNumber(condition.get("sensitivity"), "condition.sensitivity");
+            // 汇总前面计算出的状态和明细，返回给调用方。
             return;
         }
         if (!condition.containsKey("threshold")) {
@@ -517,14 +702,30 @@ public class BiSubscriptionAdminService {
         }
     }
 
+    /**
+     * 校验输入、权限或业务前置条件。
+     *
+     * @param MapString map string 参数，用于 isAnomalyCondition 流程中的校验、计算或对象转换。
+     * @param condition condition 参数，用于 isAnomalyCondition 流程中的校验、计算或对象转换。
+     * @param operator 操作人标识，用于审计和权限判断。
+     * @return 返回布尔判断结果。
+     */
     private boolean isAnomalyCondition(Map<String, Object> condition, String operator) {
         String normalizedOperator = upperDefault(operator, "");
         String mode = upperDefault(String.valueOf(condition.getOrDefault("mode", condition.getOrDefault("type", ""))), "");
         return normalizedOperator.startsWith("ANOMALY") || "ANOMALY".equals(mode);
     }
 
+    /**
+     * 根据方法职责完成对应的业务处理流程。
+     *
+     * @param value 待处理值，用于规则计算或转换。
+     * @param field 待处理业务值，用于规则计算、转换或外部调用。
+     */
     private void positiveInt(Object value, String field) {
+        // 校验关键输入和前置条件，避免无效状态继续进入主流程。
         if (value == null) {
+            // 汇总前面计算出的状态和明细，返回给调用方。
             return;
         }
         int parsed;
@@ -542,8 +743,16 @@ public class BiSubscriptionAdminService {
         }
     }
 
+    /**
+     * 根据方法职责完成对应的业务处理流程。
+     *
+     * @param value 待处理值，用于规则计算或转换。
+     * @param field 待处理业务值，用于规则计算、转换或外部调用。
+     */
     private void positiveNumber(Object value, String field) {
+        // 校验关键输入和前置条件，避免无效状态继续进入主流程。
         if (value == null) {
+            // 汇总前面计算出的状态和明细，返回给调用方。
             return;
         }
         double parsed;
@@ -561,6 +770,12 @@ public class BiSubscriptionAdminService {
         }
     }
 
+    /**
+     * 组装输出结构或完成对象转换。
+     *
+     * @param json JSON 字符串，承载结构化配置或明细。
+     * @return 返回组装或转换后的结果对象。
+     */
     private Map<String, Object> map(String json) {
         if (json == null || json.isBlank()) {
             return Map.of();
@@ -573,6 +788,12 @@ public class BiSubscriptionAdminService {
         }
     }
 
+    /**
+     * 根据方法职责完成对应的业务处理流程。
+     *
+     * @param value 待处理值，用于规则计算或转换。
+     * @return 返回 json 生成的文本或业务键。
+     */
     private String json(Object value) {
         try {
             return objectMapper.writeValueAsString(value == null ? Map.of() : value);
@@ -581,6 +802,14 @@ public class BiSubscriptionAdminService {
         }
     }
 
+    /**
+     * 根据方法职责完成对应的业务处理流程。
+     *
+     * @param value 待处理值，用于规则计算或转换。
+     * @param allowed allowed 参数，用于 enumValue 流程中的校验、计算或对象转换。
+     * @param field 待处理业务值，用于规则计算、转换或外部调用。
+     * @return 返回 enum value 生成的文本或业务键。
+     */
     private String enumValue(String value, Set<String> allowed, String field) {
         String normalized = upperDefault(required(value, field), "");
         if (!allowed.contains(normalized)) {
@@ -589,6 +818,13 @@ public class BiSubscriptionAdminService {
         return normalized;
     }
 
+    /**
+     * 根据方法职责完成对应的业务处理流程。
+     *
+     * @param value 待处理值，用于规则计算或转换。
+     * @param field 待处理业务值，用于规则计算、转换或外部调用。
+     * @return 返回 resource key 生成的文本或业务键。
+     */
     private String resourceKey(String value, String field) {
         String key = required(value, field);
         if (!RESOURCE_KEY.matcher(key).matches()) {
@@ -597,6 +833,13 @@ public class BiSubscriptionAdminService {
         return key;
     }
 
+    /**
+     * 校验输入、权限或业务前置条件。
+     *
+     * @param value 待处理值，用于规则计算或转换。
+     * @param field 待处理业务值，用于规则计算、转换或外部调用。
+     * @return 返回 required 生成的文本或业务键。
+     */
     private String required(String value, String field) {
         if (value == null || value.isBlank()) {
             throw new IllegalArgumentException(field + " is required");
@@ -604,31 +847,71 @@ public class BiSubscriptionAdminService {
         return value.trim();
     }
 
+    /**
+     * 根据方法职责完成对应的业务处理流程。
+     *
+     * @param value 待处理值，用于规则计算或转换。
+     * @param defaultValue 待处理值，用于规则计算或转换。
+     * @return 返回 upper default 生成的文本或业务键。
+     */
     private String upperDefault(String value, String defaultValue) {
         return value == null || value.isBlank() ? defaultValue : value.trim().toUpperCase(Locale.ROOT);
     }
 
+    /**
+     * 生成默认值或兜底结果，保证调用链稳定。
+     *
+     * @param username 操作人标识，用于审计和权限判断。
+     * @return 返回 default user 生成的文本或业务键。
+     */
     private String defaultUser(String username) {
         return username == null || username.isBlank() ? "system" : username;
     }
 
+    /**
+     * 根据方法职责完成对应的业务处理流程。
+     *
+     * @param limit 分页或数量限制，避免一次处理过多数据。
+     * @return 返回 cap limit 计算得到的数量、金额或指标值。
+     */
     private int capLimit(int limit) {
         return Math.max(1, Math.min(limit <= 0 ? 20 : limit, 100));
     }
 
+    /**
+     * 解析、归一化或保护输入值，生成安全可用的中间结果。
+     *
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @return 返回解析、归一化或安全处理后的值。
+     */
     private Long normalizeTenant(Long tenantId) {
         return tenantId == null ? 0L : tenantId;
     }
 
+    /**
+     * 根据方法职责完成对应的业务处理流程。
+     *
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @return 返回 tenant scope 汇总后的集合、分页或映射视图。
+     */
     private List<Long> tenantScope(Long tenantId) {
         Long scopedTenantId = normalizeTenant(tenantId);
         return scopedTenantId == 0L ? List.of(0L) : List.of(scopedTenantId, 0L);
     }
 
+    /**
+     * 根据方法职责完成对应的业务处理流程。
+     *
+     * @param value 待处理值，用于规则计算或转换。
+     * @return 返回 safe list 汇总后的集合、分页或映射视图。
+     */
     private <T> List<T> safeList(List<T> value) {
         return value == null ? List.of() : value;
     }
 
+    /**
+     * ResourceRef 承载对应领域的业务规则、流程编排和结果转换。
+     */
     private record ResourceRef(String resourceType, Long resourceId, Long workspaceId) {
     }
 }

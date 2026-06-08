@@ -4,6 +4,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.chovy.canvas.dal.dataobject.BiDeliveryAttachmentDO;
 import org.chovy.canvas.dal.dataobject.BiSubscriptionDO;
 import org.chovy.canvas.dal.mapper.BiDeliveryAttachmentMapper;
+import org.chovy.canvas.domain.bi.permission.BiPermissionService;
+import org.chovy.canvas.domain.bi.query.BiQueryContext;
 import org.chovy.canvas.domain.bi.storage.BiFileStorage;
 import org.chovy.canvas.domain.bi.storage.BiStoredFile;
 import org.junit.jupiter.api.Test;
@@ -22,6 +24,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
@@ -107,6 +110,31 @@ class BiDeliveryAttachmentServiceTest {
         BiDeliveryAttachmentDO audit = updateCaptor.getAllValues().get(1);
         assertThat(audit.getDownloadCount()).isEqualTo(1);
         assertThat(audit.getLastDownloadedAt()).isNotNull();
+    }
+
+    @Test
+    void downloadChecksSubscribePermissionForBoundResource() throws Exception {
+        BiDeliveryAttachmentMapper mapper = mock(BiDeliveryAttachmentMapper.class);
+        BiPermissionService permissionService = mock(BiPermissionService.class);
+        Path file = tempDir.resolve("canvas-daily.csv");
+        Files.writeString(file, "key,value\njobKey,canvas-daily\n");
+        when(mapper.selectById(201L)).thenReturn(completedAttachment(201L, file));
+        BiDeliveryAttachmentService service = new BiDeliveryAttachmentService(
+                mapper,
+                new ObjectMapper(),
+                permissionService,
+                null,
+                tempDir);
+
+        service.download(7L, 201L, "alice", "OPERATOR");
+
+        verify(permissionService).enforceResourceAccess(
+                eq(7L),
+                eq(5L),
+                eq("DASHBOARD"),
+                eq(21L),
+                any(BiQueryContext.class),
+                eq(BiPermissionService.ACTION_SUBSCRIBE));
     }
 
     @Test

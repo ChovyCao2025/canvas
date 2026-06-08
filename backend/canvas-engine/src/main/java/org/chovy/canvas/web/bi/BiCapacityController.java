@@ -23,6 +23,9 @@ import reactor.core.scheduler.Schedulers;
 
 @RestController
 @RequestMapping("/canvas/bi/capacity")
+/**
+ * BiCapacityController 提供相关 HTTP 接口入口，负责请求校验、身份上下文解析和服务编排。
+ */
 public class BiCapacityController {
 
     private final TenantContextResolver tenantContextResolver;
@@ -30,6 +33,13 @@ public class BiCapacityController {
     private final BiQuickEngineQueueService quickEngineQueueService;
 
     @Autowired
+    /**
+     * 初始化 BiCapacityController 实例。
+     *
+     * @param tenantContextResolver 依赖组件，用于完成数据访问、计算或外部能力调用。
+     * @param quickEngineCapacityService 依赖组件，用于完成数据访问或外部能力调用。
+     * @param quickEngineQueueService 依赖组件，用于完成数据访问或外部能力调用。
+     */
     public BiCapacityController(TenantContextResolver tenantContextResolver,
                                 BiQuickEngineCapacityService quickEngineCapacityService,
                                 BiQuickEngineQueueService quickEngineQueueService) {
@@ -38,12 +48,24 @@ public class BiCapacityController {
         this.quickEngineQueueService = quickEngineQueueService;
     }
 
+    /**
+     * 初始化 BiCapacityController 实例。
+     *
+     * @param tenantContextResolver 依赖组件，用于完成数据访问、计算或外部能力调用。
+     * @param quickEngineCapacityService 依赖组件，用于完成数据访问或外部能力调用。
+     */
     public BiCapacityController(TenantContextResolver tenantContextResolver,
                                 BiQuickEngineCapacityService quickEngineCapacityService) {
         this(tenantContextResolver, quickEngineCapacityService, null);
     }
 
     @GetMapping("/quick-engine")
+    /**
+     * 根据方法职责完成对应的业务处理流程。
+     *
+     * @param limit 分页或数量限制，避免一次处理过多数据。
+     * @return 返回 quickEngineCapacity 流程生成的业务结果。
+     */
     public Mono<R<BiQuickEngineCapacitySummaryView>> quickEngineCapacity(
             @RequestParam(defaultValue = "50") int limit) {
         return currentTenant().flatMap(context -> Mono.fromCallable(() ->
@@ -52,6 +74,14 @@ public class BiCapacityController {
     }
 
     @GetMapping("/quick-engine/queue")
+    /**
+     * 根据方法职责完成对应的业务处理流程。
+     *
+     * @param poolKey 业务键，用于在同一租户下定位资源。
+     * @param status 业务状态，用于筛选或推进状态流转。
+     * @param limit 分页或数量限制，避免一次处理过多数据。
+     * @return 返回 quickEngineQueue 流程生成的业务结果。
+     */
     public Mono<R<BiQuickEngineQueueSnapshotView>> quickEngineQueue(
             @RequestParam(required = false) String poolKey,
             @RequestParam(required = false) String status,
@@ -62,6 +92,12 @@ public class BiCapacityController {
     }
 
     @PostMapping("/quick-engine/alert-policy")
+    /**
+     * 写入或更新业务数据，并保持关联状态一致。
+     *
+     * @param command 命令对象，描述本次业务动作及其参数。
+     * @return 返回流程执行后的业务结果。
+     */
     public Mono<R<BiQuickEngineCapacityAlertPolicyView>> upsertQuickEngineCapacityAlertPolicy(
             @RequestBody BiQuickEngineCapacityAlertPolicyCommand command) {
         return currentTenant().flatMap(context -> Mono.fromCallable(() ->
@@ -73,6 +109,12 @@ public class BiCapacityController {
     }
 
     @PostMapping("/quick-engine/tenant-pool-policy")
+    /**
+     * 写入或更新业务数据，并保持关联状态一致。
+     *
+     * @param command 命令对象，描述本次业务动作及其参数。
+     * @return 返回流程执行后的业务结果。
+     */
     public Mono<R<BiQuickEngineTenantPoolPolicyView>> upsertQuickEngineTenantPoolPolicy(
             @RequestBody BiQuickEngineTenantPoolPolicyCommand command) {
         return currentTenant().flatMap(context -> Mono.fromCallable(() ->
@@ -83,6 +125,11 @@ public class BiCapacityController {
                 .subscribeOn(Schedulers.boundedElastic()));
     }
 
+    /**
+     * 根据方法职责完成对应的业务处理流程。
+     *
+     * @return 返回 currentTenant 流程生成的业务结果。
+     */
     private Mono<TenantContext> currentTenant() {
         if (tenantContextResolver == null) {
             return Mono.just(new TenantContext(0L, null, "system"));

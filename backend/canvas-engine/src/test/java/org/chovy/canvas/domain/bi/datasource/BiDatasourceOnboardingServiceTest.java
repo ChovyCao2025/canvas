@@ -110,6 +110,41 @@ class BiDatasourceOnboardingServiceTest {
     }
 
     @Test
+    void createsAnonymousApiDatasourceWhenAuthTypeIsNone() {
+        DataSourceConfigMapper mapper = mock(DataSourceConfigMapper.class);
+        AtomicReference<DataSourceConfigDO> inserted = new AtomicReference<>();
+        when(mapper.insert(any(DataSourceConfigDO.class))).thenAnswer(invocation -> {
+            DataSourceConfigDO row = invocation.getArgument(0);
+            row.setId(83L);
+            inserted.set(row);
+            return 1;
+        });
+        BiDatasourceOnboardingService service = new BiDatasourceOnboardingService(
+                mapper,
+                null,
+                new DataSourceCredentialCipher(DataSourceCredentialCipher.DEFAULT_SECRET));
+
+        BiDatasourceOnboardingView view = service.createOnboardingSource(17L, "alice", new BiDatasourceOnboardingCommand(
+                "API",
+                "Public API",
+                "https://api.example.com/public/orders",
+                "",
+                "",
+                null,
+                "Anonymous API datasource",
+                true,
+                "EXTRACT",
+                Map.of("authType", "NONE", "responseRowsPath", "$.items")));
+
+        DataSourceConfigDO row = inserted.get();
+        assertThat(row.getUsername()).isEqualTo("anonymous");
+        assertThat(row.getPassword()).isEqualTo("");
+        assertThat(row.getConnectorConfigJson()).contains("\"authType\":\"NONE\"");
+        assertThat(view.sourceKey()).isEqualTo("api-83");
+        assertThat(view.maskedUsername()).isEqualTo("an***us");
+    }
+
+    @Test
     void exposesApplicationDatasourceWithDedicatedAppExtractCapacityCategory() {
         BiDatasourceOnboardingService service = new BiDatasourceOnboardingService(mock(DataSourceConfigMapper.class));
 
@@ -255,6 +290,29 @@ class BiDatasourceOnboardingServiceTest {
         assertThat(view.maskedUsername()).isEqualTo("fi***ad");
         assertThat(view.supportedModes()).containsExactly("EXTRACT");
         assertThat(view.capabilities()).containsExactly("TABLE_DATASET");
+    }
+
+    @Test
+    void rejectsJdbcDriverOutsideConnectorCapability() {
+        DataSourceConfigMapper mapper = mock(DataSourceConfigMapper.class);
+        BiDatasourceOnboardingService service = new BiDatasourceOnboardingService(
+                mapper,
+                null,
+                new DataSourceCredentialCipher(DataSourceCredentialCipher.DEFAULT_SECRET));
+
+        assertThatThrownBy(() -> service.createOnboardingSource(17L, "alice", new BiDatasourceOnboardingCommand(
+                "POSTGRESQL",
+                "Postgres warehouse",
+                "jdbc:postgresql://db.example.com:5432/warehouse",
+                "bi_user",
+                "secret",
+                "com.mysql.cj.jdbc.Driver",
+                "Wrong driver",
+                true,
+                "DIRECT_QUERY",
+                Map.of())))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("BI datasource driver is not supported");
     }
 
     @Test

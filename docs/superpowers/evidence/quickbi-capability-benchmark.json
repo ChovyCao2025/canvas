@@ -1,0 +1,344 @@
+{
+  "package": "quickbi-platform-benchmark",
+  "coverageThresholdPercent": 90,
+  "officialSources": [
+    "https://www.aliyun.com/product/quick-bi",
+    "https://help.aliyun.com/zh/quick-bi/product-overview/introduction-to-quick-bi-1",
+    "https://help.aliyun.com/zh/quick-bi/user-guide/features-supported-by-different-data-sources",
+    "https://help.aliyun.com/zh/quick-bi/user-guide/faq-about-data-sources",
+    "https://help.aliyun.com/zh/quick-bi/user-guide/configure-chart-fields",
+    "https://help.aliyun.com/zh/quick-bi/user-guide/format-brush",
+    "https://help.aliyun.com/zh/quick-bi/user-guide/smartq",
+    "https://help.aliyun.com/zh/quick-bi/user-guide/chat-bi-overview",
+    "https://help.aliyun.com/zh/quick-bi/user-guide/intelligent-assistant-of-quick-bi",
+    "https://help.aliyun.com/zh/quick-bi/user-guide/overview-of-small-q-interpretation"
+  ],
+  "scoring": {
+    "implemented": 1,
+    "partial": 0.5,
+    "planned": 0,
+    "notes": "Weighted capability coverage is intended for merge-readiness audit. It does not replace full tests or runtime verification."
+  },
+  "capabilities": [
+    {
+      "key": "datasource-catalog-onboarding",
+      "officialCapability": "Data source catalog, creation, credential handling, and connection management",
+      "canvasEvidence": [
+        "backend/canvas-engine/src/main/java/org/chovy/canvas/domain/bi/datasource/BiDatasourceOnboardingService.java",
+        "frontend/src/pages/bi/index.tsx",
+        "backend/canvas-engine/src/test/java/org/chovy/canvas/domain/bi/datasource/BiDatasourceOnboardingServiceTest.java"
+      ],
+      "status": "implemented",
+      "weight": 4
+    },
+    {
+      "key": "datasource-advanced-feature-matrix",
+      "officialCapability": "Datasource-specific advanced feature support matrix",
+      "canvasEvidence": [
+        "frontend/src/pages/bi/biWorkbench.ts",
+        "frontend/src/pages/bi/biWorkbench.test.ts",
+        "docs/superpowers/specs/2026-06-05-quickbi-platform-design.md"
+      ],
+      "status": "implemented",
+      "weight": 3
+    },
+    {
+      "key": "schema-sync-preview",
+      "officialCapability": "Schema preview, schema synchronization, and metadata history",
+      "canvasEvidence": [
+        "backend/canvas-engine/src/main/java/org/chovy/canvas/domain/bi/datasource/BiDatasourceRuntimeService.java",
+        "frontend/src/pages/bi/index.tsx"
+      ],
+      "status": "implemented",
+      "weight": 4
+    },
+    {
+      "key": "dataset-table-sql-modeling",
+      "officialCapability": "Dataset creation from tables, custom SQL, fields, metrics, and semantic modeling",
+      "canvasEvidence": [
+        "backend/canvas-engine/src/main/java/org/chovy/canvas/domain/bi/dataset/BiDatasetResourceService.java",
+        "backend/canvas-engine/src/main/java/org/chovy/canvas/domain/bi/dataset/BiSqlDatasetPreviewService.java",
+        "frontend/src/pages/bi/biWorkbench.ts"
+      ],
+      "status": "implemented",
+      "weight": 5
+    },
+    {
+      "key": "physical-graph-modeling",
+      "officialCapability": "Physical model canvas with multi-table joins, multiple join keys, and relationship diagnostics",
+      "canvasEvidence": [
+        "backend/canvas-engine/src/main/java/org/chovy/canvas/domain/bi/dataset/BiDatasetFromDatasourceService.java",
+        "frontend/src/pages/bi/biWorkbench.ts",
+        "frontend/src/pages/bi/biWorkbench.test.ts"
+      ],
+      "status": "implemented",
+      "weight": 5
+    },
+    {
+      "key": "query-compiler-execution",
+      "officialCapability": "Governed query compilation, execution, cache, history, explain, cancellation, and quota controls",
+      "canvasEvidence": [
+        "backend/canvas-engine/src/main/java/org/chovy/canvas/domain/bi/query/BiQueryCompiler.java",
+        "backend/canvas-engine/src/main/java/org/chovy/canvas/domain/bi/query/BiQueryExecutionService.java",
+        "backend/canvas-engine/src/main/java/org/chovy/canvas/domain/bi/query/BiQueryGovernancePolicyService.java"
+      ],
+      "status": "implemented",
+      "weight": 5
+    },
+    {
+      "key": "quick-engine-extract-cache-capacity",
+      "officialCapability": "Quick Engine extract acceleration, query cache, extract refresh, capacity governance, and fair queue execution",
+      "canvasEvidence": [
+        "backend/canvas-engine/src/main/java/org/chovy/canvas/domain/bi/dataset/BiDatasetAccelerationService.java",
+        "backend/canvas-engine/src/main/java/org/chovy/canvas/domain/bi/dataset/BiQuickEngineCapacityService.java",
+        "backend/canvas-engine/src/main/java/org/chovy/canvas/domain/bi/dataset/BiQuickEngineQueueSchedulerService.java"
+      ],
+      "status": "implemented",
+      "weight": 6
+    },
+    {
+      "key": "dashboard-authoring-canvas",
+      "officialCapability": "Dashboard authoring canvas, widgets, drag/drop, resize, alignment, snapping, and undo/redo",
+      "canvasEvidence": [
+        "frontend/src/pages/bi/index.tsx",
+        "frontend/src/pages/bi/biWorkbench.ts",
+        "frontend/src/pages/bi/index.test.tsx"
+      ],
+      "status": "implemented",
+      "weight": 5
+    },
+    {
+      "key": "chart-authoring-style-analysis",
+      "officialCapability": "Chart fields, styles, analysis options, labels, filters, sort, limits, and diagnostics",
+      "canvasEvidence": [
+        "backend/canvas-engine/src/main/java/org/chovy/canvas/domain/bi/chart/BiChartResourceService.java",
+        "frontend/src/pages/bi/index.tsx",
+        "backend/canvas-engine/src/main/java/org/chovy/canvas/domain/bi/chart/BiChartReferenceImpactService.java"
+      ],
+      "status": "implemented",
+      "weight": 4
+    },
+    {
+      "key": "runtime-controls-parameters",
+      "officialCapability": "Dashboard query controls, cascading options, URL parameters, remembered state, and runtime parameter precedence",
+      "canvasEvidence": [
+        "backend/canvas-engine/src/main/java/org/chovy/canvas/domain/bi/dashboard/BiDashboardRuntimeStateService.java",
+        "frontend/src/pages/bi/biWorkbench.ts",
+        "frontend/src/pages/bi/index.tsx"
+      ],
+      "status": "implemented",
+      "weight": 4
+    },
+    {
+      "key": "drill-filter-link-interaction",
+      "officialCapability": "Drill, filter interaction, hyperlink, and cross-widget interaction",
+      "canvasEvidence": [
+        "frontend/src/pages/bi/biWorkbench.ts",
+        "frontend/src/pages/bi/index.tsx",
+        "docs/superpowers/specs/2026-06-05-quickbi-platform-design.md"
+      ],
+      "status": "implemented",
+      "weight": 3
+    },
+    {
+      "key": "spreadsheet-resource",
+      "officialCapability": "Spreadsheet resource lifecycle, formulas, pivot/cross table, styling, and runtime view",
+      "canvasEvidence": [
+        "backend/canvas-engine/src/main/java/org/chovy/canvas/domain/bi/spreadsheet/BiSpreadsheetResourceService.java",
+        "frontend/src/pages/bi/biWorkbench.ts",
+        "frontend/src/pages/bi/index.tsx"
+      ],
+      "status": "implemented",
+      "weight": 4
+    },
+    {
+      "key": "big-screen-resource",
+      "officialCapability": "Big-screen resource lifecycle, large-screen layout, component library, runtime view, and mobile layout",
+      "canvasEvidence": [
+        "backend/canvas-engine/src/main/java/org/chovy/canvas/domain/bi/bigscreen/BiBigScreenResourceService.java",
+        "frontend/src/pages/bi/biWorkbench.ts",
+        "frontend/src/pages/bi/index.tsx"
+      ],
+      "status": "implemented",
+      "weight": 4
+    },
+    {
+      "key": "self-service-extraction",
+      "officialCapability": "Self-service data extraction, preview, export, approval, async queue, download audit, and retention",
+      "canvasEvidence": [
+        "backend/canvas-engine/src/main/java/org/chovy/canvas/domain/bi/export/BiSelfServiceExportService.java",
+        "frontend/src/pages/bi/biWorkbench.ts",
+        "frontend/src/pages/bi/index.tsx"
+      ],
+      "status": "implemented",
+      "weight": 5
+    },
+    {
+      "key": "data-portal",
+      "officialCapability": "Data portal with menus, navigation, resource entry points, and menu authorization",
+      "canvasEvidence": [
+        "backend/canvas-engine/src/main/java/org/chovy/canvas/domain/bi/portal/BiPortalResourceService.java",
+        "backend/canvas-engine/src/main/java/org/chovy/canvas/domain/bi/portal/BiPortalRuntimeService.java",
+        "frontend/src/pages/bi/biWorkbench.ts"
+      ],
+      "status": "implemented",
+      "weight": 4
+    },
+    {
+      "key": "subscriptions-alerts-delivery",
+      "officialCapability": "Subscriptions, alerts, anomaly checks, delivery channels, retry, attachments, and audit",
+      "canvasEvidence": [
+        "backend/canvas-engine/src/main/java/org/chovy/canvas/domain/bi/subscription/BiDeliveryRuntimeService.java",
+        "backend/canvas-engine/src/main/java/org/chovy/canvas/domain/bi/subscription/BiDeliverySchedulerService.java",
+        "frontend/src/pages/bi/index.tsx"
+      ],
+      "status": "implemented",
+      "weight": 5
+    },
+    {
+      "key": "external-embedding",
+      "officialCapability": "Report embedding ticket, source whitelist, parameter claims, anonymous runtime loading, and signed query execution",
+      "canvasEvidence": [
+        "backend/canvas-engine/src/main/java/org/chovy/canvas/domain/bi/embed/BiEmbedTicketService.java",
+        "frontend/src/pages/bi/embed.tsx",
+        "frontend/src/pages/bi/embed.test.tsx"
+      ],
+      "status": "implemented",
+      "weight": 5
+    },
+    {
+      "key": "permission-governance",
+      "officialCapability": "Workspace/resource authorization, row permissions, column permissions, permission requests, audit, and lifecycle gates",
+      "canvasEvidence": [
+        "backend/canvas-engine/src/main/java/org/chovy/canvas/domain/bi/permission/BiPermissionService.java",
+        "backend/canvas-engine/src/main/java/org/chovy/canvas/domain/bi/permission/BiPermissionRequestService.java",
+        "frontend/src/pages/bi/index.tsx"
+      ],
+      "status": "implemented",
+      "weight": 6
+    },
+    {
+      "key": "resource-collaboration-lifecycle",
+      "officialCapability": "Resource movement, transfer, favorite, comment, lock, publish approval, versioning, clone/import/export/archive",
+      "canvasEvidence": [
+        "backend/canvas-engine/src/main/java/org/chovy/canvas/domain/bi/resource/BiResourceCollaborationService.java",
+        "backend/canvas-engine/src/main/java/org/chovy/canvas/domain/bi/dashboard/BiDashboardResourceService.java",
+        "frontend/src/pages/bi/index.tsx"
+      ],
+      "status": "implemented",
+      "weight": 4
+    },
+    {
+      "key": "ask-data-agent",
+      "officialCapability": "Smart Q ask-data natural language query over semantic datasets",
+      "canvasEvidence": [
+        "backend/canvas-engine/src/main/java/org/chovy/canvas/domain/bi/ai/BiAskDataAgentService.java",
+        "backend/canvas-engine/src/test/java/org/chovy/canvas/domain/bi/ai/BiAskDataAgentServiceTest.java"
+      ],
+      "status": "implemented",
+      "weight": 3
+    },
+    {
+      "key": "interpretation-agent",
+      "officialCapability": "Smart Q interpretation for charts, dashboards, and query results",
+      "canvasEvidence": [
+        "backend/canvas-engine/src/main/java/org/chovy/canvas/domain/bi/ai/BiInterpretationAgentService.java",
+        "backend/canvas-engine/src/test/java/org/chovy/canvas/domain/bi/ai/BiRemainingAiAgentsTest.java"
+      ],
+      "status": "implemented",
+      "weight": 3
+    },
+    {
+      "key": "report-agent",
+      "officialCapability": "Smart Q report generation for daily, weekly, monthly, and executive summaries",
+      "canvasEvidence": [
+        "backend/canvas-engine/src/main/java/org/chovy/canvas/domain/bi/ai/BiReportAgentService.java",
+        "backend/canvas-engine/src/test/java/org/chovy/canvas/domain/bi/ai/BiRemainingAiAgentsTest.java"
+      ],
+      "status": "implemented",
+      "weight": 3
+    },
+    {
+      "key": "dashboard-draft-agent",
+      "officialCapability": "Smart Q dashboard-building assistant",
+      "canvasEvidence": [
+        "backend/canvas-engine/src/main/java/org/chovy/canvas/domain/bi/ai/BiDashboardDraftAgentService.java",
+        "backend/canvas-engine/src/test/java/org/chovy/canvas/domain/bi/ai/BiRemainingAiAgentsTest.java"
+      ],
+      "status": "implemented",
+      "weight": 3
+    },
+    {
+      "key": "insight-agent",
+      "officialCapability": "Smart Q insight agent for trends, anomalies, attribution, and opportunities",
+      "canvasEvidence": [
+        "backend/canvas-engine/src/main/java/org/chovy/canvas/domain/bi/ai/BiInsightAgentService.java",
+        "backend/canvas-engine/src/test/java/org/chovy/canvas/domain/bi/ai/BiRemainingAiAgentsTest.java"
+      ],
+      "status": "implemented",
+      "weight": 3
+    },
+    {
+      "key": "ai-llm-adapters",
+      "officialCapability": "Configurable large-model powered BI assistants with fallback behavior",
+      "canvasEvidence": [
+        "backend/canvas-engine/src/main/java/org/chovy/canvas/domain/bi/ai/LlmBiAskDataPlanner.java",
+        "backend/canvas-engine/src/main/java/org/chovy/canvas/domain/bi/ai/LlmBiReportPlanner.java",
+        "backend/canvas-engine/src/main/java/org/chovy/canvas/domain/bi/ai/LlmBiInsightPlanner.java"
+      ],
+      "status": "implemented",
+      "weight": 2
+    },
+    {
+      "key": "open-api-cli-integration",
+      "officialCapability": "Open integration, API/CLI automation, resource query, lineage, embed state, and performance monitoring",
+      "canvasEvidence": [
+        "backend/canvas-engine/src/main/java/org/chovy/canvas/web/bi/BiQueryController.java",
+        "backend/canvas-engine/src/main/java/org/chovy/canvas/web/bi/BiSelfServiceController.java",
+        "docs/superpowers/specs/2026-06-05-quickbi-platform-design.md"
+      ],
+      "status": "partial",
+      "weight": 2
+    },
+    {
+      "key": "mobile-enterprise-access",
+      "officialCapability": "Mobile or enterprise app access through DingTalk, Lark, WeCom, Microsoft Teams, or mobile clients",
+      "canvasEvidence": [
+        "frontend/src/pages/bi/embed.tsx",
+        "backend/canvas-engine/src/main/java/org/chovy/canvas/domain/bi/subscription/BiDeliveryRuntimeService.java",
+        "docs/superpowers/specs/2026-06-05-quickbi-platform-design.md"
+      ],
+      "status": "partial",
+      "weight": 2
+    },
+    {
+      "key": "data-preparation-forms",
+      "officialCapability": "Data preparation and data entry/form workflows tied to analysis",
+      "canvasEvidence": [
+        "docs/superpowers/specs/2026-06-05-quickbi-platform-design.md"
+      ],
+      "status": "planned",
+      "weight": 2
+    },
+    {
+      "key": "managed-browser-rendering-cluster",
+      "officialCapability": "Managed browser rendering for screenshots/PDF-grade report delivery",
+      "canvasEvidence": [
+        "backend/canvas-engine/src/main/java/org/chovy/canvas/domain/bi/subscription/HttpBiSnapshotRenderer.java",
+        "docs/superpowers/specs/2026-06-05-quickbi-platform-design.md"
+      ],
+      "status": "partial",
+      "weight": 1
+    },
+    {
+      "key": "vpc-whitelist-diagnostics",
+      "officialCapability": "Datasource connection troubleshooting for whitelist, VPC, account permission, and workspace permission issues",
+      "canvasEvidence": [
+        "docs/superpowers/specs/2026-06-05-quickbi-platform-design.md",
+        "frontend/src/pages/bi/biWorkbench.ts"
+      ],
+      "status": "partial",
+      "weight": 1
+    }
+  ]
+}

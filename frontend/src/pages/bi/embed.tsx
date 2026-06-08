@@ -1,8 +1,8 @@
 import { useEffect, useState, type CSSProperties } from 'react'
 import { useParams, useSearchParams } from 'react-router-dom'
-import { Alert, Card, Col, Empty, Progress, Row, Space, Spin, Tag, Typography } from 'antd'
-import { BarChartOutlined, LinkOutlined, SafetyCertificateOutlined } from '@ant-design/icons'
-import { biApi, type BiEmbedTicketPayload, type BiQueryResult } from '../../services/biApi'
+import { Alert, Button, Card, Col, Empty, List, Progress, Row, Space, Spin, Tag, Typography } from 'antd'
+import { ApiOutlined, BarChartOutlined, LinkOutlined, SafetyCertificateOutlined } from '@ant-design/icons'
+import { biApi, type BiEmbedTicketPayload, type BiPortalMenuResource, type BiPortalResource, type BiQueryResult } from '../../services/biApi'
 import {
   buildWidgetQueryRequest,
   chartLabel,
@@ -16,6 +16,7 @@ import {
 
 const { Text, Title } = Typography
 
+/** BI 嵌入页，通过 ticket 校验后加载仪表盘预设并执行组件查询。 */
 export default function BiEmbedPage() {
   const { resourceType = 'DASHBOARD', resourceKey = 'canvas-effect' } = useParams<{
     resourceType: string
@@ -25,6 +26,7 @@ export default function BiEmbedPage() {
   const ticket = searchParams.get('ticket') || ''
   const [payload, setPayload] = useState<BiEmbedTicketPayload | null>(null)
   const [preset, setPreset] = useState<BiDashboardPresetLike | null>(null)
+  const [portal, setPortal] = useState<BiPortalResource | null>(null)
   const [runtimeParameters, setRuntimeParameters] = useState<BiDashboardRuntimeParameters>({})
   const [queryResults, setQueryResults] = useState<Record<string, BiQueryResult>>({})
   const [queryErrors, setQueryErrors] = useState<Record<string, string>>({})
@@ -40,62 +42,46 @@ export default function BiEmbedPage() {
     let cancelled = false
     const loadEmbedReport = async () => {
       setLoading(true)
+      // 每次 ticket 或资源变化都清空旧状态，避免短暂展示上一个嵌入报表的数据。
       setError(null)
       setPayload(null)
       setPreset(null)
+      setPortal(null)
       setRuntimeParameters({})
       setQueryResults({})
       setQueryErrors({})
       try {
         const verified = await biApi.verifyEmbedTicket(ticket)
         if (cancelled) return
+        // ticket 只能打开签发时绑定的资源，防止 URL 手工替换 resourceKey 越权访问。
         if (verified.data.resourceType !== resourceType || verified.data.resourceKey !== resourceKey) {
           setError('嵌入 ticket 与当前资源不匹配')
           return
         }
-        if (verified.data.resourceType !== 'DASHBOARD') {
-          setError('当前嵌入页仅支持仪表板资源')
-          return
-        }
-        const loadedPreset = await loadDashboardPreset(ticket, resourceType, resourceKey)
-        if (cancelled) return
-        const runtimeState = await biApi.getEmbedDashboardRuntimeState({
-          ticket,
-          resourceType,
-          resourceKey,
-        })
-        if (cancelled) return
-        const resolvedRuntimeParameters = dashboardRuntimeParametersFromEmbedPayload(
-          loadedPreset,
-          verified.data,
-          (runtimeState.data?.parameters ?? null) as BiDashboardRuntimeParameters | null,
-        )
-        const canvasId = embedPayloadCanvasId(verified.data)
-        const queryEntries = await Promise.all(loadedPreset.widgets.map(widget =>
-          biApi.executeEmbedQuery({
+        if (verified.data.resourceType === 'PORTAL') {
+          const loadedPortal = await biApi.getEmbedPortalResource({
             ticket,
             resourceType,
             resourceKey,
-            widgetKey: widget.widgetKey,
-            query: buildWidgetQueryRequest(loadedPreset, widget, canvasId, resolvedRuntimeParameters),
           })
-            .then(response => ({ widgetKey: widget.widgetKey, result: response.data }))
-            .catch(error => ({
-              widgetKey: widget.widgetKey,
-              error: error instanceof Error ? error.message : '查询失败',
-            })),
-        ))
+          if (cancelled) return
+          setPayload(verified.data)
+          setPortal(loadedPortal.data)
+          return
+        }
+        if (verified.data.resourceType !== 'DASHBOARD') {
+          setError('当前嵌入页仅支持仪表板和门户资源')
+          return
+        }
+        const loadedDashboard = await loadEmbeddedDashboard(ticket, resourceType, resourceKey, verified.data)
         if (cancelled) return
         setPayload(verified.data)
-        setPreset(loadedPreset)
-        setRuntimeParameters(resolvedRuntimeParameters)
-        setQueryResults(Object.fromEntries(queryEntries
-          .filter((entry): entry is { widgetKey: string; result: BiQueryResult } => 'result' in entry)
-          .map(entry => [entry.widgetKey, entry.result])))
-        setQueryErrors(Object.fromEntries(queryEntries
-          .filter((entry): entry is { widgetKey: string; error: string } => 'error' in entry)
-          .map(entry => [entry.widgetKey, entry.error])))
+        setPreset(loadedDashboard.preset)
+        setRuntimeParameters(loadedDashboard.runtimeParameters)
+        setQueryResults(loadedDashboard.queryResults)
+        setQueryErrors(loadedDashboard.queryErrors)
       } catch {
+        // 不暴露 ticket 校验细节，统一返回无效或过期提示。
         if (!cancelled) setError('嵌入 ticket 无效或已过期')
       } finally {
         if (!cancelled) setLoading(false)
@@ -125,7 +111,7 @@ export default function BiEmbedPage() {
         <Space size={10}>
           <span style={brandIconStyle}><BarChartOutlined /></span>
           <Space direction="vertical" size={0}>
-            <Title level={4} style={{ margin: 0 }}>{preset?.title ?? resourceKey}</Title>
+            <Title level={4} style={{ margin: 0 }}>{portalTitle(portal) ?? preset?.title ?? resourceKey}</Title>
             <Text type="secondary" style={{ fontSize: 12 }}>嵌入资源 · {resourceType}/{resourceKey}</Text>
           </Space>
         </Space>
@@ -139,6 +125,9 @@ export default function BiEmbedPage() {
         </Space>
       </header>
 
+      {portal ? (
+        <EmbedPortal portal={portal} ticket={ticket} payload={payload} />
+      ) : (
       <main style={canvasStyle}>
         {!preset || preset.widgets.length === 0 ? (
           <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="暂无报表组件" />
@@ -153,13 +142,15 @@ export default function BiEmbedPage() {
           ))
         )}
       </main>
+      )}
       <footer style={footerStyle}>
-        <Text type="secondary" style={{ fontSize: 12 }}>Ticket expires at {payload.expiresAt}</Text>
+        <Text type="secondary" style={{ fontSize: 12 }}>{portalFooter(portal) ?? `Ticket expires at ${payload.expiresAt}`}</Text>
       </footer>
     </div>
   )
 }
 
+/** 加载嵌入仪表盘资源；资源缺失时回退到本地默认预设，保证演示页可打开。 */
 async function loadDashboardPreset(
   ticket: string,
   resourceType: string,
@@ -173,16 +164,324 @@ async function loadDashboardPreset(
   return resource.data?.preset ?? getDefaultDashboardPreset(dashboardKey)
 }
 
+async function loadEmbeddedDashboard(
+  ticket: string,
+  resourceType: string,
+  resourceKey: string,
+  payload: BiEmbedTicketPayload,
+): Promise<{
+  preset: BiDashboardPresetLike
+  runtimeParameters: BiDashboardRuntimeParameters
+  queryResults: Record<string, BiQueryResult>
+  queryErrors: Record<string, string>
+}> {
+  // 先取仪表盘资源，再取嵌入运行态参数，保证控件默认值能和服务端记忆状态合并。
+  const loadedPreset = await loadDashboardPreset(ticket, resourceType, resourceKey)
+  const runtimeState = await biApi.getEmbedDashboardRuntimeState({
+    ticket,
+    resourceType,
+    resourceKey,
+  })
+  const resolvedRuntimeParameters = dashboardRuntimeParametersFromEmbedPayload(
+    loadedPreset,
+    payload,
+    (runtimeState.data?.parameters ?? null) as BiDashboardRuntimeParameters | null,
+  )
+  const canvasId = embedPayloadCanvasId(payload)
+  // 单组件查询互不阻塞，失败的组件记录错误并继续展示其它组件。
+  const queryEntries = await Promise.all(loadedPreset.widgets.map(widget =>
+    biApi.executeEmbedQuery({
+      ticket,
+      resourceType,
+      resourceKey,
+      widgetKey: widget.widgetKey,
+      query: buildWidgetQueryRequest(loadedPreset, widget, canvasId, resolvedRuntimeParameters),
+    })
+      .then(response => ({ widgetKey: widget.widgetKey, result: response.data }))
+      .catch(error => ({
+        widgetKey: widget.widgetKey,
+        error: error instanceof Error ? error.message : '查询失败',
+      })),
+  ))
+  return {
+    preset: loadedPreset,
+    runtimeParameters: resolvedRuntimeParameters,
+    queryResults: Object.fromEntries(queryEntries
+      .filter((entry): entry is { widgetKey: string; result: BiQueryResult } => 'result' in entry)
+      .map(entry => [entry.widgetKey, entry.result])),
+    queryErrors: Object.fromEntries(queryEntries
+      .filter((entry): entry is { widgetKey: string; error: string } => 'error' in entry)
+      .map(entry => [entry.widgetKey, entry.error])),
+  }
+}
+
+/** 从 ticket 过滤条件中兼容读取画布 ID。 */
 function embedPayloadCanvasId(payload: BiEmbedTicketPayload): string | null {
   return payload.filters?.canvasId ?? payload.filters?.canvas_id ?? null
 }
 
+/** 将运行态参数格式化为 header 标签文案。 */
 function formatRuntimeParameterValue(value: unknown): string {
   if (Array.isArray(value)) return value.map(item => formatRuntimeParameterValue(item)).filter(Boolean).join(',')
   if (value == null) return ''
   return String(value)
 }
 
+function portalTitle(portal: BiPortalResource | null): string | null {
+  if (!portal) return null
+  return typeof portal.theme?.title === 'string' && portal.theme.title.trim()
+    ? portal.theme.title.trim()
+    : portal.name
+}
+
+function portalSubtitle(portal: BiPortalResource): string | null {
+  return typeof portal.theme?.subtitle === 'string' && portal.theme.subtitle.trim()
+    ? portal.theme.subtitle.trim()
+    : null
+}
+
+function portalFooter(portal: BiPortalResource | null): string | null {
+  if (!portal) return null
+  return typeof portal.theme?.footerText === 'string' && portal.theme.footerText.trim()
+    ? portal.theme.footerText.trim()
+    : null
+}
+
+function EmbedPortal({
+  portal,
+  ticket,
+  payload,
+}: {
+  portal: BiPortalResource
+  ticket: string
+  payload: BiEmbedTicketPayload
+}) {
+  const sortedMenus = [...(portal.menus ?? [])].sort((left, right) => Number(left.sortOrder ?? 0) - Number(right.sortOrder ?? 0))
+  const defaultMenuKey = typeof portal.theme?.defaultMenuKey === 'string' ? portal.theme.defaultMenuKey : null
+  const defaultMenu = sortedMenus.find(menu => menu.menuKey === defaultMenuKey) ?? sortedMenus[0] ?? null
+  const [selectedMenuKey, setSelectedMenuKey] = useState<string | null>(defaultMenu?.menuKey ?? null)
+  const selectedMenu = sortedMenus.find(menu => menu.menuKey === selectedMenuKey) ?? defaultMenu
+  return (
+    <main style={portalMainStyle}>
+      <div style={portalLayoutStyle}>
+        <Card
+          title={(
+            <Space direction="vertical" size={0}>
+              <Space size={8}>
+                <ApiOutlined />
+                <Text strong>{portal.name}</Text>
+                <Tag color="cyan">{portal.status}</Tag>
+              </Space>
+              {portalSubtitle(portal) && <Text type="secondary" style={{ fontSize: 12 }}>{portalSubtitle(portal)}</Text>}
+            </Space>
+          )}
+          bordered
+          style={{ borderRadius: 8 }}
+        >
+          {sortedMenus.length === 0 ? (
+            <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="暂无门户菜单" />
+          ) : (
+            <List
+              dataSource={sortedMenus}
+              renderItem={menu => (
+                <PortalMenuItem
+                  menu={menu}
+                  selected={menu.menuKey === selectedMenu?.menuKey}
+                  onOpen={() => setSelectedMenuKey(menu.menuKey)}
+                />
+              )}
+            />
+          )}
+        </Card>
+        <PortalResourcePanel menu={selectedMenu} ticket={ticket} payload={payload} />
+      </div>
+    </main>
+  )
+}
+
+function PortalMenuItem({
+  menu,
+  selected,
+  onOpen,
+}: {
+  menu: BiPortalMenuResource
+  selected: boolean
+  onOpen: () => void
+}) {
+  const iconKey = typeof menu.visibility?.iconKey === 'string' ? menu.visibility.iconKey : null
+  return (
+    <List.Item>
+      <Space direction="vertical" size={4} style={{ width: '100%' }}>
+        <Space size={8} wrap>
+          <Button
+            type={selected ? 'primary' : 'text'}
+            size="small"
+            aria-label={`打开门户菜单 ${menu.title}`}
+            onClick={onOpen}
+          >
+            {menu.title}
+          </Button>
+          {iconKey && <Tag color="blue">{iconKey}</Tag>}
+          {menu.parentMenuKey && <Tag color="purple">父级 {menu.parentMenuKey}</Tag>}
+          <Tag>{menu.resourceType}</Tag>
+          {menu.resourceKey && <Text type="secondary" style={{ fontSize: 12 }}>{menu.resourceKey}</Text>}
+        </Space>
+        {menu.externalUrl && <Text type="secondary" style={{ fontSize: 12 }}>{menu.externalUrl}</Text>}
+      </Space>
+    </List.Item>
+  )
+}
+
+function PortalResourcePanel({
+  menu,
+  ticket,
+  payload,
+}: {
+  menu: BiPortalMenuResource | null
+  ticket: string
+  payload: BiEmbedTicketPayload
+}) {
+  if (!menu) {
+    return (
+      <Card title="当前打开资源" bordered style={{ borderRadius: 8 }}>
+        <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="请选择门户菜单" />
+      </Card>
+    )
+  }
+  const resourceSummary = menu.resourceKey
+    ? `${menu.resourceType} / ${menu.resourceKey}`
+    : menu.resourceType
+  if (menu.resourceType === 'DASHBOARD' && menu.resourceKey) {
+    return (
+      <PortalDashboardResource
+        menu={menu}
+        ticket={ticket}
+        payload={payload}
+        resourceSummary={resourceSummary}
+      />
+    )
+  }
+  return (
+    <Card
+      title={(
+        <Space size={8} wrap>
+          <Text strong>当前打开资源</Text>
+          <Tag color="blue">{menu.menuKey}</Tag>
+        </Space>
+      )}
+      bordered
+      style={{ borderRadius: 8 }}
+    >
+      <Space direction="vertical" size={10} style={{ width: '100%' }}>
+        <Space direction="vertical" size={2}>
+          <Title level={5} style={{ margin: 0 }}>资源：{menu.title}</Title>
+          <Text>{resourceSummary}</Text>
+          {menu.parentMenuKey && <Text type="secondary">层级 {menu.parentMenuKey} / {menu.menuKey}</Text>}
+        </Space>
+        {menu.externalUrl ? (
+          <a href={menu.externalUrl} target="_blank" rel="noreferrer">打开外部链接</a>
+        ) : (
+          <Alert
+            type="info"
+            showIcon
+            message="已在门户内选中资源"
+            description="门户 ticket 保持在当前资源边界内，资源内容由宿主侧按授权策略加载。"
+          />
+        )}
+      </Space>
+    </Card>
+  )
+}
+
+function PortalDashboardResource({
+  menu,
+  ticket,
+  payload,
+  resourceSummary,
+}: {
+  menu: BiPortalMenuResource
+  ticket: string
+  payload: BiEmbedTicketPayload
+  resourceSummary: string
+}) {
+  const [preset, setPreset] = useState<BiDashboardPresetLike | null>(null)
+  const [queryResults, setQueryResults] = useState<Record<string, BiQueryResult>>({})
+  const [queryErrors, setQueryErrors] = useState<Record<string, string>>({})
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    let cancelled = false
+    const loadDashboard = async () => {
+      if (!menu.resourceKey) return
+      setLoading(true)
+      setError(null)
+      setPreset(null)
+      setQueryResults({})
+      setQueryErrors({})
+      try {
+        const loadedDashboard = await loadEmbeddedDashboard(ticket, 'DASHBOARD', menu.resourceKey, payload)
+        if (cancelled) return
+        setPreset(loadedDashboard.preset)
+        setQueryResults(loadedDashboard.queryResults)
+        setQueryErrors(loadedDashboard.queryErrors)
+      } catch {
+        if (!cancelled) setError('门户仪表盘资源加载失败')
+      } finally {
+        if (!cancelled) setLoading(false)
+      }
+    }
+    loadDashboard()
+    return () => {
+      cancelled = true
+    }
+  }, [menu.resourceKey, payload, ticket])
+
+  return (
+    <Space direction="vertical" size={10} style={{ width: '100%' }}>
+      <Card
+        title={(
+          <Space size={8} wrap>
+            <Text strong>当前打开资源</Text>
+            <Tag color="blue">{menu.menuKey}</Tag>
+          </Space>
+        )}
+        bordered
+        style={{ borderRadius: 8 }}
+      >
+        <Space direction="vertical" size={2}>
+          <Title level={5} style={{ margin: 0 }}>资源：{menu.title}</Title>
+          <Text>{resourceSummary}</Text>
+          {menu.parentMenuKey && <Text type="secondary">层级 {menu.parentMenuKey} / {menu.menuKey}</Text>}
+        </Space>
+      </Card>
+      {error ? (
+        <Alert type="warning" showIcon message={error} />
+      ) : loading ? (
+        <Card bordered style={{ borderRadius: 8 }}>
+          <Spin />
+        </Card>
+      ) : (
+        <main style={canvasStyle}>
+          {!preset || preset.widgets.length === 0 ? (
+            <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="暂无报表组件" />
+          ) : (
+            preset.widgets.map(widget => (
+              <EmbedWidget
+                key={widget.widgetKey}
+                widget={widget}
+                result={queryResults[widget.widgetKey]}
+                error={queryErrors[widget.widgetKey]}
+              />
+            ))
+          )}
+        </main>
+      )}
+    </Space>
+  )
+}
+
+/** 嵌入页单个仪表盘组件容器，负责布局定位和查询状态标签。 */
 function EmbedWidget({
   widget,
   result,
@@ -214,6 +513,7 @@ function EmbedWidget({
   )
 }
 
+/** 根据组件类型和查询结果渲染简化版图表预览。 */
 function WidgetBody({
   widget,
   result,
@@ -224,6 +524,7 @@ function WidgetBody({
   error?: string
 }) {
   if (error) {
+    // 单组件查询失败只降级当前卡片，不影响整张嵌入仪表盘。
     return <Alert type="warning" showIcon message="组件查询失败" description={error} />
   }
   if (!result) {
@@ -234,6 +535,7 @@ function WidgetBody({
     return <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="暂无数据" />
   }
   if (widget.chartType === 'KPI_CARD') {
+    // KPI 卡片以首行首指标作为主值，成功率类指标按百分比展示。
     const metric = widget.metrics[0]
     const value = toNumber(rows[0][metric])
     const percent = metric === 'success_rate'
@@ -248,6 +550,7 @@ function WidgetBody({
     )
   }
   if (widget.chartType === 'LINE') {
+    // 折线图只渲染前两个指标，保持嵌入预览轻量。
     const primaryMetric = widget.metrics[0]
     const secondaryMetric = widget.metrics[1]
     return (
@@ -260,6 +563,7 @@ function WidgetBody({
     )
   }
   if (widget.chartType === 'BAR') {
+    // 柱状图取前 6 行，按当前结果最大值归一化高度。
     const metric = widget.metrics[0]
     const values = rows.slice(0, 6).map(row => toNumber(row[metric]))
     const max = Math.max(1, ...values)
@@ -274,6 +578,7 @@ function WidgetBody({
     )
   }
   const columns = [...widget.dimensions, ...widget.metrics].slice(0, 3)
+  // 其它图表类型兜底为小表格，便于确认查询结果仍然可见。
   return (
     <Space direction="vertical" size={0} style={{ width: '100%' }}>
       {rows.slice(0, 5).map((row, index) => (
@@ -287,6 +592,7 @@ function WidgetBody({
   )
 }
 
+/** 将数值数组转换为 SVG polyline points。 */
 function linePoints(values: number[], width: number, height: number): string {
   if (values.length === 0) return ''
   const max = Math.max(...values, 1)
@@ -299,6 +605,7 @@ function linePoints(values: number[], width: number, height: number): string {
   }).join(' ')
 }
 
+/** 将未知查询值安全转换为有限数字。 */
 function toNumber(value: unknown): number {
   if (typeof value === 'number') return Number.isFinite(value) ? value : 0
   if (typeof value === 'string') {
@@ -308,6 +615,7 @@ function toNumber(value: unknown): number {
   return 0
 }
 
+/** 按指标命名约定格式化数值或百分比。 */
 function formatMetricValue(metric: string, value: number): string {
   if (metric.includes('rate') || metric.includes('ratio') || metric.includes('percent')) {
     return `${(value <= 1 ? value * 100 : value).toFixed(1)}%`
@@ -315,6 +623,7 @@ function formatMetricValue(metric: string, value: number): string {
   return Math.round(value).toLocaleString()
 }
 
+/** 格式化表格单元格，空值展示为占位符。 */
 function formatCellValue(column: string, value: unknown): string {
   if (typeof value === 'number') {
     return column.includes('rate') || column.includes('ratio') || column.includes('percent')
@@ -349,6 +658,18 @@ const canvasStyle: CSSProperties = {
   gridTemplateColumns: 'repeat(20, minmax(0, 1fr))',
   gridAutoRows: 42,
   gap: 10,
+}
+
+const portalMainStyle: CSSProperties = {
+  display: 'grid',
+  gap: 10,
+}
+
+const portalLayoutStyle: CSSProperties = {
+  display: 'grid',
+  gridTemplateColumns: 'minmax(260px, 360px) minmax(0, 1fr)',
+  gap: 12,
+  alignItems: 'start',
 }
 
 const widgetStyle: CSSProperties = {

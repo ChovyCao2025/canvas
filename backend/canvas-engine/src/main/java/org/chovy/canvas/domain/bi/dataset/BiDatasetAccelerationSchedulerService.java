@@ -23,6 +23,9 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 @Service
 @EnableScheduling
+/**
+ * BiDatasetAccelerationSchedulerService 承载对应领域的业务规则、流程编排和结果转换。
+ */
 public class BiDatasetAccelerationSchedulerService {
 
     private static final String SCHEDULER_LEASE_KEY = "BI_DATASET_ACCELERATION_SCHEDULER";
@@ -39,6 +42,13 @@ public class BiDatasetAccelerationSchedulerService {
     private final long leaseTtlSeconds;
     private final AtomicBoolean running = new AtomicBoolean(false);
 
+    /**
+     * 初始化 BiDatasetAccelerationSchedulerService 实例。
+     *
+     * @param policyMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param accelerationService 依赖组件，用于完成数据访问或外部能力调用。
+     * @param cachePolicyService 依赖组件，用于完成数据访问或外部能力调用。
+     */
     public BiDatasetAccelerationSchedulerService(BiDatasetAccelerationPolicyMapper policyMapper,
                                                  BiDatasetAccelerationService accelerationService,
                                                  BiQueryCachePolicyService cachePolicyService) {
@@ -54,6 +64,19 @@ public class BiDatasetAccelerationSchedulerService {
     }
 
     @Autowired
+    /**
+     * 初始化 BiDatasetAccelerationSchedulerService 实例。
+     *
+     * @param policyMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param accelerationService 依赖组件，用于完成数据访问或外部能力调用。
+     * @param cachePolicyService 依赖组件，用于完成数据访问或外部能力调用。
+     * @param enabled enabled 参数，用于 BiDatasetAccelerationSchedulerService 流程中的校验、计算或对象转换。
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @param operator 操作人标识，用于审计和权限判断。
+     * @param limit 分页或数量限制，避免一次处理过多数据。
+     * @param leaseServiceProvider 依赖组件，用于完成数据访问或外部能力调用。
+     * @param leaseTtlSeconds lease ttl seconds 参数，用于 BiDatasetAccelerationSchedulerService 流程中的校验、计算或对象转换。
+     */
     public BiDatasetAccelerationSchedulerService(
             BiDatasetAccelerationPolicyMapper policyMapper,
             BiDatasetAccelerationService accelerationService,
@@ -75,6 +98,19 @@ public class BiDatasetAccelerationSchedulerService {
                 leaseTtlSeconds);
     }
 
+    /**
+     * 初始化 BiDatasetAccelerationSchedulerService 实例。
+     *
+     * @param policyMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param accelerationService 依赖组件，用于完成数据访问或外部能力调用。
+     * @param cachePolicyService 依赖组件，用于完成数据访问或外部能力调用。
+     * @param enabled enabled 参数，用于 BiDatasetAccelerationSchedulerService 流程中的校验、计算或对象转换。
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @param operator 操作人标识，用于审计和权限判断。
+     * @param limit 分页或数量限制，避免一次处理过多数据。
+     * @param leaseService 依赖组件，用于完成数据访问或外部能力调用。
+     * @param leaseTtlSeconds lease ttl seconds 参数，用于 BiDatasetAccelerationSchedulerService 流程中的校验、计算或对象转换。
+     */
     public BiDatasetAccelerationSchedulerService(BiDatasetAccelerationPolicyMapper policyMapper,
                                                  BiDatasetAccelerationService accelerationService,
                                                  BiQueryCachePolicyService cachePolicyService,
@@ -96,11 +132,21 @@ public class BiDatasetAccelerationSchedulerService {
     }
 
     @Scheduled(fixedDelayString = "${canvas.bi.dataset.acceleration.scheduler.fixed-delay-ms:60000}")
+    /**
+     * 执行核心业务流程，并协调依赖组件完成处理。
+     */
     public void scheduledCycle() {
         runScheduledOnce(LocalDateTime.now());
     }
 
+    /**
+     * 执行核心业务流程，并协调依赖组件完成处理。
+     *
+     * @param now 时间参数，用于计算窗口、过期或审计时间。
+     * @return 返回流程执行后的业务结果。
+     */
     public BiDatasetAccelerationSchedulerResult runScheduledOnce(LocalDateTime now) {
+        // 校验关键输入和前置条件，避免无效状态继续进入主流程。
         if (!enabled) {
             return empty();
         }
@@ -111,13 +157,23 @@ public class BiDatasetAccelerationSchedulerService {
             return new BiDatasetAccelerationSchedulerResult(0, 0, 1, 0);
         }
         try {
+            // 汇总前面计算出的状态和明细，返回给调用方。
             return runDueOnce(tenantId, operator, now);
         } finally {
             leaseService.release(tenantId, SCHEDULER_LEASE_KEY);
         }
     }
 
+    /**
+     * 执行核心业务流程，并协调依赖组件完成处理。
+     *
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @param actor 操作人标识，用于审计和权限判断。
+     * @param now 时间参数，用于计算窗口、过期或审计时间。
+     * @return 返回流程执行后的业务结果。
+     */
     public BiDatasetAccelerationSchedulerResult runDueOnce(Long tenantId, String actor, LocalDateTime now) {
+        // 校验关键输入和前置条件，避免无效状态继续进入主流程。
         if (!running.compareAndSet(false, true)) {
             return new BiDatasetAccelerationSchedulerResult(0, 0, 1, 0);
         }
@@ -130,6 +186,7 @@ public class BiDatasetAccelerationSchedulerService {
             int skipped = 0;
             int failed = 0;
             List<BiDatasetAccelerationSchedulerItem> items = new ArrayList<>();
+            // 遍历候选数据并按业务规则筛选、转换或聚合。
             for (BiDatasetAccelerationPolicyDO policy : policies(scopedTenantId)) {
                 checked++;
                 if (!isRefreshCandidate(policy) || !isDue(policy, effectiveNow)) {
@@ -166,12 +223,19 @@ public class BiDatasetAccelerationSchedulerService {
                             null));
                 }
             }
+            // 汇总前面计算出的状态和明细，返回给调用方。
             return new BiDatasetAccelerationSchedulerResult(checked, refreshed, skipped, failed, items);
         } finally {
             running.set(false);
         }
     }
 
+    /**
+     * 根据方法职责完成对应的业务处理流程。
+     *
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @return 返回 policies 汇总后的集合、分页或映射视图。
+     */
     private List<BiDatasetAccelerationPolicyDO> policies(Long tenantId) {
         List<BiDatasetAccelerationPolicyDO> rows = policyMapper.selectList(
                 new LambdaQueryWrapper<BiDatasetAccelerationPolicyDO>()
@@ -184,6 +248,12 @@ public class BiDatasetAccelerationSchedulerService {
         return rows == null ? List.of() : rows;
     }
 
+    /**
+     * 校验输入、权限或业务前置条件。
+     *
+     * @param policy policy 参数，用于 isRefreshCandidate 流程中的校验、计算或对象转换。
+     * @return 返回布尔判断结果。
+     */
     private boolean isRefreshCandidate(BiDatasetAccelerationPolicyDO policy) {
         return policy != null
                 && Boolean.TRUE.equals(policy.getEnabled())
@@ -192,6 +262,13 @@ public class BiDatasetAccelerationSchedulerService {
                 && BiDatasetAccelerationService.REFRESH_SCHEDULED.equals(normalize(policy.getRefreshMode()));
     }
 
+    /**
+     * 校验输入、权限或业务前置条件。
+     *
+     * @param policy policy 参数，用于 isDue 流程中的校验、计算或对象转换。
+     * @param now 时间参数，用于计算窗口、过期或审计时间。
+     * @return 返回布尔判断结果。
+     */
     private boolean isDue(BiDatasetAccelerationPolicyDO policy, LocalDateTime now) {
         if (policy.getLastRefreshedAt() == null) {
             return true;
@@ -202,6 +279,14 @@ public class BiDatasetAccelerationSchedulerService {
         return !policy.getLastRefreshedAt().plusMinutes(intervalMinutes(policy)).isAfter(now);
     }
 
+    /**
+     * 校验输入、权限或业务前置条件。
+     *
+     * @param cronExpression cron expression 参数，用于 isCronDue 流程中的校验、计算或对象转换。
+     * @param lastRefreshedAt 时间参数，用于计算窗口、过期或审计时间。
+     * @param now 时间参数，用于计算窗口、过期或审计时间。
+     * @return 返回布尔判断结果。
+     */
     private boolean isCronDue(String cronExpression, LocalDateTime lastRefreshedAt, LocalDateTime now) {
         try {
             CronExpression parsed = CronExpression.parse(cronExpression.trim());
@@ -212,17 +297,35 @@ public class BiDatasetAccelerationSchedulerService {
         }
     }
 
+    /**
+     * 根据方法职责完成对应的业务处理流程。
+     *
+     * @param policy policy 参数，用于 intervalMinutes 流程中的校验、计算或对象转换。
+     * @return 返回 interval minutes 计算得到的数量、金额或指标值。
+     */
     private long intervalMinutes(BiDatasetAccelerationPolicyDO policy) {
         Long value = policy.getRefreshIntervalMinutes();
         return value == null || value <= 0 ? 60L : value;
     }
 
+    /**
+     * 根据方法职责完成对应的业务处理流程。
+     *
+     * @param datasetKey 业务键，用于在同一租户下定位资源。
+     */
     private void invalidateDatasetCache(String datasetKey) {
         if (cachePolicyService != null) {
             cachePolicyService.invalidate(new BiQueryCacheInvalidationCommand("DATASET", null, datasetKey));
         }
     }
 
+    /**
+     * 根据方法职责完成对应的业务处理流程。
+     *
+     * @param policy policy 参数，用于 skippedItem 流程中的校验、计算或对象转换。
+     * @param reason 原因说明，用于记录状态变化的业务依据。
+     * @return 返回 skippedItem 流程生成的业务结果。
+     */
     private BiDatasetAccelerationSchedulerItem skippedItem(BiDatasetAccelerationPolicyDO policy, String reason) {
         return new BiDatasetAccelerationSchedulerItem(
                 policy == null ? null : policy.getDatasetKey(),
@@ -236,6 +339,15 @@ public class BiDatasetAccelerationSchedulerService {
                 null);
     }
 
+    /**
+     * 执行核心业务流程，并协调依赖组件完成处理。
+     *
+     * @param datasetKey 业务键，用于在同一租户下定位资源。
+     * @param status 业务状态，用于筛选或推进状态流转。
+     * @param run run 参数，用于 runItem 流程中的校验、计算或对象转换。
+     * @param reason 原因说明，用于记录状态变化的业务依据。
+     * @return 返回流程执行后的业务结果。
+     */
     private BiDatasetAccelerationSchedulerItem runItem(String datasetKey,
                                                        String status,
                                                        BiDatasetExtractRefreshRunView run,
@@ -252,6 +364,12 @@ public class BiDatasetAccelerationSchedulerService {
                 run == null ? null : run.finishedAt());
     }
 
+    /**
+     * 根据方法职责完成对应的业务处理流程。
+     *
+     * @param e e 参数，用于 errorReason 流程中的校验、计算或对象转换。
+     * @return 返回 error reason 生成的文本或业务键。
+     */
     private String errorReason(RuntimeException e) {
         if (e == null || !hasText(e.getMessage())) {
             return "refresh failed";
@@ -259,30 +377,71 @@ public class BiDatasetAccelerationSchedulerService {
         return e.getMessage().trim();
     }
 
+    /**
+     * 根据方法职责完成对应的业务处理流程。
+     *
+     * @return 返回 empty 流程生成的业务结果。
+     */
     private BiDatasetAccelerationSchedulerResult empty() {
         return new BiDatasetAccelerationSchedulerResult(0, 0, 0, 0);
     }
 
+    /**
+     * 根据方法职责完成对应的业务处理流程。
+     *
+     * @return 返回 leaseTtl 流程生成的业务结果。
+     */
     private Duration leaseTtl() {
         return Duration.ofSeconds(leaseTtlSeconds);
     }
 
+    /**
+     * 解析、归一化或保护输入值，生成安全可用的中间结果。
+     *
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @return 返回解析、归一化或安全处理后的值。
+     */
     private Long normalizeTenant(Long tenantId) {
         return tenantId == null ? 0L : tenantId;
     }
 
+    /**
+     * 生成默认值或兜底结果，保证调用链稳定。
+     *
+     * @param value 待处理值，用于规则计算或转换。
+     * @param fallback fallback 参数，用于 defaultText 流程中的校验、计算或对象转换。
+     * @return 返回 default text 生成的文本或业务键。
+     */
     private String defaultText(String value, String fallback) {
         return hasText(value) ? value.trim() : fallback;
     }
 
+    /**
+     * 解析、归一化或保护输入值，生成安全可用的中间结果。
+     *
+     * @param value 待处理值，用于规则计算或转换。
+     * @return 返回解析、归一化或安全处理后的值。
+     */
     private String normalize(String value) {
         return hasText(value) ? value.trim().toUpperCase(Locale.ROOT) : "";
     }
 
+    /**
+     * 解析、归一化或保护输入值，生成安全可用的中间结果。
+     *
+     * @param status 业务状态，用于筛选或推进状态流转。
+     * @return 返回解析、归一化或安全处理后的值。
+     */
     private String normalizeStatus(String status) {
         return normalize(status);
     }
 
+    /**
+     * 校验输入、权限或业务前置条件。
+     *
+     * @param value 待处理值，用于规则计算或转换。
+     * @return 返回布尔判断结果。
+     */
     private boolean hasText(String value) {
         return value != null && !value.isBlank();
     }

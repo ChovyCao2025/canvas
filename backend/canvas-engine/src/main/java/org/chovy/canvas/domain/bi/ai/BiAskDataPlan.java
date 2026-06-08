@@ -5,6 +5,16 @@ import org.chovy.canvas.domain.bi.query.BiSort;
 
 import java.util.List;
 
+/**
+ * BiAskDataPlan 承载 domain.bi.ai 场景中的不可变数据快照。
+ * @param datasetKey datasetKey 字段。
+ * @param dimensions dimensions 字段。
+ * @param metrics metrics 字段。
+ * @param filters filters 字段。
+ * @param sorts sorts 字段。
+ * @param limit limit 字段。
+ * @param explanation explanation 字段。
+ */
 public record BiAskDataPlan(
         String datasetKey,
         List<String> dimensions,

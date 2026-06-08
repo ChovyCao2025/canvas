@@ -12,6 +12,9 @@ import org.chovy.canvas.domain.bi.dataset.BiQuickEngineQueueStatusCount;
 import java.time.LocalDateTime;
 import java.util.List;
 
+/**
+ * BiQuickEngineQueueJobMapper 定义 dal.mapper 场景中的扩展契约。
+ */
 @Mapper
 public interface BiQuickEngineQueueJobMapper extends BaseMapper<BiQuickEngineQueueJobDO> {
 
@@ -25,6 +28,13 @@ public interface BiQuickEngineQueueJobMapper extends BaseMapper<BiQuickEngineQue
               AND status = 'QUEUED'
               AND expires_at <= #{now}
             """)
+    /**
+     * 执行数据写入或状态变更。
+     *
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @param now 时间参数，用于计算窗口、过期或审计时间。
+     * @return 返回 expire timed out 计算得到的数量、金额或指标值。
+     */
     int expireTimedOut(@Param("tenantId") Long tenantId, @Param("now") LocalDateTime now);
 
     @Update("""
@@ -36,6 +46,12 @@ public interface BiQuickEngineQueueJobMapper extends BaseMapper<BiQuickEngineQue
             WHERE status = 'QUEUED'
               AND expires_at <= #{now}
             """)
+    /**
+     * 执行数据写入或状态变更。
+     *
+     * @param now 时间参数，用于计算窗口、过期或审计时间。
+     * @return 返回 expire timed out all 计算得到的数量、金额或指标值。
+     */
     int expireTimedOutAll(@Param("now") LocalDateTime now);
 
     @Update("""
@@ -52,6 +68,16 @@ public interface BiQuickEngineQueueJobMapper extends BaseMapper<BiQuickEngineQue
             ORDER BY queued_at ASC, id ASC
             LIMIT #{limit}
             """)
+    /**
+     * 执行数据写入或状态变更。
+     *
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @param poolKey 业务键，用于在同一租户下定位资源。
+     * @param workerId 业务对象 ID，用于定位具体记录。
+     * @param now 时间参数，用于计算窗口、过期或审计时间。
+     * @param limit 分页或数量限制，避免一次处理过多数据。
+     * @return 返回 claim ready 计算得到的数量、金额或指标值。
+     */
     int claimReady(@Param("tenantId") Long tenantId,
                    @Param("poolKey") String poolKey,
                    @Param("workerId") String workerId,
@@ -68,6 +94,15 @@ public interface BiQuickEngineQueueJobMapper extends BaseMapper<BiQuickEngineQue
               AND claimed_by = #{workerId}
               AND status = 'CLAIMED'
             """)
+    /**
+     * 执行数据写入或状态变更。
+     *
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @param jobId 业务对象 ID，用于定位具体记录。
+     * @param workerId 业务对象 ID，用于定位具体记录。
+     * @param now 时间参数，用于计算窗口、过期或审计时间。
+     * @return 返回 complete claimed 计算得到的数量、金额或指标值。
+     */
     int completeClaimed(@Param("tenantId") Long tenantId,
                         @Param("jobId") Long jobId,
                         @Param("workerId") String workerId,
@@ -82,6 +117,14 @@ public interface BiQuickEngineQueueJobMapper extends BaseMapper<BiQuickEngineQue
               AND id = #{jobId}
               AND status = 'QUEUED'
             """)
+    /**
+     * 执行数据写入或状态变更。
+     *
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @param jobId 业务对象 ID，用于定位具体记录。
+     * @param now 时间参数，用于计算窗口、过期或审计时间。
+     * @return 返回 complete queued admission 计算得到的数量、金额或指标值。
+     */
     int completeQueuedAdmission(@Param("tenantId") Long tenantId,
                                 @Param("jobId") Long jobId,
                                 @Param("now") LocalDateTime now);
@@ -97,6 +140,16 @@ public interface BiQuickEngineQueueJobMapper extends BaseMapper<BiQuickEngineQue
               AND claimed_by = #{workerId}
               AND status = 'CLAIMED'
             """)
+    /**
+     * 执行数据写入或状态变更。
+     *
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @param jobId 业务对象 ID，用于定位具体记录。
+     * @param workerId 业务对象 ID，用于定位具体记录。
+     * @param reason 原因说明，用于记录状态变化的业务依据。
+     * @param now 时间参数，用于计算窗口、过期或审计时间。
+     * @return 返回 block claimed 计算得到的数量、金额或指标值。
+     */
     int blockClaimed(@Param("tenantId") Long tenantId,
                      @Param("jobId") Long jobId,
                      @Param("workerId") String workerId,
@@ -113,6 +166,15 @@ public interface BiQuickEngineQueueJobMapper extends BaseMapper<BiQuickEngineQue
               AND id = #{jobId}
               AND status = 'QUEUED'
             """)
+    /**
+     * 执行数据写入或状态变更。
+     *
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @param jobId 业务对象 ID，用于定位具体记录。
+     * @param reason 原因说明，用于记录状态变化的业务依据。
+     * @param now 时间参数，用于计算窗口、过期或审计时间。
+     * @return 返回 block queued admission 计算得到的数量、金额或指标值。
+     */
     int blockQueuedAdmission(@Param("tenantId") Long tenantId,
                              @Param("jobId") Long jobId,
                              @Param("reason") String reason,
@@ -129,6 +191,14 @@ public interface BiQuickEngineQueueJobMapper extends BaseMapper<BiQuickEngineQue
               AND status = 'CLAIMED'
               AND expires_at <= #{now}
             """)
+    /**
+     * 执行数据写入或状态变更。
+     *
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @param poolKey 业务键，用于在同一租户下定位资源。
+     * @param now 时间参数，用于计算窗口、过期或审计时间。
+     * @return 返回 expire stale claimed 计算得到的数量、金额或指标值。
+     */
     int expireStaleClaimed(@Param("tenantId") Long tenantId,
                            @Param("poolKey") String poolKey,
                            @Param("now") LocalDateTime now);
@@ -146,6 +216,15 @@ public interface BiQuickEngineQueueJobMapper extends BaseMapper<BiQuickEngineQue
               AND claimed_at <= #{cutoff}
               AND expires_at > #{now}
             """)
+    /**
+     * 执行数据写入或状态变更。
+     *
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @param poolKey 业务键，用于在同一租户下定位资源。
+     * @param cutoff cutoff 参数，用于 recoverStaleClaims 流程中的校验、计算或对象转换。
+     * @param now 时间参数，用于计算窗口、过期或审计时间。
+     * @return 返回 recover stale claims 计算得到的数量、金额或指标值。
+     */
     int recoverStaleClaims(@Param("tenantId") Long tenantId,
                            @Param("poolKey") String poolKey,
                            @Param("cutoff") LocalDateTime cutoff,
@@ -162,6 +241,14 @@ public interface BiQuickEngineQueueJobMapper extends BaseMapper<BiQuickEngineQue
             ORDER BY claimed_at ASC, id ASC
             LIMIT #{limit}
             """)
+    /**
+     * 查询或读取业务数据。
+     *
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @param workerId 业务对象 ID，用于定位具体记录。
+     * @param limit 分页或数量限制，避免一次处理过多数据。
+     * @return 返回符合条件的数据列表或视图。
+     */
     List<BiQuickEngineQueueJobDO> findClaimed(@Param("tenantId") Long tenantId,
                                               @Param("workerId") String workerId,
                                               @Param("limit") int limit);
@@ -178,6 +265,13 @@ public interface BiQuickEngineQueueJobMapper extends BaseMapper<BiQuickEngineQue
             ORDER BY MIN(queued_at) ASC, tenant_id ASC, pool_key ASC
             LIMIT #{limit}
             """)
+    /**
+     * 查询或读取业务数据。
+     *
+     * @param now 时间参数，用于计算窗口、过期或审计时间。
+     * @param limit 分页或数量限制，避免一次处理过多数据。
+     * @return 返回符合条件的数据列表或视图。
+     */
     List<BiQuickEngineQueueBacklogView> findReadyBacklogs(@Param("now") LocalDateTime now,
                                                           @Param("limit") int limit);
 
@@ -192,6 +286,14 @@ public interface BiQuickEngineQueueJobMapper extends BaseMapper<BiQuickEngineQue
             ORDER BY claimed_at ASC, tenant_id ASC, pool_key ASC, queued_at ASC, id ASC
             LIMIT #{limit}
             """)
+    /**
+     * 查询或读取业务数据。
+     *
+     * @param workerId 业务对象 ID，用于定位具体记录。
+     * @param claimedAt 时间参数，用于计算窗口、过期或审计时间。
+     * @param limit 分页或数量限制，避免一次处理过多数据。
+     * @return 返回符合条件的数据列表或视图。
+     */
     List<BiQuickEngineQueueJobDO> findClaimedByWorker(@Param("workerId") String workerId,
                                                       @Param("claimedAt") LocalDateTime claimedAt,
                                                       @Param("limit") int limit);
@@ -207,6 +309,13 @@ public interface BiQuickEngineQueueJobMapper extends BaseMapper<BiQuickEngineQue
             GROUP BY status
             </script>
             """)
+    /**
+     * 查询或读取业务数据。
+     *
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @param poolKey 业务键，用于在同一租户下定位资源。
+     * @return 返回统计数量。
+     */
     List<BiQuickEngineQueueStatusCount> countByStatus(@Param("tenantId") Long tenantId,
                                                       @Param("poolKey") String poolKey);
 
@@ -227,6 +336,15 @@ public interface BiQuickEngineQueueJobMapper extends BaseMapper<BiQuickEngineQue
             LIMIT #{limit}
             </script>
             """)
+    /**
+     * 查询或读取业务数据。
+     *
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @param poolKey 业务键，用于在同一租户下定位资源。
+     * @param status 业务状态，用于筛选或推进状态流转。
+     * @param limit 分页或数量限制，避免一次处理过多数据。
+     * @return 返回符合条件的数据列表或视图。
+     */
     List<BiQuickEngineQueueJobDO> findRecent(@Param("tenantId") Long tenantId,
                                              @Param("poolKey") String poolKey,
                                              @Param("status") String status,

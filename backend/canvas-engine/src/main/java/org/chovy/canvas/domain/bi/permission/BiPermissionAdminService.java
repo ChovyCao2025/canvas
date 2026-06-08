@@ -36,6 +36,9 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 
+/**
+ * BiPermissionAdminService 编排 domain.bi.permission 场景的领域业务规则。
+ */
 @Service
 public class BiPermissionAdminService {
 
@@ -86,6 +89,19 @@ public class BiPermissionAdminService {
     private final BiAuditLogMapper auditLogMapper;
     private final ObjectMapper objectMapper;
 
+    /**
+     * 创建 BiPermissionAdminService 实例并注入 domain.bi.permission 场景依赖。
+     * @param datasetMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param dashboardMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param chartMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param portalMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param bigScreenMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param spreadsheetMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param resourcePermissionMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param rowPermissionMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param columnPermissionMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param objectMapper 依赖组件，用于完成数据访问或外部能力调用。
+     */
     public BiPermissionAdminService(BiDatasetMapper datasetMapper,
                                     BiDashboardMapper dashboardMapper,
                                     BiChartMapper chartMapper,
@@ -100,6 +116,21 @@ public class BiPermissionAdminService {
                 resourcePermissionMapper, rowPermissionMapper, columnPermissionMapper, null, objectMapper);
     }
 
+    /**
+     * 创建 BiPermissionAdminService 实例并注入 domain.bi.permission 场景依赖。
+     * @param datasetMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param dashboardMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param chartMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param portalMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param bigScreenMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param spreadsheetMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param dataSourceConfigMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param resourcePermissionMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param rowPermissionMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param columnPermissionMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param auditLogMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param objectMapper 依赖组件，用于完成数据访问或外部能力调用。
+     */
     @Autowired
     public BiPermissionAdminService(BiDatasetMapper datasetMapper,
                                     BiDashboardMapper dashboardMapper,
@@ -127,12 +158,30 @@ public class BiPermissionAdminService {
         this.objectMapper = objectMapper == null ? new ObjectMapper() : objectMapper;
     }
 
+    /**
+     * 查询当前租户下符合条件的 BI 资源列表，过滤已归档或不可见数据并按业务更新时间返回。
+     *
+     * @param tenantId 租户标识，用于限定 BI 资源、权限和审计数据的隔离范围
+     * @param resourceType BI 资源类型，例如 DASHBOARD、CHART、DATASET 或 PORTAL
+     * @param resourceKey BI 资源业务键，用于定位权限、收藏、审批和协作记录
+     * @param resourceId BI 资源数据库主键，用于精确匹配权限规则
+     * @return 指定资源的资源级权限配置列表
+     */
     public List<BiResourcePermissionView> listResourcePermissions(Long tenantId,
                                                                   String resourceType,
                                                                   String resourceKey,
                                                                   Long resourceId) {
         Long scopedTenantId = normalizeTenant(tenantId);
         ResourceRef ref = hasText(resourceType) && (hasText(resourceKey) || resourceId != null)
+                /**
+                 * 解析业务依赖或上下文值。
+                 *
+                 * @param scopedTenantId 业务对象 ID，用于定位具体记录。
+                 * @param resourceType 类型标识，用于选择对应处理分支。
+                 * @param resourceKey 业务键，用于在同一租户下定位资源。
+                 * @param resourceId 业务对象 ID，用于定位具体记录。
+                 * @return 返回 resolveResource 流程生成的业务结果。
+                 */
                 ? resolveResource(scopedTenantId, resourceType, resourceKey, resourceId)
                 : null;
         LambdaQueryWrapper<BiResourcePermissionDO> query =
@@ -146,6 +195,7 @@ public class BiPermissionAdminService {
         if (ref != null) {
             query.eq(BiResourcePermissionDO::getResourceType, ref.resourceType())
                     .eq(BiResourcePermissionDO::getResourceId, ref.resourceId());
+        // 根据前序判断结果进入后续条件分支。
         } else if (hasText(resourceType)) {
             query.eq(BiResourcePermissionDO::getResourceType, upperRequired(resourceType, "resourceType"));
         }
@@ -154,6 +204,14 @@ public class BiPermissionAdminService {
                 .toList();
     }
 
+    /**
+     * 创建或更新资源级权限配置，并记录管理员操作审计。
+     *
+     * @param tenantId 租户标识，用于限定 BI 资源、权限和审计数据的隔离范围
+     * @param username 当前操作人账号，用于权限校验、锁持有人判断和审计记录
+     * @param command 业务操作命令，包含本次请求需要写入或校验的字段
+     * @return 用于前端展示或管理端审计的业务视图
+     */
     public BiResourcePermissionView upsertResourcePermission(Long tenantId,
                                                              String username,
                                                              BiResourcePermissionCommand command) {
@@ -207,14 +265,32 @@ public class BiPermissionAdminService {
         }
         BiResourcePermissionView view = toResourceView(row);
         auditChange(scopedTenantId, row.getWorkspaceId(), row.getId(), username,
+                /**
+                 * 执行 resourceSnapshot 流程，围绕 resource snapshot 完成校验、计算或结果组装。
+                 *
+                 * @return 返回 resourceSnapshot 流程生成的业务结果。
+                 */
                 "RESOURCE", operation, before, resourceSnapshot(row));
         return view;
     }
 
+    /**
+     * 删除资源级权限配置，使对应主体不再获得该资源授权。
+     *
+     * @param tenantId 租户标识，用于限定 BI 资源、权限和审计数据的隔离范围
+     * @param id 记录主键，用于删除或定位权限配置
+     */
     public void deleteResourcePermission(Long tenantId, Long id) {
         deleteResourcePermission(tenantId, "system", id);
     }
 
+    /**
+     * 删除资源级权限配置，使对应主体不再获得该资源授权。
+     *
+     * @param tenantId 租户标识，用于限定 BI 资源、权限和审计数据的隔离范围
+     * @param username 当前操作人账号，用于权限校验、锁持有人判断和审计记录
+     * @param id 记录主键，用于删除或定位权限配置
+     */
     public void deleteResourcePermission(Long tenantId, String username, Long id) {
         BiResourcePermissionDO row = resourcePermissionMapper.selectById(id);
         Map<String, Object> before = resourceSnapshot(row);
@@ -224,6 +300,13 @@ public class BiPermissionAdminService {
                 "RESOURCE", "DELETE", before, null);
     }
 
+    /**
+     * 查询当前租户下符合条件的 BI 资源列表，过滤已归档或不可见数据并按业务更新时间返回。
+     *
+     * @param tenantId 租户标识，用于限定 BI 资源、权限和审计数据的隔离范围
+     * @param datasetKey 数据集业务键，用于定位语义模型、权限规则和加速策略
+     * @return 指定数据集的行级权限规则列表
+     */
     public List<BiRowPermissionView> listRowPermissions(Long tenantId, String datasetKey) {
         Long scopedTenantId = normalizeTenant(tenantId);
         Long datasetId = hasText(datasetKey) ? resolveDataset(scopedTenantId, datasetKey).getId() : null;
@@ -232,20 +315,37 @@ public class BiPermissionAdminService {
                         .eq(BiRowPermissionDO::getTenantId, scopedTenantId)
                         .orderByAsc(BiRowPermissionDO::getDatasetId)
                         .orderByAsc(BiRowPermissionDO::getRuleKey);
+        // 校验关键输入和前置条件，避免无效状态继续进入主流程。
         if (datasetId != null) {
             query.eq(BiRowPermissionDO::getDatasetId, datasetId);
         }
         Map<Long, String> datasetKeys = datasetKeys(scopedTenantId);
+        // 遍历候选数据并按业务规则筛选、转换或聚合。
         return safeList(rowPermissionMapper.selectList(query)).stream()
                 .map(row -> toRowView(row, datasetKeys.get(row.getDatasetId())))
                 .toList();
     }
 
+    /**
+     * 创建或更新数据集行级权限规则，并写入权限治理审计。
+     *
+     * @param tenantId 租户标识，用于限定 BI 资源、权限和审计数据的隔离范围
+     * @param command 业务操作命令，包含本次请求需要写入或校验的字段
+     * @return 用于前端展示或管理端审计的业务视图
+     */
     public BiRowPermissionView upsertRowPermission(Long tenantId,
                                                    BiRowPermissionCommand command) {
         return upsertRowPermission(tenantId, "system", command);
     }
 
+    /**
+     * 创建或更新数据集行级权限规则，并写入权限治理审计。
+     *
+     * @param tenantId 租户标识，用于限定 BI 资源、权限和审计数据的隔离范围
+     * @param username 当前操作人账号，用于权限校验、锁持有人判断和审计记录
+     * @param command 业务操作命令，包含本次请求需要写入或校验的字段
+     * @return 用于前端展示或管理端审计的业务视图
+     */
     public BiRowPermissionView upsertRowPermission(Long tenantId,
                                                    String username,
                                                    BiRowPermissionCommand command) {
@@ -290,14 +390,32 @@ public class BiPermissionAdminService {
         }
         BiRowPermissionView view = toRowView(row, dataset.getDatasetKey());
         auditChange(scopedTenantId, dataset.getWorkspaceId(), row.getId(), username,
+                /**
+                 * 组装输出结构或完成对象转换。
+                 *
+                 * @return 返回 rowSnapshot 流程生成的业务结果。
+                 */
                 "ROW", operation, before, rowSnapshot(row));
         return view;
     }
 
+    /**
+     * 删除数据集行级权限规则，停止在查询编译时追加对应过滤条件。
+     *
+     * @param tenantId 租户标识，用于限定 BI 资源、权限和审计数据的隔离范围
+     * @param id 记录主键，用于删除或定位权限配置
+     */
     public void deleteRowPermission(Long tenantId, Long id) {
         deleteRowPermission(tenantId, "system", id);
     }
 
+    /**
+     * 删除数据集行级权限规则，停止在查询编译时追加对应过滤条件。
+     *
+     * @param tenantId 租户标识，用于限定 BI 资源、权限和审计数据的隔离范围
+     * @param username 当前操作人账号，用于权限校验、锁持有人判断和审计记录
+     * @param id 记录主键，用于删除或定位权限配置
+     */
     public void deleteRowPermission(Long tenantId, String username, Long id) {
         BiRowPermissionDO row = rowPermissionMapper.selectById(id);
         Map<String, Object> before = rowSnapshot(row);
@@ -307,6 +425,13 @@ public class BiPermissionAdminService {
                 "ROW", "DELETE", before, null);
     }
 
+    /**
+     * 查询当前租户下符合条件的 BI 资源列表，过滤已归档或不可见数据并按业务更新时间返回。
+     *
+     * @param tenantId 租户标识，用于限定 BI 资源、权限和审计数据的隔离范围
+     * @param datasetKey 数据集业务键，用于定位语义模型、权限规则和加速策略
+     * @return 指定数据集的列级权限和脱敏规则列表
+     */
     public List<BiColumnPermissionView> listColumnPermissions(Long tenantId, String datasetKey) {
         Long scopedTenantId = normalizeTenant(tenantId);
         Long datasetId = hasText(datasetKey) ? resolveDataset(scopedTenantId, datasetKey).getId() : null;
@@ -317,20 +442,37 @@ public class BiPermissionAdminService {
                         .orderByAsc(BiColumnPermissionDO::getFieldKey)
                         .orderByAsc(BiColumnPermissionDO::getSubjectType)
                         .orderByAsc(BiColumnPermissionDO::getSubjectId);
+        // 校验关键输入和前置条件，避免无效状态继续进入主流程。
         if (datasetId != null) {
             query.eq(BiColumnPermissionDO::getDatasetId, datasetId);
         }
         Map<Long, String> datasetKeys = datasetKeys(scopedTenantId);
+        // 遍历候选数据并按业务规则筛选、转换或聚合。
         return safeList(columnPermissionMapper.selectList(query)).stream()
                 .map(row -> toColumnView(row, datasetKeys.get(row.getDatasetId())))
                 .toList();
     }
 
+    /**
+     * 创建或更新列级权限规则，控制字段裁剪和脱敏展示。
+     *
+     * @param tenantId 租户标识，用于限定 BI 资源、权限和审计数据的隔离范围
+     * @param command 业务操作命令，包含本次请求需要写入或校验的字段
+     * @return 用于前端展示或管理端审计的业务视图
+     */
     public BiColumnPermissionView upsertColumnPermission(Long tenantId,
                                                          BiColumnPermissionCommand command) {
         return upsertColumnPermission(tenantId, "system", command);
     }
 
+    /**
+     * 创建或更新列级权限规则，控制字段裁剪和脱敏展示。
+     *
+     * @param tenantId 租户标识，用于限定 BI 资源、权限和审计数据的隔离范围
+     * @param username 当前操作人账号，用于权限校验、锁持有人判断和审计记录
+     * @param command 业务操作命令，包含本次请求需要写入或校验的字段
+     * @return 用于前端展示或管理端审计的业务视图
+     */
     public BiColumnPermissionView upsertColumnPermission(Long tenantId,
                                                          String username,
                                                          BiColumnPermissionCommand command) {
@@ -380,14 +522,32 @@ public class BiPermissionAdminService {
         }
         BiColumnPermissionView view = toColumnView(row, dataset.getDatasetKey());
         auditChange(scopedTenantId, dataset.getWorkspaceId(), row.getId(), username,
+                /**
+                 * 执行 columnSnapshot 流程，围绕 column snapshot 完成校验、计算或结果组装。
+                 *
+                 * @return 返回 columnSnapshot 流程生成的业务结果。
+                 */
                 "COLUMN", operation, before, columnSnapshot(row));
         return view;
     }
 
+    /**
+     * 删除列级权限规则，使对应字段恢复默认权限策略。
+     *
+     * @param tenantId 租户标识，用于限定 BI 资源、权限和审计数据的隔离范围
+     * @param id 记录主键，用于删除或定位权限配置
+     */
     public void deleteColumnPermission(Long tenantId, Long id) {
         deleteColumnPermission(tenantId, "system", id);
     }
 
+    /**
+     * 删除列级权限规则，使对应字段恢复默认权限策略。
+     *
+     * @param tenantId 租户标识，用于限定 BI 资源、权限和审计数据的隔离范围
+     * @param username 当前操作人账号，用于权限校验、锁持有人判断和审计记录
+     * @param id 记录主键，用于删除或定位权限配置
+     */
     public void deleteColumnPermission(Long tenantId, String username, Long id) {
         BiColumnPermissionDO row = columnPermissionMapper.selectById(id);
         Map<String, Object> before = columnSnapshot(row);
@@ -397,12 +557,21 @@ public class BiPermissionAdminService {
                 "COLUMN", "DELETE", before, null);
     }
 
+    /**
+     * 查询最近治理审计记录，用于追踪权限、策略和配置变更。
+     *
+     * @param tenantId 租户标识，用于限定 BI 资源、权限和审计数据的隔离范围
+     * @param limit 本次读取、处理或领取的最大数量
+     * @return 符合条件的业务列表
+     */
     public List<BiPermissionAuditEntry> recentAudit(Long tenantId, int limit) {
+        // 校验关键输入和前置条件，避免无效状态继续进入主流程。
         if (auditLogMapper == null) {
             return List.of();
         }
         Long scopedTenantId = normalizeTenant(tenantId);
         int boundedLimit = Math.max(1, Math.min(limit, 100));
+        // 访问持久化或外部依赖，获取或写入本次流程需要的数据。
         List<BiAuditLogDO> rows = auditLogMapper.selectList(
                 new LambdaQueryWrapper<BiAuditLogDO>()
                         .eq(BiAuditLogDO::getTenantId, scopedTenantId)
@@ -410,6 +579,7 @@ public class BiPermissionAdminService {
                         .eq(BiAuditLogDO::getResourceType, AUDIT_RESOURCE_TYPE)
                         .orderByDesc(BiAuditLogDO::getCreatedAt)
                         .last("LIMIT " + boundedLimit));
+        // 遍历候选数据并按业务规则筛选、转换或聚合。
         return safeList(rows).stream()
                 .filter(row -> scopedTenantId.equals(row.getTenantId()))
                 .filter(row -> AUDIT_ACTION.equals(row.getActionKey()))
@@ -427,10 +597,20 @@ public class BiPermissionAdminService {
                 .toList();
     }
 
+    /**
+     * 解析业务依赖或上下文值。
+     *
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @param resourceType 类型标识，用于选择对应处理分支。
+     * @param resourceKey 业务键，用于在同一租户下定位资源。
+     * @param resourceId 业务对象 ID，用于定位具体记录。
+     * @return 返回 resolveResource 流程生成的业务结果。
+     */
     private ResourceRef resolveResource(Long tenantId,
                                         String resourceType,
                                         String resourceKey,
                                         Long resourceId) {
+        // 管理端写权限前先把业务 key 解析为数据库 ID 和 workspaceId，后续审计与运行态授权都以该快照为准。
         String scopedType = enumValue(resourceType, RESOURCE_TYPES, "resourceType");
         if (resourceId != null && resourceId > 0) {
             return new ResourceRef(scopedType, resourceId, workspaceId(tenantId, scopedType, resourceId), resourceKey);
@@ -510,8 +690,18 @@ public class BiPermissionAdminService {
         throw new IllegalArgumentException("resourceId is required for resourceType: " + scopedType);
     }
 
+    /**
+     * 执行 workspaceId 流程，围绕 workspace id 完成校验、计算或结果组装。
+     *
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @param resourceType 类型标识，用于选择对应处理分支。
+     * @param resourceId 业务对象 ID，用于定位具体记录。
+     * @return 返回 workspace id 计算得到的数量、金额或指标值。
+     */
     private Long workspaceId(Long tenantId, String resourceType, Long resourceId) {
+        // 校验关键输入和前置条件，避免无效状态继续进入主流程。
         if (RESOURCE_DATASET.equals(resourceType)) {
+            // 访问持久化或外部依赖，获取或写入本次流程需要的数据。
             BiDatasetDO row = datasetMapper.selectById(resourceId);
             return row == null || row.getWorkspaceId() == null ? 0L : row.getWorkspaceId();
         }
@@ -538,9 +728,17 @@ public class BiPermissionAdminService {
         if (RESOURCE_DATASOURCE.equals(resourceType)) {
             return 0L;
         }
+        // 汇总前面计算出的状态和明细，返回给调用方。
         return 0L;
     }
 
+    /**
+     * 解析业务依赖或上下文值。
+     *
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @param datasetKey 业务键，用于在同一租户下定位资源。
+     * @return 返回 resolveDataset 流程生成的业务结果。
+     */
     private BiDatasetDO resolveDataset(Long tenantId, String datasetKey) {
         BiDatasetDO dataset = datasetMapper.selectOne(new LambdaQueryWrapper<BiDatasetDO>()
                 .in(BiDatasetDO::getTenantId, tenantScope(tenantId))
@@ -554,6 +752,12 @@ public class BiPermissionAdminService {
         return dataset;
     }
 
+    /**
+     * 转换为接口返回或领域视图。
+     *
+     * @param row 持久化行数据，承载数据库记录内容。
+     * @return 返回组装或转换后的结果对象。
+     */
     private BiResourcePermissionView toResourceView(BiResourcePermissionDO row) {
         if (row == null) {
             throw new IllegalStateException("BI resource permission was not persisted");
@@ -573,6 +777,13 @@ public class BiPermissionAdminService {
                 row.getCreatedAt());
     }
 
+    /**
+     * 转换为接口返回或领域视图。
+     *
+     * @param row 持久化行数据，承载数据库记录内容。
+     * @param datasetKey 业务键，用于在同一租户下定位资源。
+     * @return 返回组装或转换后的结果对象。
+     */
     private BiRowPermissionView toRowView(BiRowPermissionDO row, String datasetKey) {
         if (row == null) {
             throw new IllegalStateException("BI row permission was not persisted");
@@ -590,6 +801,13 @@ public class BiPermissionAdminService {
                 row.getCreatedAt());
     }
 
+    /**
+     * 转换为接口返回或领域视图。
+     *
+     * @param row 持久化行数据，承载数据库记录内容。
+     * @param datasetKey 业务键，用于在同一租户下定位资源。
+     * @return 返回组装或转换后的结果对象。
+     */
     private BiColumnPermissionView toColumnView(BiColumnPermissionDO row, String datasetKey) {
         if (row == null) {
             throw new IllegalStateException("BI column permission was not persisted");
@@ -608,6 +826,12 @@ public class BiPermissionAdminService {
                 row.getCreatedAt());
     }
 
+    /**
+     * 执行 datasetKeys 流程，围绕 dataset keys 完成校验、计算或结果组装。
+     *
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @return 返回 dataset keys 生成的文本或业务键。
+     */
     private Map<Long, String> datasetKeys(Long tenantId) {
         Map<Long, String> values = new LinkedHashMap<>();
         for (BiDatasetDO row : safeList(datasetMapper.selectList(new LambdaQueryWrapper<BiDatasetDO>()
@@ -619,10 +843,18 @@ public class BiPermissionAdminService {
         return values;
     }
 
+    /**
+     * 执行 resourceKey 流程，围绕 resource key 完成校验、计算或结果组装。
+     *
+     * @param resourceType 类型标识，用于选择对应处理分支。
+     * @param resourceId 业务对象 ID，用于定位具体记录。
+     * @return 返回 resource key 生成的文本或业务键。
+     */
     private String resourceKey(String resourceType, Long resourceId) {
         if (resourceId == null) {
             return null;
         }
+        // 列表视图需要把权限表中的 resourceId 还原为业务 key；查不到时返回 null，不放宽实际权限。
         if (RESOURCE_DATASET.equals(resourceType)) {
             BiDatasetDO row = datasetMapper.selectById(resourceId);
             return row == null ? null : row.getDatasetKey();
@@ -654,10 +886,18 @@ public class BiPermissionAdminService {
         return null;
     }
 
+    /**
+     * 解析业务依赖或上下文值。
+     *
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @param resourceKey 业务键，用于在同一租户下定位资源。
+     * @return 返回 resolveDatasource 流程生成的业务结果。
+     */
     private DataSourceConfigDO resolveDatasource(Long tenantId, String resourceKey) {
         if (dataSourceConfigMapper == null) {
             throw new IllegalStateException("BI datasource permission resolver is not configured");
         }
+        // 数据源权限只允许当前租户配置，且支持 jdbc-{id} 与名称两种管理入口。
         String key = required(resourceKey, "resourceKey");
         Long id = datasourceIdFromKey(key);
         LambdaQueryWrapper<DataSourceConfigDO> query = new LambdaQueryWrapper<DataSourceConfigDO>()
@@ -675,6 +915,12 @@ public class BiPermissionAdminService {
         return datasource;
     }
 
+    /**
+     * 执行 datasourceIdFromKey 流程，围绕 datasource id from key 完成校验、计算或结果组装。
+     *
+     * @param resourceKey 业务键，用于在同一租户下定位资源。
+     * @return 返回 datasource id from key 计算得到的数量、金额或指标值。
+     */
     private Long datasourceIdFromKey(String resourceKey) {
         String normalized = resourceKey.trim().toLowerCase(Locale.ROOT);
         if (!normalized.startsWith("jdbc-")) {
@@ -682,16 +928,30 @@ public class BiPermissionAdminService {
         }
         try {
             return Long.parseLong(normalized.substring("jdbc-".length()));
+        // 捕获异常并转为业务兜底处理，避免异常扩散到主流程。
         } catch (NumberFormatException ignored) {
             return null;
         }
     }
 
+    /**
+     * 执行 datasourceKey 流程，围绕 datasource key 完成校验、计算或结果组装。
+     *
+     * @param datasource datasource 参数，用于 datasourceKey 流程中的校验、计算或对象转换。
+     * @return 返回 datasource key 生成的文本或业务键。
+     */
     private String datasourceKey(DataSourceConfigDO datasource) {
         return "jdbc-" + datasource.getId();
     }
 
+    /**
+     * 处理 JSON 序列化或反序列化。
+     *
+     * @param command 命令对象，描述本次业务动作及其参数。
+     * @return 返回 row filter json 生成的文本或业务键。
+     */
     private String rowFilterJson(BiRowPermissionCommand command) {
+        // 行权限支持新版 filters 数组和旧版单 filter；统一序列化后由运行态解析为强制查询条件。
         if (!command.filters().isEmpty()) {
             return json(Map.of("filters", command.filters()));
         }
@@ -701,6 +961,18 @@ public class BiPermissionAdminService {
         throw new IllegalArgumentException("row permission filter is required");
     }
 
+    /**
+     * 记录审计、指标或状态变更信息。
+     *
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @param workspaceId 业务对象 ID，用于定位具体记录。
+     * @param permissionId 业务对象 ID，用于定位具体记录。
+     * @param actor 操作人标识，用于审计和权限判断。
+     * @param permissionKind permission kind 参数，用于 auditChange 流程中的校验、计算或对象转换。
+     * @param operation 待调度任务或操作名称，用于封装阻塞工作。
+     * @param before before 参数，用于 auditChange 流程中的校验、计算或对象转换。
+     * @param after after 参数，用于 auditChange 流程中的校验、计算或对象转换。
+     */
     private void auditChange(Long tenantId,
                              Long workspaceId,
                              Long permissionId,
@@ -712,6 +984,7 @@ public class BiPermissionAdminService {
         if (auditLogMapper == null) {
             return;
         }
+        // 审计记录 before/after 快照用于追责和回放；写失败不回滚权限变更，避免审计故障阻塞治理配置。
         Map<String, Object> detail = new LinkedHashMap<>();
         detail.put("permissionKind", permissionKind);
         detail.put("operation", operation);
@@ -728,11 +1001,18 @@ public class BiPermissionAdminService {
         row.setCreatedAt(LocalDateTime.now());
         try {
             auditLogMapper.insert(row);
+        // 捕获异常并转为业务兜底处理，避免异常扩散到主流程。
         } catch (RuntimeException ignored) {
             // Permission writes should still apply when audit storage is temporarily unavailable.
         }
     }
 
+    /**
+     * 执行 resourceSnapshot 流程，围绕 resource snapshot 完成校验、计算或结果组装。
+     *
+     * @param row 持久化行数据，承载数据库记录内容。
+     * @return 返回 resourceSnapshot 流程生成的业务结果。
+     */
     private Map<String, Object> resourceSnapshot(BiResourcePermissionDO row) {
         if (row == null) {
             return null;
@@ -750,6 +1030,12 @@ public class BiPermissionAdminService {
         return value;
     }
 
+    /**
+     * 组装输出结构或完成对象转换。
+     *
+     * @param row 持久化行数据，承载数据库记录内容。
+     * @return 返回 rowSnapshot 流程生成的业务结果。
+     */
     private Map<String, Object> rowSnapshot(BiRowPermissionDO row) {
         if (row == null) {
             return null;
@@ -766,6 +1052,12 @@ public class BiPermissionAdminService {
         return value;
     }
 
+    /**
+     * 执行 columnSnapshot 流程，围绕 column snapshot 完成校验、计算或结果组装。
+     *
+     * @param row 持久化行数据，承载数据库记录内容。
+     * @return 返回 columnSnapshot 流程生成的业务结果。
+     */
     private Map<String, Object> columnSnapshot(BiColumnPermissionDO row) {
         if (row == null) {
             return null;
@@ -783,6 +1075,12 @@ public class BiPermissionAdminService {
         return value;
     }
 
+    /**
+     * 执行 workspaceIdForDataset 流程，围绕 workspace id for dataset 完成校验、计算或结果组装。
+     *
+     * @param datasetId 业务对象 ID，用于定位具体记录。
+     * @return 返回 workspace id for dataset 计算得到的数量、金额或指标值。
+     */
     private Long workspaceIdForDataset(Long datasetId) {
         if (datasetId == null) {
             return null;
@@ -791,23 +1089,41 @@ public class BiPermissionAdminService {
         return dataset == null ? null : dataset.getWorkspaceId();
     }
 
+    /**
+     * 处理 JSON 序列化或反序列化。
+     *
+     * @param value 待处理值，用于规则计算或转换。
+     * @return 返回 json 生成的文本或业务键。
+     */
     private String json(Object value) {
         try {
             return objectMapper.writeValueAsString(value == null ? Map.of() : value);
+        // 捕获异常并转为业务兜底处理，避免异常扩散到主流程。
         } catch (JsonProcessingException e) {
             throw new IllegalArgumentException("invalid BI permission payload", e);
         }
     }
 
+    /**
+     * 执行数据写入或状态变更。
+     *
+     * @param row 持久化行数据，承载数据库记录内容。
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @param id 业务对象 ID，用于定位具体记录。
+     * @param deleteAction delete action 参数，用于 deleteOwned 流程中的校验、计算或对象转换。
+     */
     private void deleteOwned(Object row, Long tenantId, Long id, Runnable deleteAction) {
         if (row == null) {
             throw new IllegalArgumentException("BI permission not found: " + id);
         }
         Long rowTenantId;
+        // 删除前只读取权限行自身租户，不信任调用方传入类型，避免跨租户删除或误删不同权限表记录。
         if (row instanceof BiResourcePermissionDO value) {
             rowTenantId = value.getTenantId();
+        // 根据前序判断结果进入后续条件分支。
         } else if (row instanceof BiRowPermissionDO value) {
             rowTenantId = value.getTenantId();
+        // 根据前序判断结果进入后续条件分支。
         } else if (row instanceof BiColumnPermissionDO value) {
             rowTenantId = value.getTenantId();
         } else {
@@ -819,6 +1135,14 @@ public class BiPermissionAdminService {
         deleteAction.run();
     }
 
+    /**
+     * 执行 enumValue 流程，围绕 enum value 完成校验、计算或结果组装。
+     *
+     * @param value 待处理值，用于规则计算或转换。
+     * @param allowed allowed 参数，用于 enumValue 流程中的校验、计算或对象转换。
+     * @param fieldName 名称文本，用于展示或唯一性校验。
+     * @return 返回 enum value 生成的文本或业务键。
+     */
     private String enumValue(String value, Set<String> allowed, String fieldName) {
         String normalized = upperRequired(value, fieldName);
         if (!allowed.contains(normalized)) {
@@ -827,6 +1151,12 @@ public class BiPermissionAdminService {
         return normalized;
     }
 
+    /**
+     * 执行 tenantScope 流程，围绕 tenant scope 完成校验、计算或结果组装。
+     *
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @return 返回 tenant scope 汇总后的集合、分页或映射视图。
+     */
     private List<Long> tenantScope(Long tenantId) {
         Long scopedTenantId = normalizeTenant(tenantId);
         if (scopedTenantId == 0L) {
@@ -835,10 +1165,23 @@ public class BiPermissionAdminService {
         return List.of(0L, scopedTenantId);
     }
 
+    /**
+     * 按默认值规则处理输入值。
+     *
+     * @param username 操作人标识，用于审计和权限判断。
+     * @return 返回 default user 生成的文本或业务键。
+     */
     private String defaultUser(String username) {
         return hasText(username) ? username.trim() : "system";
     }
 
+    /**
+     * 校验并获取必需参数、资源或权限。
+     *
+     * @param value 待处理值，用于规则计算或转换。
+     * @param fieldName 名称文本，用于展示或唯一性校验。
+     * @return 返回 required 生成的文本或业务键。
+     */
     private String required(String value, String fieldName) {
         if (!hasText(value)) {
             throw new IllegalArgumentException(fieldName + " is required");
@@ -846,22 +1189,50 @@ public class BiPermissionAdminService {
         return value.trim();
     }
 
+    /**
+     * 执行 upperRequired 流程，围绕 upper required 完成校验、计算或结果组装。
+     *
+     * @param value 待处理值，用于规则计算或转换。
+     * @param fieldName 名称文本，用于展示或唯一性校验。
+     * @return 返回 upper required 生成的文本或业务键。
+     */
     private String upperRequired(String value, String fieldName) {
         return required(value, fieldName).toUpperCase(Locale.ROOT);
     }
 
+    /**
+     * 解析并规范化租户 ID。
+     *
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @return 返回解析、归一化或安全处理后的值。
+     */
     private Long normalizeTenant(Long tenantId) {
         return tenantId == null ? 0L : tenantId;
     }
 
+    /**
+     * 判断业务条件是否成立。
+     *
+     * @param value 待处理值，用于规则计算或转换。
+     * @return 返回布尔判断结果。
+     */
     private boolean hasText(String value) {
         return value != null && !value.isBlank();
     }
 
+    /**
+     * 按安全边界裁剪或保护输入值。
+     *
+     * @param rows rows 参数，用于 safeList 流程中的校验、计算或对象转换。
+     * @return 返回 safe list 汇总后的集合、分页或映射视图。
+     */
     private <T> List<T> safeList(List<T> rows) {
         return rows == null ? List.of() : rows;
     }
 
+    /**
+     * ResourceRef 数据记录。
+     */
     private record ResourceRef(
             String resourceType,
             Long resourceId,

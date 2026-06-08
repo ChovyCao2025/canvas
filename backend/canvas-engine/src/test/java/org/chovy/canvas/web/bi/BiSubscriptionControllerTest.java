@@ -84,12 +84,12 @@ class BiSubscriptionControllerTest {
     }
 
     @Test
-    void runSubscriptionUsesCurrentTenantAndUser() {
+    void runSubscriptionUsesCurrentTenantUserAndRole() {
         TenantContextResolver resolver = mock(TenantContextResolver.class);
         when(resolver.current()).thenReturn(Mono.just(new TenantContext(7L, "OPERATOR", "alice")));
         BiSubscriptionAdminService service = mock(BiSubscriptionAdminService.class);
         BiDeliveryRuntimeService runtimeService = mock(BiDeliveryRuntimeService.class);
-        when(runtimeService.runSubscription(7L, 31L, "alice"))
+        when(runtimeService.runSubscription(7L, 31L, "alice", "OPERATOR"))
                 .thenReturn(new BiDeliveryRunResult("SUBSCRIPTION", 31L, "canvas-daily", "TRIGGERED", List.of()));
         BiSubscriptionController controller = new BiSubscriptionController(resolver, service, runtimeService);
 
@@ -97,7 +97,7 @@ class BiSubscriptionControllerTest {
                 .assertNext(response -> assertThat(response.getData().status()).isEqualTo("TRIGGERED"))
                 .verifyComplete();
 
-        verify(runtimeService).runSubscription(7L, 31L, "alice");
+        verify(runtimeService).runSubscription(7L, 31L, "alice", "OPERATOR");
     }
 
     @Test
@@ -142,12 +142,12 @@ class BiSubscriptionControllerTest {
     }
 
     @Test
-    void retryDeliveryLogsUsesCurrentTenantAndUser() {
+    void retryDeliveryLogsUsesCurrentTenantUserAndRole() {
         TenantContextResolver resolver = mock(TenantContextResolver.class);
         when(resolver.current()).thenReturn(Mono.just(new TenantContext(7L, "OPERATOR", "alice")));
         BiSubscriptionAdminService service = mock(BiSubscriptionAdminService.class);
         BiDeliveryRuntimeService runtimeService = mock(BiDeliveryRuntimeService.class);
-        when(runtimeService.retryPendingDeliveries(7L, "alice", 10))
+        when(runtimeService.retryPendingDeliveries(7L, "alice", "OPERATOR", 10))
                 .thenReturn(new BiDeliveryRetryResult(2, 2, 1, 1, 0, List.of()));
         BiSubscriptionController controller = new BiSubscriptionController(resolver, service, runtimeService);
 
@@ -158,7 +158,7 @@ class BiSubscriptionControllerTest {
                 })
                 .verifyComplete();
 
-        verify(runtimeService).retryPendingDeliveries(7L, "alice", 10);
+        verify(runtimeService).retryPendingDeliveries(7L, "alice", "OPERATOR", 10);
     }
 
     @Test
@@ -212,7 +212,7 @@ class BiSubscriptionControllerTest {
     }
 
     @Test
-    void downloadDeliveryAttachmentUsesCurrentTenant() {
+    void downloadDeliveryAttachmentUsesCurrentTenantUserAndRole() {
         TenantContextResolver resolver = mock(TenantContextResolver.class);
         when(resolver.current()).thenReturn(Mono.just(new TenantContext(7L, "OPERATOR", "alice")));
         BiSubscriptionAdminService service = mock(BiSubscriptionAdminService.class);
@@ -223,7 +223,7 @@ class BiSubscriptionControllerTest {
         @SuppressWarnings("unchecked")
         ObjectProvider<BiDeliveryAttachmentService> attachmentProvider = mock(ObjectProvider.class);
         when(attachmentProvider.getIfAvailable()).thenReturn(attachmentService);
-        when(attachmentService.download(7L, 71L))
+        when(attachmentService.download(7L, 71L, "alice", "OPERATOR"))
                 .thenReturn(new BiDeliveryAttachmentDownload("snapshot.html", "text/html; charset=UTF-8", "<html></html>".getBytes()));
         BiSubscriptionController controller = new BiSubscriptionController(
                 resolver,
@@ -239,7 +239,7 @@ class BiSubscriptionControllerTest {
                 })
                 .verifyComplete();
 
-        verify(attachmentService).download(7L, 71L);
+        verify(attachmentService).download(7L, 71L, "alice", "OPERATOR");
     }
 
     @Test

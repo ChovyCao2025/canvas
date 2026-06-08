@@ -932,6 +932,66 @@ class BiSelfServiceExportServiceTest {
     }
 
     @Test
+    void getExportDetailReturnsPartitionManifestMetadataForObjectPerPartZip() throws Exception {
+        BiDatasetMapper datasetMapper = mock(BiDatasetMapper.class);
+        BiExportJobMapper exportJobMapper = mock(BiExportJobMapper.class);
+        BiQueryExecutionService queryExecutionService = mock(BiQueryExecutionService.class);
+        BiPermissionService permissionService = mock(BiPermissionService.class);
+        CapturingStorage storage = new CapturingStorage("S3");
+        String zipKey = "exports/tenant-7/export-91.zip";
+        storage.write(zipKey, zipWithManifest("""
+                {
+                  "storageLayout": "OBJECT_PER_PART_ZIP",
+                  "requestedRows": 1000000,
+                  "generatedRows": 15000,
+                  "partCount": 2,
+                  "partSize": 10000,
+                  "parts": [
+                    { "name": "part-00001.csv", "storageKey": "exports/tenant-7/export-91/parts/part-00001.csv", "rowCount": 10000, "sizeBytes": 128, "sha256": "aaa" },
+                    { "name": "part-00002.csv", "storageKey": "exports/tenant-7/export-91/parts/part-00002.csv", "rowCount": 5000, "sizeBytes": 64, "sha256": "bbb" }
+                  ]
+                }
+                """));
+        BiExportJobDO row = exportJob();
+        row.setId(91L);
+        row.setRequestJson(new ObjectMapper().writeValueAsString(new BiExportJobCommand(
+                "DATASET",
+                "canvas_daily_stats",
+                null,
+                "CSV",
+                query(1000000),
+                1000000,
+                false,
+                false,
+                null)));
+        row.setStorageProvider("S3");
+        row.setStorageKey(zipKey);
+        when(exportJobMapper.selectById(91L)).thenReturn(row);
+        when(datasetMapper.selectById(11L)).thenReturn(dataset());
+        BiSelfServiceExportService service = new BiSelfServiceExportService(
+                datasetMapper,
+                exportJobMapper,
+                queryExecutionService,
+                permissionService,
+                new ObjectMapper(),
+                storage,
+                7,
+                5000);
+
+        BiExportJobDetailView detail = service.getExportDetail(7L, 91L);
+
+        assertThat(detail.partition()).containsEntry("storageLayout", "OBJECT_PER_PART_ZIP");
+        assertThat(detail.partition()).containsEntry("requestedRows", 1000000);
+        assertThat(detail.partition()).containsEntry("generatedRows", 15000);
+        assertThat(detail.partition()).containsEntry("partCount", 2);
+        assertThat(detail.partition()).containsEntry("partSize", 10000);
+        assertThat(detail.partition().get("partStorageKeys")).asList()
+                .containsExactly(
+                        "exports/tenant-7/export-91/parts/part-00001.csv",
+                        "exports/tenant-7/export-91/parts/part-00002.csv");
+    }
+
+    @Test
     void getExportDetailRejectsOtherTenantJob() {
         Fixture fixture = fixture();
         BiExportJobDO row = exportJob();

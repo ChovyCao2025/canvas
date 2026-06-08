@@ -37,6 +37,9 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
 @Service
+/**
+ * BiQuickEngineCapacityService 承载对应领域的业务规则、流程编排和结果转换。
+ */
 public class BiQuickEngineCapacityService {
 
     private static final String CATEGORY_DATASET_ACCELERATION = "DATASET_ACCELERATION";
@@ -82,6 +85,18 @@ public class BiQuickEngineCapacityService {
     private final ThreadLocal<Map<Long, Deque<String>>> acquiredSlotLeases = ThreadLocal.withInitial(HashMap::new);
 
     @Autowired
+    /**
+     * 初始化 BiQuickEngineCapacityService 实例。
+     *
+     * @param policyMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param runMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param auditLogMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param objectMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param historyReaderProvider history reader provider 参数，用于 BiQuickEngineCapacityService 流程中的校验、计算或对象转换。
+     * @param slotLeaseServiceProvider 依赖组件，用于完成数据访问或外部能力调用。
+     * @param defaultCapacityLimitRows default capacity limit rows 参数，用于 BiQuickEngineCapacityService 流程中的校验、计算或对象转换。
+     * @param slotLeaseTtlSeconds slot lease ttl seconds 参数，用于 BiQuickEngineCapacityService 流程中的校验、计算或对象转换。
+     */
     public BiQuickEngineCapacityService(
             BiQuickEngineCapacityPolicyMapper policyMapper,
             BiDatasetExtractRefreshRunMapper runMapper,
@@ -99,6 +114,16 @@ public class BiQuickEngineCapacityService {
                 slotLeaseTtlSeconds);
     }
 
+    /**
+     * 初始化 BiQuickEngineCapacityService 实例。
+     *
+     * @param policyMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param runMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param auditLogMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param objectMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param clock 时间参数，用于计算窗口、过期或审计时间。
+     * @param defaultCapacityLimitRows default capacity limit rows 参数，用于 BiQuickEngineCapacityService 流程中的校验、计算或对象转换。
+     */
     public BiQuickEngineCapacityService(BiQuickEngineCapacityPolicyMapper policyMapper,
                                         BiDatasetExtractRefreshRunMapper runMapper,
                                         BiAuditLogMapper auditLogMapper,
@@ -109,6 +134,17 @@ public class BiQuickEngineCapacityService {
                 BiQueryHistoryReader.empty());
     }
 
+    /**
+     * 初始化 BiQuickEngineCapacityService 实例。
+     *
+     * @param policyMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param runMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param auditLogMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param objectMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param clock 时间参数，用于计算窗口、过期或审计时间。
+     * @param defaultCapacityLimitRows default capacity limit rows 参数，用于 BiQuickEngineCapacityService 流程中的校验、计算或对象转换。
+     * @param historyReader history reader 参数，用于 BiQuickEngineCapacityService 流程中的校验、计算或对象转换。
+     */
     public BiQuickEngineCapacityService(BiQuickEngineCapacityPolicyMapper policyMapper,
                                         BiDatasetExtractRefreshRunMapper runMapper,
                                         BiAuditLogMapper auditLogMapper,
@@ -120,6 +156,19 @@ public class BiQuickEngineCapacityService {
                 historyReader, null, 300L);
     }
 
+    /**
+     * 初始化 BiQuickEngineCapacityService 实例。
+     *
+     * @param policyMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param runMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param auditLogMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param objectMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param clock 时间参数，用于计算窗口、过期或审计时间。
+     * @param defaultCapacityLimitRows default capacity limit rows 参数，用于 BiQuickEngineCapacityService 流程中的校验、计算或对象转换。
+     * @param historyReader history reader 参数，用于 BiQuickEngineCapacityService 流程中的校验、计算或对象转换。
+     * @param slotLeaseService 依赖组件，用于完成数据访问或外部能力调用。
+     * @param slotLeaseTtlSeconds slot lease ttl seconds 参数，用于 BiQuickEngineCapacityService 流程中的校验、计算或对象转换。
+     */
     public BiQuickEngineCapacityService(BiQuickEngineCapacityPolicyMapper policyMapper,
                                         BiDatasetExtractRefreshRunMapper runMapper,
                                         BiAuditLogMapper auditLogMapper,
@@ -140,6 +189,13 @@ public class BiQuickEngineCapacityService {
         this.slotLeaseTtlSeconds = Math.max(1L, slotLeaseTtlSeconds);
     }
 
+    /**
+     * 查询并组装符合条件的业务数据。
+     *
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @param limit 分页或数量限制，避免一次处理过多数据。
+     * @return 返回 summary 流程生成的业务结果。
+     */
     public BiQuickEngineCapacitySummaryView summary(Long tenantId, int limit) {
         Long scopedTenantId = normalizeTenant(tenantId);
         BiQuickEngineCapacityAlertPolicyView policy = alertPolicy(scopedTenantId);
@@ -147,7 +203,9 @@ public class BiQuickEngineCapacityService {
         BiQuickEngineConcurrencyQueueView concurrencyQueue = concurrencyQueue(scopedTenantId, limit, poolPolicy);
         Map<String, ResourceAccumulator> resources = new TreeMap<>();
         Map<String, UserAccumulator> users = new TreeMap<>();
+        // 遍历候选数据并按业务规则筛选、转换或聚合。
         for (BiDatasetExtractRefreshRunDO row : loadRuns(scopedTenantId, limit)) {
+            // 校验关键输入和前置条件，避免无效状态继续进入主流程。
             if (!isActiveSuccess(row)) {
                 continue;
             }
@@ -180,6 +238,7 @@ public class BiQuickEngineCapacityService {
                         .reversed()
                         .thenComparing(BiQuickEngineCapacityUserUsageView::user))
                 .toList();
+        // 汇总前面计算出的状态和明细，返回给调用方。
         return new BiQuickEngineCapacitySummaryView(
                 scopedTenantId,
                 policy.capacityLimitRows(),
@@ -198,17 +257,38 @@ public class BiQuickEngineCapacityService {
                 userRankings);
     }
 
+    /**
+     * 根据方法职责完成对应的业务处理流程。
+     *
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @return 返回 alertPolicy 流程生成的业务结果。
+     */
     public BiQuickEngineCapacityAlertPolicyView alertPolicy(Long tenantId) {
         return view(findPolicy(normalizeTenant(tenantId)));
     }
 
+    /**
+     * 根据方法职责完成对应的业务处理流程。
+     *
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @return 返回 tenantPoolPolicy 流程生成的业务结果。
+     */
     public BiQuickEngineTenantPoolPolicyView tenantPoolPolicy(Long tenantId) {
         return tenantPoolView(findPolicy(normalizeTenant(tenantId)));
     }
 
+    /**
+     * 根据方法职责完成对应的业务处理流程。
+     *
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @param limit 分页或数量限制，避免一次处理过多数据。
+     * @return 返回 admitQuery 流程生成的业务结果。
+     */
     public BiQuickEngineAdmissionDecision admitQuery(Long tenantId, int limit) {
+        // 准备本次处理所需的上下文和中间变量。
         Long scopedTenantId = normalizeTenant(tenantId);
         BiQuickEngineTenantPoolPolicyView poolPolicy = tenantPoolPolicy(scopedTenantId);
+        // 校验关键输入和前置条件，避免无效状态继续进入主流程。
         if (slotLeaseService != null) {
             return admitDistributedSlot(scopedTenantId, limit, poolPolicy);
         }
@@ -237,6 +317,7 @@ public class BiQuickEngineCapacityService {
             }
             liveCounter.incrementAndGet();
         }
+        // 汇总前面计算出的状态和明细，返回给调用方。
         return new BiQuickEngineAdmissionDecision(
                 true,
                 "ADMITTED",
@@ -245,10 +326,18 @@ public class BiQuickEngineCapacityService {
                 concurrencyQueue(scopedTenantId, limit, poolPolicy));
     }
 
+    /**
+     * 根据方法职责完成对应的业务处理流程。
+     *
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @param limit 分页或数量限制，避免一次处理过多数据。
+     * @return 返回 admitQueryOrWait 流程生成的业务结果。
+     */
     public BiQuickEngineAdmissionDecision admitQueryOrWait(Long tenantId, int limit) {
         Long scopedTenantId = normalizeTenant(tenantId);
         BiQuickEngineTenantPoolPolicyView poolPolicy = tenantPoolPolicy(scopedTenantId);
         BiQuickEngineAdmissionDecision immediate = admitQuery(scopedTenantId, limit);
+        // 校验关键输入和前置条件，避免无效状态继续进入主流程。
         if (immediate == null || immediate.allowed()) {
             return immediate;
         }
@@ -262,6 +351,7 @@ public class BiQuickEngineCapacityService {
         long deadlineNanos = System.nanoTime()
                 + TimeUnit.SECONDS.toNanos(Math.max(1, poolPolicy.queueTimeoutSeconds()));
         try {
+            // 遍历候选数据并按业务规则筛选、转换或聚合。
             while (true) {
                 long remainingNanos = deadlineNanos - System.nanoTime();
                 if (remainingNanos <= 0L) {
@@ -279,6 +369,7 @@ public class BiQuickEngineCapacityService {
                 }
                 queue = concurrencyQueue(scopedTenantId, limit, poolPolicy);
                 if (queue.queuedQueries() >= poolPolicy.queueLimit()) {
+                    // 汇总前面计算出的状态和明细，返回给调用方。
                     return queueLimitDecision(poolPolicy, queue);
                 }
                 incrementQueued(scopedTenantId);
@@ -291,6 +382,11 @@ public class BiQuickEngineCapacityService {
         }
     }
 
+    /**
+     * 清理、停用或释放指定业务资源。
+     *
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     */
     public void releaseQuery(Long tenantId) {
         Long scopedTenantId = normalizeTenant(tenantId);
         String leaseKey = pollAcquiredSlotLease(scopedTenantId);
@@ -306,11 +402,20 @@ public class BiQuickEngineCapacityService {
         releaseLive(scopedTenantId);
     }
 
+    /**
+     * 根据方法职责完成对应的业务处理流程。
+     *
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @param limit 分页或数量限制，避免一次处理过多数据。
+     * @param poolPolicy pool policy 参数，用于 admitDistributedSlot 流程中的校验、计算或对象转换。
+     * @return 返回 admitDistributedSlot 流程生成的业务结果。
+     */
     private BiQuickEngineAdmissionDecision admitDistributedSlot(
             Long tenantId,
             int limit,
             BiQuickEngineTenantPoolPolicyView poolPolicy) {
         BiQuickEngineConcurrencyQueueView queue = concurrencyQueue(tenantId, limit, poolPolicy);
+        // 校验关键输入和前置条件，避免无效状态继续进入主流程。
         if (queue.queuedQueries() >= poolPolicy.queueLimit()) {
             return new BiQuickEngineAdmissionDecision(
                     false,
@@ -321,6 +426,7 @@ public class BiQuickEngineCapacityService {
                     poolPolicy,
                     queue);
         }
+        // 遍历候选数据并按业务规则筛选、转换或聚合。
         for (int slot = 0; slot < poolPolicy.maxConcurrentQueries(); slot++) {
             String leaseKey = slotLeaseKey(poolPolicy.poolKey(), slot);
             if (slotLeaseService.acquire(tenantId, leaseKey, slotLeaseTtl())) {
@@ -334,6 +440,7 @@ public class BiQuickEngineCapacityService {
                         concurrencyQueue(tenantId, limit, poolPolicy));
             }
         }
+        // 汇总前面计算出的状态和明细，返回给调用方。
         return new BiQuickEngineAdmissionDecision(
                 false,
                 "BLOCKED",
@@ -344,6 +451,13 @@ public class BiQuickEngineCapacityService {
                 queue);
     }
 
+    /**
+     * 根据方法职责完成对应的业务处理流程。
+     *
+     * @param poolPolicy pool policy 参数，用于 queueLimitDecision 流程中的校验、计算或对象转换。
+     * @param queue queue 参数，用于 queueLimitDecision 流程中的校验、计算或对象转换。
+     * @return 返回 queueLimitDecision 流程生成的业务结果。
+     */
     private BiQuickEngineAdmissionDecision queueLimitDecision(
             BiQuickEngineTenantPoolPolicyView poolPolicy,
             BiQuickEngineConcurrencyQueueView queue) {
@@ -357,6 +471,14 @@ public class BiQuickEngineCapacityService {
                 queue);
     }
 
+    /**
+     * 根据方法职责完成对应的业务处理流程。
+     *
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @param limit 分页或数量限制，避免一次处理过多数据。
+     * @param poolPolicy pool policy 参数，用于 queueTimeoutDecision 流程中的校验、计算或对象转换。
+     * @return 返回 queueTimeoutDecision 流程生成的业务结果。
+     */
     private BiQuickEngineAdmissionDecision queueTimeoutDecision(
             Long tenantId,
             int limit,
@@ -372,6 +494,14 @@ public class BiQuickEngineCapacityService {
                 queue);
     }
 
+    /**
+     * 根据方法职责完成对应的业务处理流程。
+     *
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @param limit 分页或数量限制，避免一次处理过多数据。
+     * @param poolPolicy pool policy 参数，用于 queueInterruptedDecision 流程中的校验、计算或对象转换。
+     * @return 返回 queueInterruptedDecision 流程生成的业务结果。
+     */
     private BiQuickEngineAdmissionDecision queueInterruptedDecision(
             Long tenantId,
             int limit,
@@ -385,6 +515,14 @@ public class BiQuickEngineCapacityService {
                 queue);
     }
 
+    /**
+     * 根据方法职责完成对应的业务处理流程。
+     *
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @param limit 分页或数量限制，避免一次处理过多数据。
+     * @param poolPolicy pool policy 参数，用于 admittedAfterQueueDecision 流程中的校验、计算或对象转换。
+     * @return 返回 admittedAfterQueueDecision 流程生成的业务结果。
+     */
     private BiQuickEngineAdmissionDecision admittedAfterQueueDecision(
             Long tenantId,
             int limit,
@@ -397,16 +535,31 @@ public class BiQuickEngineCapacityService {
                 concurrencyQueue(tenantId, limit, poolPolicy));
     }
 
+    /**
+     * 根据方法职责完成对应的业务处理流程。
+     *
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     */
     private void incrementLive(Long tenantId) {
         liveRunningQueries.computeIfAbsent(normalizeTenant(tenantId), ignored -> new AtomicInteger())
                 .incrementAndGet();
     }
 
+    /**
+     * 根据方法职责完成对应的业务处理流程。
+     *
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     */
     private void incrementQueued(Long tenantId) {
         liveQueuedQueries.computeIfAbsent(normalizeTenant(tenantId), ignored -> new AtomicInteger())
                 .incrementAndGet();
     }
 
+    /**
+     * 清理、停用或释放指定业务资源。
+     *
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     */
     private void releaseQueued(Long tenantId) {
         Long scopedTenantId = normalizeTenant(tenantId);
         AtomicInteger queuedCounter = liveQueuedQueries.get(scopedTenantId);
@@ -425,6 +578,11 @@ public class BiQuickEngineCapacityService {
         notifyQueueWaiters(scopedTenantId);
     }
 
+    /**
+     * 清理、停用或释放指定业务资源。
+     *
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     */
     private void releaseLive(Long tenantId) {
         Long scopedTenantId = normalizeTenant(tenantId);
         AtomicInteger liveCounter = liveRunningQueries.get(scopedTenantId);
@@ -443,6 +601,13 @@ public class BiQuickEngineCapacityService {
         notifyQueueWaiters(scopedTenantId);
     }
 
+    /**
+     * 根据方法职责完成对应的业务处理流程。
+     *
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @param remainingNanos remaining nanos 参数，用于 waitForQueueSignal 流程中的校验、计算或对象转换。
+     * @return 返回 wait for queue signal 的布尔判断结果。
+     */
     private boolean waitForQueueSignal(Long tenantId, long remainingNanos) {
         Object monitor = queueMonitors.computeIfAbsent(normalizeTenant(tenantId), ignored -> new Object());
         long waitMillis = Math.max(1L, Math.min(100L, TimeUnit.NANOSECONDS.toMillis(remainingNanos)));
@@ -457,6 +622,11 @@ public class BiQuickEngineCapacityService {
         }
     }
 
+    /**
+     * 根据方法职责完成对应的业务处理流程。
+     *
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     */
     private void notifyQueueWaiters(Long tenantId) {
         Object monitor = queueMonitors.get(normalizeTenant(tenantId));
         if (monitor == null) {
@@ -467,16 +637,30 @@ public class BiQuickEngineCapacityService {
         }
     }
 
+    /**
+     * 根据方法职责完成对应的业务处理流程。
+     *
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @param leaseKey 业务键，用于在同一租户下定位资源。
+     */
     private void rememberAcquiredSlotLease(Long tenantId, String leaseKey) {
         acquiredSlotLeases.get()
                 .computeIfAbsent(normalizeTenant(tenantId), ignored -> new ArrayDeque<>())
                 .push(leaseKey);
     }
 
+    /**
+     * 执行核心业务流程，并协调依赖组件完成处理。
+     *
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @return 返回 poll acquired slot lease 生成的文本或业务键。
+     */
     private String pollAcquiredSlotLease(Long tenantId) {
+        // 准备本次处理所需的上下文和中间变量。
         Long scopedTenantId = normalizeTenant(tenantId);
         Map<Long, Deque<String>> slotsByTenant = acquiredSlotLeases.get();
         Deque<String> slots = slotsByTenant.get(scopedTenantId);
+        // 校验关键输入和前置条件，避免无效状态继续进入主流程。
         if (slots == null || slots.isEmpty()) {
             return null;
         }
@@ -487,21 +671,43 @@ public class BiQuickEngineCapacityService {
         if (slotsByTenant.isEmpty()) {
             acquiredSlotLeases.remove();
         }
+        // 汇总前面计算出的状态和明细，返回给调用方。
         return leaseKey;
     }
 
+    /**
+     * 根据方法职责完成对应的业务处理流程。
+     *
+     * @return 返回 slotLeaseTtl 流程生成的业务结果。
+     */
     private Duration slotLeaseTtl() {
         return Duration.ofSeconds(slotLeaseTtlSeconds);
     }
 
+    /**
+     * 根据方法职责完成对应的业务处理流程。
+     *
+     * @param poolKey 业务键，用于在同一租户下定位资源。
+     * @param slot slot 参数，用于 slotLeaseKey 流程中的校验、计算或对象转换。
+     * @return 返回 slot lease key 生成的文本或业务键。
+     */
     private String slotLeaseKey(String poolKey, int slot) {
         return SLOT_LEASE_KEY_PREFIX + poolKey(poolKey, DEFAULT_POOL_KEY) + "_SLOT_" + slot;
     }
 
+    /**
+     * 写入或更新业务数据，并保持关联状态一致。
+     *
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @param command 命令对象，描述本次业务动作及其参数。
+     * @param actor 操作人标识，用于审计和权限判断。
+     * @return 返回流程执行后的业务结果。
+     */
     public BiQuickEngineCapacityAlertPolicyView upsertAlertPolicy(
             Long tenantId,
             BiQuickEngineCapacityAlertPolicyCommand command,
             String actor) {
+        // 准备本次处理所需的上下文和中间变量。
         Long scopedTenantId = normalizeTenant(tenantId);
         BiQuickEngineCapacityPolicyDO existing = findPolicy(scopedTenantId);
         BiQuickEngineCapacityAlertPolicyView before = view(existing);
@@ -537,6 +743,7 @@ public class BiQuickEngineCapacityService {
         row.setCriticalThresholdPercent(criticalThreshold);
         row.setNotificationChannels(writeList(channels));
         row.setNotificationReceivers(writeList(receivers));
+        // 访问持久化或外部依赖，获取或写入本次流程需要的数据。
         row.setUpdatedBy(actor(actor));
         row.setUpdatedAt(now);
         if (row.getId() == null) {
@@ -548,13 +755,23 @@ public class BiQuickEngineCapacityService {
 
         BiQuickEngineCapacityAlertPolicyView after = alertPolicy(scopedTenantId);
         auditUpdate(scopedTenantId, actor(actor), before, after);
+        // 汇总前面计算出的状态和明细，返回给调用方。
         return after;
     }
 
+    /**
+     * 写入或更新业务数据，并保持关联状态一致。
+     *
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @param command 命令对象，描述本次业务动作及其参数。
+     * @param actor 操作人标识，用于审计和权限判断。
+     * @return 返回流程执行后的业务结果。
+     */
     public BiQuickEngineTenantPoolPolicyView upsertTenantPoolPolicy(
             Long tenantId,
             BiQuickEngineTenantPoolPolicyCommand command,
             String actor) {
+        // 准备本次处理所需的上下文和中间变量。
         Long scopedTenantId = normalizeTenant(tenantId);
         BiQuickEngineCapacityPolicyDO existing = findPolicy(scopedTenantId);
         BiQuickEngineTenantPoolPolicyView before = tenantPoolView(existing);
@@ -587,6 +804,7 @@ public class BiQuickEngineCapacityService {
                 before.poolWeight(),
                 MAX_POOL_WEIGHT,
                 "pool weight"));
+        // 访问持久化或外部依赖，获取或写入本次流程需要的数据。
         row.setUpdatedBy(actor(actor));
         row.setUpdatedAt(now);
         if (row.getId() == null) {
@@ -604,9 +822,16 @@ public class BiQuickEngineCapacityService {
 
         BiQuickEngineTenantPoolPolicyView after = tenantPoolPolicy(scopedTenantId);
         auditPoolUpdate(scopedTenantId, actor(actor), before, after);
+        // 汇总前面计算出的状态和明细，返回给调用方。
         return after;
     }
 
+    /**
+     * 查询并组装符合条件的业务数据。
+     *
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @return 返回符合条件的数据列表或视图。
+     */
     private BiQuickEngineCapacityPolicyDO findPolicy(Long tenantId) {
         List<BiQuickEngineCapacityPolicyDO> rows = policyMapper.selectList(
                 new LambdaQueryWrapper<BiQuickEngineCapacityPolicyDO>()
@@ -616,6 +841,13 @@ public class BiQuickEngineCapacityService {
         return rows == null || rows.isEmpty() ? null : rows.get(0);
     }
 
+    /**
+     * 根据输入和依赖数据计算业务判断结果。
+     *
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @param limit 分页或数量限制，避免一次处理过多数据。
+     * @return 返回 load runs 汇总后的集合、分页或映射视图。
+     */
     private List<BiDatasetExtractRefreshRunDO> loadRuns(Long tenantId, int limit) {
         int boundedLimit = Math.max(1, Math.min(limit <= 0 ? 50 : limit, 500));
         List<BiDatasetExtractRefreshRunDO> rows = runMapper.selectList(
@@ -626,7 +858,14 @@ public class BiQuickEngineCapacityService {
         return rows == null ? List.of() : rows;
     }
 
+    /**
+     * 根据方法职责完成对应的业务处理流程。
+     *
+     * @param row 持久化行数据，承载数据库记录内容。
+     * @return 返回 view 流程生成的业务结果。
+     */
     private BiQuickEngineCapacityAlertPolicyView view(BiQuickEngineCapacityPolicyDO row) {
+        // 校验关键输入和前置条件，避免无效状态继续进入主流程。
         if (row == null) {
             return new BiQuickEngineCapacityAlertPolicyView(
                     false,
@@ -638,6 +877,7 @@ public class BiQuickEngineCapacityService {
                     "system",
                     null);
         }
+        // 汇总前面计算出的状态和明细，返回给调用方。
         return new BiQuickEngineCapacityAlertPolicyView(
                 Boolean.TRUE.equals(row.getEnabled()),
                 Math.max(1L, value(row.getCapacityLimitRows(), defaultCapacityLimitRows)),
@@ -645,11 +885,19 @@ public class BiQuickEngineCapacityService {
                 threshold(row.getCriticalThresholdPercent(), DEFAULT_CRITICAL_THRESHOLD_PERCENT, "critical threshold"),
                 readList(row.getNotificationChannels()),
                 readList(row.getNotificationReceivers()),
+                // 访问持久化或外部依赖，获取或写入本次流程需要的数据。
                 actor(row.getUpdatedBy()),
                 row.getUpdatedAt());
     }
 
+    /**
+     * 根据方法职责完成对应的业务处理流程。
+     *
+     * @param row 持久化行数据，承载数据库记录内容。
+     * @return 返回 tenantPoolView 流程生成的业务结果。
+     */
     private BiQuickEngineTenantPoolPolicyView tenantPoolView(BiQuickEngineCapacityPolicyDO row) {
+        // 校验关键输入和前置条件，避免无效状态继续进入主流程。
         if (row == null) {
             return new BiQuickEngineTenantPoolPolicyView(
                     DEFAULT_POOL_KEY,
@@ -660,6 +908,7 @@ public class BiQuickEngineCapacityService {
                     "system",
                     null);
         }
+        // 汇总前面计算出的状态和明细，返回给调用方。
         return new BiQuickEngineTenantPoolPolicyView(
                 poolKey(row.getPoolKey(), DEFAULT_POOL_KEY),
                 boundedPositive(row.getMaxConcurrentQueries(), DEFAULT_MAX_CONCURRENT_QUERIES,
@@ -668,10 +917,19 @@ public class BiQuickEngineCapacityService {
                 boundedPositive(row.getQueueTimeoutSeconds(), DEFAULT_QUEUE_TIMEOUT_SECONDS,
                         MAX_QUEUE_TIMEOUT_SECONDS, "queue timeout seconds"),
                 boundedPositive(row.getPoolWeight(), DEFAULT_POOL_WEIGHT, MAX_POOL_WEIGHT, "pool weight"),
+                // 访问持久化或外部依赖，获取或写入本次流程需要的数据。
                 actor(row.getUpdatedBy()),
                 row.getUpdatedAt());
     }
 
+    /**
+     * 根据方法职责完成对应的业务处理流程。
+     *
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @param limit 分页或数量限制，避免一次处理过多数据。
+     * @param poolPolicy pool policy 参数，用于 concurrencyQueue 流程中的校验、计算或对象转换。
+     * @return 返回 concurrencyQueue 流程生成的业务结果。
+     */
     private BiQuickEngineConcurrencyQueueView concurrencyQueue(Long tenantId,
                                                                int limit,
                                                                BiQuickEngineTenantPoolPolicyView poolPolicy) {
@@ -694,16 +952,35 @@ public class BiQuickEngineCapacityService {
                 pressureState(concurrencyUsage, queueUsage));
     }
 
+    /**
+     * 根据方法职责完成对应的业务处理流程。
+     *
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @return 返回 live running 计算得到的数量、金额或指标值。
+     */
     private int liveRunning(Long tenantId) {
         AtomicInteger counter = liveRunningQueries.get(normalizeTenant(tenantId));
         return counter == null ? 0 : Math.max(0, counter.get());
     }
 
+    /**
+     * 根据方法职责完成对应的业务处理流程。
+     *
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @return 返回 live queued 计算得到的数量、金额或指标值。
+     */
     private int liveQueued(Long tenantId) {
         AtomicInteger counter = liveQueuedQueries.get(normalizeTenant(tenantId));
         return counter == null ? 0 : Math.max(0, counter.get());
     }
 
+    /**
+     * 根据输入和依赖数据计算业务判断结果。
+     *
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @param limit 分页或数量限制，避免一次处理过多数据。
+     * @return 返回 load history 汇总后的集合、分页或映射视图。
+     */
     private List<BiQueryHistoryItem> loadHistory(Long tenantId, int limit) {
         int boundedLimit = Math.max(1, Math.min(limit <= 0 ? 50 : limit, 500));
         try {
@@ -714,12 +991,25 @@ public class BiQuickEngineCapacityService {
         }
     }
 
+    /**
+     * 统计符合条件的数据规模或状态数量。
+     *
+     * @param items items 参数，用于 countStatus 流程中的校验、计算或对象转换。
+     * @param status 业务状态，用于筛选或推进状态流转。
+     * @return 返回统计数量。
+     */
     private int countStatus(List<BiQueryHistoryItem> items, String status) {
         return (int) items.stream()
                 .filter(item -> status.equals(normalize(item == null ? null : item.status())))
                 .count();
     }
 
+    /**
+     * 校验输入、权限或业务前置条件。
+     *
+     * @param row 持久化行数据，承载数据库记录内容。
+     * @return 返回布尔判断结果。
+     */
     private boolean isActiveSuccess(BiDatasetExtractRefreshRunDO row) {
         if (row == null || !STATUS_SUCCESS.equals(normalize(row.getStatus()))) {
             return false;
@@ -727,6 +1017,13 @@ public class BiQuickEngineCapacityService {
         return !RETENTION_DROPPED.equals(normalize(row.getRetentionStatus()));
     }
 
+    /**
+     * 根据方法职责完成对应的业务处理流程。
+     *
+     * @param usedRows used rows 参数，用于 usagePercent 流程中的校验、计算或对象转换。
+     * @param capacityLimitRows capacity limit rows 参数，用于 usagePercent 流程中的校验、计算或对象转换。
+     * @return 返回 usage percent 计算得到的数量、金额或指标值。
+     */
     private double usagePercent(long usedRows, long capacityLimitRows) {
         if (capacityLimitRows <= 0) {
             return 0D;
@@ -734,7 +1031,15 @@ public class BiQuickEngineCapacityService {
         return Math.round((usedRows * 1000D) / capacityLimitRows) / 10D;
     }
 
+    /**
+     * 根据方法职责完成对应的业务处理流程。
+     *
+     * @param policy policy 参数，用于 alertLevel 流程中的校验、计算或对象转换。
+     * @param usagePercent usage percent 参数，用于 alertLevel 流程中的校验、计算或对象转换。
+     * @return 返回 alert level 生成的文本或业务键。
+     */
     private String alertLevel(BiQuickEngineCapacityAlertPolicyView policy, double usagePercent) {
+        // 校验关键输入和前置条件，避免无效状态继续进入主流程。
         if (!policy.enabled()) {
             return ALERT_DISABLED;
         }
@@ -744,9 +1049,17 @@ public class BiQuickEngineCapacityService {
         if (usagePercent >= policy.warningThresholdPercent()) {
             return ALERT_WARNING;
         }
+        // 汇总前面计算出的状态和明细，返回给调用方。
         return ALERT_NORMAL;
     }
 
+    /**
+     * 根据方法职责完成对应的业务处理流程。
+     *
+     * @param concurrencyUsagePercent concurrency usage percent 参数，用于 pressureState 流程中的校验、计算或对象转换。
+     * @param queueUsagePercent queue usage percent 参数，用于 pressureState 流程中的校验、计算或对象转换。
+     * @return 返回 pressure state 生成的文本或业务键。
+     */
     private String pressureState(double concurrencyUsagePercent, double queueUsagePercent) {
         if (concurrencyUsagePercent >= 100D || queueUsagePercent >= 100D) {
             return ALERT_CRITICAL;
@@ -757,10 +1070,20 @@ public class BiQuickEngineCapacityService {
         return ALERT_NORMAL;
     }
 
+    /**
+     * 解析、归一化或保护输入值，生成安全可用的中间结果。
+     *
+     * @param values values 参数，用于 normalizedList 流程中的校验、计算或对象转换。
+     * @param maxSize max size 参数，用于 normalizedList 流程中的校验、计算或对象转换。
+     * @param label label 参数，用于 normalizedList 流程中的校验、计算或对象转换。
+     * @return 返回解析、归一化或安全处理后的值。
+     */
     private List<String> normalizedList(List<String> values, int maxSize, String label) {
         LinkedHashSet<String> normalized = new LinkedHashSet<>();
+        // 遍历候选数据并按业务规则筛选、转换或聚合。
         for (String value : values == null ? List.<String>of() : values) {
             String trimmed = trimToNull(value);
+            // 校验关键输入和前置条件，避免无效状态继续进入主流程。
             if (trimmed != null) {
                 normalized.add(trimmed);
             }
@@ -768,9 +1091,16 @@ public class BiQuickEngineCapacityService {
         if (normalized.size() > maxSize) {
             throw new IllegalArgumentException(label + " must contain at most " + maxSize + " items");
         }
+        // 汇总前面计算出的状态和明细，返回给调用方。
         return List.copyOf(normalized);
     }
 
+    /**
+     * 根据输入和依赖数据计算业务判断结果。
+     *
+     * @param json JSON 字符串，承载结构化配置或明细。
+     * @return 返回 read list 汇总后的集合、分页或映射视图。
+     */
     private List<String> readList(String json) {
         String normalized = trimToNull(json);
         if (normalized == null) {
@@ -784,6 +1114,12 @@ public class BiQuickEngineCapacityService {
         }
     }
 
+    /**
+     * 写入或更新业务数据，并保持关联状态一致。
+     *
+     * @param values values 参数，用于 writeList 流程中的校验、计算或对象转换。
+     * @return 返回 write list 生成的文本或业务键。
+     */
     private String writeList(List<String> values) {
         try {
             return objectMapper.writeValueAsString(values == null ? List.of() : values);
@@ -792,6 +1128,14 @@ public class BiQuickEngineCapacityService {
         }
     }
 
+    /**
+     * 根据方法职责完成对应的业务处理流程。
+     *
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @param actor 操作人标识，用于审计和权限判断。
+     * @param before before 参数，用于 auditUpdate 流程中的校验、计算或对象转换。
+     * @param after after 参数，用于 auditUpdate 流程中的校验、计算或对象转换。
+     */
     private void auditUpdate(Long tenantId,
                              String actor,
                              BiQuickEngineCapacityAlertPolicyView before,
@@ -815,6 +1159,14 @@ public class BiQuickEngineCapacityService {
         }
     }
 
+    /**
+     * 根据方法职责完成对应的业务处理流程。
+     *
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @param actor 操作人标识，用于审计和权限判断。
+     * @param before before 参数，用于 auditPoolUpdate 流程中的校验、计算或对象转换。
+     * @param after after 参数，用于 auditPoolUpdate 流程中的校验、计算或对象转换。
+     */
     private void auditPoolUpdate(Long tenantId,
                                  String actor,
                                  BiQuickEngineTenantPoolPolicyView before,
@@ -838,6 +1190,12 @@ public class BiQuickEngineCapacityService {
         }
     }
 
+    /**
+     * 组装输出结构或完成对象转换。
+     *
+     * @param value 待处理值，用于规则计算或转换。
+     * @return 返回组装或转换后的结果对象。
+     */
     private String toJson(Object value) {
         try {
             return objectMapper.writeValueAsString(value);
@@ -846,14 +1204,32 @@ public class BiQuickEngineCapacityService {
         }
     }
 
+    /**
+     * 解析、归一化或保护输入值，生成安全可用的中间结果。
+     *
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @return 返回解析、归一化或安全处理后的值。
+     */
     private Long normalizeTenant(Long tenantId) {
         return tenantId == null ? 0L : tenantId;
     }
 
+    /**
+     * 解析、归一化或保护输入值，生成安全可用的中间结果。
+     *
+     * @param value 待处理值，用于规则计算或转换。
+     * @return 返回解析、归一化或安全处理后的值。
+     */
     private String normalize(String value) {
         return value == null ? "" : value.trim().toUpperCase(Locale.ROOT);
     }
 
+    /**
+     * 解析、归一化或保护输入值，生成安全可用的中间结果。
+     *
+     * @param value 待处理值，用于规则计算或转换。
+     * @return 返回解析、归一化或安全处理后的值。
+     */
     private String trimToNull(String value) {
         if (value == null || value.isBlank()) {
             return null;
@@ -861,15 +1237,35 @@ public class BiQuickEngineCapacityService {
         return value.trim();
     }
 
+    /**
+     * 根据方法职责完成对应的业务处理流程。
+     *
+     * @param actor 操作人标识，用于审计和权限判断。
+     * @return 返回 actor 生成的文本或业务键。
+     */
     private String actor(String actor) {
         String trimmed = trimToNull(actor);
         return trimmed == null ? "system" : trimmed;
     }
 
+    /**
+     * 根据方法职责完成对应的业务处理流程。
+     *
+     * @param value 待处理值，用于规则计算或转换。
+     * @param fallback fallback 参数，用于 value 流程中的校验、计算或对象转换。
+     * @return 返回 value 计算得到的数量、金额或指标值。
+     */
     private long value(Long value, long fallback) {
         return value == null ? fallback : value;
     }
 
+    /**
+     * 根据方法职责完成对应的业务处理流程。
+     *
+     * @param value 待处理值，用于规则计算或转换。
+     * @param fallback fallback 参数，用于 positive 流程中的校验、计算或对象转换。
+     * @return 返回 positive 计算得到的数量、金额或指标值。
+     */
     private long positive(Long value, long fallback) {
         long resolved = value(value, fallback);
         if (resolved <= 0) {
@@ -878,6 +1274,15 @@ public class BiQuickEngineCapacityService {
         return resolved;
     }
 
+    /**
+     * 解析、归一化或保护输入值，生成安全可用的中间结果。
+     *
+     * @param value 待处理值，用于规则计算或转换。
+     * @param fallback fallback 参数，用于 boundedPositive 流程中的校验、计算或对象转换。
+     * @param maxValue 待处理值，用于规则计算或转换。
+     * @param label label 参数，用于 boundedPositive 流程中的校验、计算或对象转换。
+     * @return 返回解析、归一化或安全处理后的值。
+     */
     private int boundedPositive(Integer value, int fallback, int maxValue, String label) {
         int resolved = value == null ? fallback : value;
         if (resolved <= 0 || resolved > maxValue) {
@@ -886,6 +1291,13 @@ public class BiQuickEngineCapacityService {
         return resolved;
     }
 
+    /**
+     * 根据方法职责完成对应的业务处理流程。
+     *
+     * @param value 待处理值，用于规则计算或转换。
+     * @param fallback fallback 参数，用于 poolKey 流程中的校验、计算或对象转换。
+     * @return 返回 pool key 生成的文本或业务键。
+     */
     private String poolKey(String value, String fallback) {
         String resolved = trimToNull(value);
         if (resolved == null) {
@@ -898,6 +1310,14 @@ public class BiQuickEngineCapacityService {
         return resolved;
     }
 
+    /**
+     * 根据方法职责完成对应的业务处理流程。
+     *
+     * @param value 待处理值，用于规则计算或转换。
+     * @param fallback fallback 参数，用于 threshold 流程中的校验、计算或对象转换。
+     * @param label label 参数，用于 threshold 流程中的校验、计算或对象转换。
+     * @return 返回 threshold 计算得到的数量、金额或指标值。
+     */
     private int threshold(Integer value, int fallback, String label) {
         int resolved = value == null ? fallback : value;
         if (resolved <= 0 || resolved > 100) {
@@ -906,6 +1326,9 @@ public class BiQuickEngineCapacityService {
         return resolved;
     }
 
+    /**
+     * ResourceAccumulator 承载对应领域的业务规则、流程编排和结果转换。
+     */
     private static final class ResourceAccumulator {
         private final String resourceKey;
         private final Set<String> tables = new LinkedHashSet<>();
@@ -915,10 +1338,24 @@ public class BiQuickEngineCapacityService {
         private Long latestRowCount;
         private String owner = "system";
 
+        /**
+         * 根据方法职责完成对应的业务处理流程。
+         *
+         * @param resourceKey 业务键，用于在同一租户下定位资源。
+         * @return 返回 ResourceAccumulator 流程生成的业务结果。
+         */
         private ResourceAccumulator(String resourceKey) {
             this.resourceKey = resourceKey;
         }
 
+        /**
+         * 创建业务对象并完成必要的初始化。
+         *
+         * @param row 持久化行数据，承载数据库记录内容。
+         * @param table table 参数，用于 add 流程中的校验、计算或对象转换。
+         * @param rowCount row count 参数，用于 add 流程中的校验、计算或对象转换。
+         * @param owner owner 参数，用于 add 流程中的校验、计算或对象转换。
+         */
         private void add(BiDatasetExtractRefreshRunDO row, String table, long rowCount, String owner) {
             if (tables.add(table)) {
                 usedRows += rowCount;
@@ -933,6 +1370,11 @@ public class BiQuickEngineCapacityService {
             }
         }
 
+        /**
+         * 根据方法职责完成对应的业务处理流程。
+         *
+         * @return 返回 view 流程生成的业务结果。
+         */
         private BiQuickEngineCapacityUsageDetailView view() {
             return new BiQuickEngineCapacityUsageDetailView(
                     CATEGORY_DATASET_ACCELERATION,
@@ -946,16 +1388,32 @@ public class BiQuickEngineCapacityService {
         }
     }
 
+    /**
+     * UserAccumulator 承载对应领域的业务规则、流程编排和结果转换。
+     */
     private static final class UserAccumulator {
         private final String user;
         private final Set<String> tables = new LinkedHashSet<>();
         private final Set<String> resources = new LinkedHashSet<>();
         private long usedRows;
 
+        /**
+         * 根据方法职责完成对应的业务处理流程。
+         *
+         * @param user 操作人标识，用于审计和权限判断。
+         * @return 返回 UserAccumulator 流程生成的业务结果。
+         */
         private UserAccumulator(String user) {
             this.user = user;
         }
 
+        /**
+         * 创建业务对象并完成必要的初始化。
+         *
+         * @param resourceKey 业务键，用于在同一租户下定位资源。
+         * @param table table 参数，用于 add 流程中的校验、计算或对象转换。
+         * @param rowCount row count 参数，用于 add 流程中的校验、计算或对象转换。
+         */
         private void add(String resourceKey, String table, long rowCount) {
             resources.add(resourceKey);
             if (tables.add(resourceKey + ":" + table)) {
@@ -963,11 +1421,23 @@ public class BiQuickEngineCapacityService {
             }
         }
 
+        /**
+         * 根据方法职责完成对应的业务处理流程。
+         *
+         * @return 返回 view 流程生成的业务结果。
+         */
         private BiQuickEngineCapacityUserUsageView view() {
             return new BiQuickEngineCapacityUserUsageView(user, usedRows, tables.size(), resources.size());
         }
     }
 
+    /**
+     * 校验输入、权限或业务前置条件。
+     *
+     * @param left left 参数，用于 isAfter 流程中的校验、计算或对象转换。
+     * @param right right 参数，用于 isAfter 流程中的校验、计算或对象转换。
+     * @return 返回布尔判断结果。
+     */
     private static boolean isAfter(LocalDateTime left, LocalDateTime right) {
         if (left == null) {
             return false;

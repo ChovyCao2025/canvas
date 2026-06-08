@@ -10,12 +10,19 @@ import {
   buildDashboardCloneCommand,
   buildDashboardImportCommand,
   buildDatasourceMultiTableDatasetCommand,
+  buildDatasourceRelationshipDiagnosticRows,
   buildDatasourceOnboardingCommand,
+  datasourceNextActionRows,
   buildSqlDatasetDraftResource,
   buildSqlDatasetParameterDrafts,
+  buildSqlDatasetImpactRows,
+  buildSqlDatasetReadinessRows,
+  buildSqlDatasetSampleProfileRows,
   buildDatasourceTableDatasetCommand,
   buildResourceMoveCommand,
   movePortalMenuItem,
+  reorderPortalMenuTree,
+  updatePortalMenuConfig,
   updatePortalNavigationConfig,
   buildResourceFavoriteCommand,
   buildResourceCommentCommand,
@@ -28,7 +35,9 @@ import {
   buildResourceTransferCommand,
   buildSelfServiceExtractionQuery,
   buildDashboardControlOptionQuery,
+  buildDashboardRuntimeStateCommand,
   buildDashboardInteractionTarget,
+  chartReferenceImpactSummary,
   dashboardPackageFileName,
   dashboardDefaultRuntimeParameters,
   dashboardRuntimeFilterLocked,
@@ -46,10 +55,12 @@ import {
   updateDashboardRuntimeParameters,
   dropSelfServiceExtractionField,
   buildEmbedTicketRequest,
+  buildEmbedTicketPreviewRows,
   buildBiPermissionResourceTargets,
   buildBiResourceTargets,
   buildBigScreenResourceOptions,
   buildBigScreenDraftResource,
+  buildVisualEditorDiagnosticRows,
   addBigScreenLibraryComponent,
   alignBigScreenLayoutItems,
   bigScreenResourceSummaryRows,
@@ -74,6 +85,8 @@ import {
   buildWidgetQueryRequest,
   canvasBiEntrypoint,
   chartLabel,
+  chartQueryPatchFromDesigner,
+  chartQueryFieldsAfterDrop,
   controlLabel,
   dashboardWidgetGridPlacement,
   duplicateDashboardWidget,
@@ -95,8 +108,12 @@ import {
   resourceLockTokenFor,
   exportApprovalStatusLabel,
   exportAuditDetailRows,
+  exportHardeningDiagnosticRows,
+  alertAnomalyDiagnosticRows,
   isCancelableExportJob,
   publishApprovalStatusLabel,
+  datasourceCapacityPolicyRows,
+  datasourceAdvancedCapabilityRows,
   datasourceHealthHistoryRows,
   datasourceHealthSloRows,
   datasourceConnectorRows,
@@ -233,6 +250,84 @@ describe('biWorkbench', () => {
     expect(interactionLabel('DRILL_DOWN')).toBe('钻取')
   })
 
+  test('summarizes chart reference impact across dashboards portals and subscriptions', () => {
+    const summary = chartReferenceImpactSummary(
+      {
+        chartKey: 'chart-kpi',
+        datasetKey: 'campaign_daily_stats',
+        query: {
+          dimensions: ['channel', 'stat_date'],
+          metrics: ['send_count'],
+        },
+      },
+      {
+        dashboards: [
+          {
+            dashboardKey: 'canvas-effect',
+            title: 'Canvas Effect',
+            widgets: [
+              { widgetKey: 'kpi', title: 'KPI', resourceType: 'CHART', resourceKey: 'chart-kpi' },
+              { widgetKey: 'rank', title: 'Rank', chartKey: 'other-chart' },
+            ],
+          },
+        ],
+        portals: [
+          {
+            portalKey: 'executive-home',
+            name: 'Executive Home',
+            menus: [
+              { menuKey: 'kpi-menu', title: 'KPI Menu', resourceType: 'CHART', resourceKey: 'chart-kpi' },
+            ],
+          },
+        ],
+        subscriptions: [
+          { subscriptionKey: 'daily-kpi', name: 'Daily KPI', resourceType: 'CHART', resourceKey: 'chart-kpi' },
+          { subscriptionKey: 'dashboard-daily', name: 'Dashboard Daily', resourceType: 'DASHBOARD', resourceKey: 'canvas-effect' },
+        ],
+      },
+    )
+
+    expect(summary).toBe('引用影响：数据集 campaign_daily_stats · 2 维度 · 1 指标 · 仪表板 Canvas Effect/KPI · 门户 Executive Home/KPI Menu · 订阅 Daily KPI')
+  })
+
+  test('builds chart query patch from selected fields filters and sort drafts', () => {
+    expect(chartQueryPatchFromDesigner({
+      datasetKey: 'campaign_daily_stats',
+      selectedDimensions: [' channel ', 'stat_date', 'channel'],
+      selectedMetrics: [' send_count ', 'conversion_count'],
+      filterField: 'channel',
+      filterOperator: 'IN',
+      filterValue: 'SMS, Email',
+      sortField: 'stat_date',
+      sortDirection: 'DESC',
+      limit: 250,
+    })).toEqual({
+      datasetKey: 'campaign_daily_stats',
+      dimensions: ['channel', 'stat_date'],
+      metrics: ['send_count', 'conversion_count'],
+      filters: [{ field: 'channel', operator: 'IN', value: ['SMS', 'Email'] }],
+      sorts: [{ field: 'stat_date', direction: 'DESC' }],
+      limit: 250,
+    })
+  })
+
+  test('adds dropped chart fields by role without duplicates', () => {
+    expect(chartQueryFieldsAfterDrop({
+      dimensions: ['channel'],
+      metrics: ['send_count'],
+    }, 'DIMENSION', 'stat_date')).toEqual({
+      dimensions: ['channel', 'stat_date'],
+      metrics: ['send_count'],
+    })
+    expect(chartQueryFieldsAfterDrop({
+      dimensions: ['channel'],
+      metrics: ['send_count'],
+    }, 'METRIC', 'send_count')).toEqual({
+      dimensions: ['channel'],
+      metrics: ['send_count'],
+    })
+  })
+
   test('builds embed ticket request from dashboard and canvas context', () => {
     expect(buildEmbedTicketRequest(getDefaultDashboardPreset(), '12')).toEqual({
       resourceType: 'DASHBOARD',
@@ -243,6 +338,40 @@ describe('biWorkbench', () => {
       maxAccessCount: getDefaultDashboardPreset().widgets.length + 3,
     })
     expect(buildEmbedTicketRequest(getDefaultDashboardPreset(), null, 'EXTERNAL_TICKET').ttlSeconds).toBe(900)
+  })
+
+  test('summarizes embed ticket payload before creation with runtime parameters', () => {
+    const preset = {
+      ...getDefaultDashboardPreset(),
+      globalParameters: [
+        {
+          parameterKey: 'gpCanvas',
+          fieldKey: 'canvas_name',
+          filterKey: 'filter-canvas',
+          aliases: ['campaign'],
+        },
+      ],
+    }
+    const rows = buildEmbedTicketPreviewRows(
+      preset,
+      '12',
+      'EXTERNAL_TICKET',
+      {
+        'filter-canvas': 'Welcome Journey',
+        'filter-trigger-type': ['TIME', 'MQ'],
+        gpCanvas: 'Welcome Journey',
+      },
+    )
+
+    expect(rows).toEqual([
+      { key: 'resource', label: '资源', value: 'DASHBOARD / canvas-effect' },
+      { key: 'scope', label: '范围', value: 'EXTERNAL_TICKET' },
+      { key: 'ttl', label: '有效期', value: '900 秒' },
+      { key: 'filter:canvasId', label: '过滤 canvasId', value: '12' },
+      { key: 'filter:filter-canvas', label: '过滤 filter-canvas', value: 'Welcome Journey' },
+      { key: 'filter:filter-trigger-type', label: '过滤 filter-trigger-type', value: 'TIME,MQ' },
+      { key: 'parameter:gpCanvas', label: '参数 gpCanvas', value: 'Welcome Journey' },
+    ])
   })
 
   test('binds dashboard runtime parameters into embed ticket filters', () => {
@@ -366,8 +495,8 @@ describe('biWorkbench', () => {
     )
 
     expect(runtimeParameters).toEqual(expect.objectContaining({
-      'filter-stat-date': '2026-06-01,2026-06-06',
-      'filter-trigger-type': 'TIME,MQ',
+      'filter-stat-date': ['2026-06-01', '2026-06-06'],
+      'filter-trigger-type': ['TIME', 'MQ'],
       'filter-canvas': 'Welcome Journey',
       gpCanvas: 'Welcome Journey',
     }))
@@ -537,7 +666,7 @@ describe('biWorkbench', () => {
     const params = new URLSearchParams('dashboard=canvas-effect&canvasId=12&filter-trigger-type=TIME,MQ&canvas_name=Welcome')
 
     expect(dashboardRuntimeParametersFromSearchParams(getDefaultDashboardPreset(), params)).toEqual({
-      'filter-trigger-type': 'TIME,MQ',
+      'filter-trigger-type': ['TIME', 'MQ'],
       canvas_name: 'Welcome',
     })
   })
@@ -553,7 +682,7 @@ describe('biWorkbench', () => {
     )).toEqual({
       'filter-stat-date': ['2026-05-31', '2026-06-06'],
       'filter-canvas': 'Remembered Canvas',
-      'filter-trigger-type': 'TIME,MQ',
+      'filter-trigger-type': ['TIME', 'MQ'],
     })
   })
 
@@ -616,6 +745,37 @@ describe('biWorkbench', () => {
     expect(dashboardRuntimeControlValue(withTriggerTypes, triggerTypeFilter)).toBe('TIME,MQ')
     expect(updateDashboardRuntimeParameters(preset, withTriggerTypes, 'filter-trigger-type', '')).toEqual({
       'filter-stat-date': ['2026-06-01', '2026-06-06'],
+    })
+  })
+
+  test('builds canonical dashboard runtime state save command', () => {
+    const preset = {
+      ...getDefaultDashboardPreset(),
+      globalParameters: [
+        {
+          parameterKey: 'canvasName',
+          filterKey: 'filter-canvas',
+          fieldKey: 'canvas_name',
+          aliases: ['canvas'],
+        },
+      ],
+    }
+
+    expect(buildDashboardRuntimeStateCommand(preset, {
+      'filter-stat-date': ['2026-06-01', '2026-06-06'],
+      canvas_name: ' Url Canvas ',
+      canvas: 'Alias Canvas',
+      'filter-trigger-type': ['TIME', '', 'MQ'],
+      stale: '',
+      emptyList: [],
+      nullable: null,
+    })).toEqual({
+      parameters: {
+        'filter-stat-date': ['2026-06-01', '2026-06-06'],
+        'filter-canvas': 'Url Canvas',
+        canvasName: 'Url Canvas',
+        'filter-trigger-type': ['TIME', 'MQ'],
+      },
     })
   })
 
@@ -1287,12 +1447,15 @@ describe('biWorkbench', () => {
           availabilityRate: 50,
           lastCheckedAt: '2026-06-05T08:10:00',
           lastMessage: 'timeout',
+          riskLevel: 'DEGRADED',
+          recommendedAction: '重新执行连接测试并检查网络',
         },
       ],
     })).toEqual([
       { label: '整体可用率', value: '75% · 3/4 正常' },
       { label: '异常检查', value: '1 次' },
       { label: '最弱数据源', value: 'doris / DORIS · 50% · timeout' },
+      { label: '治理建议', value: 'DEGRADED · 重新执行连接测试并检查网络' },
     ])
   })
 
@@ -1348,6 +1511,202 @@ describe('biWorkbench', () => {
         modes: 'EXTRACT',
         status: 'PLANNED',
         capabilities: '凭证',
+      },
+    ])
+  })
+
+  test('derives QuickBI-style datasource capacity policy rows', () => {
+    expect(datasourceCapacityPolicyRows([
+      {
+        connectorType: 'MYSQL',
+        label: 'MySQL',
+        sourceCategory: 'JDBC',
+        supportedModes: ['DIRECT_QUERY', 'CACHE'],
+        supportStatus: 'AVAILABLE',
+        capacityCategory: 'INTERACTIVE_QUERY',
+        capacityNote: 'Interactive JDBC capacity',
+        supportsConnectionTest: true,
+        supportsSchemaSync: true,
+        supportsSqlDataset: true,
+        supportsTableDataset: true,
+        supportsCredentials: true,
+        driverClassNames: ['com.mysql.cj.jdbc.Driver'],
+        note: 'JDBC connector is available',
+      },
+      {
+        connectorType: 'API',
+        label: 'API',
+        sourceCategory: 'HTTP',
+        supportedModes: ['EXTRACT'],
+        supportStatus: 'AVAILABLE',
+        capacityCategory: 'HTTP_EXTRACT_SMALL',
+        capacityNote: 'HTTP extract capacity',
+        supportsConnectionTest: false,
+        supportsSchemaSync: false,
+        supportsSqlDataset: false,
+        supportsTableDataset: true,
+        supportsCredentials: true,
+        driverClassNames: [],
+        note: 'HTTP API extract connector',
+      },
+      {
+        connectorType: 'APP_ANALYTICS',
+        label: 'Application Analytics',
+        sourceCategory: 'APP',
+        supportedModes: ['EXTRACT'],
+        supportStatus: 'AVAILABLE',
+        capacityCategory: 'APP_EXTRACT_SMALL',
+        capacityNote: 'Application extract capacity',
+        supportsConnectionTest: false,
+        supportsSchemaSync: false,
+        supportsSqlDataset: false,
+        supportsTableDataset: true,
+        supportsCredentials: true,
+        driverClassNames: [],
+        note: 'Application datasource',
+      },
+      {
+        connectorType: 'CSV_EXCEL',
+        label: 'CSV / Excel',
+        sourceCategory: 'FILE',
+        supportedModes: ['EXTRACT'],
+        supportStatus: 'AVAILABLE',
+        capacityCategory: 'FILE_EXTRACT_SMALL',
+        capacityNote: 'Uploaded-file extract capacity',
+        supportsConnectionTest: false,
+        supportsSchemaSync: false,
+        supportsSqlDataset: false,
+        supportsTableDataset: true,
+        supportsCredentials: false,
+        driverClassNames: [],
+        note: 'File upload connector',
+      },
+    ])).toEqual([
+      {
+        key: 'MYSQL',
+        connector: 'MySQL / MYSQL',
+        capacityPool: '交互查询池',
+        budget: '直连/缓存查询 · 受租户并发池和查询行数配额控制',
+        eligibility: '可用于自助取数',
+        guardrails: '连接测试、schema 同步、SQL/表数据集建模',
+      },
+      {
+        key: 'API',
+        connector: 'API / API',
+        capacityPool: 'HTTP 抽取小流量池',
+        budget: '直连预览上限 10MB / 100 列 / 1000 行；抽取分页默认每页 1000 行',
+        eligibility: '不进入自助取数',
+        guardrails: 'JSON 响应解析、模板变量、抽取刷新和源端限流保护',
+      },
+      {
+        key: 'APP_ANALYTICS',
+        connector: 'Application Analytics / APP_ANALYTICS',
+        capacityPool: '应用抽取小流量池',
+        budget: 'SaaS/API 应用源走 HTTP JSON 抽取；按应用连接器独立计量',
+        eligibility: '自助取数需落成普通数据集后评估',
+        guardrails: '应用凭证、同步周期、字段选择和容量分类隔离',
+      },
+      {
+        key: 'CSV_EXCEL',
+        connector: 'CSV / Excel / CSV_EXCEL',
+        capacityPool: '探索空间文件池',
+        budget: 'CSV/Excel 建议 50MB 内、100 列内；Excel 最多解析 5 个 Sheet',
+        eligibility: '探索空间上传源不支持自助取数',
+        guardrails: 'UTF-8 编码、字段类型校验、追加/替换文件需重新匹配',
+      },
+    ])
+  })
+
+  test('derives QuickBI-style datasource advanced capability rows', () => {
+    expect(datasourceAdvancedCapabilityRows([
+      {
+        connectorType: 'MYSQL',
+        label: 'MySQL',
+        sourceCategory: 'JDBC',
+        supportedModes: ['DIRECT_QUERY', 'CACHE'],
+        supportStatus: 'AVAILABLE',
+        capacityCategory: 'INTERACTIVE_QUERY',
+        supportsConnectionTest: true,
+        supportsSchemaSync: true,
+        supportsSqlDataset: true,
+        supportsTableDataset: true,
+        supportsCredentials: true,
+      },
+      {
+        connectorType: 'API',
+        label: 'API',
+        sourceCategory: 'HTTP',
+        supportedModes: ['EXTRACT'],
+        supportStatus: 'AVAILABLE',
+        capacityCategory: 'HTTP_EXTRACT_SMALL',
+        supportsConnectionTest: false,
+        supportsSchemaSync: false,
+        supportsSqlDataset: false,
+        supportsTableDataset: true,
+        supportsCredentials: true,
+      },
+      {
+        connectorType: 'CSV_EXCEL',
+        label: 'CSV / Excel',
+        sourceCategory: 'FILE',
+        supportedModes: ['EXTRACT'],
+        supportStatus: 'AVAILABLE',
+        capacityCategory: 'FILE_EXTRACT_SMALL',
+        supportsConnectionTest: false,
+        supportsSchemaSync: false,
+        supportsSqlDataset: false,
+        supportsTableDataset: true,
+        supportsCredentials: false,
+      },
+      {
+        connectorType: 'MAXCOMPUTE',
+        label: 'MaxCompute',
+        sourceCategory: 'ALIBABA_CLOUD',
+        supportedModes: ['EXTRACT'],
+        supportStatus: 'PLANNED',
+        capacityCategory: 'WAREHOUSE_EXTRACT',
+        supportsConnectionTest: false,
+        supportsSchemaSync: false,
+        supportsSqlDataset: false,
+        supportsTableDataset: false,
+        supportsCredentials: true,
+      },
+    ])).toEqual([
+      {
+        key: 'MYSQL',
+        connector: 'MySQL / MYSQL',
+        quickEngine: '可选 · 直连/缓存优先，跨源或大数据量时启用抽取',
+        crossSourceModeling: '支持 · 跨源关联需开启 Quick 引擎抽取',
+        selfService: '支持 · 普通数据集可进入自助取数',
+        semanticAuthoring: 'SQL + 表数据集',
+        risk: '低 · 连接测试、schema 同步和凭证治理齐全',
+      },
+      {
+        key: 'API',
+        connector: 'API / API',
+        quickEngine: '必需 · HTTP JSON 仅通过抽取物化分析',
+        crossSourceModeling: '受限 · 需先抽取成物化表后参与关联',
+        selfService: '不支持 · API/应用源不直接进入自助取数',
+        semanticAuthoring: '表数据集',
+        risk: '中 · 受 10MB/100 列/1000 行预览和源端限流约束',
+      },
+      {
+        key: 'CSV_EXCEL',
+        connector: 'CSV / Excel / CSV_EXCEL',
+        quickEngine: '必需 · 文件上传后以抽取表参与分析',
+        crossSourceModeling: '受限 · 探索空间文件需物化后再治理关联',
+        selfService: '不支持 · 探索空间上传源不进入自助取数',
+        semanticAuthoring: '表数据集',
+        risk: '中 · 文件大小、Sheet 数和字段类型漂移需复核',
+      },
+      {
+        key: 'MAXCOMPUTE',
+        connector: 'MaxCompute / MAXCOMPUTE',
+        quickEngine: '规划中 · 仓库级抽取容量未开放',
+        crossSourceModeling: '阻断 · 连接器未开放前不可发布跨源模型',
+        selfService: '阻断 · connector status PLANNED',
+        semanticAuthoring: '暂不可用',
+        risk: '高 · 需要先完成原生连接器和容量治理',
       },
     ])
   })
@@ -1696,6 +2055,147 @@ describe('biWorkbench', () => {
     })
   })
 
+  test('builds SQL dataset sample profile rows from preview columns and rows', () => {
+    expect(buildSqlDatasetSampleProfileRows({
+      columns: [
+        { key: 'stat_date', role: 'DIMENSION', dataType: 'DATE' },
+        { key: 'channel', role: 'DIMENSION', dataType: 'STRING' },
+        { key: 'total_cost', role: 'METRIC', dataType: 'NUMBER' },
+      ],
+      rows: [
+        { stat_date: '2026-06-01', channel: 'PAID', total_cost: 18.5 },
+        { stat_date: '2026-06-02', channel: 'EMAIL', total_cost: 0 },
+        { stat_date: '2026-06-03', channel: null, total_cost: 21.25 },
+      ],
+      rowCount: 3,
+      sampleLimit: 20,
+      sampleExecuted: true,
+    })).toEqual([
+      {
+        key: 'stat_date',
+        field: 'stat_date',
+        role: 'DIMENSION',
+        dataType: 'DATE',
+        filled: '3/3',
+        unique: '3',
+        samples: '2026-06-01 / 2026-06-02 / 2026-06-03',
+      },
+      {
+        key: 'channel',
+        field: 'channel',
+        role: 'DIMENSION',
+        dataType: 'STRING',
+        filled: '2/3',
+        unique: '2',
+        samples: 'PAID / EMAIL',
+      },
+      {
+        key: 'total_cost',
+        field: 'total_cost',
+        role: 'METRIC',
+        dataType: 'NUMBER',
+        filled: '3/3',
+        unique: '3',
+        samples: '18.5 / 0 / 21.25',
+      },
+    ])
+  })
+
+  test('builds SQL dataset lineage impact rows from preview lineage and impact', () => {
+    expect(buildSqlDatasetImpactRows({
+      datasetKey: 'campaign_sql',
+      lineage: {
+        dataSourceConfigId: 22,
+        sourceTables: ['campaign_daily', 'campaign_budget'],
+        parameterKeys: ['start_date', 'channel'],
+        tenantColumn: 'tenant_id',
+        referencedFields: ['stat_date', 'channel'],
+        referencedMetrics: ['SUM(total_cost)'],
+        approvalRequired: true,
+      },
+      impact: {
+        impactedAssetTypes: ['DATASET_DRAFT', 'PUBLISH_APPROVAL', 'QUERY_CACHE', 'DOWNSTREAM_REPORTS'],
+        governanceGates: ['READ_ONLY_SQL_LINT', 'TENANT_COLUMN_REQUIRED'],
+        warnings: ['下游报表缓存需要刷新'],
+      },
+    })).toEqual([
+      { key: 'assets', label: '影响资产', value: 'DATASET_DRAFT / PUBLISH_APPROVAL / QUERY_CACHE / DOWNSTREAM_REPORTS' },
+      { key: 'lineage', label: '血缘来源', value: 'datasource #22 · campaign_daily / campaign_budget · tenant tenant_id' },
+      { key: 'parameters', label: '运行参数', value: 'start_date / channel' },
+      { key: 'references', label: '引用字段', value: 'stat_date / channel · SUM(total_cost)' },
+      { key: 'governance', label: '治理门禁', value: 'READ_ONLY_SQL_LINT / TENANT_COLUMN_REQUIRED / 发布需审批' },
+      { key: 'warnings', label: '风险提示', value: '下游报表缓存需要刷新' },
+    ])
+  })
+
+  test('builds SQL dataset readiness rows from draft metadata preview and lineage', () => {
+    const draft = buildSqlDatasetDraftResource({
+      dataSourceConfigId: 22,
+      datasetKey: 'campaign_sql',
+      name: 'Campaign SQL',
+      sqlTemplate: 'SELECT tenant_id, stat_date, channel, total_cost FROM campaign_daily WHERE stat_date >= {{start_date}} AND channel = {{channel}}',
+      tenantColumn: 'tenant_id',
+      parameters: [
+        { key: 'start_date', dataType: 'DATE', required: true, defaultValue: '2026-06-01' },
+        { key: 'channel', dataType: 'STRING', required: true, allowedValuesText: 'PAID, EMAIL' },
+      ],
+      fields: [
+        { fieldKey: 'tenant_id', displayName: 'Tenant', columnExpression: 'tenant_id', role: 'DIMENSION', dataType: 'NUMBER', visible: false },
+        { fieldKey: 'stat_date', displayName: 'Date', columnExpression: 'stat_date', role: 'DIMENSION', dataType: 'DATE', formatPattern: 'yyyy-MM-dd' },
+        { fieldKey: 'channel', displayName: 'Channel', columnExpression: 'channel', role: 'DIMENSION', dataType: 'STRING', semanticType: 'TRAFFIC_CHANNEL' },
+      ],
+      metrics: [
+        {
+          metricKey: 'total_cost',
+          displayName: 'Spend',
+          expression: 'SUM(total_cost)',
+          aggregation: 'SUM',
+          dataType: 'NUMBER',
+          allowedDimensions: ['stat_date', 'channel'],
+          owner: 'bi-owner',
+          description: 'Paid media spend',
+        },
+      ],
+    })
+
+    expect(buildSqlDatasetReadinessRows({
+      draft,
+      parameters: buildSqlDatasetParameterDrafts(String(draft.model.sqlTemplate), [
+        { key: 'start_date', dataType: 'DATE', required: true, defaultValue: '2026-06-01' },
+        { key: 'channel', dataType: 'STRING', required: true, allowedValuesText: 'PAID, EMAIL' },
+      ]),
+      preview: {
+        rowCount: 0,
+        sampleExecuted: false,
+        columns: [],
+        rows: [],
+        sampleLimit: 20,
+        parameterCount: 2,
+        compiledSql: '',
+        lineage: {
+          dataSourceConfigId: 22,
+          sourceTables: ['campaign_daily'],
+          parameterKeys: ['start_date', 'channel'],
+          tenantColumn: 'tenant_id',
+          referencedFields: ['stat_date', 'channel'],
+          referencedMetrics: ['SUM(total_cost)'],
+          approvalRequired: false,
+        },
+        impact: {
+          impactedAssetTypes: ['DATASET_DRAFT'],
+          governanceGates: ['READ_ONLY_SQL_LINT'],
+          warnings: ['样例未执行'],
+        },
+      },
+    })).toEqual([
+      { key: 'metadata', label: '字段与指标', status: 'pass', statusLabel: '可发布', detail: '3 字段 / 1 指标 · 2 可见字段 · 1 指标维度约束' },
+      { key: 'parameters', label: '运行参数', status: 'block', statusLabel: '需补齐', detail: '2 参数 · 缺少默认值: channel' },
+      { key: 'sample', label: '样例预览', status: 'block', statusLabel: '需补齐', detail: '未执行样例预览' },
+      { key: 'lineage', label: '血缘与审批', status: 'warn', statusLabel: '需复核', detail: 'campaign_daily · 门禁 READ_ONLY_SQL_LINT · 未强制发布审批' },
+      { key: 'warnings', label: '风险提示', status: 'warn', statusLabel: '需复核', detail: '样例未执行' },
+    ])
+  })
+
   test('builds datasource onboarding command from QuickBI wizard draft', () => {
     expect(buildDatasourceOnboardingCommand(
       {
@@ -1888,6 +2388,69 @@ describe('biWorkbench', () => {
     })
   })
 
+  test('summarizes QuickBI-style datasource next actions for API and file extracts', () => {
+    expect(datasourceNextActionRows([
+      {
+        id: 81,
+        sourceKey: 'api-81',
+        name: 'Orders API',
+        connectorType: 'API',
+        connectionMode: 'EXTRACT',
+        schemaSyncStatus: 'SUCCESS',
+        tableCount: 1,
+        supportedModes: ['EXTRACT'],
+        supportStatus: 'AVAILABLE',
+        capabilities: ['TABLE_DATASET'],
+      },
+      {
+        id: 91,
+        sourceKey: 'file-91',
+        name: 'Orders Upload',
+        connectorType: 'CSV_EXCEL',
+        connectionMode: 'EXTRACT',
+        schemaSyncStatus: 'PENDING',
+        tableCount: 0,
+        supportedModes: ['EXTRACT'],
+        supportStatus: 'AVAILABLE',
+        capabilities: ['TABLE_DATASET'],
+      },
+      {
+        id: 7,
+        sourceKey: 'jdbc-7',
+        name: 'Warehouse',
+        connectorType: 'MYSQL',
+        connectionMode: 'DIRECT_QUERY',
+        schemaSyncStatus: 'SUCCESS',
+        tableCount: 12,
+        supportedModes: ['DIRECT_QUERY', 'CACHE'],
+        supportStatus: 'AVAILABLE',
+        capabilities: ['SQL_DATASET', 'TABLE_DATASET'],
+      },
+    ])).toEqual([
+      {
+        key: 'api-81',
+        source: 'Orders API',
+        readiness: '可建模 · 1 张表',
+        nextAction: '创建表数据集并配置抽取刷新',
+        limitations: 'API 数据源不进入自助取数；直连小数据量受 10MB/100 列/1000 行约束',
+      },
+      {
+        key: 'file-91',
+        source: 'Orders Upload',
+        readiness: '待同步 schema',
+        nextAction: '上传/预览文件后同步 schema，再创建表数据集',
+        limitations: '文件数据源适合探索空间和报表分析；自助取数需使用非探索空间数据集',
+      },
+      {
+        key: 'jdbc-7',
+        source: 'Warehouse',
+        readiness: '可建模 · 12 张表',
+        nextAction: '创建 SQL/表数据集，按需开启缓存或抽取加速',
+        limitations: '可用于自助取数；跨源数据集和高级同环比导出仍需治理校验',
+      },
+    ])
+  })
+
   test('builds datasource multi-table dataset command from schema snapshot joins', () => {
     expect(buildDatasourceMultiTableDatasetCommand({
       id: 101,
@@ -2035,6 +2598,115 @@ describe('biWorkbench', () => {
           { leftColumn: 'campaign_id', rightColumn: 'campaign_id', operator: '<>', connector: 'OR' },
         ],
       },
+    ])
+  })
+
+  test('builds datasource multi-table dataset command with grouped join conditions', () => {
+    expect(buildDatasourceMultiTableDatasetCommand({
+      id: 105,
+      dataSourceConfigId: 10,
+      sourceKey: 'jdbc-10',
+      name: 'grouped relationship warehouse',
+      connectorType: 'MYSQL',
+      syncStatus: 'SUCCESS',
+      errorMessage: null,
+      tableCount: 2,
+      columnCount: 8,
+      syncedAt: '2026-06-08T09:10:00',
+      syncedBy: 'alice',
+      tables: [
+        {
+          name: 'campaign_daily',
+          tableType: 'TABLE',
+          columns: [
+            { name: 'tenant_id', typeName: 'BIGINT', dataType: -5, nullable: false, ordinalPosition: 1 },
+            { name: 'campaign_id', typeName: 'BIGINT', dataType: -5, nullable: false, ordinalPosition: 2 },
+            { name: 'channel_code', typeName: 'VARCHAR', dataType: 12, nullable: true, ordinalPosition: 3 },
+            { name: 'fallback_channel', typeName: 'VARCHAR', dataType: 12, nullable: true, ordinalPosition: 4 },
+          ],
+        },
+        {
+          name: 'campaign_dim',
+          tableType: 'TABLE',
+          columns: [
+            { name: 'tenant_id', typeName: 'BIGINT', dataType: -5, nullable: false, ordinalPosition: 1 },
+            { name: 'campaign_id', typeName: 'BIGINT', dataType: -5, nullable: false, ordinalPosition: 2 },
+            { name: 'primary_channel', typeName: 'VARCHAR', dataType: 12, nullable: true, ordinalPosition: 3 },
+            { name: 'fallback_channel', typeName: 'VARCHAR', dataType: 12, nullable: true, ordinalPosition: 4 },
+          ],
+        },
+      ],
+    }, {
+      baseTableName: 'campaign_daily',
+      tableNames: ['campaign_daily', 'campaign_dim'],
+      tenantColumn: 'tenant_id',
+      joins: [
+        {
+          joinType: 'LEFT',
+          leftTableName: 'campaign_daily',
+          rightTableName: 'campaign_dim',
+          conditions: [
+            { leftColumn: 'tenant_id', rightColumn: 'tenant_id' },
+            { leftColumn: 'channel_code', rightColumn: 'primary_channel', connector: 'AND', groupStart: true },
+            { leftColumn: 'fallback_channel', rightColumn: 'fallback_channel', connector: 'OR', groupEnd: true },
+          ],
+        },
+      ],
+    }).joins).toEqual([
+      {
+        joinType: 'LEFT',
+        leftAlias: 'campaign_daily',
+        leftColumn: 'tenant_id',
+        rightAlias: 'campaign_dim',
+        rightColumn: 'tenant_id',
+        conditions: [
+          { leftColumn: 'tenant_id', rightColumn: 'tenant_id' },
+          { leftColumn: 'channel_code', rightColumn: 'primary_channel', groupStart: true },
+          { leftColumn: 'fallback_channel', rightColumn: 'fallback_channel', connector: 'OR', groupEnd: true },
+        ],
+      },
+    ])
+  })
+
+  test('builds datasource relationship diagnostics for layered complex joins', () => {
+    expect(buildDatasourceRelationshipDiagnosticRows({
+      baseTableName: 'campaign_daily',
+      tableNames: ['campaign_daily', 'campaign_dim', 'campaign_budget', 'channel_dim'],
+      joins: [
+        {
+          joinType: 'LEFT',
+          leftTableName: 'campaign_daily',
+          rightTableName: 'campaign_dim',
+          conditions: [
+            { leftColumn: 'tenant_id', rightColumn: 'tenant_id' },
+            { leftColumn: 'campaign_id', rightColumn: 'campaign_id', connector: 'AND' },
+          ],
+        },
+        {
+          joinType: 'INNER',
+          leftTableName: 'campaign_dim',
+          rightTableName: 'campaign_budget',
+          conditions: [
+            { leftColumn: 'tenant_id', rightColumn: 'tenant_id' },
+            { leftColumn: 'campaign_id', rightColumn: 'campaign_id', connector: 'AND', groupStart: true },
+            { leftColumn: 'budget_campaign_id', operator: '<>', rightColumn: 'legacy_campaign_id', connector: 'OR', groupEnd: true },
+          ],
+        },
+        {
+          joinType: 'FULL',
+          leftTableName: 'campaign_budget',
+          rightTableName: 'channel_dim',
+          conditions: [
+            { leftColumn: 'channel_code', rightColumn: 'primary_channel' },
+          ],
+        },
+      ],
+    })).toEqual([
+      { key: 'tables', label: '建模表', status: 'pass', statusLabel: '可建模', detail: '4 表 · 主表 campaign_daily' },
+      { key: 'joinDepth', label: '关联层级', status: 'pass', statusLabel: '可建模', detail: '3 层 · Quick BI 物理模型建议不超过 5 层' },
+      { key: 'joinTypes', label: 'Join 类型', status: 'warn', statusLabel: '需复核', detail: 'LEFT / INNER / FULL · 包含 FULL JOIN，需确认空值扩散' },
+      { key: 'conditions', label: '关联条件', status: 'warn', statusLabel: '需复核', detail: '6 条件 · 2 复合关系 · 1 OR · 1 分组' },
+      { key: 'coverage', label: '关系覆盖', status: 'pass', statusLabel: '可建模', detail: '已覆盖 4/4 表' },
     ])
   })
 
@@ -2690,6 +3362,48 @@ describe('biWorkbench', () => {
     ])
   })
 
+  test('builds visual editor diagnostics for big-screen layouts and spreadsheet cells', () => {
+    expect(buildVisualEditorDiagnosticRows({
+      bigScreen: {
+        screenKey: 'campaign-wall',
+        name: 'Campaign Wall',
+        layout: [
+          { widgetKey: 'hero', title: 'Hero', x: 0, y: 0, w: 10, h: 6 },
+          { widgetKey: 'trend', title: 'Trend', x: 8, y: 4, w: 8, h: 5 },
+          { widgetKey: 'overflow', title: 'Overflow', x: 22, y: 2, w: 4, h: 3 },
+        ],
+        mobileLayout: { columns: 2 },
+      },
+      spreadsheet: {
+        spreadsheetKey: 'campaign-sheet',
+        name: 'Campaign Sheet',
+        sheets: [
+          {
+            sheetKey: 'summary',
+            cells: {
+              A1: '地区',
+              B1: '消耗',
+              B2: '=SUM(B3:B4)',
+              B3: 100,
+              B4: '#REF!',
+            },
+            cellStyles: {
+              B2: { bold: true, backgroundColor: '#FEF3C7' },
+              B3: { textColor: '#0F172A' },
+            },
+            pivotTables: [{ pivotKey: 'pivot-summary-f1' }],
+            conditionalFormats: [{ range: 'B2:B4', operator: '>', value: 80, color: '#16A34A' }],
+          },
+        ],
+      },
+    })).toEqual([
+      { key: 'bigScreenLayout', label: '大屏布局', status: 'block', statusLabel: '需补齐', detail: '3 组件 · 1 重叠 · 1 越界' },
+      { key: 'bigScreenMobile', label: '移动布局', status: 'pass', statusLabel: '可发布', detail: '2 列 · 3 组件已覆盖' },
+      { key: 'spreadsheetCells', label: '电子表格单元格', status: 'warn', statusLabel: '需复核', detail: '5 单元格 · 1 公式 · 1 错误值' },
+      { key: 'spreadsheetStyles', label: '单元格样式', status: 'pass', statusLabel: '可发布', detail: '2 样式 · 1 条件格式 · 1 透视表' },
+    ])
+  })
+
   test('updates big-screen layout items and spreadsheet cells immutably', () => {
     const bigScreen = buildBigScreenDraftResource({
       screenKey: 'campaign-wall',
@@ -2869,6 +3583,87 @@ describe('biWorkbench', () => {
     }))
   })
 
+  test('builds spreadsheet pivot tables with multiple value fields', () => {
+    const spreadsheet = buildSpreadsheetDraftResource({
+      spreadsheetKey: 'campaign-sheet',
+      name: 'Campaign Sheet',
+    })
+    const withRows: ReturnType<typeof buildSpreadsheetDraftResource> = {
+      ...spreadsheet,
+      sheets: [{
+        ...spreadsheet.sheets[0],
+        cells: {
+          A1: '地区',
+          B1: '渠道',
+          C1: '消耗',
+          D1: '转化',
+          A2: '华东',
+          B2: '搜索',
+          C2: 100,
+          D2: 4,
+          A3: '华东',
+          B3: '信息流',
+          C3: 60,
+          D3: 2,
+          A4: '华南',
+          B4: '搜索',
+          C4: 40,
+          D4: 1,
+          A5: '华东',
+          B5: '搜索',
+          C5: 30,
+          D5: 1,
+        },
+      }],
+    }
+
+    const pivoted = buildSpreadsheetPivotTable(withRows, 'summary', {
+      sourceRange: 'A1:D5',
+      targetCell: 'F1',
+      rowField: '地区',
+      columnField: '渠道',
+      valueField: '消耗',
+      aggregation: 'SUM',
+      valueFields: [
+        { field: '消耗', aggregation: 'SUM' },
+        { field: '转化', aggregation: 'COUNT', label: '转化次数' },
+      ],
+    })
+
+    expect((pivoted.sheets[0] as Record<string, unknown>).pivotTables).toEqual([{
+      pivotKey: 'pivot-summary-f1',
+      sourceRange: 'A1:D5',
+      targetCell: 'F1',
+      rowField: '地区',
+      columnField: '渠道',
+      valueField: '消耗',
+      aggregation: 'SUM',
+      valueFields: [
+        { field: '消耗', aggregation: 'SUM', label: '消耗' },
+        { field: '转化', aggregation: 'COUNT', label: '转化次数' },
+      ],
+      rowLabels: ['华东', '华南'],
+      columnLabels: ['搜索', '信息流'],
+    }])
+    expect(pivoted.sheets[0].cells).toEqual(expect.objectContaining({
+      F1: '地区 / 渠道',
+      G1: '搜索 消耗',
+      H1: '搜索 转化次数',
+      I1: '信息流 消耗',
+      J1: '信息流 转化次数',
+      F2: '华东',
+      G2: 130,
+      H2: 2,
+      I2: 60,
+      J2: 1,
+      F3: '华南',
+      G3: 40,
+      H3: 1,
+      I3: 0,
+      J3: 0,
+    }))
+  })
+
   test('updates spreadsheet cell styles immutably', () => {
     const spreadsheet = buildSpreadsheetDraftResource({
       spreadsheetKey: 'campaign-sheet',
@@ -2932,6 +3727,26 @@ describe('biWorkbench', () => {
       B3: 4,
       B4: 2,
       B5: 6,
+    }))
+  })
+
+  test('evaluates spreadsheet arithmetic formulas and multi-argument aggregates', () => {
+    expect(evaluateSpreadsheetCells({
+      A1: 2,
+      A2: 4,
+      B1: '=A1+A2*3',
+      B2: '=(A1+A2)*3',
+      B3: '=SUM(A1:A2, 10, B1)',
+      B4: '=AVERAGE(A1:A2, B1)',
+      B5: '=A2/0',
+      B6: '=A9 + 1',
+    })).toEqual(expect.objectContaining({
+      B1: 14,
+      B2: 18,
+      B3: 30,
+      B4: 20 / 3,
+      B5: '#DIV/0!',
+      B6: 1,
     }))
   })
 
@@ -3096,8 +3911,21 @@ describe('biWorkbench', () => {
       menuSearchEnabled: true,
       fullScreenEnabled: true,
       mobileEnabled: true,
+      logoUrl: ' https://cdn.example.test/logo.svg ',
+      title: ' Executive Portal ',
+      subtitle: ' Daily growth cockpit ',
+      footerText: ' Data Ops 2026 ',
+      alias: ' exec-growth ',
+      breadcrumbEnabled: true,
+      menuCacheEnabled: true,
+      menuCacheTtlSeconds: '900',
     })
-    const reordered = movePortalMenuItem(configured, 'sales', 'up')
+    const menuConfigured = updatePortalMenuConfig(configured, 'sales', {
+      title: ' Sales Performance ',
+      parentMenuKey: 'overview',
+      iconKey: ' line-chart ',
+    })
+    const reordered = movePortalMenuItem(menuConfigured, 'sales', 'up')
 
     expect(portal.theme).toEqual({ theme: 'light' })
     expect(configured.theme).toEqual(expect.objectContaining({
@@ -3107,11 +3935,31 @@ describe('biWorkbench', () => {
       menuSearchEnabled: true,
       fullScreenEnabled: true,
       mobileEnabled: true,
+      logoUrl: 'https://cdn.example.test/logo.svg',
+      title: 'Executive Portal',
+      subtitle: 'Daily growth cockpit',
+      footerText: 'Data Ops 2026',
+      alias: 'exec-growth',
+      breadcrumbEnabled: true,
+      menuCacheEnabled: true,
+      menuCacheTtlSeconds: 900,
     }))
     expect(reordered.menus.map(menu => `${menu.menuKey}:${menu.sortOrder}`)).toEqual([
       'sales:1',
       'overview:2',
       'docs:3',
+    ])
+    expect(reordered.menus[0]).toEqual(expect.objectContaining({
+      menuKey: 'sales',
+      title: 'Sales Performance',
+      parentMenuKey: 'overview',
+      visibility: expect.objectContaining({ iconKey: 'line-chart' }),
+    }))
+    const treeReordered = reorderPortalMenuTree(reordered, 'docs', 'overview', 'before')
+    expect(treeReordered.menus.map(menu => `${menu.menuKey}:${menu.sortOrder}:${menu.parentMenuKey ?? '-'}`)).toEqual([
+      'sales:1:overview',
+      'docs:2:-',
+      'overview:3:-',
     ])
   })
 
@@ -3255,5 +4103,198 @@ describe('biWorkbench', () => {
     expect(rows).toContainEqual({ label: '存储', value: 'S3 · exports/tenant-7/export-76.pdf' })
     expect(rows).toContainEqual({ label: '下载', value: '3 次 · 2026-06-05 10:15' })
     expect(rows).toContainEqual({ label: '重试', value: '1/3' })
+  })
+
+  test('builds self-service export audit partition rows for object-per-part jobs', () => {
+    const rows = exportAuditDetailRows({
+      job: {
+        id: 91,
+        resourceKey: 'canvas_daily_stats',
+        exportFormat: 'CSV',
+        status: 'COMPLETED',
+        storageProvider: 'S3',
+        storageKey: 'exports/tenant-7/export-91.zip',
+      },
+      request: {
+        exportFormat: 'CSV',
+        rowLimit: 1000000,
+        query: {
+          datasetKey: 'canvas_daily_stats',
+          dimensions: ['stat_date'],
+          metrics: ['total_executions'],
+          filters: [],
+          sorts: [],
+          limit: 1000000,
+        },
+      },
+      partition: {
+        storageLayout: 'OBJECT_PER_PART_ZIP',
+        requestedRows: 1000000,
+        generatedRows: 15000,
+        partCount: 2,
+        partSize: 10000,
+        partStorageKeys: [
+          'exports/tenant-7/export-91/parts/part-00001.csv',
+          'exports/tenant-7/export-91/parts/part-00002.csv',
+        ],
+      },
+    })
+
+    expect(rows).toContainEqual({
+      label: '分片',
+      value: 'OBJECT_PER_PART_ZIP · 2 片 · 15,000/1,000,000 行 · 每片 10,000',
+    })
+    expect(rows).toContainEqual({
+      label: '分片对象',
+      value: 'part-00001.csv / part-00002.csv',
+    })
+  })
+
+  test('builds self-service export hardening diagnostics from task list', () => {
+    expect(exportHardeningDiagnosticRows([
+      {
+        id: 91,
+        exportFormat: 'CSV',
+        status: 'COMPLETED',
+        rowLimit: 1000000,
+        storageProvider: 'S3',
+        storageKey: 'exports/tenant-7/export-91.zip',
+        retentionDays: 7,
+        expiresAt: '2099-06-12T00:00:00',
+        downloadCount: 3,
+        retryCount: 0,
+        maxRetryCount: 3,
+        storageLayout: 'OBJECT_PER_PART_ZIP',
+        requestedRows: 1000000,
+        generatedRows: 1000000,
+        partCount: 100,
+        partSize: 10000,
+        partStorageKeys: ['exports/tenant-7/export-91/parts/part-00001.csv'],
+      },
+      {
+        id: 92,
+        exportFormat: 'XLSX',
+        status: 'PENDING_APPROVAL',
+        rowLimit: 50000,
+        approvalStatus: 'PENDING',
+        approvalReason: 'sensitive customer list',
+        requestedBy: 'alice',
+        retryCount: 1,
+        maxRetryCount: 3,
+      },
+      {
+        id: 93,
+        exportFormat: 'CSV',
+        status: 'EXPIRED',
+        rowLimit: 1000,
+        retentionDays: 7,
+        downloadCount: 1,
+        retryCount: 3,
+        maxRetryCount: 3,
+        retryExhaustedAt: '2026-06-08T10:00:00',
+      },
+    ])).toEqual([
+      {
+        key: 'exportControl',
+        label: '导出控制',
+        status: 'warn',
+        statusLabel: '需复核',
+        detail: '3 任务 · 1 审批中 · 1 已过期',
+      },
+      {
+        key: 'partitionStorage',
+        label: '分片存储',
+        status: 'pass',
+        statusLabel: '可发布',
+        detail: '1 分片任务 · 100 分片 · 1,000,000/1,000,000 行',
+      },
+      {
+        key: 'retentionDownload',
+        label: '留存下载',
+        status: 'warn',
+        statusLabel: '需复核',
+        detail: '7 天留存 · 4 下载 · 1 过期清理',
+      },
+      {
+        key: 'retryRecovery',
+        label: '重试恢复',
+        status: 'block',
+        statusLabel: '需补齐',
+        detail: '2 重试中 · 1 已耗尽',
+      },
+    ])
+  })
+
+  test('builds holiday-aware period-over-period anomaly diagnostics', () => {
+    expect(alertAnomalyDiagnosticRows([
+      {
+        alertKey: 'gmv-yoy-holiday',
+        name: 'GMV 春节同比异常',
+        enabled: true,
+        condition: {
+          operator: 'ANOMALY_DROP',
+          model: 'PERIOD_OVER_PERIOD',
+          period: 'YEAR_OVER_YEAR',
+          naturalBoundary: true,
+          holidayComparisonDate: '2025-02-10',
+          holidayName: 'spring-festival',
+          minSamples: 3,
+          calendarWindowHours: 6,
+          silenceWindow: { minutes: 60 },
+        },
+      },
+      {
+        alertKey: 'revenue-mom',
+        name: '收入月环比异常',
+        enabled: true,
+        condition: {
+          operator: 'ANOMALY_RISE',
+          model: 'PERIOD_OVER_PERIOD',
+          period: 'MONTH_OVER_MONTH',
+          naturalBoundary: true,
+          minSamples: 4,
+          calendarWindowHours: 12,
+        },
+      },
+      {
+        alertKey: 'success-rate-point',
+        name: '成功率点异常',
+        enabled: false,
+        condition: {
+          operator: 'ANOMALY_DROP',
+          model: 'POINT',
+          minSamples: 2,
+        },
+      },
+    ])).toEqual([
+      {
+        key: 'anomalyCoverage',
+        label: '异常覆盖',
+        status: 'pass',
+        statusLabel: '可发布',
+        detail: '3 异常 · 2 同环比 · 1 停用',
+      },
+      {
+        key: 'periodBoundary',
+        label: '周期边界',
+        status: 'pass',
+        statusLabel: '可发布',
+        detail: 'YEAR_OVER_YEAR / MONTH_OVER_MONTH · 2 自然边界 · 6h/12h 窗口',
+      },
+      {
+        key: 'holidayComparison',
+        label: '节假日映射',
+        status: 'pass',
+        statusLabel: '可发布',
+        detail: '1 节假日 · spring-festival -> 2025-02-10',
+      },
+      {
+        key: 'sampleSilence',
+        label: '样本静默',
+        status: 'warn',
+        statusLabel: '需复核',
+        detail: '最小样本 2/3/4 · 1 静默 · 1 停用',
+      },
+    ])
   })
 })

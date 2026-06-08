@@ -47,6 +47,9 @@ import java.util.Map;
 import java.util.regex.Pattern;
 
 @Service
+/**
+ * BiDatasourceRuntimeService 承载对应领域的业务规则、流程编排和结果转换。
+ */
 public class BiDatasourceRuntimeService {
 
     private static final Pattern SECRET_URL_PARAMETER = Pattern.compile("(?i)(password|pwd|token|authorization|api[-_]?key|access[-_]?key(?:[-_]?id|[-_]?secret)?|secret)=([^&;\\s]+)");
@@ -67,6 +70,13 @@ public class BiDatasourceRuntimeService {
     private final JdbcConnectionFactory connectionFactory;
     private final ApiHttpClient apiHttpClient;
 
+    /**
+     * 初始化 BiDatasourceRuntimeService 实例。
+     *
+     * @param dataSourceConfigMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param secretCipher secret cipher 参数，用于 BiDatasourceRuntimeService 流程中的校验、计算或对象转换。
+     * @param credentialCipher credential cipher 参数，用于 BiDatasourceRuntimeService 流程中的校验、计算或对象转换。
+     */
     public BiDatasourceRuntimeService(DataSourceConfigMapper dataSourceConfigMapper,
                                       SecretCipher secretCipher,
                                       DataSourceCredentialCipher credentialCipher) {
@@ -75,6 +85,15 @@ public class BiDatasourceRuntimeService {
     }
 
     @Autowired
+    /**
+     * 初始化 BiDatasourceRuntimeService 实例。
+     *
+     * @param dataSourceConfigMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param schemaSnapshotMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param secretCipher secret cipher 参数，用于 BiDatasourceRuntimeService 流程中的校验、计算或对象转换。
+     * @param credentialCipher credential cipher 参数，用于 BiDatasourceRuntimeService 流程中的校验、计算或对象转换。
+     * @param objectMapper 依赖组件，用于完成数据访问或外部能力调用。
+     */
     public BiDatasourceRuntimeService(DataSourceConfigMapper dataSourceConfigMapper,
                                       BiDatasourceSchemaSnapshotMapper schemaSnapshotMapper,
                                       SecretCipher secretCipher,
@@ -84,6 +103,14 @@ public class BiDatasourceRuntimeService {
                 BiDatasourceRuntimeService::openJdbcConnection, defaultApiHttpClient());
     }
 
+    /**
+     * 初始化 BiDatasourceRuntimeService 实例。
+     *
+     * @param dataSourceConfigMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param secretCipher secret cipher 参数，用于 BiDatasourceRuntimeService 流程中的校验、计算或对象转换。
+     * @param credentialCipher credential cipher 参数，用于 BiDatasourceRuntimeService 流程中的校验、计算或对象转换。
+     * @param connectionFactory 依赖组件，用于完成数据访问、计算或外部能力调用。
+     */
     BiDatasourceRuntimeService(DataSourceConfigMapper dataSourceConfigMapper,
                                SecretCipher secretCipher,
                                DataSourceCredentialCipher credentialCipher,
@@ -92,6 +119,14 @@ public class BiDatasourceRuntimeService {
                 defaultApiHttpClient());
     }
 
+    /**
+     * 初始化 BiDatasourceRuntimeService 实例。
+     *
+     * @param dataSourceConfigMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param secretCipher secret cipher 参数，用于 BiDatasourceRuntimeService 流程中的校验、计算或对象转换。
+     * @param credentialCipher credential cipher 参数，用于 BiDatasourceRuntimeService 流程中的校验、计算或对象转换。
+     * @param apiHttpClient 依赖组件，用于完成数据访问或外部能力调用。
+     */
     BiDatasourceRuntimeService(DataSourceConfigMapper dataSourceConfigMapper,
                                SecretCipher secretCipher,
                                DataSourceCredentialCipher credentialCipher,
@@ -100,6 +135,16 @@ public class BiDatasourceRuntimeService {
                 BiDatasourceRuntimeService::openJdbcConnection, apiHttpClient);
     }
 
+    /**
+     * 初始化 BiDatasourceRuntimeService 实例。
+     *
+     * @param dataSourceConfigMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param schemaSnapshotMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param secretCipher secret cipher 参数，用于 BiDatasourceRuntimeService 流程中的校验、计算或对象转换。
+     * @param credentialCipher credential cipher 参数，用于 BiDatasourceRuntimeService 流程中的校验、计算或对象转换。
+     * @param objectMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param connectionFactory 依赖组件，用于完成数据访问、计算或外部能力调用。
+     */
     BiDatasourceRuntimeService(DataSourceConfigMapper dataSourceConfigMapper,
                                BiDatasourceSchemaSnapshotMapper schemaSnapshotMapper,
                                SecretCipher secretCipher,
@@ -110,6 +155,17 @@ public class BiDatasourceRuntimeService {
                 connectionFactory, defaultApiHttpClient());
     }
 
+    /**
+     * 初始化 BiDatasourceRuntimeService 实例。
+     *
+     * @param dataSourceConfigMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param schemaSnapshotMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param secretCipher secret cipher 参数，用于 BiDatasourceRuntimeService 流程中的校验、计算或对象转换。
+     * @param credentialCipher credential cipher 参数，用于 BiDatasourceRuntimeService 流程中的校验、计算或对象转换。
+     * @param objectMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param connectionFactory 依赖组件，用于完成数据访问、计算或外部能力调用。
+     * @param apiHttpClient 依赖组件，用于完成数据访问或外部能力调用。
+     */
     BiDatasourceRuntimeService(DataSourceConfigMapper dataSourceConfigMapper,
                                BiDatasourceSchemaSnapshotMapper schemaSnapshotMapper,
                                SecretCipher secretCipher,
@@ -126,13 +182,22 @@ public class BiDatasourceRuntimeService {
         this.apiHttpClient = apiHttpClient == null ? defaultApiHttpClient() : apiHttpClient;
     }
 
+    /**
+     * 根据方法职责完成对应的业务处理流程。
+     *
+     * @param sourceId 业务对象 ID，用于定位具体记录。
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @return 返回 testConnection 流程生成的业务结果。
+     */
     public BiDatasourceConnectionTestResult testConnection(Long sourceId, Long tenantId) {
         DataSourceConfigDO source = requireSource(sourceId, tenantId);
         long start = System.nanoTime();
         LocalDateTime checkedAt = LocalDateTime.now();
+        // 校验关键输入和前置条件，避免无效状态继续进入主流程。
         if (isApiSource(source)) {
             String password = decryptPassword(source.getPassword());
             try {
+                // 访问持久化或外部依赖，获取或写入本次流程需要的数据。
                 ApiHttpResponse response = apiHttpClient.execute(apiRequest(source, password, Map.of()));
                 boolean success = response.statusCode() >= 200 && response.statusCode() < 300;
                 return new BiDatasourceConnectionTestResult(
@@ -198,6 +263,7 @@ public class BiDatasourceRuntimeService {
                     checkedAt,
                     durationMs(start));
         } catch (Exception e) {
+            // 汇总前面计算出的状态和明细，返回给调用方。
             return new BiDatasourceConnectionTestResult(
                     source.getId(),
                     sourceKey(source),
@@ -211,6 +277,14 @@ public class BiDatasourceRuntimeService {
         }
     }
 
+    /**
+     * 根据方法职责完成对应的业务处理流程。
+     *
+     * @param sourceId 业务对象 ID，用于定位具体记录。
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @param limit 分页或数量限制，避免一次处理过多数据。
+     * @return 返回 previewSchema 流程生成的业务结果。
+     */
     public BiDatasourceSchemaPreview previewSchema(Long sourceId, Long tenantId, int limit) {
         DataSourceConfigDO source = requireSource(sourceId, tenantId);
         String password = decryptPassword(source.getPassword());
@@ -221,8 +295,17 @@ public class BiDatasourceRuntimeService {
         }
     }
 
+    /**
+     * 根据方法职责完成对应的业务处理流程。
+     *
+     * @param sourceId 业务对象 ID，用于定位具体记录。
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @param request 请求对象，承载本次操作的输入参数。
+     * @return 返回 previewApiData 流程生成的业务结果。
+     */
     public BiDatasourceApiPreview previewApiData(Long sourceId, Long tenantId, BiDatasourceApiPreviewRequest request) {
         DataSourceConfigDO source = requireSource(sourceId, tenantId);
+        // 校验关键输入和前置条件，避免无效状态继续进入主流程。
         if (!isApiSource(source)) {
             throw new IllegalArgumentException("BI datasource is not an API connector: " + connectorType(source));
         }
@@ -231,6 +314,7 @@ public class BiDatasourceRuntimeService {
         String password = decryptPassword(source.getPassword());
         try {
             Map<String, Object> config = connectorConfig(source);
+            // 访问持久化或外部依赖，获取或写入本次流程需要的数据。
             ApiHttpResponse response = apiHttpClient.execute(apiRequest(source, password, requestVariables(request)));
             if (response.statusCode() < 200 || response.statusCode() >= 300) {
                 throw new IllegalStateException("HTTP " + response.statusCode() + " " + blankToDefault(response.statusText(), ""));
@@ -244,6 +328,7 @@ public class BiDatasourceRuntimeService {
             int rowLimit = Math.min(apiRowLimit(request == null ? null : request.limit()), API_ROW_LIMIT);
             List<JsonNode> apiRows = rows(rowsNode, rowLimit + 1);
             boolean rowTruncated = apiRows.size() > rowLimit;
+            // 遍历候选数据并按业务规则筛选、转换或聚合。
             List<Map<String, Object>> previewRows = apiRows.stream()
                     .limit(rowLimit)
                     .map(this::apiRow)
@@ -272,8 +357,17 @@ public class BiDatasourceRuntimeService {
         }
     }
 
+    /**
+     * 根据方法职责完成对应的业务处理流程。
+     *
+     * @param sourceId 业务对象 ID，用于定位具体记录。
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @param limit 分页或数量限制，避免一次处理过多数据。
+     * @return 返回 previewFileData 流程生成的业务结果。
+     */
     public BiDatasourceApiPreview previewFileData(Long sourceId, Long tenantId, int limit) {
         DataSourceConfigDO source = requireSource(sourceId, tenantId);
+        // 校验关键输入和前置条件，避免无效状态继续进入主流程。
         if (!isFileSource(source)) {
             throw new IllegalArgumentException("BI datasource is not a file connector: " + connectorType(source));
         }
@@ -281,10 +375,12 @@ public class BiDatasourceRuntimeService {
         LocalDateTime checkedAt = LocalDateTime.now();
         try {
             FilePreviewRows fileRows = readFileRows(source, limit);
+            // 遍历候选数据并按业务规则筛选、转换或聚合。
             List<Map<String, Object>> previewRows = fileRows.rows().stream()
                     .map(this::apiRow)
                     .map(row -> limitApiColumns(row, API_COLUMN_LIMIT))
                     .toList();
+            // 汇总前面计算出的状态和明细，返回给调用方。
             return new BiDatasourceApiPreview(
                     source.getId(),
                     sourceKey(source),
@@ -303,15 +399,35 @@ public class BiDatasourceRuntimeService {
         }
     }
 
+    /**
+     * 执行核心业务流程，并协调依赖组件完成处理。
+     *
+     * @param sourceId 业务对象 ID，用于定位具体记录。
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @param username 操作人标识，用于审计和权限判断。
+     * @param limit 分页或数量限制，避免一次处理过多数据。
+     * @return 返回流程执行后的业务结果。
+     */
     public BiDatasourceSchemaSnapshotView syncSchema(Long sourceId, Long tenantId, String username, int limit) {
         return syncSchema(sourceId, tenantId, username, limit, null);
     }
 
+    /**
+     * 执行核心业务流程，并协调依赖组件完成处理。
+     *
+     * @param sourceId 业务对象 ID，用于定位具体记录。
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @param username 操作人标识，用于审计和权限判断。
+     * @param limit 分页或数量限制，避免一次处理过多数据。
+     * @param request 请求对象，承载本次操作的输入参数。
+     * @return 返回流程执行后的业务结果。
+     */
     public BiDatasourceSchemaSnapshotView syncSchema(Long sourceId,
                                                      Long tenantId,
                                                      String username,
                                                      int limit,
                                                      BiDatasourceApiPreviewRequest request) {
+        // 准备本次处理所需的上下文和中间变量。
         DataSourceConfigDO source = requireSource(sourceId, tenantId);
         Long scopedTenantId = tenantId == null ? 0L : tenantId;
         String password = decryptPassword(source.getPassword());
@@ -327,6 +443,7 @@ public class BiDatasourceRuntimeService {
                     tables,
                     username,
                     syncedAt);
+            // 访问持久化或外部依赖，获取或写入本次流程需要的数据。
             requireSchemaSnapshotMapper().insert(row);
             return toSnapshotView(row, source, tables);
         } catch (Exception e) {
@@ -339,15 +456,31 @@ public class BiDatasourceRuntimeService {
                     username,
                     syncedAt);
             requireSchemaSnapshotMapper().insert(row);
+            // 汇总前面计算出的状态和明细，返回给调用方。
             return toSnapshotView(row, source, List.of());
         }
     }
 
+    /**
+     * 查询并组装符合条件的业务数据。
+     *
+     * @param sourceId 业务对象 ID，用于定位具体记录。
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @return 返回 latestSchemaSnapshot 流程生成的业务结果。
+     */
     public BiDatasourceSchemaSnapshotView latestSchemaSnapshot(Long sourceId, Long tenantId) {
         List<BiDatasourceSchemaSnapshotView> history = schemaSnapshotHistory(sourceId, tenantId, 1);
         return history.isEmpty() ? null : history.get(0);
     }
 
+    /**
+     * 根据方法职责完成对应的业务处理流程。
+     *
+     * @param sourceId 业务对象 ID，用于定位具体记录。
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @param limit 分页或数量限制，避免一次处理过多数据。
+     * @return 返回 schema snapshot history 汇总后的集合、分页或映射视图。
+     */
     public List<BiDatasourceSchemaSnapshotView> schemaSnapshotHistory(Long sourceId, Long tenantId, int limit) {
         DataSourceConfigDO source = requireSource(sourceId, tenantId);
         Long scopedTenantId = tenantId == null ? 0L : tenantId;
@@ -362,10 +495,20 @@ public class BiDatasourceRuntimeService {
                 .toList();
     }
 
+    /**
+     * 根据输入和依赖数据计算业务判断结果。
+     *
+     * @param source source 参数，用于 readSchema 流程中的校验、计算或对象转换。
+     * @param password password 参数，用于 readSchema 流程中的校验、计算或对象转换。
+     * @param limit 分页或数量限制，避免一次处理过多数据。
+     * @param variables variables 参数，用于 readSchema 流程中的校验、计算或对象转换。
+     * @return 返回 readSchema 流程生成的业务结果。
+     */
     private BiDatasourceSchemaPreview readSchema(DataSourceConfigDO source,
                                                  String password,
                                                  int limit,
                                                  Map<String, String> variables) throws Exception {
+        // 校验关键输入和前置条件，避免无效状态继续进入主流程。
         if (isApiSource(source)) {
             return readApiSchema(source, password, limit, variables);
         }
@@ -377,6 +520,7 @@ public class BiDatasourceRuntimeService {
             String catalog = connection.getCatalog();
             List<BiDatasourceTablePreview> tables = new ArrayList<>();
             try (ResultSet tableRows = metaData.getTables(catalog, null, "%", new String[]{"TABLE", "VIEW"})) {
+                // 遍历候选数据并按业务规则筛选、转换或聚合。
                 while (tableRows.next() && tables.size() < boundedLimit(limit)) {
                     String tableName = tableRows.getString("TABLE_NAME");
                     tables.add(new BiDatasourceTablePreview(
@@ -385,6 +529,7 @@ public class BiDatasourceRuntimeService {
                             columns(metaData, catalog, tableName)));
                 }
             }
+            // 汇总前面计算出的状态和明细，返回给调用方。
             return new BiDatasourceSchemaPreview(
                     source.getId(),
                     sourceKey(source),
@@ -395,6 +540,13 @@ public class BiDatasourceRuntimeService {
         }
     }
 
+    /**
+     * 根据输入和依赖数据计算业务判断结果。
+     *
+     * @param source source 参数，用于 readFileSchema 流程中的校验、计算或对象转换。
+     * @param limit 分页或数量限制，避免一次处理过多数据。
+     * @return 返回 readFileSchema 流程生成的业务结果。
+     */
     private BiDatasourceSchemaPreview readFileSchema(DataSourceConfigDO source, int limit) throws Exception {
         FilePreviewRows previewRows = readFileRows(source, limit);
         List<BiDatasourceColumnPreview> columns = previewRows.rows().isEmpty()
@@ -409,6 +561,13 @@ public class BiDatasourceRuntimeService {
                 LocalDateTime.now());
     }
 
+    /**
+     * 根据输入和依赖数据计算业务判断结果。
+     *
+     * @param source source 参数，用于 readFileRows 流程中的校验、计算或对象转换。
+     * @param limit 分页或数量限制，避免一次处理过多数据。
+     * @return 返回 readFileRows 流程生成的业务结果。
+     */
     private FilePreviewRows readFileRows(DataSourceConfigDO source, int limit) throws Exception {
         Map<String, Object> config = connectorConfig(source);
         String fileType = stringConfig(config, "fileType", "CSV").toUpperCase(Locale.ROOT);
@@ -422,6 +581,16 @@ public class BiDatasourceRuntimeService {
         throw new IllegalArgumentException("BI file datasource preview supports CSV, XLSX, and XLS only: " + fileType);
     }
 
+    /**
+     * 根据输入和依赖数据计算业务判断结果。
+     *
+     * @param source source 参数，用于 readDelimitedFileRows 流程中的校验、计算或对象转换。
+     * @param path path 参数，用于 readDelimitedFileRows 流程中的校验、计算或对象转换。
+     * @param config 配置对象，用于控制运行参数和策略开关。
+     * @param fileType 类型标识，用于选择对应处理分支。
+     * @param limit 分页或数量限制，避免一次处理过多数据。
+     * @return 返回 readDelimitedFileRows 流程生成的业务结果。
+     */
     private FilePreviewRows readDelimitedFileRows(DataSourceConfigDO source,
                                                   Path path,
                                                   Map<String, Object> config,
@@ -435,6 +604,7 @@ public class BiDatasourceRuntimeService {
         int rowLimit = boundedLimit(limit);
         try (BufferedReader reader = Files.newBufferedReader(path, charset)) {
             String firstLine = reader.readLine();
+            // 校验关键输入和前置条件，避免无效状态继续进入主流程。
             if (firstLine == null) {
                 headers = List.of("value");
             } else if (headerRow) {
@@ -445,6 +615,7 @@ public class BiDatasourceRuntimeService {
                 rows.add(csvRow(headers, firstValues));
             }
             String line;
+            // 遍历候选数据并按业务规则筛选、转换或聚合。
             while ((line = reader.readLine()) != null && rows.size() <= rowLimit) {
                 if (line.isBlank()) {
                     continue;
@@ -453,6 +624,7 @@ public class BiDatasourceRuntimeService {
             }
         }
         boolean truncated = rows.size() > rowLimit;
+        // 汇总前面计算出的状态和明细，返回给调用方。
         return new FilePreviewRows(
                 fileTableName(source, path),
                 fileType,
@@ -461,6 +633,16 @@ public class BiDatasourceRuntimeService {
                 truncated);
     }
 
+    /**
+     * 根据输入和依赖数据计算业务判断结果。
+     *
+     * @param source source 参数，用于 readWorkbookFileRows 流程中的校验、计算或对象转换。
+     * @param path path 参数，用于 readWorkbookFileRows 流程中的校验、计算或对象转换。
+     * @param config 配置对象，用于控制运行参数和策略开关。
+     * @param fileType 类型标识，用于选择对应处理分支。
+     * @param limit 分页或数量限制，避免一次处理过多数据。
+     * @return 返回 readWorkbookFileRows 流程生成的业务结果。
+     */
     private FilePreviewRows readWorkbookFileRows(DataSourceConfigDO source,
                                                  Path path,
                                                  Map<String, Object> config,
@@ -474,6 +656,7 @@ public class BiDatasourceRuntimeService {
         try (Workbook workbook = WorkbookFactory.create(path.toFile())) {
             Sheet sheet = workbookSheet(workbook, config);
             Row firstRow = firstWorkbookRow(sheet);
+            // 校验关键输入和前置条件，避免无效状态继续进入主流程。
             if (firstRow == null) {
                 headers = List.of("value");
             } else if (headerRow) {
@@ -484,6 +667,7 @@ public class BiDatasourceRuntimeService {
                 rows.add(csvRow(headers, firstValues));
             }
             int startRow = firstRow == null ? sheet.getFirstRowNum() : firstRow.getRowNum() + 1;
+            // 遍历候选数据并按业务规则筛选、转换或聚合。
             for (int rowIndex = startRow; rowIndex <= sheet.getLastRowNum() && rows.size() <= rowLimit; rowIndex++) {
                 Row row = sheet.getRow(rowIndex);
                 List<String> values = workbookRowValues(row, formatter);
@@ -494,6 +678,7 @@ public class BiDatasourceRuntimeService {
             }
         }
         boolean truncated = rows.size() > rowLimit;
+        // 汇总前面计算出的状态和明细，返回给调用方。
         return new FilePreviewRows(
                 fileTableName(source, path),
                 fileType,
@@ -502,17 +687,29 @@ public class BiDatasourceRuntimeService {
                 truncated);
     }
 
+    /**
+     * 根据输入和依赖数据计算业务判断结果。
+     *
+     * @param source source 参数，用于 readApiSchema 流程中的校验、计算或对象转换。
+     * @param password password 参数，用于 readApiSchema 流程中的校验、计算或对象转换。
+     * @param limit 分页或数量限制，避免一次处理过多数据。
+     * @param variables variables 参数，用于 readApiSchema 流程中的校验、计算或对象转换。
+     * @return 返回 readApiSchema 流程生成的业务结果。
+     */
     private BiDatasourceSchemaPreview readApiSchema(DataSourceConfigDO source,
                                                     String password,
                                                     int limit,
                                                     Map<String, String> variables) throws Exception {
+        // 访问持久化或外部依赖，获取或写入本次流程需要的数据。
         ApiHttpResponse response = apiHttpClient.execute(apiRequest(source, password, variables == null ? Map.of() : variables));
+        // 校验关键输入和前置条件，避免无效状态继续进入主流程。
         if (response.statusCode() < 200 || response.statusCode() >= 300) {
             throw new IllegalStateException("HTTP " + response.statusCode() + " " + blankToDefault(response.statusText(), ""));
         }
         JsonNode root = objectMapper.readTree(blankToDefault(response.body(), "{}"));
         JsonNode rowsNode = selectJsonPath(root, stringConfig(connectorConfig(source), "responseRowsPath", "$"));
         List<JsonNode> rows = rows(rowsNode, boundedLimit(limit));
+        // 汇总前面计算出的状态和明细，返回给调用方。
         return new BiDatasourceSchemaPreview(
                 source.getId(),
                 sourceKey(source),
@@ -522,14 +719,25 @@ public class BiDatasourceRuntimeService {
                 LocalDateTime.now());
     }
 
+    /**
+     * 根据方法职责完成对应的业务处理流程。
+     *
+     * @param source source 参数，用于 apiRequest 流程中的校验、计算或对象转换。
+     * @param password password 参数，用于 apiRequest 流程中的校验、计算或对象转换。
+     * @param MapString map string 参数，用于 apiRequest 流程中的校验、计算或对象转换。
+     * @param variables variables 参数，用于 apiRequest 流程中的校验、计算或对象转换。
+     * @return 返回 apiRequest 流程生成的业务结果。
+     */
     private ApiHttpRequest apiRequest(DataSourceConfigDO source, String password, Map<String, String> variables) {
         Map<String, Object> config = connectorConfig(source);
         String method = stringConfig(config, "requestMethod", "GET").toUpperCase(Locale.ROOT);
         String url = appendQueryParameters(source.getUrl(), listConfig(config.get("parameters")), variables);
         Map<String, String> headers = new LinkedHashMap<>();
+        // 遍历候选数据并按业务规则筛选、转换或聚合。
         for (Map<String, Object> header : listConfig(config.get("headers"))) {
             String name = stringValue(header.get("name"));
             String value = renderTemplate(stringValue(header.get("value")), variables);
+            // 校验关键输入和前置条件，避免无效状态继续进入主流程。
             if (!name.isBlank() && !value.isBlank() && !"***".equals(value)) {
                 headers.put(name, value);
             }
@@ -549,9 +757,16 @@ public class BiDatasourceRuntimeService {
         if (!body.isBlank()) {
             headers.putIfAbsent("Content-Type", "application/json");
         }
+        // 汇总前面计算出的状态和明细，返回给调用方。
         return new ApiHttpRequest(method, url, headers, body.isBlank() ? null : body);
     }
 
+    /**
+     * 根据方法职责完成对应的业务处理流程。
+     *
+     * @param source source 参数，用于 connectorConfig 流程中的校验、计算或对象转换。
+     * @return 返回 connectorConfig 流程生成的业务结果。
+     */
     private Map<String, Object> connectorConfig(DataSourceConfigDO source) {
         String json = source.getConnectorConfigJson();
         if (json == null || json.isBlank()) {
@@ -564,12 +779,24 @@ public class BiDatasourceRuntimeService {
         }
     }
 
+    /**
+     * 根据方法职责完成对应的业务处理流程。
+     *
+     * @param url url 参数，用于 appendQueryParameters 流程中的校验、计算或对象转换。
+     * @param ListMapString list map string 参数，用于 appendQueryParameters 流程中的校验、计算或对象转换。
+     * @param parameters parameters 参数，用于 appendQueryParameters 流程中的校验、计算或对象转换。
+     * @param MapString map string 参数，用于 appendQueryParameters 流程中的校验、计算或对象转换。
+     * @param variables variables 参数，用于 appendQueryParameters 流程中的校验、计算或对象转换。
+     * @return 返回 append query parameters 生成的文本或业务键。
+     */
     private String appendQueryParameters(String url, List<Map<String, Object>> parameters, Map<String, String> variables) {
+        // 校验关键输入和前置条件，避免无效状态继续进入主流程。
         if (parameters.isEmpty()) {
             return url;
         }
         StringBuilder builder = new StringBuilder(url == null ? "" : url);
         boolean hasQuery = builder.indexOf("?") >= 0;
+        // 遍历候选数据并按业务规则筛选、转换或聚合。
         for (Map<String, Object> parameter : parameters) {
             String name = stringValue(parameter.get("name"));
             String value = renderTemplate(stringValue(parameter.get("value")), variables);
@@ -580,14 +807,23 @@ public class BiDatasourceRuntimeService {
             hasQuery = true;
             builder.append(urlEncode(name)).append("=").append(urlEncode(value));
         }
+        // 汇总前面计算出的状态和明细，返回给调用方。
         return builder.toString();
     }
 
+    /**
+     * 查询并组装符合条件的业务数据。
+     *
+     * @param value 待处理值，用于规则计算或转换。
+     * @return 返回符合条件的数据列表或视图。
+     */
     private List<Map<String, Object>> listConfig(Object value) {
+        // 校验关键输入和前置条件，避免无效状态继续进入主流程。
         if (!(value instanceof List<?> rawList)) {
             return List.of();
         }
         List<Map<String, Object>> result = new ArrayList<>();
+        // 遍历候选数据并按业务规则筛选、转换或聚合。
         for (Object item : rawList) {
             if (item instanceof Map<?, ?> rawMap) {
                 Map<String, Object> normalized = new LinkedHashMap<>();
@@ -597,10 +833,19 @@ public class BiDatasourceRuntimeService {
                 result.add(normalized);
             }
         }
+        // 汇总前面计算出的状态和明细，返回给调用方。
         return result;
     }
 
+    /**
+     * 查询并组装符合条件的业务数据。
+     *
+     * @param root root 参数，用于 selectJsonPath 流程中的校验、计算或对象转换。
+     * @param path path 参数，用于 selectJsonPath 流程中的校验、计算或对象转换。
+     * @return 返回符合条件的数据列表或视图。
+     */
     private JsonNode selectJsonPath(JsonNode root, String path) {
+        // 校验关键输入和前置条件，避免无效状态继续进入主流程。
         if (root == null || path == null || path.isBlank() || "$".equals(path.trim())) {
             return root;
         }
@@ -611,17 +856,27 @@ public class BiDatasourceRuntimeService {
         } else if (normalized.startsWith("$")) {
             normalized = normalized.substring(1);
         }
+        // 遍历候选数据并按业务规则筛选、转换或聚合。
         for (String segment : normalized.split("\\.")) {
             if (segment.isBlank()) {
                 continue;
             }
             current = current == null ? null : current.path(segment);
         }
+        // 访问持久化或外部依赖，获取或写入本次流程需要的数据。
         return current == null ? objectMapper.nullNode() : current;
     }
 
+    /**
+     * 根据方法职责完成对应的业务处理流程。
+     *
+     * @param source source 参数，用于 filePath 流程中的校验、计算或对象转换。
+     * @return 返回 filePath 流程生成的业务结果。
+     */
     private Path filePath(DataSourceConfigDO source) {
+        // 准备本次处理所需的上下文和中间变量。
         String url = blankToDefault(source.getUrl(), "");
+        // 校验关键输入和前置条件，避免无效状态继续进入主流程。
         if (url.isBlank()) {
             throw new IllegalArgumentException("BI file datasource URL is required");
         }
@@ -632,9 +887,17 @@ public class BiDatasourceRuntimeService {
         if (!"file".equalsIgnoreCase(uri.getScheme())) {
             throw new IllegalArgumentException("BI file datasource only supports file:// URLs");
         }
+        // 汇总前面计算出的状态和明细，返回给调用方。
         return Path.of(uri);
     }
 
+    /**
+     * 根据方法职责完成对应的业务处理流程。
+     *
+     * @param MapString map string 参数，用于 delimiter 流程中的校验、计算或对象转换。
+     * @param config 配置对象，用于控制运行参数和策略开关。
+     * @return 返回 delimiter 生成的文本或业务键。
+     */
     private String delimiter(Map<String, Object> config) {
         String delimiter = stringConfig(config, "delimiter", ",");
         if ("\\t".equals(delimiter) || "TAB".equalsIgnoreCase(delimiter)) {
@@ -643,13 +906,22 @@ public class BiDatasourceRuntimeService {
         return delimiter.isBlank() ? "," : delimiter.substring(0, 1);
     }
 
+    /**
+     * 解析、归一化或保护输入值，生成安全可用的中间结果。
+     *
+     * @param line line 参数，用于 parseDelimitedLine 流程中的校验、计算或对象转换。
+     * @param delimiter delimiter 参数，用于 parseDelimitedLine 流程中的校验、计算或对象转换。
+     * @return 返回解析、归一化或安全处理后的值。
+     */
     private List<String> parseDelimitedLine(String line, String delimiter) {
         List<String> values = new ArrayList<>();
         char separator = delimiter == null || delimiter.isEmpty() ? ',' : delimiter.charAt(0);
         StringBuilder current = new StringBuilder();
         boolean quoted = false;
+        // 遍历候选数据并按业务规则筛选、转换或聚合。
         for (int index = 0; index < (line == null ? 0 : line.length()); index++) {
             char value = line.charAt(index);
+            // 校验关键输入和前置条件，避免无效状态继续进入主流程。
             if (value == '"') {
                 if (quoted && index + 1 < line.length() && line.charAt(index + 1) == '"') {
                     current.append('"');
@@ -665,9 +937,17 @@ public class BiDatasourceRuntimeService {
             }
         }
         values.add(current.toString().trim());
+        // 汇总前面计算出的状态和明细，返回给调用方。
         return values;
     }
 
+    /**
+     * 解析、归一化或保护输入值，生成安全可用的中间结果。
+     *
+     * @param rawHeaders raw headers 参数，用于 normalizeHeaders 流程中的校验、计算或对象转换。
+     * @param path path 参数，用于 normalizeHeaders 流程中的校验、计算或对象转换。
+     * @return 返回解析、归一化或安全处理后的值。
+     */
     private List<String> normalizeHeaders(List<String> rawHeaders, Path path) {
         List<String> headers = new ArrayList<>();
         for (int index = 0; index < rawHeaders.size(); index++) {
@@ -677,6 +957,12 @@ public class BiDatasourceRuntimeService {
         return headers.isEmpty() ? List.of(fileTableName(null, path) + "_value") : headers;
     }
 
+    /**
+     * 根据方法职责完成对应的业务处理流程。
+     *
+     * @param size 分页或数量限制，避免一次处理过多数据。
+     * @return 返回 generated headers 汇总后的集合、分页或映射视图。
+     */
     private List<String> generatedHeaders(int size) {
         int count = Math.max(1, size);
         List<String> headers = new ArrayList<>();
@@ -686,6 +972,13 @@ public class BiDatasourceRuntimeService {
         return headers;
     }
 
+    /**
+     * 根据方法职责完成对应的业务处理流程。
+     *
+     * @param headers 待处理业务值，用于规则计算、转换或外部调用。
+     * @param values values 参数，用于 csvRow 流程中的校验、计算或对象转换。
+     * @return 返回 csvRow 流程生成的业务结果。
+     */
     private JsonNode csvRow(List<String> headers, List<String> values) {
         Map<String, Object> row = new LinkedHashMap<>();
         for (int index = 0; index < headers.size(); index++) {
@@ -695,6 +988,12 @@ public class BiDatasourceRuntimeService {
         return objectMapper.valueToTree(row);
     }
 
+    /**
+     * 根据方法职责完成对应的业务处理流程。
+     *
+     * @param value 待处理值，用于规则计算或转换。
+     * @return 返回 csvScalar 流程生成的业务结果。
+     */
     private Object csvScalar(String value) {
         if (value == null || value.isBlank()) {
             return null;
@@ -715,6 +1014,12 @@ public class BiDatasourceRuntimeService {
         }
     }
 
+    /**
+     * 根据方法职责完成对应的业务处理流程。
+     *
+     * @param headers 待处理业务值，用于规则计算、转换或外部调用。
+     * @return 返回 varchar columns 汇总后的集合、分页或映射视图。
+     */
     private List<BiDatasourceColumnPreview> varcharColumns(List<String> headers) {
         List<BiDatasourceColumnPreview> columns = new ArrayList<>();
         int ordinal = 1;
@@ -724,6 +1029,13 @@ public class BiDatasourceRuntimeService {
         return columns;
     }
 
+    /**
+     * 根据方法职责完成对应的业务处理流程。
+     *
+     * @param source source 参数，用于 fileTableName 流程中的校验、计算或对象转换。
+     * @param path path 参数，用于 fileTableName 流程中的校验、计算或对象转换。
+     * @return 返回 file table name 生成的文本或业务键。
+     */
     private String fileTableName(DataSourceConfigDO source, Path path) {
         String fallback = path == null ? "file_upload" : path.getFileName().toString();
         String fileName = source == null ? fallback : stringConfig(connectorConfig(source), "fileName", fallback);
@@ -732,7 +1044,16 @@ public class BiDatasourceRuntimeService {
         return tableName.isBlank() ? "file_upload" : tableName;
     }
 
+    /**
+     * 根据方法职责完成对应的业务处理流程。
+     *
+     * @param workbook workbook 参数，用于 workbookSheet 流程中的校验、计算或对象转换。
+     * @param MapString map string 参数，用于 workbookSheet 流程中的校验、计算或对象转换。
+     * @param config 配置对象，用于控制运行参数和策略开关。
+     * @return 返回 workbookSheet 流程生成的业务结果。
+     */
     private Sheet workbookSheet(Workbook workbook, Map<String, Object> config) {
+        // 校验关键输入和前置条件，避免无效状态继续进入主流程。
         if (workbook == null || workbook.getNumberOfSheets() < 1) {
             throw new IllegalArgumentException("BI file datasource workbook has no sheets");
         }
@@ -744,22 +1065,39 @@ public class BiDatasourceRuntimeService {
             }
             return sheet;
         }
+        // 汇总前面计算出的状态和明细，返回给调用方。
         return workbook.getSheetAt(0);
     }
 
+    /**
+     * 根据方法职责完成对应的业务处理流程。
+     *
+     * @param sheet sheet 参数，用于 firstWorkbookRow 流程中的校验、计算或对象转换。
+     * @return 返回 firstWorkbookRow 流程生成的业务结果。
+     */
     private Row firstWorkbookRow(Sheet sheet) {
+        // 校验关键输入和前置条件，避免无效状态继续进入主流程。
         if (sheet == null) {
             return null;
         }
+        // 遍历候选数据并按业务规则筛选、转换或聚合。
         for (int rowIndex = sheet.getFirstRowNum(); rowIndex <= sheet.getLastRowNum(); rowIndex++) {
             Row row = sheet.getRow(rowIndex);
             if (workbookRowValues(row, new DataFormatter(Locale.ROOT)).stream().anyMatch(value -> !value.isBlank())) {
                 return row;
             }
         }
+        // 汇总前面计算出的状态和明细，返回给调用方。
         return null;
     }
 
+    /**
+     * 根据方法职责完成对应的业务处理流程。
+     *
+     * @param row 持久化行数据，承载数据库记录内容。
+     * @param formatter formatter 参数，用于 workbookRowValues 流程中的校验、计算或对象转换。
+     * @return 返回 workbook row values 汇总后的集合、分页或映射视图。
+     */
     private List<String> workbookRowValues(Row row, DataFormatter formatter) {
         if (row == null || row.getLastCellNum() < 0) {
             return List.of();
@@ -773,12 +1111,21 @@ public class BiDatasourceRuntimeService {
         return values;
     }
 
+    /**
+     * 组装输出结构或完成对象转换。
+     *
+     * @param rowsNode rows node 参数，用于 rows 流程中的校验、计算或对象转换。
+     * @param limit 分页或数量限制，避免一次处理过多数据。
+     * @return 返回 rows 汇总后的集合、分页或映射视图。
+     */
     private List<JsonNode> rows(JsonNode rowsNode, int limit) {
+        // 校验关键输入和前置条件，避免无效状态继续进入主流程。
         if (rowsNode == null || rowsNode.isMissingNode() || rowsNode.isNull()) {
             return List.of();
         }
         List<JsonNode> rows = new ArrayList<>();
         if (rowsNode.isArray()) {
+            // 遍历候选数据并按业务规则筛选、转换或聚合。
             for (JsonNode row : rowsNode) {
                 if (rows.size() >= limit) {
                     break;
@@ -789,9 +1136,16 @@ public class BiDatasourceRuntimeService {
             }
             return rows;
         }
+        // 汇总前面计算出的状态和明细，返回给调用方。
         return rowsNode.isObject() ? List.of(rowsNode) : List.of();
     }
 
+    /**
+     * 根据方法职责完成对应的业务处理流程。
+     *
+     * @param rowNode row node 参数，用于 apiRow 流程中的校验、计算或对象转换。
+     * @return 返回 apiRow 流程生成的业务结果。
+     */
     private Map<String, Object> apiRow(JsonNode rowNode) {
         Map<String, Object> row = new LinkedHashMap<>();
         if (rowNode == null || rowNode.isNull()) {
@@ -805,7 +1159,14 @@ public class BiDatasourceRuntimeService {
         return row;
     }
 
+    /**
+     * 根据方法职责完成对应的业务处理流程。
+     *
+     * @param value 待处理值，用于规则计算或转换。
+     * @return 返回 jsonValue 流程生成的业务结果。
+     */
     private Object jsonValue(JsonNode value) {
+        // 校验关键输入和前置条件，避免无效状态继续进入主流程。
         if (value == null || value.isNull() || value.isMissingNode()) {
             return null;
         }
@@ -818,9 +1179,18 @@ public class BiDatasourceRuntimeService {
         if (value.isTextual()) {
             return value.textValue();
         }
+        // 汇总前面计算出的状态和明细，返回给调用方。
         return value.toString();
     }
 
+    /**
+     * 解析、归一化或保护输入值，生成安全可用的中间结果。
+     *
+     * @param MapString map string 参数，用于 limitApiColumns 流程中的校验、计算或对象转换。
+     * @param row 持久化行数据，承载数据库记录内容。
+     * @param limit 分页或数量限制，避免一次处理过多数据。
+     * @return 返回解析、归一化或安全处理后的值。
+     */
     private Map<String, Object> limitApiColumns(Map<String, Object> row, int limit) {
         Map<String, Object> limited = new LinkedHashMap<>();
         int count = 0;
@@ -833,19 +1203,36 @@ public class BiDatasourceRuntimeService {
         return limited;
     }
 
+    /**
+     * 根据方法职责完成对应的业务处理流程。
+     *
+     * @param ListMapString list map string 参数，用于 inferApiPreviewColumns 流程中的校验、计算或对象转换。
+     * @param rows rows 参数，用于 inferApiPreviewColumns 流程中的校验、计算或对象转换。
+     * @return 返回 infer api preview columns 汇总后的集合、分页或映射视图。
+     */
     private List<BiQueryColumn> inferApiPreviewColumns(List<Map<String, Object>> rows) {
         Map<String, String> columns = new LinkedHashMap<>();
+        // 遍历候选数据并按业务规则筛选、转换或聚合。
         for (Map<String, Object> row : rows) {
             for (Map.Entry<String, Object> entry : row.entrySet()) {
                 columns.putIfAbsent(entry.getKey(), apiPreviewType(entry.getValue()));
+                // 校验关键输入和前置条件，避免无效状态继续进入主流程。
                 if (columns.size() >= API_COLUMN_LIMIT) {
                     return apiPreviewColumns(columns);
                 }
             }
         }
+        // 汇总前面计算出的状态和明细，返回给调用方。
         return apiPreviewColumns(columns);
     }
 
+    /**
+     * 根据方法职责完成对应的业务处理流程。
+     *
+     * @param MapString map string 参数，用于 apiPreviewColumns 流程中的校验、计算或对象转换。
+     * @param columns columns 参数，用于 apiPreviewColumns 流程中的校验、计算或对象转换。
+     * @return 返回 api preview columns 汇总后的集合、分页或映射视图。
+     */
     private List<BiQueryColumn> apiPreviewColumns(Map<String, String> columns) {
         return columns.entrySet()
                 .stream()
@@ -853,6 +1240,12 @@ public class BiDatasourceRuntimeService {
                 .toList();
     }
 
+    /**
+     * 根据方法职责完成对应的业务处理流程。
+     *
+     * @param value 待处理值，用于规则计算或转换。
+     * @return 返回 api preview type 生成的文本或业务键。
+     */
     private String apiPreviewType(Object value) {
         if (value instanceof Number) {
             return "NUMBER";
@@ -863,6 +1256,12 @@ public class BiDatasourceRuntimeService {
         return "STRING";
     }
 
+    /**
+     * 根据方法职责完成对应的业务处理流程。
+     *
+     * @param rows rows 参数，用于 inferColumns 流程中的校验、计算或对象转换。
+     * @return 返回 infer columns 汇总后的集合、分页或映射视图。
+     */
     private List<BiDatasourceColumnPreview> inferColumns(List<JsonNode> rows) {
         Map<String, ColumnInference> columns = new LinkedHashMap<>();
         for (JsonNode row : rows == null ? List.<JsonNode>of() : rows) {
@@ -884,6 +1283,14 @@ public class BiDatasourceRuntimeService {
         return previews;
     }
 
+    /**
+     * 根据方法职责完成对应的业务处理流程。
+     *
+     * @param metaData meta data 参数，用于 columns 流程中的校验、计算或对象转换。
+     * @param catalog catalog 参数，用于 columns 流程中的校验、计算或对象转换。
+     * @param tableName 名称文本，用于展示或唯一性校验。
+     * @return 返回 columns 汇总后的集合、分页或映射视图。
+     */
     private List<BiDatasourceColumnPreview> columns(DatabaseMetaData metaData, String catalog, String tableName)
             throws Exception {
         List<BiDatasourceColumnPreview> columns = new ArrayList<>();
@@ -900,6 +1307,13 @@ public class BiDatasourceRuntimeService {
         return columns;
     }
 
+    /**
+     * 校验输入、权限或业务前置条件。
+     *
+     * @param sourceId 业务对象 ID，用于定位具体记录。
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @return 返回 requireSource 流程生成的业务结果。
+     */
     private DataSourceConfigDO requireSource(Long sourceId, Long tenantId) {
         if (sourceId == null) {
             throw new IllegalArgumentException("BI data source id is required");
@@ -912,6 +1326,18 @@ public class BiDatasourceRuntimeService {
         return source;
     }
 
+    /**
+     * 查询并组装符合条件的业务数据。
+     *
+     * @param source source 参数，用于 snapshotRow 流程中的校验、计算或对象转换。
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @param status 业务状态，用于筛选或推进状态流转。
+     * @param errorMessage error message 参数，用于 snapshotRow 流程中的校验、计算或对象转换。
+     * @param tables tables 参数，用于 snapshotRow 流程中的校验、计算或对象转换。
+     * @param username 操作人标识，用于审计和权限判断。
+     * @param syncedAt 时间参数，用于计算窗口、过期或审计时间。
+     * @return 返回 snapshotRow 流程生成的业务结果。
+     */
     private BiDatasourceSchemaSnapshotDO snapshotRow(DataSourceConfigDO source,
                                                      Long tenantId,
                                                      String status,
@@ -934,6 +1360,14 @@ public class BiDatasourceRuntimeService {
         return row;
     }
 
+    /**
+     * 组装输出结构或完成对象转换。
+     *
+     * @param row 持久化行数据，承载数据库记录内容。
+     * @param source source 参数，用于 toSnapshotView 流程中的校验、计算或对象转换。
+     * @param tables tables 参数，用于 toSnapshotView 流程中的校验、计算或对象转换。
+     * @return 返回组装或转换后的结果对象。
+     */
     private BiDatasourceSchemaSnapshotView toSnapshotView(BiDatasourceSchemaSnapshotDO row,
                                                           DataSourceConfigDO source,
                                                           List<BiDatasourceTablePreview> tables) {
@@ -952,6 +1386,12 @@ public class BiDatasourceRuntimeService {
                 row.getSyncedBy());
     }
 
+    /**
+     * 根据方法职责完成对应的业务处理流程。
+     *
+     * @param tables tables 参数，用于 serializeTables 流程中的校验、计算或对象转换。
+     * @return 返回 serialize tables 生成的文本或业务键。
+     */
     private String serializeTables(List<BiDatasourceTablePreview> tables) {
         try {
             return objectMapper.writeValueAsString(tables == null ? List.of() : tables);
@@ -960,6 +1400,12 @@ public class BiDatasourceRuntimeService {
         }
     }
 
+    /**
+     * 根据方法职责完成对应的业务处理流程。
+     *
+     * @param schemaJson JSON 字符串，承载结构化配置或明细。
+     * @return 返回 deserialize tables 汇总后的集合、分页或映射视图。
+     */
     private List<BiDatasourceTablePreview> deserializeTables(String schemaJson) {
         if (schemaJson == null || schemaJson.isBlank()) {
             return List.of();
@@ -971,12 +1417,23 @@ public class BiDatasourceRuntimeService {
         }
     }
 
+    /**
+     * 统计符合条件的数据规模或状态数量。
+     *
+     * @param tables tables 参数，用于 countColumns 流程中的校验、计算或对象转换。
+     * @return 返回统计数量。
+     */
     private int countColumns(List<BiDatasourceTablePreview> tables) {
         return tables == null ? 0 : tables.stream()
                 .mapToInt(table -> table.columns() == null ? 0 : table.columns().size())
                 .sum();
     }
 
+    /**
+     * 校验输入、权限或业务前置条件。
+     *
+     * @return 返回 require schema snapshot mapper 汇总后的集合、分页或映射视图。
+     */
     private BiDatasourceSchemaSnapshotMapper requireSchemaSnapshotMapper() {
         if (schemaSnapshotMapper == null) {
             throw new IllegalStateException("BI datasource schema snapshot mapper is not configured");
@@ -984,6 +1441,12 @@ public class BiDatasourceRuntimeService {
         return schemaSnapshotMapper;
     }
 
+    /**
+     * 解析、归一化或保护输入值，生成安全可用的中间结果。
+     *
+     * @param password password 参数，用于 decryptPassword 流程中的校验、计算或对象转换。
+     * @return 返回解析、归一化或安全处理后的值。
+     */
     private String decryptPassword(String password) {
         if (password == null || password.isBlank()) {
             return password;
@@ -994,8 +1457,18 @@ public class BiDatasourceRuntimeService {
         return secretCipher == null ? password : secretCipher.decrypt(password);
     }
 
+    /**
+     * 根据方法职责完成对应的业务处理流程。
+     *
+     * @param message 原因或消息文本，用于记录状态变化的业务依据。
+     * @param source source 参数，用于 sanitizeErrorMessage 流程中的校验、计算或对象转换。
+     * @param password password 参数，用于 sanitizeErrorMessage 流程中的校验、计算或对象转换。
+     * @return 返回 sanitize error message 生成的文本或业务键。
+     */
     private static String sanitizeErrorMessage(String message, DataSourceConfigDO source, String password) {
+        // 准备本次处理所需的上下文和中间变量。
         String sanitized = message == null || message.isBlank() ? "schema sync failed" : message;
+        // 校验关键输入和前置条件，避免无效状态继续进入主流程。
         if (password != null && !password.isBlank()) {
             sanitized = sanitized.replace(password, "***");
         }
@@ -1006,9 +1479,17 @@ public class BiDatasourceRuntimeService {
             sanitized = sanitized.replace(source.getUrl(), "jdbc-url");
         }
         sanitized = SECRET_URL_PARAMETER.matcher(sanitized).replaceAll("$1=***");
+        // 汇总前面计算出的状态和明细，返回给调用方。
         return sanitized.length() > 1000 ? sanitized.substring(0, 1000) : sanitized;
     }
 
+    /**
+     * 创建业务对象并完成必要的初始化。
+     *
+     * @param source source 参数，用于 openJdbcConnection 流程中的校验、计算或对象转换。
+     * @param password password 参数，用于 openJdbcConnection 流程中的校验、计算或对象转换。
+     * @return 返回 openJdbcConnection 流程生成的业务结果。
+     */
     private static Connection openJdbcConnection(DataSourceConfigDO source, String password) throws Exception {
         if (source.getDriverClassName() != null && !source.getDriverClassName().isBlank()) {
             Class.forName(source.getDriverClassName());
@@ -1016,6 +1497,12 @@ public class BiDatasourceRuntimeService {
         return DriverManager.getConnection(source.getUrl(), source.getUsername(), password);
     }
 
+    /**
+     * 根据方法职责完成对应的业务处理流程。
+     *
+     * @param source source 参数，用于 sourceKey 流程中的校验、计算或对象转换。
+     * @return 返回 source key 生成的文本或业务键。
+     */
     private static String sourceKey(DataSourceConfigDO source) {
         if (isApiSource(source)) {
             return "api-" + (source.getId() == null ? "new" : source.getId());
@@ -1026,7 +1513,14 @@ public class BiDatasourceRuntimeService {
         return "jdbc-" + (source.getId() == null ? "new" : source.getId());
     }
 
+    /**
+     * 根据方法职责完成对应的业务处理流程。
+     *
+     * @param source source 参数，用于 connectorType 流程中的校验、计算或对象转换。
+     * @return 返回 connector type 生成的文本或业务键。
+     */
     private static String connectorType(DataSourceConfigDO source) {
+        // 校验关键输入和前置条件，避免无效状态继续进入主流程。
         if (isApiSource(source)) {
             return source.getConnectorType() == null || source.getConnectorType().isBlank()
                     ? "API"
@@ -1055,9 +1549,16 @@ public class BiDatasourceRuntimeService {
         if (value.contains("mysql")) {
             return "MYSQL";
         }
+        // 汇总前面计算出的状态和明细，返回给调用方。
         return "JDBC";
     }
 
+    /**
+     * 校验输入、权限或业务前置条件。
+     *
+     * @param source source 参数，用于 isApiSource 流程中的校验、计算或对象转换。
+     * @return 返回布尔判断结果。
+     */
     private static boolean isApiSource(DataSourceConfigDO source) {
         return source != null
                 && ("API".equalsIgnoreCase(source.getType())
@@ -1065,6 +1566,12 @@ public class BiDatasourceRuntimeService {
                 || "HTTP_JSON".equalsIgnoreCase(source.getDriverClassName()));
     }
 
+    /**
+     * 校验输入、权限或业务前置条件。
+     *
+     * @param source source 参数，用于 isFileSource 流程中的校验、计算或对象转换。
+     * @return 返回布尔判断结果。
+     */
     private static boolean isFileSource(DataSourceConfigDO source) {
         return source != null
                 && ("FILE".equalsIgnoreCase(source.getType())
@@ -1072,6 +1579,12 @@ public class BiDatasourceRuntimeService {
                 || "FILE_UPLOAD".equalsIgnoreCase(source.getDriverClassName()));
     }
 
+    /**
+     * 解析、归一化或保护输入值，生成安全可用的中间结果。
+     *
+     * @param limit 分页或数量限制，避免一次处理过多数据。
+     * @return 返回解析、归一化或安全处理后的值。
+     */
     private static int boundedLimit(int limit) {
         if (limit < 1) {
             return 1;
@@ -1079,32 +1592,75 @@ public class BiDatasourceRuntimeService {
         return Math.min(limit, 200);
     }
 
+    /**
+     * 根据方法职责完成对应的业务处理流程。
+     *
+     * @param startNanos start nanos 参数，用于 durationMs 流程中的校验、计算或对象转换。
+     * @return 返回 duration ms 计算得到的数量、金额或指标值。
+     */
     private static Long durationMs(long startNanos) {
         return Math.max(0L, (System.nanoTime() - startNanos) / 1_000_000L);
     }
 
+    /**
+     * 根据方法职责完成对应的业务处理流程。
+     *
+     * @param value 待处理值，用于规则计算或转换。
+     * @return 返回 lower 生成的文本或业务键。
+     */
     private static String lower(String value) {
         return value == null ? "" : value.toLowerCase(Locale.ROOT);
     }
 
+    /**
+     * 解析、归一化或保护输入值，生成安全可用的中间结果。
+     *
+     * @param value 待处理值，用于规则计算或转换。
+     * @param fallback fallback 参数，用于 blankToDefault 流程中的校验、计算或对象转换。
+     * @return 返回解析、归一化或安全处理后的值。
+     */
     private static String blankToDefault(String value, String fallback) {
         return value == null || value.isBlank() ? fallback : value;
     }
 
+    /**
+     * 根据方法职责完成对应的业务处理流程。
+     *
+     * @param MapString map string 参数，用于 stringConfig 流程中的校验、计算或对象转换。
+     * @param config 配置对象，用于控制运行参数和策略开关。
+     * @param key 业务键，用于在同一租户下定位资源。
+     * @param fallback fallback 参数，用于 stringConfig 流程中的校验、计算或对象转换。
+     * @return 返回 string config 生成的文本或业务键。
+     */
     private static String stringConfig(Map<String, Object> config, String key, String fallback) {
         Object value = config == null ? null : config.get(key);
         String stringValue = stringValue(value);
         return stringValue.isBlank() ? fallback : stringValue;
     }
 
+    /**
+     * 根据方法职责完成对应的业务处理流程。
+     *
+     * @param value 待处理值，用于规则计算或转换。
+     * @return 返回 string value 生成的文本或业务键。
+     */
     private static String stringValue(Object value) {
         return value == null ? "" : String.valueOf(value).trim();
     }
 
+    /**
+     * 根据方法职责完成对应的业务处理流程。
+     *
+     * @param request 请求对象，承载本次操作的输入参数。
+     * @return 返回 request variables 生成的文本或业务键。
+     */
     private static Map<String, String> requestVariables(BiDatasourceApiPreviewRequest request) {
         return request == null ? Map.of() : request.variables();
     }
 
+    /**
+     * FilePreviewRows 承载对应领域的业务规则、流程编排和结果转换。
+     */
     private record FilePreviewRows(String tableName,
                                    String fileType,
                                    List<String> headers,
@@ -1116,6 +1672,12 @@ public class BiDatasourceRuntimeService {
         }
     }
 
+    /**
+     * 根据方法职责完成对应的业务处理流程。
+     *
+     * @param limit 分页或数量限制，避免一次处理过多数据。
+     * @return 返回 api row limit 计算得到的数量、金额或指标值。
+     */
     private static int apiRowLimit(Integer limit) {
         if (limit == null || limit < 1) {
             return API_ROW_LIMIT;
@@ -1123,12 +1685,22 @@ public class BiDatasourceRuntimeService {
         return Math.min(limit, API_ROW_LIMIT);
     }
 
+    /**
+     * 组装输出结构或完成对象转换。
+     *
+     * @param value 待处理值，用于规则计算或转换。
+     * @param MapString map string 参数，用于 renderTemplate 流程中的校验、计算或对象转换。
+     * @param variables variables 参数，用于 renderTemplate 流程中的校验、计算或对象转换。
+     * @return 返回组装或转换后的结果对象。
+     */
     private static String renderTemplate(String value, Map<String, String> variables) {
+        // 校验关键输入和前置条件，避免无效状态继续进入主流程。
         if (value == null || value.isBlank()) {
             return "";
         }
         java.util.regex.Matcher matcher = TEMPLATE_PARAMETER.matcher(value);
         StringBuffer rendered = new StringBuffer();
+        // 遍历候选数据并按业务规则筛选、转换或聚合。
         while (matcher.find()) {
             String key = matcher.group(1) == null ? matcher.group(2) : matcher.group(1);
             String replacement = variables.get(key);
@@ -1138,23 +1710,44 @@ public class BiDatasourceRuntimeService {
             matcher.appendReplacement(rendered, java.util.regex.Matcher.quoteReplacement(replacement));
         }
         matcher.appendTail(rendered);
+        // 汇总前面计算出的状态和明细，返回给调用方。
         return rendered.toString();
     }
 
+    /**
+     * 根据方法职责完成对应的业务处理流程。
+     *
+     * @param value 待处理值，用于规则计算或转换。
+     * @return 返回 boolean value 的布尔判断结果。
+     */
     private static boolean booleanValue(Object value) {
         return Boolean.TRUE.equals(value) || "true".equalsIgnoreCase(String.valueOf(value));
     }
 
+    /**
+     * 根据方法职责完成对应的业务处理流程。
+     *
+     * @param value 待处理值，用于规则计算或转换。
+     * @return 返回 url encode 生成的文本或业务键。
+     */
     private static String urlEncode(String value) {
         return URLEncoder.encode(value, StandardCharsets.UTF_8);
     }
 
+    /**
+     * 生成默认值或兜底结果，保证调用链稳定。
+     *
+     * @return 返回 defaultApiHttpClient 流程生成的业务结果。
+     */
     private static ApiHttpClient defaultApiHttpClient() {
         HttpClient client = HttpClient.newHttpClient();
         return request -> {
             HttpRequest.Builder builder = HttpRequest.newBuilder(URI.create(request.url()));
+            // 遍历候选数据并按业务规则筛选、转换或聚合。
             request.headers().forEach(builder::header);
+            // 校验关键输入和前置条件，避免无效状态继续进入主流程。
             if (request.body() == null || request.body().isBlank()) {
+                // 访问持久化或外部依赖，获取或写入本次流程需要的数据。
                 builder.method(request.method(), HttpRequest.BodyPublishers.noBody());
             } else {
                 builder.method(request.method(), HttpRequest.BodyPublishers.ofString(request.body()));
@@ -1165,15 +1758,37 @@ public class BiDatasourceRuntimeService {
     }
 
     @FunctionalInterface
+    /**
+     * JdbcConnectionFactory 承载对应领域的业务规则、流程编排和结果转换。
+     */
     public interface JdbcConnectionFactory {
+        /**
+         * 创建业务对象并完成必要的初始化。
+         *
+         * @param source source 参数，用于 open 流程中的校验、计算或对象转换。
+         * @param password password 参数，用于 open 流程中的校验、计算或对象转换。
+         * @return 返回 open 流程生成的业务结果。
+         */
         Connection open(DataSourceConfigDO source, String password) throws Exception;
     }
 
     @FunctionalInterface
+    /**
+     * ApiHttpClient 承载对应领域的业务规则、流程编排和结果转换。
+     */
     public interface ApiHttpClient {
+        /**
+         * 执行核心业务流程，并协调依赖组件完成处理。
+         *
+         * @param request 请求对象，承载本次操作的输入参数。
+         * @return 返回流程执行后的业务结果。
+         */
         ApiHttpResponse execute(ApiHttpRequest request) throws Exception;
     }
 
+    /**
+     * ApiHttpRequest 承载对应领域的业务规则、流程编排和结果转换。
+     */
     public record ApiHttpRequest(String method, String url, Map<String, String> headers, String body) {
         public ApiHttpRequest {
             method = method == null || method.isBlank() ? "GET" : method.trim().toUpperCase(Locale.ROOT);
@@ -1181,15 +1796,27 @@ public class BiDatasourceRuntimeService {
         }
     }
 
+    /**
+     * ApiHttpResponse 承载对应领域的业务规则、流程编排和结果转换。
+     */
     public record ApiHttpResponse(int statusCode, String statusText, String body) {
     }
 
+    /**
+     * ColumnInference 承载对应领域的业务规则、流程编排和结果转换。
+     */
     private static class ColumnInference {
         private String typeName;
         private int dataType;
         private boolean nullable;
 
+        /**
+         * 根据方法职责完成对应的业务处理流程。
+         *
+         * @param value 待处理值，用于规则计算或转换。
+         */
         void observe(JsonNode value) {
+            // 校验关键输入和前置条件，避免无效状态继续进入主流程。
             if (value == null || value.isNull() || value.isMissingNode()) {
                 nullable = true;
                 return;
@@ -1213,6 +1840,7 @@ public class BiDatasourceRuntimeService {
                 typeName = observedTypeName;
                 dataType = observedDataType;
             } else if (typeName.equals(observedTypeName)) {
+                // 汇总前面计算出的状态和明细，返回给调用方。
                 return;
             } else if (isNumeric(typeName) && isNumeric(observedTypeName)) {
                 typeName = "DOUBLE";
@@ -1223,18 +1851,39 @@ public class BiDatasourceRuntimeService {
             }
         }
 
+        /**
+         * 校验输入、权限或业务前置条件。
+         *
+         * @param value 待处理值，用于规则计算或转换。
+         * @return 返回布尔判断结果。
+         */
         private boolean isNumeric(String value) {
             return "BIGINT".equals(value) || "DOUBLE".equals(value);
         }
 
+        /**
+         * 根据方法职责完成对应的业务处理流程。
+         *
+         * @return 返回 type name 生成的文本或业务键。
+         */
         String typeName() {
             return typeName == null ? "VARCHAR" : typeName;
         }
 
+        /**
+         * 根据方法职责完成对应的业务处理流程。
+         *
+         * @return 返回 data type 计算得到的数量、金额或指标值。
+         */
         int dataType() {
             return typeName == null ? Types.VARCHAR : dataType;
         }
 
+        /**
+         * 根据方法职责完成对应的业务处理流程。
+         *
+         * @return 返回 nullable 的布尔判断结果。
+         */
         boolean nullable() {
             return nullable;
         }

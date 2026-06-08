@@ -10,6 +10,9 @@ import org.chovy.canvas.dal.dataobject.BiDeliverySchedulerLeaseDO;
 
 import java.time.LocalDateTime;
 
+/**
+ * BiDeliverySchedulerLeaseMapper 定义 dal.mapper 场景中的扩展契约。
+ */
 @Mapper
 public interface BiDeliverySchedulerLeaseMapper extends BaseMapper<BiDeliverySchedulerLeaseDO> {
 
@@ -24,6 +27,13 @@ public interface BiDeliverySchedulerLeaseMapper extends BaseMapper<BiDeliverySch
                 last_acquired_at = IF(lease_until <= #{now} OR owner_id = #{row.ownerId}, VALUES(last_acquired_at), last_acquired_at),
                 updated_at = IF(lease_until <= #{now} OR owner_id = #{row.ownerId}, CURRENT_TIMESTAMP, updated_at)
             """)
+    /**
+     * 执行 tryAcquire 流程，围绕 try acquire 完成校验、计算或结果组装。
+     *
+     * @param row 持久化行数据，承载数据库记录内容。
+     * @param now 时间参数，用于计算窗口、过期或审计时间。
+     * @return 返回 try acquire 计算得到的数量、金额或指标值。
+     */
     int tryAcquire(@Param("row") BiDeliverySchedulerLeaseDO row, @Param("now") LocalDateTime now);
 
     @Select("""
@@ -33,6 +43,13 @@ public interface BiDeliverySchedulerLeaseMapper extends BaseMapper<BiDeliverySch
               AND lease_key = #{leaseKey}
             LIMIT 1
             """)
+    /**
+     * 查询或读取业务数据。
+     *
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @param leaseKey 业务键，用于在同一租户下定位资源。
+     * @return 返回符合条件的数据列表或视图。
+     */
     BiDeliverySchedulerLeaseDO findByKey(@Param("tenantId") Long tenantId, @Param("leaseKey") String leaseKey);
 
     @Update("""
@@ -43,6 +60,15 @@ public interface BiDeliverySchedulerLeaseMapper extends BaseMapper<BiDeliverySch
               AND lease_key = #{leaseKey}
               AND owner_id = #{ownerId}
             """)
+    /**
+     * 执行数据写入或状态变更。
+     *
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @param leaseKey 业务键，用于在同一租户下定位资源。
+     * @param ownerId 业务对象 ID，用于定位具体记录。
+     * @param releasedAt 时间参数，用于计算窗口、过期或审计时间。
+     * @return 返回 release 计算得到的数量、金额或指标值。
+     */
     int release(@Param("tenantId") Long tenantId,
                 @Param("leaseKey") String leaseKey,
                 @Param("ownerId") String ownerId,

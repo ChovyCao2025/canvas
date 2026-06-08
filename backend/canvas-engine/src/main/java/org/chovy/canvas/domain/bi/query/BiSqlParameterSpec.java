@@ -2,6 +2,14 @@ package org.chovy.canvas.domain.bi.query;
 
 import java.util.List;
 
+/**
+ * BiSqlParameterSpec 承载 domain.bi.query 场景中的不可变数据快照。
+ * @param key key 字段。
+ * @param type type 字段。
+ * @param required required 字段。
+ * @param defaultValue defaultValue 字段。
+ * @param allowedValues allowedValues 字段。
+ */
 public record BiSqlParameterSpec(
         String key,
         String type,

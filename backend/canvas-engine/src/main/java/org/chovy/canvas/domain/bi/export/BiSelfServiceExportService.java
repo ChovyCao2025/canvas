@@ -55,6 +55,12 @@ import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 import java.util.zip.ZipOutputStream;
 
+/**
+ * Manages self-service BI export jobs from preview through approval, file generation, download, retry, and cleanup.
+ *
+ * <p>Export bytes are written through {@link BiFileStorage}; large CSV jobs are partitioned into object-backed parts
+ * with a zip manifest so downloads remain bounded while rows can exceed the single-query export limit.</p>
+ */
 @Service
 public class BiSelfServiceExportService {
 
@@ -108,6 +114,25 @@ public class BiSelfServiceExportService {
     @Value("${canvas.bi.export.queue.limit:20}")
     private int exportQueueLimit;
 
+    /**
+     * 执行 BiSelfServiceExportService 流程，围绕 bi self service export service 完成校验、计算或结果组装。
+     *
+     * @param datasetMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param exportJobMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param queryExecutionService 依赖组件，用于完成数据访问或外部能力调用。
+     * @param permissionServiceProvider 依赖组件，用于完成数据访问或外部能力调用。
+     * @param objectMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param storageProvider storage provider 参数，用于 BiSelfServiceExportService 流程中的校验、计算或对象转换。
+     * @param auditLogMapperProvider 依赖组件，用于完成数据访问或外部能力调用。
+     * @param exportDir export dir 参数，用于 BiSelfServiceExportService 流程中的校验、计算或对象转换。
+     * @param retentionDays retention days 参数，用于 BiSelfServiceExportService 流程中的校验、计算或对象转换。
+     * @param approvalRowThreshold approval row threshold 参数，用于 BiSelfServiceExportService 流程中的校验、计算或对象转换。
+     * @param maxRetryCount max retry count 参数，用于 BiSelfServiceExportService 流程中的校验、计算或对象转换。
+     * @param retryInitialDelayMinutes retry initial delay minutes 参数，用于 BiSelfServiceExportService 流程中的校验、计算或对象转换。
+     * @param retryBackoffMultiplier retry backoff multiplier 参数，用于 BiSelfServiceExportService 流程中的校验、计算或对象转换。
+     * @param retryMaxDelayMinutes retry max delay minutes 参数，用于 BiSelfServiceExportService 流程中的校验、计算或对象转换。
+     * @param downloadRateLimitPerMinute download rate limit per minute 参数，用于 BiSelfServiceExportService 流程中的校验、计算或对象转换。
+     */
     @Autowired
     public BiSelfServiceExportService(BiDatasetMapper datasetMapper,
                                       BiExportJobMapper exportJobMapper,
@@ -141,6 +166,16 @@ public class BiSelfServiceExportService {
                 downloadRateLimitPerMinute);
     }
 
+    /**
+     * 执行 BiSelfServiceExportService 流程，围绕 bi self service export service 完成校验、计算或结果组装。
+     *
+     * @param datasetMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param exportJobMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param queryExecutionService 依赖组件，用于完成数据访问或外部能力调用。
+     * @param permissionService 依赖组件，用于完成数据访问或外部能力调用。
+     * @param objectMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param exportRoot export root 参数，用于 BiSelfServiceExportService 流程中的校验、计算或对象转换。
+     */
     public BiSelfServiceExportService(BiDatasetMapper datasetMapper,
                                       BiExportJobMapper exportJobMapper,
                                       BiQueryExecutionService queryExecutionService,
@@ -158,6 +193,17 @@ public class BiSelfServiceExportService {
                 5000);
     }
 
+    /**
+     * 执行 BiSelfServiceExportService 流程，围绕 bi self service export service 完成校验、计算或结果组装。
+     *
+     * @param datasetMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param exportJobMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param queryExecutionService 依赖组件，用于完成数据访问或外部能力调用。
+     * @param permissionService 依赖组件，用于完成数据访问或外部能力调用。
+     * @param objectMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param exportRoot export root 参数，用于 BiSelfServiceExportService 流程中的校验、计算或对象转换。
+     * @param retentionDays retention days 参数，用于 BiSelfServiceExportService 流程中的校验、计算或对象转换。
+     */
     public BiSelfServiceExportService(BiDatasetMapper datasetMapper,
                                       BiExportJobMapper exportJobMapper,
                                       BiQueryExecutionService queryExecutionService,
@@ -176,6 +222,18 @@ public class BiSelfServiceExportService {
                 5000);
     }
 
+    /**
+     * 执行 BiSelfServiceExportService 流程，围绕 bi self service export service 完成校验、计算或结果组装。
+     *
+     * @param datasetMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param exportJobMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param queryExecutionService 依赖组件，用于完成数据访问或外部能力调用。
+     * @param permissionService 依赖组件，用于完成数据访问或外部能力调用。
+     * @param objectMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param fileStorage file storage 参数，用于 BiSelfServiceExportService 流程中的校验、计算或对象转换。
+     * @param retentionDays retention days 参数，用于 BiSelfServiceExportService 流程中的校验、计算或对象转换。
+     * @param approvalRowThreshold approval row threshold 参数，用于 BiSelfServiceExportService 流程中的校验、计算或对象转换。
+     */
     public BiSelfServiceExportService(BiDatasetMapper datasetMapper,
                                       BiExportJobMapper exportJobMapper,
                                       BiQueryExecutionService queryExecutionService,
@@ -199,6 +257,20 @@ public class BiSelfServiceExportService {
                 1440);
     }
 
+    /**
+     * 执行 BiSelfServiceExportService 流程，围绕 bi self service export service 完成校验、计算或结果组装。
+     *
+     * @param datasetMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param exportJobMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param queryExecutionService 依赖组件，用于完成数据访问或外部能力调用。
+     * @param permissionService 依赖组件，用于完成数据访问或外部能力调用。
+     * @param objectMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param fileStorage file storage 参数，用于 BiSelfServiceExportService 流程中的校验、计算或对象转换。
+     * @param retentionDays retention days 参数，用于 BiSelfServiceExportService 流程中的校验、计算或对象转换。
+     * @param approvalRowThreshold approval row threshold 参数，用于 BiSelfServiceExportService 流程中的校验、计算或对象转换。
+     * @param auditLogMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param downloadRateLimitPerMinute download rate limit per minute 参数，用于 BiSelfServiceExportService 流程中的校验、计算或对象转换。
+     */
     public BiSelfServiceExportService(BiDatasetMapper datasetMapper,
                                       BiExportJobMapper exportJobMapper,
                                       BiQueryExecutionService queryExecutionService,
@@ -226,6 +298,19 @@ public class BiSelfServiceExportService {
                 downloadRateLimitPerMinute);
     }
 
+    /**
+     * 执行 BiSelfServiceExportService 流程，围绕 bi self service export service 完成校验、计算或结果组装。
+     *
+     * @param datasetMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param exportJobMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param queryExecutionService 依赖组件，用于完成数据访问或外部能力调用。
+     * @param permissionService 依赖组件，用于完成数据访问或外部能力调用。
+     * @param objectMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param exportRoot export root 参数，用于 BiSelfServiceExportService 流程中的校验、计算或对象转换。
+     * @param fileStorage file storage 参数，用于 BiSelfServiceExportService 流程中的校验、计算或对象转换。
+     * @param retentionDays retention days 参数，用于 BiSelfServiceExportService 流程中的校验、计算或对象转换。
+     * @param approvalRowThreshold approval row threshold 参数，用于 BiSelfServiceExportService 流程中的校验、计算或对象转换。
+     */
     public BiSelfServiceExportService(BiDatasetMapper datasetMapper,
                                       BiExportJobMapper exportJobMapper,
                                       BiQueryExecutionService queryExecutionService,
@@ -250,6 +335,23 @@ public class BiSelfServiceExportService {
                 1440);
     }
 
+    /**
+     * 执行 BiSelfServiceExportService 流程，围绕 bi self service export service 完成校验、计算或结果组装。
+     *
+     * @param datasetMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param exportJobMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param queryExecutionService 依赖组件，用于完成数据访问或外部能力调用。
+     * @param permissionService 依赖组件，用于完成数据访问或外部能力调用。
+     * @param objectMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param exportRoot export root 参数，用于 BiSelfServiceExportService 流程中的校验、计算或对象转换。
+     * @param fileStorage file storage 参数，用于 BiSelfServiceExportService 流程中的校验、计算或对象转换。
+     * @param retentionDays retention days 参数，用于 BiSelfServiceExportService 流程中的校验、计算或对象转换。
+     * @param approvalRowThreshold approval row threshold 参数，用于 BiSelfServiceExportService 流程中的校验、计算或对象转换。
+     * @param maxRetryCount max retry count 参数，用于 BiSelfServiceExportService 流程中的校验、计算或对象转换。
+     * @param retryInitialDelayMinutes retry initial delay minutes 参数，用于 BiSelfServiceExportService 流程中的校验、计算或对象转换。
+     * @param retryBackoffMultiplier retry backoff multiplier 参数，用于 BiSelfServiceExportService 流程中的校验、计算或对象转换。
+     * @param retryMaxDelayMinutes retry max delay minutes 参数，用于 BiSelfServiceExportService 流程中的校验、计算或对象转换。
+     */
     public BiSelfServiceExportService(BiDatasetMapper datasetMapper,
                                       BiExportJobMapper exportJobMapper,
                                       BiQueryExecutionService queryExecutionService,
@@ -280,6 +382,25 @@ public class BiSelfServiceExportService {
                 0);
     }
 
+    /**
+     * 执行 BiSelfServiceExportService 流程，围绕 bi self service export service 完成校验、计算或结果组装。
+     *
+     * @param datasetMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param exportJobMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param queryExecutionService 依赖组件，用于完成数据访问或外部能力调用。
+     * @param permissionService 依赖组件，用于完成数据访问或外部能力调用。
+     * @param objectMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param exportRoot export root 参数，用于 BiSelfServiceExportService 流程中的校验、计算或对象转换。
+     * @param fileStorage file storage 参数，用于 BiSelfServiceExportService 流程中的校验、计算或对象转换。
+     * @param retentionDays retention days 参数，用于 BiSelfServiceExportService 流程中的校验、计算或对象转换。
+     * @param approvalRowThreshold approval row threshold 参数，用于 BiSelfServiceExportService 流程中的校验、计算或对象转换。
+     * @param maxRetryCount max retry count 参数，用于 BiSelfServiceExportService 流程中的校验、计算或对象转换。
+     * @param retryInitialDelayMinutes retry initial delay minutes 参数，用于 BiSelfServiceExportService 流程中的校验、计算或对象转换。
+     * @param retryBackoffMultiplier retry backoff multiplier 参数，用于 BiSelfServiceExportService 流程中的校验、计算或对象转换。
+     * @param retryMaxDelayMinutes retry max delay minutes 参数，用于 BiSelfServiceExportService 流程中的校验、计算或对象转换。
+     * @param auditLogMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param downloadRateLimitPerMinute download rate limit per minute 参数，用于 BiSelfServiceExportService 流程中的校验、计算或对象转换。
+     */
     public BiSelfServiceExportService(BiDatasetMapper datasetMapper,
                                       BiExportJobMapper exportJobMapper,
                                       BiQueryExecutionService queryExecutionService,
@@ -312,6 +433,15 @@ public class BiSelfServiceExportService {
         this.downloadRateLimitPerMinute = Math.max(0, downloadRateLimitPerMinute);
     }
 
+    /**
+     * 转换为接口返回或领域视图。
+     *
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @param username 操作人标识，用于审计和权限判断。
+     * @param role 角色标识，用于权限校验和访问范围判断。
+     * @param request 请求对象，承载本次操作的输入参数。
+     * @return 返回 preview 流程生成的业务结果。
+     */
     public BiQueryResult preview(Long tenantId, String username, String role, BiSelfServicePreviewRequest request) {
         if (request == null || request.query() == null) {
             throw new IllegalArgumentException("self-service preview query is required");
@@ -320,6 +450,15 @@ public class BiSelfServiceExportService {
         return queryExecutionService.execute(query, new BiQueryContext(tenantId, username, role));
     }
 
+    /**
+     * 执行数据写入或状态变更。
+     *
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @param username 操作人标识，用于审计和权限判断。
+     * @param role 角色标识，用于权限校验和访问范围判断。
+     * @param command 命令对象，描述本次业务动作及其参数。
+     * @return 返回流程执行后的业务结果。
+     */
     public BiExportJobView createExport(Long tenantId, String username, String role, BiExportJobCommand command) {
         if (command == null || command.query() == null) {
             throw new IllegalArgumentException("export query is required");
@@ -331,6 +470,7 @@ public class BiSelfServiceExportService {
         BiQueryRequest query = withLimit(command.query(), rowLimit);
         enforceExportPermission(scopedTenantId, dataset, username, role);
 
+        // Persist the normalized request snapshot so queue workers and retries do not depend on caller state.
         BiExportJobDO row = new BiExportJobDO();
         row.setTenantId(scopedTenantId);
         row.setWorkspaceId(dataset.getWorkspaceId());
@@ -348,6 +488,7 @@ public class BiSelfServiceExportService {
         row.setMaxRetryCount(maxRetryCount);
         row.setCreatedBy(defaultUser(username));
         if (requiresApproval(command, rowLimit)) {
+            // Approval pauses the job before any data is queried or written.
             row.setStatus(STATUS_PENDING_APPROVAL);
             row.setApprovalStatus(APPROVAL_PENDING);
             row.setApprovalReason(approvalReason(command, rowLimit));
@@ -366,11 +507,22 @@ public class BiSelfServiceExportService {
         return toView(row, dataset.getDatasetKey());
     }
 
+    /**
+     * 执行业务决策动作，并同步后续状态。
+     *
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @param username 操作人标识，用于审计和权限判断。
+     * @param role 角色标识，用于权限校验和访问范围判断。
+     * @param exportId 业务对象 ID，用于定位具体记录。
+     * @param command 命令对象，描述本次业务动作及其参数。
+     * @return 返回 reviewExport 流程生成的业务结果。
+     */
     public BiExportJobView reviewExport(Long tenantId,
                                         String username,
                                         String role,
                                         Long exportId,
                                         BiExportApprovalReviewCommand command) {
+        // 校验关键输入和前置条件，避免无效状态继续进入主流程。
         if (exportId == null || exportId <= 0) {
             throw new IllegalArgumentException("exportId is required");
         }
@@ -379,6 +531,7 @@ public class BiSelfServiceExportService {
         }
         requireApprover(role);
         Long scopedTenantId = normalizeTenant(tenantId);
+        // 访问持久化或外部依赖，获取或写入本次流程需要的数据。
         BiExportJobDO row = exportJobMapper.selectById(exportId);
         if (row == null || !scopedTenantId.equals(normalizeTenant(row.getTenantId()))) {
             throw new IllegalArgumentException("BI export job not found: " + exportId);
@@ -404,9 +557,13 @@ public class BiSelfServiceExportService {
         row.setProgressPercent(PROGRESS_QUEUED);
         row.setErrorMessage(null);
         exportJobMapper.updateById(row);
+        // 汇总前面计算出的状态和明细，返回给调用方。
         return toView(row, datasetKey(row.getResourceId()));
     }
 
+    /**
+     * 执行核心业务流程，并协调依赖组件完成处理。
+     */
     @Scheduled(fixedDelayString = "${canvas.bi.export.queue.fixed-delay-ms:60000}")
     public void scheduledExportQueueCycle() {
         if (!exportQueueEnabled) {
@@ -419,9 +576,19 @@ public class BiSelfServiceExportService {
                 exportQueueLimit);
     }
 
+    /**
+     * 执行核心业务处理流程。
+     *
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @param username 操作人标识，用于审计和权限判断。
+     * @param role 角色标识，用于权限校验和访问范围判断。
+     * @param limit 分页或数量限制，避免一次处理过多数据。
+     * @return 返回 processQueuedExports 流程生成的业务结果。
+     */
     public BiExportQueueResult processQueuedExports(Long tenantId, String username, String role, int limit) {
         Long scopedTenantId = normalizeTenant(tenantId);
         int capped = Math.max(1, Math.min(limit <= 0 ? 20 : limit, 50));
+        // Jobs are processed oldest first so approval releases and retries preserve user-visible ordering.
         List<BiExportJobDO> queued = safeList(exportJobMapper.selectList(new LambdaQueryWrapper<BiExportJobDO>()
                 .eq(BiExportJobDO::getTenantId, scopedTenantId)
                 .eq(BiExportJobDO::getStatus, STATUS_QUEUED)
@@ -436,6 +603,7 @@ public class BiSelfServiceExportService {
             jobs.add(view);
             if (STATUS_COMPLETED.equals(view.status())) {
                 completed++;
+            // 根据前序判断结果进入后续条件分支。
             } else if (STATUS_FAILED.equals(view.status())) {
                 failed++;
             }
@@ -443,6 +611,15 @@ public class BiSelfServiceExportService {
         return new BiExportQueueResult(queued.size(), jobs.size(), completed, failed, jobs);
     }
 
+    /**
+     * 执行核心业务处理流程。
+     *
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @param row 持久化行数据，承载数据库记录内容。
+     * @param username 操作人标识，用于审计和权限判断。
+     * @param role 角色标识，用于权限校验和访问范围判断。
+     * @return 返回 processQueuedExport 流程生成的业务结果。
+     */
     private BiExportJobView processQueuedExport(Long tenantId, BiExportJobDO row, String username, String role) {
         String resourceKey = datasetKey(row.getResourceId());
         try {
@@ -454,6 +631,7 @@ public class BiSelfServiceExportService {
                 resourceKey = dataset.getDatasetKey();
             }
             return runApprovedExport(tenantId, row, original.query(), exportLimit, username, role, resourceKey);
+        // 捕获异常并转为业务兜底处理，避免异常扩散到主流程。
         } catch (RuntimeException e) {
             row.setStatus(STATUS_FAILED);
             row.setErrorMessage(truncate(e.getMessage(), 1000));
@@ -463,6 +641,18 @@ public class BiSelfServiceExportService {
         }
     }
 
+    /**
+     * 执行核心业务处理流程。
+     *
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @param row 持久化行数据，承载数据库记录内容。
+     * @param query query 参数，用于 runApprovedExport 流程中的校验、计算或对象转换。
+     * @param exportLimit export limit 参数，用于 runApprovedExport 流程中的校验、计算或对象转换。
+     * @param username 操作人标识，用于审计和权限判断。
+     * @param role 角色标识，用于权限校验和访问范围判断。
+     * @param resourceKey 业务键，用于在同一租户下定位资源。
+     * @return 返回流程执行后的业务结果。
+     */
     private BiExportJobView runApprovedExport(Long tenantId,
                                               BiExportJobDO row,
                                               BiQueryRequest query,
@@ -475,8 +665,23 @@ public class BiSelfServiceExportService {
             row.setProgressPercent(PROGRESS_RUNNING);
             exportJobMapper.updateById(row);
             BiQueryContext context = new BiQueryContext(tenantId, username, role);
+            // Partition only CSV exports; JSON/XLSX/PDF must be generated from one bounded result set.
             BiStoredFile storedFile = shouldPartition(row.getExportFormat(), exportLimit)
+                    /**
+                     * 写入或更新业务数据，并保持关联状态一致。
+                     *
+                     * @param tenantId 租户 ID，用于限定数据隔离范围。
+                     * @param query query 参数，用于 writePartitionedCsvFile 流程中的校验、计算或对象转换。
+                     * @param exportLimit export limit 参数，用于 writePartitionedCsvFile 流程中的校验、计算或对象转换。
+                     * @return 返回 writePartitionedCsvFile 流程生成的业务结果。
+                     */
                     ? writePartitionedCsvFile(tenantId, row.getId(), query, exportLimit, context)
+                    /**
+                     * 写入或更新业务数据，并保持关联状态一致。
+                     *
+                     * @param tenantId 租户 ID，用于限定数据隔离范围。
+                     * @return 返回 writeFile 流程生成的业务结果。
+                     */
                     : writeFile(tenantId,
                             row.getId(),
                             row.getExportFormat(),
@@ -491,6 +696,7 @@ public class BiSelfServiceExportService {
             row.setErrorMessage(null);
             exportJobMapper.updateById(row);
             return toView(row, resourceKey);
+        // 捕获异常并转为业务兜底处理，避免异常扩散到主流程。
         } catch (RuntimeException e) {
             row.setStatus(STATUS_FAILED);
             row.setErrorMessage(truncate(e.getMessage(), 1000));
@@ -500,9 +706,19 @@ public class BiSelfServiceExportService {
         }
     }
 
+    /**
+     * 执行核心业务流程，并协调依赖组件完成处理。
+     *
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @param username 操作人标识，用于审计和权限判断。
+     * @param role 角色标识，用于权限校验和访问范围判断。
+     * @param limit 分页或数量限制，避免一次处理过多数据。
+     * @return 返回流程执行后的业务结果。
+     */
     public BiExportRetryResult retryFailedExports(Long tenantId, String username, String role, int limit) {
         Long scopedTenantId = normalizeTenant(tenantId);
         int capped = Math.max(1, Math.min(limit <= 0 ? 20 : limit, 50));
+        // 访问持久化或外部依赖，获取或写入本次流程需要的数据。
         List<BiExportJobDO> retryable = safeList(exportJobMapper.selectList(new LambdaQueryWrapper<BiExportJobDO>()
                 .eq(BiExportJobDO::getTenantId, scopedTenantId)
                 .eq(BiExportJobDO::getStatus, STATUS_FAILED)
@@ -518,6 +734,7 @@ public class BiSelfServiceExportService {
         List<BiExportJobView> jobs = new ArrayList<>();
         int completed = 0;
         int failed = 0;
+        // 遍历候选数据并按业务规则筛选、转换或聚合。
         for (BiExportJobDO row : retryable) {
             BiExportJobView view = retryFailedExport(scopedTenantId, row, username, role);
             jobs.add(view);
@@ -527,14 +744,25 @@ public class BiSelfServiceExportService {
                 failed++;
             }
         }
+        // 汇总前面计算出的状态和明细，返回给调用方。
         return new BiExportRetryResult(retryable.size(), jobs.size(), completed, failed, jobs);
     }
 
+    /**
+     * 判断业务条件是否成立。
+     *
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @param username 操作人标识，用于审计和权限判断。
+     * @param exportId 业务对象 ID，用于定位具体记录。
+     * @return 返回布尔判断结果。
+     */
     public BiExportJobView cancelExport(Long tenantId, String username, Long exportId) {
+        // 校验关键输入和前置条件，避免无效状态继续进入主流程。
         if (exportId == null || exportId <= 0) {
             throw new IllegalArgumentException("exportId is required");
         }
         Long scopedTenantId = normalizeTenant(tenantId);
+        // 访问持久化或外部依赖，获取或写入本次流程需要的数据。
         BiExportJobDO row = exportJobMapper.selectById(exportId);
         if (row == null || !scopedTenantId.equals(normalizeTenant(row.getTenantId()))) {
             throw new IllegalArgumentException("BI export job not found: " + exportId);
@@ -549,9 +777,19 @@ public class BiSelfServiceExportService {
         row.setRetryExhaustedAt(null);
         row.setErrorMessage("BI export canceled by " + defaultUser(username));
         exportJobMapper.updateById(row);
+        // 汇总前面计算出的状态和明细，返回给调用方。
         return toView(row, datasetKey(row.getResourceId()));
     }
 
+    /**
+     * 执行核心业务流程，并协调依赖组件完成处理。
+     *
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @param row 持久化行数据，承载数据库记录内容。
+     * @param username 操作人标识，用于审计和权限判断。
+     * @param role 角色标识，用于权限校验和访问范围判断。
+     * @return 返回流程执行后的业务结果。
+     */
     private BiExportJobView retryFailedExport(Long tenantId, BiExportJobDO row, String username, String role) {
         String resourceKey = datasetKey(row.getResourceId());
         try {
@@ -572,6 +810,7 @@ public class BiSelfServiceExportService {
                 resourceKey = dataset.getDatasetKey();
             }
             return runApprovedExport(tenantId, row, original.query(), exportLimit, username, role, resourceKey);
+        // 捕获异常并转为业务兜底处理，避免异常扩散到主流程。
         } catch (RuntimeException e) {
             row.setStatus(STATUS_FAILED);
             row.setErrorMessage(truncate(e.getMessage(), 1000));
@@ -581,6 +820,13 @@ public class BiSelfServiceExportService {
         }
     }
 
+    /**
+     * 查询或读取业务数据。
+     *
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @param limit 分页或数量限制，避免一次处理过多数据。
+     * @return 返回符合条件的数据列表或视图。
+     */
     public List<BiExportJobView> listExports(Long tenantId, int limit) {
         Long scopedTenantId = normalizeTenant(tenantId);
         int capped = Math.max(1, Math.min(limit <= 0 ? 20 : limit, 100));
@@ -594,6 +840,13 @@ public class BiSelfServiceExportService {
                 .toList();
     }
 
+    /**
+     * 查询或读取业务数据。
+     *
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @param exportId 业务对象 ID，用于定位具体记录。
+     * @return 返回 getExportDetail 流程生成的业务结果。
+     */
     public BiExportJobDetailView getExportDetail(Long tenantId, Long exportId) {
         if (exportId == null) {
             throw new IllegalArgumentException("exportId is required");
@@ -605,13 +858,29 @@ public class BiSelfServiceExportService {
         }
         return new BiExportJobDetailView(
                 toView(row, datasetKey(row.getResourceId())),
-                exportCommand(row));
+                exportCommand(row),
+                partitionDownloadAudit(row));
     }
 
+    /**
+     * 执行 download 流程，围绕 download 完成校验、计算或结果组装。
+     *
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @param exportId 业务对象 ID，用于定位具体记录。
+     * @return 返回 download 流程生成的业务结果。
+     */
     public BiExportDownload download(Long tenantId, Long exportId) {
         return download(tenantId, null, exportId);
     }
 
+    /**
+     * 执行 download 流程，围绕 download 完成校验、计算或结果组装。
+     *
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @param username 操作人标识，用于审计和权限判断。
+     * @param exportId 业务对象 ID，用于定位具体记录。
+     * @return 返回 download 流程生成的业务结果。
+     */
     public BiExportDownload download(Long tenantId, String username, Long exportId) {
         if (exportId == null) {
             throw new IllegalArgumentException("exportId is required");
@@ -632,9 +901,20 @@ public class BiSelfServiceExportService {
             throw new IllegalStateException("BI export job has expired: " + exportId);
         }
         if (!tryAcquireDownload(scopedTenantId, actor)) {
+            // Rate-limited attempts are audited even though the file bytes are never read.
             auditExport(row, actor, AUDIT_DOWNLOAD_RATE_LIMITED, Map.of(
                     "limitPerMinute", downloadRateLimitPerMinute,
+                    /**
+                     * 执行 optionalString 流程，围绕 optional string 完成校验、计算或结果组装。
+                     *
+                     * @return 返回 optionalString 流程生成的业务结果。
+                     */
                     "storageKey", optionalString(row.getStorageKey()),
+                    /**
+                     * 执行 optionalString 流程，围绕 optional string 完成校验、计算或结果组装。
+                     *
+                     * @return 返回 optionalString 流程生成的业务结果。
+                     */
                     "exportFormat", optionalString(row.getExportFormat())));
             throw new IllegalStateException("BI export download rate limit exceeded");
         }
@@ -645,11 +925,20 @@ public class BiSelfServiceExportService {
                     downloadFileName(row),
                     downloadContentType(row),
                     bytes);
+        // 捕获异常并转为业务兜底处理，避免异常扩散到主流程。
         } catch (RuntimeException e) {
             throw new IllegalStateException("BI export file is not available: " + exportId, e);
         }
     }
 
+    /**
+     * 执行 restoreExportObjects 流程，围绕 restore export objects 完成校验、计算或结果组装。
+     *
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @param exportId 业务对象 ID，用于定位具体记录。
+     * @param fallbackStorage fallback storage 参数，用于 restoreExportObjects 流程中的校验、计算或对象转换。
+     * @return 返回 restoreExportObjects 流程生成的业务结果。
+     */
     public BiExportObjectRestoreResult restoreExportObjects(
             Long tenantId,
             Long exportId,
@@ -672,6 +961,7 @@ public class BiSelfServiceExportService {
             throw new IllegalStateException("BI export job does not use object storage: " + exportId);
         }
 
+        // Restore the zip manifest first, then use it to recover any missing partition objects.
         List<String> checkedKeys = new ArrayList<>();
         List<String> restoredKeys = new ArrayList<>();
         List<String> missingKeys = new ArrayList<>();
@@ -696,6 +986,13 @@ public class BiSelfServiceExportService {
                 List.copyOf(missingKeys));
     }
 
+    /**
+     * 执行 cleanupExpiredExports 流程，围绕 cleanup expired exports 完成校验、计算或结果组装。
+     *
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @param limit 分页或数量限制，避免一次处理过多数据。
+     * @return 返回 cleanupExpiredExports 流程生成的业务结果。
+     */
     public BiExportCleanupResult cleanupExpiredExports(Long tenantId, int limit) {
         Long scopedTenantId = normalizeTenant(tenantId);
         int capped = Math.max(1, Math.min(limit <= 0 ? 100 : limit, 500));
@@ -718,6 +1015,7 @@ public class BiSelfServiceExportService {
                 }
                 markExpired(row, "BI export file expired");
                 expired++;
+            // 捕获异常并转为业务兜底处理，避免异常扩散到主流程。
             } catch (RuntimeException e) {
                 failed++;
                 row.setErrorMessage(truncate(e.getMessage(), 1000));
@@ -727,6 +1025,14 @@ public class BiSelfServiceExportService {
         return new BiExportCleanupResult(rows.size(), expired, filesDeleted, failed);
     }
 
+    /**
+     * 执行 enforceExportPermission 流程，围绕 enforce export permission 完成校验、计算或结果组装。
+     *
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @param dataset dataset 参数，用于 enforceExportPermission 流程中的校验、计算或对象转换。
+     * @param username 操作人标识，用于审计和权限判断。
+     * @param role 角色标识，用于权限校验和访问范围判断。
+     */
     private void enforceExportPermission(Long tenantId, BiDatasetDO dataset, String username, String role) {
         if (permissionService == null) {
             return;
@@ -740,6 +1046,15 @@ public class BiSelfServiceExportService {
                 BiPermissionService.ACTION_EXPORT);
     }
 
+    /**
+     * 写入或更新业务数据，并保持关联状态一致。
+     *
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @param exportId 业务对象 ID，用于定位具体记录。
+     * @param format 时间参数，用于计算窗口、过期或审计时间。
+     * @param result result 参数，用于 writeFile 流程中的校验、计算或对象转换。
+     * @return 返回 writeFile 流程生成的业务结果。
+     */
     private BiStoredFile writeFile(Long tenantId, Long exportId, String format, BiQueryResult result) {
         try {
             byte[] bytes = switch (format) {
@@ -749,11 +1064,22 @@ public class BiSelfServiceExportService {
                 default -> csv(result).getBytes(StandardCharsets.UTF_8);
             };
             return fileStorage.write(storageKey(tenantId, exportId, format), bytes);
+        // 捕获异常并转为业务兜底处理，避免异常扩散到主流程。
         } catch (IOException e) {
             throw new IllegalStateException("failed to write BI export file", e);
         }
     }
 
+    /**
+     * 写入或更新业务数据，并保持关联状态一致。
+     *
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @param exportId 业务对象 ID，用于定位具体记录。
+     * @param query query 参数，用于 writePartitionedCsvFile 流程中的校验、计算或对象转换。
+     * @param exportLimit export limit 参数，用于 writePartitionedCsvFile 流程中的校验、计算或对象转换。
+     * @param context 上下文对象，承载租户、身份或运行时信息。
+     * @return 返回 writePartitionedCsvFile 流程生成的业务结果。
+     */
     private BiStoredFile writePartitionedCsvFile(Long tenantId,
                                                  Long exportId,
                                                  BiQueryRequest query,
@@ -762,6 +1088,7 @@ public class BiSelfServiceExportService {
         int generatedRows = 0;
         List<CsvExportPart> parts = new ArrayList<>();
         try {
+            // Query pages sequentially so each part has its own checksum and storage object.
             for (int offset = 0; offset < exportLimit; offset += SINGLE_FILE_EXPORT_LIMIT) {
                 int pageLimit = Math.min(SINGLE_FILE_EXPORT_LIMIT, exportLimit - offset);
                 BiQueryResult result = queryExecutionService.execute(withLimitAndOffset(query, pageLimit, offset), context);
@@ -784,6 +1111,7 @@ public class BiSelfServiceExportService {
                 }
             }
             int finalGeneratedRows = generatedRows;
+            // The downloadable zip contains the manifest plus every part object read back from storage.
             return fileStorage.write(partitionStorageKey(tenantId, exportId), output -> {
                 try (ZipOutputStream zip = new ZipOutputStream(output, StandardCharsets.UTF_8)) {
                     writeZipEntry(zip, "manifest.json", partitionManifest(query, exportLimit, finalGeneratedRows, parts)
@@ -794,25 +1122,42 @@ public class BiSelfServiceExportService {
                     zip.finish();
                 }
             });
+        // 捕获异常并转为业务兜底处理，避免异常扩散到主流程。
         } catch (RuntimeException e) {
             deleteGeneratedPartObjects(parts);
             throw e;
         }
     }
 
+    /**
+     * 执行数据写入或状态变更。
+     *
+     * @param parts parts 参数，用于 deleteGeneratedPartObjects 流程中的校验、计算或对象转换。
+     */
     private void deleteGeneratedPartObjects(List<CsvExportPart> parts) {
         for (CsvExportPart part : safeList(parts)) {
             try {
                 fileStorage.delete(part.storageKey());
+            // 捕获异常并转为业务兜底处理，避免异常扩散到主流程。
             } catch (RuntimeException ignored) {
                 // Failed exports still need their retry state persisted; cleanup is best-effort.
             }
         }
     }
 
+    /**
+     * CsvExportPart 数据记录。
+     */
     private record CsvExportPart(String name, String storageKey, int rowCount, long sizeBytes, String sha256) {
     }
 
+    /**
+     * 写入或更新业务数据，并保持关联状态一致。
+     *
+     * @param zip zip 参数，用于 writeZipEntry 流程中的校验、计算或对象转换。
+     * @param name 名称文本，用于展示或唯一性校验。
+     * @param bytes bytes 参数，用于 writeZipEntry 流程中的校验、计算或对象转换。
+     */
     private void writeZipEntry(ZipOutputStream zip, String name, byte[] bytes) throws IOException {
         ZipEntry entry = new ZipEntry(name);
         zip.putNextEntry(entry);
@@ -820,6 +1165,15 @@ public class BiSelfServiceExportService {
         zip.closeEntry();
     }
 
+    /**
+     * 执行 partitionManifest 流程，围绕 partition manifest 完成校验、计算或结果组装。
+     *
+     * @param query query 参数，用于 partitionManifest 流程中的校验、计算或对象转换。
+     * @param requestedRows requested rows 参数，用于 partitionManifest 流程中的校验、计算或对象转换。
+     * @param generatedRows generated rows 参数，用于 partitionManifest 流程中的校验、计算或对象转换。
+     * @param parts parts 参数，用于 partitionManifest 流程中的校验、计算或对象转换。
+     * @return 返回 partition manifest 生成的文本或业务键。
+     */
     private String partitionManifest(BiQueryRequest query,
                                      int requestedRows,
                                      int generatedRows,
@@ -843,16 +1197,36 @@ public class BiSelfServiceExportService {
                         .toList()));
     }
 
+    /**
+     * 执行 partitionPartName 流程，围绕 partition part name 完成校验、计算或结果组装。
+     *
+     * @param part part 参数，用于 partitionPartName 流程中的校验、计算或对象转换。
+     * @return 返回 partition part name 生成的文本或业务键。
+     */
     private String partitionPartName(int part) {
         return String.format(Locale.ROOT, "part-%05d.csv", part);
     }
 
+    /**
+     * 判断业务条件是否成立。
+     *
+     * @param format 时间参数，用于计算窗口、过期或审计时间。
+     * @param exportLimit export limit 参数，用于 shouldPartition 流程中的校验、计算或对象转换。
+     * @return 返回布尔判断结果。
+     */
     private boolean shouldPartition(String format, int exportLimit) {
         return "CSV".equals(exportFormat(format)) && exportLimit > SINGLE_FILE_EXPORT_LIMIT;
     }
 
+    /**
+     * 查询或读取业务数据。
+     *
+     * @param row 持久化行数据，承载数据库记录内容。
+     * @return 返回 readFile 流程生成的业务结果。
+     */
     private byte[] readFile(BiExportJobDO row) {
         if (hasText(row.getStorageKey())) {
+            // Object storage rows prefer storageKey; local paths are retained for legacy single-file exports.
             byte[] bytes = fileStorage.read(row.getStorageKey());
             if (bytes == null) {
                 throw new IllegalStateException("BI export storage object is not available: " + row.getStorageKey());
@@ -861,12 +1235,20 @@ public class BiSelfServiceExportService {
         }
         try {
             return Files.readAllBytes(exportPath(row.getTenantId(), row.getId(), row.getExportFormat()));
+        // 捕获异常并转为业务兜底处理，避免异常扩散到主流程。
         } catch (IOException e) {
             throw new IllegalStateException("BI export file is not available: " + row.getId(), e);
         }
     }
 
+    /**
+     * 执行 csv 流程，围绕 csv 完成校验、计算或结果组装。
+     *
+     * @param result result 参数，用于 csv 流程中的校验、计算或对象转换。
+     * @return 返回 csv 生成的文本或业务键。
+     */
     private String csv(BiQueryResult result) {
+        // 遍历候选数据并按业务规则筛选、转换或聚合。
         List<String> columns = result.columns().stream().map(BiQueryColumn::key).toList();
         StringBuilder builder = new StringBuilder();
         builder.append(String.join(",", columns.stream().map(this::csvCell).toList())).append('\n');
@@ -875,14 +1257,22 @@ public class BiSelfServiceExportService {
                     .map(column -> csvCell(row.get(column)))
                     .toList())).append('\n');
         }
+        // 汇总前面计算出的状态和明细，返回给调用方。
         return builder.toString();
     }
 
+    /**
+     * 执行 xlsx 流程，围绕 xlsx 完成校验、计算或结果组装。
+     *
+     * @param result result 参数，用于 xlsx 流程中的校验、计算或对象转换。
+     * @return 返回 xlsx 流程生成的业务结果。
+     */
     private byte[] xlsx(BiQueryResult result) throws IOException {
         try (XSSFWorkbook workbook = new XSSFWorkbook();
              ByteArrayOutputStream output = new ByteArrayOutputStream()) {
             org.apache.poi.ss.usermodel.Sheet sheet = workbook.createSheet("BI Export");
             List<String> columns = result.columns().stream().map(BiQueryColumn::key).toList();
+            // Style and freeze the header so downloaded workbooks remain usable for ad-hoc analysis.
             CellStyle headerStyle = workbook.createCellStyle();
             headerStyle.setFillForegroundColor(IndexedColors.DARK_BLUE.getIndex());
             headerStyle.setFillPattern(FillPatternType.SOLID_FOREGROUND);
@@ -923,6 +1313,12 @@ public class BiSelfServiceExportService {
         }
     }
 
+    /**
+     * 执行 pdf 流程，围绕 pdf 完成校验、计算或结果组装。
+     *
+     * @param result result 参数，用于 pdf 流程中的校验、计算或对象转换。
+     * @return 返回 pdf 流程生成的业务结果。
+     */
     private byte[] pdf(BiQueryResult result) {
         List<String> columns = result.columns().stream().map(BiQueryColumn::key).toList();
         List<String> lines = new ArrayList<>();
@@ -938,6 +1334,7 @@ public class BiSelfServiceExportService {
         int maxLinesPerPage = 34;
         int pageCount = Math.max(1, (int) Math.ceil(lines.size() / (double) maxLinesPerPage));
         List<String> objects = new ArrayList<>();
+        // Build a small PDF directly; BI exports only need a readable tabular snapshot.
         objects.add("<< /Type /Catalog /Pages 2 0 R >>");
         StringBuilder kids = new StringBuilder();
         for (int page = 0; page < pageCount; page++) {
@@ -972,6 +1369,15 @@ public class BiSelfServiceExportService {
         return pdf.toString().getBytes(StandardCharsets.ISO_8859_1);
     }
 
+    /**
+     * 执行 pdfPageContent 流程，围绕 pdf page content 完成校验、计算或结果组装。
+     *
+     * @param lines lines 参数，用于 pdfPageContent 流程中的校验、计算或对象转换。
+     * @param pageIndex page index 参数，用于 pdfPageContent 流程中的校验、计算或对象转换。
+     * @param pageCount page count 参数，用于 pdfPageContent 流程中的校验、计算或对象转换。
+     * @param maxLinesPerPage max lines per page 参数，用于 pdfPageContent 流程中的校验、计算或对象转换。
+     * @return 返回 pdf page content 生成的文本或业务键。
+     */
     private String pdfPageContent(List<String> lines, int pageIndex, int pageCount, int maxLinesPerPage) {
         int start = pageIndex * maxLinesPerPage;
         int end = Math.min(lines.size(), start + maxLinesPerPage);
@@ -989,6 +1395,12 @@ public class BiSelfServiceExportService {
         return content.toString();
     }
 
+    /**
+     * 执行 pdfLiteral 流程，围绕 pdf literal 完成校验、计算或结果组装。
+     *
+     * @param value 待处理值，用于规则计算或转换。
+     * @return 返回 pdf literal 生成的文本或业务键。
+     */
     private String pdfLiteral(String value) {
         return (value == null ? "" : value)
                 .replace("\\", "\\\\")
@@ -998,6 +1410,12 @@ public class BiSelfServiceExportService {
                 .replace("\n", " ");
     }
 
+    /**
+     * 执行 csvCell 流程，围绕 csv cell 完成校验、计算或结果组装。
+     *
+     * @param value 待处理值，用于规则计算或转换。
+     * @return 返回 csv cell 生成的文本或业务键。
+     */
     private String csvCell(Object value) {
         String text = value == null ? "" : String.valueOf(value);
         if (text.contains(",") || text.contains("\"") || text.contains("\n") || text.contains("\r")) {
@@ -1006,6 +1424,12 @@ public class BiSelfServiceExportService {
         return text;
     }
 
+    /**
+     * 执行 sha256Hex 流程，围绕 sha256 hex 完成校验、计算或结果组装。
+     *
+     * @param bytes bytes 参数，用于 sha256Hex 流程中的校验、计算或对象转换。
+     * @return 返回 sha256 hex 生成的文本或业务键。
+     */
     private String sha256Hex(byte[] bytes) {
         try {
             byte[] hash = MessageDigest.getInstance("SHA-256").digest(bytes == null ? new byte[0] : bytes);
@@ -1014,33 +1438,78 @@ public class BiSelfServiceExportService {
                 builder.append(String.format(Locale.ROOT, "%02x", value));
             }
             return builder.toString();
+        // 捕获异常并转为业务兜底处理，避免异常扩散到主流程。
         } catch (NoSuchAlgorithmException e) {
             throw new IllegalStateException("SHA-256 digest is not available", e);
         }
     }
 
+    /**
+     * 执行 exportPath 流程，围绕 export path 完成校验、计算或结果组装。
+     *
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @param exportId 业务对象 ID，用于定位具体记录。
+     * @param format 时间参数，用于计算窗口、过期或审计时间。
+     * @return 返回 exportPath 流程生成的业务结果。
+     */
     private Path exportPath(Long tenantId, Long exportId, String format) {
         return exportRoot
                 .resolve("tenant-" + normalizeTenant(tenantId))
                 .resolve("export-" + exportId + "." + extension(format));
     }
 
+    /**
+     * 执行 storageKey 流程，围绕 storage key 完成校验、计算或结果组装。
+     *
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @param exportId 业务对象 ID，用于定位具体记录。
+     * @param format 时间参数，用于计算窗口、过期或审计时间。
+     * @return 返回 storage key 生成的文本或业务键。
+     */
     private String storageKey(Long tenantId, Long exportId, String format) {
         return "exports/tenant-" + normalizeTenant(tenantId) + "/" + exportFileName(exportId, format);
     }
 
+    /**
+     * 执行 partitionStorageKey 流程，围绕 partition storage key 完成校验、计算或结果组装。
+     *
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @param exportId 业务对象 ID，用于定位具体记录。
+     * @return 返回 partition storage key 生成的文本或业务键。
+     */
     private String partitionStorageKey(Long tenantId, Long exportId) {
         return "exports/tenant-" + normalizeTenant(tenantId) + "/export-" + exportId + ".zip";
     }
 
+    /**
+     * 执行 partitionPartStorageKey 流程，围绕 partition part storage key 完成校验、计算或结果组装。
+     *
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @param exportId 业务对象 ID，用于定位具体记录。
+     * @param partName 名称文本，用于展示或唯一性校验。
+     * @return 返回 partition part storage key 生成的文本或业务键。
+     */
     private String partitionPartStorageKey(Long tenantId, Long exportId, String partName) {
         return "exports/tenant-" + normalizeTenant(tenantId) + "/export-" + exportId + "/parts/" + partName;
     }
 
+    /**
+     * 执行 exportFileName 流程，围绕 export file name 完成校验、计算或结果组装。
+     *
+     * @param exportId 业务对象 ID，用于定位具体记录。
+     * @param format 时间参数，用于计算窗口、过期或审计时间。
+     * @return 返回 export file name 生成的文本或业务键。
+     */
     private String exportFileName(Long exportId, String format) {
         return "export-" + exportId + "." + extension(format);
     }
 
+    /**
+     * 执行 extension 流程，围绕 extension 完成校验、计算或结果组装。
+     *
+     * @param format 时间参数，用于计算窗口、过期或审计时间。
+     * @return 返回 extension 生成的文本或业务键。
+     */
     private String extension(String format) {
         return switch (exportFormat(format)) {
             case "JSON" -> "json";
@@ -1050,6 +1519,12 @@ public class BiSelfServiceExportService {
         };
     }
 
+    /**
+     * 执行 contentType 流程，围绕 content type 完成校验、计算或结果组装。
+     *
+     * @param format 时间参数，用于计算窗口、过期或审计时间。
+     * @return 返回 content type 生成的文本或业务键。
+     */
     private String contentType(String format) {
         return switch (exportFormat(format)) {
             case "JSON" -> "application/json";
@@ -1059,6 +1534,12 @@ public class BiSelfServiceExportService {
         };
     }
 
+    /**
+     * 执行 downloadFileName 流程，围绕 download file name 完成校验、计算或结果组装。
+     *
+     * @param row 持久化行数据，承载数据库记录内容。
+     * @return 返回 download file name 生成的文本或业务键。
+     */
     private String downloadFileName(BiExportJobDO row) {
         if (hasText(row.getStorageKey()) && row.getStorageKey().endsWith(".zip")) {
             return "export-" + row.getId() + ".zip";
@@ -1066,6 +1547,12 @@ public class BiSelfServiceExportService {
         return exportFileName(row.getId(), row.getExportFormat());
     }
 
+    /**
+     * 执行 downloadContentType 流程，围绕 download content type 完成校验、计算或结果组装。
+     *
+     * @param row 持久化行数据，承载数据库记录内容。
+     * @return 返回 download content type 生成的文本或业务键。
+     */
     private String downloadContentType(BiExportJobDO row) {
         if (hasText(row.getStorageKey()) && row.getStorageKey().endsWith(".zip")) {
             return "application/zip";
@@ -1073,10 +1560,25 @@ public class BiSelfServiceExportService {
         return contentType(row.getExportFormat());
     }
 
+    /**
+     * 按安全边界裁剪或保护输入值。
+     *
+     * @param query query 参数，用于 withLimit 流程中的校验、计算或对象转换。
+     * @param limit 分页或数量限制，避免一次处理过多数据。
+     * @return 返回 withLimit 流程生成的业务结果。
+     */
     private BiQueryRequest withLimit(BiQueryRequest query, int limit) {
         return withLimitAndOffset(query, limit, 0);
     }
 
+    /**
+     * 按安全边界裁剪或保护输入值。
+     *
+     * @param query query 参数，用于 withLimitAndOffset 流程中的校验、计算或对象转换。
+     * @param limit 分页或数量限制，避免一次处理过多数据。
+     * @param offset 分页或数量限制，避免一次处理过多数据。
+     * @return 返回 withLimitAndOffset 流程生成的业务结果。
+     */
     private BiQueryRequest withLimitAndOffset(BiQueryRequest query, int limit, int offset) {
         return new BiQueryRequest(
                 query.datasetKey(),
@@ -1089,6 +1591,13 @@ public class BiSelfServiceExportService {
                 offset);
     }
 
+    /**
+     * 按安全边界裁剪或保护输入值。
+     *
+     * @param requested requested 参数，用于 cappedLimit 流程中的校验、计算或对象转换。
+     * @param max max 参数，用于 cappedLimit 流程中的校验、计算或对象转换。
+     * @return 返回 capped limit 计算得到的数量、金额或指标值。
+     */
     private int cappedLimit(Integer requested, int max) {
         if (requested == null || requested <= 0) {
             return Math.min(500, max);
@@ -1096,6 +1605,12 @@ public class BiSelfServiceExportService {
         return Math.max(1, Math.min(requested, max));
     }
 
+    /**
+     * 执行 exportFormat 流程，围绕 export format 完成校验、计算或结果组装。
+     *
+     * @param value 待处理值，用于规则计算或转换。
+     * @return 返回 export format 生成的文本或业务键。
+     */
     private String exportFormat(String value) {
         String format = value == null || value.isBlank() ? "CSV" : value.trim().toUpperCase(Locale.ROOT);
         if (!List.of("CSV", "JSON", "XLSX", "PDF").contains(format)) {
@@ -1104,6 +1619,13 @@ public class BiSelfServiceExportService {
         return format;
     }
 
+    /**
+     * 解析业务依赖或上下文值。
+     *
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @param datasetKey 业务键，用于在同一租户下定位资源。
+     * @return 返回 resolveDataset 流程生成的业务结果。
+     */
     private BiDatasetDO resolveDataset(Long tenantId, String datasetKey) {
         BiDatasetDO dataset = datasetMapper.selectOne(new LambdaQueryWrapper<BiDatasetDO>()
                 .in(BiDatasetDO::getTenantId, tenantScope(tenantId))
@@ -1117,6 +1639,12 @@ public class BiSelfServiceExportService {
         return dataset;
     }
 
+    /**
+     * 执行 datasetKey 流程，围绕 dataset key 完成校验、计算或结果组装。
+     *
+     * @param datasetId 业务对象 ID，用于定位具体记录。
+     * @return 返回 dataset key 生成的文本或业务键。
+     */
     private String datasetKey(Long datasetId) {
         if (datasetId == null) {
             return null;
@@ -1125,6 +1653,13 @@ public class BiSelfServiceExportService {
         return dataset == null ? null : dataset.getDatasetKey();
     }
 
+    /**
+     * 校验并获取必需参数、资源或权限。
+     *
+     * @param command 命令对象，描述本次业务动作及其参数。
+     * @param rowLimit row limit 参数，用于 requiresApproval 流程中的校验、计算或对象转换。
+     * @return 返回 requires approval 的布尔判断结果。
+     */
     private boolean requiresApproval(BiExportJobCommand command, int rowLimit) {
         if (Boolean.TRUE.equals(command.approvalRequired()) || Boolean.TRUE.equals(command.sensitive())) {
             return true;
@@ -1132,8 +1667,17 @@ public class BiSelfServiceExportService {
         return approvalRowThreshold > 0 && rowLimit > approvalRowThreshold;
     }
 
+    /**
+     * 执行 approvalReason 流程，围绕 approval reason 完成校验、计算或结果组装。
+     *
+     * @param command 命令对象，描述本次业务动作及其参数。
+     * @param rowLimit row limit 参数，用于 approvalReason 流程中的校验、计算或对象转换。
+     * @return 返回 approval reason 生成的文本或业务键。
+     */
     private String approvalReason(BiExportJobCommand command, int rowLimit) {
+        // 准备本次处理所需的上下文和中间变量。
         String reason = optionalText(command.approvalReason(), "approvalReason");
+        // 校验关键输入和前置条件，避免无效状态继续进入主流程。
         if (reason != null) {
             return reason;
         }
@@ -1143,9 +1687,15 @@ public class BiSelfServiceExportService {
         if (approvalRowThreshold > 0 && rowLimit > approvalRowThreshold) {
             return "row limit " + rowLimit + " exceeds approval threshold " + approvalRowThreshold;
         }
+        // 汇总前面计算出的状态和明细，返回给调用方。
         return "export approval required";
     }
 
+    /**
+     * 校验并获取必需参数、资源或权限。
+     *
+     * @param role 角色标识，用于权限校验和访问范围判断。
+     */
     private void requireApprover(String role) {
         String value = role == null ? "" : role.trim().toUpperCase(Locale.ROOT);
         if (!List.of(RoleNames.ADMIN, RoleNames.SUPER_ADMIN, RoleNames.TENANT_ADMIN).contains(value)) {
@@ -1153,6 +1703,12 @@ public class BiSelfServiceExportService {
         }
     }
 
+    /**
+     * 执行业务决策动作，并同步后续状态。
+     *
+     * @param value 待处理值，用于规则计算或转换。
+     * @return 返回 review status 生成的文本或业务键。
+     */
     private String reviewStatus(String value) {
         String status = value == null ? "" : value.trim().toUpperCase(Locale.ROOT);
         if (!List.of(APPROVAL_APPROVED, APPROVAL_REJECTED).contains(status)) {
@@ -1161,6 +1717,12 @@ public class BiSelfServiceExportService {
         return status;
     }
 
+    /**
+     * 执行 exportCommand 流程，围绕 export command 完成校验、计算或结果组装。
+     *
+     * @param row 持久化行数据，承载数据库记录内容。
+     * @return 返回 exportCommand 流程生成的业务结果。
+     */
     private BiExportJobCommand exportCommand(BiExportJobDO row) {
         try {
             BiExportJobCommand command = objectMapper.readValue(row.getRequestJson(), BiExportJobCommand.class);
@@ -1177,16 +1739,25 @@ public class BiSelfServiceExportService {
                     command.approvalRequired(),
                     command.sensitive(),
                     command.approvalReason());
+        // 捕获异常并转为业务兜底处理，避免异常扩散到主流程。
         } catch (JsonProcessingException e) {
             throw new IllegalStateException("BI export request cannot be restored: " + row.getId(), e);
         }
     }
 
+    /**
+     * 规范化输入值。
+     *
+     * @param query query 参数，用于 normalizeRestoredQuery 流程中的校验、计算或对象转换。
+     * @return 返回解析、归一化或安全处理后的值。
+     */
     private BiQueryRequest normalizeRestoredQuery(BiQueryRequest query) {
+        // 汇总前面计算出的状态和明细，返回给调用方。
         return new BiQueryRequest(
                 query.datasetKey(),
                 query.dimensions(),
                 query.metrics(),
+                // 遍历候选数据并按业务规则筛选、转换或聚合。
                 query.filters().stream()
                         .filter(filter -> filter != null)
                         .map(this::normalizeRestoredFilter)
@@ -1195,20 +1766,42 @@ public class BiSelfServiceExportService {
                 query.limit());
     }
 
+    /**
+     * 规范化输入值。
+     *
+     * @param filter filter 参数，用于 normalizeRestoredFilter 流程中的校验、计算或对象转换。
+     * @return 返回解析、归一化或安全处理后的值。
+     */
     private BiFilter normalizeRestoredFilter(BiFilter filter) {
         return new BiFilter(filter.field(), filter.operator(), normalizeRestoredFilterValue(filter.value()));
     }
 
+    /**
+     * 规范化输入值。
+     *
+     * @param value 待处理值，用于规则计算或转换。
+     * @return 返回解析、归一化或安全处理后的值。
+     */
     private Object normalizeRestoredFilterValue(Object value) {
+        // 校验关键输入和前置条件，避免无效状态继续进入主流程。
         if (value instanceof Integer || value instanceof Short || value instanceof Byte) {
             return ((Number) value).longValue();
         }
         if (value instanceof List<?> values) {
+            // 遍历候选数据并按业务规则筛选、转换或聚合。
             return values.stream().map(this::normalizeRestoredFilterValue).toList();
         }
+        // 汇总前面计算出的状态和明细，返回给调用方。
         return value;
     }
 
+    /**
+     * 执行 optionalText 流程，围绕 optional text 完成校验、计算或结果组装。
+     *
+     * @param value 待处理值，用于规则计算或转换。
+     * @param fieldName 名称文本，用于展示或唯一性校验。
+     * @return 返回 optional text 生成的文本或业务键。
+     */
     private String optionalText(String value, String fieldName) {
         if (value == null || value.isBlank()) {
             return null;
@@ -1220,7 +1813,15 @@ public class BiSelfServiceExportService {
         return trimmed;
     }
 
+    /**
+     * 转换为接口返回或领域视图。
+     *
+     * @param row 持久化行数据，承载数据库记录内容。
+     * @param resourceKey 业务键，用于在同一租户下定位资源。
+     * @return 返回组装或转换后的结果对象。
+     */
     private BiExportJobView toView(BiExportJobDO row, String resourceKey) {
+        // 汇总前面计算出的状态和明细，返回给调用方。
         return new BiExportJobView(
                 row.getId(),
                 row.getTenantId(),
@@ -1254,17 +1855,31 @@ public class BiSelfServiceExportService {
                 row.getRetryExhaustedAt(),
                 row.getCreatedBy(),
                 row.getCreatedAt(),
+                // 访问持久化或外部依赖，获取或写入本次流程需要的数据。
                 row.getUpdatedAt());
     }
 
+    /**
+     * 处理 JSON 序列化或反序列化。
+     *
+     * @param value 待处理值，用于规则计算或转换。
+     * @return 返回 json 生成的文本或业务键。
+     */
     private String json(Object value) {
         try {
             return objectMapper.writeValueAsString(value == null ? Map.of() : value);
+        // 捕获异常并转为业务兜底处理，避免异常扩散到主流程。
         } catch (JsonProcessingException e) {
             throw new IllegalArgumentException("invalid BI export payload", e);
         }
     }
 
+    /**
+     * 执行核心业务流程，并协调依赖组件完成处理。
+     *
+     * @param row 持久化行数据，承载数据库记录内容。
+     * @param now 时间参数，用于计算窗口、过期或审计时间。
+     */
     private void scheduleRetryAfterFailure(BiExportJobDO row, LocalDateTime now) {
         int retryCount = retryCount(row);
         int rowMaxRetryCount = configuredMaxRetryCount(row);
@@ -1277,18 +1892,37 @@ public class BiSelfServiceExportService {
             row.setRetryExhaustedAt(now);
             return;
         }
+        // Retry delay is stored on the row so any worker can resume after process restart.
         row.setNextRetryAt(now.plusMinutes(retryDelayMinutes(retryCount + 1)));
         row.setRetryExhaustedAt(null);
     }
 
+    /**
+     * 执行核心业务流程，并协调依赖组件完成处理。
+     *
+     * @param row 持久化行数据，承载数据库记录内容。
+     * @return 返回流程执行后的业务结果。
+     */
     private int retryAttempt(BiExportJobDO row) {
         return retryCount(row) + 1;
     }
 
+    /**
+     * 执行核心业务流程，并协调依赖组件完成处理。
+     *
+     * @param row 持久化行数据，承载数据库记录内容。
+     * @return 返回流程执行后的业务结果。
+     */
     private int retryCount(BiExportJobDO row) {
         return Math.max(0, row == null || row.getRetryCount() == null ? 0 : row.getRetryCount());
     }
 
+    /**
+     * 执行 configuredMaxRetryCount 流程，围绕 configured max retry count 完成校验、计算或结果组装。
+     *
+     * @param row 持久化行数据，承载数据库记录内容。
+     * @return 返回 configured max retry count 计算得到的数量、金额或指标值。
+     */
     private int configuredMaxRetryCount(BiExportJobDO row) {
         int rowMaxRetryCount = row == null || row.getMaxRetryCount() == null
                 ? maxRetryCount
@@ -1296,6 +1930,12 @@ public class BiSelfServiceExportService {
         return Math.max(0, rowMaxRetryCount);
     }
 
+    /**
+     * 执行核心业务流程，并协调依赖组件完成处理。
+     *
+     * @param nextAttempt next attempt 参数，用于 retryDelayMinutes 流程中的校验、计算或对象转换。
+     * @return 返回流程执行后的业务结果。
+     */
     private long retryDelayMinutes(int nextAttempt) {
         int attempt = Math.max(1, nextAttempt);
         double multiplier = Math.pow(retryBackoffMultiplier, attempt - 1);
@@ -1303,6 +1943,12 @@ public class BiSelfServiceExportService {
         return Math.max(1, Math.min(delay, retryMaxDelayMinutes));
     }
 
+    /**
+     * 执行 tenantScope 流程，围绕 tenant scope 完成校验、计算或结果组装。
+     *
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @return 返回 tenant scope 汇总后的集合、分页或映射视图。
+     */
     private List<Long> tenantScope(Long tenantId) {
         Long scopedTenantId = normalizeTenant(tenantId);
         if (scopedTenantId == 0L) {
@@ -1311,6 +1957,13 @@ public class BiSelfServiceExportService {
         return List.of(0L, scopedTenantId);
     }
 
+    /**
+     * 校验并获取必需参数、资源或权限。
+     *
+     * @param value 待处理值，用于规则计算或转换。
+     * @param fieldName 名称文本，用于展示或唯一性校验。
+     * @return 返回 required 生成的文本或业务键。
+     */
     private String required(String value, String fieldName) {
         if (value == null || value.isBlank()) {
             throw new IllegalArgumentException(fieldName + " is required");
@@ -1318,24 +1971,51 @@ public class BiSelfServiceExportService {
         return value.trim();
     }
 
+    /**
+     * 判断业务条件是否成立。
+     *
+     * @param value 待处理值，用于规则计算或转换。
+     * @return 返回布尔判断结果。
+     */
     private boolean hasText(String value) {
         return value != null && !value.isBlank();
     }
 
+    /**
+     * 按默认值规则处理输入值。
+     *
+     * @param username 操作人标识，用于审计和权限判断。
+     * @return 返回 default user 生成的文本或业务键。
+     */
     private String defaultUser(String username) {
         return username == null || username.isBlank() ? "system" : username;
     }
 
+    /**
+     * 判断业务条件是否成立。
+     *
+     * @param row 持久化行数据，承载数据库记录内容。
+     * @param now 时间参数，用于计算窗口、过期或审计时间。
+     * @return 返回布尔判断结果。
+     */
     private boolean isExpired(BiExportJobDO row, LocalDateTime now) {
         return row.getExpiresAt() != null && !row.getExpiresAt().isAfter(now);
     }
 
+    /**
+     * 执行 tryAcquireDownload 流程，围绕 try acquire download 完成校验、计算或结果组装。
+     *
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @param actor 操作人标识，用于审计和权限判断。
+     * @return 返回 try acquire download 的布尔判断结果。
+     */
     private boolean tryAcquireDownload(Long tenantId, String actor) {
         if (downloadRateLimitPerMinute <= 0) {
             return true;
         }
         long windowMinute = System.currentTimeMillis() / 60_000L;
         String key = normalizeTenant(tenantId) + ":" + defaultUser(actor);
+        // The in-memory window is a per-node throttle; audit logs still expose throttled attempts.
         synchronized (downloadRateWindows) {
             DownloadRateWindow current = downloadRateWindows.get(key);
             if (current == null || current.windowMinute() != windowMinute) {
@@ -1350,8 +2030,18 @@ public class BiSelfServiceExportService {
         }
     }
 
+    /**
+     * 执行 auditDownload 流程，围绕 audit download 完成校验、计算或结果组装。
+     *
+     * @param row 持久化行数据，承载数据库记录内容。
+     * @param actor 操作人标识，用于审计和权限判断。
+     * @param now 时间参数，用于计算窗口、过期或审计时间。
+     * @param bytes bytes 参数，用于 auditDownload 流程中的校验、计算或对象转换。
+     */
     private void auditDownload(BiExportJobDO row, String actor, LocalDateTime now, byte[] bytes) {
+        // 准备本次处理所需的上下文和中间变量。
         int downloadCount = (row.getDownloadCount() == null ? 0 : row.getDownloadCount()) + 1;
+        // 访问持久化或外部依赖，获取或写入本次流程需要的数据。
         BiExportJobDO update = new BiExportJobDO();
         update.setId(row.getId());
         update.setDownloadCount(downloadCount);
@@ -1373,6 +2063,12 @@ public class BiSelfServiceExportService {
         auditExport(row, actor, AUDIT_DOWNLOAD, detail);
     }
 
+    /**
+     * 执行 partitionDownloadAudit 流程，围绕 partition download audit 完成校验、计算或结果组装。
+     *
+     * @param row 持久化行数据，承载数据库记录内容。
+     * @return 返回 partitionDownloadAudit 流程生成的业务结果。
+     */
     private Map<String, Object> partitionDownloadAudit(BiExportJobDO row) {
         if (row == null || !hasText(row.getStorageKey()) || !row.getStorageKey().endsWith(".zip")) {
             return Map.of();
@@ -1415,12 +2111,22 @@ public class BiSelfServiceExportService {
                     }
                 }
             }
+        // 捕获异常并转为业务兜底处理，避免异常扩散到主流程。
         } catch (IOException | RuntimeException e) {
             return Map.of();
         }
         return Map.of();
     }
 
+    /**
+     * 执行 auditExport 流程，围绕 audit export 完成校验、计算或结果组装。
+     *
+     * @param row 持久化行数据，承载数据库记录内容。
+     * @param actor 操作人标识，用于审计和权限判断。
+     * @param actionKey 业务键，用于在同一租户下定位资源。
+     * @param String string 参数，用于 auditExport 流程中的校验、计算或对象转换。
+     * @param detail detail 参数，用于 auditExport 流程中的校验、计算或对象转换。
+     */
     private void auditExport(BiExportJobDO row, String actor, String actionKey, Map<String, Object> detail) {
         if (auditLogMapper == null || row == null) {
             return;
@@ -1436,23 +2142,44 @@ public class BiSelfServiceExportService {
         audit.setCreatedAt(LocalDateTime.now());
         try {
             auditLogMapper.insert(audit);
+        // 捕获异常并转为业务兜底处理，避免异常扩散到主流程。
         } catch (RuntimeException ignored) {
             // Export governance decisions should not depend on audit storage availability.
         }
     }
 
+    /**
+     * 执行 optionalString 流程，围绕 optional string 完成校验、计算或结果组装。
+     *
+     * @param value 待处理值，用于规则计算或转换。
+     * @return 返回 optional string 生成的文本或业务键。
+     */
     private String optionalString(String value) {
         return value == null ? "" : value;
     }
 
+    /**
+     * 推进状态流转并记录本次处理结果。
+     *
+     * @param row 持久化行数据，承载数据库记录内容。
+     * @param message 原因或消息文本，用于记录状态变化的业务依据。
+     */
     private void markExpired(BiExportJobDO row, String message) {
         row.setStatus(STATUS_EXPIRED);
         row.setErrorMessage(message);
         exportJobMapper.updateById(row);
     }
 
+    /**
+     * 执行数据写入或状态变更。
+     *
+     * @param row 持久化行数据，承载数据库记录内容。
+     * @return 返回 delete file 的布尔判断结果。
+     */
     private boolean deleteFile(BiExportJobDO row) {
+        // 校验关键输入和前置条件，避免无效状态继续进入主流程。
         if (row != null && hasText(row.getStorageKey())) {
+            // 访问持久化或外部依赖，获取或写入本次流程需要的数据。
             boolean partDeleted = deletePartitionPartObjects(row);
             boolean rootDeleted = fileStorage.delete(row.getStorageKey());
             return rootDeleted || partDeleted;
@@ -1460,11 +2187,20 @@ public class BiSelfServiceExportService {
         return deleteLocalFile(row);
     }
 
+    /**
+     * 执行数据写入或状态变更。
+     *
+     * @param row 持久化行数据，承载数据库记录内容。
+     * @return 返回 delete partition part objects 的布尔判断结果。
+     */
     private boolean deletePartitionPartObjects(BiExportJobDO row) {
+        // 校验关键输入和前置条件，避免无效状态继续进入主流程。
         if (row == null || !hasText(row.getStorageKey()) || !row.getStorageKey().endsWith(".zip")) {
             return false;
         }
+        // 访问持久化或外部依赖，获取或写入本次流程需要的数据。
         boolean deleted = false;
+        // 遍历候选数据并按业务规则筛选、转换或聚合。
         for (String partKey : partitionManifestPartKeys(row.getStorageKey())) {
             if (fileStorage.delete(partKey)) {
                 deleted = true;
@@ -1473,6 +2209,12 @@ public class BiSelfServiceExportService {
         return deleted;
     }
 
+    /**
+     * 执行 partitionManifestPartKeys 流程，围绕 partition manifest part keys 完成校验、计算或结果组装。
+     *
+     * @param storageKey 业务键，用于在同一租户下定位资源。
+     * @return 返回 partition manifest part keys 汇总后的集合、分页或映射视图。
+     */
     private List<String> partitionManifestPartKeys(String storageKey) {
         try {
             byte[] bytes = fileStorage.read(storageKey);
@@ -1499,12 +2241,19 @@ public class BiSelfServiceExportService {
                     }
                 }
             }
+        // 捕获异常并转为业务兜底处理，避免异常扩散到主流程。
         } catch (IOException | RuntimeException e) {
             return List.of();
         }
         return List.of();
     }
 
+    /**
+     * 执行 partitionManifestPartKeys 流程，围绕 partition manifest part keys 完成校验、计算或结果组装。
+     *
+     * @param bytes bytes 参数，用于 partitionManifestPartKeys 流程中的校验、计算或对象转换。
+     * @return 返回 partition manifest part keys 汇总后的集合、分页或映射视图。
+     */
     private List<String> partitionManifestPartKeys(byte[] bytes) {
         if (bytes == null || bytes.length == 0) {
             return List.of();
@@ -1528,12 +2277,22 @@ public class BiSelfServiceExportService {
                     return keys;
                 }
             }
+        // 捕获异常并转为业务兜底处理，避免异常扩散到主流程。
         } catch (IOException | RuntimeException e) {
             return List.of();
         }
         return List.of();
     }
 
+    /**
+     * 执行 restoreObjectIfMissing 流程，围绕 restore object if missing 完成校验、计算或结果组装。
+     *
+     * @param storageKey 业务键，用于在同一租户下定位资源。
+     * @param fallbackStorage fallback storage 参数，用于 restoreObjectIfMissing 流程中的校验、计算或对象转换。
+     * @param restoredKeys restored keys 参数，用于 restoreObjectIfMissing 流程中的校验、计算或对象转换。
+     * @param missingKeys missing keys 参数，用于 restoreObjectIfMissing 流程中的校验、计算或对象转换。
+     * @return 返回 restoreObjectIfMissing 流程生成的业务结果。
+     */
     private byte[] restoreObjectIfMissing(
             String storageKey,
             BiFileStorage fallbackStorage,
@@ -1553,14 +2312,28 @@ public class BiSelfServiceExportService {
         return fallbackBytes;
     }
 
+    /**
+     * 按安全边界裁剪或保护输入值。
+     *
+     * @param storage storage 参数，用于 safeRead 流程中的校验、计算或对象转换。
+     * @param storageKey 业务键，用于在同一租户下定位资源。
+     * @return 返回 safeRead 流程生成的业务结果。
+     */
     private byte[] safeRead(BiFileStorage storage, String storageKey) {
         try {
             return storage.read(storageKey);
+        // 捕获异常并转为业务兜底处理，避免异常扩散到主流程。
         } catch (RuntimeException e) {
             return null;
         }
     }
 
+    /**
+     * 执行数据写入或状态变更。
+     *
+     * @param row 持久化行数据，承载数据库记录内容。
+     * @return 返回 delete local file 的布尔判断结果。
+     */
     private boolean deleteLocalFile(BiExportJobDO row) {
         if (row == null || row.getId() == null || row.getExportFormat() == null) {
             return false;
@@ -1569,21 +2342,30 @@ public class BiSelfServiceExportService {
             Path root = exportRoot.toAbsolutePath().normalize();
             Path file = exportPath(row.getTenantId(), row.getId(), row.getExportFormat()).toAbsolutePath().normalize();
             if (!file.startsWith(root)) {
+                // Never delete outside the configured export root, even if persisted metadata is corrupt.
                 return false;
             }
             boolean deleted = Files.deleteIfExists(file);
             deleteEmptyParents(file.getParent(), root);
             return deleted;
+        // 捕获异常并转为业务兜底处理，避免异常扩散到主流程。
         } catch (IOException e) {
             throw new IllegalStateException("failed to delete BI export file: " + row.getId(), e);
         }
     }
 
+    /**
+     * 执行数据写入或状态变更。
+     *
+     * @param parent parent 参数，用于 deleteEmptyParents 流程中的校验、计算或对象转换。
+     * @param root root 参数，用于 deleteEmptyParents 流程中的校验、计算或对象转换。
+     */
     private void deleteEmptyParents(Path parent, Path root) throws IOException {
         Path cursor = parent;
         while (cursor != null && cursor.startsWith(root) && !cursor.equals(root)) {
             try {
                 Files.deleteIfExists(cursor);
+            // 捕获异常并转为业务兜底处理，避免异常扩散到主流程。
             } catch (DirectoryNotEmptyException e) {
                 return;
             }
@@ -1591,10 +2373,23 @@ public class BiSelfServiceExportService {
         }
     }
 
+    /**
+     * 解析并规范化租户 ID。
+     *
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @return 返回解析、归一化或安全处理后的值。
+     */
     private Long normalizeTenant(Long tenantId) {
         return tenantId == null ? 0L : tenantId;
     }
 
+    /**
+     * 执行 truncate 流程，围绕 truncate 完成校验、计算或结果组装。
+     *
+     * @param value 待处理值，用于规则计算或转换。
+     * @param maxLength max length 参数，用于 truncate 流程中的校验、计算或对象转换。
+     * @return 返回 truncate 生成的文本或业务键。
+     */
     private String truncate(String value, int maxLength) {
         if (value == null || value.length() <= maxLength) {
             return value;
@@ -1602,10 +2397,19 @@ public class BiSelfServiceExportService {
         return value.substring(0, maxLength);
     }
 
+    /**
+     * 按安全边界裁剪或保护输入值。
+     *
+     * @param rows rows 参数，用于 safeList 流程中的校验、计算或对象转换。
+     * @return 返回 safe list 汇总后的集合、分页或映射视图。
+     */
     private <T> List<T> safeList(List<T> rows) {
         return rows == null ? List.of() : rows;
     }
 
+    /**
+     * DownloadRateWindow 数据记录。
+     */
     private record DownloadRateWindow(long windowMinute, int count) {
     }
 }

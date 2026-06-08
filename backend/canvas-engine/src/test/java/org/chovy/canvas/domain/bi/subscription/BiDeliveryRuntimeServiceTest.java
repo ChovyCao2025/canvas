@@ -9,7 +9,9 @@ import org.chovy.canvas.dal.mapper.BiAlertRuleMapper;
 import org.chovy.canvas.dal.mapper.BiDatasetMapper;
 import org.chovy.canvas.dal.mapper.BiDeliveryLogMapper;
 import org.chovy.canvas.dal.mapper.BiSubscriptionMapper;
+import org.chovy.canvas.domain.bi.permission.BiPermissionService;
 import org.chovy.canvas.domain.bi.query.BiQueryColumn;
+import org.chovy.canvas.domain.bi.query.BiQueryContext;
 import org.chovy.canvas.domain.bi.query.BiQueryExecutionService;
 import org.chovy.canvas.domain.bi.query.BiQueryRequest;
 import org.chovy.canvas.domain.bi.query.BiQueryResult;
@@ -27,6 +29,7 @@ import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -59,6 +62,30 @@ class BiDeliveryRuntimeServiceTest {
         assertThat(logCaptor.getAllValues().get(1).getRetryCount()).isZero();
         assertThat(logCaptor.getAllValues().get(1).getMaxRetryCount()).isEqualTo(4);
         assertThat(logCaptor.getAllValues().get(1).getNextRetryAt()).isNotNull();
+    }
+
+    @Test
+    void runSubscriptionChecksSubscribePermissionBeforeDelivery() {
+        BiSubscriptionMapper subscriptionMapper = mock(BiSubscriptionMapper.class);
+        BiAlertRuleMapper alertRuleMapper = mock(BiAlertRuleMapper.class);
+        BiDatasetMapper datasetMapper = mock(BiDatasetMapper.class);
+        BiDeliveryLogMapper deliveryLogMapper = mock(BiDeliveryLogMapper.class);
+        BiQueryExecutionService queryExecutionService = mock(BiQueryExecutionService.class);
+        NotificationService notificationService = mock(NotificationService.class);
+        BiPermissionService permissionService = mock(BiPermissionService.class);
+        when(subscriptionMapper.selectById(31L)).thenReturn(subscription());
+        BiDeliveryRuntimeService service = service(subscriptionMapper, alertRuleMapper, datasetMapper,
+                deliveryLogMapper, queryExecutionService, permissionService, notificationService, null);
+
+        service.runSubscription(7L, 31L, "alice", "OPERATOR");
+
+        verify(permissionService).enforceResourceAccess(
+                eq(7L),
+                eq(5L),
+                eq("DASHBOARD"),
+                eq(21L),
+                any(BiQueryContext.class),
+                eq(BiPermissionService.ACTION_SUBSCRIBE));
     }
 
     @Test
@@ -689,6 +716,32 @@ class BiDeliveryRuntimeServiceTest {
     }
 
     @Test
+    void retryPendingDeliveriesChecksSubscribePermissionBeforeAdapterReplay() {
+        BiSubscriptionMapper subscriptionMapper = mock(BiSubscriptionMapper.class);
+        BiAlertRuleMapper alertRuleMapper = mock(BiAlertRuleMapper.class);
+        BiDatasetMapper datasetMapper = mock(BiDatasetMapper.class);
+        BiDeliveryLogMapper deliveryLogMapper = mock(BiDeliveryLogMapper.class);
+        BiQueryExecutionService queryExecutionService = mock(BiQueryExecutionService.class);
+        BiDeliveryAdapterService adapterService = mock(BiDeliveryAdapterService.class);
+        BiPermissionService permissionService = mock(BiPermissionService.class);
+        when(deliveryLogMapper.selectList(any())).thenReturn(List.of(retryableWebhookLog()));
+        when(adapterService.deliver(any(BiDeliveryAdapterRequest.class)))
+                .thenReturn(BiDeliveryAdapterResult.delivered("WEBHOOK webhook delivered: HTTP 200"));
+        BiDeliveryRuntimeService service = service(subscriptionMapper, alertRuleMapper, datasetMapper,
+                deliveryLogMapper, queryExecutionService, permissionService, null, adapterService);
+
+        service.retryPendingDeliveries(7L, "alice", "OPERATOR", 10);
+
+        verify(permissionService).enforceResourceAccess(
+                eq(7L),
+                eq(5L),
+                eq("DASHBOARD"),
+                eq(21L),
+                any(BiQueryContext.class),
+                eq(BiPermissionService.ACTION_SUBSCRIBE));
+    }
+
+    @Test
     void retryPendingDeliveriesMarksExhaustedWhenBackoffLimitReached() {
         BiSubscriptionMapper subscriptionMapper = mock(BiSubscriptionMapper.class);
         BiAlertRuleMapper alertRuleMapper = mock(BiAlertRuleMapper.class);
@@ -708,6 +761,7 @@ class BiDeliveryRuntimeServiceTest {
                 datasetMapper,
                 deliveryLogMapper,
                 queryExecutionService,
+                null,
                 null,
                 adapterService,
                 null,
@@ -825,14 +879,34 @@ class BiDeliveryRuntimeServiceTest {
                                              BiQueryExecutionService queryExecutionService,
                                              NotificationService notificationService,
                                              BiDeliveryAdapterService adapterService) {
+        return service(subscriptionMapper,
+                alertRuleMapper,
+                datasetMapper,
+                deliveryLogMapper,
+                queryExecutionService,
+                null,
+                notificationService,
+                adapterService);
+    }
+
+    private BiDeliveryRuntimeService service(BiSubscriptionMapper subscriptionMapper,
+                                             BiAlertRuleMapper alertRuleMapper,
+                                             BiDatasetMapper datasetMapper,
+                                             BiDeliveryLogMapper deliveryLogMapper,
+                                             BiQueryExecutionService queryExecutionService,
+                                             BiPermissionService permissionService,
+                                             NotificationService notificationService,
+                                             BiDeliveryAdapterService adapterService) {
         return new BiDeliveryRuntimeService(
                 subscriptionMapper,
                 alertRuleMapper,
                 datasetMapper,
                 deliveryLogMapper,
                 queryExecutionService,
+                permissionService,
                 notificationService,
                 adapterService,
+                null,
                 new ObjectMapper());
     }
 

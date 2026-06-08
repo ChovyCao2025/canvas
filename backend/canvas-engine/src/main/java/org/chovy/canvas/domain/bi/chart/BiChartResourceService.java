@@ -32,6 +32,9 @@ import java.util.Set;
 import java.util.regex.Pattern;
 
 @Service
+/**
+ * BiChartResourceService 承载对应领域的业务规则、流程编排和结果转换。
+ */
 public class BiChartResourceService {
 
     private static final String WORKSPACE_KEY = "marketing_canvas";
@@ -63,6 +66,14 @@ public class BiChartResourceService {
     private final BiResourceCollaborationService collaborationService;
     private final BiQueryCompiler queryCompiler = new BiQueryCompiler();
 
+    /**
+     * 初始化 BiChartResourceService 实例。
+     *
+     * @param workspaceMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param datasetMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param chartMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param objectMapper 依赖组件，用于完成数据访问或外部能力调用。
+     */
     public BiChartResourceService(BiWorkspaceMapper workspaceMapper,
                                   BiDatasetMapper datasetMapper,
                                   BiChartMapper chartMapper,
@@ -71,6 +82,19 @@ public class BiChartResourceService {
     }
 
     @Autowired
+    /**
+     * 初始化 BiChartResourceService 实例。
+     *
+     * @param workspaceMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param datasetMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param chartMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param versionMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param objectMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param datasetSpecResolverProvider 依赖组件，用于完成数据访问、计算或外部能力调用。
+     * @param permissionGuardProvider permission guard provider 参数，用于 BiChartResourceService 流程中的校验、计算或对象转换。
+     * @param publishApprovalServiceProvider 依赖组件，用于完成数据访问或外部能力调用。
+     * @param collaborationServiceProvider 依赖组件，用于完成数据访问或外部能力调用。
+     */
     public BiChartResourceService(BiWorkspaceMapper workspaceMapper,
                                   BiDatasetMapper datasetMapper,
                                   BiChartMapper chartMapper,
@@ -87,6 +111,16 @@ public class BiChartResourceService {
                 collaborationServiceProvider == null ? null : collaborationServiceProvider.getIfAvailable());
     }
 
+    /**
+     * 初始化 BiChartResourceService 实例。
+     *
+     * @param workspaceMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param datasetMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param chartMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param versionMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param objectMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param datasetSpecResolver 依赖组件，用于完成数据访问、计算或外部能力调用。
+     */
     public BiChartResourceService(BiWorkspaceMapper workspaceMapper,
                                   BiDatasetMapper datasetMapper,
                                   BiChartMapper chartMapper,
@@ -96,6 +130,17 @@ public class BiChartResourceService {
         this(workspaceMapper, datasetMapper, chartMapper, versionMapper, objectMapper, datasetSpecResolver, null);
     }
 
+    /**
+     * 初始化 BiChartResourceService 实例。
+     *
+     * @param workspaceMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param datasetMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param chartMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param versionMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param objectMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param datasetSpecResolver 依赖组件，用于完成数据访问、计算或外部能力调用。
+     * @param permissionGuard permission guard 参数，用于 BiChartResourceService 流程中的校验、计算或对象转换。
+     */
     public BiChartResourceService(BiWorkspaceMapper workspaceMapper,
                                   BiDatasetMapper datasetMapper,
                                   BiChartMapper chartMapper,
@@ -107,6 +152,18 @@ public class BiChartResourceService {
                 permissionGuard, null, null);
     }
 
+    /**
+     * 初始化 BiChartResourceService 实例。
+     *
+     * @param workspaceMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param datasetMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param chartMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param versionMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param objectMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param datasetSpecResolver 依赖组件，用于完成数据访问、计算或外部能力调用。
+     * @param permissionGuard permission guard 参数，用于 BiChartResourceService 流程中的校验、计算或对象转换。
+     * @param publishApprovalService 依赖组件，用于完成数据访问或外部能力调用。
+     */
     public BiChartResourceService(BiWorkspaceMapper workspaceMapper,
                                   BiDatasetMapper datasetMapper,
                                   BiChartMapper chartMapper,
@@ -119,6 +176,19 @@ public class BiChartResourceService {
                 permissionGuard, publishApprovalService, null);
     }
 
+    /**
+     * 初始化 BiChartResourceService 实例。
+     *
+     * @param workspaceMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param datasetMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param chartMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param versionMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param objectMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param datasetSpecResolver 依赖组件，用于完成数据访问、计算或外部能力调用。
+     * @param permissionGuard permission guard 参数，用于 BiChartResourceService 流程中的校验、计算或对象转换。
+     * @param publishApprovalService 依赖组件，用于完成数据访问或外部能力调用。
+     * @param collaborationService 依赖组件，用于完成数据访问或外部能力调用。
+     */
     public BiChartResourceService(BiWorkspaceMapper workspaceMapper,
                                   BiDatasetMapper datasetMapper,
                                   BiChartMapper chartMapper,
@@ -139,6 +209,12 @@ public class BiChartResourceService {
         this.collaborationService = collaborationService;
     }
 
+    /**
+     * 查询并组装符合条件的业务数据。
+     *
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @return 返回符合条件的数据列表或视图。
+     */
     public List<BiChartResource> list(Long tenantId) {
         Long scopedTenantId = normalizeTenant(tenantId);
         Long workspaceId = workspaceId(scopedTenantId);
@@ -153,6 +229,13 @@ public class BiChartResourceService {
                 .toList();
     }
 
+    /**
+     * 根据方法职责完成对应的业务处理流程。
+     *
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @param chartKey 业务键，用于在同一租户下定位资源。
+     * @return 返回 get 流程生成的业务结果。
+     */
     public BiChartResource get(Long tenantId, String chartKey) {
         Long scopedTenantId = normalizeTenant(tenantId);
         Long workspaceId = workspaceId(scopedTenantId);
@@ -163,14 +246,41 @@ public class BiChartResourceService {
         return toResource(row);
     }
 
+    /**
+     * 写入或更新业务数据，并保持关联状态一致。
+     *
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @param username 操作人标识，用于审计和权限判断。
+     * @param resource resource 参数，用于 saveDraft 流程中的校验、计算或对象转换。
+     * @return 返回流程执行后的业务结果。
+     */
     public BiChartResource saveDraft(Long tenantId, String username, BiChartResource resource) {
         return saveDraft(tenantId, username, null, resource);
     }
 
+    /**
+     * 写入或更新业务数据，并保持关联状态一致。
+     *
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @param username 操作人标识，用于审计和权限判断。
+     * @param role 角色标识，用于权限校验和访问范围判断。
+     * @param resource resource 参数，用于 saveDraft 流程中的校验、计算或对象转换。
+     * @return 返回流程执行后的业务结果。
+     */
     public BiChartResource saveDraft(Long tenantId, String username, String role, BiChartResource resource) {
         return saveDraftInternal(tenantId, username, role, resource, null, false);
     }
 
+    /**
+     * 写入或更新业务数据，并保持关联状态一致。
+     *
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @param username 操作人标识，用于审计和权限判断。
+     * @param role 角色标识，用于权限校验和访问范围判断。
+     * @param resource resource 参数，用于 saveDraft 流程中的校验、计算或对象转换。
+     * @param lockToken 令牌或锁标识，用于鉴权、幂等或并发控制。
+     * @return 返回流程执行后的业务结果。
+     */
     public BiChartResource saveDraft(Long tenantId,
                                      String username,
                                      String role,
@@ -179,12 +289,24 @@ public class BiChartResourceService {
         return saveDraftInternal(tenantId, username, role, resource, lockToken, true);
     }
 
+    /**
+     * 写入或更新业务数据，并保持关联状态一致。
+     *
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @param username 操作人标识，用于审计和权限判断。
+     * @param role 角色标识，用于权限校验和访问范围判断。
+     * @param resource resource 参数，用于 saveDraftInternal 流程中的校验、计算或对象转换。
+     * @param lockToken 令牌或锁标识，用于鉴权、幂等或并发控制。
+     * @param enforceEditLock enforce edit lock 参数，用于 saveDraftInternal 流程中的校验、计算或对象转换。
+     * @return 返回流程执行后的业务结果。
+     */
     private BiChartResource saveDraftInternal(Long tenantId,
                                               String username,
                                               String role,
                                               BiChartResource resource,
                                               String lockToken,
                                               boolean enforceEditLock) {
+        // 准备本次处理所需的上下文和中间变量。
         Long scopedTenantId = normalizeTenant(tenantId);
         Long workspaceId = workspaceId(scopedTenantId);
         validateResource(resource, scopedTenantId);
@@ -206,9 +328,11 @@ public class BiChartResourceService {
         row.setInteractionJson(json(resource.interaction()));
         row.setStatus(STATUS_DRAFT);
         row.setCreatedBy(username == null || username.isBlank() ? "system" : username);
+        // 访问持久化或外部依赖，获取或写入本次流程需要的数据。
         chartMapper.upsert(row);
 
         BiChartDO persisted = find(scopedTenantId, workspaceId, resource.chartKey());
+        // 汇总前面计算出的状态和明细，返回给调用方。
         return persisted == null ? new BiChartResource(
                 resource.chartKey(),
                 resource.name(),
@@ -221,22 +345,48 @@ public class BiChartResourceService {
                 "PERSISTED") : toResource(persisted);
     }
 
+    /**
+     * 执行业务决策动作，并同步后续状态。
+     *
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @param chartKey 业务键，用于在同一租户下定位资源。
+     * @return 返回流程执行后的业务结果。
+     */
     public BiChartResource publish(Long tenantId, String chartKey) {
         return publish(tenantId, null, chartKey);
     }
 
+    /**
+     * 执行业务决策动作，并同步后续状态。
+     *
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @param username 操作人标识，用于审计和权限判断。
+     * @param chartKey 业务键，用于在同一租户下定位资源。
+     * @return 返回流程执行后的业务结果。
+     */
     public BiChartResource publish(Long tenantId, String username, String chartKey) {
         return publish(tenantId, username, null, chartKey);
     }
 
+    /**
+     * 执行业务决策动作，并同步后续状态。
+     *
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @param username 操作人标识，用于审计和权限判断。
+     * @param role 角色标识，用于权限校验和访问范围判断。
+     * @param chartKey 业务键，用于在同一租户下定位资源。
+     * @return 返回流程执行后的业务结果。
+     */
     public BiChartResource publish(Long tenantId, String username, String role, String chartKey) {
         Long scopedTenantId = normalizeTenant(tenantId);
         Long workspaceId = workspaceId(scopedTenantId);
         BiChartDO row = find(scopedTenantId, workspaceId, chartKey);
+        // 校验关键输入和前置条件，避免无效状态继续进入主流程。
         if (row == null) {
             throw new IllegalArgumentException("BI chart not found: " + chartKey);
         }
         requirePermission(scopedTenantId, workspaceId, "CHART", row.getId(),
+                // 访问持久化或外部依赖，获取或写入本次流程需要的数据。
                 username, role, BiPermissionService.ACTION_PUBLISH);
         requirePublishApproval(scopedTenantId, workspaceId, "CHART", chartKey, row.getUpdatedAt(), role);
         chartMapper.publish(scopedTenantId, workspaceId, chartKey);
@@ -249,9 +399,17 @@ public class BiChartResourceService {
         }
         BiChartResource resource = toResource(published);
         insertVersionSnapshot(scopedTenantId, workspaceId, published, resource, username);
+        // 汇总前面计算出的状态和明细，返回给调用方。
         return resource;
     }
 
+    /**
+     * 清理、停用或释放指定业务资源。
+     *
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @param chartKey 业务键，用于在同一租户下定位资源。
+     * @return 返回 archive 流程生成的业务结果。
+     */
     public BiChartResource archive(Long tenantId, String chartKey) {
         Long scopedTenantId = normalizeTenant(tenantId);
         Long workspaceId = workspaceId(scopedTenantId);
@@ -268,33 +426,74 @@ public class BiChartResourceService {
         return toResource(archived);
     }
 
+    /**
+     * 查询并组装符合条件的业务数据。
+     *
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @param chartKey 业务键，用于在同一租户下定位资源。
+     * @param limit 分页或数量限制，避免一次处理过多数据。
+     * @return 返回符合条件的数据列表或视图。
+     */
     public List<BiChartVersionView> listVersions(Long tenantId, String chartKey, int limit) {
         Long scopedTenantId = normalizeTenant(tenantId);
         Long workspaceId = workspaceId(scopedTenantId);
         BiChartDO row = find(scopedTenantId, workspaceId, chartKey);
+        // 校验关键输入和前置条件，避免无效状态继续进入主流程。
         if (row == null || row.getId() == null || versionMapper == null) {
             return List.of();
         }
         int capped = Math.max(1, Math.min(limit <= 0 ? 20 : limit, 100));
+        // 访问持久化或外部依赖，获取或写入本次流程需要的数据。
         return safeList(versionMapper.selectList(new LambdaQueryWrapper<BiChartVersionDO>()
                         .eq(BiChartVersionDO::getTenantId, scopedTenantId)
                         .eq(BiChartVersionDO::getWorkspaceId, workspaceId)
                         .eq(BiChartVersionDO::getChartId, row.getId())
                         .orderByDesc(BiChartVersionDO::getVersion)
                         .last("LIMIT " + capped)))
+                // 遍历候选数据并按业务规则筛选、转换或聚合。
                 .stream()
                 .map(this::toVersionView)
                 .toList();
     }
 
+    /**
+     * 根据方法职责完成对应的业务处理流程。
+     *
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @param username 操作人标识，用于审计和权限判断。
+     * @param chartKey 业务键，用于在同一租户下定位资源。
+     * @param version version 参数，用于 restoreVersion 流程中的校验、计算或对象转换。
+     * @return 返回 restoreVersion 流程生成的业务结果。
+     */
     public BiChartResource restoreVersion(Long tenantId, String username, String chartKey, int version) {
         return restoreVersion(tenantId, username, null, chartKey, version);
     }
 
+    /**
+     * 根据方法职责完成对应的业务处理流程。
+     *
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @param username 操作人标识，用于审计和权限判断。
+     * @param role 角色标识，用于权限校验和访问范围判断。
+     * @param chartKey 业务键，用于在同一租户下定位资源。
+     * @param version version 参数，用于 restoreVersion 流程中的校验、计算或对象转换。
+     * @return 返回 restoreVersion 流程生成的业务结果。
+     */
     public BiChartResource restoreVersion(Long tenantId, String username, String role, String chartKey, int version) {
         return restoreVersionInternal(tenantId, username, role, chartKey, version, null, false);
     }
 
+    /**
+     * 根据方法职责完成对应的业务处理流程。
+     *
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @param username 操作人标识，用于审计和权限判断。
+     * @param role 角色标识，用于权限校验和访问范围判断。
+     * @param chartKey 业务键，用于在同一租户下定位资源。
+     * @param version version 参数，用于 restoreVersion 流程中的校验、计算或对象转换。
+     * @param lockToken 令牌或锁标识，用于鉴权、幂等或并发控制。
+     * @return 返回 restoreVersion 流程生成的业务结果。
+     */
     public BiChartResource restoreVersion(Long tenantId,
                                           String username,
                                           String role,
@@ -304,6 +503,18 @@ public class BiChartResourceService {
         return restoreVersionInternal(tenantId, username, role, chartKey, version, lockToken, true);
     }
 
+    /**
+     * 根据方法职责完成对应的业务处理流程。
+     *
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @param username 操作人标识，用于审计和权限判断。
+     * @param role 角色标识，用于权限校验和访问范围判断。
+     * @param chartKey 业务键，用于在同一租户下定位资源。
+     * @param version version 参数，用于 restoreVersionInternal 流程中的校验、计算或对象转换。
+     * @param lockToken 令牌或锁标识，用于鉴权、幂等或并发控制。
+     * @param enforceEditLock enforce edit lock 参数，用于 restoreVersionInternal 流程中的校验、计算或对象转换。
+     * @return 返回 restoreVersionInternal 流程生成的业务结果。
+     */
     private BiChartResource restoreVersionInternal(Long tenantId,
                                                    String username,
                                                    String role,
@@ -314,6 +525,7 @@ public class BiChartResourceService {
         Long scopedTenantId = normalizeTenant(tenantId);
         Long workspaceId = workspaceId(scopedTenantId);
         BiChartDO row = find(scopedTenantId, workspaceId, chartKey);
+        // 校验关键输入和前置条件，避免无效状态继续进入主流程。
         if (row == null || row.getId() == null) {
             throw new IllegalArgumentException("BI chart not found: " + chartKey);
         }
@@ -323,6 +535,7 @@ public class BiChartResourceService {
         if (versionMapper == null) {
             throw new IllegalStateException("BI chart version mapper is required");
         }
+        // 访问持久化或外部依赖，获取或写入本次流程需要的数据。
         BiChartVersionDO snapshot = versionMapper.selectOne(new LambdaQueryWrapper<BiChartVersionDO>()
                 .eq(BiChartVersionDO::getTenantId, scopedTenantId)
                 .eq(BiChartVersionDO::getWorkspaceId, workspaceId)
@@ -338,18 +551,41 @@ public class BiChartResourceService {
         return saveDraft(scopedTenantId, username, role, resourceFromJson(snapshot.getResourceJson()));
     }
 
+    /**
+     * 校验输入、权限或业务前置条件。
+     *
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @param workspaceId 业务对象 ID，用于定位具体记录。
+     * @param resourceType 类型标识，用于选择对应处理分支。
+     * @param resourceKey 业务键，用于在同一租户下定位资源。
+     * @param resourceUpdatedAt 时间参数，用于计算窗口、过期或审计时间。
+     * @param role 角色标识，用于权限校验和访问范围判断。
+     */
     private void requirePublishApproval(Long tenantId,
                                         Long workspaceId,
                                         String resourceType,
                                         String resourceKey,
                                         java.time.LocalDateTime resourceUpdatedAt,
                                         String role) {
+        // 校验关键输入和前置条件，避免无效状态继续进入主流程。
         if (publishApprovalService != null && !canBypassPublishApproval(role)) {
             publishApprovalService.requireApprovedApproval(
                     tenantId, workspaceId, resourceType, resourceKey, resourceUpdatedAt);
         }
     }
 
+    /**
+     * 校验输入、权限或业务前置条件。
+     *
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @param workspaceId 业务对象 ID，用于定位具体记录。
+     * @param resourceType 类型标识，用于选择对应处理分支。
+     * @param resourceKey 业务键，用于在同一租户下定位资源。
+     * @param username 操作人标识，用于审计和权限判断。
+     * @param role 角色标识，用于权限校验和访问范围判断。
+     * @param lockToken 令牌或锁标识，用于鉴权、幂等或并发控制。
+     * @param required required 参数，用于 requireEditLock 流程中的校验、计算或对象转换。
+     */
     private void requireEditLock(Long tenantId,
                                  Long workspaceId,
                                  String resourceType,
@@ -363,10 +599,22 @@ public class BiChartResourceService {
         }
     }
 
+    /**
+     * 校验输入、权限或业务前置条件。
+     *
+     * @param role 角色标识，用于权限校验和访问范围判断。
+     * @return 返回布尔判断结果。
+     */
     private boolean canBypassEditLock(String role) {
         return canBypassPublishApproval(role);
     }
 
+    /**
+     * 校验输入、权限或业务前置条件。
+     *
+     * @param role 角色标识，用于权限校验和访问范围判断。
+     * @return 返回布尔判断结果。
+     */
     private boolean canBypassPublishApproval(String role) {
         if (role == null || role.isBlank()) {
             return false;
@@ -377,6 +625,17 @@ public class BiChartResourceService {
                 || RoleNames.TENANT_ADMIN.equals(normalized);
     }
 
+    /**
+     * 校验输入、权限或业务前置条件。
+     *
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @param workspaceId 业务对象 ID，用于定位具体记录。
+     * @param resourceType 类型标识，用于选择对应处理分支。
+     * @param resourceId 业务对象 ID，用于定位具体记录。
+     * @param username 操作人标识，用于审计和权限判断。
+     * @param role 角色标识，用于权限校验和访问范围判断。
+     * @param actionKey 业务键，用于在同一租户下定位资源。
+     */
     private void requirePermission(Long tenantId,
                                    Long workspaceId,
                                    String resourceType,
@@ -389,7 +648,14 @@ public class BiChartResourceService {
         }
     }
 
+    /**
+     * 校验输入、权限或业务前置条件。
+     *
+     * @param resource resource 参数，用于 validateResource 流程中的校验、计算或对象转换。
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     */
     private void validateResource(BiChartResource resource, Long tenantId) {
+        // 校验关键输入和前置条件，避免无效状态继续进入主流程。
         if (resource == null) {
             throw new IllegalArgumentException("chart resource is required");
         }
@@ -412,6 +678,14 @@ public class BiChartResourceService {
         queryCompiler.compile(dataset, resource.query(), tenantId);
     }
 
+    /**
+     * 查询并组装符合条件的业务数据。
+     *
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @param workspaceId 业务对象 ID，用于定位具体记录。
+     * @param chartKey 业务键，用于在同一租户下定位资源。
+     * @return 返回符合条件的数据列表或视图。
+     */
     private BiChartDO find(Long tenantId, Long workspaceId, String chartKey) {
         return chartMapper.selectOne(new LambdaQueryWrapper<BiChartDO>()
                 .eq(BiChartDO::getTenantId, tenantId)
@@ -420,6 +694,12 @@ public class BiChartResourceService {
                 .last("LIMIT 1"));
     }
 
+    /**
+     * 根据方法职责完成对应的业务处理流程。
+     *
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @return 返回 workspace id 计算得到的数量、金额或指标值。
+     */
     private Long workspaceId(Long tenantId) {
         BiWorkspaceDO workspace = workspaceMapper.selectOne(new LambdaQueryWrapper<BiWorkspaceDO>()
                 .in(BiWorkspaceDO::getTenantId, List.of(tenantId, 0L))
@@ -429,6 +709,14 @@ public class BiChartResourceService {
         return workspace == null || workspace.getId() == null ? 0L : workspace.getId();
     }
 
+    /**
+     * 根据方法职责完成对应的业务处理流程。
+     *
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @param workspaceId 业务对象 ID，用于定位具体记录。
+     * @param datasetKey 业务键，用于在同一租户下定位资源。
+     * @return 返回 dataset id 计算得到的数量、金额或指标值。
+     */
     private Long datasetId(Long tenantId, Long workspaceId, String datasetKey) {
         BiDatasetDO dataset = datasetMapper.selectOne(new LambdaQueryWrapper<BiDatasetDO>()
                 .in(BiDatasetDO::getTenantId, List.of(tenantId, 0L))
@@ -448,6 +736,12 @@ public class BiChartResourceService {
         return dataset.getId();
     }
 
+    /**
+     * 组装输出结构或完成对象转换。
+     *
+     * @param row 持久化行数据，承载数据库记录内容。
+     * @return 返回组装或转换后的结果对象。
+     */
     private BiChartResource toResource(BiChartDO row) {
         BiQueryRequest query = query(row.getQueryJson());
         return new BiChartResource(
@@ -462,12 +756,23 @@ public class BiChartResourceService {
                 "PERSISTED");
     }
 
+    /**
+     * 写入或更新业务数据，并保持关联状态一致。
+     *
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @param workspaceId 业务对象 ID，用于定位具体记录。
+     * @param chart chart 参数，用于 insertVersionSnapshot 流程中的校验、计算或对象转换。
+     * @param resource resource 参数，用于 insertVersionSnapshot 流程中的校验、计算或对象转换。
+     * @param username 操作人标识，用于审计和权限判断。
+     */
     private void insertVersionSnapshot(Long tenantId,
                                        Long workspaceId,
                                        BiChartDO chart,
                                        BiChartResource resource,
                                        String username) {
+        // 校验关键输入和前置条件，避免无效状态继续进入主流程。
         if (versionMapper == null) {
+            // 汇总前面计算出的状态和明细，返回给调用方。
             return;
         }
         if (chart.getId() == null) {
@@ -479,12 +784,21 @@ public class BiChartResourceService {
         row.setChartId(chart.getId());
         row.setChartKey(chart.getChartKey());
         row.setVersion(nextVersion(tenantId, workspaceId, chart.getId()));
+        // 访问持久化或外部依赖，获取或写入本次流程需要的数据。
         row.setStatus(STATUS_PUBLISHED);
         row.setResourceJson(json(resource));
         row.setPublishedBy(defaultUser(username));
         versionMapper.insert(row);
     }
 
+    /**
+     * 根据方法职责完成对应的业务处理流程。
+     *
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @param workspaceId 业务对象 ID，用于定位具体记录。
+     * @param chartId 业务对象 ID，用于定位具体记录。
+     * @return 返回 next version 计算得到的数量、金额或指标值。
+     */
     private int nextVersion(Long tenantId, Long workspaceId, Long chartId) {
         if (versionMapper == null) {
             return 1;
@@ -498,6 +812,12 @@ public class BiChartResourceService {
         return latest == null || latest.getVersion() == null ? 1 : latest.getVersion() + 1;
     }
 
+    /**
+     * 组装输出结构或完成对象转换。
+     *
+     * @param row 持久化行数据，承载数据库记录内容。
+     * @return 返回组装或转换后的结果对象。
+     */
     private BiChartVersionView toVersionView(BiChartVersionDO row) {
         return new BiChartVersionView(
                 row.getId(),
@@ -509,6 +829,12 @@ public class BiChartResourceService {
                 row.getCreatedAt());
     }
 
+    /**
+     * 根据方法职责完成对应的业务处理流程。
+     *
+     * @param json JSON 字符串，承载结构化配置或明细。
+     * @return 返回 resourceFromJson 流程生成的业务结果。
+     */
     private BiChartResource resourceFromJson(String json) {
         try {
             return objectMapper.readValue(json, BiChartResource.class);
@@ -517,6 +843,12 @@ public class BiChartResourceService {
         }
     }
 
+    /**
+     * 查询并组装符合条件的业务数据。
+     *
+     * @param json JSON 字符串，承载结构化配置或明细。
+     * @return 返回符合条件的数据列表或视图。
+     */
     private BiQueryRequest query(String json) {
         try {
             return objectMapper.readValue(json, BiQueryRequest.class);
@@ -525,6 +857,12 @@ public class BiChartResourceService {
         }
     }
 
+    /**
+     * 组装输出结构或完成对象转换。
+     *
+     * @param json JSON 字符串，承载结构化配置或明细。
+     * @return 返回组装或转换后的结果对象。
+     */
     private Map<String, Object> map(String json) {
         if (json == null || json.isBlank()) {
             return Map.of();
@@ -537,6 +875,12 @@ public class BiChartResourceService {
         }
     }
 
+    /**
+     * 根据方法职责完成对应的业务处理流程。
+     *
+     * @param value 待处理值，用于规则计算或转换。
+     * @return 返回 json 生成的文本或业务键。
+     */
     private String json(Object value) {
         try {
             return objectMapper.writeValueAsString(value == null ? Map.of() : value);
@@ -545,6 +889,13 @@ public class BiChartResourceService {
         }
     }
 
+    /**
+     * 校验输入、权限或业务前置条件。
+     *
+     * @param value 待处理值，用于规则计算或转换。
+     * @param field 待处理业务值，用于规则计算、转换或外部调用。
+     * @return 返回 required 生成的文本或业务键。
+     */
     private String required(String value, String field) {
         if (value == null || value.isBlank()) {
             throw new IllegalArgumentException(field + " is required");
@@ -552,14 +903,32 @@ public class BiChartResourceService {
         return value.trim();
     }
 
+    /**
+     * 生成默认值或兜底结果，保证调用链稳定。
+     *
+     * @param username 操作人标识，用于审计和权限判断。
+     * @return 返回 default user 生成的文本或业务键。
+     */
     private String defaultUser(String username) {
         return username == null || username.isBlank() ? "system" : username;
     }
 
+    /**
+     * 解析、归一化或保护输入值，生成安全可用的中间结果。
+     *
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @return 返回解析、归一化或安全处理后的值。
+     */
     private Long normalizeTenant(Long tenantId) {
         return tenantId == null ? 0L : tenantId;
     }
 
+    /**
+     * 根据方法职责完成对应的业务处理流程。
+     *
+     * @param value 待处理值，用于规则计算或转换。
+     * @return 返回 safe list 汇总后的集合、分页或映射视图。
+     */
     private <T> List<T> safeList(List<T> value) {
         return value == null ? List.of() : value;
     }

@@ -110,6 +110,52 @@ class BiDatasetResourceServiceTest {
     }
 
     @Test
+    void saveDraftAcceptsSqlDatasetWithDerivedTableSource() {
+        BiWorkspaceMapper workspaceMapper = mock(BiWorkspaceMapper.class);
+        BiDatasetMapper datasetMapper = mock(BiDatasetMapper.class);
+        BiDatasetFieldMapper fieldMapper = mock(BiDatasetFieldMapper.class);
+        BiMetricMapper metricMapper = mock(BiMetricMapper.class);
+        when(workspaceMapper.selectOne(any(LambdaQueryWrapper.class))).thenReturn(workspace());
+        when(datasetMapper.selectOne(any(LambdaQueryWrapper.class))).thenReturn(sqlDataset("DRAFT"));
+        BiDatasetResourceService service = service(workspaceMapper, datasetMapper, fieldMapper, metricMapper);
+        BiDatasetResource sql = sqlDatasetResource(
+                "SELECT tenant_id, stat_date, total_cost FROM "
+                        + "(SELECT tenant_id, stat_date, total_cost FROM campaign_daily WHERE deleted = 0) daily "
+                        + "WHERE total_cost >= 0");
+
+        service.saveDraft(7L, "alice", sql);
+
+        ArgumentCaptor<BiDatasetDO> datasetCaptor = ArgumentCaptor.forClass(BiDatasetDO.class);
+        verify(datasetMapper).upsert(datasetCaptor.capture());
+        assertThat(datasetCaptor.getValue().getTableExpression())
+                .isEqualTo("(SELECT tenant_id, stat_date, total_cost FROM "
+                        + "(SELECT tenant_id, stat_date, total_cost FROM campaign_daily WHERE deleted = 0) daily "
+                        + "WHERE total_cost >= 0) sql_dataset");
+    }
+
+    @Test
+    void saveDraftAcceptsSqlDatasetWithQuotedSourceIdentifier() {
+        BiWorkspaceMapper workspaceMapper = mock(BiWorkspaceMapper.class);
+        BiDatasetMapper datasetMapper = mock(BiDatasetMapper.class);
+        BiDatasetFieldMapper fieldMapper = mock(BiDatasetFieldMapper.class);
+        BiMetricMapper metricMapper = mock(BiMetricMapper.class);
+        when(workspaceMapper.selectOne(any(LambdaQueryWrapper.class))).thenReturn(workspace());
+        when(datasetMapper.selectOne(any(LambdaQueryWrapper.class))).thenReturn(sqlDataset("DRAFT"));
+        BiDatasetResourceService service = service(workspaceMapper, datasetMapper, fieldMapper, metricMapper);
+        BiDatasetResource sql = sqlDatasetResource(
+                "SELECT \"tenant_id\" AS tenant_id, \"stat_date\" AS stat_date, \"total_cost\" AS total_cost "
+                        + "FROM \"campaign daily\" WHERE \"deleted\" = 0");
+
+        service.saveDraft(7L, "alice", sql);
+
+        ArgumentCaptor<BiDatasetDO> datasetCaptor = ArgumentCaptor.forClass(BiDatasetDO.class);
+        verify(datasetMapper).upsert(datasetCaptor.capture());
+        assertThat(datasetCaptor.getValue().getTableExpression())
+                .isEqualTo("(SELECT \"tenant_id\" AS tenant_id, \"stat_date\" AS stat_date, "
+                        + "\"total_cost\" AS total_cost FROM \"campaign daily\" WHERE \"deleted\" = 0) sql_dataset");
+    }
+
+    @Test
     void saveDraftAcceptsSqlDatasetWithBoundParametersAndStoresTemplateMetadata() {
         BiWorkspaceMapper workspaceMapper = mock(BiWorkspaceMapper.class);
         BiDatasetMapper datasetMapper = mock(BiDatasetMapper.class);
@@ -183,6 +229,30 @@ class BiDatasetResourceServiceTest {
         assertThatThrownBy(() -> service.saveDraft(7L, "alice", resource))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("SQL dataset query must be a single read-only SELECT");
+    }
+
+    @Test
+    void saveDraftRejectsSqlDatasetWithoutSourceTable() {
+        BiDatasetResourceService service = service(
+                mock(BiWorkspaceMapper.class),
+                mock(BiDatasetMapper.class),
+                mock(BiDatasetFieldMapper.class),
+                mock(BiMetricMapper.class));
+        BiDatasetResource resource = new BiDatasetResource(
+                "campaign_sql",
+                "Campaign SQL",
+                "SQL",
+                "SELECT tenant_id, 1 AS total_cost",
+                "tenant_id",
+                Map.of(),
+                sqlDatasetResource().fields(),
+                sqlDatasetResource().metrics(),
+                "DRAFT",
+                "CLIENT");
+
+        assertThatThrownBy(() -> service.saveDraft(7L, "alice", resource))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("SQL dataset query must include a FROM source");
     }
 
     @Test
@@ -574,11 +644,15 @@ class BiDatasetResourceServiceTest {
     }
 
     private BiDatasetResource sqlDatasetResource() {
+        return sqlDatasetResource("SELECT tenant_id, stat_date, total_cost FROM campaign_daily WHERE deleted = 0");
+    }
+
+    private BiDatasetResource sqlDatasetResource(String tableExpression) {
         return new BiDatasetResource(
                 "campaign_sql",
                 "Campaign SQL",
                 "SQL",
-                "SELECT tenant_id, stat_date, total_cost FROM campaign_daily WHERE deleted = 0",
+                tableExpression,
                 "tenant_id",
                 Map.of("dataSourceConfigId", 7L),
                 List.of(

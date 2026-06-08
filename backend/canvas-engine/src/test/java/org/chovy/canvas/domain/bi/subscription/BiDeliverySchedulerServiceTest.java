@@ -35,7 +35,7 @@ class BiDeliverySchedulerServiceTest {
         when(subscriptionMapper.selectList(any())).thenReturn(List.of(subscription));
         when(alertRuleMapper.selectList(any())).thenReturn(List.of());
         when(deliveryLogMapper.selectList(any())).thenReturn(List.of());
-        when(runtimeService.runSubscription(7L, 31L, "alice"))
+        when(runtimeService.runSubscription(7L, 31L, "alice", "OPERATOR"))
                 .thenReturn(new BiDeliveryRunResult("SUBSCRIPTION", 31L, "canvas-daily", "TRIGGERED", List.of()));
         BiDeliverySchedulerService service = service(subscriptionMapper, alertRuleMapper, deliveryLogMapper, runtimeService, true);
 
@@ -46,7 +46,7 @@ class BiDeliverySchedulerServiceTest {
         assertThat(result.subscriptionsTriggered()).isEqualTo(1);
         assertThat(result.skipped()).isZero();
         assertThat(result.failed()).isZero();
-        verify(runtimeService).runSubscription(7L, 31L, "alice");
+        verify(runtimeService).runSubscription(7L, 31L, "alice", "OPERATOR");
     }
 
     @Test
@@ -150,7 +150,7 @@ class BiDeliverySchedulerServiceTest {
                 true)));
         when(alertRuleMapper.selectList(any())).thenReturn(List.of());
         when(deliveryLogMapper.selectList(any())).thenReturn(List.of());
-        when(runtimeService.runSubscription(7L, 31L, "scheduler"))
+        when(runtimeService.runSubscription(7L, 31L, "scheduler", "SYSTEM"))
                 .thenReturn(new BiDeliveryRunResult("SUBSCRIPTION", 31L, "canvas-daily", "TRIGGERED", List.of()));
         BiDeliverySchedulerService service = service(
                 subscriptionMapper,

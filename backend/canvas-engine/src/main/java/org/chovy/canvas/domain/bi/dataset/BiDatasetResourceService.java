@@ -39,6 +39,12 @@ import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+/**
+ * Owns persisted BI dataset definitions and exposes them as executable query specs.
+ *
+ * <p>Built-in registry datasets remain the fallback for tenant 0 and missing rows; persisted datasets can be drafted,
+ * published, versioned, restored, and converted into {@link BiDatasetSpec} for query execution.</p>
+ */
 @Service
 public class BiDatasetResourceService implements BiDatasetSpecResolver {
 
@@ -50,6 +56,7 @@ public class BiDatasetResourceService implements BiDatasetSpecResolver {
     private static final Pattern TABLE_EXPRESSION = Pattern.compile("[A-Za-z0-9_]+(\\.[A-Za-z0-9_]+){0,2}");
     private static final Pattern COLUMN_EXPRESSION = Pattern.compile("[A-Za-z0-9_]+(\\.[A-Za-z0-9_]+)?");
     private static final Pattern METRIC_EXPRESSION = Pattern.compile("[A-Za-z0-9_\\s().,+\\-*/<>=]+");
+    private static final Pattern SQL_FROM_TOKEN = Pattern.compile("\\bFROM\\b", Pattern.CASE_INSENSITIVE);
     private static final Pattern FORBIDDEN_SQL_TOKEN = Pattern.compile(
             "\\b(INSERT|UPDATE|DELETE|DROP|ALTER|TRUNCATE|CREATE|MERGE|CALL|EXEC|GRANT|REVOKE|COPY|LOAD)\\b",
             Pattern.CASE_INSENSITIVE);
@@ -70,9 +77,21 @@ public class BiDatasetResourceService implements BiDatasetSpecResolver {
     private final BiPublishApprovalService publishApprovalService;
     private final BiResourceCollaborationService collaborationService;
 
+    /**
+     * SqlDatasetNormalization 数据记录。
+     */
     private record SqlDatasetNormalization(String tableExpression, Map<String, Object> model) {
     }
 
+    /**
+     * 执行 BiDatasetResourceService 流程，围绕 bi dataset resource service 完成校验、计算或结果组装。
+     *
+     * @param workspaceMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param datasetMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param fieldMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param metricMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param objectMapper 依赖组件，用于完成数据访问或外部能力调用。
+     */
     public BiDatasetResourceService(BiWorkspaceMapper workspaceMapper,
                                     BiDatasetMapper datasetMapper,
                                     BiDatasetFieldMapper fieldMapper,
@@ -81,6 +100,19 @@ public class BiDatasetResourceService implements BiDatasetSpecResolver {
         this(workspaceMapper, datasetMapper, fieldMapper, metricMapper, null, objectMapper);
     }
 
+    /**
+     * 执行 BiDatasetResourceService 流程，围绕 bi dataset resource service 完成校验、计算或结果组装。
+     *
+     * @param workspaceMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param datasetMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param fieldMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param metricMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param versionMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param objectMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param permissionGuardProvider permission guard provider 参数，用于 BiDatasetResourceService 流程中的校验、计算或对象转换。
+     * @param publishApprovalServiceProvider 依赖组件，用于完成数据访问或外部能力调用。
+     * @param collaborationServiceProvider 依赖组件，用于完成数据访问或外部能力调用。
+     */
     @Autowired
     public BiDatasetResourceService(BiWorkspaceMapper workspaceMapper,
                                     BiDatasetMapper datasetMapper,
@@ -97,6 +129,16 @@ public class BiDatasetResourceService implements BiDatasetSpecResolver {
                 collaborationServiceProvider == null ? null : collaborationServiceProvider.getIfAvailable());
     }
 
+    /**
+     * 执行 BiDatasetResourceService 流程，围绕 bi dataset resource service 完成校验、计算或结果组装。
+     *
+     * @param workspaceMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param datasetMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param fieldMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param metricMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param versionMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param objectMapper 依赖组件，用于完成数据访问或外部能力调用。
+     */
     public BiDatasetResourceService(BiWorkspaceMapper workspaceMapper,
                                     BiDatasetMapper datasetMapper,
                                     BiDatasetFieldMapper fieldMapper,
@@ -107,6 +149,17 @@ public class BiDatasetResourceService implements BiDatasetSpecResolver {
                 (BiResourcePermissionGuard) null);
     }
 
+    /**
+     * 执行 BiDatasetResourceService 流程，围绕 bi dataset resource service 完成校验、计算或结果组装。
+     *
+     * @param workspaceMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param datasetMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param fieldMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param metricMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param versionMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param objectMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param permissionGuard permission guard 参数，用于 BiDatasetResourceService 流程中的校验、计算或对象转换。
+     */
     public BiDatasetResourceService(BiWorkspaceMapper workspaceMapper,
                                     BiDatasetMapper datasetMapper,
                                     BiDatasetFieldMapper fieldMapper,
@@ -118,6 +171,18 @@ public class BiDatasetResourceService implements BiDatasetSpecResolver {
                 permissionGuard, null, null);
     }
 
+    /**
+     * 执行 BiDatasetResourceService 流程，围绕 bi dataset resource service 完成校验、计算或结果组装。
+     *
+     * @param workspaceMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param datasetMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param fieldMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param metricMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param versionMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param objectMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param permissionGuard permission guard 参数，用于 BiDatasetResourceService 流程中的校验、计算或对象转换。
+     * @param publishApprovalService 依赖组件，用于完成数据访问或外部能力调用。
+     */
     public BiDatasetResourceService(BiWorkspaceMapper workspaceMapper,
                                     BiDatasetMapper datasetMapper,
                                     BiDatasetFieldMapper fieldMapper,
@@ -130,6 +195,19 @@ public class BiDatasetResourceService implements BiDatasetSpecResolver {
                 permissionGuard, publishApprovalService, null);
     }
 
+    /**
+     * 执行 BiDatasetResourceService 流程，围绕 bi dataset resource service 完成校验、计算或结果组装。
+     *
+     * @param workspaceMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param datasetMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param fieldMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param metricMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param versionMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param objectMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param permissionGuard permission guard 参数，用于 BiDatasetResourceService 流程中的校验、计算或对象转换。
+     * @param publishApprovalService 依赖组件，用于完成数据访问或外部能力调用。
+     * @param collaborationService 依赖组件，用于完成数据访问或外部能力调用。
+     */
     public BiDatasetResourceService(BiWorkspaceMapper workspaceMapper,
                                     BiDatasetMapper datasetMapper,
                                     BiDatasetFieldMapper fieldMapper,
@@ -150,6 +228,12 @@ public class BiDatasetResourceService implements BiDatasetSpecResolver {
         this.collaborationService = collaborationService;
     }
 
+    /**
+     * 查询或读取业务数据。
+     *
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @return 返回符合条件的数据列表或视图。
+     */
     public List<BiDatasetResource> listResources(Long tenantId) {
         Long scopedTenantId = normalizeTenant(tenantId);
         Long workspaceId = workspaceId(scopedTenantId);
@@ -164,6 +248,13 @@ public class BiDatasetResourceService implements BiDatasetSpecResolver {
                 .toList();
     }
 
+    /**
+     * 查询或读取业务数据。
+     *
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @param datasetKey 业务键，用于在同一租户下定位资源。
+     * @return 返回 getResource 流程生成的业务结果。
+     */
     public BiDatasetResource getResource(Long tenantId, String datasetKey) {
         Long scopedTenantId = normalizeTenant(tenantId);
         Long workspaceId = workspaceId(scopedTenantId);
@@ -178,14 +269,41 @@ public class BiDatasetResourceService implements BiDatasetSpecResolver {
         return toResource(row, fields(row.getTenantId(), row.getId()), metrics(row.getTenantId(), row.getId()));
     }
 
+    /**
+     * 执行数据写入或状态变更。
+     *
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @param username 操作人标识，用于审计和权限判断。
+     * @param resource resource 参数，用于 saveDraft 流程中的校验、计算或对象转换。
+     * @return 返回流程执行后的业务结果。
+     */
     public BiDatasetResource saveDraft(Long tenantId, String username, BiDatasetResource resource) {
         return saveDraft(tenantId, username, null, resource);
     }
 
+    /**
+     * 执行数据写入或状态变更。
+     *
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @param username 操作人标识，用于审计和权限判断。
+     * @param role 角色标识，用于权限校验和访问范围判断。
+     * @param resource resource 参数，用于 saveDraft 流程中的校验、计算或对象转换。
+     * @return 返回流程执行后的业务结果。
+     */
     public BiDatasetResource saveDraft(Long tenantId, String username, String role, BiDatasetResource resource) {
         return saveDraftInternal(tenantId, username, role, resource, null, false);
     }
 
+    /**
+     * 执行数据写入或状态变更。
+     *
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @param username 操作人标识，用于审计和权限判断。
+     * @param role 角色标识，用于权限校验和访问范围判断。
+     * @param resource resource 参数，用于 saveDraft 流程中的校验、计算或对象转换。
+     * @param lockToken 令牌或锁标识，用于鉴权、幂等或并发控制。
+     * @return 返回流程执行后的业务结果。
+     */
     public BiDatasetResource saveDraft(Long tenantId,
                                        String username,
                                        String role,
@@ -194,11 +312,28 @@ public class BiDatasetResourceService implements BiDatasetSpecResolver {
         return saveDraftInternal(tenantId, username, role, resource, lockToken, true);
     }
 
+    /**
+     * 规范化输入值。
+     *
+     * @param resource resource 参数，用于 normalizeDraft 流程中的校验、计算或对象转换。
+     * @return 返回解析、归一化或安全处理后的值。
+     */
     public BiDatasetDraftNormalization normalizeDraft(BiDatasetResource resource) {
         BiDatasetResource normalized = validateResource(resource);
         return new BiDatasetDraftNormalization(normalized, toSpec(normalized));
     }
 
+    /**
+     * 执行数据写入或状态变更。
+     *
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @param username 操作人标识，用于审计和权限判断。
+     * @param role 角色标识，用于权限校验和访问范围判断。
+     * @param resource resource 参数，用于 saveDraftInternal 流程中的校验、计算或对象转换。
+     * @param lockToken 令牌或锁标识，用于鉴权、幂等或并发控制。
+     * @param enforceEditLock enforce edit lock 参数，用于 saveDraftInternal 流程中的校验、计算或对象转换。
+     * @return 返回流程执行后的业务结果。
+     */
     private BiDatasetResource saveDraftInternal(Long tenantId,
                                                 String username,
                                                 String role,
@@ -232,6 +367,7 @@ public class BiDatasetResourceService implements BiDatasetSpecResolver {
         if (datasetId == null) {
             throw new IllegalStateException("BI dataset was not persisted: " + normalizedResource.datasetKey());
         }
+        // Replace child rows from the normalized draft so stale fields cannot survive a model rewrite.
         fieldMapper.deleteByDataset(scopedTenantId, datasetId);
         metricMapper.deleteByDataset(scopedTenantId, datasetId);
         for (BiDatasetFieldResource field : normalizedResource.fields()) {
@@ -245,14 +381,38 @@ public class BiDatasetResourceService implements BiDatasetSpecResolver {
                 normalizedResource.metrics());
     }
 
+    /**
+     * 执行核心业务处理流程。
+     *
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @param datasetKey 业务键，用于在同一租户下定位资源。
+     * @return 返回流程执行后的业务结果。
+     */
     public BiDatasetResource publish(Long tenantId, String datasetKey) {
         return publish(tenantId, null, datasetKey);
     }
 
+    /**
+     * 执行核心业务处理流程。
+     *
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @param username 操作人标识，用于审计和权限判断。
+     * @param datasetKey 业务键，用于在同一租户下定位资源。
+     * @return 返回流程执行后的业务结果。
+     */
     public BiDatasetResource publish(Long tenantId, String username, String datasetKey) {
         return publish(tenantId, username, null, datasetKey);
     }
 
+    /**
+     * 执行核心业务处理流程。
+     *
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @param username 操作人标识，用于审计和权限判断。
+     * @param role 角色标识，用于权限校验和访问范围判断。
+     * @param datasetKey 业务键，用于在同一租户下定位资源。
+     * @return 返回流程执行后的业务结果。
+     */
     public BiDatasetResource publish(Long tenantId, String username, String role, String datasetKey) {
         Long scopedTenantId = normalizeTenant(tenantId);
         Long workspaceId = workspaceId(scopedTenantId);
@@ -261,6 +421,7 @@ public class BiDatasetResourceService implements BiDatasetSpecResolver {
             throw new IllegalArgumentException("BI dataset not found: " + datasetKey);
         }
         requirePermission(scopedTenantId, workspaceId, "DATASET", row.getId(), username, role, BiPermissionService.ACTION_PUBLISH);
+        // SQL datasets require approval because the stored query text controls the runtime source shape.
         requirePublishApproval(scopedTenantId, workspaceId, "DATASET", datasetKey, row.getUpdatedAt(), role,
                 requiresSqlDatasetApproval(row));
         datasetMapper.publish(scopedTenantId, workspaceId, datasetKey);
@@ -277,6 +438,13 @@ public class BiDatasetResourceService implements BiDatasetSpecResolver {
         return resource;
     }
 
+    /**
+     * 清理、停用或释放指定业务资源。
+     *
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @param datasetKey 业务键，用于在同一租户下定位资源。
+     * @return 返回 archive 流程生成的业务结果。
+     */
     public BiDatasetResource archive(Long tenantId, String datasetKey) {
         Long scopedTenantId = normalizeTenant(tenantId);
         Long workspaceId = workspaceId(scopedTenantId);
@@ -293,33 +461,74 @@ public class BiDatasetResourceService implements BiDatasetSpecResolver {
         return toResource(archived, fields(scopedTenantId, archived.getId()), metrics(scopedTenantId, archived.getId()));
     }
 
+    /**
+     * 查询或读取业务数据。
+     *
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @param datasetKey 业务键，用于在同一租户下定位资源。
+     * @param limit 分页或数量限制，避免一次处理过多数据。
+     * @return 返回符合条件的数据列表或视图。
+     */
     public List<BiDatasetVersionView> listVersions(Long tenantId, String datasetKey, int limit) {
         Long scopedTenantId = normalizeTenant(tenantId);
         Long workspaceId = workspaceId(scopedTenantId);
         BiDatasetDO row = find(scopedTenantId, workspaceId, datasetKey);
+        // 校验关键输入和前置条件，避免无效状态继续进入主流程。
         if (row == null || row.getId() == null || versionMapper == null) {
             return List.of();
         }
         int capped = Math.max(1, Math.min(limit <= 0 ? 20 : limit, 100));
+        // 访问持久化或外部依赖，获取或写入本次流程需要的数据。
         return safeList(versionMapper.selectList(new LambdaQueryWrapper<BiDatasetVersionDO>()
                         .eq(BiDatasetVersionDO::getTenantId, scopedTenantId)
                         .eq(BiDatasetVersionDO::getWorkspaceId, workspaceId)
                         .eq(BiDatasetVersionDO::getDatasetId, row.getId())
                         .orderByDesc(BiDatasetVersionDO::getVersion)
                         .last("LIMIT " + capped)))
+                // 遍历候选数据并按业务规则筛选、转换或聚合。
                 .stream()
                 .map(this::toVersionView)
                 .toList();
     }
 
+    /**
+     * 执行 restoreVersion 流程，围绕 restore version 完成校验、计算或结果组装。
+     *
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @param username 操作人标识，用于审计和权限判断。
+     * @param datasetKey 业务键，用于在同一租户下定位资源。
+     * @param version version 参数，用于 restoreVersion 流程中的校验、计算或对象转换。
+     * @return 返回 restoreVersion 流程生成的业务结果。
+     */
     public BiDatasetResource restoreVersion(Long tenantId, String username, String datasetKey, int version) {
         return restoreVersion(tenantId, username, null, datasetKey, version);
     }
 
+    /**
+     * 执行 restoreVersion 流程，围绕 restore version 完成校验、计算或结果组装。
+     *
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @param username 操作人标识，用于审计和权限判断。
+     * @param role 角色标识，用于权限校验和访问范围判断。
+     * @param datasetKey 业务键，用于在同一租户下定位资源。
+     * @param version version 参数，用于 restoreVersion 流程中的校验、计算或对象转换。
+     * @return 返回 restoreVersion 流程生成的业务结果。
+     */
     public BiDatasetResource restoreVersion(Long tenantId, String username, String role, String datasetKey, int version) {
         return restoreVersionInternal(tenantId, username, role, datasetKey, version, null, false);
     }
 
+    /**
+     * 执行 restoreVersion 流程，围绕 restore version 完成校验、计算或结果组装。
+     *
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @param username 操作人标识，用于审计和权限判断。
+     * @param role 角色标识，用于权限校验和访问范围判断。
+     * @param datasetKey 业务键，用于在同一租户下定位资源。
+     * @param version version 参数，用于 restoreVersion 流程中的校验、计算或对象转换。
+     * @param lockToken 令牌或锁标识，用于鉴权、幂等或并发控制。
+     * @return 返回 restoreVersion 流程生成的业务结果。
+     */
     public BiDatasetResource restoreVersion(Long tenantId,
                                             String username,
                                             String role,
@@ -329,6 +538,18 @@ public class BiDatasetResourceService implements BiDatasetSpecResolver {
         return restoreVersionInternal(tenantId, username, role, datasetKey, version, lockToken, true);
     }
 
+    /**
+     * 执行 restoreVersionInternal 流程，围绕 restore version internal 完成校验、计算或结果组装。
+     *
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @param username 操作人标识，用于审计和权限判断。
+     * @param role 角色标识，用于权限校验和访问范围判断。
+     * @param datasetKey 业务键，用于在同一租户下定位资源。
+     * @param version version 参数，用于 restoreVersionInternal 流程中的校验、计算或对象转换。
+     * @param lockToken 令牌或锁标识，用于鉴权、幂等或并发控制。
+     * @param enforceEditLock enforce edit lock 参数，用于 restoreVersionInternal 流程中的校验、计算或对象转换。
+     * @return 返回 restoreVersionInternal 流程生成的业务结果。
+     */
     private BiDatasetResource restoreVersionInternal(Long tenantId,
                                                      String username,
                                                      String role,
@@ -339,6 +560,7 @@ public class BiDatasetResourceService implements BiDatasetSpecResolver {
         Long scopedTenantId = normalizeTenant(tenantId);
         Long workspaceId = workspaceId(scopedTenantId);
         BiDatasetDO row = find(scopedTenantId, workspaceId, datasetKey);
+        // 校验关键输入和前置条件，避免无效状态继续进入主流程。
         if (row == null || row.getId() == null) {
             throw new IllegalArgumentException("BI dataset not found: " + datasetKey);
         }
@@ -348,6 +570,7 @@ public class BiDatasetResourceService implements BiDatasetSpecResolver {
         if (versionMapper == null) {
             throw new IllegalStateException("BI dataset version mapper is required");
         }
+        // 访问持久化或外部依赖，获取或写入本次流程需要的数据。
         BiDatasetVersionDO snapshot = versionMapper.selectOne(new LambdaQueryWrapper<BiDatasetVersionDO>()
                 .eq(BiDatasetVersionDO::getTenantId, scopedTenantId)
                 .eq(BiDatasetVersionDO::getWorkspaceId, workspaceId)
@@ -363,6 +586,17 @@ public class BiDatasetResourceService implements BiDatasetSpecResolver {
         return saveDraft(scopedTenantId, username, role, resourceFromJson(snapshot.getResourceJson()));
     }
 
+    /**
+     * 校验并获取必需参数、资源或权限。
+     *
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @param workspaceId 业务对象 ID，用于定位具体记录。
+     * @param resourceType 类型标识，用于选择对应处理分支。
+     * @param resourceId 业务对象 ID，用于定位具体记录。
+     * @param username 操作人标识，用于审计和权限判断。
+     * @param role 角色标识，用于权限校验和访问范围判断。
+     * @param actionKey 业务键，用于在同一租户下定位资源。
+     */
     private void requirePermission(Long tenantId,
                                    Long workspaceId,
                                    String resourceType,
@@ -375,6 +609,17 @@ public class BiDatasetResourceService implements BiDatasetSpecResolver {
         }
     }
 
+    /**
+     * 校验并获取必需参数、资源或权限。
+     *
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @param workspaceId 业务对象 ID，用于定位具体记录。
+     * @param resourceType 类型标识，用于选择对应处理分支。
+     * @param resourceKey 业务键，用于在同一租户下定位资源。
+     * @param resourceUpdatedAt 时间参数，用于计算窗口、过期或审计时间。
+     * @param role 角色标识，用于权限校验和访问范围判断。
+     * @param approvalAlwaysRequired approval always required 参数，用于 requirePublishApproval 流程中的校验、计算或对象转换。
+     */
     private void requirePublishApproval(Long tenantId,
                                         Long workspaceId,
                                         String resourceType,
@@ -382,16 +627,35 @@ public class BiDatasetResourceService implements BiDatasetSpecResolver {
                                         java.time.LocalDateTime resourceUpdatedAt,
                                         String role,
                                         boolean approvalAlwaysRequired) {
+        // 校验关键输入和前置条件，避免无效状态继续进入主流程。
         if (publishApprovalService != null && (approvalAlwaysRequired || !canBypassPublishApproval(role))) {
             publishApprovalService.requireApprovedApproval(
                     tenantId, workspaceId, resourceType, resourceKey, resourceUpdatedAt);
         }
     }
 
+    /**
+     * 校验并获取必需参数、资源或权限。
+     *
+     * @param row 持久化行数据，承载数据库记录内容。
+     * @return 返回 requires sql dataset approval 的布尔判断结果。
+     */
     private boolean requiresSqlDatasetApproval(BiDatasetDO row) {
         return row != null && "SQL".equalsIgnoreCase(row.getDatasetType());
     }
 
+    /**
+     * 校验并获取必需参数、资源或权限。
+     *
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @param workspaceId 业务对象 ID，用于定位具体记录。
+     * @param resourceType 类型标识，用于选择对应处理分支。
+     * @param resourceKey 业务键，用于在同一租户下定位资源。
+     * @param username 操作人标识，用于审计和权限判断。
+     * @param role 角色标识，用于权限校验和访问范围判断。
+     * @param lockToken 令牌或锁标识，用于鉴权、幂等或并发控制。
+     * @param required required 参数，用于 requireEditLock 流程中的校验、计算或对象转换。
+     */
     private void requireEditLock(Long tenantId,
                                  Long workspaceId,
                                  String resourceType,
@@ -405,10 +669,22 @@ public class BiDatasetResourceService implements BiDatasetSpecResolver {
         }
     }
 
+    /**
+     * 判断业务条件是否成立。
+     *
+     * @param role 角色标识，用于权限校验和访问范围判断。
+     * @return 返回布尔判断结果。
+     */
     private boolean canBypassEditLock(String role) {
         return canBypassPublishApproval(role);
     }
 
+    /**
+     * 判断业务条件是否成立。
+     *
+     * @param role 角色标识，用于权限校验和访问范围判断。
+     * @return 返回布尔判断结果。
+     */
     private boolean canBypassPublishApproval(String role) {
         if (role == null || role.isBlank()) {
             return false;
@@ -419,6 +695,13 @@ public class BiDatasetResourceService implements BiDatasetSpecResolver {
                 || RoleNames.TENANT_ADMIN.equals(normalized);
     }
 
+    /**
+     * 执行 dataset 流程，围绕 dataset 完成校验、计算或结果组装。
+     *
+     * @param datasetKey 业务键，用于在同一租户下定位资源。
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @return 返回 dataset 流程生成的业务结果。
+     */
     @Override
     public BiDatasetSpec dataset(String datasetKey, Long tenantId) {
         Long scopedTenantId = normalizeTenant(tenantId);
@@ -433,6 +716,12 @@ public class BiDatasetResourceService implements BiDatasetSpecResolver {
         return toSpec(row, fields(row.getTenantId(), row.getId()), metrics(row.getTenantId(), row.getId()));
     }
 
+    /**
+     * 执行 datasets 流程，围绕 datasets 完成校验、计算或结果组装。
+     *
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @return 返回 datasets 汇总后的集合、分页或映射视图。
+     */
     @Override
     public List<BiDatasetSpec> datasets(Long tenantId) {
         Map<String, BiDatasetSpec> result = new LinkedHashMap<>();
@@ -441,6 +730,7 @@ public class BiDatasetResourceService implements BiDatasetSpecResolver {
         }
         Long scopedTenantId = normalizeTenant(tenantId);
         Long workspaceId = workspaceId(scopedTenantId);
+        // Tenant datasets override built-ins with the same key while preserving built-ins not customized by tenant.
         for (BiDatasetDO row : safeList(datasetMapper.selectList(new LambdaQueryWrapper<BiDatasetDO>()
                 .eq(BiDatasetDO::getTenantId, scopedTenantId)
                 .eq(BiDatasetDO::getWorkspaceId, workspaceId)
@@ -450,6 +740,12 @@ public class BiDatasetResourceService implements BiDatasetSpecResolver {
         return List.copyOf(result.values());
     }
 
+    /**
+     * 校验输入、权限或业务前置条件。
+     *
+     * @param resource resource 参数，用于 validateResource 流程中的校验、计算或对象转换。
+     * @return 返回布尔判断结果。
+     */
     private BiDatasetResource validateResource(BiDatasetResource resource) {
         if (resource == null) {
             throw new IllegalArgumentException("dataset resource is required");
@@ -470,9 +766,11 @@ public class BiDatasetResourceService implements BiDatasetSpecResolver {
         String tableExpression = required(resource.tableExpression(), "tableExpression");
         Map<String, Object> model = resource.model();
         if ("SQL".equals(datasetType)) {
+            // Persist SQL datasets as derived tables so executors can treat them like normal dataset specs.
             SqlDatasetNormalization normalizedSql = normalizeSqlDataset(tableExpression, tenantColumn, model);
             tableExpression = normalizedSql.tableExpression();
             model = normalizedSql.model();
+        // 根据前序判断结果进入后续条件分支。
         } else if (!TABLE_EXPRESSION.matcher(tableExpression).matches()) {
             throw new IllegalArgumentException("tableExpression must be a qualified table name");
         }
@@ -509,6 +807,14 @@ public class BiDatasetResourceService implements BiDatasetSpecResolver {
                 resource.source());
     }
 
+    /**
+     * 规范化输入值。
+     *
+     * @param sql sql 参数，用于 normalizeSqlDataset 流程中的校验、计算或对象转换。
+     * @param tenantColumn tenant column 参数，用于 normalizeSqlDataset 流程中的校验、计算或对象转换。
+     * @param model model 参数，用于 normalizeSqlDataset 流程中的校验、计算或对象转换。
+     * @return 返回解析、归一化或安全处理后的值。
+     */
     private SqlDatasetNormalization normalizeSqlDataset(String sql,
                                                         String tenantColumn,
                                                         Map<String, Object> model) {
@@ -523,8 +829,16 @@ public class BiDatasetResourceService implements BiDatasetSpecResolver {
         return new SqlDatasetNormalization(expression, sqlDatasetModel(model, query, parameterOrder, parameterDefinitions));
     }
 
+    /**
+     * 规范化输入值。
+     *
+     * @param sql sql 参数，用于 normalizedSqlQuery 流程中的校验、计算或对象转换。
+     * @param tenantColumn tenant column 参数，用于 normalizedSqlQuery 流程中的校验、计算或对象转换。
+     * @return 返回解析、归一化或安全处理后的值。
+     */
     private String normalizedSqlQuery(String sql, String tenantColumn) {
         String query = sql.trim().replaceAll("\\s+", " ");
+        // The SQL dataset surface is intentionally read-only and single-statement.
         if (!query.toUpperCase(Locale.ROOT).startsWith("SELECT ")
                 || query.contains(";")
                 || query.contains("--")
@@ -538,9 +852,22 @@ public class BiDatasetResourceService implements BiDatasetSpecResolver {
                 .find()) {
             throw new IllegalArgumentException("SQL dataset query must include tenant column: " + tenantColumn);
         }
+        // Require an explicit source so parameter-only SELECTs cannot bypass lineage and permission review.
+        if (!SQL_FROM_TOKEN.matcher(query).find()) {
+            throw new IllegalArgumentException("SQL dataset query must include a FROM source");
+        }
         return query;
     }
 
+    /**
+     * 执行 sqlDatasetModel 流程，围绕 sql dataset model 完成校验、计算或结果组装。
+     *
+     * @param model model 参数，用于 sqlDatasetModel 流程中的校验、计算或对象转换。
+     * @param sqlTemplate sql template 参数，用于 sqlDatasetModel 流程中的校验、计算或对象转换。
+     * @param parameterOrder parameter order 参数，用于 sqlDatasetModel 流程中的校验、计算或对象转换。
+     * @param parameterDefinitions parameter definitions 参数，用于 sqlDatasetModel 流程中的校验、计算或对象转换。
+     * @return 返回 sqlDatasetModel 流程生成的业务结果。
+     */
     private Map<String, Object> sqlDatasetModel(Map<String, Object> model,
                                                 String sqlTemplate,
                                                 List<String> parameterOrder,
@@ -556,6 +883,12 @@ public class BiDatasetResourceService implements BiDatasetSpecResolver {
         return result;
     }
 
+    /**
+     * 执行 sqlParameterOrder 流程，围绕 sql parameter order 完成校验、计算或结果组装。
+     *
+     * @param query query 参数，用于 sqlParameterOrder 流程中的校验、计算或对象转换。
+     * @return 返回 sql parameter order 汇总后的集合、分页或映射视图。
+     */
     private List<String> sqlParameterOrder(String query) {
         List<String> order = new ArrayList<>();
         Matcher matcher = SQL_PARAMETER_TEMPLATE.matcher(query);
@@ -565,6 +898,13 @@ public class BiDatasetResourceService implements BiDatasetSpecResolver {
         return order;
     }
 
+    /**
+     * 执行 sqlParameterDefinitions 流程，围绕 sql parameter definitions 完成校验、计算或结果组装。
+     *
+     * @param model model 参数，用于 sqlParameterDefinitions 流程中的校验、计算或对象转换。
+     * @param parameterOrder parameter order 参数，用于 sqlParameterDefinitions 流程中的校验、计算或对象转换。
+     * @return 返回 sqlParameterDefinitions 流程生成的业务结果。
+     */
     private List<Map<String, Object>> sqlParameterDefinitions(Map<String, Object> model,
                                                               List<String> parameterOrder) {
         Map<String, Map<String, Object>> definitions = new LinkedHashMap<>();
@@ -581,6 +921,7 @@ public class BiDatasetResourceService implements BiDatasetSpecResolver {
                 throw new IllegalArgumentException("SQL parameter definition is required: " + key);
             }
         }
+        // Reject unused definitions so approvals review the exact parameter contract that reaches execution.
         for (String key : definitions.keySet()) {
             if (!referenced.contains(key)) {
                 throw new IllegalArgumentException("SQL parameter definition is not referenced: " + key);
@@ -593,7 +934,14 @@ public class BiDatasetResourceService implements BiDatasetSpecResolver {
         return orderedDefinitions;
     }
 
+    /**
+     * 执行 sqlParameterDefinition 流程，围绕 sql parameter definition 完成校验、计算或结果组装。
+     *
+     * @param rawParameter raw parameter 参数，用于 sqlParameterDefinition 流程中的校验、计算或对象转换。
+     * @return 返回 sqlParameterDefinition 流程生成的业务结果。
+     */
     private Map<String, Object> sqlParameterDefinition(Object rawParameter) {
+        // 校验关键输入和前置条件，避免无效状态继续进入主流程。
         if (!(rawParameter instanceof Map<?, ?> rawMap)) {
             throw new IllegalArgumentException("SQL parameter definition must be an object");
         }
@@ -615,10 +963,19 @@ public class BiDatasetResourceService implements BiDatasetSpecResolver {
             definition.put("defaultValue", rawMap.get("defaultValue"));
         }
         definition.put("allowedValues", listValues(rawMap.get("allowedValues")));
+        // 汇总前面计算出的状态和明细，返回给调用方。
         return definition;
     }
 
+    /**
+     * 执行 sqlParameterSpecs 流程，围绕 sql parameter specs 完成校验、计算或结果组装。
+     *
+     * @param String string 参数，用于 sqlParameterSpecs 流程中的校验、计算或对象转换。
+     * @param model model 参数，用于 sqlParameterSpecs 流程中的校验、计算或对象转换。
+     * @return 返回 sql parameter specs 汇总后的集合、分页或映射视图。
+     */
     private List<BiSqlParameterSpec> sqlParameterSpecs(Map<String, Object> model) {
+        // 校验关键输入和前置条件，避免无效状态继续进入主流程。
         if (model == null || model.isEmpty()) {
             return List.of();
         }
@@ -627,6 +984,7 @@ public class BiDatasetResourceService implements BiDatasetSpecResolver {
             return List.of();
         }
         Map<String, Map<String, Object>> definitions = new LinkedHashMap<>();
+        // 遍历候选数据并按业务规则筛选、转换或聚合。
         for (Object rawParameter : rawList) {
             Map<String, Object> definition = sqlParameterDefinition(rawParameter);
             definitions.put(String.valueOf(definition.get("key")), definition);
@@ -646,9 +1004,17 @@ public class BiDatasetResourceService implements BiDatasetSpecResolver {
                     definition.containsKey("defaultValue") ? stringValue(definition.get("defaultValue")) : null,
                     stringListValues(definition.get("allowedValues"))));
         }
+        // 汇总前面计算出的状态和明细，返回给调用方。
         return result;
     }
 
+    /**
+     * 执行 stringValue 流程，围绕 string value 完成校验、计算或结果组装。
+     *
+     * @param value 待处理值，用于规则计算或转换。
+     * @param fieldName 名称文本，用于展示或唯一性校验。
+     * @return 返回 string value 生成的文本或业务键。
+     */
     private String stringValue(Object value, String fieldName) {
         String text = stringValue(value);
         if (text == null || text.isBlank()) {
@@ -657,10 +1023,22 @@ public class BiDatasetResourceService implements BiDatasetSpecResolver {
         return text.trim();
     }
 
+    /**
+     * 执行 stringValue 流程，围绕 string value 完成校验、计算或结果组装。
+     *
+     * @param value 待处理值，用于规则计算或转换。
+     * @return 返回 string value 生成的文本或业务键。
+     */
     private String stringValue(Object value) {
         return value == null ? null : String.valueOf(value);
     }
 
+    /**
+     * 执行 booleanValue 流程，围绕 boolean value 完成校验、计算或结果组装。
+     *
+     * @param value 待处理值，用于规则计算或转换。
+     * @return 返回 boolean value 的布尔判断结果。
+     */
     private boolean booleanValue(Object value) {
         if (value instanceof Boolean bool) {
             return bool;
@@ -668,6 +1046,12 @@ public class BiDatasetResourceService implements BiDatasetSpecResolver {
         return value != null && Boolean.parseBoolean(String.valueOf(value));
     }
 
+    /**
+     * 查询或读取业务数据。
+     *
+     * @param value 待处理值，用于规则计算或转换。
+     * @return 返回符合条件的数据列表或视图。
+     */
     private List<Object> listValues(Object value) {
         if (!(value instanceof List<?> list)) {
             return List.of();
@@ -675,16 +1059,30 @@ public class BiDatasetResourceService implements BiDatasetSpecResolver {
         return List.copyOf(list);
     }
 
+    /**
+     * 执行 stringListValues 流程，围绕 string list values 完成校验、计算或结果组装。
+     *
+     * @param value 待处理值，用于规则计算或转换。
+     * @return 返回 string list values 汇总后的集合、分页或映射视图。
+     */
     private List<String> stringListValues(Object value) {
+        // 校验关键输入和前置条件，避免无效状态继续进入主流程。
         if (!(value instanceof List<?> list)) {
             return List.of();
         }
+        // 遍历候选数据并按业务规则筛选、转换或聚合。
         return list.stream()
                 .map(String::valueOf)
                 .toList();
     }
 
+    /**
+     * 校验输入、权限或业务前置条件。
+     *
+     * @param field 待处理业务值，用于规则计算、转换或外部调用。
+     */
     private void validateField(BiDatasetFieldResource field) {
+        // 校验关键输入和前置条件，避免无效状态继续进入主流程。
         if (field == null) {
             throw new IllegalArgumentException("dataset field is required");
         }
@@ -703,7 +1101,14 @@ public class BiDatasetResourceService implements BiDatasetSpecResolver {
         }
     }
 
+    /**
+     * 校验输入、权限或业务前置条件。
+     *
+     * @param metric metric 参数，用于 validateMetric 流程中的校验、计算或对象转换。
+     * @param fieldKeys field keys 参数，用于 validateMetric 流程中的校验、计算或对象转换。
+     */
     private void validateMetric(BiMetricResource metric, Set<String> fieldKeys) {
+        // 校验关键输入和前置条件，避免无效状态继续进入主流程。
         if (metric == null) {
             throw new IllegalArgumentException("metric is required");
         }
@@ -722,6 +1127,7 @@ public class BiDatasetResourceService implements BiDatasetSpecResolver {
         if (!DATA_TYPES.contains(required(metric.dataType(), "dataType"))) {
             throw new IllegalArgumentException("unsupported metric data type: " + metric.dataType());
         }
+        // 遍历候选数据并按业务规则筛选、转换或聚合。
         for (String dimension : metric.allowedDimensions()) {
             if (!fieldKeys.contains(dimension)) {
                 throw new IllegalArgumentException("metric allowed dimension is not a dataset field: " + dimension);
@@ -729,6 +1135,14 @@ public class BiDatasetResourceService implements BiDatasetSpecResolver {
         }
     }
 
+    /**
+     * 查询或读取业务数据。
+     *
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @param workspaceId 业务对象 ID，用于定位具体记录。
+     * @param datasetKey 业务键，用于在同一租户下定位资源。
+     * @return 返回符合条件的数据列表或视图。
+     */
     private BiDatasetDO find(Long tenantId, Long workspaceId, String datasetKey) {
         return datasetMapper.selectOne(new LambdaQueryWrapper<BiDatasetDO>()
                 .eq(BiDatasetDO::getTenantId, tenantId)
@@ -737,6 +1151,12 @@ public class BiDatasetResourceService implements BiDatasetSpecResolver {
                 .last("LIMIT 1"));
     }
 
+    /**
+     * 执行 workspaceId 流程，围绕 workspace id 完成校验、计算或结果组装。
+     *
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @return 返回 workspace id 计算得到的数量、金额或指标值。
+     */
     private Long workspaceId(Long tenantId) {
         BiWorkspaceDO workspace = workspaceMapper.selectOne(new LambdaQueryWrapper<BiWorkspaceDO>()
                 .in(BiWorkspaceDO::getTenantId, List.of(tenantId, 0L))
@@ -746,6 +1166,13 @@ public class BiDatasetResourceService implements BiDatasetSpecResolver {
         return workspace == null || workspace.getId() == null ? 0L : workspace.getId();
     }
 
+    /**
+     * 执行 fields 流程，围绕 fields 完成校验、计算或结果组装。
+     *
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @param datasetId 业务对象 ID，用于定位具体记录。
+     * @return 返回 fields 汇总后的集合、分页或映射视图。
+     */
     private List<BiDatasetFieldResource> fields(Long tenantId, Long datasetId) {
         return safeList(fieldMapper.selectList(new LambdaQueryWrapper<BiDatasetFieldDO>()
                         .eq(BiDatasetFieldDO::getTenantId, tenantId)
@@ -757,6 +1184,13 @@ public class BiDatasetResourceService implements BiDatasetSpecResolver {
                 .toList();
     }
 
+    /**
+     * 执行 metrics 流程，围绕 metrics 完成校验、计算或结果组装。
+     *
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @param datasetId 业务对象 ID，用于定位具体记录。
+     * @return 返回 metrics 汇总后的集合、分页或映射视图。
+     */
     private List<BiMetricResource> metrics(Long tenantId, Long datasetId) {
         return safeList(metricMapper.selectList(new LambdaQueryWrapper<BiMetricDO>()
                         .eq(BiMetricDO::getTenantId, tenantId)
@@ -767,6 +1201,14 @@ public class BiDatasetResourceService implements BiDatasetSpecResolver {
                 .toList();
     }
 
+    /**
+     * 转换为接口返回或领域视图。
+     *
+     * @param row 持久化行数据，承载数据库记录内容。
+     * @param fields fields 参数，用于 toResource 流程中的校验、计算或对象转换。
+     * @param metrics metrics 参数，用于 toResource 流程中的校验、计算或对象转换。
+     * @return 返回组装或转换后的结果对象。
+     */
     private BiDatasetResource toResource(BiDatasetDO row,
                                          List<BiDatasetFieldResource> fields,
                                          List<BiMetricResource> metrics) {
@@ -783,7 +1225,14 @@ public class BiDatasetResourceService implements BiDatasetSpecResolver {
                 "PERSISTED");
     }
 
+    /**
+     * 组装输出结构或完成对象转换。
+     *
+     * @param dataset dataset 参数，用于 fromBuiltIn 流程中的校验、计算或对象转换。
+     * @return 返回组装或转换后的结果对象。
+     */
     private BiDatasetResource fromBuiltIn(BiDatasetSpec dataset) {
+        // 遍历候选数据并按业务规则筛选、转换或聚合。
         List<BiDatasetFieldResource> fields = dataset.fields().values().stream()
                 .map(field -> new BiDatasetFieldResource(
                         field.fieldKey(),
@@ -813,6 +1262,7 @@ public class BiDatasetResourceService implements BiDatasetSpecResolver {
                         null,
                         "ACTIVE"))
                 .toList();
+        // 汇总前面计算出的状态和明细，返回给调用方。
         return new BiDatasetResource(
                 dataset.datasetKey(),
                 dataset.datasetKey(),
@@ -822,15 +1272,26 @@ public class BiDatasetResourceService implements BiDatasetSpecResolver {
                 Map.of("preset", true),
                 fields,
                 metrics,
+                // 访问持久化或外部依赖，获取或写入本次流程需要的数据。
                 STATUS_PUBLISHED,
                 "PRESET");
     }
 
+    /**
+     * 转换为接口返回或领域视图。
+     *
+     * @param row 持久化行数据，承载数据库记录内容。
+     * @param fields fields 参数，用于 toSpec 流程中的校验、计算或对象转换。
+     * @param metrics metrics 参数，用于 toSpec 流程中的校验、计算或对象转换。
+     * @return 返回组装或转换后的结果对象。
+     */
     private BiDatasetSpec toSpec(BiDatasetDO row,
                                 List<BiDatasetFieldResource> fields,
                                 List<BiMetricResource> metrics) {
         Map<String, BiFieldSpec> fieldSpecs = new LinkedHashMap<>();
+        // 遍历候选数据并按业务规则筛选、转换或聚合。
         for (BiDatasetFieldResource field : fields) {
+            // 校验关键输入和前置条件，避免无效状态继续进入主流程。
             if (!field.visible()) {
                 continue;
             }
@@ -852,6 +1313,7 @@ public class BiDatasetResourceService implements BiDatasetSpecResolver {
                     metric.allowedDimensions()));
         }
         Map<String, Object> model = map(row.getModelJson());
+        // 汇总前面计算出的状态和明细，返回给调用方。
         return new BiDatasetSpec(
                 row.getDatasetKey(),
                 row.getTableExpression(),
@@ -862,9 +1324,17 @@ public class BiDatasetResourceService implements BiDatasetSpecResolver {
                 model);
     }
 
+    /**
+     * 转换为接口返回或领域视图。
+     *
+     * @param resource resource 参数，用于 toSpec 流程中的校验、计算或对象转换。
+     * @return 返回组装或转换后的结果对象。
+     */
     private BiDatasetSpec toSpec(BiDatasetResource resource) {
         Map<String, BiFieldSpec> fieldSpecs = new LinkedHashMap<>();
+        // 遍历候选数据并按业务规则筛选、转换或聚合。
         for (BiDatasetFieldResource field : resource.fields()) {
+            // 校验关键输入和前置条件，避免无效状态继续进入主流程。
             if (!field.visible()) {
                 continue;
             }
@@ -885,6 +1355,7 @@ public class BiDatasetResourceService implements BiDatasetSpecResolver {
                     metric.dataType(),
                     metric.allowedDimensions()));
         }
+        // 汇总前面计算出的状态和明细，返回给调用方。
         return new BiDatasetSpec(
                 resource.datasetKey(),
                 resource.tableExpression(),
@@ -895,6 +1366,14 @@ public class BiDatasetResourceService implements BiDatasetSpecResolver {
                 resource.model());
     }
 
+    /**
+     * 转换为接口返回或领域视图。
+     *
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @param datasetId 业务对象 ID，用于定位具体记录。
+     * @param field 待处理业务值，用于规则计算、转换或外部调用。
+     * @return 返回组装或转换后的结果对象。
+     */
     private BiDatasetFieldDO toField(Long tenantId, Long datasetId, BiDatasetFieldResource field) {
         BiDatasetFieldDO row = new BiDatasetFieldDO();
         row.setTenantId(tenantId);
@@ -914,6 +1393,15 @@ public class BiDatasetResourceService implements BiDatasetSpecResolver {
         return row;
     }
 
+    /**
+     * 转换为接口返回或领域视图。
+     *
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @param workspaceId 业务对象 ID，用于定位具体记录。
+     * @param datasetId 业务对象 ID，用于定位具体记录。
+     * @param metric metric 参数，用于 toMetric 流程中的校验、计算或对象转换。
+     * @return 返回组装或转换后的结果对象。
+     */
     private BiMetricDO toMetric(Long tenantId, Long workspaceId, Long datasetId, BiMetricResource metric) {
         BiMetricDO row = new BiMetricDO();
         row.setTenantId(tenantId);
@@ -933,6 +1421,12 @@ public class BiDatasetResourceService implements BiDatasetSpecResolver {
         return row;
     }
 
+    /**
+     * 转换为接口返回或领域视图。
+     *
+     * @param row 持久化行数据，承载数据库记录内容。
+     * @return 返回组装或转换后的结果对象。
+     */
     private BiDatasetFieldResource toField(BiDatasetFieldDO row) {
         return new BiDatasetFieldResource(
                 row.getFieldKey(),
@@ -949,6 +1443,12 @@ public class BiDatasetResourceService implements BiDatasetSpecResolver {
                 row.getSortOrder() == null ? 0 : row.getSortOrder());
     }
 
+    /**
+     * 转换为接口返回或领域视图。
+     *
+     * @param row 持久化行数据，承载数据库记录内容。
+     * @return 返回组装或转换后的结果对象。
+     */
     private BiMetricResource toMetric(BiMetricDO row) {
         return new BiMetricResource(
                 row.getMetricKey(),
@@ -964,12 +1464,23 @@ public class BiDatasetResourceService implements BiDatasetSpecResolver {
                 row.getStatus());
     }
 
+    /**
+     * 执行数据写入或状态变更。
+     *
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @param workspaceId 业务对象 ID，用于定位具体记录。
+     * @param dataset dataset 参数，用于 insertVersionSnapshot 流程中的校验、计算或对象转换。
+     * @param resource resource 参数，用于 insertVersionSnapshot 流程中的校验、计算或对象转换。
+     * @param username 操作人标识，用于审计和权限判断。
+     */
     private void insertVersionSnapshot(Long tenantId,
                                        Long workspaceId,
                                        BiDatasetDO dataset,
                                        BiDatasetResource resource,
                                        String username) {
+        // 校验关键输入和前置条件，避免无效状态继续进入主流程。
         if (versionMapper == null) {
+            // 汇总前面计算出的状态和明细，返回给调用方。
             return;
         }
         if (dataset.getId() == null) {
@@ -981,12 +1492,21 @@ public class BiDatasetResourceService implements BiDatasetSpecResolver {
         row.setDatasetId(dataset.getId());
         row.setDatasetKey(dataset.getDatasetKey());
         row.setVersion(nextVersion(tenantId, workspaceId, dataset.getId()));
+        // 访问持久化或外部依赖，获取或写入本次流程需要的数据。
         row.setStatus(STATUS_PUBLISHED);
         row.setResourceJson(json(resource));
         row.setPublishedBy(defaultUser(username));
         versionMapper.insert(row);
     }
 
+    /**
+     * 执行 nextVersion 流程，围绕 next version 完成校验、计算或结果组装。
+     *
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @param workspaceId 业务对象 ID，用于定位具体记录。
+     * @param datasetId 业务对象 ID，用于定位具体记录。
+     * @return 返回 next version 计算得到的数量、金额或指标值。
+     */
     private int nextVersion(Long tenantId, Long workspaceId, Long datasetId) {
         if (versionMapper == null) {
             return 1;
@@ -1000,6 +1520,12 @@ public class BiDatasetResourceService implements BiDatasetSpecResolver {
         return latest == null || latest.getVersion() == null ? 1 : latest.getVersion() + 1;
     }
 
+    /**
+     * 转换为接口返回或领域视图。
+     *
+     * @param row 持久化行数据，承载数据库记录内容。
+     * @return 返回组装或转换后的结果对象。
+     */
     private BiDatasetVersionView toVersionView(BiDatasetVersionDO row) {
         return new BiDatasetVersionView(
                 row.getId(),
@@ -1011,14 +1537,27 @@ public class BiDatasetResourceService implements BiDatasetSpecResolver {
                 row.getCreatedAt());
     }
 
+    /**
+     * 处理 JSON 序列化或反序列化。
+     *
+     * @param json JSON 字符串，承载结构化配置或明细。
+     * @return 返回 resourceFromJson 流程生成的业务结果。
+     */
     private BiDatasetResource resourceFromJson(String json) {
         try {
             return objectMapper.readValue(json, BiDatasetResource.class);
+        // 捕获异常并转为业务兜底处理，避免异常扩散到主流程。
         } catch (Exception e) {
             throw new IllegalArgumentException("invalid BI dataset version payload", e);
         }
     }
 
+    /**
+     * 组装输出结构或完成对象转换。
+     *
+     * @param json JSON 字符串，承载结构化配置或明细。
+     * @return 返回组装或转换后的结果对象。
+     */
     private Map<String, Object> map(String json) {
         if (json == null || json.isBlank()) {
             return Map.of();
@@ -1026,11 +1565,18 @@ public class BiDatasetResourceService implements BiDatasetSpecResolver {
         try {
             return objectMapper.readValue(json, new TypeReference<Map<String, Object>>() {
             });
+        // 捕获异常并转为业务兜底处理，避免异常扩散到主流程。
         } catch (Exception e) {
             return Map.of();
         }
     }
 
+    /**
+     * 执行 stringList 流程，围绕 string list 完成校验、计算或结果组装。
+     *
+     * @param json JSON 字符串，承载结构化配置或明细。
+     * @return 返回 string list 汇总后的集合、分页或映射视图。
+     */
     private List<String> stringList(String json) {
         if (json == null || json.isBlank()) {
             return List.of();
@@ -1038,19 +1584,34 @@ public class BiDatasetResourceService implements BiDatasetSpecResolver {
         try {
             return objectMapper.readValue(json, new TypeReference<List<String>>() {
             });
+        // 捕获异常并转为业务兜底处理，避免异常扩散到主流程。
         } catch (Exception e) {
             return List.of();
         }
     }
 
+    /**
+     * 处理 JSON 序列化或反序列化。
+     *
+     * @param value 待处理值，用于规则计算或转换。
+     * @return 返回 json 生成的文本或业务键。
+     */
     private String json(Object value) {
         try {
             return objectMapper.writeValueAsString(value == null ? Map.of() : value);
+        // 捕获异常并转为业务兜底处理，避免异常扩散到主流程。
         } catch (JsonProcessingException e) {
             throw new IllegalArgumentException("invalid BI dataset payload", e);
         }
     }
 
+    /**
+     * 校验并获取必需参数、资源或权限。
+     *
+     * @param value 待处理值，用于规则计算或转换。
+     * @param field 待处理业务值，用于规则计算、转换或外部调用。
+     * @return 返回 required 生成的文本或业务键。
+     */
     private String required(String value, String field) {
         if (value == null || value.isBlank()) {
             throw new IllegalArgumentException(field + " is required");
@@ -1058,14 +1619,32 @@ public class BiDatasetResourceService implements BiDatasetSpecResolver {
         return value.trim();
     }
 
+    /**
+     * 解析并规范化租户 ID。
+     *
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @return 返回解析、归一化或安全处理后的值。
+     */
     private Long normalizeTenant(Long tenantId) {
         return tenantId == null ? 0L : tenantId;
     }
 
+    /**
+     * 按默认值规则处理输入值。
+     *
+     * @param username 操作人标识，用于审计和权限判断。
+     * @return 返回 default user 生成的文本或业务键。
+     */
     private String defaultUser(String username) {
         return username == null || username.isBlank() ? "system" : username;
     }
 
+    /**
+     * 按安全边界裁剪或保护输入值。
+     *
+     * @param value 待处理值，用于规则计算或转换。
+     * @return 返回 safe list 汇总后的集合、分页或映射视图。
+     */
     private <T> List<T> safeList(List<T> value) {
         return value == null ? List.of() : value;
     }

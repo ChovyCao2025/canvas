@@ -4,6 +4,8 @@ import org.chovy.canvas.common.tenant.TenantContext;
 import org.chovy.canvas.common.tenant.TenantContextResolver;
 import org.chovy.canvas.domain.bi.chart.BiChartResource;
 import org.chovy.canvas.domain.bi.chart.BiChartResourceService;
+import org.chovy.canvas.domain.bi.chart.BiChartReferenceImpact;
+import org.chovy.canvas.domain.bi.chart.BiChartReferenceImpactService;
 import org.chovy.canvas.domain.bi.chart.BiChartVersionView;
 import org.chovy.canvas.domain.bi.query.BiQueryRequest;
 import org.junit.jupiter.api.Test;
@@ -68,6 +70,31 @@ class BiChartControllerTest {
                 .assertNext(response -> assertThat(response.getData()).singleElement()
                         .satisfies(item -> assertThat(item.chartType()).isEqualTo("LINE")))
                 .verifyComplete();
+    }
+
+    @Test
+    void impactUsesCurrentTenant() {
+        TenantContextResolver resolver = mock(TenantContextResolver.class);
+        when(resolver.current()).thenReturn(Mono.just(new TenantContext(7L, "TENANT_ADMIN", "alice")));
+        BiChartResourceService service = mock(BiChartResourceService.class);
+        BiChartReferenceImpactService impactService = mock(BiChartReferenceImpactService.class);
+        when(impactService.impact(7L, "trend-executions")).thenReturn(new BiChartReferenceImpact(
+                "trend-executions",
+                "Execution Trend",
+                "canvas_daily_stats",
+                List.of(),
+                List.of(),
+                List.of()));
+        BiChartController controller = new BiChartController(resolver, service, impactService);
+
+        StepVerifier.create(controller.impact("trend-executions"))
+                .assertNext(response -> {
+                    assertThat(response.getData().chartKey()).isEqualTo("trend-executions");
+                    assertThat(response.getData().datasetKey()).isEqualTo("canvas_daily_stats");
+                })
+                .verifyComplete();
+
+        verify(impactService).impact(7L, "trend-executions");
     }
 
     @Test

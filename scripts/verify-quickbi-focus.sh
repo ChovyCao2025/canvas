@@ -1,10 +1,15 @@
 #!/usr/bin/env bash
+# Runs the focused QuickBI/BI platform verification suite.
+#
+# The script resolves Java/Node toolchains, runs targeted backend/frontend tests,
+# and is intended as a faster alternative to full regression when touching BI code.
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 BACKEND_DIR="$ROOT_DIR/backend"
 ENGINE_DIR="$BACKEND_DIR/canvas-engine"
 FRONTEND_DIR="$ROOT_DIR/frontend"
+QUICKBI_BENCHMARK_EVIDENCE="$ROOT_DIR/docs/superpowers/evidence/quickbi-capability-benchmark.json"
 
 CORE_BACKEND_TEST_SOURCES=(
   "src/test/java/org/chovy/canvas/domain/bi/datasource/BiDatasourceOnboardingServiceTest.java"
@@ -15,6 +20,7 @@ CORE_BACKEND_TEST_SOURCES=(
   "src/test/java/org/chovy/canvas/domain/bi/dataset/BiDatasetAccelerationServiceTest.java"
   "src/test/java/org/chovy/canvas/infrastructure/bi/JdbcBiDatasetExtractMaterializerTest.java"
   "src/test/java/org/chovy/canvas/domain/bi/query/BiQueryCompilerTest.java"
+  "src/test/java/org/chovy/canvas/domain/bi/query/BiDatasourceHealthSloSummaryTest.java"
   "src/test/java/org/chovy/canvas/web/bi/BiQueryControllerTest.java"
   "src/test/java/org/chovy/canvas/domain/bi/query/BiQueryCachePolicyServiceTest.java"
   "src/test/java/org/chovy/canvas/domain/bi/query/BiQueryGovernancePolicyServiceTest.java"
@@ -37,6 +43,13 @@ API_EXTRACT_BACKEND_TEST_SOURCES=(
 
 FRONTEND_TESTS=(
   "src/pages/bi/index.test.tsx"
+  "src/pages/bi/biWorkbench.test.ts"
+  "src/services/biApi.test.ts"
+)
+FRONTEND_PAGE_TESTS=(
+  "src/pages/bi/index.test.tsx"
+)
+FRONTEND_SUPPORT_TESTS=(
   "src/pages/bi/biWorkbench.test.ts"
   "src/services/biApi.test.ts"
 )
@@ -240,8 +253,19 @@ BACKEND_COMPILE_CMD=(mvn -q -f "$ENGINE_DIR/pom.xml" -DskipTests \
   -Dmaven.compiler.forceJavacCompilerUse=true \
   compile)
 BACKEND_TEST_CMD=()
-FRONTEND_TEST_CMD=()
+FRONTEND_PAGE_TEST_CMD=()
+FRONTEND_SUPPORT_TEST_CMD=()
 FRONTEND_BUILD_CMD=()
+QUICKBI_BENCHMARK_AUDIT_CMD=()
+
+if [[ -x /opt/homebrew/bin/node ]]; then
+  PATH="/opt/homebrew/bin:$PATH"
+  export PATH
+fi
+
+command -v node >/dev/null 2>&1 || fail "node is required for QuickBI benchmark audit"
+[[ -f "$QUICKBI_BENCHMARK_EVIDENCE" ]] || fail "QuickBI benchmark evidence is missing: $QUICKBI_BENCHMARK_EVIDENCE"
+QUICKBI_BENCHMARK_AUDIT_CMD=(node "$ROOT_DIR/tools/strategy/quickbi-benchmark-audit.mjs" "$QUICKBI_BENCHMARK_EVIDENCE")
 
 if [[ "$RUN_BACKEND" == "true" ]]; then
   [[ -d "$ENGINE_DIR" ]] || fail "backend canvas-engine directory is missing: $ENGINE_DIR"
@@ -263,12 +287,15 @@ if [[ "$RUN_FRONTEND" == "true" ]]; then
   [[ -d "$FRONTEND_DIR" ]] || fail "frontend directory is missing: $FRONTEND_DIR"
   resolve_frontend_node
   assert_frontend_tests_exist "${FRONTEND_TESTS[@]}"
-  FRONTEND_TEST_CMD=(npm run test -- "${FRONTEND_TESTS[@]}")
+  FRONTEND_PAGE_TEST_CMD=(npm run test -- "${FRONTEND_PAGE_TESTS[@]}")
+  FRONTEND_SUPPORT_TEST_CMD=(npm run test -- "${FRONTEND_SUPPORT_TESTS[@]}")
   FRONTEND_BUILD_CMD=(npm run build)
 fi
 
 if [[ "$DRY_RUN" == "true" ]]; then
   echo "quickbi focus verification dry-run passed"
+  printf 'quickbi-benchmark-audit:'
+  quote_cmd "${QUICKBI_BENCHMARK_AUDIT_CMD[@]}"
   if [[ "$RUN_BACKEND" == "true" ]]; then
     echo "JAVA_HOME: $JAVA_HOME"
     echo "java_specification_version: $(java_spec_for "$JAVA_HOME/bin/java")"
@@ -281,8 +308,10 @@ if [[ "$DRY_RUN" == "true" ]]; then
     echo "NODE_BIN: $(command -v node)"
     echo "node_version: $(node_version_for "$(command -v node)")"
     echo "NPM_BIN: $(command -v npm)"
-    printf 'frontend-tests: cd frontend &&'
-    quote_cmd "${FRONTEND_TEST_CMD[@]}"
+    printf 'frontend-page-tests: cd frontend &&'
+    quote_cmd "${FRONTEND_PAGE_TEST_CMD[@]}"
+    printf 'frontend-support-tests: cd frontend &&'
+    quote_cmd "${FRONTEND_SUPPORT_TEST_CMD[@]}"
     if [[ "$RUN_FRONTEND_BUILD" == "true" ]]; then
       printf 'frontend-build: cd frontend &&'
       quote_cmd "${FRONTEND_BUILD_CMD[@]}"
@@ -290,6 +319,9 @@ if [[ "$DRY_RUN" == "true" ]]; then
   fi
   exit 0
 fi
+
+echo "Running QuickBI benchmark coverage audit"
+"${QUICKBI_BENCHMARK_AUDIT_CMD[@]}"
 
 if [[ "$RUN_BACKEND" == "true" ]]; then
   echo "Running QuickBI backend verification with java.specification.version=$(java_spec_for "$JAVA_HOME/bin/java")"
@@ -301,7 +333,10 @@ if [[ "$RUN_FRONTEND" == "true" ]]; then
   echo "Running QuickBI frontend verification with node $(node -v)"
   (
     cd "$FRONTEND_DIR"
-    "${FRONTEND_TEST_CMD[@]}"
+    echo "Running QuickBI frontend page tests"
+    "${FRONTEND_PAGE_TEST_CMD[@]}"
+    echo "Running QuickBI frontend helper/API tests"
+    "${FRONTEND_SUPPORT_TEST_CMD[@]}"
     if [[ "$RUN_FRONTEND_BUILD" == "true" ]]; then
       "${FRONTEND_BUILD_CMD[@]}"
     fi

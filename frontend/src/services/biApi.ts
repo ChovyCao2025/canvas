@@ -2,37 +2,57 @@ import http from './api'
 import type { R } from '../types'
 
 export interface BiQueryFilter {
+  /** 过滤字段 key，必须来自数据集维度或运行态参数映射。 */
   field: string
+  /** 查询过滤运算符。 */
   operator: 'EQ' | 'NEQ' | 'GT' | 'GTE' | 'LT' | 'LTE' | 'IN' | 'BETWEEN' | 'CONTAINS'
+  /** 过滤值；IN/BETWEEN 可传数组，其它场景通常为标量。 */
   value: unknown
 }
 
 export interface BiQuerySort {
+  /** 排序字段 key。 */
   field: string
+  /** 排序方向。 */
   direction: 'ASC' | 'DESC'
 }
 
 export interface BiQueryRequest {
+  /** 查询的数据集 key。 */
   datasetKey: string
+  /** 来源仪表盘 key，用于审计、缓存和权限上下文。 */
   dashboardKey?: string | null
+  /** 查询维度字段。 */
   dimensions: string[]
+  /** 查询指标字段。 */
   metrics: string[]
+  /** 查询过滤条件。 */
   filters: BiQueryFilter[]
+  /** 查询排序条件。 */
   sorts: BiQuerySort[]
+  /** 最大返回行数。 */
   limit: number
+  /** 分页偏移量。 */
   offset?: number
+  /** SQL 数据集运行时参数。 */
   sqlParameters?: Record<string, string>
 }
 
 export interface BiCompiledQuery {
+  /** 后端编译后的 SQL。 */
   sql: string
+  /** SQL 绑定参数。 */
   parameters: unknown[]
 }
 
 export interface BiQueryExplanation {
+  /** 被解释的数据集 key。 */
   datasetKey: string
+  /** SQL 指纹，用于缓存、取消和审计关联。 */
   sqlHash: string
+  /** 参数数量。 */
   parametersCount: number
+  /** 查询规划和治理步骤说明。 */
   steps: string[]
 }
 
@@ -49,12 +69,19 @@ export interface BiQueryColumn {
 }
 
 export interface BiQueryResult {
+  /** 实际查询的数据集 key。 */
   datasetKey: string
+  /** 返回列元数据。 */
   columns: BiQueryColumn[]
+  /** 查询结果行。 */
   rows: Record<string, unknown>[]
+  /** 返回行数。 */
   rowCount: number
+  /** 查询耗时，单位毫秒。 */
   durationMs: number
+  /** SQL 指纹，用于缓存命中和历史追踪。 */
   sqlHash: string
+  /** 是否命中查询缓存。 */
   cached: boolean
 }
 
@@ -94,6 +121,8 @@ export interface BiDatasourceHealthSourceSlo {
   availabilityRate: number
   lastCheckedAt: string
   lastMessage: string
+  riskLevel?: string
+  recommendedAction?: string
 }
 
 export interface BiDatasourceHealthSloSummary {
@@ -105,19 +134,33 @@ export interface BiDatasourceHealthSloSummary {
 }
 
 export interface BiDatasourceConnectorCapability {
+  /** 连接器类型编码。 */
   connectorType: string
+  /** 连接器展示名称。 */
   label: string
+  /** 数据源类别，例如 DATABASE、FILE、API。 */
   sourceCategory: string
+  /** 支持的接入模式。 */
   supportedModes: string[]
+  /** 支持状态，例如 GA、BETA、DEPRECATED。 */
   supportStatus: string
+  /** 容量归类，用于 QuickEngine 容量看板聚合。 */
   capacityCategory?: string | null
+  /** 容量使用说明。 */
   capacityNote?: string | null
+  /** 是否支持连接测试。 */
   supportsConnectionTest: boolean
+  /** 是否支持 schema 同步。 */
   supportsSchemaSync: boolean
+  /** 是否支持 SQL 数据集建模。 */
   supportsSqlDataset: boolean
+  /** 是否支持表数据集建模。 */
   supportsTableDataset: boolean
+  /** 是否需要凭据。 */
   supportsCredentials: boolean
+  /** 可选 JDBC 驱动类名。 */
   driverClassNames: string[]
+  /** 连接器说明或限制。 */
   note: string
 }
 
@@ -522,45 +565,79 @@ export interface BiDatasetView {
 }
 
 export interface BiDatasetFieldResource {
+  /** 字段 key，作为维度/度量查询引用标识。 */
   fieldKey: string
+  /** 字段展示名。 */
   displayName: string
+  /** 字段来源表达式，通常是表列或 SQL 表达式。 */
   columnExpression: string
+  /** 字段角色：维度或度量。 */
   role: 'DIMENSION' | 'MEASURE'
+  /** 字段数据类型。 */
   dataType: string
+  /** 语义类型，例如日期、地区、用户标识。 */
   semanticType?: string | null
+  /** 默认聚合方式。 */
   defaultAggregation?: string | null
+  /** 前端格式化模式。 */
   formatPattern?: string | null
+  /** 指标单位。 */
   unit?: string | null
+  /** 字段分组文件夹 key。 */
   folderKey?: string | null
+  /** 是否在自助分析和图表设计中可见。 */
   visible: boolean
+  /** 敏感等级，用于列权限和脱敏策略。 */
   sensitiveLevel: string
+  /** 字段排序值。 */
   sortOrder: number
 }
 
 export interface BiMetricResource {
+  /** 指标 key，作为图表和查询引用标识。 */
   metricKey: string
+  /** 指标展示名。 */
   displayName: string
+  /** 指标计算表达式。 */
   expression: string
+  /** 指标聚合方式。 */
   aggregation: string
+  /** 指标数据类型。 */
   dataType: string
+  /** 指标单位。 */
   unit?: string | null
+  /** 指标格式化模式。 */
   formatPattern?: string | null
+  /** 允许与该指标组合查询的维度 key。 */
   allowedDimensions: string[]
+  /** 指标负责人。 */
   owner?: string | null
+  /** 指标口径说明。 */
   description?: string | null
+  /** 指标状态，例如 DRAFT、PUBLISHED。 */
   status: string
 }
 
 export interface BiDatasetResource {
+  /** 数据集 key。 */
   datasetKey: string
+  /** 数据集名称。 */
   name: string
+  /** 数据集类型，例如 TABLE、SQL、API。 */
   datasetType: string
+  /** 表达式或物化表名称。 */
   tableExpression: string
+  /** 租户隔离字段。 */
   tenantColumn: string
+  /** 数据集模型扩展配置。 */
   model: Record<string, unknown>
+  /** 数据集字段列表。 */
   fields: BiDatasetFieldResource[]
+  /** 数据集指标列表。 */
   metrics: BiMetricResource[]
+  /** 发布状态。 */
   status: string
+  /** 数据来源说明。 */
   source: string
 }
 
@@ -591,6 +668,8 @@ export interface BiDatasetFromDatasourceJoinCommand {
     operator?: string
     connector?: string
     rightColumn: string
+    groupStart?: boolean
+    groupEnd?: boolean
   }>
 }
 
@@ -721,22 +800,36 @@ export interface BiDashboardGlobalParameter {
 }
 
 export interface BiDashboardPreset {
+  /** 仪表盘 key。 */
   dashboardKey: string
+  /** 仪表盘标题。 */
   title: string
+  /** 仪表盘描述。 */
   description: string
+  /** 默认数据集 key。 */
   datasetKey: string
+  /** 组件配置。 */
   widgets: BiDashboardWidget[]
+  /** 查询控件配置。 */
   filters: BiDashboardFilter[]
+  /** 全局参数配置。 */
   globalParameters?: BiDashboardGlobalParameter[] | null
+  /** 交互规则配置。 */
   interactions: BiDashboardInteraction[]
+  /** 可订阅渠道。 */
   subscriptionChannels: string[]
+  /** 可嵌入作用域。 */
   embedScopes: string[]
 }
 
 export interface BiDashboardResource {
+  /** 仪表盘预设快照。 */
   preset: BiDashboardPreset
+  /** 发布状态。 */
   status: string
+  /** 当前版本号。 */
   version: number
+  /** 来源说明，例如 SYSTEM、USER_IMPORT。 */
   source: string
 }
 
@@ -785,14 +878,23 @@ export interface BiDashboardVersionView {
 }
 
 export interface BiChartResource {
+  /** 图表 key。 */
   chartKey: string
+  /** 图表名称。 */
   name: string
+  /** 图表类型。 */
   chartType: string
+  /** 绑定数据集 key。 */
   datasetKey: string
+  /** 图表查询定义。 */
   query: BiQueryRequest
+  /** 图表样式配置。 */
   style: Record<string, unknown>
+  /** 图表交互配置。 */
   interaction: Record<string, unknown>
+  /** 图表发布状态。 */
   status: string
+  /** 图表来源说明。 */
   source: string
 }
 
@@ -806,24 +908,89 @@ export interface BiChartVersionView {
   createdAt?: string | null
 }
 
-export interface BiPortalMenuResource {
-  menuKey: string
-  parentMenuKey?: string | null
+export interface BiChartDashboardReference {
+  /** 引用该图表的仪表盘 key。 */
+  dashboardKey: string
+  /** 仪表盘标题。 */
   title: string
+  /** 引用该图表的组件 key。 */
+  widgetKey: string
+  /** 组件标题。 */
+  widgetTitle: string
+  /** 仪表盘状态。 */
+  status: string
+}
+
+export interface BiChartPortalReference {
+  /** 引用该图表的门户 key。 */
+  portalKey: string
+  /** 门户名称。 */
+  name: string
+  /** 引用该图表的菜单 key。 */
+  menuKey: string
+  /** 菜单标题。 */
+  menuTitle: string
+  /** 门户状态。 */
+  status: string
+}
+
+export interface BiChartSubscriptionReference {
+  /** 引用该图表的订阅 key。 */
+  subscriptionKey: string
+  /** 订阅名称。 */
+  name: string
+  /** 订阅是否启用。 */
+  enabled?: boolean | null
+}
+
+export interface BiChartReferenceImpact {
+  /** 被分析的图表 key。 */
+  chartKey: string
+  /** 被分析的图表名称。 */
+  chartName: string
+  /** 图表绑定的数据集 key。 */
+  datasetKey: string
+  /** 受影响的仪表盘引用。 */
+  dashboards: BiChartDashboardReference[]
+  /** 受影响的门户引用。 */
+  portals: BiChartPortalReference[]
+  /** 受影响的订阅引用。 */
+  subscriptions: BiChartSubscriptionReference[]
+}
+
+export interface BiPortalMenuResource {
+  /** 门户菜单 key。 */
+  menuKey: string
+  /** 父菜单 key，空值表示一级菜单。 */
+  parentMenuKey?: string | null
+  /** 菜单标题。 */
+  title: string
+  /** 菜单指向的资源类型，例如 DASHBOARD、CHART、EXTERNAL。 */
   resourceType: string
+  /** 菜单指向的资源 key。 */
   resourceKey?: string | null
+  /** 菜单指向的资源 ID。 */
   resourceId?: number | null
+  /** 外部链接地址。 */
   externalUrl?: string | null
+  /** 菜单可见性和扩展配置。 */
   visibility: Record<string, unknown>
+  /** 菜单排序值。 */
   sortOrder: number
 }
 
 export interface BiPortalResource {
+  /** 门户 key。 */
   portalKey: string
+  /** 门户名称。 */
   name: string
+  /** 门户主题、导航和品牌化配置。 */
   theme: Record<string, unknown>
+  /** 门户菜单树。 */
   menus: BiPortalMenuResource[]
+  /** 门户发布状态。 */
   status: string
+  /** 门户来源说明。 */
   source: string
 }
 
@@ -886,36 +1053,61 @@ export interface BiSpreadsheetVersionView {
 }
 
 export interface BiEmbedTicketRequest {
+  /** 嵌入资源类型。 */
   resourceType: string
+  /** 嵌入资源 key。 */
   resourceKey: string
+  /** 嵌入作用域，例如 INTERNAL_CANVAS、EXTERNAL_TICKET。 */
   scope: string
+  /** ticket 内置过滤条件。 */
   filters: Record<string, string>
+  /** ticket 内置运行态参数。 */
   parameters?: Record<string, string>
+  /** ticket 有效期，单位秒。 */
   ttlSeconds: number
+  /** 允许加载嵌入页的域名白名单。 */
   allowedDomains?: string[]
+  /** ticket 最大访问次数。 */
   maxAccessCount?: number
+  /** ticket 每分钟访问限制。 */
   rateLimitPerMinute?: number
 }
 
 export interface BiEmbedTicket {
+  /** 一次性或短期有效的嵌入 ticket。 */
   ticket: string
+  /** ticket 过期时间。 */
   expiresAt: string
+  /** 可直接打开的嵌入 URL。 */
   embedUrl: string
 }
 
 export interface BiEmbedTicketPayload {
+  /** ticket 所属租户。 */
   tenantId: number
+  /** ticket 签发用户。 */
   username: string
+  /** ticket 授权资源类型。 */
   resourceType: string
+  /** ticket 授权资源 key。 */
   resourceKey: string
+  /** ticket 授权作用域。 */
   scope: string
+  /** ticket 固化过滤条件。 */
   filters: Record<string, string>
+  /** ticket 固化运行态参数。 */
   parameters: Record<string, string>
+  /** 域名白名单。 */
   allowedDomains: string[]
+  /** 最大访问次数。 */
   maxAccessCount?: number | null
+  /** 每分钟访问限制。 */
   rateLimitPerMinute?: number | null
+  /** 防重放随机串。 */
   nonce: string
+  /** 签发时间。 */
   issuedAt: string
+  /** 过期时间。 */
   expiresAt: string
 }
 
@@ -940,12 +1132,19 @@ export interface BiEmbedTokenCleanupResult {
 }
 
 export interface BiResourcePermissionCommand {
+  /** 授权资源类型。 */
   resourceType: string
+  /** 授权资源 key。 */
   resourceKey?: string | null
+  /** 授权资源 ID，兼容仅有 ID 的资源。 */
   resourceId?: number | null
+  /** 主体类型，例如 USER、ROLE、GROUP、ALL。 */
   subjectType: string
+  /** 主体 ID。 */
   subjectId: string
+  /** 授权动作，例如 USE、EDIT、EXPORT。 */
   actionKey: string
+  /** 授权效果：ALLOW 或 DENY。 */
   effect: string
 }
 
@@ -954,7 +1153,8 @@ export interface BiResourcePermissionView extends BiResourcePermissionCommand {
   tenantId: number
   workspaceId: number
   resourceKey?: string | null
-  resourceId: number
+  /** 资源 ID，部分 key 型资源可能为空。 */
+  resourceId?: number | null
   createdBy?: string | null
   createdAt?: string | null
 }
@@ -1110,12 +1310,19 @@ export interface BiPermissionRequestView {
 }
 
 export interface BiRowPermissionCommand {
+  /** 数据集 key。 */
   datasetKey: string
+  /** 行权限规则 key。 */
   ruleKey: string
+  /** 主体类型。 */
   subjectType: string
+  /** 主体 ID。 */
   subjectId: string
+  /** 查询过滤条件形式的行级约束。 */
   filters: BiQueryFilter[]
+  /** 原始过滤 JSON，便于后端保存复杂表达式。 */
   filter: Record<string, unknown>
+  /** 是否启用该规则。 */
   enabled: boolean
 }
 
@@ -1123,7 +1330,8 @@ export interface BiRowPermissionView {
   id: number
   tenantId: number
   datasetKey: string
-  datasetId: number
+  /** 数据集 ID，部分测试或轻量接口只返回 datasetKey。 */
+  datasetId?: number | null
   ruleKey: string
   subjectType: string
   subjectId: string
@@ -1133,12 +1341,19 @@ export interface BiRowPermissionView {
 }
 
 export interface BiColumnPermissionCommand {
+  /** 数据集 key。 */
   datasetKey: string
+  /** 字段 key。 */
   fieldKey: string
+  /** 主体类型。 */
   subjectType: string
+  /** 主体 ID。 */
   subjectId: string
+  /** 字段策略：ALLOW、DENY 或 MASK。 */
   policy: string
+  /** 脱敏配置。 */
   mask: Record<string, unknown>
+  /** 是否启用该规则。 */
   enabled: boolean
 }
 
@@ -1146,13 +1361,15 @@ export interface BiColumnPermissionView {
   id: number
   tenantId: number
   datasetKey: string
-  datasetId: number
+  /** 数据集 ID，部分测试或轻量接口只返回 datasetKey。 */
+  datasetId?: number | null
   fieldKey: string
   subjectType: string
   subjectId: string
   policy: string
   maskJson?: string | null
-  enabled: boolean
+  /** 是否启用该列权限规则，旧响应可能缺省。 */
+  enabled?: boolean | null
   createdAt?: string | null
 }
 
@@ -1171,14 +1388,23 @@ export interface BiSelfServicePreviewRequest {
 }
 
 export interface BiExportJobCommand {
+  /** 导出资源类型。 */
   resourceType: string
+  /** 导出资源 key。 */
   resourceKey?: string | null
+  /** 导出资源 ID。 */
   resourceId?: number | null
+  /** 导出格式，例如 CSV、XLSX、PDF。 */
   exportFormat: string
+  /** 导出使用的查询请求。 */
   query: BiQueryRequest
+  /** 导出行数上限。 */
   rowLimit: number
+  /** 是否需要审批。 */
   approvalRequired?: boolean | null
+  /** 是否包含敏感数据。 */
   sensitive?: boolean | null
+  /** 导出审批理由。 */
   approvalReason?: string | null
 }
 
@@ -1221,6 +1447,14 @@ export interface BiExportJobView {
 export interface BiExportJobDetailView {
   job: BiExportJobView
   request: BiExportJobCommand
+  partition?: {
+    storageLayout?: string | null
+    requestedRows?: number | null
+    generatedRows?: number | null
+    partCount?: number | null
+    partSize?: number | null
+    partStorageKeys?: string[] | null
+  } | null
 }
 
 export interface BiExportRetryResult {
@@ -1237,14 +1471,23 @@ export interface BiExportApprovalReviewCommand {
 }
 
 export interface BiSubscriptionCommand {
+  /** 订阅 key。 */
   subscriptionKey: string
+  /** 订阅名称。 */
   name: string
+  /** 订阅资源类型。 */
   resourceType: string
+  /** 订阅资源 key。 */
   resourceKey?: string | null
+  /** 订阅资源 ID。 */
   resourceId?: number | null
+  /** 调度配置，例如 cron、时区、频率。 */
   schedule: Record<string, unknown>
+  /** 接收人配置。 */
   receivers: Record<string, unknown>
+  /** 投递渠道和附件配置。 */
   delivery: Record<string, unknown>
+  /** 是否启用订阅。 */
   enabled: boolean
 }
 
@@ -1386,8 +1629,10 @@ export interface BiExportCleanupResult {
   failed: number
 }
 
+/** 将权限、导入导出和上传类接口的可选参数组装为查询串。 */
 function permissionQuery(params: Record<string, string | number | null | undefined>) {
   const search = new URLSearchParams()
+  // 空值不进入 URL，避免后端把空字符串误判为显式过滤条件。
   Object.entries(params).forEach(([key, value]) => {
     if (value !== undefined && value !== null && value !== '') search.set(key, String(value))
   })
@@ -1395,10 +1640,12 @@ function permissionQuery(params: Record<string, string | number | null | undefin
   return value ? `?${value}` : ''
 }
 
+/** 草稿保存时附加锁 token，用于后端做 BI 资源编辑并发控制。 */
 function draftLockConfig(lockToken?: string | null) {
   return lockToken ? { headers: { 'X-BI-LOCK-TOKEN': lockToken } } : undefined
 }
 
+/** BI 模块 API 封装，保持前端页面只依赖业务方法而不散落后端路径。 */
 export const biApi = {
   listDatasets: () =>
     http.get<R<BiDatasetView[]>, R<BiDatasetView[]>>('/canvas/bi/datasets'),
@@ -1474,6 +1721,8 @@ export const biApi = {
     http.get<R<BiChartResource[]>, R<BiChartResource[]>>('/canvas/bi/charts/resources'),
   getChartResource: (chartKey: string) =>
     http.get<R<BiChartResource>, R<BiChartResource>>(`/canvas/bi/charts/resources/${chartKey}`),
+  getChartReferenceImpact: (chartKey: string) =>
+    http.get<R<BiChartReferenceImpact>, R<BiChartReferenceImpact>>(`/canvas/bi/charts/resources/${chartKey}/impact`),
   saveChartDraft: (chartKey: string, resource: BiChartResource, lockToken?: string | null) =>
     http.post<R<BiChartResource>, R<BiChartResource>>(
       `/canvas/bi/charts/resources/${chartKey}/draft`,
@@ -1580,6 +1829,8 @@ export const biApi = {
     http.post<R<BiDashboardResource>, R<BiDashboardResource>>('/canvas/bi/embed/resources/dashboard', request),
   getEmbedDashboardRuntimeState: (request: BiEmbedDashboardResourceRequest) =>
     http.post<R<BiDashboardRuntimeStateView>, R<BiDashboardRuntimeStateView>>('/canvas/bi/embed/resources/dashboard/runtime-state', request),
+  getEmbedPortalResource: (request: BiEmbedDashboardResourceRequest) =>
+    http.post<R<BiPortalResource>, R<BiPortalResource>>('/canvas/bi/embed/resources/portal', request),
   cleanupEmbedTickets: (limit = 100) =>
     http.post<R<BiEmbedTokenCleanupResult>, R<BiEmbedTokenCleanupResult>>(`/canvas/bi/embed-tickets/cleanup?limit=${limit}`, {}),
   compileQuery: (request: BiQueryRequest) =>

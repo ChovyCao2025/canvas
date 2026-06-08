@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom'
 import {
   Badge,
   Button,
+  Checkbox,
   Col,
   Descriptions,
   Divider,
@@ -89,6 +90,7 @@ import {
   buildBiResourceTargets,
   buildBigScreenResourceOptions,
   buildBigScreenDraftResource,
+  buildVisualEditorDiagnosticRows,
   alignBigScreenLayoutItems,
   bigScreenResourceSummaryRows,
   moveBigScreenLayoutItem,
@@ -114,9 +116,15 @@ import {
   buildDashboardCloneCommand,
   buildDashboardImportCommand,
   buildDatasourceMultiTableDatasetCommand,
+  buildDatasourceRelationshipDiagnosticRows,
   buildDatasourceOnboardingCommand,
   buildSqlDatasetDraftResource,
   buildSqlDatasetParameterDrafts,
+  buildSqlDatasetImpactRows,
+  buildSqlDatasetReadinessRows,
+  buildSqlDatasetSampleProfileRows,
+  exportHardeningDiagnosticRows,
+  alertAnomalyDiagnosticRows,
   buildDatasourceTableDatasetCommand,
   buildResourceCommentCommand,
   buildResourceFavoriteCommand,
@@ -129,7 +137,12 @@ import {
   buildResourceTransferCommand,
   buildDashboardControlOptionQuery,
   buildDashboardInteractionTarget,
+  buildDashboardRuntimeStateCommand,
   buildSelfServiceExtractionQuery,
+  chartReferenceImpactSummary,
+  chartReferenceImpactSummaryFromImpact,
+  chartQueryPatchFromDesigner,
+  chartQueryFieldsAfterDrop,
   dashboardWidgetGridPlacementForColumns,
   dashboardLayoutColumns,
   dashboardPackageFileName,
@@ -147,6 +160,7 @@ import {
   updateDashboardRuntimeParameters,
   dropSelfServiceExtractionField,
   buildEmbedTicketRequest,
+  buildEmbedTicketPreviewRows,
   buildBiPermissionResourceTargets,
   buildWidgetQueryRequest,
   chartLabel,
@@ -173,10 +187,13 @@ import {
   exportApprovalStatusLabel,
   isCancelableExportJob,
   publishApprovalStatusLabel,
+  datasourceCapacityPolicyRows,
+  datasourceAdvancedCapabilityRows,
   datasourceConnectorRows,
   datasourceConnectionTestRows,
   datasourceHealthHistoryRows,
   datasourceHealthSloRows,
+  datasourceNextActionRows,
   datasourceOnboardingRows,
   datasourceSchemaPreviewRows,
   datasourceSchemaSnapshotHistoryRows,
@@ -204,6 +221,8 @@ import {
   toResourceLocationIndex,
   toResourceOwnershipIndex,
   toMarketingDatasetPreset,
+  reorderPortalMenuTree,
+  updatePortalMenuConfig,
   createDashboardPresetHistory,
   pushDashboardPresetHistory,
   redoDashboardPresetHistory,
@@ -222,6 +241,12 @@ import {
   type BiSqlDatasetFieldDraftLike,
   type BiSqlDatasetMetricDraftLike,
   type BiSqlDatasetParameterDraftLike,
+  type BiSqlDatasetReadinessRow,
+  type BiDatasourceRelationshipDiagnosticRow,
+  type BiVisualEditorDiagnosticRow,
+  type BiExportHardeningDiagnosticRow,
+  type BiAlertAnomalyDiagnosticRow,
+  type BiSpreadsheetPivotAggregation,
   type MarketingDatasetPreset,
   type SelfServiceExtractionState,
 } from './biWorkbench'
@@ -232,7 +257,9 @@ import {
   type BiDeliveryAuditSummary,
   type BiAlertRuleView,
   type BiChartResource,
+  type BiChartReferenceImpact,
   type BiChartVersionView,
+  type BiDatasetFieldResource,
   type BiDatasetResource,
   type BiDatasetAccelerationPolicyView,
   type BiDatasetAccelerationSchedulerResult,
@@ -271,6 +298,7 @@ import {
   type BiSpreadsheetVersionView,
   type BiColumnPermissionView,
   type BiPermissionAuditEntry,
+  type BiPermissionRequestView,
   type BiQueryCacheInvalidationResult,
   type BiQueryCacheInvalidationCommand,
   type BiQueryCachePolicyView,
@@ -771,80 +799,140 @@ const resourceFavoriteColumns: ColumnsType<BiResourceFavoriteView> = [
   },
 ]
 
-const resourcePermissionColumns: ColumnsType<BiResourcePermissionView> = [
-  {
-    title: '资源',
-    render: (_, row) => (
-      <Space direction="vertical" size={0}>
-        <Space size={6}>
-          <Tag color="blue">{row.resourceType}</Tag>
-          <Text strong style={{ fontSize: 12 }}>{row.resourceKey ?? row.resourceId}</Text>
+/** 创建资源权限表格列，注入删除状态以便单行展示 loading。 */
+function createResourcePermissionColumns(
+  deletingPermission: string | null,
+  onDelete: (row: BiResourcePermissionView) => void,
+): ColumnsType<BiResourcePermissionView> {
+  return [
+    {
+      title: '资源',
+      render: (_, row) => (
+        <Space direction="vertical" size={0}>
+          <Space size={6}>
+            <Tag color="blue">{row.resourceType}</Tag>
+            <Text strong style={{ fontSize: 12 }}>{row.resourceKey ?? row.resourceId}</Text>
+          </Space>
+          <Text type="secondary" style={{ fontSize: 11 }}>workspace #{row.workspaceId}</Text>
         </Space>
-        <Text type="secondary" style={{ fontSize: 11 }}>workspace #{row.workspaceId}</Text>
-      </Space>
-    ),
-  },
-  {
-    title: '主体',
-    width: 128,
-    render: (_, row) => <Tag>{permissionSubjectLabel(row.subjectType, row.subjectId)}</Tag>,
-  },
-  {
-    title: '动作',
-    width: 108,
-    render: (_, row) => <Tag color={row.effect === 'DENY' ? 'red' : 'green'}>{row.actionKey} · {row.effect}</Tag>,
-  },
-]
+      ),
+    },
+    {
+      title: '主体',
+      width: 128,
+      render: (_, row) => <Tag>{permissionSubjectLabel(row.subjectType, row.subjectId)}</Tag>,
+    },
+    {
+      title: '动作',
+      width: 108,
+      render: (_, row) => <Tag color={row.effect === 'DENY' ? 'red' : 'green'}>{row.actionKey} · {row.effect}</Tag>,
+    },
+    {
+      title: '操作',
+      width: 72,
+      render: (_, row) => (
+        <Button
+          size="small"
+          danger
+          aria-label={`删除资源权限 #${row.id}`}
+          icon={<DeleteOutlined />}
+          loading={deletingPermission === `resource-${row.id}`}
+          onClick={() => onDelete(row)}
+        />
+      ),
+    },
+  ]
+}
 
-const rowPermissionColumns: ColumnsType<BiRowPermissionView> = [
-  {
-    title: '规则',
-    render: (_, row) => (
-      <Space direction="vertical" size={0}>
-        <Space size={6}>
-          <Text strong style={{ fontSize: 12 }}>{row.ruleKey}</Text>
-          <Tag color={row.enabled ? 'green' : 'default'}>{row.enabled ? '启用' : '停用'}</Tag>
+/** 创建行权限表格列，展示数据集行级过滤规则和删除入口。 */
+function createRowPermissionColumns(
+  deletingPermission: string | null,
+  onDelete: (row: BiRowPermissionView) => void,
+): ColumnsType<BiRowPermissionView> {
+  return [
+    {
+      title: '规则',
+      render: (_, row) => (
+        <Space direction="vertical" size={0}>
+          <Space size={6}>
+            <Text strong style={{ fontSize: 12 }}>{row.ruleKey}</Text>
+            <Tag color={row.enabled ? 'green' : 'default'}>{row.enabled ? '启用' : '停用'}</Tag>
+          </Space>
+          <Text type="secondary" style={{ fontSize: 11 }}>{row.datasetKey}</Text>
         </Space>
-        <Text type="secondary" style={{ fontSize: 11 }}>{row.datasetKey}</Text>
-      </Space>
-    ),
-  },
-  {
-    title: '主体',
-    width: 128,
-    render: (_, row) => <Tag>{permissionSubjectLabel(row.subjectType, row.subjectId)}</Tag>,
-  },
-  {
-    title: '过滤',
-    width: 180,
-    render: (_, row) => <Text code ellipsis style={{ maxWidth: 170, display: 'block', fontSize: 11 }}>{row.filterJson}</Text>,
-  },
-]
+      ),
+    },
+    {
+      title: '主体',
+      width: 128,
+      render: (_, row) => <Tag>{permissionSubjectLabel(row.subjectType, row.subjectId)}</Tag>,
+    },
+    {
+      title: '过滤',
+      width: 180,
+      render: (_, row) => <Text code ellipsis style={{ maxWidth: 170, display: 'block', fontSize: 11 }}>{row.filterJson}</Text>,
+    },
+    {
+      title: '操作',
+      width: 72,
+      render: (_, row) => (
+        <Button
+          size="small"
+          danger
+          aria-label={`删除行权限 #${row.id}`}
+          icon={<DeleteOutlined />}
+          loading={deletingPermission === `row-${row.id}`}
+          onClick={() => onDelete(row)}
+        />
+      ),
+    },
+  ]
+}
 
-const columnPermissionColumns: ColumnsType<BiColumnPermissionView> = [
-  {
-    title: '字段',
-    render: (_, row) => (
-      <Space direction="vertical" size={0}>
-        <Space size={6}>
-          <Text strong style={{ fontSize: 12 }}>{row.fieldKey}</Text>
-          <Tag color={row.policy === 'DENY' ? 'red' : row.policy === 'MASK' ? 'gold' : 'green'}>{row.policy}</Tag>
+/** 创建列权限表格列，展示字段级允许、拒绝或脱敏策略。 */
+function createColumnPermissionColumns(
+  deletingPermission: string | null,
+  onDelete: (row: BiColumnPermissionView) => void,
+): ColumnsType<BiColumnPermissionView> {
+  return [
+    {
+      title: '字段',
+      render: (_, row) => (
+        <Space direction="vertical" size={0}>
+          <Space size={6}>
+            <Text strong style={{ fontSize: 12 }}>{row.fieldKey}</Text>
+            <Tag color={row.policy === 'DENY' ? 'red' : row.policy === 'MASK' ? 'gold' : 'green'}>{row.policy}</Tag>
+          </Space>
+          <Text type="secondary" style={{ fontSize: 11 }}>{row.datasetKey}</Text>
         </Space>
-        <Text type="secondary" style={{ fontSize: 11 }}>{row.datasetKey}</Text>
-      </Space>
-    ),
-  },
-  {
-    title: '主体',
-    width: 128,
-    render: (_, row) => <Tag>{permissionSubjectLabel(row.subjectType, row.subjectId)}</Tag>,
-  },
-  {
-    title: '脱敏',
-    width: 130,
-    render: (_, row) => row.maskJson ? <Text code ellipsis style={{ maxWidth: 120, display: 'block', fontSize: 11 }}>{row.maskJson}</Text> : <Text type="secondary">-</Text>,
-  },
-]
+      ),
+    },
+    {
+      title: '主体',
+      width: 128,
+      render: (_, row) => <Tag>{permissionSubjectLabel(row.subjectType, row.subjectId)}</Tag>,
+    },
+    {
+      title: '脱敏',
+      width: 130,
+      render: (_, row) => row.maskJson ? <Text code ellipsis style={{ maxWidth: 120, display: 'block', fontSize: 11 }}>{row.maskJson}</Text> : <Text type="secondary">-</Text>,
+    },
+    {
+      title: '操作',
+      width: 72,
+      render: (_, row) => (
+        <Button
+          size="small"
+          danger
+          aria-label={`删除列权限 #${row.id}`}
+          icon={<DeleteOutlined />}
+          loading={deletingPermission === `column-${row.id}`}
+          onClick={() => onDelete(row)}
+        />
+      ),
+    },
+  ]
+}
 
 function createExportJobColumns(
   reviewingExport: string | null,
@@ -943,6 +1031,7 @@ function createExportJobColumns(
               <Tooltip title="批准导出">
                 <Button
                   size="small"
+                  aria-label={`批准导出 #${row.id}`}
                   icon={<CheckCircleOutlined />}
                   loading={reviewingExport === `${row.id}:APPROVED`}
                   onClick={() => onReview(row, 'APPROVED')}
@@ -952,6 +1041,7 @@ function createExportJobColumns(
                 <Button
                   size="small"
                   danger
+                  aria-label={`驳回导出 #${row.id}`}
                   icon={<ExclamationCircleOutlined />}
                   loading={reviewingExport === `${row.id}:REJECTED`}
                   onClick={() => onReview(row, 'REJECTED')}
@@ -1109,6 +1199,176 @@ type SqlDatasetMetricDraft = BiSqlDatasetMetricDraftLike & {
   allowedDimensionsText?: string | null
 }
 
+interface SpreadsheetPivotMetricDraft {
+  id: string
+  field: string
+  aggregation: BiSpreadsheetPivotAggregation
+  label: string
+}
+
+type SpreadsheetPivotDropRole = 'ROW' | 'COLUMN' | 'METRIC'
+
+interface SpreadsheetPivotPreviewRow {
+  rowKey: string
+  cells: Array<{ cellKey: string; value: string }>
+}
+
+type ResourceLocationTableRow = BiResourceLocationView & { __tableRowKey: string }
+type ResourceOwnershipTableRow = BiResourceOwnershipView & { __tableRowKey: string }
+type ResourceFavoriteTableRow = BiResourceFavoriteView & { __tableRowKey: string }
+
+const SPREADSHEET_PIVOT_AGGREGATION_OPTIONS: Array<{ label: string; value: BiSpreadsheetPivotAggregation }> = [
+  { label: '求和', value: 'SUM' },
+  { label: '计数', value: 'COUNT' },
+  { label: '平均值', value: 'AVERAGE' },
+  { label: '最小值', value: 'MIN' },
+  { label: '最大值', value: 'MAX' },
+]
+
+function defaultSpreadsheetPivotMetrics(): SpreadsheetPivotMetricDraft[] {
+  return [
+    { id: 'metric-1', field: '消耗', aggregation: 'SUM', label: '消耗' },
+    { id: 'metric-2', field: '转化', aggregation: 'COUNT', label: '转化次数' },
+  ]
+}
+
+function spreadsheetPivotFieldsFromSheet(
+  sheet: Record<string, unknown> | null | undefined,
+  sourceRange: string,
+): string[] {
+  const cells = sheet?.cells
+  if (!cells || typeof cells !== 'object') return []
+  const [startCell, endCell] = sourceRange.split(':').map(item => item.trim()).filter(Boolean)
+  const start = parseSpreadsheetCellAddress(startCell ?? sourceRange)
+  const end = parseSpreadsheetCellAddress(endCell ?? startCell ?? sourceRange)
+  if (!start || !end) return []
+  const headerRow = Math.min(start.row, end.row)
+  const fromColumn = Math.min(start.column, end.column)
+  const toColumn = Math.max(start.column, end.column)
+  const cellMap = cells as Record<string, unknown>
+  const fields: string[] = []
+  for (let column = fromColumn; column <= toColumn; column += 1) {
+    const value = cellMap[`${spreadsheetColumnName(column)}${headerRow}`]
+    const field = String(value ?? '').trim()
+    if (field && !fields.includes(field)) fields.push(field)
+  }
+  return fields
+}
+
+function parseSpreadsheetCellAddress(value: string): { column: number; row: number } | null {
+  const match = value.trim().toUpperCase().match(/^([A-Z]+)([0-9]+)$/)
+  if (!match) return null
+  return {
+    column: match[1].split('').reduce((total, char) => total * 26 + char.charCodeAt(0) - 64, 0),
+    row: Number(match[2]),
+  }
+}
+
+function spreadsheetColumnName(index: number): string {
+  let remaining = index
+  let name = ''
+  while (remaining > 0) {
+    const offset = (remaining - 1) % 26
+    name = String.fromCharCode(65 + offset) + name
+    remaining = Math.floor((remaining - offset - 1) / 26)
+  }
+  return name
+}
+
+function spreadsheetPivotPreviewColumns(
+  sheet: Record<string, unknown> | null | undefined,
+  sourceRange: string,
+  columnField: string,
+  metrics: SpreadsheetPivotMetricDraft[],
+): string[] {
+  const cells = sheet?.cells
+  if (!cells || typeof cells !== 'object') return []
+  const [startCell, endCell] = sourceRange.split(':').map(item => item.trim()).filter(Boolean)
+  const start = parseSpreadsheetCellAddress(startCell ?? sourceRange)
+  const end = parseSpreadsheetCellAddress(endCell ?? startCell ?? sourceRange)
+  if (!start || !end) return []
+  const fromColumn = Math.min(start.column, end.column)
+  const toColumn = Math.max(start.column, end.column)
+  const fromRow = Math.min(start.row, end.row)
+  const toRow = Math.max(start.row, end.row)
+  const cellMap = cells as Record<string, unknown>
+  const headerRow = fromRow
+  let columnFieldIndex = -1
+  for (let column = fromColumn; column <= toColumn; column += 1) {
+    const header = String(cellMap[`${spreadsheetColumnName(column)}${headerRow}`] ?? '').trim()
+    if (header === columnField.trim()) {
+      columnFieldIndex = column
+      break
+    }
+  }
+  if (columnFieldIndex < 0) return []
+  const labels: string[] = []
+  for (let row = fromRow + 1; row <= toRow; row += 1) {
+    const label = String(cellMap[`${spreadsheetColumnName(columnFieldIndex)}${row}`] ?? '').trim()
+    if (label && !labels.includes(label)) labels.push(label)
+  }
+  const activeMetrics = metrics
+    .map(metric => ({ field: metric.field.trim(), label: metric.label.trim() || metric.field.trim() }))
+    .filter(metric => metric.field)
+  if (activeMetrics.length === 0) return labels
+  return labels.flatMap(label => activeMetrics.map(metric => `${label} ${metric.label}`))
+}
+
+function spreadsheetPivotPreviewRows(
+  sheet: Record<string, unknown> | null | undefined,
+  sourceRange: string,
+  targetCell: string,
+  rowField: string,
+  columnField: string,
+  metrics: SpreadsheetPivotMetricDraft[],
+): SpreadsheetPivotPreviewRow[] {
+  if (!sheet) return []
+  const target = parseSpreadsheetCellAddress(targetCell)
+  if (!target) return []
+  const activeMetrics = metrics
+    .map(metric => ({
+      field: metric.field.trim(),
+      aggregation: metric.aggregation,
+      label: metric.label.trim() || metric.field.trim(),
+    }))
+    .filter(metric => metric.field)
+  if (!activeMetrics.length) return []
+  const sheetKey = String(sheet.sheetKey ?? 'summary')
+  const preview = buildSpreadsheetPivotTable({
+    spreadsheetKey: 'pivot-preview',
+    name: 'Pivot Preview',
+    description: null,
+    sheets: [{ ...sheet }],
+    dataBinding: {},
+    style: {},
+    status: 'DRAFT',
+    version: 0,
+    source: 'PREVIEW',
+  }, sheetKey, {
+    sourceRange,
+    targetCell,
+    rowField,
+    columnField,
+    valueField: activeMetrics[0].field,
+    aggregation: activeMetrics[0].aggregation,
+    valueFields: activeMetrics,
+  })
+  const previewSheet = preview.sheets[0] ?? {}
+  const cells = (previewSheet.cells && typeof previewSheet.cells === 'object') ? previewSheet.cells as Record<string, unknown> : {}
+  const pivotTable = Array.isArray(previewSheet.pivotTables) ? previewSheet.pivotTables[previewSheet.pivotTables.length - 1] as Record<string, unknown> : null
+  const rowCount = 1 + (Array.isArray(pivotTable?.rowLabels) ? pivotTable.rowLabels.length : 0)
+  const columnLabelCount = Array.isArray(pivotTable?.columnLabels) ? pivotTable.columnLabels.length : 0
+  const columnCount = 1 + Math.max(1, columnLabelCount * activeMetrics.length)
+  return Array.from({ length: Math.min(rowCount, 5) }, (_, rowOffset) => ({
+    rowKey: `preview-row-${rowOffset}`,
+    cells: Array.from({ length: Math.min(columnCount, 8) }, (_, columnOffset) => {
+      const cellKey = `${spreadsheetColumnName(target.column + columnOffset)}${target.row + rowOffset}`
+      const value = cells[cellKey]
+      return { cellKey, value: value == null ? '' : String(value) }
+    }),
+  }))
+}
+
 function defaultSqlDatasetFields(): BiSqlDatasetFieldDraftLike[] {
   return [
     {
@@ -1158,6 +1418,8 @@ type DatasourceModelingJoinConditionDraft = {
   operator: DatasourceModelingJoinConditionOperator
   connector?: 'AND' | 'OR'
   rightColumn: string
+  groupStart?: boolean
+  groupEnd?: boolean
 }
 
 type DatasourceModelingJoinDraft = {
@@ -1188,12 +1450,22 @@ function swapDatasourceModelingJoinConditionOperator(operator?: string | null): 
 function datasourceModelingJoinConditionSummary(conditions: DatasourceModelingJoinDraft['conditions']): string {
   if (conditions.length === 0) return '0 个条件'
   const pairs = conditions.map((condition, index) => {
-    const expression = `${condition.leftColumn} ${condition.operator} ${condition.rightColumn}`
+    const expression = `${condition.groupStart ? '(' : ''}${condition.leftColumn} ${condition.operator} ${condition.rightColumn}${condition.groupEnd ? ')' : ''}`
     if (index === 0) return expression
     return `${condition.connector === 'OR' ? '或' : '且'} ${expression}`
   })
   if (pairs.length <= 2) return pairs.join(' ')
   return `${pairs.slice(0, 2).join(' ')} 等 ${pairs.length} 个条件`
+}
+
+function datasourceModelingJoinGroupsBalanced(conditions: DatasourceModelingJoinDraft['conditions']): boolean {
+  let depth = 0
+  for (const condition of conditions) {
+    if (condition.groupStart) depth += 1
+    if (condition.groupEnd) depth -= 1
+    if (depth < 0) return false
+  }
+  return depth === 0
 }
 
 type ApiPreviewVariableDraft = {
@@ -1223,6 +1495,7 @@ type DatasourceModelingGraphDragState = {
   originY: number
 }
 
+/** BI 工作台主页面，集中承载数据集、图表、仪表盘、门户、订阅、导出和权限配置。 */
 export default function BiWorkbenchPage() {
   const [searchParams] = useSearchParams()
   const navigate = useNavigate()
@@ -1234,6 +1507,7 @@ export default function BiWorkbenchPage() {
     () => biRuntimeRouteFromSearchParams(searchParams),
     [runtimeParameterKey],
   )
+  // 图表查询条件的 draftRef 用于保存按钮读取最新输入，避免受 React 异步状态批处理影响。
   const [sectionKey, setSectionKey] = useState<BiSectionKey>('dashboard')
   const [datasets, setDatasets] = useState<MarketingDatasetPreset[]>(DEFAULT_MARKETING_DATASETS)
   const [datasetMetadata, setDatasetMetadata] = useState<BiDatasetView | null>(null)
@@ -1241,13 +1515,35 @@ export default function BiWorkbenchPage() {
   const [selectedDatasetKey, setSelectedDatasetKey] = useState<string | null>(null)
   const [selectedDatasetFieldKeys, setSelectedDatasetFieldKeys] = useState('')
   const [datasetFieldFolderKey, setDatasetFieldFolderKey] = useState('')
+  const [selectedDatasetDetailFieldKey, setSelectedDatasetDetailFieldKey] = useState<string | null>(null)
+  const [datasetBatchRole, setDatasetBatchRole] = useState<'DIMENSION' | 'MEASURE'>('DIMENSION')
+  const [datasetBatchFormat, setDatasetBatchFormat] = useState('')
+  const [datasetBatchVisible, setDatasetBatchVisible] = useState(true)
+  const [datasetDragFieldKey, setDatasetDragFieldKey] = useState<string | null>(null)
+  const [datasetDropTargetFieldKey, setDatasetDropTargetFieldKey] = useState<string | null>(null)
+  const [datasetDropPosition, setDatasetDropPosition] = useState<'before' | 'after'>('before')
+  const [datasetDropFolderKey, setDatasetDropFolderKey] = useState('')
   const [datasetVersions, setDatasetVersions] = useState<BiDatasetVersionView[]>([])
   const [chartResources, setChartResources] = useState<BiChartResource[]>([])
   const [selectedChartKey, setSelectedChartKey] = useState<string | null>(null)
   const [chartVersions, setChartVersions] = useState<BiChartVersionView[]>([])
+  const [chartReferenceImpacts, setChartReferenceImpacts] = useState<Record<string, BiChartReferenceImpact>>({})
+  const [chartFilterFieldDraft, setChartFilterFieldDraft] = useState('')
+  const [chartFilterOperatorDraft, setChartFilterOperatorDraft] = useState('IN')
+  const [chartFilterValueDraft, setChartFilterValueDraft] = useState('')
+  const [chartSortFieldDraft, setChartSortFieldDraft] = useState('')
+  const [chartSortDirectionDraft, setChartSortDirectionDraft] = useState('DESC')
+  const chartFilterFieldDraftRef = useRef('')
+  const chartFilterOperatorDraftRef = useRef('IN')
+  const chartFilterValueDraftRef = useRef('')
+  const chartSortFieldDraftRef = useRef('')
+  const chartSortDirectionDraftRef = useRef('DESC')
   const [portalResources, setPortalResources] = useState<BiPortalResource[]>([])
   const [selectedPortalKey, setSelectedPortalKey] = useState<string | null>(null)
   const [selectedPortalMenuKey, setSelectedPortalMenuKey] = useState<string | null>(null)
+  const [portalDragMenuKey, setPortalDragMenuKey] = useState<string | null>(null)
+  const [portalDropTargetMenuKey, setPortalDropTargetMenuKey] = useState<string | null>(null)
+  const [portalDropPosition, setPortalDropPosition] = useState<'before' | 'after' | 'inside'>('inside')
   const [portalVersions, setPortalVersions] = useState<BiPortalVersionView[]>([])
   const [portalRuntimeResources, setPortalRuntimeResources] = useState<BiPortalResource[]>([])
   const [bigScreenResources, setBigScreenResources] = useState<BiBigScreenResource[]>([])
@@ -1262,6 +1558,11 @@ export default function BiWorkbenchPage() {
   const [selectedSpreadsheetSheetKey, setSelectedSpreadsheetSheetKey] = useState<string | null>(null)
   const [selectedSpreadsheetCellKey, setSelectedSpreadsheetCellKey] = useState('A1')
   const [spreadsheetFillRange, setSpreadsheetFillRange] = useState('')
+  const [spreadsheetPivotSourceRange, setSpreadsheetPivotSourceRange] = useState('A1:D5')
+  const [spreadsheetPivotTargetCell, setSpreadsheetPivotTargetCell] = useState('F1')
+  const [spreadsheetPivotRowField, setSpreadsheetPivotRowField] = useState('地区')
+  const [spreadsheetPivotColumnField, setSpreadsheetPivotColumnField] = useState('渠道')
+  const [spreadsheetPivotMetrics, setSpreadsheetPivotMetrics] = useState<SpreadsheetPivotMetricDraft[]>(() => defaultSpreadsheetPivotMetrics())
   const [spreadsheetVersions, setSpreadsheetVersions] = useState<BiSpreadsheetVersionView[]>([])
   const [dashboardPreset, setDashboardPreset] = useState<BiDashboardPresetLike>(() => getDefaultDashboardPreset(dashboardKey))
   const [dashboardHistory, setDashboardHistory] = useState(() => createDashboardPresetHistory(dashboardPreset))
@@ -1419,6 +1720,7 @@ export default function BiWorkbenchPage() {
   const [rowPermissions, setRowPermissions] = useState<BiRowPermissionView[]>([])
   const [columnPermissions, setColumnPermissions] = useState<BiColumnPermissionView[]>([])
   const [permissionAudit, setPermissionAudit] = useState<BiPermissionAuditEntry[]>([])
+  const [permissionRequests, setPermissionRequests] = useState<BiPermissionRequestView[]>([])
   const [resourceLocations, setResourceLocations] = useState<BiResourceLocationView[]>([])
   const [resourceOwnerships, setResourceOwnerships] = useState<BiResourceOwnershipView[]>([])
   const [resourceFavorites, setResourceFavorites] = useState<BiResourceFavoriteView[]>([])
@@ -1433,12 +1735,36 @@ export default function BiWorkbenchPage() {
   const [loadingResourceLock, setLoadingResourceLock] = useState(false)
   const [loadingPublishApprovals, setLoadingPublishApprovals] = useState(false)
   const [savingPermission, setSavingPermission] = useState<string | null>(null)
+  const [deletingPermission, setDeletingPermission] = useState<string | null>(null)
   const [permissionResourceTarget, setPermissionResourceTarget] = useState('DATASET')
+  const [resourcePermissionSubjectType, setResourcePermissionSubjectType] = useState('ROLE')
+  const [resourcePermissionSubjectId, setResourcePermissionSubjectId] = useState('OPERATOR')
+  const [resourcePermissionAction, setResourcePermissionAction] = useState('USE')
+  const [resourcePermissionEffect, setResourcePermissionEffect] = useState('ALLOW')
+  const [rowPermissionRuleKey, setRowPermissionRuleKey] = useState('operator-canvas-scope')
+  const [rowPermissionSubjectType, setRowPermissionSubjectType] = useState('ROLE')
+  const [rowPermissionSubjectId, setRowPermissionSubjectId] = useState('OPERATOR')
+  const [rowPermissionFilterJson, setRowPermissionFilterJson] = useState('{"canvas_id":[12,13]}')
+  const [rowPermissionEnabled, setRowPermissionEnabled] = useState(true)
+  const [columnPermissionFieldKey, setColumnPermissionFieldKey] = useState('canvas_name')
+  const [columnPermissionSubjectType, setColumnPermissionSubjectType] = useState('ROLE')
+  const [columnPermissionSubjectId, setColumnPermissionSubjectId] = useState('OPERATOR')
+  const [columnPermissionPolicy, setColumnPermissionPolicy] = useState('MASK')
+  const [columnPermissionMaskJson, setColumnPermissionMaskJson] = useState('{"strategy":"FIXED","replacement":"MASKED"}')
+  const [columnPermissionEnabled, setColumnPermissionEnabled] = useState(true)
+  const [permissionRequestAction, setPermissionRequestAction] = useState('USE')
+  const [permissionRequestReason, setPermissionRequestReason] = useState('')
+  const [permissionReviewComment, setPermissionReviewComment] = useState('')
+  const [reviewingPermissionRequest, setReviewingPermissionRequest] = useState<string | null>(null)
   const [moveResourceTarget, setMoveResourceTarget] = useState('DASHBOARD')
   const [moveFolderKey, setMoveFolderKey] = useState('marketing')
   const [movingResource, setMovingResource] = useState<string | null>(null)
   const [transferOwnerUser, setTransferOwnerUser] = useState('owner@example.com')
   const [transferringResource, setTransferringResource] = useState<string | null>(null)
+  const [batchDatasetResourceKeys, setBatchDatasetResourceKeys] = useState('')
+  const [batchDatasetFolderKey, setBatchDatasetFolderKey] = useState('')
+  const [batchDatasetOwnerUser, setBatchDatasetOwnerUser] = useState('owner@example.com')
+  const [batchDatasetResourceAction, setBatchDatasetResourceAction] = useState<'move' | 'transfer' | null>(null)
   const [favoritingResource, setFavoritingResource] = useState<string | null>(null)
   const [resourceCommentText, setResourceCommentText] = useState('')
   const [savingResourceComment, setSavingResourceComment] = useState(false)
@@ -1453,6 +1779,7 @@ export default function BiWorkbenchPage() {
   const [previewingSelfService, setPreviewingSelfService] = useState(false)
   const [creatingExport, setCreatingExport] = useState(false)
   const [reviewingExport, setReviewingExport] = useState<string | null>(null)
+  const [exportReviewComment, setExportReviewComment] = useState('')
   const [cancellingExportId, setCancellingExportId] = useState<number | null>(null)
   const [cleaningExports, setCleaningExports] = useState(false)
   const [retryingExports, setRetryingExports] = useState(false)
@@ -1496,6 +1823,7 @@ export default function BiWorkbenchPage() {
   )
   const explicitDashboardRuntimeParameters = useMemo(
     () => {
+      // 用户主动清除的参数需要从显式 URL 参数中剔除，避免再次参与优先级解析。
       let effectiveSearchParams = new URLSearchParams(searchParams)
       for (const key of clearedDashboardRuntimeParameterKeys) {
         effectiveSearchParams = stripDashboardRuntimeSearchParam(dashboardPreset, effectiveSearchParams, key)
@@ -1510,6 +1838,7 @@ export default function BiWorkbenchPage() {
   )
   const dashboardRuntimeParameters = useMemo(
     () => {
+      // UI 最终使用的参数由 URL、已记住状态和默认值共同解析得出。
       let effectiveSearchParams = new URLSearchParams(searchParams)
       for (const key of clearedDashboardRuntimeParameterKeys) {
         effectiveSearchParams = stripDashboardRuntimeSearchParam(dashboardPreset, effectiveSearchParams, key)
@@ -1522,6 +1851,10 @@ export default function BiWorkbenchPage() {
     },
     [dashboardPreset, runtimeParameterKey, dashboardRuntimeState, clearedDashboardRuntimeParameterKeys],
   )
+  const dashboardRuntimeParametersRef = useRef(dashboardRuntimeParameters)
+  useEffect(() => {
+    dashboardRuntimeParametersRef.current = dashboardRuntimeParameters
+  }, [dashboardRuntimeParameters])
   const dashboardRuntimeRows = useMemo(
     () => dashboardRuntimeStateRows(
       dashboardPreset,
@@ -1536,6 +1869,7 @@ export default function BiWorkbenchPage() {
   const canRedoDashboardEdit = dashboardHistory.future.length > 0
 
   useEffect(() => {
+    // 自助分析默认跟随当前组件字段，用户可在此基础上增删维度和指标。
     setSelfServiceExtraction({
       dimensions: selectedWidget.dimensions,
       metrics: selectedWidget.metrics,
@@ -1543,6 +1877,7 @@ export default function BiWorkbenchPage() {
   }, [selectedWidget.widgetKey])
 
   const resetDashboardPreset = (preset: BiDashboardPresetLike) => {
+    // 切换仪表盘时重置历史栈，避免撤销跨资源污染。
     setDashboardPreset(preset)
     setDashboardHistory(createDashboardPresetHistory(preset))
     const nextSelectedKey = preset.widgets.some(widget => widget.widgetKey === selectedWidgetKey)
@@ -1556,6 +1891,7 @@ export default function BiWorkbenchPage() {
     setDashboardPreset(current => {
       const next = updater(current)
       if (next === current) return current
+      // 每次设计器编辑都推入历史栈，支撑撤销/重做。
       setDashboardHistory(history => pushDashboardPresetHistory({ ...history, present: current }, next))
       return next
     })
@@ -1605,6 +1941,18 @@ export default function BiWorkbenchPage() {
     () => chartResources.find(chart => chart.chartKey === selectedChartKey) ?? chartResources[0] ?? null,
     [chartResources, selectedChartKey],
   )
+  const selectedChartServerImpact = selectedChartResource ? chartReferenceImpacts[selectedChartResource.chartKey] : null
+  const selectedChartReferenceImpact = useMemo(
+    // 服务端影响分析优先；失败时使用当前页面内存资源做本地兜底摘要。
+    () => selectedChartServerImpact
+      ? chartReferenceImpactSummaryFromImpact(selectedChartResource, selectedChartServerImpact)
+      : chartReferenceImpactSummary(selectedChartResource, {
+        dashboards: [dashboardPreset],
+        portals: portalResources,
+        subscriptions,
+      }),
+    [dashboardPreset, portalResources, selectedChartResource, selectedChartServerImpact, subscriptions],
+  )
   const selectedPortalResource = useMemo(
     () => portalResources.find(portal => portal.portalKey === selectedPortalKey) ?? portalResources[0] ?? null,
     [portalResources, selectedPortalKey],
@@ -1650,6 +1998,15 @@ export default function BiWorkbenchPage() {
       }),
     [selectedPortalResource],
   )
+  const selectedPortalMenu = useMemo(
+    () => (selectedPortalResource?.menus ?? [])
+      .find(menu => String(menu.menuKey ?? '') === selectedPortalMenuKey) ?? null,
+    [selectedPortalResource?.menus, selectedPortalMenuKey],
+  )
+  const portalParentMenuOptions = useMemo(
+    () => portalMenuOptions.filter(option => option.value !== selectedPortalMenuKey),
+    [portalMenuOptions, selectedPortalMenuKey],
+  )
   const selectedDatasetFolderSummary = useMemo(() => {
     const counts = new Map<string, number>()
     for (const field of selectedDatasetResource?.fields ?? []) {
@@ -1661,6 +2018,21 @@ export default function BiWorkbenchPage() {
       .map(([folderKey, count]) => `字段文件夹：${folderKey} · ${count} 字段`)
       .join('；')
   }, [selectedDatasetResource])
+  const selectedDatasetDetailField = useMemo(
+    () => (selectedDatasetResource?.fields ?? [])
+      .find(field => field.fieldKey === selectedDatasetDetailFieldKey)
+      ?? selectedDatasetResource?.fields?.[0]
+      ?? null,
+    [selectedDatasetResource, selectedDatasetDetailFieldKey],
+  )
+  const datasetFieldTreeGroups = useMemo(() => {
+    const groups = new Map<string, BiDatasetFieldResource[]>()
+    for (const field of [...(selectedDatasetResource?.fields ?? [])].sort((left, right) => Number(left.sortOrder ?? 0) - Number(right.sortOrder ?? 0))) {
+      const folderKey = field.folderKey?.trim() || '未分组'
+      groups.set(folderKey, [...(groups.get(folderKey) ?? []), field])
+    }
+    return Array.from(groups.entries())
+  }, [selectedDatasetResource])
   const bigScreenSummaryRows = useMemo(
     () => bigScreenResourceSummaryRows(selectedBigScreenResource),
     [selectedBigScreenResource],
@@ -1668,6 +2040,13 @@ export default function BiWorkbenchPage() {
   const spreadsheetSummaryRows = useMemo(
     () => spreadsheetResourceSummaryRows(selectedSpreadsheetResource),
     [selectedSpreadsheetResource],
+  )
+  const visualEditorDiagnosticRows = useMemo(
+    () => buildVisualEditorDiagnosticRows({
+      bigScreen: selectedBigScreenResource,
+      spreadsheet: selectedSpreadsheetResource,
+    }),
+    [selectedBigScreenResource, selectedSpreadsheetResource],
   )
   const selectedBigScreenLayoutItem = useMemo(() => {
     const layout = selectedBigScreenResource?.layout ?? []
@@ -1709,16 +2088,68 @@ export default function BiWorkbenchPage() {
     const style = (cellStyles as Record<string, unknown>)[selectedSpreadsheetCellKey.toUpperCase()]
     return style && typeof style === 'object' ? style as Record<string, unknown> : {}
   }, [selectedSpreadsheetCellKey, selectedSpreadsheetSheet])
+  const spreadsheetPivotFields = useMemo(
+    () => spreadsheetPivotFieldsFromSheet(selectedSpreadsheetSheet, spreadsheetPivotSourceRange),
+    [selectedSpreadsheetSheet, spreadsheetPivotSourceRange],
+  )
+  const spreadsheetPivotPreviewColumnLabels = useMemo(
+    () => spreadsheetPivotPreviewColumns(
+      selectedSpreadsheetSheet,
+      spreadsheetPivotSourceRange,
+      spreadsheetPivotColumnField,
+      spreadsheetPivotMetrics,
+    ),
+    [selectedSpreadsheetSheet, spreadsheetPivotColumnField, spreadsheetPivotMetrics, spreadsheetPivotSourceRange],
+  )
+  const spreadsheetPivotPreviewGridRows = useMemo(
+    () => spreadsheetPivotPreviewRows(
+      selectedSpreadsheetSheet,
+      spreadsheetPivotSourceRange,
+      spreadsheetPivotTargetCell,
+      spreadsheetPivotRowField,
+      spreadsheetPivotColumnField,
+      spreadsheetPivotMetrics,
+    ),
+    [
+      selectedSpreadsheetSheet,
+      spreadsheetPivotColumnField,
+      spreadsheetPivotMetrics,
+      spreadsheetPivotRowField,
+      spreadsheetPivotSourceRange,
+      spreadsheetPivotTargetCell,
+    ],
+  )
   const resourceLocationIndex = useMemo(
     () => toResourceLocationIndex(resourceLocations),
+    [resourceLocations],
+  )
+  const resourceLocationTableRows = useMemo(
+    () => resourceLocations.map((row, index) => ({
+      ...row,
+      __tableRowKey: resourceLocationTableRowKey(row, index),
+    })),
     [resourceLocations],
   )
   const resourceOwnershipIndex = useMemo(
     () => toResourceOwnershipIndex(resourceOwnerships),
     [resourceOwnerships],
   )
+  const resourceOwnershipTableRows = useMemo(
+    () => resourceOwnerships.map((row, index) => ({
+      ...row,
+      __tableRowKey: resourceOwnershipTableRowKey(row, index),
+    })),
+    [resourceOwnerships],
+  )
   const resourceFavoriteIndex = useMemo(
     () => toResourceFavoriteIndex(resourceFavorites),
+    [resourceFavorites],
+  )
+  const resourceFavoriteTableRows = useMemo(
+    () => resourceFavorites.map((row, index) => ({
+      ...row,
+      __tableRowKey: resourceFavoriteTableRowKey(row, index),
+    })),
     [resourceFavorites],
   )
   const resourceMoveTargets = useMemo(() => buildBiResourceTargets({
@@ -1766,6 +2197,26 @@ export default function BiWorkbenchPage() {
     [permissionResourceTargets, permissionResourceTarget],
   )
   const isDatasetPermissionTarget = selectedPermissionTarget.resourceType === 'DATASET'
+  const selectedPermissionDatasetResource = useMemo(
+    () => datasetResources.find(dataset => dataset.datasetKey === selectedPermissionTarget.resourceKey)
+      ?? (isDatasetPermissionTarget ? selectedDatasetResource : null),
+    [datasetResources, selectedPermissionTarget.resourceKey, isDatasetPermissionTarget, selectedDatasetResource],
+  )
+  const selectedPermissionSensitiveFields = useMemo(
+    () => (selectedPermissionDatasetResource?.fields ?? []).filter(field =>
+      String(field.sensitiveLevel ?? 'PUBLIC').toUpperCase() !== 'PUBLIC' || field.visible === false),
+    [selectedPermissionDatasetResource],
+  )
+  const columnPermissionShortcutFieldKeys = useMemo(() => {
+    const sensitiveFieldKeys = selectedPermissionSensitiveFields
+      .map(field => field.fieldKey)
+      .filter(fieldKey => fieldKey.trim())
+    if (sensitiveFieldKeys.length > 0) {
+      return sensitiveFieldKeys
+    }
+    const fallbackFieldKey = columnPermissionFieldKey.trim()
+    return fallbackFieldKey ? [fallbackFieldKey] : []
+  }, [selectedPermissionSensitiveFields, columnPermissionFieldKey])
   const selectedResourceIndexKey = selectedMoveTarget.resourceKey
     ? resourceLocationIndexKey(selectedMoveTarget.resourceType, selectedMoveTarget.resourceKey)
     : ''
@@ -1806,6 +2257,14 @@ export default function BiWorkbenchPage() {
   const retryableExportCount = useMemo(
     () => exportJobs.filter(isRetryableExportJob).length,
     [exportJobs],
+  )
+  const exportHardeningRows = useMemo(
+    () => exportHardeningDiagnosticRows(exportJobs),
+    [exportJobs],
+  )
+  const alertAnomalyDiagnosticRowsValue = useMemo(
+    () => alertAnomalyDiagnosticRows(alertRules),
+    [alertRules],
   )
 
   useEffect(() => {
@@ -1868,7 +2327,7 @@ export default function BiWorkbenchPage() {
   useEffect(() => {
     if (Object.keys(explicitDashboardRuntimeParameters).length === 0) return
     let cancelled = false
-    biApi.saveDashboardRuntimeState(dashboardPreset.dashboardKey, { parameters: dashboardRuntimeParameters })
+    biApi.saveDashboardRuntimeState(dashboardPreset.dashboardKey, buildDashboardRuntimeStateCommand(dashboardPreset, dashboardRuntimeParameters))
       .then(response => {
         if (!cancelled) setDashboardRuntimeState(response.data ?? null)
       })
@@ -1994,6 +2453,14 @@ export default function BiWorkbenchPage() {
       current && menus.some(menu => String(menu.menuKey ?? '') === current)
         ? current
         : String(menus[0]?.menuKey ?? '') || null)
+    setPortalDragMenuKey(current =>
+      current && menus.some(menu => String(menu.menuKey ?? '') === current)
+        ? current
+        : String(menus[0]?.menuKey ?? '') || null)
+    setPortalDropTargetMenuKey(current =>
+      current && menus.some(menu => String(menu.menuKey ?? '') === current)
+        ? current
+        : String(menus[1]?.menuKey ?? menus[0]?.menuKey ?? '') || null)
   }, [selectedPortalResource?.portalKey, selectedPortalResource?.menus])
 
   useEffect(() => {
@@ -2030,6 +2497,52 @@ export default function BiWorkbenchPage() {
       cancelled = true
     }
   }, [])
+
+  useEffect(() => {
+    const chartKey = selectedChartResource?.chartKey
+    if (!chartKey) return
+    let cancelled = false
+    // 图表引用影响用于提示修改/发布图表会波及哪些仪表盘、门户和订阅。
+    biApi.getChartReferenceImpact(chartKey)
+      .then(response => {
+        const impact = response.data
+        if (!cancelled && impact && !Array.isArray(impact)) {
+          setChartReferenceImpacts(current => ({ ...current, [chartKey]: impact }))
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          // 服务端影响接口失败时清空缓存，让 UI 使用本地资源关系兜底。
+          setChartReferenceImpacts(current => {
+            const next = { ...current }
+            delete next[chartKey]
+            return next
+          })
+        }
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [selectedChartResource?.chartKey])
+
+  useEffect(() => {
+    // 切换图表后把已保存查询条件同步到表单草稿和 ref，保持保存动作读取一致。
+    const filterField = String(selectedChartResource?.query.filters?.[0]?.field ?? '')
+    const filterOperator = String(selectedChartResource?.query.filters?.[0]?.operator ?? 'IN')
+    const filterValue = chartFilterValueText(selectedChartResource?.query.filters?.[0]?.value)
+    const sortField = String(selectedChartResource?.query.sorts?.[0]?.field ?? '')
+    const sortDirection = String(selectedChartResource?.query.sorts?.[0]?.direction ?? 'DESC')
+    chartFilterFieldDraftRef.current = filterField
+    chartFilterOperatorDraftRef.current = filterOperator
+    chartFilterValueDraftRef.current = filterValue
+    chartSortFieldDraftRef.current = sortField
+    chartSortDirectionDraftRef.current = sortDirection
+    setChartFilterFieldDraft(filterField)
+    setChartFilterOperatorDraft(filterOperator)
+    setChartFilterValueDraft(filterValue)
+    setChartSortFieldDraft(sortField)
+    setChartSortDirectionDraft(sortDirection)
+  }, [selectedChartResource?.chartKey])
 
   const reloadResourceLocations = () => {
     setLoadingResourceLocations(true)
@@ -2405,12 +2918,19 @@ export default function BiWorkbenchPage() {
       biApi.listRowPermissions(dashboardPreset.datasetKey).catch(() => ({ data: [] })),
       biApi.listColumnPermissions(dashboardPreset.datasetKey).catch(() => ({ data: [] })),
       biApi.listPermissionAudit(8).catch(() => ({ data: [] })),
+      selectedPermissionTarget.resourceKey
+        ? biApi.listPermissionRequests({
+          resourceType: selectedPermissionTarget.resourceType,
+          resourceKey: selectedPermissionTarget.resourceKey,
+        }).catch(() => ({ data: [] }))
+        : Promise.resolve({ data: [] }),
     ])
-      .then(([resourceResponse, rowResponse, columnResponse, auditResponse]) => {
+      .then(([resourceResponse, rowResponse, columnResponse, auditResponse, requestResponse]) => {
         setResourcePermissions(resourceResponse.data ?? [])
         setRowPermissions(rowResponse.data ?? [])
         setColumnPermissions(columnResponse.data ?? [])
         setPermissionAudit(auditResponse.data ?? [])
+        setPermissionRequests(requestResponse.data ?? [])
       })
       .finally(() => setLoadingPermissions(false))
   }
@@ -2497,14 +3017,30 @@ export default function BiWorkbenchPage() {
       .finally(() => setCreatingEmbedTicket(false))
   }
 
+  const createPortalEmbedTicket = () => {
+    if (!selectedPortalResource) return
+    setCreatingEmbedTicket(true)
+    biApi.createEmbedTicket({
+      resourceType: 'PORTAL',
+      resourceKey: selectedPortalResource.portalKey,
+      scope: 'INTERNAL_CANVAS',
+      filters: {},
+      ttlSeconds: 900,
+      maxAccessCount: Math.max(3, selectedPortalResource.menus.length + 2),
+    })
+      .then(response => setEmbedTicket(response.data))
+      .finally(() => setCreatingEmbedTicket(false))
+  }
+
   const persistDashboardRuntimeParameters = (parameters: BiDashboardRuntimeParameters) => {
+    dashboardRuntimeParametersRef.current = parameters
     setDashboardRuntimeState(current => ({
       dashboardKey: dashboardPreset.dashboardKey,
       username: current?.username ?? '',
       parameters,
       updatedAt: current?.updatedAt ?? null,
     }))
-    biApi.saveDashboardRuntimeState(dashboardPreset.dashboardKey, { parameters })
+    biApi.saveDashboardRuntimeState(dashboardPreset.dashboardKey, buildDashboardRuntimeStateCommand(dashboardPreset, parameters))
       .then(response => setDashboardRuntimeState(response.data ?? null))
       .catch(() => undefined)
   }
@@ -2513,7 +3049,15 @@ export default function BiWorkbenchPage() {
     if (rawValue) {
       setClearedDashboardRuntimeParameterKeys(keys => keys.filter(key => key !== filterKey))
     }
-    const parameters = updateDashboardRuntimeParameters(dashboardPreset, dashboardRuntimeParameters, filterKey, rawValue)
+    const parameters = updateDashboardRuntimeParameters(dashboardPreset, dashboardRuntimeParametersRef.current, filterKey, rawValue)
+    const nextSearchParams = stripDashboardRuntimeSearchParam(dashboardPreset, searchParams, filterKey)
+    if (rawValue.trim()) {
+      nextSearchParams.set(filterKey, rawValue.trim())
+    }
+    const nextQuery = nextSearchParams.toString()
+    if (nextQuery !== searchParams.toString()) {
+      navigate(nextQuery ? `/bi?${nextQuery}` : '/bi', { replace: true })
+    }
     persistDashboardRuntimeParameters(parameters)
   }
 
@@ -2725,12 +3269,120 @@ export default function BiWorkbenchPage() {
     upsertSelectedChartResource(updated)
   }
 
+  const updateSelectedChartStyle = (patch: Record<string, unknown>) => {
+    if (!selectedChartResource) return
+    updateSelectedChartResource({
+      style: {
+        ...selectedChartResource.style,
+        ...patch,
+      },
+    })
+  }
+
+  const updateSelectedChartAxisStyle = (patch: Record<string, unknown>) => {
+    if (!selectedChartResource) return
+    const currentAxis = selectedChartResource.style?.axis && typeof selectedChartResource.style.axis === 'object'
+      ? selectedChartResource.style.axis as Record<string, unknown>
+      : {}
+    updateSelectedChartStyle({
+      axis: {
+        ...currentAxis,
+        ...patch,
+      },
+    })
+  }
+
+  const updateSelectedChartLabelStyle = (patch: Record<string, unknown>) => {
+    if (!selectedChartResource) return
+    const currentLabels = selectedChartResource.style?.labels && typeof selectedChartResource.style.labels === 'object'
+      ? selectedChartResource.style.labels as Record<string, unknown>
+      : {}
+    updateSelectedChartStyle({
+      labels: {
+        ...currentLabels,
+        ...patch,
+      },
+    })
+  }
+
+  const updateSelectedChartConditionalFormat = (patch: Record<string, unknown>) => {
+    if (!selectedChartResource) return
+    const currentRule = Array.isArray(selectedChartResource.style?.conditionalFormats)
+      && selectedChartResource.style.conditionalFormats[0]
+      && typeof selectedChartResource.style.conditionalFormats[0] === 'object'
+      ? selectedChartResource.style.conditionalFormats[0] as Record<string, unknown>
+      : {}
+    updateSelectedChartStyle({
+      conditionalFormats: [{
+        ...currentRule,
+        ...patch,
+      }],
+    })
+  }
+
+  const updateSelectedChartInteraction = (patch: Record<string, unknown>) => {
+    if (!selectedChartResource) return
+    updateSelectedChartResource({
+      interaction: {
+        drillEnabled: Boolean(selectedChartResource.interaction?.drillEnabled ?? selectedChartResource.interaction?.drill),
+        linkageTarget: String(selectedChartResource.interaction?.linkageTarget ?? ''),
+        hyperlinkTemplate: String(selectedChartResource.interaction?.hyperlinkTemplate ?? ''),
+        ...patch,
+      },
+    })
+  }
+
+  const applySelectedChartQueryDesigner = (patch: {
+    selectedDimensions?: string[]
+    selectedMetrics?: string[]
+    filterField?: string
+    filterOperator?: string
+    filterValue?: string
+    sortField?: string
+    sortDirection?: string
+    limit?: number | string
+  }) => {
+    if (!selectedChartResource) return
+    // 合并局部表单变更和当前图表查询，再统一走查询 patch 归一化。
+    updateSelectedChartResource({
+      query: chartQueryPatchFromDesigner({
+        datasetKey: selectedChartResource.datasetKey,
+        selectedDimensions: patch.selectedDimensions ?? selectedChartResource.query.dimensions,
+        selectedMetrics: patch.selectedMetrics ?? selectedChartResource.query.metrics,
+        filterField: patch.filterField ?? chartFilterFieldDraftRef.current,
+        filterOperator: patch.filterOperator ?? chartFilterOperatorDraftRef.current,
+        filterValue: patch.filterValue ?? chartFilterValueDraftRef.current,
+        sortField: patch.sortField ?? chartSortFieldDraftRef.current,
+        sortDirection: patch.sortDirection ?? chartSortDirectionDraftRef.current,
+        limit: patch.limit ?? selectedChartResource.query.limit,
+      }),
+    })
+  }
+
+  /** 将图表过滤值转换为表单展示文本，数组过滤使用逗号分隔。 */
+  const chartFilterValueText = (value: unknown) => Array.isArray(value) ? value.join(',') : String(value ?? '')
+
+  /** 处理图表字段拖放，按角色写入维度或指标槽。 */
+  const dropSelectedChartField = (role: 'DIMENSION' | 'METRIC', fieldKey: string) => {
+    if (!selectedChartResource) return
+    const next = chartQueryFieldsAfterDrop({
+      dimensions: selectedChartResource.query.dimensions,
+      metrics: selectedChartResource.query.metrics,
+    }, role, fieldKey)
+    applySelectedChartQueryDesigner({
+      selectedDimensions: next.dimensions,
+      selectedMetrics: next.metrics,
+    })
+  }
+
+  /** 复制当前图表草稿，并生成不冲突的新 chartKey。 */
   const copySelectedChartDraft = () => {
     if (!selectedChartResource) return
     const baseKey = `${selectedChartResource.chartKey}-copy`
     const existingKeys = new Set(chartResources.map(chart => chart.chartKey))
     let chartKey = baseKey
     let index = 2
+    // 副本 key 需要避开已有图表，保证本地 upsert 不覆盖原资源。
     while (existingKeys.has(chartKey)) {
       chartKey = `${baseKey}-${index}`
       index += 1
@@ -2744,12 +3396,31 @@ export default function BiWorkbenchPage() {
     })
   }
 
+  /** 保存当前图表草稿，保存前重新归一化查询条件。 */
   const saveChartDraft = () => {
     if (!selectedChartResource) return
+    const resourceToSave: BiChartResource = {
+      ...selectedChartResource,
+      query: {
+        ...selectedChartResource.query,
+        // 使用 ref 中的最新表单值，避免 onChange 后立即保存读到旧 state。
+        ...chartQueryPatchFromDesigner({
+          datasetKey: selectedChartResource.datasetKey,
+          selectedDimensions: selectedChartResource.query.dimensions,
+          selectedMetrics: selectedChartResource.query.metrics,
+          filterField: chartFilterFieldDraftRef.current,
+          filterOperator: chartFilterOperatorDraftRef.current,
+          filterValue: chartFilterValueDraftRef.current,
+          sortField: chartSortFieldDraftRef.current,
+          sortDirection: chartSortDirectionDraftRef.current,
+          limit: selectedChartResource.query.limit,
+        }),
+      },
+    }
     setSavingChart(selectedChartResource.chartKey)
     biApi.saveChartDraft(
-      selectedChartResource.chartKey,
-      selectedChartResource,
+      resourceToSave.chartKey,
+      resourceToSave,
       resourceLockTokenFor(resourceLock, resourceLockToken, 'CHART', selectedChartResource.chartKey),
     )
       .then(response => {
@@ -2782,6 +3453,61 @@ export default function BiWorkbenchPage() {
           : field),
     }
     upsertSelectedDatasetResource(updated)
+  }
+
+  const updateSelectedDatasetField = (patch: Partial<BiDatasetFieldResource>) => {
+    if (!selectedDatasetResource || !selectedDatasetDetailField) return
+    const updated: BiDatasetResource = {
+      ...selectedDatasetResource,
+      fields: selectedDatasetResource.fields.map(field =>
+        field.fieldKey === selectedDatasetDetailField.fieldKey
+          ? { ...field, ...patch }
+          : field),
+    }
+    upsertSelectedDatasetResource(updated)
+    setSelectedDatasetDetailFieldKey(selectedDatasetDetailField.fieldKey)
+  }
+
+  const applyDatasetBatchFieldConfig = () => {
+    if (!selectedDatasetResource) return
+    const targetFieldKeys = new Set(parseChartFieldList(selectedDatasetFieldKeys))
+    if (targetFieldKeys.size === 0) return
+    const formatPattern = datasetBatchFormat.trim()
+    const updated: BiDatasetResource = {
+      ...selectedDatasetResource,
+      fields: selectedDatasetResource.fields.map(field =>
+        targetFieldKeys.has(field.fieldKey)
+          ? {
+              ...field,
+              role: datasetBatchRole,
+              ...(formatPattern ? { formatPattern } : {}),
+              visible: datasetBatchVisible,
+            }
+          : field),
+    }
+    upsertSelectedDatasetResource(updated)
+  }
+
+  const applyDatasetFieldDrop = (dragKey = datasetDragFieldKey, targetKey = datasetDropTargetFieldKey) => {
+    if (!selectedDatasetResource || !dragKey || !targetKey || dragKey === targetKey) return
+    const currentFields = [...selectedDatasetResource.fields]
+      .sort((left, right) => Number(left.sortOrder ?? 0) - Number(right.sortOrder ?? 0))
+    const dragged = currentFields.find(field => field.fieldKey === dragKey)
+    const withoutDragged = currentFields.filter(field => field.fieldKey !== dragKey)
+    const targetIndex = withoutDragged.findIndex(field => field.fieldKey === targetKey)
+    if (!dragged || targetIndex < 0) return
+    const insertIndex = datasetDropPosition === 'after' ? targetIndex + 1 : targetIndex
+    const folderKey = datasetDropFolderKey.trim()
+    const reordered = [
+      ...withoutDragged.slice(0, insertIndex),
+      { ...dragged, ...(folderKey ? { folderKey } : {}) },
+      ...withoutDragged.slice(insertIndex),
+    ].map((field, index) => ({ ...field, sortOrder: index + 1 }))
+    upsertSelectedDatasetResource({
+      ...selectedDatasetResource,
+      fields: reordered,
+    })
+    setSelectedDatasetDetailFieldKey(dragKey)
   }
 
   const copySelectedDatasetDraft = () => {
@@ -2859,6 +3585,30 @@ export default function BiWorkbenchPage() {
     setPortalResources(current => current.map(portal =>
       portal.portalKey === updated.portalKey ? updated : portal))
     setSelectedPortalKey(updated.portalKey)
+  }
+
+  const updateSelectedPortalMenuConfig = (patch: Parameters<typeof updatePortalMenuConfig>[2]) => {
+    if (!selectedPortalResource || !selectedPortalMenuKey) return
+    const updated = updatePortalMenuConfig(selectedPortalResource, selectedPortalMenuKey, patch) as BiPortalResource
+    setPortalResources(current => current.map(portal =>
+      portal.portalKey === updated.portalKey ? updated : portal))
+    setSelectedPortalKey(updated.portalKey)
+    setSelectedPortalMenuKey(selectedPortalMenuKey)
+  }
+
+  const applyPortalMenuDrop = (
+    draggedMenuKey = portalDragMenuKey,
+    targetMenuKey = portalDropTargetMenuKey,
+    position = portalDropPosition,
+  ) => {
+    if (!selectedPortalResource || !draggedMenuKey || !targetMenuKey) return
+    const updated = reorderPortalMenuTree(selectedPortalResource, draggedMenuKey, targetMenuKey, position) as BiPortalResource
+    setPortalResources(current => current.map(portal =>
+      portal.portalKey === updated.portalKey ? updated : portal))
+    setSelectedPortalKey(updated.portalKey)
+    setSelectedPortalMenuKey(draggedMenuKey)
+    setPortalDragMenuKey(draggedMenuKey)
+    setPortalDropTargetMenuKey(targetMenuKey)
   }
 
   const moveSelectedPortalMenu = (direction: 'up' | 'down') => {
@@ -3058,21 +3808,130 @@ export default function BiWorkbenchPage() {
     setSelectedSpreadsheetSheetKey(sheetKey)
   }
 
+  const updateSpreadsheetPivotMetric = (
+    metricId: string,
+    patch: Partial<Pick<SpreadsheetPivotMetricDraft, 'field' | 'aggregation' | 'label'>>,
+  ) => {
+    setSpreadsheetPivotMetrics(current => current.map(metric => (
+      metric.id === metricId ? { ...metric, ...patch } : metric
+    )))
+  }
+
+  const addSpreadsheetPivotMetric = () => {
+    setSpreadsheetPivotMetrics(current => [
+      ...current,
+      {
+        id: `metric-${Date.now()}-${current.length + 1}`,
+        field: '',
+        aggregation: 'SUM',
+        label: '',
+      },
+    ])
+  }
+
+  const removeSpreadsheetPivotMetric = (metricId: string) => {
+    setSpreadsheetPivotMetrics(current => (
+      current.length > 1 ? current.filter(metric => metric.id !== metricId) : current
+    ))
+  }
+
+  const moveSpreadsheetPivotMetric = (metricId: string, direction: 'up' | 'down') => {
+    setSpreadsheetPivotMetrics(current => {
+      const index = current.findIndex(metric => metric.id === metricId)
+      if (index < 0) return current
+      const targetIndex = direction === 'up' ? index - 1 : index + 1
+      if (targetIndex < 0 || targetIndex >= current.length) return current
+      const next = [...current]
+      const [metric] = next.splice(index, 1)
+      next.splice(targetIndex, 0, metric)
+      return next
+    })
+  }
+
+  const assignSpreadsheetPivotField = (role: SpreadsheetPivotDropRole, field: string) => {
+    const normalizedField = field.trim()
+    if (!normalizedField) return
+    if (role === 'ROW') {
+      setSpreadsheetPivotRowField(normalizedField)
+      return
+    }
+    if (role === 'COLUMN') {
+      setSpreadsheetPivotColumnField(normalizedField)
+      return
+    }
+    setSpreadsheetPivotMetrics(current => {
+      if (current.some(metric => metric.field.trim() === normalizedField)) return current
+      const sourceFieldSet = new Set(spreadsheetPivotFields)
+      const replaceIndex = current.findIndex(metric => (
+        !metric.field.trim() || (sourceFieldSet.size > 0 && !sourceFieldSet.has(metric.field.trim()))
+      ))
+      const nextMetric = {
+        id: replaceIndex >= 0 ? current[replaceIndex].id : `metric-${Date.now()}-${current.length + 1}`,
+        field: normalizedField,
+        aggregation: 'SUM' as BiSpreadsheetPivotAggregation,
+        label: normalizedField,
+      }
+      if (replaceIndex < 0) return [...current, nextMetric]
+      return current.map((metric, index) => (index === replaceIndex ? nextMetric : metric))
+    })
+  }
+
+  const dragSpreadsheetPivotField = (event: ReactDragEvent<HTMLElement>, field: string) => {
+    event.dataTransfer.effectAllowed = 'copy'
+    event.dataTransfer.setData('application/x-bi-spreadsheet-pivot-field', field)
+    event.dataTransfer.setData('text/plain', field)
+  }
+
+  const dropSpreadsheetPivotField = (event: ReactDragEvent<HTMLElement>, role: SpreadsheetPivotDropRole) => {
+    event.preventDefault()
+    const field = event.dataTransfer.getData('application/x-bi-spreadsheet-pivot-field') || event.dataTransfer.getData('text/plain')
+    assignSpreadsheetPivotField(role, field)
+  }
+
+  const normalizedSpreadsheetPivotMetrics = () => spreadsheetPivotMetrics
+    .map(metric => ({
+      field: metric.field.trim(),
+      aggregation: metric.aggregation,
+      label: metric.label.trim() || metric.field.trim(),
+    }))
+    .filter(metric => metric.field)
+
   const generateSelectedSpreadsheetPivotTable = () => {
     const resource = selectedSpreadsheetResource ?? defaultSpreadsheetDraft()
     const sheetKey = selectedSpreadsheetSheetKey ?? String(resource.sheets[0]?.sheetKey ?? 'summary')
+    const metric = normalizedSpreadsheetPivotMetrics()[0] ?? { field: '', aggregation: 'SUM' as BiSpreadsheetPivotAggregation, label: '' }
     const updated = buildSpreadsheetPivotTable(resource, sheetKey, {
-      sourceRange: 'A1:D5',
-      targetCell: 'F1',
-      rowField: '地区',
-      columnField: '渠道',
-      valueField: '消耗',
-      aggregation: 'SUM',
+      sourceRange: spreadsheetPivotSourceRange,
+      targetCell: spreadsheetPivotTargetCell,
+      rowField: spreadsheetPivotRowField,
+      columnField: spreadsheetPivotColumnField,
+      valueField: metric.field,
+      aggregation: metric.aggregation,
     }) as BiSpreadsheetResource
     setSpreadsheetResources(current => upsertSpreadsheetResource(current, updated))
     setSelectedSpreadsheetKey(updated.spreadsheetKey)
     setSelectedSpreadsheetSheetKey(sheetKey)
-    setSelectedSpreadsheetCellKey('F1')
+    setSelectedSpreadsheetCellKey(spreadsheetPivotTargetCell.toUpperCase())
+  }
+
+  const generateSelectedSpreadsheetMultiMetricPivotTable = () => {
+    const resource = selectedSpreadsheetResource ?? defaultSpreadsheetDraft()
+    const sheetKey = selectedSpreadsheetSheetKey ?? String(resource.sheets[0]?.sheetKey ?? 'summary')
+    const metrics = normalizedSpreadsheetPivotMetrics()
+    const firstMetric = metrics[0] ?? { field: '', aggregation: 'SUM' as BiSpreadsheetPivotAggregation, label: '' }
+    const updated = buildSpreadsheetPivotTable(resource, sheetKey, {
+      sourceRange: spreadsheetPivotSourceRange,
+      targetCell: spreadsheetPivotTargetCell,
+      rowField: spreadsheetPivotRowField,
+      columnField: spreadsheetPivotColumnField,
+      valueField: firstMetric.field,
+      aggregation: firstMetric.aggregation,
+      valueFields: metrics,
+    }) as BiSpreadsheetResource
+    setSpreadsheetResources(current => upsertSpreadsheetResource(current, updated))
+    setSelectedSpreadsheetKey(updated.spreadsheetKey)
+    setSelectedSpreadsheetSheetKey(sheetKey)
+    setSelectedSpreadsheetCellKey(spreadsheetPivotTargetCell.toUpperCase())
   }
 
   const saveSpreadsheetDraft = () => {
@@ -3277,6 +4136,48 @@ export default function BiWorkbenchPage() {
       .finally(() => setTransferringResource(null))
   }
 
+  const selectedBatchDatasetResourceKeys = () => parseChartFieldList(batchDatasetResourceKeys)
+    .filter(key => datasetResources.some(dataset => dataset.datasetKey === key))
+
+  const moveBatchDatasetResources = () => {
+    const datasetKeys = selectedBatchDatasetResourceKeys()
+    if (datasetKeys.length === 0) return
+    setBatchDatasetResourceAction('move')
+    Promise.all(datasetKeys.map((datasetKey, index) =>
+      biApi.moveResource(buildResourceMoveCommand('DATASET', datasetKey, batchDatasetFolderKey, index))))
+      .then(responses => {
+        setResourceLocations(current => {
+          const movedKeys = new Set(datasetKeys.map(key => resourceLocationIndexKey('DATASET', key)))
+          return [
+            ...current.filter(location => !movedKeys.has(resourceLocationIndexKey(location.resourceType, location.resourceKey))),
+            ...responses.map(response => response.data),
+          ].sort(compareResourceLocations)
+        })
+      })
+      .catch(() => undefined)
+      .finally(() => setBatchDatasetResourceAction(null))
+  }
+
+  const transferBatchDatasetResources = () => {
+    const ownerUser = batchDatasetOwnerUser.trim()
+    const datasetKeys = selectedBatchDatasetResourceKeys()
+    if (datasetKeys.length === 0 || !ownerUser) return
+    setBatchDatasetResourceAction('transfer')
+    Promise.all(datasetKeys.map(datasetKey =>
+      biApi.transferResource(buildResourceTransferCommand('DATASET', datasetKey, ownerUser))))
+      .then(responses => {
+        setResourceOwnerships(current => {
+          const transferredKeys = new Set(datasetKeys.map(key => resourceLocationIndexKey('DATASET', key)))
+          return [
+            ...current.filter(ownership => !transferredKeys.has(resourceLocationIndexKey(ownership.resourceType, ownership.resourceKey))),
+            ...responses.map(response => response.data),
+          ].sort(compareResourceOwnerships)
+        })
+      })
+      .catch(() => undefined)
+      .finally(() => setBatchDatasetResourceAction(null))
+  }
+
   const toggleSelectedFavorite = () => {
     if (!selectedMoveTarget.resourceKey) return
     const command = buildResourceFavoriteCommand(
@@ -3458,6 +4359,84 @@ export default function BiWorkbenchPage() {
 
   const grantSelectedResourceExport = () => grantSelectedResourcePermission('EXPORT', 'export')
 
+  const saveResourcePermissionRule = () => {
+    if (!selectedPermissionTarget.resourceKey) return
+    const subjectId = resourcePermissionSubjectType === 'ALL'
+      ? 'ALL'
+      : resourcePermissionSubjectId.trim()
+    if (!subjectId) return
+    setSavingPermission('resource-editor')
+    biApi.upsertResourcePermission({
+      resourceType: selectedPermissionTarget.resourceType,
+      resourceKey: selectedPermissionTarget.resourceKey,
+      subjectType: resourcePermissionSubjectType,
+      subjectId,
+      actionKey: resourcePermissionAction,
+      effect: resourcePermissionEffect,
+    })
+      .then(() => reloadPermissions())
+      .finally(() => setSavingPermission(null))
+  }
+
+  const submitPermissionRequest = () => {
+    if (!selectedPermissionTarget.resourceKey) return
+    setSavingPermission('request')
+    biApi.requestPermission({
+      resourceType: selectedPermissionTarget.resourceType,
+      resourceKey: selectedPermissionTarget.resourceKey,
+      requestedAction: permissionRequestAction,
+      reason: permissionRequestReason.trim() || null,
+    })
+      .then(response => {
+        setPermissionRequests(current => [
+          response.data,
+          ...current.filter(request => request.id !== response.data.id),
+        ])
+        setPermissionRequestReason('')
+        return reloadPermissions()
+      })
+      .finally(() => setSavingPermission(null))
+  }
+
+  const reviewPermissionRequest = (request: BiPermissionRequestView, status: 'APPROVED' | 'REJECTED') => {
+    if (!request.id) return
+    setReviewingPermissionRequest(`${status}-${request.id}`)
+    biApi.reviewPermissionRequest(request.id, {
+      requestId: request.id,
+      status,
+      reviewComment: permissionReviewComment.trim() || null,
+    })
+      .then(response => {
+        setPermissionRequests(current => current.map(item => item.id === response.data.id ? response.data : item))
+        return reloadPermissions()
+      })
+      .finally(() => setReviewingPermissionRequest(null))
+  }
+
+  const deleteResourcePermissionRule = (row: BiResourcePermissionView) => {
+    if (!row.id) return
+    setDeletingPermission(`resource-${row.id}`)
+    biApi.deleteResourcePermission(row.id)
+      .then(() => reloadPermissions())
+      .finally(() => setDeletingPermission(null))
+  }
+
+  const deleteRowPermissionRule = (row: BiRowPermissionView) => {
+    if (!row.id) return
+    setDeletingPermission(`row-${row.id}`)
+    biApi.deleteRowPermission(row.id)
+      .then(() => reloadPermissions())
+      .finally(() => setDeletingPermission(null))
+  }
+
+  const deleteColumnPermissionRule = (row: BiColumnPermissionView) => {
+    if (!row.id) return
+    setDeletingPermission(`column-${row.id}`)
+    biApi.deleteColumnPermission(row.id)
+      .then(() => reloadPermissions())
+      .finally(() => setDeletingPermission(null))
+  }
+
   const addCanvasRowPermission = () => {
     const scopedCanvasIds = canvasId ? [Number.isNaN(Number(canvasId)) ? canvasId : Number(canvasId)] : [12, 13]
     setSavingPermission('row')
@@ -3471,6 +4450,77 @@ export default function BiWorkbenchPage() {
       enabled: true,
     })
       .then(reloadPermissions)
+      .finally(() => setSavingPermission(null))
+  }
+
+  const saveRowPermissionRule = () => {
+    if (!isDatasetPermissionTarget || !selectedPermissionTarget.resourceKey) return
+    const ruleKey = rowPermissionRuleKey.trim()
+    const subjectId = rowPermissionSubjectType === 'ALL' ? 'ALL' : rowPermissionSubjectId.trim()
+    if (!ruleKey || !subjectId) return
+    let parsedFilter: Record<string, unknown>
+    try {
+      const parsed = JSON.parse(rowPermissionFilterJson || '{}')
+      parsedFilter = parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : {}
+    } catch {
+      parsedFilter = {}
+    }
+    setSavingPermission('row-editor')
+    biApi.upsertRowPermission({
+      datasetKey: selectedPermissionTarget.resourceKey,
+      ruleKey,
+      subjectType: rowPermissionSubjectType,
+      subjectId,
+      filters: [],
+      filter: parsedFilter,
+      enabled: rowPermissionEnabled,
+    })
+      .then(() => reloadPermissions())
+      .finally(() => setSavingPermission(null))
+  }
+
+  const saveColumnPermissionRule = () => {
+    if (!isDatasetPermissionTarget || !selectedPermissionTarget.resourceKey) return
+    const fieldKey = columnPermissionFieldKey.trim()
+    const subjectId = columnPermissionSubjectType === 'ALL' ? 'ALL' : columnPermissionSubjectId.trim()
+    if (!fieldKey || !subjectId) return
+    let parsedMask: Record<string, unknown>
+    try {
+      const parsed = JSON.parse(columnPermissionMaskJson || '{}')
+      parsedMask = parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : {}
+    } catch {
+      parsedMask = {}
+    }
+    setSavingPermission('column-editor')
+    biApi.upsertColumnPermission({
+      datasetKey: selectedPermissionTarget.resourceKey,
+      fieldKey,
+      subjectType: columnPermissionSubjectType,
+      subjectId,
+      policy: columnPermissionPolicy,
+      mask: parsedMask,
+      enabled: columnPermissionEnabled,
+    })
+      .then(() => reloadPermissions())
+      .finally(() => setSavingPermission(null))
+  }
+
+  const applySensitiveFieldColumnPermissions = () => {
+    if (!isDatasetPermissionTarget || !selectedPermissionTarget.resourceKey || columnPermissionShortcutFieldKeys.length === 0) return
+    const subjectId = columnPermissionSubjectType === 'ALL' ? 'ALL' : columnPermissionSubjectId.trim()
+    if (!subjectId) return
+    setSavingPermission('sensitive-columns')
+    Promise.all(columnPermissionShortcutFieldKeys.map(fieldKey =>
+      biApi.upsertColumnPermission({
+        datasetKey: selectedPermissionTarget.resourceKey!,
+        fieldKey,
+        subjectType: columnPermissionSubjectType,
+        subjectId,
+        policy: 'MASK',
+        mask: { strategy: 'FIXED', replacement: 'MASKED' },
+        enabled: true,
+      })))
+      .then(() => reloadPermissions())
       .finally(() => setSavingPermission(null))
   }
 
@@ -3533,9 +4583,15 @@ export default function BiWorkbenchPage() {
     setReviewingExport(`${row.id}:${status}`)
     biApi.reviewExport(
       row.id,
-      buildExportApprovalReviewCommand(status, status === 'APPROVED' ? '工作台通过' : '工作台驳回'),
+      buildExportApprovalReviewCommand(
+        status,
+        exportReviewComment.trim() || (status === 'APPROVED' ? '工作台通过' : '工作台驳回'),
+      ),
     )
-      .then(() => reloadExports())
+      .then(() => {
+        setExportReviewComment('')
+        return reloadExports()
+      })
       .finally(() => setReviewingExport(null))
   }
 
@@ -3574,7 +4630,19 @@ export default function BiWorkbenchPage() {
       inspectSelfServiceExport,
       cancelSelfServiceExport,
     ),
-    [reviewingExport, cancellingExportId],
+    [reviewingExport, cancellingExportId, exportReviewComment],
+  )
+  const resourcePermissionTableColumns = useMemo(
+    () => createResourcePermissionColumns(deletingPermission, deleteResourcePermissionRule),
+    [deletingPermission],
+  )
+  const rowPermissionTableColumns = useMemo(
+    () => createRowPermissionColumns(deletingPermission, deleteRowPermissionRule),
+    [deletingPermission],
+  )
+  const columnPermissionTableColumns = useMemo(
+    () => createColumnPermissionColumns(deletingPermission, deleteColumnPermissionRule),
+    [deletingPermission],
   )
 
   const exportAuditRows = useMemo(
@@ -3694,6 +4762,16 @@ export default function BiWorkbenchPage() {
     [datasourceConnectors],
   )
 
+  const datasourceCapacityPolicyTableRows = useMemo(
+    () => datasourceCapacityPolicyRows(datasourceConnectors),
+    [datasourceConnectors],
+  )
+
+  const datasourceAdvancedCapabilityTableRows = useMemo(
+    () => datasourceAdvancedCapabilityRows(datasourceConnectors),
+    [datasourceConnectors],
+  )
+
   const availableDatasourceConnectors = useMemo(
     () => datasourceConnectors.filter(connector => connector.supportStatus === 'AVAILABLE'),
     [datasourceConnectors],
@@ -3765,6 +4843,11 @@ export default function BiWorkbenchPage() {
 
   const datasourceOnboardingTableRows = useMemo(
     () => datasourceOnboardingRows(datasourceOnboarding),
+    [datasourceOnboarding],
+  )
+
+  const datasourceNextActionTableRows = useMemo(
+    () => datasourceNextActionRows(datasourceOnboarding),
     [datasourceOnboarding],
   )
 
@@ -3950,7 +5033,14 @@ export default function BiWorkbenchPage() {
       const key = `${leftColumn}=${rightColumn}`
       if (!leftColumn || !rightColumn || seenConditions.has(key)) return
       seenConditions.add(key)
-      conditions.push({ leftColumn, operator, connector, rightColumn })
+      conditions.push({
+        leftColumn,
+        operator,
+        connector,
+        rightColumn,
+        groupStart: condition.groupStart === true,
+        groupEnd: condition.groupEnd === true,
+      })
     })
     if (conditions.length === 0 && defaultLeftColumn && defaultRightColumn) {
       conditions.push({ leftColumn: defaultLeftColumn, operator: '=', connector: 'AND', rightColumn: defaultRightColumn })
@@ -3998,6 +5088,14 @@ export default function BiWorkbenchPage() {
     ...explicitDatasourceModelingJoins,
     ...defaultDatasourceModelingJoins,
   ]
+  const datasourceRelationshipDiagnosticRows = useMemo(
+    () => buildDatasourceRelationshipDiagnosticRows({
+      baseTableName: datasourceModelingBaseTableValue,
+      tableNames: datasourceModelingTableNamesValue,
+      joins: effectiveDatasourceModelingJoins,
+    }),
+    [datasourceModelingBaseTableValue, datasourceModelingTableNamesValue, effectiveDatasourceModelingJoins],
+  )
   const selectedDatasourceModelingGraphJoinIndexValue = effectiveDatasourceModelingJoins[selectedDatasourceModelingGraphJoinIndex]
     ? selectedDatasourceModelingGraphJoinIndex
     : effectiveDatasourceModelingJoins.length > 0 ? 0 : -1
@@ -4028,7 +5126,8 @@ export default function BiWorkbenchPage() {
       && join.rightTableName
       && join.leftTableName !== join.rightTableName
       && join.conditions.length > 0
-      && join.conditions.every(condition => condition.leftColumn && condition.rightColumn))
+      && join.conditions.every(condition => condition.leftColumn && condition.rightColumn)
+      && datasourceModelingJoinGroupsBalanced(join.conditions))
     && datasourceModelingTableNamesValue.every(tableName => datasourceModelingCoveredTables.has(tableName))
 
   const sqlDatasetDataSourceConfigId = datasourceSchemaSnapshot?.dataSourceConfigId
@@ -4073,6 +5172,14 @@ export default function BiWorkbenchPage() {
     && sqlDatasetParameterDrafts.every(parameter => !!parameter.key)
     && sqlDatasetDraftResource.fields.length > 0
     && sqlDatasetDraftResource.metrics.length > 0
+  const sqlDatasetReadinessRows = useMemo(
+    () => buildSqlDatasetReadinessRows({
+      draft: sqlDatasetDraftResource,
+      parameters: sqlDatasetParameterDrafts,
+      preview: sqlDatasetPreview,
+    }),
+    [sqlDatasetDraftResource, sqlDatasetParameterDrafts, sqlDatasetPreview],
+  )
 
   const updateSqlDatasetParameter = (parameterKey: string, patch: Partial<BiSqlDatasetParameterDraftLike>) => {
     setSqlDatasetParameters(current => buildSqlDatasetParameterDrafts(sqlDatasetTemplate, current)
@@ -4236,6 +5343,8 @@ export default function BiWorkbenchPage() {
           operator: swapDatasourceModelingJoinConditionOperator(condition.operator),
           connector: condition.connector,
           rightColumn: condition.leftColumn,
+          groupStart: condition.groupStart,
+          groupEnd: condition.groupEnd,
         })),
       }, join.leftTableName)
     }))
@@ -4244,7 +5353,7 @@ export default function BiWorkbenchPage() {
   const updateDatasourceModelingJoinCondition = (
     joinIndex: number,
     conditionIndex: number,
-    patch: Partial<{ leftColumn: string; operator: DatasourceModelingJoinConditionOperator; connector: 'AND' | 'OR'; rightColumn: string }>,
+    patch: Partial<DatasourceModelingJoinConditionDraft>,
   ) => {
     setDatasourceModelingJoinDrafts(effectiveDatasourceModelingJoins.map((join, itemIndex) => {
       if (itemIndex !== joinIndex) return join
@@ -5352,7 +6461,7 @@ export default function BiWorkbenchPage() {
                         value={(selectedChartResource?.query.dimensions ?? []).join(',')}
                         placeholder="dimension_a,dimension_b"
                         disabled={!selectedChartResource}
-                        onChange={event => updateSelectedChartResource({ query: { dimensions: parseChartFieldList(event.target.value) } })}
+                        onChange={event => applySelectedChartQueryDesigner({ selectedDimensions: parseChartFieldList(event.target.value) })}
                       />
                       <Input
                         size="small"
@@ -5360,8 +6469,89 @@ export default function BiWorkbenchPage() {
                         value={(selectedChartResource?.query.metrics ?? []).join(',')}
                         placeholder="metric_a,metric_b"
                         disabled={!selectedChartResource}
-                        onChange={event => updateSelectedChartResource({ query: { metrics: parseChartFieldList(event.target.value) } })}
+                        onChange={event => applySelectedChartQueryDesigner({ selectedMetrics: parseChartFieldList(event.target.value) })}
                       />
+                      <ChartFieldDropBuilder
+                        dimensionFields={filteredDimensions.map(field => field.fieldKey)}
+                        metricFields={filteredMetrics.map(metric => metric.metricKey)}
+                        selectedDimensions={selectedChartResource?.query.dimensions ?? []}
+                        selectedMetrics={selectedChartResource?.query.metrics ?? []}
+                        disabled={!selectedChartResource}
+                        onDropField={dropSelectedChartField}
+                      />
+                      <Space size={8} wrap>
+                        <Input
+                          size="small"
+                          aria-label="图表筛选字段"
+                          value={chartFilterFieldDraft}
+                          placeholder="filter_field"
+                          style={{ width: 140 }}
+                          disabled={!selectedChartResource}
+                          onChange={event => {
+                            chartFilterFieldDraftRef.current = event.target.value
+                            setChartFilterFieldDraft(event.target.value)
+                            applySelectedChartQueryDesigner({ filterField: event.target.value })
+                          }}
+                        />
+                        <select
+                          aria-label="图表筛选操作符"
+                          value={chartFilterOperatorDraft}
+                          style={{ width: 96, height: 24, border: '1px solid #d9d9d9', borderRadius: 4, padding: '0 8px' }}
+                          disabled={!selectedChartResource}
+                          onChange={event => {
+                            chartFilterOperatorDraftRef.current = event.target.value
+                            setChartFilterOperatorDraft(event.target.value)
+                            applySelectedChartQueryDesigner({ filterOperator: event.target.value })
+                          }}
+                        >
+                          <option value="IN">IN</option>
+                          <option value="EQ">EQ</option>
+                          <option value="CONTAINS">CONTAINS</option>
+                          <option value="BETWEEN">BETWEEN</option>
+                        </select>
+                        <Input
+                          size="small"
+                          aria-label="图表筛选值"
+                          value={chartFilterValueDraft}
+                          placeholder="value 或 a,b"
+                          style={{ width: 160 }}
+                          disabled={!selectedChartResource}
+                          onChange={event => {
+                            chartFilterValueDraftRef.current = event.target.value
+                            setChartFilterValueDraft(event.target.value)
+                            applySelectedChartQueryDesigner({ filterValue: event.target.value })
+                          }}
+                        />
+                      </Space>
+                      <Space size={8} wrap>
+                        <Input
+                          size="small"
+                          aria-label="图表排序字段"
+                          value={chartSortFieldDraft}
+                          placeholder="sort_field"
+                          style={{ width: 140 }}
+                          disabled={!selectedChartResource}
+                          onChange={event => {
+                            chartSortFieldDraftRef.current = event.target.value
+                            setChartSortFieldDraft(event.target.value)
+                            applySelectedChartQueryDesigner({ sortField: event.target.value })
+                          }}
+                        />
+                        <select
+                          aria-label="图表排序方向"
+                          value={chartSortDirectionDraft}
+                          style={{ width: 96, height: 24, border: '1px solid #d9d9d9', borderRadius: 4, padding: '0 8px' }}
+                          disabled={!selectedChartResource}
+                          onChange={event => {
+                            chartSortDirectionDraftRef.current = event.target.value
+                            setChartSortDirectionDraft(event.target.value)
+                            applySelectedChartQueryDesigner({ sortDirection: event.target.value })
+                          }}
+                        >
+                          <option value="DESC">DESC</option>
+                          <option value="ASC">ASC</option>
+                        </select>
+                      </Space>
                       <Input
                         size="small"
                         type="number"
@@ -5369,10 +6559,174 @@ export default function BiWorkbenchPage() {
                         value={String(selectedChartResource?.query.limit ?? 100)}
                         placeholder="100"
                         disabled={!selectedChartResource}
-                        onChange={event => updateSelectedChartResource({ query: { limit: Math.max(1, Number(event.target.value) || 1) } })}
+                        onChange={event => applySelectedChartQueryDesigner({ limit: Math.max(1, Number(event.target.value) || 1) })}
                       />
+                      <Space size={8} wrap>
+                        <select
+                          aria-label="图表主题"
+                          value={String(selectedChartResource?.style?.theme ?? 'default')}
+                          style={{ width: 132, height: 24, border: '1px solid #d9d9d9', borderRadius: 4, padding: '0 8px' }}
+                          disabled={!selectedChartResource}
+                          onChange={event => updateSelectedChartStyle({ theme: event.target.value })}
+                        >
+                          <option value="default">默认浅色</option>
+                          <option value="screen-dark">大屏深色</option>
+                          <option value="mobile-compact">移动紧凑</option>
+                        </select>
+                        <select
+                          aria-label="图表密度"
+                          value={String(selectedChartResource?.style?.density ?? 'compact')}
+                          style={{ width: 116, height: 24, border: '1px solid #d9d9d9', borderRadius: 4, padding: '0 8px' }}
+                          disabled={!selectedChartResource}
+                          onChange={event => updateSelectedChartStyle({ density: event.target.value })}
+                        >
+                          <option value="compact">紧凑</option>
+                          <option value="comfortable">标准</option>
+                          <option value="spacious">宽松</option>
+                        </select>
+                        <select
+                          aria-label="图表调色板"
+                          value={String(selectedChartResource?.style?.palette ?? 'blue')}
+                          style={{ width: 116, height: 24, border: '1px solid #d9d9d9', borderRadius: 4, padding: '0 8px' }}
+                          disabled={!selectedChartResource}
+                          onChange={event => updateSelectedChartStyle({ palette: event.target.value })}
+                        >
+                          <option value="blue">蓝色</option>
+                          <option value="green">绿色</option>
+                          <option value="warm">暖色</option>
+                          <option value="mono">灰阶</option>
+                        </select>
+                      </Space>
+                      <Space size={12} wrap>
+                        <Switch
+                          size="small"
+                          aria-label="图表图例"
+                          checked={Boolean(selectedChartResource?.style?.legendVisible ?? selectedChartResource?.chartType !== 'KPI_CARD')}
+                          disabled={!selectedChartResource}
+                          onChange={checked => updateSelectedChartStyle({ legendVisible: checked })}
+                        />
+                        <Text type="secondary" style={{ fontSize: 12 }}>图例</Text>
+                        <Switch
+                          size="small"
+                          aria-label="图表数据标签"
+                          checked={Boolean(selectedChartResource?.style?.dataLabelsVisible ?? false)}
+                          disabled={!selectedChartResource}
+                          onChange={checked => updateSelectedChartStyle({ dataLabelsVisible: checked })}
+                        />
+                        <Text type="secondary" style={{ fontSize: 12 }}>数据标签</Text>
+                        <Switch
+                          size="small"
+                          aria-label="图表钻取"
+                          checked={Boolean(selectedChartResource?.interaction?.drillEnabled ?? selectedChartResource?.interaction?.drill ?? false)}
+                          disabled={!selectedChartResource}
+                          onChange={checked => updateSelectedChartInteraction({ drillEnabled: checked })}
+                        />
+                        <Text type="secondary" style={{ fontSize: 12 }}>钻取</Text>
+                      </Space>
+                      <Space size={8} wrap>
+                        <Input
+                          size="small"
+                          aria-label="图表X轴标题"
+                          value={String((selectedChartResource?.style?.axis as Record<string, unknown> | undefined)?.xTitle ?? '')}
+                          placeholder="X 轴标题"
+                          style={{ width: 140 }}
+                          disabled={!selectedChartResource}
+                          onChange={event => updateSelectedChartAxisStyle({ xTitle: event.target.value })}
+                        />
+                        <Input
+                          size="small"
+                          aria-label="图表Y轴标题"
+                          value={String((selectedChartResource?.style?.axis as Record<string, unknown> | undefined)?.yTitle ?? '')}
+                          placeholder="Y 轴标题"
+                          style={{ width: 140 }}
+                          disabled={!selectedChartResource}
+                          onChange={event => updateSelectedChartAxisStyle({ yTitle: event.target.value })}
+                        />
+                        <select
+                          aria-label="图表标签位置"
+                          value={String((selectedChartResource?.style?.labels as Record<string, unknown> | undefined)?.position ?? 'outside')}
+                          style={{ width: 116, height: 24, border: '1px solid #d9d9d9', borderRadius: 4, padding: '0 8px' }}
+                          disabled={!selectedChartResource}
+                          onChange={event => updateSelectedChartLabelStyle({ position: event.target.value })}
+                        >
+                          <option value="outside">外侧</option>
+                          <option value="inside">内侧</option>
+                          <option value="center">居中</option>
+                        </select>
+                        <Input
+                          size="small"
+                          aria-label="图表数字格式"
+                          value={String((selectedChartResource?.style?.labels as Record<string, unknown> | undefined)?.numberFormat ?? '')}
+                          placeholder="0,0"
+                          style={{ width: 116 }}
+                          disabled={!selectedChartResource}
+                          onChange={event => updateSelectedChartLabelStyle({ numberFormat: event.target.value })}
+                        />
+                      </Space>
+                      <Space size={8} wrap>
+                        <Input
+                          size="small"
+                          aria-label="图表条件格式字段"
+                          value={String(((selectedChartResource?.style?.conditionalFormats as Array<Record<string, unknown>> | undefined)?.[0])?.field ?? '')}
+                          placeholder="metric"
+                          style={{ width: 140 }}
+                          disabled={!selectedChartResource}
+                          onChange={event => updateSelectedChartConditionalFormat({ field: event.target.value })}
+                        />
+                        <select
+                          aria-label="图表条件格式操作符"
+                          value={String(((selectedChartResource?.style?.conditionalFormats as Array<Record<string, unknown>> | undefined)?.[0])?.operator ?? 'GTE')}
+                          style={{ width: 96, height: 24, border: '1px solid #d9d9d9', borderRadius: 4, padding: '0 8px' }}
+                          disabled={!selectedChartResource}
+                          onChange={event => updateSelectedChartConditionalFormat({ operator: event.target.value })}
+                        >
+                          <option value="GTE">&gt;=</option>
+                          <option value="GT">&gt;</option>
+                          <option value="LTE">&lt;=</option>
+                          <option value="LT">&lt;</option>
+                          <option value="EQ">=</option>
+                        </select>
+                        <Input
+                          size="small"
+                          aria-label="图表条件格式阈值"
+                          value={String(((selectedChartResource?.style?.conditionalFormats as Array<Record<string, unknown>> | undefined)?.[0])?.value ?? '')}
+                          placeholder="阈值"
+                          style={{ width: 96 }}
+                          disabled={!selectedChartResource}
+                          onChange={event => updateSelectedChartConditionalFormat({ value: event.target.value })}
+                        />
+                        <Input
+                          size="small"
+                          aria-label="图表条件格式颜色"
+                          value={String(((selectedChartResource?.style?.conditionalFormats as Array<Record<string, unknown>> | undefined)?.[0])?.color ?? '')}
+                          placeholder="#16a34a"
+                          style={{ width: 112 }}
+                          disabled={!selectedChartResource}
+                          onChange={event => updateSelectedChartConditionalFormat({ color: event.target.value })}
+                        />
+                      </Space>
+                      <Space size={8} wrap>
+                        <Input
+                          size="small"
+                          aria-label="图表联动目标"
+                          value={String(selectedChartResource?.interaction?.linkageTarget ?? '')}
+                          placeholder="target_widget"
+                          style={{ width: 160 }}
+                          disabled={!selectedChartResource}
+                          onChange={event => updateSelectedChartInteraction({ linkageTarget: event.target.value })}
+                        />
+                        <Input
+                          size="small"
+                          aria-label="图表跳转模板"
+                          value={String(selectedChartResource?.interaction?.hyperlinkTemplate ?? '')}
+                          placeholder="/path/{field}"
+                          style={{ width: 220 }}
+                          disabled={!selectedChartResource}
+                          onChange={event => updateSelectedChartInteraction({ hyperlinkTemplate: event.target.value })}
+                        />
+                      </Space>
                       <Text type="secondary" style={{ fontSize: 12 }}>
-                        引用影响：数据集 {selectedChartResource?.datasetKey ?? '-'} · {selectedChartResource?.query.dimensions.length ?? 0} 维度 · {selectedChartResource?.query.metrics.length ?? 0} 指标
+                        {selectedChartReferenceImpact}
                       </Text>
                       <Space size={8} wrap>
                         <Button
@@ -6174,6 +7528,20 @@ export default function BiWorkbenchPage() {
                 locale={{ emptyText: '暂无已接入数据源' }}
                 scroll={{ x: 800 }}
               />
+              <Table
+                rowKey="key"
+                size="small"
+                pagination={false}
+                columns={[
+                  { title: '数据源', dataIndex: 'source', key: 'source', width: 180, ellipsis: true },
+                  { title: '就绪状态', dataIndex: 'readiness', key: 'readiness', width: 130 },
+                  { title: '下一步', dataIndex: 'nextAction', key: 'nextAction', width: 240, ellipsis: true },
+                  { title: '限制', dataIndex: 'limitations', key: 'limitations', ellipsis: true },
+                ]}
+                dataSource={datasourceNextActionTableRows}
+                locale={{ emptyText: '暂无数据源后续动作' }}
+                scroll={{ x: 860 }}
+              />
               <Modal
                 title={`轮换凭证${credentialRotationDatasource ? ` · ${credentialRotationDatasource.name}` : ''}`}
                 open={credentialRotationDatasourceId !== null}
@@ -6609,6 +7977,9 @@ export default function BiWorkbenchPage() {
                       ))}
                     </Space>
                   </Col>
+                  <Col xs={24}>
+                    <SqlDatasetReadinessSummary rows={sqlDatasetReadinessRows} />
+                  </Col>
                   {sqlDatasetPreviewError && (
                     <Col xs={24}>
                       <Text type="danger" style={{ fontSize: 12 }}>{sqlDatasetPreviewError}</Text>
@@ -6622,10 +7993,10 @@ export default function BiWorkbenchPage() {
                             SQL 预览 {sqlDatasetPreview.rowCount} 行
                           </Tag>
                           <Tag color="blue">参数 {sqlDatasetPreview.parameterCount}</Tag>
-                          <Tag color={sqlDatasetPreview.lineage.approvalRequired ? 'volcano' : 'default'}>
-                            {sqlDatasetPreview.lineage.approvalRequired ? '发布需审批' : '无审批门禁'}
+                          <Tag color={sqlDatasetPreview.lineage?.approvalRequired ? 'volcano' : 'default'}>
+                            {sqlDatasetPreview.lineage?.approvalRequired ? '发布需审批' : '无审批门禁'}
                           </Tag>
-                          {sqlDatasetPreview.lineage.dataSourceConfigId && (
+                          {sqlDatasetPreview.lineage?.dataSourceConfigId && (
                             <Tag color="geekblue">datasource #{sqlDatasetPreview.lineage.dataSourceConfigId}</Tag>
                           )}
                         </Space>
@@ -6633,16 +8004,18 @@ export default function BiWorkbenchPage() {
                           {sqlDatasetPreview.compiledSql}
                         </Text>
                         <Space size={[4, 4]} wrap>
-                          {sqlDatasetPreview.lineage.sourceTables.map(table => (
+                          {(sqlDatasetPreview.lineage?.sourceTables ?? []).map(table => (
                             <Tag color="purple" key={table}>{table}</Tag>
                           ))}
-                          {sqlDatasetPreview.impact.governanceGates.map(gate => (
+                          {(sqlDatasetPreview.impact?.governanceGates ?? []).map(gate => (
                             <Tag key={gate}>{gate}</Tag>
                           ))}
-                          {sqlDatasetPreview.impact.warnings.map(warning => (
+                          {(sqlDatasetPreview.impact?.warnings ?? []).map(warning => (
                             <Tag color="orange" key={warning}>{warning}</Tag>
                           ))}
                         </Space>
+                        <SqlDatasetImpactSummary result={sqlDatasetPreview} />
+                        <SqlDatasetSampleProfileTable result={sqlDatasetPreview} />
                         <SqlDatasetPreviewTable result={sqlDatasetPreview} loading={previewingSqlDataset} />
                       </Space>
                     </Col>
@@ -6991,6 +8364,28 @@ export default function BiWorkbenchPage() {
                                       onChange={(value: string) => updateDatasourceModelingJoinCondition(selectedDatasourceModelingGraphJoinIndexValue, conditionIndex, { rightColumn: value })}
                                       style={{ width: 132 }}
                                     />
+                                    <Checkbox
+                                      aria-label={`从画布设置左括号 ${selectedDatasourceModelingGraphJoin.leftTableName} 到 ${selectedDatasourceModelingGraphJoin.rightTableName} 条件 ${conditionIndex + 1}`}
+                                      checked={condition.groupStart === true}
+                                      onChange={event => updateDatasourceModelingJoinCondition(
+                                        selectedDatasourceModelingGraphJoinIndexValue,
+                                        conditionIndex,
+                                        { groupStart: event.target.checked },
+                                      )}
+                                    >
+                                      (
+                                    </Checkbox>
+                                    <Checkbox
+                                      aria-label={`从画布设置右括号 ${selectedDatasourceModelingGraphJoin.leftTableName} 到 ${selectedDatasourceModelingGraphJoin.rightTableName} 条件 ${conditionIndex + 1}`}
+                                      checked={condition.groupEnd === true}
+                                      onChange={event => updateDatasourceModelingJoinCondition(
+                                        selectedDatasourceModelingGraphJoinIndexValue,
+                                        conditionIndex,
+                                        { groupEnd: event.target.checked },
+                                      )}
+                                    >
+                                      )
+                                    </Checkbox>
                                     {selectedDatasourceModelingGraphJoin.conditions.length > 1 ? (
                                       <Button
                                         size="small"
@@ -7006,6 +8401,7 @@ export default function BiWorkbenchPage() {
                             </Space>
                           </Space>
                         ) : null}
+                        <DatasourceRelationshipDiagnosticSummary rows={datasourceRelationshipDiagnosticRows} />
                       </Space>
                     </Col>
                     {effectiveDatasourceModelingJoins.map((join, index) => {
@@ -7087,7 +8483,7 @@ export default function BiWorkbenchPage() {
                                     const conditionSuffix = `${labelSuffix}${conditionIndex === 0 ? '' : ` 条件 ${conditionIndex + 1}`}`
                                     return (
                                       <Row gutter={[8, 8]} key={`${condition.leftColumn}-${condition.operator}-${condition.rightColumn}-${conditionIndex}`} align="middle">
-                                        <Col xs={24} md={9}>
+                                        <Col xs={24} md={8}>
                                           <Select
                                             size="small"
                                             aria-label={`多表建模左字段${conditionSuffix}`}
@@ -7107,7 +8503,7 @@ export default function BiWorkbenchPage() {
                                             style={{ width: '100%' }}
                                           />
                                         </Col>
-                                        <Col xs={24} md={9}>
+                                        <Col xs={24} md={8}>
                                           <Select
                                             size="small"
                                             aria-label={`多表建模右字段${conditionSuffix}`}
@@ -7116,6 +8512,24 @@ export default function BiWorkbenchPage() {
                                             onChange={(value: string) => updateDatasourceModelingJoinCondition(index, conditionIndex, { rightColumn: value })}
                                             style={{ width: '100%' }}
                                           />
+                                        </Col>
+                                        <Col xs={12} md={1}>
+                                          <Checkbox
+                                            aria-label={`多表建模左括号${conditionSuffix}`}
+                                            checked={condition.groupStart === true}
+                                            onChange={event => updateDatasourceModelingJoinCondition(index, conditionIndex, { groupStart: event.target.checked })}
+                                          >
+                                            (
+                                          </Checkbox>
+                                        </Col>
+                                        <Col xs={12} md={1}>
+                                          <Checkbox
+                                            aria-label={`多表建模右括号${conditionSuffix}`}
+                                            checked={condition.groupEnd === true}
+                                            onChange={event => updateDatasourceModelingJoinCondition(index, conditionIndex, { groupEnd: event.target.checked })}
+                                          >
+                                            )
+                                          </Checkbox>
                                         </Col>
                                         <Col xs={24} md={2}>
                                           {join.conditions.length > 1 ? (
@@ -7215,6 +8629,37 @@ export default function BiWorkbenchPage() {
                 dataSource={datasourceConnectorTableRows}
                 locale={{ emptyText: '暂无连接器目录' }}
                 scroll={{ x: 760 }}
+              />
+              <Table
+                rowKey="key"
+                size="small"
+                pagination={false}
+                columns={[
+                  { title: '连接器', dataIndex: 'connector', key: 'connector', width: 180, ellipsis: true },
+                  { title: '容量池', dataIndex: 'capacityPool', key: 'capacityPool', width: 150 },
+                  { title: '预算/约束', dataIndex: 'budget', key: 'budget', width: 300, ellipsis: true },
+                  { title: '自助取数', dataIndex: 'eligibility', key: 'eligibility', width: 180 },
+                  { title: '治理动作', dataIndex: 'guardrails', key: 'guardrails', ellipsis: true },
+                ]}
+                dataSource={datasourceCapacityPolicyTableRows}
+                locale={{ emptyText: '暂无容量策略' }}
+                scroll={{ x: 980 }}
+              />
+              <Table
+                rowKey="key"
+                size="small"
+                pagination={false}
+                columns={[
+                  { title: '连接器', dataIndex: 'connector', key: 'connector', width: 180, ellipsis: true },
+                  { title: 'Quick 引擎', dataIndex: 'quickEngine', key: 'quickEngine', width: 260, ellipsis: true },
+                  { title: '跨源建模', dataIndex: 'crossSourceModeling', key: 'crossSourceModeling', width: 260, ellipsis: true },
+                  { title: '自助取数', dataIndex: 'selfService', key: 'selfService', width: 220, ellipsis: true },
+                  { title: '语义建模', dataIndex: 'semanticAuthoring', key: 'semanticAuthoring', width: 130 },
+                  { title: '风险', dataIndex: 'risk', key: 'risk', ellipsis: true },
+                ]}
+                dataSource={datasourceAdvancedCapabilityTableRows}
+                locale={{ emptyText: '暂无高阶功能支持' }}
+                scroll={{ x: 1220 }}
               />
               <Table
                 rowKey="key"
@@ -7681,10 +9126,15 @@ export default function BiWorkbenchPage() {
               <SafetyCertificateOutlined />
               <Text strong>权限治理</Text>
               <Tag color="blue">{selectedPermissionTarget.resourceKey || '未选择资源'}</Tag>
+              <Tag color="geekblue">资源 {resourcePermissions.length}</Tag>
+              <Tag color="cyan">行 {rowPermissions.length}</Tag>
+              <Tag color="purple">列 {columnPermissions.length}</Tag>
+              <Tag color={selectedPermissionSensitiveFields.length ? 'red' : 'default'}>敏感字段 {selectedPermissionSensitiveFields.length}</Tag>
             </Space>
             <Space size={8} wrap>
               <Select
                 size="small"
+                aria-label="权限治理资源"
                 value={selectedPermissionTarget.value}
                 style={{ width: 220 }}
                 options={permissionResourceTargets.map(target => ({
@@ -7726,6 +9176,244 @@ export default function BiWorkbenchPage() {
               <Badge status={loadingPermissions ? 'processing' : 'success'} text={loadingPermissions ? '同步中' : '已就绪'} />
             </Space>
           </Space>
+          <Space size={8} wrap>
+            <select
+              aria-label="资源权限主体类型"
+              value={resourcePermissionSubjectType}
+              style={{ width: 104, height: 24, border: '1px solid #d9d9d9', borderRadius: 4, padding: '0 8px' }}
+              disabled={!selectedPermissionTarget.resourceKey}
+              onChange={event => setResourcePermissionSubjectType(event.target.value)}
+            >
+              <option value="ROLE">ROLE</option>
+              <option value="USER">USER</option>
+              <option value="GROUP">GROUP</option>
+              <option value="ALL">ALL</option>
+            </select>
+            <Input
+              size="small"
+              aria-label="资源权限主体"
+              value={resourcePermissionSubjectId}
+              placeholder={resourcePermissionSubjectType === 'ALL' ? 'ALL' : '主体 ID'}
+              style={{ width: 160 }}
+              disabled={!selectedPermissionTarget.resourceKey || resourcePermissionSubjectType === 'ALL'}
+              onChange={event => setResourcePermissionSubjectId(event.target.value)}
+            />
+            <select
+              aria-label="资源权限动作"
+              value={resourcePermissionAction}
+              style={{ width: 112, height: 24, border: '1px solid #d9d9d9', borderRadius: 4, padding: '0 8px' }}
+              disabled={!selectedPermissionTarget.resourceKey}
+              onChange={event => setResourcePermissionAction(event.target.value)}
+            >
+              <option value="USE">USE</option>
+              <option value="EDIT">EDIT</option>
+              <option value="EXPORT">EXPORT</option>
+              <option value="PUBLISH">PUBLISH</option>
+              <option value="SUBSCRIBE">SUBSCRIBE</option>
+            </select>
+            <select
+              aria-label="资源权限效果"
+              value={resourcePermissionEffect}
+              style={{ width: 104, height: 24, border: '1px solid #d9d9d9', borderRadius: 4, padding: '0 8px' }}
+              disabled={!selectedPermissionTarget.resourceKey}
+              onChange={event => setResourcePermissionEffect(event.target.value)}
+            >
+              <option value="ALLOW">ALLOW</option>
+              <option value="DENY">DENY</option>
+            </select>
+            <Button
+              size="small"
+              type="primary"
+              aria-label="保存资源权限规则"
+              icon={<SafetyCertificateOutlined />}
+              disabled={!selectedPermissionTarget.resourceKey}
+              loading={savingPermission === 'resource-editor'}
+              onClick={saveResourcePermissionRule}
+            >
+              保存资源权限规则
+            </Button>
+          </Space>
+          <Space size={8} wrap>
+            <Input
+              size="small"
+              aria-label="行权限规则Key"
+              value={rowPermissionRuleKey}
+              placeholder="行权限规则 Key"
+              style={{ width: 170 }}
+              disabled={!isDatasetPermissionTarget}
+              onChange={event => setRowPermissionRuleKey(event.target.value)}
+            />
+            <select
+              aria-label="行权限主体类型"
+              value={rowPermissionSubjectType}
+              style={{ width: 104, height: 24, border: '1px solid #d9d9d9', borderRadius: 4, padding: '0 8px' }}
+              disabled={!isDatasetPermissionTarget}
+              onChange={event => setRowPermissionSubjectType(event.target.value)}
+            >
+              <option value="ROLE">ROLE</option>
+              <option value="USER">USER</option>
+              <option value="GROUP">GROUP</option>
+              <option value="ALL">ALL</option>
+            </select>
+            <Input
+              size="small"
+              aria-label="行权限主体"
+              value={rowPermissionSubjectId}
+              placeholder={rowPermissionSubjectType === 'ALL' ? 'ALL' : '主体 ID'}
+              style={{ width: 140 }}
+              disabled={!isDatasetPermissionTarget || rowPermissionSubjectType === 'ALL'}
+              onChange={event => setRowPermissionSubjectId(event.target.value)}
+            />
+            <Input
+              size="small"
+              aria-label="行权限过滤JSON"
+              value={rowPermissionFilterJson}
+              placeholder='{"field":"value"}'
+              style={{ width: 220 }}
+              disabled={!isDatasetPermissionTarget}
+              onChange={event => setRowPermissionFilterJson(event.target.value)}
+            />
+            <Checkbox
+              checked={rowPermissionEnabled}
+              disabled={!isDatasetPermissionTarget}
+              onChange={event => setRowPermissionEnabled(event.target.checked)}
+            >
+              启用
+            </Checkbox>
+            <Button
+              size="small"
+              type="primary"
+              aria-label="保存行权限规则"
+              icon={<FilterOutlined />}
+              disabled={!isDatasetPermissionTarget}
+              loading={savingPermission === 'row-editor'}
+              onClick={saveRowPermissionRule}
+            >
+              保存行权限规则
+            </Button>
+          </Space>
+          <Space size={8} wrap>
+            <Input
+              size="small"
+              aria-label="列权限字段"
+              value={columnPermissionFieldKey}
+              placeholder="字段 key"
+              style={{ width: 140 }}
+              disabled={!isDatasetPermissionTarget}
+              onChange={event => setColumnPermissionFieldKey(event.target.value)}
+            />
+            <select
+              aria-label="列权限主体类型"
+              value={columnPermissionSubjectType}
+              style={{ width: 104, height: 24, border: '1px solid #d9d9d9', borderRadius: 4, padding: '0 8px' }}
+              disabled={!isDatasetPermissionTarget}
+              onChange={event => setColumnPermissionSubjectType(event.target.value)}
+            >
+              <option value="ROLE">ROLE</option>
+              <option value="USER">USER</option>
+              <option value="GROUP">GROUP</option>
+              <option value="ALL">ALL</option>
+            </select>
+            <Input
+              size="small"
+              aria-label="列权限主体"
+              value={columnPermissionSubjectId}
+              placeholder={columnPermissionSubjectType === 'ALL' ? 'ALL' : '主体 ID'}
+              style={{ width: 140 }}
+              disabled={!isDatasetPermissionTarget || columnPermissionSubjectType === 'ALL'}
+              onChange={event => setColumnPermissionSubjectId(event.target.value)}
+            />
+            <select
+              aria-label="列权限策略"
+              value={columnPermissionPolicy}
+              style={{ width: 104, height: 24, border: '1px solid #d9d9d9', borderRadius: 4, padding: '0 8px' }}
+              disabled={!isDatasetPermissionTarget}
+              onChange={event => setColumnPermissionPolicy(event.target.value)}
+            >
+              <option value="MASK">MASK</option>
+              <option value="DENY">DENY</option>
+              <option value="ALLOW">ALLOW</option>
+            </select>
+            <Input
+              size="small"
+              aria-label="列权限Mask JSON"
+              value={columnPermissionMaskJson}
+              placeholder='{"strategy":"FIXED"}'
+              style={{ width: 240 }}
+              disabled={!isDatasetPermissionTarget}
+              onChange={event => setColumnPermissionMaskJson(event.target.value)}
+            />
+            <Checkbox
+              checked={columnPermissionEnabled}
+              disabled={!isDatasetPermissionTarget}
+              onChange={event => setColumnPermissionEnabled(event.target.checked)}
+            >
+              启用
+            </Checkbox>
+            <Button
+              size="small"
+              type="primary"
+              aria-label="保存列权限规则"
+              icon={<SafetyCertificateOutlined />}
+              disabled={!isDatasetPermissionTarget}
+              loading={savingPermission === 'column-editor'}
+              onClick={saveColumnPermissionRule}
+            >
+              保存列权限规则
+            </Button>
+            <Button
+              size="small"
+              aria-label="应用敏感字段列权限"
+              icon={<SafetyCertificateOutlined />}
+              disabled={!isDatasetPermissionTarget || columnPermissionShortcutFieldKeys.length === 0}
+              loading={savingPermission === 'sensitive-columns'}
+              onClick={applySensitiveFieldColumnPermissions}
+            >
+              应用敏感字段列权限
+            </Button>
+          </Space>
+          <Space size={8} wrap>
+            <select
+              aria-label="权限申请动作"
+              value={permissionRequestAction}
+              style={{ width: 112, height: 24, border: '1px solid #d9d9d9', borderRadius: 4, padding: '0 8px' }}
+              disabled={!selectedPermissionTarget.resourceKey}
+              onChange={event => setPermissionRequestAction(event.target.value)}
+            >
+              <option value="USE">USE</option>
+              <option value="EDIT">EDIT</option>
+              <option value="EXPORT">EXPORT</option>
+              <option value="PUBLISH">PUBLISH</option>
+            </select>
+            <Input
+              size="small"
+              aria-label="权限申请理由"
+              value={permissionRequestReason}
+              placeholder="申请理由"
+              style={{ width: 260 }}
+              disabled={!selectedPermissionTarget.resourceKey}
+              onChange={event => setPermissionRequestReason(event.target.value)}
+            />
+            <Button
+              size="small"
+              type="primary"
+              aria-label="提交权限申请"
+              icon={<SafetyCertificateOutlined />}
+              disabled={!selectedPermissionTarget.resourceKey}
+              loading={savingPermission === 'request'}
+              onClick={submitPermissionRequest}
+            >
+              提交权限申请
+            </Button>
+            <Input
+              size="small"
+              aria-label="权限审核意见"
+              value={permissionReviewComment}
+              placeholder="审核意见"
+              style={{ width: 240 }}
+              onChange={event => setPermissionReviewComment(event.target.value)}
+            />
+          </Space>
           <Row gutter={12}>
             <Col xs={24} xl={8}>
               <Table
@@ -7733,10 +9421,10 @@ export default function BiWorkbenchPage() {
                 size="small"
                 loading={loadingPermissions}
                 pagination={false}
-                columns={resourcePermissionColumns}
+                columns={resourcePermissionTableColumns}
                 dataSource={resourcePermissions}
                 locale={{ emptyText: '暂无资源授权' }}
-                scroll={{ x: 520 }}
+                scroll={{ x: 592 }}
               />
             </Col>
             <Col xs={24} xl={8}>
@@ -7745,10 +9433,10 @@ export default function BiWorkbenchPage() {
                 size="small"
                 loading={loadingPermissions}
                 pagination={false}
-                columns={rowPermissionColumns}
+                columns={rowPermissionTableColumns}
                 dataSource={rowPermissions}
                 locale={{ emptyText: '暂无行权限' }}
-                scroll={{ x: 560 }}
+                scroll={{ x: 632 }}
               />
             </Col>
             <Col xs={24} xl={8}>
@@ -7757,13 +9445,76 @@ export default function BiWorkbenchPage() {
                 size="small"
                 loading={loadingPermissions}
                 pagination={false}
-                columns={columnPermissionColumns}
+                columns={columnPermissionTableColumns}
                 dataSource={columnPermissions}
                 locale={{ emptyText: '暂无列权限' }}
-                scroll={{ x: 520 }}
+                scroll={{ x: 592 }}
               />
             </Col>
           </Row>
+          <Table
+            rowKey={row => String(row.id ?? `${row.resourceType}-${row.resourceKey}-${row.requestedAction}`)}
+            size="small"
+            loading={loadingPermissions}
+            pagination={false}
+            columns={[
+              {
+                title: '申请资源',
+                render: (_, row: BiPermissionRequestView) => (
+                  <Space direction="vertical" size={0}>
+                    <Space size={6}>
+                      <Tag color="blue">{row.resourceType}</Tag>
+                      <Text strong style={{ fontSize: 12 }}>{row.resourceKey}</Text>
+                    </Space>
+                    <Text type="secondary" style={{ fontSize: 11 }}>{row.requestedBy ?? '-'} · {formatAttachmentTime(row.requestedAt)}</Text>
+                  </Space>
+                ),
+              },
+              {
+                title: '动作',
+                width: 96,
+                render: (_, row: BiPermissionRequestView) => <Tag color="geekblue">{row.requestedAction}</Tag>,
+              },
+              {
+                title: '状态',
+                width: 112,
+                render: (_, row: BiPermissionRequestView) => <Tag color={row.status === 'APPROVED' ? 'green' : row.status === 'REJECTED' ? 'red' : 'gold'}>{row.status}</Tag>,
+              },
+              {
+                title: '理由',
+                width: 220,
+                render: (_, row: BiPermissionRequestView) => <Text type="secondary" ellipsis style={{ maxWidth: 210, display: 'block', fontSize: 12 }}>{row.reason ?? '-'}</Text>,
+              },
+              {
+                title: '审核',
+                width: 180,
+                render: (_, row: BiPermissionRequestView) => row.status === 'PENDING' ? (
+                  <Space size={4}>
+                    <Button
+                      size="small"
+                      aria-label={`批准权限申请 #${row.id}`}
+                      loading={reviewingPermissionRequest === `APPROVED-${row.id}`}
+                      onClick={() => reviewPermissionRequest(row, 'APPROVED')}
+                    >
+                      批准
+                    </Button>
+                    <Button
+                      size="small"
+                      danger
+                      aria-label={`拒绝权限申请 #${row.id}`}
+                      loading={reviewingPermissionRequest === `REJECTED-${row.id}`}
+                      onClick={() => reviewPermissionRequest(row, 'REJECTED')}
+                    >
+                      拒绝
+                    </Button>
+                  </Space>
+                ) : <Text type="secondary" style={{ fontSize: 12 }}>{row.reviewedBy ?? '-'}</Text>,
+              },
+            ]}
+            dataSource={permissionRequests}
+            locale={{ emptyText: '暂无权限申请' }}
+            scroll={{ x: 860 }}
+          />
           <Table
             rowKey="key"
             size="small"
@@ -7834,6 +9585,14 @@ export default function BiWorkbenchPage() {
                   <Button size="small" icon={<DeleteOutlined />} loading={cleaningExports} onClick={cleanupExports}>清理过期</Button>
                 </Space>
               </Space>
+              <Input
+                size="small"
+                aria-label="导出审批意见"
+                value={exportReviewComment}
+                placeholder="导出审批意见"
+                onChange={event => setExportReviewComment(event.target.value)}
+              />
+              <ExportHardeningDiagnosticSummary rows={exportHardeningRows} />
               <Table
                 rowKey="id"
                 size="small"
@@ -7891,6 +9650,7 @@ export default function BiWorkbenchPage() {
                   <Button size="small" icon={<PlayCircleOutlined />} disabled={alertRules.length === 0} loading={runningDelivery === 'alert'} onClick={runLatestAlert}>检测</Button>
                 </Space>
               </Space>
+              <AlertAnomalyDiagnosticSummary rows={alertAnomalyDiagnosticRowsValue} />
               <Table
                 rowKey="id"
                 size="small"
@@ -7968,6 +9728,7 @@ export default function BiWorkbenchPage() {
               text={loadingBigScreens || loadingSpreadsheets ? '同步中' : '已就绪'}
             />
           </Space>
+          <VisualEditorDiagnosticSummary rows={visualEditorDiagnosticRows} />
           <Row gutter={[12, 12]}>
             <Col xs={24} lg={12}>
               <Space direction="vertical" size={10} style={{ width: '100%' }}>
@@ -8281,6 +10042,194 @@ export default function BiWorkbenchPage() {
                       style={{ width: 48, padding: 2 }}
                       onChange={event => updateSelectedSpreadsheetCellStyle({ textColor: event.target.value.toUpperCase() })}
                     />
+                  </Space>
+                  <Divider style={{ margin: '4px 0' }} />
+                  <Space direction="vertical" size={6} style={{ width: '100%' }}>
+                    <Space size={8} wrap>
+                      <Input
+                        size="small"
+                        aria-label="透视源范围"
+                        value={spreadsheetPivotSourceRange}
+                        placeholder="A1:D5"
+                        style={{ width: 110 }}
+                        onChange={event => setSpreadsheetPivotSourceRange(event.target.value.toUpperCase())}
+                      />
+                      <Input
+                        size="small"
+                        aria-label="透视输出单元格"
+                        value={spreadsheetPivotTargetCell}
+                        placeholder="F1"
+                        style={{ width: 92 }}
+                        onChange={event => setSpreadsheetPivotTargetCell(event.target.value.toUpperCase())}
+                      />
+                      <Input
+                        size="small"
+                        aria-label="透视行字段"
+                        value={spreadsheetPivotRowField}
+                        placeholder="行字段"
+                        style={{ width: 96 }}
+                        onChange={event => setSpreadsheetPivotRowField(event.target.value)}
+                      />
+                      <Input
+                        size="small"
+                        aria-label="透视列字段"
+                        value={spreadsheetPivotColumnField}
+                        placeholder="列字段"
+                        style={{ width: 96 }}
+                        onChange={event => setSpreadsheetPivotColumnField(event.target.value)}
+                      />
+                      <Button
+                        size="small"
+                        aria-label="添加透视指标"
+                        icon={<PlusOutlined />}
+                        onClick={addSpreadsheetPivotMetric}
+                      >
+                        添加指标
+                      </Button>
+                    </Space>
+                    <Space size={6} wrap>
+                      <Tag color="geekblue">字段</Tag>
+                      {spreadsheetPivotFields.length ? spreadsheetPivotFields.map(field => (
+                        <Tag
+                          key={`spreadsheet-pivot-field-${field}`}
+                          aria-label={`透视字段 ${field}`}
+                          draggable
+                          color="blue"
+                          style={{ cursor: 'grab' }}
+                          onDragStart={event => dragSpreadsheetPivotField(event, field)}
+                        >
+                          {field}
+                          <Button
+                            size="small"
+                            type="text"
+                            aria-label={`将 ${field} 设为透视行字段`}
+                            onClick={() => assignSpreadsheetPivotField('ROW', field)}
+                          >
+                            行
+                          </Button>
+                          <Button
+                            size="small"
+                            type="text"
+                            aria-label={`将 ${field} 设为透视列字段`}
+                            onClick={() => assignSpreadsheetPivotField('COLUMN', field)}
+                          >
+                            列
+                          </Button>
+                          <Button
+                            size="small"
+                            type="text"
+                            aria-label={`将 ${field} 添加为透视指标`}
+                            onClick={() => assignSpreadsheetPivotField('METRIC', field)}
+                          >
+                            指标
+                          </Button>
+                        </Tag>
+                      )) : <Text type="secondary" style={{ fontSize: 12 }}>源范围首行暂无字段</Text>}
+                    </Space>
+                    <Space size={6} wrap>
+                      <div
+                        aria-label="透视行字段放置区"
+                        onDragOver={event => event.preventDefault()}
+                        onDrop={event => dropSpreadsheetPivotField(event, 'ROW')}
+                        style={spreadsheetPivotDropZoneStyle}
+                      >
+                        <Tag color="purple">行</Tag>
+                        <Text style={{ fontSize: 12 }}>{spreadsheetPivotRowField || '-'}</Text>
+                      </div>
+                      <div
+                        aria-label="透视列字段放置区"
+                        onDragOver={event => event.preventDefault()}
+                        onDrop={event => dropSpreadsheetPivotField(event, 'COLUMN')}
+                        style={spreadsheetPivotDropZoneStyle}
+                      >
+                        <Tag color="purple">列</Tag>
+                        <Text style={{ fontSize: 12 }}>{spreadsheetPivotColumnField || '-'}</Text>
+                      </div>
+                      <div
+                        aria-label="透视指标放置区"
+                        onDragOver={event => event.preventDefault()}
+                        onDrop={event => dropSpreadsheetPivotField(event, 'METRIC')}
+                        style={{ ...spreadsheetPivotDropZoneStyle, minWidth: 220 }}
+                      >
+                        <Tag color="purple">指标</Tag>
+                        <Text style={{ fontSize: 12 }}>
+                          {spreadsheetPivotMetrics.map(metric => metric.field.trim()).filter(Boolean).join(' / ') || '-'}
+                        </Text>
+                      </div>
+                    </Space>
+                    {spreadsheetPivotMetrics.map((metric, index) => (
+                      <Space key={metric.id} size={6} wrap>
+                        <Tag color="blue">指标 {index + 1}</Tag>
+                        <Input
+                          size="small"
+                          aria-label={`透视指标字段 ${index + 1}`}
+                          value={metric.field}
+                          placeholder="指标字段"
+                          style={{ width: 104 }}
+                          onChange={event => updateSpreadsheetPivotMetric(metric.id, { field: event.target.value })}
+                        />
+                        <Select
+                          size="small"
+                          aria-label={`透视指标聚合 ${index + 1}`}
+                          value={metric.aggregation}
+                          style={{ width: 96 }}
+                          options={SPREADSHEET_PIVOT_AGGREGATION_OPTIONS}
+                          onChange={aggregation => updateSpreadsheetPivotMetric(metric.id, { aggregation })}
+                        />
+                        <Input
+                          size="small"
+                          aria-label={`透视指标标签 ${index + 1}`}
+                          value={metric.label}
+                          placeholder={metric.field || '显示标签'}
+                          style={{ width: 118 }}
+                          onChange={event => updateSpreadsheetPivotMetric(metric.id, { label: event.target.value })}
+                        />
+                        <Button
+                          size="small"
+                          aria-label={`上移透视指标 ${index + 1}`}
+                          icon={<ArrowUpOutlined />}
+                          disabled={index === 0}
+                          onClick={() => moveSpreadsheetPivotMetric(metric.id, 'up')}
+                        />
+                        <Button
+                          size="small"
+                          aria-label={`下移透视指标 ${index + 1}`}
+                          icon={<ArrowDownOutlined />}
+                          disabled={index === spreadsheetPivotMetrics.length - 1}
+                          onClick={() => moveSpreadsheetPivotMetric(metric.id, 'down')}
+                        />
+                        <Button
+                          size="small"
+                          aria-label={`删除透视指标 ${index + 1}`}
+                          icon={<DeleteOutlined />}
+                          disabled={spreadsheetPivotMetrics.length <= 1}
+                          onClick={() => removeSpreadsheetPivotMetric(metric.id)}
+                        />
+                      </Space>
+                    ))}
+                    <Space size={6} wrap>
+                      <Tag color="cyan">预览</Tag>
+                      <Text aria-label="透视输出列预览" style={{ fontSize: 12 }}>
+                        {spreadsheetPivotPreviewColumnLabels.slice(0, 8).join(' / ') || '暂无输出列'}
+                      </Text>
+                    </Space>
+                    {spreadsheetPivotPreviewGridRows.length > 0 && (
+                      <div
+                        aria-label="透视结果预览"
+                        style={spreadsheetPivotPreviewGridStyle}
+                      >
+                        {spreadsheetPivotPreviewGridRows.flatMap(row => row.cells.map(cell => (
+                          <div
+                            key={`${row.rowKey}-${cell.cellKey}`}
+                            aria-label={`透视预览单元格 ${cell.cellKey}`}
+                            style={spreadsheetPivotPreviewCellStyle}
+                          >
+                            {cell.value}
+                          </div>
+                        )))}
+                      </div>
+                    )}
+                    <Space size={8} wrap>
                     <Button
                       size="small"
                       aria-label="生成交叉表透视"
@@ -8289,6 +10238,15 @@ export default function BiWorkbenchPage() {
                     >
                       生成交叉表透视
                     </Button>
+                    <Button
+                      size="small"
+                      aria-label="生成多指标透视"
+                      icon={<AppstoreOutlined />}
+                      onClick={generateSelectedSpreadsheetMultiMetricPivotTable}
+                    >
+                      多指标透视
+                    </Button>
+                    </Space>
                   </Space>
                 </Space>
                 <Space size={8} wrap>
@@ -8420,12 +10378,12 @@ export default function BiWorkbenchPage() {
             </Space>
           </Space>
           <Table
-            rowKey={row => resourceLocationIndexKey(row.resourceType, row.resourceKey)}
+            rowKey="__tableRowKey"
             size="small"
             loading={loadingResourceLocations}
             pagination={false}
-            columns={resourceLocationColumns}
-            dataSource={resourceLocations}
+            columns={resourceLocationColumns as ColumnsType<ResourceLocationTableRow>}
+            dataSource={resourceLocationTableRows}
             locale={{ emptyText: '暂无资源位置，移动资源后会记录文件夹和排序' }}
             scroll={{ x: 760 }}
           />
@@ -8463,12 +10421,12 @@ export default function BiWorkbenchPage() {
             </Space>
           </Space>
           <Table
-            rowKey={row => resourceLocationIndexKey(row.resourceType, row.resourceKey)}
+            rowKey="__tableRowKey"
             size="small"
             loading={loadingResourceOwnerships}
             pagination={false}
-            columns={resourceOwnershipColumns}
-            dataSource={resourceOwnerships}
+            columns={resourceOwnershipColumns as ColumnsType<ResourceOwnershipTableRow>}
+            dataSource={resourceOwnershipTableRows}
             locale={{ emptyText: '暂无资源负责人记录，转让后会记录当前负责人' }}
             scroll={{ x: 700 }}
           />
@@ -8497,12 +10455,12 @@ export default function BiWorkbenchPage() {
             </Space>
           </Space>
           <Table
-            rowKey={row => resourceLocationIndexKey(row.resourceType, row.resourceKey)}
+            rowKey="__tableRowKey"
             size="small"
             loading={loadingResourceFavorites}
             pagination={false}
-            columns={resourceFavoriteColumns}
-            dataSource={resourceFavorites}
+            columns={resourceFavoriteColumns as ColumnsType<ResourceFavoriteTableRow>}
+            dataSource={resourceFavoriteTableRows}
             locale={{ emptyText: '暂无收藏资源，收藏后会出现在这里' }}
             scroll={{ x: 740 }}
           />
@@ -8760,17 +10718,29 @@ export default function BiWorkbenchPage() {
                 <Text strong>门户编辑器</Text>
                 <Tag color={selectedPortalResource ? 'blue' : 'default'}>{selectedPortalResource?.portalKey ?? '未选择门户'}</Tag>
               </Space>
-              <Button
-                size="small"
-                type="primary"
-                aria-label="保存门户草稿"
-                icon={<SaveOutlined />}
-                disabled={!selectedPortalResource}
-                loading={savingPortal === selectedPortalResource?.portalKey}
-                onClick={savePortalDraft}
-              >
-                保存草稿
-              </Button>
+              <Space size={6}>
+                <Button
+                  size="small"
+                  aria-label="生成门户嵌入"
+                  icon={<LinkOutlined />}
+                  disabled={!selectedPortalResource}
+                  loading={creatingEmbedTicket}
+                  onClick={createPortalEmbedTicket}
+                >
+                  生成门户嵌入
+                </Button>
+                <Button
+                  size="small"
+                  type="primary"
+                  aria-label="保存门户草稿"
+                  icon={<SaveOutlined />}
+                  disabled={!selectedPortalResource}
+                  loading={savingPortal === selectedPortalResource?.portalKey}
+                  onClick={savePortalDraft}
+                >
+                  保存草稿
+                </Button>
+              </Space>
             </Space>
             <Space size={8} wrap>
               <select
@@ -8821,6 +10791,80 @@ export default function BiWorkbenchPage() {
               <Text type="secondary">移动端</Text>
             </Space>
             <Space size={8} wrap>
+              <Input
+                size="small"
+                aria-label="门户LOGO"
+                value={String(selectedPortalResource?.theme?.logoUrl ?? '')}
+                placeholder="logo url"
+                style={{ width: 220 }}
+                disabled={!selectedPortalResource}
+                onChange={event => updateSelectedPortalNavigationConfig({ logoUrl: event.target.value })}
+              />
+              <Input
+                size="small"
+                aria-label="门户主标题"
+                value={String(selectedPortalResource?.theme?.title ?? '')}
+                placeholder="门户主标题"
+                style={{ width: 160 }}
+                disabled={!selectedPortalResource}
+                onChange={event => updateSelectedPortalNavigationConfig({ title: event.target.value })}
+              />
+              <Input
+                size="small"
+                aria-label="门户副标题"
+                value={String(selectedPortalResource?.theme?.subtitle ?? '')}
+                placeholder="门户副标题"
+                style={{ width: 180 }}
+                disabled={!selectedPortalResource}
+                onChange={event => updateSelectedPortalNavigationConfig({ subtitle: event.target.value })}
+              />
+              <Input
+                size="small"
+                aria-label="门户页脚"
+                value={String(selectedPortalResource?.theme?.footerText ?? '')}
+                placeholder="页脚"
+                style={{ width: 160 }}
+                disabled={!selectedPortalResource}
+                onChange={event => updateSelectedPortalNavigationConfig({ footerText: event.target.value })}
+              />
+              <Input
+                size="small"
+                aria-label="门户别名"
+                value={String(selectedPortalResource?.theme?.alias ?? '')}
+                placeholder="portal-alias"
+                style={{ width: 140 }}
+                disabled={!selectedPortalResource}
+                onChange={event => updateSelectedPortalNavigationConfig({ alias: event.target.value })}
+              />
+            </Space>
+            <Space size={8} wrap>
+              <Switch
+                size="small"
+                aria-label="门户面包屑"
+                checked={selectedPortalResource?.theme?.breadcrumbEnabled === true}
+                disabled={!selectedPortalResource}
+                onChange={breadcrumbEnabled => updateSelectedPortalNavigationConfig({ breadcrumbEnabled })}
+              />
+              <Text type="secondary">面包屑</Text>
+              <Switch
+                size="small"
+                aria-label="门户菜单缓存"
+                checked={selectedPortalResource?.theme?.menuCacheEnabled === true}
+                disabled={!selectedPortalResource}
+                onChange={menuCacheEnabled => updateSelectedPortalNavigationConfig({ menuCacheEnabled })}
+              />
+              <Text type="secondary">菜单缓存</Text>
+              <Input
+                size="small"
+                aria-label="门户缓存TTL"
+                value={String(selectedPortalResource?.theme?.menuCacheTtlSeconds ?? '')}
+                placeholder="TTL 秒"
+                style={{ width: 96 }}
+                disabled={!selectedPortalResource}
+                onChange={event => updateSelectedPortalNavigationConfig({ menuCacheTtlSeconds: event.target.value })}
+              />
+            </Space>
+            <Space size={8} wrap>
               <select
                 aria-label="门户菜单"
                 value={selectedPortalMenuKey ?? ''}
@@ -8832,6 +10876,77 @@ export default function BiWorkbenchPage() {
                   <option key={option.value} value={option.value}>{option.label}</option>
                 ))}
               </select>
+              <Input
+                size="small"
+                aria-label="门户菜单标题"
+                value={String(selectedPortalMenu?.title ?? '')}
+                placeholder="菜单标题"
+                style={{ width: 160 }}
+                disabled={!selectedPortalMenu}
+                onChange={event => updateSelectedPortalMenuConfig({ title: event.target.value })}
+              />
+              <select
+                aria-label="门户父级菜单"
+                value={String(selectedPortalMenu?.parentMenuKey ?? '')}
+                style={{ width: 180, height: 24, border: '1px solid #d9d9d9', borderRadius: 4, padding: '0 8px' }}
+                disabled={!selectedPortalMenu}
+                onChange={event => updateSelectedPortalMenuConfig({ parentMenuKey: event.target.value })}
+              >
+                <option value="">无父级菜单</option>
+                {portalParentMenuOptions.map(option => (
+                  <option key={option.value} value={option.value}>{option.label}</option>
+                ))}
+              </select>
+              <Input
+                size="small"
+                aria-label="门户菜单图标"
+                value={String(selectedPortalMenu?.visibility?.iconKey ?? '')}
+                placeholder="icon key"
+                style={{ width: 128 }}
+                disabled={!selectedPortalMenu}
+                onChange={event => updateSelectedPortalMenuConfig({ iconKey: event.target.value })}
+              />
+              <select
+                aria-label="门户拖拽菜单"
+                value={portalDragMenuKey ?? ''}
+                style={{ width: 160, height: 24, border: '1px solid #d9d9d9', borderRadius: 4, padding: '0 8px' }}
+                disabled={!selectedPortalResource || portalMenuOptions.length === 0}
+                onChange={event => setPortalDragMenuKey(event.target.value)}
+              >
+                {portalMenuOptions.map(option => (
+                  <option key={option.value} value={option.value}>{option.label}</option>
+                ))}
+              </select>
+              <select
+                aria-label="门户拖放目标菜单"
+                value={portalDropTargetMenuKey ?? ''}
+                style={{ width: 180, height: 24, border: '1px solid #d9d9d9', borderRadius: 4, padding: '0 8px' }}
+                disabled={!selectedPortalResource || portalMenuOptions.length === 0}
+                onChange={event => setPortalDropTargetMenuKey(event.target.value)}
+              >
+                {portalMenuOptions.map(option => (
+                  <option key={option.value} value={option.value}>{option.label}</option>
+                ))}
+              </select>
+              <select
+                aria-label="门户拖放位置"
+                value={portalDropPosition}
+                style={{ width: 116, height: 24, border: '1px solid #d9d9d9', borderRadius: 4, padding: '0 8px' }}
+                disabled={!selectedPortalResource}
+                onChange={event => setPortalDropPosition(event.target.value as 'before' | 'after' | 'inside')}
+              >
+                <option value="before">前面</option>
+                <option value="after">后面</option>
+                <option value="inside">子菜单</option>
+              </select>
+              <Button
+                size="small"
+                aria-label="应用门户菜单拖放"
+                disabled={!portalDragMenuKey || !portalDropTargetMenuKey || portalDragMenuKey === portalDropTargetMenuKey}
+                onClick={() => applyPortalMenuDrop()}
+              >
+                应用拖放
+              </Button>
               <Tooltip title="上移菜单">
                 <Button
                   size="small"
@@ -8852,6 +10967,58 @@ export default function BiWorkbenchPage() {
               </Tooltip>
               <Tag color="geekblue">{selectedPortalResource?.menus.length ?? 0} 菜单</Tag>
             </Space>
+            <Space size={[6, 6]} wrap>
+              {(selectedPortalResource?.menus ?? []).map(menu => {
+                const menuKey = String(menu.menuKey ?? '')
+                return (
+                  <Tag
+                    key={`portal-menu-drag-${menuKey}`}
+                    draggable
+                    aria-label={`门户菜单拖拽项 ${menuKey}`}
+                    onDragStart={event => {
+                      event.dataTransfer.effectAllowed = 'move'
+                      event.dataTransfer.setData('application/x-bi-portal-menu', menuKey)
+                      event.dataTransfer.setData('text/plain', menuKey)
+                      setPortalDragMenuKey(menuKey)
+                    }}
+                    onDragOver={event => event.preventDefault()}
+                    onDrop={event => {
+                      event.preventDefault()
+                      const draggedKey = event.dataTransfer.getData('application/x-bi-portal-menu') || event.dataTransfer.getData('text/plain')
+                      setPortalDropTargetMenuKey(menuKey)
+                      applyPortalMenuDrop(draggedKey, menuKey, portalDropPosition)
+                    }}
+                    style={{ cursor: 'grab' }}
+                  >
+                    {String(menu.title ?? menuKey)} · {menuKey}
+                  </Tag>
+                )
+              })}
+            </Space>
+            {selectedPortalResource ? (
+              <div style={{ padding: 10, border: '1px solid #e5e7eb', borderRadius: 6, background: '#fff' }}>
+                <Space direction="vertical" size={6} style={{ width: '100%' }}>
+                  <Space size={8} wrap>
+                    <ApiOutlined />
+                    <Text strong>门户预览</Text>
+                    <Tag color="cyan">{selectedPortalResource.theme?.navigationLayout ? String(selectedPortalResource.theme.navigationLayout) : 'top'}</Tag>
+                    {selectedPortalResource.theme?.breadcrumbEnabled === true && <Tag color="blue">面包屑</Tag>}
+                  </Space>
+                  <Space direction="vertical" size={0}>
+                    <Text strong>{String(selectedPortalResource.theme?.title ?? selectedPortalResource.name)}</Text>
+                    {selectedPortalResource.theme?.subtitle ? <Text type="secondary" style={{ fontSize: 12 }}>{String(selectedPortalResource.theme.subtitle)}</Text> : null}
+                  </Space>
+                  <Space size={[6, 6]} wrap>
+                    {[...selectedPortalResource.menus].sort((left, right) => Number(left.sortOrder ?? 0) - Number(right.sortOrder ?? 0)).map(menu => (
+                      <Tag key={`portal-preview-${menu.menuKey}`} color={menu.parentMenuKey ? 'purple' : 'geekblue'}>
+                        {menu.title}{menu.parentMenuKey ? ` · ${menu.parentMenuKey}` : ''}
+                      </Tag>
+                    ))}
+                  </Space>
+                  {selectedPortalResource.theme?.footerText ? <Text type="secondary" style={{ fontSize: 12 }}>{String(selectedPortalResource.theme.footerText)}</Text> : null}
+                </Space>
+              </div>
+            ) : null}
           </Space>
           <Divider style={{ margin: '4px 0' }} />
           <Space align="center" style={{ justifyContent: 'space-between', width: '100%' }}>
@@ -8944,6 +11111,253 @@ export default function BiWorkbenchPage() {
               ) : (
                 <Text type="secondary" style={{ fontSize: 12 }}>字段文件夹：未配置</Text>
               )}
+            </Space>
+            <Space direction="vertical" size={8} style={{ width: '100%' }}>
+              <Text strong style={{ fontSize: 12 }}>字段大纲</Text>
+              <Space size={8} wrap>
+                <select
+                  aria-label="数据集拖拽字段"
+                  value={datasetDragFieldKey ?? ''}
+                  style={{ width: 150, height: 24, border: '1px solid #d9d9d9', borderRadius: 4, padding: '0 8px' }}
+                  disabled={!selectedDatasetResource}
+                  onChange={event => setDatasetDragFieldKey(event.target.value || null)}
+                >
+                  <option value="">选择字段</option>
+                  {(selectedDatasetResource?.fields ?? []).map(field => (
+                    <option key={`dataset-drag-${field.fieldKey}`} value={field.fieldKey}>{field.fieldKey}</option>
+                  ))}
+                </select>
+                <select
+                  aria-label="数据集拖放目标字段"
+                  value={datasetDropTargetFieldKey ?? ''}
+                  style={{ width: 170, height: 24, border: '1px solid #d9d9d9', borderRadius: 4, padding: '0 8px' }}
+                  disabled={!selectedDatasetResource}
+                  onChange={event => setDatasetDropTargetFieldKey(event.target.value || null)}
+                >
+                  <option value="">目标字段</option>
+                  {(selectedDatasetResource?.fields ?? []).map(field => (
+                    <option key={`dataset-drop-target-${field.fieldKey}`} value={field.fieldKey}>{field.fieldKey}</option>
+                  ))}
+                </select>
+                <select
+                  aria-label="数据集字段拖放位置"
+                  value={datasetDropPosition}
+                  style={{ width: 116, height: 24, border: '1px solid #d9d9d9', borderRadius: 4, padding: '0 8px' }}
+                  disabled={!selectedDatasetResource}
+                  onChange={event => setDatasetDropPosition(event.target.value as 'before' | 'after')}
+                >
+                  <option value="before">前面</option>
+                  <option value="after">后面</option>
+                </select>
+                <Input
+                  size="small"
+                  aria-label="数据集字段拖放文件夹"
+                  value={datasetDropFolderKey}
+                  placeholder="目标文件夹"
+                  style={{ width: 150 }}
+                  disabled={!selectedDatasetResource}
+                  onChange={event => setDatasetDropFolderKey(event.target.value)}
+                />
+                <Button
+                  size="small"
+                  aria-label="应用数据集字段拖放"
+                  disabled={!datasetDragFieldKey || !datasetDropTargetFieldKey || datasetDragFieldKey === datasetDropTargetFieldKey}
+                  onClick={() => applyDatasetFieldDrop()}
+                >
+                  应用字段拖放
+                </Button>
+              </Space>
+              {datasetFieldTreeGroups.length === 0 ? (
+                <Text type="secondary" style={{ fontSize: 12 }}>暂无字段</Text>
+              ) : datasetFieldTreeGroups.map(([folderKey, fields]) => (
+                <Space key={folderKey} direction="vertical" size={4} style={{ width: '100%' }}>
+                  <Tag color={folderKey === '未分组' ? 'default' : 'cyan'}>{folderKey}</Tag>
+                  <Space size={[4, 4]} wrap>
+                    {fields.map(field => (
+                      <Button
+                        key={field.fieldKey}
+                        size="small"
+                        aria-label={`字段详情 ${field.fieldKey}`}
+                        type={selectedDatasetDetailField?.fieldKey === field.fieldKey ? 'primary' : 'default'}
+                        draggable
+                        onDragStart={event => {
+                          event.dataTransfer.effectAllowed = 'move'
+                          event.dataTransfer.setData('application/x-bi-dataset-field', field.fieldKey)
+                          event.dataTransfer.setData('text/plain', field.fieldKey)
+                          setDatasetDragFieldKey(field.fieldKey)
+                        }}
+                        onDragOver={event => event.preventDefault()}
+                        onDrop={event => {
+                          event.preventDefault()
+                          const draggedKey = event.dataTransfer.getData('application/x-bi-dataset-field') || event.dataTransfer.getData('text/plain')
+                          setDatasetDropTargetFieldKey(field.fieldKey)
+                          applyDatasetFieldDrop(draggedKey, field.fieldKey)
+                        }}
+                        onClick={() => setSelectedDatasetDetailFieldKey(field.fieldKey)}
+                      >
+                        {field.displayName || field.fieldKey}
+                      </Button>
+                    ))}
+                  </Space>
+                </Space>
+              ))}
+            </Space>
+            <Space direction="vertical" size={8} style={{ width: '100%' }}>
+              <Text strong style={{ fontSize: 12 }}>字段详情</Text>
+              <Space size={8} wrap>
+                <Input
+                  size="small"
+                  aria-label="数据集字段显示名"
+                  value={selectedDatasetDetailField?.displayName ?? ''}
+                  placeholder="展示名"
+                  style={{ width: 160 }}
+                  disabled={!selectedDatasetDetailField}
+                  onChange={event => updateSelectedDatasetField({ displayName: event.target.value })}
+                />
+                <select
+                  aria-label="数据集字段角色"
+                  value={selectedDatasetDetailField?.role ?? 'DIMENSION'}
+                  style={{ width: 116, height: 24, border: '1px solid #d9d9d9', borderRadius: 4, padding: '0 8px' }}
+                  disabled={!selectedDatasetDetailField}
+                  onChange={event => updateSelectedDatasetField({ role: event.target.value as 'DIMENSION' | 'MEASURE' })}
+                >
+                  <option value="DIMENSION">维度</option>
+                  <option value="MEASURE">度量</option>
+                </select>
+                <Input
+                  size="small"
+                  aria-label="数据集字段语义类型"
+                  value={selectedDatasetDetailField?.semanticType ?? ''}
+                  placeholder="semantic"
+                  style={{ width: 130 }}
+                  disabled={!selectedDatasetDetailField}
+                  onChange={event => updateSelectedDatasetField({ semanticType: event.target.value || null })}
+                />
+                <select
+                  aria-label="数据集字段默认聚合"
+                  value={selectedDatasetDetailField?.defaultAggregation ?? 'NONE'}
+                  style={{ width: 116, height: 24, border: '1px solid #d9d9d9', borderRadius: 4, padding: '0 8px' }}
+                  disabled={!selectedDatasetDetailField}
+                  onChange={event => updateSelectedDatasetField({ defaultAggregation: event.target.value || null })}
+                >
+                  <option value="NONE">NONE</option>
+                  <option value="SUM">SUM</option>
+                  <option value="COUNT">COUNT</option>
+                  <option value="AVG">AVG</option>
+                  <option value="MAX">MAX</option>
+                  <option value="MIN">MIN</option>
+                </select>
+                <Input
+                  size="small"
+                  aria-label="数据集字段格式"
+                  value={selectedDatasetDetailField?.formatPattern ?? ''}
+                  placeholder="format"
+                  style={{ width: 130 }}
+                  disabled={!selectedDatasetDetailField}
+                  onChange={event => updateSelectedDatasetField({ formatPattern: event.target.value || null })}
+                />
+                <Switch
+                  size="small"
+                  aria-label="数据集字段可见"
+                  checked={Boolean(selectedDatasetDetailField?.visible)}
+                  disabled={!selectedDatasetDetailField}
+                  onChange={checked => updateSelectedDatasetField({ visible: checked })}
+                />
+                <Text type="secondary" style={{ fontSize: 12 }}>可见</Text>
+              </Space>
+            </Space>
+            <Space direction="vertical" size={8} style={{ width: '100%' }}>
+              <Text strong style={{ fontSize: 12 }}>批量字段配置</Text>
+              <Space size={8} wrap>
+                <select
+                  aria-label="数据集批量角色"
+                  value={datasetBatchRole}
+                  style={{ width: 116, height: 24, border: '1px solid #d9d9d9', borderRadius: 4, padding: '0 8px' }}
+                  disabled={!selectedDatasetResource}
+                  onChange={event => setDatasetBatchRole(event.target.value as 'DIMENSION' | 'MEASURE')}
+                >
+                  <option value="DIMENSION">维度</option>
+                  <option value="MEASURE">度量</option>
+                </select>
+                <Input
+                  size="small"
+                  aria-label="数据集批量格式"
+                  value={datasetBatchFormat}
+                  placeholder="format"
+                  style={{ width: 130 }}
+                  disabled={!selectedDatasetResource}
+                  onChange={event => setDatasetBatchFormat(event.target.value)}
+                />
+                <Switch
+                  size="small"
+                  aria-label="数据集批量可见"
+                  checked={datasetBatchVisible}
+                  disabled={!selectedDatasetResource}
+                  onChange={setDatasetBatchVisible}
+                />
+                <Text type="secondary" style={{ fontSize: 12 }}>可见</Text>
+                <Button
+                  size="small"
+                  aria-label="应用数据集字段批量配置"
+                  icon={<SaveOutlined />}
+                  disabled={!selectedDatasetResource || parseChartFieldList(selectedDatasetFieldKeys).length === 0}
+                  onClick={applyDatasetBatchFieldConfig}
+                >
+                  应用批量配置
+                </Button>
+              </Space>
+            </Space>
+            <Space direction="vertical" size={8} style={{ width: '100%' }}>
+              <Text strong style={{ fontSize: 12 }}>批量资源治理</Text>
+              <Space size={8} wrap>
+                <Input
+                  size="small"
+                  aria-label="数据集批量资源选择"
+                  value={batchDatasetResourceKeys}
+                  placeholder="dataset_a,dataset_b"
+                  style={{ width: 220 }}
+                  disabled={datasetResources.length === 0}
+                  onChange={event => setBatchDatasetResourceKeys(event.target.value)}
+                />
+                <Input
+                  size="small"
+                  aria-label="数据集批量移动文件夹"
+                  value={batchDatasetFolderKey}
+                  placeholder="目标文件夹"
+                  style={{ width: 160 }}
+                  disabled={datasetResources.length === 0}
+                  onChange={event => setBatchDatasetFolderKey(event.target.value)}
+                />
+                <Button
+                  size="small"
+                  aria-label="批量移动数据集资源"
+                  icon={<FolderOpenOutlined />}
+                  disabled={selectedBatchDatasetResourceKeys().length === 0}
+                  loading={batchDatasetResourceAction === 'move'}
+                  onClick={moveBatchDatasetResources}
+                >
+                  批量移动
+                </Button>
+                <Input
+                  size="small"
+                  aria-label="数据集批量转让人"
+                  value={batchDatasetOwnerUser}
+                  placeholder="owner@example.com"
+                  style={{ width: 190 }}
+                  disabled={datasetResources.length === 0}
+                  onChange={event => setBatchDatasetOwnerUser(event.target.value)}
+                />
+                <Button
+                  size="small"
+                  aria-label="批量转让数据集资源"
+                  icon={<SwapOutlined />}
+                  disabled={selectedBatchDatasetResourceKeys().length === 0 || !batchDatasetOwnerUser.trim()}
+                  loading={batchDatasetResourceAction === 'transfer'}
+                  onClick={transferBatchDatasetResources}
+                >
+                  批量转让
+                </Button>
+              </Space>
             </Space>
           </Space>
           <Divider style={{ margin: '4px 0' }} />
@@ -9589,6 +12003,38 @@ function compareResourceFavorites(a: BiResourceFavoriteView, b: BiResourceFavori
     .localeCompare(resourceLocationIndexKey(b.resourceType, b.resourceKey))
 }
 
+function resourceLocationTableRowKey(row: BiResourceLocationView, index: number): string {
+  return [
+    resourceLocationIndexKey(row.resourceType, row.resourceKey),
+    row.id ?? 'no-id',
+    row.workspaceId ?? 'no-workspace',
+    row.folderKey ?? 'root',
+    row.sortOrder ?? 'no-sort',
+    index,
+  ].join(':')
+}
+
+function resourceOwnershipTableRowKey(row: BiResourceOwnershipView, index: number): string {
+  return [
+    resourceLocationIndexKey(row.resourceType, row.resourceKey),
+    row.id ?? 'no-id',
+    row.workspaceId ?? 'no-workspace',
+    row.ownerUser ?? 'no-owner',
+    index,
+  ].join(':')
+}
+
+function resourceFavoriteTableRowKey(row: BiResourceFavoriteView, index: number): string {
+  return [
+    resourceLocationIndexKey(row.resourceType, row.resourceKey),
+    row.id ?? 'no-id',
+    row.workspaceId ?? 'no-workspace',
+    row.username ?? 'no-user',
+    row.favorite ? 'favorite' : 'not-favorite',
+    index,
+  ].join(':')
+}
+
 function compareResourceComments(a: BiResourceCommentView, b: BiResourceCommentView): number {
   return String(a.createdAt ?? '').localeCompare(String(b.createdAt ?? '')) || Number(a.id ?? 0) - Number(b.id ?? 0)
 }
@@ -9776,6 +12222,132 @@ interface SelfServiceExtractionBuilderProps {
   value: SelfServiceExtractionState
   onDropField: (role: 'DIMENSION' | 'METRIC', fieldKey: string) => void
   onRemoveField: (role: 'DIMENSION' | 'METRIC', fieldKey: string) => void
+}
+
+/** 图表字段拖放构建器，支持从数据集字段快速填充维度槽和指标槽。 */
+function ChartFieldDropBuilder({
+  dimensionFields,
+  metricFields,
+  selectedDimensions,
+  selectedMetrics,
+  disabled,
+  onDropField,
+}: {
+  dimensionFields: string[]
+  metricFields: string[]
+  selectedDimensions: string[]
+  selectedMetrics: string[]
+  disabled: boolean
+  onDropField: (role: 'DIMENSION' | 'METRIC', fieldKey: string) => void
+}) {
+  const uniqueDimensionFields = Array.from(new Set(dimensionFields))
+  const uniqueMetricFields = Array.from(new Set(metricFields))
+  const addField = (role: 'DIMENSION' | 'METRIC', fieldKey: string) => {
+    if (!disabled) onDropField(role, fieldKey)
+  }
+  const startDrag = (event: ReactDragEvent<HTMLElement>, role: 'DIMENSION' | 'METRIC', fieldKey: string) => {
+    // 写入自定义 MIME，避免和页面其它拖放能力互相误识别。
+    event.dataTransfer.effectAllowed = 'copy'
+    event.dataTransfer.setData('application/x-bi-chart-field-role', role)
+    event.dataTransfer.setData('application/x-bi-chart-field', fieldKey)
+    event.dataTransfer.setData('text/plain', fieldKey)
+  }
+  const dropField = (event: ReactDragEvent<HTMLDivElement>, role: 'DIMENSION' | 'METRIC') => {
+    event.preventDefault()
+    if (disabled) return
+    // text/plain 作为兜底，兼容浏览器或测试环境丢失自定义 MIME 的情况。
+    const fieldKey = event.dataTransfer.getData('application/x-bi-chart-field') || event.dataTransfer.getData('text/plain')
+    if (fieldKey) onDropField(role, fieldKey)
+  }
+  return (
+    <Row gutter={8}>
+      <Col xs={24} md={8}>
+        <Space direction="vertical" size={6} style={{ width: '100%' }}>
+          <Text type="secondary" style={{ fontSize: 12 }}>拖放字段</Text>
+          <Space size={[4, 4]} wrap>
+            {uniqueDimensionFields.slice(0, 8).map(field => (
+              <Tag
+                key={`chart-dimension-source-${field}`}
+                color="blue"
+                role="button"
+                tabIndex={disabled ? -1 : 0}
+                aria-label={`添加图表维度字段 ${field}`}
+                draggable={!disabled}
+                onDragStart={event => startDrag(event, 'DIMENSION', field)}
+                onClick={() => addField('DIMENSION', field)}
+                onKeyDown={event => {
+                  if (event.key === 'Enter' || event.key === ' ') {
+                    event.preventDefault()
+                    addField('DIMENSION', field)
+                  }
+                }}
+                style={{ cursor: disabled ? 'not-allowed' : 'grab' }}
+              >
+                {field}
+              </Tag>
+            ))}
+            {uniqueMetricFields.slice(0, 8).map(field => (
+              <Tag
+                key={`chart-metric-source-${field}`}
+                color="purple"
+                role="button"
+                tabIndex={disabled ? -1 : 0}
+                aria-label={`添加图表指标字段 ${field}`}
+                draggable={!disabled}
+                onDragStart={event => startDrag(event, 'METRIC', field)}
+                onClick={() => addField('METRIC', field)}
+                onKeyDown={event => {
+                  if (event.key === 'Enter' || event.key === ' ') {
+                    event.preventDefault()
+                    addField('METRIC', field)
+                  }
+                }}
+                style={{ cursor: disabled ? 'not-allowed' : 'grab' }}
+              >
+                {field}
+              </Tag>
+            ))}
+          </Space>
+        </Space>
+      </Col>
+      <Col xs={24} md={8}>
+        <ChartFieldDropZone title="维度槽" role="DIMENSION" fields={selectedDimensions} onDrop={dropField} />
+      </Col>
+      <Col xs={24} md={8}>
+        <ChartFieldDropZone title="指标槽" role="METRIC" fields={selectedMetrics} onDrop={dropField} />
+      </Col>
+    </Row>
+  )
+}
+
+/** 图表字段槽位，负责接收拖入字段并展示当前已选字段。 */
+function ChartFieldDropZone({
+  title,
+  role,
+  fields,
+  onDrop,
+}: {
+  title: string
+  role: 'DIMENSION' | 'METRIC'
+  fields: string[]
+  onDrop: (event: ReactDragEvent<HTMLDivElement>, role: 'DIMENSION' | 'METRIC') => void
+}) {
+  return (
+    <div
+      style={extractionDropZoneStyle}
+      onDragOver={event => event.preventDefault()}
+      onDrop={event => onDrop(event, role)}
+    >
+      <Space direction="vertical" size={6} style={{ width: '100%' }}>
+        <Text type="secondary" style={{ fontSize: 12 }}>{title}</Text>
+        <Space size={[4, 4]} wrap>
+          {fields.length === 0 ? <Text type="secondary" style={{ fontSize: 12 }}>未选择</Text> : fields.map(field => (
+            <Tag key={`${role}-${field}`} color={role === 'DIMENSION' ? 'blue' : 'purple'}>{field}</Tag>
+          ))}
+        </Space>
+      </Space>
+    </div>
+  )
 }
 
 function SelfServiceExtractionBuilder({
@@ -10059,6 +12631,240 @@ function SqlDatasetPreviewTable({ result, loading }: { result: BiSqlDatasetPrevi
   )
 }
 
+function SqlDatasetReadinessSummary({ rows }: { rows: BiSqlDatasetReadinessRow[] }) {
+  const statusColor: Record<BiSqlDatasetReadinessRow['status'], string> = {
+    pass: 'green',
+    warn: 'gold',
+    block: 'volcano',
+  }
+  return (
+    <Space direction="vertical" size={6} style={{ width: '100%' }}>
+      <Text strong style={{ fontSize: 12 }}>发布诊断</Text>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+        {rows.map(row => (
+          <div
+            key={row.key}
+            style={{
+              border: '1px solid #e5e7eb',
+              borderRadius: 6,
+              padding: '6px 8px',
+              minWidth: 190,
+              flex: '1 1 190px',
+              background: '#fff',
+            }}
+          >
+            <Space direction="vertical" size={4} style={{ width: '100%' }}>
+              <Space size={6} wrap>
+                <Text style={{ fontSize: 12 }}>{row.label}</Text>
+                <Tag color={statusColor[row.status]}>{row.statusLabel}</Tag>
+              </Space>
+              <Text type="secondary" style={{ fontSize: 12 }}>{row.detail}</Text>
+            </Space>
+          </div>
+        ))}
+      </div>
+    </Space>
+  )
+}
+
+function DatasourceRelationshipDiagnosticSummary({ rows }: { rows: BiDatasourceRelationshipDiagnosticRow[] }) {
+  const statusColor: Record<BiDatasourceRelationshipDiagnosticRow['status'], string> = {
+    pass: 'green',
+    warn: 'gold',
+    block: 'volcano',
+  }
+  return (
+    <Space direction="vertical" size={6} style={{ width: '100%' }}>
+      <Text strong style={{ fontSize: 12 }}>关系诊断</Text>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+        {rows.map(row => (
+          <div
+            key={row.key}
+            style={{
+              border: '1px solid #e5e7eb',
+              borderRadius: 6,
+              padding: '6px 8px',
+              minWidth: 190,
+              flex: '1 1 190px',
+              background: '#fff',
+            }}
+          >
+            <Space direction="vertical" size={4} style={{ width: '100%' }}>
+              <Space size={6} wrap>
+                <Text style={{ fontSize: 12 }}>{row.label}</Text>
+                <Tag color={statusColor[row.status]}>{row.statusLabel}</Tag>
+              </Space>
+              <Text type="secondary" style={{ fontSize: 12 }}>{row.detail}</Text>
+            </Space>
+          </div>
+        ))}
+      </div>
+    </Space>
+  )
+}
+
+function VisualEditorDiagnosticSummary({ rows }: { rows: BiVisualEditorDiagnosticRow[] }) {
+  const statusColor: Record<BiVisualEditorDiagnosticRow['status'], string> = {
+    pass: 'green',
+    warn: 'gold',
+    block: 'volcano',
+  }
+  return (
+    <Space direction="vertical" size={6} style={{ width: '100%' }}>
+      <Text strong style={{ fontSize: 12 }}>视觉诊断</Text>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+        {rows.map(row => (
+          <div
+            key={row.key}
+            style={{
+              border: '1px solid #e5e7eb',
+              borderRadius: 6,
+              padding: '6px 8px',
+              minWidth: 190,
+              flex: '1 1 190px',
+              background: '#fff',
+            }}
+          >
+            <Space direction="vertical" size={4} style={{ width: '100%' }}>
+              <Space size={6} wrap>
+                <Text style={{ fontSize: 12 }}>{row.label}</Text>
+                <Tag color={statusColor[row.status]}>{row.statusLabel}</Tag>
+              </Space>
+              <Text type="secondary" style={{ fontSize: 12 }}>{row.detail}</Text>
+            </Space>
+          </div>
+        ))}
+      </div>
+    </Space>
+  )
+}
+
+function ExportHardeningDiagnosticSummary({ rows }: { rows: BiExportHardeningDiagnosticRow[] }) {
+  const statusColor: Record<BiExportHardeningDiagnosticRow['status'], string> = {
+    pass: 'green',
+    warn: 'gold',
+    block: 'volcano',
+  }
+  return (
+    <Space direction="vertical" size={6} style={{ width: '100%' }}>
+      <Text strong style={{ fontSize: 12 }}>导出硬化诊断</Text>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+        {rows.map(row => (
+          <div
+            key={row.key}
+            style={{
+              border: '1px solid #e5e7eb',
+              borderRadius: 6,
+              padding: '6px 8px',
+              minWidth: 190,
+              flex: '1 1 190px',
+              background: '#fff',
+            }}
+          >
+            <Space direction="vertical" size={4} style={{ width: '100%' }}>
+              <Space size={6} wrap>
+                <Text style={{ fontSize: 12 }}>{row.label}</Text>
+                <Tag color={statusColor[row.status]}>{row.statusLabel}</Tag>
+              </Space>
+              <Text type="secondary" style={{ fontSize: 12 }}>{row.detail}</Text>
+            </Space>
+          </div>
+        ))}
+      </div>
+    </Space>
+  )
+}
+
+function AlertAnomalyDiagnosticSummary({ rows }: { rows: BiAlertAnomalyDiagnosticRow[] }) {
+  const statusColor: Record<BiAlertAnomalyDiagnosticRow['status'], string> = {
+    pass: 'green',
+    warn: 'gold',
+    block: 'volcano',
+  }
+  return (
+    <Space direction="vertical" size={6} style={{ width: '100%' }}>
+      <Text strong style={{ fontSize: 12 }}>异常诊断</Text>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+        {rows.map(row => (
+          <div
+            key={row.key}
+            style={{
+              border: '1px solid #e5e7eb',
+              borderRadius: 6,
+              padding: '6px 8px',
+              minWidth: 190,
+              flex: '1 1 190px',
+              background: '#fff',
+            }}
+          >
+            <Space direction="vertical" size={4} style={{ width: '100%' }}>
+              <Space size={6} wrap>
+                <Text style={{ fontSize: 12 }}>{row.label}</Text>
+                <Tag color={statusColor[row.status]}>{row.statusLabel}</Tag>
+              </Space>
+              <Text type="secondary" style={{ fontSize: 12 }}>{row.detail}</Text>
+            </Space>
+          </div>
+        ))}
+      </div>
+    </Space>
+  )
+}
+
+function SqlDatasetSampleProfileTable({ result }: { result: BiSqlDatasetPreviewResult | null }) {
+  const rows = buildSqlDatasetSampleProfileRows(result)
+  if (!rows.length) return null
+  return (
+    <Space direction="vertical" size={6} style={{ width: '100%' }}>
+      <Text strong style={{ fontSize: 12 }}>样本剖析</Text>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+        {rows.map(row => (
+          <div
+            key={row.key}
+            style={{
+              border: '1px solid #e5e7eb',
+              borderRadius: 6,
+              padding: '6px 8px',
+              minWidth: 180,
+              flex: '1 1 180px',
+              background: '#fff',
+            }}
+          >
+            <Space direction="vertical" size={2} style={{ width: '100%' }}>
+              <Text style={{ fontSize: 12 }}>{row.field} · {row.role} · {row.dataType}</Text>
+              <Space size={[4, 4]} wrap>
+                <Tag>填充 {row.filled}</Tag>
+                <Tag>唯一 {row.unique}</Tag>
+              </Space>
+              <Text type="secondary" ellipsis style={{ maxWidth: '100%', fontSize: 12 }}>{row.samples}</Text>
+            </Space>
+          </div>
+        ))}
+      </div>
+    </Space>
+  )
+}
+
+function SqlDatasetImpactSummary({ result }: { result: BiSqlDatasetPreviewResult | null }) {
+  const rows = buildSqlDatasetImpactRows(result)
+  if (!rows.length) return null
+  return (
+    <Space direction="vertical" size={6} style={{ width: '100%' }}>
+      <Text strong style={{ fontSize: 12 }}>影响分析</Text>
+      <Descriptions
+        size="small"
+        column={1}
+        bordered
+        items={rows.map(row => ({
+          key: row.key,
+          label: row.label,
+          children: <Text style={{ fontSize: 12 }}>{row.value}</Text>,
+        }))}
+      />
+    </Space>
+  )
+}
+
 function DataConfig({
   widget,
   queryResult,
@@ -10196,6 +13002,128 @@ function StyleConfig({ widget }: { widget: BiDashboardWidgetPreset }) {
   )
 }
 
+function DashboardRuntimeControlEditor({
+  filter,
+  runtimeParameters,
+  disabled,
+  ariaPrefix,
+  compact = false,
+  optionResult,
+  onChange,
+}: {
+  filter: BiDashboardFilterPreset
+  runtimeParameters: BiDashboardRuntimeParameters
+  disabled: boolean
+  ariaPrefix: string
+  compact?: boolean
+  optionResult?: BiQueryResult
+  onChange: (rawValue: string) => void
+}) {
+  const controlValue = dashboardRuntimeControlValue(runtimeParameters, filter)
+  const [draftValue, setDraftValue] = useState(controlValue)
+  const editedAtRef = useRef(0)
+  useEffect(() => {
+    if (Date.now() - editedAtRef.current < 500) return
+    setDraftValue(controlValue)
+  }, [controlValue])
+  const values = dashboardRuntimeControlParts(draftValue)
+  const updateDraftValue = (nextValue: string) => {
+    editedAtRef.current = Date.now()
+    setDraftValue(nextValue)
+    onChange(nextValue)
+  }
+  if (filter.controlType === 'DATE_RANGE') {
+    return (
+      <Space.Compact>
+        <Input
+          size="small"
+          type="date"
+          aria-label={`${ariaPrefix}开始日期`}
+          prefix={<CalendarOutlined />}
+          value={values[0] ?? ''}
+          disabled={disabled}
+          onChange={event => updateDraftValue(dashboardRuntimeDateRangeValue(event.target.value, values[1] ?? ''))}
+          style={{ width: compact ? 140 : 150 }}
+        />
+        <Input
+          size="small"
+          type="date"
+          aria-label={`${ariaPrefix}结束日期`}
+          value={values[1] ?? ''}
+          disabled={disabled}
+          onChange={event => updateDraftValue(dashboardRuntimeDateRangeValue(values[0] ?? '', event.target.value))}
+          style={{ width: compact ? 140 : 150 }}
+        />
+      </Space.Compact>
+    )
+  }
+  const candidateValues = filter.controlType === 'ENUM_MULTI_SELECT'
+    ? dashboardRuntimeCandidateValues(filter, optionResult)
+    : []
+  return (
+    <Space direction={compact ? 'horizontal' : 'vertical'} size={4} style={{ width: compact ? undefined : '100%' }}>
+      <Input
+        size="small"
+        aria-label={`${ariaPrefix}${compact ? '' : '运行参数'}`}
+        prefix={compact ? <FilterOutlined /> : undefined}
+        placeholder={filter.controlType === 'ENUM_MULTI_SELECT' ? '逗号分隔多选值' : filter.label}
+        value={draftValue}
+        disabled={disabled}
+        onChange={event => updateDraftValue(event.target.value)}
+        style={{ width: compact ? 150 : '100%' }}
+      />
+      {candidateValues.length > 0 && (
+        <Space size={[4, 4]} wrap>
+          {candidateValues.map(value => {
+            const selected = values.includes(value)
+            return (
+              <Button
+                key={`${filter.filterKey}-${value}`}
+                size="small"
+                type={selected ? 'primary' : 'default'}
+                aria-label={`选择${filter.label} ${value}`}
+                disabled={disabled}
+                onClick={() => updateDraftValue(dashboardRuntimeToggleCandidateValue(values, value))}
+              >
+                {value}
+              </Button>
+            )
+          })}
+        </Space>
+      )}
+    </Space>
+  )
+}
+
+function dashboardRuntimeControlParts(value: string): string[] {
+  return value
+    .split(',')
+    .map(item => item.trim())
+    .filter(Boolean)
+}
+
+function dashboardRuntimeDateRangeValue(startDate: string, endDate: string): string {
+  return [startDate, endDate].map(value => value.trim()).filter(Boolean).join(',')
+}
+
+function dashboardRuntimeToggleCandidateValue(currentValues: string[], candidate: string): string {
+  const normalized = candidate.trim()
+  if (!normalized) return currentValues.join(',')
+  const nextValues = currentValues.includes(normalized)
+    ? currentValues.filter(value => value !== normalized)
+    : [...currentValues, normalized]
+  return nextValues.join(',')
+}
+
+function dashboardRuntimeCandidateValues(filter: BiDashboardFilterPreset, result?: BiQueryResult): string[] {
+  const optionFieldKey = filter.optionFieldKey ?? filter.fieldKey
+  return [...new Set((result?.rows ?? [])
+    .map(row => row[optionFieldKey])
+    .filter(value => value !== undefined && value !== null && String(value).trim() !== '')
+    .map(value => String(value).trim()))]
+    .slice(0, 8)
+}
+
 function DashboardRuntimeToolbar({
   preset,
   runtimeParameters,
@@ -10218,15 +13146,13 @@ function DashboardRuntimeToolbar({
       {preset.filters.map(filter => (
         <Space.Compact key={filter.filterKey}>
           <Tooltip title={dashboardRuntimeFilterLocked(preset, filter) ? '全局参数锁定' : undefined}>
-            <Input
-              size="small"
-              aria-label={`运行态${filter.label}`}
-              prefix={filter.controlType === 'DATE_RANGE' ? <CalendarOutlined /> : <FilterOutlined />}
-              placeholder={filter.label}
-              value={dashboardRuntimeControlValue(runtimeParameters, filter)}
+            <DashboardRuntimeControlEditor
+              filter={filter}
+              runtimeParameters={runtimeParameters}
               disabled={dashboardRuntimeFilterLocked(preset, filter)}
-              onChange={event => onRuntimeParameterChange(filter.filterKey, event.target.value)}
-              style={{ width: filter.controlType === 'DATE_RANGE' ? 190 : 150 }}
+              ariaPrefix={`运行态${filter.label}`}
+              compact
+              onChange={rawValue => onRuntimeParameterChange(filter.filterKey, rawValue)}
             />
           </Tooltip>
           <Tooltip title={`清除运行态${filter.label}`}>
@@ -10291,6 +13217,7 @@ function InteractionConfig({
   const interactions = preset.interactions.filter(interaction => interaction.sourceWidgetKey === widget.widgetKey)
   const sampleRow = queryResult?.rows[0]
   const runtimeEntryCount = Object.keys(runtimeParameters).length
+  const embedPreviewRows = buildEmbedTicketPreviewRows(preset, canvasId, 'INTERNAL_CANVAS', runtimeParameters)
   return (
     <Space direction="vertical" size={12} style={{ width: '100%' }}>
       <ConfigBlock title="运行参数">
@@ -10313,13 +13240,14 @@ function InteractionConfig({
                 <Text style={{ fontSize: 12 }}>{filter.label}</Text>
                 {dashboardRuntimeFilterLocked(preset, filter) && <Tag color="gold">锁定</Tag>}
               </Space>
-              <Space.Compact style={{ width: '100%' }}>
-                <Input
-                  size="small"
-                  aria-label={`${filter.label}运行参数`}
-                  value={dashboardRuntimeControlValue(runtimeParameters, filter)}
+          <Space.Compact style={{ width: '100%' }}>
+                <DashboardRuntimeControlEditor
+                  filter={filter}
+                  runtimeParameters={runtimeParameters}
                   disabled={dashboardRuntimeFilterLocked(preset, filter)}
-                  onChange={event => onRuntimeParameterChange(filter.filterKey, event.target.value)}
+                  ariaPrefix={filter.label}
+                  optionResult={controlOptionResults[filter.filterKey]}
+                  onChange={rawValue => onRuntimeParameterChange(filter.filterKey, rawValue)}
                 />
                 <Button
                   size="small"
@@ -10386,6 +13314,16 @@ function InteractionConfig({
         </Space>
       </ConfigBlock>
       <ConfigBlock title="嵌入 Ticket">
+        <Space direction="vertical" size={6} style={{ width: '100%', marginBottom: 8 }}>
+          <Text strong style={{ fontSize: 12 }}>嵌入参数预览</Text>
+          <Space size={[4, 4]} wrap>
+            {embedPreviewRows.map(row => (
+              <Tag key={row.key} color={row.key.startsWith('filter:') ? 'blue' : row.key.startsWith('parameter:') ? 'purple' : 'default'}>
+                {row.label}：{row.value}
+              </Tag>
+            ))}
+          </Space>
+        </Space>
         {embedTicket ? (
           <Space direction="vertical" size={6} style={{ width: '100%' }}>
             <Input.TextArea value={embedTicket.embedUrl} autoSize={{ minRows: 2, maxRows: 4 }} readOnly />
@@ -10600,6 +13538,41 @@ const extractionDropZoneStyle: CSSProperties = {
   border: '1px dashed #cbd5e1',
   borderRadius: 8,
   background: '#f8fafc',
+}
+
+const spreadsheetPivotDropZoneStyle: CSSProperties = {
+  minHeight: 30,
+  minWidth: 120,
+  padding: '4px 8px',
+  border: '1px dashed #cbd5e1',
+  borderRadius: 6,
+  background: '#f8fafc',
+  display: 'inline-flex',
+  alignItems: 'center',
+  gap: 6,
+}
+
+const spreadsheetPivotPreviewGridStyle: CSSProperties = {
+  width: '100%',
+  maxWidth: 760,
+  display: 'grid',
+  gridTemplateColumns: 'repeat(8, minmax(74px, 1fr))',
+  borderTop: '1px solid #e5e7eb',
+  borderLeft: '1px solid #e5e7eb',
+  overflowX: 'auto',
+}
+
+const spreadsheetPivotPreviewCellStyle: CSSProperties = {
+  minHeight: 28,
+  minWidth: 0,
+  padding: '5px 8px',
+  borderRight: '1px solid #e5e7eb',
+  borderBottom: '1px solid #e5e7eb',
+  background: '#fff',
+  fontSize: 12,
+  whiteSpace: 'nowrap',
+  overflow: 'hidden',
+  textOverflow: 'ellipsis',
 }
 
 const subscriptionBandStyle: CSSProperties = {

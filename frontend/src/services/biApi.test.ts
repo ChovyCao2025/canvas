@@ -96,6 +96,12 @@ describe('biApi', () => {
     )
   })
 
+  it('loads chart reference impact from chart resource endpoint', async () => {
+    await biApi.getChartReferenceImpact('trend-executions')
+
+    expect(mockedHttp.get).toHaveBeenCalledWith('/canvas/bi/charts/resources/trend-executions/impact')
+  })
+
   it('calls datasource credential rotation endpoint without exposing credentials in the path', async () => {
     await biApi.rotateDatasourceCredential(11, { password: 'rotated-password' })
 
@@ -177,6 +183,18 @@ describe('biApi', () => {
     await biApi.getEmbedDashboardRuntimeState(request)
 
     expect(mockedHttp.post).toHaveBeenCalledWith('/canvas/bi/embed/resources/dashboard/runtime-state', request)
+  })
+
+  it('loads embedded portal metadata through the anonymous ticket-bound endpoint', async () => {
+    const request = {
+      ticket: 'ticket-portal',
+      resourceType: 'PORTAL',
+      resourceKey: 'executive-home',
+    }
+
+    await biApi.getEmbedPortalResource(request)
+
+    expect(mockedHttp.post).toHaveBeenCalledWith('/canvas/bi/embed/resources/portal', request)
   })
 
   it('uploads datasource files through multipart transport', async () => {

@@ -129,6 +129,22 @@ class BiPermissionServiceTest {
     }
 
     @Test
+    void systemRoleCanDeliverSubscriptionsWithoutExplicitGrant() {
+        Fixtures fixtures = fixtures();
+        when(fixtures.resourcePermissionMapper.selectList(any())).thenReturn(List.of());
+
+        fixtures.service.enforceResourceAccess(
+                7L,
+                3L,
+                "DASHBOARD",
+                21L,
+                new BiQueryContext(7L, "bi-delivery-scheduler", "SYSTEM"),
+                BiPermissionService.ACTION_SUBSCRIBE);
+
+        verify(fixtures.auditLogMapper).insert(any(BiAuditLogDO.class));
+    }
+
+    @Test
     void workspaceMemberRoleAppliesRowPermissionsDuringQuery() {
         Fixtures fixtures = fixtures();
         when(fixtures.workspaceMemberMapper.selectOne(any())).thenReturn(workspaceMember("BI_VIEWER"));

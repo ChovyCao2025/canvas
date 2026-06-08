@@ -7,6 +7,9 @@ import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Update;
 import org.chovy.canvas.dal.dataobject.BiChartDO;
 
+/**
+ * BiChartMapper 定义 dal.mapper 场景中的扩展契约。
+ */
 @Mapper
 public interface BiChartMapper extends BaseMapper<BiChartDO> {
 
@@ -28,6 +31,12 @@ public interface BiChartMapper extends BaseMapper<BiChartDO> {
                 status = VALUES(status),
                 updated_at = CURRENT_TIMESTAMP
             """)
+    /**
+     * 执行数据写入或状态变更。
+     *
+     * @param row 持久化行数据，承载数据库记录内容。
+     * @return 返回流程执行后的业务结果。
+     */
     int upsert(@Param("row") BiChartDO row);
 
     @Update("""
@@ -38,6 +47,14 @@ public interface BiChartMapper extends BaseMapper<BiChartDO> {
               AND workspace_id = #{workspaceId}
               AND chart_key = #{chartKey}
             """)
+    /**
+     * 执行数据写入或状态变更。
+     *
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @param workspaceId 业务对象 ID，用于定位具体记录。
+     * @param chartKey 业务键，用于在同一租户下定位资源。
+     * @return 返回流程执行后的业务结果。
+     */
     int publish(@Param("tenantId") Long tenantId,
                 @Param("workspaceId") Long workspaceId,
                 @Param("chartKey") String chartKey);
@@ -50,6 +67,14 @@ public interface BiChartMapper extends BaseMapper<BiChartDO> {
               AND workspace_id = #{workspaceId}
               AND chart_key = #{chartKey}
             """)
+    /**
+     * 执行数据写入或状态变更。
+     *
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @param workspaceId 业务对象 ID，用于定位具体记录。
+     * @param chartKey 业务键，用于在同一租户下定位资源。
+     * @return 返回 archive 计算得到的数量、金额或指标值。
+     */
     int archive(@Param("tenantId") Long tenantId,
                 @Param("workspaceId") Long workspaceId,
                 @Param("chartKey") String chartKey);

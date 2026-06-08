@@ -1,4 +1,5 @@
 import type {
+  BiDashboardRuntimeStateCommand,
   BiEmbedTicketPayload,
   BiQueryCacheInvalidationCommand,
   BiQueryCachePolicyCommand,
@@ -20,101 +21,177 @@ export type BiSectionKey =
   | 'ai'
 
 export interface BiWorkbenchSection {
+  /** 工作台导航 key，对应页面分区和 URL tab。 */
   key: BiSectionKey
+  /** 导航展示名称。 */
   label: string
+  /** 分区能力摘要，用于概览卡片。 */
   summary: string
+  /** 该分区承载的 BI 产品能力说明。 */
   capability: string
 }
 
 export interface MarketingDatasetPreset {
+  /** 数据集唯一 key，作为查询和资源引用的稳定标识。 */
   key: string
+  /** 面向运营/分析人员展示的数据集名称。 */
   label: string
+  /** 数据来源说明，例如 Doris 表或投递回执。 */
   source: string
+  /** 是否平台内置的营销分析预置数据集。 */
   preset: boolean
+  /** 数据集中对外展示的核心指标名称。 */
   metrics: string[]
 }
 
 export interface BiDatasetMetadataLike {
+  /** 后端语义数据集 key。 */
   datasetKey: string
+  /** 数据集指标元数据，用于转换为营销数据集预置项。 */
   metrics: Array<{ metricKey: string }>
 }
 
 export interface BiDashboardPresetLike {
+  /** 仪表盘资源 key，用于发布、嵌入、订阅和导出定位。 */
   dashboardKey: string
+  /** 仪表盘标题。 */
   title: string
+  /** 仪表盘业务描述。 */
   description: string
+  /** 默认查询数据集 key，组件未覆盖时使用该数据集。 */
   datasetKey: string
+  /** 仪表盘组件布局和查询配置。 */
   widgets: BiDashboardWidgetPreset[]
+  /** 仪表盘查询控件配置。 */
   filters: BiDashboardFilterPreset[]
+  /** 跨控件共享的全局参数，用于 URL、嵌入票据和联动别名统一取值。 */
   globalParameters?: BiDashboardGlobalParameterPreset[] | null
+  /** 组件之间的钻取、联动或超链接交互。 */
   interactions: BiDashboardInteractionPreset[]
+  /** 允许订阅推送的渠道，例如 EMAIL、LARK。 */
   subscriptionChannels: string[]
+  /** 允许生成嵌入 ticket 的作用域。 */
   embedScopes: string[]
 }
 
 export interface BiDashboardWidgetPreset {
+  /** 组件唯一 key，也是查询结果和布局操作的索引。 */
   widgetKey: string
+  /** 组件标题。 */
   title: string
+  /** 图表类型，例如 KPI_CARD、LINE、BAR。 */
   chartType: string
+  /** 参与查询的维度字段。 */
   dimensions: string[]
+  /** 参与查询的指标字段。 */
   metrics: string[]
+  /** 栅格布局横向起点。 */
   gridX: number
+  /** 栅格布局纵向起点。 */
   gridY: number
+  /** 栅格布局宽度。 */
   gridW: number
+  /** 栅格布局高度。 */
   gridH: number
+  /** 组件视觉样式预设。 */
   stylePreset: string
 }
 
 export interface BiDashboardFilterPreset {
+  /** 控件 key，URL 参数、运行态状态和联动逻辑优先使用。 */
   filterKey: string
+  /** 过滤字段 key，对应数据集维度字段。 */
   fieldKey: string
+  /** 控件展示名称。 */
   label: string
+  /** 控件类型，例如 SELECT、DATE_RANGE。 */
   controlType: string
+  /** 是否必须提供过滤值。 */
   required: boolean
+  /** 默认过滤值，支持相对日期等运行态解析。 */
   defaultValue?: string | null
+  /** 控件只作用于指定组件；为空表示作用于全部组件。 */
   targetWidgetKeys?: string[] | null
+  /** 级联配置，用于父控件约束子控件候选项。 */
   cascade?: BiDashboardFilterCascadePreset | null
+  /** 候选项查询使用的数据集 key，缺省使用仪表盘数据集。 */
   optionDatasetKey?: string | null
+  /** 候选项查询展示字段，缺省使用 fieldKey。 */
   optionFieldKey?: string | null
+  /** 是否隐藏控件但保留参数过滤能力。 */
   hidden?: boolean | null
 }
 
 export interface BiDashboardFilterCascadePreset {
+  /** 父级控件 key 列表，决定当前控件候选项的上游过滤条件。 */
   parentFilterKeys: string[]
+  /** 父控件字段到当前候选项字段的映射，跨数据源级联时使用。 */
   parentFieldMapping?: Record<string, string> | null
+  /** 级联匹配模式：同源字段或显式映射字段。 */
   mode?: 'SAME_SOURCE' | 'MAPPED' | null
 }
 
 export interface BiDashboardGlobalParameterPreset {
+  /** 全局参数 key，作为运行态参数的主键。 */
   parameterKey: string
+  /** 绑定的数据集字段，用于和查询控件互相镜像。 */
   fieldKey?: string | null
+  /** 绑定的控件 key。 */
   filterKey?: string | null
+  /** URL 或嵌入参数中的别名集合。 */
   aliases?: string[] | null
+  /** 全局参数默认值。 */
   defaultValue?: string | null
+  /** 是否锁定，锁定后已有值不会被普通控件修改覆盖。 */
   locked?: boolean | null
 }
 
 export interface BiDashboardInteractionPreset {
+  /** 交互规则 key。 */
   interactionKey: string
+  /** 触发交互的源组件 key。 */
   sourceWidgetKey: string
+  /** 联动或钻取目标组件 key。 */
   targetWidgetKey?: string | null
+  /** 交互类型，例如 DRILL_DOWN、FILTER_LINKAGE、HYPERLINK。 */
   interactionType: string
+  /** 从点击行中读取的字段 key。 */
   fieldKey: string
+  /** 超链接目标或自定义交互目标。 */
   target?: string | null
 }
 
+/** 仪表盘运行态参数值，覆盖 URL、嵌入 ticket、记住条件和默认值。 */
 export type BiDashboardRuntimeParameterValue = string | string[] | number | boolean | null | undefined
+/** 运行态参数字典，key 可能是 filterKey、fieldKey 或全局参数别名。 */
 export type BiDashboardRuntimeParameters = Record<string, BiDashboardRuntimeParameterValue>
+/** 运行态参数来源，用于 UI 展示当前值为何生效。 */
 export type BiDashboardRuntimeStateSource = 'URL' | 'REMEMBERED' | 'DEFAULT' | 'CLEARED' | 'EMPTY'
 
 export interface BiDashboardRuntimeStateRow {
+  /** 控件 key。 */
   key: string
+  /** 数据集字段 key。 */
   fieldKey: string
+  /** 控件展示名称。 */
   label: string
+  /** 已格式化的当前参数值。 */
   valueText: string
+  /** 当前值来源。 */
   source: BiDashboardRuntimeStateSource
+  /** 来源中文标签。 */
   sourceLabel: string
+  /** 是否由全局参数锁定。 */
   locked: boolean
+}
+
+export interface BiEmbedTicketPreviewRow {
+  /** 预览行稳定 key。 */
+  key: string
+  /** 面向用户展示的字段名。 */
+  label: string
+  /** 面向用户展示的字段值。 */
+  value: string
 }
 
 export interface BiDesignerToolbarAction {
@@ -129,25 +206,39 @@ export interface BiDesignerPaletteItem {
 }
 
 export interface DashboardPresetHistory {
+  /** 撤销栈，存放当前版本之前的仪表盘快照。 */
   past: BiDashboardPresetLike[]
+  /** 设计器当前正在编辑的仪表盘快照。 */
   present: BiDashboardPresetLike
+  /** 重做栈，撤销后保留的后续快照。 */
   future: BiDashboardPresetLike[]
 }
 
 export interface BiDashboardPackageLike {
+  /** 导入/导出的仪表盘预设内容。 */
   preset: BiDashboardPresetLike
+  /** 来源包版本，用于兼容未来结构升级。 */
   sourceVersion?: number
 }
 
 export interface BiResourceLocationLike {
+  /** 位置记录 ID。 */
   id?: number
+  /** 租户 ID。 */
   tenantId?: number
+  /** 工作区 ID。 */
   workspaceId?: number
+  /** 资源类型，例如 DASHBOARD、DATASET、CHART。 */
   resourceType: string
+  /** 资源 key。 */
   resourceKey: string
+  /** 所属文件夹 key，空值表示根目录。 */
   folderKey?: string | null
+  /** 文件夹内排序值。 */
   sortOrder?: number | null
+  /** 最近移动操作者。 */
   movedBy?: string | null
+  /** 最近移动时间。 */
   movedAt?: string | null
 }
 
@@ -159,13 +250,21 @@ export interface BiResourceMoveCommandLike {
 }
 
 export interface BiResourceOwnershipLike {
+  /** 归属记录 ID。 */
   id?: number
+  /** 租户 ID。 */
   tenantId?: number
+  /** 工作区 ID。 */
   workspaceId?: number
+  /** 资源类型。 */
   resourceType: string
+  /** 资源 key。 */
   resourceKey: string
+  /** 当前负责人账号。 */
   ownerUser?: string | null
+  /** 最近转交操作者。 */
   transferredBy?: string | null
+  /** 最近转交时间。 */
   transferredAt?: string | null
 }
 
@@ -194,30 +293,52 @@ export interface BiResourceCommentLike {
 }
 
 export interface BiResourceLockLike {
+  /** 锁记录 ID。 */
   id?: number | null
+  /** 租户 ID。 */
   tenantId?: number
+  /** 工作区 ID。 */
   workspaceId?: number
+  /** 被锁资源类型。 */
   resourceType: string
+  /** 被锁资源 key。 */
   resourceKey: string
+  /** 草稿锁 token，保存草稿时用于乐观并发保护。 */
   lockToken?: string | null
+  /** 持锁人。 */
   lockedBy?: string | null
+  /** 加锁时间。 */
   lockedAt?: string | null
+  /** 锁过期时间。 */
   expiresAt?: string | null
+  /** 当前是否有效持锁。 */
   locked?: boolean | null
 }
 
 export interface BiPublishApprovalLike {
+  /** 审批记录 ID。 */
   id?: number | null
+  /** 租户 ID。 */
   tenantId?: number
+  /** 工作区 ID。 */
   workspaceId?: number
+  /** 待发布资源类型。 */
   resourceType: string
+  /** 待发布资源 key。 */
   resourceKey: string
+  /** 审批状态，例如 PENDING、APPROVED、REJECTED。 */
   status: string
+  /** 发起发布审批的原因。 */
   reason?: string | null
+  /** 申请人。 */
   requestedBy?: string | null
+  /** 申请时间。 */
   requestedAt?: string | null
+  /** 审核人。 */
   reviewedBy?: string | null
+  /** 审核时间。 */
   reviewedAt?: string | null
+  /** 审核意见。 */
   reviewComment?: string | null
 }
 
@@ -260,9 +381,13 @@ export interface BiPublishApprovalReviewCommandLike {
 }
 
 export interface BiPermissionRequestCommandLike {
+  /** 申请访问的资源类型。 */
   resourceType: string
+  /** 申请访问的资源 key。 */
   resourceKey: string
+  /** 申请动作，例如 USE、EDIT、EXPORT、PUBLISH。 */
   requestedAction: string
+  /** 申请理由。 */
   reason: string | null
 }
 
@@ -273,10 +398,15 @@ export interface BiPermissionRequestReviewCommandLike {
 }
 
 export interface BiResourceTargetLike {
+  /** 下拉展示文案。 */
   label: string
+  /** 下拉值，通常由资源类型和 key 拼接。 */
   value: string
+  /** BI 资源类型。 */
   resourceType: string
+  /** BI 资源 key。 */
   resourceKey: string
+  /** 是否禁止选择，常用于缺少可操作资源时兜底展示。 */
   disabled: boolean
 }
 
@@ -340,21 +470,166 @@ export interface BiBigScreenLayoutPatchLike {
 export type BiPortalNavigationLayout = 'top' | 'left' | 'dual'
 
 export interface BiPortalNavigationConfigPatchLike {
+  /** 门户导航布局：顶部、左侧或双栏。 */
   navigationLayout?: string | null
+  /** 默认打开的菜单 key。 */
   defaultMenuKey?: string | null
+  /** 是否开启菜单搜索。 */
   menuSearchEnabled?: boolean | null
+  /** 是否允许门户全屏展示。 */
   fullScreenEnabled?: boolean | null
+  /** 是否启用移动端适配。 */
   mobileEnabled?: boolean | null
+  /** 门户 Logo 地址。 */
+  logoUrl?: string | null
+  /** 门户主标题。 */
+  title?: string | null
+  /** 门户副标题。 */
+  subtitle?: string | null
+  /** 门户页脚文案。 */
+  footerText?: string | null
+  /** 门户访问别名。 */
+  alias?: string | null
+  /** 是否展示面包屑。 */
+  breadcrumbEnabled?: boolean | null
+  /** 是否缓存菜单结构。 */
+  menuCacheEnabled?: boolean | null
+  /** 菜单缓存 TTL，单位秒。 */
+  menuCacheTtlSeconds?: string | number | null
 }
 
 export interface BiPortalMenuResourceLike {
+  /** 菜单 key。 */
   menuKey?: unknown
+  /** 父菜单 key，空值表示一级菜单。 */
+  parentMenuKey?: unknown
+  /** 菜单标题。 */
+  title?: unknown
+  /** 菜单可见性和扩展配置，例如 iconKey。 */
+  visibility?: Record<string, unknown> | null
+  /** 菜单排序值。 */
   sortOrder?: unknown
 }
 
 export interface BiPortalResourceLike {
+  /** 门户主题、导航和品牌化配置。 */
   theme?: Record<string, unknown> | null
+  /** 门户菜单资源树。 */
   menus?: BiPortalMenuResourceLike[] | null
+}
+
+export interface BiPortalMenuConfigPatchLike {
+  /** 菜单标题补丁。 */
+  title?: string | null
+  /** 父菜单 key 补丁。 */
+  parentMenuKey?: string | null
+  /** 菜单图标 key 补丁，写入 visibility.iconKey。 */
+  iconKey?: string | null
+}
+
+export type BiPortalMenuDropPosition = 'before' | 'after' | 'inside'
+
+export interface BiChartReferenceResourceLike {
+  /** 图表资源 key。 */
+  chartKey?: string | null
+  /** 图表绑定的数据集 key。 */
+  datasetKey?: string | null
+  /** 图表查询字段快照，用于展示引用影响摘要。 */
+  query?: {
+    dimensions?: string[] | null
+    metrics?: string[] | null
+  } | null
+}
+
+export interface BiChartReferenceDashboardLike {
+  /** 仪表盘 key。 */
+  dashboardKey: string
+  /** 仪表盘标题。 */
+  title?: string | null
+  /** 仪表盘内可能引用图表的组件列表。 */
+  widgets?: Array<{
+    widgetKey: string
+    title?: string | null
+    chartKey?: string | null
+    resourceType?: string | null
+    resourceKey?: string | null
+  }> | null
+}
+
+export interface BiChartReferencePortalLike {
+  /** 门户 key。 */
+  portalKey: string
+  /** 门户名称。 */
+  name?: string | null
+  /** 门户内可能引用图表的菜单列表。 */
+  menus?: Array<{
+    menuKey: string
+    title?: string | null
+    resourceType?: string | null
+    resourceKey?: string | null
+  }> | null
+}
+
+export interface BiChartReferenceSubscriptionLike {
+  /** 订阅 key。 */
+  subscriptionKey: string
+  /** 订阅名称。 */
+  name?: string | null
+  /** 订阅目标资源类型。 */
+  resourceType?: string | null
+  /** 订阅目标资源 key。 */
+  resourceKey?: string | null
+}
+
+export interface BiChartReferenceImpactInputLike {
+  dashboards?: BiChartReferenceDashboardLike[] | null
+  portals?: BiChartReferencePortalLike[] | null
+  subscriptions?: BiChartReferenceSubscriptionLike[] | null
+}
+
+export interface BiChartReferenceImpactViewLike {
+  dashboards?: Array<{
+    dashboardKey: string
+    title?: string | null
+    widgetKey: string
+    widgetTitle?: string | null
+  }> | null
+  portals?: Array<{
+    portalKey: string
+    name?: string | null
+    menuKey: string
+    menuTitle?: string | null
+  }> | null
+  subscriptions?: Array<{
+    subscriptionKey: string
+    name?: string | null
+  }> | null
+}
+
+export interface BiChartQueryDesignerInputLike {
+  datasetKey: string
+  selectedDimensions?: string[] | null
+  selectedMetrics?: string[] | null
+  filterField?: string | null
+  filterOperator?: string | null
+  filterValue?: string | null
+  sortField?: string | null
+  sortDirection?: string | null
+  limit?: number | string | null
+}
+
+export interface BiChartQueryPatchLike {
+  datasetKey: string
+  dimensions: string[]
+  metrics: string[]
+  filters: BiQueryRequest['filters']
+  sorts: BiQueryRequest['sorts']
+  limit: number
+}
+
+export interface BiChartQueryFieldStateLike {
+  dimensions: string[]
+  metrics: string[]
 }
 
 export type BiBigScreenLayoutDirection = 'left' | 'right' | 'up' | 'down'
@@ -404,6 +679,12 @@ export interface BiSpreadsheetDraftResourceLike {
 
 export type BiSpreadsheetPivotAggregation = 'SUM' | 'COUNT' | 'AVERAGE' | 'MIN' | 'MAX'
 
+export interface BiSpreadsheetPivotValueFieldInputLike {
+  field: string
+  aggregation?: BiSpreadsheetPivotAggregation | string | null
+  label?: string | null
+}
+
 export interface BiSpreadsheetPivotTableInputLike {
   sourceRange: string
   targetCell: string
@@ -411,6 +692,7 @@ export interface BiSpreadsheetPivotTableInputLike {
   columnField: string
   valueField: string
   aggregation?: BiSpreadsheetPivotAggregation | string | null
+  valueFields?: BiSpreadsheetPivotValueFieldInputLike[] | null
 }
 
 export type BiSqlDatasetParameterDataType = 'STRING' | 'NUMBER' | 'DATE' | 'DATETIME' | 'BOOLEAN' | 'PERCENT'
@@ -471,6 +753,86 @@ export interface BiSqlDatasetDraftInputLike {
   metrics?: BiSqlDatasetMetricDraftLike[] | null
 }
 
+export interface BiSqlDatasetSampleColumnLike {
+  key: string
+  role?: string | null
+  dataType?: string | null
+}
+
+export interface BiSqlDatasetSampleProfileInputLike {
+  columns?: BiSqlDatasetSampleColumnLike[] | null
+  rows?: Array<Record<string, unknown>> | null
+  rowCount?: number | null
+  sampleLimit?: number | null
+  sampleExecuted?: boolean | null
+}
+
+export interface BiSqlDatasetSampleProfileRow {
+  key: string
+  field: string
+  role: string
+  dataType: string
+  filled: string
+  unique: string
+  samples: string
+}
+
+export interface BiSqlDatasetLineageLike {
+  dataSourceConfigId?: number | null
+  sourceTables?: string[] | null
+  parameterKeys?: string[] | null
+  tenantColumn?: string | null
+  referencedFields?: string[] | null
+  referencedMetrics?: string[] | null
+  approvalRequired?: boolean | null
+}
+
+export interface BiSqlDatasetImpactLike {
+  impactedAssetTypes?: string[] | null
+  governanceGates?: string[] | null
+  warnings?: string[] | null
+}
+
+export interface BiSqlDatasetImpactInputLike {
+  datasetKey?: string | null
+  lineage?: BiSqlDatasetLineageLike | null
+  impact?: BiSqlDatasetImpactLike | null
+}
+
+export interface BiSqlDatasetImpactRow {
+  key: string
+  label: string
+  value: string
+}
+
+export type BiSqlDatasetReadinessStatus = 'pass' | 'warn' | 'block'
+
+export interface BiSqlDatasetReadinessPreviewLike extends BiSqlDatasetSampleProfileInputLike {
+  compiledSql?: string | null
+  parameterCount?: number | null
+  executionError?: string | null
+  lineage?: BiSqlDatasetLineageLike | null
+  impact?: BiSqlDatasetImpactLike | null
+}
+
+export interface BiSqlDatasetReadinessInputLike {
+  draft?: {
+    fields?: BiSqlDatasetFieldDraftLike[] | null
+    metrics?: BiSqlDatasetMetricDraftLike[] | null
+    tenantColumn?: string | null
+  } | null
+  parameters?: BiSqlDatasetParameterResolvedLike[] | null
+  preview?: BiSqlDatasetReadinessPreviewLike | null
+}
+
+export interface BiSqlDatasetReadinessRow {
+  key: string
+  label: string
+  status: BiSqlDatasetReadinessStatus
+  statusLabel: string
+  detail: string
+}
+
 export interface BiBigScreenResourceLike extends BiBigScreenResourceOptionLike {
   description?: string | null
   size?: Record<string, unknown> | null
@@ -515,6 +877,25 @@ export interface BiEditorSummaryRow {
   value: string
 }
 
+export type BiVisualEditorDiagnosticStatus = 'pass' | 'warn' | 'block'
+
+export interface BiVisualEditorDiagnosticRow {
+  key: string
+  label: string
+  status: BiVisualEditorDiagnosticStatus
+  statusLabel: string
+  detail: string
+}
+
+interface BiSpreadsheetVisualStats {
+  cellCount: number
+  formulaCount: number
+  errorCount: number
+  styleCount: number
+  pivotTableCount: number
+  conditionalFormatCount: number
+}
+
 export interface BiExportApprovalReviewCommandLike {
   status: 'APPROVED' | 'REJECTED'
   reviewComment: string | null
@@ -525,10 +906,13 @@ export interface BiExportAuditJobLike {
   resourceKey?: string | null
   resourceId?: number | null
   exportFormat?: string | null
+  rowLimit?: number | null
   status?: string | null
   progressPercent?: number | null
   storageProvider?: string | null
   storageKey?: string | null
+  retentionDays?: number | null
+  expiresAt?: string | null
   downloadCount?: number | null
   lastDownloadedAt?: string | null
   approvalStatus?: string | null
@@ -537,8 +921,15 @@ export interface BiExportAuditJobLike {
   reviewedBy?: string | null
   retryCount?: number | null
   maxRetryCount?: number | null
+  retryExhaustedAt?: string | null
   createdBy?: string | null
   createdAt?: string | null
+  storageLayout?: string | null
+  requestedRows?: number | null
+  generatedRows?: number | null
+  partCount?: number | null
+  partSize?: number | null
+  partStorageKeys?: string[] | null
 }
 
 export interface BiExportAuditRequestLike {
@@ -553,11 +944,48 @@ export interface BiExportAuditRequestLike {
 export interface BiExportAuditDetailLike {
   job?: BiExportAuditJobLike | null
   request?: BiExportAuditRequestLike | null
+  partition?: BiExportAuditPartitionLike | null
 }
 
 export interface BiExportAuditDetailRow {
   label: string
   value: string
+}
+
+export type BiExportHardeningDiagnosticStatus = 'pass' | 'warn' | 'block'
+
+export interface BiExportHardeningDiagnosticRow {
+  key: string
+  label: string
+  status: BiExportHardeningDiagnosticStatus
+  statusLabel: string
+  detail: string
+}
+
+export type BiAlertAnomalyDiagnosticStatus = 'pass' | 'warn' | 'block'
+
+export interface BiAlertAnomalyDiagnosticRuleLike {
+  alertKey?: string | null
+  name?: string | null
+  enabled?: boolean | null
+  condition?: Record<string, unknown> | null
+}
+
+export interface BiAlertAnomalyDiagnosticRow {
+  key: string
+  label: string
+  status: BiAlertAnomalyDiagnosticStatus
+  statusLabel: string
+  detail: string
+}
+
+export interface BiExportAuditPartitionLike {
+  storageLayout?: string | null
+  requestedRows?: number | null
+  generatedRows?: number | null
+  partCount?: number | null
+  partSize?: number | null
+  partStorageKeys?: string[] | null
 }
 
 export interface BiQueryHistoryDetailLike {
@@ -934,6 +1362,8 @@ export interface BiDatasourceHealthSourceSloLike {
   availabilityRate?: number | null
   lastCheckedAt?: string | null
   lastMessage?: string | null
+  riskLevel?: string | null
+  recommendedAction?: string | null
 }
 
 export interface BiDatasourceHealthSloLike {
@@ -976,6 +1406,25 @@ export interface BiDatasourceConnectorRow {
   capabilities: string
 }
 
+export interface BiDatasourceCapacityPolicyRow {
+  key: string
+  connector: string
+  capacityPool: string
+  budget: string
+  eligibility: string
+  guardrails: string
+}
+
+export interface BiDatasourceAdvancedCapabilityRow {
+  key: string
+  connector: string
+  quickEngine: string
+  crossSourceModeling: string
+  selfService: string
+  semanticAuthoring: string
+  risk: string
+}
+
 export interface BiDatasourceOnboardingLike {
   id?: number | null
   sourceKey?: string | null
@@ -1004,6 +1453,14 @@ export interface BiDatasourceOnboardingRow {
   connection: string
   schema: string
   credential: string
+}
+
+export interface BiDatasourceNextActionRow {
+  key: string
+  source: string
+  readiness: string
+  nextAction: string
+  limitations: string
 }
 
 export interface BiDatasourceOnboardingDraftInputLike {
@@ -1147,6 +1604,8 @@ export interface BiDatasourceMultiTableJoinInputLike {
     operator?: string | null
     connector?: string | null
     rightColumn?: string | null
+    groupStart?: boolean | null
+    groupEnd?: boolean | null
   }> | null
 }
 
@@ -1185,6 +1644,8 @@ export interface BiDatasourceMultiTableDatasetCommandLike {
       operator?: string
       connector?: string
       rightColumn: string
+      groupStart?: boolean
+      groupEnd?: boolean
     }>
   }>
   graph: {
@@ -1196,6 +1657,16 @@ export interface BiDatasourceMultiTableDatasetCommandLike {
       y: number
     }>
   }
+}
+
+export type BiDatasourceRelationshipDiagnosticStatus = 'pass' | 'warn' | 'block'
+
+export interface BiDatasourceRelationshipDiagnosticRow {
+  key: string
+  label: string
+  status: BiDatasourceRelationshipDiagnosticStatus
+  statusLabel: string
+  detail: string
 }
 
 export interface BiQueryExecutionPlanLike {
@@ -1516,10 +1987,12 @@ export function getBiSection(key: string | null | undefined): BiWorkbenchSection
   return BI_WORKBENCH_SECTIONS.find(section => section.key === key) ?? BI_WORKBENCH_SECTIONS[0]
 }
 
+/** 生成从营销画布跳转到 BI 效果仪表盘的入口地址。 */
 export function canvasBiEntrypoint(canvasId: number | string): string {
   return `/bi?dashboard=canvas-effect&canvasId=${canvasId}`
 }
 
+/** 根据仪表盘预设和运行态参数组装嵌入 ticket 申请载荷。 */
 export function buildEmbedTicketRequest(
   preset: BiDashboardPresetLike,
   canvasId?: string | null,
@@ -1534,6 +2007,7 @@ export function buildEmbedTicketRequest(
   ttlSeconds: number
   maxAccessCount: number
 } {
+  // 将全局参数和控件值固化进 ticket，避免嵌入页依赖外部 URL 状态。
   const parameters = buildEmbedTicketParameters(preset, runtimeParameters)
   return {
     resourceType: 'DASHBOARD',
@@ -1546,6 +2020,32 @@ export function buildEmbedTicketRequest(
   }
 }
 
+/** 预览即将固化到嵌入 ticket 的资源、运行态过滤和全局参数。 */
+export function buildEmbedTicketPreviewRows(
+  preset: BiDashboardPresetLike,
+  canvasId?: string | null,
+  scope = 'INTERNAL_CANVAS',
+  runtimeParameters?: BiDashboardRuntimeParameters | null,
+): BiEmbedTicketPreviewRow[] {
+  const request = buildEmbedTicketRequest(preset, canvasId, scope, runtimeParameters)
+  return [
+    { key: 'resource', label: '资源', value: `${request.resourceType} / ${request.resourceKey}` },
+    { key: 'scope', label: '范围', value: request.scope },
+    { key: 'ttl', label: '有效期', value: `${request.ttlSeconds} 秒` },
+    ...Object.entries(request.filters).map(([key, value]) => ({
+      key: `filter:${key}`,
+      label: `过滤 ${key}`,
+      value,
+    })),
+    ...Object.entries(request.parameters ?? {}).map(([key, value]) => ({
+      key: `parameter:${key}`,
+      label: `参数 ${key}`,
+      value,
+    })),
+  ]
+}
+
+/** 将单个仪表盘组件转换为后端 BI 查询请求。 */
 export function buildWidgetQueryRequest(
   preset: BiDashboardPresetLike,
   widget: BiDashboardWidgetPreset,
@@ -1553,8 +2053,10 @@ export function buildWidgetQueryRequest(
   runtimeParametersOrLimit?: BiDashboardRuntimeParameters | number | null,
   limit = 500,
 ): BiQueryRequest {
+  // 兼容历史调用：第四个参数既可能是运行态参数，也可能直接是 limit。
   const runtimeParameters = typeof runtimeParametersOrLimit === 'number' ? null : runtimeParametersOrLimit
   const effectiveLimit = typeof runtimeParametersOrLimit === 'number' ? runtimeParametersOrLimit : limit
+  // 合并画布过滤、控件参数和组件作用域，保证查询只取当前业务上下文。
   const filters = buildDashboardRuntimeFilters(preset, canvasId, runtimeParameters, widget.widgetKey)
   return {
     datasetKey: preset.datasetKey,
@@ -1569,6 +2071,7 @@ export function buildWidgetQueryRequest(
   }
 }
 
+/** 根据组件交互规则和点击行数据生成钻取、联动或超链接目标。 */
 export function buildDashboardInteractionTarget(
   preset: BiDashboardPresetLike,
   interaction: BiDashboardInteractionPreset,
@@ -1579,6 +2082,7 @@ export function buildDashboardInteractionTarget(
   } = {},
 ): string | null {
   if (interaction.interactionType === 'HYPERLINK') {
+    // 超链接允许使用行字段模板，并附加当前画布和运行态参数上下文。
     const target = interaction.target?.trim()
     if (!target) return null
     const templatedTarget = replaceInteractionTemplate(target, row)
@@ -1594,6 +2098,7 @@ export function buildDashboardInteractionTarget(
   }
 
   const params = new URLSearchParams()
+  // 仪表盘内钻取统一回到 BI 页面，由 URL 参数恢复过滤状态。
   params.set('dashboard', preset.dashboardKey)
   appendInteractionParameter(params, 'canvasId', options.canvasId)
   appendInteractionParameter(params, 'widget', interaction.targetWidgetKey)
@@ -1605,6 +2110,7 @@ export function buildDashboardInteractionTarget(
   return `/bi?${params.toString()}`
 }
 
+/** 构造查询控件候选项请求，包含父级级联控件的过滤条件。 */
 export function buildDashboardControlOptionQuery(
   preset: BiDashboardPresetLike,
   filterKey: string,
@@ -1617,6 +2123,7 @@ export function buildDashboardControlOptionQuery(
     throw new Error(`Unknown dashboard filter: ${filterKey}`)
   }
 
+  // 候选项查询只取控件字段，并把画布上下文作为基础过滤。
   const optionFieldKey = targetFilter.optionFieldKey ?? targetFilter.fieldKey
   const filters = canvasIdQueryFilter(canvasId)
     ? [canvasIdQueryFilter(canvasId) as BiQueryRequest['filters'][number]]
@@ -1628,6 +2135,7 @@ export function buildDashboardControlOptionQuery(
       continue
     }
     const value = dashboardRuntimeValueForFilter(preset, runtimeParameters, parentFilter)
+    // 级联父控件字段可能需要映射到候选项数据集中的字段。
     const parentOptionField = mappedCascadeParentField(targetFilter.cascade, parentFilter)
     const queryFilter = toRuntimeQueryFilter({ ...parentFilter, fieldKey: parentOptionField }, value)
     if (queryFilter) filters.push(queryFilter)
@@ -1644,11 +2152,13 @@ export function buildDashboardControlOptionQuery(
   }
 }
 
+/** 在自助分析字段槽中添加字段，并保证维度和指标互斥。 */
 export function dropSelfServiceExtractionField(
   state: SelfServiceExtractionState,
   role: 'DIMENSION' | 'METRIC',
   fieldKey: string,
 ): SelfServiceExtractionState {
+  // 先归一化已有状态，避免空字段或重复拖拽污染查询请求。
   const normalized = fieldKey.trim()
   if (!normalized) return normalizeExtractionState(state)
   const current = normalizeExtractionState(state)
@@ -1664,6 +2174,7 @@ export function dropSelfServiceExtractionField(
   }
 }
 
+/** 从自助分析字段槽中移除指定字段。 */
 export function removeSelfServiceExtractionField(
   state: SelfServiceExtractionState,
   role: 'DIMENSION' | 'METRIC',
@@ -1676,6 +2187,7 @@ export function removeSelfServiceExtractionField(
     : { ...current, metrics: current.metrics.filter(field => field !== normalized) }
 }
 
+/** 将自助分析字段选择转换为 BI 查询请求。 */
 export function buildSelfServiceExtractionQuery(
   preset: BiDashboardPresetLike,
   state: SelfServiceExtractionState,
@@ -1683,6 +2195,7 @@ export function buildSelfServiceExtractionQuery(
   runtimeParametersOrLimit?: BiDashboardRuntimeParameters | number | null,
   limit = 500,
 ): BiQueryRequest {
+  // 自助分析与仪表盘组件共用运行态过滤，保证预览结果与仪表盘上下文一致。
   const current = normalizeExtractionState(state)
   const runtimeParameters = typeof runtimeParametersOrLimit === 'number' ? null : runtimeParametersOrLimit
   const effectiveLimit = typeof runtimeParametersOrLimit === 'number' ? runtimeParametersOrLimit : limit
@@ -1700,23 +2213,26 @@ export function buildSelfServiceExtractionQuery(
   }
 }
 
+/** 从 URLSearchParams 中提取仪表盘运行态参数，兼容 filterKey、fieldKey 和全局别名。 */
 export function dashboardRuntimeParametersFromSearchParams(
   preset: BiDashboardPresetLike,
   searchParams: URLSearchParams,
 ): BiDashboardRuntimeParameters {
   const result: BiDashboardRuntimeParameters = {}
   for (const filter of preset.filters) {
+    // 控件 key 优先，字段 key 作为历史或外部链接兼容入口。
     const valueByFilterKey = searchParamValue(searchParams, filter.filterKey)
     if (valueByFilterKey != null) {
-      result[filter.filterKey] = valueByFilterKey
+      result[filter.filterKey] = dashboardRuntimeControlParameterValue(filter, searchParamRuntimeRawValue(valueByFilterKey))
       continue
     }
     const valueByFieldKey = searchParamValue(searchParams, filter.fieldKey)
     if (valueByFieldKey != null) {
-      result[filter.fieldKey] = valueByFieldKey
+      result[filter.fieldKey] = dashboardRuntimeControlParameterValue(filter, searchParamRuntimeRawValue(valueByFieldKey))
     }
   }
   for (const parameter of dashboardGlobalParameters(preset)) {
+    // 全局参数可能存在多个别名，需要镜像到所有候选 key。
     const value = searchParamValueByKeys(searchParams, globalParameterCandidateKeys(parameter))
     if (value != null) {
       mirrorGlobalParameterValue(result, parameter, value)
@@ -1742,6 +2258,7 @@ export function dashboardRuntimeParametersFromEmbedPayload(
   rememberedParametersOrToday?: BiDashboardRuntimeParameters | Date | null,
   today = new Date(),
 ): BiDashboardRuntimeParameters {
+  // 兼容旧签名：第三个参数可传 today，也可传记住的运行态参数。
   const rememberedParameters = rememberedParametersOrToday instanceof Date
     ? null
     : rememberedParametersOrToday ?? null
@@ -1749,6 +2266,7 @@ export function dashboardRuntimeParametersFromEmbedPayload(
   return resolveDashboardRuntimeParameters(preset, embedTicketPayloadSearchParams(payload), rememberedParameters, effectiveToday)
 }
 
+/** 按 URL 显式值、记住条件、默认值、已有全局值的优先级解析运行态参数。 */
 export function resolveDashboardRuntimeParameters(
   preset: BiDashboardPresetLike,
   searchParams: URLSearchParams,
@@ -1758,6 +2276,7 @@ export function resolveDashboardRuntimeParameters(
   const explicitParameters = dashboardRuntimeParametersFromSearchParams(preset, searchParams)
   const result: BiDashboardRuntimeParameters = {}
   for (const filter of preset.filters) {
+    // 单个控件值优先从 URL 恢复，其次使用用户记住条件，最后落默认值。
     const explicitValue = explicitParameters[filter.filterKey] ?? explicitParameters[filter.fieldKey]
     if (explicitValue != null) {
       result[filter.filterKey] = explicitValue
@@ -1774,6 +2293,7 @@ export function resolveDashboardRuntimeParameters(
     }
   }
   for (const parameter of dashboardGlobalParameters(preset)) {
+    // 全局参数需要与绑定控件双向镜像，避免别名和 filterKey 出现分裂。
     const explicitValue = dashboardRuntimeValueForGlobalParameter(parameter, explicitParameters)
     const rememberedValue = dashboardRuntimeValueForGlobalParameter(parameter, rememberedParameters)
     const existingFilterValue = dashboardRuntimeValueForGlobalParameter(parameter, result)
@@ -1800,6 +2320,7 @@ export function dashboardRuntimeStateRows(
   clearedParameterKeys: string[] = [],
   today = new Date(),
 ): BiDashboardRuntimeStateRow[] {
+  // 被清除的参数要先从有效 URL 中剔除，同时保留原值用于展示“已清除”来源。
   const clearedAliases = new Set(clearedParameterKeys.flatMap(key => dashboardRuntimeSearchParamAliases(preset, key)))
   let effectiveSearchParams = new URLSearchParams(searchParams)
   for (const key of clearedParameterKeys) {
@@ -1808,6 +2329,7 @@ export function dashboardRuntimeStateRows(
   const explicitParameters = dashboardRuntimeParametersFromSearchParams(preset, effectiveSearchParams)
   const originalExplicitParameters = dashboardRuntimeParametersFromSearchParams(preset, searchParams)
   return preset.filters.map(filter => {
+    // UI 行聚合当前控件最终生效值及其来源，便于用户判断覆盖关系。
     const explicitValue = dashboardRuntimeValueForFilter(preset, explicitParameters, filter)
     const rememberedValue = dashboardRuntimeValueForFilter(preset, rememberedParameters, filter)
     const defaultValue = defaultRuntimeParameterValue(filter.defaultValue, today)
@@ -1912,11 +2434,13 @@ export function updateDashboardRuntimeParameters(
   const filter = preset.filters.find(item => item.filterKey === filterKey || item.fieldKey === filterKey)
   if (!filter) return { ...(currentParameters ?? {}) }
   const globalParameter = dashboardGlobalParameterForFilter(preset, filter)
+  // 锁定的全局参数已有值时，普通控件不能覆盖它。
   if (globalParameter?.locked && dashboardRuntimeValueForGlobalParameter(globalParameter, currentParameters) != null) {
     return { ...(currentParameters ?? {}) }
   }
   const next = { ...(currentParameters ?? {}) }
   const value = dashboardRuntimeControlParameterValue(filter, rawValue)
+  // 删除 fieldKey 旧值，统一以 filterKey 作为当前控件的主存储 key。
   delete next[filter.fieldKey]
   if (value == null) {
     delete next[filter.filterKey]
@@ -1926,6 +2450,29 @@ export function updateDashboardRuntimeParameters(
   next[filter.filterKey] = value
   if (globalParameter) mirrorGlobalParameterValue(next, globalParameter, value)
   return next
+}
+
+export function buildDashboardRuntimeStateCommand(
+  preset: BiDashboardPresetLike,
+  runtimeParameters: BiDashboardRuntimeParameters | null | undefined,
+): BiDashboardRuntimeStateCommand {
+  const parameters: Record<string, unknown> = {}
+  for (const filter of preset.filters) {
+    const value = persistedRuntimeParameterValue(dashboardRuntimeValueForFilter(preset, runtimeParameters, filter))
+    if (value == null) continue
+    parameters[filter.filterKey] = value
+    const globalParameter = dashboardGlobalParameterForFilter(preset, filter)
+    if (globalParameter?.parameterKey?.trim()) {
+      parameters[globalParameter.parameterKey.trim()] = value
+    }
+  }
+  for (const parameter of dashboardGlobalParameters(preset)) {
+    const parameterKey = parameter.parameterKey.trim()
+    if (!parameterKey || parameters[parameterKey] != null) continue
+    const value = persistedRuntimeParameterValue(dashboardRuntimeValueForGlobalParameter(parameter, runtimeParameters))
+    if (value != null) parameters[parameterKey] = value
+  }
+  return { parameters }
 }
 
 function buildDashboardRuntimeFilters(
@@ -2146,6 +2693,26 @@ function dashboardRuntimeControlParameterValue(
   return trimmed
 }
 
+function persistedRuntimeParameterValue(value: BiDashboardRuntimeParameterValue): unknown {
+  if (value == null) return null
+  if (Array.isArray(value)) {
+    const items = value
+      .map(item => persistedRuntimeScalarValue(item))
+      .filter((item): item is string | number | boolean => item != null)
+    return items.length > 0 ? items : null
+  }
+  return persistedRuntimeScalarValue(value)
+}
+
+function persistedRuntimeScalarValue(value: string | number | boolean | null | undefined): string | number | boolean | null {
+  if (value == null) return null
+  if (typeof value === 'string') {
+    const trimmed = value.trim()
+    return trimmed || null
+  }
+  return value
+}
+
 function replaceInteractionTemplate(
   target: string,
   row?: Record<string, unknown> | null,
@@ -2255,6 +2822,10 @@ function searchParamValue(
   return values.length === 1 ? values[0] : values
 }
 
+function searchParamRuntimeRawValue(value: string | string[]): string {
+  return Array.isArray(value) ? value.join(',') : value
+}
+
 function defaultRuntimeParameterValue(
   defaultValue: string | null | undefined,
   today: Date,
@@ -2310,6 +2881,160 @@ export function toMarketingDatasetPreset(dataset: BiDatasetMetadataLike): Market
 
 export function chartLabel(chartType: string): string {
   return QUICKBI_CHART_PALETTE.find(chart => chart.key === chartType)?.label ?? chartType
+}
+
+/** 汇总图表被仪表盘、门户和订阅引用的影响范围，供发布/编辑前提示使用。 */
+export function chartReferenceImpactSummary(
+  chart: BiChartReferenceResourceLike | null | undefined,
+  impact: BiChartReferenceImpactInputLike = {},
+): string {
+  // 先展示图表本身的数据集和字段规模，即使没有引用信息也能给出基础影响。
+  const chartKey = chart?.chartKey?.trim()
+  const datasetKey = chart?.datasetKey?.trim() || '-'
+  const dimensionCount = chart?.query?.dimensions?.length ?? 0
+  const metricCount = chart?.query?.metrics?.length ?? 0
+  const parts = [`引用影响：数据集 ${datasetKey} · ${dimensionCount} 维度 · ${metricCount} 指标`]
+
+  if (!chartKey) return parts[0]
+
+  // 从本地或服务端影响数据中提取实际命中的资源引用。
+  const dashboardReferences = (impact.dashboards ?? []).flatMap(dashboard =>
+    (dashboard.widgets ?? [])
+      .filter(widget => chartReferenceMatches(widget, chartKey))
+      .map(widget => `${dashboard.title?.trim() || dashboard.dashboardKey}/${widget.title?.trim() || widget.widgetKey}`),
+  )
+  const portalReferences = (impact.portals ?? []).flatMap(portal =>
+    (portal.menus ?? [])
+      .filter(menu => chartReferenceMatches(menu, chartKey))
+      .map(menu => `${portal.name?.trim() || portal.portalKey}/${menu.title?.trim() || menu.menuKey}`),
+  )
+  const subscriptionReferences = (impact.subscriptions ?? [])
+    .filter(subscription => chartReferenceMatches(subscription, chartKey))
+    .map(subscription => subscription.name?.trim() || subscription.subscriptionKey)
+
+  if (dashboardReferences.length > 0) {
+    parts.push(`仪表板 ${dashboardReferences.join('、')}`)
+  }
+  if (portalReferences.length > 0) {
+    parts.push(`门户 ${portalReferences.join('、')}`)
+  }
+  if (subscriptionReferences.length > 0) {
+    parts.push(`订阅 ${subscriptionReferences.join('、')}`)
+  }
+
+  return parts.join(' · ')
+}
+
+/** 将后端扁平化的图表引用影响结构转换为本地摘要函数可消费的形态。 */
+export function chartReferenceImpactSummaryFromImpact(
+  chart: BiChartReferenceResourceLike | null | undefined,
+  impact: BiChartReferenceImpactViewLike | null | undefined,
+): string {
+  const chartKey = chart?.chartKey ?? ''
+  if (!impact) {
+    // 服务端影响接口失败时退化为只展示图表自身信息。
+    return chartReferenceImpactSummary(chart)
+  }
+  return chartReferenceImpactSummary(chart, {
+    dashboards: (impact.dashboards ?? []).map(reference => ({
+      dashboardKey: reference.dashboardKey,
+      title: reference.title,
+      widgets: [{
+        widgetKey: reference.widgetKey,
+        title: reference.widgetTitle,
+        chartKey,
+      }],
+    })),
+    portals: (impact.portals ?? []).map(reference => ({
+      portalKey: reference.portalKey,
+      name: reference.name,
+      menus: [{
+        menuKey: reference.menuKey,
+        title: reference.menuTitle,
+        resourceType: 'CHART',
+        resourceKey: chartKey,
+      }],
+    })),
+    subscriptions: (impact.subscriptions ?? []).map(reference => ({
+      subscriptionKey: reference.subscriptionKey,
+      name: reference.name,
+      resourceType: 'CHART',
+      resourceKey: chartKey,
+    })),
+  })
+}
+
+/** 把图表设计器草稿转换为后端图表查询 patch。 */
+export function chartQueryPatchFromDesigner(input: BiChartQueryDesignerInputLike): BiChartQueryPatchLike {
+  // 对用户输入做最小归一化，确保请求中没有空字段和重复字段。
+  const filterField = input.filterField?.trim() ?? ''
+  const filterOperator = normalizeQueryFilterOperator(input.filterOperator)
+  const filterValue = input.filterValue?.trim() ?? ''
+  const sortField = input.sortField?.trim() ?? ''
+  const sortDirection = input.sortDirection?.trim().toUpperCase() === 'ASC' ? 'ASC' : 'DESC'
+  return {
+    datasetKey: input.datasetKey.trim(),
+    dimensions: uniqueTrimmed(input.selectedDimensions ?? []),
+    metrics: uniqueTrimmed(input.selectedMetrics ?? []),
+    // IN/BETWEEN 过滤值需要拆分为数组，其它运算符保持原始标量。
+    filters: filterField && filterValue
+      ? [{ field: filterField, operator: filterOperator, value: parseChartFilterValue(filterOperator, filterValue) }]
+      : [],
+    sorts: sortField ? [{ field: sortField, direction: sortDirection }] : [],
+    limit: Math.max(1, Number(input.limit) || 100),
+  }
+}
+
+/** 处理图表字段拖放后的维度/指标状态，保证字段唯一。 */
+export function chartQueryFieldsAfterDrop(
+  state: BiChartQueryFieldStateLike,
+  role: 'DIMENSION' | 'METRIC',
+  fieldKey: string,
+): BiChartQueryFieldStateLike {
+  // 空字段拖放直接忽略，避免生成不可执行的查询字段。
+  const normalized = fieldKey.trim()
+  if (!normalized) return state
+  return role === 'DIMENSION'
+    ? { ...state, dimensions: appendUnique(state.dimensions, normalized) }
+    : { ...state, metrics: appendUnique(state.metrics, normalized) }
+}
+
+/** 将图表过滤输入文本转换为后端查询值。 */
+function parseChartFilterValue(operator: string, value: string): unknown {
+  if (operator === 'IN') {
+    return uniqueTrimmed(value.split(','))
+  }
+  if (operator === 'BETWEEN') {
+    return value.split(',').map(item => item.trim()).filter(Boolean).slice(0, 2)
+  }
+  return value
+}
+
+/** 归一化图表过滤运算符，避免任意字符串进入 BiQueryRequest。 */
+function normalizeQueryFilterOperator(operator: string | null | undefined): BiQueryRequest['filters'][number]['operator'] {
+  const normalized = operator?.trim().toUpperCase()
+  if (
+    normalized === 'NEQ'
+    || normalized === 'GT'
+    || normalized === 'GTE'
+    || normalized === 'LT'
+    || normalized === 'LTE'
+    || normalized === 'IN'
+    || normalized === 'BETWEEN'
+    || normalized === 'CONTAINS'
+  ) {
+    return normalized
+  }
+  return 'EQ'
+}
+
+/** 判断仪表盘组件、门户菜单或订阅是否引用了指定图表。 */
+function chartReferenceMatches(
+  reference: { chartKey?: string | null, resourceType?: string | null, resourceKey?: string | null },
+  chartKey: string,
+): boolean {
+  if (reference.chartKey?.trim() === chartKey) return true
+  return reference.resourceType?.trim().toUpperCase() === 'CHART' && reference.resourceKey?.trim() === chartKey
 }
 
 export function controlLabel(controlType: string): string {
@@ -3633,15 +4358,21 @@ export function buildSpreadsheetPivotTable<T extends BiSpreadsheetResourceLike>(
   const currentCells = {
     ...((currentSheet.cells && typeof currentSheet.cells === 'object') ? currentSheet.cells as Record<string, unknown> : {}),
   }
+  const evaluatedCells = evaluateSpreadsheetCells(currentCells)
   const sourceCells = spreadsheetCellRangeFromText(input.sourceRange)
   const sourceRows = spreadsheetCellRows(sourceCells)
   const headerCells = sourceRows[0] ?? []
-  const headers = headerCells.map(cellKey => String(currentCells[cellKey] ?? '').trim())
+  const headers = headerCells.map(cellKey => String(evaluatedCells[cellKey] ?? '').trim())
   const rowFieldIndex = headers.findIndex(header => header === input.rowField.trim())
   const columnFieldIndex = headers.findIndex(header => header === input.columnField.trim())
-  const valueFieldIndex = headers.findIndex(header => header === input.valueField.trim())
+  const valueFields = normalizeSpreadsheetPivotValueFields(input)
+    .map(valueField => ({
+      ...valueField,
+      index: headers.findIndex(header => header === valueField.field),
+    }))
+    .filter((valueField): valueField is BiSpreadsheetPivotValueFieldInputLike & { field: string; aggregation: BiSpreadsheetPivotAggregation; label: string; index: number } => valueField.index >= 0)
   const target = parseSpreadsheetCellKey(input.targetCell)
-  if (!target || rowFieldIndex < 0 || columnFieldIndex < 0 || valueFieldIndex < 0) {
+  if (!target || rowFieldIndex < 0 || columnFieldIndex < 0 || valueFields.length === 0) {
     sheets[sheetIndex] = currentSheet
     return { ...resource, sheets }
   }
@@ -3652,28 +4383,37 @@ export function buildSpreadsheetPivotTable<T extends BiSpreadsheetResourceLike>(
   const buckets = new Map<string, unknown[]>()
 
   for (const row of sourceRows.slice(1)) {
-    const rowLabel = String(currentCells[row[rowFieldIndex]] ?? '').trim()
-    const columnLabel = String(currentCells[row[columnFieldIndex]] ?? '').trim()
+    const rowLabel = String(evaluatedCells[row[rowFieldIndex]] ?? '').trim()
+    const columnLabel = String(evaluatedCells[row[columnFieldIndex]] ?? '').trim()
     if (!rowLabel || !columnLabel) continue
     if (!rowLabels.includes(rowLabel)) rowLabels.push(rowLabel)
     if (!columnLabels.includes(columnLabel)) columnLabels.push(columnLabel)
     const bucketKey = `${rowLabel}\u0000${columnLabel}`
-    buckets.set(bucketKey, [...(buckets.get(bucketKey) ?? []), currentCells[row[valueFieldIndex]]])
+    const bucketValues = valueFields.map(valueField => evaluatedCells[row[valueField.index]])
+    buckets.set(bucketKey, [...(buckets.get(bucketKey) ?? []), bucketValues])
   }
 
   const cells = { ...currentCells }
   const targetColumn = target.column
   const targetRow = target.row
   cells[spreadsheetColumnName(targetColumn) + targetRow] = `${input.rowField.trim()} / ${input.columnField.trim()}`
-  columnLabels.forEach((label, index) => {
-    cells[spreadsheetColumnName(targetColumn + index + 1) + targetRow] = label
+  const multipleValueFields = valueFields.length > 1
+  columnLabels.forEach((columnLabel, columnIndex) => {
+    valueFields.forEach((valueField, valueIndex) => {
+      const outputColumn = targetColumn + columnIndex * valueFields.length + valueIndex + 1
+      cells[spreadsheetColumnName(outputColumn) + targetRow] = multipleValueFields ? `${columnLabel} ${valueField.label}` : columnLabel
+    })
   })
   rowLabels.forEach((rowLabel, rowIndex) => {
     const outputRow = targetRow + rowIndex + 1
     cells[spreadsheetColumnName(targetColumn) + outputRow] = rowLabel
     columnLabels.forEach((columnLabel, columnIndex) => {
       const values = buckets.get(`${rowLabel}\u0000${columnLabel}`) ?? []
-      cells[spreadsheetColumnName(targetColumn + columnIndex + 1) + outputRow] = evaluateSpreadsheetAggregate(aggregation, values)
+      valueFields.forEach((valueField, valueIndex) => {
+        const outputColumn = targetColumn + columnIndex * valueFields.length + valueIndex + 1
+        const metricValues = values.map(rowValues => Array.isArray(rowValues) ? rowValues[valueIndex] : rowValues)
+        cells[spreadsheetColumnName(outputColumn) + outputRow] = evaluateSpreadsheetAggregate(valueField.aggregation, metricValues)
+      })
     })
   })
 
@@ -3686,6 +4426,13 @@ export function buildSpreadsheetPivotTable<T extends BiSpreadsheetResourceLike>(
     columnField: input.columnField.trim(),
     valueField: input.valueField.trim(),
     aggregation,
+    ...(multipleValueFields ? {
+      valueFields: valueFields.map(valueField => ({
+        field: valueField.field,
+        aggregation: valueField.aggregation,
+        label: valueField.label,
+      })),
+    } : {}),
     rowLabels,
     columnLabels,
   }
@@ -3735,13 +4482,15 @@ function evaluateSpreadsheetValue(
   const expression = value.trim().slice(1).trim()
   const directReference = expression.match(/^([A-Z]+[0-9]+)$/i)
   if (directReference) return evaluateCell(directReference[1])
-  const aggregateRange = expression.match(/^(SUM|AVERAGE|MIN|MAX|COUNT)\(([A-Z]+[0-9]+):([A-Z]+[0-9]+)\)$/i)
-  if (aggregateRange) {
-    const values = spreadsheetCellRange(aggregateRange[2], aggregateRange[3])
-      .map(cellKey => evaluateCell(cellKey))
-    return evaluateSpreadsheetAggregate(aggregateRange[1], values)
+  const aggregate = expression.match(/^(SUM|AVERAGE|MIN|MAX|COUNT)\((.*)\)$/i)
+  if (aggregate) {
+    // 聚合函数支持单元格、区域、数字和嵌套算术表达式作为参数。
+    const values = spreadsheetFormulaArguments(aggregate[2], evaluateCell)
+    return evaluateSpreadsheetAggregate(aggregate[1], values)
   }
-  return value
+  // 非聚合公式兜底尝试四则运算，无法解析时保留原公式文本。
+  const arithmetic = evaluateSpreadsheetArithmeticExpression(expression, evaluateCell)
+  return arithmetic ?? value
 }
 
 function evaluateSpreadsheetAggregate(functionName: string, values: unknown[]): number {
@@ -3760,6 +4509,24 @@ function normalizeSpreadsheetPivotAggregation(value: string | null | undefined):
   return 'SUM'
 }
 
+function normalizeSpreadsheetPivotValueFields(
+  input: BiSpreadsheetPivotTableInputLike,
+): Array<{ field: string; aggregation: BiSpreadsheetPivotAggregation; label: string }> {
+  const rawValueFields = (input.valueFields ?? [])
+    .map(valueField => ({
+      field: valueField.field.trim(),
+      aggregation: normalizeSpreadsheetPivotAggregation(valueField.aggregation),
+      label: valueField.label?.trim() || valueField.field.trim(),
+    }))
+    .filter(valueField => valueField.field)
+
+  if (rawValueFields.length) return rawValueFields
+  const field = input.valueField.trim()
+  return field
+    ? [{ field, aggregation: normalizeSpreadsheetPivotAggregation(input.aggregation), label: field }]
+    : []
+}
+
 function spreadsheetNumberValue(value: unknown): number {
   return spreadsheetNumericValue(value) ?? 0
 }
@@ -3771,6 +4538,153 @@ function spreadsheetNumericValue(value: unknown): number | null {
     if (Number.isFinite(parsed)) return parsed
   }
   return null
+}
+
+function spreadsheetFormulaArguments(
+  expression: string,
+  evaluateCell: (cellKey: string) => unknown,
+): unknown[] {
+  // 参数拆分需要尊重括号层级，避免 SUM(A1,(B1+C1)) 被错误切开。
+  return splitSpreadsheetFormulaArguments(expression).flatMap(argument => {
+    const range = argument.match(/^([A-Z]+[0-9]+):([A-Z]+[0-9]+)$/i)
+    if (range) return spreadsheetCellRange(range[1], range[2]).map(cellKey => evaluateCell(cellKey))
+    const directReference = argument.match(/^([A-Z]+[0-9]+)$/i)
+    if (directReference) return [evaluateCell(directReference[1])]
+    const numberValue = spreadsheetNumericValue(argument)
+    if (numberValue != null) return [numberValue]
+    const arithmetic = evaluateSpreadsheetArithmeticExpression(argument, evaluateCell)
+    return arithmetic == null ? [argument] : [arithmetic]
+  })
+}
+
+function splitSpreadsheetFormulaArguments(expression: string): string[] {
+  const args: string[] = []
+  let depth = 0
+  let start = 0
+  for (let index = 0; index < expression.length; index += 1) {
+    const char = expression[index]
+    if (char === '(') depth += 1
+    if (char === ')') depth = Math.max(0, depth - 1)
+    if (char === ',' && depth === 0) {
+      args.push(expression.slice(start, index).trim())
+      start = index + 1
+    }
+  }
+  const last = expression.slice(start).trim()
+  if (last) args.push(last)
+  return args.filter(Boolean)
+}
+
+function evaluateSpreadsheetArithmeticExpression(
+  expression: string,
+  evaluateCell: (cellKey: string) => unknown,
+): number | string | null {
+  const tokens = tokenizeSpreadsheetArithmeticExpression(expression)
+  if (tokens.length === 0) return null
+  const values: Array<number | string> = []
+  const operators: string[] = []
+  const applyOperator = (): boolean => {
+    const operator = operators.pop()
+    if (!operator || operator === '(') return false
+    const right = values.pop()
+    const left = values.pop()
+    if (typeof left !== 'number' || typeof right !== 'number') return false
+    if (operator === '/' && right === 0) {
+      // 保持电子表格常见错误语义，避免 Infinity 进入后续展示。
+      values.push('#DIV/0!')
+      return true
+    }
+    const result = switchSpreadsheetOperator(operator, left, right)
+    if (result == null) return false
+    values.push(result)
+    return true
+  }
+  for (const token of tokens) {
+    if (token.type === 'number') {
+      values.push(Number(token.value))
+      continue
+    }
+    if (token.type === 'cell') {
+      values.push(spreadsheetNumberValue(evaluateCell(token.value)))
+      continue
+    }
+    if (token.value === '(') {
+      operators.push(token.value)
+      continue
+    }
+    if (token.value === ')') {
+      while (operators.length && operators[operators.length - 1] !== '(') {
+        if (!applyOperator()) return null
+        if (values[values.length - 1] === '#DIV/0!') return '#DIV/0!'
+      }
+      if (operators.pop() !== '(') return null
+      continue
+    }
+    while (
+      operators.length
+      && operators[operators.length - 1] !== '('
+      && spreadsheetOperatorPrecedence(operators[operators.length - 1]) >= spreadsheetOperatorPrecedence(token.value)
+    ) {
+      // 使用运算符优先级归约，保证乘除先于加减。
+      if (!applyOperator()) return null
+      if (values[values.length - 1] === '#DIV/0!') return '#DIV/0!'
+    }
+    operators.push(token.value)
+  }
+  while (operators.length) {
+    if (!applyOperator()) return null
+    if (values[values.length - 1] === '#DIV/0!') return '#DIV/0!'
+  }
+  return values.length === 1 ? values[0] : null
+}
+
+function tokenizeSpreadsheetArithmeticExpression(expression: string): Array<{ type: 'number' | 'cell' | 'operator'; value: string }> {
+  const tokens: Array<{ type: 'number' | 'cell' | 'operator'; value: string }> = []
+  let index = 0
+  let expectsValue = true
+  while (index < expression.length) {
+    const char = expression[index]
+    if (/\s/.test(char)) {
+      index += 1
+      continue
+    }
+    const rest = expression.slice(index)
+    const signedNumber = expectsValue ? rest.match(/^[+-]?(?:[0-9]+(?:\.[0-9]+)?|\.[0-9]+)/) : null
+    const number = signedNumber ?? rest.match(/^(?:[0-9]+(?:\.[0-9]+)?|\.[0-9]+)/)
+    if (number) {
+      tokens.push({ type: 'number', value: number[0] })
+      index += number[0].length
+      expectsValue = false
+      continue
+    }
+    const cell = rest.match(/^[A-Z]+[0-9]+/i)
+    if (cell) {
+      tokens.push({ type: 'cell', value: cell[0] })
+      index += cell[0].length
+      expectsValue = false
+      continue
+    }
+    if ('+-*/()'.includes(char)) {
+      tokens.push({ type: 'operator', value: char })
+      index += 1
+      expectsValue = char !== ')'
+      continue
+    }
+    return []
+  }
+  return tokens
+}
+
+function switchSpreadsheetOperator(operator: string, left: number, right: number): number | null {
+  if (operator === '+') return left + right
+  if (operator === '-') return left - right
+  if (operator === '*') return left * right
+  if (operator === '/') return left / right
+  return null
+}
+
+function spreadsheetOperatorPrecedence(operator: string): number {
+  return operator === '*' || operator === '/' ? 2 : 1
 }
 
 function spreadsheetCellRange(startCell: string, endCell: string): string[] {
@@ -3880,6 +4794,109 @@ export function spreadsheetResourceSummaryRows(
   ]
 }
 
+export function buildVisualEditorDiagnosticRows(input: {
+  bigScreen?: BiBigScreenResourceLike | null
+  spreadsheet?: BiSpreadsheetResourceLike | null
+}): BiVisualEditorDiagnosticRow[] {
+  const layoutItems = input.bigScreen?.layout ?? []
+  const overlapCount = countBigScreenLayoutOverlaps(layoutItems)
+  const overflowCount = layoutItems.filter(item => {
+    const x = Number(item.x ?? 0)
+    const w = Number(item.w ?? 0)
+    return Number.isFinite(x) && Number.isFinite(w) && x + w > 24
+  }).length
+  const mobileLayout = input.bigScreen?.mobileLayout
+  const mobileColumns = Number(isPlainRecord(mobileLayout) ? mobileLayout.columns : undefined)
+  const mobileEnabled = isPlainRecord(mobileLayout) && (mobileLayout.enabled === true || Number.isFinite(mobileColumns))
+  const spreadsheetStats = spreadsheetVisualStats(input.spreadsheet)
+  return [
+    {
+      key: 'bigScreenLayout',
+      label: '大屏布局',
+      status: overlapCount > 0 || overflowCount > 0 ? 'block' : 'pass',
+      statusLabel: overlapCount > 0 || overflowCount > 0 ? '需补齐' : '可发布',
+      detail: `${layoutItems.length} 组件 · ${overlapCount} 重叠 · ${overflowCount} 越界`,
+    },
+    {
+      key: 'bigScreenMobile',
+      label: '移动布局',
+      status: mobileEnabled ? 'pass' : 'warn',
+      statusLabel: mobileEnabled ? '可发布' : '需复核',
+      detail: mobileEnabled
+        ? `${Number.isFinite(mobileColumns) ? mobileColumns : 1} 列 · ${layoutItems.length} 组件已覆盖`
+        : '未配置移动端布局',
+    },
+    {
+      key: 'spreadsheetCells',
+      label: '电子表格单元格',
+      status: spreadsheetStats.errorCount > 0 ? 'warn' : 'pass',
+      statusLabel: spreadsheetStats.errorCount > 0 ? '需复核' : '可发布',
+      detail: `${spreadsheetStats.cellCount} 单元格 · ${spreadsheetStats.formulaCount} 公式 · ${spreadsheetStats.errorCount} 错误值`,
+    },
+    {
+      key: 'spreadsheetStyles',
+      label: '单元格样式',
+      status: 'pass',
+      statusLabel: '可发布',
+      detail: `${spreadsheetStats.styleCount} 样式 · ${spreadsheetStats.conditionalFormatCount} 条件格式 · ${spreadsheetStats.pivotTableCount} 透视表`,
+    },
+  ]
+}
+
+function countBigScreenLayoutOverlaps(layoutItems: Record<string, unknown>[]): number {
+  let count = 0
+  for (let leftIndex = 0; leftIndex < layoutItems.length; leftIndex += 1) {
+    for (let rightIndex = leftIndex + 1; rightIndex < layoutItems.length; rightIndex += 1) {
+      if (bigScreenLayoutItemsOverlap(layoutItems[leftIndex], layoutItems[rightIndex])) count += 1
+    }
+  }
+  return count
+}
+
+function bigScreenLayoutItemsOverlap(left: Record<string, unknown>, right: Record<string, unknown>): boolean {
+  const leftX = Number(left.x ?? 0)
+  const leftY = Number(left.y ?? 0)
+  const leftW = Number(left.w ?? 0)
+  const leftH = Number(left.h ?? 0)
+  const rightX = Number(right.x ?? 0)
+  const rightY = Number(right.y ?? 0)
+  const rightW = Number(right.w ?? 0)
+  const rightH = Number(right.h ?? 0)
+  return leftX < rightX + rightW
+    && leftX + leftW > rightX
+    && leftY < rightY + rightH
+    && leftY + leftH > rightY
+}
+
+function spreadsheetVisualStats(resource: BiSpreadsheetResourceLike | null | undefined): BiSpreadsheetVisualStats {
+  return (resource?.sheets ?? []).reduce<BiSpreadsheetVisualStats>((stats, sheet) => {
+    const cells = isPlainRecord(sheet.cells) ? sheet.cells : {}
+    const cellStyles = isPlainRecord(sheet.cellStyles) ? sheet.cellStyles : {}
+    const pivotTables = Array.isArray(sheet.pivotTables) ? sheet.pivotTables : []
+    const conditionalFormats = Array.isArray(sheet.conditionalFormats) ? sheet.conditionalFormats : []
+    const values = Object.values(cells)
+    return {
+      cellCount: stats.cellCount + values.length,
+      formulaCount: stats.formulaCount + values.filter(value => String(value).trim().startsWith('=')).length,
+      errorCount: stats.errorCount + values.filter(value => /^#(REF|VALUE|DIV\/0|NAME|N\/A|NUM)!?$/i.test(String(value).trim())).length,
+      styleCount: stats.styleCount + Object.keys(cellStyles).length,
+      pivotTableCount: stats.pivotTableCount + pivotTables.length,
+      conditionalFormatCount: stats.conditionalFormatCount + conditionalFormats.length,
+    }
+  }, {
+    cellCount: 0,
+    formulaCount: 0,
+    errorCount: 0,
+    styleCount: 0,
+    pivotTableCount: 0,
+    conditionalFormatCount: 0,
+  })
+}
+
+function isPlainRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
+}
+
 export function upsertBigScreenResource<T extends BiBigScreenResourceOptionLike>(resources: T[], resource: T): T[] {
   return upsertResourceByKey(resources, resource, item => item.screenKey)
 }
@@ -3959,7 +4976,14 @@ export function exportAuditDetailRows(detail: BiExportAuditDetailLike | null | u
   const metrics = query?.metrics ?? []
   const fields = [...dimensions, ...metrics].filter(Boolean)
   const approvalReason = request?.approvalReason || job?.approvalReason || '-'
-  return [
+  const partition = detail?.partition
+  const storageLayout = partition?.storageLayout ?? job?.storageLayout
+  const partCount = partition?.partCount ?? job?.partCount
+  const generatedRows = partition?.generatedRows ?? job?.generatedRows
+  const requestedRows = partition?.requestedRows ?? job?.requestedRows
+  const partSize = partition?.partSize ?? job?.partSize
+  const partStorageKeys = partition?.partStorageKeys ?? job?.partStorageKeys ?? []
+  const rows: BiExportAuditDetailRow[] = [
     {
       label: '任务',
       value: `#${job?.id ?? '-'} · ${job?.status ?? '-'} · ${request?.exportFormat || job?.exportFormat || '-'}`,
@@ -3995,6 +5019,142 @@ export function exportAuditDetailRows(detail: BiExportAuditDetailLike | null | u
     {
       label: '创建',
       value: `${job?.createdBy ?? '-'} · ${formatExportAuditTime(job?.createdAt)}`,
+    },
+  ]
+  if (storageLayout || partCount || generatedRows || requestedRows || partSize) {
+    rows.push({
+      label: '分片',
+      value: [
+        storageLayout || '-',
+        partCount ? `${formatExportAuditNumber(partCount)} 片` : null,
+        generatedRows || requestedRows
+          ? `${formatExportAuditNumber(generatedRows ?? 0)}/${formatExportAuditNumber(requestedRows ?? 0)} 行`
+          : null,
+        partSize ? `每片 ${formatExportAuditNumber(partSize)}` : null,
+      ].filter(Boolean).join(' · '),
+    })
+  }
+  if (partStorageKeys.length > 0) {
+    rows.push({
+      label: '分片对象',
+      value: partStorageKeys.map(formatExportAuditPartStorageKey).join(' / '),
+    })
+  }
+  return rows
+}
+
+export function exportHardeningDiagnosticRows(
+  jobs: BiExportAuditJobLike[] | null | undefined,
+): BiExportHardeningDiagnosticRow[] {
+  const exportJobs = jobs ?? []
+  const pendingApprovalCount = exportJobs.filter(job => normalizedExportStatus(job.approvalStatus || job.status) === 'PENDING_APPROVAL' || normalizedExportStatus(job.approvalStatus) === 'PENDING').length
+  const expiredCount = exportJobs.filter(isExpiredExportAuditJob).length
+  const partitionJobs = exportJobs.filter(job => {
+    const layout = String(job.storageLayout ?? '').trim().toUpperCase()
+    return layout === 'OBJECT_PER_PART_ZIP' || Number(job.partCount ?? 0) > 0
+  })
+  const partitionCount = partitionJobs.reduce((total, job) => total + Number(job.partCount ?? 0), 0)
+  const partitionRequestedRows = partitionJobs.reduce((total, job) => total + Number(job.requestedRows ?? job.rowLimit ?? 0), 0)
+  const partitionGeneratedRows = partitionJobs.reduce((total, job) => total + Number(job.generatedRows ?? 0), 0)
+  const retentionDays = exportJobs
+    .map(job => Number(job.retentionDays ?? 0))
+    .filter(value => Number.isFinite(value) && value > 0)
+  const minRetentionDays = retentionDays.length ? Math.min(...retentionDays) : 0
+  const downloadCount = exportJobs.reduce((total, job) => total + Number(job.downloadCount ?? 0), 0)
+  const retryingCount = exportJobs.filter(job => Number(job.retryCount ?? 0) > 0).length
+  const retryExhaustedCount = exportJobs.filter(job => Boolean(job.retryExhaustedAt) || (
+    Number(job.maxRetryCount ?? 0) > 0 && Number(job.retryCount ?? 0) >= Number(job.maxRetryCount ?? 0)
+  )).length
+  return [
+    {
+      key: 'exportControl',
+      label: '导出控制',
+      status: pendingApprovalCount > 0 || expiredCount > 0 ? 'warn' : 'pass',
+      statusLabel: pendingApprovalCount > 0 || expiredCount > 0 ? '需复核' : '可发布',
+      detail: `${exportJobs.length} 任务 · ${pendingApprovalCount} 审批中 · ${expiredCount} 已过期`,
+    },
+    {
+      key: 'partitionStorage',
+      label: '分片存储',
+      status: partitionJobs.length > 0 ? 'pass' : 'warn',
+      statusLabel: partitionJobs.length > 0 ? '可发布' : '需复核',
+      detail: `${partitionJobs.length} 分片任务 · ${formatExportAuditNumber(partitionCount)} 分片 · ${formatExportAuditNumber(partitionGeneratedRows)}/${formatExportAuditNumber(partitionRequestedRows)} 行`,
+    },
+    {
+      key: 'retentionDownload',
+      label: '留存下载',
+      status: expiredCount > 0 ? 'warn' : 'pass',
+      statusLabel: expiredCount > 0 ? '需复核' : '可发布',
+      detail: `${minRetentionDays || '-'} 天留存 · ${formatExportAuditNumber(downloadCount)} 下载 · ${expiredCount} 过期清理`,
+    },
+    {
+      key: 'retryRecovery',
+      label: '重试恢复',
+      status: retryExhaustedCount > 0 ? 'block' : retryingCount > 0 ? 'warn' : 'pass',
+      statusLabel: retryExhaustedCount > 0 ? '需补齐' : retryingCount > 0 ? '需复核' : '可发布',
+      detail: `${retryingCount} 重试中 · ${retryExhaustedCount} 已耗尽`,
+    },
+  ]
+}
+
+export function alertAnomalyDiagnosticRows(
+  rules: BiAlertAnomalyDiagnosticRuleLike[] | null | undefined,
+): BiAlertAnomalyDiagnosticRow[] {
+  const alertRules = rules ?? []
+  const anomalyRules = alertRules.filter(rule => isAnomalyCondition(rule.condition))
+  const disabledCount = anomalyRules.filter(rule => rule.enabled === false).length
+  const periodRules = anomalyRules.filter(rule => normalizedAlertConditionValue(rule.condition?.model) === 'PERIOD_OVER_PERIOD'
+    || Boolean(normalizedAlertConditionValue(rule.condition?.period)))
+  const naturalBoundaryCount = periodRules.filter(rule => rule.condition?.naturalBoundary === true).length
+  const periodLabels = Array.from(new Set(periodRules
+    .map(rule => normalizedAlertConditionValue(rule.condition?.period))
+    .filter(Boolean)))
+  const calendarWindows = Array.from(new Set(periodRules
+    .map(rule => Number(rule.condition?.calendarWindowHours ?? 0))
+    .filter(value => Number.isFinite(value) && value > 0)
+    .map(value => `${value}h`)))
+  const holidayRules = anomalyRules.filter(rule => Boolean(rule.condition?.holidayComparisonDate || rule.condition?.holidayName))
+  const holidaySummary = holidayRules
+    .map(rule => {
+      const name = String(rule.condition?.holidayName ?? 'holiday')
+      const date = String(rule.condition?.holidayComparisonDate ?? '-')
+      return `${name} -> ${date}`
+    })
+    .slice(0, 3)
+    .join(' / ')
+  const minSamples = Array.from(new Set(anomalyRules
+    .map(rule => Number(rule.condition?.minSamples ?? 0))
+    .filter(value => Number.isFinite(value) && value > 0)))
+    .sort((left, right) => left - right)
+  const silenceCount = anomalyRules.filter(rule => hasAlertSilenceConfig(rule.condition)).length
+  return [
+    {
+      key: 'anomalyCoverage',
+      label: '异常覆盖',
+      status: anomalyRules.length > 0 && periodRules.length > 0 ? 'pass' : anomalyRules.length > 0 ? 'warn' : 'block',
+      statusLabel: anomalyRules.length > 0 && periodRules.length > 0 ? '可发布' : anomalyRules.length > 0 ? '需复核' : '需补齐',
+      detail: `${anomalyRules.length} 异常 · ${periodRules.length} 同环比 · ${disabledCount} 停用`,
+    },
+    {
+      key: 'periodBoundary',
+      label: '周期边界',
+      status: periodRules.length > 0 && naturalBoundaryCount > 0 ? 'pass' : periodRules.length > 0 ? 'warn' : 'block',
+      statusLabel: periodRules.length > 0 && naturalBoundaryCount > 0 ? '可发布' : periodRules.length > 0 ? '需复核' : '需补齐',
+      detail: `${periodLabels.length ? periodLabels.join(' / ') : '-'} · ${naturalBoundaryCount} 自然边界 · ${calendarWindows.length ? calendarWindows.join('/') : '-'} 窗口`,
+    },
+    {
+      key: 'holidayComparison',
+      label: '节假日映射',
+      status: holidayRules.length > 0 ? 'pass' : periodRules.length > 0 ? 'warn' : 'block',
+      statusLabel: holidayRules.length > 0 ? '可发布' : periodRules.length > 0 ? '需复核' : '需补齐',
+      detail: `${holidayRules.length} 节假日 · ${holidaySummary || '-'}`,
+    },
+    {
+      key: 'sampleSilence',
+      label: '样本静默',
+      status: disabledCount > 0 || silenceCount > 0 ? 'warn' : 'pass',
+      statusLabel: disabledCount > 0 || silenceCount > 0 ? '需复核' : '可发布',
+      detail: `最小样本 ${minSamples.length ? minSamples.join('/') : '-'} · ${silenceCount} 静默 · ${disabledCount} 停用`,
     },
   ]
 }
@@ -4115,7 +5275,7 @@ export function datasourceHealthSloRows(
 ): BiDatasourceHealthSloRow[] {
   const weakestSource = [...(summary?.sources ?? [])]
     .sort((left, right) => (left.availabilityRate ?? 100) - (right.availabilityRate ?? 100))[0]
-  return [
+  const rows = [
     {
       label: '整体可用率',
       value: `${summary?.availabilityRate ?? 100}% · ${summary?.availableChecks ?? 0}/${summary?.totalChecks ?? 0} 正常`,
@@ -4131,6 +5291,13 @@ export function datasourceHealthSloRows(
         : '-',
     },
   ]
+  if (weakestSource?.riskLevel || weakestSource?.recommendedAction) {
+    rows.push({
+      label: '治理建议',
+      value: `${weakestSource.riskLevel || '-'} · ${weakestSource.recommendedAction || '-'}`,
+    })
+  }
+  return rows
 }
 
 export function datasourceConnectorRows(
@@ -4152,6 +5319,145 @@ export function datasourceConnectorRows(
   })
 }
 
+export function datasourceCapacityPolicyRows(
+  connectors: BiDatasourceConnectorCapabilityLike[] | null | undefined,
+): BiDatasourceCapacityPolicyRow[] {
+  return (connectors ?? []).map(connector => {
+    const connectorType = connector.connectorType || '-'
+    return {
+      key: connectorType,
+      connector: `${connector.label || connectorType} / ${connectorType}`,
+      ...datasourceCapacityPolicy(connectorType, connector.sourceCategory, connector.capacityCategory),
+    }
+  })
+}
+
+export function datasourceAdvancedCapabilityRows(
+  connectors: BiDatasourceConnectorCapabilityLike[] | null | undefined,
+): BiDatasourceAdvancedCapabilityRow[] {
+  return (connectors ?? []).map(connector => {
+    const connectorType = connector.connectorType || '-'
+    return {
+      key: connectorType,
+      connector: `${connector.label || connectorType} / ${connectorType}`,
+      ...datasourceAdvancedCapability(connector),
+    }
+  })
+}
+
+function datasourceAdvancedCapability(
+  connector: BiDatasourceConnectorCapabilityLike,
+): Omit<BiDatasourceAdvancedCapabilityRow, 'key' | 'connector'> {
+  const connectorType = (connector.connectorType || '').toUpperCase()
+  const sourceCategory = (connector.sourceCategory || '').toUpperCase()
+  const capacityCategory = (connector.capacityCategory || '').toUpperCase()
+  const supportStatus = (connector.supportStatus || '').toUpperCase()
+  const modes = (connector.supportedModes ?? []).map(mode => mode.toUpperCase())
+  const supportsSql = connector.supportsSqlDataset === true
+  const supportsTable = connector.supportsTableDataset === true
+  if (supportStatus === 'PLANNED') {
+    return {
+      quickEngine: '规划中 · 仓库级抽取容量未开放',
+      crossSourceModeling: '阻断 · 连接器未开放前不可发布跨源模型',
+      selfService: '阻断 · connector status PLANNED',
+      semanticAuthoring: '暂不可用',
+      risk: '高 · 需要先完成原生连接器和容量治理',
+    }
+  }
+  if (connectorType === 'API' || sourceCategory === 'HTTP' || capacityCategory.startsWith('HTTP_EXTRACT')) {
+    return {
+      quickEngine: '必需 · HTTP JSON 仅通过抽取物化分析',
+      crossSourceModeling: '受限 · 需先抽取成物化表后参与关联',
+      selfService: '不支持 · API/应用源不直接进入自助取数',
+      semanticAuthoring: semanticAuthoringLabel(supportsSql, supportsTable),
+      risk: '中 · 受 10MB/100 列/1000 行预览和源端限流约束',
+    }
+  }
+  if (sourceCategory === 'APP' || capacityCategory.startsWith('APP_EXTRACT')) {
+    return {
+      quickEngine: '必需 · 应用数据源通过抽取物化分析',
+      crossSourceModeling: '受限 · 需先抽取成物化表后参与关联',
+      selfService: '不支持 · API/应用源不直接进入自助取数',
+      semanticAuthoring: semanticAuthoringLabel(supportsSql, supportsTable),
+      risk: '中 · 应用凭证、同步周期和字段漂移需治理',
+    }
+  }
+  if (connectorType === 'CSV_EXCEL' || sourceCategory === 'FILE' || capacityCategory.startsWith('FILE_EXTRACT')) {
+    return {
+      quickEngine: '必需 · 文件上传后以抽取表参与分析',
+      crossSourceModeling: '受限 · 探索空间文件需物化后再治理关联',
+      selfService: '不支持 · 探索空间上传源不进入自助取数',
+      semanticAuthoring: semanticAuthoringLabel(supportsSql, supportsTable),
+      risk: '中 · 文件大小、Sheet 数和字段类型漂移需复核',
+    }
+  }
+  if (modes.includes('EXTRACT') && !modes.includes('DIRECT_QUERY')) {
+    return {
+      quickEngine: '必需 · 仅抽取模式参与分析',
+      crossSourceModeling: '受限 · 跨源关联需开启 Quick 引擎抽取',
+      selfService: supportsTable ? '支持 · 物化为普通数据集后可进入自助取数' : '受限 · 需先开放表数据集',
+      semanticAuthoring: semanticAuthoringLabel(supportsSql, supportsTable),
+      risk: '中 · 需关注抽取容量、调度和物化保留',
+    }
+  }
+  return {
+    quickEngine: '可选 · 直连/缓存优先，跨源或大数据量时启用抽取',
+    crossSourceModeling: '支持 · 跨源关联需开启 Quick 引擎抽取',
+    selfService: '支持 · 普通数据集可进入自助取数',
+    semanticAuthoring: semanticAuthoringLabel(supportsSql, supportsTable),
+    risk: connector.supportsConnectionTest && connector.supportsSchemaSync && connector.supportsCredentials
+      ? '低 · 连接测试、schema 同步和凭证治理齐全'
+      : '中 · 需补齐连接测试、schema 同步或凭证治理',
+  }
+}
+
+function semanticAuthoringLabel(supportsSql: boolean, supportsTable: boolean): string {
+  if (supportsSql && supportsTable) return 'SQL + 表数据集'
+  if (supportsSql) return 'SQL 数据集'
+  if (supportsTable) return '表数据集'
+  return '暂不可用'
+}
+
+function datasourceCapacityPolicy(
+  connectorType: string | null | undefined,
+  sourceCategory: string | null | undefined,
+  capacityCategory: string | null | undefined,
+): Omit<BiDatasourceCapacityPolicyRow, 'key' | 'connector'> {
+  const normalizedConnector = (connectorType || '').toUpperCase()
+  const normalizedSource = (sourceCategory || '').toUpperCase()
+  const normalizedCapacity = (capacityCategory || '').toUpperCase()
+  if (normalizedConnector === 'API' || normalizedSource === 'HTTP' || normalizedCapacity.startsWith('HTTP_EXTRACT')) {
+    return {
+      capacityPool: 'HTTP 抽取小流量池',
+      budget: '直连预览上限 10MB / 100 列 / 1000 行；抽取分页默认每页 1000 行',
+      eligibility: '不进入自助取数',
+      guardrails: 'JSON 响应解析、模板变量、抽取刷新和源端限流保护',
+    }
+  }
+  if (normalizedSource === 'APP' || normalizedCapacity.startsWith('APP_EXTRACT')) {
+    return {
+      capacityPool: '应用抽取小流量池',
+      budget: 'SaaS/API 应用源走 HTTP JSON 抽取；按应用连接器独立计量',
+      eligibility: '自助取数需落成普通数据集后评估',
+      guardrails: '应用凭证、同步周期、字段选择和容量分类隔离',
+    }
+  }
+  if (normalizedConnector === 'CSV_EXCEL' || normalizedSource === 'FILE' || normalizedCapacity.startsWith('FILE_EXTRACT')) {
+    return {
+      capacityPool: '探索空间文件池',
+      budget: 'CSV/Excel 建议 50MB 内、100 列内；Excel 最多解析 5 个 Sheet',
+      eligibility: '探索空间上传源不支持自助取数',
+      guardrails: 'UTF-8 编码、字段类型校验、追加/替换文件需重新匹配',
+    }
+  }
+  return {
+    capacityPool: '交互查询池',
+    budget: '直连/缓存查询 · 受租户并发池和查询行数配额控制',
+    eligibility: '可用于自助取数',
+    guardrails: '连接测试、schema 同步、SQL/表数据集建模',
+  }
+}
+
 export function datasourceOnboardingRows(
   sources: BiDatasourceOnboardingLike[] | null | undefined,
 ): BiDatasourceOnboardingRow[] {
@@ -4170,6 +5476,46 @@ export function datasourceOnboardingRows(
       credential: `${source.maskedUsername || '-'} · ${source.maskedUrl || '-'}`,
     }
   })
+}
+
+export function datasourceNextActionRows(
+  sources: BiDatasourceOnboardingLike[] | null | undefined,
+): BiDatasourceNextActionRow[] {
+  return (sources ?? []).map((source, index) => {
+    const sourceKey = source.sourceKey || `source-${source.id ?? index}`
+    const connectorType = (source.connectorType || source.type || '').toUpperCase()
+    const tableCount = source.tableCount ?? 0
+    const ready = (source.schemaSyncStatus || '').toUpperCase() === 'SUCCESS' && tableCount > 0
+    const isApi = connectorType === 'API' || sourceKey.toLowerCase().startsWith('api-')
+    const isFile = connectorType === 'CSV_EXCEL' || connectorType === 'FILE' || sourceKey.toLowerCase().startsWith('file-')
+    return {
+      key: sourceKey,
+      source: source.name || sourceKey,
+      readiness: ready ? `可建模 · ${tableCount} 张表` : '待同步 schema',
+      nextAction: datasourceNextAction(isApi, isFile, ready),
+      limitations: datasourceLimitations(isApi, isFile),
+    }
+  })
+}
+
+function datasourceNextAction(isApi: boolean, isFile: boolean, ready: boolean): string {
+  if (isApi) {
+    return ready ? '创建表数据集并配置抽取刷新' : '完成 API 预览、解析响应字段并同步 schema'
+  }
+  if (isFile) {
+    return ready ? '创建表数据集并进入报表/门户分析' : '上传/预览文件后同步 schema，再创建表数据集'
+  }
+  return ready ? '创建 SQL/表数据集，按需开启缓存或抽取加速' : '完成连接测试并同步 schema'
+}
+
+function datasourceLimitations(isApi: boolean, isFile: boolean): string {
+  if (isApi) {
+    return 'API 数据源不进入自助取数；直连小数据量受 10MB/100 列/1000 行约束'
+  }
+  if (isFile) {
+    return '文件数据源适合探索空间和报表分析；自助取数需使用非探索空间数据集'
+  }
+  return '可用于自助取数；跨源数据集和高级同环比导出仍需治理校验'
 }
 
 export function datasourceConnectionTestRows(
@@ -4360,6 +5706,89 @@ export function buildDatasourceMultiTableDatasetCommand(
   }
 }
 
+export function buildDatasourceRelationshipDiagnosticRows(
+  input: BiDatasourceMultiTableModelInputLike | null | undefined,
+): BiDatasourceRelationshipDiagnosticRow[] {
+  const tableNames = uniqueStrings(input?.tableNames ?? [])
+  const baseTableName = trimValue(input?.baseTableName) || tableNames[0] || '-'
+  const joins = input?.joins ?? []
+  const normalizedJoinTypes = uniqueStrings(joins.map(join => trimValue(join.joinType).toUpperCase() || 'LEFT'))
+  const rawConditions = joins.flatMap(join => {
+    const conditions = join.conditions?.length
+      ? join.conditions
+      : [{ leftColumn: join.leftColumn, operator: '=', rightColumn: join.rightColumn }]
+    return conditions.map(condition => ({
+      leftColumn: trimValue(condition.leftColumn),
+      rightColumn: trimValue(condition.rightColumn),
+      connector: normalizeDatasourceJoinConnector(condition.connector),
+      groupStart: condition.groupStart === true,
+      groupEnd: condition.groupEnd === true,
+    }))
+  }).filter(condition => condition.leftColumn && condition.rightColumn)
+  const complexJoinCount = joins.filter(join => {
+    const conditionCount = join.conditions?.length ?? (join.leftColumn && join.rightColumn ? 1 : 0)
+    return conditionCount > 1
+  }).length
+  const orConditionCount = rawConditions.filter(condition => condition.connector === 'OR').length
+  const groupedConditionCount = Math.max(
+    rawConditions.filter(condition => condition.groupStart).length,
+    rawConditions.filter(condition => condition.groupEnd).length,
+  )
+  const relatedTables = new Set<string>()
+  if (baseTableName && baseTableName !== '-') relatedTables.add(baseTableName)
+  joins.forEach(join => {
+    const leftTableName = trimValue(join.leftTableName)
+    const rightTableName = trimValue(join.rightTableName)
+    if (leftTableName) relatedTables.add(leftTableName)
+    if (rightTableName) relatedTables.add(rightTableName)
+  })
+  const missingCoverage = tableNames.filter(tableName => !relatedTables.has(tableName))
+  const joinDepth = joins.length
+  const overQuickBiDepth = joinDepth > 5
+  const hasFullJoin = normalizedJoinTypes.includes('FULL')
+  const conditionStatus: BiDatasourceRelationshipDiagnosticStatus = orConditionCount > 0 || groupedConditionCount > 0 ? 'warn' : 'pass'
+
+  return [
+    {
+      key: 'tables',
+      label: '建模表',
+      status: tableNames.length >= 2 ? 'pass' : 'block',
+      statusLabel: tableNames.length >= 2 ? '可建模' : '需补齐',
+      detail: `${tableNames.length} 表 · 主表 ${baseTableName}`,
+    },
+    {
+      key: 'joinDepth',
+      label: '关联层级',
+      status: overQuickBiDepth ? 'warn' : 'pass',
+      statusLabel: overQuickBiDepth ? '需复核' : '可建模',
+      detail: `${joinDepth} 层 · Quick BI 物理模型建议不超过 5 层`,
+    },
+    {
+      key: 'joinTypes',
+      label: 'Join 类型',
+      status: hasFullJoin ? 'warn' : 'pass',
+      statusLabel: hasFullJoin ? '需复核' : '可建模',
+      detail: `${normalizedJoinTypes.join(' / ') || '-'}${hasFullJoin ? ' · 包含 FULL JOIN，需确认空值扩散' : ''}`,
+    },
+    {
+      key: 'conditions',
+      label: '关联条件',
+      status: conditionStatus,
+      statusLabel: conditionStatus === 'pass' ? '可建模' : '需复核',
+      detail: `${rawConditions.length} 条件 · ${complexJoinCount} 复合关系 · ${orConditionCount} OR · ${groupedConditionCount} 分组`,
+    },
+    {
+      key: 'coverage',
+      label: '关系覆盖',
+      status: missingCoverage.length ? 'block' : 'pass',
+      statusLabel: missingCoverage.length ? '需补齐' : '可建模',
+      detail: missingCoverage.length
+        ? `未覆盖: ${missingCoverage.join(', ')}`
+        : `已覆盖 ${relatedTables.size}/${tableNames.length} 表`,
+    },
+  ]
+}
+
 export function buildSqlDatasetParameterDrafts(
   sqlTemplate: string | null | undefined,
   existingParameters: BiSqlDatasetParameterDraftLike[] | null | undefined = [],
@@ -4421,6 +5850,138 @@ export function buildSqlDatasetDraftResource(input: BiSqlDatasetDraftInputLike) 
     status: 'DRAFT',
     source: 'CLIENT',
   }
+}
+
+export function buildSqlDatasetSampleProfileRows(
+  input: BiSqlDatasetSampleProfileInputLike | null | undefined,
+): BiSqlDatasetSampleProfileRow[] {
+  const columns = input?.columns ?? []
+  const rows = input?.rows ?? []
+  const totalRows = rows.length || Math.max(0, input?.rowCount ?? 0)
+  return columns.map(column => {
+    const values = rows.map(row => row[column.key])
+    const filledValues = values.filter(value => !isEmptySampleProfileValue(value))
+    const uniqueValues = uniqueSampleProfileValues(filledValues)
+    return {
+      key: column.key,
+      field: column.key,
+      role: trimValue(column.role) || '-',
+      dataType: trimValue(column.dataType) || '-',
+      filled: `${filledValues.length}/${totalRows}`,
+      unique: String(uniqueValues.length),
+      samples: uniqueValues.slice(0, 3).map(formatSampleProfileValue).join(' / ') || '-',
+    }
+  })
+}
+
+export function buildSqlDatasetImpactRows(input: BiSqlDatasetImpactInputLike | null | undefined): BiSqlDatasetImpactRow[] {
+  const lineage = input?.lineage
+  const impact = input?.impact
+  const sourceParts = [
+    lineage?.dataSourceConfigId != null ? `datasource #${lineage.dataSourceConfigId}` : null,
+    sqlImpactList(lineage?.sourceTables),
+    lineage?.tenantColumn ? `tenant ${lineage.tenantColumn}` : null,
+  ].filter(Boolean)
+  const referenceParts = [
+    sqlImpactList(lineage?.referencedFields),
+    sqlImpactList(lineage?.referencedMetrics),
+  ].filter(value => value && value !== '-')
+  const governanceGates = [
+    ...(impact?.governanceGates ?? []),
+    ...(lineage?.approvalRequired ? ['发布需审批'] : []),
+  ]
+  return [
+    { key: 'assets', label: '影响资产', value: sqlImpactList(impact?.impactedAssetTypes) },
+    { key: 'lineage', label: '血缘来源', value: sourceParts.join(' · ') || '-' },
+    { key: 'parameters', label: '运行参数', value: sqlImpactList(lineage?.parameterKeys) },
+    { key: 'references', label: '引用字段', value: referenceParts.join(' · ') || '-' },
+    { key: 'governance', label: '治理门禁', value: sqlImpactList(governanceGates) },
+    { key: 'warnings', label: '风险提示', value: sqlImpactList(impact?.warnings) },
+  ]
+}
+
+export function buildSqlDatasetReadinessRows(
+  input: BiSqlDatasetReadinessInputLike | null | undefined,
+): BiSqlDatasetReadinessRow[] {
+  const fields = input?.draft?.fields ?? []
+  const metrics = input?.draft?.metrics ?? []
+  const parameters = input?.parameters ?? []
+  const preview = input?.preview
+  const visibleFieldCount = fields.filter(field => field.visible !== false).length
+  const dimensionConstrainedMetricCount = metrics.filter(metric => (metric.allowedDimensions ?? []).length > 0).length
+  const metadataIssues = [
+    fields.length === 0 ? '缺少字段' : '',
+    metrics.length === 0 ? '缺少指标' : '',
+    metrics.some(metric => !trimValue(metric.owner)) ? '指标缺少负责人' : '',
+    metrics.some(metric => !trimValue(metric.description)) ? '指标缺少描述' : '',
+  ].filter(Boolean)
+  const missingDefaults = parameters
+    .filter(parameter => parameter.required && !trimValue(parameter.defaultValue))
+    .map(parameter => parameter.key)
+  const sampleBlocked = !preview
+    || preview.sampleExecuted !== true
+    || !!trimValue(preview.executionError)
+    || (preview.columns ?? []).length === 0
+  const lineage = preview?.lineage
+  const gates = preview?.impact?.governanceGates ?? []
+  const sourceTables = lineage?.sourceTables ?? []
+  const lineageIssues = [
+    !lineage ? '未返回血缘' : '',
+    lineage && sourceTables.length === 0 ? '未识别来源表' : '',
+    lineage && lineage.approvalRequired !== true ? '未强制发布审批' : '',
+  ].filter(Boolean)
+  const warnings = [
+    ...(preview?.impact?.warnings ?? []),
+    ...(!preview ? ['尚未预览'] : []),
+  ]
+
+  return [
+    {
+      key: 'metadata',
+      label: '字段与指标',
+      status: metadataIssues.length ? 'warn' : 'pass',
+      statusLabel: metadataIssues.length ? '需复核' : '可发布',
+      detail: metadataIssues.length
+        ? metadataIssues.join(' / ')
+        : `${fields.length} 字段 / ${metrics.length} 指标 · ${visibleFieldCount} 可见字段 · ${dimensionConstrainedMetricCount} 指标维度约束`,
+    },
+    {
+      key: 'parameters',
+      label: '运行参数',
+      status: missingDefaults.length ? 'block' : 'pass',
+      statusLabel: missingDefaults.length ? '需补齐' : '可发布',
+      detail: missingDefaults.length
+        ? `${parameters.length} 参数 · 缺少默认值: ${missingDefaults.join(', ')}`
+        : `${parameters.length} 参数 · 默认值已补齐`,
+    },
+    {
+      key: 'sample',
+      label: '样例预览',
+      status: sampleBlocked ? 'block' : 'pass',
+      statusLabel: sampleBlocked ? '需补齐' : '可发布',
+      detail: sampleBlocked
+        ? (trimValue(preview?.executionError) || '未执行样例预览')
+        : `${preview?.rowCount ?? 0}/${preview?.sampleLimit ?? 0} 行 · ${(preview?.columns ?? []).length} 列`,
+    },
+    {
+      key: 'lineage',
+      label: '血缘与审批',
+      status: lineageIssues.length ? 'warn' : 'pass',
+      statusLabel: lineageIssues.length ? '需复核' : '可发布',
+      detail: [
+        sourceTables.length ? sourceTables.join(' / ') : '无来源表',
+        gates.length ? `门禁 ${gates.join(' / ')}` : '无门禁',
+        ...lineageIssues,
+      ].join(' · '),
+    },
+    {
+      key: 'warnings',
+      label: '风险提示',
+      status: warnings.length ? 'warn' : 'pass',
+      statusLabel: warnings.length ? '需复核' : '可发布',
+      detail: warnings.length ? warnings.join(' / ') : '暂无风险提示',
+    },
+  ]
 }
 
 export function buildDatasourceOnboardingCommand(
@@ -4641,6 +6202,34 @@ function sqlAllowedValues(parameter: BiSqlDatasetParameterDraftLike): string[] {
   return uniqueStrings(fromText.length > 0 ? fromText : fromArray)
 }
 
+function isEmptySampleProfileValue(value: unknown): boolean {
+  return value === null || value === undefined || value === ''
+}
+
+function uniqueSampleProfileValues(values: unknown[]): unknown[] {
+  const seen = new Set<string>()
+  const result: unknown[] = []
+  for (const value of values) {
+    const key = formatSampleProfileValue(value)
+    if (!seen.has(key)) {
+      seen.add(key)
+      result.push(value)
+    }
+  }
+  return result
+}
+
+function formatSampleProfileValue(value: unknown): string {
+  if (value === null || value === undefined) return '-'
+  if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') return String(value)
+  return JSON.stringify(value)
+}
+
+function sqlImpactList(values: string[] | null | undefined): string {
+  const normalized = uniqueStrings((values ?? []).map(value => trimValue(value)).filter(Boolean))
+  return normalized.length > 0 ? normalized.join(' / ') : '-'
+}
+
 function normalizeSqlDatasetField(field: BiSqlDatasetFieldDraftLike, index: number) {
   const fieldKey = normalizeDatasetKey(field.fieldKey || field.columnExpression || field.displayName || '')
   const displayName = trimValue(field.displayName) || fieldKey
@@ -4704,31 +6293,37 @@ function datasourceJoinConditionCommand(
   operator: string,
   rightColumn: string,
   connector?: string,
-): { leftColumn: string; operator?: string; connector?: string; rightColumn: string } {
-  const command: { leftColumn: string; operator?: string; connector?: string; rightColumn: string } = {
+  groupStart = false,
+  groupEnd = false,
+): { leftColumn: string; operator?: string; connector?: string; rightColumn: string; groupStart?: boolean; groupEnd?: boolean } {
+  const command: { leftColumn: string; operator?: string; connector?: string; rightColumn: string; groupStart?: boolean; groupEnd?: boolean } = {
     leftColumn,
     rightColumn,
   }
   if (operator !== '=') command.operator = operator
   if (connector) command.connector = connector
+  if (groupStart) command.groupStart = true
+  if (groupEnd) command.groupEnd = true
   return command
 }
 
-function normalizeDatasourceJoinConditions(join: BiDatasourceMultiTableJoinInputLike): Array<{ leftColumn: string; operator?: string; connector?: string; rightColumn: string }> {
+function normalizeDatasourceJoinConditions(join: BiDatasourceMultiTableJoinInputLike): Array<{ leftColumn: string; operator?: string; connector?: string; rightColumn: string; groupStart?: boolean; groupEnd?: boolean }> {
   const rawConditions = (join.conditions ?? []).length > 0
     ? join.conditions ?? []
     : [{ leftColumn: join.leftColumn, operator: '=', rightColumn: join.rightColumn }]
   const seen = new Set<string>()
-  const conditions: Array<{ leftColumn: string; operator?: string; connector?: string; rightColumn: string }> = []
+  const conditions: Array<{ leftColumn: string; operator?: string; connector?: string; rightColumn: string; groupStart?: boolean; groupEnd?: boolean }> = []
   rawConditions.forEach(condition => {
     const leftColumn = trimValue(condition?.leftColumn)
     const operator = normalizeDatasourceJoinConditionOperator(condition?.operator)
     const connector = normalizeDatasourceJoinConnector(condition?.connector)
     const rightColumn = trimValue(condition?.rightColumn)
-    const key = `${leftColumn}${operator}${connector}${rightColumn}`
+    const groupStart = condition?.groupStart === true
+    const groupEnd = condition?.groupEnd === true
+    const key = `${leftColumn}${operator}${connector}${rightColumn}${groupStart}${groupEnd}`
     if (!leftColumn || !rightColumn || seen.has(key)) return
     seen.add(key)
-    conditions.push(datasourceJoinConditionCommand(leftColumn, operator, rightColumn, connector))
+    conditions.push(datasourceJoinConditionCommand(leftColumn, operator, rightColumn, connector, groupStart, groupEnd))
   })
   return conditions
 }
@@ -5175,6 +6770,52 @@ function formatQueryHistoryValue(value: unknown): string {
   return String(value)
 }
 
+function formatExportAuditNumber(value: number): string {
+  return Number.isFinite(value) ? Math.trunc(value).toLocaleString('en-US') : '0'
+}
+
+function normalizedExportStatus(value: string | null | undefined): string {
+  return value?.trim().toUpperCase() ?? ''
+}
+
+function isExpiredExportAuditJob(job: BiExportAuditJobLike): boolean {
+  if (normalizedExportStatus(job.status) === 'EXPIRED') return true
+  const expiresAt = job.expiresAt
+  if (!expiresAt) return false
+  const time = Date.parse(expiresAt)
+  return Number.isFinite(time) && time <= Date.now()
+}
+
+function normalizedAlertConditionValue(value: unknown): string {
+  return String(value ?? '').trim().toUpperCase()
+}
+
+function isAnomalyCondition(condition: Record<string, unknown> | null | undefined): boolean {
+  if (!condition) return false
+  const operator = normalizedAlertConditionValue(condition.operator)
+  const mode = normalizedAlertConditionValue(condition.mode || condition.type)
+  const model = normalizedAlertConditionValue(condition.model)
+  return operator.startsWith('ANOMALY') || mode === 'ANOMALY' || model === 'PERIOD_OVER_PERIOD'
+}
+
+function hasAlertSilenceConfig(condition: Record<string, unknown> | null | undefined): boolean {
+  if (!condition) return false
+  return Boolean(
+    condition.silence
+    || condition.mute
+    || condition.quietHours
+    || condition.silenceWindow
+    || condition.silenceEnabled
+    || condition.muteUntil
+    || condition.silenceUntil,
+  )
+}
+
+function formatExportAuditPartStorageKey(value: string): string {
+  const segments = value.split('/').filter(Boolean)
+  return segments[segments.length - 1] || value
+}
+
 function formatExportAuditTime(value?: string | null): string {
   return value ? value.replace('T', ' ').slice(0, 16) : '-'
 }
@@ -5200,6 +6841,7 @@ export function updatePortalNavigationConfig<T extends BiPortalResourceLike>(
   portal: T,
   patch: BiPortalNavigationConfigPatchLike,
 ): T {
+  // theme 可能来自后端任意 JSON，先克隆并保证是可写对象。
   const theme = {
     ...((portal.theme && typeof portal.theme === 'object') ? portal.theme : {}),
   }
@@ -5214,14 +6856,36 @@ export function updatePortalNavigationConfig<T extends BiPortalResourceLike>(
   if (patch.menuSearchEnabled != null) theme.menuSearchEnabled = patch.menuSearchEnabled === true
   if (patch.fullScreenEnabled != null) theme.fullScreenEnabled = patch.fullScreenEnabled === true
   if (patch.mobileEnabled != null) theme.mobileEnabled = patch.mobileEnabled === true
+  setTrimmedPortalThemeValue(theme, 'logoUrl', patch.logoUrl)
+  setTrimmedPortalThemeValue(theme, 'title', patch.title)
+  setTrimmedPortalThemeValue(theme, 'subtitle', patch.subtitle)
+  setTrimmedPortalThemeValue(theme, 'footerText', patch.footerText)
+  setTrimmedPortalThemeValue(theme, 'alias', patch.alias)
+  if (patch.breadcrumbEnabled != null) theme.breadcrumbEnabled = patch.breadcrumbEnabled === true
+  if (patch.menuCacheEnabled != null) theme.menuCacheEnabled = patch.menuCacheEnabled === true
+  if (patch.menuCacheTtlSeconds != null) {
+    // TTL 非正数视为清空配置，让后端或运行时使用默认缓存策略。
+    const ttl = Number(patch.menuCacheTtlSeconds)
+    if (Number.isFinite(ttl) && ttl > 0) theme.menuCacheTtlSeconds = Math.trunc(ttl)
+    else delete theme.menuCacheTtlSeconds
+  }
   return { ...portal, theme }
 }
 
+/** 写入门户主题字符串配置，空字符串表示删除该配置。 */
+function setTrimmedPortalThemeValue(theme: Record<string, unknown>, key: string, value: string | null | undefined) {
+  if (value == null) return
+  const normalized = value.trim()
+  if (normalized) theme[key] = normalized
+  else delete theme[key]
+}
+
+/** 移动门户菜单排序，并重新归一化 sortOrder。 */
 export function movePortalMenuItem<T extends BiPortalResourceLike>(
   portal: T,
   menuKey: string | null | undefined,
   direction: 'up' | 'down',
-): T {
+): Omit<T, 'menus'> & { menus: BiPortalMenuResourceLike[] } {
   const requestedKey = menuKey?.trim() || ''
   const menus = [...(portal.menus ?? [])].map(menu => ({ ...menu }))
   const index = menus.findIndex(menu => String(menu.menuKey ?? '') === requestedKey)
@@ -5233,6 +6897,76 @@ export function movePortalMenuItem<T extends BiPortalResourceLike>(
   nextMenus[index] = nextMenus[targetIndex]
   nextMenus[targetIndex] = current
   return { ...portal, menus: normalizePortalMenuSortOrder(nextMenus) }
+}
+
+/** 更新门户菜单标题、父级和图标配置，保持菜单层级引用有效。 */
+export function updatePortalMenuConfig<T extends BiPortalResourceLike>(
+  portal: T,
+  menuKey: string | null | undefined,
+  patch: BiPortalMenuConfigPatchLike,
+): Omit<T, 'menus'> & { menus: BiPortalMenuResourceLike[] } {
+  const requestedKey = menuKey?.trim() || ''
+  const menus = [...(portal.menus ?? [])].map(menu => ({ ...menu }))
+  // 只允许设置为现存菜单且不能指向自身，避免形成无效父级。
+  const menuKeys = new Set(menus.map(menu => String(menu.menuKey ?? '')).filter(Boolean))
+  const nextMenus = menus.map(menu => {
+    if (String(menu.menuKey ?? '') !== requestedKey) return menu
+    const nextMenu = { ...menu }
+    if (patch.title != null) {
+      const title = patch.title.trim()
+      if (title) nextMenu.title = title
+    }
+    if (patch.parentMenuKey != null) {
+      const parentMenuKey = patch.parentMenuKey.trim()
+      if (parentMenuKey && parentMenuKey !== requestedKey && menuKeys.has(parentMenuKey)) {
+        nextMenu.parentMenuKey = parentMenuKey
+      } else {
+        delete nextMenu.parentMenuKey
+      }
+    }
+    if (patch.iconKey != null) {
+      // 图标属于菜单扩展配置，写入 visibility 以兼容后端 JSON 结构。
+      const visibility = {
+        ...((nextMenu.visibility && typeof nextMenu.visibility === 'object') ? nextMenu.visibility : {}),
+      }
+      const iconKey = patch.iconKey.trim()
+      if (iconKey) visibility.iconKey = iconKey
+      else delete visibility.iconKey
+      nextMenu.visibility = visibility
+    }
+    return nextMenu
+  })
+  return { ...portal, menus: nextMenus }
+}
+
+/** 按树式拖放语义重排门户菜单。before/after 会提升为同级，inside 会挂到目标菜单下。 */
+export function reorderPortalMenuTree<T extends BiPortalResourceLike>(
+  portal: T,
+  draggedMenuKey: string | null | undefined,
+  targetMenuKey: string | null | undefined,
+  position: BiPortalMenuDropPosition,
+): Omit<T, 'menus'> & { menus: BiPortalMenuResourceLike[] } {
+  const draggedKey = draggedMenuKey?.trim() || ''
+  const targetKey = targetMenuKey?.trim() || ''
+  if (!draggedKey || !targetKey || draggedKey === targetKey) {
+    return { ...portal, menus: [...(portal.menus ?? [])] }
+  }
+  const menus = [...(portal.menus ?? [])].map(menu => ({ ...menu }))
+  const draggedIndex = menus.findIndex(menu => String(menu.menuKey ?? '') === draggedKey)
+  const targetIndex = menus.findIndex(menu => String(menu.menuKey ?? '') === targetKey)
+  if (draggedIndex < 0 || targetIndex < 0) return { ...portal, menus }
+
+  const draggedMenu = { ...menus[draggedIndex] }
+  const remainingMenus = menus.filter((_, index) => index !== draggedIndex)
+  const nextTargetIndex = remainingMenus.findIndex(menu => String(menu.menuKey ?? '') === targetKey)
+  if (position === 'inside') {
+    draggedMenu.parentMenuKey = targetKey
+    remainingMenus.splice(nextTargetIndex + 1, 0, draggedMenu)
+    return { ...portal, menus: normalizePortalMenuSortOrder(remainingMenus) }
+  }
+  delete draggedMenu.parentMenuKey
+  remainingMenus.splice(position === 'before' ? nextTargetIndex : nextTargetIndex + 1, 0, draggedMenu)
+  return { ...portal, menus: normalizePortalMenuSortOrder(remainingMenus) }
 }
 
 function normalizePortalNavigationLayout(value: string): BiPortalNavigationLayout {

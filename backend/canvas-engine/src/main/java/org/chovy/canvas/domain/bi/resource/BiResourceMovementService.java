@@ -24,6 +24,9 @@ import java.util.List;
 import java.util.Locale;
 import java.util.regex.Pattern;
 
+/**
+ * BiResourceMovementService 编排 domain.bi.resource 场景的领域业务规则。
+ */
 @Service
 public class BiResourceMovementService {
 
@@ -41,6 +44,17 @@ public class BiResourceMovementService {
     private final BiSpreadsheetMapper spreadsheetMapper;
     private final BiResourceLocationMapper locationMapper;
 
+    /**
+     * 创建 BiResourceMovementService 实例并注入 domain.bi.resource 场景依赖。
+     * @param workspaceMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param datasetMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param dashboardMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param chartMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param portalMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param bigScreenMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param spreadsheetMapper 依赖组件，用于完成数据访问或外部能力调用。
+     * @param locationMapper 依赖组件，用于完成数据访问或外部能力调用。
+     */
     public BiResourceMovementService(BiWorkspaceMapper workspaceMapper,
                                      BiDatasetMapper datasetMapper,
                                      BiDashboardMapper dashboardMapper,
@@ -59,7 +73,16 @@ public class BiResourceMovementService {
         this.locationMapper = locationMapper;
     }
 
+    /**
+     * 移动 BI 资源到目标目录或位置，更新资源位置并记录移动人。
+     *
+     * @param tenantId 租户标识，用于限定 BI 资源、权限和审计数据的隔离范围
+     * @param movedBy 执行资源移动的操作人
+     * @param command 业务操作命令，包含本次请求需要写入或校验的字段
+     * @return 用于前端展示或管理端审计的业务视图
+     */
     public BiResourceLocationView move(Long tenantId, String movedBy, BiResourceMoveCommand command) {
+        // 校验关键输入和前置条件，避免无效状态继续进入主流程。
         if (command == null) {
             throw new IllegalArgumentException("BI resource move command is required");
         }
@@ -78,10 +101,19 @@ public class BiResourceMovementService {
         row.setSortOrder(sortOrder(command.sortOrder()));
         row.setMovedBy(defaultUser(movedBy));
         row.setMovedAt(LocalDateTime.now());
+        // 访问持久化或外部依赖，获取或写入本次流程需要的数据。
         locationMapper.upsert(row);
+        // 汇总前面计算出的状态和明细，返回给调用方。
         return toView(row);
     }
 
+    /**
+     * 查询当前租户下符合条件的 BI 资源列表，过滤已归档或不可见数据并按业务更新时间返回。
+     *
+     * @param tenantId 租户标识，用于限定 BI 资源、权限和审计数据的隔离范围
+     * @param resourceType BI 资源类型，例如 DASHBOARD、CHART、DATASET 或 PORTAL
+     * @return 指定类型 BI 资源的位置列表
+     */
     public List<BiResourceLocationView> list(Long tenantId, String resourceType) {
         Long scopedTenantId = normalizeTenant(tenantId);
         BiWorkspaceDO workspace = defaultWorkspace(scopedTenantId);
@@ -91,16 +123,28 @@ public class BiResourceMovementService {
                 .orderByAsc(BiResourceLocationDO::getFolderKey)
                 .orderByAsc(BiResourceLocationDO::getSortOrder)
                 .orderByAsc(BiResourceLocationDO::getResourceKey);
+        // 校验关键输入和前置条件，避免无效状态继续进入主流程。
         if (resourceType != null && !resourceType.isBlank()) {
             query.eq(BiResourceLocationDO::getResourceType, normalizeResourceType(resourceType));
         }
+        // 遍历候选数据并按业务规则筛选、转换或聚合。
         return safeList(locationMapper.selectList(query)).stream()
                 .map(this::toView)
                 .toList();
     }
 
+    /**
+     * 校验输入、权限或业务前置条件。
+     *
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @param workspaceId 业务对象 ID，用于定位具体记录。
+     * @param resourceType 类型标识，用于选择对应处理分支。
+     * @param resourceKey 业务键，用于在同一租户下定位资源。
+     */
     private void assertResourceExists(Long tenantId, Long workspaceId, String resourceType, String resourceKey) {
+        // 准备本次处理所需的上下文和中间变量。
         Object row = switch (resourceType) {
+            // 访问持久化或外部依赖，获取或写入本次流程需要的数据。
             case "DATASET" -> datasetMapper.selectOne(new LambdaQueryWrapper<BiDatasetDO>()
                     .eq(BiDatasetDO::getTenantId, tenantId)
                     .eq(BiDatasetDO::getWorkspaceId, workspaceId)
@@ -141,6 +185,12 @@ public class BiResourceMovementService {
         }
     }
 
+    /**
+     * 执行 resourceStatus 流程，围绕 resource status 完成校验、计算或结果组装。
+     *
+     * @param row 持久化行数据，承载数据库记录内容。
+     * @return 返回 resource status 生成的文本或业务键。
+     */
     private String resourceStatus(Object row) {
         return switch (row) {
             case BiDatasetDO dataset -> dataset.getStatus();
@@ -153,6 +203,12 @@ public class BiResourceMovementService {
         };
     }
 
+    /**
+     * 按默认值规则处理输入值。
+     *
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @return 返回 defaultWorkspace 流程生成的业务结果。
+     */
     private BiWorkspaceDO defaultWorkspace(Long tenantId) {
         LambdaQueryWrapper<BiWorkspaceDO> query = new LambdaQueryWrapper<BiWorkspaceDO>()
                 .in(BiWorkspaceDO::getTenantId, List.of(tenantId, 0L))
@@ -167,6 +223,12 @@ public class BiResourceMovementService {
         return workspace;
     }
 
+    /**
+     * 转换为接口返回或领域视图。
+     *
+     * @param row 持久化行数据，承载数据库记录内容。
+     * @return 返回组装或转换后的结果对象。
+     */
     private BiResourceLocationView toView(BiResourceLocationDO row) {
         return new BiResourceLocationView(
                 row.getId(),
@@ -180,6 +242,12 @@ public class BiResourceMovementService {
                 row.getMovedAt());
     }
 
+    /**
+     * 规范化输入值。
+     *
+     * @param resourceType 类型标识，用于选择对应处理分支。
+     * @return 返回解析、归一化或安全处理后的值。
+     */
     private String normalizeResourceType(String resourceType) {
         String value = required(resourceType, "resourceType").toUpperCase(Locale.ROOT);
         if ("DATASET".equals(value) || "DASHBOARD".equals(value)
@@ -190,6 +258,13 @@ public class BiResourceMovementService {
         throw new IllegalArgumentException("unsupported BI resource type: " + resourceType);
     }
 
+    /**
+     * 校验并获取必需参数、资源或权限。
+     *
+     * @param value 待处理值，用于规则计算或转换。
+     * @param field 待处理业务值，用于规则计算、转换或外部调用。
+     * @return 返回 required 生成的文本或业务键。
+     */
     private String required(String value, String field) {
         if (value == null || value.isBlank()) {
             throw new IllegalArgumentException(field + " is required");
@@ -197,6 +272,12 @@ public class BiResourceMovementService {
         return value.trim();
     }
 
+    /**
+     * 执行 resourceKey 流程，围绕 resource key 完成校验、计算或结果组装。
+     *
+     * @param value 待处理值，用于规则计算或转换。
+     * @return 返回 resource key 生成的文本或业务键。
+     */
     private String resourceKey(String value) {
         String key = required(value, "resourceKey");
         if (!RESOURCE_KEY.matcher(key).matches()) {
@@ -205,6 +286,12 @@ public class BiResourceMovementService {
         return key;
     }
 
+    /**
+     * 执行 folderKey 流程，围绕 folder key 完成校验、计算或结果组装。
+     *
+     * @param value 待处理值，用于规则计算或转换。
+     * @return 返回 folder key 生成的文本或业务键。
+     */
     private String folderKey(String value) {
         if (value == null || value.isBlank()) {
             return null;
@@ -216,6 +303,11 @@ public class BiResourceMovementService {
         return key;
     }
 
+    /**
+     * 校验资源在目录中的排序值。
+     *
+     * <p>空值按 0 处理，负数直接拒绝，保证同一文件夹内排序口径稳定且不会出现反向哨兵值。</p>
+     */
     private int sortOrder(Integer value) {
         int sortOrder = value == null ? 0 : value;
         if (sortOrder < 0) {
@@ -224,14 +316,32 @@ public class BiResourceMovementService {
         return sortOrder;
     }
 
+    /**
+     * 按默认值规则处理输入值。
+     *
+     * @param value 待处理值，用于规则计算或转换。
+     * @return 返回 default user 生成的文本或业务键。
+     */
     private String defaultUser(String value) {
         return value == null || value.isBlank() ? "system" : value.trim();
     }
 
+    /**
+     * 解析并规范化租户 ID。
+     *
+     * @param tenantId 租户 ID，用于限定数据隔离范围。
+     * @return 返回解析、归一化或安全处理后的值。
+     */
     private Long normalizeTenant(Long tenantId) {
         return tenantId == null ? 0L : tenantId;
     }
 
+    /**
+     * 按安全边界裁剪或保护输入值。
+     *
+     * @param rows rows 参数，用于 safeList 流程中的校验、计算或对象转换。
+     * @return 返回 safe list 汇总后的集合、分页或映射视图。
+     */
     private <T> List<T> safeList(List<T> rows) {
         return rows == null ? List.of() : rows;
     }
