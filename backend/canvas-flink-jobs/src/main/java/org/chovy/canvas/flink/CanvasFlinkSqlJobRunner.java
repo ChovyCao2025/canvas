@@ -36,8 +36,58 @@ public class CanvasFlinkSqlJobRunner {
         List<String> statements = new ArrayList<>();
         StringBuilder current = new StringBuilder();
         boolean inSingleQuote = false;
+        boolean inLineComment = false;
+        boolean inBlockComment = false;
+        String dollarQuoteDelimiter = null;
         for (int i = 0; i < sql.length(); i++) {
             char c = sql.charAt(i);
+            if (dollarQuoteDelimiter != null) {
+                if (startsWith(sql, i, dollarQuoteDelimiter)) {
+                    current.append(dollarQuoteDelimiter);
+                    i += dollarQuoteDelimiter.length() - 1;
+                    dollarQuoteDelimiter = null;
+                } else {
+                    current.append(c);
+                }
+                continue;
+            }
+            if (inLineComment) {
+                current.append(c);
+                if (c == '\n' || c == '\r') {
+                    inLineComment = false;
+                }
+                continue;
+            }
+            if (inBlockComment) {
+                current.append(c);
+                if (c == '*' && i + 1 < sql.length() && sql.charAt(i + 1) == '/') {
+                    current.append(sql.charAt(i + 1));
+                    i++;
+                    inBlockComment = false;
+                }
+                continue;
+            }
+            if (!inSingleQuote && c == '-' && i + 1 < sql.length() && sql.charAt(i + 1) == '-') {
+                current.append(c);
+                current.append(sql.charAt(i + 1));
+                i++;
+                inLineComment = true;
+                continue;
+            }
+            if (!inSingleQuote && c == '/' && i + 1 < sql.length() && sql.charAt(i + 1) == '*') {
+                current.append(c);
+                current.append(sql.charAt(i + 1));
+                i++;
+                inBlockComment = true;
+                continue;
+            }
+            String openingDollarQuoteDelimiter = dollarQuoteDelimiter(sql, i);
+            if (!inSingleQuote && openingDollarQuoteDelimiter != null) {
+                current.append(openingDollarQuoteDelimiter);
+                i += openingDollarQuoteDelimiter.length() - 1;
+                dollarQuoteDelimiter = openingDollarQuoteDelimiter;
+                continue;
+            }
             if (c == '\'') {
                 current.append(c);
                 if (inSingleQuote && i + 1 < sql.length() && sql.charAt(i + 1) == '\'') {
@@ -57,6 +107,27 @@ public class CanvasFlinkSqlJobRunner {
         }
         addStatement(statements, current);
         return List.copyOf(statements);
+    }
+
+    private static String dollarQuoteDelimiter(String sql, int start) {
+        if (sql.charAt(start) != '$') {
+            return null;
+        }
+        int end = sql.indexOf('$', start + 1);
+        if (end < 0) {
+            return null;
+        }
+        for (int i = start + 1; i < end; i++) {
+            char c = sql.charAt(i);
+            if (!Character.isLetterOrDigit(c) && c != '_') {
+                return null;
+            }
+        }
+        return sql.substring(start, end + 1);
+    }
+
+    private static boolean startsWith(String sql, int start, String value) {
+        return start + value.length() <= sql.length() && sql.startsWith(value, start);
     }
 
     private static void addStatement(List<String> statements, StringBuilder current) {
