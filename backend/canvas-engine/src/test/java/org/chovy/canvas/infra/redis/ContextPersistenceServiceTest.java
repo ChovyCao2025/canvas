@@ -115,8 +115,9 @@ class ContextPersistenceServiceTest {
         doThrow(new IllegalStateException("redis fail"))
                 .when(redis).execute(any(), eq(java.util.List.of("canvas:resume-lock:10:user-1")), eq("token-1"));
 
-        service.releaseResumeLock(10L, "user-1", "token-1");
+        boolean released = service.releaseResumeLock(10L, "user-1", "token-1");
 
+        assertThat(released).isFalse();
         verify(redis, never()).delete("canvas:resume-lock:10:user-1");
     }
 

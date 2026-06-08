@@ -303,19 +303,20 @@ public class ContextPersistenceService {
      * <p>只有当锁的 value 等于 {@code token} 时才执行 DEL，防止锁过期后被其他机器重新获取，
      * 而本机因执行延迟才来释放，错误删除他机的锁。
      *
-     * @param token 获锁时传入的 instanceId，null 时降级为无校验 DEL（兜底）
+     * @param token 获锁时传入的 instanceId；为空时不会释放锁
+     * @return true 表示当前 token 匹配且锁已释放
      */
-    public void releaseResumeLock(Long canvasId, String userId, String token) {
-        String key = keys.resumeLock(canvasId, userId);
-        if (token == null) {
-            // 历史调用未传 token 时只能降级直接删除；新路径应优先走 Lua 校验释放。
-            redis.delete(key);
-            return;
+    public boolean releaseResumeLock(Long canvasId, String userId, String token) {
+        if (!hasText(token)) {
+            return false;
         }
+        String key = keys.resumeLock(canvasId, userId);
         try {
-            redis.execute(RESUME_LOCK_RELEASE_SCRIPT, List.of(key), token);
+            Long released = redis.execute(RESUME_LOCK_RELEASE_SCRIPT, List.of(key), token);
+            return Long.valueOf(1L).equals(released);
         } catch (Exception e) {
             log.warn("[CTX] resumeLock Lua 释放失败，保留锁等待 TTL 过期 key={}: {}", key, e.getMessage());
+            return false;
         }
     }
 
