@@ -423,7 +423,17 @@ public class TieredCacheImpl<K, V> implements TieredCache<K, V> {
         }
         if (!misses.isEmpty()) {
             // batchLoader 只接收真正 miss 的 key，减少下游数据库或远程服务压力。
-            Map<K, V> loaded = batchLoader.apply(List.copyOf(misses));
+            Map<K, V> loaded;
+            try {
+                loaded = batchLoader.apply(List.copyOf(misses));
+            } catch (Exception e) {
+                for (K key : misses) {
+                    Optional<V> optional = handleLoaderFailure(key, staleFor(key), e);
+                    putL1WithCurrentVersion(key, optional);
+                    result.put(key, optional);
+                }
+                return result;
+            }
             if (loaded == null) {
                 loaded = Map.of();
             }
@@ -724,19 +734,23 @@ public class TieredCacheImpl<K, V> implements TieredCache<K, V> {
             rememberStale(key, value);
             return Optional.ofNullable(value);
         } catch (Exception e) {
-            increment(loaderFailures);
-            localLoaderFailures.increment();
-            Optional<V> stale = staleFor(key);
-            if (useStaleOnError() && stale.isPresent()) {
-                // 读路径优先保护可用性：启用 stale 策略时，加载失败可返回最近一次成功值。
-                return stale;
-            }
-            return switch (loaderFailure) {
-                case THROW -> throw asRuntime(e);
-                case RETURN_STALE -> staleValue != null ? staleValue : Optional.empty();
-                case RETURN_EMPTY -> Optional.empty();
-            };
+            return handleLoaderFailure(key, staleValue, e);
         }
+    }
+
+    private Optional<V> handleLoaderFailure(K key, Optional<V> staleValue, Exception e) {
+        increment(loaderFailures);
+        localLoaderFailures.increment();
+        Optional<V> stale = staleFor(key);
+        if (useStaleOnError() && stale.isPresent()) {
+            // 读路径优先保护可用性：启用 stale 策略时，加载失败可返回最近一次成功值。
+            return stale;
+        }
+        return switch (loaderFailure) {
+            case THROW -> throw asRuntime(e);
+            case RETURN_STALE -> staleValue != null ? staleValue : Optional.empty();
+            case RETURN_EMPTY -> Optional.empty();
+        };
     }
 
     /**

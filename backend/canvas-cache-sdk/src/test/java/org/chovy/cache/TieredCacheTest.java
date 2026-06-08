@@ -31,6 +31,7 @@ import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 import org.chovy.cache.strategy.AvalancheProtectionStrategy;
 import org.chovy.cache.strategy.BreakdownProtectionStrategy;
+import org.chovy.cache.strategy.LoaderFailureStrategy;
 import org.chovy.cache.strategy.PenetrationProtectionStrategy;
 
 /**
@@ -320,6 +321,44 @@ class TieredCacheTest {
         Map<Integer, Optional<SampleValue>> result = cache.getAll(List.of(1), missing -> null);
 
         assertThat(result).containsEntry(1, Optional.empty());
+    }
+
+    @Test
+    void getAllReturnsEmptyWhenBatchLoaderFailsAndStrategyReturnsEmpty() {
+        when(values.get("sample:v1:1")).thenReturn(null);
+        TieredCache<Integer, SampleValue> cache = TieredCacheBuilder.<Integer, SampleValue>builder()
+                .name("sample")
+                .l2KeyPrefix("sample:")
+                .onLoaderFailure(LoaderFailureStrategy.RETURN_EMPTY)
+                .loader(key -> new SampleValue("unused"))
+                .valueType(SampleValue.class)
+                .build(manager);
+
+        Map<Integer, Optional<SampleValue>> result = cache.getAll(List.of(1), missing -> {
+            throw new IllegalStateException("db down");
+        });
+
+        assertThat(result).containsEntry(1, Optional.empty());
+    }
+
+    @Test
+    void getAllReturnsStaleValueWhenBatchLoaderFailsAndStaleOnErrorIsEnabled() {
+        when(values.get("sample:v1:88")).thenReturn(null);
+        TieredCache<Integer, SampleValue> cache = TieredCacheBuilder.<Integer, SampleValue>builder()
+                .name("sample")
+                .l2KeyPrefix("sample:")
+                .avalanche(AvalancheProtectionStrategy.STALE_ON_ERROR)
+                .loader(key -> new SampleValue("unused"))
+                .valueType(SampleValue.class)
+                .build(manager);
+        cache.put(88, new SampleValue("stale"));
+        cache.invalidate(88);
+
+        Map<Integer, Optional<SampleValue>> result = cache.getAll(List.of(88), missing -> {
+            throw new IllegalStateException("db down");
+        });
+
+        assertThat(result).containsEntry(88, Optional.of(new SampleValue("stale")));
     }
 
     @Test
