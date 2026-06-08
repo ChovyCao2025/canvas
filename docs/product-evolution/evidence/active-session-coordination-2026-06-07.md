@@ -106,15 +106,20 @@ Current focused implementation evidence:
     `CdpWarehouseJobLeaseService`.
   - Official Maven focused test command for the P2-087/P2-088/control-plane
     classes.
-  - Latest Maven result: 76 tests run, 0 failures, 0 errors, build success.
+  - Latest Maven result on 2026-06-08: 78 tests run, 0 failures, 0 errors,
+    build success.
+  - `HttpMarketingIntegrationContractProbeClientTest` now avoids binding a
+    local loopback server by injecting a stub `HttpClient`; this keeps focused
+    verification runnable in environments where local server binds fail with
+    `Operation not permitted`.
 - Focused frontend verification has passed for:
   - `frontend/src/pages/marketing-platform/marketingPlatformControlPlane.test.ts`
   - `frontend/src/pages/marketing-platform/index.test.tsx`
   - `frontend/src/services/marketingPlatformApi.test.ts`
-  - Latest result: 3 test files passed, 11 tests passed.
+  - Latest result on 2026-06-08: 3 test files passed, 11 tests passed.
   - `npx vite build`
-  - Latest Vite result: production bundle built successfully, including
-    `marketing-platform-*.js`.
+  - Latest Vite result on 2026-06-08: production bundle built successfully,
+    including `marketing-platform-*.js`.
 
 This does not prove full repository build readiness. The main worktree has many
 unrelated dirty and untracked changes, and full builds are known to be affected

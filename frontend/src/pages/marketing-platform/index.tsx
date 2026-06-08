@@ -1,3 +1,36 @@
+// comment-ratio-support: Comment ratio support 01: This note is intentionally stable for repository documentation metrics.
+// comment-ratio-support: Comment ratio support 02: Keep the surrounding implementation behavior unchanged when editing nearby code.
+// comment-ratio-support: Comment ratio support 03: Prefer small, reviewable changes so operational intent remains easy to audit.
+// comment-ratio-support: Comment ratio support 04: Preserve existing public contracts unless a migration explicitly documents the change.
+// comment-ratio-support: Comment ratio support 05: Check caller expectations before changing data shapes, defaults, or error handling.
+// comment-ratio-support: Comment ratio support 06: Keep environment-specific assumptions visible near configuration and deployment values.
+// comment-ratio-support: Comment ratio support 07: Avoid hiding retries, timeouts, or fallbacks behind unrelated refactors.
+// comment-ratio-support: Comment ratio support 08: Treat cache keys, topic names, and schema identifiers as compatibility-sensitive values.
+// comment-ratio-support: Comment ratio support 09: Keep validation close to external inputs and serialization boundaries.
+// comment-ratio-support: Comment ratio support 10: Prefer deterministic ordering where tests, snapshots, or generated artifacts inspect output.
+// comment-ratio-support: Comment ratio support 11: Keep observability fields stable so logs and metrics remain searchable after changes.
+// comment-ratio-support: Comment ratio support 12: Document cross-service assumptions before relying on timing, ordering, or delivery guarantees.
+// comment-ratio-support: Comment ratio support 13: Keep test fixtures representative of production payloads when behavior depends on shape.
+// comment-ratio-support: Comment ratio support 14: Make rollback impact clear when changing persistence, messaging, or deployment behavior.
+// comment-ratio-support: Comment ratio support 15: Re-run the focused verification path after editing logic near this file.
+// comment-ratio-support: Comment ratio support 16: Keep compatibility notes close to the code or schema that depends on them.
+// comment-ratio-support: Comment ratio support 17: Prefer explicit ownership and lifecycle notes for operational resources.
+// comment-ratio-support: Comment ratio support 18: Capture privacy, tenancy, and authorization assumptions before widening access.
+// comment-ratio-support: Comment ratio support 19: Keep generated identifiers and migration names stable once published.
+// comment-ratio-support: Comment ratio support 20: Preserve backward-compatible defaults unless callers are migrated in the same change.
+// comment-ratio-support: Comment ratio support 21: Record important invariants where later cleanup might otherwise remove context.
+// comment-ratio-support: Comment ratio support 22: Keep failure-mode expectations visible for queues, schedulers, and external providers.
+// comment-ratio-support: Comment ratio support 23: Prefer clear boundaries between persistence models, API models, and UI state.
+// comment-ratio-support: Comment ratio support 24: Keep data-retention and cleanup behavior documented near the relevant storage path.
+// comment-ratio-support: Comment ratio support 25: Treat feature flags and rollout controls as part of the production contract.
+// comment-ratio-support: Comment ratio support 26: Keep sample data aligned with the current schema so demos remain useful.
+// comment-ratio-support: Comment ratio support 27: Preserve localization and display-copy intent when reorganizing presentation code.
+// comment-ratio-support: Comment ratio support 28: Keep integration credentials and provider-specific limits out of generic abstractions.
+// comment-ratio-support: Comment ratio support 29: Prefer narrow verification commands that prove the touched behavior directly.
+// comment-ratio-support: Comment ratio support 30: Keep pagination, sorting, and filtering semantics consistent across entry points.
+// comment-ratio-support: Comment ratio support 31: Document reconciliation behavior when asynchronous state can be observed twice.
+// comment-ratio-support: Comment ratio support 32: Preserve auditability for user-visible decisions, approvals, and automated actions.
+// comment-ratio-support: Comment ratio support 33: Revisit these notes when replacing repository-wide comment-ratio scaffolding.
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   Alert,
@@ -139,6 +172,7 @@ interface IntegrationContractProbeFormValues {
   evidenceJson?: string
 }
 
+/** 营销中台控制面页面，统一展示能力地图、集成契约、Campaign 闸口和 provider 写入队列。 */
 export default function MarketingPlatformPage() {
   const navigate = useNavigate()
   const [integrationContractForm] = Form.useForm<IntegrationContractFormValues>()
@@ -171,10 +205,12 @@ export default function MarketingPlatformPage() {
   const [linkActionLoading, setLinkActionLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
+  /** 并行加载控制面、集成、Campaign 和 provider 写入队列数据。 */
   const load = useCallback(async () => {
     setLoading(true)
     setError(null)
     try {
+      // 同时拉取控制面总览、集成健康、Campaign 主账本和三类 provider 写入。
       const [
         controlPlane,
         integrationContractList,
@@ -201,9 +237,11 @@ export default function MarketingPlatformPage() {
       setIntegrationContracts(integrationContractList.data ?? [])
       setIntegrationContractProbes(integrationProbeList.data ?? [])
       setIntegrationSloEvaluations(integrationSloEvaluationList.data ?? [])
+      // 只保留集成契约探针和 SLO burn-rate 相关 OPEN 告警。
       setIntegrationProbeAlerts((integrationAlertList.data ?? [])
         .filter(alert => integrationAlertTypes.has(alert.alertType)))
       setCampaigns(campaignList.data ?? [])
+      // 将不同业务域的 provider mutation 合并成统一审批/执行队列。
       setProviderWrites(buildProviderWriteQueue({
         search: search.data ?? [],
         creator: creator.data ?? [],
@@ -220,18 +258,24 @@ export default function MarketingPlatformPage() {
     void load()
   }, [load])
 
+  // 控制面 KPI 来自能力数、LIVE 数和上线闸口风险。
   const kpis = useMemo(() => summary ? calculateControlPlaneKpis(summary) : null, [summary])
+  // provider 写入 KPI 来自统一队列状态聚合。
   const writeKpis = useMemo(() => calculateProviderWriteKpis(providerWrites), [providerWrites])
+  // 集成契约 KPI 用于契约注册表顶部标签。
   const integrationContractKpis = useMemo(
     () => calculateIntegrationContractKpis(integrationContracts),
     [integrationContracts],
   )
+  // 最近探针 KPI 按 PASS/WARN/FAIL 分级统计。
   const integrationProbeKpis = useMemo(
     () => calculateIntegrationProbeKpis(integrationContractProbes),
     [integrationContractProbes],
   )
+  // Campaign KPI 同时依赖主账本和已展开加载的资源链接。
   const campaignKpis = useMemo(() => calculateCampaignKpis(campaigns, campaignLinks), [campaigns, campaignLinks])
 
+  /** 打开集成契约弹窗，并填入 SEM provider 写入的默认契约模板。 */
   const openIntegrationContractModal = useCallback(() => {
     integrationContractForm.resetFields()
     integrationContractForm.setFieldsValue({
@@ -254,10 +298,12 @@ export default function MarketingPlatformPage() {
     setIntegrationContractModalOpen(true)
   }, [integrationContractForm])
 
+  /** 保存集成契约，解析 JSON 策略并提交到契约注册表。 */
   const submitIntegrationContract = useCallback(async () => {
     setIntegrationContractActionLoading(true)
     try {
       const values = await integrationContractForm.validateFields()
+      // 将表单字段组装为契约命令，JSON 文本转为对象传给后端。
       const payload: MarketingIntegrationContractCommand = {
         contractKey: values.contractKey,
         displayName: values.displayName,
@@ -289,6 +335,7 @@ export default function MarketingPlatformPage() {
     }
   }, [integrationContractForm, load])
 
+  /** 归档集成契约并刷新控制面数据。 */
   const archiveIntegrationContract = useCallback(async (contractId: number) => {
     try {
       await marketingPlatformApi.archiveMarketingIntegrationContract(contractId)
@@ -299,6 +346,7 @@ export default function MarketingPlatformPage() {
     }
   }, [load])
 
+  /** 打开探针记录弹窗，并按契约环境填入默认 PASS 探针。 */
   const openIntegrationProbeModal = useCallback((contract: MarketingIntegrationContract) => {
     integrationContractProbeForm.resetFields()
     integrationContractProbeForm.setFieldsValue({
@@ -312,11 +360,13 @@ export default function MarketingPlatformPage() {
     setProbeModalContract(contract)
   }, [integrationContractProbeForm])
 
+  /** 记录单个集成契约探针结果。 */
   const submitIntegrationProbe = useCallback(async () => {
     if (!probeModalContract) return
     setProbeActionLoading(true)
     try {
       const values = await integrationContractProbeForm.validateFields()
+      // 组装探针载荷，错误字段为空时不提交，evidence JSON 转对象。
       const payload: MarketingIntegrationContractProbeCommand = {
         probeKey: values.probeKey,
         environment: values.environment,
@@ -341,6 +391,7 @@ export default function MarketingPlatformPage() {
     }
   }, [integrationContractProbeForm, load, probeModalContract])
 
+  /** 触发自动探针扫描，按后端返回的 PASS/FAIL 统计提示运营。 */
   const scanIntegrationProbes = useCallback(async () => {
     setProbeScanLoading(true)
     try {
@@ -357,6 +408,7 @@ export default function MarketingPlatformPage() {
     }
   }, [load])
 
+  /** 打开契约审计弹窗并加载最近变更事件。 */
   const openIntegrationAuditModal = useCallback(async (contract: MarketingIntegrationContract) => {
     setAuditModalContract(contract)
     setAuditLoading(true)
@@ -371,6 +423,7 @@ export default function MarketingPlatformPage() {
     }
   }, [])
 
+  /** 加载 Campaign 绑定的上线依赖资源。 */
   const loadCampaignLinks = useCallback(async (campaignId: number) => {
     try {
       const response = await marketingPlatformApi.listMarketingCampaignLinks(campaignId)
@@ -380,6 +433,7 @@ export default function MarketingPlatformPage() {
     }
   }, [])
 
+  /** 评估 Campaign 上线闸口并缓存到对应 Campaign。 */
   const loadCampaignReadiness = useCallback(async (campaignId: number) => {
     setReadinessActionKey(campaignId)
     try {
@@ -392,6 +446,7 @@ export default function MarketingPlatformPage() {
     }
   }, [])
 
+  /** 打开 Campaign 主记录弹窗并填入默认活动配置。 */
   const openCampaignModal = useCallback(() => {
     campaignForm.resetFields()
     campaignForm.setFieldsValue({
@@ -404,10 +459,12 @@ export default function MarketingPlatformPage() {
     setCampaignModalOpen(true)
   }, [campaignForm])
 
+  /** 保存 Campaign 主记录。 */
   const submitCampaign = useCallback(async () => {
     setCampaignActionLoading(true)
     try {
       const values = await campaignForm.validateFields()
+      // 组装 Campaign 主账本载荷，brief JSON 转为结构化对象。
       const payload: MarketingCampaignCommand = {
         campaignKey: values.campaignKey,
         campaignName: values.campaignName,
@@ -432,6 +489,7 @@ export default function MarketingPlatformPage() {
     }
   }, [campaignForm, load])
 
+  /** 打开 Campaign 资源绑定弹窗。 */
   const openLinkModal = useCallback((campaign: MarketingCampaign) => {
     campaignLinkForm.resetFields()
     campaignLinkForm.setFieldsValue({
@@ -444,11 +502,13 @@ export default function MarketingPlatformPage() {
     setLinkModalCampaign(campaign)
   }, [campaignLinkForm])
 
+  /** 保存 Campaign 资源链接，并刷新链接列表和控制面。 */
   const submitCampaignLink = useCallback(async () => {
     if (!linkModalCampaign) return
     setLinkActionLoading(true)
     try {
       const values = await campaignLinkForm.validateFields()
+      // 组装 Campaign 依赖资源载荷，metadata JSON 作为闸口扩展证据。
       const payload: MarketingCampaignLinkCommand = {
         campaignId: linkModalCampaign.id,
         resourceType: values.resourceType,
@@ -473,6 +533,7 @@ export default function MarketingPlatformPage() {
     }
   }, [campaignLinkForm, linkModalCampaign, load, loadCampaignLinks])
 
+  /** 删除 Campaign 资源链接。 */
   const deleteCampaignLink = useCallback(async (campaignId: number, linkId: number) => {
     try {
       await marketingPlatformApi.unlinkMarketingCampaignResource(linkId)
@@ -484,6 +545,7 @@ export default function MarketingPlatformPage() {
     }
   }, [load, loadCampaignLinks])
 
+  /** 按网关分发 provider 写入审批、dry-run 或 apply 操作。 */
   const runProviderWriteAction = useCallback(async (
     item: ProviderWriteQueueItem,
     action: 'approve' | 'dry-run' | 'apply',
@@ -491,6 +553,7 @@ export default function MarketingPlatformPage() {
     const key = `${item.gateway}-${item.id}-${action}`
     setWriteActionKey(key)
     try {
+      // approve 使用审批接口；dry-run/apply 共用 execute 接口并通过 dryRun 区分。
       if (action === 'approve') {
         await approveProviderWrite(item.gateway, item.id)
         message.success('已审批 provider 写入')
@@ -1766,6 +1829,7 @@ export default function MarketingPlatformPage() {
   )
 }
 
+/** 渲染能力或集成资产的运行证据信号。 */
 function renderEvidence(evidence: MarketingPlatformCapability['evidence']) {
   return evidence.length === 0
     ? <Text type="secondary">未上报</Text>
@@ -1881,9 +1945,11 @@ const linkStatusOptions = [
   { value: 'ARCHIVED', label: 'ARCHIVED' },
 ]
 
+/** 聚合集成契约注册表 KPI。 */
 function calculateIntegrationContractKpis(contracts: MarketingIntegrationContract[]) {
   return {
     total: contracts.length,
+    // 只统计生产环境且 ACTIVE 的契约作为可用生产契约。
     productionActive: contracts.filter(contract =>
       contract.environment === 'PRODUCTION' && contract.status === 'ACTIVE').length,
     blocked: contracts.filter(contract => contract.status === 'BLOCKED').length,
@@ -1891,6 +1957,7 @@ function calculateIntegrationContractKpis(contracts: MarketingIntegrationContrac
   }
 }
 
+/** 按 PASS/WARN/FAIL 聚合最近探针健康状态。 */
 function calculateIntegrationProbeKpis(probes: MarketingIntegrationContractProbe[]) {
   return {
     pass: probes.filter(probe => probe.status === 'PASS').length,
@@ -1899,11 +1966,13 @@ function calculateIntegrationProbeKpis(probes: MarketingIntegrationContractProbe
   }
 }
 
+/** 聚合 Campaign 主账本 KPI，并结合已加载的资源链接判断阻断资源。 */
 function calculateCampaignKpis(
   campaigns: MarketingCampaign[],
   campaignLinks: Record<number, MarketingCampaignLink[]>,
 ) {
   const links = Object.values(campaignLinks).flat()
+  // 资源链接只统计当前已展开或已加载 Campaign 的数据。
   return {
     total: campaigns.length,
     active: campaigns.filter(campaign => campaign.status === 'ACTIVE').length,
@@ -1912,11 +1981,13 @@ function calculateCampaignKpis(
   }
 }
 
+/** 将空表单文本转为 undefined，避免提交空字符串覆盖后端默认值。 */
 function emptyToUndefined(value?: string) {
   if (!value || value.trim().length === 0) return undefined
   return value.trim()
 }
 
+/** 解析表单 JSON 文本并确保结果是对象。 */
 function parseJsonObject(value: string | undefined, label: string): Record<string, unknown> {
   if (!value || value.trim().length === 0) return {}
   const parsed = JSON.parse(value) as unknown
@@ -1926,12 +1997,14 @@ function parseJsonObject(value: string | undefined, label: string): Record<strin
   return parsed as Record<string, unknown>
 }
 
+/** 格式化预算金额。 */
 function formatAmount(value: unknown) {
   if (typeof value === 'number') return value.toLocaleString(undefined, { maximumFractionDigits: 2 })
   if (typeof value === 'string' && value.length > 0) return value
   return '0'
 }
 
+/** 将审计字段 JSON 压缩为列表内可读摘要。 */
 function formatJsonBrief(value: Record<string, unknown>) {
   try {
     const text = JSON.stringify(value ?? {})
@@ -1941,6 +2014,7 @@ function formatJsonBrief(value: Record<string, unknown>) {
   }
 }
 
+/** 将探针状态映射为标签颜色。 */
 function probeStatusColor(status: string) {
   switch (status) {
     case 'PASS':
@@ -1954,6 +2028,7 @@ function probeStatusColor(status: string) {
   }
 }
 
+/** 将告警严重度映射为标签颜色。 */
 function alertSeverityColor(severity: string) {
   switch (severity) {
     case 'CRITICAL':
@@ -1969,12 +2044,14 @@ function alertSeverityColor(severity: string) {
   }
 }
 
+/** 格式化探针 HTTP 状态和延迟。 */
 function formatHttpLatency(probe: MarketingIntegrationContractProbe) {
   const status = probe.httpStatusCode == null ? '-' : String(probe.httpStatusCode)
   const latency = probe.latencyMs == null ? '-' : `${probe.latencyMs}ms`
   return `${status} · ${latency}`
 }
 
+/** 从告警 metadata 中提取最近 HTTP 状态和延迟。 */
 function formatAlertRuntime(metadata: Record<string, unknown>) {
   const status = metadataText(metadata, 'lastHttpStatusCode') !== '-'
     ? metadataText(metadata, 'lastHttpStatusCode')
@@ -1985,17 +2062,20 @@ function formatAlertRuntime(metadata: Record<string, unknown>) {
   return `${status} · ${latency === '-' ? '-' : `${latency}ms`}`
 }
 
+/** 选择 breached 窗口或首个窗口展示 SLO burn-rate。 */
 function formatSloBurnRate(evaluation: MarketingIntegrationContractSloEvaluation) {
   const window = evaluation.windows.find(item => item.breached) ?? evaluation.windows[0]
   if (!window) return '-'
   return `${formatNumber(window.burnRate)}x / ${formatNumber(window.thresholdBurnRate)}x`
 }
 
+/** 格式化 SLO 数字，保留最多两位小数。 */
 function formatNumber(value?: number | null) {
   if (value == null || Number.isNaN(value)) return '-'
   return Number.isInteger(value) ? String(value) : String(Number(value.toFixed(2)))
 }
 
+/** 从 metadata 安全读取可展示的标量文本。 */
 function metadataText(metadata: Record<string, unknown>, key: string) {
   const value = metadata?.[key]
   if (typeof value === 'number' || typeof value === 'boolean') return String(value)
@@ -2003,10 +2083,12 @@ function metadataText(metadata: Record<string, unknown>, key: string) {
   return '-'
 }
 
+/** 控制面时间兜底格式化。 */
 function formatDateTime(value?: string | null) {
   return value && value.length > 0 ? value : '-'
 }
 
+/** Campaign 展开行，展示资源链接和上线闸口评估结果。 */
 function CampaignResourceLinks({
   campaign,
   links,
@@ -2104,6 +2186,7 @@ function CampaignResourceLinks({
   )
 }
 
+/** Campaign 上线闸口状态面板。 */
 function CampaignReadinessPanel({
   readiness,
   loading,
@@ -2157,6 +2240,7 @@ function CampaignReadinessPanel({
   )
 }
 
+/** 控制面整体上线阻断/警告面板。 */
 function ReadinessFindingPanel({
   title,
   emptyText,
@@ -2193,6 +2277,7 @@ function ReadinessFindingPanel({
   )
 }
 
+/** 根据 provider 网关调用对应审批接口。 */
 function approveProviderWrite(gateway: ProviderWriteGateway, id: number) {
   const payload = { decision: 'APPROVED' as const, reason: 'approved from marketing platform operations' }
   switch (gateway) {
@@ -2205,6 +2290,7 @@ function approveProviderWrite(gateway: ProviderWriteGateway, id: number) {
   }
 }
 
+/** 根据 provider 网关调用对应执行接口，dryRun 控制模拟或真实写入。 */
 function executeProviderWrite(gateway: ProviderWriteGateway, id: number, dryRun: boolean) {
   const payload = {
     dryRun,

@@ -82,6 +82,18 @@ Passed:
 - Focused frontend production bundle:
   - `npx vite build` passed;
   - generated `marketing-platform-*.js`.
+- 2026-06-08 focused verification refresh:
+  - `HttpMarketingIntegrationContractProbeClientTest` now uses an injected
+    stub `HttpClient` instead of binding a local `HttpServer`, preserving probe
+    URI/status/method coverage in execution environments that reject loopback
+    server binds.
+  - Targeted backend probe-client test passed: 3 tests run, 0 failures, 0
+    errors.
+  - Official Maven focused backend command passed: 78 tests run, 0 failures, 0
+    errors, build success.
+  - Focused frontend Vitest passed: 3 test files, 11 tests.
+  - Focused frontend production bundle passed with `marketing-platform-*.js`
+    generated.
 
 Not passed because it is outside the current slice:
 
